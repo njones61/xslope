@@ -14422,6 +14422,148 @@ def test_a_member_overlay_claims_no_force_it_was_not_given():
     return fails
 
 
+#: The overlay's magenta, read off the drawn artists rather than restated: the
+#: colour ``plot_reinforcement_forces`` draws its "At residual" class in.
+_RESIDUAL_RGBA = (1.0, 0.0, 1.0, 0.9)
+
+
+def _overlay_render(bundle, field_state, solution=None):
+    """The finite element results figure for one bundle at one field state.
+
+    ``solution`` replaces the bundle's converged field, which is how a check
+    puts a state the sample never reached in front of the drawing code.
+    """
+    import matplotlib.figure as mplfig
+    from xslope.plot_fem import plot_fem_results
+    from xslope.report import FEM_PANELS
+
+    fig = mplfig.Figure(figsize=(7.0, 8.0))
+    with contextlib.redirect_stdout(io.StringIO()):
+        plot_fem_results(bundle["fem_data"],
+                         bundle["solution"] if solution is None else solution,
+                         plot_type=[p for p, _c, _s in FEM_PANELS], fig=fig,
+                         failure_solution=bundle.get("failure_solution"),
+                         field_state=field_state, show_title=False)
+    return fig
+
+
+def _overlay_legend(fig):
+    labels = []
+    for ax in fig.axes:
+        labels += ax.get_legend_handles_labels()[1]
+    return labels
+
+
+def _residual_segments(fig):
+    """How many member elements the figure drew as "at residual" — counted off
+    the magenta collections themselves, so the count is what reaches the page."""
+    import numpy as np
+    from matplotlib.collections import LineCollection
+
+    n = 0
+    for ax in fig.axes:
+        for coll in ax.collections:
+            if not isinstance(coll, LineCollection):
+                continue
+            colors = np.asarray(coll.get_colors())
+            if len(colors) == 1 and np.allclose(colors[0], _RESIDUAL_RGBA):
+                n += len(coll.get_segments())
+    return n
+
+
+def test_the_member_overlay_marks_the_state_the_solver_recorded():
+    """The overlay's "At residual" is the softening latch, not the yield latch.
+
+    The solver keeps two: ``failed_1d_elements``, set for reporting the moment
+    an element reaches the capacity it was given, and ``softened_1d_elements``,
+    set when an element DROPS off that capacity onto its residual. The overlay
+    classified from the first, so the reinforcement sample's at-failure figure —
+    where forty-five elements are holding their full 800 and not one has
+    softened — printed "At residual (Tres)" in magenta over most of the bars.
+    They were at Tmax. Softening is the mark; an element at its peak rides the
+    force ramp at the colour its force earns.
+
+    Pinned in both fields of the sample, because they differ: the converged
+    field has five back-end elements that softened with nothing left to hold and
+    are marked pulled out, and the at-failure field has none.
+    """
+    fails = []
+    import numpy as np
+    import xslope.plot_fem as plot_fem_mod
+
+    _sd, solutions = _restored(FEM_REINF_XLSX)
+    bundle = solutions.get("fem")
+    if not bundle:
+        return ["the reinforcement sample ships no finite element solution"]
+    fem_data = bundle["fem_data"]
+    converged, failure = bundle["solution"], bundle.get("failure_solution")
+    if failure is None:
+        return ["the reinforcement sample carries no at-failure snapshot, so "
+                "the two fields this check compares are one field"]
+
+    n_1d = len(fem_data["elements_1d"])
+    t_res = np.asarray(fem_data["t_res_by_1d_elem"], dtype=float)
+
+    def counts(solution):
+        """(softened onto a residual, softened with nothing left) — what the
+        figure should mark, read off the solver's own arrays."""
+        soft = np.asarray(solution.get("softened_1d_elements",
+                                       np.zeros(n_1d, bool)), dtype=bool)
+        force = np.asarray(solution.get("forces_1d", np.zeros(n_1d)), dtype=float)
+        pulled = soft & (t_res < 1e-6) & (force < 1e-6)
+        return int((soft & ~pulled).sum()), int(pulled.sum())
+
+    # The sample's own two fields.
+    for state, solution in (("failure", failure), ("converged", converged)):
+        residual, pulled = counts(solution)
+        fig = _overlay_render(bundle, state)
+        legend = _overlay_legend(fig)
+        drawn = _residual_segments(fig)
+        if drawn != residual:
+            fails.append(f"at the {state} field {residual} element(s) softened "
+                         f"onto a residual and the figure marks {drawn}")
+        if ("At residual (Tres)" in legend) != (residual > 0):
+            fails.append(f"at the {state} field the legend {'names' if residual else 'does not name'} "
+                         f"a residual state that {residual} element(s) are in: {legend}")
+        if ("Pulled out" in legend) != (pulled > 0):
+            fails.append(f"at the {state} field the legend disagrees with the "
+                         f"{pulled} pulled-out element(s): {legend}")
+
+    # The class itself, put in front of the drawing code: one element softened
+    # onto a residual it can still hold is marked, and one that has merely
+    # reached its peak is not.
+    soft = np.zeros(n_1d, dtype=bool)
+    holds = np.where((t_res > 1e-6)
+                     & (np.asarray(failure["forces_1d"]) > 1e-6))[0]
+    if len(holds) < 2:
+        fails.append("the sample has no element carrying force against a "
+                     "residual capacity, so the marked class cannot be pinned")
+        return fails
+    soft[holds[0]] = True
+    synthetic = dict(failure, softened_1d_elements=soft,
+                     failed_1d_elements=np.ones(n_1d, dtype=bool))
+    fig = _overlay_render(dict(bundle, failure_solution=None), "converged",
+                          solution=synthetic)
+    if _residual_segments(fig) != 1:
+        fails.append(f"one softened element with a residual left to hold is "
+                     f"drawn as {_residual_segments(fig)} residual segments, "
+                     f"with every other element latched as yielded")
+
+    # Mutation: the yield latch put back where the softening latch belongs. The
+    # at-failure field is the case it was wrong on — nothing there has softened,
+    # and everything has yielded.
+    real = plot_fem_mod._elem_flags
+    plot_fem_mod._elem_flags = (
+        lambda solution, key, n: real(solution, "failed_1d_elements", n))
+    try:
+        if not _residual_segments(_overlay_render(bundle, "failure")):
+            fails.append("classifying from the yield latch marks nothing at "
+                         "failure either; the reclassification is not pinned")
+    finally:
+        plot_fem_mod._elem_flags = real
+    return fails
+
+
 def _detail_profiles_exist(slope_data, bundle, kind):
     """Whether the run owns member profiles at all — so a subsection's silence
     can be told apart from a model with no member in it."""
@@ -17187,6 +17329,8 @@ CHECKS = [
      test_the_factor_of_safety_is_defined_as_a_ratio),
     ("the reinforcement direction is named as its column prints it",
      test_the_reinforcement_direction_is_named_as_the_column_prints_it),
+    ("the member overlay marks the state the solver recorded",
+     test_the_member_overlay_marks_the_state_the_solver_recorded),
     ("the shared-model plot", test_shared_plot),
     ("every profile line names its material",
      test_profile_lines_name_their_materials),

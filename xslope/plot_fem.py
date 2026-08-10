@@ -1901,6 +1901,20 @@ PILE_GEOMETRY_LABEL = 'Pile line'
 _GEOMETRY_MEMBER_COLOR = '#BBBBBB'
 
 
+def _elem_flags(solution, key, n):
+    """A per-1D-element boolean array from ``solution``, length ``n``.
+
+    A solution that never recorded the flag, or recorded it at some other
+    length, yields all-False: the state is unknown, and an unknown state is one
+    the figure does not mark.
+    """
+    values = (solution or {}).get(key)
+    if values is None:
+        return np.zeros(n, dtype=bool)
+    values = np.asarray(values, dtype=bool)
+    return values if values.shape == (n,) else np.zeros(n, dtype=bool)
+
+
 def _member_forces_in_solution(solution, key):
     """Whether ``solution`` actually carries the solved force array ``key``.
 
@@ -1923,9 +1937,19 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
 
     Color scheme:
     - Blue to green to yellow to red: 0 to Tmax (tension force ramp)
-    - Magenta: element has yielded and is at residual capacity Tres
-    - White/open with dashed outline: element has pulled out (broken, T=0)
-    - Gray: element carrying no tension (inactive or in compression)
+    - Magenta: element has softened to its residual capacity Tres
+    - Black: element has pulled out — softened with no residual left, carrying
+      nothing
+    - Green: element carrying no tension (inactive or in compression)
+
+    The two marked states are read from ``softened_1d_elements``, the array the
+    solver sets when an element DROPS to its residual capacity. An element that
+    has reached its peak capacity and is holding there is a different thing: it
+    is at Tmax, not at Tres, and it rides the force ramp at the color its force
+    earns. Classifying from ``failed_1d_elements`` instead — the yield latch,
+    which the solver sets for reporting the moment an element reaches its cap —
+    put every bar that was holding its full capacity under a legend entry
+    reading "At residual", which is the one state those bars were not in.
 
     Where the solution carries no force array for a kind of member, that kind is
     drawn as GEOMETRY ONLY: one neutral color, a legend entry naming the kind,
@@ -1954,7 +1978,7 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     forces_1d = solution.get("forces_1d", np.zeros(len(elements_1d)))
     t_allow = fem_data.get("t_allow_by_1d_elem", np.ones(len(elements_1d)))
     t_res = fem_data.get("t_res_by_1d_elem", np.zeros(len(elements_1d)))
-    failed_1d = solution.get("failed_1d_elements", np.zeros(len(elements_1d), dtype=bool))
+    softened_1d = _elem_flags(solution, "softened_1d_elements", len(elements_1d))
 
     # Find global Tmax (max of all t_allow values)
     t_max_global = t_allow.max() if len(t_allow) > 0 else 1.0
@@ -2003,11 +2027,16 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
             continue
 
         force = forces_1d[i]
-        is_failed = failed_1d[i]
+        # Softened: the element dropped off its peak onto whatever residual it
+        # was given. With no residual left and no force in it, that drop was a
+        # pullout — the same three-part definition
+        # :func:`xslope.fem_details.reinforcement_profile` marks a pullout by,
+        # so the overlay and the member detail figure mark the same elements.
+        is_softened = softened_1d[i]
 
-        if is_failed and t_res[i] < 1e-6 and force < 1e-6:
+        if is_softened and t_res[i] < 1e-6 and force < 1e-6:
             pullout_lines.append(coords)
-        elif is_failed and t_res[i] > 1e-6:
+        elif is_softened:
             tres_lines.append(coords)
         elif force > 1e-6:
             ratio = min(force / t_max_global, 1.0) if t_max_global > 0 else 0.0
@@ -2058,7 +2087,7 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
             cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
             cbar.set_label(reinf_force_label, rotation=270, labelpad=15, fontsize=10)
 
-    # Draw elements at Tres (magenta)
+    # Draw elements that softened onto their residual capacity (magenta)
     if tres_lines:
         lc_outline = LineCollection(tres_lines, colors='black', linewidths=4.5, alpha=0.9, zorder=5.9)
         ax.add_collection(lc_outline)

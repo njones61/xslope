@@ -1347,6 +1347,73 @@
       "features": {
         "circular": true,
         "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/fem/files/xslope_piles_fem_nopile.xlsx",
+      "references": [
+        {
+          "anchor": "2-slope-stabilized-with-drilled-shaft-piles",
+          "checks": [
+            "fem_ssrm"
+          ],
+          "level": 3,
+          "page": "fem/samples/",
+          "resolution": "input-link",
+          "source_md": "docs/fem/samples.md",
+          "title": "2. Slope Stabilized with Drilled Shaft Piles",
+          "url": "https://xslope.readthedocs.io/en/latest/fem/samples/#2-slope-stabilized-with-drilled-shaft-piles"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
         "dloads": 1,
         "element_type": null,
         "hoek_brown": false,
@@ -3489,7 +3556,7 @@
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
-        "unit_system": "imperial",
+        "unit_system": "si",
         "unsaturated_models": [
           "lf"
         ]
@@ -21639,7 +21706,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 304,
+    "models": 305,
     "pages": [
       "fem/samples/",
       "lem/design/",
@@ -21654,11 +21721,11 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 526,
+    "tags": 527,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 142,
+      "homogeneous": 143,
       "non-circular": 30,
       "piles": 8,
       "probabilistic": 12,
@@ -21713,6 +21780,7 @@
       "docs/fem/files/xslope_griffiths6_dry.xlsx",
       "docs/fem/files/xslope_griffiths6_full.xlsx",
       "docs/fem/files/xslope_piles_fem.xlsx",
+      "docs/fem/files/xslope_piles_fem_nopile.xlsx",
       "docs/lem/files/xslope_acads_simple.xlsx",
       "docs/lem/files/xslope_arai_tagyo.xlsx",
       "docs/lem/files/xslope_gsat_nowater.xlsx",

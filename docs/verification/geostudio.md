@@ -31,8 +31,8 @@ either. The 2025.2 edition also adds an 11-problem "Verifications – 3D" chapte
 (§3.1–3.11) verifying SLOPE3D — ellipsoidal and wedge surfaces, 3D seismic and
 piezometric cases, and the Kettleman Hills case history. XSLOPE is a 2D formulation, so
 the 3D chapter is out of scope and not tracked here. The seven **SEEP/W** transient-seepage
-examples (T01–T07) at the foot of the table come from GeoStudio's separate example library,
-not from this manual.
+examples (T01–T07) and the **SIGMA/W** strength-reduction example (SRS) at the foot of the
+table come from GeoStudio's separate example library, not from this manual.
 
 **Match to the published value**
 
@@ -104,6 +104,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within ~0.04 m of SEEP/W at the initial and early frames and ~0.12 m at the high-rate near-steady (0.5–1.5% of the 8 m column) | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
 | [T07](#seepw-t07) | 🟢 | SEEP/W – GeoStudio-PEST Multistep Outflow | Column total head −0.093 / −0.134 / −0.175 m at the three stages, reproducing SEEP/W's −0.07 … −0.22 m pressure field to the published read-off precision | **built**; stepped base suction through a time-varying head (plain-Dirichlet) series |
+| [SRS](#sigmaw-wall) | 🟡 | SIGMA/W – Slope stabilization with a sheet pile wall | No wall: SSRM 1.011 vs SIGMA/W SRS 1.025 (−1.4%) — with the same project's FE stability 1.035 (−2.3%) and Morgenstern-Price 1.033 (−2.1%) · with the wall: SSRM 1.466 vs SIGMA/W SRS 1.4 (+4.7%) | **built**; both published factors are interpretations of an SRS sweep rather than solver outputs, and the wall case is read off a still-rising curve. The wall's moment and shear reproduce the published shape and turning point at near two-thirds the published peaks |
 
 </div>
 
@@ -1539,3 +1540,109 @@ retention curve to RMS 1×10⁻⁴, so it is not SWCC mapping).
 <!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=219600, points=0.003:0.02:-0.1749;0.003:0.06:-0.1749;0.003:0.1:-0.1749, tolerance=0.01, benchmark=SEEPW-T07-t219600 -->
 
 **Sources:** GeoStudio SEEP/W example "GeoStudio-PEST – Multistep Outflow" (Seequent).
+
+## Slope stabilization (SIGMA/W) {#sigmaw}
+
+The sections above are SLOPE/W limit-equilibrium problems and SEEP/W seepage problems. GeoStudio's
+stress-deformation product **SIGMA/W** contributes one more example, and it is the only benchmark in this
+corpus that puts a structural member inside a slope and analyses the two together: a **Strength Reduction
+Stability (SRS)** run — the same strength-reduction procedure XSLOPE's [SSRM](ssrm.md) implements — on a
+slope with and without a sheet pile wall. It is the reference behind the applicability of XSLOPE's
+[pile beam element](../fem/piles.md#applicability-continuous-walls-and-discrete-pile-rows), whose
+plane-strain beam is an exact description of a wall that is continuous out of plane.
+
+As with the SLOPE/W corpus, the `.gsz` model file is Seequent's and is not redistributed here; the model
+below is transcribed from it and from the example's write-up, and the published factors of safety and wall
+actions are the comparison values.
+
+### SIGMAW-SRS — Slope stabilization with a sheet pile wall {#sigmaw-wall}
+
+A slope held at the edge of stability by a 1 m band of weak clay running beneath it, stabilized by a
+continuous sheet pile wall driven from the lower bench through that band into the competent material below.
+
+**Section.** Ground surface (1, 20) – (20, 20) – (36, 10) – (38, 10) – (40, 10) – (42, 9) – (44, 8) –
+(65, 8): a flat crest at el. 20, the slope face down to a bench at el. 10 spanning x = 36–40 where the wall
+head sits, the toe at (44, 8), and flat ground out to the right boundary. The base is at el. −4 and pinned;
+both sides are on rollers. Three zones, all γ = 20 kN/m³ and ν′ = 0.4:
+
+| Zone | Elevation | E′ (kPa) | c′ (kPa) | φ′ (°) | Stress model |
+|---|---|---:|---:|---:|---|
+| Sandy Clay | 6 → ground surface | 10,000 | 20 | 30 | Mohr-Coulomb, tensile strength 0 |
+| Weak Clay | 5 → 6 | 5,000 | 0 | 10 | Mohr-Coulomb, tensile strength 0 |
+| OC Soil | −4 → 5 | 500,000 | — | — | isotropic elastic — it carries no strength because it cannot fail |
+
+The wall runs from (38, 10) to (38, 1): E = 200 GPa, A = 0.02 m²/m, I = 0.0005 m⁴/m. It is **continuous**
+out of plane — the model declares no spacing at all, because a plane-strain beam's EA and EI are already
+per metre of wall — so XSLOPE's spacing column is 1 and the section constants transcribe unchanged. The
+tensile strength of 0 kPa on both Mohr-Coulomb zones is the example's own printed material property, and it
+is load-bearing: without it a c′–φ′ soil carries tension to the Mohr-Coulomb apex, which in the sandy clay
+is c′/tan φ′ = 34.6 kPa.
+
+**Pore pressure is XSLOPE's own seepage solve.** GeoStudio drives this problem from a steady-state SEEP/W
+analysis and hands that field to every stress analysis beneath it. The field is not published as numbers, so
+it is not transcribable — but the boundary value problem that produced it is, and it is reproduced here
+rather than approximated by a piezometric line. Total head is held at el. 14 on the left boundary, pressure
+head at zero on the flat ground beyond the toe (el. 8), the slope face from x = 36 to x = 44 is a potential
+seepage face, and the right boundary, the base and the crest above el. 14 are no-flow; conductivity is
+1×10⁻⁵ m/s and the same in all three zones, so the head field does not depend on its value. XSLOPE solves
+that problem with its own finite-element seepage (`u = 'seep'`) and the nodal field is committed beside the
+model. It reproduces the water table the example states — el. 14 at the left boundary falling to about
+el. 7.8 at the right — and gives 176.5 kPa at the left boundary's base, which is exactly γ_w × 18 m. This is
+the one modelling decision in the transcription, and it makes the comparison one of two programs solving the
+same boundary value problem rather than one reading the other's answer.
+
+Both models are meshed by their builder rather than by their tag, because a model whose pore pressures come
+from a stored nodal field has to run its stability solve on the mesh that field was written on: 6,484 tri6
+elements without the wall and 6,532 with it, the weak clay band carrying a local size override that puts
+four element rows across its 1 m thickness.
+
+**Input:** [gs2_wall_none.xlsx](files/geostudio/gs2_wall_none.xlsx) (no wall) ·
+[gs2_wall.xlsx](files/geostudio/gs2_wall.xlsx) (wall)
+
+| Case | XSLOPE SSRM | SIGMA/W SRS | Other published values for the same model |
+|---|---|---|---|
+| No wall | 1.011 | 1.025 (−1.4%) | FE stability 1.035 (−2.3%) · Morgenstern-Price 1.033 (−2.1%) |
+| Sheet pile wall | 1.466 | 1.4 (+4.7%) | — |
+
+**How the published factors are read.** Neither SIGMA/W value is a solver output printed to three decimals;
+both are interpretations of an SRS sweep, which is how a strength-reduction analysis reports. Without the
+wall the example increments the reduction factor over a bracket of 0.975 to 1.05 and observes the unbalanced
+energy and iteration count jump between 1.0 and 1.025, giving "around 1.025" at a sweep resolution of 0.025.
+With the wall it sweeps to 1.5 and reads the energy upturn and the inflection in the crest-displacement
+curve at "about 1.4". The no-wall reading has two independent corroborations inside the same project — a
+stress-based FE stability analysis at 1.035 and a Morgenstern-Price limit-equilibrium analysis at 1.033 —
+and XSLOPE's bisection sits below all three by 1.4 to 2.3%. The wall case has no such corroboration, and
+XSLOPE reads 4.7% above a value taken off a curve that is still rising where it is read. Relative to its own
+unreinforced slope, XSLOPE makes the wall worth a factor of 1.450 and SIGMA/W a factor of 1.366.
+
+**What the wall carries.** The moment and shear XSLOPE recovers down the wall reproduce the published
+distributions in shape. The bending moment is zero at the head and at the toe — both are free, which is the
+check that the profile is being read correctly — and peaks at el. 5.00, the base of the weak clay band, at
+1,135 kN·m/m. The shear holds one sign above that elevation (peak 510 kN/m) and reverses to the other below
+it (peak 866 kN/m), so the wall is being driven by the band and is reacting against the stiff material under
+it. The example's own diagrams have the same form and the same turning point, with peaks of roughly
+1,650 kN·m/m and roughly 750 and 1,300 kN/m. XSLOPE's peaks are near two-thirds of those, and all three
+scale by nearly the same factor — 0.69 for the moment, 0.68 and 0.67 for the two shear branches — so this is
+a difference in how much load the wall has taken up at the state each is read at, not a difference in how
+the wall distributes it. The published curves grow with every increment of the sweep and are printed at its
+last step, past the reduction factor the example interprets as the factor of safety; XSLOPE's are read at
+the mechanism its bisection captured.
+
+How steeply the actions rise once the section fails is measurable here rather than assumed. Both committed
+fields bracket the failure: the last equilibrium state at F = 1.46 and the post-failure state the bisection
+captured at F = 1.69. Between them XSLOPE's own peak moment rises from 869 to 1,135 kN·m/m, a factor of
+1.31, and its two shear peaks by factors of 1.19 and 1.31 — so where along the failure sweep the published
+values were read materially affects the comparison of peaks.
+
+![gs2_wall_none: inputs and the strength-reduction mechanism without the wall](images/gs2_wall_none.png)
+
+![gs2_wall: inputs and the strength-reduction mechanism with the wall in place](images/gs2_wall.png)
+
+![gs2_wall: the wall's bending moment (left) and shear (right) at the mechanism](images/gs2_wall_forces.png)
+
+**Sources:** GeoStudio SIGMA/W example "Slope stabilization with piles" (Seequent), which reports the SRS
+result with and without the wall, a stress-based FE stability corroboration, a Morgenstern-Price
+limit-equilibrium comparison, and the wall's moment and shear distributions.
+
+<!-- test: file=files/geostudio/gs2_wall_none.xlsx, type=fem_ssrm, expected_fs=1.011, element_type=tri6, tolerance=0.01, f_min=0.95, f_max=1.25, max_iter=16000, benchmark=SIGMAW-SRS-nowall -->
+<!-- test: file=files/geostudio/gs2_wall.xlsx, type=fem_ssrm, expected_fs=1.466, element_type=tri6, tolerance=0.01, f_min=1.15, f_max=1.65, max_iter=16000, benchmark=SIGMAW-SRS-wall -->

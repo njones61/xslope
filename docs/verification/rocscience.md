@@ -328,7 +328,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | deep, P = 1.4: Spencer 1.221 vs Slide2 1.215 (+0.5%) · P = 1.5: Spencer 1.298 vs Slide2 1.290 (+0.6%) · P = 1.6: Spencer 1.374 vs Slide2 1.366 (+0.6%) · shallow: Spencer 1.322 vs Slide2 1.324 (−0.2%) | **built** (4 files, both mechanisms); the deep→shallow switch lands in Slide2's own interval |
 | [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) | **built** (3 of 4 scenarios); the Newmark displacement is reproduced by a benchmark diagnostic (−0.5% at Slide2's K<sub>y</sub>), not an XSLOPE mode |
 | [105](#vp105) | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) |  | *blocked* — needs an orientation-dependent strength model |
-| [106](#vp106) | 🟢 | Support, Ito & Matsui pile | no pile: Bishop 1.143 vs Slide 1.14 (+0.3%) · D1/D = 2: Bishop 1.540 vs Slide 1.54 (0.0%) · D1/D = 3: Bishop 1.451 vs Slide 1.43 (+1.5%) · D1/D = 4: Bishop 1.341 vs Slide 1.33 (+0.8%) · D1/D = 6: Bishop 1.260 vs Slide 1.25 (+0.8%) | **built** (5 cases); the Ito & Matsui limit pressure is auto-computed |
+| [106](#vp106) | 🟢 | Support, Ito & Matsui pile | no pile: Bishop 1.143 vs Slide 1.14 (+0.3%) · D1/D = 2: Bishop 1.540 vs Slide 1.54 (0.0%) · D1/D = 3: Bishop 1.451 vs Slide 1.43 (+1.5%) · D1/D = 4: Bishop 1.341 vs Slide 1.33 (+0.8%) · D1/D = 6: Bishop 1.260 vs Slide 1.25 (+0.8%) | **built** (5 cases); the Ito & Matsui limit pressure is auto-computed. The paper's three-dimensional finite-element results are compared separately, as a [diagnostic of the 2D pile idealization](#vp106-fem) that carries no dot |
 | [107](#vp107) | 🟢 | Retaining walls, gabion walls, supports | equivalent cohesion: Spencer 1.398 vs Slide 1.386 (+0.9%) · mesh supports: Spencer 1.398 vs Slide 1.392 (+0.4%) |  |
 | [108](#vp108) | 🟢 | Retaining walls, gabion walls, supports | equivalent cohesion: Bishop 1.790 vs Slide 1.787 (+0.2%) · mesh: Bishop 1.830 vs Slide 1.835 (−0.3%) | Spencer within 0.3% on both |
 | [109](#vp109) | 🟢 | Retaining walls, gabion walls, weak layers | Spencer 1.797 vs Slide's joint block search 1.803 (−0.3%) · Bishop 1.790 vs Slide 1.799 (−0.5%) | the joints do not govern overall stability |
@@ -2762,6 +2762,62 @@ Slide within 0.8% and with the originating paper within 2.4%.
 ![vp106c: inputs and representative solution](images/vp106c.png)
 ![vp106d: inputs and representative solution](images/vp106d.png)
 ![vp106e: inputs and representative solution](images/vp106e.png)
+
+### VP106 — finite-element variant: the 2D pile idealization measured {#vp106-fem}
+
+**Input files:** [vp106a_fem.xlsx](files/rocscience/vp106a_fem.xlsx) (no pile) ·
+[vp106c_fem.xlsx](files/rocscience/vp106c_fem.xlsx) (D1/D = 3, free head) ·
+[vp106c_fem_fix.xlsx](files/rocscience/vp106c_fem_fix.xlsx) (D1/D = 3, head rotation restrained)
+
+Cai & Ugai analysed this slope twice. The limit-equilibrium side is [VP106](#vp106) above. The other side is
+a **three-dimensional** shear-strength-reduction finite-element model that meshes the individual piles and
+the soil between them, with interfaces that can slip. These three files run that side of the paper through
+XSLOPE's SSRM at D1/D = 3 — the paper's default spacing, the one its Table 3 reports with exact values — on the same section and
+soil, with the pile as a plane-strain beam: E = 6×10⁷ kPa on the 0.8 m section, so I = π D⁴/64 = 0.0201 m⁴
+and A = π D²/4 = 0.5027 m², both divided by the 2.4 m spacing; soil E = 2×10⁵ kPa, ν = 0.25. The Ito &
+Matsui limit pressure the limit-equilibrium files carry is deliberately absent — in a finite-element
+analysis the pile carries what the soil pushes onto it, and imposing a limit pressure as well would count it
+twice.
+
+**This is a diagnostic, not a verification, and it carries no match dot.** The two models are not the same
+model, and the differences below are the measurement of what separates them rather than an error in either.
+
+| Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
+|---|---|---|
+| No pile | 1.136 | 1.14 (−0.4%) |
+| Pile, free head | 1.497 | 1.36 (+10.1%) |
+| Pile, head rotation restrained | 1.552 | 1.45 (+7.0%) |
+
+Without a pile the two agree to −0.4%: the same section, the same soil, the same strength-reduction
+procedure, and nothing three-dimensional in either model. That row is what makes the other two readable —
+what they carry is the pile, not the slope.
+
+With the pile in place the two-dimensional model reads high, by +10.1% with a free head and +7.0% with the
+head rotation restrained. Read as the credit each model gives the pile row, XSLOPE multiplies its own
+unreinforced factor of safety by 1.318 and Cai & Ugai's model multiplies theirs by 1.193. The direction is
+the one the idealization predicts. In three dimensions the soil at three diameters' spacing arches onto the
+piles, some of it moves between them, and it can slip along each pile's surface; in a plane-strain smear the
+row is a continuous sheet at one-third the stiffness, and everything above it has to push through it.
+Restraining the head rotation is worth less in XSLOPE for the same reason — a factor of 1.037 against their
+1.066 — because a smeared row is already stiffer than the row it stands for, so stiffening its head adds
+less.
+
+On this problem the limit-equilibrium path lands closer to the three-dimensional answer than the
+two-dimensional finite-element path does: [VP106](#vp106)'s Bishop search reads 1.451 where the paper's own
+limit-equilibrium value is 1.37, and the Ito & Matsui limit pressure behind it is a theory *of* the
+three-dimensional mechanism rather than a two-dimensional stand-in for it.
+
+**Scope.** The plane-strain beam is an exact representation of a member that really is continuous out of
+plane, and it is verified as one against a sheet pile wall in
+[GeoStudio's SIGMA/W benchmark](geostudio.md#sigmaw-wall). For a discrete pile row the validated route is
+limit equilibrium with the Ito & Matsui limit pressure — [VP106](#vp106) across four spacings, and
+[VP54](#vp54). See [Pile Elements in FEM](../fem/piles.md#applicability-continuous-walls-and-discrete-pile-rows).
+
+**Sources:** Cai & Ugai (2000), the three-dimensional shear-strength-reduction results.
+
+<!-- test: file=files/rocscience/vp106a_fem.xlsx, type=fem_ssrm, expected_fs=1.136, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.85, f_max=1.45, max_iter=16000, benchmark=VP106-FEM-nopile -->
+<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.497, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
+<!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.552, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed -->
 
 ### VP107: Retaining walls, gabion walls, supports {#vp107}
 

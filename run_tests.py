@@ -5915,6 +5915,39 @@ def run_k0_level_ground_test(test):
     return 0.0, None
 
 
+def run_beam_element_test(test):
+    """The pile beam element against closed-form beam theory.
+
+    The two-node Euler-Bernoulli element is the whole of XSLOPE's structural-member
+    physics, so it is pinned against solutions that owe nothing to XSLOPE: the
+    simply supported and cantilever closed forms quoted in GeoStudio's SIGMA/W
+    "Beams and Bars in a Frame" verification (M = PL/4 and PL^3/48EI under a central
+    point load, wL^2/8 and 5wL^4/384EI under a uniform load, wL^2/2 and wL^4/8EI for
+    the cantilever). Deflections, support reactions and recovered end actions are all
+    compared, plus orientation invariance (the rotation matrix), the axial EA/L
+    action, the 1/S per-unit-width scaling and the circular-section constants derived
+    from a diameter.
+
+    The check itself lives in test/beam_element_check.py (file-less: it hand-builds
+    a node chain so the stations are exactly where the closed forms are written, and
+    assembles only the element matrices build_fem_data returns — no soil, no solve).
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'beam_element_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('beam_element_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_quad_mesh_test(test):
     """The mesh builder: element quality, delivered size, the size field, and sweeps.
 
@@ -10786,6 +10819,8 @@ def _dispatch_test(test):
         return run_dload_sign_test(test)
     if test_type == 'k0_level_ground':
         return run_k0_level_ground_test(test)
+    if test_type == 'beam_element':
+        return run_beam_element_test(test)
     if test_type == 'stability_time':
         return run_stability_time_test(test)
     if test_type == 'steady_seep_save':
@@ -10900,7 +10935,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments',
                        'thread_safety',
@@ -11365,6 +11400,13 @@ def main():
         # no-op there. File-less (builds a 20 x 10 m block).
         tests.append({'type': 'k0_level_ground', 'file': 'K0 level-ground equilibrium',
                       'method': '-', 'source': 'k0_level_ground'})
+        # Guard the pile beam element against closed-form beam theory — the
+        # SIGMA/W "Beams and Bars in a Frame" simply-supported and cantilever
+        # solutions, plus orientation invariance, the axial action and the 1/S
+        # per-unit-width scaling. File-less (it hand-builds the node chain and
+        # assembles only the beam matrices build_fem_data returns).
+        tests.append({'type': 'beam_element', 'file': 'pile beam element vs beam theory',
+                      'method': '-', 'source': 'beam_element'})
         # Guard the transient stability TIME: the precedence a run applies, the
         # tseep sheet's round trip of stability_time, the saved-frame schedule, the
         # two Run dialogs' selector, and the refusal of stage times with no frames.

@@ -5304,6 +5304,147 @@
     },
     {
       "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [
+          "free"
+        ],
+        "piles": 1,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": true,
+        "seepage_problem": true,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/geostudio/gs2_wall.xlsx",
+      "references": [
+        {
+          "anchor": "sigmaw-wall",
+          "checks": [
+            "SIGMAW-SRS-wall"
+          ],
+          "level": 3,
+          "page": "verification/geostudio/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/geostudio.md",
+          "title": "SIGMAW-SRS — Slope stabilization with a sheet pile wall",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/geostudio/#sigmaw-wall"
+        }
+      ],
+      "topics": [
+        "piles",
+        "seepage-coupled",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": false,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "elastic",
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": true,
+        "seepage_problem": true,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/geostudio/gs2_wall_none.xlsx",
+      "references": [
+        {
+          "anchor": "sigmaw-wall",
+          "checks": [
+            "SIGMAW-SRS-nowall"
+          ],
+          "level": 3,
+          "page": "verification/geostudio/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/geostudio.md",
+          "title": "SIGMAW-SRS — Slope stabilization with a sheet pile wall",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/geostudio/#sigmaw-wall"
+        }
+      ],
+      "topics": [
+        "seepage-coupled",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 0,
@@ -19165,6 +19306,78 @@
         "n_materials": 1,
         "non_circular": false,
         "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": true,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [
+          "c",
+          "gamma",
+          "phi"
+        ],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp106a_fem.xlsx",
+      "references": [
+        {
+          "anchor": "vp106-fem",
+          "checks": [
+            "VP106-FEM-nopile"
+          ],
+          "level": 3,
+          "page": "verification/rocscience/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rocscience.md",
+          "title": "VP106 — finite-element variant: the 2D pile idealization measured",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp106-fem"
+        }
+      ],
+      "topics": [
+        "probabilistic",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
         "pile_fixities": [
           "free"
         ],
@@ -19286,6 +19499,156 @@
       ],
       "topics": [
         "piles",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [
+          "free"
+        ],
+        "piles": 1,
+        "polygon_geometry": true,
+        "probabilistic": true,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [
+          "c",
+          "gamma",
+          "phi"
+        ],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp106c_fem.xlsx",
+      "references": [
+        {
+          "anchor": "vp106-fem",
+          "checks": [
+            "VP106-FEM-free"
+          ],
+          "level": 3,
+          "page": "verification/rocscience/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rocscience.md",
+          "title": "VP106 — finite-element variant: the 2D pile idealization measured",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp106-fem"
+        }
+      ],
+      "topics": [
+        "piles",
+        "probabilistic",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [
+          "fixed"
+        ],
+        "piles": 1,
+        "polygon_geometry": true,
+        "probabilistic": true,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [
+          "c",
+          "gamma",
+          "phi"
+        ],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/rocscience/vp106c_fem_fix.xlsx",
+      "references": [
+        {
+          "anchor": "vp106-fem",
+          "checks": [
+            "VP106-FEM-fixed"
+          ],
+          "level": 3,
+          "page": "verification/rocscience/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rocscience.md",
+          "title": "VP106 — finite-element variant: the 2D pile idealization measured",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp106-fem"
+        }
+      ],
+      "topics": [
+        "piles",
+        "probabilistic",
         "homogeneous"
       ]
     },
@@ -21706,7 +22069,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 305,
+    "models": 310,
     "pages": [
       "fem/samples/",
       "lem/design/",
@@ -21721,22 +22084,22 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 527,
+    "tags": 532,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 143,
+      "homogeneous": 146,
       "non-circular": 30,
-      "piles": 8,
-      "probabilistic": 12,
+      "piles": 11,
+      "probabilistic": 15,
       "rapid-drawdown": 6,
       "reinforcement": 23,
-      "seepage-coupled": 64,
+      "seepage-coupled": 66,
       "seismic": 10,
       "soil-nails": 5,
       "tension-cracks": 19,
       "transient-seepage": 20,
-      "zoned-dams": 38
+      "zoned-dams": 40
     },
     "unloadable": 0
   },
@@ -21891,8 +22254,11 @@
       "docs/verification/files/rocscience/vp102t_60.xlsx",
       "docs/verification/files/rocscience/vp102t_600.xlsx",
       "docs/verification/files/rocscience/vp106a.xlsx",
+      "docs/verification/files/rocscience/vp106a_fem.xlsx",
       "docs/verification/files/rocscience/vp106b.xlsx",
       "docs/verification/files/rocscience/vp106c.xlsx",
+      "docs/verification/files/rocscience/vp106c_fem.xlsx",
+      "docs/verification/files/rocscience/vp106c_fem_fix.xlsx",
       "docs/verification/files/rocscience/vp106d.xlsx",
       "docs/verification/files/rocscience/vp106e.xlsx",
       "docs/verification/files/rocscience_gw/gw001.xlsx",
@@ -21949,10 +22315,13 @@
     "piles": [
       "docs/fem/files/xslope_piles_fem.xlsx",
       "docs/lem/files/xslope_piles.xlsx",
+      "docs/verification/files/geostudio/gs2_wall.xlsx",
       "docs/verification/files/rocscience/vp049.xlsx",
       "docs/verification/files/rocscience/vp054b.xlsx",
       "docs/verification/files/rocscience/vp106b.xlsx",
       "docs/verification/files/rocscience/vp106c.xlsx",
+      "docs/verification/files/rocscience/vp106c_fem.xlsx",
+      "docs/verification/files/rocscience/vp106c_fem_fix.xlsx",
       "docs/verification/files/rocscience/vp106d.xlsx",
       "docs/verification/files/rocscience/vp106e.xlsx"
     ],
@@ -21968,7 +22337,10 @@
       "docs/verification/files/rocscience/vp033.xlsx",
       "docs/verification/files/rocscience/vp034.xlsx",
       "docs/verification/files/rocscience/vp035.xlsx",
-      "docs/verification/files/rocscience/vp036.xlsx"
+      "docs/verification/files/rocscience/vp036.xlsx",
+      "docs/verification/files/rocscience/vp106a_fem.xlsx",
+      "docs/verification/files/rocscience/vp106c_fem.xlsx",
+      "docs/verification/files/rocscience/vp106c_fem_fix.xlsx"
     ],
     "rapid-drawdown": [
       "docs/lem/files/xslope_gsat_rapid.xlsx",
@@ -22019,6 +22391,8 @@
       "docs/verification/files/geostudio/gs2_pond.xlsx",
       "docs/verification/files/geostudio/gs2_rdd_inst.xlsx",
       "docs/verification/files/geostudio/gs2_rdd_slow.xlsx",
+      "docs/verification/files/geostudio/gs2_wall.xlsx",
+      "docs/verification/files/geostudio/gs2_wall_none.xlsx",
       "docs/verification/files/rocscience/rs2_28a.xlsx",
       "docs/verification/files/rocscience/rs2_28b.xlsx",
       "docs/verification/files/rocscience/rs2_28c.xlsx",
@@ -22148,6 +22522,8 @@
       "docs/seep/files/xslope_levee_poly.xlsx",
       "docs/seep/files/xslope_rface_PIEZO_KEY.xlsx",
       "docs/seep/files/xslope_rface_SEEP_KEY.xlsx",
+      "docs/verification/files/geostudio/gs2_wall.xlsx",
+      "docs/verification/files/geostudio/gs2_wall_none.xlsx",
       "docs/verification/files/rocscience/rs2_51.xlsx",
       "docs/verification/files/rocscience/rs2_64l_split.xlsx",
       "docs/verification/files/rocscience/rs2_65.xlsx",

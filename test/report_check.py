@@ -15008,6 +15008,65 @@ def _residual_segments(fig):
     return n
 
 
+def test_the_deformed_members_are_a_different_color_from_the_original():
+    """On the deformation panel, a member's original and deformed positions are
+    drawn in colors a reader can tell apart.
+
+    Both pile overlays were green — the same green, one over the other — so at
+    any exaggeration the panel showed one pile and the deformation of the piles
+    could not be read at all. Norm: "a terrible idea."
+
+    The convention the panel already uses for the reinforcement is the one the
+    piles now follow: the ORIGINAL configuration is the muted reference (the
+    reinforcement's gray, the pile's own green, the dashed gray mesh outline),
+    and the DEFORMED configuration is red. Red on this panel therefore means
+    "this is the deformed position" and not "this is a reinforcement line" —
+    the reinforcement's geometry color elsewhere is gray, never red — so a model
+    carrying both kinds reads consistently, with the two kinds held apart by
+    line weight and by their legend entries.
+    """
+    fails = []
+    from matplotlib.colors import to_rgba
+    from xslope.plot_fem import (PILE_COLOR, PILE_DEFORMED_COLOR,
+                                 plot_fem_results)
+
+    if to_rgba(PILE_COLOR)[:3] == to_rgba(PILE_DEFORMED_COLOR)[:3]:
+        fails.append(f"the original and deformed pile colors are the same "
+                     f"({PILE_COLOR!r}, {PILE_DEFORMED_COLOR!r})")
+
+    for label, xlsx in (("piles", FEM_PILES_XLSX),
+                        ("reinforcement", FEM_REINF_XLSX)):
+        _sd, bundle = _fem_1d_bundle(xlsx)
+        import matplotlib.figure as _mplfig
+        fig = _mplfig.Figure(figsize=(8.0, 4.5))
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_fem_results(bundle["fem_data"], bundle["solution"],
+                             plot_type=["deformation"], fig=fig,
+                             show_title=False)
+        ax = fig.axes[0]
+        gid = "PILES" if label == "piles" else "REINFORCEMENT"
+        drawn = [c for c in ax.collections if c.get_gid() == gid]
+        if len(drawn) != 2:
+            fails.append(f"{label}: the deformation panel draws {len(drawn)} "
+                         f"{gid} overlays, not the original and the deformed")
+            continue
+        colors = [tuple(c.get_colors()[0][:3]) for c in drawn]
+        if colors[0] == colors[1]:
+            fails.append(f"{label}: the original and deformed overlays are both "
+                         f"drawn in {colors[0]}, so neither can be read")
+        # Far enough apart to survive printing: not two shades of one hue.
+        if max(abs(a - b) for a, b in zip(*colors)) < 0.25:
+            fails.append(f"{label}: the two overlays differ by less than a "
+                         f"quarter of a channel: {colors}")
+        named = set(ax.get_legend_handles_labels()[1])
+        kind = "Pile" if label == "piles" else "Reinforcement"
+        for want in (f"Original {kind}", f"Deformed {kind}"):
+            if want not in named:
+                fails.append(f"{label}: the legend does not name {want!r}: "
+                             f"{sorted(named)}")
+    return fails
+
+
 def test_the_member_overlay_marks_the_state_the_solver_recorded():
     """The overlay's "At residual" is the softening latch, not the yield latch.
 
@@ -18387,6 +18446,8 @@ CHECKS = [
      test_the_reinforcement_direction_is_named_as_the_column_prints_it),
     ("the member overlay marks the state the solver recorded",
      test_the_member_overlay_marks_the_state_the_solver_recorded),
+    ("the deformed members are a different color from the original",
+     test_the_deformed_members_are_a_different_color_from_the_original),
     ("the member terms are defined where they are used",
      test_the_member_terms_are_defined_where_they_are_used),
     ("a definition follows the thing it defines",

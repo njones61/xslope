@@ -1648,10 +1648,19 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     plot_mesh_lines(ax, fem_data_deformed, color=deformed_color, alpha=1.0,
                     linewidth=lw, label='Deformed')
     
-    # Plot reinforcement in both original and deformed configurations
+    # Plot members in both original and deformed configurations. The two
+    # configurations are told apart by COLOR, on both kinds of member: the
+    # original is the muted reference (gray reinforcement, the pile's own green)
+    # and the deformed is drawn in red, the same red the deformed grid's story
+    # is told in. Both pile overlays were green and lay one on top of the other.
     if show_reinforcement and 'elements_1d' in fem_data:
-        plot_reinforcement_lines(ax, fem_data, solution, color='gray', alpha=0.5, linewidth=2, label='Original Reinforcement')
-        plot_reinforcement_lines(ax, fem_data_deformed, solution, color='red', alpha=0.8, linewidth=2, label='Deformed Reinforcement')
+        plot_reinforcement_lines(ax, fem_data, solution, color='gray', alpha=0.5,
+                                 linewidth=2, label='Original Reinforcement',
+                                 pile_color=PILE_COLOR)
+        plot_reinforcement_lines(ax, fem_data_deformed, solution, color='red',
+                                 alpha=0.8, linewidth=2,
+                                 label='Deformed Reinforcement',
+                                 pile_color=PILE_DEFORMED_COLOR)
     
     # Add element labels if requested
     if label_elements:
@@ -1848,9 +1857,28 @@ def _plot_boundary_outline(ax, fem_data, color='0.55', alpha=0.6, linewidth=1.0,
         ax.add_collection(lc)
 
 
-def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0, linewidth=2, label=None):
+#: What a pile is drawn in wherever its geometry is shown: the package-wide pile
+#: color (xslope.style's "piles"), so a pile looks the same on every figure.
+PILE_COLOR = 'green'
+
+#: What a pile is drawn in where a figure shows it DEFORMED beside its original
+#: position. The deformation panel already draws the deformed reinforcement in
+#: red over the original in gray, so red on that panel means "this is the
+#: deformed configuration" and not "this is a reinforcement line" — the
+#: reinforcement's own geometry color is gray. Original and deformed piles were
+#: both drawn in green and could not be told apart at any exaggeration.
+PILE_DEFORMED_COLOR = 'red'
+
+
+def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0,
+                             linewidth=2, label=None, pile_color=PILE_COLOR):
     """
     Plot reinforcement and pile elements as lines with distinct colors.
+
+    ``color`` is the reinforcement color; ``pile_color`` the pile color, which
+    defaults to the package-wide green. A caller drawing the same members twice
+    — original and deformed — passes a different color for each configuration on
+    BOTH kinds, or the two overlays are indistinguishable.
     """
     if 'elements_1d' not in fem_data:
         return
@@ -1876,7 +1904,7 @@ def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0, lin
         ax.add_collection(lc)
     if pile_lines:
         pile_label = label.replace('Reinforcement', 'Pile') if label and 'Reinforcement' in label else None
-        lc = LineCollection(pile_lines, colors='green', alpha=alpha, linewidths=linewidth + 1, label=pile_label, gid='PILES')
+        lc = LineCollection(pile_lines, colors=pile_color, alpha=alpha, linewidths=linewidth + 1, label=pile_label, gid='PILES')
         ax.add_collection(lc)
 
 

@@ -49,7 +49,7 @@ other column — same-method entries pair and carry a delta, cross-method entrie
 | [3](#verification-griffiths3) | 🟢 | Example 3 — undrained clay slope with a thin weak layer | Worst station $c_{u2}/c_{u1} = 0.2$: Janbu 0.462 vs the paper's own Janbu three-line wedge 0.45–0.50 (inside the band) · Spencer 0.462 on the same surface · circular search 1.23 vs the paper's stated ≈1.3 (−5.4%) | scored at the source's own 0.05 read-off resolution |
 | [4](#verification-griffiths4) | 🟢 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.45 vs Griffiths & Lane FE 1.45 (0.0%) · SSRM 2.02 vs their FE 2.03 (−0.5%) · relative jump ×1.40 vs their ×1.40 (0.0%) | the critical mechanism flips base → toe, as in the paper's Fig. 11 |
 | [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown sweep | Submerged plateau 1.86 vs Griffiths & Lane FE 1.85 (+0.5%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.39 vs their FE 1.40 (−0.7%) | the three refined quad8 locks read 1.1–2.9% below the printed FE values |
-| [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.86 vs Griffiths & Lane FE 1.9 (−2.1%) · before filling 2.40 vs their FE 2.4 (0.0%) | FE against FE, both printed to 0.1 |
+| [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.87 vs Griffiths & Lane FE 1.9 (−1.6%) · before filling 2.40 vs their FE 2.4 (0.0%) | FE against FE, both printed to 0.1 |
 
 </div>
 
@@ -729,9 +729,9 @@ An actual earth dam cross-section, analysed with the reservoir full and before f
 
 | Case | XSLOPE | Griffiths & Lane FE | Note |
 |---|---|---|---|
-| SSRM, full reservoir (free surface) | 1.86 | **1.9** (−2.1%) | their Figs 18, 20, 21 |
+| SSRM, full reservoir (free surface) | 1.87 | **1.9** (−1.6%) | their Figs 18, 20, 21 |
 | SSRM, before filling (no free surface) | 2.40 | **2.4** (0.0%) | their Figs 18, 19, 21 |
-| Reservoir effect, wet/dry | 0.77 | 0.79 (−2.5%) | from their FE 1.9 / 2.4; their limit equilibrium gives 0.79 again, from 1.90 / 2.42 |
+| Reservoir effect, wet/dry | 0.78 | 0.79 (−1.3%) | from their FE 1.9 / 2.4; their limit equilibrium gives 0.79 again, from 1.90 / 2.42 |
 
 Cross-bearing against the paper's own limit-equilibrium solution:
 
@@ -775,7 +775,7 @@ beneath the crest and exiting on the downstream face:
 
 ![griffiths6_dry_results.png](../fem/images/griffiths6_dry_results.png){width=1000}
 
-Solution for the full-reservoir case at the computed factor of safety (F = 1.86). With the
+Solution for the full-reservoir case at the computed factor of safety (F = 1.87). With the
 free surface in place, the downstream slope is the weaker side: the shear strain band runs
 from the crest to the downstream toe, and the displacement vectors show the rotational
 sliding mass — the same surface found by Griffiths & Lane and by XSLOPE's own Spencer
@@ -791,12 +791,12 @@ effective-stress formulation with consistently integrated boundary loads, the
 submerged soil simply carries its buoyant weight: a solve at F = 1 converges in
 a handful of iterations with an essentially elastic strain field (flooded
 ground at working strength sits quietly — a sanity check worth running on any
-submerged model), and the failure boundary emerges sharply at F = 1.86 under
+submerged model), and the failure boundary emerges sharply at F = 1.87 under
 the default failure criterion. The agreement with limit equilibrium is
 striking: XSLOPE's own Spencer analysis of the same section finds the same
 downstream critical surface as the paper's, and the relative reservoir effect
 matches the paper.
 
 <!-- test: file=../fem/files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.40, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=16000, benchmark=SSRM-2 -->
-<!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.858, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=16000, benchmark=SSRM-2 -->
+<!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.867, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=16000, benchmark=SSRM-2 -->
 

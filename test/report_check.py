@@ -7114,10 +7114,13 @@ def test_calculation_leads_read_once():
         fails.append(f"Bishop's lead does not give the base normal to the "
                      f"equation that forms it: {bishop!r}")
 
-    # And the model figure is introduced as the one analysis it carries, or as
-    # every analysis where there are several. Built off one model with one
-    # engine's solutions and then with two, so the sentence is read as the
-    # report writes it.
+    # And the Project Definition is written in the register the owner set: the
+    # subject is the problem, the figure reference is inside the sentence, and
+    # the zones are named. A report of several analyses says once that they all
+    # run on this one section; a report of one counts nothing. Built off one
+    # model with one engine's solutions and then with two, so the sentences are
+    # read as the report writes them. The figure is geometry: naming a member
+    # here would name a line the figure no longer draws.
     from xslope.fileio import load_slope_data
     from xslope.report import (DEFAULT_OPTIONS, _Counter,
                                _project_definition_section)
@@ -7136,12 +7139,36 @@ def test_calculation_leads_read_once():
                 slope_data, solutions, opts, _Counter(), tmp)
             said[how] = " ".join(b.text for b in section.blocks
                                  if b.kind == "prose")
-    if "The analysis is run on the model of" not in said["one"]:
+    for how, text in said.items():
+        if "The problem cross section is defined by 2 material zones described " \
+                "with profile lines." not in text:
+            fails.append(f"{how}: the section is not defined noun-first: {text!r}")
+        if "The zones are named" not in text:
+            fails.append(f"{how}: the material zones are not named: {text!r}")
+        if "The problem definition is displayed in Figure 1, including the " \
+                "geometry and material zones" not in text:
+            fails.append(f"{how}: the figure is not referred to from inside the "
+                         f"sentence that says what it shows: {text!r}")
+        for retired in ("is run on the model of", "The section is defined by"):
+            if retired in text:
+                fails.append(f"{how}: the retired wording {retired!r} is back: "
+                             f"{text!r}")
+        # The reinforced fixture's members are drawn by the engine, not here —
+        # read off the figure sentence itself, which is the only one making a
+        # claim about what Figure 1 carries.
+        shown = text.partition("The problem definition is displayed in")[2]
+        shown = shown.partition(".")[0]
+        for member in ("reinforcement", "pile"):
+            if member in shown:
+                fails.append(f"{how}: the figure sentence names the {member}, "
+                             f"which the Project Definition figure no longer "
+                             f"draws: {shown!r}")
+    if "Every analysis in this report is run on this cross section." in said["one"]:
         fails.append(f"a report of one analysis counts them: {said['one']!r}")
-    if "Every analysis in this report is run on the model of" not in \
+    if "Every analysis in this report is run on this cross section." not in \
             said["several"]:
-        fails.append(f"a report of several analyses names one: "
-                     f"{said['several']!r}")
+        fails.append(f"a report of several analyses does not say they share the "
+                     f"section: {said['several']!r}")
     return fails
 
 
@@ -8393,8 +8420,16 @@ def test_profile_lines_name_their_materials():
 
 
 def test_shared_plot():
-    """mode="shared" draws the model without the trial surfaces, and draws the
-    water line the seepage head boundaries state."""
+    """mode="shared" draws the model without the trial surfaces and without the
+    members, and draws the water line the seepage head boundaries state.
+
+    The members — reinforcement lines and piles — are structure an analysis acts
+    on rather than part of the section, and each engine's own model figure draws
+    the ones it carries. On a model whose only feature is its piles, the Project
+    Definition figure and the finite element model figure were the same picture
+    one page apart. What the section itself carries — the geometry, the water
+    lines, the distributed loads — stays.
+    """
     fails = []
     import matplotlib
     matplotlib.use("Agg")
@@ -8421,9 +8456,53 @@ def test_shared_plot():
     for suppressed in ("Starting Circle", "Non-Circular Surface"):
         if suppressed in shared_labels:
             fails.append(f"the shared plot still draws {suppressed!r}")
-    for shared_thing in ("Distributed Load", "Reinforcement Line"):
+    for shared_thing in ("Distributed Load",):
         if shared_thing not in shared_labels:
             fails.append(f"the shared plot dropped {shared_thing!r}")
+    # The members leave. Counted on the drawn lines rather than on the legend
+    # alone: only the first line of a set carries a label, so a legend test would
+    # miss every line after it. Each member kind is counted in its own engine's
+    # view first, so a zero in the shared view is the suppression and not an
+    # empty fixture.
+    def member_lines(ax, colors, label):
+        """Every line of one member kind on ``ax``, by its own drawn color."""
+        from matplotlib.colors import to_rgba
+        want = {to_rgba(c) for c in colors}
+        return [ln for ln in ax.lines
+                if to_rgba(ln.get_color()) in want
+                and (ln.get_label() == label or not ln.get_label().strip()
+                     or ln.get_label().startswith("_"))]
+
+    reinf_lem = len(member_lines(lem_ax, ("darkgray",), "Reinforcement Line"))
+    reinf_shared = len(member_lines(shared_ax, ("darkgray",), "Reinforcement Line"))
+    if not reinf_lem:
+        fails.append(f"the reinforced fixture draws no reinforcement in its own "
+                     f"engine view, so its absence below proves nothing: "
+                     f"{sorted(lem_labels)}")
+    if reinf_shared:
+        fails.append(f"the shared plot still draws {reinf_shared} reinforcement "
+                     f"lines")
+    if "Reinforcement Line" in shared_labels:
+        fails.append("the shared plot still names the reinforcement in its legend")
+
+    piled = load_slope_data(PILES_XLSX)
+    pile_lem = draw(piled, "lem")
+    pile_shared = draw(piled, "shared")
+
+    def piles_on(ax):
+        lines = len(member_lines(ax, ("green",), "Pile"))
+        heads = len([t for t in ax.texts if t.get_text().startswith("H=")])
+        return lines, heads
+
+    if piles_on(pile_lem) == (0, 0):
+        fails.append("the pile fixture draws no pile in its own engine view, so "
+                     "its absence below proves nothing")
+    still = piles_on(pile_shared)
+    if still != (0, 0):
+        fails.append(f"the shared plot still draws the piles: "
+                     f"{still[0]} lines, {still[1]} head labels")
+    if "Pile" in set(pile_shared.get_legend_handles_labels()[1]):
+        fails.append("the shared plot still names the piles in its legend")
 
     # A model with a reservoir/head boundary: the water line is on the figure,
     # and it is the same line the load derivation measures against.
@@ -16722,8 +16801,8 @@ def test_the_material_zones_are_named_in_bold():
     if block is None:
         fails.append("the Project Definition never names the material zones")
         return fails
-    said = f"The zones are {_join_names(names)}." if len(names) > 1 else \
-        f"The zone is {names[0]}."
+    said = f"The zones are named {_join_names(names)}." if len(names) > 1 else \
+        f"The zone is named {names[0]}."
     if said not in block.text:
         fails.append(f"the zones are named as {block.text!r}, not {said!r}")
     if list(getattr(block, "bold", None) or []) != names:
@@ -16742,7 +16821,8 @@ def test_the_material_zones_are_named_in_bold():
         elif not any("<w:b/>" in r for r in runs):
             fails.append(f"{name!r} reaches the document in no bold run")
     if _re.search(r"<w:r>(?:(?!</w:r>).)*?<w:b/>(?:(?!</w:r>).)*?"
-                  r"<w:t[^>]*>The section is defined by</w:t>", doc, _re.S):
+                  r"<w:t[^>]*>The problem cross section is defined by</w:t>",
+                  doc, _re.S):
         fails.append("the sentence that introduces the zones is itself bold")
     return fails
 

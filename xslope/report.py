@@ -2356,6 +2356,11 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
     that analysis is; and the reinforcement and the piles are read for a capacity
     and a direction by one engine and for a stiffness by the other, so each
     states the properties it reads (:func:`_member_sections`).
+
+    The members are left out of the FIGURE for the same reason they are left out
+    of the tables: each engine's own model figure draws the ones it carries. On a
+    model whose only feature is its members, this figure and the engine's were
+    the same picture a page apart.
     """
     sec = Section("Project Definition")
     feats = water_features(slope_data)
@@ -2394,14 +2399,14 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
                 if slope_data.get("polygons") and not slope_data.get("profile_lines")
                 else "profile lines")
     mats = referenced_materials(slope_data)
-    text = (f"The section is defined by {len(mats)} material "
+    text = (f"The problem cross section is defined by {len(mats)} material "
             f"{'zone' if len(mats) == 1 else 'zones'} described with {geometry}.")
     # Named, in the order the model lists them, so the reader meets the words the
     # legend and every properties table use before either appears.
     names = [str(m.get("name") or "").strip() for _i, m in mats]
     names = [n for n in names if n]
     if names:
-        text += (f" The {'zone is' if len(names) == 1 else 'zones are'} "
+        text += (f" The {'zone is' if len(names) == 1 else 'zones are'} named "
                  f"{_join(names)}.")
     # Set in bold where they are introduced: these are the words the legend of
     # every figure and the first column of the materials table use, and a reader
@@ -2410,25 +2415,26 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
     links = []
     if figure is not None:
         # Only what the model carries: a figure caption that lists water surfaces
-        # on a dry section describes a different model.
-        shows = ["the geometry and materials"]
+        # on a dry section describes a different model. The reinforcement and the
+        # piles are NOT among them: they are structure an analysis acts on rather
+        # than part of the section, so the figure leaves them to the engine that
+        # carries them (``mode="shared"`` in :func:`~xslope.plot.plot_inputs`),
+        # and a sentence naming them here would name lines the figure does not
+        # draw.
+        shows = ["the geometry and material zones"]
         if feats["surfaces"]:
             shows.append("the water surface"
                          if len(feats["surfaces"]) == 1 else "the water surfaces")
         if slope_data.get("dloads"):
             shows.append("the distributed loads")
-        if slope_data.get("reinforcement_lines"):
-            shows.append("the reinforcement lines")
-        if slope_data.get("pile_lines"):
-            shows.append("the piles")
         where, links = cite("Figure", figure.number)
-        # One analysis is named directly, for the reason the sentence below this
-        # one is: "every analysis" over a report that runs a single analysis
-        # counts something the reader can see there is one of.
-        every = ("Every analysis in this report is"
-                 if len(_engine_sections(solutions, opts)) > 1
-                 else "The analysis is")
-        text += (f" {every} run on the model of {where}: {_join(shows)}.")
+        # A report of several analyses says once that they all run on this one
+        # section; a report of one has nothing to distinguish, and counting to
+        # one is a fact the reader can already see.
+        if len(_engine_sections(solutions, opts)) > 1:
+            text += " Every analysis in this report is run on this cross section."
+        text += (f" The problem definition is displayed in {where}, including "
+                 f"{_join(shows)}.")
     sec.blocks.append(Prose(text, links=links, bold=bold))
 
     # The units statement leads: a reader meets the numbers knowing what they are

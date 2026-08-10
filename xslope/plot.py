@@ -3472,12 +3472,16 @@ def plot_inputs(
             - "seep": Seepage properties (k₁, k₂, Angle, kr₀, h₀)
             - "fem": FEM properties (γ, c, φ, E, ν)
             - "shared": the model every engine shares — geometry, materials,
-              water surfaces, loads, reinforcement and piles — with the
-              engine-specific overlays suppressed: no trial circles or
-              non-circular surfaces (they belong with the search that produced
-              them) and no background mesh (it belongs with the mesh figure).
-              This is the plot the Analysis Report's Project Definition uses.
-              Its material table, if asked for, is the LEM one.
+              water surfaces and loads — with the engine-specific overlays
+              suppressed: no trial circles or non-circular surfaces (they
+              belong with the search that produced them), no background mesh
+              (it belongs with the mesh figure), and no reinforcement lines or
+              piles. The members are structure an analysis acts on rather than
+              part of the section, and each engine's own model figure draws the
+              ones it carries them as; drawn here too they were the same lines
+              twice, one page apart, on a model whose only feature is its
+              members. This is the plot the Analysis Report's Project
+              Definition uses. Its material table, if asked for, is the LEM one.
         tab_loc: Table placement when mat_table is True or 'auto'. Valid options:
             - "upper left": Top-left corner of plot area
             - "upper right": Top-right corner of plot area
@@ -3598,8 +3602,12 @@ def plot_inputs(
     if mode != "seep":
         plot_dloads(ax, slope_data, style=style)
     plot_tcrack_surface(ax, slope_data, style=style)
-    plot_reinforcement_lines(ax, slope_data, style=style)
-    plot_piles(ax, slope_data, style=style)
+    # The members belong to the engine that carries them, not to the section:
+    # each engine's model figure draws its own, and the shared model leaves them
+    # out (see the "shared" entry under ``mode``).
+    if mode != "shared":
+        plot_reinforcement_lines(ax, slope_data, style=style)
+        plot_piles(ax, slope_data, style=style)
     plot_line_loads(ax, slope_data, style=style)
 
     if mode == "lem":

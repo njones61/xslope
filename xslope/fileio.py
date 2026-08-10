@@ -849,6 +849,8 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     """
     This function reads input data from various Excel sheets and parses it into
     structured components used throughout the slope stability analysis framework.
+    It handles circular and non-circular failure surface data, reinforcement, piezometric
+    lines, and distributed loads.
 
     ``filepath`` is a workbook (.xlsx) or a project package (.xslz). A package is
     unpacked first and the extracted workbook loaded, because the sidecars this
@@ -857,8 +859,6 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     ``dest`` and ``overwrite`` are passed to :func:`xslope.unpack` and are meaningful
     only for a package: by default it extracts to a folder named for the package,
     beside it, and raises rather than write over a folder that is already there.
-    It handles circular and non-circular failure surface data, reinforcement, piezometric
-    lines, and distributed loads.
 
     Validation is enforced to ensure required geometry and material information is present:
     - Circular failure surface: must contain at least one valid row with Xo and Yo

@@ -517,6 +517,14 @@ MAP_CONTEXT = 0.55
 #: of its larger dimension — the geometry figures' own (:mod:`xslope.plot_fem`).
 MAP_PAD = 0.035
 
+#: The tallest the frame is allowed to be, as a fraction of its width. Piles run
+#: down rather than along, so their own bounding box is tall and narrow, and an
+#: equal-aspect frame around it printed at text width is a figure taller than the
+#: page it locates them on. Past this the frame is widened rather than the
+#: drawing squashed — it takes in more of the section, which is what a locator is
+#: for — and never past the section's own extent.
+MAP_MAX_ASPECT = 0.6
+
 C_MAP_MEMBER = "#7f8c8d"   # a member of the kind being mapped
 C_MAP_OTHER = "#bdc3c7"    # a member of the other kind, drawn for context
 
@@ -577,10 +585,16 @@ def plot_member_map(fem_data, slope_data=None, kind="reinforcement",
     ys = [v for m in members for v in (m["ends"][0][1], m["ends"][1][1])]
     if xs and len(nodes):
         grow = MAP_CONTEXT * max(max(xs) - min(xs), max(ys) - min(ys), 1e-9)
-        x0 = max(min(xs) - grow, float(nodes[:, 0].min()))
-        x1 = min(max(xs) + grow, float(nodes[:, 0].max()))
-        y0 = max(min(ys) - grow, float(nodes[:, 1].min()))
-        y1 = min(max(ys) + grow, float(nodes[:, 1].max()))
+        mx0, mx1 = float(nodes[:, 0].min()), float(nodes[:, 0].max())
+        my0, my1 = float(nodes[:, 1].min()), float(nodes[:, 1].max())
+        x0, x1 = max(min(xs) - grow, mx0), min(max(xs) + grow, mx1)
+        y0, y1 = max(min(ys) - grow, my0), min(max(ys) + grow, my1)
+        # A frame taller than MAP_MAX_ASPECT of its width is widened until it is
+        # not, as far as the section reaches.
+        wanted = (y1 - y0) / MAP_MAX_ASPECT
+        if wanted > x1 - x0:
+            spare = 0.5 * (wanted - (x1 - x0))
+            x0, x1 = max(x0 - spare, mx0), min(x1 + spare, mx1)
         pad = MAP_PAD * max(x1 - x0, y1 - y0, 1e-9)
         ax.set_xlim(x0 - pad, x1 + pad)
         ax.set_ylim(y0 - pad, y1 + pad)

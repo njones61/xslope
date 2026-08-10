@@ -213,15 +213,21 @@ Section "Uninstall"
   DeleteRegKey HKCU "${UNINSTKEY}"
   DeleteRegKey HKCU "${APPKEY}"
 
-  ; The package association and the URL scheme, both written above. The extension
-  ; key is only removed if it still points at OUR ProgID: another application may
-  ; have claimed .xslz since, and deleting the key would then break its
-  ; association rather than ours.
+  ; The package association and the URL scheme, both written above. Neither key
+  ; lives in a namespace we own: another application may have claimed .xslz or the
+  ; xslope: scheme since this one was installed, and deleting the key would then
+  ; break ITS association rather than ours. So each is removed only while it still
+  ; points at this install — the extension by its ProgID, the scheme by the command
+  ; it runs.
   ReadRegStr $0 HKCU "Software\Classes\${PKGEXT}" ""
   ${If} $0 == "${PROGID}"
     DeleteRegKey HKCU "Software\Classes\${PKGEXT}"
   ${EndIf}
+  ReadRegStr $0 HKCU "Software\Classes\${URLSCHEME}\shell\open\command" ""
+  ${If} $0 == '"$INSTDIR\${EXENAME}" "%1"'
+    DeleteRegKey HKCU "Software\Classes\${URLSCHEME}"
+  ${EndIf}
+  ; This one IS ours by name — nothing else writes ${PROGID}.
   DeleteRegKey HKCU "Software\Classes\${PROGID}"
-  DeleteRegKey HKCU "Software\Classes\${URLSCHEME}"
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 SectionEnd

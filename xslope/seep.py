@@ -2721,8 +2721,8 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
             d_safe = np.where(ok, detJ, 1.0)
             # Jinv of the constant corner-node Jacobian
             Ji00 = (y[:, 1]-y[:, 2]) / d_safe
-            Ji01 = -(x[:, 1]-x[:, 2]) / d_safe
-            Ji10 = -(y[:, 0]-y[:, 2]) / d_safe
+            Ji01 = -(y[:, 0]-y[:, 2]) / d_safe
+            Ji10 = -(x[:, 1]-x[:, 2]) / d_safe
             Ji11 = (x[:, 0]-x[:, 2]) / d_safe
             if use_kr:
                 # kr at the element centroid via quadratic shape functions
@@ -2828,8 +2828,8 @@ def compute_gradient(nodes, elements, head, element_types=None):
             ok = np.abs(detJ) > 1e-10
             d_safe = np.where(ok, detJ, 1.0)
             Ji00 = (y[:, 1]-y[:, 2]) / d_safe
-            Ji01 = -(x[:, 1]-x[:, 2]) / d_safe
-            Ji10 = -(y[:, 0]-y[:, 2]) / d_safe
+            Ji01 = -(y[:, 0]-y[:, 2]) / d_safe
+            Ji10 = -(x[:, 1]-x[:, 2]) / d_safe
             Ji11 = (x[:, 0]-x[:, 2]) / d_safe
             w_total = np.zeros(len(idx))
             i_sum = np.zeros((len(idx), 2))

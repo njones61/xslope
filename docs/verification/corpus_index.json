@@ -1559,6 +1559,280 @@
         "circular": true,
         "cutoff_walls": 0,
         "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/fem/files/xslope_torggler_3a_nopile.xlsx",
+      "references": [
+        {
+          "anchor": "verification-torggler3a",
+          "checks": [
+            "SSRM-TORGGLER"
+          ],
+          "level": 3,
+          "page": "verification/ssrm/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/ssrm.md",
+          "title": "Torggler (2016) §3 — Homogeneous slope with a vertical plate",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3a"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [
+          "free"
+        ],
+        "piles": 1,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/fem/files/xslope_torggler_3a_plate.xlsx",
+      "references": [
+        {
+          "anchor": "verification-torggler3a",
+          "checks": [
+            "SSRM-TORGGLER"
+          ],
+          "level": 3,
+          "page": "verification/ssrm/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/ssrm.md",
+          "title": "Torggler (2016) §3 — Homogeneous slope with a vertical plate",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3a"
+        }
+      ],
+      "topics": [
+        "piles",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/fem/files/xslope_torggler_3b_nopile.xlsx",
+      "references": [
+        {
+          "anchor": "verification-torggler3b",
+          "checks": [
+            "SSRM-TORGGLER"
+          ],
+          "level": 3,
+          "page": "verification/ssrm/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/ssrm.md",
+          "title": "Torggler (2016) §4 — Slope with a weak layer and a 15 m plate",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3b"
+        }
+      ],
+      "topics": [
+        "non-circular"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": true,
+        "piezo_line": false,
+        "pile_fixities": [
+          "free"
+        ],
+        "piles": 1,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/fem/files/xslope_torggler_3b_plate.xlsx",
+      "references": [
+        {
+          "anchor": "verification-torggler3b",
+          "checks": [
+            "SSRM-TORGGLER"
+          ],
+          "level": 3,
+          "page": "verification/ssrm/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/ssrm.md",
+          "title": "Torggler (2016) §4 — Slope with a weak layer and a 15 m plate",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3b"
+        }
+      ],
+      "topics": [
+        "piles",
+        "non-circular"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
         "element_type": null,
         "hoek_brown": false,
         "homogeneous": true,
@@ -2423,6 +2697,228 @@
         }
       ],
       "topics": []
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": true,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [
+          "c",
+          "gamma",
+          "phi"
+        ],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/lem/files/xslope_hassiotis.xlsx",
+      "references": [
+        {
+          "anchor": "17-pile-stabilized-slope-hassiotis-et-al-1997",
+          "checks": [
+            "LEM-HASSIOTIS"
+          ],
+          "level": 3,
+          "page": "lem/samples/",
+          "resolution": "input-link",
+          "source_md": "docs/lem/samples.md",
+          "title": "17. Pile-Stabilized Slope (Hassiotis et al. 1997)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997"
+        }
+      ],
+      "topics": [
+        "probabilistic",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [
+          "free"
+        ],
+        "piles": 1,
+        "polygon_geometry": true,
+        "probabilistic": true,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [
+          "c",
+          "gamma",
+          "phi"
+        ],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/lem/files/xslope_hassiotis_p1.xlsx",
+      "references": [
+        {
+          "anchor": "17-pile-stabilized-slope-hassiotis-et-al-1997",
+          "checks": [
+            "LEM-HASSIOTIS"
+          ],
+          "level": 3,
+          "page": "lem/samples/",
+          "resolution": "input-link",
+          "source_md": "docs/lem/samples.md",
+          "title": "17. Pile-Stabilized Slope (Hassiotis et al. 1997)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997"
+        }
+      ],
+      "topics": [
+        "piles",
+        "probabilistic",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [
+          "free"
+        ],
+        "piles": 1,
+        "polygon_geometry": true,
+        "probabilistic": true,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [
+          "c",
+          "gamma",
+          "phi"
+        ],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": true,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/lem/files/xslope_hassiotis_p2.xlsx",
+      "references": [
+        {
+          "anchor": "17-pile-stabilized-slope-hassiotis-et-al-1997",
+          "checks": [
+            "LEM-HASSIOTIS"
+          ],
+          "level": 3,
+          "page": "lem/samples/",
+          "resolution": "input-link",
+          "source_md": "docs/lem/samples.md",
+          "title": "17. Pile-Stabilized Slope (Hassiotis et al. 1997)",
+          "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997"
+        }
+      ],
+      "topics": [
+        "piles",
+        "probabilistic",
+        "homogeneous"
+      ]
     },
     {
       "features": {
@@ -22069,7 +22565,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 310,
+    "models": 317,
     "pages": [
       "fem/samples/",
       "lem/design/",
@@ -22084,14 +22580,14 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 532,
+    "tags": 544,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 146,
-      "non-circular": 30,
-      "piles": 11,
-      "probabilistic": 15,
+      "homogeneous": 151,
+      "non-circular": 32,
+      "piles": 15,
+      "probabilistic": 18,
       "rapid-drawdown": 6,
       "reinforcement": 23,
       "seepage-coupled": 66,
@@ -22144,11 +22640,16 @@
       "docs/fem/files/xslope_griffiths6_full.xlsx",
       "docs/fem/files/xslope_piles_fem.xlsx",
       "docs/fem/files/xslope_piles_fem_nopile.xlsx",
+      "docs/fem/files/xslope_torggler_3a_nopile.xlsx",
+      "docs/fem/files/xslope_torggler_3a_plate.xlsx",
       "docs/lem/files/xslope_acads_simple.xlsx",
       "docs/lem/files/xslope_arai_tagyo.xlsx",
       "docs/lem/files/xslope_gsat_nowater.xlsx",
       "docs/lem/files/xslope_gsat_piezo.xlsx",
       "docs/lem/files/xslope_gsat_sidecar.xlsx",
+      "docs/lem/files/xslope_hassiotis.xlsx",
+      "docs/lem/files/xslope_hassiotis_p1.xlsx",
+      "docs/lem/files/xslope_hassiotis_p2.xlsx",
       "docs/lem/files/xslope_piles.xlsx",
       "docs/lem/files/xslope_prob_submerged_KEY.xlsx",
       "docs/lem/files/xslope_simple_embankment.xlsx",
@@ -22283,6 +22784,8 @@
     "non-circular": [
       "docs/fem/files/xslope_griffiths3_r0p2.xlsx",
       "docs/fem/files/xslope_noncircular_fem.xlsx",
+      "docs/fem/files/xslope_torggler_3b_nopile.xlsx",
+      "docs/fem/files/xslope_torggler_3b_plate.xlsx",
       "docs/lem/files/xslope_acads_weak_layer.xlsx",
       "docs/lem/files/xslope_noncircular.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
@@ -22314,6 +22817,10 @@
     ],
     "piles": [
       "docs/fem/files/xslope_piles_fem.xlsx",
+      "docs/fem/files/xslope_torggler_3a_plate.xlsx",
+      "docs/fem/files/xslope_torggler_3b_plate.xlsx",
+      "docs/lem/files/xslope_hassiotis_p1.xlsx",
+      "docs/lem/files/xslope_hassiotis_p2.xlsx",
       "docs/lem/files/xslope_piles.xlsx",
       "docs/verification/files/geostudio/gs2_wall.xlsx",
       "docs/verification/files/rocscience/vp049.xlsx",
@@ -22328,6 +22835,9 @@
     "probabilistic": [
       "docs/fem/files/xslope_simple_mult_layers_fem.xlsx",
       "docs/lem/files/xslope_acads_simple.xlsx",
+      "docs/lem/files/xslope_hassiotis.xlsx",
+      "docs/lem/files/xslope_hassiotis_p1.xlsx",
+      "docs/lem/files/xslope_hassiotis_p2.xlsx",
       "docs/lem/files/xslope_prob_submerged_KEY.xlsx",
       "docs/verification/files/rocscience/vp028a.xlsx",
       "docs/verification/files/rocscience/vp028b.xlsx",

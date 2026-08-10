@@ -101,7 +101,7 @@ def _ssrm_builders(m):
 # deliberately absent: it is a parked/blocked example whose BUILDERS list is empty.
 _GS2_MODULES = ('build_gs2_18 build_gs2_22 build_gs2_26 build_gs2_33 build_gs2_45 '
                 'build_gs2_46 build_gs2_cons build_gs2_heap build_gs2_infil '
-                'build_gs2_mso build_gs2_pond build_gs2_rdd').split()
+                'build_gs2_mso build_gs2_pond build_gs2_rdd build_gs2_wall').split()
 
 
 def _gs2_builders(mods):
@@ -162,6 +162,12 @@ GROUPS = {
                   corpus='docs/verification/files/rocscience',
                   builders=lambda m: list(m.BUILDERS),
                   slow=False),
+    # The three finite-element variants of VP106 (the Cai & Ugai 2D-vs-3D pile
+    # diagnostic). They only WRITE files -- no solve -- so they are cheap.
+    'vp106_fem': dict(module='build_vp106_fem', outattr='OUT',
+                      corpus='docs/verification/files/rocscience',
+                      builders=lambda m: list(m.BUILDERS),
+                      slow=False),
     'ssrm': dict(module='benchmarks.build_ssrm', outattr='OUTDIR',
                  corpus='docs/fem/files',
                  builders=_ssrm_builders,

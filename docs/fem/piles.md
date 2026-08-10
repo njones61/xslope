@@ -17,6 +17,52 @@ This approach captures several behaviors that are difficult or impossible to mod
 For background on the general finite element slope stability methodology in XSLOPE, see the [FEM Overview](overview.md). For the LEM treatment of piles, including force resolution, typical parameters, and the Ito & Matsui method, see [LEM Piles](../lem/piles.md).
 
 
+## Applicability: Continuous Walls and Discrete Pile Rows
+
+A two-dimensional beam element is a plane-strain member. It is continuous out of plane, and its $EA$ and
+$EI$ are stiffnesses per metre of wall. That is an exact description of one kind of structure and an
+idealization of another, and the difference decides which of XSLOPE's two paths a problem belongs on.
+
+**Continuous walls** — sheet pile walls, diaphragm walls, secant pile walls — *are* continuous out of
+plane, so the beam formulation represents them directly and the spacing $S$ is 1. This is the case the
+finite element path is verified on, at both levels:
+
+- The element itself is measured against closed-form beam theory with no soil present: simply supported
+  and cantilever deflections, moments, shears and support reactions, the axial $EA/L$ action, the
+  rotation into global coordinates at five orientations, the $1/S$ scaling and the circular-section
+  constants derived from a diameter. All reproduce to machine precision
+  (`test/beam_element_check.py`, against the closed forms of GeoStudio's SIGMA/W *Beams and Bars in a
+  Frame* verification).
+- The whole path — wall, soil, pore pressures and strength reduction together — is measured against
+  GeoStudio's SIGMA/W *slope stabilization with piles* example, in which a sheet pile wall driven from a
+  bench through a weak clay band raises the strength reduction factor of safety from about 1.03 to about
+  1.4, with the wall's bending moment and shear reported down its length. See
+  [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall).
+
+**Discrete pile rows** are not continuous out of plane. Soil arches onto the piles and, at wide enough
+spacing, moves between them, so the load a pile attracts is set by a three-dimensional mechanism. Dividing
+$EA$ and $EI$ by the spacing (see [Assembly](#assembly)) smears one pile's stiffness over a metre of wall.
+That reproduces the row's average stiffness; it does not reproduce the arching, and shared-node coupling
+does not reproduce the slip that develops on each pile's surface (see
+[Pile-Soil Interface and Load Transfer](#pile-soil-interface-and-load-transfer)).
+
+The size of that idealization is measured rather than asserted. Cai & Ugai (2000) analysed one
+pile-stabilized slope both ways — with a three-dimensional strength reduction finite element model that
+meshes the individual piles with slip interfaces, and with limit equilibrium — and XSLOPE's SSRM is run on
+the same slope at a spacing of three diameters in
+[the VP106 diagnostic](../verification/rocscience.md#vp106-fem). The comparison there states the measured
+differences.
+
+**Which path to use.** For a discrete pile row, the validated route is limit equilibrium with the Ito &
+Matsui (1975) limit pressure, which is a theory *of* the three-dimensional mechanism rather than a
+two-dimensional substitute for it: XSLOPE computes it automatically from the pile diameter and spacing,
+and it is verified across four spacings against both Slide2 and the originating paper in
+[VP106](../verification/rocscience.md#vp106) and again in
+[VP54](../verification/rocscience.md#vp54). See [LEM Piles](../lem/piles.md). The finite element path
+remains the right one for a continuous wall, and for a pile row it is best read as a stiffness-and-force
+study whose factor of safety carries the idealization above.
+
+
 ## Comparison with Reinforcement (Truss) Elements
 
 The existing FEM module models flexible reinforcement as **2-node truss elements** (axial only, tension only). Piles reuse much of this infrastructure but differ in key ways:

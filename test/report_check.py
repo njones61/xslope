@@ -14769,25 +14769,25 @@ def _map_labels(slope_data, bundle, kind, highlight=None):
 
 
 def test_the_member_terms_are_defined_where_they_are_used():
-    """Utilization and the failure band are defined on the page that uses them.
+    """Utilization and the band are defined on the page that uses them.
 
     A member subsection printed a utilization column, a State column reading
-    "at capacity", and figures carrying a shaded failure band, and defined none
-    of the three. Norm, reading it: "A good clear explanation would help
-    tremendously."
+    "at capacity", and figures carrying a shaded band, and defined none of the
+    three. Norm, reading it: "A good clear explanation would help tremendously."
 
     Each definition is written once per report — the term is one term, however
     many runs and however many kinds of member the report describes — and the
     state language matches the classes the solver actually records: at capacity
     is a member holding its full capacity, softened is one that has dropped onto
     its residual, pulled out is one with no residual left carrying nothing.
+
+    The band is the one term that is really two. On a strength reduction run it
+    marks the mechanism; on a run that converged under gravity there is no
+    mechanism, and the shared sentence had a stable section's members crossed by
+    a failure the analysis never found.
     """
     fails = []
-    from xslope.report import UTILIZATION_DEFINED
-
-    band = ("The failure band marked on a figure is the stretch of the member "
-            "the failure mechanism passes through, read from the shear strain "
-            "field")
+    from xslope.report import BAND_DEFINED, UTILIZATION_DEFINED
 
     # What each definition has to say, as against merely being present: the
     # page is compared to the constant below, so the constant is compared to
@@ -14801,15 +14801,63 @@ def test_the_member_terms_are_defined_where_they_are_used():
             if word not in UTILIZATION_DEFINED[kind]:
                 fails.append(f"the {kind} definition of utilization does not "
                              f"say {word!r}: {UTILIZATION_DEFINED[kind]!r}")
+
+    # The band means one thing on a run that developed a mechanism and another
+    # on one that converged under gravity, and the two definitions are held
+    # apart: the converged one cannot claim a failure the analysis never found.
+    for word in ("failure mechanism passes through", "shear strain field"):
+        if word not in BAND_DEFINED["failure"]:
+            fails.append(f"the at-failure band definition does not say {word!r}: "
+                         f"{BAND_DEFINED['failure']!r}")
+    if "computed shear strain concentrates" not in BAND_DEFINED["converged"]:
+        fails.append(f"the converged band definition does not say where the "
+                     f"strain concentrates: {BAND_DEFINED['converged']!r}")
+    if "failure" in BAND_DEFINED["converged"]:
+        fails.append(f"a run that reached no failure is told about one: "
+                     f"{BAND_DEFINED['converged']!r}")
+
+    # The two sample models are documented from a gravity trial each — no
+    # snapshot, no mechanism — so their pages take the converged definition and
+    # not the other one.
     for label, xlsx, kind in (("reinforcement", FEM_REINF_XLSX, "reinforcement"),
                               ("piles", FEM_PILES_XLSX, "pile")):
         said = " ".join(_prose(_engine_report("fem", xlsx=xlsx)))
         for what, phrase in (("utilization", UTILIZATION_DEFINED[kind]),
-                             ("the failure band", band)):
+                             ("the band", BAND_DEFINED["converged"])):
             n = said.count(phrase)
             if n != 1:
                 fails.append(f"{label}: {what} is defined {n} times on the page "
                              f"({phrase[:48]!r}…)")
+        if BAND_DEFINED["failure"] in said:
+            fails.append(f"{label}: a converged gravity run's band is called the "
+                         f"failure mechanism's")
+
+    # And the run that DID develop one: the shipped strength reduction solution,
+    # which is what the reinforcement deliverable is built from.
+    _sd, ssrm = _restored(FEM_REINF_XLSX)
+    if not ssrm.get("fem"):
+        fails.append("the reinforcement sample ships no strength reduction run, "
+                     "so the at-failure definition is untested")
+    else:
+        at_failure = " ".join(_prose(_engine_report(
+            "fem", bundle=ssrm["fem"], xlsx=FEM_REINF_XLSX)))
+        if at_failure.count(BAND_DEFINED["failure"]) != 1:
+            fails.append(f"a run carrying a mechanism defines the failure band "
+                         f"{at_failure.count(BAND_DEFINED['failure'])} times")
+        if BAND_DEFINED["converged"] in at_failure:
+            fails.append("a run carrying a mechanism calls its band the "
+                         "converged field's")
+        # A report of both kinds of run defines each band once: the term is two
+        # terms, and the first must not silence the second.
+        _gd, gravity = _fem_1d_bundle(FEM_REINF_XLSX)
+        mixed = " ".join(_prose(_built_report(
+            _sd, {"fem": [ssrm["fem"], gravity]},
+            {"input_path": FEM_REINF_XLSX, "lem": False, "pd_figure": False})))
+        for state in ("failure", "converged"):
+            n = mixed.count(BAND_DEFINED[state])
+            if n != 1:
+                fails.append(f"a report of a mechanism run and a gravity run "
+                             f"defines the {state} band {n} times")
 
     # The states, where the model declares a residual capacity for them to be
     # reachable — and the definition that they are the softening latch's, not
@@ -14837,7 +14885,7 @@ def test_the_member_terms_are_defined_where_they_are_used():
                      f"subsection(s), so a repeated definition could not arise")
     twice = " ".join(_prose(two_runs))
     for what, phrase in (("utilization", UTILIZATION_DEFINED["reinforcement"]),
-                         ("the failure band", band)):
+                         ("the band", BAND_DEFINED["converged"])):
         n = twice.count(phrase)
         if n != 1:
             fails.append(f"a report of two runs defines {what} {n} times")

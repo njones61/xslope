@@ -141,6 +141,22 @@ def field_state_label(field_state):
     return "at failure" if field_state == "failure" else "last converged"
 
 
+def band_state(solution, failure_solution=None):
+    """Which field the band across a member was read from: ``'failure'`` where a
+    mechanism was captured, ``'converged'`` where none was.
+
+    A different question from the profile's own ``field_state``, and it has a
+    different answer. The forces switch between the two fields; the band does
+    not — it is read from the snapshot in both states when there is one (see
+    :func:`_mechanism_field`), so on a strength reduction run it always marks the
+    mechanism. On a run that reached no failure there is no mechanism to mark,
+    and what the band shows is where the CONVERGED shear strain concentrates —
+    a real reading, and not the one the words "failure band" describe.
+    """
+    return ("failure" if has_failure_state(solution, failure_solution)
+            else "converged")
+
+
 # --------------------------------------------------------------------------
 # presence / discovery
 # --------------------------------------------------------------------------
@@ -527,7 +543,8 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     ``bond_s``, ``bond_q`` : mobilized bond force per unit length, dT/ds, at the
         boundaries between consecutive elements
     ``slip_modelled`` : False — see note below
-    ``band_lo``, ``band_hi``, ``band_peak`` : failure-band extents in ``s``
+    ``band_lo``, ``band_hi``, ``band_peak`` : band extents in ``s``
+    ``band_state`` : the field that band was read from (:func:`band_state`)
     ``peak_s``, ``peak_T``, ``peak_utilization``, ``badge``, ``status``
     ``peak_indices`` : every sample standing at the greatest utilization
     ``peak_span``, ``peak_T_span`` : the stretch of ``s``, and the range of
@@ -663,6 +680,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "slip_modelled": False,
         "mechanism": mech,
         "band_lo": band_lo, "band_hi": band_hi, "band_peak": band_peak,
+        "band_state": band_state(solution, failure_solution),
         "peak_s": float(s[peak_i]) if peak_i is not None else None,
         "peak_T": float(T[peak_i]) if peak_i is not None else None,
         "peak_utilization": peak_util,
@@ -795,7 +813,8 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
     ``limit_depth``, ``limit_p`` : the Ito & Matsui limiting resistance
         envelope (None when the model does not supply pile diameter and spacing)
     ``max_moment``, ``max_moment_depth``
-    ``band_depth`` : depth at which the failure band crosses the pile
+    ``band_depth`` : depth at which the band crosses the pile
+    ``band_state`` : the field that band was read from (:func:`band_state`)
     ``peak_utilization``, ``badge``, ``status``, ``utilization_basis``
     ``field_state`` : the state the series above were read at
     ``units``
@@ -828,7 +847,9 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         "limit_depth": None, "limit_p": None, "reaction_ratio": None,
         "V_cap": None, "M_cap": None,
         "max_moment": None, "max_moment_depth": None,
-        "band_depth": None, "peak_utilization": None,
+        "band_depth": None,
+        "band_state": band_state(solution, failure_solution),
+        "peak_utilization": None,
         "badge": "none", "status": "no results", "utilization_basis": None,
         "units": units,
     }
@@ -962,6 +983,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         "max_moment_depth": max_moment_depth,
         "mechanism": mech,
         "band_depth": band_depth,
+        "band_state": band_state(solution, failure_solution),
         "peak_utilization": util,
         "utilization_basis": basis,
         "badge": _badge(util),

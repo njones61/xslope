@@ -7343,6 +7343,24 @@ UTILIZATION_DEFINED = {
         "limiting resistance where it does not."),
 }
 
+#: What the band drawn across a member is, per the field it was read from
+#: (:func:`xslope.fem_details.band_state`). A strength reduction run captured a
+#: mechanism and the band marks where it crosses the member. A run that converged
+#: under gravity found no failure at all, and the band it carries is where the
+#: computed shear strain concentrates — the same reading, of a section that is
+#: standing. The figure names the mark the same way
+#: (:func:`xslope.plot_fem_details.band_label`).
+BAND_DEFINED = {
+    "failure": (
+        "The failure band marked on a figure is the stretch of the member the "
+        "failure mechanism passes through, read from the shear strain field; a "
+        "member the mechanism does not reach carries none."),
+    "converged": (
+        "The shear strain band marked on a figure is the stretch of the member "
+        "where the computed shear strain concentrates; a member the "
+        "concentration does not reach carries none."),
+}
+
 #: What one detail figure's caption calls it, before the member's own name.
 DETAIL_FIGURE_CAPTIONS = {
     "reinforcement": "Axial force and bond transfer along",
@@ -7611,7 +7629,7 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     # Which field the forces were read from, named the way the results view
     # names it: the developed mechanism where the run captured one, and the
     # converged field where it did not.
-    from .fem_details import field_state_label
+    from .fem_details import band_state, field_state_label
     state = field_state_label(profiles[0].get("field_state", "converged"))
     read_at = ("The forces are read from the developed mechanism at failure."
                if state == "at failure" else
@@ -7729,13 +7747,18 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         text = (f"For each {spec['one']}, {named} {verb} "
                 f"{DETAIL_FIGURE_SHOWS[kind]}.")
         # The mark the figures carry that nothing else in the report explains,
-        # written the first time a figure carries it.
-        if "failure band" not in defined:
-            defined.add("failure band")
-            text += (" The failure band marked on a figure is the stretch of "
-                     "the member the failure mechanism passes through, read "
-                     "from the shear strain field; a member the mechanism does "
-                     "not reach carries none.")
+        # written the first time a figure carries it — and it does not mean the
+        # same thing on every run, so the definition follows the run. A run that
+        # converged under gravity reached no failure, and calling the band it
+        # carries a failure mechanism describes a collapse the analysis never
+        # found. Keyed by which sentence it is, so a report carrying both kinds
+        # of run writes each once rather than letting the first silence the
+        # second.
+        band = BAND_DEFINED[band_state(bundle.get("solution") or {},
+                                       bundle.get("failure_solution"))]
+        if band not in defined:
+            defined.add(band)
+            text += f" {band}"
         if len(figures) < len(profiles):
             # A profile whose plot could not be produced still has a row: the
             # table is the record, and the sentence says how many are only there.

@@ -32,7 +32,7 @@ import numpy as np
 # Colours, kept in one place so the two figures read as one family.
 C_FORCE = "#1f5fa9"        # mobilized quantity
 C_ENVELOPE = "#333333"     # declared capacity
-C_BAND = "#d95f0e"         # failure band
+C_BAND = "#d95f0e"         # failure / shear strain band (see band_label)
 C_PEAK = "#c0392b"         # peak / maximum marker
 C_SOFT = "#8e44ad"         # softened to residual
 C_PULL = "#000000"         # pulled out
@@ -200,6 +200,20 @@ def _annotate_inside(ax, xy, text, color, fontsize=8.5, fontweight="bold",
                 arrowprops=arrow, zorder=8)
 
 
+def band_label(profile):
+    """What the band drawn across a member is called on the figure.
+
+    A strength reduction run captured a mechanism and the band marks it. A run
+    that converged under gravity and reached no failure has no mechanism to
+    mark, and its band is where the computed shear strain concentrates — which
+    is worth drawing and is not a failure. The name follows the field the band
+    was read from (:func:`xslope.fem_details.band_state`), so the mark on the
+    page and the sentence that defines it in the report say one thing.
+    """
+    return ("failure band" if (profile or {}).get("band_state") == "failure"
+            else "shear strain band")
+
+
 def _title(profile):
     util = profile.get("peak_utilization")
     bits = [profile["label"]]
@@ -224,9 +238,9 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     Upper panel: mobilized axial force along the bar, over the dashed capacity
     envelope — the pullout ramp developing from each free end over its
     development length, the tensile plateau at Tmax in the middle, and the step
-    to the connection capacity at an anchored end. The failure band the
-    mechanism field puts on this bar is shaded, and elements that softened or
-    pulled out are marked where they occur.
+    to the connection capacity at an anchored end. The band the mechanism field
+    puts on this bar is shaded and named by :func:`band_label`, and elements that
+    softened or pulled out are marked where they occur.
 
     The point of greatest utilization is ringed where it is a point, and where
     the line holds that utilization over a stretch — which is the usual case,
@@ -348,8 +362,8 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     # the one naming the utilization is placed knowing where it ended up.
     if lo is not None:
         band_x = 0.5 * (lo + hi) if hi is not None else lo
-        _annotate_inside(ax, (band_x, ax.get_ylim()[1]), "failure band", C_BAND,
-                         fontsize=8, fontweight="normal")
+        _annotate_inside(ax, (band_x, ax.get_ylim()[1]), band_label(profile),
+                         C_BAND, fontsize=8, fontweight="normal")
 
     if span is not None and len(tied):
         mid = 0.5 * (span[0] + span[1])
@@ -382,8 +396,9 @@ def plot_pile_detail(profile, fig=None):
     Four panels sharing one depth axis, pile head at the top: lateral
     displacement, shear, bending moment, and the lateral soil reaction with the
     Ito & Matsui limiting resistance dashed beside it. The maximum-moment depth
-    is marked, and the depth at which the failure band crosses the pile is ruled
-    across all four so the profiles can be read against the mechanism.
+    is marked, and the depth at which the band crosses the pile (named by
+    :func:`band_label`) is ruled across all four so the profiles can be read
+    against it.
 
     Capacity lines are drawn only for the capacities the model declares. Shear
     and moment capacities come from the ``Vcap`` and ``Mcap`` inputs; there is no
@@ -497,7 +512,7 @@ def plot_pile_detail(profile, fig=None):
     # question about the drawn panel and not about the moment. The band's label
     # is placed by the same solver, on the same terms.
     if band is not None:
-        _annotate_inside(ax_u, (ax_u.get_xlim()[0], band), "failure band",
+        _annotate_inside(ax_u, (ax_u.get_xlim()[0], band), band_label(profile),
                          C_BAND, fontsize=8, fontweight="normal")
     if profile.get("max_moment") is not None:
         _annotate_inside(ax_m, (profile["max_moment"],

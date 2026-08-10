@@ -907,6 +907,87 @@ def test_the_band_needs_the_mechanism():
     return fails
 
 
+def test_the_band_is_named_for_the_field_it_was_read_from():
+    """The band across a member is called what it is on the run that drew it.
+
+    The band is read from the at-failure snapshot whenever there is one, so on a
+    strength reduction run it marks the mechanism and "failure band" is what it
+    is. A run that converged under gravity captured no snapshot and reached no
+    failure; its band is where the computed shear strain concentrates in a
+    section that is standing, and calling that a failure band states a collapse
+    the analysis never found.
+
+    Both members, both runs, off the drawn figures.
+    """
+    fails = []
+    from xslope import fem_details as fd
+    from xslope.plot_fem_details import band_label
+
+    for path, kind, read in ((REINF_XLSX, "reinforcement",
+                              fd.reinforcement_profile),
+                             (PILES_XLSX, "pile", fd.pile_profile)):
+        slope_data, fem_data, solution = _solved(path)
+        failure = _failure_field(path)
+        ids = [m["index"] for m in fd.list_lines(fem_data, solution, slope_data)
+               if m["kind"] == kind]
+        drawn = {}
+        for state, snapshot, want in (("failure", failure, "failure band"),
+                                      ("converged", None, "shear strain band")):
+            banded = None
+            for index in ids:
+                prof = read(fem_data, solution, index, slope_data,
+                            field_state="converged", failure_solution=snapshot)
+                if fd.band_state(solution, snapshot) != state:
+                    fails.append(f"{kind}: a run {'with' if snapshot else 'without'}"
+                                 f" a snapshot reads its band from "
+                                 f"{fd.band_state(solution, snapshot)!r}")
+                    break
+                if band_label(prof) != want:
+                    fails.append(f"{kind} {prof['label']}: the {state} run's "
+                                 f"band is called {band_label(prof)!r}")
+                has_band = (prof.get("band_depth") is not None
+                            if kind == "pile" else prof.get("band_lo") is not None)
+                if has_band and banded is None:
+                    banded = prof
+            drawn[state] = banded
+            if banded is None:
+                fails.append(f"{kind}: the {state} run bands no member, so the "
+                             f"name on the figure is untested")
+                continue
+            said = " ".join(t.get_text()
+                            for ax in _drawn(banded).axes for t in ax.texts)
+            if want not in said:
+                fails.append(f"{kind} {banded['label']}: the {state} run's "
+                             f"figure does not say {want!r}: {said!r}")
+            other = ("shear strain band" if want == "failure band"
+                     else "failure band")
+            if other in said:
+                fails.append(f"{kind} {banded['label']}: the {state} run's "
+                             f"figure says {other!r}")
+
+    # Mutation: the name fixed at "failure band" whatever the run, which is what
+    # the figures said before. The converged run has to catch it.
+    import xslope.plot_fem_details as ppd
+    real = ppd.band_label
+    ppd.band_label = lambda profile: "failure band"
+    try:
+        slope_data, fem_data, solution = _solved(REINF_XLSX)
+        prof = next((p for p in (fd.reinforcement_profile(
+            fem_data, solution, i, slope_data) for i in range(1, 7))
+            if p.get("band_lo") is not None), None)
+        if prof is None:
+            fails.append("the gravity run bands no line, so the mutation has "
+                         "nothing to act on")
+        else:
+            said = " ".join(t.get_text() for t in _drawn(prof).axes[0].texts)
+            if "shear strain band" in said:
+                fails.append("the name was pinned to 'failure band' and the "
+                             "figure still said 'shear strain band'")
+    finally:
+        ppd.band_label = real
+    return fails
+
+
 def test_the_peak_utilization_is_tie_aware():
     """A member at its greatest utilization over a stretch reports the stretch.
 
@@ -1140,6 +1221,8 @@ def test_the_inset_follows_the_selection():
 
 CHECKS = [
     ("the failure band needs the mechanism", test_the_band_needs_the_mechanism),
+    ("the band is named for the field it was read from",
+     test_the_band_is_named_for_the_field_it_was_read_from),
     ("the inset follows the selection", test_the_inset_follows_the_selection),
     ("the peak utilization is tie-aware",
      test_the_peak_utilization_is_tie_aware),

@@ -1082,7 +1082,14 @@ def _tseep_sidecar_bundle(stem, slope_data, notes):
 
 
 def _fem_sidecar_bundle(stem, slope_data, notes):
-    """The finite element bundle saved beside a model, or ``None``."""
+    """The finite element bundle saved beside a model, or ``None``.
+
+    The nodal and element fields are read against the model's own mesh, so a field
+    that is not this model's cannot be read at all. The reinforcement and pile
+    result files carry no such check of their own shape, so the reader states which
+    of them it refused (``sidecar_notes``); those refusals join the notes here,
+    where a field that could not be read is reported.
+    """
     nodes = f"{stem}_fem_nodes.csv"
     if not os.path.exists(nodes):
         return None
@@ -1098,6 +1105,11 @@ def _fem_sidecar_bundle(stem, slope_data, notes):
         notes.append(f"{os.path.basename(stem)}_fem_*.csv could not be read: "
                      f"{exc}")
         return None
+
+    # A member sidecar the reader refused as not this model's, on the converged
+    # field or on the at-failure twin.
+    for field in (solution, solution.get("failure_solution") or {}):
+        notes.extend(field.pop("sidecar_notes", []))
 
     meta = import_fem_meta(stem) or {}
     # The strength reduction factor the saved field was solved at, where the run

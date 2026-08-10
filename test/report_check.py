@@ -15235,6 +15235,89 @@ def test_unusable_sidecars_are_reported_not_raised():
     return fails
 
 
+def _rewrite_member_csv(path, edit):
+    """``path`` with ``edit`` applied to its data rows — the comment header and the
+    column line are kept, since that is what a real member sidecar looks like and
+    the reader skips the one and needs the other."""
+    with open(path) as f:
+        lines = f.readlines()
+    head = [ln for ln in lines if ln.startswith("#")]
+    body = [ln for ln in lines if not ln.startswith("#")]
+    with open(path, "w") as f:
+        f.writelines(head + [body[0]] + edit(body[1:]))
+
+
+def test_member_companions_that_are_not_this_models_are_refused():
+    """Member forces are restored from a file only when the file is this model's.
+
+    ``{stem}_fem_reinf.csv`` and ``{stem}_fem_piles.csv`` are found by name beside
+    the field, and a name carries no model identity: a file holding another
+    model's members was grafted on, and rows addressing elements this model does
+    not have were dropped one at a time, so a partial set of forces arrived
+    looking like a solved result. Each file is measured against the model's own
+    element count, and one that disagrees is left out whole and named — the same
+    treatment, through the same notes, a field saved against a rebuilt mesh gets.
+    """
+    fails = []
+
+    # The model's own files: the members come back, and nothing is said.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(os.path.splitext(FEM_PILES_XLSX)[0], tmp)
+        notes = []
+        _sd, solutions = _restored(f"{stem}.xlsx", notes)
+        sol = (solutions.get("fem") or {}).get("solution") or {}
+        if "forces_pile_lateral" not in sol:
+            fails.append("a model read beside its own pile companion got no "
+                         "pile forces")
+        if notes:
+            fails.append(f"a model read beside its own companions was faulted "
+                         f"for it: {notes}")
+
+    # A file holding more members than the model has. Count alone settles it:
+    # every row could address an element that exists and the file would still be
+    # a different model's.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(os.path.splitext(FEM_PILES_XLSX)[0], tmp)
+        _rewrite_member_csv(f"{stem}_fem_piles.csv", lambda rows: rows[:-1])
+        notes = []
+        _sd, solutions = _restored(f"{stem}.xlsx", notes)
+        sol = (solutions.get("fem") or {}).get("solution") or {}
+        if "forces_pile_lateral" in sol:
+            fails.append("a pile companion with the wrong number of members was "
+                         "grafted onto the model anyway")
+        if not any("_fem_piles.csv" in n and "not this model's" in n
+                   for n in notes):
+            fails.append(f"a pile companion that was refused is not in the "
+                         f"notes: {notes}")
+
+    # A file whose rows address elements the model does not carry. The row count
+    # is right; the ids are not, and every row that missed used to vanish in
+    # silence.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(os.path.splitext(FEM_REINF_XLSX)[0], tmp)
+
+        def _shift(rows):
+            out = []
+            for ln in rows:
+                cells = ln.split(",")
+                cells[0] = str(int(cells[0]) + 100000)
+                out.append(",".join(cells))
+            return out
+
+        _rewrite_member_csv(f"{stem}_fem_reinf.csv", _shift)
+        notes = []
+        _sd, solutions = _restored(f"{stem}.xlsx", notes)
+        sol = (solutions.get("fem") or {}).get("solution") or {}
+        if "forces_1d" in sol:
+            fails.append("a reinforcement companion addressing elements the "
+                         "model does not have was grafted onto it anyway")
+        if not any("_fem_reinf.csv" in n and "not this model's" in n
+                   for n in notes):
+            fails.append(f"a reinforcement companion that was refused is not in "
+                         f"the notes: {notes}")
+    return fails
+
+
 # --------------------------------------------------------------------------
 # H. nothing is said that is not so
 # --------------------------------------------------------------------------
@@ -17616,6 +17699,8 @@ CHECKS = [
      test_sidecars_assemble_the_solutions),
     ("an unusable companion is reported, not raised",
      test_unusable_sidecars_are_reported_not_raised),
+    ("a member companion that is not this model's is refused",
+     test_member_companions_that_are_not_this_models_are_refused),
     ("the water prose follows the model", test_water_prose_is_conditional),
     ("members stand with the engine that reads them",
      test_members_stand_with_the_engine_that_reads_them),

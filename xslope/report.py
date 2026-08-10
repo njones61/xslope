@@ -1344,7 +1344,12 @@ def mesh_counts(container):
         return []
     kinds = _join([ELEMENT_LONG_NAMES.get(t, f"{ELEMENT_NAMES.get(t, t)} elements")
                    for t in types])
-    return [f"{n_nodes:,} nodes", f"{n_elems:,} {kinds}"]
+    if n_elems == 1:
+        # A one-element mesh is degenerate, but "1 elements" is a sentence the
+        # report would print rather than refuse.
+        kinds = kinds.replace(" elements ", " element ")
+    return [f"{n_nodes:,} node" if n_nodes == 1 else f"{n_nodes:,} nodes",
+            f"{n_elems:,} {kinds}"]
 
 
 def one_d_counts(fem_data):
@@ -6338,15 +6343,21 @@ def _seep_bc_marked(n_head, n_exit):
 #: boundary discontinuity, on the drawn-down face — and never at the exit face a
 #: piping check is made on. A sentence that cannot be derived from the solution
 #: cannot be held to it, so none is written.
-def _shown_in(subjects, where, when="", tail=""):
+def _shown_in(subjects, where, when="", tail="", plural=None):
     """``"The pore pressure field is shown in Figure 5."`` — one figure sentence
     in the register the owner set: the subject first, the figure reference inside
-    the sentence, and the verb agreeing with however many things are named.
+    the sentence, and the verb agreeing with the subject.
 
     ``subjects`` is one phrase or a list of them, written the way the figure's own
     overlays are named. ``when`` is a time the subject is qualified by ("at
     t = 15 days"), which belongs to the subject and not to the figure. ``tail`` is
     a clause the sentence ends on.
+
+    ``plural`` is the subject's own number, for the case the item count cannot
+    settle: a list of one whose one member is itself plural — "the head contours"
+    on a frame carrying neither a phreatic surface nor a boundary water level —
+    takes a plural verb, and counting the list would have written "The head
+    contours is shown". A caller that knows says so; otherwise the count decides.
     """
     if isinstance(subjects, str):
         subjects = [subjects] if subjects else []
@@ -6355,7 +6366,8 @@ def _shown_in(subjects, where, when="", tail=""):
         return ""
     named = _join(subjects)
     named = named[0].upper() + named[1:]
-    verb = "is shown" if len(subjects) == 1 else "are shown"
+    many = len(subjects) > 1 if plural is None else plural
+    verb = "are shown" if many else "is shown"
     at = f" at {when}" if when else ""
     return f"{named}{at} {verb} in {where}{tail}."
 
@@ -6619,7 +6631,9 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
                   # figure was still credited with them.
                   "the water level held by each specified-head boundary"
                   if levels_drawn else ""] if item]
-        text += f" {_shown_in(drawn, where)}"
+        # Plural whatever else the figure carries: the head contours are always
+        # on it, and they are contours.
+        text += f" {_shown_in(drawn, where, plural=True)}"
     sub.blocks.append(Prose(text, links=links))
 
     q = _num(solution.get("flowrate"))
@@ -7019,7 +7033,10 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
             sub.blocks.append(Prose(
                 _shown_in(shows, where, when=said_when,
                           tail=(", with the velocity vectors drawn over it"
-                                if panel["vectors"] else "")),
+                                if panel["vectors"] else ""),
+                          # The head figure's subject opens on the contours,
+                          # however few overlays a given state carries.
+                          plural=True if variable == "head" else None),
                 links=links))
             sub.blocks.append(figure)
 

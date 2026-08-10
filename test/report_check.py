@@ -10703,6 +10703,57 @@ def test_one_term_for_flow_lines():
     return fails
 
 
+def test_a_figure_sentence_agrees_with_its_subject():
+    """The verb in a figure sentence follows the subject, not the number of
+    things listed.
+
+    "The pore pressure field is shown in Figure 5" and "The head contours and
+    the flow lines are shown in Figure 4" are settled by the count. "The head
+    contours", alone on a state carrying no phreatic surface and no boundary
+    water level, is not: one item in the list, a plural noun, and a verb chosen
+    by counting wrote "The head contours is shown in Figure 3". The caller that
+    knows its subject's number says so.
+    """
+    fails = []
+    from xslope.report import _shown_in
+
+    for subjects, kwargs, want in (
+            ("the pore pressure field", {}, "The pore pressure field is shown "
+             "in Figure 5."),
+            (["the head contours", "the flow lines"], {},
+             "The head contours and the flow lines are shown in Figure 5."),
+            (["the head contours"], {"plural": True},
+             "The head contours are shown in Figure 5."),
+            (["the phreatic surface"], {"plural": False},
+             "The phreatic surface is shown in Figure 5."),
+            ("the magnitude of the seepage velocity",
+             {"when": "t = 0 days",
+              "tail": ", with the velocity vectors drawn over it"},
+             "The magnitude of the seepage velocity at t = 0 days is shown in "
+             "Figure 5, with the velocity vectors drawn over it."),
+            ([], {}, ""),
+            (["", None], {}, "")):
+        got = _shown_in(subjects, "Figure 5", **kwargs)
+        if got != want:
+            fails.append(f"{subjects!r} {kwargs}: {got!r}, not {want!r}")
+
+    # And the mesh counts agree too: a one-element mesh is degenerate, but the
+    # sentence would print "1 elements" rather than refuse to print.
+    import numpy as np
+    from xslope.report import mesh_counts, one_d_counts
+    single = mesh_counts({"nodes": np.zeros((1, 2)),
+                          "elements": np.zeros((1, 6)),
+                          "element_types": np.array([6])})
+    if single != ["1 node", "1 six-node quadratic triangular element (tri6)"]:
+        fails.append(f"a one-element mesh is counted {single!r}")
+    lone = one_d_counts({"elements_1d": np.zeros((1, 3), int),
+                         "element_types_1d": np.array([2]),
+                         "pile_elem_mask": np.array([True])})
+    if lone != ["1 two-node beam element for the piles"]:
+        fails.append(f"a single pile element is counted {lone!r}")
+    return fails
+
+
 def test_seep_boundaries_not_on_record():
     """A solution restored without the boundary conditions that produced it says
     so, rather than describing a boundary problem that does not exist.
@@ -10750,6 +10801,14 @@ def test_seep_boundaries_not_on_record():
         fails.append(f"the model figure does not say what it does show: {lead!r}")
     if "The seepage mesh constructed for the problem is shown in" not in lead:
         fails.append(f"the inputs do not say what the mesh figure is: {lead!r}")
+
+    # And the head figure's sentence agrees with its own subject. This solve
+    # carries neither a phreatic surface nor a boundary water level, so the
+    # subject is the contours ALONE — one item in the list and a plural noun —
+    # and a verb chosen by counting the list wrote "The head contours is shown".
+    if "The head contours are shown in" not in text:
+        fails.append(f"the head figure's sentence does not agree with its "
+                     f"subject: {text!r}")
 
     # And they say it ONCE. The sentence stood in the inputs and in the results,
     # on facing pages, for the same model. It belongs to the results — the fact is
@@ -18421,6 +18480,8 @@ CHECKS = [
     ("one term for the lines a flow net draws", test_one_term_for_flow_lines),
     ("a solve whose boundaries are not on record",
      test_seep_boundaries_not_on_record),
+    ("a figure sentence agrees with its subject",
+     test_a_figure_sentence_agrees_with_its_subject),
     ("a solution whose record and boundaries disagree",
      test_seep_stale_sidecar_says_so),
     ("a solution that records no flow rate", test_seep_without_a_flowrate),

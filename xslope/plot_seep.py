@@ -864,9 +864,58 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
                 velocity_scaled = velocity * scale_factor
             else:
                 velocity_scaled = velocity
-            
+
+            # WHERE the arrows go, which is separate from how long they are. An arrow
+            # per node draws the mesh rather than the flow: a mesh is refined where the
+            # solver needs resolution, so the arrows crowd into exactly the zone the
+            # flow concentrates in and read there as a black smudge, while the quiet
+            # part of the domain gets the sparse arrows nobody needed.
+            #
+            # So the arrows are placed on a regular grid instead, one per cell, and the
+            # cell is square in data units with a side of max_vector_length — the length
+            # of the longest arrow the figure will draw. That is the only spacing that
+            # cannot be crowded: the longest arrow exactly spans its own cell and so can
+            # never reach into another's. It needs no tuning and no figure-size term,
+            # because the arrows are drawn in data units (scale_units='xy'), so it is
+            # the domain that sets whether they collide, not how large the figure is.
+            # The domain's aspect then sets the row and column counts by itself.
+            #
+            # Nothing here touches how long an arrow is. The scaling above — this
+            # frame's own maximum, or the vector_max a series is pinned to — is applied
+            # to the sampled field exactly as it was to the nodal field, so an arrow of
+            # a given length still means the same speed, and paired or dual solutions
+            # pinned to one vector_max still share their scale across the arrows that
+            # remain.
+            y_min_vec, y_max_vec = nodes[:, 1].min(), nodes[:, 1].max()
+            y_range = y_max_vec - y_min_vec
+            step = max_vector_length
+            n_x = max(int(np.ceil(x_range / step)), 1) if step > 0 else 0
+            n_y = max(int(np.ceil(y_range / step)), 1) if step > 0 else 0
+
+            # A grid denser than the field it samples would invent arrows rather than
+            # thin them, which is what a mesh coarser than the grid would do. In that
+            # case the nodes already are the sparser sample, so they are drawn directly.
+            if 0 < n_x * n_y < len(nodes):
+                gx = x_min_vec + (np.arange(n_x) + 0.5) * (x_range / n_x)
+                gy = y_min_vec + (np.arange(n_y) + 0.5) * (y_range / n_y)
+                gx, gy = np.meshgrid(gx, gy)
+                # The triangulation covers the meshed domain and nothing else, so
+                # interpolating on it masks every cell whose centre lies outside the
+                # soil — the arrows stay inside the domain the nodes described. No
+                # other mask is applied, matching the nodal overlay, which drew the
+                # unsaturated zone too (where the velocity is small and so is its
+                # arrow).
+                vx_i = tri.LinearTriInterpolator(triang, velocity_scaled[:, 0])(gx, gy)
+                vy_i = tri.LinearTriInterpolator(triang, velocity_scaled[:, 1])(gx, gy)
+                inside = ~(np.ma.getmaskarray(vx_i) | np.ma.getmaskarray(vy_i))
+                qx, qy = gx[inside], gy[inside]
+                qu, qv = np.asarray(vx_i)[inside], np.asarray(vy_i)[inside]
+            else:
+                qx, qy = nodes[:, 0], nodes[:, 1]
+                qu, qv = velocity_scaled[:, 0], velocity_scaled[:, 1]
+
             # Plot vectors using quiver
-            _q = ax.quiver(nodes[:, 0], nodes[:, 1], velocity_scaled[:, 0], velocity_scaled[:, 1],
+            _q = ax.quiver(qx, qy, qu, qv,
                      angles='xy', scale_units='xy', scale=1, width=0.002, headwidth=2.5,
                      headlength=3, headaxislength=2.5, color='black', alpha=0.7)
             _q.set_gid('VELOCITY')

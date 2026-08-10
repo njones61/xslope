@@ -8516,8 +8516,6 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # reads and which its table therefore does not carry.
     sec.children.extend(_member_sections(slope_data, opts, counter, "fem"))
 
-    for i, bundle in enumerate(bundles):
-        title = "Results" if len(bundles) == 1 else f"Run {i + 1}"
     # Terms the member subsections define on first use, shared across every run
     # so the second run's reinforcement does not define utilization again.
     defined = set()

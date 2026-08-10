@@ -404,6 +404,14 @@ def _band_span(positions, mech, global_peak=None):
     of three bars, hard against the end of the frame. A member whose greatest
     sampled strain does not reach ``BAND_FRACTION`` of the section's peak has
     not been crossed, and gets no band.
+
+    The one fraction is applied against TWO normalizations, deliberately: the
+    gate below measures the member against the section's peak, and the edges
+    against the member's own. A member barely over the gate therefore gets a
+    band as wide as one sitting in the heart of the mechanism — the band says
+    where along THIS member the field concentrates, and the gate says whether
+    that concentration is part of the mechanism at all. Neither reading wants
+    the other's denominator, and the asymmetry is not a leftover.
     """
     if mech is None or len(mech) == 0:
         return None, None, None
@@ -411,10 +419,12 @@ def _band_span(positions, mech, global_peak=None):
     peak = float(np.nanmax(mech))
     if not np.isfinite(peak) or peak <= 0:
         return None, None, None
+    # (1) the gate — this member against the whole section's peak.
     if (global_peak is not None and np.isfinite(global_peak) and global_peak > 0
             and peak < BAND_FRACTION * global_peak):
         return None, None, None
     k = int(np.nanargmax(mech))
+    # (2) the edges — the member against its OWN peak. See the note above.
     thresh = BAND_FRACTION * peak
     lo = k
     while lo - 1 >= 0 and mech[lo - 1] >= thresh:

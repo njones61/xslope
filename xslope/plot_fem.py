@@ -2060,7 +2060,7 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
         ax.plot([], [], '-', color=_GEOMETRY_MEMBER_COLOR, linewidth=3, alpha=0.9,
                 label=geometry_label)
 
-    # Draw inactive elements (cyan, solid)
+    # Draw inactive elements (green, solid)
     if inactive_lines:
         lc_outline = LineCollection(inactive_lines, colors='black', linewidths=4.5, alpha=0.9, zorder=3.9)
         ax.add_collection(lc_outline)
@@ -2095,7 +2095,7 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
         ax.add_collection(lc)
         ax.plot([], [], '-', color='magenta', linewidth=3, label='At residual (Tres)')
 
-    # Draw pulled-out elements (orange, solid)
+    # Draw pulled-out elements (black, solid)
     if pullout_lines:
         lc_outline = LineCollection(pullout_lines, colors='black', linewidths=4.5, alpha=0.9, zorder=5.9)
         ax.add_collection(lc_outline)

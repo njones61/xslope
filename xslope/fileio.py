@@ -29,7 +29,7 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from .mesh import import_mesh_from_json, build_polygons
-from .package import is_package, unpack
+from .package import MESH_SIDECAR, SEEP_SIDECARS, is_package, unpack
 from .units import (GAMMA_W, infer_system_from_gamma_water, normalize_unit_system,
                     units_check)
 # v22 main!D23 vocabulary. It lives in xslope.water, which is where the mode is
@@ -1596,8 +1596,12 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             [(x, y - tcrack_depth) for (x, y) in ground_surface.coords])
 
     # === MESH AND SEEPAGE ANALYSIS FILES ===
+    # The suffixes come from xslope.package, which is where the whole companion
+    # convention is defined: the same names the packager uses to decide which of two
+    # workbooks in one folder a results file belongs to. One definition, so the
+    # loader and the packager cannot drift into disagreeing about a project's set.
     base, _ = os.path.splitext(filepath)
-    mesh_filename = f"{base}_mesh.json"
+    mesh_filename = f"{base}{MESH_SIDECAR}"
 
     # Load mesh if it exists (used by both seep and fem workflows)
     mesh = None
@@ -1614,8 +1618,8 @@ def load_slope_data(filepath, dest=None, overwrite=False):
 
     if has_seep_materials:
         try:
-            solution1_filename = f"{base}_seep.csv"
-            solution2_filename = f"{base}_seep2.csv"
+            solution1_filename = f"{base}{SEEP_SIDECARS[0]}"
+            solution2_filename = f"{base}{SEEP_SIDECARS[1]}"
 
             if mesh is not None and os.path.exists(solution1_filename):
                 # comment="#" skips BOTH the trailing "# Total Flowrate:" footer and any

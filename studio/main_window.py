@@ -26,7 +26,8 @@ from PySide6.QtWidgets import (
 )
 
 from xslope.fileio import default_template_path
-from xslope.package import PACKAGE_EXT, is_package, pack, package_contents, unpack
+from xslope.package import (FEM_SOLUTION_SIDECARS as _FEM_SOLUTION_SIDECARS,
+                            PACKAGE_EXT, is_package, pack, package_contents, unpack)
 
 from .canvas import MplCanvas
 from .dialogs import (
@@ -62,19 +63,12 @@ MODES = [("LEM", "lem"), ("Seepage", "seep"), ("FEM", "fem")]
 TEMPLATE = default_template_path()
 CATEGORY_ROLE = Qt.UserRole + 1
 
-#: Every file ``xslope.fem.export_fem_solution`` writes beside a model, by suffix —
-#: the converged fields, the at-failure snapshot, the run metadata, and the
-#: per-member force tables for reinforcement and piles, converged and at-failure.
-#: Deleting a solution means deleting ALL of them: the member tables are read back
-#: by name, so a list that named only the nodal files left the last run's bar
-#: forces on disk to be grafted onto whatever solution was imported next.
-FEM_SOLUTION_SIDECARS = (
-    "_fem_nodes.csv", "_fem_elements.csv", "_fem_meta.json",
-    "_fem_reinf.csv", "_fem_piles.csv",
-    "_fem_failure_nodes.csv", "_fem_failure_elements.csv",
-    "_fem_failure_meta.json",
-    "_fem_failure_reinf.csv", "_fem_failure_piles.csv",
-)
+#: Every file ``xslope.fem.export_fem_solution`` writes beside a model, by suffix.
+#: Imported from ``xslope.package``, where the whole companion convention lives, so
+#: that the list this window deletes a solution by and the list the packager
+#: attributes files with are the same list. (Re-exported here because the name is
+#: part of this module's vocabulary and the editors import it from here.)
+FEM_SOLUTION_SIDECARS = _FEM_SOLUTION_SIDECARS
 
 
 # The engine prints color-emoji markers (🔁 ✅ ❌ ⚠️). Apple Color Emoji is a bitmap
@@ -924,7 +918,7 @@ class MainWindow(QMainWindow):
         dlg = UnpackPackageDialog(package, self)
         if not dlg.exec():
             return None
-        dest, mode = dlg.result()
+        dest, mode = dlg.chosen()
         workbook = os.path.join(dest, names[0])
         if mode == "existing":
             if not os.path.isfile(workbook):
@@ -992,13 +986,20 @@ class MainWindow(QMainWindow):
             if self.doc.dirty or not self.doc.path:
                 return          # the save failed or was cancelled
         stem = os.path.splitext(self.doc.path)[0]
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Export project package", stem + PACKAGE_EXT,
-            f"XSLOPE project packages (*{PACKAGE_EXT})")
-        if not path:
+        # The dialog appends the extension itself (setDefaultSuffix) rather than this
+        # code appending it afterwards: a name typed without one has to become
+        # "name.xslz" BEFORE the dialog checks whether that file exists, or the
+        # overwrite confirmation is asked about a file nobody is going to write.
+        dlg = QFileDialog(self, "Export project package", stem + PACKAGE_EXT,
+                          f"XSLOPE project packages (*{PACKAGE_EXT})")
+        dlg.setAcceptMode(QFileDialog.AcceptSave)
+        dlg.setDefaultSuffix(PACKAGE_EXT.lstrip("."))
+        if not dlg.exec():
             return
-        if not path.lower().endswith(PACKAGE_EXT):
-            path += PACKAGE_EXT
+        selected = dlg.selectedFiles()
+        if not selected:
+            return
+        path = selected[0]
         try:
             pack(self.doc.path, dest=path, overwrite=True)   # the dialog confirmed
         except Exception as exc:

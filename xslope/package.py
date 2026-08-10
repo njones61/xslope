@@ -14,8 +14,8 @@ loose files and then opens those; neither Studio nor the library ever edits insi
 package or saves back into one.
 
 The naming convention is defined once, here, in :func:`project_files`: a project's
-sidecars are its ``{base}_*`` siblings. There is no list of known suffixes to keep in
-step with the solvers — a sidecar a future solver invents travels automatically.
+sidecars are its ``{base}_*`` siblings. Collection is a glob, not a list of known
+suffixes, so a sidecar a future solver invents travels automatically.
 """
 
 import os
@@ -23,6 +23,43 @@ import zipfile
 
 #: The package extension. Studio's file dialogs and the docs both spell it from here.
 PACKAGE_EXT = ".xslz"
+
+# === THE SIDECAR SUFFIXES, IN ONE PLACE =====================================
+# Every name a solver writes beside a workbook, and every name a loader goes looking
+# for. This is the ONE definition: xslope.fileio reads MESH_SIDECAR / SEEP_SIDECARS
+# to find its companions, studio.main_window reads FEM_SOLUTION_SIDECARS to write and
+# delete an FEM solution, and project_files below uses the whole set to decide which
+# of two workbooks in one folder a file belongs to.
+#
+# The set does NOT decide what travels — an unrecognized {base}_* sibling still packs
+# (see project_files). It decides only ATTRIBUTION, and it has to be exact: a
+# nearly-right list here would hand one project's results to another.
+
+#: The mesh, read by ``load_slope_data`` and written by Build Mesh.
+MESH_SIDECAR = "_mesh.json"
+#: Steady pore-pressure fields, per boundary-condition set (2 = rapid drawdown).
+SEEP_SIDECARS = ("_seep.csv", "_seep2.csv")
+#: A transient march: the frames and the run metadata (written by xslope.seep).
+TSEEP_SIDECARS = ("_tseep.csv", "_tseep_meta.json")
+#: Every file ``xslope.fem.export_fem_solution`` writes beside a model, by suffix —
+#: the converged fields, the at-failure snapshot, the run metadata, and the per-member
+#: force tables for reinforcement and piles, converged and at-failure. Deleting a
+#: solution means deleting ALL of them: the member tables are read back by name, so a
+#: list naming only the nodal files leaves the last run's bar forces on disk to be
+#: grafted onto whatever solution is imported next.
+FEM_SOLUTION_SIDECARS = (
+    "_fem_nodes.csv", "_fem_elements.csv", "_fem_meta.json",
+    "_fem_reinf.csv", "_fem_piles.csv",
+    "_fem_failure_nodes.csv", "_fem_failure_elements.csv",
+    "_fem_failure_meta.json",
+    "_fem_failure_reinf.csv", "_fem_failure_piles.csv",
+)
+#: Studio's per-project display styles (studio.document).
+STYLES_SIDECAR = "_styles.json"
+
+#: The union: every suffix that makes a file some workbook's own companion.
+SIDECAR_SUFFIXES = ((MESH_SIDECAR,) + SEEP_SIDECARS + TSEEP_SIDECARS
+                    + FEM_SOLUTION_SIDECARS + (STYLES_SIDECAR,))
 
 
 def is_package(path):
@@ -36,22 +73,53 @@ def _abs(path):
     return os.path.abspath(os.path.expanduser(str(path)))
 
 
+def companion_of(name, stems):
+    """Which of ``stems`` claims the file ``name``, or None.
+
+    Claimed means what the LOADERS mean by it: the file is exactly some workbook's
+    stem plus one of the suffixes those loaders read and those writers write
+    (:data:`SIDECAR_SUFFIXES`). Nothing is inferred from the shape of the name, and
+    a file no suffix matches is claimed by nobody.
+
+    No suffix is a tail of another at an underscore boundary, so at most one stem can
+    match and the answer does not depend on the order of ``stems``.
+    """
+    for stem in stems:
+        if not name.startswith(stem):
+            continue
+        for suffix in SIDECAR_SUFFIXES:
+            if name == stem + suffix:
+                return stem
+    return None
+
+
 def project_files(xlsx_path):
     """Return every file that belongs to the project at ``xlsx_path``.
 
     The workbook comes first, then its sidecars in name order. A sidecar is any
     ``{base}_*`` file sitting beside the workbook — the same basename convention
     ``load_slope_data`` uses to find ``{base}_mesh.json`` and ``{base}_seep.csv``.
+    A ``{base}_*`` sibling nothing recognizes travels too: the package is transport,
+    and a file named after the project is part of it until some other project claims
+    it.
 
     Two kinds of ``{base}_*`` sibling are NOT this project's:
 
-    * another workbook (``{base}_something.xlsx``) — folders of samples routinely
-      hold ``xslope_earth_dam1.xlsx`` beside ``xslope_earth_dam1_vg.xlsx``, and
-    * that other workbook's own sidecars (``{base}_something_mesh.json``).
+    * another workbook (``{base}_something.xlsx``), and
+    * any other workbook's own companions — the files ITS loaders would read, which
+      means its stem plus one of :data:`SIDECAR_SUFFIXES`, and nothing else.
 
-    A sidecar therefore belongs to the LONGEST workbook basename that prefixes it,
-    which is exactly the attribution the loader makes when it goes looking for a
-    companion of one workbook.
+    That second test is the loaders' test, and it cannot be replaced by "the longest
+    workbook name that prefixes the file". ``vp091.xlsx`` and ``vp091_fem.xlsx`` sit
+    in one corpus folder, and ``vp091``'s own FEM results are ``vp091_fem_nodes.csv``,
+    ``vp091_fem_meta.json`` and their at-failure twins — every one of which the
+    longest-prefix reading hands to ``vp091_fem``, whose real companions are
+    ``vp091_fem_fem_nodes.csv`` and friends. Under that reading ``vp091`` packs as a
+    bare workbook and its entire solved FEM set is dropped on the floor.
+
+    The claim is checked against every other workbook in the folder, not only those
+    whose names extend this one: read the same pair the other way round and it is
+    ``vp091_fem`` that would otherwise walk off with ``vp091``'s results.
     """
     xlsx_path = _abs(xlsx_path)
     if not os.path.isfile(xlsx_path):
@@ -60,10 +128,9 @@ def project_files(xlsx_path):
     base = os.path.splitext(os.path.basename(xlsx_path))[0]
 
     names = sorted(os.listdir(folder))
-    # The other workbooks whose names extend this one; each owns its own sidecars.
     others = [os.path.splitext(n)[0] for n in names
               if n.lower().endswith(".xlsx") and not n.startswith("~$")
-              and os.path.splitext(n)[0].startswith(base + "_")]
+              and os.path.splitext(n)[0] != base]
 
     files = [xlsx_path]
     for name in names:
@@ -74,9 +141,10 @@ def project_files(xlsx_path):
             continue
         if name.lower().endswith(".xlsx"):
             continue                        # another project's workbook
-        stem = os.path.splitext(name)[0]
-        if any(stem.startswith(other + "_") for other in others):
-            continue                        # that project's sidecar
+        # This project's own companion wins any tie by construction — its loader is
+        # going to read the file by that exact name.
+        if companion_of(name, [base]) is None and companion_of(name, others):
+            continue                        # another project's companion
         files.append(path)
     return files
 

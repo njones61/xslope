@@ -2530,8 +2530,9 @@ class UnpackPackageDialog(QDialog):
     (leave the folder alone and open the project already in it) and **Extract
     Fresh** (unpack into a new numbered folder beside it).
 
-    ``result()`` returns ``(destination, mode)`` with mode ``"extract"`` or
-    ``"existing"``.
+    :meth:`chosen` returns ``(destination, mode)`` with mode ``"extract"`` or
+    ``"existing"``. (Not ``result()`` — QDialog already has one, and its meaning is
+    the accepted/rejected code every Qt caller expects.)
     """
 
     def __init__(self, package, parent=None):
@@ -2629,6 +2630,6 @@ class UnpackPackageDialog(QDialog):
             self._mode = "extract"
             self.accept()
 
-    def result(self):
+    def chosen(self):
         """``(destination folder, "extract" | "existing")``."""
         return self.dest.text(), self._mode

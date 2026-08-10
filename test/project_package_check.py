@@ -7,11 +7,17 @@ quiet, which is why each is checked here rather than left to a hands-on session:
 
   A. THE SET IS THE RIGHT SET. Sidecars are collected by the ``{base}_*`` convention
      rather than a list of known suffixes, so a sidecar a future solver invents
-     travels without anyone remembering to add it. The hazard on the other side is
-     over-collection: ``xslope_earth_dam1_vg.xlsx`` sits in the same folder as
-     ``xslope_earth_dam1.xlsx`` and its own sidecars start with the shorter name, so
-     a naive glob packs one project inside another. A sidecar belongs to the LONGEST
-     workbook basename that prefixes it — the same attribution the loader makes.
+     travels without anyone remembering to add it. Two workbooks in one folder, one
+     name extending the other, is where attribution gets decided, and it has to be
+     decided the way the LOADERS decide it — a file belongs to the workbook whose
+     loader reads it by that exact name. Reading it as "the longest workbook name
+     that prefixes the file" instead is wrong in both directions on real corpus
+     pairs: ``vp091.xlsx``'s own FEM results are ``vp091_fem_nodes.csv`` and friends
+     (``vp091_fem.xlsx``'s would be ``vp091_fem_fem_nodes.csv``), so longest-prefix
+     packs ``vp091`` as a bare workbook and silently drops its entire solved FEM set;
+     and read the other way, ``vp091_fem`` walks off with results that are not its.
+     Meanwhile ``xslope_earth_dam1_vg_mesh.json`` really is the ``_vg`` project's
+     mesh and must stay out of ``xslope_earth_dam1``.
   B. WHAT WENT IN COMES OUT. Every packed file is restored byte for byte, and the
      model the extracted workbook loads to is the model the original loads to —
      mesh and pore-pressure field included, since those live in the sidecars and
@@ -182,6 +188,107 @@ def test_file_set():
     if sorted(vg) != sorted(["xslope_earth_dam1_vg.xlsx", "xslope_earth_dam1_vg_mesh.json",
                              "xslope_earth_dam1_vg_seep.csv"]):
         fails.append(f"the neighbouring project's own set is wrong: {vg}")
+    return fails
+
+
+# ------------------------------------------- A2. attribution the loaders' way, both ways
+def _fem_pair(folder):
+    """The corpus shape that decides this: ``X.xlsx`` and ``X_fem.xlsx`` in one
+    folder, where X's FEM results are ``X_fem_*`` and X_fem's own are ``X_fem_fem_*``
+    (docs/verification/files/rocscience/vp091 and vp027 are both really like this).
+    Synthesized rather than copied so the check states the shape it is about."""
+    made = {}
+    for name in ("model.xlsx", "model_fem.xlsx",
+                 "model_fem_nodes.csv", "model_fem_meta.json",
+                 "model_fem_failure_nodes.csv",
+                 "model_fem_fem_nodes.csv", "model_fem_fem_meta.json",
+                 "model_notes.txt"):
+        path = os.path.join(folder, name)
+        with open(path, "w") as fh:
+            fh.write(name)
+        made[name] = path
+    return made
+
+
+def test_attribution():
+    """Which of two workbooks in one folder owns a results file.
+
+    The rule is the loaders' rule: a file belongs to the workbook whose loader reads
+    it by that exact name — its stem plus one of the suffixes the writers write. The
+    tempting shorthand, "the longest workbook name that prefixes it", is wrong in
+    both directions here, and wrong in a way that loses a solved FEM set without a
+    word."""
+    fails = []
+    folder = _tmp()
+    _fem_pair(folder)
+
+    got = [os.path.basename(p)
+           for p in project_files(os.path.join(folder, "model.xlsx"))]
+    want = ["model.xlsx", "model_fem_failure_nodes.csv", "model_fem_meta.json",
+            "model_fem_nodes.csv", "model_notes.txt"]
+    if sorted(got) != sorted(want):
+        fails.append(f"model.xlsx collected {sorted(got)}, expected {sorted(want)}")
+
+    got_fem = [os.path.basename(p)
+               for p in project_files(os.path.join(folder, "model_fem.xlsx"))]
+    want_fem = ["model_fem.xlsx", "model_fem_fem_meta.json", "model_fem_fem_nodes.csv"]
+    if sorted(got_fem) != sorted(want_fem):
+        fails.append(f"model_fem.xlsx collected {sorted(got_fem)}, "
+                     f"expected {sorted(want_fem)}")
+
+    # LOCALITY: what a project packs must not depend on which neighbours happen to be
+    # in the folder. Its own set, alone in a folder, is the same set.
+    alone = _tmp()
+    for name in want:
+        shutil.copy2(os.path.join(folder, name), alone)
+    solo = [os.path.basename(p)
+            for p in project_files(os.path.join(alone, "model.xlsx"))]
+    if sorted(solo) != sorted(want):
+        fails.append(f"alone in a folder model.xlsx collects {sorted(solo)} — its set "
+                     f"depends on its neighbours")
+
+    # MUTATION: reinstate the longest-prefix rule and this must go red. A guard that
+    # cannot fail is not a guard.
+    import xslope.package as P
+
+    original = P.companion_of
+    try:
+        P.companion_of = lambda name, stems: next(
+            (s for s in stems if name.startswith(s + "_")), None)
+        mutated = [os.path.basename(p)
+                   for p in project_files(os.path.join(folder, "model.xlsx"))]
+        if sorted(mutated) == sorted(want):
+            fails.append("the longest-prefix rule passes this check — the check does "
+                         "not actually pin the attribution rule")
+    finally:
+        P.companion_of = original
+
+    # And the real corpus pair the defect was found on, if it is in this checkout.
+    vp091 = os.path.join(_REPO, "docs/verification/files/rocscience/vp091.xlsx")
+    if os.path.exists(vp091):
+        real = [os.path.basename(p) for p in project_files(vp091)]
+        fem_results = [n for n in real if n.startswith("vp091_fem")]
+        if len(fem_results) != 8:
+            fails.append(f"vp091.xlsx collected {len(fem_results)} of its 8 FEM "
+                         f"result files: {real}")
+        if "vp091_fem.xlsx" in real:
+            fails.append("vp091's package carries the neighbouring workbook")
+        # And it survives the round trip as something the FEM loader can still read.
+        # dest= throughout: the corpus is read here, never written to.
+        from xslope.fem import import_fem_meta
+
+        before = import_fem_meta(os.path.splitext(vp091)[0])
+        pkg = xslope.pack(vp091, dest=_tmp())
+        book = xslope.unpack(pkg, dest=os.path.join(_tmp(), "vp091"))
+        after = import_fem_meta(os.path.splitext(book)[0])
+        if before is None:
+            fails.append("the vp091 fixture no longer carries an FEM solution")
+        elif after is None:
+            fails.append("vp091's FEM solution did not survive the round trip — the "
+                         "package arrived without the results")
+        elif _diff(before, after, "fem_meta"):
+            fails.append("vp091's FEM metadata came back changed: "
+                         + "; ".join(_diff(before, after, "fem_meta")[:3]))
     return fails
 
 
@@ -433,7 +540,7 @@ def test_studio():
         fails.append("an existing destination must ask: open the existing copy, or "
                      "extract fresh")
     dlg._clicked(dlg.btn_fresh)
-    fresh_dest, mode = dlg.result()
+    fresh_dest, mode = dlg.chosen()
     if fresh_dest != taken + "-2" or mode != "extract":
         fails.append(f"Extract Fresh chose {fresh_dest} ({mode}), not {taken}-2")
     dlg.close()
@@ -479,15 +586,42 @@ def test_studio():
         fails.append("Export Project Package stayed disabled with a project open")
 
     # --- File -> Export Project Package ---------------------------------------
+    # The save dialog is stubbed as an OBJECT, not as the static getSaveFileName:
+    # the export builds a QFileDialog so it can set a default suffix, and a stub of
+    # the static call would leave the real dialog to open and block forever.
+    import studio.main_window as MW
+
     out = os.path.join(_tmp(), "exported" + PACKAGE_EXT)
-    _save = QFileDialog.getSaveFileName
+    configured = {}
+
+    class _StubSaveDialog:
+        AcceptMode = QFileDialog.AcceptMode
+        AcceptSave = QFileDialog.AcceptSave
+
+        def __init__(self, parent=None, caption="", directory="", filter=""):
+            configured["directory"] = directory
+            configured["filter"] = filter
+
+        def setAcceptMode(self, mode):
+            configured["accept_mode"] = mode
+
+        def setDefaultSuffix(self, suffix):
+            configured["suffix"] = suffix
+
+        def exec(self):
+            return QDialog.Accepted
+
+        def selectedFiles(self):
+            return [configured.get("picked", out)]
+
+    _dialog_cls = MW.QFileDialog
     _question = QMessageBox.question
-    QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (out, ""))
+    MW.QFileDialog = _StubSaveDialog
     QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.Cancel)
     try:
         _quiet(mw.export_package_dialog)
     finally:
-        QFileDialog.getSaveFileName = _save
+        MW.QFileDialog = _dialog_cls
         QMessageBox.question = _question
     if not os.path.exists(out):
         fails.append("Export Project Package wrote nothing")
@@ -496,19 +630,31 @@ def test_studio():
         want = sorted(os.path.basename(p) for p in project_files(mw.doc.path))
         if got != want:
             fails.append(f"the exported package holds {got}, the project is {want}")
+    # The extension is the DIALOG's default suffix, not something appended after it
+    # returns: a name typed without one has to become "name.xslz" before the dialog
+    # decides whether to ask about overwriting an existing file.
+    if configured.get("suffix") != PACKAGE_EXT.lstrip("."):
+        fails.append(f"the save dialog's default suffix is {configured.get('suffix')!r},"
+                     f" so a typed name skips the overwrite confirmation")
+    if configured.get("accept_mode") != QFileDialog.AcceptSave:
+        fails.append("the export dialog is not in save mode, so it never asks about "
+                     "overwriting")
+    if not str(configured.get("directory", "")).endswith(PACKAGE_EXT):
+        fails.append(f"the export dialog opens on {configured.get('directory')!r}, "
+                     f"which does not name a package")
 
     # A project with a solution the session has not written out yet is saved first,
     # not packaged around: the question is asked, and Cancel stops the export.
     mw.doc.results["fem_solution"] = {"fem_data": None, "solution": None}
     os.remove(out)
     asked = []
+    MW.QFileDialog = _StubSaveDialog
     QMessageBox.question = staticmethod(
         lambda *a, **k: (asked.append(a[1]), QMessageBox.Cancel)[1])
-    QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (out, ""))
     try:
         _quiet(mw.export_package_dialog)
     finally:
-        QFileDialog.getSaveFileName = _save
+        MW.QFileDialog = _dialog_cls
         QMessageBox.question = _question
     if not asked:
         fails.append("a run that has not been saved was packaged without a word")
@@ -523,6 +669,7 @@ def test_studio():
 
 CHECKS = [
     ("A. the file set is the right set", test_file_set),
+    ("A2. attribution is the loaders' rule", test_attribution),
     ("B. what went in comes out", test_round_trip),
     ("C. a single-file project packages too", test_single_file),
     ("D. the collision is a refusal", test_collision),

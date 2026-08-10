@@ -70,9 +70,17 @@ xslope.project_files("slope1.xlsx")
 ```
 
 Sidecars are collected by the naming convention rather than a list of known file types,
-so results a future analysis writes travel too. A file belongs to the longest workbook
-name that prefixes it: with `slope1.xlsx` and `slope1_drained.xlsx` in one folder,
-`slope1_drained_mesh.json` packs with `slope1_drained`, not with `slope1`.
+so anything named after the project travels — including results a future analysis
+writes, and any `{base}_*` file of your own that nothing in xslope recognizes.
+
+Where two workbooks share a folder and one name starts with the other, a file goes to
+the workbook that would actually **read** it. With `slope1.xlsx` and
+`slope1_drained.xlsx` side by side, `slope1_drained_mesh.json` is the mesh
+`slope1_drained` loads, so it packs with `slope1_drained`; but `slope1_fem_nodes.csv`
+is the FEM result `slope1` loads, so it packs with `slope1` — even though
+`slope1_fem.xlsx` may also be sitting there. (That workbook's own FEM results would be
+`slope1_fem_fem_nodes.csv`.) A workbook never travels inside another project's
+package.
 
 ## Opening a package
 

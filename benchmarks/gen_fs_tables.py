@@ -28,7 +28,15 @@ import sys
 
 from xslope.fileio import load_slope_data
 from xslope.slice import generate_slices
-from xslope.search import circular_search, noncircular_search
+from xslope.search import (circular_search, noncircular_search, file_search_window,
+                           noncircular_search_opts)
+
+# Search-window keys a tag may carry. They say which mechanism the problem is
+# about, so they are run WITH the search and written back INTO the rebuilt tag;
+# dropping them would rewrite a windowed problem's factors of safety as some
+# other surface's and delete the statement that it was ever windowed.
+WINDOW_KEYS = ('entry_range', 'exit_range', 'tangent_depth', 'center_box',
+               'min_slip_depth')
 from xslope.solve import solve_selected
 
 SAMPLES_MD = "docs/lem/samples.md"
@@ -95,6 +103,16 @@ def compute_fs(params):
     path = os.path.join(os.path.dirname(SAMPLES_MD), file_rel)
 
     slope_data = load_slope_data(path)
+    # The tag's own window wins; anything it leaves open comes from the model's
+    # circles sheet, which is the same reading every other search path takes.
+    win = {}
+    for key in WINDOW_KEYS:
+        raw = params.get(key)
+        if raw is None or str(raw).strip() == '':
+            continue
+        vals = tuple(float(v) for v in str(raw).split(';') if v.strip() != '')
+        win[key] = vals if len(vals) > 1 else vals[0]
+    win.update(file_search_window(slope_data, already=win))
     results = {}
     for short, solver, _ in METHODS:
         if (file_rel, short) in EXCLUDED:
@@ -115,10 +133,12 @@ def compute_fs(params):
                     r = solve_selected(solver, slice_df, rapid=rapid)
                     results[short] = r["FS"] if isinstance(r, dict) else None
                 elif test_type == "noncircular_search":
-                    fs_cache, _, _ = noncircular_search(slope_data, solver, num_slices=num_slices, rapid=rapid)
+                    fs_cache, _, _ = noncircular_search(slope_data, solver, num_slices=num_slices, rapid=rapid,
+                                                        **noncircular_search_opts(win))
                     results[short] = fs_cache[0]["FS"] if fs_cache and fs_cache[0]["FS"] < 9999 else None
                 else:  # circular_search
-                    fs_cache, _, _, _ = circular_search(slope_data, solver, num_slices=num_slices, rapid=rapid)
+                    fs_cache, _, _, _ = circular_search(slope_data, solver, num_slices=num_slices, rapid=rapid,
+                                                        **win)
                     results[short] = fs_cache[0]["FS"] if fs_cache and fs_cache[0]["FS"] < 9999 else None
         except Exception as e:
             print(f"    ! {solver} failed on {file_rel}: {e}", file=sys.stderr)
@@ -153,6 +173,9 @@ def build_tag(params, fs):
     parts = [f"file={params['file']}", f"type={params.get('type', 'circular_search')}"]
     if "num_slices" in params:
         parts.append(f"num_slices={params['num_slices']}")
+    for key in WINDOW_KEYS:
+        if params.get(key) is not None and str(params[key]).strip() != "":
+            parts.append(f"{key}={params[key]}")
     for short, _, _ in METHODS:
         v = fs.get(short)
         if v is not None and v != NA:

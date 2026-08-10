@@ -896,7 +896,7 @@ factors of safety are the full soil force, so a cap would change the quantity
 being compared. $H$ is left blank, so the Ito & Matsui force is computed for every
 trial surface from $D$, $S$ and the soil above that surface at the pile.
 
-#### Unreinforced (FS = 1.104)
+#### Unreinforced (FS = 1.105)
 
 ![hassiotis_results.png](sample_images/hassiotis_results.png){width=900}
 
@@ -904,20 +904,20 @@ Bishop's method gives 1.106 against the 1.12 Hull & Poulos (1999) report with th
 same method (−1.2%). Hassiotis et al. report 1.08 and Ausilio et al. (2001) 1.11,
 both by the friction-circle method, which XSLOPE does not implement.
 
-<!-- test: file=files/xslope_hassiotis.xlsx, type=circular_search, num_slices=40, fs_oms=1.055, fs_bishop=1.106, fs_janbu=1.104, fs_corps=1.167, fs_lowe=1.135, fs_spencer=1.104, fs_mprice=1.104, benchmark=LEM-HASSIOTIS -->
+<!-- test: file=files/xslope_hassiotis.xlsx, type=circular_search, num_slices=50, fs_oms=1.056, fs_bishop=1.106, fs_janbu=1.105, fs_corps=1.167, fs_lowe=1.135, fs_spencer=1.105, fs_mprice=1.104, benchmark=LEM-HASSIOTIS -->
 
-#### Pile row 13.7 m from the toe (FS = 1.854)
+#### Pile row 13.7 m from the toe (FS = 1.855)
 
 ![hassiotis_p1_results.png](sample_images/hassiotis_p1_results.png){width=900}
 
 Bishop's method gives 1.859 against 1.82 (Hassiotis et al., friction circle, +2.1%).
 The row raises the factor of safety by 68%.
 
-#### Pile row 23.1 m from the toe (FS = 1.276)
+#### Pile row 23.1 m from the toe (FS = 1.284)
 
 ![hassiotis_p2_results.png](sample_images/hassiotis_p2_results.png){width=900}
 
-Bishop's method gives 1.290 against 1.64 (Hassiotis et al., −21%). The row sits
+Bishop's method gives 1.289 against 1.64 (Hassiotis et al., −21%). The row sits
 0.6 m short of the crest, so every surface that reaches it crosses it within a few
 metres of the pile head, where the soil column above the surface — and with it the
 Ito & Matsui force — is small. Moving the entry limit 2 m further behind the crest
@@ -937,12 +937,12 @@ way.
 
 #### Ito & Matsui summary
 
-On the critical surface for the 13.7 m row, the surface crosses the pile 5.67 m
+On the critical surface for the 13.7 m row, the surface crosses the pile 5.72 m
 below its head. At $D = 1.0$, $S = 2.5$ and $\phi = 10°$ the coefficients are
 $A_1 = 3.2298$ and $A_2 = 1.5695$, giving a pressure of 77.3 kN/m at the head
-rising to 251.9 kN/m at the surface, a force of 932.9 kN **per pile**, and
+rising to 253.4 kN/m at the surface, a force of 945.4 kN **per pile**, and
 
-$$H = \frac{F_{\text{pile}}}{S} = \frac{932.9}{2.5} = 373.1 \ \text{kN/m of slope}$$
+$$H = \frac{F_{\text{pile}}}{S} = \frac{945.4}{2.5} = 378.2 \ \text{kN/m of slope}$$
 
 which is the per-unit-width value the slice equations apply, horizontally, at the
 pile–surface intersection.
@@ -971,8 +971,8 @@ spread rather than as a target.
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.822 | 1.859 | 1.787 | 1.881 | 1.868 | 1.854 | 1.854 |
+| 1.822 | 1.859 | 1.788 | 1.885 | 1.871 | 1.855 | 1.855 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_hassiotis_p1.xlsx, type=circular_search, num_slices=40, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=11.01;33.7, fs_oms=1.822, fs_bishop=1.859, fs_janbu=1.787, fs_corps=1.881, fs_lowe=1.868, fs_spencer=1.854, fs_mprice=1.854, benchmark=LEM-HASSIOTIS -->
-<!-- test: file=files/xslope_hassiotis_p2.xlsx, type=circular_search, num_slices=40, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=16.44;33.7, fs_oms=1.244, fs_bishop=1.290, fs_janbu=1.373, fs_corps=1.378, fs_lowe=1.343, fs_spencer=1.276, fs_mprice=1.291, benchmark=LEM-HASSIOTIS -->
+<!-- test: file=files/xslope_hassiotis_p1.xlsx, type=circular_search, num_slices=50, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=11.01;33.7, fs_oms=1.822, fs_bishop=1.859, fs_janbu=1.788, fs_corps=1.885, fs_lowe=1.871, fs_spencer=1.855, fs_mprice=1.855, benchmark=LEM-HASSIOTIS -->
+<!-- test: file=files/xslope_hassiotis_p2.xlsx, type=circular_search, num_slices=50, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=16.44;33.7, fs_oms=1.244, fs_bishop=1.289, fs_janbu=1.373, fs_corps=1.385, fs_lowe=1.340, fs_spencer=1.284, fs_mprice=1.289, benchmark=LEM-HASSIOTIS -->

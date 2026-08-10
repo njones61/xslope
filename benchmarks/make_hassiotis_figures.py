@@ -32,7 +32,7 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 FILES = os.path.join(ROOT, 'docs', 'lem', 'files')
 IMG = os.path.join(ROOT, 'docs', 'lem', 'sample_images')
 METHOD = 'spencer'
-NUM_SLICES = 40
+NUM_SLICES = 50
 DPI = 200
 
 

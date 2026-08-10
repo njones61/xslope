@@ -1626,8 +1626,13 @@ scale by nearly the same factor — 0.69 for the moment, 0.68 and 0.67 for the t
 a difference in how much load the wall has taken up at the state each is read at, not a difference in how
 the wall distributes it. The published curves grow with every increment of the sweep and are printed at its
 last step, past the reduction factor the example interprets as the factor of safety; XSLOPE's are read at
-the mechanism its bisection captured. Both fields are committed beside the model, so the converged state and
-the at-failure state can be compared directly.
+the mechanism its bisection captured.
+
+How steeply the actions grow near failure is measurable here rather than assumed. Both fields are committed
+beside the model, and between the last converged state and the captured mechanism — a difference in the
+reduction factor of a few thousandths — XSLOPE's own peak moment rises from 869 to 1,135 kN·m/m, a factor of
+1.31, and its two shear peaks by factors of 1.31 and 1.19. An action read a couple of sweep increments
+higher is a substantially larger action, which is the size of effect that separates the two sets of peaks.
 
 ![gs2_wall_none: inputs and the strength-reduction mechanism without the wall](images/gs2_wall_none.png)
 

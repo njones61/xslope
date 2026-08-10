@@ -45,9 +45,15 @@ OUT = os.path.join(_REPO, 'docs', 'verification', 'images')
 #: The example's published peak wall actions, read off its Figures 17 and 18.
 #: They are drawn on the profile figure as reference markers, and the docs entry
 #: states them as read-off values.
+#:
+#: The two programs number the beam's shear the opposite way round -- the example
+#: prints its above-band branch negative and its below-band branch positive, and
+#: XSLOPE prints them the other way -- so the shear markers are drawn on the
+#: branch each value belongs to rather than at the sign the example prints, and
+#: the figure and the docs entry both say so. The moment convention agrees.
 PUB_M_PEAK = 1650.0      # kN m/m, at the weak layer
-PUB_V_NEG = -750.0       # kN/m, above the weak layer
-PUB_V_POS = 1300.0       # kN/m, below it
+PUB_V_ABOVE = 750.0      # kN/m, above the weak layer (the example prints -750)
+PUB_V_BELOW = -1300.0    # kN/m, below it (the example prints +1300)
 
 PANEL = (8.0, 5.0)
 DPI = 150
@@ -168,8 +174,8 @@ def forces(stem='gs2_wall'):
         ('moment', y_m, m, 'Bending moment (kN·m/m)',
          [(PUB_M_PEAK, f'SIGMA/W peak ≈ {PUB_M_PEAK:,.0f}')]),
         ('shear', y_v, v, 'Shear (kN/m)',
-         [(PUB_V_NEG, f'SIGMA/W peaks ≈ {PUB_V_NEG:,.0f} / {PUB_V_POS:,.0f}'),
-          (PUB_V_POS, None)]),
+         [(PUB_V_ABOVE, 'SIGMA/W peaks ≈ 750 / 1,300 (sign convention mirrored)'),
+          (PUB_V_BELOW, None)]),
     ]
     paths = []
     for key, yy, vals, xlabel, pubs in panels:

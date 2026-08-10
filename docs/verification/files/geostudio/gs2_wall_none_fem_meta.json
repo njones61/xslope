@@ -1,0 +1,110 @@
+{
+  "failure_criterion": "hybrid",
+  "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
+  "final_interval": [
+    1.0062499999999999,
+    1.015625
+  ],
+  "interval_width": 0.009375000000000133,
+  "iterations_ssrm": 5,
+  "trials": [
+    {
+      "F": 0.95,
+      "role": "lower",
+      "converged": false,
+      "stable": true,
+      "verdict": "STABLE_STUCK",
+      "u_ratio": 1.2228510354967606,
+      "growth": 0.004605489709761954,
+      "exit_reason": "iteration_cap",
+      "ee_suppressed": false,
+      "iterations": 16000
+    },
+    {
+      "F": 1.25,
+      "role": "upper",
+      "converged": false,
+      "stable": false,
+      "verdict": "AMBIGUOUS",
+      "u_ratio": 1.4574707682908448,
+      "growth": 0.1263951308648013,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 4354
+    },
+    {
+      "F": 1.1,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "AMBIGUOUS",
+      "u_ratio": 1.388166098353249,
+      "growth": 0.06690119258448368,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 11587
+    },
+    {
+      "F": 1.025,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "AMBIGUOUS",
+      "u_ratio": 1.2596207100135492,
+      "growth": 0.009042717766936376,
+      "exit_reason": "iteration_cap",
+      "ee_suppressed": false,
+      "iterations": 16000
+    },
+    {
+      "F": 0.9874999999999999,
+      "role": "bisect",
+      "converged": false,
+      "stable": true,
+      "verdict": "STABLE_STUCK",
+      "u_ratio": 1.238186785178772,
+      "growth": 0.005709874231216336,
+      "exit_reason": "iteration_cap",
+      "ee_suppressed": false,
+      "iterations": 16000
+    },
+    {
+      "F": 1.0062499999999999,
+      "role": "bisect",
+      "converged": false,
+      "stable": true,
+      "verdict": "STABLE_STUCK",
+      "u_ratio": 1.2476690946540636,
+      "growth": 0.0070589598706787444,
+      "exit_reason": "iteration_cap",
+      "ee_suppressed": false,
+      "iterations": 16000
+    },
+    {
+      "F": 1.015625,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "AMBIGUOUS",
+      "u_ratio": 1.2532692894734496,
+      "growth": 0.007998934924466669,
+      "exit_reason": "iteration_cap",
+      "ee_suppressed": false,
+      "iterations": 16000
+    }
+  ],
+  "tolerance": 0.01,
+  "F_min": 0.95,
+  "F_max": 1.25,
+  "analysis_type": "ssrm",
+  "FS": 1.0109374999999998,
+  "element_type": "tri6",
+  "max_iter": 16000,
+  "F": 1.0062499999999999,
+  "expected_fs": 1.011,
+  "unit_system": "si",
+  "converged": false,
+  "iterations": 16000,
+  "residual": 4.30066573073012e-06,
+  "max_displacement": 0.15171105501018065
+}

@@ -53,7 +53,7 @@ alongside a SLIDE limit-equilibrium table read the same way.
 | [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown sweep | Submerged plateau 1.86 vs Griffiths & Lane FE 1.85 (+0.5%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.39 vs their FE 1.40 (−0.7%) | the three refined quad8 locks read 1.1–2.9% below the printed FE values |
 | [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.87 vs Griffiths & Lane FE 1.9 (−1.6%) · before filling 2.40 vs their FE 2.4 (0.0%) | FE against FE, both printed to 0.1 |
 | [7](#verification-torggler3a) | 🟢 | Torggler §3 — homogeneous slope with a 7.5 m plate | Unsupported 1.129 vs Torggler PLAXIS 1.111 (+1.6%) · with plate 1.187 vs his 1.175 (+1.0%) · plate peak shear 20.9 kN/m vs his 21 kN (−0.5%) | the plate variant without interfaces is XSLOPE's shared-node beam |
-| [8](#verification-torggler3b) | 🔴 | Torggler §4 — weak-layer slope with a 15 m plate | Unsupported 1.064 vs Torggler PLAXIS 1.045 (+1.8%) · with plate 1.277 vs his 1.725 (−26.0%) | the soil model agrees and the beam does not; the shortfall is measured in the row |
+| [8](#verification-torggler3b) | 🔴 | Torggler §4 — weak-layer slope with a 15 m plate | Unsupported 1.064 vs Torggler PLAXIS 1.045 (+1.8%) · with plate 1.277 vs his 1.725 (−26.0%) | the beam does not cut the weak-layer mechanism: the supported model keeps the unsupported one, and the plate carries about half his internal forces |
 
 </div>
 
@@ -844,7 +844,6 @@ Graz University of Technology, §3.
 | Domain | 57.0 m wide × 30.0 m high, toe at (20, 20) |
 | Cohesion, $c$ | 10 kPa |
 | Friction angle, $\phi$ | 15 degrees |
-| Dilatancy angle, $\psi$ | 0 degrees |
 | Unit weight, $\gamma = \gamma_{sat}$ | 16 kN/m³ |
 | Young's modulus, $E$ | 2,000 kPa |
 | Poisson's ratio, $\nu$ | 0.4 |
@@ -857,7 +856,14 @@ spacing — because XSLOPE smears a pile row as $EA/S$ and $EI/S$, so those four
 numbers reproduce his $EA$ and $EI$ exactly. A 1.0 m spacing is a continuous wall,
 which is what a 2D plate element is. Fig. 17 dimensions the plate 8.66 m from the
 crest and 8.66 m from the toe, so its head sits at mid-slope where the ground is
-at elevation 25.0.
+at elevation 25.0. The plate's own weight — Table 4 gives $w$ = 0.6 kN/m per metre
+of wall, so 4.5 kN/m over the 7.5 m plate — is not carried, because XSLOPE's beam
+elements are weightless.
+
+Torggler runs both models non-associated at $\psi$ = 0 (his Tables 1 and 10), which
+is the flow rule XSLOPE's viscoplastic solver applies to every Mohr-Coulomb
+material — its plastic potential takes zero dilation by formulation, so there is
+nothing to transcribe.
 
 Excel input files: [xslope_torggler_3a_nopile.xlsx](../fem/files/xslope_torggler_3a_nopile.xlsx),
 [xslope_torggler_3a_plate.xlsx](../fem/files/xslope_torggler_3a_plate.xlsx)
@@ -892,8 +898,8 @@ at 1.0 m. The locks are taken at 0.7 m.
 
 The same slope carrying a 1 m band of near-cohesionless soil along a published
 failure line, unsupported and then supported by a 15 m vertical plate at mid-slope.
-The unsupported case agrees; the supported case does not, and the shortfall is
-measured below rather than explained away.
+The unsupported case agrees; the supported case does not, and it does not because
+the plate never takes the weak layer out of the mechanism.
 
 | Quantity | XSLOPE | Torggler PLAXIS | Note |
 |---|---|---|---|
@@ -909,10 +915,7 @@ Same-method limit-equilibrium pairing on his own published failure line:
 | Spencer | 1.121 | 1.043 (+7.5%) |
 | Morgenstern-Price | 1.093 | GLE/Morgenstern-Price 1.039 (+5.2%) |
 
-*The dot is scored on the supported SSRM row. The unsupported slope, which is the
-model without the beam in it, lands 1.8% from the published value on a
-mesh-stationary answer, so the disagreement is located in what the beam does, not
-in the soil model or the transcription of the weak layer.*
+*The dot is scored on the supported SSRM row.*
 
 The limit-equilibrium pair is read on the Table 18 polyline itself — a fixed
 surface — while SLIDE's figures come from a search, and the critical surface in a
@@ -931,7 +934,6 @@ This is the benchmark problem from [Torggler (2016)](https://diglib.tugraz.at/do
 | Soil body: $c$ / $\phi$ / $E$ / $\nu$ | 10 kPa / 25° / 15,000 kPa / 0.3 |
 | Weak layer: $c$ / $\phi$ / $E$ / $\nu$ | 0.01 kPa / 20° / 5,000 kPa / 0.3 |
 | Unit weight, $\gamma$ (both) | 16 kN/m³ |
-| Dilatancy angle, $\psi$ (both) | 0 degrees |
 | Weak layer geometry | Table 18 polyline, 32 points, offset 0.5 m each side |
 | Plate length / station | 15 m, vertical, head at (28.66, 25.0) |
 
@@ -962,15 +964,34 @@ so the band is resolved at every global size:
 The unsupported answer is identical at both sizes. The supported one rises from
 1.256 to 1.277 (+1.7%) over the same refinement and does not approach 1.725.
 
-**What the beam does not do.** Raising the plate's stiffness a hundredfold moves
-the supported factor of safety to 1.345 and lowers its peak shear, so the shortfall
-is not the beam being too soft. A displacement-versus-$F$ sweep on the supported
-model reads 0.46 m at $F$ = 1.10, 0.76 m at 1.40, 1.35 m at 1.55 and 2.28 m at
-1.70, with no catastrophe knee, and the controlling node migrates from the weak
-band's daylight on the plateau to the crest between $F$ = 1.40 and 1.55: the
-band creeps at every trial because its cohesion is 0.01 kPa, and the failure
-criterion closes on that creep rather than on the global mechanism the plate is
-holding back.
+**The beam does not cut the weak-layer mechanism.** In PLAXIS the plate changes
+which mechanism controls: "Because the plate is modelled as elastic material a
+different failure mechanism as compared to the unsupported case is developed
+(failure in the weak layer is prevented by the plate)" (§4.2), and §4.3.1 places
+the supported mechanisms "outside the weakness zone." In XSLOPE the supported
+model keeps the unsupported mechanism. The weak layer shears along its whole
+length, from its daylight at the toe to its daylight on the plateau, straight past
+the plate station at $x$ = 28.66:
+
+| Model, trial $F$ | Mean viscoplastic shear strain in the band, per 4 m reach from $x$ = 18 to $x$ = 46 |
+|---|---|
+| Unsupported, $F$ = 1.10 (its FS is 1.064) | 0.216 · 0.251 · 0.237 · 0.239 · 0.211 · 0.209 · 0.238 |
+| With plate, $F$ = 1.30 (its FS is 1.277) | 0.077 · 0.084 · 0.076 · 0.095 · 0.098 · 0.113 · 0.123 |
+| With plate, $F$ = 1.60 | 0.476 · 0.475 · 0.399 · 0.456 · 0.513 · 0.587 · 0.585 |
+
+No reach of the band is spared, and the reaches downslope and upslope of the plate
+shear as hard as the reach the plate passes through — one mass sliding on the band,
+the same mechanism the model without the plate fails in. The plate's internal
+forces are consistent with that: it carries about half of what Torggler's does,
+594 against ≈1250 kNm/m of moment and 225 against ≈500 kN/m of shear.
+
+Two measurements place the gap at the beam and not at the soil, the weak layer or
+the geometry. The same model without the beam lands 1.8% from the published
+unsupported answer on a mesh-stationary factor of safety. Raising the plate's
+stiffness a hundredfold moves the supported factor of safety only to 1.345, and
+lowers its peak shear, so the beam is not merely too flexible. What is short is the
+load the sliding mass transmits into the beam. That shortfall is XSLOPE's and is
+unexplained.
 
 <!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=fem_ssrm, expected_fs=1.064, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=0.9, f_max=1.2, max_iter=6000, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3b_plate.xlsx, type=fem_ssrm, expected_fs=1.277, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=1.15, f_max=1.45, max_iter=8000, benchmark=SSRM-TORGGLER -->

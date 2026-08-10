@@ -13957,6 +13957,18 @@ def _column(table, prefix):
     return None
 
 
+def _cell_numbers(text):
+    """The numbers in a member-table cell, as floats.
+
+    A cell holds one number, or the two ends of a stretch written ``"a to b"`` —
+    what the force and position columns print for a line that reaches its
+    greatest utilization at more than one point. Raises ValueError on anything
+    that is neither.
+    """
+    return [float(part.replace(",", "").strip())
+            for part in str(text).split(" to ")]
+
+
 def _member_faults(table, profiles, force_prefix, force_key):
     """What a member table has to say about the profiles it was built from.
 
@@ -13988,15 +14000,22 @@ def _member_faults(table, profiles, force_prefix, force_key):
             faults.append(f"{where}: the utilization is printed {stated!r}, "
                           f"and the profile peaks at {want!r}")
         force = profile.get(force_key)
+        # A member at its greatest utilization along a stretch prints the range
+        # of force over that stretch, and the profile carries the same two ends.
+        span = profile.get(f"{force_key}_span")
+        want = [float(v) for v in span] if span else (
+            [float(force)] if force is not None else [])
         try:
-            printed = float(row[force_col].replace(",", ""))
+            got = _cell_numbers(row[force_col])
         except ValueError:
             faults.append(f"{where}: the force column reads {row[force_col]!r}")
             continue
-        if force is not None and abs(printed - float(force)) > (
-                0.05 + 0.005 * abs(float(force))):
-            faults.append(f"{where}: the force is printed {printed:,.1f} and "
-                          f"the profile peaks at {float(force):,.1f}")
+        if want and (len(got) != len(want) or any(
+                abs(g - w) > 0.05 + 0.005 * abs(w)
+                for g, w in zip(got, want))):
+            faults.append(f"{where}: the force is printed {got} and the profile "
+                          f"carries {want}")
+        printed = max(got) if got else 0.0
         printed_forces.append(printed)
         if stated not in ("", "0%") and printed == 0.0:
             faults.append(f"{where}: the row claims {stated} of capacity with "
@@ -14058,7 +14077,11 @@ def test_fem_members_are_reported():
                 fails.append(f"the reinforcement table declares no {header} "
                              f"capacity: {table.headers}")
 
-    figures = [b for b in sec.blocks if b.kind == "figure"]
+    # The locator opens the subsection and is not one of the details; every line
+    # the analysis solved is drawn after it
+    # (:func:`test_the_member_subsections_locate_their_members`).
+    figures = [b for b in sec.blocks
+               if b.kind == "figure" and not b.source.endswith(" map")]
     if len(figures) != len(profiles):
         fails.append(f"{n_lines} lines drew {len(figures)} detail figures; every "
                      f"line the analysis solved is drawn")
@@ -14096,7 +14119,8 @@ def test_fem_members_are_reported():
         else:
             fails += _member_faults(pile_table, pile_profiles, "Peak moment",
                                     "max_moment")
-        pile_figures = [b for b in pile_sec.blocks if b.kind == "figure"]
+        pile_figures = [b for b in pile_sec.blocks
+                        if b.kind == "figure" and not b.source.endswith(" map")]
         if len(pile_figures) != len(pile_profiles):
             fails.append(f"{len(pile_profiles)} piles drew "
                          f"{len(pile_figures)} detail figures; every pile the "
@@ -14152,8 +14176,8 @@ def test_fem_members_are_reported():
         table = next((b for b in sec.blocks if b.kind == "table"), None)
         force_col = _column(table, "Force") if table else None
         if force_col is not None:
-            printed = max(float(r[force_col].replace(",", ""))
-                          for r in table.rows)
+            printed = max(v for r in table.rows
+                          for v in _cell_numbers(r[force_col]))
             if abs(printed - 2.0 * peak) > 0.05 + 0.005 * 2.0 * peak:
                 fails.append(f"the at-failure table peaks at {printed:,.1f} "
                              f"where the snapshot carries {2.0 * peak:,.1f}; "

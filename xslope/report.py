@@ -7504,11 +7504,10 @@ def _reinforcement_forces_table(slope_data, profiles, counter):
     # is a different number; the sentence that cites the table says which point
     # they belong to, and the detail figure marks that same point.
     #
-    # A line at its greatest utilization along a STRETCH gives the stretch in
-    # both columns, and the force over it as the range it covers. The line is at
-    # that utilization everywhere in there, so one position out of the stretch
-    # is a point the line does not distinguish, and one force out of it is a
-    # force most of the stretch does not carry.
+    # A line that reaches its greatest utilization at MORE THAN ONE point gives
+    # the stretch those points span, and the range of force over it. One of them
+    # printed as the position is a point the line does not distinguish from the
+    # others, and its force is a force the rest of the stretch does not carry.
     headers = (["Line", f"T_max{fu}"] + ([f"T_res{fu}"] if softens else [])
                + [f"Force{fu}", f"Position{lu}", "Utilization", "State"])
     rows = []

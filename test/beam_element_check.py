@@ -170,6 +170,10 @@ def end_actions(fem_data, u, p_idx):
     EI_val = fem_data['EI_by_pile_elem'][p_idx]
     EA_val = fem_data['EA_by_pile_elem'][p_idx]
 
+    # The T matrix and the axial/V/M1/M2 expressions below are copies of
+    # fem.py's Step 10c, "Compute final pile beam element forces"
+    # (xslope/fem.py lines ~4845-4866), verified line-identical at this
+    # commit. A change there must be mirrored here.
     T = np.array([
         [c, s, 0, 0, 0, 0],
         [-s, c, 0, 0, 0, 0],

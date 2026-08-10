@@ -1594,7 +1594,7 @@ same boundary value problem rather than one reading the other's answer.
 Both models are meshed by their builder rather than by their tag, because a model whose pore pressures come
 from a stored nodal field has to run its stability solve on the mesh that field was written on: 6,484 tri6
 elements without the wall and 6,532 with it, the weak clay band carrying a local size override that puts
-3.4 element rows across its 1 m thickness.
+four element rows across its 1 m thickness.
 
 **Input:** [gs2_wall_none.xlsx](files/geostudio/gs2_wall_none.xlsx) (no wall) ·
 [gs2_wall.xlsx](files/geostudio/gs2_wall.xlsx) (wall)
@@ -1628,11 +1628,11 @@ the wall distributes it. The published curves grow with every increment of the s
 last step, past the reduction factor the example interprets as the factor of safety; XSLOPE's are read at
 the mechanism its bisection captured.
 
-How steeply the actions grow near failure is measurable here rather than assumed. Both fields are committed
-beside the model, and between the last converged state and the captured mechanism — a difference in the
-reduction factor of a few thousandths — XSLOPE's own peak moment rises from 869 to 1,135 kN·m/m, a factor of
-1.31, and its two shear peaks by factors of 1.31 and 1.19. An action read a couple of sweep increments
-higher is a substantially larger action, which is the size of effect that separates the two sets of peaks.
+How steeply the actions rise once the section fails is measurable here rather than assumed. Both committed
+fields bracket the failure: the last equilibrium state at F = 1.46 and the post-failure state the bisection
+captured at F = 1.69. Between them XSLOPE's own peak moment rises from 869 to 1,135 kN·m/m, a factor of
+1.31, and its two shear peaks by factors of 1.19 and 1.31 — so where along the failure sweep the published
+values were read materially affects the comparison of peaks.
 
 ![gs2_wall_none: inputs and the strength-reduction mechanism without the wall](images/gs2_wall_none.png)
 

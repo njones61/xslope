@@ -2772,7 +2772,7 @@ Slide within 0.8% and with the originating paper within 2.4%.
 Cai & Ugai analysed this slope twice. The limit-equilibrium side is [VP106](#vp106) above. The other side is
 a **three-dimensional** shear-strength-reduction finite-element model that meshes the individual piles and
 the soil between them, with interfaces that can slip. These three files run that side of the paper through
-XSLOPE's SSRM at D1/D = 3 — the spacing where the published values spread widest — on the same section and
+XSLOPE's SSRM at D1/D = 3 — the paper's default spacing, the one its Table 3 reports with exact values — on the same section and
 soil, with the pile as a plane-strain beam: E = 6×10⁷ kPa on the 0.8 m section, so I = π D⁴/64 = 0.0201 m⁴
 and A = π D²/4 = 0.5027 m², both divided by the 2.4 m spacing; soil E = 2×10⁵ kPa, ν = 0.25. The Ito &
 Matsui limit pressure the limit-equilibrium files carry is deliberately absent — in a finite-element

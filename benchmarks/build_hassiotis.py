@@ -69,12 +69,33 @@ def _pile_at(distance_from_toe):
     }
 
 
+def _material():
+    """The single dry Mohr-Coulomb soil, written out in full.
+
+    Every column the material table carries is named here rather than left to
+    whatever the seed file happened to hold, so the model states only what the
+    paper publishes.  The paper gives no uncertainties, so the sigma columns are
+    zero; it gives no stiffness, so E and nu are left empty; and it gives no
+    tensile strength, so t_cut is empty rather than carrying a cutoff.
+    """
+    return {
+        'name': 'Soil', 'gamma': GAMMA, 'gamma_sat': None, 'option': 'mc',
+        'c': COH, 'phi': PHI, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0,
+        't_cut': None, 'phi_b': None, 's_cap': None, 'Ss': None, 'Sy': None,
+        'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0,
+        'u': 'none', 'ru': 0.0,
+        'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0,
+        'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0,
+        'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf',
+        'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0,
+        'E': None, 'nu': None,
+        'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0,
+    }
+
+
 def _slope_data():
     sd = load_slope_data(SEED)
-    m = sd['materials'][0]
-    m.update(name='Soil', gamma=GAMMA, gamma_sat=None, option='mc',
-             c=COH, phi=PHI, u='none', ru=0.0, psi=0.0)
-    sd['materials'] = [m]
+    sd['materials'] = [_material()]
     sd['gamma_water'] = 9.81
     sd['unit_system'] = 'si'
     sd['tcrack_depth'] = 0.0

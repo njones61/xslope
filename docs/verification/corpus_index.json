@@ -2717,7 +2717,7 @@
         "pile_fixities": [],
         "piles": 0,
         "polygon_geometry": true,
-        "probabilistic": true,
+        "probabilistic": false,
         "rapid_drawdown": false,
         "reinforcement": {
           "appls": [],
@@ -2733,15 +2733,11 @@
         "seepage_coupled": false,
         "seepage_problem": false,
         "seismic_k": 0.0,
-        "sigmas": [
-          "c",
-          "gamma",
-          "phi"
-        ],
+        "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
         "template_version": 22,
-        "tensile_cutoff": true,
+        "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -2766,7 +2762,6 @@
         }
       ],
       "topics": [
-        "probabilistic",
         "homogeneous"
       ]
     },
@@ -2791,7 +2786,7 @@
         ],
         "piles": 1,
         "polygon_geometry": true,
-        "probabilistic": true,
+        "probabilistic": false,
         "rapid_drawdown": false,
         "reinforcement": {
           "appls": [],
@@ -2807,15 +2802,11 @@
         "seepage_coupled": false,
         "seepage_problem": false,
         "seismic_k": 0.0,
-        "sigmas": [
-          "c",
-          "gamma",
-          "phi"
-        ],
+        "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
         "template_version": 22,
-        "tensile_cutoff": true,
+        "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -2841,7 +2832,6 @@
       ],
       "topics": [
         "piles",
-        "probabilistic",
         "homogeneous"
       ]
     },
@@ -2866,7 +2856,7 @@
         ],
         "piles": 1,
         "polygon_geometry": true,
-        "probabilistic": true,
+        "probabilistic": false,
         "rapid_drawdown": false,
         "reinforcement": {
           "appls": [],
@@ -2882,15 +2872,11 @@
         "seepage_coupled": false,
         "seepage_problem": false,
         "seismic_k": 0.0,
-        "sigmas": [
-          "c",
-          "gamma",
-          "phi"
-        ],
+        "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
         "template_version": 22,
-        "tensile_cutoff": true,
+        "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
         "transient_seepage": false,
@@ -2916,7 +2902,6 @@
       ],
       "topics": [
         "piles",
-        "probabilistic",
         "homogeneous"
       ]
     },
@@ -22587,7 +22572,7 @@
       "homogeneous": 151,
       "non-circular": 32,
       "piles": 15,
-      "probabilistic": 18,
+      "probabilistic": 15,
       "rapid-drawdown": 6,
       "reinforcement": 23,
       "seepage-coupled": 66,
@@ -22835,9 +22820,6 @@
     "probabilistic": [
       "docs/fem/files/xslope_simple_mult_layers_fem.xlsx",
       "docs/lem/files/xslope_acads_simple.xlsx",
-      "docs/lem/files/xslope_hassiotis.xlsx",
-      "docs/lem/files/xslope_hassiotis_p1.xlsx",
-      "docs/lem/files/xslope_hassiotis_p2.xlsx",
       "docs/lem/files/xslope_prob_submerged_KEY.xlsx",
       "docs/verification/files/rocscience/vp028a.xlsx",
       "docs/verification/files/rocscience/vp028b.xlsx",

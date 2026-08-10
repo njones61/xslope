@@ -456,7 +456,13 @@ def capture_report_dialog():
     this script running an analysis. Two methods are ticked, which is the picture
     the surrounding prose describes — a report that documents both in full. The
     metadata fields are filled in because empty boxes photograph as a broken
-    dialog."""
+    dialog.
+
+    The contents tree is opened to its full height before the grab. The dialog's
+    own size hint sizes the tree to the controls beside it, which on a tree of
+    four engine branches leaves the last of them below a scrollbar — a picture of
+    a control with most of it cut off. Measured from the rows themselves, so a row
+    added to :data:`studio.report_dialog.CONTENT_TREE` grows the shot with it."""
     from PySide6.QtCore import Qt
 
     from xslope.fileio import load_slope_data
@@ -479,8 +485,23 @@ def capture_report_dialog():
     dlg.project_number.setText("2026-114")
     dlg.organization.setText("Example Engineering")
     dlg.author.setText("N. L. Jones")
+    _open_tree(dlg.contents)
     dlg.resize(dlg.sizeHint())
     return _grab(dlg, "reports_dialog.png")
+
+
+def _open_tree(tree):
+    """Size ``tree`` to its own contents: every expanded row showing at once, and
+    every label printed rather than elided."""
+    from PySide6.QtWidgets import QTreeWidgetItemIterator
+
+    rows = 0
+    it = QTreeWidgetItemIterator(tree, QTreeWidgetItemIterator.NotHidden)
+    while it.value():
+        rows += tree.visualItemRect(it.value()).height()
+        it += 1
+    tree.setMinimumHeight(rows + tree.header().height() + 2 * tree.frameWidth())
+    tree.setMinimumWidth(tree.sizeHintForColumn(0) + 2 * tree.frameWidth())
 
 
 def capture_dxf_wizard():

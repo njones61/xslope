@@ -148,3 +148,30 @@ folder alone.
 There is no way to read a project out of a package without extracting it, by design:
 the solvers write their results beside the workbook, and inside a zip there is nowhere
 for them to land.
+
+## Samples on this site
+
+Every sample and verification problem in this documentation is published as a project
+package, so what you get is the whole model — the workbook plus whatever mesh and
+results were saved with it — rather than a workbook that has to be re-solved. The
+packages are rebuilt each time the site is built, from the same files the results on
+these pages were computed from.
+
+Each input file is offered twice:
+
+- **Download** saves the `.xslz` package. Open it afterwards with File → Open, or
+  `load_slope_data`, exactly as above.
+- **Open in Studio** hands it straight to XSLOPE Studio. Studio shows you what it is
+  about to fetch and from where, downloads the package to your Downloads folder when
+  you agree, and then unpacks and opens it the same way File → Open would.
+
+Open in Studio works when Studio was installed from an
+[installer](../getting_started/install.md), which is what registers `xslope://` links
+with your operating system; it also registers `.xslz`, so a downloaded package opens on
+a double-click. A `pip install` registers neither — those links will do nothing, and
+Download is the way in.
+
+Studio only fetches from the sites XSLOPE publishes from, refuses anything else by
+name, and never opens a file on your computer through a link: a page can put an
+`xslope://` link in front of you, but it cannot make Studio act on it without your
+say-so.

@@ -28,8 +28,8 @@ shared [References](references.md) page.
 
 The dot scores the **match quality of what is locked**, not how much of a problem is built; the partial/blocked detail is in the row text.
 
-Every dot below is scored against **Griffiths & Lane's own published result for the same
-problem, read with the matching failure criterion**. Their factors of safety are FE readings
+Every dot below is scored against **the source's own published result for the same
+problem, read with the matching failure criterion**. Griffiths & Lane's factors of safety are FE readings
 taken at non-convergence of a displacement test, and they are printed to limited precision —
 Examples 1 and 2 on a 0.05 trial grid, the Fig. 7 sweep "to the nearest 0.05" (p. 394),
 Example 6 to 0.1. Deltas are stated against the printed value as printed; where a classical
@@ -39,6 +39,8 @@ headline factor of safety is its published answer and takes a delta whatever eng
 produced it — carrying a delta is a separate question from governing the dot; where the
 same source prints a per-method table, each value is read like any
 other column — same-method entries pair and carry a delta, cross-method entries stay bare.
+Torggler's factors of safety are PLAXIS $\Sigma M_{sf}$ values printed to three decimals,
+alongside a SLIDE limit-equilibrium table read the same way.
 
 <div class="corpus-summary match" markdown>
 
@@ -50,6 +52,8 @@ other column — same-method entries pair and carry a delta, cross-method entrie
 | [4](#verification-griffiths4) | 🟢 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.45 vs Griffiths & Lane FE 1.45 (0.0%) · SSRM 2.02 vs their FE 2.03 (−0.5%) · relative jump ×1.40 vs their ×1.40 (0.0%) | the critical mechanism flips base → toe, as in the paper's Fig. 11 |
 | [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown sweep | Submerged plateau 1.86 vs Griffiths & Lane FE 1.85 (+0.5%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.39 vs their FE 1.40 (−0.7%) | the three refined quad8 locks read 1.1–2.9% below the printed FE values |
 | [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.87 vs Griffiths & Lane FE 1.9 (−1.6%) · before filling 2.40 vs their FE 2.4 (0.0%) | FE against FE, both printed to 0.1 |
+| [7](#verification-torggler3a) | 🟢 | Torggler §3 — homogeneous slope with a 7.5 m plate | Unsupported 1.129 vs Torggler PLAXIS 1.111 (+1.6%) · with plate 1.187 vs his 1.175 (+1.0%) · plate peak shear 20.9 kN/m vs his 21 kN (−0.5%) | the plate variant without interfaces is XSLOPE's shared-node beam |
+| [8](#verification-torggler3b) | 🔴 | Torggler §4 — weak-layer slope with a 15 m plate | Unsupported 1.064 vs Torggler PLAXIS 1.045 (+1.8%) · with plate 1.277 vs his 1.725 (−26.0%) | the soil model agrees and the beam does not; the shortfall is measured in the row |
 
 </div>
 
@@ -800,3 +804,175 @@ matches the paper.
 <!-- test: file=../fem/files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.40, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=16000, benchmark=SSRM-2 -->
 <!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.867, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=16000, benchmark=SSRM-2 -->
 
+### Torggler (2016) §3 — Homogeneous slope with a vertical plate {#verification-torggler3a}
+
+A 10 m slope at 30° in a soft Mohr-Coulomb clay, unsupported and then supported by
+a 7.5 m vertical plate at mid-slope — the only published SSRM benchmark that gives
+both the factor of safety and the plate's internal forces.
+
+| Quantity | XSLOPE | Torggler PLAXIS | Note |
+|---|---|---|---|
+| SSRM FS, unsupported (tri6, 6,793 elements) | 1.129 | **1.111** (+1.6%) | his Table 2 / Table 3 |
+| SSRM FS, plate without interfaces (tri6, 6,834 elements) | 1.187 | **1.175** (+1.0%) | his §3.2.1 |
+| Plate peak shear | 20.9 kN/m | **21 kN** (−0.5%) | at a depth of −5.11 m against his −4.85 m; his §3.2, Fig. 14 |
+
+Same-method limit-equilibrium pairings against his SLIDE circular column:
+
+| Method | XSLOPE | SLIDE (Table 3, circular) |
+|---|---|---|
+| Bishop simplified | 1.135 | 1.138 (−0.3%) |
+| Spencer | 1.132 | 1.130 (+0.2%) |
+| Morgenstern-Price | 1.132 | GLE/Morgenstern-Price 1.131 (+0.1%) |
+
+*The dot is scored on the two SSRM rows — FE against FE on the mechanism each
+engine finds for itself. The plate variant compared is the one without interfaces,
+because a plate sharing nodes with the soil is exactly XSLOPE's beam formulation;
+the interface variant reads 1.168 and Torggler reports the internal forces of the
+two as almost identical.*
+
+Torggler's SLIDE Janbu row is the uncorrected simplified method and XSLOPE's Janbu
+carries the correction factor, so those two are not a pair and no delta is taken;
+Torggler himself flags his Janbu figures as too small.
+
+This is the benchmark problem from [Torggler (2016)](https://diglib.tugraz.at/download.php?id=5891c94c5ba8d&location=browse),
+"Numerical Studies of Embedded Beam Row in Safety Analysis in PLAXIS 2D," MSc thesis,
+Graz University of Technology, §3.
+
+| Property | Value |
+|----------|-------|
+| Slope height / angle | 10 m / 30 degrees |
+| Domain | 57.0 m wide × 30.0 m high, toe at (20, 20) |
+| Cohesion, $c$ | 10 kPa |
+| Friction angle, $\phi$ | 15 degrees |
+| Dilatancy angle, $\psi$ | 0 degrees |
+| Unit weight, $\gamma = \gamma_{sat}$ | 16 kN/m³ |
+| Young's modulus, $E$ | 2,000 kPa |
+| Poisson's ratio, $\nu$ | 0.4 |
+| Plate $EA$ / $EI$ | 2.0 × 10⁶ kN/m / 4.0 × 10⁴ kNm²/m |
+| Plate length / station | 7.5 m, vertical, head at (28.66, 25.0) |
+
+The plate stiffnesses are entered as the section Torggler's Table 5 gives for the
+equivalent dowel — $E$ = 2.0 × 10⁸ kPa, $A$ = 0.01 m², $I$ = 2.0 × 10⁻⁴ m⁴ at 1.0 m
+spacing — because XSLOPE smears a pile row as $EA/S$ and $EI/S$, so those four
+numbers reproduce his $EA$ and $EI$ exactly. A 1.0 m spacing is a continuous wall,
+which is what a 2D plate element is. Fig. 17 dimensions the plate 8.66 m from the
+crest and 8.66 m from the toe, so its head sits at mid-slope where the ground is
+at elevation 25.0.
+
+Excel input files: [xslope_torggler_3a_nopile.xlsx](../fem/files/xslope_torggler_3a_nopile.xlsx),
+[xslope_torggler_3a_plate.xlsx](../fem/files/xslope_torggler_3a_plate.xlsx)
+
+![torggler_3a_mesh.png](../fem/images/torggler_3a_mesh.png){width=900}
+
+![torggler_3a_nopile_results.png](../fem/images/torggler_3a_nopile_results.png){width=900}
+
+![torggler_3a_plate_results.png](../fem/images/torggler_3a_plate_results.png){width=900}
+
+**Mesh convergence.** Torggler publishes his own mesh study (his Table 2: 1.106 at
+560 elements rising to 1.111 at 33,581), so the same question is answered here at
+three element sizes rather than at one:
+
+| Target size | tri6 elements | SSRM FS, unsupported | SSRM FS, with plate |
+|---|---:|---:|---:|
+| 2.0 m | 860 | 1.155 | — |
+| 1.0 m | 3,345 | 1.136 | 1.186 |
+| 0.7 m | 6,793 | 1.129 | 1.187 |
+
+The unsupported factor of safety falls with refinement, the last halving of element
+area moving it from 1.136 to 1.129 (−0.6%); the supported one is already stationary
+at 1.0 m. The locks are taken at 0.7 m.
+
+<!-- test: file=../fem/files/xslope_torggler_3a_nopile.xlsx, type=fem_ssrm, expected_fs=1.129, element_type=tri6, target_size=0.7, tolerance=0.01, f_min=1.0, f_max=1.25, max_iter=8000, benchmark=SSRM-TORGGLER -->
+<!-- test: file=../fem/files/xslope_torggler_3a_plate.xlsx, type=fem_ssrm, expected_fs=1.187, element_type=tri6, target_size=0.7, tolerance=0.01, f_min=1.05, f_max=1.30, max_iter=8000, benchmark=SSRM-TORGGLER -->
+<!-- test: file=../fem/files/xslope_torggler_3a_nopile.xlsx, type=circular_search, method=bishop, num_slices=40, expected_fs=1.135, tolerance=0.01, benchmark=SSRM-TORGGLER -->
+<!-- test: file=../fem/files/xslope_torggler_3a_nopile.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.132, tolerance=0.01, benchmark=SSRM-TORGGLER -->
+<!-- test: file=../fem/files/xslope_torggler_3a_nopile.xlsx, type=circular_search, method=mprice, num_slices=40, expected_fs=1.132, tolerance=0.01, benchmark=SSRM-TORGGLER -->
+
+### Torggler (2016) §4 — Slope with a weak layer and a 15 m plate {#verification-torggler3b}
+
+The same slope carrying a 1 m band of near-cohesionless soil along a published
+failure line, unsupported and then supported by a 15 m vertical plate at mid-slope.
+The unsupported case agrees; the supported case does not, and the shortfall is
+measured below rather than explained away.
+
+| Quantity | XSLOPE | Torggler PLAXIS | Note |
+|---|---|---|---|
+| SSRM FS, unsupported (tri6, 4,929 elements) | 1.064 | **1.045** (+1.8%) | his Table 11 / Table 12 |
+| SSRM FS, plate without interfaces (tri6, 4,945 elements) | 1.277 | **1.725** (−26.0%) | his §4.2 |
+| Plate peak moment, at failure | 594 kNm/m | **1250 kNm/m** (−52.5%) | at a depth of −9.6 m against his −9.5 m; his Fig. 66, chart read |
+| Plate peak shear, at failure | 225 kN/m | **500 kN/m** (−55.0%) | at a depth of −7.5 m against his −13 m; his Fig. 66, chart read |
+
+Same-method limit-equilibrium pairing on his own published failure line:
+
+| Method | XSLOPE | SLIDE (Table 12) |
+|---|---|---|
+| Spencer | 1.121 | 1.043 (+7.5%) |
+| Morgenstern-Price | 1.093 | GLE/Morgenstern-Price 1.039 (+5.2%) |
+
+*The dot is scored on the supported SSRM row. The unsupported slope, which is the
+model without the beam in it, lands 1.8% from the published value on a
+mesh-stationary answer, so the disagreement is located in what the beam does, not
+in the soil model or the transcription of the weak layer.*
+
+The limit-equilibrium pair is read on the Table 18 polyline itself — a fixed
+surface — while SLIDE's figures come from a search, and the critical surface in a
+1 m band of $c = 0.01$ kPa soil lies on the band's lower face rather than its
+centre. Sweeping the surface across the band thickness moves Spencer from 1.121 at
+the centreline to 1.074 at the lower face, which is 3.0% from SLIDE's 1.043, so
+most of the centreline delta is the surface, not the method. XSLOPE's own
+non-circular search cannot be used to close that gap here: it converges on a
+saw-toothed surface at 0.338 whose facets alternate in and out of the band.
+
+This is the benchmark problem from [Torggler (2016)](https://diglib.tugraz.at/download.php?id=5891c94c5ba8d&location=browse), §4.
+
+| Property | Value |
+|----------|-------|
+| Domain | 65.0 m wide × 30.0 m high, toe at (20, 20) |
+| Soil body: $c$ / $\phi$ / $E$ / $\nu$ | 10 kPa / 25° / 15,000 kPa / 0.3 |
+| Weak layer: $c$ / $\phi$ / $E$ / $\nu$ | 0.01 kPa / 20° / 5,000 kPa / 0.3 |
+| Unit weight, $\gamma$ (both) | 16 kN/m³ |
+| Dilatancy angle, $\psi$ (both) | 0 degrees |
+| Weak layer geometry | Table 18 polyline, 32 points, offset 0.5 m each side |
+| Plate length / station | 15 m, vertical, head at (28.66, 25.0) |
+
+The plate station is not printed in §4. It is read from Fig. 66, whose deviatoric-
+strain panel places the plate head 5.0 m above the toe elevation — mid-slope, the
+same station as §3 — to within the ±0.4 m the panel's 0.2 m-per-pixel scale
+resolves. Torggler's §4.3.1 confirms the reading independently: he states the
+unsupported failure mechanism is 7.5 m deep at the row, and the Table 18 line
+passes 7.5 m below the surface at exactly mid-slope.
+
+Excel input files: [xslope_torggler_3b_nopile.xlsx](../fem/files/xslope_torggler_3b_nopile.xlsx),
+[xslope_torggler_3b_plate.xlsx](../fem/files/xslope_torggler_3b_plate.xlsx)
+
+![torggler_3b_mesh.png](../fem/images/torggler_3b_mesh.png){width=900}
+
+![torggler_3b_nopile_results.png](../fem/images/torggler_3b_nopile_results.png){width=900}
+
+![torggler_3b_plate_results.png](../fem/images/torggler_3b_plate_results.png){width=900}
+
+**Mesh convergence.** The weak layer carries a 0.5 m local element size of its own,
+so the band is resolved at every global size:
+
+| Target size | tri6 elements | SSRM FS, unsupported | SSRM FS, with plate |
+|---|---:|---:|---:|
+| 1.5 m | 3,152 | 1.064 | 1.256 |
+| 1.0 m | 4,929 | 1.064 | 1.277 |
+
+The unsupported answer is identical at both sizes. The supported one rises from
+1.256 to 1.277 (+1.7%) over the same refinement and does not approach 1.725.
+
+**What the beam does not do.** Raising the plate's stiffness a hundredfold moves
+the supported factor of safety to 1.345 and lowers its peak shear, so the shortfall
+is not the beam being too soft. A displacement-versus-$F$ sweep on the supported
+model reads 0.46 m at $F$ = 1.10, 0.76 m at 1.40, 1.35 m at 1.55 and 2.28 m at
+1.70, with no catastrophe knee, and the controlling node migrates from the weak
+band's daylight on the plateau to the crest between $F$ = 1.40 and 1.55: the
+band creeps at every trial because its cohesion is 0.01 kPa, and the failure
+criterion closes on that creep rather than on the global mechanism the plate is
+holding back.
+
+<!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=fem_ssrm, expected_fs=1.064, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=0.9, f_max=1.2, max_iter=6000, benchmark=SSRM-TORGGLER -->
+<!-- test: file=../fem/files/xslope_torggler_3b_plate.xlsx, type=fem_ssrm, expected_fs=1.277, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=1.15, f_max=1.45, max_iter=8000, benchmark=SSRM-TORGGLER -->
+<!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=single_noncirc, method=spencer, num_slices=40, expected_fs=1.121, tolerance=0.01, benchmark=SSRM-TORGGLER -->
+<!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=single_noncirc, method=mprice, num_slices=40, expected_fs=1.093, tolerance=0.01, benchmark=SSRM-TORGGLER -->

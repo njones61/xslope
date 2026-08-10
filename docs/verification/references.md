@@ -294,6 +294,11 @@ Engineers).
   along a proposed highway (Ankara clay, E90). *Environmental Geology* 45,
   963–977. [doi:10.1007/s00254-003-0954-3](https://doi.org/10.1007/s00254-003-0954-3). *(Cited
   in the RS2 manual as "Topal & Isik (2004)".)*
+- Torggler, N. (2016). *Numerical Studies of Embedded Beam Row in Safety Analysis
+  in PLAXIS 2D*. MSc thesis, Institut für Bodenmechanik und Grundbau, Graz
+  University of Technology.
+  [diglib.tugraz.at](https://diglib.tugraz.at/download.php?id=5891c94c5ba8d&location=browse).
+  *(Source of the §3 homogeneous-slope and §4 weak-layer plate benchmarks.)*
 - Torres & Coffman (1997). The earth dam cross-section analysed as Example 6 of
   Griffiths & Lane (1999), as cited there. *(Primary source not fully verified — full
   author names, title and venue unconfirmed from available materials.)*

@@ -68,6 +68,12 @@ UTIL_TIE_TOL = 0.005
 # location reaches this fraction of the field's maximum along that member. Read
 # from the at-failure snapshot when one was captured, else from the converged
 # field.
+#
+# The same fraction decides whether a member is crossed by the mechanism AT ALL,
+# measured against the mechanism's peak over the whole section rather than along
+# the member. Both readings are the one question — is the field here a real part
+# of this mechanism — asked of the picture and then of the member, so there is
+# one number and not two.
 BAND_FRACTION = 0.5
 
 # The two fields a profile can be read from, spelled exactly as
@@ -317,15 +323,42 @@ def _sample_mechanism(fem_data, solution, points, failure_solution=None):
     return field[np.asarray(idx, dtype=int)]
 
 
-def _band_span(positions, mech):
+def _mechanism_peak(fem_data, solution, failure_solution=None):
+    """The mechanism field's greatest value anywhere in the section, or None.
+
+    What a member's own sampled strain is judged against before it is given a
+    failure band — see :func:`_band_span`.
+    """
+    field = _mechanism_field(fem_data, solution, failure_solution)
+    if field is None or len(field) == 0:
+        return None
+    peak = float(np.nanmax(field))
+    return peak if np.isfinite(peak) and peak > 0 else None
+
+
+def _band_span(positions, mech, global_peak=None):
     """Contiguous run of ``positions`` around the mechanism peak whose field
     reaches ``BAND_FRACTION`` of that peak — the failure band as this member
-    sees it. Returns ``(lo, hi, peak_position)`` or ``(None, None, None)``."""
+    sees it. Returns ``(lo, hi, peak_position)`` or ``(None, None, None)``.
+
+    ``global_peak`` is the mechanism's peak over the whole section
+    (:func:`_mechanism_peak`), and it is what decides whether this member is in
+    the mechanism at all. Normalizing to the member's own peak alone gives every
+    member a band: on a bar the mechanism misses, the largest of its background
+    strains becomes a peak by construction and a band is drawn around it — on
+    the reinforcement sample that produced a one-sample band on the last element
+    of three bars, hard against the end of the frame. A member whose greatest
+    sampled strain does not reach ``BAND_FRACTION`` of the section's peak has
+    not been crossed, and gets no band.
+    """
     if mech is None or len(mech) == 0:
         return None, None, None
     mech = np.asarray(mech, dtype=float)
     peak = float(np.nanmax(mech))
     if not np.isfinite(peak) or peak <= 0:
+        return None, None, None
+    if (global_peak is not None and np.isfinite(global_peak) and global_peak > 0
+            and peak < BAND_FRACTION * global_peak):
         return None, None, None
     k = int(np.nanargmax(mech))
     thresh = BAND_FRACTION * peak
@@ -506,7 +539,9 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         bond_q = np.zeros(0)
 
     mech = _sample_mechanism(fem_data, solution, pts, failure_solution)
-    band_lo, band_hi, band_peak = _band_span(s, mech) if len(idx) else (None, None, None)
+    band_lo, band_hi, band_peak = (
+        _band_span(s, mech, _mechanism_peak(fem_data, solution, failure_solution))
+        if len(idx) else (None, None, None))
 
     peak_i, tied = _peak_utilization(util)
     peak_util = float(util[peak_i]) if peak_i is not None else None
@@ -807,7 +842,10 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
     if len(elem_depth):
         mech_pts[:, 0] = 0.5 * (xy[:-1, 0] + xy[1:, 0])
     mech = _sample_mechanism(fem_data, solution, mech_pts, failure_solution)
-    _, _, band_depth = _band_span(elem_depth, mech) if len(elem_depth) else (None, None, None)
+    _, _, band_depth = (
+        _band_span(elem_depth, mech,
+                   _mechanism_peak(fem_data, solution, failure_solution))
+        if len(elem_depth) else (None, None, None))
 
     reaction_ratio = _reaction_ratio(reaction, reaction_depth, limit_depth, limit_p)
     util, basis = _pile_utilization(shear, moment, V_cap, M_cap, reaction_ratio)

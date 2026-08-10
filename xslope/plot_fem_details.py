@@ -109,7 +109,7 @@ def _panel_obstacles(ax, renderer):
     return segments, boxes
 
 
-def _annotate_inside(ax, xy, text, color, fontsize=8.5):
+def _annotate_inside(ax, xy, text, color, fontsize=8.5, fontweight="bold"):
     """Annotate a point where the panel has room for it.
 
     A peak sits on the curve it is the peak OF, and on a member well inside its
@@ -120,6 +120,11 @@ def _annotate_inside(ax, xy, text, color, fontsize=8.5):
     edge of the panel — and the cheapest taken. Same rule as the model figure's
     coordinate labels (:func:`xslope.plot.plot_coordinate_labels`), and the same
     box/segment test underneath it.
+
+    Which is why the failure band's own label is placed through here too. Set
+    against the band's left edge, it ran off the right of the panel whenever the
+    band sat on the last element of the line — the label a reader needs is the
+    one that is fully on the page, and where that is depends on the panel.
     """
     import math
     from matplotlib.font_manager import FontProperties
@@ -134,11 +139,11 @@ def _annotate_inside(ax, xy, text, color, fontsize=8.5):
         renderer = None
     if renderer is None:
         ax.annotate(text, xy=xy, xytext=(8, 8), textcoords="offset points",
-                    color=color, fontsize=fontsize, fontweight="bold",
+                    color=color, fontsize=fontsize, fontweight=fontweight,
                     ha="left", va="bottom", zorder=8)
         return
 
-    prop = FontProperties(size=fontsize, weight="bold")
+    prop = FontProperties(size=fontsize, weight=fontweight)
     # Measured line by line: a two-line label is as wide as its widest line and
     # as tall as both, which is not what a single measurement of the whole
     # string reports.
@@ -181,7 +186,7 @@ def _annotate_inside(ax, xy, text, color, fontsize=8.5):
     # has places where every offset is over SOMETHING, and the label that lands
     # on one is read rather than dissolved into the grid behind it.
     ax.annotate(text, xy=xy, xytext=(dx, dy), textcoords="offset points",
-                color=color, fontsize=fontsize, fontweight="bold", ha=ha, va=va,
+                color=color, fontsize=fontsize, fontweight=fontweight, ha=ha, va=va,
                 bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
                           edgecolor="none", alpha=0.8),
                 zorder=8)
@@ -314,13 +319,6 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
         ps, pt = profile["peak_s"], profile["peak_T"]
         ax.plot([ps], [pt], "o", color=C_PEAK, markersize=7,
                 markerfacecolor="none", markeredgewidth=1.8, zorder=7)
-    if lo is not None:
-        from matplotlib.transforms import blended_transform_factory
-        ax.text(lo, 0.97, " failure band",
-                transform=blended_transform_factory(ax.transData, ax.transAxes),
-                color=C_BAND, fontsize=8, va="top", ha="left", zorder=8,
-                bbox=dict(facecolor="white", edgecolor="none", alpha=0.75, pad=1))
-
     if ax_b is not None:
         ax_b.axhline(0.0, color="0.6", linewidth=0.8)
         ax_b.plot(profile["bond_s"], profile["bond_q"], "-", color=C_FORCE,
@@ -334,9 +332,15 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
 
     _fit_stacked_panels(fig, DETAIL_BANDS if has_bond else DETAIL_BANDS[:1])
 
-    # The peak label goes on last, on the final layout: it is placed against the
-    # curves and the legend as they are drawn, and both move when the panels are
-    # sized to their bands.
+    # The labels go on last, on the final layout: each is placed against the
+    # curves, the legend and the labels already standing, and all of those move
+    # when the panels are sized to their bands. The band's label goes first, so
+    # the one naming the utilization is placed knowing where it ended up.
+    if lo is not None:
+        band_x = 0.5 * (lo + hi) if hi is not None else lo
+        _annotate_inside(ax, (band_x, ax.get_ylim()[1]), "failure band", C_BAND,
+                         fontsize=8, fontweight="normal")
+
     if span is not None and len(tied):
         mid = 0.5 * (span[0] + span[1])
         _annotate_inside(
@@ -465,10 +469,6 @@ def plot_pile_detail(profile, fig=None):
         if profile.get("max_moment_depth") is not None:
             ax.axhline(profile["max_moment_depth"], color=C_PEAK, linewidth=0.8,
                        alpha=0.35, zorder=2)
-    if band is not None:
-        ax_u.annotate("failure band", xy=(0.03, band),
-                      xycoords=ax_u.get_yaxis_transform(), color=C_BAND,
-                      fontsize=8, va="bottom", ha="left", zorder=8)
     if profile.get("max_moment") is not None:
         mm, md = profile["max_moment"], profile["max_moment_depth"]
         ax_m.plot([mm], [md], "o", color=C_PEAK, markersize=6,
@@ -477,9 +477,13 @@ def plot_pile_detail(profile, fig=None):
     fig.suptitle(_title(profile), fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
 
-    # The peak label goes on last, on the final layout: the moment panel is one
-    # of four sharing a depth axis and is narrow, so where the label fits is a
-    # question about the drawn panel and not about the moment.
+    # The labels go on last, on the final layout: the moment panel is one of
+    # four sharing a depth axis and is narrow, so where a label fits is a
+    # question about the drawn panel and not about the moment. The band's label
+    # is placed by the same solver, on the same terms.
+    if band is not None:
+        _annotate_inside(ax_u, (ax_u.get_xlim()[0], band), "failure band",
+                         C_BAND, fontsize=8, fontweight="normal")
     if profile.get("max_moment") is not None:
         _annotate_inside(ax_m, (profile["max_moment"],
                                 profile["max_moment_depth"]),

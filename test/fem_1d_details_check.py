@@ -595,6 +595,7 @@ def test_field_state_profiles():
 
     slope_data, fem_data, solution = _solved(REINF_XLSX)
     failure = _failure_field(REINF_XLSX)
+    banded = []
     for line_id in (1, 4, 6):
         conv = fd.reinforcement_profile(fem_data, solution, line_id, slope_data,
                                         field_state="converged",
@@ -615,9 +616,15 @@ def test_field_state_profiles():
         if conv["band_lo"] != fail["band_lo"] or conv["band_hi"] != fail["band_hi"]:
             fails.append(f"line {line_id}: the failure band moved with the field "
                          f"state ({conv['band_lo']} -> {fail['band_lo']})")
-        if fail["band_lo"] is None:
-            fails.append(f"line {line_id}: no failure band was marked from the "
-                         f"snapshot")
+        if fail["band_lo"] is not None:
+            banded.append(line_id)
+    # Which lines are banded is the mechanism's business (see
+    # :func:`test_the_band_needs_the_mechanism`); what this check needs is that
+    # the mechanism marked SOMETHING, or the comparison above compares two
+    # absences.
+    if not banded:
+        fails.append("the snapshot marked no failure band on any line, so the "
+                     "band's independence from the field state is untested")
 
     slope_data, fem_data, solution = _solved(PILES_XLSX)
     failure = _failure_field(PILES_XLSX)
@@ -762,8 +769,17 @@ def test_field_state_export():
 
 
 # --------------------------------------------------------------------------
-# G. what the profiles mark, and where the marks are drawn
+# G. the failure band, and the labels around it
 # --------------------------------------------------------------------------
+
+def _label_boxes(ax, text):
+    """The drawn box of every annotation on ``ax`` whose text starts with
+    ``text``, in display pixels, with the panel's own frame."""
+    renderer = ax.figure.canvas.get_renderer()
+    boxes = [t.get_window_extent(renderer) for t in ax.texts
+             if str(t.get_text()).strip().startswith(text)]
+    return boxes, ax.get_window_extent(renderer)
+
 
 def _drawn(profile, figsize=(9.5, 6.0)):
     """One detail figure, drawn on a real canvas so the label placement runs."""
@@ -776,6 +792,119 @@ def _drawn(profile, figsize=(9.5, 6.0)):
     plot_detail(profile, fig=fig)
     fig.canvas.draw()
     return fig
+
+
+def test_the_band_needs_the_mechanism():
+    """A member gets a failure band only where the mechanism reaches it.
+
+    The band's edges are the positions along a member where the mechanism field
+    falls to BAND_FRACTION of its peak ALONG THAT MEMBER. Normalized to the
+    member alone, every member has a peak and so every member has a band: on the
+    reinforcement sample the lines the mechanism misses were given one-sample
+    bands on their last element, drawn as a dashed rule hard against the end of
+    the frame with a label running off the panel.
+
+    The member's own peak is now measured against the mechanism's peak over the
+    whole section, on the same fraction. Pinned on all six lines of the
+    reinforcement sample, which has both cases, and on the drawn figures: a band
+    that is one sample wide still draws inside the frame, and the label that
+    names it is inside the panel in both cases.
+    """
+    fails = []
+    from xslope import fem_details as fd
+
+    slope_data, fem_data, solution = _solved(REINF_XLSX)
+    failure = _failure_field(REINF_XLSX)
+    peak = fd._mechanism_peak(fem_data, solution, failure)
+    if not peak:
+        return ["the sample's snapshot carries no mechanism field to band from"]
+
+    banded, bare = [], []
+    for line_id in range(1, 7):
+        prof = fd.reinforcement_profile(fem_data, solution, line_id, slope_data,
+                                        field_state="failure",
+                                        failure_solution=failure)
+        mech = prof.get("mechanism")
+        if mech is None or not len(mech):
+            fails.append(f"line {line_id}: the mechanism was not sampled at all")
+            continue
+        own = float(np.nanmax(mech))
+        crossed = own >= fd.BAND_FRACTION * peak
+        has_band = prof["band_lo"] is not None
+        if has_band != crossed:
+            fails.append(
+                f"line {line_id} reaches {own / peak:.0%} of the mechanism's "
+                f"peak and {'has' if has_band else 'has no'} failure band")
+        (banded if has_band else bare).append((line_id, prof))
+
+    if not banded:
+        fails.append("no line is banded, so the drawn band is untested")
+    if not bare:
+        fails.append("every line is banded, so the gate is untested — the "
+                     "sample no longer carries a member the mechanism misses")
+    if fails:
+        return fails
+
+    # The drawn figures: a band inside the frame, and its label inside the
+    # panel — including the narrowest band the sample has.
+    narrowest = min(banded, key=lambda b: b[1]["band_hi"] - b[1]["band_lo"])
+    for line_id, prof in (banded[0], narrowest):
+        fig = _drawn(prof)
+        ax = fig.axes[0]
+        lo, hi = ax.get_xlim()
+        if not (lo <= prof["band_lo"] <= hi and lo <= prof["band_hi"] <= hi):
+            fails.append(f"line {line_id}: the band ({prof['band_lo']}, "
+                         f"{prof['band_hi']}) falls outside the drawn frame "
+                         f"({lo}, {hi})")
+        boxes, frame = _label_boxes(ax, "failure band")
+        if not boxes:
+            fails.append(f"line {line_id}: the band is drawn and not named")
+        for box in boxes:
+            if not (frame.x0 <= box.x0 and box.x1 <= frame.x1
+                    and frame.y0 <= box.y0 and box.y1 <= frame.y1):
+                fails.append(f"line {line_id}: the band's label is cut by the "
+                             f"panel edge (label {box.x0:.0f}..{box.x1:.0f}, "
+                             f"panel {frame.x0:.0f}..{frame.x1:.0f})")
+
+    # And the narrowest band there can be, at the place it was worst: one
+    # sample wide, on the last element of the line. That is the band the sample
+    # used to fabricate, and the label naming it ran off the right of the panel.
+    line_id, prof = banded[0]
+    end = float(np.asarray(prof["s"], dtype=float)[-1])
+    ax = _drawn(dict(prof, band_lo=end, band_hi=end, band_peak=end)).axes[0]
+    boxes, frame = _label_boxes(ax, "failure band")
+    if not boxes:
+        fails.append(f"line {line_id}: a band on the last element is not named")
+    for box in boxes:
+        if not (frame.x0 <= box.x0 and box.x1 <= frame.x1
+                and frame.y0 <= box.y0 and box.y1 <= frame.y1):
+            fails.append(f"line {line_id}: a band on the last element puts its "
+                         f"label outside the panel ({box.x0:.0f}..{box.x1:.0f} "
+                         f"against {frame.x0:.0f}..{frame.x1:.0f})")
+
+    # A line the mechanism misses draws no band and names none.
+    line_id, prof = bare[0]
+    ax = _drawn(prof).axes[0]
+    if _label_boxes(ax, "failure band")[0]:
+        fails.append(f"line {line_id}: no band was measured and one is named")
+
+    # Mutation: the gate removed — the member's own peak judged against itself,
+    # which is what fabricated the bands this check exists to refuse.
+    real = fd._band_span
+    fd._band_span = lambda positions, mech, global_peak=None: real(positions, mech)
+    try:
+        still = 0
+        for line_id, _prof in bare:
+            prof = fd.reinforcement_profile(fem_data, solution, line_id,
+                                            slope_data, field_state="failure",
+                                            failure_solution=failure)
+            still += prof["band_lo"] is not None
+        if still != len(bare):
+            fails.append(f"without the gate only {still} of {len(bare)} unbanded "
+                         f"lines gain a band; the gate is not what removed them")
+    finally:
+        fd._band_span = real
+    return fails
 
 
 def test_the_peak_utilization_is_tie_aware():
@@ -885,6 +1014,7 @@ def test_the_peak_utilization_is_tie_aware():
 
 
 CHECKS = [
+    ("the failure band needs the mechanism", test_the_band_needs_the_mechanism),
     ("the peak utilization is tie-aware",
      test_the_peak_utilization_is_tie_aware),
     ("the toolbar button and its gate", test_gate),

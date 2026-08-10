@@ -8191,7 +8191,10 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                     stretch += (
                         " A point inside that stretch which stands below them "
                         "is excepted from it, and the mark breaks there.")
-            trailing = f"{stretch}{' '.join(definitions)}{states} {read_at}".strip()
+            trailing = " ".join(
+                part.strip() for part in
+                [stretch, " ".join(definitions), states, read_at]
+                if part.strip())
             if trailing:
                 text += f" {trailing}"
         # The mark the figures carry that nothing else in the report explains,
@@ -8227,7 +8230,9 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     elif table is None:
         # No table and no figure: the terms are owed to a reader who has been
         # told the analysis carries these members and shown nothing of them.
-        trailing = f"{' '.join(definitions)}{states} {read_at}".strip()
+        trailing = " ".join(part.strip() for part in
+                            [" ".join(definitions), states, read_at]
+                            if part.strip())
         if trailing:
             sec.blocks.append(Prose(trailing))
     return sec

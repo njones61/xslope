@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import io
+import math
 import os
 import pickle
 import re
@@ -3338,18 +3339,24 @@ def _parse_cell_ref(ref):
 def _round_cell_float(value):
     """Strip binary-repr noise from a float on its way into a cell.
 
-    ``round(v, 10)`` is what kills ``0.1 + 0.2 -> 0.30000000000000004``, but it
-    rounds to ten DECIMAL places, so on its own it sends every magnitude below
-    1e-10 to exactly zero — a 1e-13 m/s hydraulic conductivity (Rocscience GW#5's
-    low-permeability lens) is written as 0 and loads back as a hole in the model,
-    with no error anywhere. Values that survive the decimal rounding are written
-    exactly as before; only a value that would be annihilated by it falls back to
-    ten SIGNIFICANT digits, which strips the same noise without the floor.
+    The noise to remove is the tail past about ten meaningful digits — what turns
+    ``0.1 + 0.2`` into ``0.30000000000000004``. Rounding to ten DECIMAL places
+    does that at everyday magnitudes but measures from the decimal point rather
+    than from the number, so it eats real digits as the value shrinks: it leaves a
+    1e-9 m/s conductivity with two significant figures (8.944271910e-9 written as
+    8.9e-9) and sends anything below 5e-11 to exactly zero, so a 1e-13 m/s
+    low-permeability lens loads back as a hole in the model with no error anywhere.
+
+    So the rule is ten SIGNIFICANT digits, never coarser than ten decimal places:
+    the decimal count is measured from the value's own exponent, and floored at
+    ten so nothing that used to survive is now rounded harder. At |v| >= 0.1 that
+    is ten decimals exactly — unchanged. Below it the count grows with the
+    exponent, which is what keeps a small conductivity intact.
     """
-    r = round(value, 10)
-    if r == 0.0 and value != 0.0:
-        return float(f'{value:.10g}')
-    return r
+    if value == 0.0 or not math.isfinite(value):
+        return value
+    dp = 9 - math.floor(math.log10(abs(value)))   # ten significant digits
+    return round(value, max(dp, 10))
 
 
 def _modify_existing_cell(cell_xml, value):

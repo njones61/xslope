@@ -21215,6 +21215,75 @@
           "vg"
         ]
       },
+      "model": "docs/verification/files/rocscience_gw/gw006d.xlsx",
+      "references": [
+        {
+          "anchor": "gw6",
+          "checks": [
+            "GW6d-h",
+            "GW6d-q"
+          ],
+          "level": 3,
+          "page": "verification/rocscience_groundwater/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/rocscience_groundwater.md",
+          "title": "GW6: Steady-state seepage through saturated–unsaturated soils",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience_groundwater/#gw6"
+        }
+      ],
+      "topics": [
+        "seepage-coupled",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": true,
+        "seepage_problem": true,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 22,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "vg"
+        ]
+      },
       "model": "docs/verification/files/rocscience_gw/gw006e.xlsx",
       "references": [
         {
@@ -22550,7 +22619,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 317,
+    "models": 318,
     "pages": [
       "fem/samples/",
       "lem/design/",
@@ -22565,17 +22634,17 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 544,
+    "tags": 546,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 151,
+      "homogeneous": 152,
       "non-circular": 32,
       "piles": 15,
       "probabilistic": 15,
       "rapid-drawdown": 6,
       "reinforcement": 23,
-      "seepage-coupled": 66,
+      "seepage-coupled": 67,
       "seismic": 10,
       "soil-nails": 5,
       "tension-cracks": 19,
@@ -22753,6 +22822,7 @@
       "docs/verification/files/rocscience_gw/gw004.xlsx",
       "docs/verification/files/rocscience_gw/gw006a.xlsx",
       "docs/verification/files/rocscience_gw/gw006b.xlsx",
+      "docs/verification/files/rocscience_gw/gw006d.xlsx",
       "docs/verification/files/rocscience_gw/gw006e.xlsx",
       "docs/verification/files/rocscience_gw/gw009a.xlsx",
       "docs/verification/files/rocscience_gw/gw010.xlsx",
@@ -22917,6 +22987,7 @@
       "docs/verification/files/rocscience_gw/gw006a.xlsx",
       "docs/verification/files/rocscience_gw/gw006b.xlsx",
       "docs/verification/files/rocscience_gw/gw006c.xlsx",
+      "docs/verification/files/rocscience_gw/gw006d.xlsx",
       "docs/verification/files/rocscience_gw/gw006e.xlsx",
       "docs/verification/files/rocscience_gw/gw007.xlsx",
       "docs/verification/files/rocscience_gw/gw008.xlsx",

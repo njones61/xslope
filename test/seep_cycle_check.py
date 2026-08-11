@@ -37,23 +37,26 @@ WHY THE GATES ARE WHERE THEY ARE (both measured over the corpus, and both mutabl
 in one line if a reader wants to see the other side of them):
 
 * A period of 1 is NOT a cycle. vp046b and vp077a creep toward their answers for
-  hundreds of sweeps repeating their previous sweep within tolerance; applying the
-  floor to them from sweep 121 instead of on detection costs vp046b its convergence
-  (207 sweeps -> 600 without closing) and vp077a its (500 -> 1000 without closing).
-  Reproduce by dropping the detection and setting ``relax = min(relax, 1e-3)``
-  unconditionally after the ladder in ``solve_unsaturated``.
+  hundreds of sweeps, each repeating its previous sweep within tolerance. Replace the
+  detection with ``relax = min(relax, 1e-3)`` for every sweep past 120 and both lose
+  their convergence (207 sweeps -> 600 without closing, and 500 -> 1000), earth_dam1_vg
+  takes 687 sweeps for 180, and johnson_rapid_KEY does not converge in 1000 either.
 * Neither is a repeat that never left. After earth_dam2's exit face settles, the
   field creeps at ~1e-8 of the head range per sweep, which sits inside the repeat
   tolerance at every lag and reads as a period-2 orbit unless the iterate is required
-  to have gone somewhere in between. Reproduce by deleting the ``_cyc_away`` term:
-  earth_dam2 then drops its floor at sweep 789 and stops at its ceiling with the
-  closure still an order of magnitude short.
+  to have gone somewhere in between. Delete the ``_cyc_away`` term and earth_dam2
+  drops its floor at sweep 789 and stops at its ceiling with its closure test still
+  short of closing, while earth_dam1_vg fires at 164 and takes 305 sweeps for 180.
 * Revisiting sets is normal EARLY. Every converging model in the corpus revisits
   exit-face sets while its seepage face is still finding its extent, and all of them
   are done by sweep 41 (vp077a, the latest); earth_dam2 is still revisiting at sweep
-  992. Reproduce by setting ``_SET_REVISIT_SWEEP = 0``.
-* Removing the Class B gate leaves earth_dam2 where it was: with the revisit branch
-  deleted it runs to its 1000-sweep ceiling without converging.
+  992. Set ``_SET_REVISIT_SWEEP = 0`` and earth_dam1_vg's committed field moves --
+  its flow rate goes to 40.271920 for 40.120963 -- while earth_dam2 converges to
+  1.272890, a different answer from the one it reaches when the orbit is what frees
+  the edge.
+* Removing the Class B gate leaves earth_dam2 where it was: with
+  ``_SET_REVISIT_SWEEP`` set past any reachable sweep it runs to its 1000-sweep
+  ceiling and reports 1.275147, the flow rate off the moving field.
 
 Run directly:  PYTHONPATH=. python3 test/seep_cycle_check.py
 """

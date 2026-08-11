@@ -198,8 +198,7 @@ Columns your choices make inert grey themselves out: the c/p pair once the optio
 1. `profile!B2` **Max Depth** = `0`. This is an *elevation*, not a thickness: it
    places a horizontal rigid base at the toe of the slope.
 2. `profile!B5` **Mat ID** = `1` for Profile Line #1 — the ID you gave the material
-   on the `mat` sheet. Excel echoes that material's name back below the label, so a
-   wrong ID shows up as a blank.
+   on the `mat` sheet.
 3. Enter the three ground-surface points in the `x` / `y` columns beneath, left to
    right: `0, 0` then `20, 20` then `60, 20`.
 

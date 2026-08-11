@@ -38,15 +38,15 @@ that differ from one to the next: a few were produced by no steady solve at all
 missing mesh belongs to something else. Each is listed in ``EXCLUDED`` below with its
 own reason.
 
-Eight further companions re-solve to a MATERIALLY DIFFERENT field on their own
+Seven further companions re-solve to a MATERIALLY DIFFERENT field on their own
 committed mesh. Their cause is NOT a workbook migration: for every one of them the
 workbook as it stood at the sidecar's own commit produces bit-identical results to
 the workbook as it stands today, so the model is not what changed. What changed is
-measured per entry in ``HELD`` — the solver since the field was saved, an input the
-field was solved against that was never committed, or a solve that does not converge
-and so has no single answer to reproduce. Rewriting them is a corpus change with
-published numbers behind some of them, not a footer correction, so they are left
-alone. ``--check --held`` prints the measured difference for every one.
+measured per entry in ``HELD`` — the solver since the field was saved, a field no
+committed revision of the model reproduces, or a solve that does not converge and so
+has no single answer to reproduce. Rewriting them is a corpus change with published
+numbers behind some of them, not a footer correction, so they are left alone.
+``--check --held`` prints the measured difference for every one.
 """
 import argparse
 import contextlib
@@ -88,6 +88,11 @@ MODELS = [
     ("docs/seep/files/xslope_earth_dam1",                (1,), DOCS),
     ("docs/seep/files/xslope_earth_dam1_vg",             (1,), DOCS),
     ("docs/seep/files/xslope_johnson_res",               (1,), DOCS),
+    # levee2's shipped field was solved at a grout curtain k = 0.001 that no committed
+    # revision of the workbook carries — classroom experimentation, k being what
+    # students are set to sweep. The committed k = 0.2 is the model (owner, 2026-08-10),
+    # so the field is solved at it and the workbook is untouched.
+    ("docs/seep/files/xslope_levee2",                    (1,), DOCS),
     ("docs/seep/files/xslope_sea_trench_anis",           (1,), DOCS),
     ("docs/verification/files/geostudio/gs2_46",         (1,), GS),
     ("docs/verification/files/rocscience/rs2_28a",       (1,), VENDOR),
@@ -156,12 +161,6 @@ EXCLUDED = {
 #: results bit-identical to re-solving with the workbook as it stands today, so no
 #: input change explains any of these. Held for a decision, not silently rewritten.
 HELD = {
-    "docs/seep/files/xslope_levee2":
-        "SOLVED AGAINST AN UNCOMMITTED INPUT. The committed workbook gives the grout "
-        "curtain k = 0.2 and re-solves to flowrate 0.995013; at grout k = 0.001 the "
-        "committed field reproduces EXACTLY (max |du| 5.3e-12, flowrate 0.006655 to "
-        "the digit). The field beside the model was solved from a k the corpus never "
-        "carried, so what is stale is the sidecar, not the workbook. No lock reads it.",
     "docs/lem/files/xslope_earth_dam_rapid":
         "SOLVER EVOLUTION. max |du| 628 / 258 psf; flowrate 181.62 -> 183.92, and the "
         "second set 44.88 -> 53.53 (+19%). The first set does not converge on this "

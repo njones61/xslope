@@ -629,18 +629,7 @@ class LemRunner(RunnerThread):
     def __init__(self, slope_data, options, parent=None):
         super().__init__(parent)
         self._sd = slope_data
-        self._method = options["method"]
-        self._analysis = options.get("analysis", "single_surface")
-        self._surface = options.get("surface", "circular")
-        self._num_slices = options.get("num_slices", 40)
-        self._rapid = options.get("rapid", False)
-        self._composite = options.get("composite", False)
-        self._seed = 'grid' if options.get("grid_seed", False) else 'circles'
-        self._diagnostic = options.get("diagnostic", False)
-        self._fs_tol = options.get("fs_tol")
-        self._tol = options.get("tol")
-        self._max_iter = options.get("max_iter")
-        self._min_slip_depth = options.get("min_slip_depth")
+        self._opts = dict(options or {})
         self._cancel = threading.Event()
 
     def cancel(self):
@@ -648,44 +637,10 @@ class LemRunner(RunnerThread):
         iteration boundary and the run emits ``cancelled``."""
         self._cancel.set()
 
-    def _search_kwargs(self, circular):
-        """Tolerance and search-window kwargs to forward to the search functions.
-
-        ``tol`` is only accepted by ``circular_search`` (noncircular has no
-        geometric tol). The model's own window is read by
-        :func:`xslope.search.file_search_window` — the one reading every path
-        that searches on the model's behalf shares — and BOTH branches apply what
-        their search understands: the circular one takes the whole window, the
-        non-circular one the ``min_slip_depth`` subset
-        :func:`xslope.search.noncircular_search_opts` selects, which is the same
-        limit the dialog already offers it.
-        """
-        from xslope.search import file_search_window, noncircular_search_opts
-        kw = {}
-        if self._fs_tol is not None:
-            kw["fs_tol"] = self._fs_tol
-        if self._max_iter is not None:
-            kw["max_iter"] = self._max_iter
-        if self._min_slip_depth is not None:
-            kw["min_slip_depth"] = self._min_slip_depth
-        if circular and self._tol is not None:
-            kw["tol"] = self._tol
-        win = file_search_window(self._sd, already=kw)
-        if not circular:
-            win = noncircular_search_opts(win)
-        if win:
-            print(f"Applying the file's search window: "
-                  f"{', '.join(sorted(win))}.")
-        kw.update(win)
-        return kw
-
     def run(self):
         from xslope.search import AnalysisCancelled
         try:
-            if self._analysis == "auto_search":
-                self._run_search()
-            else:
-                self._run_single()
+            self._run()
         except AnalysisCancelled:
             print("Run cancelled.")
             self.cancelled.emit()
@@ -701,96 +656,42 @@ class LemRunner(RunnerThread):
             traceback.print_exc()   # streams to the Log pane via the stdout/stderr tee
             self.failed.emit("Solve failed — see the Log pane for details.")
 
-    # --- single surface --------------------------------------------------
-    def _run_single(self):
-        from xslope.slice import generate_slices
-        from xslope.solve import solve_selected
+    def _run(self):
+        """One analysis, run the way every path that runs one runs it.
 
-        sd = self._sd
-        circular = self._surface == "circular"
-        if circular:
-            circle = sd["circles"][0] if sd.get("circular") and sd.get("circles") else None
-            if circle is None:
-                self.failed.emit("A circular surface is required (no circles defined).")
-                return
-            non_circ = None
-            print(f"Running {self._method.upper()} — single circular surface "
-                  f"(Xo={circle.get('Xo')}, Yo={circle.get('Yo')}, R={circle.get('R'):.3g}), "
-                  f"{self._num_slices} slices{self._rapid_tag()}…")
-        else:
-            non_circ = sd.get("non_circ") or None
-            if not non_circ:
-                self.failed.emit("A non-circular surface is required "
-                                 "(no non-circular points defined).")
-                return
-            circle = None
-            print(f"Running {self._method.upper()} — single non-circular surface, "
-                  f"{self._num_slices} slices{self._rapid_tag()}…")
+        The work itself is :func:`xslope.search.run_lem_analysis` — the search or
+        the specified surface, the model's own search window, and the bundle the
+        result views and the report both read. What is left here is the thread's
+        own business: the cancel flag, and turning a run that could not be made
+        into the message the Run box shows.
+        """
+        from xslope.search import AnalysisError, run_lem_analysis
 
-        ok, result = generate_slices(sd, circle=circle, non_circ=non_circ,
-                                     num_slices=self._num_slices,
-                                     composite=self._composite)
-        if not ok:
-            self.failed.emit(str(result))
+        o = self._opts
+        try:
+            bundle = run_lem_analysis(
+                self._sd, o["method"],
+                analysis=o.get("analysis", "single_surface"),
+                surface=o.get("surface", "circular"),
+                num_slices=o.get("num_slices", 40),
+                rapid=o.get("rapid", False),
+                composite=o.get("composite", False),
+                grid_seed=o.get("grid_seed", False),
+                diagnostic=o.get("diagnostic", False),
+                cancel_check=self._cancel.is_set,
+                fs_tol=o.get("fs_tol"), tol=o.get("tol"),
+                max_iter=o.get("max_iter"),
+                min_slip_depth=o.get("min_slip_depth"))
+        except AnalysisError as e:
+            self.failed.emit(str(e))
             return
-        slice_df, failure_surface = result
-        print(f"Generated {len(slice_df)} slices; solving…")
-        results = solve_selected(self._method, slice_df, rapid=self._rapid)
-        if not isinstance(results, dict):
-            self.failed.emit(f"No solution: {results}")
+        if bundle.get("results") is None:
+            # The surface was built and the method did not converge on it. The
+            # run has no result to show, so it is reported as a failed run with
+            # the solver's own reason.
+            self.failed.emit(f"No solution: {bundle.get('failure')}")
             return
-        self.succeeded.emit({"slice_df": slice_df, "failure_surface": failure_surface,
-                             "results": results, "search": None})
-
-    # --- auto-search -----------------------------------------------------
-    def _run_search(self):
-        from xslope.search import circular_search, noncircular_search
-
-        sd = self._sd
-        circular = self._surface == "circular"
-        if circular:
-            if self._seed != 'grid' and not (sd.get("circular") and sd.get("circles")):
-                self.failed.emit("Circular search needs at least one starting circle "
-                                 "(or turn on grid seeding).")
-                return
-            print(f"Searching for the critical circular surface with "
-                  f"{self._method.upper()}{self._rapid_tag()}…")
-            fs_cache, converged, search_path, circle_cache = circular_search(
-                sd, self._method, rapid=self._rapid, num_slices=self._num_slices,
-                diagnostic=self._diagnostic, cancel_check=self._cancel.is_set,
-                composite=self._composite, seed=self._seed,
-                **self._search_kwargs(circular=True))
-            search = {"kind": "circular", "fs_cache": fs_cache,
-                      "search_path": search_path, "circle_cache": circle_cache}
-        else:
-            if not sd.get("non_circ"):
-                self.failed.emit("Non-circular search needs a starting non-circular surface.")
-                return
-            print(f"Searching for the critical non-circular surface with "
-                  f"{self._method.upper()}{self._rapid_tag()}…")
-            fs_cache, converged, search_path = noncircular_search(
-                sd, self._method, rapid=self._rapid, num_slices=self._num_slices,
-                diagnostic=self._diagnostic, cancel_check=self._cancel.is_set,
-                **self._search_kwargs(circular=False))
-            search = {"kind": "noncircular", "fs_cache": fs_cache,
-                      "search_path": search_path, "circle_cache": None}
-
-        if not fs_cache:
-            self.failed.emit("Search produced no valid surfaces.")
-            return
-        critical = fs_cache[0]
-        results = critical.get("solver_result")
-        if not isinstance(results, dict):
-            self.failed.emit("Search found no surface with a valid solution.")
-            return
-        tail = "" if converged else "  (search did not fully converge)"
-        print(f"Critical FS = {results.get('FS'):.3f}{tail}")
-        self.succeeded.emit({"slice_df": critical.get("slices"),
-                             "failure_surface": critical.get("failure_surface"),
-                             "results": results, "search": search})
-
-    def _rapid_tag(self):
-        return " (rapid drawdown)" if self._rapid else ""
+        self.succeeded.emit(bundle)
 
 
 class SensitivityRunner(RunnerThread):
@@ -1202,13 +1103,19 @@ class ReportRunner(RunnerThread):
     The run has two phases, and :attr:`progress` reports them differently
     because they are differently knowable:
 
-      * **The figures, then the document** — determinate, over
-        ``planned_figures(...) + REPORT_WRITE_STEPS`` steps. Each figure is
-        announced by ``xslope.report``'s own callback, with the label it
-        produces ("the force diagram — Spencer's Method"). The last announcement
-        is followed by the sections that carry no figure and by the ``.docx``
-        write, none of which the builder announces, so the runner names that
-        stretch itself (:data:`REPORT_WRITE_LABEL`) as the last figure is
+      * **The solves and figures, then the document** — determinate, over
+        ``planned_steps(...) + REPORT_WRITE_STEPS`` steps. A report asked for a
+        method the run never solved solves it first, and that solve is a step
+        like a figure, announced by name: it is the longest thing in such a
+        build, and a bar standing still through a search says the report has
+        hung. Each step is announced by ``xslope.report``'s own callback, with
+        the label it produces ("the force diagram — Spencer's Method"). The
+        builder revises its own total upward once the methods it had to run
+        exist, since what their blocks draw is not knowable before that, and the
+        bar follows the revised count rather than the estimate. The last
+        announcement is followed by the sections that carry no figure and by the
+        ``.docx`` write, none of which the builder announces, so the runner names
+        that stretch itself (:data:`REPORT_WRITE_LABEL`) as the last step is
         announced. The bar does not advance for it until the document is
         written — it is the one step that is named before it is finished, rather
         than a bar that stands still through the longest step in the run.
@@ -1244,6 +1151,7 @@ class ReportRunner(RunnerThread):
         # Whether the Word finish is switched on is a QSettings question, so it
         # is answered where QSettings lives (the GUI thread) and passed in.
         self._finalize = bool(finalize)
+        self._steps = 0                 # set from the builder's own count
         self._cancel = threading.Event()
 
     def cancel(self):
@@ -1261,28 +1169,37 @@ class ReportRunner(RunnerThread):
                              "pane for details.")
 
     def _generate(self):
-        from xslope.report import (generate_report, planned_figures,
+        from xslope.report import (generate_report, methods_to_run,
+                                   planned_figures, planned_steps,
                                    resolve_options)
 
         opts = dict(self._opts)
-        figures = planned_figures(self._sd, self._solutions,
-                                  resolve_options(opts))
-        total = figures + REPORT_WRITE_STEPS
-        opts["progress"] = self._figure_cb(figures, total)
+        resolved = resolve_options(opts)
+        figures = planned_figures(self._sd, self._solutions, resolved)
+        solves = len(methods_to_run(self._sd, self._solutions, resolved))
+        # Revised by the builder as it goes: a method it has to run first is a
+        # step of its own, and the figures that method's block draws are not
+        # counted until the run exists.
+        self._steps = planned_steps(self._sd, self._solutions, resolved)
+        opts["progress"] = self._figure_cb()
         # A report with every figure switched off still has a document to write,
         # and the builder will announce nothing at all: name the step up front so
         # the bar is determinate from the start either way.
-        self.progress.emit(0, total,
-                           "rendering the figures" if figures
+        self.progress.emit(0, self._steps + REPORT_WRITE_STEPS,
+                           "rendering the figures" if self._steps
                            else REPORT_WRITE_LABEL)
 
-        print(f"Generating the report — {figures} "
-              f"figure{'' if figures == 1 else 's'}…")
+        said = f"{figures} figure{'' if figures == 1 else 's'}"
+        if solves:
+            said += (f", after running {solves} "
+                     f"method{'' if solves == 1 else 's'} it was asked for")
+        print(f"Generating the report — {said}…")
         ok, out = generate_report(self._sd, self._solutions, opts, self._path,
                                   fmt=self._fmt)
         if not ok:
             self.failed.emit(str(out))
             return
+        total = self._steps + REPORT_WRITE_STEPS
         self.progress.emit(total, total, REPORT_WRITE_LABEL)
 
         finalized = False
@@ -1292,14 +1209,22 @@ class ReportRunner(RunnerThread):
             finalized, _msg = word_finish(self._path, True)
         self.succeeded.emit(dict(out, finalized=finalized, fmt=self._fmt))
 
-    def _figure_cb(self, figures, total):
-        """``xslope.report``'s progress callback: one signal per figure, and the
-        cancel flag read at each one."""
-        def cb(done, _total, label):
+    def _figure_cb(self):
+        """``xslope.report``'s progress callback: one signal per step the builder
+        announces, and the cancel flag read at each one.
+
+        The builder's own count comes with every step, and it is the one the bar
+        is drawn against: a build that had to run a method before it could draw
+        that method's figures knows how many there are only once it has.
+        """
+        def cb(done, planned, label):
             if self._cancel.is_set():
                 raise ReportCancelled()
+            if int(planned) > 0:
+                self._steps = int(planned)
+            total = self._steps + REPORT_WRITE_STEPS
             self.progress.emit(int(done), total, str(label))
-            if int(done) >= figures:
+            if int(done) >= self._steps:
                 self.progress.emit(int(done), total, REPORT_WRITE_LABEL)
         return cb
 

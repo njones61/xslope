@@ -1209,12 +1209,13 @@ def method_list(method):
 def featured_methods(solutions, opts=None):
     """The methods the report documents in DETAIL, in the order it documents them.
 
-    The caller's ``method`` option decides, in the order it names them — but only
-    among the methods the analysis actually RAN. A report documents the analysis:
-    a method the run never solved has no factor of safety to report, and one the
-    report solved for itself on another method's critical surface is a number the
-    analysis never produced (the owner's ruling, fem_piles review). A name that
-    was not run is dropped here, and nothing downstream has to describe it.
+    The caller's ``method`` option decides, in the order it names them. Every
+    method it names is documented from a solution of its OWN: one the analysis
+    ran, or one the report ran for it (:func:`run_requested_methods`, called
+    before anything here is asked). A method is never documented from another
+    method's critical surface — each method searches for its own — so the only
+    name dropped here is one whose own run could not be made at all, and the
+    reason for that was printed where the run was attempted.
 
     With nothing asked for, the first method that was actually run is featured;
     with nothing run either, the default method is, so a report always has one
@@ -1225,6 +1226,119 @@ def featured_methods(solutions, opts=None):
     if wanted:
         return wanted
     return [run[0]] if run else [DEFAULT_METHOD]
+
+
+def methods_to_run(slope_data, solutions, opts=None):
+    """The methods this report was asked for that the analysis did not run.
+
+    Every method the report is asked to document is RUN for it (the owner's
+    ruling): the report documents an analysis, and a method that has one is
+    documented from it whether the run was made at the Run dialog or here. Only
+    a method the caller NAMED is run — a report that asks for nothing in
+    particular documents what the analysis carries and solves nothing.
+
+    Two names are not runs and are left where they were. One the solver does not
+    offer at all, which is a typo rather than a request; and one this surface
+    family cannot take, which the report has always declined to document and the
+    dialog dims for the same reason, out of the same rule
+    (:func:`xslope.preflight.method_surface_reason`).
+    """
+    if opts is not None and not opts.get("lem", True):
+        return []
+    from .preflight import method_surface_reason
+
+    run = solved_methods(solutions)
+    offered = supported_methods()
+    family = surface_family(slope_data, solutions)
+    return [m for m in method_list((opts or {}).get("method"))
+            if m not in run and m in offered
+            and not method_surface_reason(m, family)]
+
+
+def analysis_options(slope_data, solutions):
+    """How this model's limit equilibrium analysis was run.
+
+    A method the report has to run for itself is run the same way as the ones
+    that came with the solutions: the same analysis class, the same surface
+    family, the same slice count, the same drawdown staging. Where the run
+    recorded its own options — Studio hands them to the report on the bundle —
+    those are the answer. Otherwise they are read off the analysis itself: a
+    bundle carrying a search was searched for, one carrying stage factors of
+    safety was a rapid drawdown, and the slice count is the count it was cut
+    into.
+
+    A model with no limit equilibrium run at all is read as what its input
+    says: the surface it specifies, solved once. A search is something an
+    engineer asks for, and no report starts one on a model whose analysis never
+    did.
+    """
+    bundles = lem_bundles(solutions)
+    ref = bundles[0] if bundles else {}
+    recorded = ref.get("options") or {}
+    results = ref.get("results") or {}
+    surface = surface_family(slope_data, solutions)
+    slice_df = ref.get("slice_df")
+    slices = (len(slice_df) if slice_df is not None and len(slice_df)
+              else _num(slope_data.get("num_slices")) or 40)
+    out = {"analysis": "auto_search" if ref.get("search") else "single_surface",
+           "surface": surface,
+           "num_slices": int(slices),
+           "rapid": "stage1_FS" in results,
+           "composite": False,
+           "grid_seed": False}
+    for key in out:
+        if recorded.get(key) is not None:
+            out[key] = recorded[key]
+    # The tolerances and limits a run was given, where it recorded them; the
+    # model's own search window fills in the rest inside the search itself.
+    for key in ("fs_tol", "tol", "max_iter", "min_slip_depth", "diagnostic"):
+        if recorded.get(key) is not None:
+            out[key] = recorded[key]
+    return out
+
+
+def run_requested_methods(slope_data, solutions, opts, progress=None):
+    """``solutions`` with every method the report was asked for solved.
+
+    A method the analysis did not run is run HERE, exactly as it would have been
+    had it been ticked in the Run dialog: its own search for its own critical
+    surface where the analysis searched (:func:`analysis_options`), the
+    specified surface where it did not, and the drawdown staging either way. The
+    bundle that comes back is a run bundle like any other — its factor of safety
+    is its own, its detail block is full, and its search is drawn in its own
+    section — because it was produced by the one function every path that runs a
+    method runs it through (:func:`xslope.search.run_lem_analysis`).
+
+    What it is NOT is the old courtesy solve, which took the featured method's
+    critical surface and evaluated another method on it: that is a number the
+    analysis never produced, and no method here is given a surface it did not
+    find.
+
+    A run that cannot be made at all — no surface of the model's family, a
+    search that finds nothing valid — leaves that method out, with the reason
+    printed. The caller's ``solutions`` is never modified: the extra runs belong
+    to this report, not to the session that asked for it.
+    """
+    from .search import AnalysisError, run_lem_analysis
+
+    pending = methods_to_run(slope_data, solutions, opts)
+    if not pending:
+        return solutions
+    how = analysis_options(slope_data, solutions)
+    out = dict(solutions or {})
+    bundles = list(lem_bundles(solutions))
+    for name in pending:
+        if progress:
+            progress(f"the {method_label(name)} analysis")
+        try:
+            bundles.append(run_lem_analysis(slope_data, name, **how))
+        except AnalysisError as exc:
+            print(f"{method_label(name)} could not be run on this model: {exc}")
+        except Exception:                                   # noqa: BLE001
+            import traceback
+            traceback.print_exc()
+    out["lem"] = bundles
+    return out
 
 
 def select_bundle(solutions, method=None):
@@ -2974,13 +3088,13 @@ def _surface_family(slice_df, slope_data):
 def detail_bundle(slope_data, solutions, method):
     """``(bundle, note)`` — what the report documents in detail for one method.
 
-    A method that was RUN is documented from its own bundle, and ``note`` is
-    empty. A method that was not run is not documented at all: the report
-    describes the analysis, and a factor of safety the report computed for itself
-    on somebody else's critical surface is not one the analysis produced (the
-    owner's ruling, fem_piles review). Such a method never reaches here —
-    :func:`featured_methods` drops it — and the empty bundle below is the
-    belt-and-braces answer for a caller that asks anyway.
+    A method is documented from its OWN bundle — the run the analysis made, or
+    the run the report made for it (:func:`run_requested_methods`) — and ``note``
+    is empty. Never from another method's critical surface: a factor of safety
+    worked out on a surface some other method found is not that method's answer
+    (the owner's ruling, fem_piles review). A method with no bundle of its own
+    never reaches here, :func:`featured_methods` having dropped it, and the empty
+    bundle below is the belt-and-braces answer for a caller that asks anyway.
     """
     method = str(method or "").lower()
     for b in lem_bundles(solutions):
@@ -3005,14 +3119,15 @@ def _solution_parameters(res):
 def _fs_table(slope_data, solutions, opts, counter):
     """The factor of safety each documented method reported, on its own surface.
 
-    Only the methods this report documents, and only their own answers. The
-    summary used to list every method xslope offers, filling in the ones that had
-    not been run by solving them on the surface the featured method had found —
-    which made a column of numbers that were not comparable in the way a column
-    of numbers reads as: each method has its own critical surface, and a method
-    solved on somebody else's is not reporting its factor of safety. Which
-    methods a reader wants compared is a decision the reader makes, by choosing
-    what the report documents.
+    Only the methods this report documents, and only their own answers — every
+    one of them from a run of that method's own, on the surface that run found
+    (:func:`run_requested_methods`). The summary used to list every method xslope
+    offers, filling in the ones that had not been run by solving them on the
+    surface the featured method had found, which made a column of numbers that
+    were not comparable in the way a column of numbers reads as: each method has
+    its own critical surface, and a method solved on somebody else's is not
+    reporting its factor of safety. Which methods a reader wants compared is a
+    decision the reader makes, by choosing what the report documents.
 
     None for a report of a single method: two rows are a comparison, one row is
     the same number the method's own section states, and a table that restates it
@@ -3037,9 +3152,10 @@ def _fs_table(slope_data, solutions, opts, counter):
     rows = []
     for name in methods:
         bundle = solved.get(name) or {}
-        # Every row is a method that RAN (:func:`featured_methods`). "did not
-        # converge" is therefore what it says: the solver was given this method
-        # on this surface and returned no factor of safety.
+        # Every row is a method that RAN — for this analysis or for this report,
+        # which are the same run made at two moments. "did not converge" is
+        # therefore what it says: the solver was given this method on this
+        # surface and returned no factor of safety.
         res = bundle.get("results")
         res = res if isinstance(res, dict) else {}
         fs = _num(res.get("FS"))
@@ -9327,21 +9443,44 @@ def _diagram_is_printed(slope_data, solutions, method, opts):
         return False
 
 
+def planned_steps(slope_data, solutions, opts):
+    """How many steps a build with these options will announce.
+
+    The figures, plus one for every method the report has to run before it can
+    draw them (:func:`methods_to_run`). Those runs are steps a caller has to be
+    told about — a search is the longest thing in a report, and a bar that
+    stands still through it says the build has hung.
+
+    A lower bound while any method is still to be run: what its block draws is
+    not knowable until its bundle exists, so the count is revised upward, once,
+    as soon as it does. Callers following the build's own progress lines are
+    handed the revised total with every step.
+    """
+    return (planned_figures(slope_data, solutions, opts)
+            + len(methods_to_run(slope_data, solutions, opts)))
+
+
 def _progress_reporter(callback, total):
     """A one-argument ``progress(label)`` that counts its calls off against
     ``total`` and hands ``(done, total, label)`` to ``callback``. None when
-    nobody is listening, so the builder can test for it once."""
+    nobody is listening, so the builder can test for it once.
+
+    ``step.retotal(n)`` revises the total the remaining steps are counted
+    against: the figures a method the report ran for itself will draw are not
+    known until it has been run.
+    """
     if not callable(callback):
         return None
-    state = {"done": 0}
+    state = {"done": 0, "total": total}
 
     def step(label):
         state["done"] += 1
         try:
-            callback(state["done"], total, label)
+            callback(state["done"], state["total"], label)
         except Exception:
             pass                      # a progress line is never worth the report
 
+    step.retotal = lambda n: state.update(total=int(n))
     return step
 
 
@@ -9358,7 +9497,10 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
 
         ``"lem"``
             ``{"slice_df", "failure_surface", "results", "search", "method"}``,
-            plus the method's name. One per method.
+            plus the method's name, and optionally the ``options`` the run was
+            made under. One per method — and a method the ``method`` option names
+            that is not among them is RUN before the report is built, under those
+            same options (:func:`run_requested_methods`).
         ``"seep"``
             ``{"seep_data", "solution", "options"}``, where ``options["bc"]``
             names the boundary condition set. One per set solved.
@@ -9400,7 +9542,19 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
     report = Report(meta=meta)
 
     progress = _progress_reporter(opts.get("progress"),
-                                  planned_figures(slope_data, solutions, opts))
+                                  planned_steps(slope_data, solutions, opts))
+
+    # Every method the report was asked for is documented from a run of its own,
+    # so the ones the analysis did not run are run now — before the count of what
+    # this build draws is taken off the solutions, and before any section reads
+    # them (:func:`run_requested_methods`).
+    if opts["lem"]:
+        pending = len(methods_to_run(slope_data, solutions, opts))
+        if pending:
+            solutions = run_requested_methods(slope_data, solutions, opts, progress)
+            if progress:
+                progress.retotal(
+                    planned_figures(slope_data, solutions, opts) + pending)
 
     if opts["traceability"]:
         report.sections.append(_traceability_section(slope_data, solutions, opts))

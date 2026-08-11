@@ -501,20 +501,33 @@ class ReportDialog(QDialog):
         results view is showing.
 
         EVERY method is offered, not only the ones that have been run, and each
-        row says which it is. A report documents the analysis, so a method the
-        run never solved is dropped from it — it has no factor of safety to
-        report, and one solved here on another method's critical surface would be
-        a number the analysis never produced (the owner's ruling, fem_piles
-        review; :func:`~xslope.report.featured_methods` does the dropping). A
-        method that cannot run on this surface family at all is listed and
-        disabled, with the reason on it, rather than quietly missing.
+        row says which it is. Ticking a method that has not been run RUNS it,
+        exactly as ticking it in the Run dialog would have: a search for its own
+        critical surface where this model's analysis searched, the specified
+        surface where it did not (the owner's ruling;
+        :func:`~xslope.report.run_requested_methods` does the running). So every
+        tick means the same thing, and the rows that say "not run yet" are saying
+        how long the report will take, not that they are worth less. A method
+        that cannot run on this surface family at all is listed and disabled,
+        with the reason on it, rather than quietly missing.
         """
         from xslope.preflight import method_surface_reason
-        from xslope.report import (DEFAULT_METHOD, method_label, solved_methods,
-                                   supported_methods, surface_family)
+        from xslope.report import (DEFAULT_METHOD, analysis_options, method_label,
+                                   solved_methods, supported_methods,
+                                   surface_family)
 
         family = surface_family(self._sd, self._solutions)
         run = solved_methods(self._solutions)
+        # What ticking an unrun method costs, in the terms of THIS model's
+        # analysis: the report runs it the way the run was made
+        # (:func:`~xslope.report.analysis_options`), which is a search on a model
+        # that searched and one solve on a model that did not.
+        will_run = ("Not run yet; the report will run it — a search for this "
+                    "method's own critical surface, which takes as long as a run."
+                    if analysis_options(self._sd, self._solutions)["analysis"]
+                    == "auto_search" else
+                    "Not run yet; the report will run it, on the surface the "
+                    "input specifies.")
 
         # What opens ticked: the results view's own method, else a method that
         # was run, else the default — the first of those this SURFACE can take.
@@ -540,12 +553,7 @@ class ReportDialog(QDialog):
             else:
                 item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
                 item.setCheckState(Qt.Checked if name == opening else Qt.Unchecked)
-                if name in run:
-                    item.setToolTip("Solved in this run.")
-                else:
-                    item.setToolTip("Not run; ticking it adds nothing to the "
-                                    "report. Run it first to have it "
-                                    "documented.")
+                item.setToolTip("Solved in this run." if name in run else will_run)
             self.methods.addItem(item)
         self.methods.blockSignals(False)
         self._ensure_a_method()

@@ -303,12 +303,13 @@ def _first_window(fn, circular=True):
 def _studio_window(sd, circular=True):
     """The window Studio's Run LEM path forwards to its search.
 
-    ``_search_kwargs`` is the whole of that path's window handling, and it reads
-    nothing the constructor does not set, so a runner built with a bare options
-    dict answers exactly what a real run would."""
-    from studio.runners import LemRunner
-    runner = LemRunner(sd, {'method': 'bishop'})
-    kw = runner._search_kwargs(circular)
+    ``analysis_search_kwargs`` is the whole of that path's window handling —
+    Studio's Run LEM button and the report's own solve both run through
+    :func:`xslope.search.run_lem_analysis`, which reads the window there and
+    nowhere else — so asking it with no tolerances set answers exactly what a
+    real run would."""
+    from xslope.search import analysis_search_kwargs
+    kw = analysis_search_kwargs(sd, circular=circular, announce=False)
     return {k: v for k, v in kw.items() if k in _WINDOW_KEYS}
 
 

@@ -230,6 +230,17 @@ class AnalysisCancelled(Exception):
     worker thread) can abort cleanly without killing the thread mid-computation."""
 
 
+class AnalysisError(Exception):
+    """Raised when an analysis cannot be run at all, with the reason as its message.
+
+    The reason is written for the person who asked for the run — "A circular
+    surface is required (no circles defined)." — because that is where it is
+    shown: Studio puts it in the Run LEM box, and the report prints it where the
+    method would have been documented. Not a failure to converge, which is an
+    answer about the model; this is the run never having happened.
+    """
+
+
 def _check_cancel(cancel_check):
     if cancel_check is not None and cancel_check():
         raise AnalysisCancelled()
@@ -1165,6 +1176,187 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         print(f"\n[✅ converged] Iter={iteration+1}, FS={best_fs:.4f}, elapsed time={elapsed:.2f} seconds")
     else:
         print(f"\n[❌ max iterations reached] FS={best_fs:.4f}, elapsed time={elapsed:.2f} seconds")
-    
+
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
     return sorted_fs_cache, converged, search_path
+
+
+# ---------------------------------------------------------------------------
+# One analysis, run once
+#
+# A limit equilibrium analysis is a method, a surface family, and the choice
+# between searching for the critical surface and solving the one the input
+# specifies. Studio's Run LEM button and the report both need that done, and the
+# report needs it for a method the run never solved: the owner's rule is that
+# every method the report is asked for is RUN, each searching for its own
+# critical surface, rather than borrowed from another method's answer. Both come
+# through here, so a method run from the report is run exactly as the same method
+# ticked in the Run dialog would have been — the file's own search window
+# included.
+# ---------------------------------------------------------------------------
+
+def analysis_search_kwargs(slope_data, circular=True, fs_tol=None, tol=None,
+                           max_iter=None, min_slip_depth=None, announce=True):
+    """The search keyword arguments one analysis is run under.
+
+    The caller's tolerances where it states them, and the model's own window
+    (:func:`file_search_window`) for everything it does not: a windowed model is
+    searched inside its window whoever started the search. ``tol`` is circular
+    only — a non-circular search has no geometric tolerance — and the window is
+    reduced to the limits that branch understands
+    (:func:`noncircular_search_opts`).
+    """
+    kw = {}
+    if fs_tol is not None:
+        kw["fs_tol"] = fs_tol
+    if max_iter is not None:
+        kw["max_iter"] = max_iter
+    if min_slip_depth is not None:
+        kw["min_slip_depth"] = min_slip_depth
+    if circular and tol is not None:
+        kw["tol"] = tol
+    win = file_search_window(slope_data, already=kw)
+    if not circular:
+        win = noncircular_search_opts(win)
+    if win and announce:
+        print(f"Applying the file's search window: {', '.join(sorted(win))}.")
+    kw.update(win)
+    return kw
+
+
+def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circular",
+                     num_slices=40, rapid=False, composite=False, grid_seed=False,
+                     diagnostic=False, cancel_check=None, fs_tol=None, tol=None,
+                     max_iter=None, min_slip_depth=None, announce=True):
+    """Run ONE method on this model and return the bundle every consumer reads.
+
+    Parameters
+    ----------
+    slope_data : dict
+        The model, as :func:`xslope.fileio.load_slope_data` returns it.
+    method : str
+        The solver's own name for the method (``"spencer"``, ``"bishop"``, ...).
+    analysis : {"auto_search", "single_surface"}
+        Whether to search for the critical surface or solve the surface the input
+        specifies. A search finds the critical surface FOR THIS METHOD: run the
+        same model under two methods and the two searches settle on two surfaces.
+    surface : {"circular", "noncircular"}
+        Which family to run over, for a model that defines both.
+    num_slices, rapid, composite, grid_seed, diagnostic
+        The run options, under the names Studio's Run LEM dialog gives them.
+    cancel_check : callable, optional
+        Polled at iteration boundaries; raises :class:`AnalysisCancelled`.
+    fs_tol, tol, max_iter, min_slip_depth
+        Search tolerances and limits; anything left None is taken from the model's
+        own search window where it declares one (:func:`analysis_search_kwargs`).
+    announce : bool
+        Whether to print what is being run, which is how Studio's Log pane and a
+        script's console follow a solve that takes minutes.
+
+    Returns
+    -------
+    dict
+        ``{"slice_df", "failure_surface", "results", "search", "method"}`` — the
+        bundle the report, the plots and Studio's result views all read.
+        ``search`` is None for a single-surface run and a dict describing the
+        search otherwise. ``results`` is None where the solver returned no
+        solution on a surface that was otherwise built, with the solver's reason
+        on ``failure``: the method ran and did not converge, which is an answer
+        about the model rather than a run that never happened.
+
+    Raises
+    ------
+    AnalysisError
+        The run could not be made at all — no surface of the requested family, a
+        surface that cannot be sliced, a search that found nothing valid.
+    AnalysisCancelled
+        ``cancel_check`` asked it to stop.
+    """
+    method = str(method or "").lower()
+    circular = surface != "noncircular"
+    tag = " (rapid drawdown)" if rapid else ""
+    if analysis == "auto_search":
+        kw = analysis_search_kwargs(slope_data, circular=circular, fs_tol=fs_tol,
+                                    tol=tol, max_iter=max_iter,
+                                    min_slip_depth=min_slip_depth,
+                                    announce=announce)
+        seed = "grid" if grid_seed else "circles"
+        if circular:
+            if seed != "grid" and not (slope_data.get("circular")
+                                       and slope_data.get("circles")):
+                raise AnalysisError("Circular search needs at least one starting "
+                                    "circle (or turn on grid seeding).")
+            if announce:
+                print(f"Searching for the critical circular surface with "
+                      f"{method.upper()}{tag}…")
+            fs_cache, converged, search_path, circle_cache = circular_search(
+                slope_data, method, rapid=rapid, num_slices=num_slices,
+                diagnostic=diagnostic, cancel_check=cancel_check,
+                composite=composite, seed=seed, **kw)
+            search = {"kind": "circular", "fs_cache": fs_cache,
+                      "search_path": search_path, "circle_cache": circle_cache}
+        else:
+            if not slope_data.get("non_circ"):
+                raise AnalysisError("Non-circular search needs a starting "
+                                    "non-circular surface.")
+            if announce:
+                print(f"Searching for the critical non-circular surface with "
+                      f"{method.upper()}{tag}…")
+            fs_cache, converged, search_path = noncircular_search(
+                slope_data, method, rapid=rapid, num_slices=num_slices,
+                diagnostic=diagnostic, cancel_check=cancel_check, **kw)
+            search = {"kind": "noncircular", "fs_cache": fs_cache,
+                      "search_path": search_path, "circle_cache": None}
+        if not fs_cache:
+            raise AnalysisError("Search produced no valid surfaces.")
+        critical = fs_cache[0]
+        results = critical.get("solver_result")
+        if not isinstance(results, dict):
+            raise AnalysisError("Search found no surface with a valid solution.")
+        if announce:
+            tail = "" if converged else "  (search did not fully converge)"
+            print(f"Critical FS = {results.get('FS'):.3f}{tail}")
+        return {"slice_df": critical.get("slices"),
+                "failure_surface": critical.get("failure_surface"),
+                "results": results, "search": search, "method": method}
+
+    # --- the surface the input specifies ---
+    if circular:
+        circle = (slope_data["circles"][0]
+                  if slope_data.get("circular") and slope_data.get("circles")
+                  else None)
+        if circle is None:
+            raise AnalysisError("A circular surface is required (no circles "
+                                "defined).")
+        non_circ = None
+        if announce:
+            print(f"Running {method.upper()} — single circular surface "
+                  f"(Xo={circle.get('Xo')}, Yo={circle.get('Yo')}, "
+                  f"R={circle.get('R'):.3g}), {num_slices} slices{tag}…")
+    else:
+        non_circ = slope_data.get("non_circ") or None
+        if not non_circ:
+            raise AnalysisError("A non-circular surface is required (no "
+                                "non-circular points defined).")
+        circle = None
+        if announce:
+            print(f"Running {method.upper()} — single non-circular surface, "
+                  f"{num_slices} slices{tag}…")
+
+    ok, out = generate_slices(slope_data, circle=circle, non_circ=non_circ,
+                              num_slices=num_slices, composite=composite)
+    if not ok:
+        raise AnalysisError(str(out))
+    slice_df, failure_surface = out
+    if announce:
+        print(f"Generated {len(slice_df)} slices; solving…")
+    results = solve.solve_selected(method, slice_df, rapid=rapid)
+    bundle = {"slice_df": slice_df, "failure_surface": failure_surface,
+              "results": results if isinstance(results, dict) else None,
+              "search": None, "method": method}
+    if bundle["results"] is None:
+        # The surface was built and the method was given it: it ran, and it did
+        # not converge. The bundle keeps the surface so that answer can be
+        # reported as the answer it is, with the solver's own reason beside it.
+        bundle["failure"] = str(results)
+    return bundle

@@ -140,7 +140,13 @@ def load_slope_data_cached(xlsx):
 def _solved():
     """The sample model with one circular surface solved by two methods, plus a
     small synthetic search bundle. Solved once and cached: nothing here reads a
-    converged value, only the report's treatment of one."""
+    converged value, only the report's treatment of one.
+
+    Each bundle records the options it was solved under, the way Studio's do. A
+    report asked for a method these did not solve RUNS it, under those options
+    (:func:`~xslope.report.run_requested_methods`), so the recorded options are
+    what keeps that run the same cheap single solve these were rather than a
+    search this fixture never made."""
     if "it" in _SOLVED:
         return _SOLVED["it"]
     import matplotlib
@@ -161,7 +167,9 @@ def _solved():
         df = slice_df.copy()
         results = solve_selected(name, df)
         bundles.append({"slice_df": df, "failure_surface": surface,
-                        "results": results, "search": None, "method": name})
+                        "results": results, "search": None, "method": name,
+                        "options": {"analysis": "single_surface",
+                                    "surface": "circular", "num_slices": 15}})
     # A search bundle built from the surfaces that were solved: the search
     # section reads counts and factors of safety, not the search's internals, so
     # this exercises every line of it without spending a real search.
@@ -876,38 +884,44 @@ def test_multi_method_detail():
     if heads3 != [method_label("bishop")]:
         fails.append(f"method='bishop' produced {heads3}")
 
-    # A method the analysis never RAN is not documented at all. The report
-    # describes the analysis: a factor of safety the report worked out for
-    # itself, on a surface another method found, is not one the analysis
-    # produced (the owner's ruling, fem_piles review). Asking for it leaves the
-    # report on the methods that were run — never an empty block, and never a
-    # number with a footnote explaining where it came from.
+    # A method the analysis did not run is RUN for the report, and documented
+    # from that run like any other (the owner's ruling). Asking for one
+    # produces its detail block, its own factor of safety, and no note anywhere
+    # about where the number came from — because it came from the same place
+    # every other number in the report did.
     from xslope.report import solved_methods
     run = solved_methods(solutions)
     unrun = next(m for m in ("janbu", "lowe", "corps") if m not in run)
     extra = _build({"method": [unrun]})
     prose = " ".join(b.text for b in extra.blocks("prose"))
     heads4 = [t for _l, t in extra.section_titles() if t in labels]
-    if method_label(unrun) in heads4:
-        fails.append(f"a method that was not run ({unrun}) got a detail block")
-    if heads4 != [method_label(run[0])]:
-        fails.append(f"asking only for an unrun method documented {heads4}, not "
-                     f"the run the analysis actually carries")
+    if heads4 != [method_label(unrun)]:
+        fails.append(f"asking for {unrun}, which the analysis did not run, "
+                     f"documented {heads4}")
+    if f"{method_label(unrun)} gives a factor of safety" not in prose:
+        fails.append(f"{unrun} was run for the report and its block reports no "
+                     f"factor of safety: {prose[-400:]!r}")
     for banned in ("It was not run in the analysis",
-                   "the report solved it on the same"):
+                   "the report solved it on the same",
+                   "was not run in this analysis"):
         if banned in prose:
-            fails.append(f"the report still discloses a courtesy solve: "
-                         f"{banned!r}")
-    # Asked for a run method AND an unrun one, the run one is documented and the
-    # other is simply not there.
+            fails.append(f"a method the report ran is described as unrun, or "
+                         f"as solved on another method's surface: {banned!r}")
+    # Asked for a run method AND an unrun one, BOTH are documented, and both
+    # rows of the summary carry a number of their own.
     mixed = _build({"method": [run[0], unrun]})
     heads5 = [t for _l, t in mixed.section_titles() if t in labels]
-    if heads5 != [method_label(run[0])]:
+    if heads5 != [method_label(run[0]), method_label(unrun)]:
         fails.append(f"a mixed request documented {heads5}")
-    if any(method_label(unrun) in r[0] for t in mixed.tables()
-           if t.caption == "Computed factors of safety" for r in t.rows):
-        fails.append(f"the summary table carries a row for {unrun}, which was "
-                     f"never run")
+    summary = [t for t in mixed.tables()
+               if t.caption == "Computed factors of safety"]
+    rows = {r[0]: r[1] for t in summary for r in t.rows}
+    if method_label(unrun) not in rows:
+        fails.append(f"the summary table carries no row for {unrun}, which the "
+                     f"report ran: {sorted(rows)}")
+    elif rows[method_label(unrun)] == "did not converge":
+        fails.append(f"{unrun} was run for the report and its row says it did "
+                     f"not converge: {rows}")
     return fails
 
 
@@ -1497,6 +1511,122 @@ def test_each_searched_method_draws_its_own_search():
     if not method_searched(one, "spencer"):
         fails.append("the method that searched is not reported as having "
                      "searched")
+    return fails
+
+
+def test_a_method_the_run_did_not_solve_is_run_for_the_report():
+    """A method the report is asked for is RUN for it, and finds its own surface.
+
+    The owner's rule: every method selected for a report is solved, the way it
+    would have been had it been ticked in the Run dialog — a full search for ITS
+    critical surface where the analysis searched, the specified surface where it
+    did not. Two failures this stands against, and they are opposite ones.
+
+    Dropping it silently: a report asked for five methods and documenting the two
+    that had been run is a table missing the rows a reader asked to see, with
+    nothing anywhere saying they are missing.
+
+    Borrowing a surface: evaluating the method on the surface another method's
+    search found produces a factor of safety no analysis made. Two searches over
+    the same model settle on two different circles, so the surfaces here are
+    checked to be different ones — a borrowed surface would be the same object as
+    its lender's, and the same numbers down the slice table.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.report import (build_report, method_label, methods_to_run,
+                               resolve_options, run_requested_methods)
+    from xslope.search import run_lem_analysis
+
+    slope_data = load_slope_data(REINF_XLSX)
+    # The analysis: ONE method, searched, on a slice count that keeps this check
+    # to a few seconds. What is under test is the surface a second method gets,
+    # which is a question about the machinery and not about the mesh.
+    how = {"analysis": "auto_search", "surface": "circular", "num_slices": 12}
+    with contextlib.redirect_stdout(io.StringIO()):
+        first = run_lem_analysis(slope_data, "bishop", **how)
+    solutions = {"lem": [dict(first, options=how)]}
+
+    opts = resolve_options({"input_path": REINF_XLSX, "title": "Two Methods",
+                            "method": ["bishop", "spencer"], "pd_figure": False,
+                            "lem_inputs_figure": False,
+                            "lem_search_figure": False,
+                            "lem_solution_figure": False,
+                            "lem_slice_key": False})
+    if methods_to_run(slope_data, solutions, opts) != ["spencer"]:
+        return ["the fixture already carries Spencer; nothing is run for the "
+                "report and the run it makes is untested"]
+    with contextlib.redirect_stdout(io.StringIO()):
+        after = run_requested_methods(slope_data, solutions, opts)
+
+    if len(solutions["lem"]) != 1:
+        fails.append("the caller's own solutions were added to; the extra run "
+                     "belongs to the report, not to the session")
+    second = next((b for b in after["lem"] if b.get("method") == "spencer"), None)
+    if second is None:
+        return fails + ["Spencer was asked for and not run"]
+
+    # It ran, and it ran the analysis this model's own run was: its own search.
+    if not second.get("search"):
+        fails.append("the method the report ran carries no search of its own, "
+                     "though the analysis it was run beside searched")
+    if (second.get("results") or {}).get("FS") is None:
+        fails.append("the method the report ran reports no factor of safety")
+
+    # And what it searched is ITS surface. A borrowed one is the lender's own
+    # object; a found one is a different circle, with different slices on it.
+    for key in ("failure_surface", "slice_df"):
+        if second.get(key) is first.get(key):
+            fails.append(f"the method the report ran was handed the other "
+                         f"method's {key}")
+    centers = []
+    for bundle in (first, second):
+        df = bundle.get("slice_df")
+        centers.append(None if df is None or "xo" not in df.columns
+                       else (round(float(df["xo"].iloc[0]), 6),
+                             round(float(df["yo"].iloc[0]), 6)))
+    if None in centers:
+        fails.append("the slice tables carry no circle center; the surfaces "
+                     "cannot be told apart")
+    elif centers[0] == centers[1]:
+        fails.append(f"both methods report the same critical circle {centers[0]}; "
+                     f"each search finds its own")
+
+    # No bundle is a borrowed surface: one with no search of its own standing on
+    # another method's geometry is the courtesy solve, and it is gone.
+    for i, a in enumerate(after["lem"]):
+        for b in after["lem"][i + 1:]:
+            if a.get("search") is None and b.get("search") is None:
+                continue
+            if a.get("failure_surface") is b.get("failure_surface") \
+                    and (a.get("search") is None or b.get("search") is None):
+                fails.append(f"{a.get('method')} and {b.get('method')} stand on "
+                             f"one surface, and only one of them searched for it")
+
+    # The report built from those runs documents both, in full.
+    with contextlib.redirect_stdout(io.StringIO()):
+        report = build_report(slope_data, after, dict(opts),
+                              tempfile.mkdtemp(prefix="xslope_ranfor_"))
+    titles = [t for _l, t in report.section_titles()]
+    if method_label("spencer") not in titles:
+        fails.append(f"the method the report ran got no detail block: {titles}")
+    block = next((s for sec in report.sections for _l, s in sec.walk()
+                  if s.title == method_label("spencer")), None)
+    if block is not None:
+        kids = [c.title for c in block.children]
+        if "Search for the Critical Surface" not in kids:
+            fails.append(f"the method the report searched for documents no "
+                         f"search: {kids}")
+    rows = {r[0]: r[1] for t in report.tables()
+            if t.caption == "Computed factors of safety" for r in t.rows}
+    fs = rows.get(method_label("spencer"))
+    if fs is None or fs == "did not converge":
+        fails.append(f"the summary does not carry Spencer's own answer: {rows}")
+    if fs is not None and fs == rows.get(method_label("bishop")):
+        fails.append(f"both methods report the same factor of safety on "
+                     f"different surfaces: {rows}")
     return fails
 
 
@@ -19385,6 +19515,8 @@ CHECKS = [
      test_member_companions_that_are_not_this_models_are_refused),
     ("each searched method draws its own search",
      test_each_searched_method_draws_its_own_search),
+    ("a method the run did not solve is run for the report",
+     test_a_method_the_run_did_not_solve_is_run_for_the_report),
     ("the rapid drawdown block names the governing stage",
      test_rapid_drawdown_names_the_governing_stage),
     ("the water prose follows the model", test_water_prose_is_conditional),

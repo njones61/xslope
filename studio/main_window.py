@@ -2749,13 +2749,17 @@ class MainWindow(QMainWindow):
         The LEM bundle alone is carried with the method it was run under: the
         runner emits the solution, and the method the user chose is the run
         options', so the two are joined here rather than guessed from the result
-        dict.
+        dict. The rest of those options ride along too — a report asked for a
+        method this run did not solve runs it, and runs it the way this run was
+        run rather than inferring it from the answer.
         """
         out = {}
         bundle = self.doc.results.get("lem_solution")
         if bundle:
-            method = (self._last_lem_opts or {}).get("method")
-            out["lem"] = [dict(bundle, method=method or bundle.get("method"))]
+            opts = self._last_lem_opts or {}
+            method = opts.get("method")
+            out["lem"] = [dict(bundle, method=method or bundle.get("method"),
+                               options=dict(opts))]
         seep = self.doc.results.get("seep_solutions") or {}
         if seep:
             out["seep"] = [seep[bc] for bc in sorted(seep)]

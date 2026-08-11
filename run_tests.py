@@ -6661,6 +6661,52 @@ def run_project_package_test(test):
     return 0.0, None
 
 
+def run_docs_links_test(test):
+    """The docs' sample links, and the ``xslope://`` scheme Studio answers them with.
+
+    The documentation hands out each sample as a ``.xslz`` package built at docs-build
+    time, linked twice: Download, and Open in Studio. Both halves fail quietly. A
+    Download link and its Open in Studio twin can drift onto different files the day
+    someone edits one of them by hand; a package can stop being built for a sample
+    whose shape changed, leaving a link to a 404. And the scheme is registered with
+    the operating system, so ANY web page can put an ``xslope://`` link in front of a
+    user: the handler's one verb, its host allowlist, its refusal of local paths, and
+    its confirmation-before-download are the whole of what stands between a hostile
+    link and a file on the user's disk.
+
+    The check itself lives in test/docs_links_check.py: the verb gate and the
+    allowlist, both mutation-tested; redirects re-checked at each hop; the saved name
+    reduced to a plain file name; a real MkDocs build over a scratch docs tree,
+    asserting the packages, the pairs (whose two hrefs must name the same package),
+    the escape hatch and the one-time note; and Studio's flow in order — refuse, ask,
+    fetch, then the ordinary unpack-then-open path. No network: the download is
+    stubbed, and the build writes only to a temporary directory.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'docs_links_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        QApplication.instance() or QApplication([])
+        QMessageBox.warning = staticmethod(lambda *a, **k: QMessageBox.Ok)
+        QMessageBox.information = staticmethod(lambda *a, **k: QMessageBox.Ok)
+        QMessageBox.critical = staticmethod(lambda *a, **k: QMessageBox.Ok)
+    except Exception:
+        pass                       # no PySide6: the module skips its Studio leg
+    spec = importlib.util.spec_from_file_location('docs_links_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_updater_test(test):
     """Studio's in-app updater: what stands between a version on a web server and
     an installer running on the user's machine.
@@ -10911,6 +10957,8 @@ def _dispatch_test(test):
         return run_noncircular_generator_test(test)
     if test_type == 'project_package':
         return run_project_package_test(test)
+    if test_type == 'docs_links':
+        return run_docs_links_test(test)
     if test_type == 'updater':
         return run_updater_test(test)
     if test_type == 'assistant_models':
@@ -11026,7 +11074,7 @@ def _expected_and_tol(test, default_tolerance):
                        'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
-                       'project_package',
+                       'project_package', 'docs_links',
                        'noncircular_generator', 'updater', 'fem_1d_details',
                        'report', 'report_finalize',
                        'assistant_models',
@@ -11655,6 +11703,11 @@ def main():
         # pack, unpack, and ask whether the same project came back — and it costs
         # seconds: it solves nothing.
         tests.append({'type': 'project_package', 'file': '(project packaging)',
+                      'method': '-', 'source': 'roundtrip'})
+        # The docs' paired sample links and the xslope:// scheme behind them. Same
+        # group and same reason: a docs build over a scratch tree, a pack, and a set
+        # of refusals — no solve anywhere in it.
+        tests.append({'type': 'docs_links', 'file': '(docs sample links)',
                       'method': '-', 'source': 'roundtrip'})
         if Path(ROUNDTRIP_TEMPLATE).exists():
             n_rt = 0

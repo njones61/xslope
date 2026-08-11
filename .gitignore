@@ -31,6 +31,9 @@ __pycache__/
 dist/
 build/
 site/
+# Sample project packages built by hooks/docs_packages.py. Build output, kept
+# outside site/ only so a rebuild does not have to pack the whole corpus again.
+.xslz_cache/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/

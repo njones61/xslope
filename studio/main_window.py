@@ -15,8 +15,9 @@ import os
 import re
 import sys
 import traceback
+from urllib.parse import urlparse
 
-from PySide6.QtCore import Qt, QObject, QSettings, QThread, Signal
+from PySide6.QtCore import Qt, QObject, QSettings, QStandardPaths, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QDialog, QDockWidget, QFileDialog, QHBoxLayout,
@@ -29,6 +30,7 @@ from xslope.fileio import default_template_path
 from xslope.package import (FEM_SOLUTION_SIDECARS as _FEM_SOLUTION_SIDECARS,
                             PACKAGE_EXT, is_package, pack, package_contents, unpack)
 
+from . import urlscheme
 from .canvas import MplCanvas
 from .dialogs import (
     BuildMeshDialog, DxfImportDialog, GszImportDialog, ReliabilityDialog,
@@ -940,6 +942,76 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"Unpacked {os.path.basename(package)} to {dest}")
         return workbook
+
+    # --- xslope:// links (the docs' "Open in Studio") ----------------------
+    def download_dir(self):
+        """Where a package fetched from a link is saved — the user's Downloads
+        folder, or the home folder on a system that has none. Somewhere durable and
+        visible, like every other destination in the packaging flow: what comes out
+        of the package is a workbook the user is going to open in Excel."""
+        for kind in (QStandardPaths.DownloadLocation, QStandardPaths.HomeLocation):
+            path = QStandardPaths.writableLocation(kind)
+            if path:
+                return path
+        return os.path.expanduser("~")
+
+    def open_scheme_url(self, uri):
+        """Act on an ``xslope://open?url=...`` link — the docs' Open in Studio.
+
+        The link arrives from the operating system, which got it from a web page,
+        which can be any page anywhere: the scheme is registered system-wide, not
+        for one site. So the order here is the order of :mod:`studio.urlscheme`'s
+        promises — understand the verb, check the host, ASK, and only then touch the
+        network — and the last step is the ordinary :meth:`open_path`, so a package
+        that arrives this way is unpacked and opened exactly like one that was
+        double-clicked.
+
+        Returns the downloaded package's path, or None if the link was refused, the
+        user cancelled, or the download failed. Every refusal is shown to the user
+        with the thing that was refused named in it.
+        """
+        try:
+            _verb, url = urlscheme.parse_request(uri)
+            urlscheme.check_url(url)
+        except urlscheme.SchemeError as exc:
+            QMessageBox.warning(self, "XSLOPE link", str(exc))
+            return None
+        except Exception as exc:
+            # urlscheme's contract is that every refusal is a SchemeError, and a
+            # check stands here anyway: whatever a link contains, the outcome has to
+            # be a dialog. An exception reaching Qt from an OS-delivered link takes
+            # the window down with the user's unsaved work in it.
+            traceback.print_exc()
+            QMessageBox.warning(self, "XSLOPE link",
+                                f"{uri} could not be read as an XSLOPE link:\n\n{exc}")
+            return None
+        name = urlscheme.package_name(url)
+        dest_dir = self.download_dir()
+        answer = QMessageBox.question(
+            self, "Open a project from the web?",
+            f"XSLOPE Studio will download the project package\n\n    {name}\n\n"
+            f"from {urlparse(url).hostname}, save it in {dest_dir}, and open it.\n\n"
+            f"{url}\n\nDownload it?",
+            QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel)
+        if answer != QMessageBox.Yes:
+            return None
+        self.statusBar().showMessage(f"Downloading {name}...")
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            package = urlscheme.download_package(url, dest_dir)
+        except Exception as exc:
+            if not isinstance(exc, urlscheme.SchemeError):
+                traceback.print_exc()          # as above: never out to Qt
+            QApplication.restoreOverrideCursor()
+            self.statusBar().clearMessage()
+            QMessageBox.critical(self, "Could not download the project", str(exc))
+            return None
+        finally:
+            if QApplication.overrideCursor() is not None:
+                QApplication.restoreOverrideCursor()
+        self.statusBar().showMessage(f"Downloaded {name}")
+        self.open_path(package)
+        return package
 
     def _results_off_disk(self):
         """True if the session holds a mesh or solution with no sidecar beside the

@@ -24,6 +24,22 @@ import zipfile
 #: The package extension. Studio's file dialogs and the docs both spell it from here.
 PACKAGE_EXT = ".xslz"
 
+#: The most a package may write to disk when it is unpacked (1 GiB).
+#:
+#: A zip's compression ratio is unbounded: a 498 KB archive of one repeated byte
+#: expands to 524 MB, and nothing about the file on disk hints at it. Without a
+#: ceiling, opening a package — the thing a link, an email attachment or a colleague
+#: can hand a user — is an invitation to fill their disk.
+#:
+#: The number comes from what a project actually is. The largest project in the whole
+#: verification corpus unpacks to 12 MB (``gs2_wall``: a workbook plus a 2.8 MB
+#: pore-pressure field), so this is some eighty times the largest real one — room for
+#: a transient run with thousands of frames on a fine mesh, and still a bound. It is
+#: checked twice: against the sizes the archive DECLARES (:func:`package_contents`),
+#: and again against the bytes that actually arrive (:func:`unpack`), because a
+#: crafted header can declare anything.
+MAX_UNPACKED_BYTES = 1024 ** 3
+
 # === THE SIDECAR SUFFIXES, IN ONE PLACE =====================================
 # Every name a solver writes beside a workbook, and every name a loader goes looking
 # for. This is the ONE definition: xslope.fileio reads MESH_SIDECAR / SEEP_SIDECARS
@@ -196,15 +212,22 @@ def package_contents(package):
     """Return the flat member names in a package, workbook first.
 
     Raises ValueError if the archive is not a project package: entries must be plain
-    file names (no folders, no paths that would escape the destination), and exactly
-    one of them must be the ``.xlsx`` workbook.
+    file names (no folders, no paths that would escape the destination, no drive
+    letters), exactly one of them must be the ``.xlsx`` workbook, and what they
+    unpack to must fit in :data:`MAX_UNPACKED_BYTES`.
     """
     package = _abs(package)
     with zipfile.ZipFile(package) as zf:
-        names = zf.namelist()
+        infos = zf.infolist()
+    names = [info.filename for info in infos]
     for name in names:
-        if name.endswith("/") or "/" in name or "\\" in name or os.path.isabs(name) \
-                or name in (".", "..") or name.startswith(".."):
+        # ":" is here for Windows, where a member called "D:pwned.txt" is a path on
+        # another drive: ntpath.join(dest, "D:pwned.txt") discards dest entirely and
+        # the file lands in D:'s working directory. On POSIX the same name is just a
+        # file name, so the check has to be made everywhere, not where it bites.
+        if name.endswith("/") or "/" in name or "\\" in name or ":" in name \
+                or os.path.isabs(name) or name in (".", "..") \
+                or name.startswith(".."):
             raise ValueError(
                 f"{os.path.basename(package)} is not a project package: it contains "
                 f"{name!r}, and a package holds only plain files.")
@@ -213,7 +236,19 @@ def package_contents(package):
         raise ValueError(
             f"{os.path.basename(package)} is not a project package: it holds "
             f"{len(books)} .xlsx workbooks, and a package holds exactly one.")
+    declared = sum(info.file_size for info in infos)
+    if declared > MAX_UNPACKED_BYTES:
+        raise ValueError(_too_big(package, declared))
     return books + [n for n in names if n not in books]
+
+
+def _too_big(package, size):
+    """The one refusal message for a package that would not fit on disk."""
+    return (f"{os.path.basename(package)} unpacks to at least "
+            f"{size / (1024 ** 2):.0f} MB, more than the "
+            f"{MAX_UNPACKED_BYTES / (1024 ** 2):.0f} MB a project package may hold, "
+            f"so nothing was extracted. A project this size is not a project; if it "
+            f"really is yours, unzip it yourself and open the workbook directly.")
 
 
 def unpack_path(package, dest=None):
@@ -240,6 +275,12 @@ def unpack(package, dest=None, overwrite=False):
 
     The package is never read in place: solvers write their results beside the
     workbook, and inside a zip there is nowhere for them to land.
+
+    Extraction is streamed and counted against :data:`MAX_UNPACKED_BYTES` as the
+    bytes arrive. :func:`package_contents` has already checked the sizes the archive
+    declares, but a declared size is whatever the person who built the archive typed:
+    the count that stops a zip bomb is this one, and everything it wrote is removed
+    before it raises.
     """
     package = _abs(package)
     names = package_contents(package)
@@ -252,8 +293,26 @@ def unpack(package, dest=None, overwrite=False):
             f"different folder, or pass overwrite=True to replace the files in "
             f"this one.")
     os.makedirs(out, exist_ok=True)
-    with zipfile.ZipFile(package) as zf:
-        for name in names:
-            with zf.open(name) as src, open(os.path.join(out, name), "wb") as dst:
-                dst.write(src.read())
+    written, total = [], 0
+    try:
+        with zipfile.ZipFile(package) as zf:
+            for name in names:
+                path = os.path.join(out, name)
+                with zf.open(name) as src, open(path, "wb") as dst:
+                    written.append(path)
+                    while True:
+                        block = src.read(1 << 20)
+                        if not block:
+                            break
+                        total += len(block)
+                        if total > MAX_UNPACKED_BYTES:
+                            raise ValueError(_too_big(package, total))
+                        dst.write(block)
+    except BaseException:
+        for path in written:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+        raise
     return os.path.join(out, names[0])

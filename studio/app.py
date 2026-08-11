@@ -1,4 +1,11 @@
-"""Application entry point for XSLOPE Studio (the ``xslope-studio`` command)."""
+"""Application entry point for XSLOPE Studio (the ``xslope-studio`` command).
+
+Studio runs one process per launch: there is no single-instance server, so on
+Windows and Linux a double-clicked ``.xslz`` or a clicked ``xslope://`` link starts
+a new copy of Studio rather than reaching one that is already running. macOS is the
+exception by nature — it routes both to the running application as a
+``QEvent.FileOpen`` (see :class:`StudioApplication`).
+"""
 
 from __future__ import annotations
 
@@ -9,9 +16,11 @@ os.environ.setdefault("QT_API", "pyside6")
 
 import sys
 
+from PySide6.QtCore import QEvent
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
+from . import urlscheme
 from .main_window import APP_NAME, ORG_NAME, MainWindow
 
 ICON_PATH = os.path.join(os.path.dirname(__file__), "resources", "icon.png")
@@ -44,6 +53,62 @@ def _apply_icon(app):
             pass
 
 
+class StudioApplication(QApplication):
+    """The application object, with the one platform event Studio has to answer.
+
+    macOS does not pass a double-clicked document or a clicked ``xslope://`` link on
+    the command line: it posts a ``QEvent.FileOpen`` to the running application,
+    which may be a copy that has been open for hours or one the click just launched.
+    Windows and Linux use ``argv`` instead (:func:`main` reads it).
+
+    An event that arrives before the window exists — the usual case when the click
+    is what launched the app — is held and replayed by :meth:`set_window`, so the
+    launch and the already-running case end in the same call.
+    """
+
+    def __init__(self, argv):
+        super().__init__(argv)
+        self._window = None
+        self._pending = []
+
+    def set_window(self, window):
+        self._window = window
+        pending, self._pending = self._pending, []
+        for request in pending:
+            self._deliver(request)
+
+    def event(self, event):
+        if event.type() == QEvent.FileOpen:
+            url = event.url()
+            request = url.toString() if url.scheme() == urlscheme.SCHEME else event.file()
+            if request:
+                self._deliver(request)
+                return True
+        return super().event(event)
+
+    def _deliver(self, request):
+        if self._window is None:
+            self._pending.append(request)
+            return
+        open_request(self._window, request)
+
+
+def open_request(window, request):
+    """Open whatever the OS just handed us: an ``xslope://`` link, or a file path.
+
+    One place, because the two arrival routes (``argv`` on Windows and Linux,
+    ``QEvent.FileOpen`` on macOS) carry exactly the same two kinds of thing and must
+    treat them the same way. A link goes through the scheme handler, which confirms
+    and checks the host before any network request; a path goes straight to the
+    normal open. A path that does not exist is ignored, as it was before.
+    """
+    if urlscheme.is_scheme_url(request):
+        return window.open_scheme_url(request)
+    if os.path.exists(request):
+        return window.open_path(request)
+    return None
+
+
 def _silence_aspect_limit_noise():
     """Drop Matplotlib's "Ignoring fixed x/y limits to fulfill fixed data aspect
     with adjustable data limits" warning. Many engine plots intentionally use
@@ -63,7 +128,7 @@ def _silence_aspect_limit_noise():
 def main(argv=None):
     _silence_aspect_limit_noise()
     argv = list(sys.argv if argv is None else argv)
-    app = QApplication.instance() or QApplication(argv)
+    app = QApplication.instance() or StudioApplication(argv)
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(ORG_NAME)
     _apply_icon(app)
@@ -71,11 +136,16 @@ def main(argv=None):
     win = MainWindow()
     win.setWindowIcon(app.windowIcon())
     win.show()
+    if isinstance(app, StudioApplication):
+        # macOS delivers a double-clicked file or an xslope:// link as an event,
+        # possibly before this point; the app has been holding it for the window.
+        app.set_window(win)
 
-    # Optionally open a file passed on the command line.
+    # A file or an xslope:// link passed on the command line — how Windows and
+    # Linux deliver both a double-clicked document and a clicked scheme link.
     rest = argv[1:]
-    if rest and os.path.exists(rest[0]):
-        win.open_path(rest[0])
+    if rest:
+        open_request(win, rest[0])
 
     # The silent startup update check (Help → Check for Updates at Startup,
     # default on, at most once a day). Deferred so the window paints first, and

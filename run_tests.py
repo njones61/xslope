@@ -5984,6 +5984,40 @@ def run_flow_recovery_test(test):
     return 0.0, None
 
 
+def run_seep_cycle_test(test):
+    """The unconfined solver's two limit-cycle escapes, and their inertness.
+
+    Four corpus models used to run to their iteration ceiling and report a flow rate
+    off a field that was still moving. Neither was diverging: the head field of three
+    of them, and the exit-face active set of the fourth, had settled into an exact
+    periodic orbit that the relaxation ladder's terminal 0.01 hid. Each escape acts
+    only on the orbit it detects — a return to a recent sweep it had left, or a return
+    to an exit-face set already visited past sweep 100 — so a model that converges on
+    its own must be untouched by both.
+
+    The check itself lives in test/seep_cycle_check.py, which re-solves the four
+    rescued models and seven that converge without help on their COMMITTED meshes, at
+    the settings their companions are recorded under. Inertness is locked on the sweep
+    count as well as the flow rate: a trajectory that has been nudged shows there
+    first. The file also carries the one-line mutation for each gate and the row it
+    breaks.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'seep_cycle_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('seep_cycle_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_quad_mesh_test(test):
     """The mesh builder: element quality, delivered size, the size field, and sweeps.
 
@@ -10865,6 +10899,8 @@ def _dispatch_test(test):
     test_type = test.get('type', '')
     if test_type == 'seep_exit_collapse':
         return run_seep_exit_collapse_test(test)
+    if test_type == 'seep_cycle':
+        return run_seep_cycle_test(test)
     if test_type == 'tseep_exit_cycle':
         return run_tseep_exit_cycle_test(test)
     if test_type == 'mesh_conform':
@@ -11079,7 +11115,8 @@ def _expected_and_tol(test, default_tolerance):
                        'report', 'report_finalize',
                        'assistant_models',
                        'fs_vs_time',
-                       'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
+                       'seep_elements', 'seep_exit_collapse', 'seep_cycle',
+                       'tseep_exit_cycle',
                        'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'piezo_u_guard',
@@ -11299,6 +11336,13 @@ def main():
         tests.append({'type': 'seep_exit_collapse',
                       'file': 'tri6 thin-domain exit face (#51 #53)',
                       'method': '-', 'source': 'seep_exit_collapse'})
+        # The two limit-cycle escapes in the unconfined solver: the four corpus
+        # models that used to run to their ceiling converge, and every model that
+        # converged without them is unchanged sweep for sweep. It re-solves eleven
+        # committed models, so it rides --seep with the rest of the seepage suite.
+        tests.append({'type': 'seep_cycle',
+                      'file': 'limit-cycle escapes (steady exit face)',
+                      'method': '-', 'source': 'seep_cycle'})
 
     if run_tseep:
         # Transient exit-face anti-cycling: the partly-wet resolution of a cycling

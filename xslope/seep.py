@@ -746,6 +746,58 @@ def _require_runtime_dirichlet(dir_mask):
         )
 
 
+#: Limit-cycle escape, and the one relaxation floor below the ladder's 0.01.
+#:
+#: A handful of interior nodes on a high-conductivity-contrast interface can settle
+#: into an exact periodic orbit: the relaxed iterate returns to a sweep 2 to 25 back,
+#: to within :data:`_CYCLE_TOL` x domain height, with the exit-face set unchanged, and
+#: repeats that indefinitely. The ladder's terminal relax = 0.01 is what hides the
+#: orbit — the iterate barely moves, while the un-relaxed step the convergence gate
+#: tests lands far from it, so the solve neither converges nor visibly diverges.
+#:
+#: Detected only as a RETURN — a repeat at a period of 2 or more that the iterate had
+#: travelled further than the tolerance away from at every shorter lag — held for
+#: :data:`_CYCLE_PERSIST` consecutive sweeps. A period of 1 is not a cycle: it is
+#: ordinary stagnation near a fixed point, which is what vp046b and vp077a do for
+#: hundreds of sweeps before converging normally, and dropping the floor under them
+#: costs them their convergence. Nor is a repeat the iterate never left: a fine enough
+#: creep sits inside the tolerance at every lag and reads as a period of 2. And the
+#: persistence window is what separates a true orbit from the short-lived repeats a
+#: converging solve passes through (johnson_res holds one for 7 sweeps).
+#:
+#: THE FLOOR DROPS ONCE, TO 1e-3, AND NO FURTHER — it is a window, not a ladder.
+#: Measured over the three models that cycle: at 3e-3 earth_dam_rapid still does not
+#: converge in 2000 sweeps; at 1e-3 all three converge; at 3e-4 all three still
+#: converge, to fields within 0.04 psf of the 1e-3 answer, and under a floor applied
+#: from the start rather than on detection johnson_rapid_KEY loses convergence at 3e-4
+#: and at 1e-4. 1e-3 is the coarsest floor that carries every one of them.
+_CYCLE_LOOKBACK = 25      # how many sweeps back a repeat is looked for
+_CYCLE_TOL = 1e-6         # repeat tolerance, x domain height
+_CYCLE_PERSIST = 30       # consecutive sweeps the repeat must hold before acting
+_CYCLE_RELAX_FLOOR = 1e-3
+#: Sweeps granted beyond ``max_iter``, once, on the sweep the floor drops and never
+#: otherwise. A solve stepping at a thousandth needs the room, and the sweep it
+#: detects its orbit on is not something the caller can budget for: earth_dam_rapid
+#: detects at 396 and closes at 463, so at the library's own 400-sweep default it
+#: would otherwise stop four sweeps after diagnosing itself. The extension is granted
+#: from that sweep and is not renewed; a solve that has not closed by then stops.
+_CYCLE_EXTRA_SWEEPS = 600
+
+#: Set-revisit escape for a cycling quadratic exit-face edge.
+#:
+#: The all-or-nothing edge rule below keeps a quadratic seepage side fully active or
+#: fully inactive. On earth_dam2 that forbids the one self-consistent set the solve
+#: is reaching for (midside active, corner not), so the exit-face active set orbits
+#: between two sets it has already visited, for as long as it is allowed to run.
+#:
+#: The gate is that orbit and nothing else: the active set RETURNS TO A SET IT HAS
+#: ALREADY VISITED, after sweep :data:`_SET_REVISIT_SWEEP`. Every converging model in
+#: the corpus revisits sets too — while its seepage face is still finding its extent —
+#: but is done doing so early: the latest last-revisit measured over the corpus is
+#: sweep 41 (vp077a), and earth_dam2 is still revisiting at sweep 992.
+_SET_REVISIT_SWEEP = 100
+
+
 def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                       k1_vals=1.0, k2_vals=1.0, angles=0.0,
                       max_iter=400, tol=1e-6, element_types=None,
@@ -755,13 +807,24 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     Iterative FEM solver for unconfined flow using linear kr frontal function.
     Supports triangular and quadrilateral elements with both linear and quadratic shape functions.
 
-    Convergence is a HYBRID test: both the relative head change (max-norm,
-    scaled by domain height x tol) and the relative flow-closure error
-    (|net inflow - net outflow| / inflow < closure_tol) must be satisfied.
-    The head test alone is a numerical stationarity check whose relation to
-    mass balance varies from problem to problem; requiring closure directly
-    guarantees the reported flowrate balances to closure_tol on every problem.
-    
+    Convergence is a HYBRID test of three things, all of which must hold on the same
+    sweep: the relative head change (max-norm, scaled by domain height x tol), the
+    nonlinear residual ``rel_closure`` below closure_tol, and an exit-face active set
+    that did not change on this sweep.
+
+    WHAT ``rel_closure`` IS: the L1 nodal residual of the UN-RELAXED step over the
+    free rows, divided by the inflow — how far the kr matrix lags the head field it
+    was assembled from. It is NOT the boundary flow imbalance. The two are different
+    quantities and differ by orders of magnitude on the same solve: the closure error
+    this function RETURNS is |net inflow - net outflow| at the final consistency
+    solve, an absolute flow rate in the model's own flow units. Passing the gate says
+    the nonlinear iteration has stopped moving, not that the reported flowrate
+    balances to closure_tol.
+
+    Two escapes act on a solve that is caught in a cycle rather than converging; both
+    are inert on a solve that is not (see :data:`_CYCLE_PERSIST` and
+    :data:`_SET_REVISIT_SWEEP` for the gates and what was measured on the corpus).
+
     Parameters:
         element_types : (n_elements,) array indicating:
             3 = 3-node triangle (linear)
@@ -837,7 +900,27 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     _prev_active = exit_face_active.copy()
     _n_stable = 0   # consecutive iterations with an unchanged exit-face set
 
-    for iteration in range(1, max_iter + 1):
+    # Limit-cycle escape state (Class A). The two ring buffers hold the last
+    # _CYCLE_LOOKBACK relaxed iterates and their exit-face sets; _cyc_run counts the
+    # consecutive sweeps a period >= 2 repeat has held.
+    _cyc_h, _cyc_a = [], []
+    _cyc_run = 0
+    _cycle_floor = None      # the relaxation floor once the orbit is detected
+    _cycle_fired_at = None
+
+    # Set-revisit escape state (Class B). _seen maps each exit-face set visited (bit
+    # packed) to the sweep it was last visited on, and _flip_sweep records when each
+    # node last changed state, so the nodes that moved during a revisited orbit are
+    # exactly those that flipped after the set was last here.
+    _seen = {np.packbits(exit_face_active).tobytes(): 0}
+    _flip_sweep = np.zeros(n_nodes, dtype=np.int64)   # last sweep each node flipped
+    _free_edges = set()      # quadratic exit-face edges the veto no longer governs
+    _revisit_fired_at = None
+
+    budget = max_iter        # raised once, and only where the floor drops
+    iteration = 0
+    while iteration < budget:
+        iteration += 1
 
         # Apply boundary conditions: fixed heads plus the active exit-face set
         dir_mask = (bc_type == 1) | ((bc_type == 2) & exit_face_active)
@@ -861,6 +944,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
             relax = 0.02
         if iteration > 120:
             relax = 0.01
+        if _cycle_floor is not None:
+            relax = min(relax, _cycle_floor)
 
         # Apply relaxation
         h_new = relax * h_solved + (1 - relax) * h_last
@@ -917,6 +1002,20 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
                 mid_candidate = not (h_new[mid] < y[mid] - hyst or q[mid] > 0)
             else:
                 mid_candidate = (h_new[mid] >= y[mid] + hyst and q[mid] <= 0)
+
+            if (c1, mid, c2) in _free_edges:
+                # This edge, and only this edge, is updated per node: it was carrying
+                # a cycling active set, which is what the all-or-nothing veto below
+                # forbids from settling (see _SET_REVISIT_SWEEP). Each node is set
+                # from its own test, still by setting True only, so a corner shared
+                # with a governed edge keeps whatever that edge gives it.
+                if corner_candidate[c1]:
+                    new_exit_face_active[c1] = True
+                if mid_candidate:
+                    new_exit_face_active[mid] = True
+                if corner_candidate[c2]:
+                    new_exit_face_active[c2] = True
+                continue
 
             edge_active = bool(corner_candidate[c1] and mid_candidate and corner_candidate[c2])
             if edge_active:
@@ -989,8 +1088,76 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         rel_closure = (float(np.sum(np.abs(q_chk[free_mask] - f_ext[free_mask]))) / inflow_pos
                        if inflow_pos > 1e-30 else 0.0)
         set_stable = bool(np.array_equal(exit_face_active, _prev_active))
+        _flip_sweep[exit_face_active != _prev_active] = iteration
         _prev_active = exit_face_active.copy()
         _n_stable = _n_stable + 1 if set_stable else 0
+
+        # ESCAPE 1 (Class A): the head field is in a limit cycle. Compare the relaxed
+        # iterate against the last _CYCLE_LOOKBACK sweeps; a RETURN to a sweep 2 or
+        # more back — within _CYCLE_TOL x domain height of it, having been further
+        # than that away at every shorter lag, with the exit-face set unchanged —
+        # held for _CYCLE_PERSIST consecutive sweeps, is an orbit and not a solve
+        # still converging. Drop the relaxation floor once, to _CYCLE_RELAX_FLOOR,
+        # and grant the sweeps that stepping that finely then takes.
+        #
+        # Both halves of "returned" are load-bearing. A solve creeping monotonically
+        # toward its answer also sits within the tolerance of its recent sweeps once
+        # the creep is fine enough, and lands on the SAME reading as an orbit unless
+        # the iterate is required to have gone somewhere in between: earth_dam2 after
+        # its exit face settles creeps at ~1e-8 of the head range per sweep, which
+        # reads as a period-2 repeat and is nothing of the kind. Requiring a shorter
+        # lag to be FURTHER away is what separates the two — distance grows with lag
+        # under a creep, and collapses at the period under an orbit.
+        if _cycle_floor is None:
+            repeats = False
+            _cyc_eps = _CYCLE_TOL * (ymax - ymin)
+            _cyc_away = float('inf')     # the CLOSEST any shorter lag came
+            for k in range(1, min(_CYCLE_LOOKBACK, len(_cyc_h)) + 1):
+                _cyc_d = float(np.max(np.abs(h_new - _cyc_h[-k])))
+                if (k >= 2 and _cyc_d < _cyc_eps and _cyc_away > _cyc_eps
+                        and np.array_equal(exit_face_active, _cyc_a[-k])):
+                    repeats = True
+                    break
+                _cyc_away = min(_cyc_away, _cyc_d)
+            _cyc_run = _cyc_run + 1 if repeats else 0
+            if _cyc_run >= _CYCLE_PERSIST:
+                _cycle_floor = _CYCLE_RELAX_FLOOR
+                _cycle_fired_at = iteration
+                budget = max(budget, iteration + _CYCLE_EXTRA_SWEEPS)
+                print(f"Iteration {iteration}: head field is cycling (period <= "
+                      f"{_CYCLE_LOOKBACK}, held {_cyc_run} sweeps) — relaxation floor "
+                      f"lowered to {_CYCLE_RELAX_FLOOR:g}, sweeps allowed to {budget}")
+                _cyc_h, _cyc_a = [], []
+            else:
+                _cyc_h.append(h_new.copy())
+                _cyc_a.append(exit_face_active.copy())
+                if len(_cyc_h) > _CYCLE_LOOKBACK:
+                    _cyc_h.pop(0)
+                    _cyc_a.pop(0)
+
+        # ESCAPE 2 (Class B): the exit-face active set is in a limit cycle — it has
+        # LEFT a set and come back to it, past the sweep by which every converging
+        # model in the corpus has finished revisiting. The set it cannot settle on is
+        # one the all-or-nothing edge rule forbids, so the veto is lifted from the
+        # edges carrying the nodes that moved during the orbit, and only those. The
+        # rule still governs every other edge: it fixes a real divergence (issue #51).
+        # The transient stepper meets the same cycle within a step and resolves it the
+        # same way, per edge (see _resolve_exit_cycle); it pins the resolved nodes for
+        # the rest of its step, where here the freed edge keeps testing itself every
+        # sweep and the ordinary set-stability gate decides when it has settled.
+        if not set_stable and _exit_quadratic_edges and not _free_edges:
+            key = np.packbits(exit_face_active).tobytes()
+            visited = _seen.get(key)
+            if visited is not None and iteration > _SET_REVISIT_SWEEP:
+                moved = _flip_sweep > visited
+                _free_edges = {e for e in _exit_quadratic_edges
+                               if moved[e[0]] or moved[e[1]] or moved[e[2]]}
+                if _free_edges:
+                    _revisit_fired_at = iteration
+                    print(f"Iteration {iteration}: exit-face set returned to the set "
+                          f"of sweep {visited} — {len(_free_edges)} cycling edge(s) "
+                          f"updated per node from here")
+            _seen[key] = iteration
 
         # Matrix for the next iteration, from the relaxed head field
         data = _assembly_data(asm, p_nodes=h_new - y, kr0=kr0, h0=h0, mode='head', vg_a=vg_a, vg_n=vg_n, model=model)
@@ -1014,7 +1181,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         h_last = h_new.copy()
 
     else:
-        print(f"Warning: Did not converge in {max_iter} iterations")
+        # The sweeps actually run, which is max_iter unless an escape extended it.
+        print(f"Warning: Did not converge in {budget} iterations")
         print("\nConvergence history:")
         for i, r in enumerate(residuals):
             if i % 20 == 0 or i == len(residuals) - 1:
@@ -3631,10 +3799,12 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
             a run: :func:`import_seep_solution` takes one purely as the shape of the
             mesh it needs to read a stored field back.
         tol: relative head-change tolerance (scaled by domain height)
-        closure_tol: relative flow-closure tolerance for unconfined problems —
-            iteration continues until |net inflow - net outflow| / inflow is
-            below this, so the reported flowrate balances regardless of how
-            the head tolerance maps to mass balance on a given problem
+        closure_tol: nonlinear-residual tolerance for unconfined problems —
+            iteration continues until the L1 nodal residual of the un-relaxed step
+            over the free rows, relative to the inflow, falls below this. It is a
+            measure of how far the kr matrix lags the head field, not of boundary
+            mass balance; the balance the solution actually closed to is reported
+            separately, as ``closure_error`` and ``closure_fraction``
         max_iter: iteration cap for the unconfined (exit-face) solver; raise it
             when a hard problem reports non-convergence near the cap
     
@@ -3651,6 +3821,12 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
         - 'flowrate': scalar total flow rate
         - 'flux_nodal': numpy array of consistent nodal loads applied by the
           specified-flux (Neumann) BCs (+ = inflow), zero without flux BCs
+        - 'converged': whether the unconfined iteration closed (a confined solve is
+          direct, and always True)
+        - 'closure_error': |net inflow - net outflow| at the solution, an ABSOLUTE
+          flow rate in the model's own flow units
+        - 'closure_fraction': the same imbalance divided by the flow through the
+          section — the dimensionless reading of it
     """
     report = seep_data.get("_preflight")
     if report is not None:
@@ -3821,7 +3997,16 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
         # Consistent nodal loads applied by the specified-flux BCs (+ = inflow).
         "flux_nodal": flux_nodal,
         "converged": converged,
+        # Two readings of the same imbalance, because one of them alone is not
+        # readable. ``closure_error`` is |net inflow - net outflow| — an absolute
+        # flow rate, in whatever flow units the model is in, which says nothing on
+        # its own about whether it is large. ``closure_fraction`` is that imbalance
+        # over the flow through the section, which is the number a reader can judge
+        # (and the one comparable with ``closure_tol``). A solve with no flow at all
+        # has no fraction to report and records 0.0.
         "closure_error": closure_error,
+        "closure_fraction": (abs(closure_error) / abs(total_flow)
+                             if total_flow else 0.0),
         # Which branch produced this solution. Consumers need it: a confined solve is
         # fully saturated with kr never evaluated, so its negative pore pressures carry
         # no phreatic surface (see plot_seep_solution).
@@ -4672,7 +4857,9 @@ def export_seep_solution(seep_data, solution, filename):
     Below the table the file records what the solve was, as ``#`` comment lines the
     CSV readers skip: the total flowrate, and — for a solution that carries them —
     whether the problem was solved unconfined, whether the solve converged, and the
-    flow closure error it converged to. Those three are what
+    flow imbalance it closed to, written twice: ``Closure Error`` is the absolute
+    imbalance, a flow rate in the model's own units, and ``Closure Fraction`` is that
+    imbalance over the flow through the section. Those are what
     :func:`run_seepage_analysis` returns beside the nodal fields and the only part of
     its answer the columns cannot hold; without them a solution read back could not
     say whether its negative pore pressures mean a phreatic surface (unconfined) or
@@ -4720,6 +4907,16 @@ def export_seep_solution(seep_data, solution, filename):
             f.write(f"# Converged: {bool(solution['converged'])}\n")
         if solution.get("closure_error") is not None:
             f.write(f"# Closure Error: {float(solution['closure_error']):.6e}\n")
+            # The same imbalance as a fraction of the flow through the section. The
+            # line above it is an absolute flow rate in the model's own units, which
+            # a bare number in a footer reads as a proportion when it is nothing of
+            # the kind — "0.0266" against a flow of 1.27 is 2% of it, not 2.66%.
+            # Written beside it rather than instead of it, so nothing that reads the
+            # absolute value changes meaning, and appended AFTER it so a file written
+            # today is still a file written before it plus lines.
+            if solution.get("closure_fraction") is not None:
+                f.write(f"# Closure Fraction: "
+                        f"{float(solution['closure_fraction']):.6e}\n")
 
     print(f"Exported solution to {filename}")
 
@@ -4771,8 +4968,10 @@ def import_seep_solution(seep_data, filename):
     Returns:
         dict: solution with the keys ``plot_seep_solution`` expects — head, u,
         velocity, v_mag, gradient, i_mag, q, phi, flowrate — plus ``unconfined``,
-        ``converged`` and ``closure_error`` for a file whose footer records them.
-        Those three keys are ABSENT for a file written before the footer existed, or
+        ``converged``, ``closure_error`` and ``closure_fraction`` for a file whose
+        footer records them (``closure_fraction`` is the newest of the four, so a
+        companion written before it reads back with the other three and without it).
+        Those keys are ABSENT for a file written before the footer existed, or
         by :func:`export_seep_u`, which has no answer for them: absent means unknown,
         and a consumer falls back to what it can see (``plot_seep_solution`` treats an
         unknown solve as unconfined, its long-standing default). For a pressure-only
@@ -4817,6 +5016,11 @@ def import_seep_solution(seep_data, filename):
             elif line.startswith("# Closure Error:"):
                 try:
                     meta["closure_error"] = float(line.split(":", 1)[1])
+                except ValueError:
+                    pass
+            elif line.startswith("# Closure Fraction:"):
+                try:
+                    meta["closure_fraction"] = float(line.split(":", 1)[1])
                 except ValueError:
                     pass
 

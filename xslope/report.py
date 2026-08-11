@@ -9610,13 +9610,19 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
     # so the ones the analysis did not run are run now — before the count of what
     # this build draws is taken off the solutions, and before any section reads
     # them (:func:`run_requested_methods`).
+    #
+    # Called whether or not there is anything to run: it no-ops on nothing to
+    # run, and it is also where a method that will NOT be run says why. Guarding
+    # the call on the pending count skipped that sentence for exactly the report
+    # that needed it — one whose every requested method was declined — and put
+    # the silence back that this arrangement removes.
     if opts["lem"]:
         pending = len(methods_to_run(slope_data, solutions, opts))
-        if pending:
-            solutions = run_requested_methods(slope_data, solutions, opts, progress)
-            if progress:
-                progress.retotal(
-                    planned_figures(slope_data, solutions, opts) + pending)
+        solutions = run_requested_methods(slope_data, solutions, opts, progress)
+        # The count is revised only where something was added to it.
+        if pending and progress:
+            progress.retotal(
+                planned_figures(slope_data, solutions, opts) + pending)
 
     if opts["traceability"]:
         report.sections.append(_traceability_section(slope_data, solutions, opts))

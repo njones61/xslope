@@ -1744,41 +1744,66 @@ def test_a_method_that_is_not_run_says_why():
     arrangement was built to end, arriving by a different door. The reason
     printed is the rule's own, so it is the sentence the Run dialog dims that
     method with.
+
+    Read off BUILD_REPORT, which is the path a report takes. Asking the solving
+    function directly proves nothing about the report: the builder used to call
+    it only when there was something to run, so a report whose every requested
+    method was declined — the one case where the sentence is the whole of what
+    the user gets — went through a build that never reached it and said nothing
+    at all.
     """
     fails = []
     import matplotlib
     matplotlib.use("Agg")
     from xslope.fileio import load_slope_data
     from xslope.preflight import method_surface_reason
-    from xslope.report import (method_label, resolve_options,
-                               run_requested_methods)
-    from xslope.search import run_lem_analysis
+    from xslope.report import build_report, method_label
 
     slope_data = load_slope_data(NONCIRC_XLSX)
+    from xslope.search import run_lem_analysis
     with contextlib.redirect_stdout(io.StringIO()):
         first = run_lem_analysis(slope_data, "spencer",
                                  analysis="single_surface",
                                  surface="noncircular", num_slices=20)
-    opts = resolve_options({"input_path": NONCIRC_XLSX,
-                            "method": ["spencer", "bishop", "no_such_method"]})
-    said = io.StringIO()
-    with contextlib.redirect_stdout(said):
-        after = run_requested_methods(slope_data, {"lem": [first]}, opts)
-    said = said.getvalue()
+    solutions = {"lem": [first]}
+    base = {"input_path": NONCIRC_XLSX, "pd_figure": False,
+            "lem_inputs_figure": False, "lem_search_figure": False,
+            "lem_solution_figure": False, "lem_slice_key": False,
+            "lem_slice_table": False, "lem_calculations": False}
 
-    if [b.get("method") for b in after["lem"]] != ["spencer"]:
-        fails.append(f"a method this surface cannot take was run anyway: "
-                     f"{[b.get('method') for b in after['lem']]}")
+    def built(methods):
+        said = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp:
+            with contextlib.redirect_stdout(said):
+                report = build_report(slope_data, solutions,
+                                      dict(base, method=methods), tmp)
+        return report, said.getvalue()
+
     reason = method_surface_reason("bishop", "noncircular")
-    if method_label("bishop") not in said:
-        fails.append(f"Bishop was asked for and declined without a word: "
-                     f"{said!r}")
-    elif reason.split(",")[0] not in said:
-        fails.append(f"Bishop is declined without the rule's own reason: "
-                     f"{said!r}")
-    if "not a method this solver offers" not in said:
-        fails.append(f"a method the solver does not have was declined without "
-                     f"saying so: {said!r}")
+    cases = [
+        # A method that IS run stands beside the declines.
+        ("with a method to run", ["spencer", "bishop", "no_such_method"]),
+        # …and the case the builder used to skip entirely: nothing to run, so
+        # the declines are the whole of what there is to say.
+        ("with nothing to run", ["bishop", "no_such_method"]),
+    ]
+    for where, methods in cases:
+        report, said = built(methods)
+        if method_label("bishop") not in said:
+            fails.append(f"{where}: Bishop was asked for and declined without a "
+                         f"word: {said!r}")
+        elif reason.split(",")[0] not in said:
+            fails.append(f"{where}: Bishop is declined without the rule's own "
+                         f"reason: {said!r}")
+        if "not a method this solver offers" not in said:
+            fails.append(f"{where}: a method the solver does not have was "
+                         f"declined without saying so: {said!r}")
+        # And no declined method is documented as though it had run.
+        titles = {t for _l, t in report.section_titles()}
+        for name in ("bishop", "no_such_method"):
+            if method_label(name) in titles:
+                fails.append(f"{where}: {name} was declined and documented "
+                             f"anyway")
     return fails
 
 

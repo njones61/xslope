@@ -6379,8 +6379,13 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     if tc:
         items.append(("Tension crack depth", f"{tc:g}"))
         items.append(("Tension crack water", f"{_num(slope_data.get('tcrack_water')) or 0:g}"))
+    # An ELEVATION, so zero is a value and not an absence: a model whose maximum
+    # depth is elevation 0.0 is as constrained as one whose depth is -15, and it
+    # is the same line the model figure draws and the Project Definition names.
+    # Read as a truth value, that model stated no depth here while the figure
+    # beside it drew one.
     md = _num(slope_data.get("max_depth"))
-    if md:
+    if md is not None:
         items.append(("Maximum surface depth (elevation)", f"{md:g}"))
     sub_inputs = Section("Analysis Inputs")
 

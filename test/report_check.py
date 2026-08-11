@@ -6595,6 +6595,62 @@ def test_the_shared_slice_count():
     return fails
 
 
+def test_the_maximum_depth_is_an_input_at_any_elevation():
+    """The maximum surface depth stands among the engine inputs whenever the
+    model declares one — elevation zero included.
+
+    It is an ELEVATION, and zero is a place. Read as a truth value, a model whose
+    depth is 0.0 stated no maximum depth here while the model figure beside it
+    drew the line and the Project Definition named it: three statements about one
+    input, one of them missing. A model that declares none — a section given by
+    polygons — still gets no row.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.report import build_report
+
+    def rows_for(model):
+        with tempfile.TemporaryDirectory() as tmp:
+            with contextlib.redirect_stdout(io.StringIO()):
+                slope_data, solutions = _solved()
+                report = build_report(model, solutions,
+                                      {"input_path": REINF_XLSX,
+                                       "method": "bishop", "pd_figure": False,
+                                       "lem_inputs_figure": False,
+                                       "lem_search_figure": False,
+                                       "lem_solution_figure": False,
+                                       "lem_slice_key": False,
+                                       "lem_slice_table": False,
+                                       "lem_calculations": False}, tmp)
+        return dict(_analysis_inputs(report))
+
+    label = "Maximum surface depth (elevation)"
+    slope_data, _solutions = _solved()
+    if slope_data.get("max_depth") != 0.0:
+        fails.append(f"the sample's maximum depth is "
+                     f"{slope_data.get('max_depth')!r}, so elevation zero — the "
+                     f"case that was dropped — is not under test")
+    got = rows_for(slope_data)
+    if label not in got:
+        fails.append(f"a model whose maximum depth is "
+                     f"{slope_data.get('max_depth')!r} states no maximum depth: "
+                     f"{sorted(got)}")
+    elif got[label] != "0":
+        fails.append(f"the maximum depth is printed {got[label]!r}, not the "
+                     f"elevation the model declares")
+    # Declared deeper, and it is the model's number that is printed.
+    deep = rows_for(dict(slope_data, max_depth=-15.0))
+    if deep.get(label) != "-15":
+        fails.append(f"a maximum depth of -15 is printed {deep.get(label)!r}")
+    # Not declared at all, and there is no row to print.
+    none = rows_for(dict(slope_data, max_depth=None))
+    if label in none:
+        fails.append(f"a model that declares no maximum depth is given one: "
+                     f"{none[label]!r}")
+    return fails
+
+
 def _whole_mass_is_the_page(printed, want_num, want_den, where):
     """One printed whole-mass balance held against equation (12) of the page."""
     num, den, why = _as_quotient(printed, f"{where}: the whole-mass balance")
@@ -19579,6 +19635,8 @@ CHECKS = [
     ("the whole-mass balance is published then reduced",
      test_the_whole_mass_balance_is_published_then_reduced),
     ("the shared slice count", test_the_shared_slice_count),
+    ("the maximum depth is an input at any elevation",
+     test_the_maximum_depth_is_an_input_at_any_elevation),
     ("each method prints its own page's equations",
      test_the_method_prints_its_own_pages_equations),
     ("a symbol in a sentence is set as a symbol",

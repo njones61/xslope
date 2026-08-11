@@ -705,8 +705,10 @@ def gw006d():
     is not the same number as the normal flux XSLOPE's flux BC takes: on the
     2:1 faces the vendor's own cards carry qn = 1e-8 * cos(atan 0.5) = 8.9443e-9,
     and only across the horizontal crest is qn the full 1e-8. So the surface goes
-    in as three blocks at the vendor's two rates, and the total inflow is the
-    rain rate times the 28 m horizontal footprint, 2.8e-7 m3/s per m.
+    in as three blocks at the vendor's two rates, and the assembled inflow is the
+    rain rate times the 28 m horizontal footprint, 2.800000e-7 m3/s per m, to
+    seven figures. The face rate goes in exact rather than rounded — at
+    8.94427191e-9 a two-figure 8.9e-9 would leave the boundary 0.6% light.
 
     The drain is XSLOPE's exit face, as on cases 1-3. The vendor writes it as a
     specified head of 0; in XSLOPE that would leave the model with no exit face
@@ -715,8 +717,9 @@ def gw006d():
 
     Target: pressure head along line 1-1 (x=26) from Fig 6.18, which prints
     Slide and Ref[1] markers at every metre of elevation. Infiltration lifts the
-    whole profile about 0.6 m above case 1. xslope tracks the Slide markers to
-    0.19 m rms over the 13 stations, running above them by 0.18 m on average.
+    profile 0.65 m above case 1 at the base and 1.33 m at the crest. xslope
+    tracks the Slide markers to 0.19 m rms over the 13 stations, running above
+    them by 0.18 m on average.
     Chart-only target, so xslope's own flowrate and total-head field are locked."""
     sd = _base_sd(k1=1e-7)
     m = sd['materials'][0]

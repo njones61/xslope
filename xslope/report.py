@@ -880,6 +880,9 @@ DEFAULT_OPTIONS = {
                                       # where nothing recorded it
     "style": None,                    # Studio's live display style
     "progress": None,                 # called (done, total, label) per figure
+    "cancel_check": None,             # polled inside a solve the report has to
+                                      # make; True stops it at the next iteration
+                                      # boundary (xslope.search.AnalysisCancelled)
     "dpi": FIGURE_DPI,
     "figsize": FIGURE_SIZE,
 }
@@ -1260,12 +1263,22 @@ def analysis_options(slope_data, solutions):
 
     A method the report has to run for itself is run the same way as the ones
     that came with the solutions: the same analysis class, the same surface
-    family, the same slice count, the same drawdown staging. Where the run
-    recorded its own options — Studio hands them to the report on the bundle —
-    those are the answer. Otherwise they are read off the analysis itself: a
-    bundle carrying a search was searched for, one carrying stage factors of
-    safety was a rapid drawdown, and the slice count is the count it was cut
-    into.
+    family, the same slice count, the same drawdown staging.
+
+    The run's OWN record is the answer wherever there is one, and there is one
+    for every run made through :func:`xslope.search.run_lem_analysis`, which
+    stamps what it was called with onto the bundle it returns. Nothing is
+    inferred from a recorded run — the slice count above all, which cannot be
+    recovered from the slice table: a run of 20 slices comes back as 21 rows
+    where the slicer split at a boundary, and re-running a neighbour at 21 puts
+    the two methods on one surface at two discretizations and takes the shared
+    slice count out of the section's inputs.
+
+    A bundle from somewhere else — one a script assembled by hand — is read as
+    best it can be: a bundle carrying a search was searched for, one carrying
+    stage factors of safety was a rapid drawdown, and the slice count is the
+    count it was cut into, which is the nearest thing to the truth available
+    when nobody recorded the truth.
 
     A model with no limit equilibrium run at all is read as what its input
     says: the surface it specifies, solved once. A search is something an
@@ -1314,14 +1327,25 @@ def run_requested_methods(slope_data, solutions, opts, progress=None):
     analysis never produced, and no method here is given a surface it did not
     find.
 
-    A run that cannot be made at all — no surface of the model's family, a
-    search that finds nothing valid — leaves that method out, with the reason
-    printed. The caller's ``solutions`` is never modified: the extra runs belong
-    to this report, not to the session that asked for it.
+    A method that is not run says so, whichever reason it is: one this surface
+    family cannot take names the rule that excludes it, one the solver does not
+    offer says so, and one whose run could not be made — no surface of the
+    model's family, a search that finds nothing valid — prints what stopped it.
+    A method that vanishes without a word is the failure this whole arrangement
+    is here to end, and it must not come back as a silent decline.
+
+    ``opts["cancel_check"]`` is polled inside the solve, so a report cancelled
+    while it is searching stops at the next iteration boundary rather than at the
+    end of the search: :class:`~xslope.search.AnalysisCancelled` is raised there
+    and passed straight out of here, unwinding the build.
+
+    The caller's ``solutions`` is never modified: the extra runs belong to this
+    report, not to the session that asked for it.
     """
-    from .search import AnalysisError, run_lem_analysis
+    from .search import AnalysisCancelled, AnalysisError, run_lem_analysis
 
     pending = methods_to_run(slope_data, solutions, opts)
+    _say_why_not_run(slope_data, solutions, opts, pending)
     if not pending:
         return solutions
     how = analysis_options(slope_data, solutions)
@@ -1331,7 +1355,14 @@ def run_requested_methods(slope_data, solutions, opts, progress=None):
         if progress:
             progress(f"the {method_label(name)} analysis")
         try:
-            bundles.append(run_lem_analysis(slope_data, name, **how))
+            bundles.append(run_lem_analysis(
+                slope_data, name, cancel_check=(opts or {}).get("cancel_check"),
+                **how))
+        except AnalysisCancelled:
+            # The user asked for the run to stop, and this IS the run. Nothing
+            # below may treat it as a method that failed: it is the build being
+            # unwound, and the caller is waiting for it to stop.
+            raise
         except AnalysisError as exc:
             print(f"{method_label(name)} could not be run on this model: {exc}")
         except Exception:                                   # noqa: BLE001
@@ -1339,6 +1370,32 @@ def run_requested_methods(slope_data, solutions, opts, progress=None):
             traceback.print_exc()
     out["lem"] = bundles
     return out
+
+
+def _say_why_not_run(slope_data, solutions, opts, pending):
+    """Name every method the report was asked for and will not run, with the
+    reason it is not being run.
+
+    :func:`methods_to_run` declines two kinds of name, and a decline that says
+    nothing is indistinguishable from the silent drop this round removed. The
+    reason is the rule's own words, so it is the same sentence the Run dialog
+    dims that method with.
+    """
+    from .preflight import method_surface_reason
+
+    run = solved_methods(solutions)
+    offered = supported_methods()
+    family = surface_family(slope_data, solutions)
+    for name in method_list((opts or {}).get("method")):
+        if name in run or name in pending:
+            continue
+        if name not in offered:
+            print(f"{method_label(name)} is not a method this solver offers, "
+                  f"so the report does not run it.")
+            continue
+        reason = method_surface_reason(name, family)
+        if reason:
+            print(f"{method_label(name)} was not run for this report: {reason}")
 
 
 def select_bundle(solutions, method=None):
@@ -9647,12 +9704,20 @@ def generate_report(slope_data, solutions=None, options=None, path=None,
     if not spec["enabled"]:
         return False, f"{spec['label']} reports are not available yet."
 
+    from .search import AnalysisCancelled
+
     keep_figures = figure_dir is not None
     if not keep_figures:
         figure_dir = tempfile.mkdtemp(prefix="xslope_report_")
     try:
         try:
             report = build_report(slope_data, solutions, options, figure_dir)
+        except AnalysisCancelled:
+            # The user stopped a solve this build was making. That is not a
+            # report that could not be built; it is a report nobody is waiting
+            # for any more, and the caller that asked for the stop is the one
+            # that has to hear about it.
+            raise
         except Exception as exc:
             import traceback
             traceback.print_exc()

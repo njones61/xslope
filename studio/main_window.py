@@ -2758,8 +2758,10 @@ class MainWindow(QMainWindow):
         if bundle:
             opts = self._last_lem_opts or {}
             method = opts.get("method")
+            # The run's own record wins; the dialog's options are the fallback
+            # for a bundle that predates the runner recording them.
             out["lem"] = [dict(bundle, method=method or bundle.get("method"),
-                               options=dict(opts))]
+                               options=bundle.get("options") or dict(opts))]
         seep = self.doc.results.get("seep_solutions") or {}
         if seep:
             out["seep"] = [seep[bc] for bc in sorted(seep)]

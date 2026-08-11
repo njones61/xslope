@@ -1256,13 +1256,21 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     Returns
     -------
     dict
-        ``{"slice_df", "failure_surface", "results", "search", "method"}`` — the
-        bundle the report, the plots and Studio's result views all read.
-        ``search`` is None for a single-surface run and a dict describing the
-        search otherwise. ``results`` is None where the solver returned no
-        solution on a surface that was otherwise built, with the solver's reason
-        on ``failure``: the method ran and did not converge, which is an answer
-        about the model rather than a run that never happened.
+        ``{"slice_df", "failure_surface", "results", "search", "method",
+        "options"}`` — the bundle the report, the plots and Studio's result views
+        all read. ``search`` is None for a single-surface run and a dict
+        describing the search otherwise. ``results`` is None where the solver
+        returned no solution on a surface that was otherwise built, with the
+        solver's reason on ``failure``: the method ran and did not converge,
+        which is an answer about the model rather than a run that never happened.
+
+        ``options`` is what this run was made under, recorded here because here
+        is the only place that knows it. A second method run beside this one is
+        run from that record rather than from anything read back out of the
+        answer — a slice count in particular, which cannot be recovered from the
+        slice table: the slicer splits at material and water boundaries, so a run
+        of 20 comes back as 21 rows, and a neighbour re-run at 21 is a different
+        discretization on the same surface.
 
     Raises
     ------
@@ -1275,6 +1283,14 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     method = str(method or "").lower()
     circular = surface != "noncircular"
     tag = " (rapid drawdown)" if rapid else ""
+    # Recorded before anything is solved, so what comes back says how it was made
+    # whichever branch made it.
+    made_under = {"analysis": analysis,
+                  "surface": "circular" if circular else "noncircular",
+                  "num_slices": num_slices, "rapid": rapid,
+                  "composite": composite, "grid_seed": grid_seed,
+                  "diagnostic": diagnostic, "fs_tol": fs_tol, "tol": tol,
+                  "max_iter": max_iter, "min_slip_depth": min_slip_depth}
     if analysis == "auto_search":
         kw = analysis_search_kwargs(slope_data, circular=circular, fs_tol=fs_tol,
                                     tol=tol, max_iter=max_iter,
@@ -1318,7 +1334,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
             print(f"Critical FS = {results.get('FS'):.3f}{tail}")
         return {"slice_df": critical.get("slices"),
                 "failure_surface": critical.get("failure_surface"),
-                "results": results, "search": search, "method": method}
+                "results": results, "search": search, "method": method,
+                "options": made_under}
 
     # --- the surface the input specifies ---
     if circular:
@@ -1353,7 +1370,7 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     results = solve.solve_selected(method, slice_df, rapid=rapid)
     bundle = {"slice_df": slice_df, "failure_surface": failure_surface,
               "results": results if isinstance(results, dict) else None,
-              "search": None, "method": method}
+              "search": None, "method": method, "options": made_under}
     if bundle["results"] is None:
         # The surface was built and the method was given it: it ran, and it did
         # not converge. The bundle keeps the surface so that answer can be

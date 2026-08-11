@@ -1123,12 +1123,16 @@ class ReportRunner(RunnerThread):
         window's progress slot already reads), and only when the caller asked
         for the finish.
 
-    Cancel is cooperative and figure-bounded: the flag is read at the next
-    figure the builder announces, and :class:`ReportCancelled` unwinds the build
-    from there. Once the last figure is announced nothing checks it again — the
-    document write is one call into python-docx and the Word finish is one call
-    into Word, and neither may be interrupted halfway with the user's report as
-    the thing at risk.
+    Cancel is cooperative and bounded by the work: the flag is read at the next
+    figure the builder announces, and — because the longest stretch of a report
+    that has methods to run is inside one of those runs — at every iteration
+    boundary of the solves themselves, through the ``cancel_check`` the builder
+    is given. :class:`ReportCancelled` and
+    :class:`~xslope.search.AnalysisCancelled` unwind the build from wherever it
+    was. Once the last step is announced nothing checks it again — the document
+    write is one call into python-docx and the Word finish is one call into Word,
+    and neither may be interrupted halfway with the user's report as the thing at
+    risk.
 
     Emits ``succeeded`` with :func:`~xslope.report.generate_report`'s own result
     dict plus ``finalized`` (whether Word rebuilt the page numbers) and
@@ -1158,9 +1162,14 @@ class ReportRunner(RunnerThread):
         self._cancel.set()
 
     def run(self):
+        from xslope.search import AnalysisCancelled
+
         try:
             self._generate()
-        except ReportCancelled:
+        except (ReportCancelled, AnalysisCancelled):
+            # Two seams, one meaning: the flag was read at a figure boundary, or
+            # inside a solve the report was making. Either way the user stopped
+            # it (:class:`ReportCancelled`, :class:`~xslope.search.AnalysisCancelled`).
             print("Report cancelled.")
             self.cancelled.emit()
         except Exception:
@@ -1182,23 +1191,39 @@ class ReportRunner(RunnerThread):
         # counted until the run exists.
         self._steps = planned_steps(self._sd, self._solutions, resolved)
         opts["progress"] = self._figure_cb()
+        # Stopping a report that is searching must stop the search, not wait for
+        # it: the builder polls this inside every solve it makes.
+        opts["cancel_check"] = self._cancel.is_set
         # A report with every figure switched off still has a document to write,
         # and the builder will announce nothing at all: name the step up front so
-        # the bar is determinate from the start either way.
+        # the bar is determinate from the start either way. What the first steps
+        # ARE decides what that name is — a build that has methods to run is
+        # running them, and calling that "rendering the figures" names the wrong
+        # minutes.
         self.progress.emit(0, self._steps + REPORT_WRITE_STEPS,
-                           "rendering the figures" if self._steps
+                           "running the methods the report was asked for" if solves
+                           else "rendering the figures" if self._steps
                            else REPORT_WRITE_LABEL)
 
-        said = f"{figures} figure{'' if figures == 1 else 's'}"
+        # The figure count is not knowable yet where methods have still to be
+        # run — the blocks they produce carry figures of their own — so the
+        # opening line says what is about to happen and the count is stated when
+        # it is a count of what was drawn.
         if solves:
-            said += (f", after running {solves} "
-                     f"method{'' if solves == 1 else 's'} it was asked for")
-        print(f"Generating the report — {said}…")
+            print(f"Generating the report — running {solves} "
+                  f"method{'' if solves == 1 else 's'} it was asked for, then "
+                  f"its figures…")
+        else:
+            print(f"Generating the report — {figures} "
+                  f"figure{'' if figures == 1 else 's'}…")
         ok, out = generate_report(self._sd, self._solutions, opts, self._path,
                                   fmt=self._fmt)
         if not ok:
             self.failed.emit(str(out))
             return
+        if solves:
+            drawn = len(out.get("figures") or ())
+            print(f"Report built — {drawn} figure{'' if drawn == 1 else 's'}.")
         total = self._steps + REPORT_WRITE_STEPS
         self.progress.emit(total, total, REPORT_WRITE_LABEL)
 

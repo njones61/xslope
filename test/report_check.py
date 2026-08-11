@@ -1627,6 +1627,158 @@ def test_a_method_the_run_did_not_solve_is_run_for_the_report():
     if fs is not None and fs == rows.get(method_label("bishop")):
         fails.append(f"both methods report the same factor of safety on "
                      f"different surfaces: {rows}")
+
+    # Stopping the report stops the SEARCH it is making, at the search's next
+    # iteration boundary. A cancel that is only read between figures leaves the
+    # user holding a Cancel button through the longest stretch of the build —
+    # minutes, on a model worth searching. The flag is asked here from the start,
+    # so the run unwinds at the first boundary it reaches rather than at the end.
+    from xslope.search import AnalysisCancelled
+    stopped = "the build ran to the end"
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            build_report(slope_data, solutions,
+                         dict(opts, cancel_check=lambda: True),
+                         tempfile.mkdtemp(prefix="xslope_cancel_"))
+    except AnalysisCancelled:
+        stopped = "cancelled"
+    except Exception as exc:                                # noqa: BLE001
+        stopped = f"raised {exc!r}"
+    if stopped != "cancelled":
+        fails.append(f"a report cancelled while it was solving did not stop: "
+                     f"{stopped}")
+    # And the cancellation reaches the caller of generate_report rather than
+    # being turned into a failure message, which is what a build wrapped in
+    # "except Exception" would have done with it.
+    from xslope.report import generate_report
+    stopped = "generate_report returned"
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            with contextlib.redirect_stdout(io.StringIO()):
+                generate_report(slope_data, solutions,
+                                dict(opts, cancel_check=lambda: True),
+                                os.path.join(tmp, "cancelled.docx"))
+    except AnalysisCancelled:
+        stopped = "cancelled"
+    if stopped != "cancelled":
+        fails.append(f"generate_report swallowed the cancellation: {stopped}")
+    return fails
+
+
+def test_a_report_run_method_is_run_at_the_analysis_discretization():
+    """A method the report runs is cut into the same slices the analysis was.
+
+    The count a run was made with cannot be read back off its slice table: the
+    slicer splits at material and water boundaries, so a run of 20 comes back as
+    21 rows. Inferring the option from the table ran the second method at 21,
+    which is a different discretization of the same surface — and the section's
+    Analysis Inputs, which prints the slice count only where the methods share
+    one, silently lost the row.
+
+    So the run records what it was made under and the record is what a second
+    method is run from. Pinned end to end: a scripted 20 stays a scripted 20,
+    both tables come out the same size, and the shared row is printed.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.report import (analysis_options, build_report, resolve_options,
+                               run_requested_methods)
+    from xslope.search import run_lem_analysis
+
+    slope_data = load_slope_data(REINF_XLSX)
+    asked = 20
+    with contextlib.redirect_stdout(io.StringIO()):
+        first = run_lem_analysis(slope_data, "bishop", analysis="single_surface",
+                                 num_slices=asked)
+    if len(first["slice_df"]) == asked:
+        return [f"this model cuts {asked} slices into {asked} rows, so the "
+                f"count cannot be told from the table and nothing is pinned"]
+    if (first.get("options") or {}).get("num_slices") != asked:
+        fails.append(f"the run does not record the slice count it was made "
+                     f"with: {first.get('options')}")
+
+    solutions = {"lem": [first]}
+    opts = resolve_options({"input_path": REINF_XLSX,
+                            "method": ["bishop", "spencer"], "pd_figure": False,
+                            "lem_inputs_figure": False,
+                            "lem_search_figure": False,
+                            "lem_solution_figure": False,
+                            "lem_slice_key": False})
+    if analysis_options(slope_data, solutions)["num_slices"] != asked:
+        fails.append(f"the analysis is read as "
+                     f"{analysis_options(slope_data, solutions)['num_slices']} "
+                     f"slices, not the {asked} it was run with")
+    with contextlib.redirect_stdout(io.StringIO()):
+        after = run_requested_methods(slope_data, solutions, opts)
+    second = next((b for b in after["lem"] if b.get("method") == "spencer"), None)
+    if second is None:
+        return fails + ["Spencer was asked for and not run"]
+    if (second.get("options") or {}).get("num_slices") != asked:
+        fails.append(f"the method the report ran was asked for "
+                     f"{(second.get('options') or {}).get('num_slices')} slices, "
+                     f"not the {asked} the analysis was run with")
+    if len(second["slice_df"]) != len(first["slice_df"]):
+        fails.append(f"the analysis was cut into {len(first['slice_df'])} slices "
+                     f"and the method the report ran into "
+                     f"{len(second['slice_df'])}")
+
+    # …so the section can still state one slice count for the analysis.
+    with contextlib.redirect_stdout(io.StringIO()):
+        report = build_report(slope_data, after, dict(opts),
+                              tempfile.mkdtemp(prefix="xslope_slices_"))
+    shared = _shared_slice_counts(_analysis_inputs(report))
+    if shared != [str(len(first["slice_df"]))]:
+        fails.append(f"the two methods are cut alike and the engine inputs "
+                     f"print {shared} for the slice count")
+    return fails
+
+
+def test_a_method_that_is_not_run_says_why():
+    """A method the report is asked for and does not run says so, and says why.
+
+    Two names are declined rather than run: one this surface family cannot take,
+    and one the solver does not offer. Both used to disappear — no section, no
+    row, nothing on the console — which is the same silence this whole
+    arrangement was built to end, arriving by a different door. The reason
+    printed is the rule's own, so it is the sentence the Run dialog dims that
+    method with.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.preflight import method_surface_reason
+    from xslope.report import (method_label, resolve_options,
+                               run_requested_methods)
+    from xslope.search import run_lem_analysis
+
+    slope_data = load_slope_data(NONCIRC_XLSX)
+    with contextlib.redirect_stdout(io.StringIO()):
+        first = run_lem_analysis(slope_data, "spencer",
+                                 analysis="single_surface",
+                                 surface="noncircular", num_slices=20)
+    opts = resolve_options({"input_path": NONCIRC_XLSX,
+                            "method": ["spencer", "bishop", "no_such_method"]})
+    said = io.StringIO()
+    with contextlib.redirect_stdout(said):
+        after = run_requested_methods(slope_data, {"lem": [first]}, opts)
+    said = said.getvalue()
+
+    if [b.get("method") for b in after["lem"]] != ["spencer"]:
+        fails.append(f"a method this surface cannot take was run anyway: "
+                     f"{[b.get('method') for b in after['lem']]}")
+    reason = method_surface_reason("bishop", "noncircular")
+    if method_label("bishop") not in said:
+        fails.append(f"Bishop was asked for and declined without a word: "
+                     f"{said!r}")
+    elif reason.split(",")[0] not in said:
+        fails.append(f"Bishop is declined without the rule's own reason: "
+                     f"{said!r}")
+    if "not a method this solver offers" not in said:
+        fails.append(f"a method the solver does not have was declined without "
+                     f"saying so: {said!r}")
     return fails
 
 
@@ -19573,6 +19725,10 @@ CHECKS = [
      test_each_searched_method_draws_its_own_search),
     ("a method the run did not solve is run for the report",
      test_a_method_the_run_did_not_solve_is_run_for_the_report),
+    ("a report-run method is cut like the analysis",
+     test_a_report_run_method_is_run_at_the_analysis_discretization),
+    ("a method that is not run says why",
+     test_a_method_that_is_not_run_says_why),
     ("the rapid drawdown block names the governing stage",
      test_rapid_drawdown_names_the_governing_stage),
     ("the water prose follows the model", test_water_prose_is_conditional),

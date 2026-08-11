@@ -45,9 +45,10 @@ behind some of them, and not a footer correction. Six such files were held throu
 to the iteration ceiling without closing, so there was no single field to record. The
 solver was diagnosed and fixed on 2026-08-10 (two limit cycles, one in the head field
 and one in the exit-face active set, both invisible behind the relaxation ladder) and
-all four converge. Five of the six are regenerated above; the sixth is a copy of one of
-them, held for a reason that has nothing to do with the model — ``--check --held``
-prints it.
+all four converge, so all six files are regenerated above. Five went in the round that
+fixed the solver; the sixth is a second name for one of them and waited for a test
+fixture, not for a ruling about the model. Nothing is held today, which ``--held``
+prints.
 """
 import argparse
 import contextlib
@@ -99,9 +100,12 @@ MODELS = [
     # second sets had drifted with the same solver evolution. The cause was a limit
     # cycle in the head field, hidden by the relaxation ladder's terminal 0.01; with
     # the escape in place each converges (463 and 901 sweeps) and each has one answer,
-    # so all four files are solved for it here. gsat_seep is the same field under a
-    # second name and is released with them — see HELD for why its copy waits.
+    # so all four files are solved for it here. gsat_seep is the same model under a
+    # second name, and its field is earth_dam_rapid's first set to the last digit; it
+    # waited one round longer than the rest, until test/report_check.py's sample of a
+    # solution that records nothing about its solve moved off it.
     ("docs/lem/files/xslope_earth_dam_rapid",         (1, 2), DOCS),
+    ("docs/lem/files/xslope_gsat_seep",                  (1,), DOCS),
     ("docs/lem/files/xslope_johnson_rapid_KEY",       (1, 2), DOCS),
     ("docs/seep/files/xslope_clay_blanket",              (1,), DOCS),
     ("docs/seep/files/xslope_double_sheetpile",          (1,), DOCS),
@@ -198,22 +202,9 @@ EXCLUDED = {
 #: The four models held here through 2026-08-09 were held for one cause between them —
 #: their solves did not converge, and a flow rate read off a field that is still moving
 #: is not the flow through the section. That was a solver defect, not a corpus
-#: decision; it was fixed on 2026-08-10 and three of the four are in MODELS above, each
-#: with the ruling that released it. The fourth is held for a reason of a different
-#: kind, and not about the model at all.
-HELD = {
-    "docs/lem/files/xslope_gsat_seep":
-        "RELEASED, WAITING ON A TEST FIXTURE (2026-08-10). Its field is the "
-        "earth_dam_rapid field under a second name, which is regenerated and "
-        "converged; this copy reproduces it exactly (q = 183.958670, 463 sweeps) and "
-        "is the file to write. What it cannot do yet is CARRY A SOLVE FOOTER: "
-        "test/report_check.py uses this model as the sample whose saved solution "
-        "records nothing about its solve, and two of its checks are premised on that "
-        "silence (test_seep_convergence_is_stated, test_seep_stale_sidecar_says_so). "
-        "That file belongs to another round in flight. Regenerate this stem in the "
-        "same change that points those two fixtures at a sample that is genuinely "
-        "silent, and that raises _truncated()'s row count past the footer length.",
-}
+#: decision; it was fixed on 2026-08-10 and all four are in MODELS above, each with the
+#: ruling that released it. Nothing is held today.
+HELD = {}
 
 
 def _quiet(fn, *a, **k):

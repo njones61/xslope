@@ -10782,6 +10782,41 @@ def test_shipped_seep_companions_record_their_solve():
     return fails
 
 
+#: The dam with the solve facts taken back off its saved solution: a model whose
+#: seepage field is on record and whose solve is not, which is what every companion
+#: written before ``export_seep_solution`` grew its footer looks like, and what a
+#: field imported from another program looks like today.
+#:
+#: MADE HERE, NOT COMMITTED. Every steady companion the corpus ships is written by
+#: tools/make_seep_sidecars.py and records its solve — a footerless one kept in the
+#: corpus as a fixture would be the single file contradicting that, and the guard
+#: above (:func:`test_shipped_seep_companions_record_their_solve`) is what it would
+#: have to be excused from. So the silent sample is cut from a copy instead: the
+#: model and its companions go to a temporary directory and the copy's footer loses
+#: its solve-fact lines, leaving the flow rate and the nodal table untouched.
+_SILENT = {}
+
+
+def _silent_seep_xlsx():
+    """Path to the copied model, made once per run and removed at exit."""
+    if "xlsx" not in _SILENT:
+        _SILENT["tmp"] = tempfile.TemporaryDirectory(prefix="xslope_silent_")
+        stem = _sidecar_copy(os.path.splitext(SEEP_XLSX)[0], _SILENT["tmp"].name)
+        path = f"{stem}_seep.csv"
+        with open(path) as f:
+            lines = f.readlines()
+        kept = [l for l in lines if not l.startswith(
+            ("# Unconfined:", "# Converged:", "# Closure "))]
+        if len(kept) == len(lines):
+            raise AssertionError(f"{os.path.basename(path)} carries no solve "
+                                 f"facts to take off — the silent sample is a "
+                                 f"copy of a file that was already silent")
+        with open(path, "w") as f:
+            f.writelines(kept)
+        _SILENT["xlsx"] = f"{stem}.xlsx"
+    return _SILENT["xlsx"]
+
+
 def test_seep_convergence_is_stated():
     """A solution that records whether it converged says so; one that does not
     records nothing about it.
@@ -10793,9 +10828,10 @@ def test_seep_convergence_is_stated():
     voice of a result.
     """
     fails = []
-    _slope_data, bundle = _seep_bundle()
+    xlsx = _silent_seep_xlsx()
+    _slope_data, bundle = _seep_bundle(xlsx)
 
-    quiet = " ".join(_seep_results_prose(_engine_report("seep")))
+    quiet = " ".join(_seep_results_prose(_engine_report("seep", xlsx=xlsx)))
     if "converge" in quiet:
         if bundle["solution"].get("converged") is not None:
             fails.append("the sample's saved solution records convergence, so "
@@ -10807,7 +10843,7 @@ def test_seep_convergence_is_stated():
     def reported(**facts):
         edited = dict(bundle, solution=dict(bundle["solution"], **facts))
         return " ".join(_seep_results_prose(
-            _engine_report("seep", bundle=edited)))
+            _engine_report("seep", bundle=edited, xlsx=xlsx)))
 
     closed = reported(converged=True, closure_error=3.25e-6)
     if "The solution converged" not in closed:
@@ -11327,7 +11363,8 @@ def test_seep_stale_sidecar_says_so():
     fails = []
     from xslope.report import _bc_counts, _seep_bc_stale
 
-    _slope_data, bundle = _seep_bundle()
+    xlsx = _silent_seep_xlsx()
+    _slope_data, bundle = _seep_bundle(xlsx)
     n_head, n_exit = _bc_counts(bundle["seep_data"])
     if not (n_head and n_exit):
         fails.append(f"the sample carries {n_head} head and {n_exit} exit-face "
@@ -11340,7 +11377,7 @@ def test_seep_stale_sidecar_says_so():
     def reported(**facts):
         edited = dict(bundle, solution=dict(bundle["solution"], **facts))
         return " ".join(_seep_results_prose(
-            _engine_report("seep", bundle=edited)))
+            _engine_report("seep", bundle=edited, xlsx=xlsx)))
 
     # The record and the mesh agree: the counts are the solve's own boundaries and
     # are stated as such, with no stale-sidecar language anywhere.
@@ -16915,13 +16952,24 @@ def _sidecar_copy(stem, tmp, meta_edit=None, drop=()):
 
 
 def _truncated(path, rows=5):
-    """``path`` with its last few rows cut off — a solution that no longer has a
-    row per node, which is what a saved solution looks like once its mesh has
-    been rebuilt under it."""
+    """``path`` with its last few NODE rows cut off — a solution that no longer
+    has a row per node, which is what a saved solution looks like once its mesh
+    has been rebuilt under it.
+
+    The rows are counted past whatever footer the file ends with, and the footer
+    is left on. Counting from the end of the file instead cuts the footer and
+    nothing else once it is as long as the count: the file keeps its row per node,
+    the reader finds no mismatch, and the check passes on a solution it never
+    damaged.
+    """
     with open(path) as f:
         lines = f.readlines()
+    footer = 0
+    while footer < len(lines) and lines[-1 - footer].startswith("#"):
+        footer += 1
+    body = lines[:len(lines) - footer]
     with open(path, "w") as f:
-        f.writelines(lines[:-rows])
+        f.writelines(body[:-rows] + lines[len(lines) - footer:])
 
 
 def test_sidecars_assemble_the_solutions():

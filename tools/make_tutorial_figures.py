@@ -111,12 +111,16 @@ def render(name, src, sheet, rows=None, cols=None):
     return out
 
 
-def placeholder(name, title, lines, size=(1200, 620)):
+def placeholder(name, title, lines, width=1200):
     """A visible TODO card standing in for a capture only a person can take.
 
     Drawn rather than left as a broken image reference: the page has to render
     complete for the layout around the missing figure to be reviewable, and a
     reader who reaches an un-captured state should be told so on the page.
+
+    The height follows the text. A card is a gap marker, not a figure, and one
+    sized to a screenshot's aspect outweighs the real figures around it on the
+    page — so the box closes under the last line it carries.
     """
     from PIL import Image, ImageDraw
     from matplotlib import font_manager
@@ -127,21 +131,26 @@ def placeholder(name, title, lines, size=(1200, 620)):
         from PIL import ImageFont
         return ImageFont.truetype(f, px)
 
-    w, h = size
-    im = Image.new("RGB", (w, h), (247, 247, 249))
+    pad, bar, title_px, line_px, lead = 22, 50, 26, 19, 30
+    y_title = bar + pad
+    y_first = y_title + title_px + pad
+    h = y_first + lead * len(lines) + pad - (lead - line_px)
+
+    im = Image.new("RGB", (width, h), (247, 247, 249))
     d = ImageDraw.Draw(im)
-    d.rectangle([6, 6, w - 7, h - 7], outline=(196, 148, 40), width=3)
-    d.rectangle([6, 6, w - 7, 62], fill=(250, 226, 160), outline=(196, 148, 40), width=3)
-    d.text((28, 22), "SCREENSHOT TO BE CAPTURED", font=font(22, "bold"),
+    d.rectangle([6, 6, width - 7, h - 7], outline=(196, 148, 40), width=3)
+    d.rectangle([6, 6, width - 7, bar], fill=(250, 226, 160),
+                outline=(196, 148, 40), width=3)
+    d.text((pad + 6, 16), "SCREENSHOT TO BE CAPTURED", font=font(19, "bold"),
            fill=(105, 76, 12))
-    d.text((28, 96), title, font=font(28, "bold"), fill=(40, 40, 46))
-    y = 156
+    d.text((pad + 6, y_title), title, font=font(title_px, "bold"), fill=(40, 40, 46))
+    y = y_first
     for line in lines:
-        d.text((28, y), line, font=font(20), fill=(70, 70, 80))
-        y += 34
+        d.text((pad + 6, y), line, font=font(line_px), fill=(70, 70, 80))
+        y += lead
     out = os.path.join(OUT_DIR, name)
     im.save(out)
-    print("-> %s  (placeholder)" % name)
+    print("-> %s  (placeholder, %dx%d)" % (name, width, h))
     return out
 
 
@@ -172,13 +181,11 @@ def lem01_plots():
     """The states the tutorial asks the reader to compare their own screen against."""
     sd = load_slope_data(LEM01)
 
-    # After the geometry, before the failure surface — the build order's step 2
-    # checkpoint. The circle is dropped from a COPY of the loaded model; nothing is
-    # written back to the sample file.
-    geom = dict(sd)
-    geom["circles"] = []
-    geom["circular"] = False
-    capture("lem01_inputs_geometry.png", plot_inputs, geom,
+    # Where the three build paths rejoin: the finished model, before anything is
+    # run. Geometry AND the starting circle, because that is the state all three
+    # paths leave the reader in, and the page shows this figure at the point it
+    # claims they now hold the same model.
+    capture("lem01_inputs_geometry.png", plot_inputs, sd,
             title="Slope Geometry and Inputs")
 
     # The single starting circle.
@@ -216,24 +223,26 @@ def lem01_placeholders():
     """
     placeholder(
         "lem01_studio_canvas.png",
-        "Studio — the finished model on the Inputs view",
-        ["XSLOPE Studio main window, Inputs view, LEM mode, with the completed",
-         "simple-embankment model loaded: the profile line, the max-depth line",
-         "at y = 0, and the starting circle.",
-         "",
-         "Source model: docs/lem/files/xslope_simple_embankment.xlsx",
-         "Full main-window captures are taken by hand at the project's",
-         "standard window size and theme."])
+        "Studio — the canvas after the profile line is entered",
+        ["Main window, Inputs view, LEM mode, at the end of the tutorial's Studio "
+         "step 3:",
+         "the profile line in the material's color and the hatched max-depth line at "
+         "y = 0.",
+         "No failure surface yet — the starting circle is the step after this one.",
+         "Model: docs/lem/files/xslope_simple_embankment.xlsx, circles removed.",
+         "Main-window captures are taken by hand at the project's window size and "
+         "theme."])
     placeholder(
         "lem01_assistant_dock.png",
         "Studio — the assistant dock building this model",
-        ["The Assistant dock after the problem sketch has been pasted into the",
-         "chat box and the assistant has built the model: the transcript with",
-         "the image, the assistant's reading of the geometry, one 'ran code'",
-         "block, and the section drawn on the canvas beside it.",
-         "",
-         "Needs a live provider and API key, so it cannot be generated;",
-         "the transcript's wording varies with the model selected."])
+        ["The Assistant dock after the problem sketch has been pasted into the chat "
+         "box",
+         "and the assistant has built the model: the transcript with the image, its "
+         "reading",
+         "of the geometry, one 'ran code' block, and the section drawn on the canvas "
+         "beside it.",
+         "Needs a live provider and API key, so it cannot be generated; the wording "
+         "varies."])
 
 
 GROUPS = {

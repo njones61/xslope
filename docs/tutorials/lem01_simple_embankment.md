@@ -125,10 +125,11 @@ This is the part that teaches. Read what it built against the section it was giv
 and correct it in the same conversation — plain sentences work, and each correction
 is undoable.
 
+- **φ = 0.** Check this first: it is the judgment the drawing leaves to you, and the
+  likeliest miss, because the drawing never states it. If the assistant supplied a
+  friction angle, say: *"c = 500 psf is an undrained strength. Set phi to 0 and leave
+  the pore pressure option at none."*
 - **One material**, γ = `125` pcf, c = `500` psf, strength option `mc`.
-- **φ = 0.** The likeliest miss, because the drawing never states it. If the
-  assistant supplied a friction angle, say: *"c = 500 psf is an undrained strength.
-  Set phi to 0 and leave the pore pressure option at none."*
 - **No water.** There should be no piezometric line. If one was added, have it
   removed — with φ = 0 it cannot change the answer, and a water table nobody asked
   for is an input you will have to explain later.
@@ -151,7 +152,8 @@ yours and compare. Continue at [Running the analysis](#running-the-analysis).
 Start from [input_template.xlsx](../inputs/input_template.xlsx) and save a copy under
 a name of your own.
 
-Fill the worksheets in the order the model depends on them: materials, because
+Fill the worksheets in the order the model depends on them: `main` first, since the
+unit system it declares is what every number after it means; then materials, because
 geometry points at a material ID; then geometry; then the failure surface, because a
 sensible starting circle depends on the geometry it cuts through.
 
@@ -191,7 +193,10 @@ One material, first row of the table:
 
 The rest of this 42-column sheet belongs to analyses this problem does not run.
 Columns your choices make inert grey themselves out: the c/p pair once the option is
-`mc`, and `ru` once **u** is `none`.
+`mc`, and `ru` once **u** is `none`. The screenshot is of the completed file, which a
+script wrote and which carries an explicit `0` in columns these steps never mention —
+`d`, `psi`, `E`, `nu` and the power-curve and Hoek-Brown groups. Typing your own,
+leave them blank; on this sheet a blank in one of those columns reads as zero.
 
 ### 3. The `profile` worksheet
 
@@ -260,10 +265,13 @@ Click **Profile lines**, then **Add line**:
 
 ![The profile lines editor](images/lem01_studio_profile.png)
 
-The preview redraws as you type, so a mistyped vertex shows up before you commit it.
-Click **OK**; the canvas fills the material zone under the line.
+The preview redraws as you type, so a mistyped vertex shows up before you commit it:
+the line in the material's color, and the hatched **Max depth** line at y = 0 beneath
+it. Click **OK**, and the canvas draws the same two things. Profile-line geometry is
+drawn as lines; the shaded material zones you may have seen in other XSLOPE figures
+are how *polygon* input is drawn.
 
-![The model on the canvas](images/lem01_studio_canvas.png)
+![The canvas after the profile line](images/lem01_studio_canvas.png)
 
 ### 4. The starting circle
 
@@ -280,9 +288,12 @@ disabled. Under the finding is a **Generate starting circles…** button.
 2. Apply it, and close the dialog.
 
 Its rule is the one to learn: **one circle through the toe, and one at the base of
-each layer**. This slope is a single material on a rigid base, so the toe circle is
-the whole set — a second candidate that would have daylighted outside the model was
-dropped.
+each layer**. Here the two candidates share a center — above the middle of the face,
+at twice the slope height — and differ only in radius, and the one that survives is
+the layer-base circle: R = 40, tangent to the rigid base at y = 0. Reaching the toe
+from that same center would take R = 41.23, which puts the bottom of the circle
+1.23 ft *below* the base, on ground the model does not contain. That is the candidate
+the dialog reports dropping *"for not daylighting inside the model"*.
 
 Now audit what it made. Click **Failure surfaces** in the Inputs tree:
 
@@ -298,8 +309,19 @@ Save the project with **File → Save As**.
 ## Running the analysis
 
 All three paths end in the same place: this model open in Studio. If you built the
-workbook by hand, open it now with **File → Open**. Run the starting circle on its own
-first — a single, understood surface, solved before the search adds moving parts.
+workbook by hand, open it now with **File → Open**. Whichever path you took, the
+Inputs view is now the same picture — the profile line, the hatched base at y = 0, and
+the arc of the starting circle between the two points where it daylights.
+
+![The finished model](images/lem01_inputs_geometry.png)
+
+The circle's center is at (10, 40), above the top of the frame; the red arrow is its
+radius, drawn from the center down to the arc. Compare this against your own screen
+before running anything — a geometry error is far cheaper to find here than in a
+factor of safety.
+
+Run the starting circle on its own first — a single, understood surface, solved before
+the search adds moving parts.
 
 1. Click **Run LEM…**.
 2. **Method** = `Bishop's Simplified`. On a circular surface Bishop satisfies moment
@@ -313,9 +335,10 @@ first — a single, understood surface, solved before the search adds moving par
    run along the base between the crossings. This circle does not reach below the
    base, so the option changes nothing — but where the base is real bedrock it is how
    the critical mechanism gets found.
-6. Click **Run**.
 
-![The Run LEM dialog](images/lem01_studio_run_lem.png)
+    ![The Run LEM dialog](images/lem01_studio_run_lem.png)
+
+6. Click **Run**.
 
 Then run it again with **Analysis** = `Auto search`, which starts from your circle and
 refines toward the critical one.
@@ -341,12 +364,13 @@ swelling under the tall middle of the slide mass and shrinking toward both ends.
 last few slices at the crest, where the surface is steepest, are drawn red instead:
 their bases are in tension.
 
-Now switch **Method** to `OMS`, `Spencer` or `Morgenstern-Price`. Every one returns
-**1.281**. With φ = 0 the resisting force on a slice base is `c · Δl` whatever normal
-force acts on it, and on a circular surface the normal forces all point at the center
-and take no moment about it — so every method that takes moments about the center
-solves the same equation. The force-equilibrium methods `Janbu`, `Corps of Engineers`
-and `Lowe & Karafiath` do not, and report higher values on this very same circle.
+Now switch **Method** to `Ordinary Method of Slices (OMS)`, `Spencer` or
+`Morgenstern-Price`. Every one returns **1.281**. With φ = 0 the resisting force on a
+slice base is `c · Δl` whatever normal force acts on it, and on a circular surface the
+normal forces all point at the center and take no moment about it — so every method
+that takes moments about the center solves the same equation. The force-equilibrium
+methods `Janbu (Corrected)`, `Corps of Engineers` and `Lowe & Karafiath` do not, and
+report higher values on this very same circle: 1.394, 1.393 and 1.329.
 
 !!! note "If you run Spencer here"
     Spencer and Morgenstern-Price return the same 1.281, but with an amber strip
@@ -370,9 +394,16 @@ search explored the slope or sat still.
 
 ![The critical surface](images/lem01_solution_search.png)
 
-The critical circle is flatter and deeper than the one you started from, and bottoms
-out along the rigid base: with strength independent of depth, a bigger and deeper
-slide mass is a better mechanism, and the base is the only thing stopping it.
+Both circles bottom out on the rigid base at y = 0: with the strength the same at
+every depth there is nothing to be gained by going deeper, and nothing below y = 0
+to cut. So what the search moves is the center, back and down — and the circle it
+lands on is the *smaller* of the two, not the bigger. The radius falls from 40 ft to
+33.5 ft, the arc from 50.9 ft to 43.7 ft, and the slide mass from 61,000 to
+43,400 lb per foot of slope, 29% lighter. With φ = 0 the resisting moment is
+c · L · R, so it loses both of the lengths it is built from — 28% in all — while the
+driving moment loses only 24%, because the lighter mass hangs on a slightly longer
+average lever arm about the new center. Resistance falls faster than drive, and the
+factor of safety with it.
 
 That 5% drop is a fair warning of how much a hand-placed circle can flatter a slope —
 and of how much it matters, since a search refines from where you point it.
@@ -380,10 +411,10 @@ and of how much it matters, since a search refines from where you point it.
 protects against a seed in the wrong family.
 
 All seven methods, each on its own critical surface, are tabulated on
-[LEM Sample Problem 1](../lem/samples.md#1-simple-embankment). Read that spread with
-the paragraph above in hand: the moment-equilibrium methods differ only because each
-search settled on a different circle, while the force-equilibrium methods differ on
-every surface, before any search is involved.
+[LEM Sample Problem 1](../lem/samples.md#1-simple-embankment). Read that spread
+against what you just measured: on any one surface the moment-equilibrium methods
+agree, and the force-equilibrium methods do not — they differ on the starting circle
+and on the critical circle alike, before any search is involved.
 
 ---
 

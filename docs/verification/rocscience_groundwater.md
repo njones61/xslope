@@ -351,8 +351,10 @@ XSLOPE carries van Genuchten, Gardner and linear-front laws rather than a table,
 is fit. The five solved fields reach 6.7 m of suction at the deepest (case 3), and the
 least-squares Mualem–van Genuchten fit over 0–8 m of suction, **α = 0.2452, n = 2.5739**, holds
 the vendor table to **0.030 decades rms and 0.102 decades worst** across that band. The fit is
-not the controlling uncertainty at this quality: fits taken over 0–6 m and over the table's
-full 0–15 m move every case's profile by less than 0.02 m.
+not the controlling uncertainty at this quality: refitting over 0–6 m instead moves no case's
+profile by more than 0.004 m, and refitting over the table's full 0–15 m — which buys accuracy
+in a tail the solutions never reach at the cost of the band they occupy — moves it by at most
+0.047 m, at the crest of case 4.
 
 **Case 1 — isotropic dam with a 12 m horizontal drain.**
 

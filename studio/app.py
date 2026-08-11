@@ -20,7 +20,7 @@ from PySide6.QtCore import QEvent
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from . import urlscheme
+from . import urlscheme, welcome
 from .main_window import APP_NAME, ORG_NAME, MainWindow
 
 ICON_PATH = os.path.join(os.path.dirname(__file__), "resources", "icon.png")
@@ -146,6 +146,16 @@ def main(argv=None):
     rest = argv[1:]
     if rest:
         open_request(win, rest[0])
+
+    # The welcome window, on a launch whose settings still ask for one — the first
+    # one, and afterwards only while the reader leaves it switched on. Deferred so
+    # the main window paints behind it, and it lives HERE rather than in MainWindow
+    # for the same reason the update check does: constructing a window, which every
+    # Studio test does, must never raise a modal dialog. Set XSLOPE_NO_WELCOME=1 to
+    # suppress it (a capture, a kiosk, a classroom image).
+    if welcome.show_at_launch(win.settings) and not os.environ.get("XSLOPE_NO_WELCOME"):
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, win.show_welcome)
 
     # The silent startup update check (Help → Check for Updates at Startup,
     # default on, at most once a day). Deferred so the window paints first, and

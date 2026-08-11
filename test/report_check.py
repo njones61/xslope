@@ -14497,6 +14497,111 @@ TABLE_AS_SUBJECT = re.compile(r"\bTables? \d+(?:[–-]\d+)? "
                               r"(gives|holds|lists|shows|summari[sz]es)\b")
 
 
+def test_a_wide_table_is_fitted_by_the_lines_it_makes():
+    """A table too wide for the page is cut so that no cell wraps further than
+    it has to, and no value wraps at all.
+
+    "Keep every column, but be smarter about the widths" was the owner's ruling
+    on the pile forces table, which had come out with one column of prose broken
+    into four lines beside a column of five-character displacements printed at
+    an inch and a quarter. The cause was a measurement, not a preference: a
+    column of numbers was floored at its widest line INCLUDING its header, so
+    the longest thing written at the top of a table set the width of the table.
+
+    What is measured here is the outcome and not the recipe. The shipped
+    document is read back, every cell is wrapped at the width it was actually
+    given, and three things have to hold: no value is broken; the tallest cell
+    in the table is as short as the page allows, proved by showing that one line
+    fewer does not fit; and two columns under the same header are the same
+    width.
+    """
+    fails = []
+    import re
+
+    from docx import Document
+
+    from xslope.report_docx import (_column_widths, _table_font, _text_width,
+                                    _usable_twips, _width_within,
+                                    _wrapped_lines)
+
+    slope_data, bundle = _fem_1d_bundle(FEM_PILES_XLSX)
+    with tempfile.TemporaryDirectory() as tmp:
+        opts = {"input_path": FEM_PILES_XLSX, "lem": False, "pd_figure": False,
+                "fem_inputs_figure": False, "fem_mesh_figure": False,
+                "fem_figure": False, "fem_pile_figures": False}
+        opts.update(FAST_FIGURES)
+        _report, doc_xml, path = _written("the piles report", slope_data,
+                                          {"fem": bundle}, opts, tmp)
+        document = Document(path)
+        family = _table_font(document)
+        usable = _usable_twips(document.sections[0])
+        wide = None
+        for tbl in re.findall(r"<w:tbl>.*?</w:tbl>", doc_xml, re.S):
+            columns = _table_cell_texts(tbl)
+            if columns and columns[0] and columns[0][0] == "Pile":
+                wide = (tbl, columns)
+        if wide is None:
+            return ["the piles report carries no pile forces table"]
+        tbl, columns = wide
+        grid = [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"/>', tbl)]
+        size = _table_point_size(tbl)
+        margin = _cell_margin(tbl, "", "TableGrid")
+        pad = 2 * (DEFAULT_CELL_MARGIN if margin is None else margin)
+        if len(grid) != len(columns) or size is None:
+            return [f"the pile table reads as {len(columns)} columns of text "
+                    f"for {len(grid)} grid columns at {size} pt"]
+        if sum(grid) <= usable - 1:
+            return [f"the pile table fits the page with {usable - sum(grid)} "
+                    f"twips to spare, so nothing below is being measured"]
+
+        # No NUMBER is broken. A number over two lines is the defect the whole
+        # measurement exists to prevent; a sentence in a cell is meant to wrap,
+        # and the column it wraps in is what the rest of this measures.
+        from xslope.columns import is_number
+        for j, texts in enumerate(columns):
+            for text in texts[1:]:
+                if is_number(text) and \
+                        _wrapped_lines(text, family, size, grid[j] - pad) > 1:
+                    fails.append(f"column {j} prints the number {text!r} on "
+                                 f"more than one line at {grid[j]} twips")
+
+        # The tallest cell is as short as the page allows.
+        tallest = max(_wrapped_lines(t, family, size, grid[j] - pad)
+                      for j, texts in enumerate(columns) for t in texts)
+        if tallest > 1:
+            need = 0.0
+            for j, texts in enumerate(columns):
+                lo = max(_text_width(w, family, size)
+                         for t in texts for w in t.split())
+                hi = max(_text_width(t, family, size) for t in texts)
+                need += _width_within(texts, family, size, lo, hi,
+                                      tallest - 1) + pad
+            if need <= usable:
+                fails.append(f"the table wraps to {tallest} lines where "
+                             f"{tallest - 1} would fit in {need:.0f} of "
+                             f"{usable} twips")
+
+        # One header, one width.
+        by_header = {}
+        for j, texts in enumerate(columns):
+            by_header.setdefault(texts[0], []).append(j)
+        for header, members in by_header.items():
+            if len({grid[j] for j in members}) > 1:
+                fails.append(f"the two {header!r} columns print at "
+                             f"{[grid[j] for j in members]} twips")
+
+    # …and the measurement that decides it does not read the header as a value:
+    # a header far longer than anything under it may wrap.
+    long_header = [["Head movement (ft)", "-6.308", "-8.135"],
+                   ["State", "within capacity", "within capacity"]]
+    widths = _column_widths(long_header, "Calibri", 9.0, 2000, 86,
+                            nowrap=[True, False], header_rows=1)
+    if widths[0] >= _text_width("Head movement (ft)", "Calibri", 9.0):
+        fails.append(f"a column of five-character numbers is held open by its "
+                     f"own header: {widths}")
+    return fails
+
+
 def test_the_tension_crack_is_documented_where_it_is_read():
     """The tension crack is drawn on the limit equilibrium model figure, named
     in that figure's own sentence, and named there once.
@@ -19204,6 +19309,8 @@ CHECKS = [
      test_the_model_figure_names_only_the_members_it_draws),
     ("the finite element prose reads as documentation",
      test_the_fem_prose_reads_as_documentation),
+    ("a wide table is fitted by the lines it makes",
+     test_a_wide_table_is_fitted_by_the_lines_it_makes),
     ("the tension crack is documented where it is read",
      test_the_tension_crack_is_documented_where_it_is_read),
     ("every table is introduced in the owner's register",

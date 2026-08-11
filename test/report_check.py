@@ -7188,7 +7188,7 @@ def test_calculation_leads_read_once():
         if "The zones are named" not in text:
             fails.append(f"{how}: the material zones are not named: {text!r}")
         if "The problem definition is displayed in Figure 1, including the " \
-                "geometry and material zones" not in text:
+                "geometry, the material zones and the maximum depth line" not in text:
             fails.append(f"{how}: the figure is not referred to from inside the "
                          f"sentence that says what it shows: {text!r}")
         for retired in ("is run on the model of", "The section is defined by"):
@@ -14170,13 +14170,42 @@ def test_the_inputs_an_engine_reads_are_stated_where_it_is_documented():
         for b in section.blocks:
             if b.kind == "prose" and "displayed in Figure" in b.text:
                 pd_said = b.text
-    if "the geometry and material zones" not in pd_said:
+    if "the geometry" not in pd_said or "the material zones" not in pd_said:
         fails.append(f"the project definition figure's sentence does not name "
                      f"the section it draws: {pd_said!r}")
     for banned in ("water", "load", "piezometric", "reinforcement", "pile"):
         if banned in pd_said.lower():
             fails.append(f"the project definition figure is credited with "
                          f"{banned!r}, which it does not draw: {pd_said!r}")
+
+    # The maximum depth line IS geometry — the profile lines are closed at it to
+    # make the material zones — so the sentence names it on a model that defines
+    # one and on no other (the owner's ruling). The figure draws it under exactly
+    # that condition.
+    from xslope.report import DEFAULT_OPTIONS, _Counter, _project_definition_section
+
+    depth_model = load_slope_data_cached(REINF_XLSX)
+    if depth_model.get("max_depth") is None:
+        fails.append("the sample defines no maximum depth; the clause is "
+                     "untested")
+    else:
+        with tempfile.TemporaryDirectory() as tmp:
+            def _pd_said(model):
+                opts = dict(DEFAULT_OPTIONS, method="bishop", pd_figure=True)
+                section = _project_definition_section(
+                    model, {}, opts, _Counter(), tmp)
+                return " ".join(b.text for b in section.blocks
+                                if b.kind == "prose")
+
+            named = "the maximum depth line"
+            if named not in _pd_said(depth_model):
+                fails.append(f"the figure draws the maximum depth line and the "
+                             f"sentence does not name it: "
+                             f"{_pd_said(depth_model)!r}")
+            without = _pd_said(dict(depth_model, max_depth=None))
+            if named in without:
+                fails.append(f"a model with no maximum depth is credited with "
+                             f"the line: {without!r}")
 
     # --- the derived water load is a row of the loads table ------------------
     from xslope.report import _loads_section, _Counter

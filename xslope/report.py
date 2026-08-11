@@ -2795,8 +2795,19 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
         # one is a fact the reader can already see.
         if len(_engine_sections(solutions, opts)) > 1:
             text += " Every analysis in this report is run on this cross section."
+        # The maximum depth line is geometry, not an analysis input: the profile
+        # lines are closed at it to make the material zones, so it is part of what
+        # defines the section and belongs in this list where the model has one
+        # (the owner's ruling). Named on exactly the models the figure draws
+        # it on — a section given by polygons has no such line and no such
+        # elevation (:func:`~xslope.plot.plot_base_geometry`).
+        drawn = "the geometry and material zones"
+        if slope_data.get("profile_lines") and \
+                slope_data.get("max_depth") is not None:
+            drawn = ("the geometry, the material zones and the maximum depth "
+                     "line the zones are closed at")
         text += (f" The problem definition is displayed in {where}, including "
-                 f"the geometry and material zones.")
+                 f"{drawn}.")
     sec.blocks.append(Prose(text, links=links, bold=bold))
 
     # The units statement leads: a reader meets the numbers knowing what they are

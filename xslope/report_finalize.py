@@ -574,6 +574,7 @@ def finalize_with_libreoffice(path, timeout=None):
     # The copy keeps the report's name: the PDF is named after the file that was
     # laid out, and a name with a space or a dot in it is then still found.
     work = os.path.join(work_dir, os.path.basename(path))
+    profile = tempfile.mkdtemp(prefix="xslope_soffice_")
     try:
         shutil.copy2(path, work)
         try:
@@ -593,7 +594,8 @@ def finalize_with_libreoffice(path, timeout=None):
         cached = [None] * len(entries)             # the numbers now on the page
         for _pass in range(PASSES):
             headings, page_count, why = _laid_out_headings(work, work_dir,
-                                                           soffice, timeout)
+                                                           soffice, timeout,
+                                                           profile)
             if headings is None:
                 return False, why
             pages, why = _pages_of(entries, headings)
@@ -629,6 +631,7 @@ def finalize_with_libreoffice(path, timeout=None):
         return False, f"The finished report could not be put back: {exc}."
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
+        shutil.rmtree(profile, ignore_errors=True)
 
 
 def _finishable(path):
@@ -864,7 +867,7 @@ def _section_of(doc, para):
 # The layout, and the pages read back off it
 # ---------------------------------------------------------------------------
 
-def _laid_out_headings(path, outdir, soffice, timeout):
+def _laid_out_headings(path, outdir, soffice, timeout, profile=None):
     """``(headings, page count, why not)`` for a LibreOffice layout of ``path``.
 
     ``headings`` is ``[(text, page), …]`` — every heading of the document, in
@@ -875,7 +878,7 @@ def _laid_out_headings(path, outdir, soffice, timeout):
     running head that repeats it at the top of every page of its section, and
     from the contents entry that names it.
     """
-    pdf = _render_pdf(path, outdir, soffice, timeout)
+    pdf = _render_pdf(path, outdir, soffice, timeout, profile)
     if not os.path.exists(pdf):
         return None, 0, ("LibreOffice did not lay the report out — it wrote no "
                          "PDF.")
@@ -893,19 +896,37 @@ def _laid_out_headings(path, outdir, soffice, timeout):
     return headings, count, ""
 
 
-def _render_pdf(path, outdir, soffice, timeout):
-    """Lay ``path`` out to a PDF beside it, and return where that PDF is."""
+def _render_pdf(path, outdir, soffice, timeout, profile=None):
+    """Lay ``path`` out to a PDF beside it, and return where that PDF is.
+
+    ``profile`` is a LibreOffice user profile of our own. It matters: a
+    ``soffice`` started with the user's profile while LibreOffice is open joins
+    THAT session and does the work in the copy of LibreOffice the user is
+    working in — the same discourtesy this module refuses to do to Word. Given
+    a profile of its own it starts on its own, and finishing a report cannot
+    disturb a document open on the screen. It is also quicker: a profile that
+    nothing else is using needs no lock waited for.
+    """
     pdf = os.path.join(outdir,
                        os.path.splitext(os.path.basename(path))[0] + ".pdf")
     if os.path.exists(pdf):
         os.remove(pdf)                     # never read the previous pass's pages
+    argv = [soffice]
+    if profile:
+        argv.append("-env:UserInstallation=" + _file_url(profile))
+    argv += ["--headless", "--convert-to", "pdf", "--outdir", outdir, path]
     try:
-        subprocess.run([soffice, "--headless", "--convert-to", "pdf",
-                        "--outdir", outdir, path],
-                       capture_output=True, text=True, timeout=timeout)
+        subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
     except (OSError, subprocess.SubprocessError):
         return pdf                         # absent, and reported as such
     return pdf
+
+
+def _file_url(path):
+    """A ``file://`` URL for a local directory, spelled as this platform spells
+    one — which is what LibreOffice's ``-env:`` switches take."""
+    import pathlib
+    return pathlib.Path(path).absolute().as_uri()
 
 
 def _walk_outline(reader, items, out):

@@ -292,10 +292,14 @@ def _layout_pages(path):
     been checked by something that did not compute them.
     """
     import subprocess
-    from xslope.report_finalize import _soffice
+    from xslope.report_finalize import _file_url, _soffice
     tmp = tempfile.mkdtemp()
+    profile = tempfile.mkdtemp(prefix="xslope_soffice_check_")
     try:
-        subprocess.run([_soffice(), "--headless", "--convert-to", "pdf",
+        # A profile of this check's own: a LibreOffice started with the user's
+        # would join the session they have open on the screen.
+        subprocess.run([_soffice(), "-env:UserInstallation=" + _file_url(profile),
+                        "--headless", "--convert-to", "pdf",
                         "--outdir", tmp, path], capture_output=True, timeout=900)
         pdf = os.path.join(
             tmp, os.path.splitext(os.path.basename(path))[0] + ".pdf")
@@ -305,6 +309,7 @@ def _layout_pages(path):
         return [page.extract_text() or "" for page in pypdf.PdfReader(pdf).pages]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+        shutil.rmtree(profile, ignore_errors=True)
 
 
 def _body_starts(pages, title):

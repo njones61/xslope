@@ -6129,14 +6129,17 @@ def run_report_test(test):
 
 
 def run_report_finalize_test(test):
-    """Finishing the Analysis Report in Word (test/report_finalize_check.py).
+    """Building the Analysis Report's page numbers (test/report_finalize_check.py).
 
-    On a machine with Word this really drives it: a generated report goes in
-    with a contents page that names its sections and must come out with one that
-    says what page each is on, with no field left marked dirty. Costs one Word
-    launch (~10 s all told). With no Word — a build machine, Linux, a Mac
-    without Office — the row still runs and checks that the detection says so
-    and that every refusal is a sentence rather than an exception.
+    On a machine with Word, and only when the run has been allowed to drive it,
+    this really does: a generated report goes in with a contents page that names
+    its sections and must come out with one that says what page each is on, with
+    no field left marked dirty. The finish that needs no Word is checked
+    wherever LibreOffice is installed — the same report, finished by laying it
+    out, with every page number measured against a second layout. With neither —
+    a build machine, Linux, a Mac without Office — the row still runs and checks
+    that the detection says so and that every refusal is a sentence rather than
+    an exception.
 
     Returns (0.0, None) on success, else (None, message) — a pass/fail test."""
     import importlib.util
@@ -11674,13 +11677,16 @@ def main():
         # nothing it checks is FEM-gated.
         tests.append({'type': 'report', 'file': 'Analysis Report (tree + DOCX + dialog)',
                       'method': '-', 'source': 'report'})
-        # Guard the finish: after a report is generated, Word is asked to update
-        # its fields so the contents page arrives with real page numbers. The
-        # page numbers are Word's, so the only honest check is to drive Word —
-        # which this does where there is one, and where there is not it checks
-        # that the absence is detected and falls back without raising.
+        # Guard the finish: after a report is generated, a page layout engine
+        # builds its contents page's page numbers — Word updating its own
+        # fields, or LibreOffice laying the document out where there is no Word.
+        # The numbers belong to whatever laid the pages out, so the only honest
+        # check is to lay them out: this drives Word where the run has been
+        # allowed to, lays the report out where LibreOffice is installed, and
+        # where there is neither it checks that the absence is detected and
+        # falls back without raising.
         tests.append({'type': 'report_finalize',
-                      'file': 'Analysis Report finished in Word',
+                      'file': 'Analysis Report page numbers built',
                       'method': '-', 'source': 'report_finalize'})
         # Guard the non-circular starting-surface generator: the mobilisable-strength
         # metric it ranks zones on, the separation threshold that decides whether it

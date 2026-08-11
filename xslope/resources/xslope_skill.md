@@ -12,6 +12,22 @@ $ARGUMENTS
 
 Based on the user's request, do one or more of the following:
 
+### Do what was asked — building and running are separate requests
+
+When the user asks you to **build** a model (or import or fix one), build it, validate it with
+`plot_inputs` and the input checks, report that it is ready, and **stop there**. Then name what
+a run would involve — the method, single surface or search, roughly how long — and offer it. The
+user has not confirmed the geometry yet, and a factor of safety computed off an unconfirmed
+model is a number they have to unlearn.
+
+**A verification run is still a run.** "Let me verify the model", "quick check", "just making
+sure it solves" — a single-surface solve or a search under any of those headings is the analysis
+the user did not ask for. Loading the file, plotting the inputs, and preflight are the whole of
+the verification a build request authorizes; if one of them refuses, fix the input and say so.
+The same split applies downstream: result plots, reports, sensitivity sweeps and method
+comparisons happen when asked, not as a bonus. Ending with *"the model is ready — want me to run
+Spencer with an auto search?"* is the right shape.
+
 ### Phase 1: Build Input Template
 
 If the user already has a model file from another program — `.gsz` (GeoStudio), `.sli`/`.slim`/
@@ -73,8 +89,11 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
 
 4. **Choose starting circles** for LEM. **Preferred: generate them** — once the
    geometry and materials are in the `slope_data` dict, call
-   `xslope.generators.generate_starting_circles(slope_data)` (also exported from
-   `xslope.search`); it implements the full strategy below (mid-slope center,
+   `generate_starting_circles(slope_data)`, imported as
+   `from xslope.search import generate_starting_circles` (`xslope.generators` holds
+   the same function; either import works, but **import the name** — `import xslope`
+   alone does not bind the submodules, so `xslope.generators.…` raises
+   AttributeError); it implements the full strategy below (mid-slope center,
    toe circle, per-layer base circles, and the cohesionless skimming circle) and
    is validated against the corpus. It seeds **every significant face** (a dam
    gets a set on each of its two, since either can be critical) and keeps only
@@ -540,7 +559,8 @@ points **left-to-right**. `max_depth` is a sibling scalar.
 # max_depth: the LITERAL elevation of the horizontal rigid base (0 means elevation zero,
 # NOT "auto"). Failure surfaces cannot pass below it. If the lowest profile line IS the base,
 # set max_depth equal to that line's elevation. Pick a datum that keeps the base elevation
-# meaningful.
+# meaningful. A problem that states a RIGID base/foundation gives no soil below the geometry it
+# describes, so max_depth is the TOE elevation — never a depth you invented for the search.
 slope_data['max_depth'] = 0.0
 slope_data['profile_lines'] = [
     {'mat_id': 0, 'coords': [(0, 84), (150, 84), (174.7, 64)]},   # top layer (material #1)
@@ -717,7 +737,7 @@ that is **non-conservatively high**. (Measured on the Talbingo dam: the true min
 steepest bench face is 1.669, but a toe/base-seeded search returns 1.948.)
 
 A circle *can* represent this — a large radius approximates a plane — you just have to seed it.
-`xslope.generators.generate_starting_circles(slope_data)` builds these skimming circles
+`generate_starting_circles(slope_data)` (`from xslope.search import …`) builds these skimming circles
 automatically for every cohesionless face segment (with sane geometry guaranteed — sunk
 slightly below the face so they never graze their own vertices), so prefer the generator.
 The hand-built form, for when you need it standalone — one skimming circle **per face
@@ -786,8 +806,9 @@ pass the limits as its `entry_range` / `exit_range` / `center_box` / `tangent_de
 
 **Non-circular** surfaces are a list of point dicts, ordered left-to-right.
 **Preferred: generate one** — once the geometry and materials are in the
-`slope_data` dict, call `xslope.generators.generate_noncircular_surface(slope_data)`
-(also exported from `xslope.search`). It ranks the material zones by the shear
+`slope_data` dict, call `generate_noncircular_surface(slope_data)`, imported as
+`from xslope.search import generate_noncircular_surface` (`xslope.generators` holds
+it too; import the name, not the package attribute). It ranks the material zones by the shear
 strength each can mobilise *at the stress it actually carries* — the only quantity
 comparable across `mc`, `cp`, `hb` and `pow` materials — tracks the base of the
 weakest, and ramps to the ground at both ends, with explicit Y and Movement on every
@@ -795,7 +816,7 @@ point. It is validated against the corpus's weak-seam problems. Fall back to
 hand-building only when it declines and states why.
 
 ```python
-from xslope.generators import generate_noncircular_surface
+from xslope.search import generate_noncircular_surface
 
 result = generate_noncircular_surface(slope_data, report=True)
 if result["surface"]:
@@ -1802,7 +1823,26 @@ results = solve_selected("spencer", slice_df, rapid=True)
    the base elevation is ever ambiguous with profile lines, build the material as a **polygon
    closed along its drawn bottom** (e.g. a single embankment zone) and the ambiguity disappears.
 
+   **Never invent depth the problem does not describe.** A problem that states a **rigid base or
+   rigid foundation**, or that describes no material at all below its lowest surface, has already
+   given you the base: Max Depth is the **toe elevation** of the described geometry. Do not add a
+   foundation layer to "give deep circles room" — on a rigid base the deep mechanism *is* the
+   circle tangent to the base at the toe elevation, so invented depth adds no search room, it
+   changes the problem. It is not a conservative habit either: on an undrained (φ=0) soil a
+   deeper base lets the critical circle deepen, so 20 ft of soil that the problem never mentioned
+   comes back as a lower FS for a slope that cannot fail that way. A foundation layer exists only
+   when the problem gives it properties — a thickness or base elevation, γ, and strength. If the
+   problem seems to need one and does not describe one, ask; never supply it silently.
+
 5. **Extend the geometry far enough horizontally.** The flat ground sections must run well beyond the slope on both sides so that every trial failure surface daylights on the ground surface inside the model — never at a vertical model edge. Rule of thumb: extend each flat at least ~2× the slope height beyond the toe and beyond the crest, and farther for deep circles tangent to the base. **Do not copy the width shown in the source diagram** — it is usually cropped to the area of interest, not the full domain needed for the search. If the critical surface reaches the left/right boundary, widen the geometry and re-run.
+   Two limits on this rule. It extends the model **sideways only, never downward** — the base
+   elevation comes from the described geometry (guideline 4), and no amount of search room is a
+   reason to put soil under it. And it extends by **continuing the flat ground the description
+   ends in**, never by deleting, moving or resizing a feature the problem does describe: a stated
+   40-ft crest that runs on as level ground is unchanged when the level ground continues to 100
+   ft, whereas a stated 40-ft bench with a second slope rising behind it must keep both. Say in
+   your summary which extents are stated and which are search room, so the extension reads as
+   this rule rather than as a misreading of the problem.
 
 6. **For seepage-only problems**, you do NOT need circles, piezo, or non-circ sheets. Only fill main, mat (with k1, k2, kr0, h0), profile (or polygon), and seep bc. **For FEM-only problems**, also add one nominal starting circle — the loader requires a surface definition unless seepage BCs or a pre-built mesh are present.
 

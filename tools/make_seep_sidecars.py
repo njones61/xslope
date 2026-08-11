@@ -38,15 +38,14 @@ that differ from one to the next: a few were produced by no steady solve at all
 missing mesh belongs to something else. Each is listed in ``EXCLUDED`` below with its
 own reason.
 
-Seven further companions re-solve to a MATERIALLY DIFFERENT field on their own
+Six further companions re-solve to a MATERIALLY DIFFERENT field on their own
 committed mesh. Their cause is NOT a workbook migration: for every one of them the
 workbook as it stood at the sidecar's own commit produces bit-identical results to
 the workbook as it stands today, so the model is not what changed. What changed is
-measured per entry in ``HELD`` — the solver since the field was saved, a field no
-committed revision of the model reproduces, or a solve that does not converge and so
-has no single answer to reproduce. Rewriting them is a corpus change with published
-numbers behind some of them, not a footer correction, so they are left alone.
-``--check --held`` prints the measured difference for every one.
+measured per entry in ``HELD`` — the solver since the field was saved, or a solve
+that does not converge and so has no single answer to reproduce. Rewriting them is a
+corpus change with published numbers behind some of them, not a footer correction, so
+they are left alone. ``--check --held`` prints the measured difference for every one.
 """
 import argparse
 import contextlib
@@ -93,6 +92,11 @@ MODELS = [
     # students are set to sweep. The committed k = 0.2 is the model (owner, 2026-08-10),
     # so the field is solved at it and the workbook is untouched.
     ("docs/seep/files/xslope_levee2",                    (1,), DOCS),
+    # rface_SEEP_KEY's shipped field matches no committed revision of its workbook, so
+    # there was no state of the model to restore it to. It is solved from the committed
+    # workbook (owner, 2026-08-10) and the seven factors of safety published on
+    # docs/seep/seep_slope.md re-anchored to what that field gives.
+    ("docs/seep/files/xslope_rface_SEEP_KEY",            (1,), DOCS),
     ("docs/seep/files/xslope_sea_trench_anis",           (1,), DOCS),
     ("docs/verification/files/geostudio/gs2_46",         (1,), GS),
     ("docs/verification/files/rocscience/rs2_28a",       (1,), VENDOR),
@@ -176,13 +180,6 @@ HELD = {
         "today, and the workbook at the sidecar's commit gives the same answer as "
         "today's. Measured against its own single_circle locks the seven factors of "
         "safety all still round the same, but the field moves across 12-59% of nodes.",
-    "docs/seep/files/xslope_rface_SEEP_KEY":
-        "NO COMMITTED REVISION REPRODUCES IT. max |du| 19.5 psf, flowrate 3.7754 -> "
-        "3.7867, and the workbook at the sidecar's own commit re-solves to the same "
-        "3.7867 that today's does — so there is no committed state of this model the "
-        "saved field came from. It also MOVES ITS LOCKS: all seven single_circle "
-        "factors of safety shift by 0.0008-0.0016, re-rounding every published value "
-        "(e.g. spencer 2.080 -> 2.078).",
     "docs/seep/files/xslope_earth_dam2":
         "NON-CONVERGENCE IS ITSELF THE CAUSE. It does not converge on its committed "
         "mesh at any solver setting tried (tol 1e-4 to 1e-6, 400 to 4000 sweeps): the "

@@ -254,7 +254,7 @@ file: [xslope_rface_SEEP_KEY.xlsx](files/xslope_rface_SEEP_KEY.xlsx)
 
 Spencer's method gives **FS = 2.08**.
 
-<!-- test: file=files/xslope_rface_SEEP_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.473, fs_bishop=2.068, fs_janbu=1.863, fs_corps=2.798, fs_lowe=2.258, fs_spencer=2.080, fs_mprice=2.081 -->
+<!-- test: file=files/xslope_rface_SEEP_KEY.xlsx, type=single_circle, num_slices=40, fs_oms=1.472, fs_bishop=2.067, fs_janbu=1.862, fs_corps=2.797, fs_lowe=2.256, fs_spencer=2.078, fs_mprice=2.080 -->
 
 ### Comparison
 
@@ -266,7 +266,7 @@ the slope than the flow field does, and slightly less near the toe.*
 | Pore-pressure model | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:--|--:|--:|--:|--:|--:|--:|--:|
 | Piezometric line | 1.298 | 1.928 | 1.716 | 2.649 | 2.105 | 1.943 | 1.943 |
-| Seepage | 1.473 | 2.068 | 1.863 | 2.798 | 2.258 | 2.080 | 2.081 |
+| Seepage | 1.472 | 2.067 | 1.862 | 2.797 | 2.256 | 2.078 | 2.080 |
 
 For this slope the piezometric line returns a modestly **lower (more conservative)** factor of
 safety — the two agree within about 7%, consistently across all methods. The difference is not

@@ -440,8 +440,8 @@ def _finalize_windows(path, timeout):
 # ---------------------------------------------------------------------------
 
 #: Seconds a LibreOffice render may take. A report of a hundred pages with a
-#: figure on most of them is a minute of work, and the first render of the day
-#: builds a user profile before it starts.
+#: figure on most of them is a minute of work, and the first render of a finish
+#: builds the user profile it runs in before it starts.
 RENDER_TIMEOUT = 900
 
 #: How many times the numbers may be written before they have to agree with the
@@ -629,6 +629,11 @@ def finalize_with_libreoffice(path, timeout=None):
                       f"pages.")
     except OSError as exc:
         return False, f"The finished report could not be put back: {exc}."
+    except Exception as exc:
+        # A cosmetic step may not cost anyone their report, whatever it trips
+        # over. The copy is thrown away and the report is the one that was
+        # written.
+        return False, f"The report's page numbers could not be built: {exc}."
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
         shutil.rmtree(profile, ignore_errors=True)
@@ -948,20 +953,30 @@ def _pages_of(entries, headings):
     Matched in document order: each entry takes the first heading at or after
     the one the entry before it took. Two sections that share a title — a
     "Results" under every method — are therefore told apart by where they are
-    rather than by what they say, and an entry that matches nothing is named.
+    rather than by what they say.
+
+    An entry that matches nothing fails the whole finish, and the reason names
+    the entries and counts both sides of the tally: a contents page that is
+    right about eleven sections and silent about the twelfth is worse than one
+    with no numbers on it at all, because nothing on the page says which line to
+    distrust.
     """
-    pages, at = [], 0
-    for index, (_para, text) in enumerate(entries):
+    pages, at, missing = [], 0, []
+    for _para, text in entries:
         found = next((n for n in range(at, len(headings))
                       if headings[n][0] == text), None)
         if found is None:
-            return None, (f"The contents entry \u201c{text}\u201d is on no page "
-                          f"of the laid-out report ({len(pages)} of "
-                          f"{len(entries)} entries were numbered). It names a "
-                          f"heading the document does not have, or one the "
-                          f"layout dropped.")
+            missing.append(text)
+            pages.append(None)
+            continue
         pages.append(headings[found][1])
         at = found + 1
+    if missing:
+        named = "\u201d, \u201c".join(missing[:3])
+        return None, (f"{len(entries) - len(missing)} of {len(entries)} contents "
+                      f"entries were numbered; {len(missing)} name a heading "
+                      f"that is on no page of the laid-out report: "
+                      f"\u201c{named}\u201d. Nothing was written.")
     return pages, ""
 
 

@@ -467,7 +467,7 @@ def test_an_entry_with_no_page_is_named():
         if sabotage not in (msg or ""):
             fails.append(f"the entry that could not be placed is not named: "
                          f"{msg!r}")
-        if not re.search(r"\d+ of \d+ entries", msg or ""):
+        if not re.search(r"\d+ of \d+ contents entries", msg or ""):
             fails.append(f"the refusal does not say how many entries were "
                          f"numbered and how many were not: {msg!r}")
         with open(path, "rb") as handle:

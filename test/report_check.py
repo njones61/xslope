@@ -3407,6 +3407,18 @@ def test_column_registry():
         fails.append(f"the weight column is not unit-labeled: {headers}")
     if "α (deg)" not in headers:
         fails.append(f"the base-angle column is not in degrees: {headers}")
+    # A moment per unit width of section is spelled one way in this report, and
+    # it is the way the pile capacities are already spelled
+    # (:func:`xslope.fem_details.unit_labels`): force x length per length, which
+    # reads as a moment. Cancelled to "lb/ft·ft" it reads as force per area.
+    from xslope.fem_details import unit_labels as member_unit_labels
+    for system in ("imperial", "si"):
+        want = member_unit_labels({"unit_system": system})["moment"]
+        for key in ("m_res", "m_drv"):
+            got = cols.unit_label(cols.BY_KEY[key], labels(system))
+            if got != want:
+                fails.append(f"{system}: the slice table's {key} is in {got!r} "
+                             f"and the member tables' moments in {want!r}")
     if "Slice" not in headers:
         fails.append(f"the slice number column is missing: {headers}")
     if any(h.startswith("Slice (") for h in headers):
@@ -7028,7 +7040,7 @@ def test_table_symbols_are_set_as_symbols():
     # of the notation it is typed in.
     from xslope.report_docx import _table_font, _text_width
     family = _table_font(doc)
-    for notation in ("N_S", "Z_{i+1}", "M_R (lb-ft/ft)"):
+    for notation in ("N_S", "Z_{i+1}", "M_R (lb·ft per ft)"):
         if _text_width(notation, family, TABLE_PT) != _text_width(
                 _plain(notation), family, TABLE_PT):
             fails.append(f"{notation!r} is measured as its notation and set as "

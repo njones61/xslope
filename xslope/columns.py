@@ -231,8 +231,13 @@ def unit_label(column, unit_labels):
     if not unit_labels:
         return ""
     if q == "moment":
-        length, force = unit_labels.get("length", ""), unit_labels.get("force_per_len", "")
-        return f"{force}·{length}" if length and force else ""
+        # A moment per unit width of section, spelled the one way the report
+        # spells it — force x length per length, as the pile capacities are
+        # (:func:`xslope.fem_details.unit_labels`). "lb/ft·ft" is the same
+        # quantity written so that it reads as force per area.
+        length = unit_labels.get("length", "")
+        force = (unit_labels.get("force_per_len", "") or "").split("/")[0]
+        return f"{force}·{length} per {length}" if length and force else ""
     return unit_labels.get(q, "")
 
 

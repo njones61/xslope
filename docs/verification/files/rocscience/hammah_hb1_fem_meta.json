@@ -4,5 +4,9 @@
   "FS": 1.1656250000000001,
   "expected_fs": "1.159",
   "file": "files/rocscience/hammah_hb1.xlsx",
-  "unit_system": "si"
+  "unit_system": "si",
+  "converged": true,
+  "iterations": 406,
+  "residual": 2.0398889630608652e-05,
+  "max_displacement": 3.508758051153736e-05
 }

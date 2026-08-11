@@ -46,6 +46,7 @@ seepage sidecar, and it saves on a machine that happens to have a ``zip`` binary
 Skips its Studio leg cleanly when PySide6 is absent; A-F otherwise run either way.
 """
 import contextlib
+import copy
 import io
 import os
 import shutil
@@ -602,42 +603,71 @@ def test_small_magnitudes_survive_the_write():
     error in the boundary, silently. Below 5e-11 the same rule writes 0, so a
     1e-13 m/s conductivity loads back as a hole in the model.
 
-    Every value here is written to a real workbook and read back through the
-    loader, so this covers the whole path rather than the rounding helper alone.
+    Every value here is written into a real workbook through ``save_slope_data_to_xlsx``
+    and read back through ``load_slope_data``, so the cell builders are covered along
+    with the rounding helper: a value can be lost in either, and only the round trip
+    sees both. The helper is checked first so a failure says which half broke.
     """
     fails = []
     # (label, value) — the rain-boundary normal flux, a conductivity below the old
     # floor, one either side of it, and the noise the rounding exists to remove.
+    NOISE = 0.1 + 0.2
     cases = [("2:1 rain boundary q_n", 1e-8 * 2.0 / 5.0 ** 0.5),
              ("low-k lens conductivity", 1e-13),
              ("just under the old floor", 4.9e-11),
              ("nine significant digits", 1.234567891e-9),
              ("negative small", -8.94427191e-9),
              ("everyday magnitude", 0.3),
-             ("repr noise", 0.1 + 0.2)]
+             ("repr noise", NOISE)]
+
+    def _judge(where, label, v, got):
+        if v == NOISE:                               # the one value meant to move
+            if got != 0.3:
+                fails.append(f"{where}: {label}: repr noise survived, {got!r}")
+            return
+        if got == 0.0:
+            fails.append(f"{where}: {label}: {v!r} came back as zero")
+            return
+        rel = abs(got - v) / abs(v)
+        if rel > 5e-10:                              # ten significant digits
+            fails.append(f"{where}: {label}: {v!r} became {got!r}, relative error "
+                         f"{rel:.2g} — significant digits lost")
+
     tmpdir = tempfile.mkdtemp(prefix="steady_seep_round_")
     try:
         for label, v in cases:
-            got = _round_cell_float(v)
-            if v == 0.1 + 0.2:                       # the one value meant to move
-                if got != 0.3:
-                    fails.append(f"{label}: repr noise survived, {got!r}")
-                continue
-            if got == 0.0:
-                fails.append(f"{label}: {v!r} was written as zero")
-                continue
-            rel = abs(got - v) / abs(v)
-            if rel > 5e-10:                          # ten significant digits
-                fails.append(f"{label}: {v!r} became {got!r}, "
-                             f"relative error {rel:.2g} — significant digits lost")
+            _judge("helper", label, v, _round_cell_float(v))
 
-        # ...and the same values through a real save/load round trip.
+        # The real path. gw006d is the donor because it carries flux boundary blocks,
+        # which is where a rate of this magnitude actually lives; each value is written
+        # into all of them, saved, and read back. A save writes some cells fresh and
+        # edits others in place, so both cell builders are on this path.
         src = os.path.join(_REPO, "docs/verification/files/rocscience_gw/gw006d.xlsx")
-        if os.path.exists(src):
-            sd = _quiet(load_slope_data, src)
-            rates = [b["flux"] for b in sd["seepage_bc"]["specified_fluxes"]]
+        if not os.path.exists(src):
+            fails.append("gw006d.xlsx is missing — the round trip did not run")
+        else:
+            donor = _quiet(load_slope_data, src)
+            if not donor["seepage_bc"].get("specified_fluxes"):
+                fails.append("the donor carries no flux block to write through")
+            out = os.path.join(tmpdir, "roundtrip.xlsx")
+            for label, v in cases:
+                sd = copy.deepcopy(donor)
+                for b in sd["seepage_bc"]["specified_fluxes"]:
+                    b["flux"] = v
+                _quiet(save_slope_data_to_xlsx, sd, out)
+                back = _quiet(load_slope_data, out)
+                got = [b["flux"] for b in back["seepage_bc"]["specified_fluxes"]]
+                if len(got) != len(sd["seepage_bc"]["specified_fluxes"]):
+                    fails.append(f"round trip: {label}: {len(got)} flux blocks came "
+                                 f"back, {len(sd['seepage_bc']['specified_fluxes'])} "
+                                 "went in")
+                for r in got:
+                    _judge("round trip", label, v, r)
+
+            # ...and the shipped artifact still carries its exact rate.
             want = 1e-8 * 2.0 / 5.0 ** 0.5
-            face = [r for r in rates if r < 9.9e-9]
+            face = [b["flux"] for b in donor["seepage_bc"]["specified_fluxes"]
+                    if b["flux"] < 9.9e-9]
             if not face:
                 fails.append("gw006d carries no sloped-face flux block to check")
             for r in face:

@@ -456,7 +456,7 @@ average; against Ref[1] the figures are 0.42 m rms and 0.42 m mean. The offset i
 0.12–0.19 m up the saturated part of the line and opens to 0.37 m at the crest node itself,
 where the profile is steepest and the suction deepest. Refining the mesh moves the crest
 reading by 0.012 m over a tri3 1.0 m → tri3 0.5 m → tri6 1.0 m → tri6 0.5 m ladder (−2.855 /
-−2.845 / −2.853 / −2.843), a twentieth of the offset itself. Locked at XSLOPE's own values.*
+−2.844 / −2.852 / −2.843), about 3% of the offset itself. Locked at XSLOPE's own values.*
 
 Infiltration lifts line 1-1 by 0.65 m at the base, widening to 1.33 m at the crest as the
 unsaturated zone above the free surface takes the rain, and pushes the phreatic surface

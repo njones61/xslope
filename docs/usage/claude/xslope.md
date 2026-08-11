@@ -20,6 +20,11 @@ a run would involve — the method, single surface or search, roughly how long �
 user has not confirmed the geometry yet, and a factor of safety computed off an unconfirmed
 model is a number they have to unlearn.
 
+**A build request that names the analysis is still a build request.** "Add a starting circle for
+a critical-surface search", "set it up for a rapid drawdown", "build the mesh for an SSRM" — the
+purpose clause says what the model is *for*, so you build the inputs that purpose needs. It
+authorizes nothing beyond them: the search it names is the run to offer, not the run to perform.
+
 **A verification run is still a run.** "Let me verify the model", "quick check", "just making
 sure it solves" — a single-surface solve or a search under any of those headings is the analysis
 the user did not ask for. Loading the file, plotting the inputs, and preflight are the whole of
@@ -1823,24 +1828,24 @@ results = solve_selected("spencer", slice_df, rapid=True)
    the base elevation is ever ambiguous with profile lines, build the material as a **polygon
    closed along its drawn bottom** (e.g. a single embankment zone) and the ambiguity disappears.
 
-   **Never invent depth the problem does not describe.** A problem that states a **rigid base or
-   rigid foundation**, or that describes no material at all below its lowest surface, has already
-   given you the base: Max Depth is the **toe elevation** of the described geometry. Do not add a
-   foundation layer to "give deep circles room" — on a rigid base the deep mechanism *is* the
-   circle tangent to the base at the toe elevation, so invented depth adds no search room, it
-   changes the problem. It is not a conservative habit either: on an undrained (φ=0) soil a
-   deeper base lets the critical circle deepen, so 20 ft of soil that the problem never mentioned
-   comes back as a lower FS for a slope that cannot fail that way. A foundation layer exists only
-   when the problem gives it properties — a thickness or base elevation, γ, and strength. If the
-   problem seems to need one and does not describe one, ask; never supply it silently.
+   **Never invent depth the problem does not describe.** A problem that puts the slope on a
+   **rigid base, rigid foundation, firm stratum, bedrock or hard layer** — any of them stated at
+   or below the toe with no properties given — or that describes no material at all below its
+   lowest surface, has already given you the base: Max Depth is the **lowest described
+   elevation** of the geometry (for a slope sitting directly on that base, the toe elevation).
+   Do not add a foundation layer to "give deep circles room" — on a rigid base the deep mechanism
+   *is* the circle tangent to the base at that elevation, so invented depth adds no search room,
+   it changes the problem. A foundation layer exists only when the problem gives it properties —
+   a thickness or base elevation, γ, and strength. If the problem seems to need one and does not
+   describe one, ask; never supply it silently.
 
 5. **Extend the geometry far enough horizontally.** The flat ground sections must run well beyond the slope on both sides so that every trial failure surface daylights on the ground surface inside the model — never at a vertical model edge. Rule of thumb: extend each flat at least ~2× the slope height beyond the toe and beyond the crest, and farther for deep circles tangent to the base. **Do not copy the width shown in the source diagram** — it is usually cropped to the area of interest, not the full domain needed for the search. If the critical surface reaches the left/right boundary, widen the geometry and re-run.
    Two limits on this rule. It extends the model **sideways only, never downward** — the base
    elevation comes from the described geometry (guideline 4), and no amount of search room is a
    reason to put soil under it. And it extends by **continuing the flat ground the description
    ends in**, never by deleting, moving or resizing a feature the problem does describe: a stated
-   40-ft crest that runs on as level ground is unchanged when the level ground continues to 100
-   ft, whereas a stated 40-ft bench with a second slope rising behind it must keep both. Say in
+   25-ft crest that runs on as level ground is unchanged when the level ground continues to 90
+   ft, whereas a stated 25-ft bench with a second slope rising behind it must keep both. Say in
    your summary which extents are stated and which are search room, so the extension reads as
    this rule rather than as a misreading of the problem.
 

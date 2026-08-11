@@ -584,6 +584,12 @@ def finalize_with_libreoffice(path, timeout=None):
         entries, placeholder = _toc_field(doc)
         if not entries:
             return False, ("The document has no table of contents to number.")
+        if _built_by_word(entries):
+            return False, ("This contents page was built by Word, which keeps "
+                           "its own page numbers in fields of their own; "
+                           "numbering it again here would write a second set "
+                           "beside them. Update it in Word, or generate the "
+                           "report again.")
 
         _strip_placeholder(placeholder)
         for entry, _text in entries:
@@ -710,6 +716,23 @@ def _toc_field(doc):
         if closed:
             break
     return entries, placeholder
+
+
+def _built_by_word(entries):
+    """True when these contents entries carry Word's own page numbers.
+
+    Word builds a contents entry as a hyperlink with a ``PAGEREF`` field on the
+    end, and that field is the page number: it is not text this leg can take off
+    and replace, and a number written beside it would be a second number on the
+    line. Such a document is one Word has already finished, so it is left to
+    Word.
+    """
+    from docx.oxml.ns import qn
+    for para, _text in entries:
+        for instr in para._p.iter(qn("w:instrText")):
+            if _field_name(instr.text or "") == "PAGEREF":
+                return True
+    return False
 
 
 def _field_name(instruction):

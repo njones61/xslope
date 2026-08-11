@@ -529,7 +529,7 @@ def test_the_contents_field_is_found_by_its_instruction():
     halfway down the list. Both are measured.
     """
     from docx import Document
-    from xslope.report_finalize import _toc_field
+    from xslope.report_finalize import _toc_field, finalize_with_libreoffice
     from xslope.report_docx import TOC_INSTRUCTION, add_field, _fld_char, \
         _instr_text
 
@@ -557,6 +557,18 @@ def test_the_contents_field_is_found_by_its_instruction():
         path = os.path.join(tmp, "nested.docx")
         doc.save(path)
         entries, placeholder = _toc_field(Document(path))
+
+        # The nested field here is a PAGEREF, which is how Word writes a page
+        # number. Numbering such a page again would put a second number beside
+        # Word's own, so it is declined rather than done — no layout needed to
+        # know it.
+        done, why = finalize_with_libreoffice(path)
+        if done:
+            fails.append("a contents page Word had already numbered was "
+                         "numbered again")
+        if "Word" not in (why or ""):
+            fails.append(f"declining a contents page of Word's is reported as "
+                         f"{why!r}")
 
     found = [text for _para, text in entries]
     if found != ["1 One", "2 Two", "3 Three9", "4 Four"]:

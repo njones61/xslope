@@ -6194,6 +6194,45 @@ def run_quad_style_dialog_test(test):
     return 0.0, None
 
 
+def run_welcome_window_test(test):
+    """Studio's welcome window and the Help menu's way out to the documentation.
+
+    The first launch is where a new user is told the documentation exists — and
+    the documentation is also the sample browser, so a broken link there is a user
+    who never finds a sample problem. Every failure mode is quiet: a link that
+    still opens at a page that has been renamed, a preference written but never
+    read (the welcome either never returns or never leaves), a menu item whose slot
+    went missing.
+
+    The check itself lives in test/welcome_window_check.py: the window's links
+    against the constants they must carry, the show-at-launch preference round-trip
+    on a throwaway settings file, the launch gate in ``studio.app`` with both
+    answers, the Help menu's order and the URL Documentation opens, and every link
+    resolved to a page that exists in ``docs/``. No browser is opened and no
+    network is touched; it skips itself cleanly when PySide6 is absent.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'welcome_window_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('welcome_window_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_mode_segments_test(test):
     """Studio's analysis-mode switch — the segmented LEM / Seepage / FEM strip.
 
@@ -11003,6 +11042,8 @@ def _dispatch_test(test):
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
         return run_quad_style_dialog_test(test)
+    if test_type == 'welcome_window':
+        return run_welcome_window_test(test)
     if test_type == 'fem_1d_details':
         return run_fem_1d_details_test(test)
     if test_type == 'report':
@@ -11105,7 +11146,7 @@ def _expected_and_tol(test, default_tolerance):
                        'sweep_gate', 'steady_seep_save',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
-                       'quad_style_dialog', 'mode_segments',
+                       'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
                        'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
@@ -11634,6 +11675,14 @@ def main():
         tests.append({'type': 'mode_segments',
                       'file': 'analysis-mode switch (Studio toolbar)',
                       'method': '-', 'source': 'mode_segments'})
+        # Guard the welcome window and Help → Documentation: the links a first
+        # launch offers (against the constants they must carry and the pages they
+        # must resolve to in docs/), the show-at-launch preference in both
+        # directions, the launch gate, and the Help menu's order. Opens no browser
+        # and touches no network; runs no analysis.
+        tests.append({'type': 'welcome_window',
+                      'file': 'welcome window + Help → Documentation',
+                      'method': '-', 'source': 'welcome_window'})
         # Guard what the background threads may touch. A widget released on a
         # worker thread is not deleted there — it is queued onto the GUI thread and
         # deleted at whatever Python runs next, which for an idle window is an event

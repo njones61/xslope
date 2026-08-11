@@ -313,7 +313,10 @@ the page its heading lands on in the document that carries it. An entry that
 cannot be placed at all is a refusal that names the entry, not a contents page
 that is quietly wrong about one line. This leg needs LibreOffice on the machine
 and the `pypdf` package (`pip install pypdf`); without either it says so and the
-report is left as written.
+report is left as written. It also needs the document to be one xslope wrote: a
+`.docx` that has been re-saved *through* LibreOffice keeps its contents field
+inside a content control, where this does not look for it, and the answer is
+that the document has no table of contents to number.
 
 Every way this can fail is ordinary — no Word and no LibreOffice, no permission
 to drive Word, a Word that does not answer within a minute — and each one leaves

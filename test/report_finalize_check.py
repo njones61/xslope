@@ -644,7 +644,7 @@ def test_numbers_that_never_settle_are_refused():
         entries = [entry for entry, _page in _cached_contents(path)]
         answers = [3, 4]
 
-        def restless(work, outdir, soffice, timeout, profile=None):
+        def restless(work, outdir, soffice, timeout, profile):
             page = answers[0]
             answers.reverse()
             return [(entry, page) for entry in entries], 9, ""

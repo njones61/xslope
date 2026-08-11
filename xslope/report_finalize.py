@@ -37,6 +37,14 @@ Word puts them on an update (:func:`finalize_with_libreoffice`). The field stays
 live: nothing is marked dirty, nothing is flattened, and F9 in Word still
 recomputes the whole table.
 
+**One document this cannot number**, and says so: a ``.docx`` that has been
+re-saved THROUGH LibreOffice comes back with its contents field wrapped in a
+``w:sdt`` content control, which is not among the paragraphs python-docx walks.
+The field is not found, and the answer is "The document has no table of contents
+to number" — a refusal, never a document numbered in part. No report xslope
+writes takes that route: the leg lays a copy out to PDF and never asks
+LibreOffice to write a Word file.
+
 What either program is handed is a COPY, which takes the report's place when it
 comes back. A finish that fails, hangs or is killed halfway therefore leaves the
 report exactly as it was written, and Word's lock file is never written beside
@@ -895,7 +903,7 @@ def _section_of(doc, para):
 # The layout, and the pages read back off it
 # ---------------------------------------------------------------------------
 
-def _laid_out_headings(path, outdir, soffice, timeout, profile=None):
+def _laid_out_headings(path, outdir, soffice, timeout, profile):
     """``(headings, page count, why not)`` for a LibreOffice layout of ``path``.
 
     ``headings`` is ``[(text, page), …]`` — every heading of the document, in
@@ -924,25 +932,25 @@ def _laid_out_headings(path, outdir, soffice, timeout, profile=None):
     return headings, count, ""
 
 
-def _render_pdf(path, outdir, soffice, timeout, profile=None):
+def _render_pdf(path, outdir, soffice, timeout, profile):
     """Lay ``path`` out to a PDF beside it, and return where that PDF is.
 
-    ``profile`` is a LibreOffice user profile of our own. It matters: a
-    ``soffice`` started with the user's profile while LibreOffice is open joins
-    THAT session and does the work in the copy of LibreOffice the user is
-    working in — the same discourtesy this module refuses to do to Word. Given
-    a profile of its own it starts on its own, and finishing a report cannot
-    disturb a document open on the screen. It is also quicker: a profile that
-    nothing else is using needs no lock waited for.
+    ``profile`` is a LibreOffice user profile of our own, and it is REQUIRED —
+    no default, so that every way of reaching this function has to say where the
+    profile is. A ``soffice`` started with the user's profile while LibreOffice
+    is open joins THAT session and does the work in the copy of LibreOffice the
+    user is working in, which is the discourtesy this module refuses to do to
+    Word; a default would leave that a call away. Given a profile of its own it
+    starts on its own, and finishing a report cannot disturb a document open on
+    the screen. It is also quicker: a profile nothing else is using needs no
+    lock waited for.
     """
     pdf = os.path.join(outdir,
                        os.path.splitext(os.path.basename(path))[0] + ".pdf")
     if os.path.exists(pdf):
         os.remove(pdf)                     # never read the previous pass's pages
-    argv = [soffice]
-    if profile:
-        argv.append("-env:UserInstallation=" + _file_url(profile))
-    argv += ["--headless", "--convert-to", "pdf", "--outdir", outdir, path]
+    argv = [soffice, "-env:UserInstallation=" + _file_url(profile),
+            "--headless", "--convert-to", "pdf", "--outdir", outdir, path]
     try:
         subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
     except (OSError, subprocess.SubprocessError):
@@ -1059,6 +1067,13 @@ def finalize_report(path, timeout=None, prefer=None):
     :data:`FINISH_ENV` and then to ``"auto"``. Returns the ``(bool, message)``
     of whichever leg answered; when both decline, both reasons are given, since
     on a machine with neither program the second is the actionable one.
+
+    ``timeout`` reaches the LibreOffice leg only, where it is seconds for ONE
+    layout (:data:`RENDER_TIMEOUT`). Word keeps :data:`TIMEOUT`, which is a wait
+    for a different thing on a different scale — an application answering an
+    Apple event, not a document being typeset — and a number chosen for one is
+    not a number for the other. A caller who wants to say how long Word may take
+    calls :func:`finalize_with_word` and says it there.
     """
     prefer = (prefer or os.environ.get(FINISH_ENV) or "auto").strip().lower()
     if prefer not in ("word", "libreoffice", "auto"):

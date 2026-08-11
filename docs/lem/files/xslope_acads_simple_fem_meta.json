@@ -4,5 +4,9 @@
   "FS": 0.9859374999999999,
   "expected_fs": "0.986",
   "file": "../lem/files/xslope_acads_simple.xlsx",
-  "unit_system": "si"
+  "unit_system": "si",
+  "converged": true,
+  "iterations": 345,
+  "residual": 6.855687271792126e-07,
+  "max_displacement": 0.019700738163466288
 }

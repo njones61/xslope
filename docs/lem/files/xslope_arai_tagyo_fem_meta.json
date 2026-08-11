@@ -4,5 +4,9 @@
   "FS": 1.4109375,
   "expected_fs": "1.411",
   "file": "../lem/files/xslope_arai_tagyo.xlsx",
-  "unit_system": "si"
+  "unit_system": "si",
+  "converged": true,
+  "iterations": 1392,
+  "residual": 8.810592783017062e-06,
+  "max_displacement": 0.022216459187916288
 }

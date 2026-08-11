@@ -4,5 +4,9 @@
   "FS": 0.9968750000000001,
   "expected_fs": "0.997",
   "file": "files/rocscience/rs2_29clay.xlsx",
-  "unit_system": "si"
+  "unit_system": "si",
+  "converged": true,
+  "iterations": 5768,
+  "residual": 9.655167458599005e-06,
+  "max_displacement": 0.011872069383386908
 }

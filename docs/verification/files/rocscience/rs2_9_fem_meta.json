@@ -4,5 +4,9 @@
   "FS": 1.28671875,
   "expected_fs": "1.287",
   "file": "files/rocscience/rs2_9.xlsx",
-  "unit_system": "si"
+  "unit_system": "si",
+  "converged": true,
+  "iterations": 583,
+  "residual": 9.958077513415666e-06,
+  "max_displacement": 0.008083537604704557
 }

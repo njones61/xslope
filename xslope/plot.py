@@ -452,19 +452,12 @@ def plot_material_kr_set(materials, n=200, fig=None, figsize=(8, 5), style=None,
 def _derived_water_blocks(slope_data):
     """The derived water blocks a model would be drawn with (empty in manual mode).
 
-    Asked by the legend and the framing, which must account for a load the user
-    never typed; it goes through the same derivation the plot and the solver use.
+    Asked by the framing, which must leave room for a load the user never typed;
+    it goes through the same derivation the plot and the solver use.
     """
     from .water import with_water_loads, derived_blocks
     sd = with_water_loads(slope_data)
     return derived_blocks(sd, 1) + derived_blocks(sd, 2)
-
-
-def _derived_water_color(style=None):
-    """The stage-1 derived water-load colour, for the legend key."""
-    from .style import resolve_style, feature_style
-    return feature_style(resolve_style(style), "dloads_derived").get(
-        "color", "royalblue")
 
 
 def get_dload_legend_handler(color='purple'):
@@ -3792,21 +3785,15 @@ def plot_inputs(
             ax.set_ylim(y0, y1 + pad)
     ax.grid(False)
 
-    # Get legend handles and labels
+    # The legend is read off the DRAWN artists and nothing else. Every layer
+    # above labels what it draws — the loads included, each set naming itself on
+    # its own surface line — so the key and the picture cannot disagree: a mode
+    # that suppresses a layer suppresses its legend entry with it, by the same
+    # decision, and there is no second list of entries to keep in step. Entries
+    # appended from the input data instead said "Water Load (derived)" and
+    # "Distributed Load" on the shared section and the seepage view, which draw
+    # no load at all.
     handles, labels = ax.get_legend_handles_labels()
-
-    # Add distributed load to legend if present
-    if slope_data['dloads']:
-        handler_class, dummy_line = get_dload_legend_handler()
-        handles.append(dummy_line)
-        labels.append('Distributed Load')
-    # And the derived water loads, which are their own entry. A model in automatic
-    # mode may carry no user dloads at all and still have a reservoir drawn on it,
-    # so a legend keyed only on slope_data['dloads'] would leave the one load the
-    # user cannot see in the sheets out of the plot that exists to show it.
-    if _derived_water_blocks(slope_data):
-        handles.append(get_dload_legend_handler(color=_derived_water_color(style))[1])
-        labels.append('Water Load (derived)')
 
     if show_title:
         ax.set_title(title)
@@ -3966,24 +3953,14 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     normal_patch = mpatches.Patch(facecolor='none', edgecolor='green', hatch='.....', label="Eff Normal Stress (σ')")
     pore_patch = mpatches.Patch(color='blue', alpha=alpha, label='Pore Pressure (u)')
 
-    # Get legend handles and labels
+    # The legend is read off the drawn artists; the two patches above stand for
+    # the base-stress bars, which are drawn as unlabelled polygons. The loads
+    # name themselves where they are drawn — a load that is not drawn is not
+    # named — so there are no entries appended from the input data here either.
     handles, labels = ax.get_legend_handles_labels()
     handles.extend([normal_patch, pore_patch])
     labels.extend(["Eff Normal Stress (σ')", 'Pore Pressure (u)'])
-    
-    # Add distributed load to legend if present
-    if slope_data['dloads']:
-        handler_class, dummy_line = get_dload_legend_handler()
-        handles.append(dummy_line)
-        labels.append('Distributed Load')
-    # And the derived water loads, which are their own entry. A model in automatic
-    # mode may carry no user dloads at all and still have a reservoir drawn on it,
-    # so a legend keyed only on slope_data['dloads'] would leave the one load the
-    # user cannot see in the sheets out of the plot that exists to show it.
-    if _derived_water_blocks(slope_data):
-        handles.append(get_dload_legend_handler(color=_derived_water_color(style))[1])
-        labels.append('Water Load (derived)')
-    
+
     ax.set_aspect('equal', adjustable='datalim')
 
     fs = results['FS']

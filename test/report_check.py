@@ -9010,6 +9010,45 @@ def test_shared_plot():
     if plot_derived_water_lines(fig.add_subplot(111), reinf):
         fails.append("a model with no head boundaries drew a water line")
 
+    # THE LEGEND NAMES WHAT THE FIGURE DRAWS, in every mode. A key is a promise
+    # that the thing is on the page, and the suppressions above are only half
+    # kept while an entry can outlive the artist it names: the Project Definition
+    # figure of a delivered report (fem_johnson_res, page 3) carried a "Water
+    # Load (derived)" key over a section with no load drawn on it, because the
+    # load entries were appended from the input data instead of read off the
+    # artists. Read the RENDERED legend against the drawn artists' own labels, so
+    # an entry from any second list fails here whatever it is called.
+    load_keys = {"Distributed Load", "Distributed Load 2",
+                 "Water Load (derived)", "Water Load 2 (derived)"}
+    for what, model, own_key in (("the reinforced model", reinf,
+                                  "Distributed Load"),
+                                 ("the dam", dam, "Water Load (derived)")):
+        for mode in ("shared", "lem", "fem", "seep"):
+            ax = draw(model, mode)
+            legend = ax.get_legend()
+            shown = [t.get_text() for t in (legend.get_texts() if legend else [])]
+            named_by_artists = {l for l in ax.get_legend_handles_labels()[1]
+                                if not l.startswith("_")}
+            for entry in shown:
+                if entry not in named_by_artists:
+                    fails.append(f"mode={mode!r} on {what}: the legend says "
+                                 f"{entry!r} and no artist draws it")
+            # …and the load keys in particular track the drawn load, both ways.
+            drew_load = any(ln.get_gid() == "DLOADS" for ln in ax.lines)
+            keyed = load_keys & set(shown)
+            if drew_load and own_key not in keyed:
+                fails.append(f"mode={mode!r} draws {what}'s load and leaves it "
+                             f"out of the legend: {sorted(shown)}")
+            if not drew_load and keyed:
+                fails.append(f"mode={mode!r} names {sorted(keyed)} on {what}, "
+                             f"which draws no load at all")
+            # The engine views draw the load, so its absence from the shared
+            # section and the seepage view is the suppression and not an empty
+            # fixture.
+            if mode in ("lem", "fem") and not drew_load:
+                fails.append(f"mode={mode!r} draws no load on {what}, so the "
+                             f"legend checks above prove nothing")
+
     # The mesh belongs to the mesh figures, not to the shared model — and an
     # engine's model figure can ask for the same, which is what the report's
     # seepage and finite element inputs do: each gives the mesh a figure of its

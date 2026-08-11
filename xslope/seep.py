@@ -755,10 +755,13 @@ def _require_runtime_dirichlet(dir_mask):
 #: orbit — the iterate barely moves, while the un-relaxed step the convergence gate
 #: tests lands far from it, so the solve neither converges nor visibly diverges.
 #:
-#: Detected only as a PERIOD OF 2 OR MORE held for :data:`_CYCLE_PERSIST` consecutive
-#: sweeps. A period of 1 is not a cycle — it is ordinary stagnation near a fixed
-#: point, which is what vp046b and vp077a do for hundreds of sweeps before converging
-#: normally, and dropping the floor under them costs them their convergence. The
+#: Detected only as a RETURN — a repeat at a period of 2 or more that the iterate had
+#: travelled further than the tolerance away from at every shorter lag — held for
+#: :data:`_CYCLE_PERSIST` consecutive sweeps. A period of 1 is not a cycle: it is
+#: ordinary stagnation near a fixed point, which is what vp046b and vp077a do for
+#: hundreds of sweeps before converging normally, and dropping the floor under them
+#: costs them their convergence. Nor is a repeat the iterate never left: a fine enough
+#: creep sits inside the tolerance at every lag and reads as a period of 2. And the
 #: persistence window is what separates a true orbit from the short-lived repeats a
 #: converging solve passes through (johnson_res holds one for 7 sweeps).
 #:

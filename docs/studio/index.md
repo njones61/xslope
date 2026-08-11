@@ -105,6 +105,26 @@ editors (or the assistant).
 
 ---
 
+## The welcome window
+
+The first launch opens a welcome window over the empty canvas: what Studio is, the
+version it is running, the address to write to, and links into this documentation —
+**Documentation**, **Getting started**, **Sample problems**, and **Verification**.
+Each link opens in your browser.
+
+![The welcome window](images/overview_welcome_window.png)
+
+**Don't show this again** is ticked when the window opens, so the welcome appears on
+the first launch and not on later ones. Untick it to be greeted every time.
+**Help → Welcome** reopens the window whenever you want it, whichever way the box is
+set — and unticking it there brings the launch greeting back.
+
+The rest of the Help menu is **Documentation**, which opens the documentation root
+in your browser, the two update items described under
+[App management](app_management.md), and **About**.
+
+---
+
 ## How the documentation is organized
 
 - **[The interface](interface.md)** — the window layout: the canvas and its

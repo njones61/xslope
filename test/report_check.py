@@ -13045,6 +13045,79 @@ def test_fem_mesh_legend_names_what_it_holds():
         if "vertical" not in label.lower():
             fails.append(f"the roller entry is {label!r} and does not say which "
                          f"axis those nodes are free on")
+
+    # …AND EVERY FIXITY KEY IS CARRIED BY A SYMBOL THE FIGURE DREW. This legend
+    # is assembled from a handle list built alongside the drawing rather than
+    # read off the axes, so an entry can outlive the thing it names: the force
+    # key was appended for every node MARKED as loaded, and a node marked as
+    # loaded can carry a force of zero, whose arrow is skipped as a segment of no
+    # length. Such a model was promised a green arrow the figure never drew.
+    # Stated frames, because no solved model states a zero load on a loaded node.
+    def framed(bc_type, bc_values, element_types=(3, 3), element_materials=(1, 1)):
+        """Two triangles, with the stated fixity on the corners."""
+        return {
+            "nodes": np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]),
+            "elements": np.array([[0, 1, 2], [0, 2, 3]]),
+            "element_types": np.array(element_types),
+            "element_materials": np.array(element_materials),
+            "bc_type": np.array(bc_type),
+            "bc_values": np.array(bc_values, dtype=float),
+        }
+
+    def drew(fem_data):
+        """(the gids drawn on the axes, the entries the legend shows)."""
+        fig = plt.figure(figsize=(6, 4))
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                plot_fem_data(fem_data, fig=fig, show_title=False, show_bc=True,
+                              show_nodes=False)
+            ax = fig.axes[0]
+            return ({a.get_gid() for a in (list(ax.collections) + list(ax.lines)
+                                           + list(ax.patches))},
+                    [t.get_text() for legend in fig.findobj(Legend)
+                     for t in legend.get_texts()])
+        finally:
+            plt.close(fig)
+
+    # What each key claims the figure shows, and the artists that show it.
+    SYMBOLS = (("FIXED_BC", "held on both axes", lambda l: l == "Fixed"),
+               ("ROLLER_BC", "held on one axis", lambda l: "oller" in l),
+               ("APPLIED_FORCE", "loaded", lambda l: "force" in l.lower()))
+
+    for what, bc_values, arrows in (
+            ("a node loaded with a force", [[0, 0], [0, 0], [10.0, -10.0], [0, 0]], True),
+            ("a node marked as loaded carrying no force",
+             [[0, 0], [0, 0], [0.0, 0.0], [0, 0]], False)):
+        drawn, shown = drew(framed([1, 2, 4, 0], bc_values))
+
+        # The frame is what it is called: the arrows are there, or they are not.
+        if ("APPLIED_FORCE" in drawn) is not arrows:
+            fails.append(f"{what} draws {'no' if arrows else 'an'} arrow; it is "
+                         f"the wrong frame for this check")
+            continue
+        for gid, holds, names in SYMBOLS:
+            keys = [l for l in shown if names(l)]
+            if keys and gid not in drawn:
+                fails.append(f"{what}: the mesh legend says {keys} and the "
+                             f"figure draws no symbol on the nodes {holds}")
+            if gid in drawn and not keys:
+                fails.append(f"{what}: the figure marks the nodes {holds} and "
+                             f"the legend names nothing for them: {shown}")
+
+    # The zone swatches are keyed the same way — off the zones this function
+    # actually filled, not off the material column. An element of a shape it
+    # draws no face for leaves its zone uncolored, and the swatch is a color the
+    # reader cannot find on the figure.
+    unfillable = 5    # no branch of the fill loop draws this shape
+    drawn, shown = drew(framed([1, 2, 4, 0], [[0, 0]] * 4,
+                               element_types=(3, unfillable),
+                               element_materials=(1, 2)))
+    if "MESH_FILL" not in drawn:
+        fails.append("the two-zone frame filled nothing; its swatches are untested")
+    zones = [l for l in shown if l.startswith("Material")]
+    if zones != ["Material 1"]:
+        fails.append(f"one zone of two is drawn with a face and the legend "
+                     f"swatches {zones}")
     return fails
 
 

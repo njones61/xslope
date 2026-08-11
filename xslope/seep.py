@@ -1111,14 +1111,14 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         if _cycle_floor is None:
             repeats = False
             _cyc_eps = _CYCLE_TOL * (ymax - ymin)
-            _cyc_away = 0.0
+            _cyc_away = float('inf')     # the CLOSEST any shorter lag came
             for k in range(1, min(_CYCLE_LOOKBACK, len(_cyc_h)) + 1):
                 _cyc_d = float(np.max(np.abs(h_new - _cyc_h[-k])))
                 if (k >= 2 and _cyc_d < _cyc_eps and _cyc_away > _cyc_eps
                         and np.array_equal(exit_face_active, _cyc_a[-k])):
                     repeats = True
                     break
-                _cyc_away = max(_cyc_away, _cyc_d)
+                _cyc_away = min(_cyc_away, _cyc_d)
             _cyc_run = _cyc_run + 1 if repeats else 0
             if _cyc_run >= _CYCLE_PERSIST:
                 _cycle_floor = _CYCLE_RELAX_FLOOR

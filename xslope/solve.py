@@ -2307,14 +2307,14 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
     # Mapped on the right-facing seepage sample (docs/seep xslope_rface_SEEP_KEY, 40
     # slices), whose h(λ) = moment residual evaluated at F_f(λ) falls MONOTONICALLY
     # from +2.5e7 at λ=-1.5 to -1.9e7 at λ=+1.1 and crosses zero exactly once, at
-    # λ* = -0.2189 (FS 2.0808). Seeding approach_B's hybr at (FS0, 0) returns that
+    # λ* = -0.2188 (FS 2.0797). Seeding approach_B's hybr at (FS0, 0) returns that
     # same root for every FS0 in [1.07, 5.07] and under ulp-scale jitter of the
     # Bishop seed. A 78x31 (FS0, λ0) seed grid does find other roots that pass the
     # acceptance test, but every one sits at FS <= 1.6 with |λ0| >= 1.1 — off the
     # λ0 = 0 seed line this solver actually uses, and well BELOW the physical FS.
     # There is no secondary root above it. So an M-P answer that comes back HIGH on
     # a model of this class is not the root-finder: look at the water first. The one
-    # such excursion on record (3.183 against a locked 2.081, once in ~2000 rows)
+    # such excursion on record (3.183 against a locked 2.080, once in ~2000 rows)
     # was exactly the DRY answer for that model, to four digits. Its cause was
     # mesh.find_element_containing_point's spatial-grid cache, then keyed on
     # id(nodes): a recycled address served one model the grid of another, every

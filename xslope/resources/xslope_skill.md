@@ -105,7 +105,15 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    circles that daylight on the ground surface INSIDE the model. Pass
    `report=True` for `{'circles', 'summary', 'reason'}` when you need to say what
    it will do before doing it. Fall back to hand-building only when the generator
-   declines and states why. The strategy it implements:
+   declines and states why. **A hand-built circle obeys the generator's own floor
+   rule: its lowest point (Depth, = Yo − R) sits at or above the model's Max
+   Depth.** On a rigid base the deep circle is *tangent* to the base
+   (Depth = Max Depth exactly) — a bottom below the base is the toe-circle trap
+   the generator exists to drop, and preflight flags it
+   (`surface.circle_below_domain_floor`). After building, run the input checks
+   and resolve every warning before reporting the model ready — a warning passed
+   over silently is a defect in the build, not a formality. The strategy it
+   implements:
    - **Center X**: Place Xo halfway between the toe and crest of the slope.
    - **Center Y**: Set Yo = toe elevation + 2 × slope height (i.e., double the slope height above the toe).
    - **Always include**: one circle that passes through the toe of the slope. Circles are stored in Depth form (`Xo`, `Yo`, `Depth` = elevation of the lowest point), so compute the toe circle as `R = distance((Xo, Yo), toe)`, `Depth = Yo - R` — see the circles section below.

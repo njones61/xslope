@@ -2807,6 +2807,11 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
     if ref == 0:
         ref = 1.0
 
+    # The bars that are drawn with real extent, in the order they are drawn, so
+    # the legend keys below can be put on the bars themselves.
+    eff_drawn = []                       # (i, patch, in tension)
+    pore_drawn = []                      # (i, patch)
+
     for i, (index, row) in enumerate(slice_df.iterrows()):
         if i >= len(n_eff):
             break
@@ -2843,13 +2848,11 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
         poly_x = [x1, x2, x2_top, x1_top]
         poly_y = [y1, y2, y2_top, y1_top]
 
-        # Each bar names its own legend key, and only where it is drawn with real
-        # extent: a bar of zero length paints nothing on the base line, so it
-        # takes no entry. The legend de-duplicates by label, so the first drawn
-        # bar of each kind carries the key for all of them.
-        ax.fill(poly_x, poly_y, facecolor='none', edgecolor='red' if stress <= 0 else 'limegreen', hatch='.....',
-                linewidth=1, gid='EFF_NORMAL_STRESS',
-                label="Eff Normal Stress (σ')" if bar_len > 0 else None)
+        patch = ax.fill(poly_x, poly_y, facecolor='none',
+                        edgecolor='red' if stress <= 0 else 'limegreen', hatch='.....',
+                        linewidth=1, gid='EFF_NORMAL_STRESS')[0]
+        if bar_len > 0:
+            eff_drawn.append((i, patch, stress <= 0))
 
         # --- Pore pressure trapezoid ---
         u_len = (pore / ref) * max_bar_len
@@ -2863,8 +2866,28 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
         poly_ux = [x1, x2, ux2_top, ux1_top]
         poly_uy = [y1, y2, uy2_top, uy1_top]
 
-        ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1, gid='PORE_PRESSURE',
-                label='Pore Pressure (u)' if u_len != 0 else None)
+        patch = ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k',
+                        linewidth=1, gid='PORE_PRESSURE')[0]
+        if u_len != 0:
+            pore_drawn.append((i, patch))
+
+    # --- the legend keys, carried by the bars themselves ---
+    # A bar of zero length paints nothing on the base line, so it takes no key: a
+    # section with no pore pressure draws its pore bars flat and is not named for
+    # them. The effective-stress key goes on a bar in COMPRESSION wherever the
+    # section has one — the bars are colored by sign, and one tension slice at the
+    # heel would otherwise key a page of green bars in red — and on the red bars
+    # themselves where every bar is in tension. The pore key goes on a bar drawn
+    # no earlier than that one, so the two entries read in the same order on every
+    # model.
+    eff_key = next((e for e in eff_drawn if not e[2]),
+                   eff_drawn[0] if eff_drawn else None)
+    if eff_key is not None:
+        eff_key[1].set_label("Eff Normal Stress (σ')")
+    if pore_drawn:
+        after = [p for p in pore_drawn
+                 if eff_key is None or p[0] >= eff_key[0]]
+        (after or pore_drawn)[0][1].set_label('Pore Pressure (u)')
 
 
 def plot_thrust_line_from_df(ax, slice_df,

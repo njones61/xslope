@@ -9172,6 +9172,54 @@ def test_solution_plot_legend():
             if not drawn and key in shown:
                 fails.append(f"the solution plot of {what} names {key!r} over "
                              f"{len(bars)} bars of no length: {shown}")
+
+    # WHICH bar carries the effective-stress key, on a section that has both
+    # kinds. The bars are colored by sign — red where the base is in tension —
+    # so keying the figure off whichever bar comes first would put a red swatch
+    # over a page of green wherever a single slice at the heel goes into tension,
+    # which two of the delivered reports do (rapid_drawdown, water_table_drained).
+    # The key belongs to a bar in compression wherever the section has one, and
+    # to the red bars only where every bar is red. Made on a stated frame rather
+    # than a solved model: the sign of the first slice's base stress is the whole
+    # case, and no fixture states it.
+    import pandas as pd
+    from matplotlib.colors import to_rgba
+    from xslope.plot import plot_base_stresses
+
+    def framed(stresses, pores):
+        """A slice frame with the stated base stresses and pore pressures."""
+        n = len(stresses)
+        return pd.DataFrame({
+            "x_l": [float(i) for i in range(n)],
+            "x_r": [float(i + 1) for i in range(n)],
+            "y_lb": [0.0] * n, "y_rb": [0.0] * n,
+            "y_cb": [0.0] * n, "y_ct": [10.0] * n,
+            "dl": [1.0] * n,
+            "n_eff": [float(s) for s in stresses],
+            "u": [float(p) for p in pores],
+        })
+
+    for what, stresses, want_color in (
+            ("a section with one slice in tension", [-40.0, 100.0, 120.0],
+             "limegreen"),
+            ("a section entirely in tension", [-40.0, -60.0, -30.0], "red")):
+        fig = Figure(figsize=(6, 4))
+        FigureCanvasAgg(fig)
+        ax = fig.add_subplot(111)
+        plot_base_stresses(ax, framed(stresses, [20.0, 30.0, 25.0]))
+        handles, labels = ax.get_legend_handles_labels()
+        keys = [l for l in labels if l in (EFF_KEY, PORE_KEY)]
+        if keys.count(EFF_KEY) != 1 or keys.count(PORE_KEY) != 1:
+            fails.append(f"{what} carries {keys}; each key belongs to exactly "
+                         f"one bar")
+            continue
+        if keys != [EFF_KEY, PORE_KEY]:
+            fails.append(f"{what} names its bars {keys}; the two keys read in "
+                         f"one order on every model")
+        keyed = handles[labels.index(EFF_KEY)]
+        if to_rgba(keyed.get_edgecolor()) != to_rgba(want_color):
+            fails.append(f"{what} keys its bars in "
+                         f"{keyed.get_edgecolor()}, not {want_color}")
     return fails
 
 

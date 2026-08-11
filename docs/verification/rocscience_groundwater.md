@@ -28,6 +28,8 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:6.5688;26:2:6.7452;26:4:7.2663;26:6:7.8577, tolerance=0.05, benchmark=GW6b-h -->
 <!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.873e-08, tolerance=0.05, benchmark=GW6c-q -->
 <!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.7859;26:2:5.7854;26:4:6.3608;26:6:7.0789, tolerance=0.05, benchmark=GW6c-h -->
+<!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.728e-07, tolerance=0.05, benchmark=GW6d-q -->
+<!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.8945;26:2:7.9136;26:4:8.0338;26:6:8.1821;26:8:8.4074;26:10:8.6712;26:12:9.1425, tolerance=0.05, benchmark=GW6d-h -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.777e-07, tolerance=0.05, benchmark=GW6e-q -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:8.3539;26:2:8.3537;26:4:8.4092;26:6:8.4682, tolerance=0.05, benchmark=GW6e-h -->
 <!-- test: file=files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.3069e-05, tolerance=0.05, benchmark=GW9a-q -->
@@ -113,7 +115,7 @@ used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide chart everywhere | |
 | [4](#gw4) | 🔴 | Steady unconfined flow through earth dam | Phreatic surface within 0.02–0.06 m of the Kozeny basic parabola over the dam body · y₁ above the drain toe 0.401 vs RS2's own solve of this model 0.395 (+1.5%) · vs Slide 0.442 (−9.3%) · vs Eq 4.1 0.486 (−17.5%) · drain-face entry offset x₁ 0.272 vs 0.226 (**+20.4%**, and it sets the dot) | RS2's Table 4.1 for the file this model is built from is the governing pairing and publishes both quantities; y₁ is green on it, x₁ is not, and x₁ turns on an unsaturated curve the vendor file does not store |
 | [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.165×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%; +1.8% on the finest mesh) · solved pressure head inside Fig 5-4's own 1 m colour bands at 46 of 49 grid points (worst miss 0.025 m) | **built**; chart-keyed target, locked on XSLOPE's own field |
-| [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1, against Slide: case 2 within 0.07 m and case 5 within 0.10 m · case 1 within 0.24 m · case 3 within 0.16 m up to mid-height and 0.98 m at elevation 8, where Slide and Ref[1] themselves differ by 0.9 m | **built** (4 of 5 cases); chart-only target, locked on XSLOPE's own field; one conductivity curve, taken from the vendor tables and fit to 0.030 decades rms, serves every case |
+| [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1, against Slide: case 2 within 0.07 m and case 5 within 0.10 m · case 1 within 0.24 m · case 4 within 0.37 m over all thirteen of Fig 6.18's markers (0.19 m rms) · case 3 within 0.16 m up to mid-height and 0.98 m at elevation 8, where Slide and Ref[1] themselves differ by 0.9 m | **built** (5 of 5 cases); chart-only target, locked on XSLOPE's own field; one conductivity curve, taken from the vendor tables and fit to 0.030 decades rms, serves all five |
 | [7](#gw7) | 🟢 | Seepage within layered slope | Total head along the manual's own query line within 0.005 m rms / 0.013 m worst of the Fig 22.7 steady markers over 21 stations (≈1% of the profile's head range) · water table at the toe el 0.30 vs the stated Slide / Rulon & Freeze 0.3 m (0.00 m) · perched zone and slope-face spring reproduced · Q = q·L = 1.68×10⁻⁴ locked | **built**; problem 7's own figures are chart-only, so the numeric target comes from problem 22's Fig 22.7 steady frame |
 | [8](#gw8) | 🟢 | Flow through ditch-drained soils | Flux boundary exact — total inflow = *q*·*L*, the confined response matching the closed form to six figures · water table within 0.004–0.006 m of the Fig 8.3/8.4 line over the whole span (worst 2.4% of the 0.25 m divide mound) · Fig 8.3's labeled pressure-head contours within 0.010 m rms over 14 stations | **built**; flux rate and Soil B's Gardner *a* taken from the vendor model where it disagrees with the printed tables |
 | [9](#gw9) | 🟢 | Seepage through dam | Dam 1: Q = 1.384×10⁻³ vs Slide 1.378×10⁻³ m³/(min·m) (+0.4%) · dam 2: Q = 4.28×10⁻⁶ vs Slide 4.23×10⁻⁶ m³/(s·m) (+1.2%) | **built** (both dams); body k read from Bowles (1984) Fig E9-2b, not the Chapuis caption |
@@ -323,16 +325,18 @@ above standing as the vendor check.
 **Input files:** [gw006a.xlsx](files/rocscience_gw/gw006a.xlsx) (case 1, isotropic) /
 [gw006b.xlsx](files/rocscience_gw/gw006b.xlsx) (case 2, 9:1 anisotropy) /
 [gw006c.xlsx](files/rocscience_gw/gw006c.xlsx) (case 3, core) /
+[gw006d.xlsx](files/rocscience_gw/gw006d.xlsx) (case 4, infiltration) /
 [gw006e.xlsx](files/rocscience_gw/gw006e.xlsx) (case 5, seepage face)
 
 This manual problem runs the same 12 m dam through five cases. The published target in every
 case is the pressure-head profile along **line 1-1** (the crest centerline, x = 26) — a chart
-(Figs 6.6 / 6.9 / 6.14 / 6.23) with no tabulated value and no numeric key — so, as the
+(Figs 6.6 / 6.9 / 6.14 / 6.18 / 6.23) with no tabulated value and no numeric key — so, as the
 methodology note sets out for a chart target, each case locks XSLOPE's own flowrate and
-total-head field. The case-2/3/5 material and boundary data were read from the vendor RS2
-groundwater models (`groundwater #006_02/03/05.slw` in the RS2 Groundwater zip): case 2's
+total-head field. All five cases' material and boundary data were read from the vendor RS2
+groundwater models (`groundwater #006_01…05.slw` in the RS2 Groundwater zip): case 2's
 `condx:1 condy:0.111111` (kₕ = 9e-7, k_v = 1e-7), case 3's 100×-lower core over the mesh's
-material-2 footprint (a rectangle x ∈ [24, 28], y ∈ [0, 10]), and case 5's crest-plus-downstream-slope seepage face.
+material-2 footprint (a rectangle x ∈ [24, 28], y ∈ [0, 10]), case 4's fourteen infiltration
+traction cards, and case 5's crest-plus-downstream-slope seepage face.
 
 **The conductivity function.** Every case shares one unsaturated curve, and the vendor models
 publish it as a table rather than leaving it to be read off Figure 6.2. Case 1's is four points
@@ -344,7 +348,7 @@ repeat case 1's. Digitizing Figure 6.2 recovers the same curve to 0.007 decades 
 and table agree and the table is used because it is exact.
 
 XSLOPE carries van Genuchten, Gardner and linear-front laws rather than a table, so the curve
-is fit. The four solved fields reach 6.7 m of suction at the deepest (case 3), and the
+is fit. The five solved fields reach 6.7 m of suction at the deepest (case 3), and the
 least-squares Mualem–van Genuchten fit over 0–8 m of suction, **α = 0.2452, n = 2.5739**, holds
 the vendor table to **0.030 decades rms and 0.102 decades worst** across that band. The fit is
 not the controlling uncertainty at this quality: fits taken over 0–6 m and over the table's
@@ -420,7 +424,49 @@ the case the fit moves most. Locked at XSLOPE's own values.*
 
 ![gw006c: mesh and solved heads (low-k core)](images/gw006c.png)
 
-*Case 4 (steady-state infiltration) shares this conductivity curve and is not yet built.*
+**Case 4 — isotropic dam under steady-state infiltration.** Rain falls on the exposed surface
+while the toe drain still runs. The vendor applies it as fourteen traction cards, each a
+**vertical** flux of 10⁻⁸ m/s, over the surface from (22, 11) across the crest and down the
+downstream face to (50, 1) — one element short of the fixed-head node at each end. A vertical
+rain rate is not the number a normal-flux boundary takes: on the 2:1 faces the vendor's own
+cards carry q_n = 10⁻⁸ cos(arctan ½) = 8.944×10⁻⁹, and only across the horizontal crest is
+q_n the full 10⁻⁸. The surface therefore goes in as three blocks at those two rates, and the
+inflow XSLOPE assembles, 2.788×10⁻⁷ m³/s per m, is the rain rate over its 28 m horizontal
+footprint to within the half-element the endpoints round off.
+
+Figure 6.18 is the one target on this problem printed as **markers rather than a curve** —
+Slide and Ref[1] at every metre of elevation — so it can be read to about 0.05 m, and all
+thirteen stations are compared:
+
+| Elevation on line 1-1 | XSLOPE pressure head | Slide (Fig 6.18) | Ref[1] |
+|---|---|---|---|
+| 0 | 7.84 | ≈7.73 (≈+0.11 m) | ≈7.49 (≈+0.35 m) |
+| 2 | 5.91 | ≈5.77 (≈+0.14 m) | ≈5.53 (≈+0.38 m) |
+| 4 | 4.03 | ≈3.88 (≈+0.15 m) | ≈3.64 (≈+0.39 m) |
+| 6 | 2.18 | ≈2.05 (≈+0.13 m) | ≈1.79 (≈+0.39 m) |
+| 8 | 0.41 | ≈0.25 (≈+0.16 m) | ≈−0.01 (≈+0.42 m) |
+| 10 | −1.33 | ≈−1.52 (≈+0.19 m) | ≈−1.78 (≈+0.45 m) |
+| 12 (crest) | −2.86 | ≈−3.23 (≈+0.37 m) | ≈−3.36 (≈+0.50 m) |
+
+*Over all thirteen stations XSLOPE tracks Slide to 0.19 m rms, running above it by 0.18 m on
+average; against Ref[1] the figures are 0.42 m rms and 0.42 m mean. The offset is flat at
+0.11–0.19 m up the saturated part of the line and opens to 0.37 m at the crest node itself,
+where the profile is steepest and the suction deepest. Refining the mesh does not move it: the
+crest reading is −2.86 at tri3 1.0 m, −2.85 at tri3 0.5 m, −2.86 at tri6 1.0 m and −2.85 at
+tri6 0.5 m. Locked at XSLOPE's own values.*
+
+Infiltration lifts the whole line about 0.64 m above case 1 and pushes the phreatic surface
+downstream, which is the effect the case is posed to show. The drain is XSLOPE's exit face
+here, as on cases 1–3, rather than the specified head of 0 the vendor writes: with no exit
+face anywhere the model has no free surface to track, and XSLOPE would solve it confined —
+saturated everywhere, with the unsaturated law this problem is about dropped.
+
+Flowrate 4.728×10⁻⁷ m³/s per m (locked with the total-head field). The rain accounts for
+2.788×10⁻⁷ of it, leaving 1.940×10⁻⁷ from the reservoir against the 2.808×10⁻⁷ the reservoir
+drives in case 1: the infiltration lifts heads inside the dam and flattens the gradient the
+reservoir works against.
+
+![gw006d: mesh and solved heads (steady-state infiltration)](images/gw006d.png)
 
 **Case 5 — isotropic dam with a downstream seepage face (no drain).** The horizontal toe
 drain is replaced by the "unknown boundary condition": the crest and the whole downstream

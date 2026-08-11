@@ -693,6 +693,53 @@ def gw006e():
     return 'gw006e.xlsx'
 
 
+def gw006d():
+    """GW#6 case 4: the case-1 dam under steady-state INFILTRATION — rain
+    falling on the exposed surface while the toe drain still runs. Same 12 m
+    dam, 2:1 faces, 12 m toe drain, reservoir at 10 m, case-1 material.
+
+    The vendor model (groundwater #006_04.slw) applies the infiltration as
+    fourteen traction cards, each a VERTICAL flux of 1e-8 m/s, over the surface
+    from (22, 11) up across the crest and down the downstream face to (50, 1) —
+    one element short of the fixed-head node at each end. A vertical rain rate
+    is not the same number as the normal flux XSLOPE's flux BC takes: on the
+    2:1 faces the vendor's own cards carry qn = 1e-8 * cos(atan 0.5) = 8.9443e-9,
+    and only across the horizontal crest is qn the full 1e-8. So the surface goes
+    in as three blocks at the vendor's two rates, and the total inflow is the
+    rain rate times the 28 m horizontal footprint, 2.8e-7 m3/s per m.
+
+    The drain is XSLOPE's exit face, as on cases 1-3. The vendor writes it as a
+    specified head of 0; in XSLOPE that would leave the model with no exit face
+    at all, which selects the confined solver and drops the unsaturated law the
+    problem is about.
+
+    Target: pressure head along line 1-1 (x=26) from Fig 6.18, which prints
+    Slide and Ref[1] markers at every metre of elevation. Infiltration lifts the
+    whole profile about 0.6 m above case 1. xslope tracks the Slide markers to
+    0.19 m rms over the 13 stations, running above them by 0.18 m on average.
+    Chart-only target, so xslope's own flowrate and total-head field are locked."""
+    sd = _base_sd(k1=1e-7)
+    m = sd['materials'][0]
+    m.update(name='Dam fill', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
+             kr0=0.0, h0=0.0, **_GW6_VG)
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 0.0), (24.0, 12.0),
+                                                    (28.0, 12.0), (52.0, 0.0)]}]
+    sd['max_depth'] = 0.0
+    q_vert = 1e-8                             # the vendor's rain rate
+    q_face = q_vert * 2.0 / math.sqrt(5.0)    # its normal component on a 2:1 face
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 10.0, 'coords': [(0.0, 0.0), (20.0, 10.0)]}],
+        'specified_fluxes': [
+            {'flux': q_face, 'coords': [(22.0, 11.0), (24.0, 12.0)]},
+            {'flux': q_vert, 'coords': [(24.0, 12.0), (28.0, 12.0)]},
+            {'flux': q_face, 'coords': [(28.0, 12.0), (50.0, 1.0)]},
+        ],
+        'exit_face': [(40.0, 0.0), (52.0, 0.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw006d.xlsx'))
+    return 'gw006d.xlsx'
+
+
 def gw008():
     """GW#8: flow through ditch-drained soils (Gureghian 1981), the corpus'
     first specified-flux (Neumann) problem. Fig 8.1 (p.34): half-drain
@@ -1446,7 +1493,7 @@ if __name__ == '__main__':
         _print_locks()
     else:
         for fn in (gw001, gw002, gw003, gw004, gw005,
-                   gw006a, gw006b, gw006c, gw006e,
+                   gw006a, gw006b, gw006c, gw006d, gw006e,
                    gw007, gw008, gw009a, gw009b, gw010, gw011, gw012, gw013,
                    *_TRANSIENT):
             print(fn())

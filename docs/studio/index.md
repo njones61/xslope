@@ -119,6 +119,10 @@ the first launch and not on later ones. Untick it to be greeted every time.
 **Help → Welcome** reopens the window whenever you want it, whichever way the box is
 set — and unticking it there brings the launch greeting back.
 
+Starting Studio by opening something — double-clicking an input file or a project
+package, or following an **Open in Studio** link — opens that project and no welcome
+over it. The next launch with nothing to open is greeted as usual.
+
 The rest of the Help menu is **Documentation**, which opens the documentation root
 in your browser, the two update items described under
 [App management](app_management.md), and **About**.

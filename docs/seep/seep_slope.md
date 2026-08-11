@@ -269,9 +269,12 @@ the slope than the flow field does, and slightly less near the toe.*
 | Seepage | 1.472 | 2.067 | 1.862 | 2.797 | 2.256 | 2.078 | 2.080 |
 
 For this slope the piezometric line returns a modestly **lower (more conservative)** factor of
-safety — the two agree within about 7%, consistently across all methods. The difference is not
-always this small nor always in this direction: where seepage is routed through the more
-permeable layers and exits along the downstream face, the computed pore pressures near the toe
-can be far higher than any reasonable piezometric line, dropping the factor of safety
-dramatically. That is why a seepage analysis is preferred wherever seepage is actually
-occurring.
+safety. All seven factors move by a similar amount — between 0.136 and 0.174 — so the percentage
+difference tracks the size of the factor rather than the method: 5.6 to 8.5% for the six methods
+that carry interslice forces, and 13.4% for OMS, whose factor is the smallest of the seven.
+
+The difference is not always this small nor always in this direction: where seepage is routed
+through the more permeable layers and exits along the downstream face, the computed pore
+pressures near the toe can be far higher than any reasonable piezometric line, dropping the
+factor of safety dramatically. That is why a seepage analysis is preferred wherever seepage is
+actually occurring.

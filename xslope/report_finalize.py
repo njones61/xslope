@@ -75,9 +75,9 @@ import subprocess
 import sys
 import tempfile
 
-__all__ = ["TIMEOUT", "RENDER_TIMEOUT", "word_available", "finalize_with_word",
-           "libreoffice_available", "finalize_with_libreoffice",
-           "finalize_report"]
+__all__ = ["TIMEOUT", "RENDER_TIMEOUT", "FINISH_ENV", "word_available",
+           "finalize_with_word", "libreoffice_available",
+           "finalize_with_libreoffice", "finalize_report"]
 
 #: Seconds any one call into Word may take before it is abandoned. Generous:
 #: Word's first launch of the day is slow, and the alternative to waiting is a

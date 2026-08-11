@@ -101,12 +101,20 @@ def open_request(window, request):
     treat them the same way. A link goes through the scheme handler, which confirms
     and checks the host before any network request; a path goes straight to the
     normal open. A path that does not exist is ignored, as it was before.
+
+    A request that is acted on marks the window ``opened_by_request``, which is how
+    :func:`main` knows the launch arrived with work in hand — here rather than at
+    each caller, because this function is already the one place both arrival routes
+    meet, and a request that was ignored is not work.
     """
     if urlscheme.is_scheme_url(request):
-        return window.open_scheme_url(request)
-    if os.path.exists(request):
-        return window.open_path(request)
-    return None
+        handled = window.open_scheme_url(request)
+    elif os.path.exists(request):
+        handled = window.open_path(request)
+    else:
+        return None
+    window.opened_by_request = True
+    return handled
 
 
 def _silence_aspect_limit_noise():
@@ -147,13 +155,22 @@ def main(argv=None):
     if rest:
         open_request(win, rest[0])
 
+    # Did this launch arrive with work in hand? Both arrival routes have run by now
+    # — the command line just above, and the events macOS delivers instead, replayed
+    # by set_window before it — and both mark the window through open_request.
+    with_work = bool(getattr(win, "opened_by_request", False))
+
     # The welcome window, on a launch whose settings still ask for one — the first
     # one, and afterwards only while the reader leaves it switched on. Deferred so
     # the main window paints behind it, and it lives HERE rather than in MainWindow
     # for the same reason the update check does: constructing a window, which every
-    # Studio test does, must never raise a modal dialog. Set XSLOPE_NO_WELCOME=1 to
-    # suppress it (a capture, a kiosk, a classroom image).
-    if welcome.show_at_launch(win.settings) and not os.environ.get("XSLOPE_NO_WELCOME"):
+    # Studio test does, must never raise a modal dialog. A launch that was handed a
+    # document or a link is skipped whatever the preference says: the user asked for
+    # that project, and a greeting over it is a dialog in the way of an answer — the
+    # next bare launch still shows it. Set XSLOPE_NO_WELCOME=1 to suppress it
+    # entirely (a capture, a kiosk, a classroom image).
+    if (not with_work and welcome.show_at_launch(win.settings)
+            and not os.environ.get("XSLOPE_NO_WELCOME")):
         from PySide6.QtCore import QTimer
         QTimer.singleShot(0, win.show_welcome)
 

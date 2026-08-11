@@ -20,7 +20,8 @@ once is what it is for. Closing writes the preference by any route (the button,
 Escape, the title bar), because a window dismissed with Escape is dismissed.
 **Help → Welcome** reopens it whatever the preference says, which is what makes
 turning it off a safe thing to do — and unticking the box there is how a launch
-gets it back.
+gets it back. A launch that was handed a document or a link opens that and no
+greeting over it (:func:`studio.app.main`), preference untouched.
 """
 
 from __future__ import annotations
@@ -133,9 +134,11 @@ class WelcomeDialog(QDialog):
             f'<li><a href="{links.DOCS_URL}">Documentation</a> — '
             "the whole site: inputs, methods, and both engines.</li>"
             f'<li><a href="{links.GETTING_STARTED_URL}">Getting started</a> — '
-            "installing Studio, and what a first session looks like.</li>"
+            "installing Studio, first launch, and keeping it up to date.</li>"
             f'<li><a href="{links.SAMPLES_URL}">Sample problems</a> — '
-            "worked examples, each with its input file to download.</li>"
+            "worked limit-equilibrium examples, each with its input file to "
+            "download. The seepage and finite element sample pages sit beside "
+            "it in the documentation navigation.</li>"
             f'<li><a href="{links.VERIFICATION_URL}">Verification</a> — '
             "XSLOPE's results against published benchmarks and other software.</li>"
             "</ul>")

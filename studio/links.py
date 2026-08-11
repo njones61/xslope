@@ -24,11 +24,15 @@ __all__ = ["DOCS_URL", "GETTING_STARTED_URL", "SAMPLES_URL", "VERIFICATION_URL",
 #: current release at ``/en/latest/``, and every URL below extends this one.
 DOCS_URL = "https://xslope.readthedocs.io/en/latest/"
 
-#: Installing Studio, first launch, and where the application's own files land.
+#: Installing Studio: the downloads, the system requirements, what a first launch
+#: does, where the application's files land, and keeping it up to date.
 GETTING_STARTED_URL = DOCS_URL + "getting_started/install/"
 
-#: The sample problems: a worked example per model, each with its input file. This
-#: page IS the sample browser — Studio keeps no second list of its own.
+#: The limit-equilibrium sample problems: a worked example per model, each with the
+#: input file it was solved from. It is one of THREE sample pages — seepage and FEM
+#: keep their own, reached from the same documentation navigation — so this is the
+#: way in to the samples, not the whole of them. The documentation is where they are
+#: browsed either way; Studio keeps no list of its own.
 SAMPLES_URL = DOCS_URL + "lem/samples/"
 
 #: Verification and validation: the benchmark and vendor-corpus comparisons.

@@ -84,7 +84,7 @@ from xslope.style import resolve_style, material_style
 from xslope.plot import (
     plot_base_geometry, plot_piezo_line, plot_dloads, plot_tcrack_surface, plot_ssr_zones,
     plot_reinforcement_lines as _plot_input_reinf_lines, plot_piles, plot_line_loads,
-    get_dload_legend_handler, adaptive_colorbar_ticks, adaptive_edge_linewidth,
+    adaptive_colorbar_ticks, adaptive_edge_linewidth,
 )
 from xslope.plot_fem import (
     plot_shear_strain_contours, plot_displacement_vectors,
@@ -597,12 +597,22 @@ def _draw_inputs_panel(ax, sd, style):
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow',
                           edgecolor='orange', linewidth=1.0, alpha=0.9))
 
+    # The legend is read off the DRAWN artists and nothing else, de-duplicated by
+    # label — the discipline plot_inputs and _legend_below hold in the package. Every
+    # layer above names what it draws, the load sets included: plot_dloads labels the
+    # surface line of EACH block with its set's key, so a model with several typed
+    # blocks put several identical entries in this list, and an entry appended here
+    # from sd['dloads'] put one more on top of them. vp009 printed "Distributed Load"
+    # three times, rs2_29clay twice. One drawn thing, one key.
     handles, labels = ax.get_legend_handles_labels()
-    if sd.get('dloads'):
-        _handler, dummy = get_dload_legend_handler()
-        handles.append(dummy)
-        labels.append('Distributed Load')
-    return handles, labels, (bg_lc, bg_segs)
+    seen, dh, dl = set(), [], []
+    for h, l in zip(handles, labels):
+        if l in seen or (isinstance(l, str) and l.startswith('_')):
+            continue
+        seen.add(l)
+        dh.append(h)
+        dl.append(l)
+    return dh, dl, (bg_lc, bg_segs)
 
 
 def _draw_mesh_panel(ax, fem_data, style, alpha=0.6):

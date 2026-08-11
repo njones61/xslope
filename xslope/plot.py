@@ -460,33 +460,6 @@ def _derived_water_blocks(slope_data):
     return derived_blocks(sd, 1) + derived_blocks(sd, 2)
 
 
-def get_dload_legend_handler(color='purple'):
-    """
-    Creates and returns a custom legend entry for distributed loads.
-    Returns a tuple of (handler_class, dummy_patch) for use in matplotlib legends.
-
-    ``color`` selects which load set the key stands for: the user's own blocks
-    (purple, the default) or the engine's derived water loads (water-blue).
-
-    No plot in the package calls this: the load layers name themselves where they
-    are drawn, so the legend needs no stand-in for them. It is kept for the
-    benchmark figure scripts, which build their legends by hand.
-    """
-    # Create a line with built-in arrow marker
-    dummy_line = Line2D([0.0, 1.0], [0, 0],  # Two points to define line
-                       color=color, 
-                       alpha=0.7, 
-                       linewidth=2,
-                       marker='>',  # Built-in right arrow marker
-                       markersize=6,  # Smaller marker size
-                       markerfacecolor=color,
-                       markeredgecolor=color,
-                       drawstyle='steps-post',  # Draw line then marker
-                       solid_capstyle='butt')
-    
-    return None, dummy_line
-
-
 def plot_profile_lines(ax, profile_lines, materials=None, labels=False, style=None):
     """
     Plots the profile lines for each material in the slope.

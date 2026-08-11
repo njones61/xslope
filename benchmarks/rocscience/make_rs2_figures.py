@@ -281,6 +281,14 @@ def _declare_dry_beyond_piezo(sd, mesh):
     return out
 
 
+def _uses_seep(sd):
+    """True where a material reads its pore pressures off stored nodal seepage
+    values. Such a model carries its mesh as part of its definition: the solve has
+    to reuse that discretization, and the inputs panel has to show it."""
+    return any(str(m.get('u', '')).strip().lower() == 'seep'
+               for m in sd.get('materials', []))
+
+
 def _build(tag):
     """Mesh + fem_data exactly as run_tests.run_fem_test does. Returns
     ``(sd, fem_data, path, mesh)`` — ``path`` is the resolved case xlsx, so the
@@ -291,9 +299,7 @@ def _build(tag):
     sd = load_slope_data(path)
 
     # seepage-coupled models must reuse the stored mesh (nodal seep_u)
-    uses_seep = any(str(m.get('u', '')).strip().lower() == 'seep'
-                    for m in sd.get('materials', []))
-    if uses_seep and sd.get('mesh') is not None:
+    if _uses_seep(sd) and sd.get('mesh') is not None:
         mesh = sd['mesh']
     else:
         target = tag.get('target_size')
@@ -547,9 +553,16 @@ def _draw_inputs_panel(ax, sd, style):
     from matplotlib.collections import LineCollection
     from xslope.style import feature_style
 
-    # Background mesh (only if the case carries one, e.g. seep-coupled) — same as
-    # plot_inputs. Width finalized after layout so a dense grid stays a hairline.
-    mesh = sd.get('mesh')
+    # Background mesh, drawn only where the mesh is part of the MODEL: a seep-coupled
+    # case reads its pore pressures off stored nodal values, so the discretization is
+    # an input the reader has to see. The test is what the model does with the mesh,
+    # not whether a {stem}_mesh.json happens to lie beside the xlsx — since make_figure
+    # writes exactly that file, keying on the file's presence made the panel depend on
+    # whether the builder had run before: the first row on a shared file drew a clean
+    # section and the next row on the SAME file drew a meshed one (RS2-4 / RS2-4-zone),
+    # and a second pass over the corpus would mesh every panel that a first pass left
+    # clean. Width finalized after layout so a dense grid stays a hairline.
+    mesh = sd.get('mesh') if _uses_seep(sd) else None
     bg_lc, bg_segs = None, None
     if mesh is not None:
         m_nodes, m_elems, m_et = mesh['nodes'], mesh['elements'], mesh['element_types']

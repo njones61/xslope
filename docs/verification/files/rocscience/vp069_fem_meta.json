@@ -1,8 +1,12 @@
 {
-  "benchmark": "RS2-P4-VP69",
+  "benchmark": "RS2-P4-VP69-m8",
   "analysis": "ssrm",
-  "FS": 1.94375,
-  "expected_fs": "1.944",
+  "FS": 2.01875,
+  "expected_fs": "2.019",
   "file": "files/rocscience/vp069.xlsx",
-  "unit_system": "imperial"
+  "unit_system": "imperial",
+  "converged": true,
+  "iterations": 8376,
+  "residual": 1.343109034739493e-06,
+  "max_displacement": 0.5984112764100512
 }

@@ -106,6 +106,12 @@ def open_request(window, request):
     :func:`main` knows the launch arrived with work in hand — here rather than at
     each caller, because this function is already the one place both arrival routes
     meet, and a request that was ignored is not work.
+
+    A link the scheme handler goes on to REFUSE (a host that is not allowlisted, an
+    unknown verb) still counts as work, and the launch is not greeted. That is the
+    intended reading of the asymmetry rather than an oversight: the user is looking
+    at a refusal that names what was wrong with the link, and a welcome window
+    stacked behind it makes that harder to read, not easier.
     """
     if urlscheme.is_scheme_url(request):
         handled = window.open_scheme_url(request)

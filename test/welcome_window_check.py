@@ -107,6 +107,61 @@ def _settings(tmp, name="w.ini"):
     return QSettings(os.path.join(tmp, name), QSettings.IniFormat)
 
 
+def _isolated_launch(tmp):
+    """Patch ``MainWindow`` so a launch inside this context writes nothing of the
+    user's: returns ``(restore, opened)``.
+
+    A launch is not a dialog. It builds the whole window and, handed a document,
+    runs it through the real open path — which appends to the recent-files list in
+    ``QSettings("XSlope", "XSlope Studio")``. Left alone, this check reorders the
+    recent files of whoever runs the suite (measured, on the machine this was
+    written on).
+
+    **What does NOT work on macOS, measured rather than assumed:**
+
+    * Pointing ``HOME`` somewhere else. The native store is served by ``cfprefsd``,
+      which resolves the domain for the logged-in user whatever ``HOME`` says.
+    * ``QSettings.setDefaultFormat(IniFormat)`` + ``setPath(IniFormat, UserScope,
+      tmp)``. ``setDefaultFormat`` takes (``defaultFormat()`` reports IniFormat
+      afterwards) and ``QSettings(IniFormat, UserScope, org, app)`` does land in
+      ``tmp`` — but the two-argument ``QSettings(org, app)`` that Studio actually
+      constructs still comes back NativeFormat, at the real plist. A store that
+      cannot be redirected has to be REPLACED.
+
+    So the window's own store is replaced with a scratch ini after it is built —
+    ``self.settings`` is the one store MainWindow writes through (``_add_recent``
+    is its only ``setValue``) — and the open path is recorded rather than run,
+    since what this leg is about is the gate and not the loading of a workbook.
+    """
+    from PySide6.QtCore import QSettings
+    from studio.main_window import MainWindow
+
+    real_init = MainWindow.__init__
+    real_open = MainWindow.open_path
+    opened = []
+    stores = []
+
+    def scratch_init(self, *a, **k):
+        real_init(self, *a, **k)
+        self.settings = QSettings(os.path.join(tmp, "studio.ini"),
+                                  QSettings.IniFormat)
+        stores.append(self.settings.fileName())
+
+    def record_open(self, path):
+        """The real open path's contract, minus the loading: the launch is what is
+        under test, and a loaded workbook is what writes the recent files."""
+        opened.append(path)
+
+    MainWindow.__init__ = scratch_init
+    MainWindow.open_path = record_open
+
+    def restore():
+        MainWindow.__init__ = real_init
+        MainWindow.open_path = real_open
+
+    return restore, opened, stores
+
+
 # ------------------------------------------------------------------ A. contents
 def test_contents():
     fails = []
@@ -235,9 +290,18 @@ def test_launch_gate():
     real_show = MainWindow.show_welcome
     real_exec = QApplication.exec
     calls = []
+    escaped = []              # launches that came up on a store outside the scratch
 
     def _run(answer, suppress, args=()):
-        """One ``studio.app.main`` launch, with the gate answering ``answer``."""
+        """One ``studio.app.main`` launch, with the gate answering ``answer``.
+
+        Isolated by :func:`_isolated_launch`, which is where the reasons are: a
+        launch writes the user's own preferences unless the window's store is
+        replaced, and on macOS it cannot be redirected out from under it.
+
+        Returns ``(welcomes, opened)`` — how many welcome windows the launch
+        raised, and what it sent through the open path.
+        """
         del calls[:]
         welcome.show_at_launch = lambda settings=None: answer
         MainWindow.show_welcome = lambda self: calls.append(self)
@@ -249,38 +313,57 @@ def test_launch_gate():
             os.environ["XSLOPE_NO_WELCOME"] = "1"
         else:
             os.environ.pop("XSLOPE_NO_WELCOME", None)
-        try:
-            studio_app.main(["xslope-studio", *args])
-        finally:
-            os.environ.pop("XSLOPE_NO_WELCOME", None)
-            for w in QApplication.topLevelWidgets():
-                if isinstance(w, MainWindow):
-                    w.stop_threads()
-                    w.close()
-        return len(calls)
+        with tempfile.TemporaryDirectory(prefix="xslope-launch-") as tmp:
+            restore, opened, stores = _isolated_launch(tmp)
+            try:
+                studio_app.main(["xslope-studio", *args])
+            finally:
+                os.environ.pop("XSLOPE_NO_WELCOME", None)
+                # Closed BEFORE the patches are lifted, so anything a window does
+                # on the way out is still writing to the scratch store.
+                for w in QApplication.topLevelWidgets():
+                    if isinstance(w, MainWindow):
+                        w.stop_threads()
+                        w.close()
+                restore()
+            # The isolation is itself checked, every launch: a window that came up
+            # on anything but the scratch store wrote the preferences of whoever
+            # ran the suite, and that must fail here rather than be noticed months
+            # later in someone's recent-files list.
+            for store in stores:
+                if not os.path.abspath(store).startswith(os.path.abspath(tmp)):
+                    escaped.append(store)
+        return len(calls), list(opened)
 
     try:
-        if _run(answer=True, suppress=False) != 1:
+        if _run(answer=True, suppress=False)[0] != 1:
             fails.append("a launch whose preference asks for the welcome window "
                          "did not open one")
-        if _run(answer=False, suppress=False) != 0:
+        if _run(answer=False, suppress=False)[0] != 0:
             fails.append("a launch opened the welcome window although the "
                          "preference says not to")
-        if _run(answer=True, suppress=True) != 0:
+        if _run(answer=True, suppress=True)[0] != 0:
             fails.append("XSLOPE_NO_WELCOME did not suppress the window")
         # A launch that arrived with work in hand — a document on the command line,
         # which is how a double-clicked file reaches Studio on Windows and Linux —
         # opens that document and no greeting over it. The preference is untouched,
         # so the next bare launch still shows the window.
         if os.path.exists(SAMPLE):
-            if _run(answer=True, suppress=False, args=(SAMPLE,)) != 0:
+            welcomes, opened = _run(answer=True, suppress=False, args=(SAMPLE,))
+            if opened != [SAMPLE]:
+                fails.append(f"a file on the command line reached {opened}, not "
+                             "the window's open path")
+            if welcomes != 0:
                 fails.append("a launch that was handed a file still opened the "
                              "welcome window over it")
         else:
             fails.append(f"missing fixture {os.path.relpath(SAMPLE, _REPO)}")
-        if _run(answer=True, suppress=False) != 1:
+        if _run(answer=True, suppress=False)[0] != 1:
             fails.append("a bare launch after a file launch showed no welcome "
                          "window, so opening a file switched it off for good")
+        if escaped:
+            fails.append(f"a launch in this check came up on {escaped[0]} — the "
+                         "real user preferences, not the scratch store")
     finally:
         welcome.show_at_launch = real_gate
         MainWindow.show_welcome = real_show

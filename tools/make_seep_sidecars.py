@@ -38,14 +38,16 @@ that differ from one to the next: a few were produced by no steady solve at all
 missing mesh belongs to something else. Each is listed in ``EXCLUDED`` below with its
 own reason.
 
-Six further companions re-solve to a MATERIALLY DIFFERENT field on their own
-committed mesh. Their cause is NOT a workbook migration: for every one of them the
-workbook as it stood at the sidecar's own commit produces bit-identical results to
-the workbook as it stands today, so the model is not what changed. What changed is
-measured per entry in ``HELD`` — the solver since the field was saved, or a solve
-that does not converge and so has no single answer to reproduce. Rewriting them is a
-corpus change with published numbers behind some of them, not a footer correction, so
-they are left alone. ``--check --held`` prints the measured difference for every one.
+A companion that re-solves to a MATERIALLY DIFFERENT field on its own committed mesh
+is HELD rather than rewritten: rewriting it is a corpus change, with published numbers
+behind some of them, and not a footer correction. Six such files were held through
+2026-08-09, all four of their models for the same reason underneath — their solves ran
+to the iteration ceiling without closing, so there was no single field to record. The
+solver was diagnosed and fixed on 2026-08-10 (two limit cycles, one in the head field
+and one in the exit-face active set, both invisible behind the relaxation ladder) and
+all four converge. Five of the six are regenerated above; the sixth is a copy of one of
+them, held for a reason that has nothing to do with the model — ``--check --held``
+prints it.
 """
 import argparse
 import contextlib
@@ -82,10 +84,26 @@ GS = dict(tol=1e-5, max_iter=400)
 MODELS = [
     ("docs/fem/files/xslope_griffiths6_seep",            (1,), DOCS),
     ("docs/inputs/seep/xslope_earth_dam_bc2",         (1, 2), DOCS),
+    # Held until 2026-08-10 as SOLVER EVOLUTION: the first BC set of each ran to the
+    # 1000-sweep ceiling without closing, so it had no single field to record, and the
+    # second sets had drifted with the same solver evolution. The cause was a limit
+    # cycle in the head field, hidden by the relaxation ladder's terminal 0.01; with
+    # the escape in place each converges (463 and 901 sweeps) and each has one answer,
+    # so all four files are solved for it here. gsat_seep is the same field under a
+    # second name and is released with them — see HELD for why its copy waits.
+    ("docs/lem/files/xslope_earth_dam_rapid",         (1, 2), DOCS),
+    ("docs/lem/files/xslope_johnson_rapid_KEY",       (1, 2), DOCS),
     ("docs/seep/files/xslope_clay_blanket",              (1,), DOCS),
     ("docs/seep/files/xslope_double_sheetpile",          (1,), DOCS),
     ("docs/seep/files/xslope_earth_dam1",                (1,), DOCS),
     ("docs/seep/files/xslope_earth_dam1_vg",             (1,), DOCS),
+    # Held until 2026-08-10, where non-convergence was itself the cause: the exit-face
+    # active set cycled, so the field landed 8-23 psf apart depending only on where the
+    # sweep count stopped. The cycle was the all-or-nothing quadratic-edge rule
+    # forbidding the set the solve was reaching for; with that resolved it converges in
+    # 927 sweeps on 8 of its 97 exit-face nodes, closing to 8e-10 of its own flow, and
+    # has one field to record. Its type=seep lock re-meshes and is unaffected either way.
+    ("docs/seep/files/xslope_earth_dam2",                (1,), DOCS),
     ("docs/seep/files/xslope_johnson_res",               (1,), DOCS),
     # levee2's shipped field was solved at a grout curtain k = 0.001 that no committed
     # revision of the workbook carries — classroom experimentation, k being what
@@ -160,32 +178,31 @@ EXCLUDED = {
 }
 
 #: Companions whose committed field does not reproduce on their own committed mesh,
-#: with the DIAGNOSED cause of each. The model is ruled out as the cause for every one
-#: of them: re-solving with the workbook as it stood at the sidecar's own commit gives
-#: results bit-identical to re-solving with the workbook as it stands today, so no
-#: input change explains any of these. Held for a decision, not silently rewritten.
+#: each with the DIAGNOSED cause of it. A model is ruled out as the cause before an
+#: entry is made: re-solving with the workbook as it stood at the sidecar's own commit
+#: must give results bit-identical to re-solving with the workbook as it stands today,
+#: so no input change can explain the difference. Held for a decision, not silently
+#: rewritten — and a decision that holds an entry here is a decision to leave a stale
+#: field in the corpus, so an entry is a place to start work, not a place to end it.
+#:
+#: The four models held here through 2026-08-09 were held for one cause between them —
+#: their solves did not converge, and a flow rate read off a field that is still moving
+#: is not the flow through the section. That was a solver defect, not a corpus
+#: decision; it was fixed on 2026-08-10 and three of the four are in MODELS above, each
+#: with the ruling that released it. The fourth is held for a reason of a different
+#: kind, and not about the model at all.
 HELD = {
-    "docs/lem/files/xslope_earth_dam_rapid":
-        "SOLVER EVOLUTION. max |du| 628 / 258 psf; flowrate 181.62 -> 183.92, and the "
-        "second set 44.88 -> 53.53 (+19%). The first set does not converge on this "
-        "mesh today. The workbook at the sidecar's commit reproduces today's answer "
-        "bit for bit, so the change is in the solver, not the model.",
     "docs/lem/files/xslope_gsat_seep":
-        "SOLVER EVOLUTION, inherited. Its _seep.csv is byte-identical to "
-        "xslope_earth_dam_rapid_seep.csv — one field shipped under two names — so it "
-        "moves with it, and does not converge. Carries a circular_search lock "
-        "(fs_bishop 1.933, fs_spencer 1.912).",
-    "docs/lem/files/xslope_johnson_rapid_KEY":
-        "SOLVER EVOLUTION. max |du| 362 / 25 psf; the first set does not converge "
-        "today, and the workbook at the sidecar's commit gives the same answer as "
-        "today's. Measured against its own single_circle locks the seven factors of "
-        "safety all still round the same, but the field moves across 12-59% of nodes.",
-    "docs/seep/files/xslope_earth_dam2":
-        "NON-CONVERGENCE IS ITSELF THE CAUSE. It does not converge on its committed "
-        "mesh at any solver setting tried (tol 1e-4 to 1e-6, 400 to 4000 sweeps): the "
-        "exit-face active set cycles, so the field lands 8-23 psf away depending only "
-        "on where the sweep count stops, and there is no single answer to reproduce. "
-        "Its type=seep lock re-meshes and is unaffected.",
+        "RELEASED, WAITING ON A TEST FIXTURE (2026-08-10). Its field is the "
+        "earth_dam_rapid field under a second name, which is regenerated and "
+        "converged; this copy reproduces it exactly (q = 183.958670, 463 sweeps) and "
+        "is the file to write. What it cannot do yet is CARRY A SOLVE FOOTER: "
+        "test/report_check.py uses this model as the sample whose saved solution "
+        "records nothing about its solve, and two of its checks are premised on that "
+        "silence (test_seep_convergence_is_stated, test_seep_stale_sidecar_says_so). "
+        "That file belongs to another round in flight. Regenerate this stem in the "
+        "same change that points those two fixtures at a sample that is genuinely "
+        "silent, and that raises _truncated()'s row count past the footer length.",
 }
 
 
@@ -259,7 +276,11 @@ def main(argv=None):
         run(stem_rel, bcs, settings, args.check)
 
     if args.held:
-        print("\nHELD — stale field, not rewritten:")
+        if not HELD:
+            print("\nHELD — nothing: every companion in the corpus is the field its "
+                  "own committed mesh and workbook give.")
+        else:
+            print("\nHELD — stale field, not rewritten:")
         for stem_rel, why in HELD.items():
             print(f"\n  {os.path.basename(stem_rel)}: {why}")
             bcs = (1, 2) if os.path.exists(

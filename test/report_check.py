@@ -13053,9 +13053,11 @@ def test_fem_mesh_legend_names_what_it_holds():
     # loaded can carry a force of zero, whose arrow is skipped as a segment of no
     # length. Such a model was promised a green arrow the figure never drew.
     # Stated frames, because no solved model states a zero load on a loaded node.
-    def framed(bc_type, bc_values, element_types=(3, 3), element_materials=(1, 1)):
-        """Two triangles, with the stated fixity on the corners."""
-        return {
+    def framed(bc_type, bc_values, element_types=(3, 3), element_materials=(1, 1),
+               elements_1d=None, pile_elem_mask=None):
+        """Two triangles, with the stated fixity on the corners and the stated
+        1D elements strung across them."""
+        frame = {
             "nodes": np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]),
             "elements": np.array([[0, 1, 2], [0, 2, 3]]),
             "element_types": np.array(element_types),
@@ -13063,6 +13065,10 @@ def test_fem_mesh_legend_names_what_it_holds():
             "bc_type": np.array(bc_type),
             "bc_values": np.array(bc_values, dtype=float),
         }
+        if elements_1d is not None:
+            frame["elements_1d"] = np.array(elements_1d)
+            frame["pile_elem_mask"] = np.array(pile_elem_mask, dtype=bool)
+        return frame
 
     def drew(fem_data):
         """(the gids drawn on the axes, the entries the legend shows)."""
@@ -13080,29 +13086,58 @@ def test_fem_mesh_legend_names_what_it_holds():
             plt.close(fig)
 
     # What each key claims the figure shows, and the artists that show it.
-    SYMBOLS = (("FIXED_BC", "held on both axes", lambda l: l == "Fixed"),
-               ("ROLLER_BC", "held on one axis", lambda l: "oller" in l),
-               ("APPLIED_FORCE", "loaded", lambda l: "force" in l.lower()))
+    # ("force" is a substring of "reinforcement", so the arrow key is matched on
+    # the whole phrase.)
+    SYMBOLS = (("FIXED_BC", "on the nodes held on both axes", lambda l: l == "Fixed"),
+               ("ROLLER_BC", "on the nodes held on one axis", lambda l: "oller" in l),
+               ("APPLIED_FORCE", "on the loaded nodes",
+                lambda l: "applied force" in l.lower()),
+               ("REINFORCEMENT", "on a reinforcement line",
+                lambda l: l.startswith("Reinforcement")),
+               ("PILES", "on a pile", lambda l: l.startswith("Pile")))
+    keyed = {gid for gid, _, _ in SYMBOLS}
 
-    for what, bc_values, arrows in (
-            ("a node loaded with a force", [[0, 0], [0, 0], [10.0, -10.0], [0, 0]], True),
+    loaded = [[0, 0], [0, 0], [10.0, -10.0], [0, 0]]
+    unloaded = [[0, 0]] * 4
+    bar = [[0, 2, 0]]     # one 1D element, node 0 to node 2, third column padding
+    # Each frame states the symbols it is built to hold. A key can only be shown
+    # to be carried if some frame draws it and another draws none, so the frames
+    # cover both cases for all five, and the stated set is checked: a frame that
+    # quietly stops exercising the empty case fails here rather than turning into
+    # a row that can only ever pass.
+    for what, fem, holds in (
+            ("a node loaded with a force",
+             framed([1, 2, 4, 0], loaded),
+             {"FIXED_BC", "ROLLER_BC", "APPLIED_FORCE"}),
             ("a node marked as loaded carrying no force",
-             [[0, 0], [0, 0], [0.0, 0.0], [0, 0]], False)):
-        drawn, shown = drew(framed([1, 2, 4, 0], bc_values))
+             framed([1, 2, 4, 0], unloaded),
+             {"FIXED_BC", "ROLLER_BC"}),
+            ("a mesh held on no node",
+             framed([0, 0, 4, 0], loaded),
+             {"APPLIED_FORCE"}),
+            ("a reinforcement line and no pile",
+             framed([0, 0, 0, 0], unloaded, elements_1d=bar, pile_elem_mask=[False]),
+             {"REINFORCEMENT"}),
+            ("a pile and no reinforcement",
+             framed([0, 0, 0, 0], unloaded, elements_1d=bar, pile_elem_mask=[True]),
+             {"PILES"})):
+        drawn, shown = drew(fem)
 
-        # The frame is what it is called: the arrows are there, or they are not.
-        if ("APPLIED_FORCE" in drawn) is not arrows:
-            fails.append(f"{what} draws {'no' if arrows else 'an'} arrow; it is "
-                         f"the wrong frame for this check")
+        # The frame is what it is called: it draws the symbols it is named for
+        # and no others.
+        if drawn & keyed != holds:
+            fails.append(f"{what} draws {sorted(drawn & keyed)}, not the "
+                         f"{sorted(holds)} it is built to hold; it tests "
+                         f"something other than what it is called")
             continue
-        for gid, holds, names in SYMBOLS:
+        for gid, on, names in SYMBOLS:
             keys = [l for l in shown if names(l)]
             if keys and gid not in drawn:
                 fails.append(f"{what}: the mesh legend says {keys} and the "
-                             f"figure draws no symbol on the nodes {holds}")
+                             f"figure draws no symbol {on}")
             if gid in drawn and not keys:
-                fails.append(f"{what}: the figure marks the nodes {holds} and "
-                             f"the legend names nothing for them: {shown}")
+                fails.append(f"{what}: the figure draws a symbol {on} and the "
+                             f"legend names nothing for it: {shown}")
 
     # The zone swatches are keyed the same way — off the zones this function
     # actually filled, not off the material column. An element of a shape it

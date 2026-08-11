@@ -476,6 +476,49 @@ def test_an_entry_with_no_page_is_named():
     return fails
 
 
+def test_a_page_is_numbered_as_a_reader_would_call_it():
+    """A document that does not number its pages straight through is left alone.
+
+    The layout says which SHEET a heading landed on; the contents page has to
+    say which PAGE, and those are the same number only while the document
+    numbers its pages from its first sheet — which is how the report is set. A
+    report whose body restarted its numbering is the case where they differ, and
+    every entry in it would be numbered for a sheet the reader cannot find by
+    that name. Built here by restarting the numbering, which is one attribute.
+    """
+    from docx import Document
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from xslope.report_finalize import finalize_with_libreoffice
+
+    ok, why = _layout_available()
+    if not ok:
+        print(f"    (nothing here lays a document out: {why})")
+        return []
+
+    fails = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _report_docx(tmp)
+        doc = Document(path)
+        for section in doc.sections[1:]:
+            restart = OxmlElement("w:pgNumType")
+            restart.set(qn("w:start"), "1")
+            section._sectPr.append(restart)
+        doc.save(path)
+
+        done, msg = finalize_with_libreoffice(path)
+        if done:
+            fails.append("a report that restarts its page numbering was "
+                         "numbered by sheet anyway")
+        if "number its pages" not in (msg or ""):
+            fails.append(f"the refusal does not say what is wrong with the "
+                         f"document: {msg!r}")
+        if any(page is not None for _entry, page in _cached_contents(path)):
+            fails.append("a page number was written into a report the finish "
+                         "refused")
+    return fails
+
+
 def test_the_contents_field_is_found_by_its_instruction():
     """Fields nest, and the contents field is the one whose instruction says so.
 
@@ -564,6 +607,56 @@ def test_the_numbers_are_proved_after_they_are_written():
                 if handle.read() != written:
                     fails.append(f"a finish that went wrong ({what}) changed "
                                  f"the report anyway")
+    return fails
+
+
+def test_numbers_that_never_settle_are_refused():
+    """A finish that cannot reach agreement refuses; it does not ship its last
+    guess.
+
+    Writing a page number can move the heading it points at — a long entry
+    wrapped onto a second line moves the contents page's own break — so the leg
+    writes, lays out again and compares. This is the case that would otherwise
+    go round for ever: a layout that answers differently every time. Nothing is
+    laid out here; the layout is the stub, so this runs on a machine with no
+    LibreOffice at all.
+    """
+    import xslope.report_finalize as rf
+
+    fails = []
+    real_layout = rf._laid_out_headings
+    real_available = rf.libreoffice_available
+    real_soffice = rf._soffice
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _report_docx(tmp)
+        entries = [entry for entry, _page in _cached_contents(path)]
+        answers = [3, 4]
+
+        def restless(work, outdir, soffice, timeout, profile=None):
+            page = answers[0]
+            answers.reverse()
+            return [(entry, page) for entry in entries], 9, ""
+
+        with open(path, "rb") as handle:
+            written = handle.read()
+        rf._laid_out_headings = restless
+        rf.libreoffice_available = lambda: (True, "a stub")
+        rf._soffice = lambda: "a stub"
+        try:
+            done, msg = rf.finalize_with_libreoffice(path)
+        finally:
+            rf._laid_out_headings = real_layout
+            rf.libreoffice_available = real_available
+            rf._soffice = real_soffice
+        if done:
+            fails.append(f"page numbers that never agreed with the layout were "
+                         f"reported as finished: {msg}")
+        if "settle" not in (msg or ""):
+            fails.append(f"the refusal does not say what went wrong: {msg!r}")
+        with open(path, "rb") as handle:
+            if handle.read() != written:
+                fails.append("a finish that never settled changed the report "
+                             "anyway")
     return fails
 
 
@@ -969,10 +1062,14 @@ CHECKS = [
      test_libreoffice_numbers_the_report),
     ("an entry on no page is named, and nothing is written",
      test_an_entry_with_no_page_is_named),
+    ("a page is numbered as a reader would call it",
+     test_a_page_is_numbered_as_a_reader_would_call_it),
     ("the contents field is found among fields",
      test_the_contents_field_is_found_by_its_instruction),
     ("the numbers are proved on the document",
      test_the_numbers_are_proved_after_they_are_written),
+    ("numbers that never settle are refused",
+     test_numbers_that_never_settle_are_refused),
     ("the finish uses the program it is told to",
      test_the_finish_uses_the_program_it_is_told_to),
     ("every refusal is a sentence", test_refusals_are_sentences),

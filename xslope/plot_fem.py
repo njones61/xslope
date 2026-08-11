@@ -354,10 +354,15 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
             edge_segments.extend([[n0, n1], [n1, n2], [n2, n3], [n3, n0]])
 
     # Render filled polygons as batched PatchCollections (one per material)
+    # The materials that end up with a fill on the axes — the legend is keyed off
+    # this list rather than off the material column, so a zone whose elements are
+    # of a shape this function does not fill gets no swatch.
+    filled_materials = []
     for mat in materials:
         polys = mat_fill_polys[mat]
         if not polys:
             continue
+        filled_materials.append(mat)
         has_edge = any(element_types[i] in (3, 4) for i, m in enumerate(element_materials) if m == mat)
         has_no_edge = any(element_types[i] in (6, 8, 9) for i, m in enumerate(element_materials) if m == mat)
         color = mat_to_color[mat]
@@ -433,7 +438,7 @@ def plot_fem_data(fem_data, figsize=(12, 7), show_nodes=False, show_bc=True,
     material_names = fem_data.get("material_names", [])
 
     legend_handles = []
-    for mat in materials:
+    for mat in filled_materials:
         if material_names and mat <= len(material_names):
             label = material_names[mat - 1]
         else:
@@ -582,7 +587,8 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
                 [x + triangle_width/2, y - triangle_height],
                 [x, y]
             ], closed=True))
-        pc = PatchCollection(tri_patches, facecolor='none', edgecolor='red', linewidth=1.5)
+        pc = PatchCollection(tri_patches, facecolor='none', edgecolor='red', linewidth=1.5,
+                             gid='FIXED_BC')
         ax.add_collection(pc)
 
         legend_handles.append(
@@ -612,9 +618,10 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
             circle_patches.append(patches.Circle((cx, y), circle_radius))
             roller_line_segs.append([[lx, y - line_length/2], [lx, y + line_length/2]])
 
-        pc = PatchCollection(circle_patches, facecolor='none', edgecolor='blue', linewidth=1)
+        pc = PatchCollection(circle_patches, facecolor='none', edgecolor='blue', linewidth=1,
+                             gid='ROLLER_BC')
         ax.add_collection(pc)
-        lc = LineCollection(roller_line_segs, colors='blue', linewidths=1)
+        lc = LineCollection(roller_line_segs, colors='blue', linewidths=1, gid='ROLLER_BC')
         ax.add_collection(lc)
 
         legend_handles.append(
@@ -652,14 +659,20 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
                 tip_ys.append(tip_y)
 
             if arrow_segs:
-                lc = LineCollection(arrow_segs, colors='green', linewidths=1.2)
+                lc = LineCollection(arrow_segs, colors='green', linewidths=1.2,
+                                    gid='APPLIED_FORCE')
                 ax.add_collection(lc)
-                ax.plot(tip_xs, tip_ys, marker='v', color='green', markersize=3, linestyle='None')
+                ax.plot(tip_xs, tip_ys, marker='v', color='green', markersize=3, linestyle='None',
+                        gid='APPLIED_FORCE')
 
-        legend_handles.append(
-            plt.Line2D([0], [0], marker=r'$\rightarrow$', color='green', linestyle='None',
-                      markersize=12, label='Applied force')
-        )
+                # The key goes with the arrows, not with the nodes: a node can be
+                # marked as loaded and carry a force of zero, and every arrow of
+                # zero length is skipped above. Keyed from the node list, such a
+                # model promised a green arrow the figure never drew.
+                legend_handles.append(
+                    plt.Line2D([0], [0], marker=r'$\rightarrow$', color='green', linestyle='None',
+                              markersize=12, label='Applied force')
+                )
 
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],
                     deform_percent=15, show_mesh=True, show_reinforcement=True, figsize=(12, 8), label_elements=False,

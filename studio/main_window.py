@@ -30,7 +30,7 @@ from xslope.fileio import default_template_path
 from xslope.package import (FEM_SOLUTION_SIDECARS as _FEM_SOLUTION_SIDECARS,
                             PACKAGE_EXT, is_package, pack, package_contents, unpack)
 
-from . import urlscheme
+from . import links, urlscheme
 from .canvas import MplCanvas
 from .dialogs import (
     BuildMeshDialog, DxfImportDialog, GszImportDialog, ReliabilityDialog,
@@ -48,6 +48,7 @@ from .runners import (FemRunner, LemRunner, MeshWorker, ReliabilityRunner,
                       ReportRunner, SeepRunner, SensitivityRunner,
                       resume_cycle_gc, suspend_cycle_gc)
 from .update_ui import UpdateController
+from .welcome import WelcomeDialog
 
 #: The app's display name — title bar, About box, menus. Matches the name the
 #: installers give it on disk ("XSLOPE Studio.app", the Windows Add/Remove entry).
@@ -592,6 +593,12 @@ class MainWindow(QMainWindow):
         self.act_redo = QAction("&Redo", self, shortcut=QKeySequence.Redo,
                                 triggered=self._redo, enabled=False)
         self.act_about = QAction("&About", self, triggered=self._about)
+        # The documentation is one click from anywhere in the app: it is the manual,
+        # and it is also where the samples and the verification problems are listed,
+        # so Studio keeps no in-app copy of either list.
+        self.act_documentation = QAction("&Documentation", self,
+                                         triggered=self.open_documentation)
+        self.act_welcome = QAction("&Welcome", self, triggered=self.show_welcome)
         # Update items live in Help on every platform. macOS would otherwise be
         # free to re-home them by matching the text, so the role is explicit.
         self.act_check_updates = QAction("Check for &Updates…", self,
@@ -655,11 +662,17 @@ class MainWindow(QMainWindow):
         m_view.addAction(self.log_dock.toggleViewAction())
         m_view.addAction(self.chat_dock.toggleViewAction())
 
+        # Help reads outward first (the documentation and the welcome window),
+        # then the update items, then About — which macOS moves to the application
+        # menu on its own, by the action's text.
         m_help = mb.addMenu("&Help")
-        m_help.addAction(self.act_about)
+        m_help.addAction(self.act_documentation)
+        m_help.addAction(self.act_welcome)
         m_help.addSeparator()
         m_help.addAction(self.act_check_updates)
         m_help.addAction(self.act_startup_check)
+        m_help.addSeparator()
+        m_help.addAction(self.act_about)
 
     def _make_toolbar(self):
         tb = QToolBar("Main", self)
@@ -3441,6 +3454,23 @@ class MainWindow(QMainWindow):
             f"<b>{APP_NAME}</b> {__version__}<br>Desktop GUI for the xslope "
             f"slope-stability engine.<br><br>Open an Excel input file to view its "
             f"geometry and inputs.")
+
+    # --- documentation and welcome ---------------------------------------
+    def open_documentation(self):
+        """Help → Documentation — the documentation root, in the browser."""
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        return QDesktopServices.openUrl(QUrl(links.DOCS_URL))
+
+    def show_welcome(self):
+        """Help → Welcome, and the first launch (opened from ``studio.app``).
+
+        Modal: it is a page of text with links on it, and the window behind it has
+        nothing on it yet the first time this runs.
+        """
+        dlg = WelcomeDialog(self, settings=self.settings)
+        return dlg.exec()
 
     # --- updates ---------------------------------------------------------
     def _check_updates(self):

@@ -58,8 +58,9 @@ Stability-time captures (the Run dialogs' transient controls):
     saved.
 
 The remaining dialogs and dock panels — Build mesh, the steady Run Seepage dialog,
-the DXF import wizard, the Global parameters form, the two Assistant dialogs, the
-Inputs tree and the two Display panels — are captured the same way. The Display docks
+the welcome window, the DXF import wizard, the Global parameters form, the two
+Assistant dialogs, the Inputs tree and the two Display panels — are captured the
+same way. The Display docks
 and the Inputs tree are grabbed off a real :class:`studio.main_window.MainWindow`
 built offscreen, so the dock frame, its title bar and the pinned **Styles…** button
 are the window's own rather than a stand-in assembled here.
@@ -446,6 +447,24 @@ def capture_unpack_package_dialog():
     return _grab(dlg, "usage_unpack_package_dialog.png")
 
 
+def capture_welcome_dialog():
+    """The welcome window as a first launch shows it.
+
+    On a throwaway settings file, for two reasons: the shot must not read (or
+    write) the preferences of whoever runs the capture, and a store with nothing in
+    it is what a first launch is — so **Don't show this again** appears ticked, the
+    way the person in the screenshot would find it."""
+    import tempfile
+    from PySide6.QtCore import QSettings
+    from studio.welcome import WelcomeDialog
+
+    with tempfile.TemporaryDirectory() as tmp:
+        settings = QSettings(os.path.join(tmp, "welcome.ini"), QSettings.IniFormat)
+        dlg = WelcomeDialog(settings=settings)
+        dlg.resize(dlg.sizeHint())
+        return _grab(dlg, "overview_welcome_window.png")
+
+
 def capture_run_seep_dialog():
     """The Run Seepage dialog in Steady mode, on a model with two BC sets.
 
@@ -762,6 +781,7 @@ def main():
                capture_run_lem_methods, capture_run_lem_dialog,
                capture_build_mesh_dialog, capture_build_mesh_dialog_refine,
                capture_run_seep_dialog, capture_unpack_package_dialog,
+               capture_welcome_dialog,
                capture_report_dialog,
                capture_dxf_wizard, capture_global_form,
                capture_assistant_settings, capture_assistant_confirm,

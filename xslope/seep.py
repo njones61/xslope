@@ -1178,7 +1178,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         h_last = h_new.copy()
 
     else:
-        print(f"Warning: Did not converge in {max_iter} iterations")
+        # The sweeps actually run, which is max_iter unless an escape extended it.
+        print(f"Warning: Did not converge in {budget} iterations")
         print("\nConvergence history:")
         for i, r in enumerate(residuals):
             if i % 20 == 0 or i == len(residuals) - 1:

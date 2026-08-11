@@ -132,6 +132,16 @@ def _isolated_launch(tmp):
     ``self.settings`` is the one store MainWindow writes through (``_add_recent``
     is its only ``setValue``) — and the open path is recorded rather than run,
     since what this leg is about is the gate and not the loading of a workbook.
+
+    **Every handle, not just the window's.** ``UpdateController.__init__`` takes its
+    own reference to ``window.settings`` (``update_ui.py``) while the window is
+    being built, which is before this replacement happens — so repointing
+    ``self.settings`` alone leaves ``win.updates.settings`` still holding the real
+    plist. Nothing writes through it while ``XSLOPE_NO_UPDATE_CHECK`` is set, which
+    every launch here sets, but that is one environment line away from
+    ``updates/last_check`` landing in the user's domain unnoticed. Both handles are
+    repointed, and both are collected for the escaped-store guard, so a handle taken
+    somewhere new fails this check rather than a user's preferences.
     """
     from PySide6.QtCore import QSettings
     from studio.main_window import MainWindow
@@ -145,7 +155,11 @@ def _isolated_launch(tmp):
         real_init(self, *a, **k)
         self.settings = QSettings(os.path.join(tmp, "studio.ini"),
                                   QSettings.IniFormat)
+        # The update controller took its own reference while the window was being
+        # built; it gets the scratch store too, and is guarded with the rest.
+        self.updates.settings = self.settings
         stores.append(self.settings.fileName())
+        stores.append(self.updates.settings.fileName())
 
     def record_open(self, path):
         """The real open path's contract, minus the loading: the launch is what is

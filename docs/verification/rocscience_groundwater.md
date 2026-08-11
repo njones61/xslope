@@ -421,8 +421,9 @@ profile shape and sits at the high end of the published scatter:
 *The published Slide and Ref[1] curves themselves diverge 0.9 m at elevation 8; XSLOPE tracks
 the shape, runs below both over the lower half of the line and above Slide near the crest,
 ending 0.08 m from Ref[1] and 0.98 m from Slide there. Of the five cases this one reaches the
-deepest suction — 6.7 m, into the part of the conductivity curve that falls fastest — so it is
-the case the fit moves most. Locked at XSLOPE's own values.*
+deepest suction — 6.7 m, against 3.1–4.7 m for the rest — so it samples the part of the
+conductivity curve that falls fastest, and it is the case the fit moves furthest. Locked at
+XSLOPE's own values.*
 
 ![gw006c: mesh and solved heads (low-k core)](images/gw006c.png)
 

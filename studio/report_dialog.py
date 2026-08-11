@@ -500,10 +500,13 @@ class ReportDialog(QDialog):
         """One checkable row per method the solver offers, opening on the one the
         results view is showing.
 
-        EVERY method is offered, not only the ones that have been run: a method
-        that was not run is documented on the critical surface the report is
-        built around — the same surface, the same slices — and its section says
-        so. A method that cannot run on this surface family at all is listed and
+        EVERY method is offered, not only the ones that have been run, and each
+        row says which it is. A report documents the analysis, so a method the
+        run never solved is dropped from it — it has no factor of safety to
+        report, and one solved here on another method's critical surface would be
+        a number the analysis never produced (the owner's ruling, fem_piles
+        review; :func:`~xslope.report.featured_methods` does the dropping). A
+        method that cannot run on this surface family at all is listed and
         disabled, with the reason on it, rather than quietly missing.
         """
         from xslope.preflight import method_surface_reason
@@ -540,8 +543,9 @@ class ReportDialog(QDialog):
                 if name in run:
                     item.setToolTip("Solved in this run.")
                 else:
-                    item.setToolTip("Not run; it would be solved on the critical "
-                                    "surface the report documents.")
+                    item.setToolTip("Not run; ticking it adds nothing to the "
+                                    "report. Run it first to have it "
+                                    "documented.")
             self.methods.addItem(item)
         self.methods.blockSignals(False)
         self._ensure_a_method()

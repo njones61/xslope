@@ -3607,7 +3607,13 @@ def plot_inputs(
         plot_derived_water_lines(ax, slope_data, style=style)
     if mode == "seep":
         plot_seepage_bc_lines(ax, slope_data, style=style)
-    plot_tcrack_surface(ax, slope_data, style=style)
+    # The tension crack is a limit equilibrium input and nothing else's: it caps
+    # the depth a slice's driving side reaches and carries the crack water force
+    # into the method of slices. No seepage or finite element run reads it, and
+    # on the shared section it was the same red line one page from the figure
+    # that means something by it (the owner's ruling, tension_crack review).
+    if mode == "lem":
+        plot_tcrack_surface(ax, slope_data, style=style)
     # The members and the loads belong to the engine that carries them, not to
     # the section: each engine's model figure draws its own, and the shared
     # model leaves them out (see the "shared" entry under ``mode``). A seepage

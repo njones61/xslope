@@ -589,6 +589,56 @@ def _text_width(text, family, size_pt):
     return sum(_char_width(family, size_pt, ch) for ch in _plain(text))
 
 
+def _wrapped_lines(text, family, size_pt, width):
+    """How many lines ``text`` takes in a cell ``width`` twips wide.
+
+    Word's own line breaking, as far as a column measurement needs it: break
+    between words, and put a word that will not fit on a line of its own. The
+    text is measured as it PRINTS, for the reason :func:`_text_width` is.
+
+    This is what makes the allocation below an allocation of LINES rather than
+    of width. A column is only as good as the number of lines it makes its
+    content take, and two columns of equal width can take one line and four.
+    """
+    words = _plain(text).split()
+    if not words:
+        return 1
+    room = max(width, 1.0)
+    space = _char_width(family, size_pt, " ")
+    lines, filled = 1, 0.0
+    for word in words:
+        w = sum(_char_width(family, size_pt, ch) for ch in word)
+        if filled and filled + space + w > room:
+            lines += 1
+            filled = w
+        else:
+            filled += (space if filled else 0.0) + w
+    return lines
+
+
+def _width_within(texts, family, size_pt, lo, hi, budget):
+    """The narrowest width between ``lo`` and ``hi`` at which no line of
+    ``texts`` wraps past ``budget`` lines — ``hi`` where even that is not
+    enough."""
+    if hi <= lo:
+        return hi
+
+    def fits(width):
+        return all(_wrapped_lines(t, family, size_pt, width) <= budget
+                   for t in texts)
+
+    if not fits(hi):
+        return hi
+    low, high = lo, hi
+    for _ in range(24):
+        mid = (low + high) / 2
+        if fits(mid):
+            high = mid
+        else:
+            low = mid
+    return high
+
+
 def _apportion(widths, total):
     """``widths`` as whole twips summing to exactly ``total``.
 
@@ -611,11 +661,13 @@ def _apportion(widths, total):
 
 
 def _column_widths(columns, family, size_pt, usable, pad, fit="content",
-                   nowrap=None):
+                   nowrap=None, header_rows=0):
     """Column widths in twips, summing to the table's width.
 
     ``columns`` is every string that will print in each column — its header, its
-    cells and its total — one list per column.
+    cells and its total — one list per column. ``header_rows`` is how many of
+    them, at the front of each list, are headers: a header may wrap and a value
+    may not, so the two are measured differently below.
 
     Each column asks for its widest line plus ``pad``, the cell margins that sit
     either side of the text, and floors at its longest single word: Word breaks a
@@ -625,13 +677,16 @@ def _column_widths(columns, family, size_pt, usable, pad, fit="content",
     is capped there: past an equal share, refusing to break the word would starve
     every other column, and Word breaks it anyway.
 
-    ``nowrap`` is one flag per column, true where nothing in the column may be
+    ``nowrap`` is one flag per column, true where no VALUE in the column may be
     broken — a column of numbers, which the cells themselves also declare
-    (:func:`_no_wrap`). Such a column floors at its widest VALUE and that floor
+    (:func:`_no_wrap`). Such a column floors at its widest value and that floor
     is not capped: an equal share of the page is a sensible place to stop
-    widening a column of prose, and no place at all to cut a number in half. The
-    set can still be scaled bodily if even the floors do not fit, which is the
-    one case left where a table cannot hold what it is given.
+    widening a column of prose, and no place at all to cut a number in half. Its
+    HEADER is not part of that floor — "Head movement (ft)" over a column of
+    five-character displacements is meant to wrap, and a header that could not
+    would set the width of the whole table from the longest thing written at the
+    top of it. The set can still be scaled bodily if even the floors do not fit,
+    which is the one case left where a table cannot hold what it is given.
 
     ``fit`` decides what happens to a table that does not need the whole page.
     Under ``"content"`` it keeps the width its content asked for and the table
@@ -640,11 +695,15 @@ def _column_widths(columns, family, size_pt, usable, pad, fit="content",
     proportion to what the columns asked for until it fills the text width, so a
     "#" column stays narrow while the table spans the margins.
 
-    A table wider than the page is cut to a single water level whatever the fit —
-    it still has to fit. The widest column loses first and keeps losing until it
-    is no wider than the next, and a column below the level is not touched at
-    all. That is what lets a long Finding wrap while the Severity beside it still
-    prints "Warning" on one line.
+    A table wider than the page is fitted by LINES rather than by width, because
+    lines are what a reader sees: the narrowest budget of lines per cell that the
+    page can hold is found, every column is given the width it needs to keep
+    inside that budget, and what is left over is handed out in proportion to what
+    each column still wants. A column whose content fits on one line at any width
+    it is offered therefore keeps its own width and no more, and the columns that
+    have to wrap share the rest — which is what lets a long Finding wrap while
+    the Severity beside it still prints "Warning" on one line, and what stops one
+    long header from squeezing a sentence of a cell into four lines beside it.
     """
     n = max(1, len(columns))
     fair_share = usable / n
@@ -652,15 +711,40 @@ def _column_widths(columns, family, size_pt, usable, pad, fit="content",
     flags = (flags + [False] * n)[:n]
     want, floor = [], []
     for j, texts in enumerate(columns):
+        values = texts[header_rows:] or texts
         widest = max((_text_width(t, family, size_pt) for t in texts), default=0.0)
+        widest_value = max((_text_width(t, family, size_pt) for t in values),
+                           default=0.0)
         longest_word = max((_text_width(w, family, size_pt)
                             for t in texts for w in t.split()), default=0.0)
         want.append(widest + pad)
         # An empty column is still a column: one em is the narrowest that reads
         # as one rather than as a line.
-        unbreakable = max(widest if flags[j] else longest_word,
+        unbreakable = max(widest_value if flags[j] else longest_word,
                           size_pt * TWIPS_PER_PT) + pad
         floor.append(unbreakable if flags[j] else min(unbreakable, fair_share))
+        # A column can be asked for less than it can be given: a "#" column of
+        # single digits floors at the em below rather than at its own content.
+        # What it can be given is what it wants.
+        want[j] = max(want[j], floor[j])
+
+    # Columns that are the same column print at the same width. A table with two
+    # "At depth (ft)" columns in it holds one quantity twice, and two widths for
+    # it is the mismatch a reader sees before anything else. They are the same
+    # column where they carry the same header, and — in a table with no headers
+    # to go by — where they carry the same strings; both take the widest
+    # measurement of the group, and every stage below moves them together.
+    groups = {}
+    for j in range(n):
+        head = tuple(columns[j][:header_rows])
+        key = head if any(h.strip() for h in head) else tuple(columns[j])
+        groups.setdefault(key, []).append(j)
+    for members in groups.values():
+        if len(members) > 1:
+            widest_want = max(want[j] for j in members)
+            widest_floor = max(floor[j] for j in members)
+            for j in members:
+                want[j], floor[j] = widest_want, widest_floor
 
     natural = [max(want[j], floor[j]) for j in range(n)]
     if fit != "page" and sum(natural) <= usable:
@@ -672,17 +756,68 @@ def _column_widths(columns, family, size_pt, usable, pad, fit="content",
         # at this size, so it is scaled bodily and Word does the breaking.
         w = [x * usable / sum(floor) for x in floor]
     else:
-        def at(level):
-            return sum(max(min(want[j], level), floor[j]) for j in range(n))
+        # The line budget: how many lines a cell may take. One is what every
+        # table would like; the search stops at the first budget the page can
+        # hold, so no table wraps further than it has to. The ceiling is what the
+        # columns take at their own floors, which is where the search must end
+        # because it cannot go narrower than that.
+        ceiling = max((_wrapped_lines(t, family, size_pt, floor[j] - pad)
+                       for j, texts in enumerate(columns) for t in texts),
+                      default=1)
+        def at_budget(budget):
+            """The width every column needs to keep inside ``budget`` lines,
+            with the columns that are one column held to one width."""
+            out = [_width_within(columns[j], family, size_pt, floor[j] - pad,
+                                 want[j] - pad, budget) + pad
+                   for j in range(n)]
+            for members in groups.values():
+                widest = max(out[j] for j in members)
+                for j in members:
+                    out[j] = widest
+            return out
 
-        lo, hi = 0.0, max(want)
-        for _ in range(64):
-            mid = (lo + hi) / 2
-            if at(mid) > usable:
-                hi = mid
-            else:
-                lo = mid
-        w = [max(min(want[j], lo), floor[j]) for j in range(n)]
+        w = list(floor)
+        for budget in range(1, ceiling + 1):
+            trial = at_budget(budget)
+            if sum(trial) <= usable:
+                w = trial
+                break
+
+        # The budget is a ceiling, not a target. What the page has left over is
+        # spent saving lines, and the cheapest saving is bought first: a column
+        # of names that would come off two lines for a tenth of an inch is worth
+        # more than the same tenth spread over a column that stays on three
+        # whatever it is given.
+        def lines_at(j, width):
+            return max(_wrapped_lines(t, family, size_pt, width - pad)
+                       for t in columns[j])
+
+        while True:
+            slack = usable - sum(w)
+            best = None
+            for members in groups.values():
+                j = members[0]
+                here = max(lines_at(k, w[k]) for k in members)
+                if here <= 1 or w[j] >= want[j]:
+                    continue
+                need = max(_width_within(columns[k], family, size_pt,
+                                         w[k] - pad, want[k] - pad, here - 1)
+                           for k in members) + pad
+                cost = (need - w[j]) * len(members)
+                if cost <= slack and (best is None or cost < best[0]):
+                    best = (cost, members, need)
+            if best is None:
+                break
+            for j in best[1]:
+                w[j] = best[2]
+
+        # And the last twips, which buy no line at all, go to the columns still
+        # short of what they asked for, in proportion to how short they are.
+        room = [max(0.0, want[j] - w[j]) for j in range(n)]
+        slack = usable - sum(w)
+        if slack > 0 and sum(room) > 0:
+            share = min(1.0, slack / sum(room))
+            w = [w[j] + room[j] * share for j in range(n)]
     return _apportion(w, usable)
 
 
@@ -771,7 +906,7 @@ def _rule_above(cell, val, sz, color):
 
 
 def _fit_table(doc, table, section, columns, size, style_name=STYLE["table"],
-               fit="content", nowrap=None):
+               fit="content", nowrap=None, header_rows=0):
     """Give ``table`` fixed, measured columns, and the indent that puts its left
     border on the text margin.
 
@@ -793,7 +928,7 @@ def _fit_table(doc, table, section, columns, size, style_name=STYLE["table"],
     margin = CELL_MARGIN[0]
     usable = _usable_twips(section)
     widths = _column_widths(columns, _table_font(doc), size, usable, 2 * margin,
-                            fit, nowrap)
+                            fit, nowrap, header_rows)
 
     _set_cell_margins(table, *CELL_MARGIN)
     table.autofit = False                       # w:tblLayout w:type="fixed"
@@ -2029,7 +2164,8 @@ def _render_table(doc, block, section, state=None):
                fit=getattr(block, "fit", "content"),
                nowrap=[all(is_number(t) for t in texts[1:] if t.strip())
                        and any(is_number(t) for t in texts[1:])
-                       for texts in printed])
+                       for texts in printed],
+               header_rows=1)
 
     if block.legend:
         p = doc.add_paragraph()

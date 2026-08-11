@@ -468,6 +468,12 @@ def test_word_is_not_driven_unless_it_was_asked_for():
     The other checks stub ``_osascript`` out for their own purposes and put it
     back afterwards; the watch is what they put back, so it sees every call any
     of them makes for real.
+
+    The mutation at the end runs ``osascript -e 1`` twice, which is the one
+    osascript this file ever spawns: it evaluates the literal 1 and exits. It
+    starts no application, names none, and cannot reach Word — it exists only so
+    that the watch above is proved able to count a call it was meant to catch.
+    Anything watching the process list sees the name and nothing else.
     """
     import subprocess
 

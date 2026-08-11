@@ -204,27 +204,39 @@ def _pile_line_indices(fem_data):
     return sorted(int(v) for v in np.unique(by_elem))
 
 
-def _line_label(fem_data, slope_data, kind, index):
-    """A display name for one member.
+def display_labels(labels, fallback):
+    """Display names for one kind of member, in the order they are defined.
 
     The model's own label is used when it has one. Labels need not be unique —
     a piles sheet where every row is called "pile" is perfectly legal — so a
-    label shared with another member of the same kind is numbered, otherwise the
-    list would show two rows a user cannot tell apart.
+    label shared with another member of the same kind is numbered, otherwise a
+    list would show two rows a reader cannot tell apart. A member with no label
+    of its own is numbered from ``fallback``.
+
+    One rule, used everywhere a member is named: the properties table, the
+    forces table, the figure that locates the members on the section and the
+    figures of each of them all print these names, and a name that differed
+    between two of them would read as two different members (the owner's
+    ruling, fem_piles review, where the properties table called both piles
+    "pile" and everything else called them "pile 1" and "pile 2").
     """
+    own = [str(x) if x else "" for x in labels]
+    return [name if name and own.count(name) == 1
+            else (f"{name} {i + 1}" if name else f"{fallback} {i + 1}")
+            for i, name in enumerate(own)]
+
+
+def _line_label(fem_data, slope_data, kind, index):
+    """The display name of one member, by its own index."""
     if kind == "reinforcement":
-        labels = [str(x) if x else "" for x in
-                  (fem_data.get("reinforce_line_labels", None) or [])]
-        own = labels[index - 1] if 0 <= index - 1 < len(labels) else ""
-        if not own:
-            return f"Line {index}"
-        return own if labels.count(own) == 1 else f"{own} {index}"
-    lines = (slope_data or {}).get("pile_lines", []) or []
-    labels = [str(ln.get("label")) if ln.get("label") else "" for ln in lines]
-    own = labels[index] if 0 <= index < len(labels) else ""
-    if not own:
-        return f"Pile {index + 1}"
-    return own if labels.count(own) == 1 else f"{own} {index + 1}"
+        labels = list(fem_data.get("reinforce_line_labels", None) or [])
+        i, fallback = index - 1, "Line"
+    else:
+        lines = (slope_data or {}).get("pile_lines", []) or []
+        labels = [ln.get("label") for ln in lines]
+        i, fallback = index, "Pile"
+    names = display_labels(labels, fallback)
+    return names[i] if 0 <= i < len(names) else f"{fallback} {i + 1}"
 
 
 def _member_nodes(fem_data, kind, index):

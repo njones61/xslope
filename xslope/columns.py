@@ -263,12 +263,17 @@ def is_number(text):
     exists the value has been through :func:`format_value` and the string is all
     there is. A blank is not a number — a column of forces with an empty cell in
     it is still a column of forces.
+
+    A number written with thousands separators is a number. "1,550.0" is what
+    the report prints a force as, and reading it as prose cost it everything a
+    number is given: its cell was free to break mid-number across two lines, and
+    its column was measured as though it could.
     """
     s = str(text).strip()
     if not s:
         return False
     try:
-        float(s)
+        float(s.replace(",", "") if "," in s else s)
     except (TypeError, ValueError):
         return False
     return True

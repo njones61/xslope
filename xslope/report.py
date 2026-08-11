@@ -2334,8 +2334,12 @@ def _pile_fields(slope_data):
     label = _unit_labels(slope_data)
     au = f" ({label['length']}²)" if lu else ""
     iu = f" ({label['length']}⁴)" if lu else ""
-    mu = (f" ({label['force_per_len']}·{label['length']})"
-          if fu and lu else "")
+    # A moment capacity per unit width of slope, spelled the one way the report
+    # spells it: force x length per length (:func:`~xslope.fem_details.units`).
+    # "lb/ft·ft" is the same quantity written so that it reads as force per area,
+    # and the forces table beside this one already spelled it out.
+    force = (label['force_per_len'] or "").split("/")[0]
+    mu = f" ({force}·{label['length']} per {label['length']})" if fu and lu else ""
     return {
         "label": ("label", "Label", lambda m: str(m.get("label") or ""), True),
         "top": ("x1", "Top (x, y)", lambda m: _point(m, "x1", "y1"), True),
@@ -2374,8 +2378,21 @@ MEMBER_CAPTIONS = {
 }
 
 
+def _named(members, fallback):
+    """``members`` with each one's Label column set to its display name.
+
+    The name a properties table prints is the name everything else prints —
+    :func:`~xslope.fem_details.display_labels` is the one rule, and a table that
+    called both piles "pile" while the forces table and the figures beside it
+    called them "pile 1" and "pile 2" was three names for two members.
+    """
+    from .fem_details import display_labels
+    names = display_labels([m.get("label") for m in members], fallback)
+    return [dict(m, label=name) for m, name in zip(members, names)]
+
+
 def _reinforcement_table(slope_data, counter, engine):
-    lines = slope_data.get("reinforcement_lines") or []
+    lines = _named(slope_data.get("reinforcement_lines") or [], "Line")
     fields = _reinforcement_fields(slope_data)
     return _member_table(lines,
                          [fields[k] for k in REINFORCEMENT_PROPERTIES[engine]],
@@ -2383,7 +2400,7 @@ def _reinforcement_table(slope_data, counter, engine):
 
 
 def _piles_table(slope_data, counter, engine):
-    piles = slope_data.get("pile_lines") or []
+    piles = _named(slope_data.get("pile_lines") or [], "Pile")
     fields = _pile_fields(slope_data)
     return _member_table(piles, [fields[k] for k in PILE_PROPERTIES[engine]],
                          MEMBER_CAPTIONS[("piles", engine)], counter)
@@ -6268,6 +6285,11 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         # (:func:`_model_figure_shows`).
         shows = ["the section and its materials"] + \
             _model_figure_shows(slope_data, feats)
+        # The tension crack is drawn on this figure alone — no other engine reads
+        # it — so it is named in this sentence alone (:func:`~xslope.plot.
+        # plot_inputs`, mode="lem").
+        if tc:
+            shows.append("the depth the tension crack reaches")
         # Named for what it is on the plot: a circle a search departed from and a
         # circle that IS the analysis are the same drawn arc and two different
         # statements. A model that carries neither gets no clause.
@@ -9125,20 +9147,30 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # it carries (the owner's sequencing, fem_johnson_res review).
     if mesh_figure is not None or shared_mesh:
         sub_mesh = Section("Finite Element Mesh")
-        if shared_mesh:
-            there, mesh_links = cite_section(SEEPAGE_ANCHOR)
+        there, mesh_links = (cite_section(SEEPAGE_ANCHOR) if shared_mesh
+                             else ("", []))
+        if shared_mesh and mesh_figure is None:
             sub_mesh.blocks.append(Prose(
                 f"Both analyses were run on the same mesh, described in "
                 f"{there}.", links=mesh_links))
         if mesh_figure is not None:
             where, links = cite("Figure", mesh_figure.number)
+            links = list(links) + list(mesh_links)
             # Noun-first, with the figure reference inside the sentence and the
             # mesh counted out in it — the register the owner set, and the counts
             # he asked to read there rather than in a key-value line beside it.
             # The 1D elements are counted per member kind, and the fact that they
             # stand on the same nodes as the 2D elements is the one thing about
             # the mesh that is not visible in the figure.
-            text = (f"The finite element mesh constructed for the problem is "
+            #
+            # Where the flow was solved on this same mesh the sentence says so
+            # and shows it in one breath: a sentence stating the mesh is shared
+            # followed by a sentence showing it said the mesh twice with a page
+            # break between them (the owner's ruling, fem_johnson_res review).
+            text = (f"Both analyses were run on the same mesh, shown in {where} "
+                    f"and described in {there}."
+                    if shared_mesh else
+                    f"The finite element mesh constructed for the problem is "
                     f"shown in {where}.")
             counts = [] if shared_mesh else mesh_counts(fem_data)
             one_d = one_d_counts(fem_data)

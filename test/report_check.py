@@ -110,6 +110,10 @@ AXIAL_XLSX = os.path.join(_REPO, "docs", "inputs", "slope",
                           "xslope_nail_axial.xlsx")
 TENSION_XLSX = os.path.join(_REPO, "docs", "lem", "files",
                             "xslope_tension_KEY.xlsx")
+#: A model whose piezometric line has a shape: a level line is stated as its one
+#: elevation, so only this kind gets a table of its points to introduce.
+PIEZO_XLSX = os.path.join(_REPO, "docs", "lem", "files",
+                          "xslope_gsat_piezo.xlsx")
 
 #: The width a report figure prints at: the text column of a US Letter portrait
 #: page inside the report's own margins. A figure is rendered wider than this and
@@ -8482,7 +8486,7 @@ def test_shared_plot():
     if not any("Circle" in l or "Surface" in l for l in lem_labels):
         fails.append(f"the LEM plot draws no trial circles: {sorted(lem_labels)}")
     for suppressed in ("Starting Circle", "Non-Circular Surface",
-                       "Distributed Load"):
+                       "Distributed Load", "Tension Crack Depth"):
         if suppressed in shared_labels:
             fails.append(f"the shared plot still draws {suppressed!r}")
     # …and the load it no longer draws is drawn by the engine that applies it.
@@ -8551,6 +8555,40 @@ def test_shared_plot():
                     f"mode={mode!r} {'draws' if has else 'draws no'} "
                     f"piezometric line; it should "
                     f"{'draw one' if wanted else 'draw none'}")
+
+    # The tension crack is a limit equilibrium input alone — it caps the driving
+    # side of a slice and carries the crack water force — so it is drawn on the
+    # limit equilibrium view and nowhere else. On the shared section it was the
+    # same red dotted line one page from the figure that means something by it,
+    # and it was named in neither sentence (the owner's ruling, tension_crack
+    # review). The maximum-depth line is NOT suppressed with it: that one bounds
+    # the geometry the section is cut on, so it stays where the section is drawn.
+    cracked = load_slope_data(TENSION_XLSX)
+    if cracked.get("tcrack_surface") is None:
+        fails.append("the tension-crack fixture states no crack, so its absence "
+                     "from the shared view proves nothing")
+    else:
+        for mode, wanted in (("shared", False), ("lem", True), ("fem", False),
+                             ("seep", False)):
+            ax = draw(cracked, mode)
+            drawn = any(ln.get_gid() == "TENSION_CRACK" for ln in ax.lines)
+            if drawn is not wanted:
+                fails.append(
+                    f"mode={mode!r} {'draws' if drawn else 'draws no'} tension "
+                    f"crack; it should "
+                    f"{'draw one' if wanted else 'draw none'}")
+            named = "Tension Crack Depth" in set(
+                ax.get_legend_handles_labels()[1])
+            if named is not wanted:
+                fails.append(f"mode={mode!r} "
+                             f"{'names' if named else 'does not name'} the "
+                             f"tension crack in its legend")
+        # The section's own bound stays on the shared figure: the suppression
+        # above is the crack alone and not everything drawn in that corner.
+        if not any(ln.get_gid() == "MAX_DEPTH"
+                   for ln in draw(cracked, "shared").lines):
+            fails.append("the shared plot lost the maximum-depth line, which "
+                         "bounds the section rather than any one engine's model")
 
     # A model with a reservoir/head boundary: the water line is on the ENGINE
     # figures, beside the load derived from it, and not on the shared section.
@@ -14241,21 +14279,29 @@ def test_the_inputs_an_engine_reads_are_stated_where_it_is_documented():
         if shear is None or moment is None:
             fails.append(f"the pile table lost a peak column: {heads}")
         else:
+            # The depth columns are located BEFORE any value is read out of one:
+            # a table missing them has nothing at those indices to compare, and a
+            # check that read them anyway would die of whatever happened to be
+            # there instead of failing with its own sentence.
+            paired = True
             for what, i in (("shear", shear), ("moment", moment)):
-                if not heads[i + 1].startswith("At depth"):
+                if i + 1 >= len(heads) or not heads[i + 1].startswith("At depth"):
                     fails.append(f"the peak {what} is printed without its "
                                  f"depth: {heads}")
-            pile_data, pile_bundle = _fem_1d_bundle(FEM_PILES_XLSX)
-            for row, profile in zip(table.rows,
-                                    _profiles(pile_data, pile_bundle, "pile")):
-                for key, i in (("max_shear_depth", shear + 1),
-                               ("max_moment_depth", moment + 1)):
-                    want = profile.get(key)
-                    if want is None:
-                        continue
-                    if abs(float(row[i]) - float(want)) > 0.01:
-                        fails.append(f"{profile['label']}: {key} printed "
-                                     f"{row[i]}, measured {want}")
+                    paired = False
+            if paired:
+                pile_data, pile_bundle = _fem_1d_bundle(FEM_PILES_XLSX)
+                for row, profile in zip(table.rows,
+                                        _profiles(pile_data, pile_bundle,
+                                                  "pile")):
+                    for key, i in (("max_shear_depth", shear + 1),
+                                   ("max_moment_depth", moment + 1)):
+                        want = profile.get(key)
+                        if want is None:
+                            continue
+                        if abs(float(row[i]) - float(want)) > 0.01:
+                            fails.append(f"{profile['label']}: {key} printed "
+                                         f"{row[i]}, measured {want}")
     return fails
 
 
@@ -14389,6 +14435,252 @@ def test_the_fem_prose_reads_as_documentation():
     if -1 in order or order != sorted(order):
         fails.append(f"the paragraph does not run definition, then model, then "
                      f"search: {order}")
+    return fails
+
+
+#: How every table in the report is introduced, one entry per table class: the
+#: sentence shape the owner set, and the sentence shape it replaced.
+#:
+#: The register is noun-first — the subject is what the table holds, the table
+#: reference sits inside the sentence, and the columns are named after it. What
+#: it replaced was an inventory: the table as subject, a verb of possession, and
+#: a colon followed by a list ("Table 4 gives each pile: its head and tip, …").
+#: Every one of these was rewritten on the owner's review, and each is pinned
+#: from BOTH directions — the shape that must be there, and the shape that must
+#: not come back. One direction is not enough: a required phrase that is merely
+#: ABSENT from a report that never prints that table passes vacuously, and a
+#: retired phrase can return under a required one that is still true elsewhere.
+TABLE_INTRO_REGISTER = (
+    ("limit equilibrium materials",
+     "The material properties associated with the limit equilibrium analysis "
+     "are shown in",
+     "gives the properties of every material in the"),
+    ("seepage materials",
+     "The material properties associated with the seepage analysis are shown in",
+     "gives the properties of every material in the"),
+    ("finite element materials",
+     "finite element analysis are shown in",
+     "gives the properties every element is solved with"),
+    ("distributed loads",
+     "The distributed loads defined for this problem are listed in",
+     "gives each distributed load:"),
+    ("piezometric line",
+     "defined for this problem is listed in",
+     "gives the line's own points:"),
+    ("reinforcement properties",
+     "The geometry and properties for each of the reinforcement lines defined "
+     "for this problem are listed in",
+     "gives each reinforcement line:"),
+    ("pile properties",
+     "The geometry and properties for each of the piles defined for this "
+     "problem are listed in",
+     "gives each pile:"),
+    ("pile forces",
+     "The forces developed in each pile are listed in",
+     "gives every pile the analysis solved:"),
+    ("factors of safety",
+     "factor of safety reported by each method is listed in",
+     "gives the factor of safety each method reported"),
+    ("slice table",
+     "The geometry, forces and strengths of every slice on the",
+     "holds the geometry, forces and strengths of every"),
+    ("nomenclature",
+     "The symbols used above are defined in",
+     "the symbols the equations above use"),
+)
+
+#: The retired register, as a shape rather than as a list of sentences: a table
+#: as the subject of a verb of possession. This is the pin that does not have to
+#: be updated when a table is added — whatever the new table is called, it
+#: cannot be introduced in the register the owner retired.
+TABLE_AS_SUBJECT = re.compile(r"\bTables? \d+(?:[–-]\d+)? "
+                              r"(gives|holds|lists|shows|summari[sz]es)\b")
+
+
+def test_the_tension_crack_is_documented_where_it_is_read():
+    """The tension crack is drawn on the limit equilibrium model figure, named
+    in that figure's own sentence, and named there once.
+
+    It was drawn on the Project Definition figure as well — the same red dotted
+    line one page from the figure that means something by it — and named in
+    neither sentence. No engine but the method of slices reads it: it caps the
+    driving side of a slice and carries the crack water force, and a seepage or
+    finite element run reads neither. Where it is drawn is checked on the plots
+    themselves ("the shared-model plot"); this is the sentence that names it.
+    """
+    fails = []
+    report = _calc_report("spencer", xlsx=TENSION_XLSX)[0]
+    if report is None:
+        return ["the tension-crack model no longer solves, so nothing here is "
+                "checked"]
+    if not load_slope_data_cached(TENSION_XLSX).get("tcrack_depth"):
+        fails.append("the fixture states no tension crack depth")
+    said = [b.text for b in report.blocks("prose")
+            if "specific to the limit equilibrium model are shown in" in b.text]
+    if len(said) != 1:
+        fails.append(f"the limit equilibrium model figure has {len(said)} "
+                     f"sentences introducing it")
+    elif "tension crack" not in said[0]:
+        fails.append(f"the figure draws the tension crack and its sentence does "
+                     f"not name it: {said[0]!r}")
+
+    # Named where it is drawn and nowhere else: the Project Definition figure's
+    # own sentence describes a section without one.
+    shared = [b.text for b in report.blocks("prose")
+              if "The problem definition is displayed in" in b.text]
+    for text in shared:
+        if "tension crack" in text:
+            fails.append(f"the shared section figure is credited with the "
+                         f"tension crack it no longer draws: {text!r}")
+
+    # A model with no crack is credited with none.
+    plain = _build()
+    if load_slope_data_cached(REINF_XLSX).get("tcrack_depth"):
+        fails.append("the crack-less fixture states a crack after all")
+    for b in plain.blocks("prose"):
+        if "are shown in" in b.text and "tension crack" in b.text:
+            fails.append(f"a model with no tension crack is credited with one: "
+                         f"{b.text!r}")
+    return fails
+
+
+def test_every_table_is_introduced_in_the_owners_register():
+    """Every table the report prints is introduced by a noun-first sentence that
+    says what the table holds, with the table's own reference inside it.
+
+    The reports shipped for review introduced their tables as inventories —
+    "Table 4 gives each pile: its head and tip, its diameter and out-of-plane
+    spacing, …" — a register the owner superseded across every table class in
+    one review. The rewrite is pinned here from both directions and across every
+    class, because a rewrite that only one check watches is a rewrite one revert
+    undoes: the finite element materials intro was put back to its retired form
+    and the whole suite still passed.
+
+    Read off real reports carrying between them every table the builder can
+    print: the limit equilibrium tree (materials, the loads, the reinforcement
+    properties, factors of safety, the slice table and its nomenclature), a
+    model whose piezometric line has a shape and so gets a table of its points,
+    the seepage tree, and two finite element trees (materials, the piles, and
+    the forces developed in each). The reinforcement carries no forces table by
+    the owner's own ruling, so there is none to introduce.
+    """
+    fails = []
+    trees = {
+        "limit equilibrium": _build(options={"method": ["spencer", "bishop"]}),
+        "piezometric line": _calc_report(
+            "spencer", options={"lem_inputs_figure": False},
+            xlsx=PIEZO_XLSX)[0],
+        "seepage": _engine_report("seep"),
+        "finite element (strength reduction)": _engine_report("fem"),
+        "finite element (piles)": _engine_report("fem", xlsx=FEM_PILES_XLSX),
+        "finite element (reinforcement)": _engine_report("fem",
+                                                         xlsx=FEM_REINF_XLSX),
+    }
+    said = {name: " ".join(_prose(tree)) for name, tree in trees.items()}
+    everything = " ".join(said.values())
+
+    # Every table class the builder can print is printed by one of these trees,
+    # so a required sentence missing from all of them is a table introduced some
+    # other way — not a table these fixtures happen not to carry.
+    for label, required, retired in TABLE_INTRO_REGISTER:
+        if required not in everything:
+            fails.append(f"the {label} table is not introduced in the owner's "
+                         f"register ({required!r} is on no page)")
+        for name, text in said.items():
+            if retired in text:
+                fails.append(f"{name}: the {label} table is introduced as an "
+                             f"inventory again — {retired!r}")
+
+    # …and the shape itself, whatever the table.
+    for name, text in said.items():
+        for m in TABLE_AS_SUBJECT.finditer(text):
+            fails.append(f"{name}: a table is made the subject of a verb of "
+                         f"possession — {text[max(0, m.start() - 40):m.end() + 60]!r}")
+
+    # The tables really are there: a register check reading prose alone would
+    # pass a report that stopped printing the tables the sentences introduce.
+    for name, tree in trees.items():
+        if not tree.blocks("table"):
+            fails.append(f"{name}: the tree carries no table at all, so the "
+                         f"sentences checked above introduce nothing")
+    return fails
+
+
+def test_the_boundary_sentence_is_derived_from_what_was_held():
+    """The mesh sentence states the restraint the solve actually ran under,
+    read off its constraint array and not off a fixed list.
+
+    ``main!D22`` chooses what the sides of the domain are held by, and the two
+    choices are two different problems: rollers let the truncated ground settle
+    under its own weight, and clamped sides add a shear restraint the ground
+    beyond the mesh does not have. A sentence that names rollers whatever the
+    model asked for is a false statement about what was solved, and every
+    finite element report carries it. The derivation was pinned by nothing: the
+    roller codes were replaced with a hardcoded list and the whole suite passed.
+
+    Both directions, and on a real model rather than on an array written here:
+    the shipped sample is rebuilt with its sides clamped, through the same
+    ``build_fem_data`` the solve uses, and the sentence has to follow. The code
+    that stands for the other roller is exercised too, so neither roller can be
+    the one the sentence always names.
+    """
+    fails = []
+    import numpy as np
+    from xslope.fem import build_fem_data
+    from xslope.fileio import load_slope_data
+    from xslope.report import FEM_RESTRAINTS, _fem_boundary_conditions
+
+    def bc_of(side_bc):
+        """``(bc_type, sentence)`` for the sample model held that way."""
+        with contextlib.redirect_stdout(io.StringIO()):
+            sd = load_slope_data(FEM_XLSX)
+            if side_bc is not None:
+                sd["side_bc"] = side_bc
+            fem_data = build_fem_data(sd, sd["mesh"])
+        arr = np.asarray(fem_data.get("bc_type")).astype(int)
+        return arr, _fem_boundary_conditions(fem_data)
+
+    rollered, said_rollers = bc_of("rollers")
+    clamped, said_fixed = bc_of("fixed")
+
+    # The fixture is a fixture: the two models really were held differently.
+    if not (rollered == 2).any():
+        fails.append("the sample model on rollers carries no roller node, so "
+                     "the sentence below is checked against nothing")
+    if (clamped == 2).any() or (clamped == 3).any():
+        fails.append(f"the clamped model still carries roller nodes, so it is "
+                     f"not the fixture this check needs: "
+                     f"{sorted(set(clamped.tolist()))}")
+    if not (clamped == 1).any():
+        fails.append("the clamped model holds nothing at all")
+
+    if "on rollers" not in said_rollers:
+        fails.append(f"a model whose sides are on rollers does not say so: "
+                     f"{said_rollers!r}")
+    if FEM_RESTRAINTS[2] not in said_rollers:
+        fails.append(f"the roller sentence does not say what the rollers hold: "
+                     f"{said_rollers!r}")
+    if "roller" in said_fixed:
+        fails.append(f"a model whose sides are clamped is reported on rollers — "
+                     f"the sentence is not derived from what was held: "
+                     f"{said_fixed!r}")
+    if said_fixed != ("Every node on the boundary of the mesh is fixed in both "
+                      "directions."):
+        fails.append(f"a clamped model does not say what it was held by: "
+                     f"{said_fixed!r}")
+
+    # Either roller reaches the sentence, so neither can be the one it names
+    # whatever the array says.
+    for code in (2, 3):
+        arr = np.array([1, 1, code, code], dtype=int)
+        said = _fem_boundary_conditions({"bc_type": arr})
+        if FEM_RESTRAINTS[code] not in said:
+            fails.append(f"a mesh held by restraint {code} is described as "
+                         f"something else: {said!r}")
+        other = 5 - code                                # 2 <-> 3
+        if FEM_RESTRAINTS[other] in said:
+            fails.append(f"a mesh held by restraint {code} is also credited "
+                         f"with restraint {other}: {said!r}")
     return fails
 
 
@@ -18912,6 +19204,12 @@ CHECKS = [
      test_the_model_figure_names_only_the_members_it_draws),
     ("the finite element prose reads as documentation",
      test_the_fem_prose_reads_as_documentation),
+    ("the tension crack is documented where it is read",
+     test_the_tension_crack_is_documented_where_it_is_read),
+    ("every table is introduced in the owner's register",
+     test_every_table_is_introduced_in_the_owners_register),
+    ("the boundary sentence is derived from what was held",
+     test_the_boundary_sentence_is_derived_from_what_was_held),
     ("consecutive figures are cited as a range",
      test_consecutive_figures_are_cited_as_a_range),
     ("the hybrid criterion sentence is true of the runs that shipped",

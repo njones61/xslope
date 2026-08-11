@@ -24,14 +24,21 @@ earth_dam2 -- and from nothing else.
 WHAT THIS CHECK LOCKS
 
 1. The four models converge, to the flow rates below.
-2. Those flow rates are the MODEL's and not the settings': re-solved at relaxation
-   floors of 1e-3 and 3e-4 the fields agree to 0.04 psf, and tightening the head
-   tolerance from 1e-4 to 1e-6 changes neither field nor sweep count (the closure
-   test, not the head test, is what closes these solves).
-3. Neither escape fires on a model that converges without it, and every such model's
+2. Neither escape fires on a model that converges without it, and every such model's
    field, flow rate AND SWEEP COUNT are exactly what they were before the escapes
    existed. The sweep counts are in the table below for that reason: a trajectory
    that has been nudged shows up there before it shows up in a flow rate.
+
+MEASURED DURING THE ROUND, NOT LOCKED HERE
+
+The rescued flow rates are the MODELs' and not the settings': re-solved at relaxation
+floors of 1e-3 and 3e-4 the fields agree to 0.04 psf (0.012 psf on earth_dam_rapid),
+and tightening the head tolerance from 1e-4 to 1e-6 changes neither field nor sweep
+count on any of the four -- the closure test, not the head test, is what closes these
+solves. No leg re-solves them at a second setting to prove it: that would double the
+runtime for a property the trajectory pins above already constrain, since a solve
+whose answer had become a function of its settings would have to reach it along a
+different path, and the escape sweeps and sweep counts locked below are that path.
 
 WHY THE GATES ARE WHERE THEY ARE (both measured over the corpus, and both mutable
 in one line if a reader wants to see the other side of them):

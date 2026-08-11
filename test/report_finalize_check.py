@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Checks for finishing the Analysis Report in Word.
+"""Checks for finishing the Analysis Report — in Word, or without it.
 
 What is being defended:
 
@@ -21,6 +21,16 @@ What is being defended:
      with one that says what page each is on. The evidence is the field result
      cached in the document: ``PAGEREF`` fields with numbers in them where there
      were none, and the "press F9" line gone.
+
+  G. AND WITHOUT WORD THEY ARE STILL RIGHT — the same report finished by
+     LibreOffice comes out with a number against every entry, and every one of
+     those numbers is the page that heading is on. That is measured HERE, by a
+     second reading of a fresh layout that has nothing to do with how the
+     numbers were computed: the page a heading first appears on as a line of
+     text, and the page's own "Page N of M" footer. An entry that cannot be
+     placed is a failure that names it, and a failure leaves the report byte for
+     byte as it was. The proof itself is mutation-tested: a leg that writes a
+     number other than the one it computed must not report success.
 
   B. AND THE DOCUMENT IS STILL CLEAN — no field comes back marked dirty. A dirty
      field is what makes Word for Mac ask about "fields that may refer to other
@@ -59,6 +69,8 @@ unconditionally: none of it starts an application.
 """
 
 import os
+import re
+import shutil
 import sys
 import tempfile
 import zipfile
@@ -71,6 +83,11 @@ if _REPO not in sys.path:
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 REINF_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_reinf.xlsx")
+
+#: The title the sample report is written under. It is also what stands at the
+#: left of every running head, which is how a heading is told from the head that
+#: repeats it (:func:`_first_page_of`).
+SAMPLE_TITLE = "Sample Levee"
 
 _REPORT = {}
 
@@ -104,7 +121,7 @@ def _report_docx(directory):
     # A path with a space in it: the scripts are handed their arguments, never a
     # quoted command line, and this is what would catch it if that changed.
     path = os.path.join(directory, "sample report.docx")
-    opts = {"input_path": REINF_XLSX, "title": "Sample Levee",
+    opts = {"input_path": REINF_XLSX, "title": SAMPLE_TITLE,
             "pd_figure": False, "lem_search_figure": False,
             "lem_solution_figure": False}
     ok, out = generate_report(slope_data, solutions, opts, path)
@@ -132,6 +149,30 @@ def _run_texts(xml):
     """The text of every run in a fragment of document XML."""
     import re
     return re.findall(r"<w:t[^>]*>([^<]*)</w:t>", xml)
+
+
+def _cached_contents(path):
+    """``[(entry, page or None), …]`` — the contents field as the file holds it.
+
+    Read out of the document's XML here rather than through the finalizer's own
+    parser, so that a leg which numbers the wrong paragraphs is caught by
+    something that does not share its idea of which paragraphs those are.
+    """
+    with zipfile.ZipFile(path) as package:
+        xml = package.read("word/document.xml").decode("utf-8", "replace")
+    start = xml.find(" TOC ")
+    if start < 0:
+        return []
+    result = xml[start:xml.find("fldCharType=\"end\"", start)]
+    out = []
+    for chunk in result.split("</w:p>")[:-1]:
+        texts = [t for t in _run_texts(chunk)]
+        if not "".join(texts).strip():
+            continue
+        page = int(texts[-1]) if texts[-1].strip().isdigit() else None
+        joined = "".join(texts[:-1] if page is not None else texts)
+        out.append((" ".join(joined.split()), page))
+    return out
 
 
 def _stub_docx(path):
@@ -232,12 +273,495 @@ def _closed_in_word(path):
 
 
 # --------------------------------------------------------------------------
+# G. the finish without Word
+# --------------------------------------------------------------------------
+
+def _layout_available():
+    """``(True, "")`` when this machine can lay a document out, else
+    ``(False, reason)``. Printed by the caller, which then skips."""
+    from xslope.report_finalize import libreoffice_available
+    return libreoffice_available()
+
+
+def _layout_pages(path):
+    """The text of every page of a LibreOffice layout of ``path``, in order.
+
+    This check's OWN reading of the document. It borrows where LibreOffice lives
+    and nothing else: the pages come back as text, and where a heading is on
+    them is worked out here, so a finish whose page numbers agree with these has
+    been checked by something that did not compute them.
+    """
+    import subprocess
+    from xslope.report_finalize import _file_url, _soffice
+    tmp = tempfile.mkdtemp()
+    profile = tempfile.mkdtemp(prefix="xslope_soffice_check_")
+    try:
+        # A profile of this check's own: a LibreOffice started with the user's
+        # would join the session they have open on the screen.
+        subprocess.run([_soffice(), "-env:UserInstallation=" + _file_url(profile),
+                        "--headless", "--convert-to", "pdf",
+                        "--outdir", tmp, path], capture_output=True, timeout=900)
+        pdf = os.path.join(
+            tmp, os.path.splitext(os.path.basename(path))[0] + ".pdf")
+        if not os.path.exists(pdf):
+            return []
+        import pypdf
+        return [page.extract_text() or "" for page in pypdf.PdfReader(pdf).pages]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+        shutil.rmtree(profile, ignore_errors=True)
+
+
+def _body_starts(pages, title):
+    """The page the body starts on.
+
+    The running head over the body carries the report's title AND the numbered
+    section the page is in; the front matter's carries the title alone. So the
+    body starts at the first page with such a head — counting contents pages
+    instead puts the start one page early on a report whose contents run to two,
+    and every entry listed on that second page then matches itself.
+    """
+    head = re.compile(r"^%s\s+\d+(\.\d+)*\s+\S" % re.escape(title))
+    for number, text in enumerate(pages, start=1):
+        if any(head.match(line.strip()) for line in text.splitlines()):
+            return number
+    return 1
+
+
+def _first_page_of(pages, heading, title):
+    """The page a heading first stands on as a line of its own, or None.
+
+    The contents page names every heading and the running head repeats one of
+    them at the top of every page of its section, so neither counts: the search
+    starts after the front matter, and a line that begins with the report's
+    title is a running head.
+    """
+    for number, text in enumerate(pages, start=1):
+        if number < _body_starts(pages, title):
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if title and line.startswith(title):
+                continue
+            if line == heading or line.startswith(heading + " "):
+                return number
+    return None
+
+
+def _footer_number(text):
+    """What a page calls itself, out of its own footer, or None."""
+    for line in text.splitlines():
+        found = re.match(r"^Page\s+(\d+)\s+of\s+(\d+)\b", line.strip())
+        if found:
+            return int(found.group(1))
+    return None
+
+
+def test_libreoffice_numbers_the_report():
+    """A report finished without Word: every entry numbered, every number the
+    page that heading is on.
+
+    The numbers are checked against a fresh layout read as TEXT — where each
+    heading first stands as a line of its own, and what the page it stands on
+    calls itself in its footer. Neither is how the finish computed them.
+    """
+    from xslope.report_finalize import finalize_with_libreoffice
+
+    ok, why = _layout_available()
+    if not ok:
+        print(f"    (nothing here lays a document out: {why})")
+        return []
+
+    fails = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _report_docx(tmp)
+        before = _cached_contents(path)
+        if not before:
+            return ["the written report has no contents entries to number"]
+        if any(page is not None for _entry, page in before):
+            fails.append("the written report already carries page numbers; "
+                         "there would be nothing to prove")
+
+        done, msg = finalize_with_libreoffice(path)
+        if not done:
+            return fails + [f"the report was not finished: {msg}"]
+
+        after = _cached_contents(path)
+        if [e for e, _p in after] != [e for e, _p in before]:
+            fails.append(f"the finish rewrote the contents: {before} became "
+                         f"{after}")
+        unnumbered = [e for e, page in after if page is None]
+        if unnumbered:
+            fails.append(f"{len(unnumbered)} entr(ies) came back with no page: "
+                         f"{unnumbered[:3]}")
+
+        state = _contents_state(path)
+        if state["asks_for_f9"]:
+            fails.append("the contents page still asks the reader to press F9")
+        if state["dirty"]:
+            fails.append(f"the finish left {state['dirty']} dirty field(s)")
+        with zipfile.ZipFile(path) as package:
+            xml = package.read("word/document.xml").decode("utf-8", "replace")
+        for mark in ('<w:instrText', ' TOC ', 'fldCharType="begin"',
+                     'fldCharType="separate"', 'fldCharType="end"'):
+            if mark not in xml:
+                fails.append(f"the contents field is no longer a field: {mark} "
+                             f"is gone, so F9 would no longer rebuild it")
+
+        pages = _layout_pages(path)
+        if not pages:
+            return fails + ["the finished report could not be laid out again"]
+        for entry, page in after:
+            if page is None:
+                continue
+            stands_on = _first_page_of(pages, entry, SAMPLE_TITLE)
+            if stands_on != page:
+                fails.append(f"the contents sends a reader to page {page} for "
+                             f"“{entry}”, which is on page {stands_on}")
+            called = _footer_number(pages[page - 1]) if page <= len(pages) \
+                else None
+            if called is not None and called != page:
+                fails.append(f"page {page} of the file calls itself page "
+                             f"{called}, so “{entry}” is numbered for a sheet "
+                             f"and not for a page")
+    return fails
+
+
+def test_an_entry_with_no_page_is_named():
+    """An entry the layout cannot place fails the finish, by name — and the
+    report is left exactly as it was.
+
+    A contents page that is right about eleven sections and silent about the
+    twelfth is worse than one with no numbers at all: nothing on it says which
+    one it is wrong about. So the entry is named, the counts are given, and the
+    document on disk is not touched.
+    """
+    from docx import Document
+    from xslope.report_finalize import finalize_with_libreoffice
+
+    ok, why = _layout_available()
+    if not ok:
+        print(f"    (nothing here lays a document out: {why})")
+        return []
+
+    fails = []
+    sabotage = "3.2 Materials of a section this report does not have"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _report_docx(tmp)
+        doc = Document(path)
+        for para in doc.paragraphs:
+            if para.text.strip() == "3.2 Materials" \
+                    and para.style.name.lower().startswith("toc"):
+                para.runs[0].text = sabotage
+                break
+        else:
+            return ["the sample report's contents no longer list 3.2 Materials"]
+        doc.save(path)
+        with open(path, "rb") as handle:
+            written = handle.read()
+
+        done, msg = finalize_with_libreoffice(path)
+        if done:
+            fails.append("a contents page with an entry on no page was reported "
+                         "as finished")
+        if sabotage not in (msg or ""):
+            fails.append(f"the entry that could not be placed is not named: "
+                         f"{msg!r}")
+        if not re.search(r"\d+ of \d+ contents entries", msg or ""):
+            fails.append(f"the refusal does not say how many entries were "
+                         f"numbered and how many were not: {msg!r}")
+        with open(path, "rb") as handle:
+            if handle.read() != written:
+                fails.append("a finish that failed changed the report anyway")
+    return fails
+
+
+def test_a_page_is_numbered_as_a_reader_would_call_it():
+    """A document that does not number its pages straight through is left alone.
+
+    The layout says which SHEET a heading landed on; the contents page has to
+    say which PAGE, and those are the same number only while the document
+    numbers its pages from its first sheet — which is how the report is set. A
+    report whose body restarted its numbering is the case where they differ, and
+    every entry in it would be numbered for a sheet the reader cannot find by
+    that name. Built here by restarting the numbering, which is one attribute.
+    """
+    from docx import Document
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from xslope.report_finalize import finalize_with_libreoffice
+
+    ok, why = _layout_available()
+    if not ok:
+        print(f"    (nothing here lays a document out: {why})")
+        return []
+
+    fails = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _report_docx(tmp)
+        doc = Document(path)
+        for section in doc.sections[1:]:
+            restart = OxmlElement("w:pgNumType")
+            restart.set(qn("w:start"), "1")
+            section._sectPr.append(restart)
+        doc.save(path)
+
+        done, msg = finalize_with_libreoffice(path)
+        if done:
+            fails.append("a report that restarts its page numbering was "
+                         "numbered by sheet anyway")
+        if "number its pages" not in (msg or ""):
+            fails.append(f"the refusal does not say what is wrong with the "
+                         f"document: {msg!r}")
+        if any(page is not None for _entry, page in _cached_contents(path)):
+            fails.append("a page number was written into a report the finish "
+                         "refused")
+    return fails
+
+
+def test_the_contents_field_is_found_by_its_instruction():
+    """Fields nest, and the contents field is the one whose instruction says so.
+
+    The document built here has what a report has: a field on the title page
+    (whose separate mark comes first), and a field INSIDE a contents entry (whose
+    end mark comes before the contents field's own). Keying on the first
+    separate mark collects the title page; keying on the first end mark stops
+    halfway down the list. Both are measured.
+    """
+    from docx import Document
+    from xslope.report_finalize import _toc_field, finalize_with_libreoffice
+    from xslope.report_docx import TOC_INSTRUCTION, add_field, _fld_char, \
+        _instr_text
+
+    fails = []
+    doc = Document()
+    title = doc.add_paragraph()
+    add_field(title, ' DOCPROPERTY "Title" \\* MERGEFORMAT ', "Sample Levee")
+    doc.add_paragraph("Table of Contents")
+
+    first = doc.add_paragraph()
+    _fld_char(first, "begin")
+    _instr_text(first, TOC_INSTRUCTION)
+    _fld_char(first, "separate")
+    first.add_run("1 One")
+    doc.add_paragraph().add_run("2 Two")
+    nested = doc.add_paragraph()
+    nested.add_run("3 Three")
+    add_field(nested, " PAGEREF _Toc3 \\h ", "9")
+    doc.add_paragraph().add_run("4 Four")
+    hint = doc.add_paragraph()
+    hint.add_run("Page numbers appear when the table is updated in Word.")
+    _fld_char(hint, "end")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "nested.docx")
+        doc.save(path)
+        entries, placeholder = _toc_field(Document(path))
+
+        # The nested field here is a PAGEREF, which is how Word writes a page
+        # number. Numbering such a page again would put a second number beside
+        # Word's own, so it is declined rather than done — no layout needed to
+        # know it.
+        done, why = finalize_with_libreoffice(path)
+        if done:
+            fails.append("a contents page Word had already numbered was "
+                         "numbered again")
+        if "Word" not in (why or ""):
+            fails.append(f"declining a contents page of Word's is reported as "
+                         f"{why!r}")
+
+    found = [text for _para, text in entries]
+    if found != ["1 One", "2 Two", "3 Three9", "4 Four"]:
+        fails.append(f"the contents field's entries came back as {found}")
+    if any("Sample Levee" in text for text in found):
+        fails.append("the title page's own field was read as a contents entry")
+    if placeholder is None or "Page numbers appear" not in placeholder.text:
+        fails.append("the line the numbers replace was not found")
+    return fails
+
+
+def test_the_numbers_are_proved_after_they_are_written():
+    """The proof is taken off the document, not off the intention.
+
+    Mutation: the leg is made to write a number other than the one it computed,
+    and then to write none at all. A finish that reports success either way is
+    checking what it meant to do rather than what it did — which is the whole
+    difference between a page number and a guess.
+    """
+    import xslope.report_finalize as rf
+
+    ok, why = _layout_available()
+    if not ok:
+        print(f"    (nothing here lays a document out: {why})")
+        return []
+
+    fails = []
+    real = rf._write_page_number
+    mutations = [
+        ("one page out",
+         lambda para, page, width: real(para, page + 1, width)),
+        ("not written at all", lambda para, page, width: None),
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _report_docx(tmp)
+        with open(path, "rb") as handle:
+            written = handle.read()
+        for what, mutant in mutations:
+            rf._write_page_number = mutant
+            try:
+                done, msg = rf.finalize_with_libreoffice(path)
+            finally:
+                rf._write_page_number = real
+            if done:
+                fails.append(f"a report whose numbers went in {what} was "
+                             f"reported as finished: {msg}")
+            with open(path, "rb") as handle:
+                if handle.read() != written:
+                    fails.append(f"a finish that went wrong ({what}) changed "
+                                 f"the report anyway")
+    return fails
+
+
+def test_numbers_that_never_settle_are_refused():
+    """A finish that cannot reach agreement refuses; it does not ship its last
+    guess.
+
+    Writing a page number can move the heading it points at — a long entry
+    wrapped onto a second line moves the contents page's own break — so the leg
+    writes, lays out again and compares. This is the case that would otherwise
+    go round for ever: a layout that answers differently every time. Nothing is
+    laid out here; the layout is the stub, so this runs on a machine with no
+    LibreOffice at all.
+    """
+    import xslope.report_finalize as rf
+
+    fails = []
+    real_layout = rf._laid_out_headings
+    real_available = rf.libreoffice_available
+    real_soffice = rf._soffice
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _report_docx(tmp)
+        entries = [entry for entry, _page in _cached_contents(path)]
+        answers = [3, 4]
+
+        def restless(work, outdir, soffice, timeout, profile):
+            page = answers[0]
+            answers.reverse()
+            return [(entry, page) for entry in entries], 9, ""
+
+        with open(path, "rb") as handle:
+            written = handle.read()
+        rf._laid_out_headings = restless
+        rf.libreoffice_available = lambda: (True, "a stub")
+        rf._soffice = lambda: "a stub"
+        try:
+            done, msg = rf.finalize_with_libreoffice(path)
+        finally:
+            rf._laid_out_headings = real_layout
+            rf.libreoffice_available = real_available
+            rf._soffice = real_soffice
+        if done:
+            fails.append(f"page numbers that never agreed with the layout were "
+                         f"reported as finished: {msg}")
+        if "settle" not in (msg or ""):
+            fails.append(f"the refusal does not say what went wrong: {msg!r}")
+        with open(path, "rb") as handle:
+            if handle.read() != written:
+                fails.append("a finish that never settled changed the report "
+                             "anyway")
+    return fails
+
+
+def test_the_finish_uses_the_program_it_is_told_to():
+    """Which program finishes the report, and what happens when it declines.
+
+    Stubbed throughout: what is being checked is the choosing, not the
+    finishing, and this check must not start either program.
+    """
+    import xslope.report_finalize as rf
+
+    fails = []
+    called = []
+    real_word, real_office = rf.finalize_with_word, rf.finalize_with_libreoffice
+    real_available = rf.word_available
+    rf.finalize_with_word = lambda path, **kw: (called.append("word"),
+                                                (False, "Word declined."))[1]
+    rf.finalize_with_libreoffice = lambda path, **kw: (
+        called.append("libreoffice"), (True, "LibreOffice numbered them."))[1]
+    was = os.environ.get(rf.FINISH_ENV)
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = _stub_docx(os.path.join(tmp, "r.docx"))
+
+            rf.word_available = lambda: (True, "Word")
+            called.clear()
+            done, msg = rf.finalize_report(path)
+            if not done or called != ["word", "libreoffice"]:
+                fails.append(f"a Word that declined did not fall back to the "
+                             f"layout engine: {called}, {msg!r}")
+
+            called.clear()
+            done, msg = rf.finalize_report(path, prefer="word")
+            if done or called != ["word"]:
+                fails.append(f"asked for Word, the finish used {called}")
+
+            called.clear()
+            rf.word_available = lambda: (False, "Microsoft Word is not "
+                                                "installed.")
+            done, _msg = rf.finalize_report(path)
+            if not done or called != ["libreoffice"]:
+                fails.append(f"with no Word, the finish used {called}")
+
+            called.clear()
+            done, msg = rf.finalize_report(path, prefer="word")
+            if done or called:
+                fails.append(f"asked for Word where there is none, the finish "
+                             f"used {called}")
+
+            rf.word_available = lambda: (True, "Word")
+            called.clear()
+            done, _msg = rf.finalize_report(path, prefer="libreoffice")
+            if not done or called != ["libreoffice"]:
+                fails.append(f"asked for the layout engine, the finish used "
+                             f"{called}")
+
+            # The same answer from the environment, and a plain sentence when it
+            # names something that is not a program this can use.
+            called.clear()
+            os.environ[rf.FINISH_ENV] = "libreoffice"
+            rf.finalize_report(path)
+            if called != ["libreoffice"]:
+                fails.append(f"{rf.FINISH_ENV} did not choose the finish: "
+                             f"{called}")
+            os.environ[rf.FINISH_ENV] = "Microsoft Publisher"
+            done, msg = rf.finalize_report(path)
+            if done or rf.FINISH_ENV not in msg:
+                fails.append(f"an unknown {rf.FINISH_ENV} is reported as "
+                             f"{msg!r}")
+    finally:
+        rf.finalize_with_word, rf.finalize_with_libreoffice = (real_word,
+                                                              real_office)
+        rf.word_available = real_available
+        if was is None:
+            os.environ.pop(rf.FINISH_ENV, None)
+        else:
+            os.environ[rf.FINISH_ENV] = was
+    return fails
+
+
+# --------------------------------------------------------------------------
 # C. nothing raises
 # --------------------------------------------------------------------------
 
 def test_refusals_are_sentences():
-    """Every way this can decline is a (False, sentence)."""
-    from xslope.report_finalize import finalize_with_word
+    """Every way any of this can decline is a (False, sentence).
+
+    Asked of all three entry points: a report is not lost to a bad path,
+    whichever program was going to finish it.
+    """
+    from xslope.report_finalize import (finalize_report,
+                                        finalize_with_libreoffice,
+                                        finalize_with_word)
 
     fails = []
     cases = [("", "no path"), ("/no/such/report.docx", "a path to nothing")]
@@ -247,16 +771,19 @@ def test_refusals_are_sentences():
             fh.write("not a document")
         cases.append((text, "a file that is not a Word document"))
 
-        for path, what in cases:
-            try:
-                ok, msg = finalize_with_word(path)
-            except Exception as exc:
-                fails.append(f"{what} raised {exc!r}")
-                continue
-            if ok:
-                fails.append(f"{what} was reported as finished")
-            if not isinstance(msg, str) or not msg.strip():
-                fails.append(f"{what} gave no reason")
+        for finish in (finalize_with_word, finalize_with_libreoffice,
+                       finalize_report):
+            for path, what in cases:
+                where = f"{what}, through {finish.__name__}"
+                try:
+                    ok, msg = finish(path)
+                except Exception as exc:
+                    fails.append(f"{where} raised {exc!r}")
+                    continue
+                if ok:
+                    fails.append(f"{where} was reported as finished")
+                if not isinstance(msg, str) or not msg.strip():
+                    fails.append(f"{where} gave no reason")
     return fails
 
 
@@ -406,10 +933,10 @@ def test_generate_finalizes_then_opens():
     fails = []
     finalized, opened = [], []
     import xslope.report_finalize as rf
-    real_finalize = rf.finalize_with_word
+    real_finalize = rf.finalize_report
     real_open = report_dialog.QDesktopServices.openUrl
-    rf.finalize_with_word = lambda path, **kw: (finalized.append(path),
-                                                (True, "pretend"))[1]
+    rf.finalize_report = lambda path, **kw: (finalized.append(path),
+                                             (True, "pretend"))[1]
     report_dialog.QDesktopServices.openUrl = (
         lambda url: opened.append(url.toLocalFile()))
     try:
@@ -449,7 +976,7 @@ def test_generate_finalizes_then_opens():
             if not report_dialog.finalization_enabled(settings):
                 fails.append("the finish cannot be switched back on")
     finally:
-        rf.finalize_with_word = real_finalize
+        rf.finalize_report = real_finalize
         report_dialog.QDesktopServices.openUrl = real_open
     return fails
 
@@ -543,6 +1070,20 @@ def test_word_is_not_driven_unless_it_was_asked_for():
 
 CHECKS = [
     ("Word builds the report's page numbers", test_word_finishes_the_report),
+    ("LibreOffice builds them where Word cannot",
+     test_libreoffice_numbers_the_report),
+    ("an entry on no page is named, and nothing is written",
+     test_an_entry_with_no_page_is_named),
+    ("a page is numbered as a reader would call it",
+     test_a_page_is_numbered_as_a_reader_would_call_it),
+    ("the contents field is found among fields",
+     test_the_contents_field_is_found_by_its_instruction),
+    ("the numbers are proved on the document",
+     test_the_numbers_are_proved_after_they_are_written),
+    ("numbers that never settle are refused",
+     test_numbers_that_never_settle_are_refused),
+    ("the finish uses the program it is told to",
+     test_the_finish_uses_the_program_it_is_told_to),
     ("every refusal is a sentence", test_refusals_are_sentences),
     ("no Word falls back quietly", test_no_word_falls_back),
     ("a platform without Word is not driven", test_platform_gate),

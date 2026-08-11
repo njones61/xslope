@@ -49,9 +49,9 @@ from .preflight_panel import two_pane
 #: QSettings prefix for everything this dialog remembers.
 SETTINGS_PREFIX = "report/"
 
-#: Turn the Word finish (:func:`finalize_document`) off. There is no checkbox
-#: for it: a report that arrives complete is not a preference, and the key is
-#: here for the one machine where driving Word is unwelcome. On macOS the store
+#: Turn the finish (:func:`finalize_document`) off. There is no checkbox for it:
+#: a report that arrives complete is not a preference, and the key is here for
+#: the one machine where driving Word is unwelcome. On macOS the store
 #: :func:`finalization_enabled` reads is the domain Qt writes for this
 #: organization and application, so the switch is::
 #:
@@ -222,14 +222,14 @@ FORMATS = [
 def open_output(path, fmt, status=None, finalize=True):
     """Show the finished report to the user, and say what was shown.
 
-    A document is finished in Word first (:func:`finalize_document`) and then
-    opened in whatever the system uses for it. Returns ``"document"``.
+    A document has its page numbers built first (:func:`finalize_document`) and
+    is then opened in whatever the system uses for it. Returns ``"document"``.
 
     ``status`` is where the progress line goes; the default finds Studio's
-    status bar. ``finalize=False`` skips the Word finish for a caller that has
+    status bar. ``finalize=False`` skips the finish for a caller that has
     already done it — Studio's report runs on a worker thread and finishes the
-    document there, so by the time the document is opened Word has been and
-    gone.
+    document there, so by the time the document is opened the finish has been
+    and gone.
     """
     if finalize:
         finalize_document(path, status=status)
@@ -262,59 +262,67 @@ def finalization_enabled(settings=None):
     return _as_bool(s.value(FINALIZE_KEY, True))
 
 
-def word_finish(path, enabled=True):
-    """The Word finish itself, with no Qt in it.
+def document_finish(path, enabled=True):
+    """The finish itself, with no Qt in it.
 
     Everything here is a zip read and a subprocess, so this is what runs on the
     report's worker thread (``studio.runners.ReportRunner``). ``enabled`` is
     :func:`finalization_enabled`'s answer, read by the caller where QSettings
     lives. Returns the ``(bool, message)`` of the attempt; the refusals are
     results, not errors.
+
+    Which program does the work is
+    :func:`xslope.report_finalize.finalize_report`'s to decide — Word where
+    there is one, LibreOffice where there is not.
     """
     if not enabled:
-        return False, "Finishing reports in Word is switched off."
+        return False, "Finishing reports is switched off."
     if not carries_contents_field(path):
         return False, "The document has no contents field to update."
 
-    from xslope.report_finalize import finalize_with_word
+    from xslope.report_finalize import finalize_report
 
-    ok, msg = finalize_with_word(path)
+    ok, msg = finalize_report(path)
     if not ok:
-        print(f"Report: the page numbers were left for Word to build — {msg}")
+        print(f"Report: the contents page was left without page numbers — {msg}")
     return ok, msg
 
 
 def finalize_document(path, settings=None, status=None):
-    """Let Word rebuild the report's page numbers, and make no fuss if it can't.
+    """Have the report's page numbers built, and make no fuss if they can't be.
 
     The report's table of contents is a real Word field whose page numbers only
     exist once a page layout engine has laid the document out. Rather than ship
     a contents page that asks the reader to press F9 — or, worse, guess the page
-    numbers — the finished document is handed to Word, which updates its fields
-    and saves it. What the user then opens is complete.
+    numbers — the finished document is handed to a program that lays pages out:
+    Word, which updates its own fields and saves, or LibreOffice where there is
+    no Word. What the user then opens is complete.
 
-    Every way this can fail is ordinary: no Word, no permission to drive it, a
-    Word that does not answer. Each one leaves the document exactly as it was
-    written, which is a report with an unpaginated contents page, and says so in
-    one line on the console. None of them is worth a dialog.
+    Every way this can fail is ordinary: no Word and no LibreOffice, no
+    permission to drive Word, a Word that does not answer. Each one leaves the
+    document exactly as it was written, which is a report with an unpaginated
+    contents page, and says so in one line on the console. None of them is worth
+    a dialog.
 
     Returns the ``(bool, message)`` of the attempt.
 
     This is the synchronous form, for a caller already on the GUI thread: it
-    blocks for as long as Word takes, so it holds the wait cursor up and posts a
-    line saying what is happening. Studio's own report does not come through
-    here — it runs on a worker thread and calls :func:`word_finish`, so the
-    window stays live and the phase is a labelled stretch of the progress bar.
+    blocks for as long as the finish takes, so it holds the wait cursor up and
+    posts a line saying what is happening. Studio's own report does not come
+    through here — it runs on a worker thread and calls
+    :func:`document_finish`, so the window stays live and the phase is a
+    labelled stretch of the progress bar.
     """
     enabled = finalization_enabled(settings)
     if not enabled or not carries_contents_field(path):
-        return word_finish(path, enabled)   # the same two refusals, unannounced
+        # The same two refusals, unannounced.
+        return document_finish(path, enabled)
 
     say = status or _status_line
-    say("Finalizing the report in Word…")
+    say("Building the report's page numbers…")
     QApplication.setOverrideCursor(Qt.WaitCursor)
     try:
-        return word_finish(path, True)
+        return document_finish(path, True)
     finally:
         QApplication.restoreOverrideCursor()
 

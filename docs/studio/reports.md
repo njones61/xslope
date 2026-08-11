@@ -283,43 +283,68 @@ from a bundle the caller solved.
 
 ---
 
-## Finishing in Word
+## Building the page numbers
 
 The contents page is a real Word `TOC` field, and page numbers only exist once a
 page layout engine has laid the document out. Rather than guess them, the
-written document is handed to the one program that knows. On macOS, Word is
-driven over Apple events and given a **copy**: it updates every field and every
-table of contents in the copy, saves, and closes, and the copy takes the
-report's place when it comes back — a finish that fails or is killed halfway
-leaves the report exactly as it was written, and no Word lock file ever appears
-beside it. On Windows, Word is driven over COM from PowerShell and works on the
-report itself: it opens the file in place, updates the same fields, and saves.
-Word's `~$` lock file sits beside the report while it is open, and a finish
-killed partway interrupts a save of the report itself rather than of a
-disposable copy. Either way it is a labelled stretch of the progress bar.
+written document is handed to a program that lays pages out. Either way it is a
+labelled stretch of the progress bar, and either way the field stays live: F9 in
+Word still rebuilds the whole table.
 
-Every way this can fail is ordinary — no Word, no permission to drive it, a Word
-that does not answer within a minute — and each one leaves a complete report
-whose contents page lists the headings without page numbers. A line under that
-list says how to fill them in (right-click → **Update Field**, or select all and
-press F9), and it sits inside the field result, so Word's first update replaces
-it along with the rest. The page numbers in the footer keep themselves current
-regardless.
+**Word**, where the machine has it, does its own job. On macOS it is driven over
+Apple events and given a **copy**: it updates every field and every table of
+contents in the copy, saves, and closes, and the copy takes the report's place
+when it comes back — a finish that fails or is killed halfway leaves the report
+exactly as it was written, and no Word lock file ever appears beside it. On
+Windows, Word is driven over COM from PowerShell and works on the report itself:
+it opens the file in place, updates the same fields, and saves. Word's `~$` lock
+file sits beside the report while it is open, and a finish killed partway
+interrupts a save of the report itself rather than of a disposable copy.
 
-The finish can be switched off on a machine where driving Word is unwelcome:
+**LibreOffice** finishes the report where there is no Word, or where Word
+declines. It cannot update a Word field, so it is used as what it is: the
+document is laid out to PDF, the page each heading landed on is read off that
+PDF's outline — which LibreOffice builds from the heading styles and the
+document's own numbering — and those pages are written into the contents field's
+cached result, which is where Word puts them too. The work happens on a copy,
+which takes the report's place only once every number has been proved: the
+finished copy is laid out a second time, and every number it carries has to be
+the page its heading lands on in the document that carries it. An entry that
+cannot be placed at all is a refusal that names the entry, not a contents page
+that is quietly wrong about one line. This leg needs LibreOffice on the machine
+and the `pypdf` package (`pip install pypdf`); without either it says so and the
+report is left as written. It also needs the document to be one xslope wrote: a
+`.docx` that has been re-saved *through* LibreOffice keeps its contents field
+inside a content control, where this does not look for it, and the answer is
+that the document has no table of contents to number.
+
+Every way this can fail is ordinary — no Word and no LibreOffice, no permission
+to drive Word, a Word that does not answer within a minute — and each one leaves
+a complete report whose contents page lists the headings without page numbers. A
+line under that list says how to fill them in (right-click → **Update Field**, or
+select all and press F9), and it sits inside the field result, so Word's first
+update replaces it along with the rest. The page numbers in the footer keep
+themselves current regardless.
+
+The finish can be switched off on a machine where it is unwelcome:
 
 ```
 defaults write "com.xslope.XSlope Studio" report.finalize -bool NO
 ```
 
-Report generation itself never calls Word — a script that writes fifty reports
-must not open fifty documents — so a script that wants the same finish asks for
-it:
+Report generation itself never finishes a report — a script that writes fifty
+must not open fifty documents — so a script that wants the finish asks for it:
 
 ```python
-from xslope.report_finalize import finalize_with_word
-ok, msg = finalize_with_word("north_levee_report.docx")
+from xslope.report_finalize import finalize_report
+ok, msg = finalize_report("north_levee_report.docx")
 ```
+
+`finalize_report` uses Word where there is one and LibreOffice where there is
+not. A run that must not take over the Word the user is working in names the
+other one, either in the call (`prefer="libreoffice"`) or in the environment
+(`XSLOPE_FINALIZE=libreoffice`); `XSLOPE_SOFFICE` names LibreOffice's `soffice`
+program where it is installed somewhere unusual.
 
 ---
 

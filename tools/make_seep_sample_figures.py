@@ -27,7 +27,8 @@ of the old artifacts' 1411x338…3634x1462 grab-bag.
 
 Run from the repo root:
 
-    PYTHONPATH=. python3 tools/make_seep_sample_figures.py
+    PYTHONPATH=. python3 tools/make_seep_sample_figures.py            # every figure
+    PYTHONPATH=. python3 tools/make_seep_sample_figures.py earth_dam2 # stems matching
 """
 import io
 import os
@@ -140,6 +141,12 @@ def seep_sample(stem, phreatic, base_mat):
 
 
 if __name__ == "__main__":
+    import sys
+    only = tuple(sys.argv[1:])
+    n = 0
     for stem, phreatic, base_mat in CASES:
+        if only and not any(s in stem for s in only):
+            continue
         seep_sample(stem, phreatic, base_mat)
-    print("\nseep sample figures generated")
+        n += 1
+    print(f"\n{n} seep sample figures generated")

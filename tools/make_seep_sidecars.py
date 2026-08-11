@@ -70,8 +70,18 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #:
 #: ``docs`` — the convention ``run_tests.py::run_seep_test`` computes every
 #: ``type=seep`` lock under, and that ``tools/make_seep_sample_figures.py`` draws the
-#: sample flow nets under (tol 1e-4; the 1000-sweep ceiling is earth_dam2's, which
-#: needs 427 sweeps of the exit face, and changes no other model).
+#: sample flow nets under (tol 1e-4).
+#:
+#: THE 1000-SWEEP CEILING IS EARTH_DAM2'S, AND IT IS THIN. On its committed mesh that
+#: model converges in 927 sweeps — 73 of headroom — so the ceiling is load-bearing for
+#: it and for nothing else: every other companion here closes in 500 or fewer, and the
+#: library's own default of 400 would leave earth_dam2 short by more than twice over.
+#: Its exit face settles at sweep 188 (where the set-revisit escape frees the two edges
+#: it was cycling on) and the remaining 739 sweeps are the nonlinear residual walking
+#: down to closure_tol. A change that slows that walk runs it into the ceiling, where
+#: it reports a flow rate off a field that is still moving, which is the state this
+#: whole registry exists to keep out of the corpus — raise the ceiling with the model,
+#: rather than trimming the model to it.
 #: ``vendor`` — the settings the model's own builder solves it at
 #: (``benchmarks/rocscience/build_rs2.py::_build_rs2_28``, ``build_vp038``,
 #: ``build_vp046``), so a rebuild and this script agree.

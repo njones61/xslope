@@ -9,7 +9,9 @@ comes back or never goes away; a menu item that lost its slot. What is guarded:
      version it is running, and the support address as a mail link — and NO
      bug-report link, which was ruled out of this window deliberately (it is a Help
      menu item's job). The hrefs are read out of the rendered text, so a label that
-     says "Verification" over the samples URL fails here.
+     says "Verification" over the samples URL fails here; the bug-report refusal is
+     read off every widget and action on the window, because a Report a Bug button
+     is a button and a guard that reads labels alone would pass one.
   B. THE PREFERENCE ROUND-TRIPS, AND IT IS THE SAME KEY BOTH WAYS. An unset key is
      a first launch: the window opens, with the tick already in the box, so the
      welcome is a first-launch window and not a greeting at every start. Closing
@@ -22,7 +24,10 @@ comes back or never goes away; a menu item that lost its slot. What is guarded:
      building a window — which every Studio test does — never raises a modal
      dialog. Both answers are exercised, and so is the ``XSLOPE_NO_WELCOME``
      suppression, because a check that only proves the yes-path cannot tell a gate
-     from an unconditional call.
+     from an unconditional call. A launch that arrived with work in hand opens the
+     work and no greeting over it, by either arrival route — a document on the
+     command line, and the event macOS sends instead — and leaves the preference
+     alone, so the next bare launch is still greeted.
   D. THE HELP MENU CARRIES BOTH ITEMS, AND DOCUMENTATION OPENS THE DOCS. Order
      included: the outward items first, then the update items, then About.
      ``QDesktopServices.openUrl`` is intercepted, so the check reads the URL the
@@ -46,6 +51,10 @@ if _REPO not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+#: A real project to launch WITH, so the "arrived with work in hand" case is a
+#: launch that actually opened something rather than one that ignored a bad path.
+SAMPLE = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_dam.xlsx")
+
 #: The image the documentation page embeds, and the page that embeds it.
 DOCS_PAGE = os.path.join(_REPO, "docs", "studio", "index.md")
 DOCS_IMAGE = os.path.join(_REPO, "docs", "studio", "images",
@@ -55,6 +64,42 @@ DOCS_IMAGE = os.path.join(_REPO, "docs", "studio", "images",
 def _hrefs(label):
     """Every anchor target in a rich-text label, in the order they are shown."""
     return re.findall(r'href="([^"]+)"', label.text())
+
+
+#: The ways a Qt widget carries text a person can read: labels and buttons say
+#: ``text()``, group boxes ``title()``, an input its ``placeholderText()``, and
+#: anything at all a ``toolTip()``.
+_TEXT_GETTERS = ("text", "title", "placeholderText", "toolTip", "whatsThis")
+
+
+def _visible_text(widget):
+    """Everything readable on ``widget`` — its title, every child widget's text,
+    and every action on it.
+
+    Deliberately not "every QLabel": what a window offers is offered by whatever
+    widget it is offered with, so a guard that reads one widget class only proves
+    something about that class. Getters that want arguments (``QComboBox.text`` is
+    not one, ``QTableWidget.item`` is) are skipped rather than guessed at.
+    """
+    from PySide6.QtGui import QAction
+    from PySide6.QtWidgets import QWidget
+
+    seen = [widget.windowTitle()]
+    for child in [widget] + widget.findChildren(QWidget):
+        for name in _TEXT_GETTERS:
+            getter = getattr(child, name, None)
+            if not callable(getter):
+                continue
+            try:
+                value = getter()
+            except TypeError:              # a getter that takes an index or a role
+                continue
+            if isinstance(value, str) and value:
+                seen.append(value)
+    for action in list(widget.actions()) + widget.findChildren(QAction):
+        seen.append(action.text())
+        seen.append(action.toolTip())
+    return " ".join(s for s in seen if s)
 
 
 def _settings(tmp, name="w.ini"):
@@ -105,11 +150,15 @@ def test_contents():
                          "found")
 
         # Ruled out of this window (plan_docs_studio_links.md §6): reporting a bug
-        # is a Help menu item, not something the first launch asks for.
-        whole = " ".join(w.text() for w in dlg.findChildren(type(dlg.link_label)))
-        if re.search(r"report a bug|issues/new|github\.com", whole, re.I):
-            fails.append("the welcome window carries a bug-report link, which was "
-                         "ruled out of it")
+        # is a Help menu item, not something the first launch asks for. Read off
+        # EVERY widget on the window and every action on it, not the labels alone —
+        # a Report a Bug button is a button, and a guard that only reads labels is a
+        # guard that would have let one through.
+        whole = _visible_text(dlg)
+        if re.search(r"report (a )?(bug|problem)|issues/new|github\.com|"
+                     r"file an issue|bug report", whole, re.I):
+            fails.append("the welcome window carries a bug-report link or button, "
+                         "which was ruled out of it")
 
         buttons = dlg.findChildren(QDialogButtonBox)
         if not buttons or not buttons[0].button(QDialogButtonBox.Close):
@@ -187,7 +236,7 @@ def test_launch_gate():
     real_exec = QApplication.exec
     calls = []
 
-    def _run(answer, suppress):
+    def _run(answer, suppress, args=()):
         """One ``studio.app.main`` launch, with the gate answering ``answer``."""
         del calls[:]
         welcome.show_at_launch = lambda settings=None: answer
@@ -201,7 +250,7 @@ def test_launch_gate():
         else:
             os.environ.pop("XSLOPE_NO_WELCOME", None)
         try:
-            studio_app.main(["xslope-studio"])
+            studio_app.main(["xslope-studio", *args])
         finally:
             os.environ.pop("XSLOPE_NO_WELCOME", None)
             for w in QApplication.topLevelWidgets():
@@ -219,11 +268,73 @@ def test_launch_gate():
                          "preference says not to")
         if _run(answer=True, suppress=True) != 0:
             fails.append("XSLOPE_NO_WELCOME did not suppress the window")
+        # A launch that arrived with work in hand — a document on the command line,
+        # which is how a double-clicked file reaches Studio on Windows and Linux —
+        # opens that document and no greeting over it. The preference is untouched,
+        # so the next bare launch still shows the window.
+        if os.path.exists(SAMPLE):
+            if _run(answer=True, suppress=False, args=(SAMPLE,)) != 0:
+                fails.append("a launch that was handed a file still opened the "
+                             "welcome window over it")
+        else:
+            fails.append(f"missing fixture {os.path.relpath(SAMPLE, _REPO)}")
+        if _run(answer=True, suppress=False) != 1:
+            fails.append("a bare launch after a file launch showed no welcome "
+                         "window, so opening a file switched it off for good")
     finally:
         welcome.show_at_launch = real_gate
         MainWindow.show_welcome = real_show
         QApplication.exec = real_exec
         os.environ.pop("XSLOPE_NO_UPDATE_CHECK", None)
+
+    # What "work in hand" is decided by: a request that was ACTED ON marks the
+    # window, in ``open_request`` — the one place both arrival routes meet — so a
+    # command-line argument and the event macOS sends instead are answered the same
+    # way, and an argument that named nothing openable is not work.
+    class _Window:
+        def __init__(self):
+            self.opened = []
+
+        def open_path(self, path):
+            self.opened.append(path)
+
+        def open_scheme_url(self, url):
+            self.opened.append(url)
+
+    win = _Window()
+    studio_app.open_request(win, SAMPLE)
+    if win.opened != [SAMPLE]:
+        fails.append(f"a file argument reached {win.opened}, not the normal open")
+    if not getattr(win, "opened_by_request", False):
+        fails.append("opening a file from the command line did not mark the "
+                     "launch as one that arrived with work in hand")
+
+    ignored = _Window()
+    studio_app.open_request(ignored, os.path.join(_REPO, "no_such_project.xlsx"))
+    if getattr(ignored, "opened_by_request", False):
+        fails.append("an argument that named nothing openable counted as work in "
+                     "hand, so a mistyped path would suppress the welcome window")
+
+    # macOS delivers a double-clicked document as an event rather than on the
+    # command line, and when the double-click is what launched Studio the request
+    # arrives before there is a window to give it to. Held and replayed, it must
+    # reach the same mark. Qt refuses a second application object in one process,
+    # so the real methods are called against a stand-in holding the same state.
+    class _Stub:
+        _deliver = studio_app.StudioApplication._deliver
+
+    sa = _Stub()
+    sa._window, sa._pending = None, []
+    studio_app.StudioApplication._deliver(sa, SAMPLE)          # arrives too early
+    if sa._pending != [SAMPLE]:
+        fails.append("a request that arrived before the window was dropped rather "
+                     "than held")
+    held = _Window()
+    studio_app.StudioApplication.set_window(sa, held)
+    if not getattr(held, "opened_by_request", False):
+        fails.append("a request held until the window existed did not mark the "
+                     "launch — the welcome would open over a double-clicked "
+                     "document on macOS")
 
     # Building a window must never raise a dialog on its own: the tests, the
     # captures and the report pipeline all construct one.

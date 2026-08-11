@@ -63,8 +63,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import numpy as np
 
-from xslope.fileio import (default_template_path, load_slope_data,
-                           save_slope_data_to_xlsx, write_cells_to_xlsx)
+from xslope.fileio import (_round_cell_float, default_template_path,
+                           load_slope_data, save_slope_data_to_xlsx,
+                           write_cells_to_xlsx)
 from xslope.preflight import preflight
 from xslope.seep import apply_steady_stability_field
 
@@ -590,11 +591,70 @@ def test_studio():
     return fails
 
 
+def test_small_magnitudes_survive_the_write():
+    """A cell keeps ten significant digits however small the number is.
+
+    The writer strips binary-repr noise on the way into a cell. Measuring that
+    tail from the decimal point instead of from the number destroys real digits
+    as the value shrinks, and seepage is where the small numbers live: a 2:1 rain
+    boundary carries q_n = 1e-8 * cos(atan 0.5) = 8.94427191e-9 m/s, which a
+    ten-DECIMAL-place rule writes as 8.9e-9 — two significant figures, a 0.6%
+    error in the boundary, silently. Below 5e-11 the same rule writes 0, so a
+    1e-13 m/s conductivity loads back as a hole in the model.
+
+    Every value here is written to a real workbook and read back through the
+    loader, so this covers the whole path rather than the rounding helper alone.
+    """
+    fails = []
+    # (label, value) — the rain-boundary normal flux, a conductivity below the old
+    # floor, one either side of it, and the noise the rounding exists to remove.
+    cases = [("2:1 rain boundary q_n", 1e-8 * 2.0 / 5.0 ** 0.5),
+             ("low-k lens conductivity", 1e-13),
+             ("just under the old floor", 4.9e-11),
+             ("nine significant digits", 1.234567891e-9),
+             ("negative small", -8.94427191e-9),
+             ("everyday magnitude", 0.3),
+             ("repr noise", 0.1 + 0.2)]
+    tmpdir = tempfile.mkdtemp(prefix="steady_seep_round_")
+    try:
+        for label, v in cases:
+            got = _round_cell_float(v)
+            if v == 0.1 + 0.2:                       # the one value meant to move
+                if got != 0.3:
+                    fails.append(f"{label}: repr noise survived, {got!r}")
+                continue
+            if got == 0.0:
+                fails.append(f"{label}: {v!r} was written as zero")
+                continue
+            rel = abs(got - v) / abs(v)
+            if rel > 5e-10:                          # ten significant digits
+                fails.append(f"{label}: {v!r} became {got!r}, "
+                             f"relative error {rel:.2g} — significant digits lost")
+
+        # ...and the same values through a real save/load round trip.
+        src = os.path.join(_REPO, "docs/verification/files/rocscience_gw/gw006d.xlsx")
+        if os.path.exists(src):
+            sd = _quiet(load_slope_data, src)
+            rates = [b["flux"] for b in sd["seepage_bc"]["specified_fluxes"]]
+            want = 1e-8 * 2.0 / 5.0 ** 0.5
+            face = [r for r in rates if r < 9.9e-9]
+            if not face:
+                fails.append("gw006d carries no sloped-face flux block to check")
+            for r in face:
+                if abs(r - want) / want > 5e-10:
+                    fails.append(f"gw006d's 2:1 face flux reads {r!r}, not {want!r} "
+                                 "— the writer truncated it")
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    return fails
+
+
 CHECKS = [("the run gate, both directions", test_gate),
           ("what applying a steady field means", test_apply),
           ("save with no external process available", test_save_without_a_shell),
           ("save through the frozen resource layout", test_frozen_template),
           ("the written archive", test_archive),
+          ("small magnitudes survive the write", test_small_magnitudes_survive_the_write),
           ("no handle outlives a load", test_no_leaked_handle),
           ("Studio: solve then run, offscreen", test_studio)]
 

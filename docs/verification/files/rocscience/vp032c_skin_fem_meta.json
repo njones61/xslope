@@ -1,8 +1,12 @@
 {
   "benchmark": "RS2-24b-skin",
   "analysis": "ssrm",
-  "FS": 1.0007812499999997,
+  "FS": 0.9351562499999999,
   "expected_fs": "1.001",
   "file": "files/rocscience/vp032c_skin.xlsx",
-  "unit_system": "si"
+  "unit_system": "si",
+  "converged": true,
+  "iterations": 9967,
+  "residual": 3.066075665055363e-06,
+  "max_displacement": 0.047731167845444976
 }

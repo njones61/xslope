@@ -467,6 +467,10 @@ def get_dload_legend_handler(color='purple'):
 
     ``color`` selects which load set the key stands for: the user's own blocks
     (purple, the default) or the engine's derived water loads (water-blue).
+
+    No plot in the package calls this: the load layers name themselves where they
+    are drawn, so the legend needs no stand-in for them. It is kept for the
+    benchmark figure scripts, which build their legends by hand.
     """
     # Create a line with built-in arrow marker
     dummy_line = Line2D([0.0, 1.0], [0, 0],  # Two points to define line
@@ -2839,8 +2843,13 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
         poly_x = [x1, x2, x2_top, x1_top]
         poly_y = [y1, y2, y2_top, y1_top]
 
+        # Each bar names its own legend key, and only where it is drawn with real
+        # extent: a bar of zero length paints nothing on the base line, so it
+        # takes no entry. The legend de-duplicates by label, so the first drawn
+        # bar of each kind carries the key for all of them.
         ax.fill(poly_x, poly_y, facecolor='none', edgecolor='red' if stress <= 0 else 'limegreen', hatch='.....',
-                linewidth=1, gid='EFF_NORMAL_STRESS')
+                linewidth=1, gid='EFF_NORMAL_STRESS',
+                label="Eff Normal Stress (σ')" if bar_len > 0 else None)
 
         # --- Pore pressure trapezoid ---
         u_len = (pore / ref) * max_bar_len
@@ -2854,7 +2863,8 @@ def plot_base_stresses(ax, slice_df, scale_frac=0.5, alpha=0.3):
         poly_ux = [x1, x2, ux2_top, ux1_top]
         poly_uy = [y1, y2, uy2_top, uy1_top]
 
-        ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1, gid='PORE_PRESSURE')
+        ax.fill(poly_ux, poly_uy, color='blue', alpha=alpha, edgecolor='k', linewidth=1, gid='PORE_PRESSURE',
+                label='Pore Pressure (u)' if u_len != 0 else None)
 
 
 def plot_thrust_line_from_df(ax, slice_df,
@@ -3949,17 +3959,14 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
 
     plot_base_stresses(ax, slice_df, alpha=alpha)
 
-    import matplotlib.patches as mpatches
-    normal_patch = mpatches.Patch(facecolor='none', edgecolor='green', hatch='.....', label="Eff Normal Stress (σ')")
-    pore_patch = mpatches.Patch(color='blue', alpha=alpha, label='Pore Pressure (u)')
-
-    # The legend is read off the drawn artists; the two patches above stand for
-    # the base-stress bars, which are drawn as unlabelled polygons. The loads
-    # name themselves where they are drawn — a load that is not drawn is not
-    # named — so there are no entries appended from the input data here either.
+    # The legend is read off the DRAWN artists and nothing else. Every layer above
+    # labels what it draws — the base-stress bars included, each naming its key on
+    # the first bar drawn with real extent — so the key and the picture cannot
+    # disagree, and there is no second list of entries to keep in step. Patches
+    # appended here for the bars said "Pore Pressure (u)" over a dry model, whose
+    # pore bars have no length at all: five of eight delivered reports carried a
+    # blue swatch with no blue bar under it (xslope_acads_simple, page 6).
     handles, labels = ax.get_legend_handles_labels()
-    handles.extend([normal_patch, pore_patch])
-    labels.extend(["Eff Normal Stress (σ')", 'Pore Pressure (u)'])
 
     ax.set_aspect('equal', adjustable='datalim')
 

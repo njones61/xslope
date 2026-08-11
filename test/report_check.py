@@ -9077,6 +9077,104 @@ def test_shared_plot():
     return fails
 
 
+def test_solution_plot_legend():
+    """THE SOLUTION PLOT'S LEGEND NAMES THE BARS IT DRAWS, wet model or dry.
+
+    The base-stress bars stand on each slice base: the effective normal stress
+    outward, the pore pressure into the base. On a model with no pore pressure
+    the pore bar has no length — it is the base line and nothing more — and its
+    key was still promised, because the two entries were appended from a patch
+    list every time the plot was drawn rather than read off the bars. Five of
+    eight delivered limit equilibrium reports carried the blue swatch with no
+    blue bar under it (xslope_acads_simple, page 6, Figure 4).
+
+    Both fixtures are measured before they are believed: the wet model's slices
+    carry pore pressure and its bars have area, the dry model's carry none and
+    its bars have none, so each half of the coupling below is made on a model
+    that can actually fail it. The rendered legend is then read against the
+    labels of the artists on the axes — an entry from any second list fails here
+    whatever it is called — and the pore key against the bars' own geometry,
+    both ways: named where a bar is drawn, absent where none is.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    import numpy as np
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+    from xslope.plot import plot_solution
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    PORE_KEY = "Pore Pressure (u)"
+    EFF_KEY = "Eff Normal Stress (σ')"
+
+    def bar_area(patch):
+        """The area the bar covers, in data units — zero for a bar of no length,
+        which paints nothing whatever the legend says about it."""
+        xy = np.asarray(patch.get_xy(), dtype=float)
+        x, y = xy[:, 0], xy[:, 1]
+        return abs(float(np.dot(x, np.roll(y, -1))
+                         - np.dot(np.roll(x, -1), y)) / 2.0)
+
+    for what, path, wet in (("a model with pore pressure", DAM_XLSX, True),
+                            ("a dry model", REINF_XLSX, False)):
+        sd = load_slope_data_cached(path)
+        with contextlib.redirect_stdout(io.StringIO()):
+            ok, out = generate_slices(sd, circle=sd["circles"][0], num_slices=20)
+            if not ok:
+                fails.append(f"{what} produced no slices ({out}); its legend is "
+                             f"untested")
+                continue
+            slice_df, surface = out[0], out[1]
+            results = solve_selected("spencer", slice_df)
+            fig = Figure(figsize=(9, 5.5))
+            FigureCanvasAgg(fig)
+            plot_solution(sd, slice_df, surface, results, fig=fig,
+                          show_title=False)
+        ax = fig.axes[0]
+
+        # The fixture is what it is called: pore pressure on the slices of the
+        # wet one, none at all on the dry one.
+        u_max = float(np.max(np.abs(slice_df["u"]))) if len(slice_df) else 0.0
+        if (u_max > 0) is not wet:
+            fails.append(f"{what} carries max |u| = {u_max}; it is the wrong "
+                         f"fixture for this check")
+            continue
+
+        legend = ax.get_legend()
+        shown = [t.get_text() for t in (legend.get_texts() if legend else [])]
+        named_by_artists = {l for l in ax.get_legend_handles_labels()[1]
+                            if not l.startswith("_")}
+        for entry in shown:
+            if entry not in named_by_artists:
+                fails.append(f"the solution plot of {what}: the legend says "
+                             f"{entry!r} and no artist draws it")
+
+        # …and the base-stress keys in particular track the drawn bars, both
+        # ways, measured on the bars themselves.
+        for key, gid, expected in ((PORE_KEY, "PORE_PRESSURE", wet),
+                                   (EFF_KEY, "EFF_NORMAL_STRESS", True)):
+            bars = [p for p in ax.patches if p.get_gid() == gid]
+            drawn = sum(1 for p in bars if bar_area(p) > 0)
+            if not bars:
+                fails.append(f"the solution plot of {what} drew no {gid} bars "
+                             f"at all; the coupling below proves nothing")
+                continue
+            if (drawn > 0) is not expected:
+                fails.append(f"{what} draws {drawn} of {len(bars)} {gid} bars "
+                             f"with any length; it should draw "
+                             f"{'some' if expected else 'none'}")
+            if drawn and key not in shown:
+                fails.append(f"the solution plot of {what} draws {drawn} "
+                             f"{gid} bars and leaves {key!r} out of its "
+                             f"legend: {shown}")
+            if not drawn and key in shown:
+                fails.append(f"the solution plot of {what} names {key!r} over "
+                             f"{len(bars)} bars of no length: {shown}")
+    return fails
+
+
 def test_model_figure_coordinate_labels():
     """The model figure names its points, and the toggle really reaches the plot.
 
@@ -19956,6 +20054,7 @@ CHECKS = [
     ("the member subsections locate their members",
      test_the_member_subsections_locate_their_members),
     ("the shared-model plot", test_shared_plot),
+    ("the solution plot's legend", test_solution_plot_legend),
     ("every profile line names its material",
      test_profile_lines_name_their_materials),
     ("the model figure's point-coordinate toggle",

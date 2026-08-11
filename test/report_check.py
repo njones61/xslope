@@ -19510,11 +19510,11 @@ def test_report_runs_off_the_gui_thread():
     dialog_src = inspect.getsource(report_dialog)
     if "generate_report(" in dialog_src:
         fails.append("the dialog builds the report itself")
-    # The Word finish the runner calls has no Qt in it.
-    finish_src = inspect.getsource(report_dialog.word_finish)
+    # The finish the runner calls has no Qt in it.
+    finish_src = inspect.getsource(report_dialog.document_finish)
     for qt in ("QApplication", "setOverrideCursor", "_status_line"):
         if qt in finish_src:
-            fails.append(f"word_finish touches {qt} off the GUI thread")
+            fails.append(f"document_finish touches {qt} off the GUI thread")
 
     slope_data, solutions = _solved()
     mw = MainWindow()

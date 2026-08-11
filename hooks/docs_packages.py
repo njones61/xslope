@@ -164,12 +164,24 @@ def _insert_note(page_html, first_pair_at):
     Next to it means before the paragraph the pair sits in — a note at the top of a
     two-thousand-line corpus page is not near anything. When the first pair is not
     in a paragraph (a list item, a table cell) there is nowhere to put a paragraph
-    without breaking the enclosing structure, so the note goes to the top of the
-    page instead.
+    without breaking the enclosing structure, so the note goes after the page's own
+    heading instead.
+
+    After the heading, not above it. A tutorial states its completed model in the
+    header table under the title, so the top of the page body is where the H1 is,
+    and a paragraph inserted there lands between the reader and the name of the page
+    they opened. Every tutorial has that shape, so the fallback is the branch those
+    pages take, not a corner of it.
     """
     para = page_html.rfind("<p>", 0, first_pair_at)
     if para != -1 and "</p>" not in page_html[para:first_pair_at]:
         return page_html[:para] + NOTE_HTML + page_html[para:]
+    # Bounded by the pair: a heading that comes AFTER it is not a heading this note
+    # can sit under without ending up below the thing it explains.
+    heading = page_html.find("</h1>", 0, first_pair_at)
+    if heading != -1:
+        heading += len("</h1>")
+        return page_html[:heading] + "\n" + NOTE_HTML + page_html[heading:]
     return NOTE_HTML + page_html
 
 

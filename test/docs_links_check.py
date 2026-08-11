@@ -337,10 +337,18 @@ def _scratch_docs():
             f"[{single}.xlsx](files/{single}.xlsx){{: .raw-file }}\n\n"
             f"Not a sample: [the template](../usage/input_template.xlsx)\n")
     # A page whose first pair is NOT in a paragraph: there is nowhere to put a note
-    # paragraph without breaking the list, so it goes to the top of the page.
+    # paragraph without breaking the list, so it goes after the page's heading.
     with open(os.path.join(docs, "lem", "listed.md"), "w") as fh:
         fh.write(f"# Listed\n\n* [{single}.xlsx](files/{single}.xlsx)\n"
                  f"* nothing else\n")
+    # The tutorial shape: the first pair is in the header table under the title, so
+    # the fallback branch runs with NOTHING above it but the H1 itself. This is the
+    # page that pins where the fallback puts the note.
+    with open(os.path.join(docs, "lem", "tabled.md"), "w") as fh:
+        fh.write(f"# Tabled\n\n"
+                 f"| | |\n|---|---|\n"
+                 f"| **Completed model** | [{single}.xlsx](files/{single}.xlsx) |\n\n"
+                 f"Prose, after the table.\n")
     with open(os.path.join(docs, "usage", "index.md"), "w") as fh:
         fh.write("# Usage\n\nNo samples here.\n")
     open(os.path.join(docs, "usage", "input_template.xlsx"), "wb").close()
@@ -440,6 +448,26 @@ def test_docs_build():
         fails.append("the note on the list page is not above the pair")
     if not re.search(r"<li>[^<]*\(<a class=\"xslz-download\"", listed):
         fails.append("the pair broke the list item it was written in")
+    # WHERE the fallback puts it. A tutorial's only pair is in the header table
+    # directly under the title, so "the top of the page" and "above the H1" are the
+    # same place — the note would introduce the page instead of the file.
+    tabled = open(os.path.join(site, "lem", "tabled", "index.html")).read()
+    if tabled.count("xslz-note") != 1:
+        fails.append(f"a page whose first pair is inside a table carries "
+                     f"{tabled.count('xslz-note')} notes, not exactly one")
+    else:
+        h1_end = tabled.find("</h1>")
+        note_at, pair_at = tabled.find("xslz-note"), tabled.find("xslz-download")
+        if h1_end < 0:
+            fails.append("the table page rendered no <h1> to place the note under")
+        elif note_at < h1_end:
+            fails.append("the note on the table page sits ABOVE the page's <h1>, so "
+                         "the first thing the page says is the note and not its own "
+                         "title")
+        elif not note_at < pair_at:
+            fails.append("the note on the table page is not above the pair")
+    if not re.search(r"<td>[^<]*\(<a class=\"xslz-download\"", tabled):
+        fails.append("the pair broke the table cell it was written in")
     usage = open(os.path.join(site, "usage", "index.html")).read()
     if "xslz-note" in usage:
         fails.append("a page with no samples carries the note anyway")

@@ -105,7 +105,14 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    circles that daylight on the ground surface INSIDE the model. Pass
    `report=True` for `{'circles', 'summary', 'reason'}` when you need to say what
    it will do before doing it. Fall back to hand-building only when the generator
-   declines and states why. **A hand-built circle obeys the generator's own floor
+   declines and states why. **On a rigid base at the toe elevation, the ground surface ENDS at the
+   toe.** Do not extend flat ground beyond the toe at the base elevation: soil of
+   zero thickness is a degenerate domain (preflight's `domain.degenerate_ring`),
+   and the cure is to end the profile at the toe -- never to lower Max depth,
+   which invents the depth the problem does not describe. Search room beyond the
+   toe is not needed there: a circle tangent to the base daylights at or above
+   the toe. The sideways-extension rule applies only where real soil continues
+   at or below the ground being extended. **A hand-built circle obeys the generator's own floor
    rule: its lowest point (Depth, = Yo − R) sits at or above the model's Max
    Depth.** On a rigid base the deep circle is *tangent* to the base
    (Depth = Max Depth exactly) — a bottom below the base is the toe-circle trap

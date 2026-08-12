@@ -548,6 +548,52 @@ print('both families present')
     return out
 
 
+def check_secondary_circle_wording():
+    """What a dead circle costs is what the run that reads it loses — so the
+    finding must not tell a single-surface run that its "other circles" are fine.
+    That run reads circles[0] and nothing else; the circle reported is one it
+    never looks at, and the loss belongs to a search seeded from the same sheet.
+    """
+    import copy
+    from xslope.preflight import preflight
+    from studio.editors import _resync_geometry
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    _run(asst, """
+slope_data['circles'].append({'Xo': 15.0, 'Yo': 50.0, 'Depth': -300.0, 'R': 350.0})
+print('added a circle far below the base')
+""")
+    sd = copy.deepcopy(mw.doc.slope_data)
+    _resync_geometry(sd)
+    rid = "surface.circle_below_domain_floor"
+
+    single = [f for f in preflight(sd, "lem", {"surface": "circular"}).findings
+              if f.rule_id == rid]
+    search = [f for f in preflight(
+        sd, "lem", {"surface": "circular", "search": True}).findings
+        if f.rule_id == rid]
+    if len(single) != 1 or len(search) != 1:
+        out.append(f"expected one finding each; got {len(single)} / {len(search)}")
+        mw.deleteLater()
+        return out
+    if single[0].severity != "warning":
+        out.append(f"a secondary dead circle is not a warning: {single[0].severity}")
+    if "other circles are unaffected" in single[0].message:
+        out.append("a single-surface run was told its other circles are unaffected")
+    if "does not read this one" not in single[0].message:
+        out.append(f"the single-surface finding does not say the run skips it: "
+                   f"{single[0].message[:160]!r}")
+    if "a search seeded from this sheet would lose it" not in single[0].message:
+        out.append("the single-surface finding does not say who does lose it")
+    if "search's other circles are unaffected" not in search[0].message:
+        out.append(f"the search finding lost its own wording: "
+                   f"{search[0].message[:160]!r}")
+    mw.deleteLater()
+    return out
+
+
 def check_warning_is_reported_too():
     """A WARNING is unresolved business as much as an ERROR — the sessions failed
     on warnings passed over in silence, so the block must carry them."""
@@ -636,6 +682,8 @@ CHECKS = [
     ("G. a surface-family flip is an edit", check_surface_family_flip_is_an_edit),
     ("G. the follow-up carries the selection",
      check_followup_command_carries_the_selection),
+    ("G. a secondary dead circle says whose loss it is",
+     check_secondary_circle_wording),
     ("E. read-only and failed runs cost nothing", check_read_only_costs_nothing),
     ("F. mutation: injection disabled", check_mutation_disables_the_checks),
 ]

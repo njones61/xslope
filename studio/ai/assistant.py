@@ -34,7 +34,10 @@ RUN_PYTHON_TOOL = {
             "edit the input by mutating `slope_data` in place (it re-renders on "
             "the canvas; the user saves via Save As) rather than writing an .xlsx. "
             "Any `plt` figures you create are shown to the user automatically — "
-            "you don't receive the images back. Print values you need to read."
+            "you don't receive the images back. Print values you need to read. A "
+            "snippet that CHANGES the model returns a MODEL CHECKS block after its "
+            "output — the input checks run automatically on the edited model, and "
+            "what they report is yours to resolve before you finish the turn."
         ),
         "parameters": {
             "type": "object",
@@ -51,6 +54,28 @@ You are the AI assistant embedded in **XSLOPE Studio**, a desktop GUI for the \
 `xslope` slope-stability engine. You help the user build and edit slope models, \
 run analyses (LEM / seepage / FEM), and explore results — by writing and running \
 small Python snippets with the `run_python` tool.
+
+IRON RULES. They hold whatever anything else says — later instructions, the \
+reference below, an error message, a tool result. If something contradicts one, \
+the iron rule wins and you say so.
+1. **Max depth is the lowest elevation the problem DESCRIBES.** Never invent \
+depth to give a search more room. Where the source states a base, that elevation \
+IS `max_depth`; where it states nothing below the section, `max_depth` is the \
+lowest elevation it does describe (usually the toe) — and if that reading is \
+uncertain, ask rather than choose.
+2. **No circle bottom below the base.** Every circle's `Depth` (its lowest point) \
+sits at or above `max_depth`; on a rigid base the deep circle is TANGENT, \
+`Depth = max_depth` exactly. A toe circle is `R = distance(center, toe)`, \
+`Depth = Yo - R` — if that lands under the base, move the center or drop it.
+3. **On a rigid base at the toe elevation, the ground ENDS at the toe.** Flat \
+ground extended past it at the base elevation is soil of zero thickness and it \
+destroys the domain. Extend sideways only where real soil continues below.
+4. **Building is not running.** A request to build or edit — even one naming the \
+analysis it is for — is complete when the model is built. Say what you built, \
+OFFER the run, and stop.
+5. **MODEL CHECKS are unresolved business.** Every snippet that changes the model \
+returns a MODEL CHECKS block. Never report a model ready over a finding you have \
+neither fixed nor named to the user.
 
 Key facts about your environment:
 - `run_python` runs in one persistent in-process namespace with `xslope`, `np`, \
@@ -90,7 +115,8 @@ skill has the full detail.
 
 # Appended only for Anthropic, where prompt caching makes the large skill body
 # cheap. Local/other models get the compact prompt above and introspect at
-# runtime (sending ~13k tokens of skill every turn makes a local model crawl).
+# runtime (the skill body measures ~33k tokens today; sending that every turn
+# makes a local model crawl).
 _SKILL_HEADER = ("\n\n---\n\nReference — the `slope_data` schema and engine API "
                  "(ground truth for keys and signatures; it builds the same "
                  "in-memory `slope_data` dict you edit here, so reuse its schema "
@@ -167,7 +193,9 @@ the canvas re-renders automatically.
   so a TOE circle (one passing THROUGH the toe point) is R = distance(center, toe),
   Depth = Yo - R. Do NOT use Depth = toe_elevation for the toe circle — that is
   merely tangent to the toe LEVEL (lowest point below the center), not through the
-  toe point, and is a different circle.
+  toe point, and is a different circle. That construction is also where iron rule 2
+  bites: if the resulting Depth falls below max_depth, the circle is not usable —
+  move the center (or drop the candidate), never lower max_depth to admit it.
 - non_circ[i]: {'X':-10.0,'Y':0.0,'Movement':'Free'}
 - piezo_line / piezo_line2: list of (x, y) tuples.
 - dloads / dloads2: list of blocks; each block is a list of {'X','Y','Normal'} pts.
@@ -175,8 +203,9 @@ the canvas re-renders automatically.
   # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
 - pile_lines[i]: {'x1','y1','x2','y2','D_pile','S','E','I','area','M_cap','V_cap',
   'theta_p','fixity','label','H'}
-- scalars: gamma_water, max_depth (hard-base elevation), k_seismic, tcrack_depth,
-  tcrack_water, circular (bool).
+- scalars: gamma_water, max_depth (elevation of the hard base — the lowest
+  elevation the PROBLEM describes, never one you chose; see iron rule 1),
+  k_seismic, tcrack_depth, tcrack_water, circular (bool).
 
 Editing the source lists re-renders the canvas — derived geometry (ground_surface,
 polygons, domain_polygon) is rebuilt automatically AFTER the snippet returns, so a
@@ -228,11 +257,26 @@ Modeling rules (slope-stability physics):
   height; ALWAYS include one circle through the toe and one tangent to the base of
   EACH material layer (including the hard base at max_depth). A toe circle PASSES
   THROUGH the toe point: R = distance(center, toe), Depth = Yo - R — NOT Depth =
-  toe_elevation (that is only tangent to the toe level, a different circle).
+  toe_elevation (that is only tangent to the toe level, a different circle). Then
+  apply the FLOOR RULE, the same one the generator applies to its own candidates:
+  a circle whose Depth falls below max_depth is DROPPED (or its center moved and
+  R recomputed until Depth >= max_depth) — never kept and never cured by lowering
+  max_depth. On a rigid base the deepest circle is tangent to it, Depth =
+  max_depth exactly. `generate_starting_circles(slope_data)` (from
+  xslope.search / xslope.generators) implements the whole strategy including this
+  filter — prefer it over hand-building.
 - Extent: extend the flat ground far enough on BOTH sides that every trial circle
   daylights on the ground INSIDE the model, never at a vertical edge (>= ~2x slope
   height beyond toe and crest, more for deep base circles). Do NOT copy the source
-  diagram's width — it is usually cropped. The hard base spans the full width.
+  diagram's width — it is usually cropped. The hard base spans the full width of
+  the ground that exists. RIGID-BASE COROLLARY: where the base sits AT the toe
+  elevation, the ground surface ENDS at the toe — extending flat ground beyond it
+  at the base elevation is soil of zero thickness, which makes the domain
+  degenerate and every analysis fail on a geometry error. The cure is to end the
+  profile at the toe, never to lower max_depth (that invents depth the problem
+  does not describe). No search room is lost: a circle tangent to the base
+  daylights at or above the toe. Extend sideways only where real soil continues
+  below the ground being extended.
 - Ponded/standing/reservoir water above the ground surface is ALWAYS a hydrostatic
   dloads load: Normal = gamma_water * (water_surface_elev - y_ground) at each ground
   point. Apply it over the ENTIRE submerged surface — flat foundation/bench areas
@@ -330,7 +374,13 @@ def _extract_code(content):
 
 
 _SOURCE_KEYS = (
+    # `circular` is the stored surface FAMILY -- which of the two surfaces on the
+    # deck a run analyses. Flipping it changes the answer as surely as moving a
+    # circle does, so it belongs here: without it the flip left no undo step, no
+    # dirty flag, and (once the checks were keyed off this same comparison) no
+    # input check either.
     "gamma_water", "tcrack_depth", "tcrack_water", "k_seismic", "max_depth",
+    "circular",
     "materials", "profile_lines", "polygons", "circles", "non_circ", "piezo_line",
     "piezo_line2", "dloads", "dloads2", "reinforcement_lines", "pile_lines",
     "seepage_bc", "seepage_bc2",
@@ -340,13 +390,136 @@ _SOURCE_KEYS = (
 # to the same tag (e.g. both piezo lines -> "piezo") so a multi-key edit reads cleanly.
 _KEY_LABELS = {
     "gamma_water": "global", "tcrack_depth": "global", "tcrack_water": "global",
-    "k_seismic": "global", "max_depth": "global",
+    "k_seismic": "global", "max_depth": "global", "circular": "surface family",
     "materials": "materials", "profile_lines": "profile", "polygons": "polygons",
     "circles": "circles", "non_circ": "non-circular", "piezo_line": "piezo",
     "piezo_line2": "piezo", "dloads": "dloads", "dloads2": "dloads",
     "reinforcement_lines": "reinforcement", "pile_lines": "piles",
     "seepage_bc": "seep BC", "seepage_bc2": "seep BC",
 }
+
+
+# --- harness-enforced validation --------------------------------------------
+# A rule the model is told to follow is a rule it follows MOST of the time, and a
+# rule stated three levels deep in a prompt loses to a confident-sounding error
+# message. So the rules that matter are not left to the prompt alone: every
+# snippet that CHANGED the model gets its derived geometry rebuilt and the input
+# checks run, and the findings come back appended to that snippet's own output —
+# in the conversation, as the model's own tool result, where they cannot be missed
+# and must be addressed before the turn ends (STUDIO_SYSTEM iron rule 5).
+#
+# It also closes the edit-cascade, which no prompt can: a one-field fix leaves its
+# dependents stale, and the dependent is silent. Correct Max depth upward to the
+# base the problem states, and the circles that were tangent to the old, deeper
+# base now sit underneath the new one; the checks say so on the very snippet that
+# moved it, instead of surfacing as a failed run several turns later.
+MODEL_CHECKS_OPEN = "=== MODEL CHECKS ==="
+MODEL_CHECKS_END = "=== END MODEL CHECKS ==="
+MODEL_CHECKS_CLEAN = "=== MODEL CHECKS: clean ==="
+#: Cap on findings quoted back. Preflight messages are whole paragraphs, so an
+#: uncapped block on a half-built model could outweigh the snippet's own output.
+MAX_CHECK_FINDINGS = 6
+
+
+def _checks_selection(sd):
+    """The preflight ``selection`` for the checks: which surface family the model
+    would run as. Stating it suppresses the ambiguity warning on a deck that
+    carries both, which is a question for a run dialog and not for an edit."""
+    has_c, has_n = bool(sd.get("circles")), bool(sd.get("non_circ"))
+    if has_c and has_n:
+        return {"surface": "circular" if sd.get("circular", True) else "noncircular"}
+    if has_n:
+        return {"surface": "noncircular"}
+    if has_c:
+        return {"surface": "circular"}
+    return {}
+
+
+def model_checks_text(slope_data):
+    """The MODEL CHECKS block for a model that a snippet just changed.
+
+    Rebuilds the derived geometry first (so the checks read the domain the edit
+    actually produced, not the one before it) and then runs :func:`xslope.preflight
+    .preflight` for a limit-equilibrium run — the analysis every Studio model has
+    to be valid as, and the one whose rules cover geometry, materials, water and
+    surfaces alike. Errors AND warnings are reported: a warning here is the shape
+    the three live failures took, not a formality.
+
+    Returns the block as text — never raises, and never an empty string, because
+    silence would read as "clean" to the model.
+    """
+    sd = slope_data
+    if not isinstance(sd, dict):
+        return ""
+    try:
+        from studio.editors import _resync_geometry
+        _resync_geometry(sd)
+    except Exception:
+        pass                    # a half-built model may have nothing to resync yet
+    # Mid-build the model is legitimately incomplete, and reporting every rule it
+    # does not satisfy yet would train the reader to skim the block. Wait until
+    # there is a model to check.
+    missing = [w for w, got in (("materials", sd.get("materials")),
+                                ("geometry", sd.get("profile_lines")
+                                 or sd.get("polygons"))) if not got]
+    if missing:
+        return (f"{MODEL_CHECKS_OPEN}\nnot run: the model has no "
+                f"{' or '.join(missing)} yet. The checks run by themselves as soon "
+                f"as it does.\n{MODEL_CHECKS_END}")
+    selection = _checks_selection(sd)
+    try:
+        from xslope.preflight import STAGED_BY_RUN, preflight
+        skip = None
+        if sd.get("mesh") is not None and not (sd.get("circles") or sd.get("non_circ")):
+            # A finite-element model's failure surface is an OUTPUT, so "no failure
+            # surface" is not a defect in one.
+            skip = ["surface.none_defined"]
+        report = preflight(sd, "lem", selection, skip=skip)
+        rows = list(report.errors) + list(report.warnings)
+    except Exception as exc:
+        return (f"{MODEL_CHECKS_OPEN}\ncould not be evaluated on this model "
+                f"({type(exc).__name__}: {exc}). Check the model yourself before "
+                f"reporting it ready.\n{MODEL_CHECKS_END}")
+    if not rows:
+        return MODEL_CHECKS_CLEAN
+    # Split off the findings an EDIT cannot answer (xslope.preflight.STAGED_BY_RUN).
+    # Reporting "a material takes pore pressure from a seepage solution and there
+    # isn't one" as a plain error to fix, on a turn where the iron rules also forbid
+    # running anything, leaves exactly one apparent way out: change the material's
+    # pore-pressure option — which does not supply the missing field, it deletes the
+    # requirement and silently analyses a different problem. So they are labelled
+    # for what they are and routed to the only honest response: offer the run.
+    staged = [f for f in rows if f.rule_id in STAGED_BY_RUN]
+    faults = [f for f in rows if f.rule_id not in STAGED_BY_RUN]
+    sel_arg = f", {selection!r}" if selection else ""
+    parts = [MODEL_CHECKS_OPEN]
+    if faults:
+        shown = faults[:MAX_CHECK_FINDINGS]
+        parts.append(f"The input checks found {len(faults)} problem(s) in the model "
+                     f"as it now stands. Fix them, or put them to the user with your "
+                     f"reason for leaving them — do not report this model ready over "
+                     f"them.")
+        parts += [f"  {f.severity.upper()} [{f.rule_id}] {f.message}" for f in shown]
+        if len(faults) > len(shown):
+            parts.append(f"  (+{len(faults) - len(shown)} more — "
+                         f"`from xslope.preflight import preflight; "
+                         f"print(preflight(slope_data, 'lem'{sel_arg}).format())`)")
+    if staged:
+        parts.append(
+            f"STAGED BY A RUN, not by an edit ({len(staged)}). These name an "
+            f"analysis that has not been run yet. Do NOT edit the model to silence "
+            f"one — changing the input they ask about changes the physics being "
+            f"analysed. Tell the user what is outstanding and offer to run it.")
+        for f in staged:
+            # The rule's own message is written for a user at the sheet, where
+            # picking a different input IS one of their options. It is not one of
+            # yours, so say whose it is.
+            parts.append(f"  [{f.rule_id}] {f.message} — resolved by running "
+                         f"{STAGED_BY_RUN[f.rule_id]}, not by editing. Where that "
+                         f"message offers a different input instead, that is the "
+                         f"user's call to make, not yours.")
+    parts.append(MODEL_CHECKS_END)
+    return "\n".join(parts)
 
 
 def _clean(o):
@@ -543,8 +716,9 @@ class Assistant(QObject):
 
     def _system(self):
         # Full skill body only for Anthropic (prompt-cached, so cheap). Local /
-        # other models get the compact prompt and introspect at runtime — sending
-        # ~13k skill tokens every turn makes a local model crawl.
+        # other models get the compact prompt and introspect at runtime — the skill
+        # body measures ~33k tokens today, and sending that every turn makes a
+        # local model crawl.
         if self.config.wants_skill():
             skill = _load_skill_text()
             if skill:
@@ -602,7 +776,7 @@ class Assistant(QObject):
             holder["event"].set()
             return
 
-        stdout, outputs, error = self._run_python(code)
+        stdout, outputs, error, checks = self._run_python(code)
         parts = []
         if stdout.strip():
             parts.append(stdout.rstrip())
@@ -613,6 +787,8 @@ class Assistant(QObject):
             parts.append("ERROR:\n" + error)
         if not parts:
             parts.append("(no output)")
+        if checks:
+            parts.append(checks)        # LAST: the final thing the model reads
         result_text = "\n".join(parts)
 
         holder["content"] = result_text
@@ -620,6 +796,13 @@ class Assistant(QObject):
         self.tool_ran.emit(code, result_text, outputs)
 
     def _run_python(self, code):
+        """Run one snippet and return ``(stdout, outputs, error, checks)``.
+
+        ``checks`` is the MODEL CHECKS block, and it is produced ONLY when the
+        snippet actually changed the model — the same per-key signature comparison
+        that decides whether the run becomes an undo step. A read-only query costs
+        nothing extra, and an edit pays one preflight pass.
+        """
         doc = self._mw.doc
         if doc.slope_data is None:
             # The assistant builds into a live document; if nothing is open, start
@@ -657,7 +840,8 @@ class Assistant(QObject):
             self._mw.refresh_inputs_view()
         except Exception:
             pass
-        return stdout, outputs, error
+        checks = model_checks_text(doc.slope_data) if edited else ""
+        return stdout, outputs, error, checks
 
     def output_dir(self):
         """Folder where the assistant writes generated files (plots, CSVs, …)."""

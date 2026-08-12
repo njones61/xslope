@@ -538,6 +538,29 @@ def rules(analysis=None, fields=None):
     return out
 
 
+#: Rules a MODEL EDIT cannot answer: their cure is running the upstream analysis
+#: that produces the input they are asking for.
+#:
+#: A pore-pressure field is not a value anybody types -- it is the output of a
+#: seepage solve read onto this mesh -- so telling a user (or an assistant) to
+#: "fix" one of these invites the wrong repair: silence it by changing the
+#: pore-pressure option, which does not supply the missing physics, it removes
+#: the requirement and quietly changes what is being analysed. An interface that
+#: reports findings while a model is being BUILT needs to tell the two apart, so
+#: the distinction is declared here rather than inferred from wording.
+#:
+#: Derivation, and how it stays true: these are exactly the rules whose message
+#: names an analysis to run ("Run the seepage analysis first", "Re-run the
+#: seepage analysis on this mesh"). The guard in
+#: ``test/assistant_guardrails_check.py`` reads this module's own source for that
+#: phrasing and fails when a rule carries it undeclared, so a sibling added later
+#: cannot slip past as a bare error.
+STAGED_BY_RUN = {
+    "seep_field.missing": "the seepage analysis",
+    "seep_field.node_count_mismatch": "the seepage analysis, on this mesh",
+}
+
+
 def rules_for_field(field, analysis="lem", base=None):
     """The rule ids a substituted value of ``field`` can invalidate.
 
@@ -2188,10 +2211,15 @@ def _domain_degenerate(ctx):
         where = f" at ({_fmt(pt[0])}, {_fmt(pt[1])})" if pt else ""
         what = f"crosses or retraces itself{where}"
     if ctx.sd.get("profile_lines"):
-        fix = ("This is what a Max depth at or above the lowest ground elevation "
-               "produces -- the base of the model runs back along the ground surface "
-               "itself, leaving no depth beneath it. Lower Max depth below the "
-               "section (Profile lines; profile sheet B2).")
+        fix = ("This is what ground running AT the Max depth elevation produces -- "
+               "the base of the model runs back along the ground surface itself, "
+               "leaving no depth beneath it. Two cures, and which is right depends "
+               "on the problem: where soil genuinely continues below, lower Max "
+               "depth below the section (Profile lines; profile sheet B2); where "
+               "the base is a stated rigid foundation at the toe elevation, keep "
+               "Max depth there and END the ground surface at the toe instead -- "
+               "soil of zero thickness beyond the toe is not modeled, and lowering "
+               "the base would invent depth the problem does not describe.")
     else:
         fix = ("Redraw the zones' base so it stays below the ground it supports, and "
                "so no zone boundary retraces another (Polygons; polygon sheet).")
@@ -2203,7 +2231,8 @@ def _domain_degenerate(ctx):
 
 @rule("surface.circle_below_domain_floor", WARNING, ("lem",),
       summary="A circle whose Depth is below the domain floor must still cut a "
-              "surface inside it.")
+              "surface inside it; where that circle IS the run's surface, it is "
+              "an error.")
 def _circle_below_domain_floor(ctx):
     # `Depth` is the elevation of the circle's LOWEST POINT -- its nadir at x = Xo
     # -- and a nadir below the domain floor is NOT by itself an error: a skimming
@@ -2214,6 +2243,34 @@ def _circle_below_domain_floor(ctx):
     # and truncated at the floor as a composite surface. Only a circle that can do
     # neither is reported, and that one used to be silently clamped up to the floor
     # and solved as a different circle.
+    #
+    # SEVERITY is decided per finding, because what the same defect COSTS depends
+    # on which run consumes the circle, and the two answers are far apart. The
+    # question was settled by measurement rather than by reading:
+    #
+    #   A SEARCH survives it. The circles sheet is a set of SEEDS, and the
+    #   refinement moves the center and the tangent depth away from them -- so a
+    #   deck whose every circle is 200 below the floor still converges on the same
+    #   critical surface as the sound deck (xslope_dam.xlsx, bishop: 1.8147 either
+    #   way). Refusing that run would refuse a run that works, so a search keeps the
+    #   WARNING: the seed is lost, the answer is not.
+    #
+    #   A SINGLE-SURFACE run does not survive it. That path takes circles[0] and
+    #   nothing else (search.run_lem_analysis), so a dead first circle is the whole
+    #   analysis. Today it arrives as a slicing failure naming no field, several
+    #   layers below the sheet the user would fix -- which is precisely what this
+    #   gate exists to pre-empt, so that one is an ERROR.
+    #
+    # WHAT AN ERROR REACHES, precisely: the gates whose surface comes from the
+    # SHEET -- the Run dialogs, and Studio's post-edit input checks. A caller that
+    # hands generate_slices its own circle sets surface_supplied and is not asked
+    # at all (first line below), so run_lem_analysis's single-surface branch still
+    # reaches slicing on its own. Gating that path is a separate change; the
+    # severity here does not claim to have made it.
+    #
+    # This is the edit-cascade made visible: Max depth is raised or the base
+    # redrawn, the circle that was tangent to the old base now sits under the new
+    # one, and nothing about that edit says so on its own.
     if ctx.surface_supplied:
         return None
     if ctx.effective_surface_family == "noncircular":
@@ -2231,14 +2288,30 @@ def _circle_below_domain_floor(ctx):
             continue
         if ctx.circle_slices(c):
             continue
-        out.append(
+        # circles[0] IS the surface of a single-surface run; any other circle, and
+        # every circle of a search, is one candidate among several. Which is also
+        # why a single-surface run must not be told its "other circles" are fine:
+        # it reads none of them, so the honest thing to say about circle 2 there is
+        # that this run never looks at it and a search would.
+        fatal = (i == 0 and not ctx.is_search)
+        if fatal:
+            cost = (" This run analyses that circle and no other, so it has no "
+                    "failure surface to work on.")
+        elif ctx.is_search:
+            cost = " The search's other circles are unaffected; this one is lost."
+        else:
+            cost = (f" This run analyses {ctx.circle_label(0)} only and does not "
+                    f"read this one, so it does not affect the answer -- but a "
+                    f"search seeded from this sheet would lose it.")
+        out.append((
+            ERROR if fatal else WARNING,
             f"{ctx.circle_label(i)} has Depth = {_fmt(depth)}, below the bottom of "
             f"the model domain at y = {_fmt(floor)}, and the circle it defines cuts "
             f"no failure surface that stays inside the domain -- no slices can be "
             f"generated from it, either as a circle or truncated along the base, so "
-            f"this circle contributes nothing to the run. Raise Depth to at or above "
-            f"y = {_fmt(floor)} {_AT_CIRCLES}, or deepen the model so the circle "
-            f"fits inside it -- {deeper}.")
+            f"this circle contributes nothing to the run.{cost} Raise Depth to at or "
+            f"above y = {_fmt(floor)} {_AT_CIRCLES}, or deepen the model so the "
+            f"circle fits inside it -- {deeper}."))
     return out
 
 

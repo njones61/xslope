@@ -12,6 +12,27 @@ $ARGUMENTS
 
 Based on the user's request, do one or more of the following:
 
+### Do what was asked — building and running are separate requests
+
+When the user asks you to **build** a model (or import or fix one), build it, validate it with
+`plot_inputs` and the input checks, report that it is ready, and **stop there**. Then name what
+a run would involve — the method, single surface or search, roughly how long — and offer it. The
+user has not confirmed the geometry yet, and a factor of safety computed off an unconfirmed
+model is a number they have to unlearn.
+
+**A build request that names the analysis is still a build request.** "Add a starting circle for
+a critical-surface search", "set it up for a rapid drawdown", "build the mesh for an SSRM" — the
+purpose clause says what the model is *for*, so you build the inputs that purpose needs. It
+authorizes nothing beyond them: the search it names is the run to offer, not the run to perform.
+
+**A verification run is still a run.** "Let me verify the model", "quick check", "just making
+sure it solves" — a single-surface solve or a search under any of those headings is the analysis
+the user did not ask for. Loading the file, plotting the inputs, and preflight are the whole of
+the verification a build request authorizes; if one of them refuses, fix the input and say so.
+The same split applies downstream: result plots, reports, sensitivity sweeps and method
+comparisons happen when asked, not as a bonus. Ending with *"the model is ready — want me to run
+Spencer with an auto search?"* is the right shape.
+
 ### Phase 1: Build Input Template
 
 If the user already has a model file from another program — `.gsz` (GeoStudio), `.sli`/`.slim`/
@@ -73,15 +94,33 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
 
 4. **Choose starting circles** for LEM. **Preferred: generate them** — once the
    geometry and materials are in the `slope_data` dict, call
-   `xslope.generators.generate_starting_circles(slope_data)` (also exported from
-   `xslope.search`); it implements the full strategy below (mid-slope center,
+   `generate_starting_circles(slope_data)`, imported as
+   `from xslope.search import generate_starting_circles` (`xslope.generators` holds
+   the same function; either import works, but **import the name** — `import xslope`
+   alone does not bind the submodules, so `xslope.generators.…` raises
+   AttributeError); it implements the full strategy below (mid-slope center,
    toe circle, per-layer base circles, and the cohesionless skimming circle) and
    is validated against the corpus. It seeds **every significant face** (a dam
    gets a set on each of its two, since either can be critical) and keeps only
    circles that daylight on the ground surface INSIDE the model. Pass
    `report=True` for `{'circles', 'summary', 'reason'}` when you need to say what
    it will do before doing it. Fall back to hand-building only when the generator
-   declines and states why. The strategy it implements:
+   declines and states why. **On a rigid base at the toe elevation, the ground surface ENDS at the
+   toe.** Do not extend flat ground beyond the toe at the base elevation: soil of
+   zero thickness is a degenerate domain (preflight's `domain.degenerate_ring`),
+   and the cure is to end the profile at the toe -- never to lower Max depth,
+   which invents the depth the problem does not describe. Search room beyond the
+   toe is not needed there: a circle tangent to the base daylights at or above
+   the toe. The sideways-extension rule applies only where real soil continues
+   at or below the ground being extended. **A hand-built circle obeys the generator's own floor
+   rule: its lowest point (Depth, = Yo − R) sits at or above the model's Max
+   Depth.** On a rigid base the deep circle is *tangent* to the base
+   (Depth = Max Depth exactly) — a bottom below the base is the toe-circle trap
+   the generator exists to drop, and preflight flags it
+   (`surface.circle_below_domain_floor`). After building, run the input checks
+   and resolve every warning before reporting the model ready — a warning passed
+   over silently is a defect in the build, not a formality. The strategy it
+   implements:
    - **Center X**: Place Xo halfway between the toe and crest of the slope.
    - **Center Y**: Set Yo = toe elevation + 2 × slope height (i.e., double the slope height above the toe).
    - **Always include**: one circle that passes through the toe of the slope. Circles are stored in Depth form (`Xo`, `Yo`, `Depth` = elevation of the lowest point), so compute the toe circle as `R = distance((Xo, Yo), toe)`, `Depth = Yo - R` — see the circles section below.
@@ -268,7 +307,7 @@ published comparisons against the source or vendor program, not illustrations.
 | Rapid drawdown | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp98) · [VP99 — Pumped-storage project dam rapid drawdown…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp99) · [12. Rapid Drawdown (Johnson Reservoir Dam)](https://xslope.readthedocs.io/en/latest/lem/samples/#12-rapid-drawdown-johnson-reservoir-dam) · [16. Saturated vs. Moist Unit Weight (γ_sat)](https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat) |
 | Transient seepage | [8. Earth Dam — Reservoir Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#8-earth-dam-reservoir-drawdown-transient) · [9. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#9-johnson-reservoir-zoned-drawdown-transient) · [SEEPW-T01 — Simulating consolidation with SEEP/W](https://xslope.readthedocs.io/en/latest/verification/geostudio/#seepw-t01) · [SEEPW-T02 — Verification — infiltration into dry soil](https://xslope.readthedocs.io/en/latest/verification/geostudio/#seepw-t02) · [GW15 — Terzaghi 1-D consolidation](https://xslope.readthedocs.io/en/latest/verification/rocscience_groundwater/#gw15) · [GW16 — Pore-pressure dissipation in stratified s…](https://xslope.readthedocs.io/en/latest/verification/rocscience_groundwater/#gw16) |
 | Seepage-coupled stability | [VP102 — Earth dam before rapid drawdown (Huang &…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp102) · [VP46 — Baker (1993) three-stage dam — stages 1-2…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp46) · [RS2 Part IV VP102 — Homogeneous earth dam, dry (Huang & Jia 2…](https://xslope.readthedocs.io/en/latest/verification/rs2/#p4-vp102) · [RS2-28 — Excavated slope with FE groundwater and m…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-28) · [12. Rapid Drawdown (Johnson Reservoir Dam)](https://xslope.readthedocs.io/en/latest/lem/samples/#12-rapid-drawdown-johnson-reservoir-dam) · [9. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#9-johnson-reservoir-zoned-drawdown-transient) |
-| Probabilistic & reliability | [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-26) · [15. Reliability Analysis (Submerged Slope)](https://xslope.readthedocs.io/en/latest/lem/samples/#15-reliability-analysis-submerged-slope) · [4. Reliability Analysis — Two-Layer c–φ Slope](https://xslope.readthedocs.io/en/latest/fem/samples/#4-reliability-analysis-two-layer-c-slope) · [Sample Problem](https://xslope.readthedocs.io/en/latest/lem/design/#sample-problem) · [Worked sample](https://xslope.readthedocs.io/en/latest/parametric/sensitivity/#worked-sample) |
+| Probabilistic & reliability | [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-26) · [15. Reliability Analysis (Submerged Slope)](https://xslope.readthedocs.io/en/latest/lem/samples/#15-reliability-analysis-submerged-slope) · [4. Reliability Analysis — Two-Layer c–φ Slope](https://xslope.readthedocs.io/en/latest/fem/samples/#4-reliability-analysis-two-layer-c-slope) · [Worked sample](https://xslope.readthedocs.io/en/latest/parametric/sensitivity/#worked-sample) · [VP1 — Slope, homogeneous (ACADS 1(a))](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp1) |
 | Tension cracks | [VP53 — Priest (1993) rigid block on a plane](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp53) · [VP64 — USACE end-of-construction dam (EM 1110-2-…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp64) · [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.readthedocs.io/en/latest/verification/rs2/#p4-vp51) · [RS2-29 — Geosynthetic-reinforced embankment on sof…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-29) · [1. Simple Embankment](https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-embankment) · [14. Tension Crack](https://xslope.readthedocs.io/en/latest/lem/samples/#14-tension-crack) |
 | Seismic (pseudo-static) | [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.readthedocs.io/en/latest/verification/rs2/#p4-vp51) · [RS2-64 — Slope stability assessment of three homog…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-64) · [VP104 — Seismic slope with Newmark and multi-moda…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp104) · [VP4 — Slope, (3) materials, seismic](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp4) |
 | Non-circular surfaces | [Griffiths & Lane (1999) Example 3 — Undrained Clay Slope wi…](https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-griffiths3) · [VP25 — Prandtl bearing mechanism on a 60° slope…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp25) · [VP43 — Slope, homogeneous — planar surface (Bake…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp43) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-26) · [RS2-30 — Homogeneous slope, power-curve strength…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-30) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3b) |
@@ -531,6 +570,15 @@ search needs. If a critical surface reaches the left/right boundary, widen the g
 re-run. This applies to FEM too: extend the foundation depth and the flat ground beyond the
 slope so the failure mechanism forms freely.
 
+**Rigid-base corollary (both, and it overrides the extent rule):** where the base sits AT the toe
+elevation, the ground surface **ends at the toe** — do not carry flat ground past it at the base
+elevation. That is soil of zero thickness, which leaves the model domain degenerate and fails
+slicing, meshing and the search alike with a geometry error naming no field (preflight's
+`domain.degenerate_ring`). The cure is to end the profile at the toe, never to lower `max_depth`
+— that invents depth the problem does not describe. No search room is lost: a circle tangent to
+the base daylights at or above the toe. Extend sideways only where real soil continues below the
+ground being extended.
+
 ##### `profile_lines`
 
 Each entry is one soil-layer *top* line, listed **top-to-bottom** (shallowest layer first),
@@ -540,7 +588,8 @@ points **left-to-right**. `max_depth` is a sibling scalar.
 # max_depth: the LITERAL elevation of the horizontal rigid base (0 means elevation zero,
 # NOT "auto"). Failure surfaces cannot pass below it. If the lowest profile line IS the base,
 # set max_depth equal to that line's elevation. Pick a datum that keeps the base elevation
-# meaningful.
+# meaningful. A problem that states a RIGID base/foundation gives no soil below the geometry it
+# describes, so max_depth is the TOE elevation — never a depth you invented for the search.
 slope_data['max_depth'] = 0.0
 slope_data['profile_lines'] = [
     {'mat_id': 0, 'coords': [(0, 84), (150, 84), (174.7, 64)]},   # top layer (material #1)
@@ -717,7 +766,7 @@ that is **non-conservatively high**. (Measured on the Talbingo dam: the true min
 steepest bench face is 1.669, but a toe/base-seeded search returns 1.948.)
 
 A circle *can* represent this — a large radius approximates a plane — you just have to seed it.
-`xslope.generators.generate_starting_circles(slope_data)` builds these skimming circles
+`generate_starting_circles(slope_data)` (`from xslope.search import …`) builds these skimming circles
 automatically for every cohesionless face segment (with sane geometry guaranteed — sunk
 slightly below the face so they never graze their own vertices), so prefer the generator.
 The hand-built form, for when you need it standalone — one skimming circle **per face
@@ -786,8 +835,9 @@ pass the limits as its `entry_range` / `exit_range` / `center_box` / `tangent_de
 
 **Non-circular** surfaces are a list of point dicts, ordered left-to-right.
 **Preferred: generate one** — once the geometry and materials are in the
-`slope_data` dict, call `xslope.generators.generate_noncircular_surface(slope_data)`
-(also exported from `xslope.search`). It ranks the material zones by the shear
+`slope_data` dict, call `generate_noncircular_surface(slope_data)`, imported as
+`from xslope.search import generate_noncircular_surface` (`xslope.generators` holds
+it too; import the name, not the package attribute). It ranks the material zones by the shear
 strength each can mobilise *at the stress it actually carries* — the only quantity
 comparable across `mc`, `cp`, `hb` and `pow` materials — tracks the base of the
 weakest, and ramps to the ground at both ends, with explicit Y and Movement on every
@@ -795,7 +845,7 @@ point. It is validated against the corpus's weak-seam problems. Fall back to
 hand-building only when it declines and states why.
 
 ```python
-from xslope.generators import generate_noncircular_surface
+from xslope.search import generate_noncircular_surface
 
 result = generate_noncircular_surface(slope_data, report=True)
 if result["surface"]:
@@ -1802,7 +1852,31 @@ results = solve_selected("spencer", slice_df, rapid=True)
    the base elevation is ever ambiguous with profile lines, build the material as a **polygon
    closed along its drawn bottom** (e.g. a single embankment zone) and the ambiguity disappears.
 
+   **Never invent depth the problem does not describe.** A problem that puts the slope on a
+   **rigid base, rigid foundation, firm stratum, bedrock or hard layer** — any of them stated at
+   or below the toe with no properties given — or that describes no material at all below its
+   lowest surface, has already given you the base: Max Depth is the **lowest described
+   elevation** of the geometry (for a slope sitting directly on that base, the toe elevation).
+   Do not add a foundation layer to "give deep circles room" — on a rigid base the deep mechanism
+   *is* the circle tangent to the base at that elevation, so invented depth adds no search room,
+   it changes the problem. A foundation layer exists only when the problem gives it properties —
+   a thickness or base elevation, γ, and strength. If the problem seems to need one and does not
+   describe one, ask; never supply it silently.
+
 5. **Extend the geometry far enough horizontally.** The flat ground sections must run well beyond the slope on both sides so that every trial failure surface daylights on the ground surface inside the model — never at a vertical model edge. Rule of thumb: extend each flat at least ~2× the slope height beyond the toe and beyond the crest, and farther for deep circles tangent to the base. **Do not copy the width shown in the source diagram** — it is usually cropped to the area of interest, not the full domain needed for the search. If the critical surface reaches the left/right boundary, widen the geometry and re-run.
+   Three limits on this rule. It extends the model **sideways only, never downward** — the base
+   elevation comes from the described geometry (guideline 4), and no amount of search room is a
+   reason to put soil under it. Where the base sits AT the toe elevation, it does not extend past
+   the toe at all: **the ground surface ends there** (see the rigid-base corollary in the workflow
+   section above), because flat ground carried on at the base elevation is soil of zero thickness
+   and leaves the domain degenerate — and no search room is lost, since a circle tangent to the
+   base daylights at or above the toe. And it extends by **continuing the flat ground the
+   description ends in**, never by deleting, moving or resizing a feature the problem does
+   describe: a stated
+   25-ft crest that runs on as level ground is unchanged when the level ground continues to 90
+   ft, whereas a stated 25-ft bench with a second slope rising behind it must keep both. Say in
+   your summary which extents are stated and which are search room, so the extension reads as
+   this rule rather than as a misreading of the problem.
 
 6. **For seepage-only problems**, you do NOT need circles, piezo, or non-circ sheets. Only fill main, mat (with k1, k2, kr0, h0), profile (or polygon), and seep bc. **For FEM-only problems**, also add one nominal starting circle — the loader requires a surface definition unless seepage BCs or a pre-built mesh are present.
 

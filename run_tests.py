@@ -6693,6 +6693,48 @@ def run_noncircular_generator_test(test):
     return 0.0, None
 
 
+def run_circles_editor_test(test):
+    """Studio's Circles editor: what it shows, what it saves, and what its Generate
+    button does with rows already in the table.
+
+    All three failures this guards are silent ones. A seven-column table sized to sit
+    beside a preview opens with its last column past the right edge, so R is an input
+    the user never sees and a circle they cannot check. Numbers are shown rounded for
+    reading, which is only safe while the stored value survives: if the editor wrote
+    back the 41.2311 it displayed for a stored 41.23105625617661, every open of the
+    dialog would move the model a little and nothing would say so. And the generator
+    replaces the table's contents, so a press that does not ask first can throw away
+    circles the user typed.
+
+    The check itself lives in test/circles_editor_check.py: the fitted column widths
+    against the viewport at the opening size, an editor round trip on values that
+    cannot survive six-digit rounding, the button's label and dimmed state, the
+    empty-table press that asks nothing, the three answers to the replace/append
+    question, and the generated circles compared field for field against the ones the
+    Run LEM preflight remedy writes.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'circles_editor_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('circles_editor_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_project_package_test(test):
     """Project packaging: a project collected into one ``.xslz`` and taken apart
     again.
@@ -6861,6 +6903,53 @@ def run_assistant_models_test(test):
     failures = mod.run()
     if failures:
         return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_assistant_guardrails_test(test):
+    """The assistant's guardrails: the rules it is told, and the check it cannot
+    skip.
+
+    A modeling rule stated in a prompt is followed MOST of the time — three live
+    sessions measured it losing to guidance elsewhere in the stack, to a
+    confident-sounding tool error, and to the edit-cascade (a one-field fix whose
+    dependents go stale in silence). So the rules that matter do not rest on the
+    prompt: every snippet that CHANGES the model has its derived geometry rebuilt
+    and preflight run, and the findings come back appended to that snippet's own
+    tool output as a MODEL CHECKS block.
+
+    What a model does with a sentence cannot be unit-tested; everything the
+    harness does regardless of the model can, and that is what runs here — the
+    iron rules present exactly once in both prompt tiers, the compact rulebook
+    agreeing with them, and the three failure shapes replayed as scripted edit
+    sequences through the real snippet path, each asserting the finding its block
+    has to carry. Disabling the injection must make them fail.
+
+    The check itself lives in test/assistant_guardrails_check.py: offscreen, no
+    provider contacted and no network at all (the agent loop that would call one
+    is never started — tool calls go to the handler directly, as the worker
+    thread delivers them), on a throwaway settings file so it cannot see the
+    user's own keys.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'assistant_guardrails_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its checks
+    spec = importlib.util.spec_from_file_location('assistant_guardrails_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures[:6])
     return 0.0, None
 
 
@@ -11033,6 +11122,8 @@ def _dispatch_test(test):
         return run_steady_seep_save_test(test)
     if test_type == 'noncircular_generator':
         return run_noncircular_generator_test(test)
+    if test_type == 'circles_editor':
+        return run_circles_editor_test(test)
     if test_type == 'project_package':
         return run_project_package_test(test)
     if test_type == 'docs_links':
@@ -11041,6 +11132,8 @@ def _dispatch_test(test):
         return run_updater_test(test)
     if test_type == 'assistant_models':
         return run_assistant_models_test(test)
+    if test_type == 'assistant_guardrails':
+        return run_assistant_guardrails_test(test)
     if test_type == 'quad_mesh':
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
@@ -11155,9 +11248,10 @@ def _expected_and_tol(test, default_tolerance):
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
                        'project_package', 'docs_links',
-                       'noncircular_generator', 'updater', 'fem_1d_details',
+                       'noncircular_generator', 'circles_editor',
+                       'updater', 'fem_1d_details',
                        'report', 'report_finalize',
-                       'assistant_models',
+                       'assistant_models', 'assistant_guardrails',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'seep_cycle',
                        'tseep_exit_cycle',
@@ -11746,6 +11840,12 @@ def main():
         tests.append({'type': 'noncircular_generator',
                       'file': 'non-circular starting surface',
                       'method': '-', 'source': 'noncircular_generator'})
+        # Guard Studio's Circles editor: that all seven columns are visible at the
+        # size the dialog opens at, that a display-rounded number never becomes the
+        # stored one, and that the starting-circle generator asks before replacing
+        # rows the user already has. Builds dialogs offscreen and solves nothing.
+        tests.append({'type': 'circles_editor', 'file': 'Studio circles editor',
+                      'method': '-', 'source': 'circles_editor'})
         # Guard Studio's in-app updater: the version comparison, the platform
         # artifact key, the minimum_version gate, the checksum refusal, and the
         # command each platform branch would spawn. Touches no network — the
@@ -11759,6 +11859,16 @@ def main():
         # and the manifest are served over file://.
         tests.append({'type': 'assistant_models', 'file': 'assistant model list',
                       'method': '-', 'source': 'assistant_models'})
+        # Guard the assistant's guardrails: the iron rules present exactly once in
+        # both prompt tiers, and the automatic input checks injected into every
+        # snippet that changed the model. The three live failure sessions are
+        # replayed as scripted edit sequences through the real snippet path — a
+        # prompt rule alone was measured losing to the edit-cascade, so the
+        # mechanism that does not depend on the model is what is asserted. Same
+        # reason this rides here as the model list: offscreen Qt, no network.
+        tests.append({'type': 'assistant_guardrails',
+                      'file': 'assistant guardrails (rules + input checks)',
+                      'method': '-', 'source': 'assistant_guardrails'})
         # Guard against the Markdown heading trap: this theme's parser accepts
         # '#word' with no space as a heading, so a wrapped docs line starting
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.

@@ -127,20 +127,24 @@ def lem01_run_lem_no_surface():
 
 
 def lem01_circles():
-    """The circles editor on the generated circle — what the reader audits.
+    """The circles editor just after **Generate starting circles…** — what the
+    reader audits.
 
-    The generator is run here rather than the file's own circle being shown, so the
-    image is of the thing the step produces. (On this model the two are the same
-    circle, which is itself the audit's answer.)
+    The button is *pressed* here rather than the rows being pre-loaded, because the
+    summary line the step teaches the reader to read ("one candidate dropped for not
+    daylighting inside the model") only exists as the answer to a press. The model
+    arrives the way the geometry steps leave it — no circles — so the generator's
+    table is empty and it fills it without asking, which is also the flow the page
+    describes.
     """
-    from xslope.generators import generate_starting_circles
     from studio.editors import CirclesEditor
 
     d = _load(LEM01)
-    with contextlib.redirect_stdout(io.StringIO()):
-        d["circles"] = generate_starting_circles(d)
+    d["circles"] = []
+    d["circular"] = False
     dlg = CirclesEditor().build(d, None)
-    dlg.resize(1180, 720)
+    with contextlib.redirect_stdout(io.StringIO()):
+        dlg._run_generate()
     return _grab(dlg, "lem01_studio_circles.png")
 
 
@@ -160,8 +164,7 @@ SHOTS = {
     "lem01_materials": lem01_materials,
     "lem01_profile": lem01_profile,
     "lem01_run_lem": lem01_run_lem,
-    # lem01_circles returns when the Circles editor round lands (Generate button,
-    # table-over-plot layout); until then the placeholder card owns that filename.
+    "lem01_circles": lem01_circles,
     # lem01_run_lem_no_surface retired with the preflight-remedy flow the page
     # no longer teaches.
 }

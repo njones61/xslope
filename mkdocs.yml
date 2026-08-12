@@ -68,7 +68,6 @@ nav:
     - Piles and Concrete Piers: lem/piles.md
     - Rapid Drawdown Analysis: lem/rapid.md
     - Automated Search Algorithms: lem/search.md
-    - Slope Design: lem/design.md
     - Sample Problems: lem/samples.md
   - Reliability:
     - Overview: reliability/index.md

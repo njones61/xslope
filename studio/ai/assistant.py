@@ -402,9 +402,10 @@ _KEY_LABELS = {
 # and must be addressed before the turn ends (STUDIO_SYSTEM iron rule 5).
 #
 # It also closes the edit-cascade, which no prompt can: a one-field fix leaves its
-# dependents stale, and the dependent is silent. Lower Max depth and the circles
-# that were tangent to the old base are now below the new one; the checks say so
-# on the very snippet that moved it, instead of surfacing as a failed run later.
+# dependents stale, and the dependent is silent. Correct Max depth upward to the
+# base the problem states, and the circles that were tangent to the old, deeper
+# base now sit underneath the new one; the checks say so on the very snippet that
+# moved it, instead of surfacing as a failed run several turns later.
 MODEL_CHECKS_OPEN = "=== MODEL CHECKS ==="
 MODEL_CHECKS_END = "=== END MODEL CHECKS ==="
 MODEL_CHECKS_CLEAN = "=== MODEL CHECKS: clean ==="

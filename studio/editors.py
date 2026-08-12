@@ -77,6 +77,18 @@ def _display_number(v):
     return f"{v:.{_DISPLAY_SIG_DIGITS}g}"
 
 
+def _unedited(text, stored):
+    """True when ``text`` is still exactly what :func:`_display_number` rendered for
+    ``stored`` — the widget is showing a display rounding nobody has typed over, so
+    the stored value is what must be kept.
+
+    :meth:`Field.read_text` is this rule for a field in a table or a form; this is
+    the same rule for the handful of scalar edits that have no Field behind them (the
+    max-depth elevation, a seepage BC's head and flux)."""
+    return (isinstance(stored, (int, float)) and not isinstance(stored, bool)
+            and text == _display_number(stored))
+
+
 # --------------------------------------------------------------------------- #
 # Field spec + dialogs
 # --------------------------------------------------------------------------- #
@@ -159,9 +171,7 @@ class Field:
         rounding; only text the user actually changed may replace the value. Every
         editor reads its widgets back through here, so no editor can round a value
         into the model by being opened and OK'd."""
-        if (self.kind in self.NUMERIC_KINDS
-                and isinstance(stored, (int, float)) and not isinstance(stored, bool)
-                and text == self.to_text(stored)):
+        if self.kind in self.NUMERIC_KINDS and _unedited(text, stored):
             return stored
         return self.from_text(text)
 
@@ -4559,15 +4569,18 @@ class _SeepBcSetWidget(QWidget):
             self._exit = coords
         elif self._is_flux(self._cur):
             f = self._fluxes[self._flux_idx(self._cur)]
-            try:
-                f["flux"] = float(self.flux_edit.text() or 0)
-            except ValueError:
-                f["flux"] = 0.0
+            txt = self.flux_edit.text()
+            if not _unedited(txt, f.get("flux")):   # untouched keeps the stored value
+                try:
+                    f["flux"] = float(txt or 0)
+                except ValueError:
+                    f["flux"] = 0.0
             f["coords"] = coords
         elif self._is_head(self._cur):
             txt = self.head_edit.text().strip()
             try:
-                self._heads[self._cur]["head"] = float(txt or 0)
+                if not _unedited(txt, self._heads[self._cur].get("head")):
+                    self._heads[self._cur]["head"] = float(txt or 0)
             except ValueError:
                 # a non-numeric head value is a tseep series name (time-varying BC) —
                 # allowed on set 1 only; set 2 is constant, so coerce it to 0.
@@ -4595,11 +4608,11 @@ class _SeepBcSetWidget(QWidget):
         if is_head:
             kind = self._heads[idx].get("kind", "head")
             self.type_combo.setCurrentText("reservoir" if kind == "reservoir" else "head")
-            self.head_edit.setText(str(self._heads[idx]["head"]))
+            self.head_edit.setText(_display_number(self._heads[idx]["head"]))
             rows = [{"x": x, "y": y} for (x, y) in self._heads[idx]["coords"]]
         elif is_flux:
             f = self._fluxes[self._flux_idx(idx)]
-            self.flux_edit.setText(str(f["flux"]))
+            self.flux_edit.setText(_display_number(f["flux"]))
             rows = [{"x": x, "y": y} for (x, y) in f["coords"]]
         else:  # exit face
             rows = [{"x": x, "y": y} for (x, y) in self._exit]
@@ -4983,7 +4996,8 @@ class MatGeometryDialog(QDialog):
         if max_depth is not None:
             mdrow = QHBoxLayout()
             mdrow.addWidget(QLabel("Max depth (bottom boundary elevation):"))
-            self._max_depth_edit = QLineEdit(str(max_depth))
+            self._max_depth = max_depth
+            self._max_depth_edit = QLineEdit(_display_number(max_depth))
             self._max_depth_edit.setToolTip(
                 "Elevation of the model's bottom boundary, used to build the zone "
                 "polygons from the profile lines.")
@@ -5321,8 +5335,11 @@ class MatGeometryDialog(QDialog):
         """The edited max-depth value (float), or None if the field isn't shown."""
         if self._max_depth_edit is None:
             return None
+        text = self._max_depth_edit.text()
+        if _unedited(text, self._max_depth):     # untouched: keep the stored value
+            return self._max_depth
         try:
-            return float(self._max_depth_edit.text())
+            return float(text)
         except (TypeError, ValueError):
             return None
 

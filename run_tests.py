@@ -6129,14 +6129,17 @@ def run_report_test(test):
 
 
 def run_report_finalize_test(test):
-    """Finishing the Analysis Report in Word (test/report_finalize_check.py).
+    """Building the Analysis Report's page numbers (test/report_finalize_check.py).
 
-    On a machine with Word this really drives it: a generated report goes in
-    with a contents page that names its sections and must come out with one that
-    says what page each is on, with no field left marked dirty. Costs one Word
-    launch (~10 s all told). With no Word — a build machine, Linux, a Mac
-    without Office — the row still runs and checks that the detection says so
-    and that every refusal is a sentence rather than an exception.
+    On a machine with Word, and only when the run has been allowed to drive it,
+    this really does: a generated report goes in with a contents page that names
+    its sections and must come out with one that says what page each is on, with
+    no field left marked dirty. The finish that needs no Word is checked
+    wherever LibreOffice is installed — the same report, finished by laying it
+    out, with every page number measured against a second layout. With neither —
+    a build machine, Linux, a Mac without Office — the row still runs and checks
+    that the detection says so and that every refusal is a sentence rather than
+    an exception.
 
     Returns (0.0, None) on success, else (None, message) — a pass/fail test."""
     import importlib.util
@@ -6186,6 +6189,45 @@ def run_quad_style_dialog_test(test):
     except Exception:
         pass                       # no PySide6: the module skips itself
     spec = importlib.util.spec_from_file_location('quad_style_dialog_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_welcome_window_test(test):
+    """Studio's welcome window and the Help menu's way out to the documentation.
+
+    The first launch is where a new user is told the documentation exists — and
+    the documentation is also the sample browser, so a broken link there is a user
+    who never finds a sample problem. Every failure mode is quiet: a link that
+    still opens at a page that has been renamed, a preference written but never
+    read (the welcome either never returns or never leaves), a menu item whose slot
+    went missing.
+
+    The check itself lives in test/welcome_window_check.py: the window's links
+    against the constants they must carry, the show-at-launch preference round-trip
+    on a throwaway settings file, the launch gate in ``studio.app`` with both
+    answers, the Help menu's order and the URL Documentation opens, and every link
+    resolved to a page that exists in ``docs/``. No browser is opened and no
+    network is touched; it skips itself cleanly when PySide6 is absent.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'welcome_window_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('welcome_window_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -11003,6 +11045,8 @@ def _dispatch_test(test):
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
         return run_quad_style_dialog_test(test)
+    if test_type == 'welcome_window':
+        return run_welcome_window_test(test)
     if test_type == 'fem_1d_details':
         return run_fem_1d_details_test(test)
     if test_type == 'report':
@@ -11105,7 +11149,7 @@ def _expected_and_tol(test, default_tolerance):
                        'sweep_gate', 'steady_seep_save',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
-                       'quad_style_dialog', 'mode_segments',
+                       'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
                        'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
@@ -11634,6 +11678,14 @@ def main():
         tests.append({'type': 'mode_segments',
                       'file': 'analysis-mode switch (Studio toolbar)',
                       'method': '-', 'source': 'mode_segments'})
+        # Guard the welcome window and Help → Documentation: the links a first
+        # launch offers (against the constants they must carry and the pages they
+        # must resolve to in docs/), the show-at-launch preference in both
+        # directions, the launch gate, and the Help menu's order. Opens no browser
+        # and touches no network; runs no analysis.
+        tests.append({'type': 'welcome_window',
+                      'file': 'welcome window + Help → Documentation',
+                      'method': '-', 'source': 'welcome_window'})
         # Guard what the background threads may touch. A widget released on a
         # worker thread is not deleted there — it is queued onto the GUI thread and
         # deleted at whatever Python runs next, which for an idle window is an event
@@ -11674,13 +11726,16 @@ def main():
         # nothing it checks is FEM-gated.
         tests.append({'type': 'report', 'file': 'Analysis Report (tree + DOCX + dialog)',
                       'method': '-', 'source': 'report'})
-        # Guard the finish: after a report is generated, Word is asked to update
-        # its fields so the contents page arrives with real page numbers. The
-        # page numbers are Word's, so the only honest check is to drive Word —
-        # which this does where there is one, and where there is not it checks
-        # that the absence is detected and falls back without raising.
+        # Guard the finish: after a report is generated, a page layout engine
+        # builds its contents page's page numbers — Word updating its own
+        # fields, or LibreOffice laying the document out where there is no Word.
+        # The numbers belong to whatever laid the pages out, so the only honest
+        # check is to lay them out: this drives Word where the run has been
+        # allowed to, lays the report out where LibreOffice is installed, and
+        # where there is neither it checks that the absence is detected and
+        # falls back without raising.
         tests.append({'type': 'report_finalize',
-                      'file': 'Analysis Report finished in Word',
+                      'file': 'Analysis Report page numbers built',
                       'method': '-', 'source': 'report_finalize'})
         # Guard the non-circular starting-surface generator: the mobilisable-strength
         # metric it ranks zones on, the separation threshold that decides whether it

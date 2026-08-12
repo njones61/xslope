@@ -75,6 +75,13 @@ NOTE_HTML = (
     'use Download.</em></p>\n'
 )
 
+_TAG = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)\b[^>]*?(/?)>")
+
+#: Tags that never enclose anything, so they never open a block the note has to
+#: clear. The HTML the hook sees is rendered Markdown, not arbitrary input.
+_VOID_TAGS = frozenset("area base br col embed hr img input link meta param "
+                       "source track wbr".split())
+
 _ANCHOR = re.compile(r"<a\b[^>]*>.*?</a>", re.DOTALL | re.IGNORECASE)
 _HREF = re.compile(r'href\s*=\s*"([^"]*)"', re.IGNORECASE)
 _CLASS = re.compile(r'class\s*=\s*"([^"]*)"', re.IGNORECASE)
@@ -158,18 +165,67 @@ def _pair_html(inner, pkg_href, pkg_url):
     )
 
 
+def _enclosing_block_end(page_html, at):
+    """Where the outermost element still open at ``at`` closes, or ``None``.
+
+    A note is a paragraph, and a paragraph cannot be written inside a table row or
+    a list item. The nearest offset at which one *can* be written is just past the
+    close of the outermost element the pair is nested in — the ``<table>`` around
+    the ``<td>``, the ``<ul>`` around the ``<li>``.
+
+    Counted with a tag stack rather than matched with a pattern: the pair's own
+    cell is several elements deep (``table > tbody > tr > td``), and the depth
+    varies with what the author wrote.
+    """
+    stack = []
+    for m in _TAG.finditer(page_html, 0, at):
+        closing, name, self_closing = m.group(1), m.group(2).lower(), m.group(3)
+        if name in _VOID_TAGS or self_closing:
+            continue
+        if not closing:
+            stack.append(name)
+            continue
+        for i in range(len(stack) - 1, -1, -1):    # unwind to the tag being closed,
+            if stack[i] == name:                   # forgiving of anything left open
+                del stack[i:]
+                break
+    if not stack:
+        return None
+    outer = stack[0]
+    depth = stack.count(outer)                     # nested copies close first
+    for m in _TAG.finditer(page_html, at):
+        if m.group(2).lower() != outer or m.group(3):
+            continue
+        if not m.group(1):
+            depth += 1
+        else:
+            depth -= 1
+            if depth == 0:
+                return m.end()
+    return None
+
+
 def _insert_note(page_html, first_pair_at):
     """Put the one-time note next to the first pair.
 
     Next to it means before the paragraph the pair sits in — a note at the top of a
-    two-thousand-line corpus page is not near anything. When the first pair is not
-    in a paragraph (a list item, a table cell) there is nowhere to put a paragraph
-    without breaking the enclosing structure, so the note goes to the top of the
-    page instead.
+    two-thousand-line corpus page is not near anything.
+
+    When the first pair is *not* in a paragraph (a list item, a table cell) there is
+    nowhere above it to put a paragraph without breaking the enclosing structure, so
+    the note goes immediately after that structure closes. On a tutorial page the
+    pair is the Completed-model row of the header table, and the note lands under
+    the table: title, then the problem sketch, then the objectives, then the header
+    table, then the note. A reader decides whether this is the tutorial they want by
+    looking at the picture, so nothing this hook adds may come between the two —
+    which is what putting the note at the top of the page, or under the H1, did.
     """
     para = page_html.rfind("<p>", 0, first_pair_at)
     if para != -1 and "</p>" not in page_html[para:first_pair_at]:
         return page_html[:para] + NOTE_HTML + page_html[para:]
+    end = _enclosing_block_end(page_html, first_pair_at)
+    if end is not None:
+        return page_html[:end] + "\n" + NOTE_HTML + page_html[end:]
     return NOTE_HTML + page_html
 
 

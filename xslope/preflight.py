@@ -2188,10 +2188,15 @@ def _domain_degenerate(ctx):
         where = f" at ({_fmt(pt[0])}, {_fmt(pt[1])})" if pt else ""
         what = f"crosses or retraces itself{where}"
     if ctx.sd.get("profile_lines"):
-        fix = ("This is what a Max depth at or above the lowest ground elevation "
-               "produces -- the base of the model runs back along the ground surface "
-               "itself, leaving no depth beneath it. Lower Max depth below the "
-               "section (Profile lines; profile sheet B2).")
+        fix = ("This is what ground running AT the Max depth elevation produces -- "
+               "the base of the model runs back along the ground surface itself, "
+               "leaving no depth beneath it. Two cures, and which is right depends "
+               "on the problem: where soil genuinely continues below, lower Max "
+               "depth below the section (Profile lines; profile sheet B2); where "
+               "the base is a stated rigid foundation at the toe elevation, keep "
+               "Max depth there and END the ground surface at the toe instead -- "
+               "soil of zero thickness beyond the toe is not modeled, and lowering "
+               "the base would invent depth the problem does not describe.")
     else:
         fix = ("Redraw the zones' base so it stays below the ground it supports, and "
                "so no zone boundary retraces another (Polygons; polygon sheet).")

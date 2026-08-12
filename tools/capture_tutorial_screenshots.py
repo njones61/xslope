@@ -1,0 +1,182 @@
+"""Studio dialog captures for the tutorial pages, headlessly (offscreen Qt).
+
+Same practice as ``tools/capture_studio_screenshots.py``, which captures the
+dialogs the Studio reference pages embed: build the real Studio widget, ``.show()``
+it under the ``offscreen`` QPA platform, let the layout settle, then
+``QWidget.grab()`` it to a PNG. Nothing here touches a live display.
+
+The difference is the subject. The reference pages photograph a dialog to show what
+the dialog *is*, and pick whichever sample makes its controls render live. A
+tutorial photographs a dialog to show the reader **their own model at a named point
+in the build**, so every shot here runs on that tutorial's model and in the state
+the step before it leaves behind — the materials editor with this problem's one
+material in it, the Run LEM dialog before the circles exist and after.
+
+Full main-window captures are the owner's and are not attempted here; the tutorial
+carries a generated placeholder for each (see ``tools/make_tutorial_figures.py``).
+
+Run:  python3 tools/capture_tutorial_screenshots.py           # every shot
+      python3 tools/capture_tutorial_screenshots.py lem01     # by name
+
+Exits 0 with a note if PySide6 is not installed (engine-only install — no Studio
+layer to capture), mirroring the Studio capture pipeline.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import io
+import os
+import sys
+import time
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+import matplotlib
+matplotlib.use("Agg")
+
+try:
+    from PySide6.QtWidgets import QApplication, QMessageBox
+except Exception:                       # engine-only install — no studio layer
+    print("capture_tutorial_screenshots: PySide6 not installed — skipped.")
+    sys.exit(0)
+
+OUT_DIR = os.path.join(REPO_ROOT, "docs", "tutorials", "images")
+LEM01 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_simple_embankment.xlsx")
+
+_app = QApplication.instance() or QApplication([])
+# Modal dialogs must never block a headless run.
+QMessageBox.warning = staticmethod(lambda *a, **k: QMessageBox.Ok)
+QMessageBox.information = staticmethod(lambda *a, **k: QMessageBox.Ok)
+QMessageBox.critical = staticmethod(lambda *a, **k: QMessageBox.Ok)
+
+
+def _settle(cycles=12):
+    """Pump the event loop so deferred layout + the canvas's debounced render fire."""
+    for _ in range(cycles):
+        _app.processEvents()
+        time.sleep(0.02)
+
+
+def _grab(dlg, name, settle=True):
+    dlg.show()
+    if settle:
+        _settle()
+    out = os.path.join(OUT_DIR, name)
+    dlg.grab().save(out)
+    dlg.close()
+    print("-> %s" % name)
+    return out
+
+
+def _load(path):
+    from xslope.fileio import load_slope_data
+    with contextlib.redirect_stdout(io.StringIO()):
+        return load_slope_data(path)
+
+
+# --------------------------------------------------------------------------- #
+# LEM-1 — Simple Embankment
+# --------------------------------------------------------------------------- #
+def lem01_materials():
+    """The materials editor, **list view**, on this problem's one material.
+
+    List view rather than the table it opens on: with a single material the table
+    is one row of a very wide sheet, while the list view puts the strength envelope
+    beside the numbers — and on a φ = 0 material that plot is a horizontal line at
+    τ = c, which is the point the tutorial's step is making.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = MaterialsEditor().build(_load(LEM01), None)
+    dlg._set_mode("list")
+    dlg.resize(1180, 720)
+    return _grab(dlg, "lem01_studio_materials.png")
+
+
+def lem01_profile():
+    """The profile-lines editor on the finished geometry: three vertices, and the
+    preview drawing the section they make."""
+    from studio.editors import ProfileEditor
+
+    dlg = ProfileEditor().build(_load(LEM01), None, select=0)
+    dlg.resize(1180, 720)
+    return _grab(dlg, "lem01_studio_profile.png")
+
+
+def lem01_run_lem_no_surface():
+    """Run LEM on the model as the geometry steps leave it — no failure surface yet.
+
+    The circles are dropped from the loaded model (never from the file): the model
+    checks then report the missing surface as an error, **Run** is disabled, and the
+    remedy button beside the finding is the starting-circle generator the tutorial's
+    next step presses.
+    """
+    from studio.dialogs import RunLemDialog
+
+    d = _load(LEM01)
+    d["circles"] = []
+    d["circular"] = False
+    dlg = RunLemDialog(defaults={}, slope_data=d)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem01_studio_run_lem_no_surface.png")
+
+
+def lem01_circles():
+    """The circles editor on the generated circle — what the reader audits.
+
+    The generator is run here rather than the file's own circle being shown, so the
+    image is of the thing the step produces. (On this model the two are the same
+    circle, which is itself the audit's answer.)
+    """
+    from xslope.generators import generate_starting_circles
+    from studio.editors import CirclesEditor
+
+    d = _load(LEM01)
+    with contextlib.redirect_stdout(io.StringIO()):
+        d["circles"] = generate_starting_circles(d)
+    dlg = CirclesEditor().build(d, None)
+    dlg.resize(1180, 720)
+    return _grab(dlg, "lem01_studio_circles.png")
+
+
+def lem01_run_lem():
+    """The Run LEM dialog on the complete model, set up for the tutorial's first run:
+    Bishop, a single surface, 40 slices — and a clean model-checks column."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "bishop", "analysis": "single_surface",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM01))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem01_studio_run_lem.png")
+
+
+SHOTS = {
+    "lem01_materials": lem01_materials,
+    "lem01_profile": lem01_profile,
+    "lem01_run_lem_no_surface": lem01_run_lem_no_surface,
+    "lem01_circles": lem01_circles,
+    "lem01_run_lem": lem01_run_lem,
+}
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    os.makedirs(OUT_DIR, exist_ok=True)
+    names = [n for n in SHOTS if not argv or any(a in n for a in argv)]
+    if not names:
+        print("no shot matching %s; known shots: %s" % (argv, ", ".join(sorted(SHOTS))))
+        return 1
+    for name in names:
+        SHOTS[name]()
+    print("\nwrote %d screenshot(s) to docs/tutorials/images/" % len(names))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

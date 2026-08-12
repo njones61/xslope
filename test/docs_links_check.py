@@ -336,11 +336,23 @@ def _scratch_docs():
             f"The bare workbook: "
             f"[{single}.xlsx](files/{single}.xlsx){{: .raw-file }}\n\n"
             f"Not a sample: [the template](../usage/input_template.xlsx)\n")
-    # A page whose first pair is NOT in a paragraph: there is nowhere to put a note
-    # paragraph without breaking the list, so it goes to the top of the page.
+    # A page whose first pair is NOT in a paragraph: there is nowhere above it to put
+    # a note paragraph without breaking the list, so it goes below the list.
     with open(os.path.join(docs, "lem", "listed.md"), "w") as fh:
         fh.write(f"# Listed\n\n* [{single}.xlsx](files/{single}.xlsx)\n"
                  f"* nothing else\n")
+    # The tutorial shape, in full: title, the problem sketch the reader chooses the
+    # page by, the objectives, then the header table whose Completed-model row is the
+    # page's first pair. This is the page that pins where the fallback puts the note.
+    with open(os.path.join(docs, "lem", "tabled.md"), "w") as fh:
+        fh.write(f"# Tabled\n\n"
+                 f"![problem sketch](sketch.png)\n\n"
+                 f"**Objectives** — build the thing.\n\n"
+                 f"| | |\n|---|---|\n"
+                 f"| **Analysis** | Limit equilibrium |\n"
+                 f"| **Completed model** | [{single}.xlsx](files/{single}.xlsx) |\n\n"
+                 f"Prose, after the table.\n")
+    open(os.path.join(docs, "lem", "sketch.png"), "wb").close()
     with open(os.path.join(docs, "usage", "index.md"), "w") as fh:
         fh.write("# Usage\n\nNo samples here.\n")
     open(os.path.join(docs, "usage", "input_template.xlsx"), "wb").close()
@@ -356,6 +368,18 @@ def _scratch_docs():
                  f"markdown_extensions:\n  - attr_list\n"
                  f"hooks:\n  - {hook}\n")
     return root, docs, site, with_sidecars, single
+
+
+def _content(page_html):
+    """The page's own content, without the theme's chrome around it.
+
+    Placement checks are about reading order, and the navigation sidebar renders a
+    heading and half a dozen closed lists before the content starts. Measured
+    against the whole file, "the note comes after a </ul>" is true of every page
+    ever built and proves nothing.
+    """
+    at = page_html.find('role="main"')
+    return page_html[at:] if at != -1 else page_html
 
 
 def test_docs_build():
@@ -433,13 +457,43 @@ def test_docs_build():
     for wanted in ("pip", "Download", "Open in Studio"):
         if wanted not in note:
             fails.append(f"the note above the first pair does not mention {wanted!r}")
-    listed = open(os.path.join(site, "lem", "listed", "index.html")).read()
+    listed = _content(open(os.path.join(site, "lem", "listed", "index.html")).read())
     if listed.count("xslz-note") != 1:
         fails.append("a page whose first pair is inside a list got no note")
-    elif not 0 <= listed.find("xslz-note") < listed.find("xslz-download"):
-        fails.append("the note on the list page is not above the pair")
+    elif not 0 <= listed.find("</ul>") < listed.find("xslz-note"):
+        fails.append("the note on the list page is not below the list holding the "
+                     "pair, so it was written inside the list or above it")
     if not re.search(r"<li>[^<]*\(<a class=\"xslz-download\"", listed):
         fails.append("the pair broke the list item it was written in")
+
+    # WHERE the fallback puts it, pinned as the whole reading order. A tutorial's
+    # only pair is the Completed-model row of the header table, and a reader decides
+    # whether this is the page they want by looking at the sketch — so the note goes
+    # BELOW the header, next to the links it explains, and nothing this hook adds
+    # comes between the title and the picture.
+    tabled = _content(open(os.path.join(site, "lem", "tabled", "index.html")).read())
+    if tabled.count("xslz-note") != 1:
+        fails.append(f"a page whose first pair is inside a table carries "
+                     f"{tabled.count('xslz-note')} notes, not exactly one")
+    else:
+        order = [("the page's <h1>", tabled.find("</h1>")),
+                 ("the problem sketch", tabled.find("sketch.png")),
+                 ("the header table", tabled.find("<table>")),
+                 ("the first pair", tabled.find("xslz-download")),
+                 ("the end of the table", tabled.find("</table>")),
+                 ("the note", tabled.find("xslz-note"))]
+        missing = [name for name, at in order if at < 0]
+        if missing:
+            fails.append(f"the table page rendered no {', '.join(missing)}")
+        else:
+            offsets = [at for _, at in order]
+            if offsets != sorted(offsets):
+                fails.append(
+                    "the table page does not read title -> sketch -> table -> pair "
+                    "-> note; it reads " +
+                    " -> ".join(name for name, _ in sorted(order, key=lambda p: p[1])))
+    if not re.search(r"<td>[^<]*\(<a class=\"xslz-download\"", tabled):
+        fails.append("the pair broke the table cell it was written in")
     usage = open(os.path.join(site, "usage", "index.html")).read()
     if "xslz-note" in usage:
         fails.append("a page with no samples carries the note anyway")

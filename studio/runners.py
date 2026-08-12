@@ -1086,10 +1086,11 @@ REPORT_WRITE_STEPS = 1
 #: The label that step carries.
 REPORT_WRITE_LABEL = "writing the Word document"
 
-#: And the Word finish, which is reported as an indeterminate stretch: Word is
-#: driven over a single Apple event / COM call that returns when it is finished
-#: and says nothing while it runs, so there is no honest number to show.
-REPORT_FINALIZE_LABEL = "finalizing the page numbers in Word…"
+#: And the finish, which is reported as an indeterminate stretch: the program
+#: that lays the pages out is driven over a single call that returns when it is
+#: finished and says nothing while it runs, so there is no honest number to
+#: show.
+REPORT_FINALIZE_LABEL = "building the page numbers…"
 
 
 class ReportRunner(RunnerThread):
@@ -1130,13 +1131,12 @@ class ReportRunner(RunnerThread):
     is given. :class:`ReportCancelled` and
     :class:`~xslope.search.AnalysisCancelled` unwind the build from wherever it
     was. Once the last step is announced nothing checks it again — the document
-    write is one call into python-docx and the Word finish is one call into Word,
-    and neither may be interrupted halfway with the user's report as the thing at
-    risk.
+    write is one call into python-docx and the finish is one call into the
+    program that lays the pages out, and neither may be interrupted halfway with
+    the user's report as the thing at risk.
 
     Emits ``succeeded`` with :func:`~xslope.report.generate_report`'s own result
-    dict plus ``finalized`` (whether Word rebuilt the page numbers) and
-    ``fmt``.
+    dict plus ``finalized`` (whether the page numbers were built) and ``fmt``.
     """
 
     succeeded = Signal(object)
@@ -1229,9 +1229,9 @@ class ReportRunner(RunnerThread):
 
         finalized = False
         if self._finalize:
-            from .report_dialog import word_finish
+            from .report_dialog import document_finish
             self.progress.emit(0, -1, REPORT_FINALIZE_LABEL)
-            finalized, _msg = word_finish(self._path, True)
+            finalized, _msg = document_finish(self._path, True)
         self.succeeded.emit(dict(out, finalized=finalized, fmt=self._fmt))
 
     def _figure_cb(self):

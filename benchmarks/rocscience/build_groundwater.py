@@ -537,24 +537,44 @@ def gw011():
     return 'gw011.xlsx'
 
 
+# GW#6's conductivity function, shared by all five cases.
+#
+# The source is the vendor's own model file rather than the Fig 6.2 chart: every
+# ``groundwater #006_0N.slw`` inside the RS2 Groundwater zip carries the custom
+# function as a table, and case 1's is four points of pressure head (m) against
+# conductivity (m/s) --
+#
+#     -15: 1e-11    -10: 1e-10    -1: 1e-07    -0: 1e-07
+#
+# so ks = 1e-7 m/s, air entry 1 m (9.81 kPa), then log-linear in suction: -1/3
+# decade per metre to psi = 10 m, -1/5 decade per metre to psi = 15 m.  Case 2's
+# table is the same shape scaled by 9, case 3's is the same function sampled at
+# every metre (16 points) with its core 100x lower, and cases 4 and 5 repeat
+# case 1's exactly.  Digitizing Fig 6.2 recovers the same curve to 0.007 decades
+# rms, so the chart and the table agree; the table is used because it is exact.
+#
+# XSLOPE carries van Genuchten, Gardner and linear-front laws, not a table, so
+# the function is fit.  These are the least-squares Mualem-vG parameters in
+# log10(kr) over 0-8 m of suction -- the band the five solved fields occupy
+# (their deepest suction is 6.7 m, on case 3) -- and they hold the table to
+# 0.030 decades rms and 0.102 decades worst over that band.
+_GW6_VG = dict(unsat='vg', vg_a=0.2452, vg_n=2.5739)
+
+
 def gw006a():
     """GW#6 case 1: Fredlund & Rahardjo (1993) isotropic earth dam with a
     12 m horizontal drain (Fig 6.1: 12 m high, 4 m crest, symmetric 2:1
-    faces, base 52 m; reservoir 10 m). k-function digitized from the Fig 6.2
-    chart (ks=1e-7 m/s, air entry ~9 kPa, 3 decades down by ~97 kPa) and fit
-    by Mualem-vG (vg_a=0.4029, vg_n=1.9156; max deviation 0.36 decades in
-    the controlling 1-6 m suction band - three fit variants move the answer
-    <0.03 m). Target: pressure head along line 1-1 (the crest centerline,
-    x=26) from Fig 6.6, where Slide and F&R coincide. xslope reads a
-    k-fit- and mesh-insensitive +0.25-0.5 m above the published curves -
-    the same free-surface family as task #30; locked at xslope's own values
-    with the caveat stated. Case 4 (infiltration) is blocked on the flux BC
-    (task #28); cases 2 (9:1 anisotropy), 3 (core), 5 (seepage-face variant)
-    are buildable-deferred with chart targets like this one."""
+    faces, base 52 m; reservoir 10 m). Conductivity from the vendor table
+    (see _GW6_VG): ks=1e-7 m/s, air entry 1 m, fit by Mualem-vG to 0.030
+    decades rms over the suction band the solution occupies. Target:
+    pressure head along line 1-1 (the crest centerline, x=26) from Fig 6.6,
+    where Slide and F&R coincide. xslope reads +0.04 to +0.20 m above
+    Slide's curve there, mesh- and fit-insensitive; locked at xslope's own
+    values. Cases 2 (9:1 anisotropy), 3 (core), 4 (infiltration) and 5
+    (seepage face) are gw006b/c/d/e."""
     sd = _base_sd(k1=1e-7)
     m = sd['materials'][0]
-    m.update(name='Dam fill', c=10.0, phi=30.0, kr0=0.0, h0=0.0,
-             unsat='vg', vg_a=0.4029, vg_n=1.9156)
+    m.update(name='Dam fill', c=10.0, phi=30.0, kr0=0.0, h0=0.0, **_GW6_VG)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 0.0), (24.0, 12.0),
                                                     (28.0, 12.0), (52.0, 0.0)]}]
     sd['max_depth'] = 0.0
@@ -578,13 +598,13 @@ def gw006b():
     The extra horizontal conductivity spreads the flow and lowers the phreatic
     surface. Target: pressure head along line 1-1 (crest centerline x=26, Fig
     6.9). Here xslope reproduces the Slide/F&R curve almost exactly: pressure
-    head 6.52 / 4.74 / 3.19 / 1.79 / 0.42 m at elevations 0 / 2 / 4 / 6 / 8 vs
+    head 6.52 / 4.74 / 3.28 / 1.85 / 0.38 m at elevations 0 / 2 / 4 / 6 / 8 vs
     the chart's 6.5 / 4.7 / 3.2 / 1.85 / 0.4. Chart-only target (no tabulated
     value), so xslope's own flowrate and total-head field are locked."""
     sd = _base_sd(k1=9e-7)
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, k1=9e-7, k2=1e-7, alpha=0.0,
-             kr0=0.0, h0=0.0, unsat='vg', vg_a=0.4029, vg_n=1.9156)
+             kr0=0.0, h0=0.0, **_GW6_VG)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 0.0), (24.0, 12.0),
                                                     (28.0, 12.0), (52.0, 0.0)]}]
     sd['max_depth'] = 0.0
@@ -610,14 +630,18 @@ def gw006c():
     the entire hydraulic-head drop across its 4 m width (the crowded contours of
     Fig 6.13). Target: pressure head along line 1-1 (x=26, now inside the core,
     Fig 6.14). xslope reproduces the profile shape and sits at the high end of
-    the published scatter (the Slide and Ref[1] curves themselves diverge ~1.5 m
-    near the crest) — the same +0.5 m free-surface-family bias case 1 shows.
-    Chart-only target, so xslope's own flowrate and total-head field are locked."""
+    the published scatter, by up to +0.91 m at elevation 8 where the Slide and
+    Ref[1] curves themselves diverge 0.9 m. This case reaches the deepest
+    suction of the five (6.7 m), so it is the one the conductivity fit moves
+    most. Chart-only target, so xslope's own flowrate and total-head field are
+    locked. The vendor's case-3 table samples the same function as case 1 at
+    every metre, and its core's is that function 100x lower, so both zones take
+    the shared fit."""
     from shapely.geometry import Polygon
     sd = _base_sd(k1=1e-7)
     shell = sd['materials'][0]
     shell.update(name='Shell', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
-                 kr0=0.0, h0=0.0, unsat='vg', vg_a=0.4029, vg_n=1.9156)
+                 kr0=0.0, h0=0.0, **_GW6_VG)
     core = dict(shell)
     core.update(name='Core', k1=1e-9, k2=1e-9)
     sd['materials'] = [shell, core]
@@ -649,14 +673,14 @@ def gw006e():
 
     Without the drain the phreatic surface rides higher and exits on the
     downstream slope. Target: pressure head along line 1-1 (x=26, Fig 6.23).
-    xslope reproduces the Slide/F&R curve almost exactly: pressure head 8.29 /
-    6.35 / 4.39 / 2.45 / 0.5 m at elevations 0 / 2 / 4 / 6 / 8 vs the chart's
+    xslope reproduces the Slide/F&R curve almost exactly: pressure head 8.30 /
+    6.35 / 4.41 / 2.45 / 0.50 m at elevations 0 / 2 / 4 / 6 / 8 vs the chart's
     8.4 / 6.4 / 4.5 / 2.5 / 0.55. Chart-only target, so xslope's own flowrate
     and total-head field are locked."""
     sd = _base_sd(k1=1e-7)
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
-             kr0=0.0, h0=0.0, unsat='vg', vg_a=0.4029, vg_n=1.9156)
+             kr0=0.0, h0=0.0, **_GW6_VG)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 0.0), (24.0, 12.0),
                                                     (28.0, 12.0), (52.0, 0.0)]}]
     sd['max_depth'] = 0.0
@@ -667,6 +691,56 @@ def gw006e():
     }
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw006e.xlsx'))
     return 'gw006e.xlsx'
+
+
+def gw006d():
+    """GW#6 case 4: the case-1 dam under steady-state INFILTRATION — rain
+    falling on the exposed surface while the toe drain still runs. Same 12 m
+    dam, 2:1 faces, 12 m toe drain, reservoir at 10 m, case-1 material.
+
+    The vendor model (groundwater #006_04.slw) applies the infiltration as
+    fourteen traction cards, each a VERTICAL flux of 1e-8 m/s, over the surface
+    from (22, 11) up across the crest and down the downstream face to (50, 1) —
+    one element short of the fixed-head node at each end. A vertical rain rate
+    is not the same number as the normal flux XSLOPE's flux BC takes: on the
+    2:1 faces the vendor's own cards carry qn = 1e-8 * cos(atan 0.5) = 8.9443e-9,
+    and only across the horizontal crest is qn the full 1e-8. So the surface goes
+    in as three blocks at the vendor's two rates, and the assembled inflow is the
+    rain rate times the 28 m horizontal footprint, 2.800000e-7 m3/s per m, to
+    seven figures. The face rate goes in exact rather than rounded — at
+    8.94427191e-9 a two-figure 8.9e-9 would leave the boundary 0.6% light.
+
+    The drain is XSLOPE's exit face, as on cases 1-3. The vendor writes it as a
+    specified head of 0; in XSLOPE that would leave the model with no exit face
+    at all, which selects the confined solver and drops the unsaturated law the
+    problem is about.
+
+    Target: pressure head along line 1-1 (x=26) from Fig 6.18, which prints
+    Slide and Ref[1] markers at every metre of elevation. Infiltration lifts the
+    profile 0.65 m above case 1 at the base and 1.33 m at the crest. xslope
+    tracks the Slide markers to 0.19 m rms over the 13 stations, running above
+    them by 0.18 m on average.
+    Chart-only target, so xslope's own flowrate and total-head field are locked."""
+    sd = _base_sd(k1=1e-7)
+    m = sd['materials'][0]
+    m.update(name='Dam fill', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
+             kr0=0.0, h0=0.0, **_GW6_VG)
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 0.0), (24.0, 12.0),
+                                                    (28.0, 12.0), (52.0, 0.0)]}]
+    sd['max_depth'] = 0.0
+    q_vert = 1e-8                             # the vendor's rain rate
+    q_face = q_vert * 2.0 / math.sqrt(5.0)    # its normal component on a 2:1 face
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 10.0, 'coords': [(0.0, 0.0), (20.0, 10.0)]}],
+        'specified_fluxes': [
+            {'flux': q_face, 'coords': [(22.0, 11.0), (24.0, 12.0)]},
+            {'flux': q_vert, 'coords': [(24.0, 12.0), (28.0, 12.0)]},
+            {'flux': q_face, 'coords': [(28.0, 12.0), (50.0, 1.0)]},
+        ],
+        'exit_face': [(40.0, 0.0), (52.0, 0.0)],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw006d.xlsx'))
+    return 'gw006d.xlsx'
 
 
 def gw008():
@@ -1422,7 +1496,7 @@ if __name__ == '__main__':
         _print_locks()
     else:
         for fn in (gw001, gw002, gw003, gw004, gw005,
-                   gw006a, gw006b, gw006c, gw006e,
+                   gw006a, gw006b, gw006c, gw006d, gw006e,
                    gw007, gw008, gw009a, gw009b, gw010, gw011, gw012, gw013,
                    *_TRANSIENT):
             print(fn())

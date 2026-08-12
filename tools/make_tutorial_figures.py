@@ -241,17 +241,8 @@ def lem01_placeholders():
     live-session hand capture — the owner's, 2026-08-11, taken after the skill
     hardening round — since a provider conversation cannot be scripted.
     """
-    placeholder(
-        "lem01_studio_canvas.png",
-        "Studio — the canvas after the profile line is entered",
-        ["Main window, Inputs view, LEM mode, at the end of the tutorial's Studio "
-         "step 3:",
-         "the profile line in the material's color and the hatched max-depth line at "
-         "y = 0.",
-         "No failure surface yet — the starting circle is the step after this one.",
-         "Model: docs/lem/files/xslope_simple_embankment.xlsx, circles removed.",
-         "Main-window captures are taken by hand at the project's window size and "
-         "theme."])
+    # lem01_studio_canvas.png is now produced by capture_tutorial_screenshots.py
+    # (offscreen main-window grab — the hand-capture convention is retired).
 
 
 GROUPS = {

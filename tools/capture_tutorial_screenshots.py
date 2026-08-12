@@ -159,11 +159,48 @@ def lem01_run_lem():
 SHOTS = {
     "lem01_materials": lem01_materials,
     "lem01_profile": lem01_profile,
-    "lem01_run_lem_no_surface": lem01_run_lem_no_surface,
-    "lem01_circles": lem01_circles,
     "lem01_run_lem": lem01_run_lem,
+    # lem01_circles returns when the Circles editor round lands (Generate button,
+    # table-over-plot layout); until then the placeholder card owns that filename.
+    # lem01_run_lem_no_surface retired with the preflight-remedy flow the page
+    # no longer teaches.
 }
 
+
+
+def lem01_canvas():
+    """The main window at the end of the Studio path's step 3: geometry entered,
+    no circles yet. A full-window offscreen grab — the deferred canvas render
+    needs a forced synchronous kick (no real screen, no paint events), and the
+    only loss vs a hand capture is the macOS title bar. The assistant dock is
+    hidden (the Studio path does not use it) and the log cleared."""
+    from studio.main_window import MainWindow
+    win = MainWindow()
+    win.resize(1600, 1000)
+    win.open_path(os.path.join(REPO_ROOT, "docs/lem/files/xslope_simple_embankment.xlsx"))
+    win.doc.slope_data["circles"] = []
+    win._populate_inputs_tree()
+    for name in ("assistant_dock", "chat_dock", "ai_dock"):
+        d = getattr(win, name, None)
+        if d is not None:
+            d.hide()
+    win.show()
+    _settle()
+    win.canvas.render_inputs(win.doc.slope_data)
+    _settle()
+    win.canvas._render_timer.stop()
+    win.canvas._render_current()
+    win.log.clear()
+    _settle()
+    pix = win.grab()
+    out = os.path.join(OUT_DIR, "lem01_studio_canvas.png")
+    pix.save(out)
+    print("-> lem01_studio_canvas.png  (%dx%d, offscreen main window)"
+          % (pix.width(), pix.height()))
+    win.close()
+
+
+SHOTS["lem01_canvas"] = lem01_canvas
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)

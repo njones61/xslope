@@ -42,6 +42,42 @@ USAGE_TOGGLE_LABEL = {"lem": "LEM", "fem": "FEM", "seep": "Seepage", "rel": "Rel
 
 
 # --------------------------------------------------------------------------- #
+# Numeric display
+#
+# Significant digits an editor shows a stored number to. Inputs are typed, computed
+# from typed geometry (a circle's R from its intercept point) or generated, and the
+# computed ones arrive as full-precision floats: 41.23105625617661 is the radius from
+# (10, 40) to (0, 0), and printing it that way is how a coordinate table turns into a
+# wall of noise. Six digits is more than any of these inputs carries physically, and
+# the stored value is never touched — Field.read_text hands back the number the cell
+# was FILLED from whenever the text is still the rendering of it, so a rounding can
+# only ever be seen, never saved.
+#
+# (The transient dialog's own _tseep_fmt renders at 10 digits instead. It edits its
+# values in place with no stored original to fall back on, so its display has to be
+# lossless; here the original is kept, which is what buys the shorter one.)
+# --------------------------------------------------------------------------- #
+_DISPLAY_SIG_DIGITS = 6
+
+
+def _display_number(v):
+    """A stored value rendered for a numeric editor widget.
+
+    ``None`` and NaN (the templates' two spellings of "unset") render blank; ints
+    render whole; floats render at :data:`_DISPLAY_SIG_DIGITS` significant digits with
+    no trailing zeros (``40.0`` -> ``"40"``). A non-number is left to ``str``."""
+    if v is None:
+        return ""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, float) and v != v:            # NaN = unset, never the text "nan"
+        return ""
+    if isinstance(v, int):
+        return str(v)
+    return f"{v:.{_DISPLAY_SIG_DIGITS}g}"
+
+
+# --------------------------------------------------------------------------- #
 # Field spec + dialogs
 # --------------------------------------------------------------------------- #
 class Field:
@@ -60,6 +96,9 @@ class Field:
               "bool": False}
     # Kinds edited through a QComboBox rather than a line edit.
     COMBO_KINDS = ("choice", "bool")
+    # Kinds whose value is a number, and so is display-rounded on the way out and
+    # preserved on the way back in (see to_text / read_text).
+    NUMERIC_KINDS = ("float", "optfloat", "int")
     _BOOL_CHOICES = ["", "YES"]
 
     def __init__(self, key, header, kind="float", choices=None, default=None,
@@ -97,10 +136,34 @@ class Field:
 
     def to_text(self, val):
         """``val`` rendered for this field's editor widget (the inverse of
-        :meth:`from_text` for the combo kinds)."""
+        :meth:`from_text` for the combo kinds).
+
+        Numeric kinds are rendered at :data:`_DISPLAY_SIG_DIGITS` significant digits
+        rather than through ``str``, which prints a float's full repr: a radius the
+        editor itself computed from an intercept point is stored as
+        41.23105625617661 and has no business being *shown* that way. The stored
+        value is untouched — :meth:`read_text` is the other half of that promise."""
         if self.kind == "bool":
             return "YES" if val else ""
+        if self.kind in self.NUMERIC_KINDS:
+            return _display_number(val)
         return "" if val is None else str(val)
+
+    def read_text(self, text, stored):
+        """``text`` parsed back to a value — unless it is still exactly what
+        :meth:`to_text` rendered for ``stored``, in which case ``stored`` comes back
+        untouched.
+
+        This is what makes a display rounding a *display* rounding. A cell showing
+        41.2311 for a stored 41.23105625617661 must save the stored number, not the
+        rounding; only text the user actually changed may replace the value. Every
+        editor reads its widgets back through here, so no editor can round a value
+        into the model by being opened and OK'd."""
+        if (self.kind in self.NUMERIC_KINDS
+                and isinstance(stored, (int, float)) and not isinstance(stored, bool)
+                and text == self.to_text(stored)):
+            return stored
+        return self.from_text(text)
 
     def from_text(self, text):
         text = (text or "").strip()
@@ -245,8 +308,9 @@ class FormEditorDialog(QDialog):
         self._edits = {}
         layout = QVBoxLayout(self)
         form = QFormLayout()
+        self._values = dict(values)
         for f in fields:
-            edit = QLineEdit(str(values.get(f.key, f.default)))
+            edit = QLineEdit(f.to_text(values.get(f.key, f.default)))
             self._edits[f.key] = edit
             form.addRow(f.header, edit)
         layout.addLayout(form)
@@ -256,7 +320,9 @@ class FormEditorDialog(QDialog):
         layout.addWidget(bb)
 
     def result_values(self):
-        return {f.key: f.from_text(self._edits[f.key].text()) for f in self._fields}
+        return {f.key: f.read_text(self._edits[f.key].text(),
+                                   self._values.get(f.key, f.default))
+                for f in self._fields}
 
 
 class _EditableTable(QWidget):
@@ -399,7 +465,7 @@ class _EditableTable(QWidget):
                 combo.currentIndexChanged.connect(lambda *_: self._on_combo_changed())
                 self.table.setCellWidget(i, j, combo)
             else:
-                self.table.setItem(i, j, QTableWidgetItem("" if val is None else str(val)))
+                self.table.setItem(i, j, QTableWidgetItem(f.to_text(val)))
 
     def replace_rows(self, rows):
         """Swap the whole table for ``rows``, as one undoable edit of the dialog.
@@ -514,7 +580,11 @@ class _EditableTable(QWidget):
                     base[f.key] = f.from_text(widget.currentText())
                 else:
                     item = self.table.item(i, j)
-                    base[f.key] = f.from_text(item.text() if item else "")
+                    # read_text, not from_text: an untouched cell hands back the value
+                    # the row was built from, so the display rounding never lands in
+                    # the record (see Field.read_text).
+                    base[f.key] = f.read_text(item.text() if item else "",
+                                              base.get(f.key))
             out.append(base)
         return out
 
@@ -1977,6 +2047,7 @@ class GlobalParamsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Global parameters")
         self._numeric_fields = numeric_fields
+        self._values = dict(values)
         self._edits = {}
         layout = QVBoxLayout(self)
         form = QFormLayout()
@@ -2044,7 +2115,8 @@ class GlobalParamsDialog(QDialog):
             edit.setText(str(GAMMA_W[system]))
 
     def result_values(self):
-        out = {f.key: f.from_text(self._edits[f.key].text())
+        out = {f.key: f.read_text(self._edits[f.key].text(),
+                                  self._values.get(f.key, f.default))
                for f in self._numeric_fields}
         out["unit_system"] = _UNIT_SYSTEM_ITEMS[self._units.currentIndex()][1]
         t = self._time.currentText().strip()
@@ -2561,9 +2633,9 @@ class _MaterialListView(QWidget):
             else:
                 w.blockSignals(True)
                 # NaN is "unset" throughout the templates (e.g. t_res, E, area on
-                # lines that don't carry them) — render blank, never the string "nan".
-                _blank = val is None or (isinstance(val, float) and val != val)
-                w.setText("" if _blank else str(val))
+                # lines that don't carry them) — render blank, never the string "nan"
+                # (to_text does that, and rounds the rest for display).
+                w.setText(self._field_by_key[key].to_text(val))
                 w.blockSignals(False)
         ok = 0 <= idx < len(self._rows)
         self.setEnabled(True)
@@ -2596,7 +2668,9 @@ class _MaterialListView(QWidget):
             if isinstance(w, QComboBox):
                 row[key] = f.from_text(w.currentText())
             else:
-                row[key] = f.from_text(w.text())
+                # read_text: an untouched field re-commits the value it was loaded
+                # with, so the display rounding is never written back (Field.read_text).
+                row[key] = f.read_text(w.text(), row.get(key))
 
     # --- visibility ------------------------------------------------------
     def _update_option_visibility(self):
@@ -3359,9 +3433,9 @@ class _LineListView(QWidget):
                 w.setCurrentIndex(j if j >= 0 else 0)
             else:
                 # NaN is "unset" throughout the templates (e.g. t_res, E, area on
-                # lines that don't carry them) — render blank, never the string "nan".
-                _blank = val is None or (isinstance(val, float) and val != val)
-                w.setText("" if _blank else str(val))
+                # lines that don't carry them) — render blank, never the string "nan"
+                # (to_text does that, and rounds the rest for display).
+                w.setText(self._field_by_key[key].to_text(val))
             w.blockSignals(False)
         # Loading blocks the driver's textChanged, so re-word the scaled labels from
         # the freshly-loaded Spacing/S here.
@@ -3380,7 +3454,9 @@ class _LineListView(QWidget):
             if isinstance(w, QComboBox):
                 row[key] = f.from_text(w.currentText())
             else:
-                row[key] = f.from_text(w.text())
+                # read_text: an untouched field re-commits the value it was loaded
+                # with, so the display rounding is never written back (Field.read_text).
+                row[key] = f.read_text(w.text(), row.get(key))
 
     # --- events ----------------------------------------------------------
     def _on_select(self, idx):

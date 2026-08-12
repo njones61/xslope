@@ -1730,8 +1730,14 @@ class TableEditorDialog(QDialog):
         generated set of rows), widening the dialog if the new content needs it.
 
         Only ever wider: a dialog that shrank itself while the user was working in it
-        would be taking room away from them to save room they did not ask to save."""
-        if getattr(self, "_split", None) is None:
+        would be taking room away from them to save room they did not ask to save.
+
+        Only for a dialog that was sized from its content in the first place. The
+        fit takes the columns off Interactive and onto Stretch, which costs the user
+        the ability to drag a column width; that is a fair trade in a dialog whose
+        whole width was measured to fit its columns, and no trade at all in one that
+        was not -- there it would take the drag away and give nothing back."""
+        if not getattr(self, "_content_sized", False):
             return
         needed = self._content_width()
         if needed > self.width():
@@ -1859,21 +1865,38 @@ class TableEditorDialog(QDialog):
         self._schedule_preview()
 
     def _show_generate_summary(self, message, n, how):
-        """Write the generator's own summary into the dialog, under the button."""
+        """Write the generator's own summary into the dialog, under the button.
+
+        The summary is a strip that was not there a moment ago, and a dialog whose
+        height does not change has to find its room somewhere: the somewhere is the
+        preview, which is the only thing in the dialog that stretches. So the dialog
+        grows by exactly what the layout says it now needs more of -- measured as the
+        difference in the layout's own total hint across the label appearing, which
+        counts the label's wrapped height and the spacing around it and needs no
+        pixel figure of its own. The preview keeps the area it had."""
         lead = {"append": "Added", "replace": "Replaced the table with"}.get(how,
                                                                             "Generated")
         label = self.generate_summary
+        layout = self.layout()
+        before = layout.totalSizeHint().height()
         label.setText(f"{lead} {self._generate_unit(n)}: {message}".rstrip(". ") + ".")
         label.setVisible(True)
         # A wrapped label's height is only knowable once its width is: reserve it, or
         # the layout budgets one line for a summary that takes two and the difference
         # is taken out of the preview below it.
-        margins = self.layout().contentsMargins()
+        margins = layout.contentsMargins()
         wrapped = label.heightForWidth(self.width() - margins.left() - margins.right())
         if wrapped > 0:
             label.setMinimumHeight(wrapped)
+        layout.invalidate()
+        grown = layout.totalSizeHint().height() - before
         if getattr(self, "_content_sized", False):
             self._size_to_content()        # re-fit around the strip that just appeared
+        elif grown > 0:
+            screen = self.screen() or QApplication.primaryScreen()
+            avail = (screen.availableGeometry().height() if screen is not None
+                     else self.height() + grown)
+            self.resize(self.width(), min(self.height() + grown, avail))
 
     def _schedule_preview(self, *_):
         if self._preview is not None:

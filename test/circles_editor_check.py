@@ -44,6 +44,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 #: The LEM-1 tutorial's model: one material, one profile line, a rigid base at the
 #: toe. Its geometry is what the tutorial's Studio path generates a circle from.
 LEM01 = os.path.join(_REPO, "docs/lem/files/xslope_simple_embankment.xlsx")
+#: A weak-seam model whose non-circular generator runs without asking which zone —
+#: the other editor that carries both a preview and a Generate button, and so the
+#: one that shows whether the shared generate path reaches past its own dialog.
+ACADS = os.path.join(_REPO, "docs/lem/files/xslope_acads_weak_layer.xlsx")
 
 #: The button's label, quoted verbatim by the tutorial ("press **Generate starting
 #: circles…**"). A rewording here is a tutorial that no longer matches the app.
@@ -441,9 +445,70 @@ def test_generate_is_the_remedys_generator():
     return out
 
 
+def test_generate_leaves_the_other_editors_alone():
+    """The shared Generate path must not re-lay-out a dialog it did not size.
+
+    The column fit is for a dialog whose whole width was measured to fit its columns.
+    Applying it to a side-by-side editor takes its columns off Interactive — the user
+    silently loses the ability to drag a column width — and buys nothing, because that
+    dialog's width was never the columns' to claim. The non-circular editor is the
+    one that passes both a preview and a generator, so it is the one that has to be
+    checked, on a model whose generator really runs.
+    """
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QHeaderView, QMessageBox
+    from studio.editors import CATEGORY_EDITORS
+
+    editor = CATEGORY_EDITORS["non_circ"]
+    dlg = _shown(editor.build(_load(ACADS), None))
+    if getattr(dlg, "generate_button", None) is None:
+        return ["the non-circular editor has no Generate button to press"]
+    table = dlg._editable.table
+    header = table.horizontalHeader()
+    before = {"mode": header.sectionResizeMode(0),
+              "min": header.minimumSectionSize(),
+              "sections": [header.sectionSize(c) for c in range(table.columnCount())],
+              "canvas": dlg._preview.canvas.height()}
+    out = _fail(before["mode"] == QHeaderView.Interactive,
+                "the non-circular editor does not open with draggable columns, so "
+                "this check cannot tell whether Generate took them away")
+    out += _fail(dlg._split.orientation() == Qt.Horizontal,
+                 "the non-circular preview is no longer beside its table")
+
+    raised = _generate(dlg, QMessageBox.Apply)
+    out += _fail(bool(raised), "the non-circular generator replaced its surface "
+                               "without asking, over a table that had one")
+    _shown(dlg)
+
+    after_mode = header.sectionResizeMode(0)
+    out += _fail(after_mode == QHeaderView.Interactive,
+                 "pressing Generate switched the non-circular editor's columns off "
+                 "Interactive; the user can no longer drag a column width")
+    out += _fail(header.minimumSectionSize() == before["min"],
+                 f"Generate raised the minimum section size from {before['min']} to "
+                 f"{header.minimumSectionSize()} in a dialog it did not size")
+    out += _fail([header.sectionSize(c) for c in range(table.columnCount())]
+                 == before["sections"],
+                 f"Generate resized the columns from {before['sections']} to "
+                 f"{[header.sectionSize(c) for c in range(table.columnCount())]}")
+
+    # And the summary must not take its room out of the preview: the dialog grows to
+    # hold it. (Bigger is fine — the splitter gives the preview a share of the extra.)
+    out += _fail(dlg._preview.canvas.height() >= before["canvas"],
+                 f"the generator's summary shrank the preview canvas from "
+                 f"{before['canvas']} to {dlg._preview.canvas.height()} px; the "
+                 f"dialog has to grow for a strip that was not there before")
+    out += _fail(dlg.generate_summary.isVisibleTo(dlg),
+                 "the non-circular generator reported nothing in the dialog")
+    dlg.deleteLater()
+    return out
+
+
 CHECKS = [
     ("every column is visible at the opening size", test_all_columns_visible),
     ("the preview sits below the table", test_preview_is_below_the_table),
+    ("generate leaves other editors' layout alone",
+     test_generate_leaves_the_other_editors_alone),
     ("display rounds, storage does not", test_display_rounds_but_stores_the_truth),
     ("generate button exists and is labelled", test_generate_exists_and_is_labelled),
     ("generate dims with no geometry", test_generate_dims_without_geometry),

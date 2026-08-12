@@ -154,9 +154,11 @@ passes through that mechanism — the surface runs flat inside the seam and turn
 sharply at each end — so a model with a weak seam needs a surface a circular search
 cannot produce. The button builds one: it ranks the material zones by the shear
 strength each can mobilise at the stress it actually carries, lays a track just above
-the base of the weakest, and ramps up to the ground surface at both ends. It says
-which zone it chose and why before it replaces anything, and the generated points
-land in the table, so you can edit them and Cancel still discards them.
+the base of the weakest, and ramps up to the ground surface at both ends. It reports
+which zone it chose and why, under the button, so the surface can be read against the
+reasoning that produced it. On an empty table it simply builds the surface; where
+there are points already, it asks first. Either way the generated points land in the
+table, so you can edit them and Cancel still discards them.
 
 When no zone is clearly the weakest, a **Choose the weak zone** dialog lists every
 zone with its material colour, its strength model and its computed strength, and the

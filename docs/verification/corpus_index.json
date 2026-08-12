@@ -1883,18 +1883,6 @@
       "model": "docs/lem/files/xslope_acads_simple.xlsx",
       "references": [
         {
-          "anchor": "sample-problem",
-          "checks": [
-            "design_search"
-          ],
-          "level": 2,
-          "page": "lem/design/",
-          "resolution": "input-link",
-          "source_md": "docs/lem/design.md",
-          "title": "Sample Problem",
-          "url": "https://xslope.readthedocs.io/en/latest/lem/design/#sample-problem"
-        },
-        {
           "anchor": "worked-sample",
           "checks": [
             "SENS-acads-c"
@@ -22622,7 +22610,6 @@
     "models": 318,
     "pages": [
       "fem/samples/",
-      "lem/design/",
       "lem/samples/",
       "parametric/sensitivity/",
       "seep/samples/",
@@ -22634,7 +22621,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 546,
+    "tags": 545,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

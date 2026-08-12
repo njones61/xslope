@@ -190,6 +190,26 @@ choice.
 
 ---
 
+## Every edit is checked
+
+When the assistant changes the model, the change is validated before you see the
+reply. Studio rebuilds the derived geometry and runs the same
+[input checks](../usage/preflight.md) the Run dialogs use, then hands the findings
+back to the assistant as part of its own result — errors and warnings both. The
+assistant is required to resolve what comes back, or to tell you why it stands,
+before it reports the model ready.
+
+This matters most for the changes whose consequences are somewhere else. Correct
+the base elevation of a model and the circles that were tangent to the old base
+are now underneath the new one; nothing about editing that one field says so, and
+the model would otherwise look finished until a run failed on it. The checks run
+on the edit that caused it, so the stranded circles are named in the same reply.
+
+A read-only question — anything that reads the model without changing it — skips
+the checks entirely.
+
+---
+
 ## Autonomy: confirm vs. auto
 
 Running model-written code is powerful and carries the same trust model as any

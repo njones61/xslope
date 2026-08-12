@@ -6864,6 +6864,53 @@ def run_assistant_models_test(test):
     return 0.0, None
 
 
+def run_assistant_guardrails_test(test):
+    """The assistant's guardrails: the rules it is told, and the check it cannot
+    skip.
+
+    A modeling rule stated in a prompt is followed MOST of the time — three live
+    sessions measured it losing to guidance elsewhere in the stack, to a
+    confident-sounding tool error, and to the edit-cascade (a one-field fix whose
+    dependents go stale in silence). So the rules that matter do not rest on the
+    prompt: every snippet that CHANGES the model has its derived geometry rebuilt
+    and preflight run, and the findings come back appended to that snippet's own
+    tool output as a MODEL CHECKS block.
+
+    What a model does with a sentence cannot be unit-tested; everything the
+    harness does regardless of the model can, and that is what runs here — the
+    iron rules present exactly once in both prompt tiers, the compact rulebook
+    agreeing with them, and the three failure shapes replayed as scripted edit
+    sequences through the real snippet path, each asserting the finding its block
+    has to carry. Disabling the injection must make them fail.
+
+    The check itself lives in test/assistant_guardrails_check.py: offscreen, no
+    provider contacted and no network at all (the agent loop that would call one
+    is never started — tool calls go to the handler directly, as the worker
+    thread delivers them), on a throwaway settings file so it cannot see the
+    user's own keys.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'assistant_guardrails_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its checks
+    spec = importlib.util.spec_from_file_location('assistant_guardrails_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures[:6])
+    return 0.0, None
+
+
 def run_drawdown_tauff_test(test):
     """The Stage-2 undrained strength pipeline, checked against the worked example in
     Duncan, Wright & Brandon, *Soil Strength and Slope Stability*, 2nd ed., Table 9.2.
@@ -11041,6 +11088,8 @@ def _dispatch_test(test):
         return run_updater_test(test)
     if test_type == 'assistant_models':
         return run_assistant_models_test(test)
+    if test_type == 'assistant_guardrails':
+        return run_assistant_guardrails_test(test)
     if test_type == 'quad_mesh':
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
@@ -11157,7 +11206,7 @@ def _expected_and_tol(test, default_tolerance):
                        'project_package', 'docs_links',
                        'noncircular_generator', 'updater', 'fem_1d_details',
                        'report', 'report_finalize',
-                       'assistant_models',
+                       'assistant_models', 'assistant_guardrails',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'seep_cycle',
                        'tseep_exit_cycle',
@@ -11759,6 +11808,16 @@ def main():
         # and the manifest are served over file://.
         tests.append({'type': 'assistant_models', 'file': 'assistant model list',
                       'method': '-', 'source': 'assistant_models'})
+        # Guard the assistant's guardrails: the iron rules present exactly once in
+        # both prompt tiers, and the automatic input checks injected into every
+        # snippet that changed the model. The three live failure sessions are
+        # replayed as scripted edit sequences through the real snippet path — a
+        # prompt rule alone was measured losing to the edit-cascade, so the
+        # mechanism that does not depend on the model is what is asserted. Same
+        # reason this rides here as the model list: offscreen Qt, no network.
+        tests.append({'type': 'assistant_guardrails',
+                      'file': 'assistant guardrails (rules + input checks)',
+                      'method': '-', 'source': 'assistant_guardrails'})
         # Guard against the Markdown heading trap: this theme's parser accepts
         # '#word' with no space as a heading, so a wrapped docs line starting
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.

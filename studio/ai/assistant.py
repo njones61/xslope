@@ -464,7 +464,7 @@ def model_checks_text(slope_data):
         if sd.get("mesh") is not None and not (sd.get("circles") or sd.get("non_circ")):
             # A finite-element model's failure surface is an OUTPUT, so "no failure
             # surface" is not a defect in one.
-            skip = ["surface.none"]
+            skip = ["surface.none_defined"]
         report = preflight(sd, "lem", _checks_selection(sd), skip=skip)
         rows = list(report.errors) + list(report.warnings)
     except Exception as exc:

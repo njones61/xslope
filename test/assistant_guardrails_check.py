@@ -363,6 +363,48 @@ def check_ground_past_the_toe():
     return out
 
 
+def check_surfaceless_models():
+    """A limit-equilibrium model with no failure surface yet is reported as one;
+    a finite-element model, whose failure surface is an OUTPUT, is not.
+
+    The exclusion that separates them names a rule by id, and a misspelled id
+    excludes nothing at all while looking exactly like this — so both halves are
+    asserted, and the id is checked against the live registry.
+    """
+    from xslope.preflight import rules
+    out = []
+    known = {r.id for r in rules()}
+    if "surface.none_defined" not in known:
+        out.append("surface.none_defined is not a rule id — the exclusion is dead")
+
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    blk = _block(_run(asst, f"""
+slope_data['profile_lines'] = [{{'mat_id': 0, 'coords': {GROUND!r}}}]
+slope_data['max_depth'] = {DEEP_BASE!r}
+print('geometry only')
+"""))
+    if blk is None or "surface.none_defined" not in blk:
+        out.append(f"a model with no failure surface was not reported: {blk!r}")
+
+    # Attach a mesh: the same model is now a finite-element model in progress.
+    # The mesh is not one of the tracked source inputs, so the snippet also edits
+    # one that is -- otherwise nothing would be checked and the assertion below
+    # would pass on an absent block rather than on a correct one.
+    blk = _block(_run(asst, """
+slope_data['mesh'] = {'nodes': [], 'elements': [], 'element_types': [],
+                      'element_materials': []}
+slope_data['materials'][0]['E'] = 500000.0
+print('mesh attached')
+"""))
+    if blk is None:
+        out.append("the finite-element leg produced no block to assert against")
+    elif "surface.none_defined" in blk:
+        out.append("a finite-element model was told it has no failure surface")
+    mw.deleteLater()
+    return out
+
+
 def check_warning_is_reported_too():
     """A WARNING is unresolved business as much as an ERROR — the sessions failed
     on warnings passed over in silence, so the block must carry them."""
@@ -444,6 +486,7 @@ CHECKS = [
     ("D. the edit cascade surfaces", check_edit_cascade),
     ("D. ground past the toe surfaces", check_ground_past_the_toe),
     ("D. warnings are reported too", check_warning_is_reported_too),
+    ("D. surface-less LEM vs FEM models", check_surfaceless_models),
     ("E. read-only and failed runs cost nothing", check_read_only_costs_nothing),
     ("F. mutation: injection disabled", check_mutation_disables_the_checks),
 ]

@@ -1678,8 +1678,12 @@ class TableEditorDialog(QDialog):
 
         table = self._editable.table
         margins = self.layout().contentsMargins()
+        # sizeHint(), not width(): the row-number gutter is only as wide as the row
+        # count needs, and before the table has been laid out its width() has not
+        # caught up with the rows in it -- a 40-row table's gutter is wider than a
+        # 1-row table's, and measuring the stale one puts a column back over the edge.
         return (_fit_columns(table)
-                + table.verticalHeader().width() + 2 * table.frameWidth()
+                + table.verticalHeader().sizeHint().width() + 2 * table.frameWidth()
                 + self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
                 + margins.left() + margins.right())
 
@@ -1696,7 +1700,9 @@ class TableEditorDialog(QDialog):
         dialog cannot be dragged small enough to squeeze the preview into a strip, and
         anything that appears later (the generator's summary line) grows the layout's
         own minimum, so the dialog grows with it rather than taking the room out of
-        the picture."""
+        the picture. Where the two cannot both be satisfied -- a table of forty
+        circles is taller than any screen -- the preview keeps its minimum and the
+        table scrolls, which is the pane that has a scroll bar for the purpose."""
         width = self._content_width()
         pane = self._table_pane_height()
         preview = (_PREVIEW_MIN_LINES * self.fontMetrics().height()
@@ -1706,8 +1712,8 @@ class TableEditorDialog(QDialog):
         # Everything that is not the splitter: help text, legend, generate bar,
         # buttons, help strip. sizeHint() knows them all; the splitter's own hint is
         # replaced by the two pane heights measured above.
-        height = (self.sizeHint().height() - self._split.sizeHint().height()
-                  + pane + preview)
+        chrome = self.sizeHint().height() - self._split.sizeHint().height()
+        height = chrome + pane + preview
 
         screen = self.screen() or QApplication.primaryScreen()
         if screen is not None:
@@ -1715,7 +1721,9 @@ class TableEditorDialog(QDialog):
             width = min(width, avail.width())
             height = min(height, avail.height())
         self.resize(width, height)
-        self._split.setSizes([pane, max(0, height - pane)])
+        split_height = max(0, height - chrome)
+        pane = max(0, min(pane, split_height - preview))
+        self._split.setSizes([pane, split_height - pane])
 
     def _refit_columns(self):
         """Re-fit the columns to content that arrived after the dialog opened (a
@@ -1727,9 +1735,33 @@ class TableEditorDialog(QDialog):
             return
         needed = self._content_width()
         if needed > self.width():
-            screen = self.screen() or QApplication.primaryScreen()
-            avail = screen.availableGeometry().width() if screen is not None else needed
-            self.resize(min(needed, avail), self.height())
+            self._grow(needed)
+        self._grow_to_fit_columns()
+
+    def _grow(self, width):
+        """Widen to ``width``, never past the screen."""
+        screen = self.screen() or QApplication.primaryScreen()
+        avail = screen.availableGeometry().width() if screen is not None else width
+        self.resize(min(width, avail), self.height())
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if getattr(self, "_content_sized", False):
+            self._grow_to_fit_columns()
+
+    def _grow_to_fit_columns(self):
+        """Close any gap between what the columns need and what the viewport gives
+        them, now that the widgets have been laid out.
+
+        The estimate made before the first layout is close but not exact: the
+        row-number gutter widens with the row count, and a style adds its own header
+        margins only when it lays the header out. Both are small and both are in the
+        direction that hides a column, so the last word on the fit belongs to the
+        widgets once they have real geometry."""
+        table = self._editable.table
+        deficit = table.horizontalHeader().length() - table.viewport().width()
+        if deficit > 0:
+            self._grow(self.width() + deficit)
 
     def _build_generate_bar(self, spec):
         """The generator button, dimmed with its own reason when it cannot run.

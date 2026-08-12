@@ -68,6 +68,17 @@ def _bare_model():
     return d
 
 
+def _many_circles(n):
+    """The same model carrying ``n`` circles — a table taller than any screen, where
+    the row-number gutter is wider and the two panes cannot both have what they ask
+    for. Both are ways a fit measured on a one-row table stops being a fit."""
+    d = _load(LEM01)
+    base = dict(d["circles"][0])
+    d["circles"] = [dict(base, Xo=float(i), Yo=40.0 + i * 0.123456789)
+                    for i in range(n)]
+    return d
+
+
 def _shown(dlg):
     """Show ``dlg`` offscreen and let the layout settle, so widths and heights are
     the ones a user would meet rather than pre-layout hints."""
@@ -111,7 +122,8 @@ def test_all_columns_visible():
     editor = CATEGORY_EDITORS["circles"]
     out = []
     for label, model in (("with a circle", _load(LEM01)),
-                         ("empty", _bare_model())):
+                         ("empty", _bare_model()),
+                         ("forty circles", _many_circles(40))):
         dlg = _shown(editor.build(model, None))
         table = dlg._editable.table
         header = table.horizontalHeader()
@@ -158,6 +170,24 @@ def test_preview_is_below_the_table():
     out += _fail(caption is not None and
                  caption.geometry().bottom() <= dlg._preview.rect().bottom(),
                  "the preview caption is clipped by the bottom of its pane")
+    floor = dlg._preview.minimumHeight()
+    out += _fail(floor > 0 and dlg._preview.height() >= floor,
+                 f"the preview opened {dlg._preview.height()} px tall against its own "
+                 f"{floor} px minimum")
+    dlg.deleteLater()
+
+    # A table taller than the screen must not squeeze the preview out of the dialog:
+    # the table is the pane with a scroll bar, so it is the pane that gives way.
+    dlg = _shown(CATEGORY_EDITORS["circles"].build(_many_circles(40), None))
+    # The splitter's allocation, not the widget's own height: a squeezed pane keeps
+    # reporting the height it asked for while the splitter draws it at nothing.
+    given = dlg._split.sizes()[1]
+    out += _fail(given >= dlg._preview.minimumHeight(),
+                 f"forty circles left the preview {given} px of the splitter, under "
+                 f"its {dlg._preview.minimumHeight()} px minimum")
+    out += _fail(dlg._editable.table.verticalScrollBar().isVisible(),
+                 "forty circles did not put a scroll bar on the table, so the rows "
+                 "beyond the pane cannot be reached")
     dlg.deleteLater()
     return out
 

@@ -1969,7 +1969,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         sum(c dl) / sum(W sin a) — Bishop's phi = 0 answer exactly — and theta is
         left to satisfy the scalar h(theta) = sum_i n_i sec(a_i - theta) = 0.
 
-        Returns ``(n, F_m, R, sec_scale)`` or None when any precondition fails,
+        Returns ``(n, F_m, R)`` or None when any precondition fails,
         in which case the caller falls back to the coarse sweep. Right-facing
         slopes reach this with alpha negated but x_b unmirrored, so the identity
         above does not hold in that frame and the check declines them.

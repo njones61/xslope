@@ -41,6 +41,142 @@ MIN_DRIVING_FRAC = 0.01
 # 0-10%; the degenerate high-pore-pressure circles run 40-80%.
 MAX_BASE_TENSION_FRAC = 0.25
 
+#: Short names for the disclosure sentence, so it reads as a method rather than
+#: as a solver key. Anything not named here is capitalized.
+_METHOD_LABEL = {
+    "oms": "The Ordinary Method of Slices",
+    "bishop": "Bishop's method",
+    "janbu": "The Janbu method",
+    "corps": "The Corps of Engineers method",
+    "lowe": "The Lowe & Karafiath method",
+    "spencer": "Spencer",
+    "mprice": "Morgenstern-Price",
+}
+
+
+def _method_label(method_name):
+    return _METHOD_LABEL.get(str(method_name).lower(), str(method_name).capitalize())
+
+
+class UnsolvedTrials:
+    """The trial surfaces a search's method could not solve, kept and reported.
+
+    A search scores an inadmissible trial and an UNSOLVABLE one the same way —
+    ``fs_fail``, dropped, gone — and the two are not the same fact. A trial
+    rejected on geometry was never a candidate. A trial the solver could not
+    answer on WAS a candidate: the search looked at it, got no number, and moved
+    on, and if it was the lowest surface in the model the reported minimum is the
+    minimum of what the method could solve, not of the model. That is the
+    honest-search hole this closes: the counts are collected here and disclosed
+    on the search's own output, so the reported minimum is never quoted as global
+    while surfaces that outrank it went unanswered.
+
+    The ranking is by the MOMENT factor of safety, both sides — the unsolved
+    trials against the reported minimum's own moment answer, never against the
+    reported factor of safety, which is a different method's number and cannot
+    order surfaces beside Bishop's. It is free where the method already computed
+    it (Spencer's Bishop-seeded restart records it, and at phi = 0 its existence
+    test knows it in closed form); otherwise it is one Bishop solve per unsolved
+    trial, and those are a minority of the sweep.
+
+    Counting is per unique trial SURFACE. The depth optimizer re-evaluates its
+    own best depth at every step, so counting solver calls would report a surface
+    as several.
+    """
+
+    def __init__(self, method_name):
+        self.method = str(method_name).lower()
+        self.attempted = 0          # unique surfaces handed to the solver
+        self.unsolved = 0           # of those, the ones it returned no answer for
+        self.no_solution = 0        # of those, the ones that admit no solution
+        self.not_converged = 0      # of those, the ones the iteration failed on
+        self.inadmissible = 0       # of those, solved but refused on base tension
+        self.moment_fs = []         # moment factor of safety of each unsolved trial
+        self.reported_moment_fs = None
+        self.lower_by_moment = 0
+        self._seen = set()
+
+    @staticmethod
+    def _key(x, y, d):
+        return (round(float(x), 9), round(float(y), 9), round(float(d), 9))
+
+    def record(self, x, y, d, solved, df_slices, message=None):
+        """Log one trial surface the solver was given. Repeats are ignored."""
+        key = self._key(x, y, d)
+        if key in self._seen:
+            return
+        self._seen.add(key)
+        self.attempted += 1
+        if solved:
+            return
+        self.unsolved += 1
+        kind = solve.spencer_failure_kind(message)
+        setattr(self, kind, getattr(self, kind) + 1)
+        fs = self._moment_fs(df_slices)
+        if fs is not None:
+            self.moment_fs.append(fs)
+
+    @staticmethod
+    def _moment_fs(df_slices):
+        """This surface's moment factor of safety, reused where it was recorded.
+
+        ``solve.spencer`` writes ``moment_fs`` onto the slice table whenever it
+        has computed one — its Bishop-seeded restart, and the phi = 0 existence
+        test, which knows it in closed form. Absent that, Bishop is solved here.
+        """
+        if df_slices is None:
+            return None
+        fs = df_slices.attrs.get('moment_fs')
+        if fs is not None and np.isfinite(fs) and fs > 0:
+            return float(fs)
+        try:
+            ok, res = solve.bishop(df_slices)
+        except Exception:
+            return None
+        if ok and np.isfinite(res.get('FS', np.nan)) and res['FS'] > 0:
+            return float(res['FS'])
+        return None
+
+    def finish(self, critical_df):
+        """Rank the unsolved trials against the reported minimum. Idempotent."""
+        if not self.unsolved or not self.moment_fs:
+            return
+        self.reported_moment_fs = self._moment_fs(critical_df)
+        if self.reported_moment_fs is None:
+            self.lower_by_moment = 0
+            return
+        self.lower_by_moment = sum(1 for f in self.moment_fs
+                                   if f < self.reported_moment_fs)
+
+    def sentence(self):
+        """The disclosure line, or '' when every trial surface was solved."""
+        if not self.unsolved:
+            return ""
+        what = _method_label(self.method)
+        parts = [(self.no_solution, "admit no solution"),
+                 (self.not_converged, "failed to converge"),
+                 (self.inadmissible, "solved only with anomalous base tension")]
+        breakdown = ", ".join(f"{n} {t}" for n, t in parts if n)
+        line = (f"{what} could not solve {self.unsolved} of {self.attempted} "
+                f"trial surfaces ({breakdown})")
+        if self.reported_moment_fs is None:
+            return line + "; their ranking could not be measured."
+        return (f"{line}; {self.lower_by_moment} of them rank lower than the "
+                f"reported minimum by the moment measure.")
+
+    def as_dict(self):
+        """The counts, for a caller that prints them somewhere else."""
+        return {"method": self.method,
+                "attempted": self.attempted,
+                "unsolved": self.unsolved,
+                "no_solution": self.no_solution,
+                "not_converged": self.not_converged,
+                "inadmissible": self.inadmissible,
+                "lower_by_moment": self.lower_by_moment,
+                "reported_moment_fs": self.reported_moment_fs,
+                "unsolved_moment_fs": list(self.moment_fs),
+                "sentence": self.sentence()}
+
 
 def _with_water_loads_once(slope_data):
     """The model to search, with any automatic water load already derived.
@@ -250,7 +386,7 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                        rapid=False, composite=False, nx=10, ny=5, n_tangents=6,
                        keep=4, diagnostic=False, cancel_check=None, circle_cache=None,
                        min_slip_depth=None, center_box=None, entry_range=None,
-                       exit_range=None, tangent_depth=None):
+                       exit_range=None, tangent_depth=None, tally=None):
     """Coarse grid-and-tangent sweep that SEEDS the adaptive circular search.
 
     The adaptive 9-point search is a local optimizer: it refines whatever
@@ -276,6 +412,10 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
     families first among ties, capped at ``keep``. The caller merges these with
     any user-entered circles and runs the normal adaptive search from all of
     them.
+
+    ``tally`` is the caller's :class:`UnsolvedTrials`, if it keeps one: the sweep
+    hands the solver thousands of surfaces and its failures belong in the same
+    disclosure as the refinement's.
     """
     solver = getattr(solve, method_name)
     coords = list(slope_data['ground_surface'].coords)
@@ -341,6 +481,9 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                     ok, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
                 else:
                     ok, solver_result = solver(df_slices)
+                if tally is not None:
+                    tally.record(circle['Xo'], circle['Yo'], circle['Depth'],
+                                 ok, df_slices, None if ok else solver_result)
                 if not ok:
                     continue
                 FS = solver_result['FS']
@@ -463,7 +606,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
                     shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.03, depth_tol_frac=0.03,
                     diagnostic=False, num_slices=40, cancel_check=None, composite=False,
                     seed='circles', min_slip_depth=None, center_box=None, entry_range=None,
-                    exit_range=None, tangent_depth=None):
+                    exit_range=None, tangent_depth=None, unsolved_out=None):
     """
     Global 9-point circular search with adaptive grid refinement.
 
@@ -529,6 +672,12 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     All four survive the grid refinement and the grid-seed sweep. A malformed bound
     raises ValueError.
 
+    ``unsolved_out``, when a dict is passed, receives the counts of the trial
+    surfaces THE METHOD COULD NOT SOLVE (see :class:`UnsolvedTrials`), which the
+    search also prints as one line when there are any. A search whose method
+    answered on every admissible trial prints nothing extra and fills the dict
+    with zeros, so clean searches read exactly as they always have.
+
     Returns:
         list of dict: sorted fs_cache by FS
         bool: convergence flag
@@ -563,6 +712,15 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
 
     solver = getattr(solve, method_name)
     circle_cache = []  # Store ALL circles tested for plotting
+    tally = UnsolvedTrials(method_name)
+
+    def _report_unsolved(critical_df):
+        """Close the tally, disclose it, and hand the counts to the caller."""
+        tally.finish(critical_df)
+        if tally.unsolved:
+            print(f"[⚠️ unsolved trials] {tally.sentence()}")
+        if unsolved_out is not None:
+            unsolved_out.update(tally.as_dict())
 
     start_time = time.time()  # Start timing
 
@@ -608,9 +766,11 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
             rapid=rapid, composite=composite, diagnostic=diagnostic,
             cancel_check=cancel_check, circle_cache=circle_cache,
             min_slip_depth=min_slip_depth, center_box=center_box,
-            entry_range=entry_range, exit_range=exit_range, tangent_depth=tangent_depth)
+            entry_range=entry_range, exit_range=exit_range, tangent_depth=tangent_depth,
+            tally=tally)
         circles = circles + list(slope_data.get('circles') or [])
         if not circles:
+            _report_unsolved(None)
             return [], False, [], circle_cache
     else:
         circles = slope_data['circles']
@@ -686,6 +846,13 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
                             solver_success, solver_result = rapid_drawdown(df_slices, method_name, debug_level=0)
                         else:
                             solver_success, solver_result = solver(df_slices)
+                        # The two ways a trial scores fs_fail are different facts,
+                        # and only this one is about the METHOD: the surface was
+                        # admissible and the solver returned no answer on it. It
+                        # still scores fs_fail — the search is unchanged — but it
+                        # is counted, and disclosed at the end.
+                        tally.record(x, y, d, solver_success, df_slices,
+                                     None if solver_success else solver_result)
                         FS = solver_result['FS'] if solver_success else fs_fail
                         if solver_success and _base_tension_too_extensive(df_slices):
                             FS = fs_fail  # degenerate surface (base mostly in tension)
@@ -884,6 +1051,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
             best_fs, converged = fs_i, conv_i
 
     sorted_fs_cache = sorted(fs_cache.values(), key=lambda d: d['FS'])
+    _report_unsolved(sorted_fs_cache[0].get('slices') if sorted_fs_cache else None)
     return sorted_fs_cache, converged, search_path, circle_cache
 
 def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, movement_distance=4.0, shrink_factor=0.8, fs_tol=0.001, max_iter=100, move_tol=0.1, num_slices=30, max_base_angle=65.0, cancel_check=None, min_slip_depth=None):
@@ -1259,7 +1427,10 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         ``{"slice_df", "failure_surface", "results", "search", "method",
         "options"}`` — the bundle the report, the plots and Studio's result views
         all read. ``search`` is None for a single-surface run and a dict
-        describing the search otherwise. ``results`` is None where the solver
+        describing the search otherwise — including ``unsolved``, the count of
+        trial surfaces the method could not answer on and how they rank against
+        the reported minimum (:class:`UnsolvedTrials`; None on the non-circular
+        branch, which does not yet distinguish them). ``results`` is None where the solver
         returned no solution on a surface that was otherwise built, with the
         solver's reason on ``failure``: the method ran and did not converge,
         which is an answer about the model rather than a run that never happened.
@@ -1305,12 +1476,14 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
             if announce:
                 print(f"Searching for the critical circular surface with "
                       f"{method.upper()}{tag}…")
+            unsolved = {}
             fs_cache, converged, search_path, circle_cache = circular_search(
                 slope_data, method, rapid=rapid, num_slices=num_slices,
                 diagnostic=diagnostic, cancel_check=cancel_check,
-                composite=composite, seed=seed, **kw)
+                composite=composite, seed=seed, unsolved_out=unsolved, **kw)
             search = {"kind": "circular", "fs_cache": fs_cache,
-                      "search_path": search_path, "circle_cache": circle_cache}
+                      "search_path": search_path, "circle_cache": circle_cache,
+                      "unsolved": unsolved}
         else:
             if not slope_data.get("non_circ"):
                 raise AnalysisError("Non-circular search needs a starting "
@@ -1321,8 +1494,12 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
             fs_cache, converged, search_path = noncircular_search(
                 slope_data, method, rapid=rapid, num_slices=num_slices,
                 diagnostic=diagnostic, cancel_check=cancel_check, **kw)
+            # The unsolved-trial disclosure is the circular search's; the
+            # non-circular branch scores a solver failure the same way it scores
+            # a geometric rejection and cannot yet tell them apart.
             search = {"kind": "noncircular", "fs_cache": fs_cache,
-                      "search_path": search_path, "circle_cache": None}
+                      "search_path": search_path, "circle_cache": None,
+                      "unsolved": None}
         if not fs_cache:
             raise AnalysisError("Search produced no valid surfaces.")
         critical = fs_cache[0]

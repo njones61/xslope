@@ -122,7 +122,10 @@ class UnsolvedTrials:
 
         ``solve.spencer`` writes ``moment_fs`` onto the slice table whenever it
         has computed one — its Bishop-seeded restart, and the phi = 0 existence
-        test, which knows it in closed form. Absent that, Bishop is solved here.
+        test, which knows it in closed form. Absent that, Bishop is solved here,
+        ON A COPY: Bishop writes its own effective normal into ``n_eff``, and the
+        table this may be handed is the REPORTED one, whose ``n_eff`` belongs to
+        the method that solved it and is printed and plotted as that method's.
         """
         if df_slices is None:
             return None
@@ -130,7 +133,7 @@ class UnsolvedTrials:
         if fs is not None and np.isfinite(fs) and fs > 0:
             return float(fs)
         try:
-            ok, res = solve.bishop(df_slices)
+            ok, res = solve.bishop(df_slices.copy())
         except Exception:
             return None
         if ok and np.isfinite(res.get('FS', np.nan)) and res['FS'] > 0:

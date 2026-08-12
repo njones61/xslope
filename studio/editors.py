@@ -56,8 +56,20 @@ USAGE_TOGGLE_LABEL = {"lem": "LEM", "fem": "FEM", "seep": "Seepage", "rel": "Rel
 # (The transient dialog's own _tseep_fmt renders at 10 digits instead. It edits its
 # values in place with no stored original to fall back on, so its display has to be
 # lossless; here the original is kept, which is what buys the shorter one.)
+#
+# The digits are capped; the NOTATION is chosen by magnitude. A plain %g switches to
+# an exponent as soon as a value needs more than the significant digits it is allowed
+# -- which turns a Young's modulus of 2088500 into 2.0885e+06, an engineering input
+# rewritten as physics notation. 101 of the 312 corpus models carry at least one such
+# value. Inside the window below, the value is written out in full; outside it -- a
+# hydraulic conductivity of 7e-05, a modulus in the billions -- an exponent is what
+# anyone would write by hand anyway.
 # --------------------------------------------------------------------------- #
 _DISPLAY_SIG_DIGITS = 6
+#: Magnitudes written in full rather than with an exponent. The lower bound is where
+#: leading zeros start to outnumber digits; the upper is where a written-out integer
+#: stops being readable at a glance.
+_DISPLAY_FIXED_RANGE = (1e-4, 1e9)
 
 
 def _display_number(v):
@@ -65,7 +77,10 @@ def _display_number(v):
 
     ``None`` and NaN (the templates' two spellings of "unset") render blank; ints
     render whole; floats render at :data:`_DISPLAY_SIG_DIGITS` significant digits with
-    no trailing zeros (``40.0`` -> ``"40"``). A non-number is left to ``str``."""
+    no trailing zeros (``40.0`` -> ``"40"``), written out in full over
+    :data:`_DISPLAY_FIXED_RANGE` (``2088500.0`` -> ``"2088500"``, never
+    ``"2.0885e+06"``) and with an exponent outside it. A non-number is left to
+    ``str``."""
     if v is None:
         return ""
     if isinstance(v, bool) or not isinstance(v, (int, float)):
@@ -74,7 +89,19 @@ def _display_number(v):
         return ""
     if isinstance(v, int):
         return str(v)
-    return f"{v:.{_DISPLAY_SIG_DIGITS}g}"
+    if v == 0:
+        return "0"
+    low, high = _DISPLAY_FIXED_RANGE
+    if not low <= abs(v) < high:
+        return f"{v:.{_DISPLAY_SIG_DIGITS}g}"
+    # Significant digits, spelled out: the decimals left over once the digits before
+    # the point have taken their share (none left over for a value in the millions,
+    # which is exactly the case a %g would have put an exponent on).
+    decimals = max(0, _DISPLAY_SIG_DIGITS - 1 - math.floor(math.log10(abs(v))))
+    text = f"{v:.{decimals}f}"
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
 
 
 def _unedited(text, stored):
@@ -2401,7 +2428,7 @@ class GlobalParamsDialog(QDialog):
                   if 0 <= index < len(_UNIT_SYSTEM_ITEMS) else None)
         edit = self._edits.get("gamma_water")
         if system is not None and edit is not None:
-            edit.setText(str(GAMMA_W[system]))
+            edit.setText(_display_number(GAMMA_W[system]))
 
     def result_values(self):
         out = {f.key: f.read_text(self._edits[f.key].text(),

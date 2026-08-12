@@ -204,7 +204,7 @@ def test_display_rounds_but_stores_the_truth():
     """Cells read as rounded numbers; OK writes back the full-precision ones."""
     import math
 
-    from studio.editors import CATEGORY_EDITORS
+    from studio.editors import CATEGORY_EDITORS, Field
 
     editor = CATEGORY_EDITORS["circles"]
     cols = {f.key: j for j, f in enumerate(editor.FIELDS)}
@@ -250,7 +250,30 @@ def test_display_rounds_but_stores_the_truth():
                      f"and nothing in this dialog was edited")
     dlg.deleteLater()
 
-    # (3) A real edit still wins: typing over a cell replaces the stored value.
+    # (3) Notation follows magnitude, not the digit budget. A plain %g reaches for an
+    #     exponent the moment a value needs more digits than it is allowed, which
+    #     rewrites an engineering input as physics notation: a Young's modulus of
+    #     2088500 becomes 2.0885e+06. 101 of the 312 corpus models carry at least one
+    #     value that does this. Written out in full where a person would write it out,
+    #     with an exponent only where a person would use one.
+    from studio.editors import _display_number
+    for value, want in ((2088500.0, "2088500"),        # E, the case that regressed
+                        (518400000.0, "518400000"),
+                        (999999999.0, "999999999"),
+                        (-2088500.0, "-2088500"),
+                        (0.0001, "0.0001"),
+                        (125.0, "125"),
+                        (62.4, "62.4"),
+                        (0.0, "0"),
+                        (4176000000.0, "4.176e+09"),   # past where full is readable
+                        (7e-05, "7e-05")):             # and below where it is
+        got = _display_number(value)
+        out += _fail(got == want,
+                     f"{value!r} displays as {got!r}, want {want!r}")
+        out += _fail(Field("k", "K").read_text(got, value) == value,
+                     f"{value!r} does not survive its own display text {got!r}")
+
+    # (4) A real edit still wins: typing over a cell replaces the stored value.
     sd2 = _load(LEM01)
     sd2["circles"] = [{"Xo": 10.0, "Yo": 40.0, "Option": "Radius",
                        "Depth": 40.0 - r, "Xi": 0.0, "Yi": 0.0, "R": r}]

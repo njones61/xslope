@@ -118,6 +118,21 @@ The `search_path` list documents the progression of the search algorithm through
 
 The circular search additionally returns a `circle_cache` containing every circle evaluated during the search (not just the improving steps), which is used to plot all tested circles alongside the critical surface.
 
+### Trial Surfaces the Method Could Not Solve
+
+A trial surface can be admissible and still get no answer from the method it is given to. Spencer's assumption that every interslice force acts at one inclination gives a two-equation system, and on some surfaces that system has no root: no starting guess and no iteration count reaches an answer that is not there. Such a trial is scored the same as one rejected on geometry and dropped from the ranking, so if it sat below the reported minimum, the reported minimum is the minimum of what the method could solve rather than of the model.
+
+The circular search discloses this. When any admissible trial went unanswered it prints one line:
+
+```
+[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (56 admit no
+solution); 26 of them rank lower than the reported minimum by the moment measure.
+```
+
+The ranking is by the moment factor of safety on both sides — the unsolved trials against the reported minimum's own moment answer — so the comparison is between like quantities. Pass a dictionary as `unsolved_out=` to receive the same counts (`attempted`, `unsolved`, `no_solution`, `not_converged`, `inadmissible`, `lower_by_moment`, and the moment factor of safety of each unsolved trial); `run_lem_analysis` carries them on `search["unsolved"]`. A search whose method answered on every admissible trial prints nothing extra.
+
+A disclosure whose unsolved trials rank below the reported minimum means the reported answer is limited by the method, not by the search. Two things move it. A method that does not impose a single interslice inclination — the moment methods, or the force-equilibrium methods — answers on those surfaces, so running one of them beside Spencer says how much of the model Spencer's answer covers. And a surface driven rootless by an unsupported back scarp becomes solvable once the model carries the tension crack that scarp implies, since the crack removes the slices whose cohesion the assumption cannot balance.
+
 ## Visualization of Search Results
 
 The xslope package provides specialized plotting functions that transform the numerical search results into intuitive visual representations of the failure surface exploration process. These functions leverage matplotlib to create publication-quality figures that overlay the discovered failure surfaces onto the slope geometry.

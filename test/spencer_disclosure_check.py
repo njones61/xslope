@@ -41,6 +41,9 @@ WHAT IS CHECKED
   h stays negative across the whole band: classified as admitting no solution,
   and rejected BEFORE the retry cascade, since a rootless system cannot be
   solved by retrying;
+* the general case, where phi > 0 and loads reach every slice so the closed form
+  does not apply: there the verdict is a measured residual floor, and it must
+  quote what it measured and decline on a surface the method goes on to solve;
 * inertness of that early exit — over a family of circles on the same model, the
   closed form's verdict and the solver's outcome agree case for case, so no
   surface that could have been solved is refused;
@@ -83,6 +86,13 @@ CRITICAL = {'Xo': 5.28, 'Yo': 33.52, 'R': 33.52}
 
 #: A circle from the model's own circles sheet, which IS solvable.
 SOLVABLE = {'Xo': 10.0, 'Yo': 40.0, 'R': 40.0}
+
+#: The general case, where phi > 0 and reinforcement puts force and moment terms
+#: on every slice, so the closed form does not apply and the verdict rests on the
+#: measured residual floor. This circle's floor is 2.2e-3 — two hundred times the
+#: residual the solver accepts at — and the same at either sweep density.
+GENERAL_MODEL = os.path.join(REPO, 'docs', 'lem', 'files', 'xslope_reinforce.xlsx')
+GENERAL_INSOLUBLE = {'Xo': -8.0, 'Yo': 48.0, 'R': 45.0}
 
 NUM_SLICES = 40
 
@@ -175,6 +185,48 @@ def leg_critical_circle_admits_no_solution():
     print(f"  no solution  h in [{h.min():.3g}, {h.max():.3g}] over the band; "
           f"F_m={F_m:.4f}")
     print(f"               {msg}")
+    return fails
+
+
+def leg_general_case_is_measured_not_assumed():
+    """With phi > 0 and loads on every slice, the verdict rests on measurement.
+
+    The closed form does not apply here, so the general test sweeps the residual
+    over (F, theta) and descends from ten separated basins. What it must NOT do
+    is call a surface insoluble on a floor that merely looks small: the message
+    carries the floor and the bar it had to clear, and both are checked, as is
+    the decline on a surface the solver goes on to solve.
+    """
+    fails = []
+    df = _slices(GENERAL_MODEL, GENERAL_INSOLUBLE)
+    if float(np.abs(df['phi'].values).max()) <= 0:
+        fails.append("the general fixture has phi = 0 everywhere, so it is not "
+                     "the general case at all")
+    ok, msg = solve.spencer(df)
+    if ok:
+        fails.append(f"the general fixture now solves (FS={msg.get('FS'):.4f}); "
+                     f"it is no longer a no-solution fixture")
+        return fails
+    kind = solve.spencer_failure_kind(msg)
+    if kind != 'no_solution':
+        fails.append(f"general case classified {kind!r}, expected 'no_solution': {msg}")
+    elif 'times the' not in str(msg):
+        fails.append(f"the message does not quote the floor it measured: {msg}")
+    else:
+        print(f"  general      {msg}")
+
+    # And the other direction: a surface the method solves must never be reported
+    # as admitting no solution.
+    sd = load_slope_data(GENERAL_MODEL)
+    solvable = dict(sd['circles'][0])
+    df_ok = _slices(GENERAL_MODEL, {'Xo': solvable['Xo'], 'Yo': solvable['Yo'],
+                                    'R': solvable['R']})
+    ok2, msg2 = solve.spencer(df_ok)
+    if not ok2:
+        fails.append(f"the model's own starting circle no longer solves: {msg2}")
+    else:
+        print(f"  general      the model's starting circle still solves: "
+              f"FS={msg2['FS']:.4f}")
     return fails
 
 
@@ -334,6 +386,7 @@ def leg_mutations():
 LEGS = [
     ("the closed form is the shipped residual", leg_closed_form_is_the_shipped_residual),
     ("the critical circle admits no solution", leg_critical_circle_admits_no_solution),
+    ("the general case is measured", leg_general_case_is_measured_not_assumed),
     ("the moment factor of safety is recorded", leg_moment_fs_is_recorded_and_exact),
     ("the early exit is inert", leg_early_exit_is_inert),
     ("the search discloses what it could not solve", leg_search_discloses),

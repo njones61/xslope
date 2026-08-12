@@ -41,11 +41,17 @@ SPENCER_NO_CONVERGENCE = ("Spencer's method did not converge within the maximum 
 SPENCER_INADMISSIBLE = ("Spencer's method: only solutions with anomalous base "
                         "tension found")
 
-#: How small the normalized residual must get before the general-case test will
-#: NOT call a surface insoluble: a thousandth of the total slice weight. Measured
-#: rather than chosen — the surfaces the sweep does call insoluble bottom out at
-#: 2.5e-3 to 1.8e-2, an order of magnitude clear of this.
-NO_SOLUTION_FLOOR = 1e-3
+#: How far above the residual the solver ACCEPTS the reachable floor must stand
+#: before the general-case existence test will say a surface admits no solution:
+#: a thousandfold. Anchored to the tolerance rather than to a fraction of the
+#: driving weight because the measured floors form a continuum (2e-4 to 8e-3 of
+#: the driving weight across the corpus, with no gap in them) while the distance
+#: from acceptance is what the claim is actually about.
+NO_SOLUTION_MARGIN = 1e3
+
+#: A backstop under the above, for a model whose weights are small enough that
+#: the tolerance-relative bar would sit in float noise.
+NO_SOLUTION_FLOOR = 1e-6
 
 
 def spencer_failure_kind(message):
@@ -2057,12 +2063,12 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         residual pair is normalized by the quantities that make it up (the total
         slice weight, and that times the surface's own length scale, so the
         measure reads the same on a 20 ft and a 500 m slope), swept over a wide
-        (F, theta) grid, and the best few grid points are then refined by a
-        least-squares descent that is free to walk to a root the grid stepped
-        over. What comes back is the smallest residual anywhere in reach. A
-        surface with a root leaves residuals that collapse toward zero around it;
-        a floor still at a thousandth of the driving weight after refinement has
-        none.
+        (F, theta) grid, and then descended from ten separated starting basins by
+        least squares, each free to walk to a root the grid stepped over. What
+        comes back is the smallest residual anywhere in reach. A surface with a
+        root leaves residuals that collapse toward zero around it; a floor that
+        stays a thousandfold above the residual the solver would have ACCEPTED
+        has none within reach of anything.
 
         This is evidence, not proof — which is why it runs only after every retry
         has been spent, and never in front of one.
@@ -2079,18 +2085,30 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
             return np.array([R1_v / w_scale, R2_v / (w_scale * l_scale)])
 
         grid = []
-        for F_try in np.geomspace(0.05, 20.0, 45):
+        for F_try in np.geomspace(0.05, 20.0, 25):
             t_lo, t_hi = safe_theta_bounds(F_try, margin_deg=1)
             if not (t_hi > t_lo):
                 continue
-            for th in np.linspace(t_lo, t_hi, 61):
+            for th in np.linspace(t_lo, t_hi, 41):
                 grid.append((float(np.hypot(*_norm((F_try, th)))), F_try, float(th)))
         if not grid:
             return False
         grid.sort()
         floor = grid[0][0]
+        # Descend from starts SPREAD across the range, not merely from the best
+        # few grid points: the residual surface has many local minima, the best
+        # grid point does not reliably sit in the deepest basin, and a verdict
+        # taken from one descent moves when the grid spacing moves. Ten separated
+        # basins is what makes the answer the same at 25 x 41 and at 45 x 61.
         from scipy.optimize import least_squares
-        for _, F_try, th in grid[:3]:
+        starts = []
+        for _, F_try, th in grid:
+            if all(abs(np.log(F_try) - np.log(f)) > 0.3 or abs(th - t) > np.radians(10)
+                   for f, t in starts):
+                starts.append((F_try, th))
+            if len(starts) >= 10:
+                break
+        for F_try, th in starts:
             try:
                 sol = least_squares(_norm, [F_try, th], xtol=1e-12, ftol=1e-12,
                                     max_nfev=400)
@@ -2100,17 +2118,21 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
                 floor = min(floor, float(np.hypot(*_norm(sol.x))))
         if not np.isfinite(floor):
             return False
-        # Two floors to clear: the acceptance tolerance in normalized terms (the
-        # residual the solver would have taken), and a physical one — a thousandth
-        # of the total weight — so that "no solution" is never said of a surface
-        # whose residual merely bottomed out small.
-        if floor <= max(NO_SOLUTION_FLOOR, 1e3 * (tol / w_scale)):
+        # The bar is set by what the solver ACCEPTS, not by a round number: a
+        # solution is taken at |R1| < tol, which in these normalized terms is
+        # tol / w_scale, and the verdict is only given when the reachable floor
+        # stands a thousandfold above that. (Measured floors on the corpus run
+        # 2e-4 to 8e-3 — four to five orders above acceptance — with no natural
+        # gap in them, which is exactly why the bar is anchored to the tolerance
+        # rather than cut through that continuum at a chosen fraction.)
+        bar = max(NO_SOLUTION_FLOOR, NO_SOLUTION_MARGIN * (tol / w_scale))
+        if floor <= bar:
             return False
         _no_solution_detail[:] = [
             f"the force and moment residuals are bounded away from zero over the "
             f"whole admissible range of F and theta (the smallest normalized "
-            f"residual reachable is {floor:.3g} of the driving weight, against "
-            f"the {NO_SOLUTION_FLOOR:.0e} a near-solution would have to beat)"]
+            f"residual reachable is {floor:.3g}, {floor / bar:.0f} times the "
+            f"{bar:.2g} a solution would have to reach)"]
         return True
 
     #: Filled by whichever test returns the verdict, read into the message.

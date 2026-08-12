@@ -38,8 +38,7 @@ nav:
   - Home: index.md
   - Install: getting_started/install.md
   - Tutorials:
-    - Limit Equilibrium:
-      - Simple Embankment: tutorials/lem01_simple_embankment.md
+    - Simple Embankment (LEM): tutorials/lem01_simple_embankment.md
   - XSLOPE Studio:
     - Overview: studio/index.md
     - The Interface: studio/interface.md

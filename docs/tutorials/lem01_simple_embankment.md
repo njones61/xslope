@@ -1,42 +1,36 @@
 ---
 title: "Tutorial LEM-1 — Simple Embankment"
-description: "Build a single-material embankment in XSLOPE from scratch — with the AI assistant, in the Excel template, or in Studio — and find its critical circular failure surface."
+description: "Build a single-material embankment in XSLOPE from scratch — with the AI assistant, in the Excel template, or in Studio — find its critical failure surface with Spencer's method, and learn to read what the results are telling you about the model."
 ---
 
 # Tutorial LEM-1 — Simple Embankment
 
+The section below is a 20 ft embankment on a rigid foundation, one soil throughout,
+with a 1:1 face and a level crest. Its strength is a cohesion of 500 psf and no
+friction angle — a **total-stress undrained** strength.
+
 ![Simple embankment problem](../lem/sample_images/simple_embankment.png){width=700}
 
-**Objectives** — Build a single-material embankment from scratch and find its critical
-circular failure surface: the smallest complete XSLOPE model.
-
-| | |
-|---|---|
-| **Analysis** | Limit equilibrium |
-| **Features covered** | Profile-line geometry · one material · Mohr-Coulomb strength · starting circles · automated circular search |
-| **Prerequisites** | None. You need either [XSLOPE Studio](../getting_started/install.md) or the Excel template and a Python install. |
-| **Time** | ~10 minutes with the assistant · 25–30 minutes by hand |
-| **Completed model** | [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx) — the same file used by [LEM Sample Problem 1](../lem/samples.md#1-simple-embankment) |
+<div class="tut-glance" markdown>
+<div class="tgt-row">
+<div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
+<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~10 min</p></div>
+<div class="tgt-tile"><span class="tg-label">By hand</span><p>25–30 min</p></div>
+</div>
+<div class="tgm-obj" markdown>
+**Objectives** — Build the embankment from scratch — the smallest complete XSLOPE
+model — find its critical circular failure surface with Spencer's method, and read
+the results carefully enough to catch what the first model gets wrong.
+</div>
+<p><span class="tg-pill">profile lines</span><span class="tg-pill">one material</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">tension crack</span></p>
+<div class="tgm-model" markdown>**Completed model** — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx) — the same file used by [LEM Sample Problem 1](../lem/samples.md#1-simple-embankment)</div>
+</div>
 
 ---
 
 ## The problem
 
-The section above is a 20 ft embankment on a rigid foundation, one soil throughout,
-with a 1:1 face and a level crest. Its strength is a cohesion of 500 psf and no
-friction angle — a **total-stress undrained** strength. The drawing never says
-"φ = 0"; reading a bare cohesion that way is the first real judgment this problem
-asks of you, and the first thing to check in anything you or an assistant builds.
-
-That reading decides more than one input: with φ = 0 the strength on the slip surface
-is 500 psf wherever it goes, whatever the normal stress and pore pressure — so this
-model needs no water table at all.
-
-Expect a factor of safety of **1.281** on the starting circle you enter, and **1.215**
-for the critical circle a search finds. Land 20% away from those and an input is
-wrong, not the method.
-
-All three paths need the same numbers:
+The problem features the following geometry and material properties:
 
 **Material** — one material, Mohr-Coulomb (`mc`):
 
@@ -53,12 +47,6 @@ All three paths need the same numbers:
 | 3 | 60 | 20 | the back of the crest |
 
 Maximum depth = `0`, the elevation of the rigid base.
-
-**Starting circle** — a center, and the elevation of the circle's lowest point:
-
-| Xo | Yo | Option | Depth |
-|---:|---:|---|---:|
-| 10 | 40 | `Depth` | 0 |
 
 ---
 
@@ -102,18 +90,16 @@ inclination, unit weight, strength.
 2. Click in the assistant's chat box and press Ctrl/Cmd+V to attach it.
 3. Type `Build this model` and press **Enter**.
 
-![The assistant building the model](images/lem01_assistant_dock.png)
+![The assistant reading the drawing and building the model](images/lem01_assistant.png){width=1000}
 
 A geometry this simple is faster to describe than to paste, and a sentence works with
 a model that has no vision. Use this instead if you prefer:
 
+<div class="prompt-block" markdown>
 ```text
-Build a model for a simple slope on a rigid foundation. The slope is 20 ft high
-and the slope face is at an inclination of 1:1, with a level crest extending 40 ft
-back from the top of the slope. The slope is a uniform soil with a unit weight of
-125 pcf and an undrained strength of c = 500 psf, phi = 0. Add a starting circle
-for a critical-surface search.
+Build a model for a simple slope on a rigid foundation. The slope is 20 ft high and the slope face is at an inclination of 1:1, with a level crest extending 40 ft back from the top of the slope. The slope is a uniform soil with a unit weight of 125 pcf and an undrained strength of c = 500 psf, phi = 0. Add a starting circle for a critical-surface search.
 ```
+</div>
 
 The assistant builds into the open project, not into a file: its work appears on the
 canvas immediately and lands on the undo stack as one labeled step. Nothing is saved
@@ -139,7 +125,10 @@ is undoable.
   rigid foundation, and it is easy to miss. If the maximum depth is blank or below
   the toe, say: *"The foundation is rigid — set the maximum depth to the elevation of
   the toe."*
-- **A starting circle exists**, with its center above and behind the face.
+- **A starting circle exists**, with its center above and behind the face — and its
+  lowest point no lower than the maximum depth. On a rigid base the deep circle is
+  *tangent* to the base, never past it. If a circle dips below, say: *"That circle's
+  bottom is below the rigid base — set its depth to the base elevation."*
 - **Units are declared Imperial**, so the plots label their axes in feet.
 
 Then open the [completed model](../lem/files/xslope_simple_embankment.xlsx) beside
@@ -153,9 +142,8 @@ Start from [input_template.xlsx](../inputs/input_template.xlsx) and save a copy 
 a name of your own.
 
 Fill the worksheets in the order the model depends on them: `main` first, since the
-unit system it declares is what every number after it means; then materials, because
-geometry points at a material ID; then geometry; then the failure surface, because a
-sensible starting circle depends on the geometry it cuts through.
+unit system it declares is what every number after it means; then materials; then
+geometry; then the failure surface.
 
 ### 1. The `main` worksheet
 
@@ -178,7 +166,9 @@ Most of this sheet is already right:
 
 ### 2. The `mat` worksheet
 
-One material, first row of the table:
+In the `mat` worksheet, we name each of the materials in the model and enter their
+properties, including unit weight and strength parameters. For this problem, we have
+one material, so we'll use the first row of the table:
 
 1. `mat!A11` = `1` and `mat!B11` = `soil` — the ID the geometry will reference, and
    a name for the legends.
@@ -188,233 +178,273 @@ One material, first row of the table:
    undrained strength: the envelope is flat, so the strength is 500 psf at every
    depth.
 5. `mat!O11` **u** = `none`. There is no pore pressure to compute.
+6. Leave every other column in the row blank.
 
 ![The finished mat worksheet](images/lem01_sheet_mat.png)
 
-The rest of this 42-column sheet belongs to analyses this problem does not run.
-Columns your choices make inert grey themselves out: the c/p pair once the option is
-`mc`, and `ru` once **u** is `none`. The screenshot is of the completed file, which a
-script wrote and which carries an explicit `0` in columns these steps never mention —
-`d`, `psi`, `E`, `nu` and the power-curve and Hoek-Brown groups. Typing your own,
-leave them blank; on this sheet a blank in one of those columns reads as zero.
-
 ### 3. The `profile` worksheet
+
+A profile line is the *top* of a material layer: everything below it, down to the
+next profile line or the maximum depth, is that layer's material. That is why
+entering the ground surface here defines the whole body of the embankment — one line
+on material 1, with the rigid base closing it from below.
 
 1. `profile!B2` **Max Depth** = `0`. This is an *elevation*, not a thickness: it
    places a horizontal rigid base at the toe of the slope.
 2. `profile!B5` **Mat ID** = `1` for Profile Line #1 — the ID you gave the material
-   on the `mat` sheet.
+   above.
 3. Enter the three ground-surface points in the `x` / `y` columns beneath, left to
    right: `0, 0` then `20, 20` then `60, 20`.
 
 ![The finished profile worksheet](images/lem01_sheet_profile.png)
 
-A profile line is the *top* of a material layer: everything below it, down to the next
-line or to the maximum depth, is that material.
+The sheet carries table blocks for many profile lines; this model uses only the
+first, and the rest stay empty.
 
 ### 4. The `circles` worksheet
 
+Next, we enter a starting circle for the search. A starting circle is a *guess* at
+the critical surface, and the search will refine it. A good strategy: put the
+center's x-coordinate above the middle of the slope face, put its y-coordinate at
+twice the slope's height, and size the circle so it just touches the rigid base.
+
 1. `circles!B3` **Xo** = `10` and `circles!C3` **Yo** = `40` — the center of the
-   trial circle, above and behind the face.
+   trial circle, above the middle of the face at twice the slope height.
 2. `circles!D3` **Option** = `Depth`, and `circles!E3` **Depth** = `0`.
+   **Depth** is the *elevation of the circle's lowest point*, not a distance below
+   ground — so `0` sets the circle tangent to the rigid base, and the loader forms
+   the radius as R = Yo − Depth = 40.
 
 ![The finished circles worksheet](images/lem01_sheet_circles.png)
 
-**Depth** is the *elevation of the bottom of the circle*, not a depth below the ground
-surface — the name invites the other reading. The radius follows as R = Yo − Depth, so
-this circle has R = 40 and just touches the rigid base. The other two options size a
-circle by its radius, or by a point it passes through.
-
-Save the workbook and continue at [Running the analysis](#running-the-analysis).
+Save the file, and continue at [Running the analysis](#running-the-analysis) —
+open the file in Studio, or run it from Python as shown there.
 
 ---
 
 ## C — Building the problem in Studio {#c-building-the-problem-in-studio}
 
 Start with **File → New**, an empty project. Work down the **Inputs** tree in the
-order the model depends on: materials, then geometry, then the failure surface.
+order the model depends on: settings, then the material, then the geometry, then
+the starting circle.
 
 ### 1. Global parameters
 
-Click **Global parameters** and set **Units** to `Imperial`. The unit weight of water
-fills itself with `62.4`; leave the tension crack and seismic fields at `0`, and
-click **OK**.
+The global parameters declare what every number after them means. Click
+**Global parameters** and set **Units** to `Imperial` — XSLOPE never converts
+between unit systems; the declaration states what the numbers you type already
+mean, and drives the unit labels on the plots. The unit weight of water fills
+itself with `62.4`. Leave the tension crack and seismic fields at `0`, and click
+**OK**.
 
 ### 2. Materials
 
-Click **Materials** → **Add**, then switch to **List view**:
+Here you name each material in the model and enter its properties — unit weight
+and strength parameters. Everything else will reference the material by its ID,
+which is why it comes first. This problem has one material. Click **Materials** →
+**Add**, then switch to **List view**:
 
 1. **Name** = `soil`.
 2. **γ** = `125`.
 3. **Model (option)** = `mc`, **c** = `500`, **φ** = `0`.
-4. **Model (u)** = `none`.
+4. **Model (u)** = `none`. There is no pore pressure to compute.
+
+Together c = 500 and φ = 0 are the undrained strength: the envelope is flat, so
+the strength is 500 psf at every depth, whatever the normal stress.
 
 ![The materials editor on this problem's one material](images/lem01_studio_materials.png)
 
 The strength plot beside the fields redraws as you type. Here it is a flat line at
-τ = 500 — the picture of an undrained strength, and confirmation you entered the one
-you meant.
+τ = 500 — the picture of an undrained strength, and confirmation you entered the
+one you meant.
 
 ### 3. Profile lines
 
-Click **Profile lines**, then **Add line**:
+A profile line is the *top* of a material layer: everything below it, down to the
+next profile line or the maximum depth, is that layer's material. Entering the
+ground surface here therefore defines the whole body of the embankment — one line
+on the material you just created, closed from below by the rigid base. Click
+**Profile lines**, then **Add line**:
 
-1. Set **Max depth (bottom boundary elevation)** to `0`.
+1. Set **Max depth (bottom boundary elevation)** to `0`. This is an *elevation*,
+   not a thickness: it places a horizontal rigid base at the toe of the slope.
 2. Set **Material** to `1: soil`.
-3. **Add row** three times and enter `0, 0` / `20, 20` / `60, 20`.
+3. **Add row** three times and enter `0, 0` / `20, 20` / `60, 20` — the toe, the
+   crest break at the top of the 1:1 face, and the back of the crest.
 
 ![The profile lines editor](images/lem01_studio_profile.png)
 
-The preview redraws as you type, so a mistyped vertex shows up before you commit it:
-the line in the material's color, and the hatched **Max depth** line at y = 0 beneath
-it. Click **OK**, and the canvas draws the same two things. Profile-line geometry is
-drawn as lines; the shaded material zones you may have seen in other XSLOPE figures
-are how *polygon* input is drawn.
+The preview redraws as you type, so a mistyped vertex shows up before you commit
+it: the line in the material's color, and the hatched **Max depth** line at y = 0
+beneath it. Click **OK**, and the canvas draws the same two things. Profile-line
+geometry is drawn as lines; the shaded material zones you may have seen in other
+XSLOPE figures are how *polygon* input is drawn.
 
 ![The canvas after the profile line](images/lem01_studio_canvas.png)
 
 ### 4. The starting circle
 
-Studio builds the failure surface from the geometry you just entered. Click
-**Run LEM…** with no surface yet:
+A starting circle is a *guess* at the critical surface, and the search will refine
+it. A good guess puts the center's x-coordinate above the middle of the slope
+face, its y-coordinate at twice the slope's height, and sizes the circle so it
+just touches the rigid base. You can type that — or have it built for you.
 
-![Run LEM with no failure surface](images/lem01_studio_run_lem_no_surface.png)
-
-The **Model checks** column reports one error — no failure surface — and **Run** stays
-disabled. Under the finding is a **Generate starting circles…** button.
-
-1. Press **Generate starting circles…**. It shows what it would change before it
-   changes anything: *"Add 1 starting circle…"*, with the circle it proposes.
-2. Apply it, and close the dialog.
+Click **Circles**, then press **Generate starting circles…**. The generator reads
+the geometry you just entered and proposes the circle this page's Excel path types
+by hand — center (10, 40), above the middle of the face at twice the slope height,
+tangent to the rigid base.
 
 Its rule is the one to learn: **one circle through the toe, and one at the base of
-each layer**. Here the two candidates share a center — above the middle of the face,
-at twice the slope height — and differ only in radius, and the one that survives is
-the layer-base circle: R = 40, tangent to the rigid base at y = 0. Reaching the toe
-from that same center would take R = 41.23, which puts the bottom of the circle
-1.23 ft *below* the base, on ground the model does not contain. That is the candidate
-the dialog reports dropping *"for not daylighting inside the model"*.
-
-Now audit what it made. Click **Failure surfaces** in the Inputs tree:
+each layer**. Here the two candidates share a center and differ only in radius,
+and the one that survives is the layer-base circle: R = 40, tangent to the rigid
+base at y = 0. Reaching the toe from that same center would take R = 41.23, which
+puts the bottom of the circle 1.23 ft *below* the base, on ground the model does
+not contain — the candidate the generator reports dropping *"for not daylighting
+inside the model"*.
 
 ![The circles editor on the generated circle](images/lem01_studio_circles.png)
 
-One circle at `(10, 40)`, **Option** `Depth`, **Depth** = `0` — so R = Yo − Depth = 40,
-just reaching the base.
+Audit what it made — the same check-its-work step the assistant path teaches —
+and click **OK**.
 
-Save the project with **File → Save As**.
-
----
+Continue below.
 
 ## Running the analysis
 
-All three paths end in the same place: this model open in Studio. If you built the
-workbook by hand, open it now with **File → Open**. Whichever path you took, the
-Inputs view is now the same picture — the profile line, the hatched base at y = 0, and
-the arc of the starting circle between the two points where it daylights.
+However you built it, you now hold the same model. Open Studio's Inputs view and
+compare against this before running anything — a geometry error is far cheaper to
+find here than in a factor of safety:
 
-![The finished model](images/lem01_inputs_geometry.png)
+![The finished model](images/lem01_inputs_geometry.png){width=1000}
 
 The circle's center is at (10, 40), above the top of the frame; the red arrow is its
-radius, drawn from the center down to the arc. Compare this against your own screen
-before running anything — a geometry error is far cheaper to find here than in a
-factor of safety.
+radius, drawn from the center down to the arc.
 
-Run the starting circle on its own first — a single, understood surface, solved before
-the search adds moving parts.
+Click **Run LEM…**. Choose:
 
-1. Click **Run LEM…**.
-2. **Method** = `Bishop's Simplified`. On a circular surface Bishop satisfies moment
-   equilibrium about the circle center, which is the equilibrium condition this
-   problem turns on.
-3. **Analysis** = `Single surface`, which analyzes the first circle exactly as
-   entered.
-4. **Surface** = `Circular`, **Number of slices** = `40`.
-5. Leave every checkbox clear. **Composite surfaces** is the one worth understanding
-   here: it lets a circle deeper than the base of the model be truncated at it and
-   run along the base between the crossings. This circle does not reach below the
-   base, so the option changes nothing — but where the base is real bedrock it is how
-   the critical mechanism gets found.
+![The Run LEM dialog](images/lem01_studio_run_lem.png)
 
-    ![The Run LEM dialog](images/lem01_studio_run_lem.png)
+1. **Method** = `Spencer's Method` — the method that satisfies both force and moment
+   equilibrium, and the one to reach for by default.
+2. **Surface** = `Auto search`, `Circular`. The search starts from your circle and
+   refines toward the critical one.
+3. Leave the slice count at its default of 40.
+4. Click **Run**.
 
-6. Click **Run**.
+From Python, the same run is:
 
-Then run it again with **Analysis** = `Auto search`, which starts from your circle and
-refines toward the critical one.
+```python
+from xslope.fileio import load_slope_data
+from xslope.search import circular_search
+from xslope.plot import plot_solution
 
-!!! note "From a script or a notebook"
-    The same two runs, without Studio: `generate_slices(slope_data, circle=...)`
-    followed by `solve_selected("bishop", slice_df)` for the single surface, and
-    `circular_search(slope_data, "bishop")` for the search. See
-    [Colab Notebooks](../usage/notebooks.md).
+sd = load_slope_data("my_embankment.xlsx")
+fs_cache, _, path, circles = circular_search(sd, "spencer", num_slices=40)
+crit = fs_cache[0]
+plot_solution(sd, crit["slices"], crit["failure_surface"], crit["solver_result"])
+```
 
 ---
 
 ## Exploring the results
 
-### The single circle
+### The search result — and the warnings that come with it
 
-![Bishop on the starting circle](images/lem01_solution_single.png)
+![The circular search](images/lem01_search.png){width=1000}
 
-FS = **1.281**, and the plot is worth reading before moving on. The surface enters at
-the crest, cuts through the embankment and daylights just above the toe. The green
-bars drawn outward from each slice base are the effective normal stress there,
-swelling under the tall middle of the slide mass and shrinking toward both ends. The
-last few slices at the crest, where the surface is steepest, are drawn red instead:
-their bases are in tension.
+The search plot shows every circle it tried in grey, the path its center walked in
+green, and the critical circle it settled on. Spencer's answer:
 
-Now switch **Method** to `Ordinary Method of Slices (OMS)`, `Spencer` or
-`Morgenstern-Price`. Every one returns **1.281**. With φ = 0 the resisting force on a
-slice base is `c · Δl` whatever normal force acts on it, and on a circular surface the
-normal forces all point at the center and take no moment about it — so every method
-that takes moments about the center solves the same equation. The force-equilibrium
-methods `Janbu (Corrected)`, `Corps of Engineers` and `Lowe & Karafiath` do not, and
-report higher values on this very same circle: 1.394, 1.393 and 1.329.
+![Spencer's critical surface](images/lem01_solution_search.png){width=1000}
 
-!!! note "If you run Spencer here"
-    Spencer and Morgenstern-Price return the same 1.281, but with an amber strip
-    across the top of the solution listing admissibility warnings: interslice
-    tension, and a line of thrust that leaves the slices on about half the
-    boundaries. They say the internal force distribution behind the answer is
-    strained, not that the factor of safety is wrong — a circle this steep at the
-    crest strains any method that solves for interslice forces. See
-    [Interpreting the Admissibility Warnings](../lem/spencer.md#interpreting-the-admissibility-warnings).
+**FS = 1.276** — but do not stop at the number. The solution arrives with an amber
+strip across the top listing *admissibility warnings*: interslice tension, and a
+line of thrust outside the slices on about half the boundaries. Warnings like these
+are not decoration. They are the analysis telling you that the solution required the
+soil to do something soil cannot do — here, carry tension.
 
-### The search
+### Reading the anomaly
 
-![The circular search](images/lem01_search.png)
+Run the same search again with **Method** = `Bishop's Simplified`. Bishop satisfies
+moment equilibrium only, and for a φ = 0 soil that has a useful consequence: on any
+one circle, every moment-equilibrium method — Bishop, Spencer, Morgenstern-Price —
+computes exactly the same factor of safety. They cannot disagree about a circle;
+they can only disagree about which circles they managed to solve.
 
-The search tests a family of circles around the one you gave it, moves the center
-downhill in factor of safety, and refines the grid it moves on until the answer stops
-improving. Here it converges in 12 iterations, from your center at (10, 40) to one
-near (5.3, 33.5) — the green track on the plot — at a critical FS = **1.215**. Every
-trial surface is drawn in grey behind it, which is the quickest way to see whether the
-search explored the slope or sat still.
+![Bishop's critical surface](images/lem01_solution_bishop.png){width=1000}
 
-![The critical surface](images/lem01_solution_search.png)
+Bishop finds **FS = 1.215** on a circle deeper into the crest — a *lower* answer
+than Spencer's on the same model. Look at the crest end of the surface: the last few
+slices' base-stress bars are drawn in red, meaning the computed normal stress on the
+base is negative. The model is asking the top of the slope to hold itself together
+in tension.
 
-Both circles bottom out on the rigid base at y = 0: with the strength the same at
-every depth there is nothing to be gained by going deeper, and nothing below y = 0
-to cut. So what the search moves is the center, back and down — and the circle it
-lands on is the *smaller* of the two, not the bigger. The radius falls from 40 ft to
-33.5 ft, the arc from 50.9 ft to 43.7 ft, and the slide mass from 61,000 to
-43,400 lb per foot of slope, 29% lighter. With φ = 0 the resisting moment is
-c · L · R, so it loses both of the lengths it is built from — 28% in all — while the
-driving moment loses only 24%, because the lighter mass hangs on a slightly longer
-average lever arm about the new center. Resistance falls faster than drive, and the
-factor of safety with it.
+That tension is why the two searches disagree. On the circles nearest the true
+minimum, Spencer's stricter equilibrium — force *and* moment, with one interslice
+force inclination — has no solution at all: no inclination can balance slices that
+are being pulled apart. The search can only report the best circle it could solve,
+which is how a method that agrees with Bishop circle-for-circle came back with a
+higher number. The disagreement, the amber warnings and the red bars are all the
+same message: **something about this model is not physical.**
 
-That 5% drop is a fair warning of how much a hand-placed circle can flatter a slope —
-and of how much it matters, since a search refines from where you point it.
-[Automated search algorithms](../lem/search.md) covers the grid-seeded search that
-protects against a seed in the wrong family.
+### The fix is in the ground, not the settings
 
-All seven methods, each on its own critical surface, are tabulated on
-[LEM Sample Problem 1](../lem/samples.md#1-simple-embankment). Read that spread
-against what you just measured: on any one surface the moment-equilibrium methods
-agree, and the force-equilibrium methods do not — they differ on the starting circle
-and on the critical circle alike, before any search is involved.
+An undrained soil with cohesion but no friction cannot carry tension near a free
+surface — in the field, it cracks. The theoretical depth of that tension crack is
+
+$$ z_c = \frac{2c}{\gamma} = \frac{2 \times 500}{125} = 8 \text{ ft} $$
+
+Add the crack to the model:
+
+- **Studio** — open **Global parameters** and set **Tension crack depth** = `8`
+  (leave **Depth of water in crack** at `0`; the crack is dry).
+- **Excel** — `main!D11` **Tension crack depth** = `8`, `main!D12` = `0`.
+- **Assistant** — say: *"Add a dry tension crack 8 ft deep."*
+
+The crack truncates every trial surface where it reaches 8 ft below the crest — the
+model stops counting shear strength along the stretch the soil would have cracked
+away from.
+
+Run the Spencer search again:
+
+![Spencer on the cracked model](images/lem01_solution_cracked.png){width=1000}
+
+**FS = 1.084**, and this time the solution is clean: no amber strip, no red bars,
+and the line of thrust (the dashed red curve) stays inside the sliding mass. Run
+Bishop or Morgenstern-Price on the cracked model and they land on the *same* circle
+and the *same* 1.084 — once the model stops asking the soil to carry tension, the
+methods stop disagreeing.
+
+Two things worth carrying out of this:
+
+- **The cracked answer is lower.** 1.276 → 1.084 is a 15% drop: the uncracked model
+  was counting cohesion along a stretch of surface that the soil would in reality
+  have already torn open. The warnings were flagging an answer biased high.
+- **The warnings did their job.** The amber strip, the red bars and the
+  method disagreement all pointed at the same modeling omission. Reading them — not
+  silencing them — is what turned a plausible-looking 1.276 into a defensible 1.084.
+
+### How deep does the crack really need to be?
+
+The theoretical depth $z_c = 2c/\gamma$ is a hand-calculation estimate, and it
+usually overshoots: it is derived for a level ground surface at active failure, and
+the tension zone behind a real slope crest is shallower. A crack just deep enough
+to eliminate the tension is the smallest change that fixes the model — anything
+deeper removes strength the soil actually has.
+
+You can find that depth with the tool you just learned: re-run the search at a few
+trial depths and watch for the shallowest clean solution. On this slope the
+warnings persist at 4 ft, and clear at about **4¾ ft** — well short of the
+theoretical 8. Spencer there gives **FS = 1.107**, about 2% above the 8-ft
+answer, with no tension anywhere.
+
+Which to use is an engineering call, and a mild one — the two depths differ by 2%
+in factor of safety. The verge depth is the most defensible model of the soil; the
+theoretical depth is the conservative habit. What is not defensible is the
+uncracked model: both cracked answers sit far below its 1.276.
+
+The [sample page](../lem/samples.md#1-simple-embankment) catalogues the uncracked
+variant of this model; the cracked model is yours — keep it with **Save As**.
 
 ---
 
@@ -422,20 +452,17 @@ and on the critical circle alike, before any search is involved.
 
 This tutorial demonstrated:
 
-- **The build order** — materials, then geometry, then the failure surface — and why
-  it is that order.
-- **Profile-line geometry**: one line as the top of one material layer, with the
-  maximum depth as a rigid base at the toe elevation.
-- **Reading an undrained strength** out of a bare cohesion, and what φ = 0 then makes
-  irrelevant: the water table, and the pore-pressure option.
-- **Starting circles**, the `Depth` option as an *elevation*, and Studio's generator
-  as a worked example of where circles belong.
-- **A single surface before a search**, and reading the drop from 1.281 to 1.215.
-- **Why φ = 0 makes the moment-equilibrium methods agree** on a given circle, and why
-  the force-equilibrium methods still do not.
+- The smallest complete XSLOPE model: one material, one profile line, a maximum
+  depth, and a starting circle.
+- Three ways to build it — the AI assistant (and how to audit its work), the Excel
+  template, and Studio's editors — all producing the same model.
+- A starting circle is a guess; the automated search refines it to the critical
+  surface.
+- Spencer's method as the default: full equilibrium, and admissibility warnings
+  that tell you when the solution required impossible soil behavior.
+- Reading a result past its factor of safety: tension at the crest of a φ = 0
+  slope is a modeling omission, fixed with a tension crack at $z_c = 2c/\gamma$,
+  after which every method agrees on a lower, defensible answer.
 
-**Where to go next.**
-[LEM Sample Problem 1](../lem/samples.md#1-simple-embankment) carries a second version
-of this embankment — a distributed load on the crest, a water-filled tension crack,
-and 10 ft of standing water against the face, for a factor of safety below 1.0. Open
-it beside your own file and compare the worksheets.
+**Where to go next:** Tutorial LEM-2 adds loads to this same section — a surcharge
+on the crest and water above the toe.

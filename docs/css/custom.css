@@ -361,3 +361,49 @@
   padding: 0.4em 0 0.4em 0.8em;
   margin-bottom: 1.2em;
 }
+
+/* Tutorial prompt blocks: a copy-pasteable sentence styled as code but allowed
+   to wrap — a one-line prompt in a no-wrap <pre> clips at the content edge.
+   Scoped so ordinary code blocks keep their horizontal-scroll behavior. */
+.prompt-block pre,
+.prompt-block pre code {
+    white-space: pre-wrap;
+    word-break: normal;
+    overflow-wrap: break-word;
+    overflow-x: visible;
+}
+
+
+
+
+
+
+/* Tutorial "At a glance" card (the suite template, Norm-picked 2026-08-11):
+   accent card opening on a stat-tile row, feature pills, completed-model line. */
+.tut-glance { background: #f7fafc; border: 1px solid #d9e2ec;
+    border-left: 5px solid #2980b9; border-radius: 6px;
+    padding: 16px 20px 12px; margin: 0 0 1.2em; }
+.tut-glance .tgt-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 13px; }
+.tut-glance .tgt-tile { flex: 1 1 120px; background: #fff;
+    border: 1px solid #dce7f0; border-radius: 6px; padding: 7px 12px; }
+.tut-glance .tgt-tile .tg-label { display: block; font-size: 72%; font-weight: 700;
+    letter-spacing: .09em; text-transform: uppercase; color: #56718a; }
+.tut-glance .tgt-tile p { margin: 1px 0 0; font-size: 94%; }
+.tut-glance .tgm-obj > p { margin: 0 0 10px; font-size: 103%; }
+.tut-glance .tgm-model > p { margin: 8px 0 0; font-size: 94%; }
+
+
+
+/* feature pills — one base rule, containers may recolor */
+.tg-pill {
+    display: inline-block;
+    background: #e3eef7;
+    color: #14567f;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 1px 11px 2px;
+    margin: 0 4px 4px 0;
+    font-size: 88%;
+    white-space: nowrap;
+}
+

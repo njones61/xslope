@@ -447,7 +447,7 @@ def _is_wrapped(cell):
 
 
 def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
-                 identity_cols=None, base_font_pt=11):
+                 identity_cols=None, base_font_pt=11, tab_strip=True):
     """Render one worksheet to a PNG that reads like an Excel screen capture.
 
     ``rows`` / ``cols`` select a region of interest (needed for the wide ``mat``
@@ -698,7 +698,10 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
     # any value/fill/border/merge, even where the underlying sheet holds data there
     # (e.g. a mat view's next-view columns): `filler_cols` marks them so the content
     # passes below skip them. Wide grids append nothing and stay byte-identical.
-    tab_strip_w = _tab_strip_width(wb_f.sheetnames, sheet)
+    # tab_strip=False renders the grid alone: no strip, and therefore no filler
+    # columns stretching a narrow sheet out to the strip's fixed width — the
+    # tutorial captures use this so a two-column table reads at its own size.
+    tab_strip_w = _tab_strip_width(wb_f.sheetnames, sheet) if tab_strip else 0
     filler_cols = set(overflow_filler)
     if grid_w < tab_strip_w:
         nc = max(col_list) + 1
@@ -709,8 +712,8 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
             grid_w += col_px[nc]
             nc += 1
 
-    tab_h = int(round(20 * PT_TO_PX * SS))
-    tab_gap = 6 * SS
+    tab_h = int(round(20 * PT_TO_PX * SS)) if tab_strip else 0
+    tab_gap = 6 * SS if tab_strip else 0
     total_h = grid_h + tab_gap + tab_h
     # After the fill above, grid_w >= tab_strip_w for narrow sheets too, so the grid
     # spans the whole canvas and the tab strip meets gridlined columns, not a void.
@@ -891,7 +894,8 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
     d.line([(gutter_w, 0), (gutter_w, header_h)], fill=HEADER_LINE, width=SS)
 
     # ----- 6. sheet-tab strip --------------------------------------------- #
-    _draw_tab_strip(d, wb_f.sheetnames, sheet, grid_h + tab_gap, tab_h)
+    if tab_strip:
+        _draw_tab_strip(d, wb_f.sheetnames, sheet, grid_h + tab_gap, tab_h)
 
     # ----- downscale + save ------------------------------------------------ #
     final = img.resize((canvas_w // SS, total_h // SS), Image.LANCZOS)

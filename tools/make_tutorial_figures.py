@@ -19,9 +19,10 @@ One producer for every committed tutorial image that a script can make:
 
 The method matters: a figure is drawn with the same method the tutorial's prose
 quotes, so the factor of safety printed on the image is the number in the sentence
-beside it. LEM-1 runs **Bishop**, which on this φ = 0 problem returns what every
-moment-equilibrium method returns, and which — unlike Spencer — reports no
-admissibility defects on the starting circle.
+beside it. LEM-1's arc is the owner's: Spencer's search on the model as built
+(1.276), Bishop's lower answer on a circle Spencer cannot solve (1.215, its crest
+slices in tension), then the tension crack at 2c/γ = 8 ft — after which Spencer,
+Bishop and M-P land on the same circle and the same 1.084.
 
 Studio's dialog captures are a separate producer, because they need Qt:
 ``tools/capture_tutorial_screenshots.py``.
@@ -34,6 +35,7 @@ Run:  PYTHONPATH=. python3 tools/make_tutorial_figures.py            # everythin
 from __future__ import annotations
 
 import contextlib
+import copy
 import importlib.util
 import io
 import os
@@ -48,8 +50,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt                                      # noqa: E402
 
 from xslope.fileio import load_slope_data                            # noqa: E402
-from xslope.slice import generate_slices                             # noqa: E402
-from xslope.solve import solve_selected                              # noqa: E402
 from xslope.search import circular_search, file_search_window        # noqa: E402
 from xslope.plot import (plot_inputs, plot_solution,                 # noqa: E402
                          plot_circular_search_results)
@@ -60,7 +60,6 @@ OUT_DIR = os.path.join(REPO_ROOT, "docs", "tutorials", "images")
 #: builds it, ``docs/lem/samples.md`` catalogues it). Nothing is copied.
 LEM01 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_simple_embankment.xlsx")
 LEM01_SLICES = 40
-LEM01_METHOD = "bishop"
 
 
 # --------------------------------------------------------------------------- #
@@ -104,9 +103,12 @@ def _render_sheet_module():
 
 
 def render(name, src, sheet, rows=None, cols=None):
+    # Tutorial captures drop the sheet-tab strip: with it, a narrow sheet is
+    # padded with empty grid columns out to the strip's fixed width, and the
+    # owner's review found the padding made the captures hard to read.
     mod = _render_sheet_module()
     out = os.path.join(OUT_DIR, name)
-    mod.render_sheet(src, sheet, out, rows=rows, cols=cols)
+    mod.render_sheet(src, sheet, out, rows=rows, cols=cols, tab_strip=False)
     print("-> %s  (%s!%s)" % (name, os.path.relpath(src, REPO_ROOT), sheet))
     return out
 
@@ -173,7 +175,10 @@ def lem01_sheets():
     """
     render("lem01_sheet_main.png", LEM01, "main", rows=(1, 24), cols="A:D")
     render("lem01_sheet_mat.png", LEM01, "mat", rows=(9, 13), cols="A:Z")
-    render("lem01_sheet_profile.png", LEM01, "profile", rows=(1, 12), cols="A:B")
+    # profile spans two neighbouring tables so the capture reads like the real
+    # sheet — Profile Line #2 sits empty beside the filled #1, as the reader
+    # sees it (the owner's review caught a one-table crop as "not the sheet").
+    render("lem01_sheet_profile.png", LEM01, "profile", rows=(1, 12), cols="A:H")
     render("lem01_sheet_circles.png", LEM01, "circles", rows=(1, 6), cols="A:H")
 
 
@@ -188,61 +193,56 @@ def lem01_plots():
     capture("lem01_inputs_geometry.png", plot_inputs, sd,
             title="Slope Geometry and Inputs")
 
-    # The single starting circle.
-    ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=LEM01_SLICES)
-    if not ok:
-        raise SystemExit("LEM-1: could not slice the starting circle: %s" % (res,))
-    slice_df, surface = res
-    with contextlib.redirect_stdout(io.StringIO()):
-        result = solve_selected(LEM01_METHOD, slice_df)
-    if isinstance(result, str):
-        raise SystemExit("LEM-1: %s did not solve the starting circle: %s"
-                         % (LEM01_METHOD, result))
-    capture("lem01_solution_single.png", plot_solution, sd, slice_df, surface, result)
+    # The tutorial's run/exploration arc, per the owner's review: no single-circle
+    # detour — Spencer's search on the model as built, the anomaly it exposes
+    # (Bishop finds a lower circle Spencer cannot solve, its crest slices in
+    # tension), then the tension crack added and Spencer re-run, at which point
+    # every method lands on the same circle and the same number.
+    def search(model, method):
+        with contextlib.redirect_stdout(io.StringIO()):
+            fs_cache, _, path, circles = circular_search(
+                model, method, num_slices=LEM01_SLICES, diagnostic=False,
+                **file_search_window(model))
+        return fs_cache, path, circles
 
-    # The automated search: every trial surface, then the critical one on its own.
-    with contextlib.redirect_stdout(io.StringIO()):
-        fs_cache, _, path, circles = circular_search(
-            sd, LEM01_METHOD, num_slices=LEM01_SLICES, diagnostic=False,
-            **file_search_window(sd))
-    crit = fs_cache[0]
+    fs_cache, path, circles = search(sd, "spencer")
+    crit_sp = fs_cache[0]
     capture("lem01_search.png", plot_circular_search_results, sd, fs_cache, path,
             circle_cache=circles)
-    capture("lem01_solution_search.png", plot_solution, sd, crit["slices"],
-            crit["failure_surface"], crit["solver_result"])
-    print("   single circle FS = %.4f · critical FS = %.4f (%s, %d slices)"
-          % (result["FS"], crit["FS"], LEM01_METHOD, LEM01_SLICES))
+    capture("lem01_solution_search.png", plot_solution, sd, crit_sp["slices"],
+            crit_sp["failure_surface"], crit_sp["solver_result"])
+
+    # Bishop's lower answer on the same crackless model — the crest tension zone
+    # (red bars) is drawn by the plot itself and is the anomaly the page reads.
+    fs_cache_b, _, _ = search(sd, "bishop")
+    crit_b = fs_cache_b[0]
+    capture("lem01_solution_bishop.png", plot_solution, sd, crit_b["slices"],
+            crit_b["failure_surface"], crit_b["solver_result"])
+
+    # The cracked model: tension crack at the theoretical depth 2c/gamma = 8 ft,
+    # dry. Spencer solves every trial and the methods stop disagreeing.
+    sc = copy.deepcopy(sd)
+    sc["tcrack_depth"] = 8.0
+    sc["tcrack_water"] = 0.0
+    fs_cache_c, path_c, circles_c = search(sc, "spencer")
+    crit_c = fs_cache_c[0]
+    capture("lem01_solution_cracked.png", plot_solution, sc, crit_c["slices"],
+            crit_c["failure_surface"], crit_c["solver_result"])
+
+    print("   spencer %.4f · bishop %.4f · cracked spencer %.4f (%d slices)"
+          % (crit_sp["FS"], crit_b["FS"], crit_c["FS"], LEM01_SLICES))
 
 
 def lem01_placeholders():
     """The two LEM-1 figures no script can take.
 
     A full main-window capture is the owner's — it carries the real window chrome
-    at the project's fixed capture size — and an assistant transcript is a live
-    conversation with a provider, so neither is generated here.
+    at the project's fixed capture size — The assistant figure (lem01_assistant.png) is a
+    live-session hand capture — the owner's, 2026-08-11, taken after the skill
+    hardening round — since a provider conversation cannot be scripted.
     """
-    placeholder(
-        "lem01_studio_canvas.png",
-        "Studio — the canvas after the profile line is entered",
-        ["Main window, Inputs view, LEM mode, at the end of the tutorial's Studio "
-         "step 3:",
-         "the profile line in the material's color and the hatched max-depth line at "
-         "y = 0.",
-         "No failure surface yet — the starting circle is the step after this one.",
-         "Model: docs/lem/files/xslope_simple_embankment.xlsx, circles removed.",
-         "Main-window captures are taken by hand at the project's window size and "
-         "theme."])
-    placeholder(
-        "lem01_assistant_dock.png",
-        "Studio — the assistant dock building this model",
-        ["The Assistant dock after the problem sketch has been pasted into the chat "
-         "box",
-         "and the assistant has built the model: the transcript with the image, its "
-         "reading",
-         "of the geometry, one 'ran code' block, and the section drawn on the canvas "
-         "beside it.",
-         "Needs a live provider and API key, so it cannot be generated; the wording "
-         "varies."])
+    # lem01_studio_canvas.png is now produced by capture_tutorial_screenshots.py
+    # (offscreen main-window grab — the hand-capture convention is retired).
 
 
 GROUPS = {

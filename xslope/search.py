@@ -1433,8 +1433,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         describing the search otherwise — including ``unsolved``, the count of
         trial surfaces the method could not answer on and how they rank against
         the reported minimum (:class:`UnsolvedTrials`; None on the non-circular
-        branch, which does not yet distinguish them). ``results`` is None where the solver
-        returned no solution on a surface that was otherwise built, with the
+        branch, which does not yet distinguish them). ``results`` is None where
+        the solver returned no solution on a surface that was otherwise built, with the
         solver's reason on ``failure``: the method ran and did not converge,
         which is an answer about the model rather than a run that never happened.
 

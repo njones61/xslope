@@ -207,7 +207,7 @@ def _block(text):
 IRON_ANCHORS = (
     "Max depth is the lowest elevation the problem DESCRIBES.",
     "No circle bottom below the base.",
-    "Ground never runs at the base elevation beyond the toe.",
+    "On a rigid base at the toe elevation, the ground ENDS at the toe.",
     "Building is not running.",
     "MODEL CHECKS are unresolved business.",
 )
@@ -405,6 +405,149 @@ print('mesh attached')
     return out
 
 
+def check_staged_by_run_is_annotated():
+    """A finding an EDIT cannot answer must not arrive as a bare error to fix.
+
+    A material reading u = seep with no solved field is the case: iron rule 4
+    forbids the assistant running the seepage analysis unasked, so a bare ERROR
+    leaves one apparent way out — change the pore-pressure option, which does not
+    supply the field, it deletes the requirement and analyses a different problem.
+    That is failure shape (b) rebuilt inside the guardrail, so the block has to
+    name these for what they are and route them to the run.
+    """
+    from xslope.preflight import STAGED_BY_RUN
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+
+    blk = _block(_run(asst, """
+slope_data['materials'][0]['u'] = 'seep'
+print('material now reads a seepage field')
+"""))
+    if blk is None:
+        out.append("the u = seep edit produced no block")
+        mw.deleteLater()
+        return out
+    if "seep_field.missing" not in blk:
+        out.append(f"the missing seepage field was not reported at all: {blk[:200]!r}")
+    if "STAGED BY A RUN" not in blk:
+        out.append(f"a staged finding arrived unannotated: {blk[:300]!r}")
+    if "resolved by running the seepage analysis" not in blk:
+        out.append(f"the block does not name the run that resolves it: {blk[:300]!r}")
+    if "offer to run it" not in blk:
+        out.append("the block does not route the model to offering the run")
+    # It must NOT be counted among the problems to fix by editing.
+    if "found 1 problem(s)" in blk and "seep_field.missing" in blk.split(
+            "STAGED BY A RUN")[0]:
+        out.append("the staged finding was also listed as a problem to fix")
+    mw.deleteLater()
+
+    # The declaration must cover every rule whose cure is an upstream run. The
+    # criterion is the message naming one, so the module's own source is read for
+    # that phrasing: a sibling added later cannot slip past as a bare error.
+    import re
+    src = open(os.path.join(_REPO, "xslope", "preflight.py"), encoding="utf-8").read()
+    for block in re.split(r'\n@rule\(', src)[1:]:
+        rid = re.match(r'"([^"]+)"', block)
+        body = block.split("\n@rule(")[0]
+        if rid and re.search(r'"?[Rr]e-?[Rr]un the \w+ analysis', body):
+            if rid.group(1) not in STAGED_BY_RUN:
+                out.append(f"{rid.group(1)}: its cure is an upstream run but it is "
+                           f"not declared in preflight.STAGED_BY_RUN")
+    return out
+
+
+def check_surface_family_flip_is_an_edit():
+    """Flipping the stored surface family changes which surface the run analyses,
+    so it is an edit: an undo step, a dirty document, and a checks block. It was
+    none of the three, because `circular` was not among the tracked source keys."""
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    steps = len(mw.doc.undo_labels())
+
+    blk = _block(_run(asst, """
+slope_data['non_circ'] = [{'X': -10.0, 'Y': 5.0, 'Movement': 'Free'},
+                          {'X': 20.0, 'Y': -2.0, 'Movement': 'Free'},
+                          {'X': 50.0, 'Y': 20.0, 'Movement': 'Free'}]
+slope_data['circular'] = False
+print('switched to the non-circular surface')
+"""))
+    if blk is None:
+        out.append("adding a surface and flipping the family produced no block")
+    # Now flip it BACK, alone: nothing else in the model changes.
+    before = len(mw.doc.undo_labels())
+    blk = _block(_run(asst, """
+slope_data['circular'] = True
+print('switched back to the circular surface')
+"""))
+    if blk is None:
+        out.append("flipping the surface family alone produced no checks block")
+    if len(mw.doc.undo_labels()) != before + 1:
+        out.append("flipping the surface family alone left no undo step")
+    elif not mw.doc.undo_labels()[0].startswith("Assistant:"):
+        out.append(f"the undo step is unlabelled: {mw.doc.undo_labels()[0]!r}")
+    elif "surface family" not in mw.doc.undo_labels()[0]:
+        out.append(f"the undo step does not name what changed: "
+                   f"{mw.doc.undo_labels()[0]!r}")
+    if not mw.doc.dirty:
+        out.append("flipping the surface family left the document clean")
+    if len(mw.doc.undo_labels()) <= steps:
+        out.append("the surface-family edits produced no history at all")
+    mw.deleteLater()
+    return out
+
+
+def check_followup_command_carries_the_selection():
+    """The '+N more' command the block hands over must reproduce the block's own
+    findings — so it carries the same selection. Without it the ambiguity warning
+    the block suppressed comes back, and the model is told about a finding the
+    block never made."""
+    from studio.ai import assistant as A
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    # A deck carrying BOTH families (so the selection is what keeps
+    # surface.family_ambiguous off the block) and one real fault (so there is
+    # something for the overflow line to be counting).
+    _run(asst, SNIPPET_RAISE_BASE)
+    _run(asst, """
+slope_data['non_circ'] = [{'X': -10.0, 'Y': 5.0, 'Movement': 'Free'},
+                          {'X': 20.0, 'Y': -2.0, 'Movement': 'Free'},
+                          {'X': 50.0, 'Y': 20.0, 'Movement': 'Free'}]
+print('both families present')
+""")
+    sd = mw.doc.slope_data
+    sel = A._checks_selection(sd)
+    if not sel:
+        out.append("a both-family deck produced no surface selection")
+    from xslope.preflight import preflight
+    with_sel = {f.rule_id for f in preflight(sd, "lem", sel).findings}
+    without = {f.rule_id for f in preflight(sd, "lem").findings}
+    if with_sel == without:
+        out.append("the selection changes nothing here — the leg proves nothing")
+    elif "surface.family_ambiguous" not in (without - with_sel):
+        out.append(f"unexpected difference: {without - with_sel}")
+
+    # Force the overflow line and read the command out of it.
+    real_max = A.MAX_CHECK_FINDINGS
+    try:
+        A.MAX_CHECK_FINDINGS = 0
+        text = A.model_checks_text(sd)
+    finally:
+        A.MAX_CHECK_FINDINGS = real_max
+    line = [ln for ln in text.splitlines() if "more —" in ln]
+    if not line:
+        out.append("no overflow line was produced to check")
+    elif repr(sel) not in line[0]:
+        out.append(f"the follow-up command drops the selection: {line[0]!r}")
+    mw.deleteLater()
+    return out
+
+
 def check_warning_is_reported_too():
     """A WARNING is unresolved business as much as an ERROR — the sessions failed
     on warnings passed over in silence, so the block must carry them."""
@@ -467,6 +610,8 @@ def check_mutation_disables_the_checks():
             ("edit cascade", check_edit_cascade),
             ("ground past the toe", check_ground_past_the_toe),
             ("warning reported", check_warning_is_reported_too),
+            ("staged by a run", check_staged_by_run_is_annotated),
+            ("surface-family flip", check_surface_family_flip_is_an_edit),
         ) if not fn()]
     finally:
         A.model_checks_text = original
@@ -487,6 +632,10 @@ CHECKS = [
     ("D. ground past the toe surfaces", check_ground_past_the_toe),
     ("D. warnings are reported too", check_warning_is_reported_too),
     ("D. surface-less LEM vs FEM models", check_surfaceless_models),
+    ("G. staged-by-a-run findings annotated", check_staged_by_run_is_annotated),
+    ("G. a surface-family flip is an edit", check_surface_family_flip_is_an_edit),
+    ("G. the follow-up carries the selection",
+     check_followup_command_carries_the_selection),
     ("E. read-only and failed runs cost nothing", check_read_only_costs_nothing),
     ("F. mutation: injection disabled", check_mutation_disables_the_checks),
 ]

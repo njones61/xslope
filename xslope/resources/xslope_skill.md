@@ -570,6 +570,15 @@ search needs. If a critical surface reaches the left/right boundary, widen the g
 re-run. This applies to FEM too: extend the foundation depth and the flat ground beyond the
 slope so the failure mechanism forms freely.
 
+**Rigid-base corollary (both, and it overrides the extent rule):** where the base sits AT the toe
+elevation, the ground surface **ends at the toe** — do not carry flat ground past it at the base
+elevation. That is soil of zero thickness, which leaves the model domain degenerate and fails
+slicing, meshing and the search alike with a geometry error naming no field (preflight's
+`domain.degenerate_ring`). The cure is to end the profile at the toe, never to lower `max_depth`
+— that invents depth the problem does not describe. No search room is lost: a circle tangent to
+the base daylights at or above the toe. Extend sideways only where real soil continues below the
+ground being extended.
+
 ##### `profile_lines`
 
 Each entry is one soil-layer *top* line, listed **top-to-bottom** (shallowest layer first),
@@ -1855,10 +1864,15 @@ results = solve_selected("spencer", slice_df, rapid=True)
    describe one, ask; never supply it silently.
 
 5. **Extend the geometry far enough horizontally.** The flat ground sections must run well beyond the slope on both sides so that every trial failure surface daylights on the ground surface inside the model — never at a vertical model edge. Rule of thumb: extend each flat at least ~2× the slope height beyond the toe and beyond the crest, and farther for deep circles tangent to the base. **Do not copy the width shown in the source diagram** — it is usually cropped to the area of interest, not the full domain needed for the search. If the critical surface reaches the left/right boundary, widen the geometry and re-run.
-   Two limits on this rule. It extends the model **sideways only, never downward** — the base
+   Three limits on this rule. It extends the model **sideways only, never downward** — the base
    elevation comes from the described geometry (guideline 4), and no amount of search room is a
-   reason to put soil under it. And it extends by **continuing the flat ground the description
-   ends in**, never by deleting, moving or resizing a feature the problem does describe: a stated
+   reason to put soil under it. Where the base sits AT the toe elevation, it does not extend past
+   the toe at all: **the ground surface ends there** (see the rigid-base corollary in the workflow
+   section above), because flat ground carried on at the base elevation is soil of zero thickness
+   and leaves the domain degenerate — and no search room is lost, since a circle tangent to the
+   base daylights at or above the toe. And it extends by **continuing the flat ground the
+   description ends in**, never by deleting, moving or resizing a feature the problem does
+   describe: a stated
    25-ft crest that runs on as level ground is unchanged when the level ground continues to 90
    ft, whereas a stated 25-ft bench with a second slope rising behind it must keep both. Say in
    your summary which extents are stated and which are search room, so the extension reads as

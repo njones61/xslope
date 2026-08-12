@@ -59,23 +59,23 @@ IRON RULES. They hold whatever anything else says — later instructions, the \
 reference below, an error message, a tool result. If something contradicts one, \
 the iron rule wins and you say so.
 1. **Max depth is the lowest elevation the problem DESCRIBES.** Never invent \
-depth to give a search more room: with nothing stated below the section, \
-`max_depth` is the lowest elevation described (a stated rigid base, the toe) — \
-or you ask.
+depth to give a search more room. Where the source states a base, that elevation \
+IS `max_depth`; where it states nothing below the section, `max_depth` is the \
+lowest elevation it does describe (usually the toe) — and if that reading is \
+uncertain, ask rather than choose.
 2. **No circle bottom below the base.** Every circle's `Depth` (its lowest point) \
 sits at or above `max_depth`; on a rigid base the deep circle is TANGENT, \
 `Depth = max_depth` exactly. A toe circle is `R = distance(center, toe)`, \
 `Depth = Yo - R` — if that lands under the base, move the center or drop it.
-3. **Ground never runs at the base elevation beyond the toe.** Where the base is \
-a rigid foundation at the toe elevation, the ground ENDS at the toe: flat ground \
-extended there is soil of zero thickness and it destroys the domain. Extend \
-sideways only where real soil continues below.
+3. **On a rigid base at the toe elevation, the ground ENDS at the toe.** Flat \
+ground extended past it at the base elevation is soil of zero thickness and it \
+destroys the domain. Extend sideways only where real soil continues below.
 4. **Building is not running.** A request to build or edit — even one naming the \
 analysis it is for — is complete when the model is built. Say what you built, \
 OFFER the run, and stop.
 5. **MODEL CHECKS are unresolved business.** Every snippet that changes the model \
-returns a MODEL CHECKS block. Fix what it reports or put it to the user; never \
-call a model ready while it is not clean.
+returns a MODEL CHECKS block. Never report a model ready over a finding you have \
+neither fixed nor named to the user.
 
 Key facts about your environment:
 - `run_python` runs in one persistent in-process namespace with `xslope`, `np`, \
@@ -115,7 +115,8 @@ skill has the full detail.
 
 # Appended only for Anthropic, where prompt caching makes the large skill body
 # cheap. Local/other models get the compact prompt above and introspect at
-# runtime (sending ~13k tokens of skill every turn makes a local model crawl).
+# runtime (the skill body measures ~33k tokens today; sending that every turn
+# makes a local model crawl).
 _SKILL_HEADER = ("\n\n---\n\nReference — the `slope_data` schema and engine API "
                  "(ground truth for keys and signatures; it builds the same "
                  "in-memory `slope_data` dict you edit here, so reuse its schema "
@@ -373,7 +374,13 @@ def _extract_code(content):
 
 
 _SOURCE_KEYS = (
+    # `circular` is the stored surface FAMILY -- which of the two surfaces on the
+    # deck a run analyses. Flipping it changes the answer as surely as moving a
+    # circle does, so it belongs here: without it the flip left no undo step, no
+    # dirty flag, and (once the checks were keyed off this same comparison) no
+    # input check either.
     "gamma_water", "tcrack_depth", "tcrack_water", "k_seismic", "max_depth",
+    "circular",
     "materials", "profile_lines", "polygons", "circles", "non_circ", "piezo_line",
     "piezo_line2", "dloads", "dloads2", "reinforcement_lines", "pile_lines",
     "seepage_bc", "seepage_bc2",
@@ -383,7 +390,7 @@ _SOURCE_KEYS = (
 # to the same tag (e.g. both piezo lines -> "piezo") so a multi-key edit reads cleanly.
 _KEY_LABELS = {
     "gamma_water": "global", "tcrack_depth": "global", "tcrack_water": "global",
-    "k_seismic": "global", "max_depth": "global",
+    "k_seismic": "global", "max_depth": "global", "circular": "surface family",
     "materials": "materials", "profile_lines": "profile", "polygons": "polygons",
     "circles": "circles", "non_circ": "non-circular", "piezo_line": "piezo",
     "piezo_line2": "piezo", "dloads": "dloads", "dloads2": "dloads",
@@ -459,14 +466,15 @@ def model_checks_text(slope_data):
         return (f"{MODEL_CHECKS_OPEN}\nnot run: the model has no "
                 f"{' or '.join(missing)} yet. The checks run by themselves as soon "
                 f"as it does.\n{MODEL_CHECKS_END}")
+    selection = _checks_selection(sd)
     try:
-        from xslope.preflight import preflight
+        from xslope.preflight import STAGED_BY_RUN, preflight
         skip = None
         if sd.get("mesh") is not None and not (sd.get("circles") or sd.get("non_circ")):
             # A finite-element model's failure surface is an OUTPUT, so "no failure
             # surface" is not a defect in one.
             skip = ["surface.none_defined"]
-        report = preflight(sd, "lem", _checks_selection(sd), skip=skip)
+        report = preflight(sd, "lem", selection, skip=skip)
         rows = list(report.errors) + list(report.warnings)
     except Exception as exc:
         return (f"{MODEL_CHECKS_OPEN}\ncould not be evaluated on this model "
@@ -474,18 +482,44 @@ def model_checks_text(slope_data):
                 f"reporting it ready.\n{MODEL_CHECKS_END}")
     if not rows:
         return MODEL_CHECKS_CLEAN
-    shown = rows[:MAX_CHECK_FINDINGS]
-    lines = [f"  {f.severity.upper()} [{f.rule_id}] {f.message}" for f in shown]
-    if len(rows) > len(shown):
-        lines.append(f"  (+{len(rows) - len(shown)} more — "
-                     f"`from xslope.preflight import preflight; "
-                     f"print(preflight(slope_data, 'lem').format())`)")
-    return "\n".join(
-        [MODEL_CHECKS_OPEN,
-         f"The input checks found {len(rows)} problem(s) in the model as it now "
-         f"stands. Fix them, or put them to the user with your reason for leaving "
-         f"them — do not report this model ready over them.", *lines,
-         MODEL_CHECKS_END])
+    # Split off the findings an EDIT cannot answer (xslope.preflight.STAGED_BY_RUN).
+    # Reporting "a material takes pore pressure from a seepage solution and there
+    # isn't one" as a plain error to fix, on a turn where the iron rules also forbid
+    # running anything, leaves exactly one apparent way out: change the material's
+    # pore-pressure option — which does not supply the missing field, it deletes the
+    # requirement and silently analyses a different problem. So they are labelled
+    # for what they are and routed to the only honest response: offer the run.
+    staged = [f for f in rows if f.rule_id in STAGED_BY_RUN]
+    faults = [f for f in rows if f.rule_id not in STAGED_BY_RUN]
+    sel_arg = f", {selection!r}" if selection else ""
+    parts = [MODEL_CHECKS_OPEN]
+    if faults:
+        shown = faults[:MAX_CHECK_FINDINGS]
+        parts.append(f"The input checks found {len(faults)} problem(s) in the model "
+                     f"as it now stands. Fix them, or put them to the user with your "
+                     f"reason for leaving them — do not report this model ready over "
+                     f"them.")
+        parts += [f"  {f.severity.upper()} [{f.rule_id}] {f.message}" for f in shown]
+        if len(faults) > len(shown):
+            parts.append(f"  (+{len(faults) - len(shown)} more — "
+                         f"`from xslope.preflight import preflight; "
+                         f"print(preflight(slope_data, 'lem'{sel_arg}).format())`)")
+    if staged:
+        parts.append(
+            f"STAGED BY A RUN, not by an edit ({len(staged)}). These name an "
+            f"analysis that has not been run yet. Do NOT edit the model to silence "
+            f"one — changing the input they ask about changes the physics being "
+            f"analysed. Tell the user what is outstanding and offer to run it.")
+        for f in staged:
+            # The rule's own message is written for a user at the sheet, where
+            # picking a different input IS one of their options. It is not one of
+            # yours, so say whose it is.
+            parts.append(f"  [{f.rule_id}] {f.message} — resolved by running "
+                         f"{STAGED_BY_RUN[f.rule_id]}, not by editing. Where that "
+                         f"message offers a different input instead, that is the "
+                         f"user's call to make, not yours.")
+    parts.append(MODEL_CHECKS_END)
+    return "\n".join(parts)
 
 
 def _clean(o):
@@ -682,8 +716,9 @@ class Assistant(QObject):
 
     def _system(self):
         # Full skill body only for Anthropic (prompt-cached, so cheap). Local /
-        # other models get the compact prompt and introspect at runtime — sending
-        # ~13k skill tokens every turn makes a local model crawl.
+        # other models get the compact prompt and introspect at runtime — the skill
+        # body measures ~33k tokens today, and sending that every turn makes a
+        # local model crawl.
         if self.config.wants_skill():
             skill = _load_skill_text()
             if skill:

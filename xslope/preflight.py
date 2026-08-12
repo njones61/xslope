@@ -2208,7 +2208,8 @@ def _domain_degenerate(ctx):
 
 @rule("surface.circle_below_domain_floor", WARNING, ("lem",),
       summary="A circle whose Depth is below the domain floor must still cut a "
-              "surface inside it.")
+              "surface inside it; where that circle IS the run's surface, the run "
+              "is refused.")
 def _circle_below_domain_floor(ctx):
     # `Depth` is the elevation of the circle's LOWEST POINT -- its nadir at x = Xo
     # -- and a nadir below the domain floor is NOT by itself an error: a skimming
@@ -2219,6 +2220,27 @@ def _circle_below_domain_floor(ctx):
     # and truncated at the floor as a composite surface. Only a circle that can do
     # neither is reported, and that one used to be silently clamped up to the floor
     # and solved as a different circle.
+    #
+    # SEVERITY is decided per finding, because what the same defect COSTS depends
+    # on which run consumes the circle, and the two answers are far apart. The
+    # question was settled by measurement rather than by reading:
+    #
+    #   A SEARCH survives it. The circles sheet is a set of SEEDS, and the
+    #   refinement moves the center and the tangent depth away from them -- so a
+    #   deck whose every circle is 200 below the floor still converges on the same
+    #   critical surface as the sound deck (xslope_dam.xlsx, bishop: 1.8147 either
+    #   way). Refusing that run would refuse a run that works, so a search keeps the
+    #   WARNING: the seed is lost, the answer is not.
+    #
+    #   A SINGLE-SURFACE run does not survive it. That path takes circles[0] and
+    #   nothing else (search.run_lem_analysis), so a dead first circle is the whole
+    #   analysis. Today it arrives as a slicing failure naming no field, several
+    #   layers below the sheet the user would fix -- which is precisely what this
+    #   gate exists to pre-empt, so that one is an ERROR.
+    #
+    # This is the edit-cascade made visible: Max depth is raised or the base
+    # redrawn, the circle that was tangent to the old base now sits under the new
+    # one, and nothing about that edit says so on its own.
     if ctx.surface_supplied:
         return None
     if ctx.effective_surface_family == "noncircular":
@@ -2236,14 +2258,21 @@ def _circle_below_domain_floor(ctx):
             continue
         if ctx.circle_slices(c):
             continue
-        out.append(
+        # circles[0] IS the surface of a single-surface run; any other circle, and
+        # every circle of a search, is one candidate among several.
+        fatal = (i == 0 and not ctx.is_search)
+        cost = (" This run analyses that circle and no other, so it has no failure "
+                "surface to work on and is refused." if fatal else
+                " The run's other circles are unaffected; this one is simply lost.")
+        out.append((
+            ERROR if fatal else WARNING,
             f"{ctx.circle_label(i)} has Depth = {_fmt(depth)}, below the bottom of "
             f"the model domain at y = {_fmt(floor)}, and the circle it defines cuts "
             f"no failure surface that stays inside the domain -- no slices can be "
             f"generated from it, either as a circle or truncated along the base, so "
-            f"this circle contributes nothing to the run. Raise Depth to at or above "
-            f"y = {_fmt(floor)} {_AT_CIRCLES}, or deepen the model so the circle "
-            f"fits inside it -- {deeper}.")
+            f"this circle contributes nothing to the run.{cost} Raise Depth to at or "
+            f"above y = {_fmt(floor)} {_AT_CIRCLES}, or deepen the model so the "
+            f"circle fits inside it -- {deeper}."))
     return out
 
 

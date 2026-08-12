@@ -5984,6 +5984,40 @@ def run_flow_recovery_test(test):
     return 0.0, None
 
 
+def run_spencer_disclosure_test(test):
+    """Spencer's insoluble surfaces, and the search's disclosure of them.
+
+    Spencer's constant-inclination assumption gives a two-equation system that on
+    some surfaces has no root at all. The search used to score such a trial
+    exactly as it scores a circle that misses the model — fs_fail, dropped — so a
+    reported minimum could be the minimum of what the method could SOLVE while
+    lower surfaces went unanswered and unmentioned. At phi = 0 on a circular
+    no-load surface the existence question has a closed form, and the check runs
+    it against the equations the solver itself assembled.
+
+    The check lives in test/spencer_disclosure_check.py: the closed form vs the
+    shipped residuals, the tutorial embankment's critical circle refused without
+    iterating, the inertness of that early refusal over a family of circles, the
+    disclosure line on that model, silence on a model whose every trial solves,
+    and two mutations (the silent skip restored; the classifier calling the
+    insoluble circle an iteration failure).
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'spencer_disclosure_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('spencer_disclosure_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_seep_cycle_test(test):
     """The unconfined solver's two limit-cycle escapes, and their inertness.
 
@@ -11116,6 +11150,8 @@ def _dispatch_test(test):
         return run_beam_element_test(test)
     if test_type == 'flow_recovery':
         return run_flow_recovery_test(test)
+    if test_type == 'spencer_disclosure':
+        return run_spencer_disclosure_test(test)
     if test_type == 'stability_time':
         return run_stability_time_test(test)
     if test_type == 'steady_seep_save':
@@ -11258,6 +11294,7 @@ def _expected_and_tol(test, default_tolerance):
                        'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'piezo_u_guard',
+                       'spencer_disclosure',
                        'gsat_pair', 'seep_head',
                        'tseep_head', 'design_callable', 'kernel_xcheck'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
@@ -11274,7 +11311,8 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'fem_ssrm': 5, 'fem_ele
               'preflight_corpus': 5, 'preflight_rules': 4,
               'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'fs_vs_time': 5,
               'transient_seep': 4, 'seep_elements': 3, 'seep': 3,
-              'noncircular_search': 2, 'circular_search': 2}
+              'noncircular_search': 2, 'circular_search': 2,
+              'spencer_disclosure': 3}
 
 
 def _parallel_worker(item):
@@ -11621,6 +11659,13 @@ def main():
         tests.append({'type': 'dload_sign',
                       'file': 'surface-load horizontal sign (7 methods)',
                       'method': '-', 'source': 'dload_sign'})
+        # Spencer's insoluble surfaces: the phi = 0 closed form against the shipped
+        # residuals, the early refusal that skips a cascade which cannot help, and
+        # the search's disclosure of the trials its method could not answer on —
+        # with a clean model as the control that says nothing extra.
+        tests.append({'type': 'spencer_disclosure',
+                      'file': 'Spencer insoluble surfaces + search disclosure',
+                      'method': 'spencer', 'source': 'spencer_disclosure'})
 
     # Preflight (xslope.preflight) — the rule registry's own regression family.
     # The contract and mutation checks are file-less; the corpus check is one row

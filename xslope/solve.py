@@ -25,6 +25,87 @@ from .hoekbrown import hb_tangent
 from .preflight import method_surface_reason
 
 
+#: The ways a method returns no answer on a surface, as the FIRST words of the
+#: message it fails with. They are different facts about the model and are
+#: reported as different facts: an assumption about the interslice forces gives a
+#: system that on some surfaces has NO ADMISSIBLE ROOT — no iteration count and
+#: no starting guess reaches an answer the method would accept — while a system
+#: that does have one can still be missed by the iteration, and a root that is
+#: found can still be refused on the state it implies.
+#:
+#: "ADMISSIBLE" carries weight here and the claim is scoped to it deliberately.
+#: Spencer's equations are singular where a slice's m_alpha changes sign, and
+#: outside that pole-free band roots commonly do exist — at interslice
+#: inclinations that reverse a base normal. Those are not solutions anyone would
+#: report (the solver refuses them on base tension when its scipy stage happens
+#: to land on one), and saying a surface "admits no solution" full stop would be
+#: false about them. See :func:`spencer`'s existence tests.
+SPENCER_NO_ADMISSIBLE_SOLUTION = (
+    "Spencer's parallel interslice force assumption admits no admissible "
+    "solution on this surface")
+SPENCER_NO_CONVERGENCE = ("Spencer's method did not converge within the maximum "
+                          "number of iterations.")
+SPENCER_INADMISSIBLE = ("Spencer's method: only solutions with anomalous base "
+                        "tension found")
+
+#: Morgenstern-Price's two, which are the same two facts under its own
+#: assumption: no crossing of F_f and F_m anywhere in the lambda range it
+#: searches is that method's no-admissible-root condition, and its admissibility
+#: guard is the refusal of a solution it did find.
+MPRICE_NO_CROSSING = "Morgenstern-Price: no F_f/F_m crossing found in "
+MPRICE_INADMISSIBLE = "Morgenstern-Price: inadmissible solution "
+
+#: message prefix -> class. ONLY messages whose meaning has been read off the
+#: code that emits them appear here. Anything else is unmapped, and a caller that
+#: tallies failures must say so rather than guess: the fallback that used to be
+#: "not_converged" turned Morgenstern-Price's no-crossing condition — a
+#: no-admissible-root fact — into a fabricated report of iterations running out.
+_FAILURE_KINDS = (
+    (SPENCER_NO_ADMISSIBLE_SOLUTION, "no_admissible_solution"),
+    (SPENCER_INADMISSIBLE, "inadmissible"),
+    (SPENCER_NO_CONVERGENCE, "not_converged"),
+    (MPRICE_NO_CROSSING, "no_admissible_solution"),
+    (MPRICE_INADMISSIBLE, "inadmissible"),
+)
+
+#: How far above the residual the solver ACCEPTS the reachable floor must stand
+#: before the general-case existence test will say a surface admits no admissible
+#: solution: a thousandfold. Anchored to the tolerance rather than to a fraction
+#: of the driving weight because the measured floors form a continuum (2e-4 to
+#: 8e-3 of the driving weight across the corpus, with no gap in them) while the
+#: distance from acceptance is what the claim is actually about.
+NO_SOLUTION_MARGIN = 1e3
+
+#: A backstop under the above, for a model whose weights are small enough that
+#: the tolerance-relative bar would sit in float noise.
+NO_SOLUTION_FLOOR = 1e-6
+
+
+def failure_kind(message):
+    """Which kind of failure this message reports, or None if it is unmapped.
+
+    ``"no_admissible_solution"``  the system has no root the method would accept,
+                                  whatever the solver does.
+    ``"inadmissible"``            a solution was found and refused on the state it
+                                  implies.
+    ``"not_converged"``           the iteration did not reach a root that may well
+                                  exist.
+    ``None``                      a message this module has not measured. Not a
+                                  class: callers report it as unclassified rather
+                                  than folding it into one of the three.
+    """
+    text = str(message)
+    for prefix, kind in _FAILURE_KINDS:
+        if text.startswith(prefix):
+            return kind
+    return None
+
+
+def spencer_no_solution(message):
+    """True when a failure message reports a surface with no admissible root."""
+    return failure_kind(message) == "no_admissible_solution"
+
+
 def _c_eff(slice_df):
     """Effective (apparent) cohesion per slice: base cohesion ``c`` plus the
     matric-suction apparent cohesion ``c_suction`` when present.
@@ -1479,10 +1560,11 @@ def lowe(slice_df, debug=False):
         results['method'] = 'lowe'  # append method
         return success, results
 
-def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
+def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=None,
+            existence_test=True):
     """
     Spencer's Method using Steve G. Wright's formulation from the UTEXAS v2  user manual.
-    
+
 
     Parameters:
         slice_df (pd.DataFrame): must contain columns
@@ -1500,6 +1582,20 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
             'y_lt'  (left-top y, used with 'y_lb' by the report-only
                      admissibility screen for the thrust-line check),
             'h_pile' (pile force, optional), 'theta_p' (pile inclination, RADIANS, optional)
+
+        residual_hook (callable, optional): handed ``compute_residuals`` — the
+            function whose two zeros ARE the solution — as soon as this surface's
+            force and moment terms are assembled, and before anything is solved.
+            Nothing in the solve reads it back; it exists so a check can compare a
+            closed form against the equations the solver actually solves, on the
+            solver's own numbers rather than a second transcription of them (see
+            test/spencer_disclosure_check.py).
+        existence_test (bool, default True): whether the exact phi = 0 test may
+            refuse a surface before the retry cascade runs. Setting it False
+            spends the full cascade on every surface, which is how a check proves
+            the refusal is inert — the cascade must reach no solution the solver
+            would accept on any surface the test refuses. Nothing in the package
+            passes False; it exists for that proof.
 
     Returns:
         float: FS where FS_force = FS_moment
@@ -1673,6 +1769,8 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
 
         return R1, R2, Q, y_q
 
+    if residual_hook is not None:
+        residual_hook(compute_residuals)
 
     def compute_derivatives(F, theta_rad, Q, y_q):
 
@@ -1873,6 +1971,281 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
                   f"max tension {tr:.1f}x cohesive capacity — continuing search")
         return False
 
+    # ---------------------------------------------------------------------
+    # Does an ADMISSIBLE solution exist at all?
+    # ---------------------------------------------------------------------
+    # Spencer's assumption — every interslice force at the SAME inclination
+    # theta — turns equilibrium into two equations in (F, theta). On some
+    # surfaces that system has no root the method would accept, and then no
+    # starting guess and no iteration count reaches one: the retry cascade below
+    # simply spends time proving it the slow way, and what comes back reads as
+    # "did not converge", which says the solver failed when the truth is about
+    # the method. These two tests separate the cases.
+    #
+    # BOTH verdicts are scoped to the ADMISSIBLE range of theta — the pole-free
+    # band max(alpha) - pi/2 < theta < min(alpha) + pi/2, where m_alpha keeps its
+    # sign on every slice, which is the range the solver's own safe_theta_bounds
+    # searches. Outside it roots commonly DO exist, at inclinations that reverse
+    # the base normal on some slices; where the scipy stage happens to land on
+    # one, accept_or_save refuses it as anomalous base tension. So neither test
+    # may claim that a surface admits no solution at all — only that it admits
+    # none the method would accept. The phi = 0 test measures which of the two it
+    # is and says so.
+    #
+    # The FIRST is exact and runs BEFORE the cascade, on the surfaces where the
+    # question is provably scalar (see _decoupled_terms). The SECOND is a coarse
+    # sweep, evidence rather than proof, and runs only AFTER the cascade has
+    # failed — it must never preempt a retry that might have found the root.
+
+    def _decoupled_terms():
+        """The scalar existence problem this surface reduces to, or None.
+
+        At phi = 0, with no force or moment terms other than weight (Fh = 0 and
+        Mo = 0 on every slice, no passive support), on a CIRCULAR surface,
+        Spencer's system decouples. Writing n_i = -Fv_i sin(a_i) - c_i dl_i / F
+        (the driving weight component less the mobilized cohesion), equation (23)
+        gives Q_i = n_i sec(a_i - theta), so
+
+            R1 = sum_i n_i sec(a_i - theta)                                (force)
+            R2 = (Xo sin(theta) - Yo cos(theta)) R1 + R sum_i n_i         (moment)
+
+        — the moment sum factors that way because on a circle
+        x_b = Xo + R sin(a) and y_b = Yo - R cos(a), which is the identity this
+        checks on the surface's own numbers rather than assuming. So R2 = 0 with
+        R1 = 0 forces sum_i n_i = 0, i.e. F is the MOMENT factor of safety
+        sum(c dl) / sum(W sin a) — Bishop's phi = 0 answer exactly — and theta is
+        left to satisfy the scalar h(theta) = sum_i n_i sec(a_i - theta) = 0.
+
+        Returns ``(n, F_m, R)`` or None when any precondition fails, in which case
+        the caller falls back to the coarse sweep.
+
+        BOTH FACINGS QUALIFY. A right-facing slope reaches this with alpha
+        negated, and on a mirrored model x_b is mirrored with it, so
+        x_b - R sin(alpha) returns the mirrored centre exactly (measured: ptp 0.0
+        on a mirrored embankment, against 7e-15 on the original) and the same
+        surface gets the same verdict either way round. What the identity check
+        actually excludes is a surface that is not a circle in the frame it is
+        evaluated in — a composite surface truncated along the base, whose run
+        there is not at radius R.
+        """
+        if np.any(np.abs(tan_p) > 1e-12):
+            return None                      # phi = 0 only
+        if np.any(np.abs(Fh) > 1e-9) or np.any(np.abs(Mo) > 1e-9):
+            return None                      # no loads reaching force/moment terms
+        if np.any(np.abs(Fh_pas) > 1e-12) or np.any(np.abs(Fv_pas) > 1e-12) \
+                or np.any(np.abs(Mo_pas) > 1e-12):
+            return None                      # no passive support
+        if not _has_circle_center(slice_df):
+            return None
+        Rr = float(slice_df['r'].iloc[0])
+        if not np.isfinite(Rr) or Rr <= 0:
+            return None
+        # x_b = Xo + R sin(a), y_b = Yo - R cos(a) — constant to rounding on a
+        # true circle in either facing, and NOT constant on a composite surface,
+        # whose run along the base is not at radius R.
+        Xo_i = x_b - Rr * sin_a
+        Yo_i = y_b + Rr * cos_a
+        if (np.ptp(Xo_i) > 1e-6 * Rr) or (np.ptp(Yo_i) > 1e-6 * Rr):
+            return None
+        drive = float(np.sum(-Fv * sin_a - Fh * cos_a))   # sum W sin(alpha)
+        coh = float(np.sum(c * dl))                       # sum c dl
+        if drive == 0.0 or not np.isfinite(coh):
+            return None
+        F_m = coh / drive                    # both flip together when right-facing
+        if not np.isfinite(F_m) or F_m <= 0:
+            return None
+        n = -Fv * sin_a - Fh * cos_a - (c / F_m) * dl
+        return n, F_m, Rr
+
+    def _roots_outside_band(n, lo, hi):
+        """Whether h has a zero at an INADMISSIBLE inclination, outside the band.
+
+        h is continuous between consecutive poles (theta = a_i -+ pi/2 + k pi),
+        and runs to +/-infinity at each, so a sign change with no pole between
+        the two samples is a root by the intermediate value theorem. h(theta+pi)
+        = -h(theta), so one period covers every distinct root.
+
+        This is what keeps the verdict honest. Roots out here are real roots of
+        Spencer's equations — they are simply not solutions: past a pole a
+        slice's m_alpha has changed sign, so its base normal has reversed, and
+        the solver refuses such a root as anomalous base tension when its scipy
+        stage lands on one. Reporting that the surface admits NO root would be
+        false; reporting that it admits no ADMISSIBLE root is the fact.
+        """
+        start = float(np.min(alpha)) - np.pi / 2
+        th = np.linspace(start, start + np.pi, 20001)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            h = (1.0 / np.cos(alpha[None, :] - th[:, None])) @ n
+        poles = np.concatenate([alpha - np.pi / 2, alpha + np.pi / 2])
+        poles = np.concatenate([poles - np.pi, poles, poles + np.pi])
+        ok = np.isfinite(h)
+        for i in range(len(th) - 1):
+            if not (ok[i] and ok[i + 1]) or h[i] * h[i + 1] >= 0:
+                continue
+            if np.any((poles > th[i]) & (poles < th[i + 1])):
+                continue                     # a pole, not a crossing
+            mid = 0.5 * (th[i] + th[i + 1])
+            if not (lo < mid < hi):
+                return True
+        return False
+
+    def _phi0_admits_no_admissible_solution():
+        """True when the scalar test PROVES no ADMISSIBLE (F, theta) solves this.
+
+        h(theta) = sum_i n_i sec(a_i - theta) is swept across the pole-free band
+        max(a) - pi/2 < theta < min(a) + pi/2, where every sec is positive and
+        finite; outside it a slice's m_alpha changes sign, which is the
+        singularity the solver's own theta bounds exclude. h runs to +/-infinity
+        at both ends of the band (the extreme-alpha slice dominates), so a sign
+        change inside means an admissible root exists by the intermediate value
+        theorem, and no sign change means there is none.
+
+        The claim stops there, at the band. Outside it roots are common (see
+        _roots_outside_band), and the message says which case this surface is,
+        because "no root in the band" and "no root anywhere" are different facts
+        and only one of them is usually true.
+
+        The verdict is only returned when h's extremum stands clear of the
+        acceptance tolerance by a wide margin. F is not quite pinned: the solver
+        accepts |R2| < tol, which admits |sum n_i| < tol / R and so lets 1/F move
+        by tol / (R sum(c dl)), shifting h by at most tol * max(sec) / R. The
+        margin below is 1e4 times that bound, so no surface that could have been
+        accepted is ever refused. Anything short of it returns False and the
+        ordinary cascade runs.
+        """
+        terms = _decoupled_terms()
+        if terms is None:
+            return False
+        n, F_m, Rr = terms
+        # F_m is the moment factor of safety of this surface, and at phi = 0 it is
+        # Bishop's answer term for term (m_alpha = cos a, so sum c dx / m_alpha is
+        # sum c dl). Recorded for the same reason the Bishop restart below records
+        # its own: a search ranking the surfaces it could not solve reads it here.
+        slice_df.attrs['moment_fs'] = float(F_m)
+        lo = float(np.max(alpha)) - np.pi / 2
+        hi = float(np.min(alpha)) + np.pi / 2
+        if not (hi > lo):
+            return False
+        edge = 1e-6 * (hi - lo)
+        th = np.linspace(lo + edge, hi - edge, 2001)
+        sec = 1.0 / np.cos(alpha[None, :] - th[:, None])
+        h = sec @ n
+        if not np.all(np.isfinite(h)):
+            return False
+        if h.min() < 0.0 < h.max():
+            return False                     # an admissible root exists: solvable
+        k = int(np.argmax(h)) if h.max() < 0 else int(np.argmin(h))
+        extremum = float(h[k])
+        shift = tol * float(np.max(np.abs(sec[k]))) / Rr
+        if abs(extremum) <= 1e4 * max(shift, 1e-30):
+            return False                     # too close to call: let the solver try
+        elsewhere = (
+            "and the roots that do exist lie outside that band, at inclinations "
+            "that reverse the base normal on some slices"
+            if _roots_outside_band(n, lo, hi) else
+            "and no root exists at any inclination")
+        _no_solution_detail[:] = [
+            f"at phi = 0 the force and moment equations decouple, and the force "
+            f"balance has no root at any ADMISSIBLE interslice inclination "
+            f"({np.degrees(lo):.1f} to {np.degrees(hi):.1f} deg, where every "
+            f"slice keeps the sign of its base normal): its extreme value there "
+            f"is {extremum:+.4g} at theta = {np.degrees(th[k]):.2f} deg, against "
+            f"a moment factor of safety of {F_m:.4f}, {elsewhere}"]
+        return True
+
+    def _residual_floor_bounded_away():
+        """True when nothing anywhere in (F, theta) comes near solving this surface.
+
+        The general case has no closed form, so the evidence is measured: the
+        residual pair is normalized by the quantities that make it up (the total
+        slice weight, and that times the surface's own length scale, so the
+        measure reads the same on a 20 ft and a 500 m slope), swept over a wide
+        (F, theta) grid, and then descended from ten separated starting basins by
+        least squares, each free to walk to a root the grid stepped over. What
+        comes back is the smallest residual anywhere in reach. A surface with a
+        root leaves residuals that collapse toward zero around it; a floor that
+        stays a thousandfold above the residual the solver would have ACCEPTED
+        has none within reach of anything.
+
+        This is evidence, not proof — which is why it runs only after every retry
+        has been spent, and never in front of one.
+        """
+        w_scale = float(np.sum(np.abs(Fv)))
+        l_scale = float(max(np.ptp(x_b), np.ptp(y_b), 1e-12))
+        if not np.isfinite(w_scale) or w_scale <= 0:
+            return False
+
+        def _norm(x):
+            R1_v, R2_v, _, _ = compute_residuals(x[0], x[1])
+            if not (np.isfinite(R1_v) and np.isfinite(R2_v)):
+                return np.array([1e30, 1e30])
+            return np.array([R1_v / w_scale, R2_v / (w_scale * l_scale)])
+
+        grid = []
+        for F_try in np.geomspace(0.05, 20.0, 25):
+            t_lo, t_hi = safe_theta_bounds(F_try, margin_deg=1)
+            if not (t_hi > t_lo):
+                continue
+            for th in np.linspace(t_lo, t_hi, 41):
+                grid.append((float(np.hypot(*_norm((F_try, th)))), F_try, float(th)))
+        if not grid:
+            return False
+        grid.sort()
+        floor = grid[0][0]
+        # Descend from starts SPREAD across the range, not merely from the best
+        # few grid points: the residual surface has many local minima, the best
+        # grid point does not reliably sit in the deepest basin, and a verdict
+        # taken from one descent moves when the grid spacing moves. Ten separated
+        # basins is what makes the answer the same at 25 x 41 and at 45 x 61.
+        from scipy.optimize import least_squares
+        starts = []
+        for _, F_try, th in grid:
+            if all(abs(np.log(F_try) - np.log(f)) > 0.3 or abs(th - t) > np.radians(10)
+                   for f, t in starts):
+                starts.append((F_try, th))
+            if len(starts) >= 10:
+                break
+        for F_try, th in starts:
+            try:
+                sol = least_squares(_norm, [F_try, th], xtol=1e-12, ftol=1e-12,
+                                    max_nfev=400)
+            except Exception:
+                continue
+            if sol.x[0] > 0:
+                floor = min(floor, float(np.hypot(*_norm(sol.x))))
+        if not np.isfinite(floor):
+            return False
+        # The bar is set by what the solver ACCEPTS, not by a round number: a
+        # solution is taken at |R1| < tol, which in these normalized terms is
+        # tol / w_scale, and the verdict is only given when the reachable floor
+        # stands a thousandfold above that. (Measured floors on the corpus run
+        # 2e-4 to 8e-3 — four to five orders above acceptance — with no natural
+        # gap in them, which is exactly why the bar is anchored to the tolerance
+        # rather than cut through that continuum at a chosen fraction.)
+        bar = max(NO_SOLUTION_FLOOR, NO_SOLUTION_MARGIN * (tol / w_scale))
+        if floor <= bar:
+            return False
+        _no_solution_detail[:] = [
+            f"the force and moment residuals are bounded away from zero over the "
+            f"whole admissible range of F and theta (the smallest normalized "
+            f"residual reachable is {floor:.3g}, {floor / bar:.0f} times the "
+            f"{bar:.2g} a solution would have to reach)"]
+        return True
+
+    #: Filled by whichever test returns the verdict, read into the message.
+    _no_solution_detail = []
+
+    if existence_test and _phi0_admits_no_admissible_solution():
+        # Exact, and therefore taken before a single iteration is spent: no retry
+        # reaches an admissible root that is not there, so the cascade below has
+        # nothing to add but time. What it WOULD have added on some of these
+        # surfaces is the anomalous-base-tension refusal — its scipy stage is
+        # unbounded in theta and sometimes lands on one of the out-of-band roots
+        # this verdict already accounts for. Both are the same fact about the
+        # surface (no admissible solution) and both are counted as that; the
+        # refusal keeps its own message below wherever the cascade does run.
+        return False, f"{SPENCER_NO_ADMISSIBLE_SOLUTION}: {_no_solution_detail[0]}."
+
     # Strategy 1: Newton with default initial guess
     F0 = 1.5
     theta0_rad = np.radians(-8.0) if right_facing else np.radians(8)
@@ -1887,6 +2260,11 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
             success_bishop, result_bishop = bishop(slice_df)
             if success_bishop:
                 F0_bishop = result_bishop['FS']
+                # Recorded on the table, not just used as a starting guess: this
+                # is the MOMENT factor of safety of this surface, and a search
+                # that has to rank the surfaces its method could not solve reads
+                # it here rather than solving Bishop a second time.
+                slice_df.attrs['moment_fs'] = float(F0_bishop)
                 if debug_level >= 1:
                     print(f"Retrying with Bishop FS = {F0_bishop:.3f} as initial guess")
                 theta_tries = [theta0_rad, -theta0_rad, 0.0, np.radians(15), np.radians(-15)]
@@ -1925,6 +2303,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
             sb, rb = bishop(slice_df)
             if sb:
                 F_starts.insert(0, rb['FS'])
+                slice_df.attrs['moment_fs'] = float(rb['FS'])
         except Exception:
             pass
 
@@ -1953,10 +2332,16 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
 
     if not converged:
         if best_candidate is not None:
-            return False, (f"Spencer's method: only solutions with anomalous base tension found "
+            # A root WAS found and refused on the base tension it implies. That is
+            # a more specific fact than "no admissible solution" — it names the
+            # root and how far out of bounds its normals are — so it keeps its own
+            # message, ahead of the residual sweep below.
+            return False, (f"{SPENCER_INADMISSIBLE} "
                            f"({best_candidate[2]:.1f}x cohesive capacity, "
                            f"θ={np.degrees(best_candidate[1]):.1f}°)")
-        return False, "Spencer's method did not converge within the maximum number of iterations."
+        if _residual_floor_bounded_away():
+            return False, f"{SPENCER_NO_ADMISSIBLE_SOLUTION}: {_no_solution_detail[0]}."
+        return False, SPENCER_NO_CONVERGENCE
 
     # Final computation of Q and y_q
     R1, R2, Q, y_q = compute_residuals(F, theta_rad)
@@ -2336,8 +2721,7 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         else:
             lam_star = None
     if lam_star is None:
-        return False, ("Morgenstern-Price: no F_f/F_m crossing found in "
-                       f"λ ∈ [{lo}, {hi}].")
+        return False, (MPRICE_NO_CROSSING + f"λ ∈ [{lo}, {hi}].")
 
     # Recover N, Z, θ at λ* (FS already known from Approach B; else solve it via A's F_f).
     if FS is None:
@@ -2360,7 +2744,7 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
     Z_int = Z[1:-1]
     frac_Z_tension = float(np.mean(Z_int < 0)) if len(Z_int) else 0.0
     if frac_N_neg > 0.5 or frac_Z_tension > 0.30:
-        return False, ("Morgenstern-Price: inadmissible solution "
+        return False, (MPRICE_INADMISSIBLE +
                        f"({100*frac_N_neg:.0f}% of base normals in tension, "
                        f"{100*frac_Z_tension:.0f}% interslice tension)")
 

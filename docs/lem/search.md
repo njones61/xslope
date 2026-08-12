@@ -118,6 +118,28 @@ The `search_path` list documents the progression of the search algorithm through
 
 The circular search additionally returns a `circle_cache` containing every circle evaluated during the search (not just the improving steps), which is used to plot all tested circles alongside the critical surface.
 
+### Trial Surfaces the Method Could Not Solve
+
+A trial surface can be admissible and still get no answer from the method it is given to. Every method assumes something about the interslice forces, and each assumption has surfaces it cannot satisfy: Spencer's single interslice inclination gives a two-equation system with no root in the range of inclinations that keep each slice's base normal pointing the right way, and Morgenstern-Price finds no crossing of its force and moment factors of safety anywhere in the λ range it searches. Such a trial is scored the same as one rejected on geometry and dropped from the ranking, so if it sits below the reported minimum, the reported minimum is the minimum of what the method could solve rather than of the model.
+
+The circular search discloses this. When any admissible trial went unanswered it prints one line — this one from Spencer on the tutorial embankment, where the material is undrained (φ = 0) and the whole region around the critical circle is affected:
+
+```
+[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (56 admit no
+admissible solution); 26 of them rank lower than the reported minimum by the moment
+measure.
+```
+
+The ranking is by the moment factor of safety on both sides — the unsolved trials against the reported minimum's own moment answer — so the comparison is between like quantities. Pass a dictionary as `unsolved_out=` to receive the same counts (`attempted`, `unsolved`, `no_admissible_solution`, `not_converged`, `inadmissible`, `unclassified`, `lower_by_moment`, and the moment factor of safety of each unsolved trial); `run_lem_analysis` carries them on `search["unsolved"]`, which is `None` for a non-circular search, whose scoring does not yet separate a solver failure from a geometric rejection. A search whose method answered on every admissible trial prints nothing extra.
+
+The parenthetical breakdown appears only when every message behind it is one the package has read the meaning of — Spencer's three and Morgenstern-Price's two. A method whose failure messages are not mapped gets the count and the ranking without a breakdown, rather than a taxonomy assembled from a default.
+
+Its three phrases are the three ways an answer fails to arrive. *Admit no admissible solution* is a surface the method's assumption cannot be satisfied on at all. *Failed to converge* is an iteration that did not reach a root that may well exist. *Solved only with an inadmissible stress state* is a root the method found and then refused, and it names no mechanism because each method's admissibility guard trips on its own quantity: Spencer's on base tension beyond what cohesion can carry, Morgenstern-Price's chiefly on interslice tension.
+
+"Admits no admissible solution" is scoped deliberately. Spencer's equations are singular where a slice's m<sub>α</sub> changes sign, and beyond that band roots often do exist — at interslice inclinations that reverse a base normal, which is not a state anyone would report. The message says which case a surface is, and never claims a surface admits no solution at all.
+
+A disclosure whose unsolved trials rank below the reported minimum means the reported answer is limited by the method, not by the search. Two things move it. Another method's assumption may be satisfiable where this one's is not, so running a second method beside the first says how much of the model the first one's answer covers. And a surface left rootless by an unsupported back scarp becomes solvable once the model carries the tension crack that scarp implies, since the crack removes the slices whose cohesion the assumption cannot balance.
+
 ## Visualization of Search Results
 
 The xslope package provides specialized plotting functions that transform the numerical search results into intuitive visual representations of the failure surface exploration process. These functions leverage matplotlib to create publication-quality figures that overlay the discovered failure surfaces onto the slope geometry.

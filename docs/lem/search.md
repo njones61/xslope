@@ -120,18 +120,23 @@ The circular search additionally returns a `circle_cache` containing every circl
 
 ### Trial Surfaces the Method Could Not Solve
 
-A trial surface can be admissible and still get no answer from the method it is given to. Spencer's assumption that every interslice force acts at one inclination gives a two-equation system, and on some surfaces that system has no root: no starting guess and no iteration count reaches an answer that is not there. Such a trial is scored the same as one rejected on geometry and dropped from the ranking, so if it sat below the reported minimum, the reported minimum is the minimum of what the method could solve rather than of the model.
+A trial surface can be admissible and still get no answer from the method it is given to. Every method assumes something about the interslice forces, and each assumption has surfaces it cannot satisfy: Spencer's single interslice inclination gives a two-equation system with no root in the range of inclinations that keep each slice's base normal pointing the right way, and Morgenstern-Price finds no crossing of its force and moment factors of safety anywhere in the λ range it searches. Such a trial used to be scored the same as one rejected on geometry and dropped from the ranking, so if it sat below the reported minimum, the reported minimum was the minimum of what the method could solve rather than of the model.
 
-The circular search discloses this. When any admissible trial went unanswered it prints one line:
+The circular search discloses this. When any admissible trial went unanswered it prints one line — this one from Spencer on the tutorial embankment, where the material is undrained (φ = 0) and the whole region around the critical circle is affected:
 
 ```
 [⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (56 admit no
-solution); 26 of them rank lower than the reported minimum by the moment measure.
+admissible solution); 26 of them rank lower than the reported minimum by the moment
+measure.
 ```
 
-The ranking is by the moment factor of safety on both sides — the unsolved trials against the reported minimum's own moment answer — so the comparison is between like quantities. Pass a dictionary as `unsolved_out=` to receive the same counts (`attempted`, `unsolved`, `no_solution`, `not_converged`, `inadmissible`, `lower_by_moment`, and the moment factor of safety of each unsolved trial); `run_lem_analysis` carries them on `search["unsolved"]`. A search whose method answered on every admissible trial prints nothing extra.
+The ranking is by the moment factor of safety on both sides — the unsolved trials against the reported minimum's own moment answer — so the comparison is between like quantities. Pass a dictionary as `unsolved_out=` to receive the same counts (`attempted`, `unsolved`, `no_admissible_solution`, `not_converged`, `inadmissible`, `unclassified`, `lower_by_moment`, and the moment factor of safety of each unsolved trial); `run_lem_analysis` carries them on `search["unsolved"]`, which is `None` for a non-circular search, whose scoring does not yet separate a solver failure from a geometric rejection. A search whose method answered on every admissible trial prints nothing extra.
 
-A disclosure whose unsolved trials rank below the reported minimum means the reported answer is limited by the method, not by the search. Two things move it. A method that does not impose a single interslice inclination — the moment methods, or the force-equilibrium methods — answers on those surfaces, so running one of them beside Spencer says how much of the model Spencer's answer covers. And a surface driven rootless by an unsupported back scarp becomes solvable once the model carries the tension crack that scarp implies, since the crack removes the slices whose cohesion the assumption cannot balance.
+The parenthetical breakdown appears only when every message behind it is one the package has read the meaning of — Spencer's three and Morgenstern-Price's two. A method whose failure messages are not mapped gets the count and the ranking without a breakdown, rather than a taxonomy assembled from a default.
+
+"Admits no admissible solution" is scoped deliberately. Spencer's equations are singular where a slice's m<sub>α</sub> changes sign, and beyond that band roots often do exist — at interslice inclinations that reverse a base normal, which is not a state anyone would report. The message says which case a surface is, and never claims a surface admits no solution at all.
+
+A disclosure whose unsolved trials rank below the reported minimum means the reported answer is limited by the method, not by the search. Two things move it. Another method's assumption may be satisfiable where this one's is not, so running a second method beside the first says how much of the model the first one's answer covers. And a surface left rootless by an unsupported back scarp becomes solvable once the model carries the tension crack that scarp implies, since the crack removes the slices whose cohesion the assumption cannot balance.
 
 ## Visualization of Search Results
 

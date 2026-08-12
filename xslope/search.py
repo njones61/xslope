@@ -79,6 +79,11 @@ class UnsolvedTrials:
     test knows it in closed form); otherwise it is one Bishop solve per unsolved
     trial, and those are a minority of the sweep.
 
+    The REASONS are only reported where they have been read off the code that
+    emits them (:func:`solve.failure_kind`). Anything else is counted as
+    unclassified and suppresses the breakdown entirely, so no method is ever
+    given a taxonomy that was assembled from a default.
+
     Counting is per unique trial SURFACE. The depth optimizer re-evaluates its
     own best depth at every step, so counting solver calls would report a surface
     as several.
@@ -86,12 +91,13 @@ class UnsolvedTrials:
 
     def __init__(self, method_name):
         self.method = str(method_name).lower()
-        self.attempted = 0          # unique surfaces handed to the solver
-        self.unsolved = 0           # of those, the ones it returned no answer for
-        self.no_solution = 0        # of those, the ones that admit no solution
-        self.not_converged = 0      # of those, the ones the iteration failed on
-        self.inadmissible = 0       # of those, solved but refused on base tension
-        self.moment_fs = []         # moment factor of safety of each unsolved trial
+        self.attempted = 0             # unique surfaces handed to the solver
+        self.unsolved = 0              # of those, the ones it gave no answer for
+        self.no_admissible_solution = 0  # of those, with no root the method takes
+        self.not_converged = 0         # of those, the ones the iteration failed on
+        self.inadmissible = 0          # of those, a root found and refused
+        self.unclassified = 0          # of those, whose message is not mapped
+        self.moment_fs = []            # moment factor of safety of each unsolved trial
         self.reported_moment_fs = None
         self.lower_by_moment = 0
         self._seen = set()
@@ -110,7 +116,7 @@ class UnsolvedTrials:
         if solved:
             return
         self.unsolved += 1
-        kind = solve.spencer_failure_kind(message)
+        kind = solve.failure_kind(message) or 'unclassified'
         setattr(self, kind, getattr(self, kind) + 1)
         fs = self._moment_fs(df_slices)
         if fs is not None:
@@ -152,16 +158,27 @@ class UnsolvedTrials:
                                    if f < self.reported_moment_fs)
 
     def sentence(self):
-        """The disclosure line, or '' when every trial surface was solved."""
+        """The disclosure line, or '' when every trial surface was solved.
+
+        The breakdown appears only when EVERY unsolved trial's message is one
+        this package has read the meaning of (:func:`solve.failure_kind`). A
+        method whose messages are unmapped gets the count and the ranking and no
+        taxonomy at all, because a taxonomy assembled from a default is a
+        fabrication: the fallback that used to exist reported Morgenstern-Price's
+        "no F_f/F_m crossing" — a no-root fact — as an iteration failing to
+        converge, 58 times, on a model where nothing failed to converge.
+        """
         if not self.unsolved:
             return ""
         what = _method_label(self.method)
-        parts = [(self.no_solution, "admit no solution"),
+        parts = [(self.no_admissible_solution, "admit no admissible solution"),
                  (self.not_converged, "failed to converge"),
                  (self.inadmissible, "solved only with anomalous base tension")]
         breakdown = ", ".join(f"{n} {t}" for n, t in parts if n)
         line = (f"{what} could not solve {self.unsolved} of {self.attempted} "
-                f"trial surfaces ({breakdown})")
+                f"trial surfaces")
+        if not self.unclassified and breakdown:
+            line += f" ({breakdown})"
         if self.reported_moment_fs is None:
             return line + "; their ranking could not be measured."
         return (f"{line}; {self.lower_by_moment} of them rank lower than the "
@@ -172,9 +189,10 @@ class UnsolvedTrials:
         return {"method": self.method,
                 "attempted": self.attempted,
                 "unsolved": self.unsolved,
-                "no_solution": self.no_solution,
+                "no_admissible_solution": self.no_admissible_solution,
                 "not_converged": self.not_converged,
                 "inadmissible": self.inadmissible,
+                "unclassified": self.unclassified,
                 "lower_by_moment": self.lower_by_moment,
                 "reported_moment_fs": self.reported_moment_fs,
                 "unsolved_moment_fs": list(self.moment_fs),

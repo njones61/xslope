@@ -42,6 +42,81 @@ USAGE_TOGGLE_LABEL = {"lem": "LEM", "fem": "FEM", "seep": "Seepage", "rel": "Rel
 
 
 # --------------------------------------------------------------------------- #
+# Numeric display
+#
+# Significant digits an editor shows a stored number to. Inputs are typed, computed
+# from typed geometry (a circle's R from its intercept point) or generated, and the
+# computed ones arrive as full-precision floats: 41.23105625617661 is the radius from
+# (10, 40) to (0, 0), and printing it that way is how a coordinate table turns into a
+# wall of noise. Six digits is more than any of these inputs carries physically, and
+# the stored value is never touched — Field.read_text hands back the number the cell
+# was FILLED from whenever the text is still the rendering of it, so a rounding can
+# only ever be seen, never saved.
+#
+# (The transient dialog's own _tseep_fmt renders at 10 digits instead. It edits its
+# values in place with no stored original to fall back on, so its display has to be
+# lossless; here the original is kept, which is what buys the shorter one.)
+#
+# The digits are capped; the NOTATION is chosen by magnitude. A plain %g switches to
+# an exponent as soon as a value needs more than the significant digits it is allowed
+# -- which turns a Young's modulus of 2088500 into 2.0885e+06, an engineering input
+# rewritten as physics notation. 101 of the 312 corpus models carry at least one such
+# value. Inside the window below, the value is written out in full; outside it -- a
+# hydraulic conductivity of 7e-05, a modulus in the billions -- an exponent is what
+# anyone would write by hand anyway.
+# --------------------------------------------------------------------------- #
+_DISPLAY_SIG_DIGITS = 6
+#: Magnitudes written in full rather than with an exponent. The lower bound is where
+#: leading zeros start to outnumber digits; the upper is where a written-out integer
+#: stops being readable at a glance.
+_DISPLAY_FIXED_RANGE = (1e-4, 1e9)
+
+
+def _display_number(v):
+    """A stored value rendered for a numeric editor widget.
+
+    ``None`` and NaN (the templates' two spellings of "unset") render blank; ints
+    render whole; floats render at :data:`_DISPLAY_SIG_DIGITS` significant digits with
+    no trailing zeros (``40.0`` -> ``"40"``), written out in full over
+    :data:`_DISPLAY_FIXED_RANGE` (``2088500.0`` -> ``"2088500"``, never
+    ``"2.0885e+06"``) and with an exponent outside it. A non-number is left to
+    ``str``."""
+    if v is None:
+        return ""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, float) and v != v:            # NaN = unset, never the text "nan"
+        return ""
+    if isinstance(v, int):
+        return str(v)
+    if v == 0:
+        return "0"
+    low, high = _DISPLAY_FIXED_RANGE
+    if not low <= abs(v) < high:
+        return f"{v:.{_DISPLAY_SIG_DIGITS}g}"
+    # Significant digits, spelled out: the decimals left over once the digits before
+    # the point have taken their share (none left over for a value in the millions,
+    # which is exactly the case a %g would have put an exponent on).
+    decimals = max(0, _DISPLAY_SIG_DIGITS - 1 - math.floor(math.log10(abs(v))))
+    text = f"{v:.{decimals}f}"
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _unedited(text, stored):
+    """True when ``text`` is still exactly what :func:`_display_number` rendered for
+    ``stored`` — the widget is showing a display rounding nobody has typed over, so
+    the stored value is what must be kept.
+
+    :meth:`Field.read_text` is this rule for a field in a table or a form; this is
+    the same rule for the handful of scalar edits that have no Field behind them (the
+    max-depth elevation, a seepage BC's head and flux)."""
+    return (isinstance(stored, (int, float)) and not isinstance(stored, bool)
+            and text == _display_number(stored))
+
+
+# --------------------------------------------------------------------------- #
 # Field spec + dialogs
 # --------------------------------------------------------------------------- #
 class Field:
@@ -60,6 +135,9 @@ class Field:
               "bool": False}
     # Kinds edited through a QComboBox rather than a line edit.
     COMBO_KINDS = ("choice", "bool")
+    # Kinds whose value is a number, and so is display-rounded on the way out and
+    # preserved on the way back in (see to_text / read_text).
+    NUMERIC_KINDS = ("float", "optfloat", "int")
     _BOOL_CHOICES = ["", "YES"]
 
     def __init__(self, key, header, kind="float", choices=None, default=None,
@@ -97,10 +175,32 @@ class Field:
 
     def to_text(self, val):
         """``val`` rendered for this field's editor widget (the inverse of
-        :meth:`from_text` for the combo kinds)."""
+        :meth:`from_text` for the combo kinds).
+
+        Numeric kinds are rendered at :data:`_DISPLAY_SIG_DIGITS` significant digits
+        rather than through ``str``, which prints a float's full repr: a radius the
+        editor itself computed from an intercept point is stored as
+        41.23105625617661 and has no business being *shown* that way. The stored
+        value is untouched — :meth:`read_text` is the other half of that promise."""
         if self.kind == "bool":
             return "YES" if val else ""
+        if self.kind in self.NUMERIC_KINDS:
+            return _display_number(val)
         return "" if val is None else str(val)
+
+    def read_text(self, text, stored):
+        """``text`` parsed back to a value — unless it is still exactly what
+        :meth:`to_text` rendered for ``stored``, in which case ``stored`` comes back
+        untouched.
+
+        This is what makes a display rounding a *display* rounding. A cell showing
+        41.2311 for a stored 41.23105625617661 must save the stored number, not the
+        rounding; only text the user actually changed may replace the value. Every
+        editor reads its widgets back through here, so no editor can round a value
+        into the model by being opened and OK'd."""
+        if self.kind in self.NUMERIC_KINDS and _unedited(text, stored):
+            return stored
+        return self.from_text(text)
 
     def from_text(self, text):
         text = (text or "").strip()
@@ -245,8 +345,9 @@ class FormEditorDialog(QDialog):
         self._edits = {}
         layout = QVBoxLayout(self)
         form = QFormLayout()
+        self._values = dict(values)
         for f in fields:
-            edit = QLineEdit(str(values.get(f.key, f.default)))
+            edit = QLineEdit(f.to_text(values.get(f.key, f.default)))
             self._edits[f.key] = edit
             form.addRow(f.header, edit)
         layout.addLayout(form)
@@ -256,7 +357,9 @@ class FormEditorDialog(QDialog):
         layout.addWidget(bb)
 
     def result_values(self):
-        return {f.key: f.from_text(self._edits[f.key].text()) for f in self._fields}
+        return {f.key: f.read_text(self._edits[f.key].text(),
+                                   self._values.get(f.key, f.default))
+                for f in self._fields}
 
 
 class _EditableTable(QWidget):
@@ -399,7 +502,7 @@ class _EditableTable(QWidget):
                 combo.currentIndexChanged.connect(lambda *_: self._on_combo_changed())
                 self.table.setCellWidget(i, j, combo)
             else:
-                self.table.setItem(i, j, QTableWidgetItem("" if val is None else str(val)))
+                self.table.setItem(i, j, QTableWidgetItem(f.to_text(val)))
 
     def replace_rows(self, rows):
         """Swap the whole table for ``rows``, as one undoable edit of the dialog.
@@ -514,7 +617,11 @@ class _EditableTable(QWidget):
                     base[f.key] = f.from_text(widget.currentText())
                 else:
                     item = self.table.item(i, j)
-                    base[f.key] = f.from_text(item.text() if item else "")
+                    # read_text, not from_text: an untouched cell hands back the value
+                    # the row was built from, so the display rounding never lands in
+                    # the record (see Field.read_text).
+                    base[f.key] = f.read_text(item.text() if item else "",
+                                              base.get(f.key))
             out.append(base)
         return out
 
@@ -1412,6 +1519,67 @@ def _pick_dloads(set_blocks, x, y, tol):
     return (best[0], best[1]) if best[2] <= tol else None
 
 
+# --------------------------------------------------------------------------- #
+# Fitting a table to its own content
+#
+# A table dialog that opens with a column past its right edge is a table dialog with
+# a hidden input. Rather than guess a width per column, the two helpers below measure
+# one: the widest thing any column has to show (header text, cell text, and the cell
+# WIDGETS a combo column is made of, whose width no item hint knows about), squared
+# off so every column is that wide. Uniform columns read as a sheet, and a dialog
+# opened at their total can not be hiding one.
+#
+# Everything is measured in the widget's own font, so the fit follows the font, the
+# display and the platform instead of a pixel guess made on one of them.
+# --------------------------------------------------------------------------- #
+
+#: Rows of empty table to leave visible below the last one, so a short table still
+#: looks like something you can add to.
+_TABLE_SPARE_ROWS = 3
+#: Preview-pane depth, in lines of the dialog's own text. Deep enough to read a
+#: cross-section in; it scales with the font rather than fixing a pixel height.
+_PREVIEW_MIN_LINES = 16
+#: A negative number written to the display precision — the widest ordinary thing a
+#: numeric cell holds. It floors a column's width, so a table opened EMPTY is as wide
+#: as the same table opened full, and typing the first row does not need a resize.
+_NUMBER_SAMPLE = "-" + "0" * _DISPLAY_SIG_DIGITS + "."
+
+
+def _uniform_column_width(table):
+    """The width every column needs to show its widest content, header included."""
+    header = table.horizontalHeader()
+    fm = table.fontMetrics()
+    cushion = fm.horizontalAdvance("00")                    # one em-ish, both sides
+    widest = max(header.minimumSectionSize(),
+                 fm.horizontalAdvance(_NUMBER_SAMPLE) + cushion)
+    for c in range(table.columnCount()):
+        w = max(table.sizeHintForColumn(c), header.sectionSizeHint(c))
+        for r in range(table.rowCount()):
+            cell = table.cellWidget(r, c)
+            if cell is not None:
+                w = max(w, cell.sizeHint().width())
+        widest = max(widest, w + cushion)
+    return widest
+
+
+def _fit_columns(table):
+    """Size every column to :func:`_uniform_column_width` and let them share any
+    extra width the dialog is given. Returns the viewport width they need.
+
+    Stretch (rather than a one-off resize) is what keeps the fit true after the user
+    drags the dialog wider or narrower; the minimum section size is what stops the
+    stretch from squeezing a column back out of legibility."""
+    header = table.horizontalHeader()
+    # Forget the previous fit before measuring: a minimum section size left standing
+    # is reported back as the sections' own hint, so re-fitting would ratchet the
+    # columns wider every time it ran.
+    header.setMinimumSectionSize(-1)
+    width = _uniform_column_width(table)
+    header.setMinimumSectionSize(width)
+    header.setSectionResizeMode(QHeaderView.Stretch)
+    return width * max(table.columnCount(), 1)
+
+
 class TableEditorDialog(QDialog):
     """Editable table over a list of dict records.
 
@@ -1425,6 +1593,13 @@ class TableEditorDialog(QDialog):
     table row. This keeps a pure-table editor a table (no list-view rewrite); only the
     editors that pass a hook (currently starting circles) grow a preview.
 
+    ``preview_below`` stacks that preview UNDER the table instead of beside it, and
+    sizes the dialog from the table's measured content (see :func:`_fit_columns`). A
+    wide table and a preview cannot both have the width they need side by side, and
+    the table is the half that loses columns off its right edge when they compete —
+    so a table with more columns than a pane's width can hold takes the full width
+    and the section, which is wide and short anyway, takes the space below it.
+
     ``generate`` (a hook ``propose() -> (rows, message, reason)``) adds a button that
     derives the whole table from the model. It follows the same contract as a
     preflight remedy: a button that cannot run is DIMMED with the reason in its
@@ -1435,7 +1610,7 @@ class TableEditorDialog(QDialog):
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
                  usage_toggles=None, preview_draw=None, preview_caption=None,
                  pick_resolve=None, field_help=None, unit_labels=None,
-                 generate=None):
+                 generate=None, preview_below=False):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -1472,14 +1647,21 @@ class TableEditorDialog(QDialog):
                 caption=preview_caption)
             if self._pick_resolve is not None:
                 self._preview.clicked.connect(self._on_preview_click)
-            split = QSplitter(Qt.Horizontal)
+            split = QSplitter(Qt.Vertical if preview_below else Qt.Horizontal)
             split.addWidget(self._editable)
             split.addWidget(self._preview)
-            split.setStretchFactor(0, 1)
-            split.setStretchFactor(1, 1)
-            split.setSizes([560, 500])
+            self._split = split
             layout.addWidget(split, 1)
-            self.resize(min(1280, 620 + 110 * len(fields)), 520)
+            if preview_below:
+                # The table keeps the height its rows ask for and the preview absorbs
+                # everything else, so dragging the dialog taller grows the picture.
+                split.setStretchFactor(0, 0)
+                split.setStretchFactor(1, 1)
+            else:
+                split.setStretchFactor(0, 1)
+                split.setStretchFactor(1, 1)
+                split.setSizes([560, 500])
+                self.resize(min(1280, 620 + 110 * len(fields)), 520)
         else:
             layout.addWidget(self._editable)
         if generate is not None:
@@ -1493,16 +1675,147 @@ class TableEditorDialog(QDialog):
             attach_help(self, self._field_help,
                        _table_help_resolver(lambda: self._editable, lambda: self._fields))
             _wire_cell_help(self._help_strip, self._editable, self._fields, self._field_help)
+        self._content_sized = bool(preview_below)
+        if preview_below:
+            # Last, so the measurement sees every strip the dialog ended up with.
+            self._size_to_content()
+
+    def _table_pane_height(self, rows_shown=None):
+        """The height the table half needs for ``rows_shown`` rows (its own row count
+        by default), plus a few spare rows, its header and the Add/Remove bar."""
+        table = self._editable.table
+        vh = table.verticalHeader()
+        if rows_shown is None:
+            rows = sum(table.rowHeight(r) for r in range(table.rowCount()))
+        else:
+            rows = rows_shown * vh.defaultSectionSize()
+        spare = _TABLE_SPARE_ROWS * vh.defaultSectionSize()
+        chrome = 2 * table.frameWidth()
+        # The Add/Remove bar is whatever the pane's own hint holds beyond the table's.
+        bar = max(0, self._editable.sizeHint().height() - table.sizeHint().height())
+        return table.horizontalHeader().height() + rows + spare + chrome + bar
+
+    def _content_width(self):
+        """Dialog width that fits every column: the fitted columns themselves plus
+        everything they sit inside — row-number gutter, frame, the scroll bar the
+        table reserves, and the dialog's own margins. Computed from the widgets'
+        metrics rather than read off the current geometry, so it is the same answer
+        before the dialog is ever shown as after."""
+        from PySide6.QtWidgets import QStyle
+
+        table = self._editable.table
+        margins = self.layout().contentsMargins()
+        # sizeHint(), not width(): the row-number gutter is only as wide as the row
+        # count needs, and before the table has been laid out its width() has not
+        # caught up with the rows in it -- a 40-row table's gutter is wider than a
+        # 1-row table's, and measuring the stale one puts a column back over the edge.
+        return (_fit_columns(table)
+                + table.verticalHeader().sizeHint().width() + 2 * table.frameWidth()
+                + self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
+                + margins.left() + margins.right())
+
+    def _size_to_content(self):
+        """Open at the size the content asks for, capped by the screen.
+
+        Width comes from the table (every column fitted, plus the scroll bar and
+        frame it lives inside); height from the table's own rows plus a preview deep
+        enough to read a section in and whatever strips the dialog carries. Nothing
+        here is a remembered pixel count -- change the font, the columns or the row
+        count and the dialog opens to match.
+
+        Each pane also gets a MINIMUM, which is what keeps it honest afterwards: the
+        dialog cannot be dragged small enough to squeeze the preview into a strip, and
+        anything that appears later (the generator's summary line) grows the layout's
+        own minimum, so the dialog grows with it rather than taking the room out of
+        the picture. Where the two cannot both be satisfied -- a table of forty
+        circles is taller than any screen -- the preview keeps its minimum and the
+        table scrolls, which is the pane that has a scroll bar for the purpose."""
+        width = self._content_width()
+        pane = self._table_pane_height()
+        preview = (_PREVIEW_MIN_LINES * self.fontMetrics().height()
+                   + self._preview.reserve_caption(width))
+        self._preview.setMinimumHeight(preview)
+        self._editable.setMinimumHeight(self._table_pane_height(rows_shown=0))
+        # Everything that is not the splitter: help text, legend, generate bar,
+        # buttons, help strip. sizeHint() knows them all; the splitter's own hint is
+        # replaced by the two pane heights measured above.
+        chrome = self.sizeHint().height() - self._split.sizeHint().height()
+        height = chrome + pane + preview
+
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            width = min(width, avail.width())
+            height = min(height, avail.height())
+        self.resize(width, height)
+        split_height = max(0, height - chrome)
+        pane = max(0, min(pane, split_height - preview))
+        self._split.setSizes([pane, split_height - pane])
+
+    def _refit_columns(self):
+        """Re-fit the columns to content that arrived after the dialog opened (a
+        generated set of rows), widening the dialog if the new content needs it.
+
+        Only ever wider: a dialog that shrank itself while the user was working in it
+        would be taking room away from them to save room they did not ask to save.
+
+        Only for a dialog that was sized from its content in the first place. The
+        fit takes the columns off Interactive and onto Stretch, which costs the user
+        the ability to drag a column width; that is a fair trade in a dialog whose
+        whole width was measured to fit its columns, and no trade at all in one that
+        was not -- there it would take the drag away and give nothing back."""
+        if not getattr(self, "_content_sized", False):
+            return
+        needed = self._content_width()
+        if needed > self.width():
+            self._grow(needed)
+        self._grow_to_fit_columns()
+
+    def _grow(self, width):
+        """Widen to ``width``, never past the screen."""
+        screen = self.screen() or QApplication.primaryScreen()
+        avail = screen.availableGeometry().width() if screen is not None else width
+        self.resize(min(width, avail), self.height())
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if getattr(self, "_content_sized", False):
+            self._grow_to_fit_columns()
+
+    def _grow_to_fit_columns(self):
+        """Close any gap between what the columns need and what the viewport gives
+        them, now that the widgets have been laid out.
+
+        The estimate made before the first layout is close but not exact: the
+        row-number gutter widens with the row count, and a style adds its own header
+        margins only when it lays the header out. Both are small and both are in the
+        direction that hides a column, so the last word on the fit belongs to the
+        widgets once they have real geometry."""
+        table = self._editable.table
+        deficit = table.horizontalHeader().length() - table.viewport().width()
+        if deficit > 0:
+            self._grow(self.width() + deficit)
 
     def _build_generate_bar(self, spec):
         """The generator button, dimmed with its own reason when it cannot run.
 
         Same contract as a preflight remedy: a button that cannot succeed is dimmed
         with the reason in its tooltip rather than live and failing when pressed.
-        ``spec`` carries ``label``, ``available``, ``reason``, ``tooltip`` and
-        ``propose(parent) -> (rows, message, reason)``."""
+        ``spec`` carries ``label``, ``available``, ``reason``, ``tooltip``,
+        ``propose(parent) -> (rows, message, reason)``, the noun for what it makes
+        (``unit``, e.g. "circle"), and ``append`` — whether adding the generated rows
+        to the ones already there is a sensible thing to offer. It is for a table of
+        independent records (trial circles) and not for one that IS a single object
+        (the points of one non-circular surface).
+
+        The bar carries the generator's summary line under the button, because the
+        summary is the audit: it names which face each circle came from, how it was
+        sized, and what it threw away — the things a reader checks the generated rows
+        against. It has to stay readable while they do that, so it is written into
+        the dialog rather than into a box they have to dismiss first."""
         self._generate = spec
-        bar = QHBoxLayout()
+        bar = QVBoxLayout()
+        row = QHBoxLayout()
         btn = QPushButton(spec.get("label") or "Generate…")
         btn.setObjectName("generate_button")
         available = bool(spec.get("available", True))
@@ -1511,12 +1824,53 @@ class TableEditorDialog(QDialog):
                        else (spec.get("tooltip") or ""))
         btn.clicked.connect(self._run_generate)
         self.generate_button = btn
-        bar.addWidget(btn)
-        bar.addStretch(1)
+        row.addWidget(btn)
+        row.addStretch(1)
+        bar.addLayout(row)
+        self.generate_summary = QLabel()
+        self.generate_summary.setObjectName("generate_summary")
+        self.generate_summary.setWordWrap(True)
+        self.generate_summary.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.generate_summary.setVisible(False)
+        bar.addWidget(self.generate_summary)
         return bar
 
+    def _generate_unit(self, n):
+        """"3 circles" / "1 point" — the generator says what it makes."""
+        noun = self._generate.get("unit") or "point"
+        return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
+
+    def _ask_generate_disposition(self, existing, proposed, message):
+        """What to do with rows already in the table: ``"replace"``, ``"append"`` or
+        ``None`` for cancel.
+
+        Asked only when there ARE rows, and never answered for the user: work that is
+        already in the table is the user's, and a generator that quietly threw it away
+        would be a generator nobody could risk pressing."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle("Replace what is already here?")
+        box.setText(f"This table already holds {self._generate_unit(existing)}. "
+                    f"The generator built {self._generate_unit(proposed)}.")
+        box.setInformativeText(message)
+        buttons = QMessageBox.Apply | QMessageBox.Cancel
+        if self._generate.get("append"):
+            buttons |= QMessageBox.Yes
+        box.setStandardButtons(buttons)
+        box.button(QMessageBox.Apply).setText("Replace")
+        if self._generate.get("append"):
+            box.button(QMessageBox.Yes).setText("Append")
+        box.setDefaultButton(QMessageBox.Apply)
+        answer = box.exec()
+        if answer == QMessageBox.Apply:
+            return "replace"
+        if answer == QMessageBox.Yes and self._generate.get("append"):
+            return "append"
+        return None
+
     def _run_generate(self):
-        """Ask the generator for a surface, say what it will do, then do it.
+        """Ask the generator for rows, ask the user what to do with the ones already
+        in the table, then do it and show what was done.
 
         The generated rows land in the TABLE, not in the document: the preview
         redraws on them, the user can still edit them, and Cancel discards them the
@@ -1526,18 +1880,50 @@ class TableEditorDialog(QDialog):
             if reason:
                 QMessageBox.information(self, "Nothing was generated", reason)
             return
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Question)
-        box.setWindowTitle("Replace the surface?")
-        box.setText(f"Replace the {len(self._editable.result_rows())} point(s) in this "
-                    f"table with {len(rows)} generated point(s)?")
-        box.setInformativeText(message)
-        box.setStandardButtons(QMessageBox.Apply | QMessageBox.Cancel)
-        box.setDefaultButton(QMessageBox.Apply)
-        if box.exec() != QMessageBox.Apply:
-            return
-        self._editable.replace_rows(rows)
+        existing = self._editable.result_rows()
+        how = "replace"
+        if existing:                       # nothing to lose = nothing to ask about
+            how = self._ask_generate_disposition(len(existing), len(rows), message)
+            if how is None:
+                return
+        self._editable.replace_rows(existing + rows if how == "append" else rows)
+        self._refit_columns()          # generated numbers may be wider than typed ones
+        self._show_generate_summary(message, len(rows), how if existing else "fill")
         self._schedule_preview()
+
+    def _show_generate_summary(self, message, n, how):
+        """Write the generator's own summary into the dialog, under the button.
+
+        The summary is a strip that was not there a moment ago, and a dialog whose
+        height does not change has to find its room somewhere: the somewhere is the
+        preview, which is the only thing in the dialog that stretches. So the dialog
+        grows by exactly what the layout says it now needs more of -- measured as the
+        difference in the layout's own total hint across the label appearing, which
+        counts the label's wrapped height and the spacing around it and needs no
+        pixel figure of its own. The preview keeps the area it had."""
+        lead = {"append": "Added", "replace": "Replaced the table with"}.get(how,
+                                                                            "Generated")
+        label = self.generate_summary
+        layout = self.layout()
+        before = layout.totalSizeHint().height()
+        label.setText(f"{lead} {self._generate_unit(n)}: {message}".rstrip(". ") + ".")
+        label.setVisible(True)
+        # A wrapped label's height is only knowable once its width is: reserve it, or
+        # the layout budgets one line for a summary that takes two and the difference
+        # is taken out of the preview below it.
+        margins = layout.contentsMargins()
+        wrapped = label.heightForWidth(self.width() - margins.left() - margins.right())
+        if wrapped > 0:
+            label.setMinimumHeight(wrapped)
+        layout.invalidate()
+        grown = layout.totalSizeHint().height() - before
+        if getattr(self, "_content_sized", False):
+            self._size_to_content()        # re-fit around the strip that just appeared
+        elif grown > 0:
+            screen = self.screen() or QApplication.primaryScreen()
+            avail = (screen.availableGeometry().height() if screen is not None
+                     else self.height() + grown)
+            self.resize(self.width(), min(self.height() + grown, avail))
 
     def _schedule_preview(self, *_):
         if self._preview is not None:
@@ -1977,6 +2363,7 @@ class GlobalParamsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Global parameters")
         self._numeric_fields = numeric_fields
+        self._values = dict(values)
         self._edits = {}
         layout = QVBoxLayout(self)
         form = QFormLayout()
@@ -2041,10 +2428,11 @@ class GlobalParamsDialog(QDialog):
                   if 0 <= index < len(_UNIT_SYSTEM_ITEMS) else None)
         edit = self._edits.get("gamma_water")
         if system is not None and edit is not None:
-            edit.setText(str(GAMMA_W[system]))
+            edit.setText(_display_number(GAMMA_W[system]))
 
     def result_values(self):
-        out = {f.key: f.from_text(self._edits[f.key].text())
+        out = {f.key: f.read_text(self._edits[f.key].text(),
+                                  self._values.get(f.key, f.default))
                for f in self._numeric_fields}
         out["unit_system"] = _UNIT_SYSTEM_ITEMS[self._units.currentIndex()][1]
         t = self._time.currentText().strip()
@@ -2561,9 +2949,9 @@ class _MaterialListView(QWidget):
             else:
                 w.blockSignals(True)
                 # NaN is "unset" throughout the templates (e.g. t_res, E, area on
-                # lines that don't carry them) — render blank, never the string "nan".
-                _blank = val is None or (isinstance(val, float) and val != val)
-                w.setText("" if _blank else str(val))
+                # lines that don't carry them) — render blank, never the string "nan"
+                # (to_text does that, and rounds the rest for display).
+                w.setText(self._field_by_key[key].to_text(val))
                 w.blockSignals(False)
         ok = 0 <= idx < len(self._rows)
         self.setEnabled(True)
@@ -2596,7 +2984,9 @@ class _MaterialListView(QWidget):
             if isinstance(w, QComboBox):
                 row[key] = f.from_text(w.currentText())
             else:
-                row[key] = f.from_text(w.text())
+                # read_text: an untouched field re-commits the value it was loaded
+                # with, so the display rounding is never written back (Field.read_text).
+                row[key] = f.read_text(w.text(), row.get(key))
 
     # --- visibility ------------------------------------------------------
     def _update_option_visibility(self):
@@ -3359,9 +3749,9 @@ class _LineListView(QWidget):
                 w.setCurrentIndex(j if j >= 0 else 0)
             else:
                 # NaN is "unset" throughout the templates (e.g. t_res, E, area on
-                # lines that don't carry them) — render blank, never the string "nan".
-                _blank = val is None or (isinstance(val, float) and val != val)
-                w.setText("" if _blank else str(val))
+                # lines that don't carry them) — render blank, never the string "nan"
+                # (to_text does that, and rounds the rest for display).
+                w.setText(self._field_by_key[key].to_text(val))
             w.blockSignals(False)
         # Loading blocks the driver's textChanged, so re-word the scaled labels from
         # the freshly-loaded Spacing/S here.
@@ -3380,7 +3770,9 @@ class _LineListView(QWidget):
             if isinstance(w, QComboBox):
                 row[key] = f.from_text(w.currentText())
             else:
-                row[key] = f.from_text(w.text())
+                # read_text: an untouched field re-commits the value it was loaded
+                # with, so the display rounding is never written back (Field.read_text).
+                row[key] = f.read_text(w.text(), row.get(key))
 
     # --- events ----------------------------------------------------------
     def _on_select(self, idx):
@@ -3671,6 +4063,54 @@ CIRCLES_HELP = {
 }
 
 
+def _circles_generate_spec(slope_data):
+    """The Generate button's state and behaviour for the starting-circles editor.
+
+    The generator is ``xslope.search.generate_starting_circles`` — the same function
+    the Run LEM preflight offers as its ``generate_starting_circles`` remedy, so the
+    button and the remedy cannot propose different circles. Whether it CAN run is
+    settled before the dialog is drawn, from the model's own geometry: a section with
+    no room for a circle to daylight leaves a dimmed button carrying that reason
+    rather than a live one that fails when pressed."""
+    from xslope.search import generate_starting_circles
+
+    spec = {"label": "Generate starting circles…",
+            "unit": "circle",
+            # Each circle is its own trial surface, so adding to the ones already in
+            # the table is a real thing to want: a generated set alongside a circle
+            # the user typed is a wider search, not a contradiction.
+            "append": True,
+            "tooltip": "Derive a starting set from the slope's own geometry: for each "
+                       "significant face, a circle through the toe and one at the base "
+                       "of each layer, centered above the middle of the face at twice "
+                       "the slope height."}
+    probe = generate_starting_circles(slope_data, report=True)
+    if not probe["circles"]:
+        spec["available"] = False
+        spec["reason"] = (f"No starting circle can be derived from this model: "
+                          f"{probe['reason']}.")
+        return spec
+    spec["available"] = True
+
+    def propose(parent):
+        # Re-run against the model as it stands rather than reusing the probe above.
+        result = generate_starting_circles(slope_data, report=True)
+        if not result["circles"]:
+            return [], "", result["reason"]
+        rows = []
+        for circle in result["circles"]:
+            row = _new_circle()
+            row.update(circle)
+            # The generator sizes circles by the elevation of their lowest point,
+            # which is what Option = Depth means on this sheet.
+            row["Option"] = "Depth"
+            rows.append(row)
+        return rows, result["summary"], ""
+
+    spec["propose"] = propose
+    return spec
+
+
 class CirclesEditor(CategoryEditor):
     label = "Circles"
     # Mirror the 'circles' worksheet: Xo, Yo, Option, Depth, Xi, Yi, R.
@@ -3698,7 +4138,13 @@ class CirclesEditor(CategoryEditor):
                             "(selected circle bold with center, radius and depth "
                             "lines; others faint). Click a circle to select it.",
             pick_resolve=lambda x, y, tol, rows: _pick_circles(rows, x, y, tol, slope_data),
-            field_help=CIRCLES_HELP)
+            field_help=CIRCLES_HELP,
+            generate=_circles_generate_spec(slope_data),
+            # Seven columns and a section drawing do not both fit across a dialog:
+            # side by side, the table loses R off its right edge. Stacked, the table
+            # gets the full width for its columns and the section — wide and short —
+            # gets the room below.
+            preview_below=True)
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -4205,15 +4651,18 @@ class _SeepBcSetWidget(QWidget):
             self._exit = coords
         elif self._is_flux(self._cur):
             f = self._fluxes[self._flux_idx(self._cur)]
-            try:
-                f["flux"] = float(self.flux_edit.text() or 0)
-            except ValueError:
-                f["flux"] = 0.0
+            txt = self.flux_edit.text()
+            if not _unedited(txt, f.get("flux")):   # untouched keeps the stored value
+                try:
+                    f["flux"] = float(txt or 0)
+                except ValueError:
+                    f["flux"] = 0.0
             f["coords"] = coords
         elif self._is_head(self._cur):
             txt = self.head_edit.text().strip()
             try:
-                self._heads[self._cur]["head"] = float(txt or 0)
+                if not _unedited(txt, self._heads[self._cur].get("head")):
+                    self._heads[self._cur]["head"] = float(txt or 0)
             except ValueError:
                 # a non-numeric head value is a tseep series name (time-varying BC) —
                 # allowed on set 1 only; set 2 is constant, so coerce it to 0.
@@ -4241,11 +4690,11 @@ class _SeepBcSetWidget(QWidget):
         if is_head:
             kind = self._heads[idx].get("kind", "head")
             self.type_combo.setCurrentText("reservoir" if kind == "reservoir" else "head")
-            self.head_edit.setText(str(self._heads[idx]["head"]))
+            self.head_edit.setText(_display_number(self._heads[idx]["head"]))
             rows = [{"x": x, "y": y} for (x, y) in self._heads[idx]["coords"]]
         elif is_flux:
             f = self._fluxes[self._flux_idx(idx)]
-            self.flux_edit.setText(str(f["flux"]))
+            self.flux_edit.setText(_display_number(f["flux"]))
             rows = [{"x": x, "y": y} for (x, y) in f["coords"]]
         else:  # exit face
             rows = [{"x": x, "y": y} for (x, y) in self._exit]
@@ -4629,7 +5078,8 @@ class MatGeometryDialog(QDialog):
         if max_depth is not None:
             mdrow = QHBoxLayout()
             mdrow.addWidget(QLabel("Max depth (bottom boundary elevation):"))
-            self._max_depth_edit = QLineEdit(str(max_depth))
+            self._max_depth = max_depth
+            self._max_depth_edit = QLineEdit(_display_number(max_depth))
             self._max_depth_edit.setToolTip(
                 "Elevation of the model's bottom boundary, used to build the zone "
                 "polygons from the profile lines.")
@@ -4967,8 +5417,11 @@ class MatGeometryDialog(QDialog):
         """The edited max-depth value (float), or None if the field isn't shown."""
         if self._max_depth_edit is None:
             return None
+        text = self._max_depth_edit.text()
+        if _unedited(text, self._max_depth):     # untouched: keep the stored value
+            return self._max_depth
         try:
-            return float(self._max_depth_edit.text())
+            return float(text)
         except (TypeError, ValueError):
             return None
 

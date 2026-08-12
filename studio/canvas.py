@@ -843,15 +843,34 @@ class PreviewPane(QWidget):
         v = QVBoxLayout(self)
         v.setContentsMargins(0, 0, 0, 0)
         v.addWidget(self.canvas, 1)
+        self._caption = None
         if caption:
             cap = QLabel(caption)
             cap.setWordWrap(True)
             cap.setStyleSheet("color: gray; font-size: 11px;")
             v.addWidget(cap)
+            self._caption = cap
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(debounce_ms)
         self._timer.timeout.connect(self._render)
+
+    def reserve_caption(self, width):
+        """Reserve the caption's full wrapped height at ``width``, and return it.
+
+        A wrapped caption's height depends on how wide it is allowed to be, which no
+        layout minimum knows until someone asks. Without this the pane's minimum
+        covers the canvas alone and the last line of the caption is cut off along the
+        bottom edge — the words are there, just not visible. Reserving the height
+        makes a tight layout shrink the canvas instead, and lets the dialog's own
+        minimum account for the caption."""
+        if self._caption is None:
+            return 0
+        height = self._caption.heightForWidth(width)
+        if height < 0:
+            height = self._caption.sizeHint().height()
+        self._caption.setMinimumHeight(height)
+        return height
 
     def schedule(self):
         """(Re)start the debounce so a burst of edits coalesces into one render."""

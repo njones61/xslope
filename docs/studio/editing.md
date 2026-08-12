@@ -134,7 +134,19 @@ list) plus a live preview of the feature on the section.
 **Failure surfaces** is one editor or the other depending on the family the model
 uses: a circle table, or the **non-circular surface** as a list of vertices ordered
 left→right, each with a **Movement** the search obeys (*Free*, *Horiz*, *Fixed*).
-Clicking a vertex in the preview selects its row, and vice versa.
+Clicking a vertex in the preview selects its row, and vice versa. The circle table
+has seven columns, so its preview sits below the table rather than beside it.
+
+The circles editor carries a **Generate starting circles…** button — the same
+generator the Run LEM model checks offer as a remedy when a model has no failure
+surface. It reads the slope's own geometry and proposes, for each significant face,
+a circle through the toe and one at the base of each layer, centered above the
+middle of the face at twice the slope height; candidates that would leave through a
+vertical edge of the section are dropped. It reports what it built and what it
+dropped, under the button, which is what you audit the rows against. With circles
+already in the table it asks first, and can add to them instead of replacing them.
+On a section with no room for a circle to daylight the button is dimmed and its
+tooltip says so.
 
 The non-circular editor carries a **Generate from the weak zone…** button. Some
 slopes fail along a weak layer rather than along their own geometry, and no circle
@@ -142,9 +154,11 @@ passes through that mechanism — the surface runs flat inside the seam and turn
 sharply at each end — so a model with a weak seam needs a surface a circular search
 cannot produce. The button builds one: it ranks the material zones by the shear
 strength each can mobilise at the stress it actually carries, lays a track just above
-the base of the weakest, and ramps up to the ground surface at both ends. It says
-which zone it chose and why before it replaces anything, and the generated points
-land in the table, so you can edit them and Cancel still discards them.
+the base of the weakest, and ramps up to the ground surface at both ends. It reports
+which zone it chose and why, under the button, so the surface can be read against the
+reasoning that produced it. On an empty table it simply builds the surface; where
+there are points already, it asks first. Either way the generated points land in the
+table, so you can edit them and Cancel still discards them.
 
 When no zone is clearly the weakest, a **Choose the weak zone** dialog lists every
 zone with its material colour, its strength model and its computed strength, and the

@@ -171,9 +171,14 @@ class UnsolvedTrials:
         if not self.unsolved:
             return ""
         what = _method_label(self.method)
+        # The third phrase names no mechanism on purpose. Each method's
+        # admissibility guard trips on its own quantity — Spencer's on base
+        # tension beyond what cohesion can carry, Morgenstern-Price's, on this
+        # model's 28 refusals, on 31-38% INTERSLICE tension with base normals at
+        # only 5-8% — so naming one method's guard would misreport the other's.
         parts = [(self.no_admissible_solution, "admit no admissible solution"),
                  (self.not_converged, "failed to converge"),
-                 (self.inadmissible, "solved only with anomalous base tension")]
+                 (self.inadmissible, "solved only with an inadmissible stress state")]
         breakdown = ", ".join(f"{n} {t}" for n, t in parts if n)
         line = (f"{what} could not solve {self.unsolved} of {self.attempted} "
                 f"trial surfaces")

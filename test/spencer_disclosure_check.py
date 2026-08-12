@@ -65,7 +65,11 @@ WHAT IS CHECKED
 * the breakdown is only printed from messages this package has READ:
   Morgenstern-Price's two are mapped and pinned by fixtures here, an unmapped
   message suppresses the taxonomy entirely, and neither may ever be reported as
-  an iteration failing to converge;
+  an iteration failing to converge. Its phrases name no method's mechanism —
+  every one of M-P's 28 refusals on this model trips its INTERSLICE-tension
+  guard (31-38%, base normals at 5-8%), so "anomalous base tension" would
+  misreport all of them;
+* the line the docs quote, against the line the search prints, byte for byte;
 * four mutations: the silent skip restored, a classifier that calls the refused
   circle an iteration failure, a verdict that claims absolute insolubility, and
   the old catch-all that folded unmapped messages into "not_converged".
@@ -194,6 +198,13 @@ def _quiet(fn, *a, **k):
 #: Claims that would be false on BAND_CASE, and must never appear in a verdict.
 ABSOLUTE_CLAIMS = ("no root at any interslice inclination",
                    "admits no solution on this surface")
+
+#: The mechanism the disclosure's third phrase must NOT name: it is one method's
+#: guard, and the class it labels is reached by another method a different way.
+MECHANISM_CLAIM = "anomalous base tension"
+
+#: The page that quotes the disclosure line, and the fenced block it quotes it in.
+DOCS_PAGE = os.path.join(REPO, 'docs', 'lem', 'search.md')
 
 
 def leg_closed_form_is_the_shipped_residual():
@@ -528,8 +539,32 @@ def leg_breakdown_only_from_read_messages():
         fails.append(f"expected one M-P disclosure line, found {len(line)}")
     elif 'failed to converge' in line[0]:
         fails.append(f"the M-P line reports convergence failures: {line[0]}")
+    elif MECHANISM_CLAIM in line[0]:
+        fails.append(f"the M-P line names Spencer's guard ({MECHANISM_CLAIM!r}) for "
+                     f"refusals that tripped M-P's interslice-tension guard: {line[0]}")
     else:
         print(f"  M-P line     {line[0].strip()}")
+
+    # The phrase must be neutral because the refusals behind it are not Spencer's
+    # mechanism: every M-P refusal on this model is interslice tension, with base
+    # normals nowhere near M-P's own 50% base-normal threshold.
+    if out['inadmissible']:
+        worst_base = 0.0
+        for spec in (MP_INADMISSIBLE, {'Xo': 6.0, 'Yo': 42.0, 'R': 42.0}):
+            try:
+                ok_m, msg_m = solve.mprice(_slices(MODEL, spec))
+            except AssertionError:
+                continue
+            if ok_m or solve.failure_kind(msg_m) != 'inadmissible':
+                continue
+            pct = str(msg_m).split('(')[-1].split('%')[0]
+            worst_base = max(worst_base, float(pct))
+        if worst_base >= 50.0:
+            fails.append(f"M-P's refusals here reach {worst_base:.0f}% base normals "
+                         f"in tension; the neutral phrase is no longer the reason")
+        else:
+            print(f"  M-P guard    base normals at most {worst_base:.0f}% in tension "
+                  f"— the refusals are interslice, not base")
 
     # An unmapped message must leave the taxonomy off the line entirely.
     tally = xsearch.UnsolvedTrials('bishop')
@@ -542,6 +577,47 @@ def leg_breakdown_only_from_read_messages():
                      f"{tally.sentence()}")
     else:
         print(f"  unmapped     {tally.sentence().strip()}")
+    return fails
+
+
+def leg_docs_quote_matches_the_shipped_line():
+    """The line docs/lem/search.md quotes must be the line the search prints.
+
+    The page shows the Spencer disclosure from the tutorial embankment, wrapped
+    to the page width inside a fenced block. Unwrapped, it must equal what the
+    search printed above, character for character — counts, phrasing and all — so
+    the documentation cannot drift from the output it documents.
+    """
+    fails = []
+    _fs, _conv, _out, text = _search(MODEL)
+    shipped = [l.strip() for l in text.splitlines() if 'could not solve' in l]
+    if len(shipped) != 1:
+        fails.append(f"expected one printed line to compare against, found {len(shipped)}")
+        return fails
+    with open(DOCS_PAGE) as fh:
+        lines = fh.read().splitlines()
+    blocks, cur, inside = [], [], False
+    for l in lines:
+        if l.startswith('```'):
+            if inside:
+                blocks.append(cur)
+                cur = []
+            inside = not inside
+            continue
+        if inside:
+            cur.append(l)
+    quoted = [' '.join(' '.join(b).split()) for b in blocks
+              if any('could not solve' in l for l in b)]
+    if len(quoted) != 1:
+        fails.append(f"expected one quoted disclosure line on {os.path.basename(DOCS_PAGE)}, "
+                     f"found {len(quoted)}")
+        return fails
+    if quoted[0] != shipped[0]:
+        fails.append(f"the page quotes a line the search does not print.\n"
+                     f"      page: {quoted[0]}\n"
+                     f"      code: {shipped[0]}")
+    else:
+        print(f"  docs quote   matches the printed line, {len(shipped[0])} chars")
     return fails
 
 
@@ -629,6 +705,7 @@ LEGS = [
     ("the moment factor of safety is recorded", leg_moment_fs_is_recorded_and_exact),
     ("the search discloses what it could not solve", leg_search_discloses),
     ("the breakdown comes only from read messages", leg_breakdown_only_from_read_messages),
+    ("the docs quote the line that is printed", leg_docs_quote_matches_the_shipped_line),
     ("a clean search stays silent", leg_clean_search_is_silent),
     ("mutations", leg_mutations),
 ]

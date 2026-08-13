@@ -216,14 +216,16 @@ into that clay rather than anything on the face. Every material states both unit
 split at the piezometric line — γ above it, γ_sat below — the behavior [Problem 16](#16-saturated-vs-moist-unit-weight-_sat) 
 isolates.
 
-This problem is featured as part of a graduate course on slope stability analysis (CE 544 - Slope Stability Analysis)
-at Brigham Young University. The problem used in two exercises to illustrate how to solve limit equilibrium slope 
-stability problems using the method of slices and an Excel spreadsheet. The problem descriptions are here:
+This problem is similar to one used in two exercises in a graduate course on slope stability analysis
+(CE 544 - Slope Stability Analysis) at Brigham Young University, where limit equilibrium problems are solved
+with the method of slices in an Excel spreadsheet. The exercise descriptions are here:
 
 [Ordinary Method of Slices Exercise](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_class/)<br>
 [Bishop Simplified Procedure Homework](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_hw/)
 
-In these exercises, a single circular surface was analyzed. The following Excel input file illustrates the problem:
+This sample shares the exercises' geometry but carries a different set of material properties, including both
+moist and saturated unit weights. In the exercises, a single circular surface was analyzed. The following Excel
+input file illustrates the problem:
 
 Excel input file: [xslope_method_slices_problem.xlsx](files/xslope_method_slices_problem.xlsx)
 

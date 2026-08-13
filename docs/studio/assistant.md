@@ -205,6 +205,13 @@ are now underneath the new one; nothing about editing that one field says so, an
 the model would otherwise look finished until a run failed on it. The checks run
 on the edit that caused it, so the stranded circles are named in the same reply.
 
+Each finding is quoted in full the first time it is reported. On later edits the
+block quotes what is new or has changed since, and names the rest by rule on a
+single line — so a long build on a model that carries standing faults does not
+re-read the same paragraphs after every edit. Anything that would refuse a run is
+quoted in full every time, and no finding leaves the block without being named.
+A new chat, or a newly opened project, starts the reporting over.
+
 A read-only question — anything that reads the model without changing it — skips
 the checks entirely.
 

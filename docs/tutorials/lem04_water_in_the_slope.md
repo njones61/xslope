@@ -47,9 +47,9 @@ weighs below it.
 | 2 | `soil 2` | 122 | 127 | 600 | 28 | `piezo` |
 | 3 | `soil 3` | 115 | 118 | 900 | 12 | `piezo` |
 
-The third soil is the one to watch: a soft foundation clay, φ′ = 12°, carrying
-almost all of its strength as cohesion. It is weaker than the two layers above
-it, and it is where the critical surface goes.
+The third soil — the drawing's **Foundation** — is the one to watch: a soft
+clay, φ′ = 12°, carrying almost all of its strength as cohesion. It is weaker
+than the two layers above it, and it is where the critical surface goes.
 
 **Geometry** — one profile line per material, and the maximum depth at `0`,
 the elevation of the rigid base:

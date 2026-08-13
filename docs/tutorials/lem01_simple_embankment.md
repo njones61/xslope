@@ -384,8 +384,19 @@ minimum, Spencer's stricter equilibrium — force *and* moment, with one intersl
 force inclination — has no solution at all: no inclination can balance slices that
 are being pulled apart. The search can only report the best circle it could solve,
 which is how a method that agrees with Bishop circle-for-circle came back with a
-higher number. The disagreement, the amber warnings and the red bars are all the
-same message: **something about this model is not physical.**
+higher number.
+
+The search says this out loud. Its run output includes the line:
+
+```text
+[⚠️ unsolved trials] Spencer could not solve 56 of 211 trial surfaces (56 admit no admissible solution); 26 of them rank lower than the reported minimum by the moment measure.
+```
+
+Fifty-six trial circles admit no solution that keeps every slice's forces
+admissible, and twenty-six of those rank below the reported 1.276 — Bishop's 1.215
+circle is one of them. The disagreement, the amber warnings, the red bars and the
+unsolved-trials line are all the same message: **something about this model is not
+physical.**
 
 ### The fix is in the ground, not the settings
 

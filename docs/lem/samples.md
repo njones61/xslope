@@ -18,7 +18,10 @@ For each problem below, the solution figure shows the critical surface and facto
 
 ### 1. Simple Embankment
 
-This problem features a simple slope with a single material. 
+This problem features a simple slope with a single material. It is built from
+scratch — assistant, Excel, or Studio — in
+[Tutorial LEM-1](../tutorials/lem01_simple_embankment.md), which also walks
+through reading its warnings and adding the tension crack.
 
 ![simple_embankment.png](sample_images/simple_embankment.png){width=700}
 

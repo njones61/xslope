@@ -208,11 +208,11 @@ Click **Profile lines**, and set **Max depth (bottom boundary elevation):** to
 2. Press **Add line** again, set **Material:** to `2: foundation`, and **Add
    row** twice for `-30, 0` and `90, 0`.
 
-A profile line is the *top* of a material layer, so the second line is the
-contact between the two soils, and everything below it down to the maximum depth
-is foundation. The preview redraws as you type: two lines in the two materials'
-colors, the second running the full width of the section, and the hatched
-**Max depth** line beneath both. Click **OK**.
+The second line is the contact: by the [top-of-a-layer rule](#the-problem),
+everything below it down to the maximum depth is foundation. The preview redraws
+as you type: two lines in the two materials'
+colors, the second running the full width of the section, and the hatched line
+marking the bottom boundary at elevation −10 beneath both. Click **OK**.
 
 ### 3. Starting circles
 
@@ -248,9 +248,11 @@ However you built it, you now hold the same model:
 
 ![The finished model](images/lem03_inputs.png){width=1000}
 
-The two profile lines are drawn in their materials' colors, and the two starting
-circles share a center at (20, 40): the shallow one bottoming out on the contact,
-the deep one on the rock.
+The two profile lines are drawn in their materials' colors, and the two dashed
+red arcs are the starting circles: the shallow one bottoming out on the contact,
+the deep one on the rock. Their radius arrows run off the top of the frame: the
+center the two circles share, (20, 40), sits above it — twice the height of a 20
+ft slope.
 
 Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 `Auto search`, with the slice count left at 40. From Python:
@@ -282,8 +284,8 @@ is the fastest read on which mechanism this section has:
 | Through the toe | −4.72 | 1.646 | 100,872 |
 | Base of the foundation | −10 | 1.656 | 157,486 |
 
-The deep circles carry up to two and a half times the weight of the shallow one
-and are still a third safer, because everything they add is in the foundation:
+The deep circles carry up to 2.57 times the weight of the shallow one and are
+still a third safer, because everything they add is in the foundation:
 twice the cohesion of the fill along every extra foot of base. On this section
 the shallow mechanism controls before the search starts.
 
@@ -324,25 +326,58 @@ auditing. Hold the critical circle's center and vary only how deep it reaches:
 
 The minimum sits exactly on the contact, and the curve is not symmetric about it:
 approaching from above the factor of safety falls smoothly, and a quarter of a
-foot past it the answer jumps 15%. **A circle is flat near its lowest point**, so
+foot past it the answer jumps 14.6%. **A circle is flat near its lowest point**, so
 dipping 3 in. below the contact does not put 3 in. of base into the foundation —
 it puts 9.4 ft of base there, 16% of the surface, at twice the cohesion. The
 strong layer acts as a floor, and the search settles on the deepest surface that
 stays off it.
 
-That single basin is why this model is forgiving about where the search starts.
-Seeded with either of the file's circles alone, with the generator's toe circle
-alone, or with any of seven deliberately bad guesses — a shallow circle on the
-face, a small one in the crest, centers pushed out to x = 70 and x = −10, a 130
-ft arc centered 120 ft up — Spencer's search
-returns 1.244 on the same surface every time. The depth refinement is free to
-walk across the contact, and from every one of those starts the downhill
-direction points to the same place. **The per-layer circles are not what finds
-this answer; they are what makes it checkable**, and the table above is the
-check.
+That single basin is why the search on this model barely notices which circle it
+starts from — across the range of guesses a 20 ft slope invites. Each of these
+was run alone, as the model's only starting circle:
 
-A section whose depth profile has two basins is not so forgiving, and layering is
-the usual way to get one — [Sample Problem 13](../lem/samples.md#13-multiple-local-minima)
+| Starting circle (Xo, Yo), tangent elevation | R (ft) | What it is | FS returned | Center found |
+|---|---:|---|---:|---|
+| (20, 40), 0 | 40 | the file's shallow circle | 1.2441 | (18.50, 43.75) |
+| (20, 40), −10 | 50 | the file's deep circle | 1.2442 | (18.41, 43.79) |
+| (20, 40), −4.72 | 44.7 | the generator's toe circle | 1.2441 | (18.51, 42.98) |
+| (20, 30), +10 | 20 | a shallow arc on the face | 1.2441 | (18.37, 43.72) |
+| (45, 35), +15 | 20 | a small arc inside the crest | 1.2441 | (18.37, 43.85) |
+| (20, 25), 0 | 25 | the right tangent from a center 5 ft up | 1.2441 | (18.38, 43.84) |
+| (−10, 45), 0 | 45 | a center 10 ft beyond the toe | 1.2442 | (18.62, 43.00) |
+| (35, 55), −5 | 60 | a center over the crest break | 1.2441 | (18.46, 43.63) |
+| (70, 60), 0 | 60 | a center 30 ft back along the crest | 1.2441 | (18.50, 43.69) |
+| (50, 80), −10 | 90 | a wide arc from high behind the crest | 1.2441 | (18.42, 43.74) |
+| (20, 120), −9 | 129 | a 129 ft arc centered 120 ft up | 1.2440 | (18.47, 43.69) |
+
+All eleven end on the same surface: tangent to the contact within 0.001 ft,
+center within half a foot of (18.5, 43.75), factor of safety within 0.0002 of
+Spencer's 1.2441. The depth refinement is free to walk across the contact, and
+from each of those starts the downhill direction points to the same place.
+
+The tolerance has an edge, and it is worth knowing where. Seeds keep holding out
+to R = 219, an arc eleven times the height of the slope; past that the
+refinement can settle in the far field instead. Started at (20, 260) tangent at
+−9 — R = 269 — Spencer's search stops on a 222 ft arc centered at (−20.4, 220.7):
+a long, almost flat surface running from x = 74 in the crest down to the toe, 77
+ft of base against the critical circle's 58, at **FS = 1.784** — 43% above the
+minimum this section has. Bigger seeds are worse: R = 329, 409 and 509 return
+1.861, 1.948 and 2.034, the last of them 63% high. The edge is not a clean
+threshold — R = 249 traps and R = 259 does not — and nothing in a trapped run
+says so: it reports convergence, and the only warnings it carries are the
+admissibility ones the true critical surface carries too. What comes back is a
+credible-looking surface with a factor of safety that is too high.
+
+That is the argument for seeding a search with circles built from the section
+rather than typed from nowhere. The generated set here comes from the toe
+position and the slope height: three circles, all centered at (20, 40), reaching
+at most 50 ft to the bottom of the model — a seed thirteen times the height of
+the slope is not something it can propose. **The per-layer circles are not what
+finds this answer; they are what makes it checkable**, and the tables above are
+the check.
+
+A section whose depth profile has two basins gives no such tolerance at all, and
+layering is the usual way to get one — [Sample Problem 13](../lem/samples.md#13-multiple-local-minima)
 is a cohesionless embankment on soft clay where a free search collapses onto a
 shallow sliver on the face and the deep foundation mechanism has to be seeded to
 be found at all. Which is why the rule is per layer rather than per model: the
@@ -402,7 +437,7 @@ This tutorial demonstrated:
   the geometry.
 - Reading a search result at depth: the critical surface is tangent to the
   contact, its base entirely in the weaker fill, and the factor of safety jumps
-  15% a quarter of a foot below it.
+  14.6% a quarter of a foot below it.
 - Why a strong layer under a weak one puts a floor under the answer, and why
   softening it to 300 psf moves the critical surface to the base of the
   foundation and the factor of safety from 1.244 to 0.792.

@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-4 — Water in the Slope"
-description: "Build a three-layer slope with a piezometric line in XSLOPE, hold one deep circle fixed, and measure what the water is worth: pore pressure on the slice bases, the γ/γ_sat unit-weight split, the r_u alternative, and a parametric sweep on a saturated unit weight."
+description: "Build a three-layer slope with a piezometric line in XSLOPE, search it for the critical circle, and measure what the water is worth on that circle: pore pressure on the slice bases, the γ/γ_sat unit-weight split, the r_u alternative, and a parametric sweep on a saturated unit weight."
 ---
 
 # Tutorial LEM-4 — Water in the Slope
@@ -9,8 +9,8 @@ A 44 ft slope in three soil layers, with a piezometric line falling from
 elevation 80 behind the crest to the toe. Every strength here is an **effective
 stress** strength — a c′ and a φ′ — so every one of them is read against the
 pore pressure on the failure surface, and the water is the input the answer
-turns on: the same slope, on the same circle, reads **2.471 dry and 1.579
-wet.**
+turns on: the critical circle reads **1.667 with the pore pressures switched
+off and 1.301 with them on.**
 
 ![Slope with three layers and a piezometric line](../lem/sample_images/method_slices_problem.png){width=700}
 
@@ -22,13 +22,13 @@ wet.**
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Build a layered section whose materials read their pore
-pressure from a piezometric line, hold one specified deep circle fixed while
-the water assumptions change around it, and learn what each input means: the
-line and the u it produces on every slice base, the two unit-weight columns,
-the r<sub>u</sub> alternative, and a fixed-surface parametric sweep on a
+pressure from a piezometric line, search it for the critical circle, and hold
+that circle while the water assumptions change around it: the line and the u it
+produces on every slice base, the two unit-weight columns and the weight they
+split, the r<sub>u</sub> alternative, and a held-surface parametric sweep on a
 saturated unit weight.
 </div>
-<p><span class="tg-pill">three materials</span><span class="tg-pill">piezometric line</span><span class="tg-pill">effective stress</span><span class="tg-pill">single surface</span><span class="tg-pill">saturated unit weight</span><span class="tg-pill">sensitivity sweep</span></p>
+<p><span class="tg-pill">three materials</span><span class="tg-pill">piezometric line</span><span class="tg-pill">effective stress</span><span class="tg-pill">saturated unit weight</span><span class="tg-pill">circular search</span><span class="tg-pill">sensitivity sweep</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_method_slices_problem.xlsx](../lem/files/xslope_method_slices_problem.xlsx) — the same file used by [LEM Sample Problem 5](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)</div>
 </div>
 
@@ -37,13 +37,19 @@ saturated unit weight.
 ## The problem
 
 **Materials** — three Mohr-Coulomb (`mc`) soils, listed top down, every one an
-effective-stress strength reading the piezometric line:
+effective-stress strength reading the piezometric line. Each states **two** unit
+weights: γ, what the soil weighs above the water table, and γ_sat, what it
+weighs below it.
 
-| Mat ID | Name | γ (pcf) | c′ (psf) | φ′ (deg) | Pore pressure |
-|---|---|---:|---:|---:|---|
-| 1 | `soil 1` | 130 | 200 | 28 | `piezo` |
-| 2 | `soil 2` | 120 | 100 | 32 | `piezo` |
-| 3 | `soil 3` | 132 | 400 | 27 | `piezo` |
+| Mat ID | Name | γ (pcf) | γ_sat (pcf) | c′ (psf) | φ′ (deg) | Pore pressure |
+|---|---|---:|---:|---:|---:|---|
+| 1 | `soil 1` | 125 | 130 | 400 | 30 | `piezo` |
+| 2 | `soil 2` | 122 | 127 | 600 | 28 | `piezo` |
+| 3 | `soil 3` | 115 | 118 | 900 | 12 | `piezo` |
+
+The third soil is the one to watch: a soft foundation clay, φ′ = 12°, carrying
+almost all of its strength as cohesion. It is weaker than the two layers above
+it, and it is where the critical surface goes.
 
 **Geometry** — one profile line per material, and the maximum depth at `0`,
 the elevation of the rigid base:
@@ -69,13 +75,11 @@ ft down to the base.
 
 It starts 4 ft below the crest, steepens as it approaches the face, and comes
 down to the toe — from x = 189.5 on, it lies *on* the lower face and the flat
-ground beyond it. That stretch is where the water reaches the surface, and it
-decides what the search finds below.
+ground beyond it. That stretch is where the water reaches the surface.
 
-**The failure surface** — one circle, specified rather than searched for:
-center (195, 150), **Depth** = `18.1`. This problem is a single-surface
-exercise: the circle is the surface of interest, entered as given, and every
-measurement that follows is made on it.
+**The starting circle** — center (195, 150), **Depth** = `18.1`, one seed for
+the search to begin from. The surface this page measures is the one the search
+finds, not this one.
 
 ---
 
@@ -104,7 +108,7 @@ numbers, or describe the whole model:
 
 <div class="prompt-block" markdown>
 ```text
-Build a model with three horizontal soil layers over a rigid base at elevation 0. Layer 1: top at elevation 84, 130 pcf, c = 200 psf, phi = 28. Layer 2: top at 64, 120 pcf, c = 100 psf, phi = 32. Layer 3: top at 40, 132 pcf, c = 400 psf, phi = 27. The ground surface runs level at 84 from x = 0 to 150, drops through (174.7, 64) to a toe at (204.3, 40), then runs level at 40 out to x = 320. All three soils take their pore pressure from a piezometric line through (0, 80), (75, 79), (112, 76), (140, 70), (170, 61), (189.5, 52), (204.3, 40), (320, 40). Add one starting circle centered at (195, 150) with the bottom of the circle at elevation 18.1.
+Build a model with three horizontal soil layers over a rigid base at elevation 0. Layer 1: top at elevation 84, moist unit weight 125 pcf, saturated unit weight 130 pcf, c = 400 psf, phi = 30. Layer 2: top at 64, 122 pcf moist, 127 pcf saturated, c = 600 psf, phi = 28. Layer 3: top at 40, 115 pcf moist, 118 pcf saturated, c = 900 psf, phi = 12. The ground surface runs level at 84 from x = 0 to 150, drops through (174.7, 64) to a toe at (204.3, 40), then runs level at 40 out to x = 320. All three soils take their pore pressure from a piezometric line through (0, 80), (75, 79), (112, 76), (140, 70), (170, 61), (189.5, 52), (204.3, 40), (320, 40). Add one starting circle centered at (195, 150) with the bottom of the circle at elevation 18.1.
 ```
 </div>
 
@@ -122,9 +126,11 @@ Build a model with three horizontal soil layers over a rigid base at elevation 0
   standing water, and the weight of standing water is a distributed load —
   XSLOPE derives it automatically when `main!D23` **Water loads** is `auto` —
   not something to skip.
-- **γ_sat is blank.** One unit weight per material is this exercise's
-  assumption; the second column waits for
-  [a later section](#the-two-unit-weight-columns), deliberately.
+- **Both unit-weight columns are filled**, and γ_sat is the larger of the pair
+  in every row. A saturated soil weighs more than the same soil moist, never
+  less, and neither number is ever a buoyant weight —
+  [what the pair does](#the-two-unit-weight-columns) is split each slice's
+  weight at the water table.
 - **The maximum depth is `0`** — the elevation of the rigid base, not a
   thickness.
 - **The circle's Depth is `18.1`**, an *elevation*: the loader forms
@@ -146,23 +152,24 @@ under a name of your own. Confirm `main!D8` **Units** is `Imperial`, confirm
 
 One row per material, and the row number is the ID:
 
-1. `mat!A11` = `1`, `mat!B11` = `soil 1`, `mat!C11` **γ** = `130`,
-   `mat!E11` **option** = `mc`, `mat!F11` **c** = `200`, `mat!G11` **φ** =
-   `28`, `mat!O11` **u** = `piezo`.
-2. `mat!A12` = `2`, `mat!B12` = `soil 2`, γ = `120`, option = `mc`, c = `100`,
-   φ = `32`, u = `piezo`.
-3. `mat!A13` = `3`, `mat!B13` = `soil 3`, γ = `132`, option = `mc`, c = `400`,
-   φ = `27`, u = `piezo`.
+1. `mat!A11` = `1`, `mat!B11` = `soil 1`, `mat!C11` **γ** = `125`,
+   `mat!D11` **gsat** = `130`, `mat!E11` **option** = `mc`, `mat!F11` **c** =
+   `400`, `mat!G11` **φ** = `30`, `mat!O11` **u** = `piezo`.
+2. `mat!A12` = `2`, `mat!B12` = `soil 2`, γ = `122`, gsat = `127`,
+   option = `mc`, c = `600`, φ = `28`, u = `piezo`.
+3. `mat!A13` = `3`, `mat!B13` = `soil 3`, γ = `115`, gsat = `118`,
+   option = `mc`, c = `900`, φ = `12`, u = `piezo`.
 
 ![The finished mat worksheet](images/lem04_sheet_mat.png)
 
-Two of these columns are the subject of this page. **`u` is where each
+Two parts of this row are the subject of this page. **`u` is where each
 material's pore pressure comes from** — `piezo` reads the piezometric line,
 `none` reads nothing, and the [other two options](#r_u-a-pore-pressure-without-a-line)
-appear later. And the pair **C:D** are the unit-weight columns: **γ** is the
-unit weight this model uses everywhere, and **gsat**, left blank here, is the
-saturated unit weight the engine would use below the water table if it were
-given one. Blank means *γ throughout* — which is this problem's assumption.
+appear later. And the pair **C:D** are the unit-weight columns: **γ** is what
+the soil weighs above the water table, **gsat** what it weighs below it, and
+filling both is what lets the engine
+[split each slice's weight](#the-two-unit-weight-columns) at the line. Leaving
+**gsat** blank is legal and means *γ throughout*.
 
 ### 2. The `profile` worksheet
 
@@ -218,7 +225,8 @@ Start with **File → New** and work down the **Inputs** tree.
 
 Click **Materials**, and in **Table view** press **Add row** three times for
 the three soils in the order the table above lists them — the row order fixes
-the Mat IDs. Set every row's **u** to `piezo`. Then **Profile lines**: set
+the Mat IDs. Fill both unit-weight columns, **γ** and **gsat**, and set every
+row's **u** to `piezo`. Then **Profile lines**: set
 **Max depth (bottom boundary elevation):** to `0`, and press **Add line**
 three times, each line taking its **Material:** and its vertices from the
 geometry table above. The mechanics are
@@ -241,10 +249,9 @@ one rule the table has — points ordered left to right. Click **OK**.
 ### 3. The circle
 
 Click **Circles**, press **Add row**, and enter **Xo** `195`, **Yo** `150`,
-**Option** `Depth`, **Depth** `18.1`. This page does not press the generator:
-the circle is *specified* — the problem names it — and the surface of a
-single-surface study is an input, not a guess to be refined. The preview draws
-it bottoming out 21.9 ft below the toe elevation. Click **OK**.
+**Option** `Depth`, **Depth** `18.1`. The preview draws it bottoming out 21.9 ft
+below the toe elevation. One circle is enough here: it is the seed the search
+starts from, and the search moves it. Click **OK**.
 
 Continue below.
 
@@ -267,151 +274,175 @@ From Python:
 ```python
 from xslope.fileio import load_slope_data
 from xslope.search import circular_search
-from xslope.plot import plot_solution
+from xslope.plot import plot_circular_search_results
 
 sd = load_slope_data("my_water_slope.xlsx")
 fs_cache, _, path, circles = circular_search(sd, "spencer", num_slices=40)
-crit = fs_cache[0]
-plot_solution(sd, crit["slices"], crit["failure_surface"], crit["solver_result"])
+plot_circular_search_results(sd, fs_cache, path, circle_cache=circles)
 ```
 
 ---
 
 ## Exploring the results
 
-### What the search finds on a wet slope
+### What the search finds
 
 ![The circular search](images/lem04_search.png){width=1000}
 
-**FS = 0.764** — and it is not the circle you entered. The search started at
-the deep seed, walked its center down and to the right, and settled on a
-sliver of the lower face: 30 ft of section entering the upper face at x = 174,
-less than a foot above the slope break at (174.7, 64), and running to the toe
-at 204.3, nowhere more than 8.1 ft deep. Its base is 41.7 ft
-long and 41.1 ft of that is in soil 2; the mass above it weighs 20,143 lb/ft —
-3% of what the deep circle carries.
+**FS = 1.301**, and the critical circle is not the one you entered. The search
+walked the seed's center down and to the left and settled on a deep foundation
+mechanism: **Xo = 182.37, Yo = 88.32, Depth = 26.90**. It enters the crest at
+x = 121.1, bottoms out at elevation 26.9 — 13.1 ft down into soil 3 — and
+exits on the flat ground at x = 220.3, well beyond the toe. Its base is
+131.4 ft long: 19.1 ft of that in soil 1, 30.5 ft in soil 2 and **81.7 ft in
+soil 3**, and the mass above it weighs 349,677 lb/ft.
 
-The face is where this model is weakest, and the water is why. Soil 2 has the
-least cohesion of the three soils, and from x = 189.5 to the toe the
-piezometric line lies *on* the ground surface: the lower face is a seepage
-face, with pore pressures up to 472 psf on a surface skimming a few feet
-below it. That water is the difference between standing and failing — solve
-the same sliver dry and it reads 1.333; wet, 0.764. What the pore pressure
-spends is the sliver's friction: the cohesive resistance is 4,226 lb/ft in
-either state, but the frictional share drops from 10,768 lb/ft dry to 4,374
-wet, and the half-cohesion, half-friction strength that survives no longer
-balances the driving weight. A search ranks every circle
-it tries by factor of safety and nothing else, so a shallow failure in a weak,
-wet face outranks every deep mechanism the section has. The result is honest:
-this model really does say the lower face sloughs. It is also not the
-question this problem asks.
+That is the soft foundation clay doing what soft foundation clay does. Soil 3
+is the weakest soil in the section and the only one carrying nearly all of its
+strength as cohesion (φ′ = 12°), and a circle that dives into it trades a
+longer, heavier arc for 82 ft of weak sliding base. Circles that stay out of it
+do not compete: sweep centers across the face for circles tangent to the top of
+the foundation at elevation 40 — sliding entirely through soil 1 and soil 2, on
+two-thirds of the base and a third of the weight — and the lowest they give is
+**1.373**.
 
-The question is the specified deep circle, and the way to ask it is to stop
-searching: run again with **Analysis** = `Single surface`, which solves the
-first circle exactly as entered. Holding the surface fixed is what makes the
-rest of this page possible — change the water and re-search, and every answer
-comes back about whatever surface the search picked that time; change the
-water on a pinned surface, and the difference *is* the water. From Python:
+Read the figure with the search path in mind. The grey arcs are the circles
+the search tried, the black dots are their centers, the green line is the path
+its refinement took from the seed at (195, 150), and the red arc is the winner.
+A search that ends with its critical center in the middle of a well-populated
+cloud of dots has genuinely bracketed the minimum; one that ends on the edge of
+its own grid has not.
+
+### Holding the circle still {#holding-the-circle-still}
+
+Everything below asks *what is the water worth on this slope*, and the way to
+ask a question about one variable is to change one variable. So put the circle
+the search found into the model and stop searching.
+
+There is no need to read the circle off the picture: the search states it when
+it converges, in Studio's **Log** pane and on the console from Python, as
+`at (x=182.37, y=88.32, depth=26.90)`. Those are the three numbers to enter:
+
+- **Studio** — open **Circles**, and set the one row to **Xo** `182.37`,
+  **Yo** `88.32`, **Option** `Depth`, **Depth** `26.9`. Then **Run LEM…** with
+  **Analysis** = `Single surface`, which solves the first circle exactly as
+  entered.
+- **Excel** — `circles!B3` = `182.37`, `circles!C3` = `88.32`, `circles!E3` =
+  `26.9`.
+- **Assistant** — say: *"Replace the circle with the critical one: Xo 182.37,
+  Yo 88.32, Depth 26.9, and run a single-surface analysis."*
+
+From Python, the circle comes straight off the search:
 
 ```python
+from xslope.plot import plot_solution
 from xslope.slice import generate_slices
 from xslope.solve import solve_selected
 
-ok, (slice_df, surface) = generate_slices(sd, circle=sd["circles"][0],
-                                          num_slices=40)
+crit = fs_cache[0]
+circle = {"Xo": crit["Xo"], "Yo": crit["Yo"], "Depth": crit["Depth"],
+          "R": crit["Yo"] - crit["Depth"]}
+ok, (slice_df, surface) = generate_slices(sd, circle=circle, num_slices=40)
 result = solve_selected("spencer", slice_df)
 plot_solution(sd, slice_df, surface, result)
 ```
 
-### The pinned circle, dry
+![Spencer on the held circle, wet](images/lem04_solution_wet.png){width=1000}
 
-Start by asking what the circle would be worth with no water at all. Set every
-material's pore pressure option to `none` — leave the piezometric line where
-it is; with **gsat** blank, as here, a line no material reads changes nothing.
-([Fill that column](#the-two-unit-weight-columns) and that stops being true —
-the line becomes the water table the weight split keys on, whatever the `u`
-options say.) The `none` cells:
+**FS = 1.301** — the search's answer, reproduced on a surface that will now sit
+still. The blue bars on the slice bases are the legend's **Pore Pressure (u)**,
+and on 38 of the 39 slice bases they are not zero. Each one is the piezometric
+reading — u = γ<sub>w</sub> × the vertical distance from the base to the line
+— and the largest, **2064 psf at x = 163.6**, is a base sitting 33.1 ft below
+the line (62.4 × 33.1). Only the first slice, whose base hugs the crest above
+the line's left end, reads zero.
+
+### What the water costs
+
+Now take the water out of the strength calculation. Set every material's pore
+pressure option to `none` and leave everything else exactly as it is:
 
 - **Studio** — open **Materials** and set each row's **u** to `none`.
 - **Excel** — `mat!O11`, `mat!O12`, `mat!O13` = `none`.
 - **Assistant** — say: *"Set every material's pore pressure option to none."*
 
-Run the single-surface analysis:
+Run the same single surface again:
 
-![Spencer on the pinned circle, dry](images/lem04_solution_dry.png){width=1000}
+![Spencer on the held circle, dry](images/lem04_solution_dry.png){width=1000}
 
-**FS = 2.471.** The circle enters the crest at x = 80.8, bottoms out at
-elevation 18.1 in soil 3, and exits on the flat ground at x = 267.8 — 215 ft
-of base, 154 ft of it in soil 3, carrying 717,261 lb/ft. The green bars drawn
-on the base are the legend's **Eff Normal Stress (σ')**: with u = 0
-everywhere, the effective normal stress *is* the total normal stress, and
-every pound of it earns frictional strength at tan φ′.
+**FS = 1.667.** Same circle, same 131.4 ft of base, same 349,677 lb/ft of soil
+— the pore pressure is worth **22% of the factor of safety** and nothing else
+moved. (The weight is identical because the piezometric line is still there
+doing its *other* job, [splitting the weight](#the-two-unit-weight-columns);
+switching `u` off stops the line producing pressure, not the soil below it
+being saturated.) The green bars are the legend's **Eff Normal Stress (σ')**,
+and with u = 0 everywhere the effective normal stress *is* the total normal
+stress: every pound of it earns frictional strength at tan φ′.
 
-### The piezometric line, and what it costs
-
-Now put the water back — the same three cells, returned to `piezo` (or undo)
-— and run the same surface again:
-
-![Spencer on the pinned circle, wet](images/lem04_solution_wet.png){width=1000}
-
-**FS = 1.579.** Same circle, same 215 ft of base, same 717,261 lb/ft of soil —
-the water table takes 36% off the factor of safety. The figure shows where it
-went: the blue bars are the legend's **Pore Pressure (u)**, and on 39 of the
-40 slice bases they are not zero. Each one is the piezometric reading —
-u = γ<sub>w</sub> × the vertical distance from the base to the line — and the
-largest, 2571 psf at x = 157, is a base sitting 41.2 ft below the line
-(62.4 × 41.2). Only the first slice, whose base hugs the crest above the
-line's left end, reads zero.
-
-The mechanics are one line long: τ = c′ + (σ − u) tan φ′. The water carries
-part of the normal load, the part it carries produces no friction, and on
-this circle the pore pressure bars visibly hollow out the effective-stress
-bars that were there in the dry run. Nothing about the soil changed — c′ and
-φ′ are what they were — and the driving weight did not change either. The
-strength did.
+The mechanics are one line long: τ = c′ + (σ − u) tan φ′. Cohesion is untouched
+— c′ Δℓ summed over the base is **99,507 lb/ft** in both states, because
+neither c′ nor the base changed — so every pound the water costs comes out of
+friction, and it is countable: Σ u Δℓ tan φ′ over the 39 slices is
+**46,471 lb/ft** of frictional resistance that the pore pressure erases. In the
+wet figure the blue bars visibly hollow out the green ones.
 
 Run the other methods on both states and the pattern holds everywhere:
 
 | | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Dry (u = `none`) | 2.212 | 2.477 | 2.411 | 2.689 | 2.561 | 2.471 | 2.471 |
-| Piezometric line | 1.303 | 1.576 | 1.533 | 1.766 | 1.641 | 1.579 | 1.579 |
+| u = `none` | 1.502 | 1.696 | 1.633 | 2.084 | 1.810 | 1.667 | 1.669 |
+| Piezometric line | 1.115 | 1.328 | 1.266 | 1.690 | 1.421 | 1.301 | 1.303 |
 
-Two readings worth taking. **Bishop, Spencer and Morgenstern-Price agree to
-0.2% wet or dry** — on a circular surface with φ > 0 they are the reliable
-cluster, and Spencer is the one to report. And **the water widens the
-spread**: OMS sits 10% under Spencer dry but 17% under it wet. OMS computes
+Two readings worth taking. **Spencer and Morgenstern-Price agree to 0.2% wet or
+dry** — the two methods that satisfy force *and* moment equilibrium, and
+Spencer is the one to report. Bishop, which satisfies moment equilibrium alone,
+sits 2% above them on this circle. And **the water widens the spread**: OMS
+sits 10% under Spencer dry but 14% under it wet. OMS computes
 each slice's normal force from the weight alone and then subtracts the full
-u·dl from it, and on a deep circle under high pore pressure that
+u·dℓ from it, and on a deep circle under high pore pressure that
 approximation sheds too much normal force — a known conservatism of the
 method, at its worst exactly here.
 
+One thing a held surface cannot show: the water does not only change the
+strength of a mechanism, it changes *which* mechanism is critical. Set the
+three `u` cells to `none` and run **Auto search** rather than the single
+surface, and the dry slope's own critical circle is a shorter, shallower one
+that never reaches as far into the foundation — 1.651, on a mass of
+241,357 lb/ft. Isolating a variable and finding the critical surface are two
+different runs, and they answer two different questions.
+
+Put the water back — the three cells, returned to `piezo` — before going on.
+
 ### The two unit-weight columns {#the-two-unit-weight-columns}
 
-The `mat` sheet carries two unit weights per material and this model filled
-one. **γ** is the total unit weight of the soil as it sits above the water
+The `mat` sheet carries two unit weights per material and this model fills
+both. **γ** is the total unit weight of the soil as it sits above the water
 table — solids plus whatever moisture it holds. **gsat** is the total unit
 weight when the voids are full, which is what the soil below the water table
-actually weighs; a saturated soil is typically a few pcf heavier. With
-**gsat** blank, XSLOPE uses **γ** for the whole column of every slice —
-that is this exercise's assumption, one weight per soil.
+actually weighs; a saturated soil is typically a few pcf heavier. Given both,
+the engine splits each slice's column at the water table — γ above, γ_sat
+below, with the piezometric line serving as the water table. With **gsat**
+blank it uses **γ** for the whole column instead.
 
-Fill the column in and the engine splits the weight: each slice's column uses
-γ above the water table and γ_sat below it, with the piezometric line serving
-as the water table. Enter `mat!D11` = `135`, `mat!D12` = `125`,
-`mat!D13` = `140` (in Studio, the **gsat** column of the materials table) and
-re-run the pinned circle:
+That split is already in every number on this page. To see what it is worth,
+clear the three **gsat** cells and run the held circle again:
 
 | | ΣW (lb/ft) | FS (Spencer) |
 |---|---:|---:|
-| γ only (gsat blank) | 717,261 | 1.579 |
-| γ above the line, γ_sat below | 747,093 | 1.621 |
+| γ only (gsat blank) | 340,385 | 1.311 |
+| γ above the line, γ_sat below | 349,677 | 1.301 |
 
-The sliding mass gains 4.2% of its weight, all of it below the water table —
-and the factor of safety goes *up* 2.6%. That direction surprises most people
-once: added weight adds driving moment, but it also adds normal stress on a
-base whose pore pressure is fixed by the line, and on this deep, flat-bottomed
-circle the frictional gain outruns the extra drive. Neither effect is large.
+The sliding mass gains 2.7% of its weight, all of it below the water table,
+and the factor of safety falls 0.8%. Both effects are small and neither
+direction is a rule: added weight adds driving moment, but it also adds normal
+stress on a base whose pore pressure is fixed by the line, and which of the two
+wins depends on where the extra weight sits on the arc. The
+[sweeps below](#how-much-does-gsat-matter) take that apart one layer at a
+time, and the three layers do not agree.
+
+Note what did **not** change: `u`. Pore pressure comes from the line's
+elevation and the base's, never from what the soil weighs — the two columns and
+the `u` option are separate inputs about the same water.
 
 What γ_sat is **not** is a buoyant unit weight. Both columns are *total* unit
 weights, and the water's effects enter the analysis explicitly — the weight of
@@ -422,10 +453,7 @@ and u is still subtracted from a normal stress that no longer contains the
 water it removes. If the two effects are to cancel, the analysis is where
 they cancel, not the input file.
 
-The split is worth having when the answer is worth refining — the two rows
-above bound what it buys on this section. Leave **gsat** blank and the model
-is the exercise as published; it stays filled here for one more section,
-because a filled column is something a sweep can hold.
+Restore the three **gsat** cells (or undo) before going on.
 
 ### r_u — a pore pressure without a line {#r_u-a-pore-pressure-without-a-line}
 
@@ -444,12 +472,13 @@ soil weight*, where a piezometric line's u is pure geometry — the two models
 answer weight questions differently, which is one reason the line, when you
 have one, is the better input.
 
-### Does the γ_sat guess matter?
+### How much does γ_sat matter? {#how-much-does-gsat-matter}
 
-The 135 / 125 / 140 entered above are estimates, and an input you had to
-guess is an input to sweep. The question is narrow — *on this circle, how much
-does the answer move as one saturated unit weight moves?* — and narrow is
-exactly what a fixed-surface sweep answers.
+A saturated unit weight is rarely measured; it is usually inferred from a void
+ratio and a specific gravity, and an input you had to infer is an input to
+sweep. The question is narrow — *on this circle, how much does the answer move
+as one saturated unit weight moves?* — and narrow is exactly what a
+held-surface sweep answers.
 
 Click **Run → Parametric…** and set it up:
 
@@ -457,14 +486,14 @@ Click **Run → Parametric…** and set it up:
 
 1. **Mode** = `Sensitivity (tornado + plots)`, **Method** = `Spencer`.
 2. Under **Parameter**, **Material** = `soil 3` and **Property** =
-   `gamma_sat` — the deep layer, the one 154 ft of this base runs through.
-3. **Default ±%** = `5`, **Points** = `7` — a ±7 pcf band about 140, about
-   the width of a defensible guess. Press **Add parameter**, and the
+   `gamma_sat` — the foundation clay, the layer 81.7 ft of this base runs
+   through.
+3. **Default ±%** = `5`, **Points** = `7` — a ±6 pcf band about 118, about
+   the width of a defensible inference. Press **Add parameter**, and the
    parameter lands in the table.
-4. **Untick "Re-search the critical surface at each step."** This is the
-   opposite of the advice in [LEM-2](lem02_loads_on_the_crest.md), and it is
-   not a shortcut — it is the question. Re-solving the entered surface is
-   what a prescribed-surface study means.
+4. **Untick "Re-search the critical surface at each step."** The circle in the
+   model is the one the search found and the one every reading above was taken
+   on, so re-solving it is what keeps this curve comparable with them.
 5. **Run**, then double-click the tornado's one bar — the dialog's own note
    says so: *"Double-click a bar for that parameter's curve."*
 
@@ -474,38 +503,43 @@ From Python, the same sweep:
 from xslope.sensitivity import sensitivity
 from xslope.plot import plot_sensitivity
 
+sd["circles"] = [circle]        # the circle the search found, held
 success, result = sensitivity(sd, param="mat:soil 3:gamma_sat",
                               rel_range=0.05, n=7, search=False,
-                              methods=("spencer",))
+                              methods=("spencer",), num_slices=40)
 plot_sensitivity(result["df"])
 ```
 
-![The γ_sat sweep on the fixed circle](images/lem04_sweep.png){width=1000}
+![The γ_sat sweep on the held circle](images/lem04_sweep.png){width=1000}
 
-The curve is a straight line from **1.576 at 133 pcf to 1.666 at 147 pcf** —
-0.006 of factor of safety per pcf, the base case marked at (140, 1.62). The
-entire ±5% band of saturated-unit-weight guesses is worth about ±3% of the
-answer, on the same slope where the existence of the water table was worth
-36%. The sweep is the license to stop
-agonizing over the third digit of γ_sat — and its direction is not a law of
-nature but a property of *this* circle: sweep soil 2's γ_sat instead — the
-same ±5%, about 119 to 131 pcf — and the answer creeps the other way, 1.626
-down to 1.617, because that soil's weight sits over the toe end of the arc.
-Unit weights move a
-wet-slope answer by little, in whichever direction the geometry decides.
+The curve is a straight line from **1.292 at 112.1 pcf to 1.309 at 123.9 pcf**
+— 0.0014 of factor of safety per pcf, the base case marked at (118, 1.30). The
+whole ±5% band is worth **1.3%** of the answer, on the same circle where the
+existence of the pore pressures was worth 22%. That is the license to stop
+agonizing over the third digit of γ_sat.
 
-One honest wrinkle closes the loop. Leave **Re-search the critical surface at
-each step** ticked here and the sweep returns a flat line at **0.776** for
-every value of γ_sat: each step re-finds the face sliver, whose soil 1 and
-soil 2 mass never contains soil 3's saturated weight at all. The curve is
-correct, and it is a curve about the wrong surface — the checkbox is the
-difference between *"how sensitive is my circle"* and *"how sensitive is
-whatever the search finds."* (With the γ_sat column filled, the sliver reads
-0.776 rather than the 0.764 of the file as shipped — the splash of extra
-saturated weight reaches even it.)
+The *direction* is not a law of nature but a property of this arc. Here a
+heavier foundation clay helps: its weight sits under the deep, flat-bottomed
+middle of the base, where the extra normal stress buys more friction than the
+extra weight costs in drive. Sweep soil 2's γ_sat instead — the same ±5%,
+about 120.6 to 133.3 pcf — and the answer moves the other way, **1.313 down to
+1.288**, because that soil's mass sits over the driving half of the arc. Unit
+weights move a wet-slope answer by little, in whichever direction the geometry
+decides.
 
-Before saving, put the model back the way the exercise defines it: clear the
-three **gsat** cells (or undo), and confirm the three `u` cells read `piezo`.
+Tick **Re-search the critical surface at each step** and run it again: the
+curve comes back the same, 1.292 to 1.308. The critical mechanism does not move
+as the foundation clay's saturated weight changes, so the two questions have
+one answer here — which is a fact about this model, not a reason to stop asking.
+The checkbox earns its keep whenever the *entered* surface and the *critical*
+surface are different surfaces, and this model shows that too: put the original
+starting circle back in the table — (195, 150), **Depth** `18.1` — and sweep
+with re-search unticked, and the curve runs 1.446 to 1.477 about a base of
+**1.462**. Every point of it is correct, and every point of it is about a
+surface 11% stronger than the one that governs.
+
+Before saving, confirm the three `u` cells read `piezo` and put back whichever
+circle you want the file to carry.
 
 ---
 
@@ -517,25 +551,26 @@ This tutorial demonstrated:
   the section, entered once and read by every material whose `u` option is
   `piezo` — and pore pressure as γ<sub>w</sub> times depth below it, drawn on
   every slice base of the solution plot.
-- Effective stress doing the work: the same circle reads 2.471 dry and 1.579
-  wet, with c′, φ′ and the driving weight identical — the water table costs
-  36% of the factor of safety through u alone.
-- A search on a wet slope honestly reporting a shallow seepage-face failure
-  at 0.764, and the single-surface analysis as the way to hold a specified
-  deep circle fixed while the water assumptions change.
+- A search finding the mechanism a layered section really has: a deep circle
+  through the soft foundation clay at 1.301, 81.7 ft of its base in that one
+  layer, against 1.373 for the best circle that stays above it.
+- Effective stress doing the work: the same circle reads 1.667 with `u` off and
+  1.301 with the line on, with c′, φ′ and the driving weight identical — 22% of
+  the factor of safety, all of it out of friction (Σ u Δℓ tan φ′ =
+  46,471 lb/ft) and none out of cohesion.
 - The two unit-weight columns: **γ** above the water table, **gsat** below it
   (blank = **γ** throughout), both *total* unit weights — never buoyant —
-  worth +2.6% on this circle when filled with realistic values.
+  worth 2.7% of the sliding weight and −0.8% of the factor of safety here.
 - r<sub>u</sub> as the chart-era alternative — u = r<sub>u</sub> σ<sub>v</sub>
   per material, no line required, scaling with weight where a line does not.
-- A fixed-surface parametric sweep: re-search unticked because the surface is
-  prescribed, a ±5% γ_sat band moving Spencer by about ±3% — and the same
-  sweep with re-search left on answering a different question entirely, flat
-  at the sliver's 0.776.
+- A held-surface parametric sweep: a ±5% γ_sat band moving Spencer by 1.3%,
+  the sign of that movement set by where the layer sits on the arc, and the
+  re-search checkbox as the difference between sweeping the surface you entered
+  and sweeping the one that governs.
 
 **Where to go next:** the [tutorials index](index.md) lists the rest of the
 series. [Sample Problem 5](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
-carries this same model into a multi-seed search of the sloughing failure the
-single seed found here, and the
+carries this same section into a three-seed search and reports every method on
+both surfaces, and the
 [seepage documentation](../seep/overview.md) replaces the hand-drawn line
 with a computed flow field — the `seep` setting the `u` column left unused.

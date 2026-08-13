@@ -74,8 +74,8 @@ decides what the search finds below.
 
 **The failure surface** — one circle, specified rather than searched for:
 center (195, 150), **Depth** = `18.1`. This problem is a single-surface
-exercise: the circle is the surface of interest, entered as given, and
-everything this page measures is measured on it.
+exercise: the circle is the surface of interest, entered as given, and every
+measurement that follows is made on it.
 
 ---
 
@@ -98,8 +98,8 @@ Whichever you choose, rejoin at [Running the analysis](#running-the-analysis).
 
 ## A — Building it with the AI assistant {#a-building-it-with-the-ai-assistant}
 
-The drawing at the top of this page carries the layers, the strengths and the
-water line, but not the coordinates. Paste it into the chat box with the
+The problem drawing above carries the layers, the strengths and the water
+line, but not the coordinates. Paste it into the chat box with the
 numbers, or describe the whole model:
 
 <div class="prompt-block" markdown>
@@ -123,8 +123,8 @@ Build a model with three horizontal soil layers over a rigid base at elevation 0
   XSLOPE derives it automatically when `main!D23` **Water loads** is `auto` —
   not something to skip.
 - **γ_sat is blank.** One unit weight per material is this exercise's
-  assumption; the second column is an edit this page makes
-  [further down](#the-two-unit-weight-columns), deliberately.
+  assumption; the second column waits for
+  [a later section](#the-two-unit-weight-columns), deliberately.
 - **The maximum depth is `0`** — the elevation of the rigid base, not a
   thickness.
 - **The circle's Depth is `18.1`**, an *elevation*: the loader forms
@@ -146,23 +146,23 @@ under a name of your own. Confirm `main!D8` **Units** is `Imperial`, confirm
 
 One row per material, and the row number is the ID:
 
-1. `mat!A11` = `1`, `mat!B11` = `soil 1`, `mat!C11` **g** = `130`,
-   `mat!E11` **option** = `mc`, `mat!F11` **c** = `200`, `mat!G11` **f** =
+1. `mat!A11` = `1`, `mat!B11` = `soil 1`, `mat!C11` **γ** = `130`,
+   `mat!E11` **option** = `mc`, `mat!F11` **c** = `200`, `mat!G11` **φ** =
    `28`, `mat!O11` **u** = `piezo`.
-2. `mat!A12` = `2`, `mat!B12` = `soil 2`, g = `120`, option = `mc`, c = `100`,
-   f = `32`, u = `piezo`.
-3. `mat!A13` = `3`, `mat!B13` = `soil 3`, g = `132`, option = `mc`, c = `400`,
-   f = `27`, u = `piezo`.
+2. `mat!A12` = `2`, `mat!B12` = `soil 2`, γ = `120`, option = `mc`, c = `100`,
+   φ = `32`, u = `piezo`.
+3. `mat!A13` = `3`, `mat!B13` = `soil 3`, γ = `132`, option = `mc`, c = `400`,
+   φ = `27`, u = `piezo`.
 
 ![The finished mat worksheet](images/lem04_sheet_mat.png)
 
 Two of these columns are the subject of this page. **`u` is where each
 material's pore pressure comes from** — `piezo` reads the piezometric line,
 `none` reads nothing, and the [other two options](#r_u-a-pore-pressure-without-a-line)
-appear later. And the pair **C:D** are the unit-weight columns: **g** is the
+appear later. And the pair **C:D** are the unit-weight columns: **γ** is the
 unit weight this model uses everywhere, and **gsat**, left blank here, is the
 saturated unit weight the engine would use below the water table if it were
-given one. Blank means *g throughout* — which is this problem's assumption.
+given one. Blank means *γ throughout* — which is this problem's assumption.
 
 ### 2. The `profile` worksheet
 
@@ -285,8 +285,9 @@ plot_solution(sd, crit["slices"], crit["failure_surface"], crit["solver_result"]
 
 **FS = 0.764** — and it is not the circle you entered. The search started at
 the deep seed, walked its center down and to the right, and settled on a
-sliver of the lower face: 30 ft of section from x = 174, just under the slope
-break, to the toe at 204.3, nowhere more than 8.1 ft deep. Its base is 41.7 ft
+sliver of the lower face: 30 ft of section entering the upper face at x = 174,
+less than a foot above the slope break at (174.7, 64), and running to the toe
+at 204.3, nowhere more than 8.1 ft deep. Its base is 41.7 ft
 long and 41.1 ft of that is in soil 2; the mass above it weighs 20,143 lb/ft —
 3% of what the deep circle carries.
 
@@ -294,8 +295,12 @@ The face is where this model is weakest, and the water is why. Soil 2 has the
 least cohesion of the three soils, and from x = 189.5 to the toe the
 piezometric line lies *on* the ground surface: the lower face is a seepage
 face, with pore pressures up to 472 psf on a surface skimming a few feet
-below it. Effective stress near that face is close to zero, so what holds it
-up is c′ = 100 psf — and 100 psf cannot hold it. A search ranks every circle
+below it. That water is the difference between standing and failing — solve
+the same sliver dry and it reads 1.333; wet, 0.764. What the pore pressure
+spends is the sliver's friction: the cohesive resistance is 4,226 lb/ft in
+either state, but the frictional share drops from 10,768 lb/ft dry to 4,374
+wet, and the half-cohesion, half-friction strength that survives no longer
+balances the driving weight. A search ranks every circle
 it tries by factor of safety and nothing else, so a shallow failure in a weak,
 wet face outranks every deep mechanism the section has. The result is honest:
 this model really does say the lower face sloughs. It is also not the
@@ -322,7 +327,10 @@ plot_solution(sd, slice_df, surface, result)
 
 Start by asking what the circle would be worth with no water at all. Set every
 material's pore pressure option to `none` — leave the piezometric line where
-it is; a line no material reads contributes nothing:
+it is; with **gsat** blank, as here, a line no material reads changes nothing.
+([Fill that column](#the-two-unit-weight-columns) and that stops being true —
+the line becomes the water table the weight split keys on, whatever the `u`
+options say.) The `none` cells:
 
 - **Studio** — open **Materials** and set each row's **u** to `none`.
 - **Excel** — `mat!O11`, `mat!O12`, `mat!O13` = `none`.
@@ -335,7 +343,7 @@ Run the single-surface analysis:
 **FS = 2.471.** The circle enters the crest at x = 80.8, bottoms out at
 elevation 18.1 in soil 3, and exits on the flat ground at x = 267.8 — 215 ft
 of base, 154 ft of it in soil 3, carrying 717,261 lb/ft. The green bars drawn
-on the base are the legend's **Eff Normal Stress (σ′)**: with u = 0
+on the base are the legend's **Eff Normal Stress (σ')**: with u = 0
 everywhere, the effective normal stress *is* the total normal stress, and
 every pound of it earns frictional strength at tan φ′.
 
@@ -381,11 +389,11 @@ method, at its worst exactly here.
 ### The two unit-weight columns {#the-two-unit-weight-columns}
 
 The `mat` sheet carries two unit weights per material and this model filled
-one. **g** is the total unit weight of the soil as it sits above the water
+one. **γ** is the total unit weight of the soil as it sits above the water
 table — solids plus whatever moisture it holds. **gsat** is the total unit
 weight when the voids are full, which is what the soil below the water table
 actually weighs; a saturated soil is typically a few pcf heavier. With
-**gsat** blank, XSLOPE uses **g** for the whole column of every slice —
+**gsat** blank, XSLOPE uses **γ** for the whole column of every slice —
 that is this exercise's assumption, one weight per soil.
 
 Fill the column in and the engine splits the weight: each slice's column uses
@@ -397,7 +405,7 @@ re-run the pinned circle:
 | | ΣW (lb/ft) | FS (Spencer) |
 |---|---:|---:|
 | γ only (gsat blank) | 717,261 | 1.579 |
-| γ above the line, γ_sat below | 747,092 | 1.621 |
+| γ above the line, γ_sat below | 747,093 | 1.621 |
 
 The sliding mass gains 4.2% of its weight, all of it below the water table —
 and the factor of safety goes *up* 2.6%. That direction surprises most people
@@ -416,15 +424,15 @@ they cancel, not the input file.
 
 The split is worth having when the answer is worth refining — the two rows
 above bound what it buys on this section. Leave **gsat** blank and the model
-is the exercise as published; this page leaves it filled for one more section,
+is the exercise as published; it stays filled here for one more section,
 because a filled column is something a sweep can hold.
 
 ### r_u — a pore pressure without a line {#r_u-a-pore-pressure-without-a-line}
 
 The `u` column has two more settings. `seep` reads pore pressures from a
 finite element seepage solution — the subject of the
-[seepage documentation](../seep/overview.md), and the step past this page
-when the flow field matters. `ru` needs no companion at all: it computes
+[seepage documentation](../seep/overview.md), and the step to take when the
+flow field matters. `ru` needs no companion at all: it computes
 u = r<sub>u</sub> × σ<sub>v</sub> on each slice base, where σ<sub>v</sub> is
 the vertical stress of the soil column above it and r<sub>u</sub> is a
 per-material ratio entered in the column beside `u` (`mat!P`). It is the
@@ -475,14 +483,15 @@ plot_sensitivity(result["df"])
 ![The γ_sat sweep on the fixed circle](images/lem04_sweep.png){width=1000}
 
 The curve is a straight line from **1.576 at 133 pcf to 1.666 at 147 pcf** —
-0.006 of factor of safety per pcf, the base case marked at (140, 1.62). Read
-it against the section above it: the entire ±5% band of saturated-unit-weight
-guesses is worth about ±3% of the answer, on the same slope where the
-existence of the water table was worth 36%. The sweep is the license to stop
+0.006 of factor of safety per pcf, the base case marked at (140, 1.62). The
+entire ±5% band of saturated-unit-weight guesses is worth about ±3% of the
+answer, on the same slope where the existence of the water table was worth
+36%. The sweep is the license to stop
 agonizing over the third digit of γ_sat — and its direction is not a law of
-nature but a property of *this* circle: sweep soil 2's γ_sat instead and the
-answer creeps the other way, 1.625 down to 1.614 across 120–135 pcf, because
-that soil's weight sits over the toe end of the arc. Unit weights move a
+nature but a property of *this* circle: sweep soil 2's γ_sat instead — the
+same ±5%, about 119 to 131 pcf — and the answer creeps the other way, 1.626
+down to 1.617, because that soil's weight sits over the toe end of the arc.
+Unit weights move a
 wet-slope answer by little, in whichever direction the geometry decides.
 
 One honest wrinkle closes the loop. Leave **Re-search the critical surface at
@@ -514,8 +523,8 @@ This tutorial demonstrated:
 - A search on a wet slope honestly reporting a shallow seepage-face failure
   at 0.764, and the single-surface analysis as the way to hold a specified
   deep circle fixed while the water assumptions change.
-- The two unit-weight columns: **g** above the water table, **gsat** below it
-  (blank = **g** throughout), both *total* unit weights — never buoyant —
+- The two unit-weight columns: **γ** above the water table, **gsat** below it
+  (blank = **γ** throughout), both *total* unit weights — never buoyant —
   worth +2.6% on this circle when filled with realistic values.
 - r<sub>u</sub> as the chart-era alternative — u = r<sub>u</sub> σ<sub>v</sub>
   per material, no line required, scaling with weight where a line does not.
@@ -529,5 +538,4 @@ series. [Sample Problem 5](../lem/samples.md#5-slope-with-multiple-materials-and
 carries this same model into a multi-seed search of the sloughing failure the
 single seed found here, and the
 [seepage documentation](../seep/overview.md) replaces the hand-drawn line
-with a computed flow field — the `seep` setting this page's `u` column left
-unused.
+with a computed flow field — the `seep` setting the `u` column left unused.

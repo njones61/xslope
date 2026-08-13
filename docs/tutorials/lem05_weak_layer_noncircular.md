@@ -80,15 +80,20 @@ a weak-layer mechanism, and it is the shape no circle has.
 
 Three rules govern the table:
 
-- **The points are joined by straight segments, in the order given.** There is no
-  smoothing and no re-ordering, so a point out of sequence is a surface that
-  doubles back on itself.
+- **The points are joined by straight segments, ordered left to right — and the
+  solver enforces the order itself.** Before slicing, it sorts the vertices by X
+  and clips the polyline to the ground surface, without a warning: a table typed
+  in the wrong order, or one that doubles back on itself, solves as the sorted
+  surface, not the drawn one. What that does to a result is
+  [demonstrated below](#the-surface-the-solver-read).
 - **The first and last point sit on the ground surface, with their Y written
   out.** Here that is (−10, 0) on the flat ground beyond the toe and (40, 10) on
   the crest. **A blank Y is not "put it on the ground for me"** — it reaches the
   slicer as a `TypeError`, and an empty cell that loads as a blank number gets as
-  far as *"Failed to generate surface: Expected at least 2 intersection points,
-  but got 1."*
+  far as *"Failed to generate surface:Expected at least 2 intersection points,
+  but got 1."* A Y typed off the ground fails the other way — no error at all:
+  the clipping moves that end to where the polyline crosses the ground, and the
+  numbers come back clean for a surface with a different end.
 - **Movement is what an automated search is allowed to do with a point**, not a
   property of the surface being solved. `Free`, `Horiz` and `Fixed` are the three
   settings, and [what each one does](#what-movement-is-for) bites only once a
@@ -183,7 +188,7 @@ because it is the only soil whose strength the water changes here.
 
 The **E** and **nu** columns in the figure carry stiffness values, and the
 sheet's own colour legend marks them *FEM only*: a limit equilibrium run never
-reads them, and leaving them empty changes nothing on this page.
+reads them, and they may be left empty.
 
 ### 2. The `profile` worksheet
 
@@ -256,11 +261,14 @@ Press **Add row** four times and fill them from the table above: `-10, 0, Free`,
 
 ![The non-circular editor holding the four points](images/lem05_studio_noncirc.png)
 
-The preview draws the polyline on the section and marks each vertex with the
-shape of its Movement — ○ Free, ◇ Horiz-only, □ Fixed — which is where a
-mistyped Y shows up: the two interior vertices should sit between the green and
-red contacts, not above or below them. Clicking a vertex selects its row, and
-selecting a row enlarges the vertex.
+The preview draws the polyline on the section, in the order the rows were
+entered, and marks each vertex with the shape of its Movement — ○ Free,
+◇ Horiz-only, □ Fixed — which is where a mistyped Y shows up: the two interior
+vertices should sit between the green and red contacts, not above or below them.
+It is also the one drawing in XSLOPE that shows a doubled-back table as doubled
+back — the solver [sorts the vertices before slicing](#the-surface-the-solver-read),
+so nothing downstream will. Clicking a vertex selects its row, and selecting a
+row enlarges the vertex.
 
 ### 3. Generating the surface instead
 
@@ -307,8 +315,10 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 label, because the model defines a non-circular surface and no circles. The
 dialog's own note says what the two analyses do — *"Single surface analyzes the
 first circle / the non-circular surface as entered. Auto-search refines from
-there to the critical surface."* **Single surface** solves the polyline exactly
-as it was typed. From Python:
+there to the critical surface."* **Single surface** solves the polyline as the
+solver reads it — [sorted left to right and clipped to the
+ground](#the-surface-the-solver-read), which on a well-formed table is the
+surface as typed. From Python:
 
 ```python
 from xslope.fileio import load_slope_data
@@ -363,6 +373,31 @@ either side of Spencer rather than above it. **Spencer satisfies both force and
 moment equilibrium and is the one to report.** That 9.0% is what five methods do
 when they are all describing the same mechanism.
 
+### The surface the solver read {#the-surface-the-solver-read}
+
+1.789 is the answer for the surface the solver read, and on this table that is
+also the surface that was typed — but the two are not the same thing by
+construction. The solver sorts the table's vertices by X and clips the polyline
+to the ground surface before slicing, and neither step reports itself:
+
+- **This same table entered in reverse** — (40, 10) in the first row down to
+  (−10, 0) in the last — sorts back into the surface above and returns the
+  identical five numbers.
+- **The exit mistyped above the ground at (40, 14)** returns a clean
+  **FS = 1.788** — for a surface whose exit the clipping moved 3.16 ft, to
+  (36.8, 10), where the typed polyline crosses the crest. The five methods
+  spread 11.0% instead of 9.0%, and every warning list on the run is empty.
+- **A seam run typed doubled back** — its interior rows at x = 25 and then
+  x = 10 — draws a polyline that crosses itself. Sorted, it becomes a clean
+  surface entering the seam at x = 10, and solves to **FS = 1.871**, again
+  without complaint.
+
+Three tables the preview draws exactly as typed — the third as a visible
+tangle — and three sets of clean numbers, each for the sorted, clipped surface
+rather than the drawn one. So the check is not the vertex table, and it is not
+the preview: **the results plot draws the surface that was solved.** Read that
+line against the surface you meant before reading the number on it.
+
 ### What a circle gets on the same section
 
 The seam is what the non-circular surface was drawn for, so the fair question is
@@ -373,9 +408,11 @@ geometry and run the ordinary circular search on them:
 
 **FS = 1.769**, on a circle centered at (11.59, 18.66) with a radius of 24.66 —
 and its lowest point is at elevation **−6.000**, tangent to the base of the clay.
-The generated set offers one circle at the base of every layer, and the search
-settles on the one that reaches the bottom of the seam: 20.0 ft of its 47.4 ft
-base lies inside the weak layer.
+The generated set is six circles — one through the toe, one tangent to the base
+of each layer and to the maximum depth (elevations 0, −4, −6 and −10), and one
+skimming the sandy face, reaching −19.6 — and the search settles on the one that
+reaches the bottom of the seam: 20.0 ft of its 47.4 ft base lies inside the weak
+layer.
 
 It also comes within 1.1% of the polyline drawn by hand. **A circle is not
 automatically far off a weak-layer mechanism**, and here it is not: the seam is
@@ -438,15 +475,17 @@ Three things happen in that table, in order, and they are three different
 failures.
 
 **Up to about 40° the surface is simply not critical.** It solves cleanly, every
-method agrees to within 17%, and the factor of safety rises because the sliding
+method agrees to within 17.2%, and the factor of safety rises because the sliding
 mass is getting smaller — 43,855 lb/ft at the entry the file carries, 42,627 at
 x = −6. Nothing is wrong with those answers; they are just answers about worse
 surfaces.
 
 **By 51° the methods have stopped agreeing.** At an entry of x = −3, where the
 leading segment stands at 59°, the same surface reads 0.925 by Janbu and 2.258 by
-Spencer — a factor of 2.4 on one geometry, with no warning attached to either.
-**Method spread is the first tell**, and it comes earlier than any warning: five
+Spencer — a factor of 2.4 on one geometry. Spencer's warning list on its 2.258
+is genuinely empty; Janbu's 0.925 has no warning list to be empty, because its
+result carries none. **Method spread is the first tell**, and it comes earlier
+than any warning: five
 procedures that differ by 9% on a well-shaped surface and by 144% on this one are
 not describing the same mechanism.
 
@@ -494,7 +533,7 @@ So a non-circular result is read in three passes, and the number comes last:
 ### What Movement is for {#what-movement-is-for}
 
 Nothing above turned on the **Movement** column, because a single-surface run
-solves the polyline exactly as it is given. Movement is read by the automated
+never moves a vertex. Movement is read by the automated
 search, which walks the vertices to look for a lower surface: `Free` moves a
 point perpendicular to the surface, `Horiz` slides it sideways only, and `Fixed`
 pins it. The same model, searched with Spencer four ways:
@@ -511,8 +550,10 @@ but not out of it — and it is what the sheet's four rows carry. The two end
 points are entry and exit: whatever their Movement says, the search slides them
 along the ground surface, which is why the convention is to give them `Free` and
 why their Y must be a real ground elevation. And **a blank Movement is not a
-default, it is `Fixed`**: the last row of that table is a search that was handed
-a surface and told not to move it.
+default, it is `Fixed`** — the last row of that table shows both facts at once:
+with every vertex pinned that the column can pin, the search still slid the
+entry 0.77 ft and the exit 1.58 ft along the ground, and its 1.779 is the answer
+for that shifted surface, not the 1.789 of the surface as drawn.
 
 The search itself is a separate subject, and a harder one. The same section's
 [sample page](../lem/samples.md#7-non-circular-failure-surface) reports it method
@@ -520,7 +561,9 @@ by method: Spencer's search reaches 1.739, 2.8% below the 1.789 of the surface a
 drawn, on a shape much like it. Lowe & Karafiath's reaches 1.369, and it gets
 there on a surface whose entry segment stands at 64.6° — a steep leading wedge
 arrived at by a search rather than typed by hand, and one to read against the
-three passes above before believing.
+three passes above before believing. Lock that surface and run all five methods
+on it: they spread 182%, from 1.043 by Janbu to 2.941 by Spencer — the spread
+test failing a searched surface exactly as it fails a typed one.
 
 ---
 
@@ -533,6 +576,11 @@ This tutorial demonstrated:
   through the weak layer between.
 - The entry and exit points carrying explicit ground-surface elevations, because
   a blank Y is a slicing error rather than a request to snap to the ground.
+- The solver sorting the vertices by X and clipping the polyline to the ground
+  before it slices — a reversed table solving to the identical numbers, a
+  doubled-back one to a clean answer for a surface never drawn — so the solved
+  surface on the results plot, not the typed table, is what gets read against
+  the surface that was meant.
 - OMS and Bishop declining a non-circular surface outright — both take moments
   about a circle center — and the five methods that remain agreeing to 9.0% on
   the surface as drawn, at **FS = 1.789** by Spencer's method.

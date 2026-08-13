@@ -155,29 +155,22 @@ options blank.
 
 ### 1. The `mat` worksheet
 
-One row per material, and the row number is the ID:
-
-1. `mat!A11` = `1`, `mat!B11` = `embankment`, `mat!C11` **γ** = `130`,
-   `mat!E11` **option** = `mc`, `mat!F11` **c** = `400`, `mat!G11` **φ** = `0`,
-   `mat!O11` **u** = `none`.
-2. `mat!A12` = `2`, `mat!B12` = `foundation`, `mat!C12` **γ** = `135`,
-   `mat!E12` **option** = `mc`, `mat!F12` **c** = `800`, `mat!G12` **φ** = `0`,
-   `mat!O12` **u** = `none`.
+One row per material, and the row number is the ID. Enter (or copy-paste) the
+material properties from the table above, as shown below:
 
 ![The finished mat worksheet](images/lem03_sheet_mat.png)
 
-**Rows are ordered top down.** Row 11 is the material at the surface and row 12
-the one beneath it, which is the order the profile lines below assume.
+**Rows are ordered top down.** The first row is the material at the surface and
+the second the one beneath it, which is the order the profile lines below
+assume.
 
 ### 2. The `profile` worksheet
 
 1. `profile!B2` **Max Depth** = `-10`. This is an *elevation*: it puts the rigid
    base 10 ft below the toe.
-2. Profile Line #1 — `profile!B5` **Mat ID** = `1`, then the three
-   ground-surface points in the `x` / `y` columns: `0, 0` then `40, 20` then
-   `90, 20`.
-3. Profile Line #2 — `profile!E5` **Mat ID** = `2`, then two points: `-30, 0`
-   and `90, 0`.
+2. Profile Lines #1 and #2 — set each line's **Mat ID** and enter (or
+   copy-paste) its vertices from the geometry tables above, one line per
+   material, top down.
 
 ![The finished profile worksheet](images/lem03_sheet_profile.png)
 
@@ -188,12 +181,8 @@ everything between it and the maximum depth is now the foundation.
 ### 3. The `circles` worksheet
 
 Two starting circles, sharing a center above the middle of the face at twice the
-slope height — x = 20, y = 40 — and differing only in how deep they reach:
-
-1. `circles!B3` **Xo** = `20`, `circles!C3` **Yo** = `40`,
-   `circles!D3` **Option** = `Depth`, `circles!E3` **Depth** = `0`.
-2. `circles!B4` **Xo** = `20`, `circles!C4` **Yo** = `40`,
-   `circles!D4` **Option** = `Depth`, `circles!E4` **Depth** = `-10`.
+slope height — x = 20, y = 40 — and differing only in how deep they reach. Enter
+(or copy-paste) the two circles from the table above, as shown below:
 
 ![The finished circles worksheet](images/lem03_sheet_circles.png)
 
@@ -279,18 +268,7 @@ center the two circles share, (20, 40), sits above it — twice the height of a 
 ft slope.
 
 Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40. From Python:
-
-```python
-from xslope.fileio import load_slope_data
-from xslope.search import circular_search
-from xslope.plot import plot_solution
-
-sd = load_slope_data("my_layered_slope.xlsx")
-fs_cache, _, path, circles = circular_search(sd, "spencer", num_slices=40)
-crit = fs_cache[0]
-plot_solution(sd, crit["slices"], crit["failure_surface"], crit["solver_result"])
-```
+`Auto search`, with the slice count left at 40.
 
 ---
 

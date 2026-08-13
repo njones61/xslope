@@ -95,9 +95,8 @@ LEM03_FILE = os.path.join(_REPO, "docs/lem/files/xslope_simple_mult_layers.xlsx"
 LEM05_FILE = os.path.join(_REPO, "docs/lem/files/xslope_noncircular.xlsx")
 #: Tutorial LEM-4's completed model — three piezo-reading materials, an eight-point
 #: piezometric line, and one specified circle: what its pins need is a model whose
-#: Run LEM Surface row is the fixed *Circular* label, and (with the γ_sat column
-#: filled in memory, as the page's own step fills it) a Parametric picker that
-#: offers gamma_sat to sweep.
+#: Run LEM Surface row is the fixed *Circular* label, with the γ_sat column filled
+#: as the page's weight-split section reads it.
 LEM04_FILE = os.path.join(_REPO,
                           "docs/lem/files/xslope_method_slices_problem.xlsx")
 
@@ -959,16 +958,6 @@ LEM04_RUN_SURFACE = "Circular"
 LEM04_PIEZO_TABS = ("Line 1", "Line 2 (rapid drawdown)")
 LEM04_PIEZO_ADD = "Add row"
 
-#: The Parametric dialog in the state LEM-4 walks: the Sensitivity mode entry,
-#: the range controls its numbered step sets, the button that commits the
-#: parameter row, and the dialog's own tornado note — quoted on the page as the
-#: instruction to double-click through to the FS curve.
-LEM04_SENS_MODE = "Sensitivity (tornado + plots)"
-LEM04_SENS_LABELS = ("Default ±%", "Points")
-LEM04_SENS_ADD = "Add parameter"
-LEM04_SENS_NOTE = "Double-click a bar for that parameter's curve."
-LEM04_SENS_PROPERTY = "gamma_sat"
-
 #: The circles-editor columns LEM-4's pin step types the found circle into, and
 #: the dock the page tells the reader to read the search's own statement of that
 #: circle out of.
@@ -1187,22 +1176,21 @@ def _lem05_editor_labels():
 
 
 def _lem04_editor_labels(mw):
-    """The piezo and circles editors, the Log dock, Run LEM and the Parametric
-    dialog, as Tutorial LEM-4 drives them.
+    """The piezo and circles editors, the Log dock and Run LEM, as Tutorial
+    LEM-4 drives them.
 
     Everything is read on the file as it ships. The model carries both unit
-    weights, so the Parametric property picker offers ``gamma_sat`` without any
-    state being staged for it; the fixed **Circular** label the page describes is
-    what a model carrying circles and no non-circular surface produces; and the
-    circles editor's columns are the ones the page's pin step types the search's
-    critical circle into.
+    weights, which the page's weight-split section reads as the file's own
+    gsat column; the fixed **Circular** label the page describes is what a
+    model carrying circles and no non-circular surface produces; and the
+    circles editor's columns are the ones the page's pin step types the
+    search's critical circle into.
     """
-    from PySide6.QtWidgets import (QComboBox, QLabel, QPushButton, QTableWidget,
-                                   QTabWidget)
+    from PySide6.QtWidgets import QLabel, QPushButton, QTableWidget, QTabWidget
 
     from xslope.fileio import load_slope_data
 
-    from studio.dialogs import RunLemDialog, SensitivityDialog
+    from studio.dialogs import RunLemDialog
     from studio.editors import CirclesEditor, PiezoEditor
 
     fails = []
@@ -1262,36 +1250,6 @@ def _lem04_editor_labels(mw):
                      f"{LEM04_RUN_SURFACE!r} on LEM-4's model, which the page "
                      f"quotes. Its labels read {sorted(l for l in labels if l)}")
     run.deleteLater()
-
-    sens = SensitivityDialog(defaults={"mode": "sensitivity"}, slope_data=data)
-    modes = {sens.mode.itemText(i) for i in range(sens.mode.count())}
-    if LEM04_SENS_MODE not in modes:
-        fails.append(f"the Parametric dialog offers no {LEM04_SENS_MODE!r} mode, "
-                     f"which Tutorial LEM-4 selects. It offers {sorted(modes)}")
-    s_labels = {lab.text() for lab in sens.findChildren(QLabel)}
-    for name in LEM04_SENS_LABELS:
-        if name not in s_labels:
-            fails.append(f"the Parametric dialog's sensitivity page has no "
-                         f"{name!r} control; Tutorial LEM-4 names it. Its labels "
-                         f"read {sorted(l for l in s_labels if l)}")
-    if not any(LEM04_SENS_NOTE in (lab.text() or "")
-               for lab in sens.findChildren(QLabel)):
-        fails.append(f"the Parametric dialog's tornado note no longer says "
-                     f"{LEM04_SENS_NOTE!r}, which Tutorial LEM-4 quotes as the "
-                     f"way to the FS curve")
-    s_buttons = {b.text() for b in sens.findChildren(QPushButton)}
-    if LEM04_SENS_ADD not in s_buttons:
-        fails.append(f"the Parametric dialog has no {LEM04_SENS_ADD!r} button; "
-                     f"Tutorial LEM-4 tells the reader to press it. Its buttons "
-                     f"read {sorted(s_buttons)}")
-    props = set()
-    for combo in sens.findChildren(QComboBox):
-        props.update(combo.itemText(i) for i in range(combo.count()))
-    if LEM04_SENS_PROPERTY not in props:
-        fails.append(f"no Parametric property reads {LEM04_SENS_PROPERTY!r} on "
-                     f"LEM-4's model, which Tutorial LEM-4 tells the "
-                     f"reader to pick")
-    sens.deleteLater()
     return fails
 
 

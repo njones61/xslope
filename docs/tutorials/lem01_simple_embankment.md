@@ -169,20 +169,17 @@ Most of this sheet is already right:
 ### 2. The `mat` worksheet
 
 In the `mat` worksheet, we name each of the materials in the model and enter their
-properties, including unit weight and strength parameters. For this problem, we have
-one material, so we'll use the first row of the table:
-
-1. `mat!A11` = `1` and `mat!B11` = `soil` — the ID the geometry will reference, and
-   a name for the legends.
-2. `mat!C11` **γ** = `125`.
-3. `mat!E11` **option** = `mc`, the traditional Mohr-Coulomb envelope.
-4. `mat!F11` **c** = `500` and `mat!G11` **φ** = `0`. Together these are the
-   undrained strength: the envelope is flat, so the strength is 500 psf at every
-   depth.
-5. `mat!O11` **u** = `none`. There is no pore pressure to compute.
-6. Leave every other column in the row blank.
+properties, including unit weight and strength parameters. This problem has one
+material, on the first row of the table. Enter (or copy-paste) the material
+properties from the table above, as shown below:
 
 ![The finished mat worksheet](images/lem01_sheet_mat.png)
+
+The ID is what the geometry will reference and the name is what the legends
+show. **option** = `mc` is the traditional Mohr-Coulomb envelope, and c = 500
+with φ = 0 is the undrained strength: the envelope is flat, so the strength is
+500 psf at every depth. **u** = `none` means there is no pore pressure to
+compute. Every other column in the row stays blank.
 
 ### 3. The `profile` worksheet
 
@@ -196,10 +193,9 @@ on material 1, with the rigid base closing it from below.
 
 1. `profile!B2` **Max Depth** = `0`. This is an *elevation*, not a thickness: it
    places a horizontal rigid base at the toe of the slope.
-2. `profile!B5` **Mat ID** = `1` for Profile Line #1 — the ID you gave the material
-   above.
-3. Enter the three ground-surface points in the `x` / `y` columns beneath, left to
-   right: `0, 0` then `20, 20` then `60, 20`.
+2. Profile Line #1 — set its **Mat ID** to `1`, the ID you gave the material
+   above, and enter (or copy-paste) the three ground-surface points from the
+   table above into the `x` / `y` columns beneath, left to right.
 
 ![The finished profile worksheet](images/lem01_sheet_profile.png)
 
@@ -211,19 +207,16 @@ first, and the rest stay empty.
 Next, we enter a starting circle for the search. A starting circle is a *guess* at
 the critical surface, and the search will refine it. A good strategy: put the
 center's x-coordinate above the middle of the slope face, put its y-coordinate at
-twice the slope's height, and size the circle so it just touches the rigid base.
-
-1. `circles!B3` **Xo** = `10` and `circles!C3` **Yo** = `40` — the center of the
-   trial circle, above the middle of the face at twice the slope height.
-2. `circles!D3` **Option** = `Depth`, and `circles!E3` **Depth** = `0`.
-   **Depth** is the *elevation of the circle's lowest point*, not a distance below
-   ground — so `0` sets the circle tangent to the rigid base, and the loader forms
-   the radius as R = Yo − Depth = 40.
+twice the slope's height, and size the circle so it just touches the rigid base —
+here, a center at (10, 40). Enter the circle as shown below, with **Option** =
+`Depth`. **Depth** is the *elevation of the circle's lowest point*, not a distance
+below ground — so `0` sets the circle tangent to the rigid base, and the loader
+forms the radius as R = Yo − Depth = 40.
 
 ![The finished circles worksheet](images/lem01_sheet_circles.png)
 
 Save the file, and continue at [Running the analysis](#running-the-analysis) —
-open the file in Studio, or run it from Python as shown there.
+open the file in Studio and run it there.
 
 ---
 
@@ -341,19 +334,6 @@ Click **Run LEM…**. Choose:
    surface, so there is only one family to run.
 3. Leave the slice count at its default of 40.
 4. Click **Run**.
-
-From Python, the same run is:
-
-```python
-from xslope.fileio import load_slope_data
-from xslope.search import circular_search
-from xslope.plot import plot_solution
-
-sd = load_slope_data("my_embankment.xlsx")
-fs_cache, _, path, circles = circular_search(sd, "spencer", num_slices=40)
-crit = fs_cache[0]
-plot_solution(sd, crit["slices"], crit["failure_surface"], crit["solver_result"])
-```
 
 ---
 

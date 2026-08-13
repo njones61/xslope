@@ -123,14 +123,12 @@ Open your copy of the embankment workbook and go to the **dloads** worksheet.
 Everything else in the file is already right.
 
 The sheet carries six load blocks side by side, four columns apart — **X**,
-**Y**, **N**, then a gap. This model uses the first, and the rest stay empty:
-
-1. `dloads!B7` = `25`, `dloads!C7` = `20`, `dloads!D7` = `750`.
-2. `dloads!B8` = `35`, `dloads!C8` = `20`, `dloads!D8` = `750`.
-3. Leave `dloads!D5` **Direction** blank. A blank cell means `normal` — the load
-   acts perpendicular to its own line — and on a level crest that is straight
-   down anyway. It is the [face load](#which-way-the-load-pushes) further down
-   this page where the word starts to matter.
+**Y**, **N**, then a gap. This model uses the first, and the rest stay empty.
+Enter (or copy-paste) the two load points from the table above, and leave
+`dloads!D5` **Direction** blank. A blank cell means `normal` — the load acts
+perpendicular to its own line — and on a level crest that is straight down
+anyway. It is the [face load](#which-way-the-load-pushes) further down this
+page where the word starts to matter.
 
 ![The finished dloads worksheet](images/lem02_sheet_dloads.png)
 
@@ -175,18 +173,7 @@ However you added it, you now hold the same model:
 Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 `Auto search`, with the slice count left at 40. **Surface** is not a choice on
 this model: it reads `Circular` as a fixed label, because the model defines
-circles and no non-circular surface. From Python:
-
-```python
-from xslope.fileio import load_slope_data
-from xslope.search import circular_search
-from xslope.plot import plot_solution
-
-sd = load_slope_data("my_embankment.xlsx")
-fs_cache, _, path, circles = circular_search(sd, "spencer", num_slices=40)
-crit = fs_cache[0]
-plot_solution(sd, crit["slices"], crit["failure_surface"], crit["solver_result"])
-```
+circles and no non-circular surface.
 
 ---
 
@@ -361,16 +348,6 @@ In Studio, click **Run → Parametric…**:
    re-solves one fixed surface is then answering about a surface that stopped
    being critical several steps ago.
 5. **Run**.
-
-From Python, the same study:
-
-```python
-from xslope.sensitivity import design
-
-success, result = design(sd, param="mat:soil:c", low=500, high=1200,
-                         steps=8, target_fs=1.5, method="spencer")
-print(result["message"], result["crossing"])
-```
 
 ![The design sweep](images/lem02_design.png){width=1000}
 

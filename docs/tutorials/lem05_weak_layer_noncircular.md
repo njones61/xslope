@@ -207,22 +207,14 @@ options blank.
 
 ### 1. The `mat` worksheet
 
-One row per material, and the row number is the ID:
-
-1. `mat!A11` = `1`, `mat!B11` = `Sand Fill`, `mat!C11` **γ** = `120`,
-   `mat!E11` **option** = `mc`, `mat!F11` **c** = `0`, `mat!G11` **φ** = `37`,
-   `mat!O11` **u** = `none`.
-2. `mat!A12` = `2`, `mat!B12` = `Sand`, γ = `123`, option = `mc`, c = `0`,
-   φ = `33`, **u** = `piezo`.
-3. `mat!A13` = `3`, `mat!B13` = `Soft Clay`, γ = `118`, option = `mc`,
-   c = `200`, φ = `0`, u = `none`.
-4. `mat!A14` = `4`, `mat!B14` = `Dense Sand`, γ = `131`, option = `mc`, c = `0`,
-   φ = `37`, u = `none`.
+One row per material, and the row number is the ID. Enter (or copy-paste) the
+material properties from the table above, as shown below:
 
 ![The finished mat worksheet](images/lem05_sheet_mat.png)
 
-**`u` is per material, not per model.** Only row 12 reads the piezometric line,
-because it is the only soil whose strength the water changes here.
+**`u` is per material, not per model.** Only the `Sand` row reads the
+piezometric line, because it is the only soil whose strength the water changes
+here.
 
 The **E** and **nu** columns in the figure carry stiffness values, and the
 sheet's own colour legend marks them *FEM only*: a limit equilibrium run never
@@ -231,11 +223,9 @@ reads them, and they may be left empty.
 ### 2. The `profile` worksheet
 
 1. `profile!B2` **Max Depth** = `-10`. This is an *elevation*.
-2. Profile Line #1 — `profile!B5` **Mat ID** = `1`, then `0, 0` / `30, 10` /
-   `50, 10`.
-3. Profile Line #2 — `profile!E5` **Mat ID** = `2`, then `-20, 0` and `50, 0`.
-4. Profile Line #3 — `profile!H5` **Mat ID** = `3`, then `-20, -4` and `50, -4`.
-5. Profile Line #4 — `profile!K5` **Mat ID** = `4`, then `-20, -6` and `50, -6`.
+2. Profile Lines #1–#4 — set each line's **Mat ID** and enter (or copy-paste)
+   its vertices from the geometry tables above, one line per material, top
+   down.
 
 ![The finished profile worksheet](images/lem05_sheet_profile.png)
 
@@ -243,8 +233,8 @@ Lines 3 and 4 are 2 ft apart, and that gap is the seam.
 
 ### 3. The `piezo` worksheet
 
-`piezo!B3` **Type:** = `piezo`, then two points in the `x` / `y` columns:
-`-20, -2` and `50, -2`.
+Select `piezo` for the **Type**, and enter (or copy-paste) the two coordinates
+from the table above, as shown below:
 
 ![The finished piezo worksheet](images/lem05_sheet_piezo.png)
 
@@ -254,12 +244,8 @@ it. It spans the full section because the water table does.
 
 ### 4. The `non-circ` worksheet
 
-The vertex table, one point per row from row 3, left to right:
-
-1. `non-circ!A3` **X** = `-10`, `B3` **Y** = `0`, `C3` **Movement** = `Free`.
-2. `non-circ!A4` = `0`, `B4` = `-5`, `C4` = `Horiz`.
-3. `non-circ!A5` = `25`, `B5` = `-5`, `C5` = `Horiz`.
-4. `non-circ!A6` = `40`, `B6` = `10`, `C6` = `Free`.
+The vertex table, one point per row, left to right — enter (or copy-paste) the
+four points from the table above, as shown below:
 
 ![The finished non-circ worksheet](images/lem05_sheet_noncirc.png)
 
@@ -357,20 +343,7 @@ first circle / the non-circular surface as entered. Auto-search refines from
 there to the critical surface."* **Single surface** solves the polyline as the
 solver reads it — [sorted left to right and clipped to the
 ground](#the-surface-the-solver-read), which on a well-formed table is the
-surface as typed. From Python:
-
-```python
-from xslope.fileio import load_slope_data
-from xslope.slice import generate_slices
-from xslope.solve import solve_selected
-from xslope.plot import plot_solution
-
-sd = load_slope_data("my_weak_layer.xlsx")
-ok, (slice_df, surface) = generate_slices(sd, non_circ=sd["non_circ"],
-                                          num_slices=40)
-result = solve_selected("spencer", slice_df)
-plot_solution(sd, slice_df, surface, result)
-```
+surface as typed.
 
 ---
 

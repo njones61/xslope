@@ -82,6 +82,9 @@ SINGLE_FILE = os.path.join(_REPO, "docs/inputs/slope/xslope_simple1.xlsx")
 #: the distributed-loads editor has a Direction to report only on a model that
 #: carries a load.
 LEM02_FILE = os.path.join(_REPO, "docs/lem/files/xslope_crest_surcharge.xlsx")
+#: Tutorial LEM-1's completed model — one material, which is the state its Studio
+#: path leaves the materials editor in and the state its figure shows.
+LEM01_FILE = os.path.join(_REPO, "docs/lem/files/xslope_simple_embankment.xlsx")
 #: Tutorial LEM-3's completed model — two materials and two profile lines, which is
 #: what its label pins need: the materials table read as a pair of rows, and a
 #: profile editor with a material to assign each line to.
@@ -866,6 +869,17 @@ LEM02_DESIGN_RUN = "Run"
 LEM02_DESIGN_SEARCH = "Re-search the critical surface at each step"
 
 
+#: The materials-editor controls LEM-1's Studio path uses, and the view it opens on.
+#: The page sends the reader from the view the editor opens on to the one its figure
+#: shows, so the order is the guarded part: **Table view** is where a first open
+#: lands (``editors._LAST_MATERIALS_VIEW`` starts there), **List view** is the
+#: per-material form the page's numbered fields belong to, and **Add** is that
+#: form's button — the table's reads "Add row", so a step that pressed the wrong one
+#: would be pressing a button that is not in the view it just asked for.
+LEM01_MATERIALS_OPENS_ON = "table"
+LEM01_MATERIALS_VIEWS = ("Table view", "List view")
+LEM01_MATERIALS_ADD = "Add"
+
 #: The materials-editor controls LEM-3's Studio path uses. It builds two materials
 #: in the view LEM-1 does not use — the table, where the row order is what fixes the
 #: Mat IDs the profile lines reference — so both the view toggle and the button that
@@ -889,6 +903,66 @@ LEM03_PROFILE_MATERIALS = ("1: embankment", "2: foundation")
 #: (one through the toe, one at the base of each layer) row by row.
 LEM03_GENERATE_SUMMARY = "3 on the left-facing face (toe at x = 0, height 20)"
 LEM03_GENERATE_DEPTHS = (-4.72136, -10.0, 0.0)
+
+
+def _lem01_editor_labels():
+    """The materials editor as Tutorial LEM-1 drives it: opened, switched, added to.
+
+    Driven rather than read, because the page's step is a *route* — the editor
+    opens on one view and the reader is sent to the other — and only the route is
+    wrong when the two views' buttons drift apart. The module remembers the last
+    view for the session, so the remembered value is saved and restored: this
+    check must not decide which view the next editor built here opens on.
+    """
+    from PySide6.QtWidgets import QPushButton
+
+    from xslope.fileio import load_slope_data
+
+    import studio.editors as editors_mod
+    from studio.editors import MaterialsEditor
+
+    fails = []
+    remembered = editors_mod._LAST_MATERIALS_VIEW
+    try:
+        if remembered != LEM01_MATERIALS_OPENS_ON:
+            fails.append(f"the materials editor's first open lands on "
+                         f"{remembered!r}, not {LEM01_MATERIALS_OPENS_ON!r} — "
+                         f"Tutorial LEM-1 tells the reader which view they arrive "
+                         f"in before sending them to the other one")
+        data = _quiet(load_slope_data, LEM01_FILE)
+        mats = MaterialsEditor().build(data, None)
+        if mats._mode != remembered:
+            fails.append(f"the materials editor opened on {mats._mode!r} with "
+                         f"{remembered!r} remembered; Tutorial LEM-1's step assumes "
+                         f"the view it opens on is the remembered one")
+        # Both panes live in the same stack, so every button exists whichever view
+        # is up; what the page's route turns on is which of them the reader can
+        # actually press, which is visibility within the dialog.
+        def shown():
+            return {b.text() for b in mats.findChildren(QPushButton)
+                    if b.text() and b.isVisibleTo(mats)}
+
+        opened = shown()
+        for label in LEM01_MATERIALS_VIEWS:
+            if label not in opened:
+                fails.append(f"the materials editor has no {label!r} button; "
+                             f"Tutorial LEM-1 names both views. Its buttons read "
+                             f"{sorted(opened)}")
+        if LEM01_MATERIALS_ADD in opened:
+            fails.append(f"the view the materials editor opens on already offers "
+                         f"{LEM01_MATERIALS_ADD!r}; Tutorial LEM-1 sends the reader "
+                         f"to the list view for it. Its buttons read {sorted(opened)}")
+        mats.set_view_mode("list")
+        listed = shown()
+        if LEM01_MATERIALS_ADD not in listed:
+            fails.append(f"the materials editor's list view has no "
+                         f"{LEM01_MATERIALS_ADD!r} button; Tutorial LEM-1 tells the "
+                         f"reader to press it there. Its buttons read "
+                         f"{sorted(listed)}")
+        mats.deleteLater()
+    finally:
+        editors_mod._LAST_MATERIALS_VIEW = remembered
+    return fails
 
 
 def _lem03_editor_labels():
@@ -1102,6 +1176,7 @@ def test_tutorial_labels():
                              f"{action.text().replace('&', '')!r}, not {label!r} — "
                              f"the label Tutorial LEM-2 quotes")
 
+        fails += _lem01_editor_labels()
         fails += _lem02_editor_labels(mw)
         fails += _lem03_editor_labels()
 

@@ -236,8 +236,9 @@ itself with `62.4`. Leave the tension crack and seismic fields at `0`, and click
 
 Here you name each material in the model and enter its properties — unit weight
 and strength parameters. Everything else will reference the material by its ID,
-which is why it comes first. This problem has one material. Click **Materials** →
-**Add**, then switch to **List view**:
+which is why it comes first. This problem has one material. Click **Materials**.
+The editor opens on **Table view**, a material per row; press **List view** for
+the per-material form, then **Add**:
 
 1. **Name** = `soil`.
 2. **γ** = `125`.
@@ -261,19 +262,19 @@ ground surface here therefore defines the whole body of the embankment — one l
 on the material you just created, closed from below by the rigid base. Click
 **Profile lines**, then **Add line**:
 
-1. Set **Max depth (bottom boundary elevation)** to `0`. This is an *elevation*,
+1. Set **Max depth (bottom boundary elevation):** to `0`. This is an *elevation*,
    not a thickness: it places a horizontal rigid base at the toe of the slope.
-2. Set **Material** to `1: soil`.
+2. Set **Material:** to `1: soil`.
 3. **Add row** three times and enter `0, 0` / `20, 20` / `60, 20` — the toe, the
    crest break at the top of the 1:1 face, and the back of the crest.
 
 ![The profile lines editor](images/lem01_studio_profile.png)
 
 The preview redraws as you type, so a mistyped vertex shows up before you commit
-it: the line in the material's color, and the hatched **Max depth** line at y = 0
-beneath it. Click **OK**, and the canvas draws the same two things. Profile-line
-geometry is drawn as lines; the shaded material zones you may have seen in other
-XSLOPE figures are how *polygon* input is drawn.
+it: the line in the material's color, and the hatched line marking the bottom
+boundary at y = 0 beneath it. Click **OK**, and the canvas draws the same two
+things. Profile-line geometry is drawn as lines; the shaded material zones you
+may have seen in other XSLOPE figures are how *polygon* input is drawn.
 
 ![The canvas after the profile line](images/lem01_studio_canvas.png)
 

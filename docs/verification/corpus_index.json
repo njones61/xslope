@@ -17650,21 +17650,6 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
-        },
-        {
-          "anchor": "rs2-48",
-          "checks": [
-            "RS2-48",
-            "RS2-48-elastic-facing",
-            "RS2-48-m0.7",
-            "RS2-48-m1.5"
-          ],
-          "level": 3,
-          "page": "verification/rs2/",
-          "resolution": "input-link",
-          "source_md": "docs/verification/rs2.md",
-          "title": "RS2-48–55: Multi-tiered geotextile walls (Leshchinsky & Han 2004)",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-48"
         }
       ],
       "topics": [
@@ -22451,7 +22436,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 541,
+    "tags": 537,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

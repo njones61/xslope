@@ -103,8 +103,10 @@ TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 # reported-not-locked row still gets a figure instead of silently having none.
 #
 # The multi-tiered geotextile wall family (RS2-48–55, Leshchinsky & Han 2004) is the
-# case in point: only the baseline vp087 is locked, and the seven parametric variants
-# are reported. All eight share the baseline's model settings — 1.0 m tri6 mesh, the
+# case in point: no row in it is locked. The baseline's SSR row is not attempted (RS2
+# splits that mesh at the sheets and joins it with slip interfaces, so the page carries
+# no figure for it), and the seven parametric variants are reported. All eight share
+# what was the baseline's model settings — 1.0 m tri6 mesh, the
 # vendor's isotropic at-rest field stress (k0 = 1) and static tensile caps
 # (tension_srf off) — but the variants run the auto bracket rather than the baseline's
 # narrow one, because the family spans 0.76–1.10.

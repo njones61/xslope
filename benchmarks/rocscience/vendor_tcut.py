@@ -327,7 +327,9 @@ VENDOR_T_CUT = {
     'vp078c.xlsx': {
         'Material 1': 1000.0,
     },
-    # RS2-48
+    # RS2 #048 / VP87 — caps transcribed from the vendor model. The RS2 SSR row
+    #   for this wall is not attempted (the vendor mesh is split at the sheets and
+    #   joined by slip interfaces), so the file serves the Slide2 LEM row.
     'vp087.xlsx': {
         'Reinforced and retained fill': 0.0,
         'Foundation soil': 10.0,
@@ -1009,7 +1011,7 @@ VENDOR_E_NU = {
     'vp078c.xlsx': {
         'Material 1': (0.4, 1000000.0),
     },
-    # RS2-48
+    # RS2 #048 / VP87
     'vp087.xlsx': {
         'Reinforced and retained fill': (0.4, 50000.0),
         'Foundation soil': (0.4, 50000.0),

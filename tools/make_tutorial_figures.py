@@ -648,6 +648,129 @@ def lem05_plots():
              LEM05_SLIVER_X, sres["FS"]))
 
 
+# --------------------------------------------------------------------------- #
+# LEM-4 — Water in the Slope
+# --------------------------------------------------------------------------- #
+#: LEM-4's model is the piezometric-line sample — one file, two pages, as every
+#: tutorial's is. The page never writes a variant file: its dry and γ_sat states
+#: are edits the reader makes and undoes, so each is rebuilt here in memory.
+LEM04 = os.path.join(REPO_ROOT,
+                     "docs/lem/files/xslope_method_slices_problem.xlsx")
+LEM04_SLICES = 40
+
+#: The saturated unit weights the page's γ/γ_sat step enters (soils 1..3), and
+#: the ±5% / 7-point sweep its parametric step runs on the third of them.
+LEM04_GSAT = (135.0, 125.0, 140.0)
+LEM04_SWEEP_PARAM = "mat:soil 3:gamma_sat"
+LEM04_SWEEP_REL = 0.05
+LEM04_SWEEP_N = 7
+
+
+def _lem04_solve(model, method="spencer"):
+    """The pinned circle, one method, no search: what this page runs everywhere.
+
+    The circle is the file's own row 1 — the specified deep surface the whole
+    water story holds constant — so every figure of this group is that surface
+    under a different water assumption, never a different surface.
+    """
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = generate_slices(model, circle=model["circles"][0],
+                                  num_slices=LEM04_SLICES)
+        if not ok:
+            raise SystemExit("LEM-4: slicing failed — %s" % (res,))
+        slice_df, surface = res
+        result = solve_selected(method, slice_df)
+    if not isinstance(result, dict):
+        raise SystemExit("LEM-4: %s failed — %s" % (method, result))
+    return slice_df, surface, result
+
+
+def lem04_sheets():
+    """The four worksheets LEM-4's Excel path fills.
+
+    ``piezo`` is the one this page is about, and its window runs to G rather than
+    stopping at the two columns the reader types: G4:G6 is the sheet's own legend
+    for the Type cell — *piezo / phreatic* — which is the choice the step beside
+    the figure explains. The rows run to 12 because the line takes eight points.
+
+    ``mat`` takes LEM-5's frame (row 10 down, through column P) for the same
+    reason LEM-5 chose it: the u / ru pair in O:P is half the subject, and this
+    page also needs both unit-weight columns — C (**g**) filled and D (**gsat**)
+    blank — because the γ/γ_sat step is an edit made into that blank column.
+    ``profile`` runs to I: three lines at three columns each, the third ending
+    at H with its spacer.
+    """
+    render("lem04_sheet_mat.png", LEM04, "mat", rows=(10, 13), cols="A:P")
+    render("lem04_sheet_profile.png", LEM04, "profile", rows=(1, 12), cols="A:I")
+    render("lem04_sheet_piezo.png", LEM04, "piezo", rows=(1, 12), cols="A:G")
+    render("lem04_sheet_circles.png", LEM04, "circles", rows=(1, 6), cols="A:H")
+
+
+def lem04_plots():
+    """The states LEM-4 compares against, in the order the page walks them.
+
+    One search — the honest answer to Auto search on this model, a face sliver at
+    0.76 — and then no search anywhere else: the page pins the file's deep circle
+    and every remaining figure is that one surface solved by Spencer at 40
+    slices, dry (u = none in all three materials), wet (as the file ships), and
+    swept (γ_sat entered, soil 3's swept ±5% with the surface held fixed).
+    """
+    sd = load_slope_data(LEM04)
+
+    capture("lem04_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
+
+    # What Auto search actually finds on this model: the search is run from the
+    # file's own deep seed, and it walks off it to the lower-face sliver.
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path, circles = circular_search(sd, "spencer",
+                                                     num_slices=LEM04_SLICES)
+    shallow = fs_cache[0]
+    capture("lem04_search.png", plot_circular_search_results, sd, fs_cache, path,
+            circle_cache=circles)
+
+    # The pinned circle, dry: the same model with every material's pore-pressure
+    # option set to none — the reader's three-cell edit, made in memory here.
+    dry = copy.deepcopy(sd)
+    for m in dry["materials"]:
+        m["u"] = "none"
+    d_slices, d_surface, d_result = _lem04_solve(dry)
+    capture("lem04_solution_dry.png", plot_solution, dry, d_slices, d_surface,
+            d_result)
+
+    # The pinned circle wet — the model exactly as the build leaves it.
+    w_slices, w_surface, w_result = _lem04_solve(sd)
+    capture("lem04_solution_wet.png", plot_solution, sd, w_slices, w_surface,
+            w_result)
+
+    # The γ_sat sweep, fixed surface: the page's parametric step with re-search
+    # unticked, drawn the way Studio's Sensitivity · Curve view draws it
+    # (SweepCanvas.render_curve = plot_sensitivity on the sweep's df).
+    from xslope.plot import plot_sensitivity
+    from xslope.sensitivity import sensitivity
+    gs = copy.deepcopy(sd)
+    for m, v in zip(gs["materials"], LEM04_GSAT):
+        m["gamma_sat"] = v
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, sweep = sensitivity(gs, param=LEM04_SWEEP_PARAM,
+                                rel_range=LEM04_SWEEP_REL, n=LEM04_SWEEP_N,
+                                search=False, methods=("spencer",),
+                                num_slices=LEM04_SLICES)
+    if not ok:
+        raise SystemExit("LEM-4 γ_sat sweep failed: %s" % (sweep,))
+    capture("lem04_sweep.png", plot_sensitivity, sweep["df"])
+
+    g_slices, _, g_result = _lem04_solve(gs)
+    pts = sweep["df"].loc[~sweep["df"]["is_base"]].sort_values("value")
+    print("   search finds %.4f (depth %.2f) · pinned circle dry %.4f · wet %.4f "
+          "· with γ_sat %s %.4f · sweep %s %.4f→%.4f"
+          % (shallow["FS"], shallow["Depth"], d_result["FS"], w_result["FS"],
+             "/".join("%g" % v for v in LEM04_GSAT), g_result["FS"],
+             LEM04_SWEEP_PARAM, pts["fs"].iloc[0], pts["fs"].iloc[-1]))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -659,6 +782,8 @@ GROUPS = {
     "lem03_plots": lem03_plots,
     "lem05_sheets": lem05_sheets,
     "lem05_plots": lem05_plots,
+    "lem04_sheets": lem04_sheets,
+    "lem04_plots": lem04_plots,
 }
 
 

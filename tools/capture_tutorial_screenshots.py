@@ -512,6 +512,72 @@ SHOTS["lem02_lloads"] = lem02_lloads
 SHOTS["lem02_parametric"] = lem02_parametric
 
 
+# --------------------------------------------------------------------------- #
+# LEM-4 — Water in the Slope
+# --------------------------------------------------------------------------- #
+LEM04 = os.path.join(REPO_ROOT,
+                     "docs/lem/files/xslope_method_slices_problem.xlsx")
+
+#: The saturated unit weights the page's γ/γ_sat step enters (soils 1..3) —
+#: the state the parametric shot's model is in, since the sweep runs on the
+#: column that step fills.
+LEM04_GSAT = (135.0, 125.0, 140.0)
+
+
+def lem04_piezo():
+    """The piezometric-lines editor holding the eight points, as the step leaves it.
+
+    The model arrives with the line already in it, because this is the state the
+    Studio path's step ends in: the point table on the **Line 1** tab, the empty
+    **Line 2 (rapid drawdown)** tab beside it, and the preview drawing the line
+    falling across the section — which is where a mistyped elevation shows up,
+    as a point off the smooth descent from 80 to 40.
+    """
+    from studio.editors import PiezoEditor
+
+    dlg = PiezoEditor().build(_load(LEM04), None)
+    dlg.resize(1100, 640)
+    return _grab(dlg, "lem04_studio_piezo.png")
+
+
+def lem04_parametric():
+    """The Parametric dialog in **Sensitivity** mode, set up for the page's sweep.
+
+    Driven the way a reader drives it, in the page's order: the mode, then the
+    material and the property, then the range narrowed to ±5% and 7 points, then
+    **Add parameter** — pressed, so the table row is the button's answer rather
+    than a pre-load — and finally the re-search box unticked, because the page's
+    whole question is the pinned surface. The model carries the γ/γ_sat step's
+    saturated unit weights: the property picked here is the column that step
+    filled, and on the file as shipped (γ_sat blank) the picker would rightly
+    refuse to sweep it.
+    """
+    from studio.dialogs import SensitivityDialog
+
+    d = _load(LEM04)
+    for m, v in zip(d["materials"], LEM04_GSAT):
+        m["gamma_sat"] = v
+    dlg = SensitivityDialog(defaults={"mode": "sensitivity", "method": "spencer",
+                                      "num_slices": 40},
+                            slope_data=d)
+    for combo, text in ((dlg.mode, "Sensitivity"), (dlg.material, "soil 3")):
+        i = next(n for n in range(combo.count()) if text in combo.itemText(n))
+        combo.setCurrentIndex(i)
+    i = next(n for n in range(dlg.prop.count())
+             if dlg.prop.itemText(n) == "gamma_sat")
+    dlg.prop.setCurrentIndex(i)
+    dlg.pct.setValue(5.0)
+    dlg.n_points.setValue(7)
+    dlg.add_btn.click()
+    dlg.search.setChecked(False)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem04_studio_parametric.png")
+
+
+SHOTS["lem04_piezo"] = lem04_piezo
+SHOTS["lem04_parametric"] = lem04_parametric
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

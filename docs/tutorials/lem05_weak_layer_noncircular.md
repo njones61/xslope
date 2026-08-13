@@ -597,8 +597,11 @@ This tutorial demonstrated:
   opens from 9% to 144% on a surface whose leading segment has been stood up to
   59°.
 
-**Where to go next:** the [tutorials index](index.md) lists the rest of the
-series. [Sample Problem 7](../lem/samples.md#7-non-circular-failure-surface)
+**Where to go next:** [Tutorial LEM-4](lem04_water_in_the_slope.md) turns to
+the input this page entered in passing — the piezometric line — and measures
+what the water is worth on a surface held fixed: the same circle dry and wet,
+the two unit-weight columns, and a sweep on a saturated unit weight.
+[Sample Problem 7](../lem/samples.md#7-non-circular-failure-surface)
 carries this same model into an automated search, and
 [Sample Problem 13](../lem/samples.md#13-multiple-local-minima) is the circular
 counterpart of the same hazard — a section where the surface a search settles on

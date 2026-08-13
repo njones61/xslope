@@ -351,7 +351,7 @@ was run alone, as the model's only starting circle:
 | (20, 120), −9 | 129 | a 129 ft arc centered 120 ft up | 1.2440 | (18.47, 43.69) |
 
 All eleven end on the same surface: tangent to the contact within 0.001 ft,
-center within half a foot of (18.5, 43.75), factor of safety within 0.0002 of
+center within 0.8 ft of (18.5, 43.75), factor of safety within 0.0002 of
 Spencer's 1.2441. The depth refinement is free to walk across the contact, and
 from each of those starts the downhill direction points to the same place.
 

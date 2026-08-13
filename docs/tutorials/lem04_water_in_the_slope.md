@@ -354,8 +354,8 @@ still. The blue bars on the slice bases are the legend's **Pore Pressure (u)**,
 and on 38 of the 39 slice bases they are not zero. Each one is the piezometric
 reading — u = γ<sub>w</sub> × the vertical distance from the base to the line
 — and the largest, **2064 psf at x = 163.6**, is a base sitting 33.1 ft below
-the line (62.4 × 33.1). Only the first slice, whose base hugs the crest above
-the line's left end, reads zero.
+the line (62.4 × 33.1). Only the first slice reads zero: the circle enters the
+crest at elevation 84 and that slice's base, at 77.5, is still above the line.
 
 ### What the water costs
 

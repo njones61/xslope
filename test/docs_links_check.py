@@ -78,6 +78,10 @@ from studio import urlscheme                                     # noqa: E402
 WITH_SIDECARS = os.path.join(_REPO, "docs/seep/files/xslope_rface_SEEP_KEY.xlsx")
 #: A project that is a workbook and nothing else (single-file samples package too).
 SINGLE_FILE = os.path.join(_REPO, "docs/inputs/slope/xslope_simple1.xlsx")
+#: Tutorial LEM-2's completed model, which its label pins in H are read against —
+#: the distributed-loads editor has a Direction to report only on a model that
+#: carries a load.
+LEM02_FILE = os.path.join(_REPO, "docs/lem/files/xslope_crest_surcharge.xlsx")
 
 #: A URL on the docs site — what the docs build emits.
 GOOD = "https://xslope.readthedocs.io/en/latest/lem/files/xslope_simple1.xslz"
@@ -811,6 +815,88 @@ T0_PACKAGE_BUTTONS = ("Change…", "Open Existing", "Extract Fresh")
 #: The Inputs-tree rows Tutorial 0 names as the way into an editor.
 T0_INPUT_CATEGORIES = ("Global parameters", "Materials", "Profile lines", "Circles")
 
+#: The Inputs-tree rows LEM-2 sends the reader to. Both are added unconditionally,
+#: so an empty model still lists them — which is the state the tutorial's reader is
+#: in when they go looking.
+LEM02_INPUT_CATEGORIES = ("Distributed loads", "Line loads")
+
+#: The Run-menu action LEM-2's design section tells the reader to press. Same
+#: source-string convention as ``T0_FILE_ACTIONS``: Qt's ``&`` removed, the
+#: trailing ellipsis kept (the page writes it **Parametric…** too, since it is not
+#: one of the familiar File verbs that drop it).
+LEM02_RUN_ACTIONS = {"act_sensitivity": "Parametric…"}
+
+#: The two buttons LEM-2's Studio path presses to get a load into the model, and
+#: the Direction reading it leaves selected. The direction wording is the pinned
+#: one because the page's face-load section turns on the difference between the two
+#: options — a reworded combo would leave that section describing a choice the
+#: reader cannot find.
+LEM02_DLOAD_BUTTONS = ("Add load", "Add row")
+LEM02_DLOAD_DIRECTION = "Normal (perpendicular to the line)"
+
+#: The Parametric dialog in the state LEM-2 walks: the Design mode entry, every
+#: form label the page names in order, and the button that starts the sweep.
+LEM02_DESIGN_MODE = "Design (FS target)"
+LEM02_DESIGN_ROWS = ("Mode", "Method", "Number of slices", "Material", "Property",
+                     "Sweeping", "From", "To", "Steps", "Target FS")
+LEM02_DESIGN_RUN = "Run"
+
+
+def _lem02_editor_labels(mw):
+    """The two dialogs Tutorial LEM-2 drives, read for the labels it quotes.
+
+    Both are built on the tutorial's own model rather than on an empty one: the
+    distributed-loads editor's Direction combo belongs to a selected load block,
+    and there is nothing to select until the model carries one.
+    """
+    from PySide6.QtWidgets import QComboBox, QFormLayout, QPushButton
+
+    from xslope.fileio import load_slope_data
+
+    from studio.dialogs import SensitivityDialog
+    from studio.editors import DloadsEditor
+
+    fails = []
+    data = _quiet(load_slope_data, LEM02_FILE)
+
+    dlg = DloadsEditor().build(data, None)
+    buttons = {b.text() for b in dlg.findChildren(QPushButton)}
+    for label in LEM02_DLOAD_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the distributed-loads editor has no {label!r} button; "
+                         f"Tutorial LEM-2 tells the reader to press it. Its buttons "
+                         f"read {sorted(buttons)}")
+    directions = {combo.itemText(i)
+                  for combo in dlg.findChildren(QComboBox)
+                  for i in range(combo.count())}
+    if LEM02_DLOAD_DIRECTION not in directions:
+        fails.append(f"no distributed-load Direction reads "
+                     f"{LEM02_DLOAD_DIRECTION!r}, which Tutorial LEM-2 quotes. The "
+                     f"options read {sorted(directions)}")
+    dlg.deleteLater()
+
+    sens = SensitivityDialog(defaults={"mode": "design"}, slope_data=data)
+    modes = {sens.mode.itemText(i) for i in range(sens.mode.count())}
+    if LEM02_DESIGN_MODE not in modes:
+        fails.append(f"the Parametric dialog offers no {LEM02_DESIGN_MODE!r} mode, "
+                     f"which Tutorial LEM-2 selects. It offers {sorted(modes)}")
+    rows = set()
+    for form in sens.findChildren(QFormLayout):
+        for r in range(form.rowCount()):
+            label = form.itemAt(r, QFormLayout.LabelRole)
+            if label is not None and label.widget() is not None:
+                rows.add(label.widget().text().replace("&", ""))
+    for name in LEM02_DESIGN_ROWS:
+        if name not in rows:
+            fails.append(f"the Parametric dialog has no {name!r} row; Tutorial LEM-2 "
+                         f"names it. Its rows read {sorted(rows)}")
+    if sens._ok.text() != LEM02_DESIGN_RUN:
+        fails.append(f"the Parametric dialog's accept button reads "
+                     f"{sens._ok.text()!r}, not {LEM02_DESIGN_RUN!r} — the label "
+                     f"Tutorial LEM-2 tells the reader to press")
+    sens.deleteLater()
+    return fails
+
 
 def test_tutorial_labels():
     """Studio still reads the way the tutorials say it does."""
@@ -843,6 +929,22 @@ def test_tutorial_labels():
             if name not in rows:
                 fails.append(f"the Inputs tree has no {name!r} row; Tutorial 0 tells "
                              f"the reader to click it. It reads {rows}")
+        for name in LEM02_INPUT_CATEGORIES:
+            if name not in rows:
+                fails.append(f"the Inputs tree has no {name!r} row; Tutorial LEM-2 "
+                             f"tells the reader to click it. It reads {rows}")
+
+        for attr, label in LEM02_RUN_ACTIONS.items():
+            action = getattr(mw, attr, None)
+            if action is None:
+                fails.append(f"MainWindow has no {attr}, which Tutorial LEM-2 calls "
+                             f"{label!r}")
+            elif action.text().replace("&", "") != label:
+                fails.append(f"the {attr} action reads "
+                             f"{action.text().replace('&', '')!r}, not {label!r} — "
+                             f"the label Tutorial LEM-2 quotes")
+
+        fails += _lem02_editor_labels(mw)
 
         from PySide6.QtWidgets import QPushButton
 

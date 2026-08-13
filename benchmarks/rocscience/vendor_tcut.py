@@ -159,7 +159,9 @@ VENDOR_T_CUT = {
         'Bay Mud (elastic outer 1)': None,
         'Bay Mud (elastic outer 2)': None,
     },
-    # RS2-24a
+    # RS2 #024_01 / VP32a — caps transcribed from the vendor model. The RS2 SSR
+    #   rows for this problem are not attempted (the vendor mesh is split across a
+    #   slip interface), so the file serves the Slide2 LEM row; t_cut is FEM-only.
     'vp032a.xlsx': {
         'Upper embankment': 0.0,
         'Lower embankment': 0.0,
@@ -169,21 +171,7 @@ VENDOR_T_CUT = {
         'Clay 4': 32.0,
         'Clay 5': 32.0,
     },
-    # RS2-24a-skin
-    #   the two 'elastic skin' materials mirror the vendor's rock8/rock9,
-    #   which are Plasticity:None and carry no tensile field.
-    'vp032a_skin.xlsx': {
-        'Upper embankment': 0.0,
-        'Lower embankment': 0.0,
-        'Clay 1': 43.0,
-        'Clay 2': 31.0,
-        'Clay 3': 30.0,
-        'Clay 4': 32.0,
-        'Clay 5': 32.0,
-        'Upper embankment (elastic skin)': None,
-        'Lower embankment (elastic skin)': None,
-    },
-    # RS2-24b
+    # RS2 #024_02 / VP32c — same, for the H = 8.75 case.
     'vp032c.xlsx': {
         'Upper embankment': 0.0,
         'Lower embankment': 0.0,
@@ -192,20 +180,6 @@ VENDOR_T_CUT = {
         'Clay 3': 30.0,
         'Clay 4': 32.0,
         'Clay 5': 32.0,
-    },
-    # RS2-24b-skin
-    #   '#024_02' carries the same rock8/rock9 Plasticity:None skin as '#024_01',
-    #   and like it those two materials carry no tensile field.
-    'vp032c_skin.xlsx': {
-        'Upper embankment': 0.0,
-        'Lower embankment': 0.0,
-        'Clay 1': 43.0,
-        'Clay 2': 31.0,
-        'Clay 3': 30.0,
-        'Clay 4': 32.0,
-        'Clay 5': 32.0,
-        'Upper embankment (elastic skin)': None,
-        'Lower embankment (elastic skin)': None,
     },
     # RS2-26
     #   PARTIAL: this row is built from the manual tables, not the .fez. Only the
@@ -848,7 +822,7 @@ VENDOR_E_NU = {
         'Bay Mud (elastic outer 1)': (0.4, 1000000.0),
         'Bay Mud (elastic outer 2)': (0.4, 1000000.0),
     },
-    # RS2-24a
+    # RS2 #024_01 / VP32a
     'vp032a.xlsx': {
         'Upper embankment': (0.4, 50000.0),
         'Lower embankment': (0.4, 50000.0),
@@ -858,19 +832,7 @@ VENDOR_E_NU = {
         'Clay 4': (0.4, 50000.0),
         'Clay 5': (0.4, 50000.0),
     },
-    # RS2-24a-skin
-    'vp032a_skin.xlsx': {
-        'Upper embankment': (0.4, 50000.0),
-        'Lower embankment': (0.4, 50000.0),
-        'Clay 1': (0.4, 50000.0),
-        'Clay 2': (0.4, 50000.0),
-        'Clay 3': (0.4, 50000.0),
-        'Clay 4': (0.4, 50000.0),
-        'Clay 5': (0.4, 50000.0),
-        'Upper embankment (elastic skin)': (0.4, 50000.0),
-        'Lower embankment (elastic skin)': (0.4, 50000.0),
-    },
-    # RS2-24b
+    # RS2 #024_02 / VP32c
     'vp032c.xlsx': {
         'Upper embankment': (0.4, 50000.0),
         'Lower embankment': (0.4, 50000.0),
@@ -879,18 +841,6 @@ VENDOR_E_NU = {
         'Clay 3': (0.4, 50000.0),
         'Clay 4': (0.4, 50000.0),
         'Clay 5': (0.4, 50000.0),
-    },
-    # RS2-24b-skin
-    'vp032c_skin.xlsx': {
-        'Upper embankment': (0.4, 50000.0),
-        'Lower embankment': (0.4, 50000.0),
-        'Clay 1': (0.4, 50000.0),
-        'Clay 2': (0.4, 50000.0),
-        'Clay 3': (0.4, 50000.0),
-        'Clay 4': (0.4, 50000.0),
-        'Clay 5': (0.4, 50000.0),
-        'Upper embankment (elastic skin)': (0.4, 50000.0),
-        'Lower embankment (elastic skin)': (0.4, 50000.0),
     },
     # RS2-25 — the Syncrude tailings dyke. Its vendor model is the RS2-NATIVE
     # 'slope stability #025.fez' (five zones, gamma 20/17/17/17/17, phi

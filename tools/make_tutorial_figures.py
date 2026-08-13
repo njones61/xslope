@@ -102,13 +102,16 @@ def _render_sheet_module():
     return mod
 
 
-def render(name, src, sheet, rows=None, cols=None):
-    # Tutorial captures drop the sheet-tab strip: with it, a narrow sheet is
-    # padded with empty grid columns out to the strip's fixed width, and the
-    # owner's review found the padding made the captures hard to read.
+def render(name, src, sheet, rows=None, cols=None, tab_strip=False):
+    # Tutorial captures drop the sheet-tab strip by default: with it, a narrow sheet
+    # is padded with empty grid columns out to the strip's fixed width, and the
+    # owner's review found the padding made the captures hard to read. The exception
+    # is a figure whose subject IS the workbook's shape rather than one sheet's
+    # cells — Tutorial 0's tour of the template — where the strip is what the reader
+    # is being shown.
     mod = _render_sheet_module()
     out = os.path.join(OUT_DIR, name)
-    mod.render_sheet(src, sheet, out, rows=rows, cols=cols, tab_strip=False)
+    mod.render_sheet(src, sheet, out, rows=rows, cols=cols, tab_strip=tab_strip)
     print("-> %s  (%s!%s)" % (name, os.path.relpath(src, REPO_ROOT), sheet))
     return out
 
@@ -245,7 +248,35 @@ def lem01_placeholders():
     # (offscreen main-window grab — the hand-capture convention is retired).
 
 
+# --------------------------------------------------------------------------- #
+# Tutorial 0 — Building Models Three Ways
+# --------------------------------------------------------------------------- #
+#: The blank master template the docs hand out — the file Tutorial 0's Excel path
+#: starts from. Rendered blank on purpose: the reader has not filled anything in
+#: yet, and the figure's subject is the workbook's shape, not a model.
+TEMPLATE = os.path.join(REPO_ROOT, "docs/inputs/input_template.xlsx")
+
+
+def t0_template():
+    """The template's ``main`` worksheet as it is downloaded, out to column G.
+
+    The window is wider than LEM-1's ``A:D`` because the sheet carries its own
+    **Sheet / Description** table in ``F7:G21`` — the workbook naming and
+    describing every worksheet in itself, which is what the tutorial's paragraph
+    beside this figure is about. The tab strip would say the same thing less well:
+    it names the sheets without describing them, and it pads a narrow capture out
+    to its own fixed width with empty grid columns, which the owner's review of the
+    LEM-1 captures rejected.
+
+    Rows stop at 24 (the Surface-family row) for the same reason LEM-1's do —
+    below it the sheet holds the hidden source data behind the dropdowns, which is
+    not part of what a reader fills in.
+    """
+    render("t0_template_main.png", TEMPLATE, "main", rows=(1, 24), cols="A:G")
+
+
 GROUPS = {
+    "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
     "lem01_plots": lem01_plots,
     "lem01_placeholders": lem01_placeholders,

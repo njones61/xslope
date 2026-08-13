@@ -45,6 +45,11 @@ Studio answers the link. Both halves have failure modes nobody would see by look
      Studio that may already be running — or, when the click is what launched it, to
      an application that has no window yet, which must hold the request rather than
      drop it.
+  H. STUDIO READS THE WAY THE TUTORIALS SAY IT DOES. A tutorial hands the reader a
+     label to press, and a rewording in the app turns that sentence into an
+     instruction to press something that is not there. The labels Tutorial 0 quotes
+     for the file lifecycle and the package flow are pinned here, the way
+     ``circles_editor_check.GENERATE_LABEL`` pins LEM-1's generator button.
 
 No network: the download is stubbed in F and the redirect handler is exercised
 directly in C. The MkDocs build in E writes only into a temporary directory.
@@ -782,6 +787,88 @@ def test_arrival():
     return fails
 
 
+# ------------------------------------------ H. the labels the tutorials quote
+#: The File-menu actions Tutorial 0 tells the reader to use. These are the SOURCE
+#: strings with Qt's ``&`` accelerator markers removed — what the menu renders — not
+#: the page's spelling of them, which drops the trailing ellipsis on the familiar
+#: File verbs. What is guarded is that the app still calls these things what the
+#: tutorial says it calls them; a rewording there turns those sentences into
+#: instructions to press something that is not there, the same failure
+#: ``circles_editor_check.GENERATE_LABEL`` guards for LEM-1, and nothing else in the
+#: suite would notice it.
+T0_FILE_ACTIONS = {
+    "act_new": "New",
+    "act_open": "Open…",
+    "act_save": "Save",
+    "act_save_as": "Save As…",
+    "act_export_pkg": "Export Project Package…",
+}
+
+#: The buttons the package-open dialog offers when its destination already exists —
+#: the choice Tutorial 0 walks the reader through.
+T0_PACKAGE_BUTTONS = ("Change…", "Open Existing", "Extract Fresh")
+
+#: The Inputs-tree rows Tutorial 0 names as the way into an editor.
+T0_INPUT_CATEGORIES = ("Global parameters", "Materials", "Profile lines", "Circles")
+
+
+def test_tutorial_labels():
+    """Studio still reads the way the tutorials say it does."""
+    from PySide6.QtWidgets import QApplication
+
+    from studio.dialogs import UnpackPackageDialog
+    from studio.main_window import MainWindow
+
+    QApplication.instance() or QApplication([])
+    fails = []
+
+    mw = MainWindow()
+    mw._add_recent = lambda path: None            # never touch the user's settings
+    try:
+        for attr, label in T0_FILE_ACTIONS.items():
+            action = getattr(mw, attr, None)
+            if action is None:
+                fails.append(f"MainWindow has no {attr}, which Tutorial 0 calls "
+                             f"{label!r}")
+                continue
+            got = action.text().replace("&", "")
+            if got != label:
+                fails.append(f"the {attr} action reads {got!r}, not {label!r} — the "
+                             f"label Tutorial 0 quotes")
+
+        _quiet(mw.open_path, SINGLE_FILE)
+        tree = mw.inputs_tree
+        rows = [tree.topLevelItem(i).text(0) for i in range(tree.topLevelItemCount())]
+        for name in T0_INPUT_CATEGORIES:
+            if name not in rows:
+                fails.append(f"the Inputs tree has no {name!r} row; Tutorial 0 tells "
+                             f"the reader to click it. It reads {rows}")
+
+        from PySide6.QtWidgets import QPushButton
+
+        dlg = UnpackPackageDialog(os.path.join(_tmp(), "sample" + PACKAGE_EXT), mw)
+        # The dialog offers the already-exists choice only for a destination that is
+        # there, which is the case the tutorial describes. (Hidden rather than
+        # visible is the question: nothing here is on a screen, so isVisible() is
+        # False for every button in an unshown dialog.)
+        dlg.dest.setText(_tmp())
+        dlg._refresh()
+        buttons = {b.text(): b for b in dlg.findChildren(QPushButton)}
+        for label in T0_PACKAGE_BUTTONS:
+            button = buttons.get(label)
+            if button is None:
+                fails.append(f"the package dialog has no {label!r} button; Tutorial 0 "
+                             f"names it. Its buttons read {sorted(buttons)}")
+            elif button.isHidden():
+                fails.append(f"{label!r} is hidden on a destination that already "
+                             f"exists, which is the case the tutorial describes")
+        dlg.deleteLater()
+    finally:
+        mw.doc._dirty = False
+        mw.close()
+    return fails
+
+
 CHECKS = [
     ("A. one verb, and it is named", test_verb_gate),
     ("B. only XSLOPE's own sites", test_allowlist),
@@ -790,6 +877,7 @@ CHECKS = [
     ("E. the docs build packages and pairs", test_docs_build),
     ("F. refuse, ask, fetch, open", test_studio_flow),
     ("G. argv and FileOpen end in one call", test_arrival),
+    ("H. Studio reads as the tutorials say", test_tutorial_labels),
 ]
 
 
@@ -801,7 +889,8 @@ def run():
     except Exception:
         print("docs links: PySide6 not installed — Studio check skipped.")
         checks = [c for c in CHECKS
-                  if c[1] not in (test_studio_flow, test_arrival)]
+                  if c[1] not in (test_studio_flow, test_arrival,
+                                  test_tutorial_labels)]
     failures = []
     try:
         for name, fn in checks:

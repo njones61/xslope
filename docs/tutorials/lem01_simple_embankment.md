@@ -72,14 +72,9 @@ Whichever you choose, rejoin at [Running the analysis](#running-the-analysis).
 
 ### What you need first
 
-The assistant is bring-your-own-model: it needs a provider and an API key before it
-will do anything. The packaged app bundles the provider library; a pip install needs
-the `ai` extra — see
-[Getting the assistant](../studio/assistant.md#getting-the-assistant). Either way,
-open the assistant dock and press **Settings…** to choose a provider and enter a key,
-stored in your operating system's keychain — see
-[Choosing a model](../studio/assistant.md#choosing-a-model). With no API key to be
-had, choose **Ollama**, which runs a model on your own machine.
+The assistant is bring-your-own-model: it does nothing until you give it a provider
+and credentials. That setup is a one-time job, described in
+[The AI assistant](building_models.md#the-ai-assistant).
 
 ### Give it the problem
 

@@ -735,9 +735,14 @@ depth on the flat part returns the same FS, so the choice is robust. Run a handf
 A large gap between the filter-off value and the plateau means a surficial skin was governing the
 unfiltered result; a small gap means the deep mechanism already governs and the filter can stay off.
 On a low fill over soft ground the plateau can sit deep as a fraction of height — the embankment on
-soft ground of [RS2-66](../verification/rs2.md#rs2-66) plateaus at a 4 m cutoff on a 10 m fill,
-while the 162 m Talbingo dam of [RS2-4](../verification/rs2.md#rs2-4) is already on its plateau by
-10 m (its 1.67 downstream-bench skin against a 1.82–1.83 plateau held flat from 10 m out to 30 m).
+soft ground of [RS2-66](../verification/rs2.md#rs2-66), on a 4 m soft band, is on its plateau at a
+4 m cutoff on a 10 m fill (1.131 under a 4, 6 or 8 m cutoff alike), while the 162 m Talbingo dam
+of [RS2-4](../verification/rs2.md#rs2-4) is already on its plateau by 10 m (its 1.67
+downstream-bench skin against a 1.82–1.83 plateau held flat from 10 m out to 30 m). The same
+model on a 2 m band has no plateau there — 4 m returns 1.131 and 6 or 8 m returns 1.206, because
+a cutoff below the soft layer selects a deeper surface than the one the layer carries, which is
+the third reading above. A plateau is read on the model in hand, not carried over from a similar
+one.
 Set the same `min_slip_depth` in the LEM search and the SSRM run so both report the same mechanism.
 
 ### The `solve_fem()` function

@@ -167,7 +167,7 @@ polygon at all, and this is where each one's problem is treated:
 |---|---|---:|---|
 | `#009` | native | 0.9% | [RS2-9](#rs2-9) — reproduced as the elastic face skin |
 | `#023` | native | 51.1% | [RS2-23](#rs2-23) — reproduced as the two elastic outer zones |
-| `#024_01`, `#024_02` | native | 0.3% | [RS2-24](#rs2-24) — the elastic face strip, not reproduced: the SSR rows are blocked on the slip interface the same models carry |
+| `#024_01`, `#024_02` | native | 0.3% | [RS2-24](#rs2-24) — the elastic face strip is transcribable, but the SSR rows are blocked on the slip interface the same models carry |
 | `#028_01/02/03` | native | 63.4 / 63.0 / 63.0% | [RS2-28](#rs2-28) — reproduced as the elastic outer zone |
 | `#041_01` | native | 70.9% | [RS2-41](#rs2-39) (the Fig 14.4 embankment, Slide2 VP79) |
 | `#043_01` | native | 57.7% | [RS2-43](#rs2-39) — the native shallow model |
@@ -261,7 +261,7 @@ independently verifiable.
 | [21](#rs2-21) | 🟢 | Bearing capacity test prism (Prandtl II) | SSRM 1.011 vs RS2 SSRM 1.01 (+0.1%) | Converging on Prandtl theory 1.0. |
 | [22](#rs2-22) | 🟢 | Layered slope with undulating bedrock | SSRM 1.534 vs RS2 SSRM 1.52 (+0.9%) | **built** (SSRM variant), on the vendor's boundary-load cap, carried at the vendor's own vertical load direction. |
 | [23](#rs2-23) | 🟢 | Underwater slope with linearly varying cohesion | Under RS2's own elastic partition: SSRM 1.112 vs RS2 SSRM 1.12 (−0.7%) | **built** — the vendor model states the "can't fail" region element by element (a full-depth vertical band, not the text's "above el. −20 and right of the bench"), and the corpus carries it. Partition removed, the same model reads 0.215. |
-| [24](#rs2-24) | <span class="nodata">⊘</span> | Layered slope with geosynthetic reinforcement | | *blocked* — the vendor models join embankment to foundation across a frictional slip interface along the geotextile, an element type XSLOPE does not have, so these rows are not attempted; [the section](#rs2-24) reads the construction out of the vendor models. |
+| [24](#rs2-24) | <span class="nodata">⊘</span> | Layered slope with geosynthetic reinforcement | | *blocked* — the vendor models join embankment to foundation across a frictional slip interface along the geotextile, an element type XSLOPE does not have, so these rows are not attempted. The construction is read from the vendor models. RS2 SSRM 1.15 / 0.95 published. |
 | [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | **built** (caveat) — refinement widens the gap rather than closing it: 1.174 at a 2.5 m mesh against the 1.202 locked at 5 m. |
 | [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.274 vs RS2 SSRM 2.29 (−0.7%) | |
 | [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | **built** — regression lock at the 1.0 m mesh, flat from there down. |
@@ -1085,22 +1085,24 @@ above, as an SSRM/LEM pair should.
 Slide2 counterpart: [VP32](rocscience.md#vp32).
 
 The problem is a 7 m and an 8.75 m embankment of two cohesionless fills on five soft clay layers,
-each fill carrying one geosynthetic sheet at its base (Borges & Cardoso 2002). RS2 publishes an
-SSR factor for both heights, and Part IV publishes three more for the same geometry.
+with a single geosynthetic sheet at the fill base (Borges & Cardoso 2002). RS2 publishes an
+SSR factor for both heights, and Part IV publishes three more for the same problem.
 
 **The SSR rows are not attempted.** RS2 does not mesh the section as one body. Its models split
 the solid mesh along the geotextile into two, 39 coincident node pairs joined by frictional slip
 joints (c = 0, φ = 30.96°), with the geotextile itself as tension-only beam elements
 (EA = 200 000 kN/m, Ft = 200 kN/m) running along the split — so the load path between embankment
 and foundation passes through a sliding interface. XSLOPE meshes a bonded continuum and has no
-interface element, so the vendor's construction cannot be transcribed, and no XSLOPE run stands
+interface element, so that sliding joint has no XSLOPE counterpart, and no XSLOPE run stands
 opposite RS2's factors: Part I's 1.15 and 0.95, Part IV's 1.24 / 1.21 / 0.98. All five vendor
 models are built this way — the two native `#024` models and the three `#032` Slide2 imports.
 
 A mesh recipe does not stand in for the vendor's nodes either. The embankment fill is c = 0, so
-the failing band carries no length scale of its own and localizes on the elements: solved under
-the vendor's own elastic face strip, a 2 431-element mesh reads 1.080 where the vendor's own
-2 442-element mesh reads 1.048.
+the failing band carries no length scale of its own and localizes on the elements. One solver at
+two nearly equal densities, both carrying the vendor's elastic face strip, shows how far that
+reaches: XSLOPE reads 1.080 on its own 2 431-element mesh and 1.048 on the vendor's own
+2 442-element node set. Both are illustrative readings — the corpus carries no file for
+either — and RS2's own factor is bound to its discretization the same way.
 
 The limit-equilibrium side of this problem is built and locked as Slide2
 [VP32](rocscience.md#vp32) — Bishop and Spencer on the three published circles, where the

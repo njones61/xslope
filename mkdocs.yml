@@ -42,6 +42,7 @@ nav:
     - Building Models Three Ways: tutorials/building_models.md
     - Simple Embankment (LEM): tutorials/lem01_simple_embankment.md
     - Loads on the Crest (LEM): tutorials/lem02_loads_on_the_crest.md
+    - A Layered Slope (LEM): tutorials/lem03_layered_slope.md
   - XSLOPE Studio:
     - Overview: studio/index.md
     - The Interface: studio/interface.md

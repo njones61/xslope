@@ -39,5 +39,6 @@ writes, and how to send a whole project to somebody else.
 |---|---|---|---|---|---|
 | 1 | [Simple Embankment](lem01_simple_embankment.md) | The smallest complete model — one material, one profile line, a rigid base — searched for its critical circle with Spencer's method, then read past the factor of safety to the crest tension its warnings expose | Limit equilibrium | profile lines, one material, Mohr-Coulomb, starting circles, circular search, tension crack | 10–30 min |
 | 2 | [Loads on the Crest](lem02_loads_on_the_crest.md) | A surcharge added to LEM-1's embankment — spread over the crest, gathered onto a point, pushed normal to the ground or straight down, and shaken — then a sweep for the cohesion that would carry it at a target factor of safety | Limit equilibrium | distributed loads, line loads, load direction, seismic coefficient, design mode | 5–20 min |
+| 3 | [A Layered Slope](lem03_layered_slope.md) | An embankment on a foundation layer over rigid rock — a profile line at the material boundary, a starting circle at the base of each layer, and a search result read at depth: why the critical surface settles on the contact, and what moves it to the rock | Limit equilibrium | two materials, profile lines, per-layer starting circles, generated circles, circular search | 5–20 min |
 
 </div>

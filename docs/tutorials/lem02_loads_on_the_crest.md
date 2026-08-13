@@ -410,8 +410,10 @@ This tutorial demonstrated:
   disagreement between the methods from 9.9% to 3.8% — LEM-1's crest tension is
   reduced, not gone.
 
-**Where to go next:** the [tutorials index](index.md) lists the rest of the
-series. [Design Mode](../parametric/design.md) and
+**Where to go next:** [Tutorial LEM-3](lem03_layered_slope.md) gives the ground
+under the slope a second material — the case this page's design sweep names as
+the one where the critical surface migrates as the parameter moves.
+[Design Mode](../parametric/design.md) and
 [Back-Analysis](../parametric/back_analysis.md) carry the sweep above further —
 every parameter it can vary, and what a sweep that never reaches its target
 reports instead.

@@ -3070,9 +3070,8 @@ reads 1.131.
 
 **The depth cutoff.** The family's cutoff is 4 m, below the fill skin and above the basal band. At
 h₁ = 4 m it is on a plateau: 1.131 under a 4, 6 or 8 m cutoff alike. At
-h₁ = 2 m it is not — 4 m returns 1.131 and 6 or 8 m returns 1.206 — and the geometry says why: the
-soft band ends 2 m below the flat ground beside the embankment, so a 6 m cutoff sits under the
-band itself and what it returns is a deeper mechanism, not the basal squeeze the manual reports.
+h₁ = 2 m it is not: 4 m returns 1.131, and 6 or 8 m return 1.206, a different and higher reading.
+The cutoff is therefore read on the model in hand rather than carried across the family.
 
 **The flow rule is the one modelling difference this build cannot follow.** Nakamura and RS2 run
 associated (ψ = φ) where XSLOPE is non-associated throughout (ψ = 0, the Griffiths convention this

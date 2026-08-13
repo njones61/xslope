@@ -820,11 +820,12 @@ T0_INPUT_CATEGORIES = ("Global parameters", "Materials", "Profile lines", "Circl
 #: in when they go looking.
 LEM02_INPUT_CATEGORIES = ("Distributed loads", "Line loads")
 
-#: The Run-menu action LEM-2's design section tells the reader to press. Same
-#: source-string convention as ``T0_FILE_ACTIONS``: Qt's ``&`` removed, the
-#: trailing ellipsis kept (the page writes it **Parametric…** too, since it is not
-#: one of the familiar File verbs that drop it).
-LEM02_RUN_ACTIONS = {"act_sensitivity": "Parametric…"}
+#: The Run-menu actions LEM-2 tells the reader to press — the run itself, and the
+#: sweep its design section ends on. Same source-string convention as
+#: ``T0_FILE_ACTIONS``: Qt's ``&`` removed, the trailing ellipsis kept (the page
+#: writes **Run LEM…** and **Parametric…** too, since neither is one of the
+#: familiar File verbs that drop it).
+LEM02_RUN_ACTIONS = {"act_run": "Run LEM…", "act_sensitivity": "Parametric…"}
 
 #: The two buttons LEM-2's Studio path presses to get a load into the model, and
 #: the Direction reading it leaves selected. The direction wording is the pinned
@@ -834,12 +835,31 @@ LEM02_RUN_ACTIONS = {"act_sensitivity": "Parametric…"}
 LEM02_DLOAD_BUTTONS = ("Add load", "Add row")
 LEM02_DLOAD_DIRECTION = "Normal (perpendicular to the line)"
 
+#: The two tabs the page names in the distributed-loads editor, and the label on
+#: the Direction chooser. The page tells the reader which tab the ordinary load
+#: goes on and which one is the rapid-drawdown stage that stays empty, so a
+#: renamed tab leaves those sentences pointing at nothing.
+LEM02_DLOAD_TABS = ("Set 1", "Set 2 (rapid drawdown)")
+LEM02_DLOAD_DIRECTION_LABEL = "Direction:"
+
+#: The Global-parameters row LEM-2's seismic section sends the reader to.
+LEM02_GLOBAL_ROW = "Seismic coefficient k"
+
+#: The line-loads table's column headers, in the order the page dictates values
+#: into them (**Label** `footing`, **x** `30`, **y** `20`, **P** `7500`,
+#: **Angle** `-90`).
+LEM02_LLOAD_HEADERS = ("Label", "x", "y", "P", "Angle")
+
 #: The Parametric dialog in the state LEM-2 walks: the Design mode entry, every
 #: form label the page names in order, and the button that starts the sweep.
 LEM02_DESIGN_MODE = "Design (FS target)"
 LEM02_DESIGN_ROWS = ("Mode", "Method", "Number of slices", "Material", "Property",
                      "Sweeping", "From", "To", "Steps", "Target FS")
 LEM02_DESIGN_RUN = "Run"
+
+#: The checkbox the design step tells the reader to leave ticked, and whose
+#: wording the step's explanation of when re-searching matters is built on.
+LEM02_DESIGN_SEARCH = "Re-search the critical surface at each step"
 
 
 def _lem02_editor_labels(mw):
@@ -849,12 +869,13 @@ def _lem02_editor_labels(mw):
     distributed-loads editor's Direction combo belongs to a selected load block,
     and there is nothing to select until the model carries one.
     """
-    from PySide6.QtWidgets import QComboBox, QFormLayout, QPushButton
+    from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QLabel,
+                                   QPushButton, QTableWidget, QTabWidget)
 
     from xslope.fileio import load_slope_data
 
     from studio.dialogs import SensitivityDialog
-    from studio.editors import DloadsEditor
+    from studio.editors import DloadsEditor, GlobalEditor, LineLoadsEditor
 
     fails = []
     data = _quiet(load_slope_data, LEM02_FILE)
@@ -873,7 +894,43 @@ def _lem02_editor_labels(mw):
         fails.append(f"no distributed-load Direction reads "
                      f"{LEM02_DLOAD_DIRECTION!r}, which Tutorial LEM-2 quotes. The "
                      f"options read {sorted(directions)}")
+    tabs = [t.tabText(i) for t in dlg.findChildren(QTabWidget)
+            for i in range(t.count())]
+    for name in LEM02_DLOAD_TABS:
+        if name not in tabs:
+            fails.append(f"the distributed-loads editor has no {name!r} tab; "
+                         f"Tutorial LEM-2 names it. Its tabs read {tabs}")
+    dl_labels = {lab.text() for lab in dlg.findChildren(QLabel)}
+    if LEM02_DLOAD_DIRECTION_LABEL not in dl_labels:
+        fails.append(f"the distributed-loads editor labels its direction chooser "
+                     f"something other than {LEM02_DLOAD_DIRECTION_LABEL!r}, which "
+                     f"Tutorial LEM-2 tells the reader to leave alone")
     dlg.deleteLater()
+
+    glob = GlobalEditor().build(data, None)
+    rows = {lab.text() for lab in glob.findChildren(QLabel)}
+    if LEM02_GLOBAL_ROW not in rows:
+        fails.append(f"Global parameters has no {LEM02_GLOBAL_ROW!r} row; Tutorial "
+                     f"LEM-2 tells the reader to set it. Its rows read "
+                     f"{sorted(r for r in rows if r)}")
+    glob.deleteLater()
+
+    # The line-loads editor is built on the model with its distributed load
+    # replaced by the page's line load — the state the step it photographs ends in.
+    ll_data = dict(data)
+    ll_data["dloads"], ll_data["dload_dirs"] = [], []
+    ll_data["line_loads"] = [{"x": 30.0, "y": 20.0, "P": 7500.0, "angle": -90.0,
+                              "label": "footing"}]
+    lloads = LineLoadsEditor().build(ll_data, None)
+    headers = [t.horizontalHeaderItem(i).text() if t.horizontalHeaderItem(i) else ""
+               for t in lloads.findChildren(QTableWidget)
+               for i in range(t.columnCount())]
+    for name in LEM02_LLOAD_HEADERS:
+        if name not in headers:
+            fails.append(f"the line-loads table has no {name!r} column; Tutorial "
+                         f"LEM-2 dictates a value into it. Its columns read "
+                         f"{headers}")
+    lloads.deleteLater()
 
     sens = SensitivityDialog(defaults={"mode": "design"}, slope_data=data)
     modes = {sens.mode.itemText(i) for i in range(sens.mode.count())}
@@ -890,6 +947,11 @@ def _lem02_editor_labels(mw):
         if name not in rows:
             fails.append(f"the Parametric dialog has no {name!r} row; Tutorial LEM-2 "
                          f"names it. Its rows read {sorted(rows)}")
+    boxes = {c.text() for c in sens.findChildren(QCheckBox)}
+    if LEM02_DESIGN_SEARCH not in boxes:
+        fails.append(f"the Parametric dialog has no {LEM02_DESIGN_SEARCH!r} "
+                     f"checkbox; Tutorial LEM-2 tells the reader to leave it "
+                     f"ticked. Its checkboxes read {sorted(boxes)}")
     if sens._ok.text() != LEM02_DESIGN_RUN:
         fails.append(f"the Parametric dialog's accept button reads "
                      f"{sens._ok.text()!r}, not {LEM02_DESIGN_RUN!r} — the label "

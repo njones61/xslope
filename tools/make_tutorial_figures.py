@@ -461,6 +461,83 @@ def lem02_plots():
              LEM02_K, crit_k["FS"], LEM02_TARGET_FS, res["crossing"]))
 
 
+# --------------------------------------------------------------------------- #
+# LEM-3 — A Layered Slope
+# --------------------------------------------------------------------------- #
+#: LEM-3's model is the layered sample — one file, two pages, as LEM-1's is.
+LEM03 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_simple_mult_layers.xlsx")
+LEM03_SLICES = 40
+
+#: The foundation's cohesion in the page's what-if, against the 800 psf the file
+#: carries. Below the fill's 400 psf, so the weaker layer is the deep one and the
+#: mechanism the second starting circle describes is the one that controls.
+LEM03_WEAK_C = 300.0
+
+
+def _lem03_search(model, method="spencer"):
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path, circles = circular_search(
+            model, method, num_slices=LEM03_SLICES, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache, path, circles
+
+
+def lem03_sheets():
+    """The three worksheets LEM-3's Excel path fills.
+
+    ``profile`` and ``circles`` take LEM-1's windows on the same sheets — through
+    the empty Line #3 beside the two filled lines, and through the empty rows under
+    the two circles — so a reader comparing the two pages sees the same frame
+    twice.
+
+    ``mat`` does not, and the reason is legibility at the page's width. LEM-1's
+    window starts at row 9, which forces the frame out to column Z: row 9 carries
+    the sheet's *Shear Strength/Stiffness* band header merged C9:Z9, and a frame
+    that ends inside a merge is a KeyError in the renderer rather than a quiet
+    crop. Starting at row 10 — the column-name row — drops that merge and lets the
+    frame stop at O, the ``u`` column, which is the last one this problem fills.
+    The result is 15 named columns across the figure's width instead of 26, and
+    the two material rows are readable at the size the page renders them.
+    """
+    render("lem03_sheet_mat.png", LEM03, "mat", rows=(10, 13), cols="A:O")
+    render("lem03_sheet_profile.png", LEM03, "profile", rows=(1, 12), cols="A:H")
+    render("lem03_sheet_circles.png", LEM03, "circles", rows=(1, 6), cols="A:H")
+
+
+def lem03_plots():
+    """The states LEM-3 compares against, each from the run whose numbers it quotes.
+
+    The arc is the layer contact: the model as delivered (Spencer's search settling
+    on a circle tangent to the top of the foundation), and the same model with the
+    foundation softened below the fill, where the minimum moves to the base of the
+    foundation and the mechanism the second starting circle describes is the one
+    that controls.
+    """
+    sd = load_slope_data(LEM03)
+
+    capture("lem03_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
+
+    fs_cache, path, circles = _lem03_search(sd)
+    crit = fs_cache[0]
+    capture("lem03_search.png", plot_circular_search_results, sd, fs_cache, path,
+            circle_cache=circles)
+    capture("lem03_solution.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+
+    # The what-if: the foundation weaker than the fill it carries. Everything else
+    # is the delivered model, so the only thing that moved is which layer is weak.
+    weak = copy.deepcopy(sd)
+    weak["materials"][1]["c"] = LEM03_WEAK_C
+    fs_weak, _, _ = _lem03_search(weak)
+    crit_w = fs_weak[0]
+    capture("lem03_solution_weak.png", plot_solution, weak, crit_w["slices"],
+            crit_w["failure_surface"], crit_w["solver_result"])
+
+    print("   as delivered %.4f (tangent depth %.3f) · foundation at c = %g psf "
+          "%.4f (tangent depth %.3f)"
+          % (crit["FS"], crit["Depth"], LEM03_WEAK_C, crit_w["FS"], crit_w["Depth"]))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -468,6 +545,8 @@ GROUPS = {
     "lem01_placeholders": lem01_placeholders,
     "lem02_sheets": lem02_sheets,
     "lem02_plots": lem02_plots,
+    "lem03_sheets": lem03_sheets,
+    "lem03_plots": lem03_plots,
 }
 
 

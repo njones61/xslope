@@ -398,6 +398,51 @@ def lem02_parametric():
     return _grab(dlg, "lem02_studio_parametric.png")
 
 
+# --------------------------------------------------------------------------- #
+# LEM-3 — A Layered Slope
+# --------------------------------------------------------------------------- #
+LEM03 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_simple_mult_layers.xlsx")
+
+
+def lem03_materials():
+    """The materials editor, **table view**, on this problem's two materials.
+
+    Table view rather than the list view LEM-1 photographs: with two materials the
+    subject is the pair — the order that fixes the Mat IDs the profile lines
+    reference, and one row's numbers read against the other's. The list view shows
+    one material at a time, which is the wrong shape for that comparison.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = MaterialsEditor().build(_load(LEM03), None)
+    dlg._set_mode("table")
+    dlg.resize(1180, 380)
+    return _grab(dlg, "lem03_studio_materials.png")
+
+
+def lem03_circles():
+    """The circles editor just after **Generate starting circles…** on layered ground.
+
+    The button is pressed rather than the rows pre-loaded, for the reason LEM-1's
+    shot documents: the summary line is the answer to a press. The model arrives
+    with its circles dropped, the state the geometry steps leave — so what the
+    table holds is the generator's own set, three circles on a two-layer section,
+    and the tutorial's audit is read against it.
+    """
+    from studio.editors import CirclesEditor
+
+    d = _load(LEM03)
+    d["circles"] = []
+    d["circular"] = False
+    dlg = CirclesEditor().build(d, None)
+    with contextlib.redirect_stdout(io.StringIO()):
+        dlg._run_generate()
+    return _grab(dlg, "lem03_studio_circles.png")
+
+
+SHOTS["lem03_materials"] = lem03_materials
+SHOTS["lem03_circles"] = lem03_circles
+
 SHOTS["lem02_dloads"] = lem02_dloads
 SHOTS["lem02_lloads"] = lem02_lloads
 SHOTS["lem02_parametric"] = lem02_parametric

@@ -652,32 +652,37 @@ def lem05_plots():
 # LEM-4 — Water in the Slope
 # --------------------------------------------------------------------------- #
 #: LEM-4's model is the piezometric-line sample — one file, two pages, as every
-#: tutorial's is. The page never writes a variant file: its dry and γ_sat states
-#: are edits the reader makes and undoes, so each is rebuilt here in memory.
+#: tutorial's is. The page never writes a variant file: its dry and pinned-circle
+#: states are edits the reader makes and undoes, so each is rebuilt here in
+#: memory.
 LEM04 = os.path.join(REPO_ROOT,
                      "docs/lem/files/xslope_method_slices_problem.xlsx")
 LEM04_SLICES = 40
 
-#: The saturated unit weights the page's γ/γ_sat step enters (soils 1..3), and
-#: the ±5% / 7-point sweep its parametric step runs on the third of them.
-LEM04_GSAT = (135.0, 125.0, 140.0)
+#: The circle the search finds, to the two decimals the page prints and the
+#: reader types back into the model. Every figure of the water comparison is
+#: this surface under a different water assumption, so the page's dry and wet
+#: readings differ by the water and by nothing else.
+LEM04_CIRCLE = dict(Xo=182.37, Yo=88.32, Depth=26.90, R=88.32 - 26.90)
+
+#: The ±5% / 7-point sweep the parametric step runs on the foundation clay's
+#: saturated unit weight, with the found circle held.
 LEM04_SWEEP_PARAM = "mat:soil 3:gamma_sat"
 LEM04_SWEEP_REL = 0.05
 LEM04_SWEEP_N = 7
 
 
-def _lem04_solve(model, method="spencer"):
-    """The pinned circle, one method, no search: what this page runs everywhere.
+def _lem04_solve(model, method="spencer", circle=None):
+    """One circle, one method, no search: what this page runs after the search.
 
-    The circle is the file's own row 1 — the specified deep surface the whole
-    water story holds constant — so every figure of this group is that surface
-    under a different water assumption, never a different surface.
+    The circle defaults to the one the search finds, which is the surface the
+    page holds while the water assumptions change around it.
     """
     from xslope.slice import generate_slices
     from xslope.solve import solve_selected
 
     with contextlib.redirect_stdout(io.StringIO()):
-        ok, res = generate_slices(model, circle=model["circles"][0],
+        ok, res = generate_slices(model, circle=circle or LEM04_CIRCLE,
                                   num_slices=LEM04_SLICES)
         if not ok:
             raise SystemExit("LEM-4: slicing failed — %s" % (res,))
@@ -698,8 +703,8 @@ def lem04_sheets():
 
     ``mat`` takes LEM-5's frame (row 10 down, through column P) for the same
     reason LEM-5 chose it: the u / ru pair in O:P is half the subject, and this
-    page also needs both unit-weight columns — C (**g**) filled and D (**gsat**)
-    blank — because the γ/γ_sat step is an edit made into that blank column.
+    page also needs both unit-weight columns — C (**g**) and D (**gsat**), both
+    filled here — because the weight split is one of the things the page reads.
     ``profile`` runs to I: three lines at three columns each, the third ending
     at H with its spacer.
     """
@@ -712,27 +717,34 @@ def lem04_sheets():
 def lem04_plots():
     """The states LEM-4 compares against, in the order the page walks them.
 
-    One search — the honest answer to Auto search on this model, a face sliver at
-    0.76 — and then no search anywhere else: the page pins the file's deep circle
-    and every remaining figure is that one surface solved by Spencer at 40
-    slices, dry (u = none in all three materials), wet (as the file ships), and
-    swept (γ_sat entered, soil 3's swept ±5% with the surface held fixed).
+    The search runs first, from the file's own seed, and what it finds is the
+    surface the rest of the page is about: every remaining figure is that one
+    circle solved by Spencer at 40 slices — wet (as the file ships), dry (u =
+    none in all three materials), and swept (soil 3's γ_sat ±5% with the surface
+    held).
     """
     sd = load_slope_data(LEM04)
 
     capture("lem04_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
 
-    # What Auto search actually finds on this model: the search is run from the
-    # file's own deep seed, and it walks off it to the lower-face sliver.
+    # What Auto search finds on this model: run from the file's own seed circle,
+    # it settles on a deep circle through the foundation clay.
     with contextlib.redirect_stdout(io.StringIO()):
         fs_cache, _, path, circles = circular_search(sd, "spencer",
                                                      num_slices=LEM04_SLICES)
-    shallow = fs_cache[0]
+    crit = fs_cache[0]
     capture("lem04_search.png", plot_circular_search_results, sd, fs_cache, path,
             circle_cache=circles)
 
-    # The pinned circle, dry: the same model with every material's pore-pressure
-    # option set to none — the reader's three-cell edit, made in memory here.
+    # The found circle wet — the model exactly as the build leaves it, on the
+    # surface the page has the reader enter after reading it off the search.
+    w_slices, w_surface, w_result = _lem04_solve(sd)
+    capture("lem04_solution_wet.png", plot_solution, sd, w_slices, w_surface,
+            w_result)
+
+    # The same circle dry: every material's pore-pressure option set to none —
+    # the reader's three-cell edit, made in memory here. Nothing else moves, so
+    # the two figures differ by the pore pressure and by nothing else.
     dry = copy.deepcopy(sd)
     for m in dry["materials"]:
         m["u"] = "none"
@@ -740,21 +752,16 @@ def lem04_plots():
     capture("lem04_solution_dry.png", plot_solution, dry, d_slices, d_surface,
             d_result)
 
-    # The pinned circle wet — the model exactly as the build leaves it.
-    w_slices, w_surface, w_result = _lem04_solve(sd)
-    capture("lem04_solution_wet.png", plot_solution, sd, w_slices, w_surface,
-            w_result)
-
-    # The γ_sat sweep, fixed surface: the page's parametric step with re-search
-    # unticked, drawn the way Studio's Sensitivity · Curve view draws it
-    # (SweepCanvas.render_curve = plot_sensitivity on the sweep's df).
+    # The γ_sat sweep on the held surface: the page's parametric step, drawn the
+    # way Studio's Sensitivity · Curve view draws it (SweepCanvas.render_curve =
+    # plot_sensitivity on the sweep's df). The model carries the found circle,
+    # because that is the state the page's pin step leaves it in.
     from xslope.plot import plot_sensitivity
     from xslope.sensitivity import sensitivity
-    gs = copy.deepcopy(sd)
-    for m, v in zip(gs["materials"], LEM04_GSAT):
-        m["gamma_sat"] = v
+    pinned = copy.deepcopy(sd)
+    pinned["circles"] = [dict(LEM04_CIRCLE)]
     with contextlib.redirect_stdout(io.StringIO()):
-        ok, sweep = sensitivity(gs, param=LEM04_SWEEP_PARAM,
+        ok, sweep = sensitivity(pinned, param=LEM04_SWEEP_PARAM,
                                 rel_range=LEM04_SWEEP_REL, n=LEM04_SWEEP_N,
                                 search=False, methods=("spencer",),
                                 num_slices=LEM04_SLICES)
@@ -762,13 +769,21 @@ def lem04_plots():
         raise SystemExit("LEM-4 γ_sat sweep failed: %s" % (sweep,))
     capture("lem04_sweep.png", plot_sensitivity, sweep["df"])
 
-    g_slices, _, g_result = _lem04_solve(gs)
+    # What the γ_sat column is worth on this circle: the same surface with the
+    # saturated weights withheld, which is the comparison the weight-split step
+    # reports.
+    blank = copy.deepcopy(sd)
+    for m in blank["materials"]:
+        m["gamma_sat"] = None
+    b_slices, _, b_result = _lem04_solve(blank)
     pts = sweep["df"].loc[~sweep["df"]["is_base"]].sort_values("value")
-    print("   search finds %.4f (depth %.2f) · pinned circle dry %.4f · wet %.4f "
-          "· with γ_sat %s %.4f · sweep %s %.4f→%.4f"
-          % (shallow["FS"], shallow["Depth"], d_result["FS"], w_result["FS"],
-             "/".join("%g" % v for v in LEM04_GSAT), g_result["FS"],
-             LEM04_SWEEP_PARAM, pts["fs"].iloc[0], pts["fs"].iloc[-1]))
+    print("   search finds %.4f (Xo %.2f Yo %.2f depth %.2f) · that circle wet "
+          "%.4f (ΣW %.0f) · dry %.4f · γ_sat withheld %.4f (ΣW %.0f) · sweep %s "
+          "%.4f→%.4f"
+          % (crit["FS"], crit["Xo"], crit["Yo"], crit["Depth"], w_result["FS"],
+             w_slices["w"].sum(), d_result["FS"], b_result["FS"],
+             b_slices["w"].sum(), LEM04_SWEEP_PARAM, pts["fs"].iloc[0],
+             pts["fs"].iloc[-1]))
 
 
 GROUPS = {

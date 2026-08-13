@@ -518,10 +518,9 @@ SHOTS["lem02_parametric"] = lem02_parametric
 LEM04 = os.path.join(REPO_ROOT,
                      "docs/lem/files/xslope_method_slices_problem.xlsx")
 
-#: The saturated unit weights the page's γ/γ_sat step enters (soils 1..3) —
-#: the state the parametric shot's model is in, since the sweep runs on the
-#: column that step fills.
-LEM04_GSAT = (135.0, 125.0, 140.0)
+#: The circle the page's pin step puts in the model before the sweep: the one
+#: the search found, to the two decimals the page prints.
+LEM04_CIRCLE = dict(Xo=182.37, Yo=88.32, Depth=26.90, R=88.32 - 26.90)
 
 
 def lem04_piezo():
@@ -547,16 +546,13 @@ def lem04_parametric():
     material and the property, then the range narrowed to ±5% and 7 points, then
     **Add parameter** — pressed, so the table row is the button's answer rather
     than a pre-load — and finally the re-search box unticked, because the page's
-    whole question is the pinned surface. The model carries the γ/γ_sat step's
-    saturated unit weights: the property picked here is the column that step
-    filled, and on the file as shipped (γ_sat blank) the picker would rightly
-    refuse to sweep it.
+    question is the surface it just pinned. The model carries that surface, which
+    is the state the step before this one leaves it in.
     """
     from studio.dialogs import SensitivityDialog
 
     d = _load(LEM04)
-    for m, v in zip(d["materials"], LEM04_GSAT):
-        m["gamma_sat"] = v
+    d["circles"] = [dict(LEM04_CIRCLE)]
     dlg = SensitivityDialog(defaults={"mode": "sensitivity", "method": "spencer",
                                       "num_slices": 40},
                             slope_data=d)

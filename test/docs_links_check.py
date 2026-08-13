@@ -788,11 +788,14 @@ def test_arrival():
 
 
 # ------------------------------------------ H. the labels the tutorials quote
-#: The File-menu actions Tutorial 0 tells the reader to use, spelled as the page
-#: spells them (the ``&`` accelerators Qt carries are not on the page). A rewording
-#: in Studio turns those sentences into instructions to press something that is not
-#: there — the same failure ``circles_editor_check.GENERATE_LABEL`` guards for LEM-1,
-#: and nothing else in the suite would notice it.
+#: The File-menu actions Tutorial 0 tells the reader to use. These are the SOURCE
+#: strings with Qt's ``&`` accelerator markers removed — what the menu renders — not
+#: the page's spelling of them, which drops the trailing ellipsis on the familiar
+#: File verbs. What is guarded is that the app still calls these things what the
+#: tutorial says it calls them; a rewording there turns those sentences into
+#: instructions to press something that is not there, the same failure
+#: ``circles_editor_check.GENERATE_LABEL`` guards for LEM-1, and nothing else in the
+#: suite would notice it.
 T0_FILE_ACTIONS = {
     "act_new": "New",
     "act_open": "Open…",

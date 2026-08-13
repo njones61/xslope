@@ -2992,8 +2992,9 @@ The skin is the more critical of the two, so an unfiltered SSRM reports it: acro
 filter-off value is **1.031** at three of the five thicknesses, −1.8% on the closed-form 1.050,
 with **1.044** on the thinnest band and **1.019** on the thickest — nearly one number rather than
 a trend in h₁, exactly as a depth-independent mechanism should behave —
-and at the critical SRF the 25 largest-displacement nodes all lie at zero depth on the two
-embankment faces with the foundation still. Setting
+and at the critical SRF the 25 largest-displacement nodes all lie on the two embankment faces
+within 1.2 m of the surface, 17 of them on it, while the largest displacement anywhere in the
+foundation is 0.017 m against 3.298 m at the face. Setting
 `min_slip_depth` = 4 m — below the fill skin, above the basal band — excludes the skin and returns
 the deep mechanism, the filter described under
 [surficial failures and the minimum-slip-depth filter](../fem/overview.md#surficial-skin-failures-and-the-minimum-slip-depth-filter).
@@ -3058,7 +3059,7 @@ figures and the one this row's difference turns on — it reads 1.081 where the 
 reads 1.131.
 
 **The depth cutoff.** The family's cutoff is 4 m, below the fill skin and above the basal band. At
-h₁ = 4 m and thicker it is on a plateau: 1.131 at h₁ = 4 m under a 4, 6 or 8 m cutoff alike. At
+h₁ = 4 m it is on a plateau: 1.131 under a 4, 6 or 8 m cutoff alike. At
 h₁ = 2 m it is not — 4 m returns 1.131 and 6 or 8 m returns 1.206 — and the geometry says why: the
 soft band ends 2 m below the flat ground beside the embankment, so a 6 m cutoff sits under the
 band itself and what it returns is a deeper mechanism, not the basal squeeze the manual reports.

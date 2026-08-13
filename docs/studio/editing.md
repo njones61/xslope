@@ -133,7 +133,9 @@ list) plus a live preview of the feature on the section.
 
 **Failure surfaces** is one editor or the other depending on the family the model
 uses: a circle table, or the **non-circular surface** as a list of vertices ordered
-left→right, each with a **Movement** the search obeys (*Free*, *Horiz*, *Fixed*).
+left→right, each with a **Movement** setting (*Free*, *Horiz*, *Fixed*). Movement
+governs what the search may do with the interior vertices; the entry and exit
+points always slide along the ground surface, whatever their Movement says.
 Clicking a vertex in the preview selects its row, and vice versa. The circle table
 has seven columns, so its preview sits below the table rather than beside it.
 

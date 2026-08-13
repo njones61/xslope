@@ -709,7 +709,20 @@ _OFFSET_CAP = 0.02
 #: stations to six moves ``vp009`` from 0.615 to 0.700 and ``vp103a`` from 1.264 to
 #: 1.279, both the wrong way. The corpus's own hand-drawn surfaces carry two to
 #: four interior points, and there is a reason for that.
+#:
+#: A count of stations LAID, not of points kept: one that lands on a level stretch
+#: of the track is dropped again, because there it is a move the search cannot
+#: make. See :func:`_drop_inert_points`.
 _TRACK_POINTS = 4
+
+#: How far an interior point may lie off the straight line through its neighbours
+#: and still count as sitting on it, as a fraction of the slope height. Set at
+#: float-noise scale on purpose: a point this close to the chord was put there by
+#: the even-station sampling, never by a bend in the zone's own base. Measured
+#: across the corpus, the point that comes nearest to being dropped and is not --
+#: the flattest surviving bend on any model the button reaches -- clears the
+#: tolerance by a factor of 4,000, so nothing real is anywhere near it.
+_COLLINEAR_TOL = 1e-6
 
 #: Ramp inclinations to try, as offsets applied to the textbook wedge angles
 #: (``45 - phi/2`` leaving at the toe, ``45 + phi/2`` entering at the crest).
@@ -1128,6 +1141,11 @@ def generate_noncircular_surface(slope_data, zone=None, separation=_SEPARATION,
       that is the entry or exit point. Where it does not, a straight ramp at the
       wedge angle (``45 - phi/2`` leaving at the toe, ``45 + phi/2`` entering at
       the crest) carries the surface up to the ground.
+    * **No point is spare.** Where the track runs level the stations between its
+      ends are dropped: an interior point is a ``Horiz`` one, its only move is a
+      slide along x, and on a level run that slide leaves the surface exactly
+      where it was. A dipping run keeps its stations, because there the same
+      slide bends the surface and the point is a move the search can make.
     * **Every point carries an explicit Y and an explicit Movement.** A blank Y
       reaches the slicer as a ``TypeError`` and a blank Movement silently means
       ``Fixed``, which would freeze the search on the surface it was handed.
@@ -1343,6 +1361,7 @@ def _track_surface(slope_data, geom, zone, offset_frac, points):
         if x > pts[-1][0] + tol and x < right[0] - tol:
             pts.append((x, y))
     pts.append((right[0], right[1]))
+    pts = _drop_inert_points(pts, scale)
     if len(pts) < 3:
         return [], "the generated surface collapsed to a single segment"
 
@@ -1365,6 +1384,45 @@ def _track_surface(slope_data, geom, zone, offset_frac, points):
             f"{pts[-1][0]:g}")
     note += f", with {where}" if ramps else ", daylighting where the zone itself does"
     return surface, note
+
+
+def _drop_inert_points(pts, scale):
+    """Drop interior points that neither shape the surface nor give the search
+    anything to move.
+
+    The even stations are laid across the whole track, so wherever the zone's base
+    runs straight they land in the middle of a straight segment. A point there is
+    worth keeping only if something can still use it, and there are only two
+    things that could: the polyline, and the search that moves it. Removing a
+    point that lies on the line through its neighbours leaves the polyline
+    unchanged, so the whole case for it rests on the search -- which slides an
+    interior point horizontally at a fixed elevation, because that is what a
+    ``Horiz`` point is.
+
+    On a **dipping** straight run that slide bends the surface, and the point
+    earns its place: it is a degree of freedom the search can spend, which is why
+    a dipping seam keeps its subdivision. On a **level** run the slide moves the
+    point along the segment it already sits on, and the surface after the move is
+    the surface before it. Such a point is inert -- it costs a row in the table
+    and a slice boundary and buys nothing at all -- so the level run becomes what
+    it always was, its two ends.
+
+    Applied repeatedly, so a level run carrying three stations collapses to those
+    two ends rather than to a shorter subdivision of itself.
+    """
+    tol = _COLLINEAR_TOL * scale
+    out = list(pts)
+    i = 1
+    while i <= len(out) - 2:
+        (xa, ya), (xb, yb), (xc, yc) = out[i - 1], out[i], out[i + 1]
+        span = math.hypot(xc - xa, yc - ya)
+        off = (abs((xc - xa) * (yb - ya) - (yc - ya) * (xb - xa)) / span
+               if span > 0 else 0.0)
+        if off <= tol and abs(yc - ya) <= tol:
+            del out[i]                     # removal changes nothing; nor would a move
+            continue
+        i += 1
+    return out
 
 
 def _zone_vertices(polygon):

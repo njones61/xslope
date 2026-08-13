@@ -24,7 +24,12 @@ break in silence:
      freeze the search on the surface it was handed); and x increases strictly.
      Checked on a left-facing slope and on its mirror image, because a generator
      that only works downhill in one direction is a generator that works on half
-     the corpus.
+     the corpus. No point on it is inert: an interior point that lies on the line
+     through its neighbours on a LEVEL run neither shapes the surface nor gives
+     the search anything to move, since the only move it has is a slide along the
+     segment it already sits on. Checked from both sides -- a level run collapses
+     to its two ends, a dipping run keeps its stations, because there the same
+     slide bends the surface and the point is a degree of freedom worth having.
   D. THE SLICER -- the surface a corpus weak-seam model generates is one
      `generate_slices` accepts, cut into slices whose base runs inside the seam.
      This is the one check that would have caught the tangency failure, where a
@@ -60,6 +65,9 @@ ACADS = os.path.join(_REPO, "docs/lem/files/xslope_acads_weak_layer.xlsx")
 AMBIGUOUS = os.path.join(_REPO, "docs/verification/files/rocscience/vp063.xlsx")
 #: A corpus model with a single material zone: nothing to track, button dimmed.
 ONE_ZONE = os.path.join(_REPO, "docs/verification/files/rocscience/vp047.xlsx")
+#: The tutorial model LEM-5 teaches: a flat soft-clay seam under a sand fill, whose
+#: generated surface the page quotes point for point.
+SAMPLE7 = os.path.join(_REPO, "docs/lem/files/xslope_noncircular.xlsx")
 
 #: The bracket the corpus measured the separation threshold into: every ranking at
 #: or under 0.56 picks a zone whose seeded search reaches or beats the row's own
@@ -126,6 +134,23 @@ def _outcrop_model():
     return sd
 
 
+def _dipping_model():
+    """The same slope, but the seam dips across the section instead of lying flat.
+
+    Its base is still one straight line, so a track along it is still collinear --
+    but not level, and that is the whole difference: sliding a ``Horiz`` point
+    along x at fixed elevation bends this surface, so every station on it is a
+    degree of freedom the search can spend.
+    """
+    sd = _model()
+    fill = Polygon([(0, -1.5), (0, 10), (20, 10), (40, 0), (60, 0), (60, -7.5)])
+    seam = Polygon([(0, -2.0), (0, -1.5), (60, -7.5), (60, -8.0)])
+    sand = Polygon([(0, -10.0), (0, -2.0), (60, -8.0), (60, -10.0)])
+    for i, poly in enumerate((fill, seam, sand)):
+        sd["polygons"][i] = {"polygon": poly, "mat_id": i}
+    return sd
+
+
 def _pinchout_model():
     """The same slope, but the seam pinches out before the toe and reappears on the
     flat beyond it.
@@ -146,6 +171,38 @@ def _pinchout_model():
 
 def _fail(cond, message):
     return [] if cond else [message]
+
+
+#: How far off the chord through its neighbours a point may sit and still count as
+#: on it, as a fraction of the slope height. Loose against the generator's own
+#: `_COLLINEAR_TOL`, deliberately: the check has to catch a point the generator
+#: left behind, not agree with it about the last bit.
+_ON_THE_LINE = 1e-4
+
+
+def _inert_points(surface):
+    """The indices of interior points that do nothing.
+
+    A point is inert when removing it would leave the polyline unchanged AND the
+    move it is allowed cannot change the polyline either. Interior points are
+    ``Horiz``, so their move is a slide along x at fixed elevation: on a level run
+    that lands them back on the segment they started on. Both conditions are
+    measured here rather than assumed, so a generator that starts emitting a
+    different Movement is not silently waved through.
+    """
+    pts = [(p["X"], p["Y"]) for p in surface]
+    out = []
+    for i in range(1, len(pts) - 1):
+        if surface[i]["Movement"] != "Horiz":
+            continue
+        (xa, ya), (xb, yb), (xc, yc) = pts[i - 1], pts[i], pts[i + 1]
+        scale = max(abs(xc - xa), abs(yc - ya), 1e-12)
+        span = math.hypot(xc - xa, yc - ya)
+        off = (abs((xc - xa) * (yb - ya) - (yc - ya) * (xb - xa)) / span
+               if span > 0 else 0.0)
+        if off <= _ON_THE_LINE * scale and abs(yc - ya) <= _ON_THE_LINE * scale:
+            out.append(i)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +377,12 @@ def _geometry_failures_common(sd, result, label):
     out += _fail(all(p["Movement"] == "Horiz" for p in surface[1:-1]),
                  f"{label}: an interior track point is not Horiz")
 
+    for i in _inert_points(surface):
+        out.append(f"{label}: point {i} at x = {surface[i]['X']:.6g} is inert -- it "
+                   f"sits on the line through its neighbours on a level run, so "
+                   f"neither removing it nor the only move it has (a horizontal "
+                   f"slide) changes the surface at all")
+
     ground = list(sd["ground_surface"].coords)
     scale = G.slope_geometry(sd).height
     for i in (0, len(surface) - 1):
@@ -444,6 +507,95 @@ def test_wedge_ramps_are_active_and_passive():
                          f"{'right' if right else 'left'}-facing: the {label} ramp is "
                          f"{got:.1f} deg, not the {want:.0f} deg Rankine wedge angle "
                          f"for the phi = {phi_over:g} overburden it cuts")
+    return out
+
+
+def test_level_run_collapses_but_dipping_run_does_not():
+    """A straight run keeps exactly the points something can use.
+
+    The two halves are the same geometry differing only in dip, which is what
+    makes this a test of the rule rather than of one model:
+
+    * **Level.** The flat seam's track is one horizontal segment, and the stations
+      the generator lays across it are points on the middle of a straight line
+      whose only move slides them along that same line. It must emit the run's two
+      ends and nothing between them.
+    * **Dipping.** The same seam tilted. Its track is still one straight segment
+      -- asserted here, so the check cannot pass by the run having quietly
+      acquired a bend -- but now a horizontal slide lifts a station off the line,
+      so the stations are degrees of freedom and must survive.
+    """
+    out = []
+    flat = G.generate_noncircular_surface(_model())
+    if len(flat) < 3:
+        return ["the flat seam generated no track at all"]
+    interior = flat[1:-1]
+    out += _fail(len(interior) == 2,
+                 f"the flat seam's track carries {len(interior)} interior points; "
+                 f"a level run has two ends and nothing worth putting between them: "
+                 f"{[round(p['X'], 3) for p in flat]}")
+    out += _fail(len({round(p["Y"], 9) for p in interior}) == 1,
+                 "the flat seam's interior points are not at one elevation, so this "
+                 "is no longer the level run the check is about")
+
+    dipping = G.generate_noncircular_surface(_dipping_model())
+    if len(dipping) < 3:
+        return out + ["the dipping seam generated no track at all"]
+    track = [(p["X"], p["Y"]) for p in dipping[1:-1]]
+    out += _fail(len(track) >= 3,
+                 f"the dipping seam's track was cut to {len(track)} interior points; "
+                 f"its stations are moves the search can make and must be kept: "
+                 f"{[round(x, 3) for x, _y in track]}")
+    if len(track) >= 3:
+        (xa, ya), (xc, yc) = track[0], track[-1]
+        span = math.hypot(xc - xa, yc - ya)
+        worst = max(abs((xc - xa) * (yb - ya) - (yc - ya) * (xb - xa)) / span
+                    for xb, yb in track[1:-1])
+        out += _fail(worst <= 1e-6 * span,
+                     f"the dipping seam's track bends by {worst:.3g} over its own "
+                     f"length, so it is not the straight run this half is about")
+        rise = abs(yc - ya)
+        level_tol = _ON_THE_LINE * max(abs(xc - xa), rise)
+        out += _fail(rise > 100 * level_tol,
+                     f"the dipping seam's track rises {rise:.4g} over its length, "
+                     f"which the level test ({level_tol:.3g}) can barely tell from "
+                     f"flat -- both halves of the check are testing the same thing")
+    out += _fail(not _inert_points(dipping),
+                 f"the dipping seam's track carries an inert point at "
+                 f"{_inert_points(dipping)}")
+    return out
+
+
+def test_corpus_surface_carries_no_spare_points():
+    """The tutorial model's generated surface is the four points it needs.
+
+    Sample 7's seam is flat and its track is one horizontal segment between two
+    end ramps, so the whole surface is the two ground contacts and the two ramp
+    junctions. Pinned on the shipped file because this is the surface the LEM-5
+    page quotes and a reader compares against.
+    """
+    if not os.path.exists(SAMPLE7):
+        return [f"missing {SAMPLE7}"]
+    import contextlib
+    import io
+
+    from xslope.fileio import load_slope_data
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        sd = load_slope_data(SAMPLE7)
+    result = G.generate_noncircular_surface(sd, report=True)
+    if not result["surface"]:
+        return [f"sample 7: nothing generated ({result['reason'][:90]})"]
+    surface = result["surface"]
+    out = _geometry_failures_common(sd, result, "sample 7")
+    out += _fail(len(surface) == 4,
+                 f"sample 7 generated {len(surface)} points; its flat seam admits "
+                 f"four -- two ground contacts and two ramp junctions: "
+                 f"{[(round(p['X'], 3), round(p['Y'], 3)) for p in surface]}")
+    out += _fail(f"a {len(surface)}-point surface" in result["summary"],
+                 f"the summary does not state the point count it built: "
+                 f"{result['summary'][-140:]!r}")
     return out
 
 
@@ -689,6 +841,10 @@ CHECKS = [
     ("outcropping zone needs no ramp", test_outcropping_zone_needs_no_ramp),
     ("pinched-out zone uses its continuous run", test_pinched_out_zone_uses_its_continuous_run),
     ("ramps are an active/passive pair", test_wedge_ramps_are_active_and_passive),
+    ("level run collapses, dipping run does not",
+     test_level_run_collapses_but_dipping_run_does_not),
+    ("corpus surface carries no spare points",
+     test_corpus_surface_carries_no_spare_points),
     ("generator is deterministic", test_generator_is_deterministic),
     ("refusals state a reason", test_declines_state_a_reason),
     ("corpus surface slices in the seam", test_corpus_surface_slices),

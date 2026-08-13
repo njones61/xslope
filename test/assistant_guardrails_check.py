@@ -37,6 +37,13 @@ does regardless of the model, and that is what this file covers:
      none either.
   F. THE MUTATION — with the injection disabled, C and D must fail. A test that
      passes either way measures nothing.
+  H. THE DELTA — a finding is quoted in full once. On later edits the block quotes
+     what is new or changed and names the rest by rule key on one line, so a build
+     on a deck with standing faults does not re-read the same paragraphs after
+     every edit. What must survive that: a run-blocking ERROR is quoted every
+     time, a changed finding un-collapses, the staged-by-a-run label survives the
+     collapse, nothing is ever dropped without being named, and a new session
+     starts from silence. Mutations for each.
 
 Everything runs offscreen against the real Assistant, the real PythonKernel and
 the real document; no provider is contacted and no network is touched (the agent
@@ -125,6 +132,44 @@ print('materials:', len(slope_data['materials']),
 SNIPPET_RAISES = """
 slope_data['max_depth'] = 999.0
 raise RuntimeError('boom')
+"""
+
+#: A piezometric line entered right to left, and a material that reads it: two
+#: standing warnings, the fault a later edit leaves untouched.
+SNIPPET_PIEZO_REVERSED = """
+slope_data['piezo_line'] = [(90.0, 12.0), (30.0, 12.0), (0.0, 8.0)]
+slope_data['materials'][0]['u'] = 'piezo'
+print('piezo line added')
+"""
+
+#: An edit that touches a tracked input and changes no finding — the shape of the
+#: turn the delta exists for.
+SNIPPET_NEUTRAL_EDIT = """
+slope_data['materials'][0]['gamma'] = 126.0
+print('unit weight nudged')
+"""
+
+#: A third circle, far below the base: a NEW finding, arriving on a model that
+#: already carries standing ones.
+SNIPPET_ADD_DEAD_CIRCLE = """
+slope_data['circles'].append({'Xo': 15.0, 'Yo': 50.0, 'Depth': -300.0, 'R': 350.0})
+print('added a circle far below the base')
+"""
+
+#: The same fault, on a different row: circle 3 is repaired and circle 2 is broken
+#: in its place. Same rule, same wording, same numbers — only the row differs, and
+#: that makes it a different finding.
+SNIPPET_MOVE_DEAD_CIRCLE = """
+slope_data['circles'][2] = {'Xo': 15.0, 'Yo': 50.0, 'Depth': 6.0, 'R': 44.0}
+slope_data['circles'][1] = {'Xo': 15.0, 'Yo': 50.0, 'Depth': -300.0, 'R': 350.0}
+print('moved the dead circle from row 3 to row 2')
+"""
+
+#: A material that reads a seepage field there is no run to supply: the staged
+#: finding.
+SNIPPET_SEEP_MATERIAL = """
+slope_data['materials'][0]['u'] = 'seep'
+print('material now reads a seepage field')
 """
 
 
@@ -615,6 +660,314 @@ print('piezo line added')
     return out
 
 
+# --- H. the delta ----------------------------------------------------------
+
+#: A fragment of each standing finding's own paragraph. Present = quoted in full.
+PIEZO_FULL = "the points run right to left"
+CIRCLE_FULL = "below the bottom of the model domain"
+SEEP_FULL = "takes pore pressure from a seepage solution"
+
+
+def _collapsed(blk):
+    """The block's one-line summary of findings already reported, or None."""
+    for line in (blk or "").splitlines():
+        if "earlier finding" in line:
+            return line
+    return None
+
+
+def check_delta_identity_is_the_row():
+    """What makes two findings the same finding.
+
+    Keyed on the message text, a fault whose quoted values drift under an
+    unrelated edit reads as new and is quoted again — which is the cost this
+    feature exists to remove. Keyed on the rule alone, the same fault moving to a
+    different row reads as old and is never quoted at all. So identity is the rule
+    plus the row, and a change is the severity plus the message with its numbers
+    blanked.
+    """
+    from xslope.preflight import Finding
+    from studio.ai.assistant import _finding_key, _finding_sig, _finding_subject
+    out = []
+    rid = "surface.circle_below_domain_floor"
+
+    def f(msg, severity="warning", rule=rid):
+        return Finding(rule_id=rule, severity=severity, message=msg)
+
+    a = f("Circle 3 has Depth = -300, below the bottom of the model domain at y = -20.")
+    b = f("Circle 3 has Depth = -412.5, below the bottom of the model domain at y = -20.")
+    c = f("Circle 2 has Depth = -300, below the bottom of the model domain at y = -20.")
+    if _finding_key(a) != _finding_key(b) or _finding_sig(a) != _finding_sig(b):
+        out.append("a finding whose quoted values moved reads as a different one")
+    if _finding_key(a) == _finding_key(c):
+        out.append("the same fault on a different circle reads as the same finding")
+    if _finding_sig(a) == _finding_sig(f(a.message, severity="error")):
+        out.append("a severity change does not register as a change")
+    if _finding_key(a) == _finding_key(f(a.message, rule="other.rule")):
+        out.append("two rules about one row read as the same finding")
+
+    # A row label is a row label, not any number a sentence happens to contain.
+    if _finding_subject("Material 3 ('Core') has no unit weight.") != "Material 3 ('Core')":
+        out.append("a named material row is not recognised as the row")
+    for msg in ("None of the 5 reinforcement line(s) crosses any failure surface.",
+                "This model defines both a circular and a non-circular surface.",
+                "5 reinforcement line(s) leave Type blank, starting at line 1."):
+        if _finding_subject(msg) is not None:
+            out.append(f"a row was read out of prose that names none: "
+                       f"{_finding_subject(msg)!r}")
+    # ... and with no row to key on, two findings of one rule stay distinct.
+    m1 = f("Rules read left to right.", rule="x.y")
+    m2 = f("Rules read right to left.", rule="x.y")
+    if _finding_key(m1) == _finding_key(m2):
+        out.append("two unlabelled findings of one rule collapse into one key")
+    return out
+
+
+def check_new_finding_is_reported_in_full():
+    """A finding the session has not seen arrives in full, whatever else stands."""
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    _run(asst, SNIPPET_PIEZO_REVERSED)
+    _run(asst, SNIPPET_NEUTRAL_EDIT)
+
+    blk = _block(_run(asst, SNIPPET_ADD_DEAD_CIRCLE))
+    if blk is None:
+        out.append("adding a dead circle produced no block")
+        mw.deleteLater()
+        return out
+    if CIRCLE_FULL not in blk:
+        out.append(f"the new finding was not quoted in full: {blk[:200]!r}")
+    if "surface.circle_below_domain_floor" not in blk:
+        out.append("the new finding is not named by its rule key either")
+    # The standing ones are still accounted for, on one line.
+    line = _collapsed(blk)
+    if line is None or "order.piezo_reversed" not in line:
+        out.append(f"the standing findings were not carried: {blk[:200]!r}")
+    if PIEZO_FULL in blk:
+        out.append("a standing finding was quoted in full alongside the new one")
+    mw.deleteLater()
+    return out
+
+
+def check_unchanged_finding_collapses():
+    """The second report of an unchanged warning is one line naming its rule."""
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    first = _block(_run(asst, SNIPPET_PIEZO_REVERSED))
+    if first is None or PIEZO_FULL not in first:
+        out.append(f"the first report did not quote the finding in full: {first!r}")
+
+    second = _block(_run(asst, SNIPPET_NEUTRAL_EDIT))
+    if second is None:
+        out.append("the next edit produced no block")
+        mw.deleteLater()
+        return out
+    line = _collapsed(second)
+    if line is None:
+        out.append(f"the unchanged findings did not collapse: {second!r}")
+    else:
+        if "order.piezo_reversed" not in line:
+            out.append(f"the collapsed line does not name the rule: {line!r}")
+        if "2 earlier findings" not in line:
+            out.append(f"the collapsed line does not count them: {line!r}")
+        if "unresolved" not in line:
+            out.append(f"the collapsed line does not say they still stand: {line!r}")
+    if PIEZO_FULL in second:
+        out.append("an unchanged finding was quoted in full a second time")
+    if len(second) >= len(first or ""):
+        out.append("the second report is no shorter than the first")
+    mw.deleteLater()
+    return out
+
+
+def check_error_never_collapses():
+    """A run-blocking ERROR refuses the analysis until it is answered, so it is
+    live business on every edit — quoted in full in every block, however many
+    edits it survives."""
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    blk = _block(_run(asst, SNIPPET_RAISE_BASE))
+    if blk is None or "ERROR" not in blk:
+        out.append(f"the stranded circle did not arrive as an error: {blk!r}")
+
+    for i, code in enumerate((SNIPPET_NEUTRAL_EDIT, SNIPPET_PIEZO_REVERSED,
+                              SNIPPET_NEUTRAL_EDIT.replace("126.0", "127.0"))):
+        blk = _block(_run(asst, code))
+        if blk is None:
+            out.append(f"edit {i + 2} produced no block")
+            continue
+        if "ERROR [surface.circle_below_domain_floor]" not in blk:
+            out.append(f"edit {i + 2}: the error stopped being quoted: {blk[:200]!r}")
+        elif CIRCLE_FULL not in blk:
+            out.append(f"edit {i + 2}: the error lost its message: {blk[:200]!r}")
+    mw.deleteLater()
+    return out
+
+
+def check_changed_finding_uncollapses():
+    """The same rule, the same wording, the same numbers — on a different row. It
+    is a different fault about a different circle, and it is quoted in full."""
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    first = _block(_run(asst, SNIPPET_ADD_DEAD_CIRCLE))
+    if first is None or "Circle 3" not in first:
+        out.append(f"the dead circle was not reported on row 3: {first!r}")
+
+    blk = _block(_run(asst, SNIPPET_MOVE_DEAD_CIRCLE))
+    if blk is None:
+        out.append("moving the dead circle produced no block")
+        mw.deleteLater()
+        return out
+    if "Circle 2" not in blk or CIRCLE_FULL not in blk:
+        out.append(f"the fault's new row was not quoted in full: {blk[:200]!r}")
+    if _collapsed(blk) is not None:
+        out.append(f"the moved fault was written off as unchanged: "
+                   f"{_collapsed(blk)!r}")
+    if "Circle 3" in blk:
+        out.append("the repaired row is still being reported")
+    mw.deleteLater()
+    return out
+
+
+def check_fresh_session_reports_in_full():
+    """Tracking belongs to the session. A new conversation, and a second
+    assistant on the same document, both start from silence — so a model that
+    never saw the first report is not handed a rule key and nothing else."""
+    from studio.ai.assistant import Assistant
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    _run(asst, SNIPPET_PIEZO_REVERSED)
+    if _collapsed(_block(_run(asst, SNIPPET_NEUTRAL_EDIT))) is None:
+        out.append("the finding never collapsed, so this leg proves nothing")
+
+    asst.reset()                       # New chat: nothing has been said yet.
+    blk = _block(_run(asst, SNIPPET_NEUTRAL_EDIT.replace("126.0", "127.0")))
+    if blk is None or PIEZO_FULL not in blk:
+        out.append(f"a fresh conversation was not given the findings in full: "
+                   f"{blk!r}")
+    if _collapsed(blk) is not None:
+        out.append(f"a fresh conversation still collapsed a finding: "
+                   f"{_collapsed(blk)!r}")
+
+    other = Assistant(mw)              # A second session over the same document.
+    other.config.set_confirm_before_run(False)
+    blk = _block(_run(other, SNIPPET_NEUTRAL_EDIT.replace("126.0", "128.0")))
+    if blk is None or PIEZO_FULL not in blk:
+        out.append(f"a second session inherited the first one's report: {blk!r}")
+    mw.deleteLater()
+    return out
+
+
+def check_staged_collapse_keeps_the_label():
+    """A staged finding collapses like a warning — no edit answers it, so it is
+    not edit-blocking — but the collapsed line still says it is staged by a run.
+    A line that stopped saying so would read as one more edit outstanding, which
+    is the mistake the annotation exists to prevent."""
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    first = _block(_run(asst, SNIPPET_SEEP_MATERIAL))
+    if first is None or SEEP_FULL not in first:
+        out.append(f"the staged finding was not quoted in full first: {first!r}")
+
+    blk = _block(_run(asst, SNIPPET_NEUTRAL_EDIT))
+    if blk is None:
+        out.append("the next edit produced no block")
+        mw.deleteLater()
+        return out
+    line = _collapsed(blk)
+    if line is None:
+        out.append(f"the staged finding did not collapse: {blk!r}")
+    else:
+        if "STAGED BY A RUN" not in line:
+            out.append(f"the collapsed line dropped the staged label: {line!r}")
+        if "not by an edit" not in line:
+            out.append(f"the collapsed line no longer says an edit cannot answer "
+                       f"it: {line!r}")
+        if "seep_field.missing" not in line:
+            out.append(f"the collapsed line does not name the rule: {line!r}")
+    if SEEP_FULL in blk:
+        out.append("the staged finding was quoted in full a second time")
+    mw.deleteLater()
+    return out
+
+
+def check_nothing_is_dropped_unnamed():
+    """The cap on quoted findings is a cap on paragraphs, not on accountability:
+    what it leaves out is still named by rule key, so iron rule 5 stays literally
+    satisfiable — nothing reaches the model as silence."""
+    from studio.ai import assistant as A
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    _run(asst, SNIPPET_PIEZO_REVERSED)
+    sd = mw.doc.slope_data
+    real_max = A.MAX_CHECK_FINDINGS
+    try:
+        A.MAX_CHECK_FINDINGS = 1
+        text = A.model_checks_text(sd)          # no memo: a first report
+    finally:
+        A.MAX_CHECK_FINDINGS = real_max
+    from xslope.preflight import preflight
+    ids = {f.rule_id for f in preflight(sd, "lem", A._checks_selection(sd)).findings}
+    if len(ids) < 2:
+        out.append("this model carries too few findings to overflow the cap")
+    for rid in ids:
+        if rid not in text:
+            out.append(f"{rid} was dropped from the block without being named")
+    mw.deleteLater()
+    return out
+
+
+def check_delta_mutations():
+    """Four mutations, one leg each. Every one of them is a plausible reading of
+    'collapse repeats', and each breaks something the block has to keep."""
+    from studio.ai import assistant as A
+    out = []
+
+    def _all_fresh(self, findings):
+        keys = self.keys(findings)
+        return keys, set(keys)
+
+    mutations = (
+        ("nothing is exempt: errors collapse too", A, "_never_collapses",
+         lambda f: False, check_error_never_collapses,
+         "an ERROR is quoted every time"),
+        ("nothing ever collapses", A.ChecksMemo, "report", _all_fresh,
+         check_unchanged_finding_collapses, "an unchanged finding collapses"),
+        ("tracking never resets", A.ChecksMemo, "reset", lambda self: None,
+         check_fresh_session_reports_in_full, "a fresh session reports in full"),
+        ("identity is the rule alone", A, "_finding_key", lambda f: (f.rule_id,),
+         check_changed_finding_uncollapses, "a changed finding un-collapses"),
+    )
+    for name, target, attr, mutant, leg, legname in mutations:
+        real = getattr(target, attr)
+        setattr(target, attr, mutant)
+        try:
+            noticed = bool(leg())
+        except Exception:
+            noticed = True          # a leg that blows up has noticed
+        finally:
+            setattr(target, attr, real)
+        if not noticed:
+            out.append(f"mutation ({name}): '{legname}' still passed")
+        if leg():
+            out.append(f"mutation ({name}): '{legname}' did not come back green")
+    return out
+
+
 # --- E. the cost guard -----------------------------------------------------
 
 def check_read_only_costs_nothing():
@@ -649,7 +1002,7 @@ def check_mutation_disables_the_checks():
     from studio.ai import assistant as A
     out = []
     original = A.model_checks_text
-    A.model_checks_text = lambda sd: ""
+    A.model_checks_text = lambda sd, memo=None: ""
     try:
         survivors = [name for name, fn in (
             ("clean build", check_clean_build),
@@ -686,6 +1039,15 @@ CHECKS = [
      check_secondary_circle_wording),
     ("E. read-only and failed runs cost nothing", check_read_only_costs_nothing),
     ("F. mutation: injection disabled", check_mutation_disables_the_checks),
+    ("H. a finding is the rule plus the row", check_delta_identity_is_the_row),
+    ("H. a new finding arrives in full", check_new_finding_is_reported_in_full),
+    ("H. an unchanged finding collapses", check_unchanged_finding_collapses),
+    ("H. an ERROR never collapses", check_error_never_collapses),
+    ("H. a changed finding un-collapses", check_changed_finding_uncollapses),
+    ("H. a fresh session reports in full", check_fresh_session_reports_in_full),
+    ("H. the staged label survives collapse", check_staged_collapse_keeps_the_label),
+    ("H. nothing is dropped unnamed", check_nothing_is_dropped_unnamed),
+    ("H. mutation: the delta's four seams", check_delta_mutations),
 ]
 
 

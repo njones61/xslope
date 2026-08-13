@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 
 from PySide6.QtCore import QObject, QThread, Signal
@@ -421,6 +422,138 @@ MODEL_CHECKS_CLEAN = "=== MODEL CHECKS: clean ==="
 MAX_CHECK_FINDINGS = 6
 
 
+# --- what has already been said ---------------------------------------------
+# A finding is quoted in full the first time it is reported. After that it is a
+# standing fault, and a long build re-reads the same paragraphs after every edit
+# — attention spent on findings that have not moved, and the new one arrives in
+# the middle of the pile. So each block quotes what is NEW or CHANGED and names
+# the rest by rule key on one line. Two things never collapse: an ERROR, which
+# refuses the run and so is live business on every edit, and a finding the block
+# has not reported before.
+#
+# Keying is the whole difficulty. A finding is "the same one" when it is the same
+# rule about the same row — NOT when its message text matches, because a message
+# carries values ("Circle 3 has Depth = -20.4") that drift under unrelated edits
+# and would un-collapse a fault that never changed. So identity is the rule id
+# plus the row the message leads with (preflight's own convention: "Circle 2",
+# "Material 3 ('Core')"), and what counts as a CHANGE is the severity plus the
+# message with its numbers blanked — a reworded value collapses, a materially
+# different message or a new severity does not.
+
+#: Words that can sit in front of a number without the number being a row index.
+#: "None of the 5 reinforcement lines" is not a subject called "None of the 5".
+_NOT_A_SUBJECT = {
+    "a", "all", "an", "and", "any", "are", "at", "both", "by", "for", "in", "is",
+    "no", "not", "of", "on", "only", "or", "than", "the", "to", "up", "was",
+    "were", "with",
+}
+
+#: A leading row label: up to three words then an index, optionally followed by
+#: the row's own name in parentheses. The index must be a whole number (a decimal
+#: is a value, not a row).
+_SUBJECT_RE = re.compile(
+    r"^([A-Z][\w'’-]*(?: [\w'’-]+){0,2} \d+)(?![\d.])( \('[^']*'\))?")
+
+_NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+
+
+def _finding_subject(message):
+    """The row a finding is about (``"Circle 2"``, ``"Material 3 ('Core')"``), or
+    None when the message does not lead with one."""
+    m = _SUBJECT_RE.match(message or "")
+    if not m:
+        return None
+    words = m.group(1).split()
+    if words[-2].lower() in _NOT_A_SUBJECT:
+        return None
+    return m.group(1) + (m.group(2) or "")
+
+
+def _finding_skeleton(message):
+    """The message with every number blanked and whitespace normalised — what is
+    left when the values a finding quotes drift but the finding does not."""
+    return _NUMBER_RE.sub("#", " ".join((message or "").split()))
+
+
+def _finding_key(f):
+    """Identity: the rule, and the row it is about. Falls back to the message
+    skeleton when a message names no row, so two findings of one rule stay
+    distinct without keying on values that drift."""
+    subject = _finding_subject(f.message)
+    return f.rule_id, subject if subject is not None else _finding_skeleton(f.message)
+
+
+def _finding_sig(f):
+    """What a re-report has to differ in to count as changed."""
+    return f.severity, _finding_skeleton(f.message)
+
+
+def _never_collapses(f):
+    """True for a finding that is quoted in full in every block.
+
+    A run-blocking ERROR is: it refuses the analysis until it is answered, so it
+    is live business on every edit, not history. A finding STAGED BY A RUN is not
+    — it blocks no edit and no edit resolves it (see :data:`xslope.preflight
+    .STAGED_BY_RUN`), so it collapses like a warning once it has been reported.
+    """
+    from xslope.preflight import STAGED_BY_RUN
+    return f.severity == "error" and f.rule_id not in STAGED_BY_RUN
+
+
+class ChecksMemo:
+    """What the last MODEL CHECKS block reported, so the next one can report the
+    delta rather than the list again.
+
+    One per session: :meth:`Assistant.reset` clears it for a new conversation and
+    the document's ``loaded`` signal clears it for a new (or reopened) project, so
+    tracking never carries findings across into a model they were not about.
+    """
+
+    def __init__(self):
+        self._seen = {}
+
+    def reset(self):
+        self._seen = {}
+
+    @staticmethod
+    def keys(findings):
+        """One key per finding, in order. Repeats of a single key (one rule, one
+        row, twice) are numbered so they stay distinct."""
+        out, counts = [], {}
+        for f in findings:
+            key = _finding_key(f)
+            counts[key] = counts.get(key, 0) + 1
+            out.append(key + (counts[key],))
+        return out
+
+    def report(self, findings):
+        """Record ``findings`` as the block being written, and return
+        ``(keys, fresh)`` — every finding's key, and the keys of the ones that are
+        new or changed since the last block (all of them, the first time)."""
+        keys = self.keys(findings)
+        now = {k: _finding_sig(f) for k, f in zip(keys, findings)}
+        fresh = {k for k, sig in now.items() if self._seen.get(k) != sig}
+        self._seen = now
+        return keys, fresh
+
+
+def _rule_key_list(findings):
+    """``"mat.option_missing ×2, main.seismic_missing"`` — every finding named by
+    its rule key, so nothing is dropped without being named."""
+    counts = {}
+    for f in findings:
+        counts[f.rule_id] = counts.get(f.rule_id, 0) + 1
+    return ", ".join(k + (f" ×{n}" if n > 1 else "") for k, n in counts.items())
+
+
+def _unchanged_line(findings, standing):
+    """The one line a block spends on findings it has already reported in full."""
+    n = len(findings)
+    noun = "finding" if n == 1 else "findings"
+    return (f"{n} earlier {noun} unchanged, {standing} (reported in full "
+            f"earlier): {_rule_key_list(findings)}")
+
+
 def _checks_selection(sd):
     """The preflight ``selection`` for the checks: which surface family the model
     would run as. Stating it suppresses the ambiguity warning on a deck that
@@ -435,7 +568,7 @@ def _checks_selection(sd):
     return {}
 
 
-def model_checks_text(slope_data):
+def model_checks_text(slope_data, memo=None):
     """The MODEL CHECKS block for a model that a snippet just changed.
 
     Rebuilds the derived geometry first (so the checks read the domain the edit
@@ -445,12 +578,19 @@ def model_checks_text(slope_data):
     surfaces alike. Errors AND warnings are reported: a warning here is the shape
     the three live failures took, not a formality.
 
+    ``memo`` is the session's :class:`ChecksMemo`. With one, a finding already
+    reported in full and unchanged since collapses to a named entry on one line
+    (errors excepted — they never collapse); without one, every finding is quoted
+    in full, which is what a first report is anyway.
+
     Returns the block as text — never raises, and never an empty string, because
     silence would read as "clean" to the model.
     """
     sd = slope_data
     if not isinstance(sd, dict):
         return ""
+    if memo is None:
+        memo = ChecksMemo()         # no session tracking: everything is new
     try:
         from studio.editors import _resync_geometry
         _resync_geometry(sd)
@@ -463,6 +603,9 @@ def model_checks_text(slope_data):
                                 ("geometry", sd.get("profile_lines")
                                  or sd.get("polygons"))) if not got]
     if missing:
+        # Nothing was reported, so nothing is history: the next block that does
+        # report starts from a clean sheet and quotes everything in full.
+        memo.reset()
         return (f"{MODEL_CHECKS_OPEN}\nnot run: the model has no "
                 f"{' or '.join(missing)} yet. The checks run by themselves as soon "
                 f"as it does.\n{MODEL_CHECKS_END}")
@@ -477,10 +620,12 @@ def model_checks_text(slope_data):
         report = preflight(sd, "lem", selection, skip=skip)
         rows = list(report.errors) + list(report.warnings)
     except Exception as exc:
+        memo.reset()
         return (f"{MODEL_CHECKS_OPEN}\ncould not be evaluated on this model "
                 f"({type(exc).__name__}: {exc}). Check the model yourself before "
                 f"reporting it ready.\n{MODEL_CHECKS_END}")
     if not rows:
+        memo.reset()
         return MODEL_CHECKS_CLEAN
     # Split off the findings an EDIT cannot answer (xslope.preflight.STAGED_BY_RUN).
     # Reporting "a material takes pore pressure from a seepage solution and there
@@ -489,28 +634,45 @@ def model_checks_text(slope_data):
     # pore-pressure option — which does not supply the missing field, it deletes the
     # requirement and silently analyses a different problem. So they are labelled
     # for what they are and routed to the only honest response: offer the run.
-    staged = [f for f in rows if f.rule_id in STAGED_BY_RUN]
-    faults = [f for f in rows if f.rule_id not in STAGED_BY_RUN]
+    # What this block quotes in full: whatever is new or changed since the last
+    # one, plus every run-blocking error. The rest was reported in full already
+    # and is named on one line at the end of its own section. Kept per ROW rather
+    # than per finding, so two findings that read alike are still two.
+    keys, fresh = memo.report(rows)
+    quoted = [k in fresh or _never_collapses(f) for f, k in zip(rows, keys)]
+    staged = [(f, q) for f, q in zip(rows, quoted) if f.rule_id in STAGED_BY_RUN]
+    faults = [(f, q) for f, q in zip(rows, quoted) if f.rule_id not in STAGED_BY_RUN]
     sel_arg = f", {selection!r}" if selection else ""
     parts = [MODEL_CHECKS_OPEN]
     if faults:
-        shown = faults[:MAX_CHECK_FINDINGS]
-        parts.append(f"The input checks found {len(faults)} problem(s) in the model "
-                     f"as it now stands. Fix them, or put them to the user with your "
-                     f"reason for leaving them — do not report this model ready over "
-                     f"them.")
-        parts += [f"  {f.severity.upper()} [{f.rule_id}] {f.message}" for f in shown]
-        if len(faults) > len(shown):
-            parts.append(f"  (+{len(faults) - len(shown)} more — "
-                         f"`from xslope.preflight import preflight; "
-                         f"print(preflight(slope_data, 'lem'{sel_arg}).format())`)")
+        new_faults = [f for f, q in faults if q]
+        old_faults = [f for f, q in faults if not q]
+        if new_faults:
+            shown = new_faults[:MAX_CHECK_FINDINGS]
+            parts.append(f"The input checks found {len(faults)} problem(s) in the "
+                         f"model as it now stands. Fix them, or put them to the user "
+                         f"with your reason for leaving them — do not report this "
+                         f"model ready over them.")
+            parts += [f"  {f.severity.upper()} [{f.rule_id}] {f.message}"
+                      for f in shown]
+            if len(new_faults) > len(shown):
+                rest = new_faults[len(shown):]
+                parts.append(f"  (+{len(rest)} more — {_rule_key_list(rest)} — "
+                             f"`from xslope.preflight import preflight; "
+                             f"print(preflight(slope_data, 'lem'{sel_arg}).format())`)")
+        if old_faults:
+            parts.append(_unchanged_line(old_faults, "still unresolved"))
     if staged:
-        parts.append(
-            f"STAGED BY A RUN, not by an edit ({len(staged)}). These name an "
-            f"analysis that has not been run yet. Do NOT edit the model to silence "
-            f"one — changing the input they ask about changes the physics being "
-            f"analysed. Tell the user what is outstanding and offer to run it.")
-        for f in staged:
+        new_staged = [f for f, q in staged if q]
+        old_staged = [f for f, q in staged if not q]
+        if new_staged:
+            parts.append(
+                f"STAGED BY A RUN, not by an edit ({len(staged)}). These name an "
+                f"analysis that has not been run yet. Do NOT edit the model to "
+                f"silence one — changing the input they ask about changes the "
+                f"physics being analysed. Tell the user what is outstanding and "
+                f"offer to run it.")
+        for f in new_staged:
             # The rule's own message is written for a user at the sheet, where
             # picking a different input IS one of their options. It is not one of
             # yours, so say whose it is.
@@ -518,6 +680,13 @@ def model_checks_text(slope_data):
                          f"{STAGED_BY_RUN[f.rule_id]}, not by editing. Where that "
                          f"message offers a different input instead, that is the "
                          f"user's call to make, not yours.")
+        if old_staged:
+            # The label survives the collapse: what makes these different from a
+            # fault to fix is the whole point of reporting them separately, and a
+            # one-line reminder that is not still saying so would read as a list
+            # of edits outstanding.
+            parts.append(_unchanged_line(
+                old_staged, "still STAGED BY A RUN, not by an edit"))
     parts.append(MODEL_CHECKS_END)
     return "\n".join(parts)
 
@@ -705,6 +874,14 @@ class Assistant(QObject):
         self.config = AssistantConfig(getattr(main_window, "settings", None))
         self._messages = []
         self._worker = None
+        # What the MODEL CHECKS blocks have already said, so a later block reports
+        # the delta. A new or reopened project is a different model, and its
+        # findings are different findings, so the document clears it too.
+        self._checks_memo = ChecksMemo()
+        try:
+            main_window.doc.loaded.connect(self._checks_memo.reset)
+        except AttributeError:
+            pass
 
     # --- lifecycle -------------------------------------------------------
     def is_busy(self):
@@ -713,6 +890,7 @@ class Assistant(QObject):
     def reset(self):
         self._messages = []
         self._kernel.reset()          # fresh kernel — variables cleared, re-seeds
+        self._checks_memo.reset()     # nothing has been reported to this session
 
     def _system(self):
         # Full skill body only for Anthropic (prompt-cached, so cheap). Local /
@@ -801,7 +979,9 @@ class Assistant(QObject):
         ``checks`` is the MODEL CHECKS block, and it is produced ONLY when the
         snippet actually changed the model — the same per-key signature comparison
         that decides whether the run becomes an undo step. A read-only query costs
-        nothing extra, and an edit pays one preflight pass.
+        nothing extra, and an edit pays one preflight pass. The session's
+        :class:`ChecksMemo` carries what earlier blocks already said, so a repeat
+        of a standing finding costs one line instead of its paragraph.
         """
         doc = self._mw.doc
         if doc.slope_data is None:
@@ -840,7 +1020,8 @@ class Assistant(QObject):
             self._mw.refresh_inputs_view()
         except Exception:
             pass
-        checks = model_checks_text(doc.slope_data) if edited else ""
+        checks = (model_checks_text(doc.slope_data, self._checks_memo)
+                  if edited else "")
         return stdout, outputs, error, checks
 
     def output_dir(self):

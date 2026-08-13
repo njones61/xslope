@@ -7,7 +7,7 @@ description: "Build a sand slope over a 2 ft seam of soft clay in XSLOPE, enter 
 
 A 10 ft sand embankment on a 3:1 face, built over a layered foundation with a
 water table 2 ft down. Four feet below the toe there is a 2 ft seam of soft clay:
-S<sub>u</sub> = 200 psf, against friction angles of 33° and 37° in the sands
+S<sub>u</sub> = 200 psf, against friction angles φ′ of 33° and 37° in the sands
 above and below it. **The mechanism follows the seam**, and a circle cannot run
 flat along a seam — so the failure surface is entered as a list of points.
 
@@ -38,10 +38,21 @@ looks like when the answer it returns is meaningless.
 
 | Mat ID | Name | γ (pcf) | c (psf) | φ (deg) | Pore pressure |
 |---|---|---:|---:|---:|---|
-| 1 | `Sand Fill` | 120 | 0 | 37 | `none` |
+| 1 | `Sand Fill` | 120 | 0 | 37 | `piezo` |
 | 2 | `Sand` | 123 | 0 | 33 | `piezo` |
 | 3 | `Soft Clay` | 118 | 200 | 0 | `none` |
-| 4 | `Dense Sand` | 131 | 0 | 37 | `none` |
+| 4 | `Dense Sand` | 131 | 0 | 37 | `piezo` |
+
+The primes in the drawing are the strength story. Every sand is marked c′/φ′ —
+drained, effective-stress strengths — because sand is highly permeable: pore
+water drains as fast as the soil is loaded, any excess pressure dissipates, and
+what governs is the drained strength read against the pore pressure standing in
+the ground. That is why all three sands carry `u` = `piezo`, the fill included —
+above the water table the reading is simply zero. The seam's S<sub>u</sub>
+carries no prime because it is the opposite case: a clay this soft loads far
+faster than it can drain, so its strength is undrained — a total-stress
+S<sub>u</sub> that no pore pressure enters, which is why its `u` option is
+`none`.
 
 **Geometry** — entered as profile lines, one per material and each the top of
 its layer (the faster of the two geometry inputs for layered ground; polygons
@@ -91,9 +102,9 @@ one point per row as the `piezo` worksheet and Studio's editor take them:
 | -20 | -2 |
 | 50 | -2 |
 
-Only the `Sand` reads it. The clay's strength is undrained — τ = S<sub>u</sub>
-whatever the pore pressure — and no surface in this problem reaches the dense
-sand; a surface that did would need that material's `u` set to `piezo` as well.
+All three sands read it — that is what their `piezo` option means, and for the
+fill, which sits entirely above the line, the reading is zero. The clay does
+not: τ = S<sub>u</sub> whatever the pore pressure, so its `u` is `none`.
 
 **The failure surface** — four points, ordered left to right, in the three
 columns the `non-circ` worksheet and Studio's editor share:
@@ -111,12 +122,26 @@ ramps: one down from the flat ground 10 ft beyond the toe, one up to the back of
 the crest. That shape — ramp down, run along the seam, ramp up — is the whole of
 a weak-layer mechanism, and it is the shape no circle has.
 
+The third column, **Movement**, is each vertex's instruction to the automated
+search: what the search may do with that point when it walks the surface
+looking for a lower one. `Free` lets the point move without restriction,
+`Horiz` lets it slide horizontally only, and `Fixed` pins it. The settings
+here are the weak-layer pattern: the two end points are `Free`, so a search
+can walk the entry and exit along the ground, and the two seam points are
+`Horiz`, so the flat run can shift along the seam but never climb out of it.
+On the single-surface run this page teaches, the column is inert — it binds
+only once a search runs, and [what each setting does](#what-movement-is-for)
+is measured at the end of the page. The surface does not have to be drawn by
+hand, either: Studio's non-circular editor can derive this shape from the
+geometry with its **Generate from the weak zone…** button, as the
+[Studio path below](#3-generating-the-surface-instead) shows.
+
 The tables are the model, and each is laid out exactly as its destination is —
 the template's worksheets and Studio's editors, same columns in the same order.
 Select a table's block of values, copy, and paste it straight into the sheet or
 editor rather than retyping it.
 
-Three rules govern the table:
+Three rules govern the non-circular failure surface table:
 
 - **The points are joined by straight segments, ordered left to right — and the
   solver enforces the order itself.** Before slicing, it sorts the vertices by X
@@ -132,10 +157,9 @@ Three rules govern the table:
   but got 1."* A Y typed off the ground fails the other way — no error at all:
   the clipping moves that end to where the polyline crosses the ground, and the
   numbers come back clean for a surface with a different end.
-- **Movement is what an automated search is allowed to do with a point**, not a
-  property of the surface being solved. `Free`, `Horiz` and `Fixed` are the three
-  settings, and [what each one does](#what-movement-is-for) bites only once a
-  search runs. A blank cell means `Fixed`.
+- **Movement binds the search, not this solve.** The column is a property of
+  the search's freedom, never of the surface being solved, and a blank cell
+  does not mean unrestricted — it means `Fixed`.
 
 ---
 
@@ -164,7 +188,7 @@ it:
 
 <div class="prompt-block" markdown>
 ```text
-Build a model for a 10 ft sand embankment with a 3:1 face over a layered foundation. The fill is 120 pcf with phi = 37, c = 0. Below the toe: 4 ft of sand at 123 pcf, phi = 33, c = 0, then a 2 ft layer of soft clay at 118 pcf with Su = 200 psf, then dense sand at 131 pcf, phi = 37, c = 0, down to elevation -10. The water table is at elevation -2. The crest runs 20 ft back from the top of the face and the ground continues 20 ft beyond the toe. The failure surface follows the clay layer, so use a non-circular surface.
+Build a model for a 10 ft sand embankment with a 3:1 face over a layered foundation. The fill is 120 pcf with phi = 37, c = 0. Below the toe: 4 ft of sand at 123 pcf, phi = 33, c = 0, then a 2 ft layer of soft clay at 118 pcf with Su = 200 psf, then dense sand at 131 pcf, phi = 37, c = 0, down to elevation -10. The water table is at elevation -2; the sands are drained and take their pore pressure from it, and the clay is undrained. The crest runs 20 ft back from the top of the face and the ground continues 20 ft beyond the toe. The failure surface follows the clay layer, so use a non-circular surface through (-10, 0), (0, -5), (25, -5), (40, 10).
 ```
 </div>
 
@@ -176,15 +200,22 @@ Build a model for a 10 ft sand embankment with a 3:1 face over a layered foundat
 - **The clay is undrained.** S<sub>u</sub> = 200 psf is a cohesion with no
   friction angle. If a friction angle appeared in that row, say: *"The clay is an
   undrained strength: c = 200, phi = 0."*
-- **The sand under the water table reads the piezometric line.** Its pore
-  pressure option is `piezo`, not `none`. If it came back `none`, say: *"Set the
-  sand's pore pressure option to piezo — it is below the water table."*
+- **Every sand reads the piezometric line.** The three sands are drained,
+  effective-stress strengths, so each one's pore pressure option is `piezo` —
+  the fill included, even though it sits above the line where the reading is
+  zero: the option states the physics, not the geometry. Only the clay's is
+  `none`, because an undrained strength reads no pore pressure. If a sand came
+  back `none`, say: *"The sands are drained — set every sand's pore pressure
+  option to piezo. Only the clay is none."*
 - **Four profile lines**, at the ground surface, y = 0, y = −4 and y = −6. The
   two that bracket the clay are the ones the whole problem turns on: a section
   missing either of them has no seam.
-- **The failure surface is non-circular, and its interior points are inside the
-  seam.** Both interior Y values must lie between −4 and −6; a point at −3 or −7
-  puts that stretch of base in a sand.
+- **The failure surface is the problem's four points** — (−10, 0), (0, −5),
+  (25, −5), (40, 10), the interior pair mid-seam at y = −5, between the
+  contacts at −4 and −6. Another track inside the seam is a legal surface but a
+  different one, with a different answer, and every number on this page is
+  about this one. If any point differs, say: *"Set the failure surface to
+  (-10, 0), (0, -5), (25, -5), (40, 10)."*
 - **Both end points carry an explicit Y on the ground surface** — (−10, 0) and
   (40, 10). If either Y is blank, say: *"Give the entry and exit points their
   ground-surface elevations: −10 is at y = 0 and 40 is at y = 10."*
@@ -212,9 +243,10 @@ material properties from the table above, as shown below:
 
 ![The finished mat worksheet](images/lem05_sheet_mat.png)
 
-**`u` is per material, not per model.** Only the `Sand` row reads the
-piezometric line, because it is the only soil whose strength the water changes
-here.
+**`u` is per material, not per model.** The three sand rows read the
+piezometric line — drained strengths, read against the pore pressure in the
+ground, which is zero for the fill above the line — and the undrained clay's
+row reads nothing.
 
 The **E** and **nu** columns in the figure carry stiffness values, and the
 sheet's own colour legend marks them *FEM only*: a limit equilibrium run never
@@ -317,6 +349,16 @@ Every part of that line is auditable, and [worth auditing](#where-the-track-belo
 the zone it chose and the margin it chose it by, where in the seam the track
 runs, how far it reaches, and the angle of each end ramp. The rows land in the
 table, so they can be edited before **OK**, and **Cancel** discards them.
+
+What it proposes is not what this page runs. The generator derives a viable
+shape from the geometry — six points tracking near the base of the seam, at
+y = −5.8 — where the taught surface runs mid-seam at −5, and the two are
+different surfaces with different answers:
+[the results below](#where-the-track-belongs-inside-the-seam) measure the
+generated shape at 2.022 against 1.789 for the surface as drawn. Before
+leaving the editor, delete the generated rows and enter (or copy-paste) the
+four points from the table above, so the model you carry forward is the one
+every number on this page reads.
 
 Continue below.
 

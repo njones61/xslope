@@ -275,11 +275,145 @@ def t0_template():
     render("t0_template_main.png", TEMPLATE, "main", rows=(1, 24), cols="A:G")
 
 
+# --------------------------------------------------------------------------- #
+# LEM-2 — Loads on the Crest
+# --------------------------------------------------------------------------- #
+#: LEM-2's model is LEM-1's plus one distributed load, built by
+#: ``tools/build_lem02_model.py``. The tutorial's other states are edits the page
+#: has the reader make to it, so they are built here in memory rather than as
+#: files — exactly as LEM-1 builds its cracked model.
+LEM02 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_crest_surcharge.xlsx")
+LEM02_SLICES = 40
+
+#: The 750 psf stockpile moved off the level crest and onto the 1:1 face, between
+#: elevations 5 and 15. Direction is the whole subject there: perpendicular to a
+#: 45° face carries a horizontal component equal to the load itself, while the
+#: same stockpile's weight acts straight down. On the crest the two words describe
+#: the same force, which is why the comparison cannot be made on the built model.
+FACE_LOAD = [[{"X": 5.0, "Y": 5.0, "Normal": 750.0},
+              {"X": 15.0, "Y": 15.0, "Normal": 750.0}]]
+
+#: The same total force as the crest surcharge — 750 psf × 10 ft = 7500 lb/ft —
+#: gathered onto the single point at the middle of the strip.
+LINE_LOAD = [{"x": 30.0, "y": 20.0, "P": 7500.0, "angle": -90.0,
+              "label": "footing"}]
+
+LEM02_K = 0.15                     #: the seismic coefficient the page runs
+LEM02_TARGET_FS = 1.5              #: the design target the page solves for
+
+
+def _lem02_search(model, method="spencer"):
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path, circles = circular_search(
+            model, method, num_slices=LEM02_SLICES, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache, path, circles
+
+
+def lem02_sheets():
+    """The one worksheet LEM-2's Excel path fills.
+
+    Only ``dloads``: LEM-2 starts from the file LEM-1 finished, so ``main``,
+    ``mat``, ``profile`` and ``circles`` are already right and already
+    photographed on that page.
+
+    The window runs to column H — the empty gap column and the whole of the
+    still-blank Distributed Load #2 beside the filled #1, which is the sheet's
+    four-columns-per-load shape a reader adding a second load has to see. It is
+    also the narrowest window the renderer will take: #2's header is merged
+    F4:H4, and a frame ending at F sends the renderer looking for a merge anchor
+    outside it, which is a KeyError rather than a quiet crop (the same constraint
+    LEM-1's ``mat`` window documents).
+
+    Rows start at 4, the block header. Above it the sheet carries one merged
+    formula cell whose text appears only when the workbook's water loads are
+    automatic, and a freshly written file has no cached result for it — so rows
+    1-3 render as three empty bands rather than as the note they hold in Excel.
+    """
+    render("lem02_sheet_dloads.png", LEM02, "dloads", rows=(4, 10), cols="A:H")
+
+
+def lem02_plots():
+    """The states the page compares against, each run with the method it quotes.
+
+    The arc: the surcharge on the model LEM-1 left (Spencer, and every other
+    method, on one circle), the same total force concentrated into a line load,
+    the same load on the face read both ways round, the seismic coefficient, and
+    the design sweep that says what cohesion would hold the target.
+    """
+    sd = load_slope_data(LEM02)
+
+    # The problem, at the top of the page: the section and the load on it, with the
+    # starting circle dropped. A trial circle is a step toward the answer rather
+    # than part of the question, and the figure a reader decides the page by should
+    # carry only what they are being asked about.
+    problem = copy.deepcopy(sd)
+    problem["circles"], problem["circular"] = [], False
+    capture("lem02_problem.png", plot_inputs, problem, title="Slope Geometry and Inputs")
+
+    # Where the three paths rejoin: the same model with the circle back.
+    capture("lem02_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
+
+    fs_cache, _, _ = _lem02_search(sd)
+    crit = fs_cache[0]
+    capture("lem02_solution_load.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+
+    # The same resultant as a line load: one point instead of a 10 ft strip.
+    ll = copy.deepcopy(sd)
+    ll["dloads"], ll["dload_dirs"] = [], []
+    ll["line_loads"] = copy.deepcopy(LINE_LOAD)
+    fs_ll, _, _ = _lem02_search(ll)
+    crit_ll = fs_ll[0]
+    capture("lem02_solution_lload.png", plot_solution, ll, crit_ll["slices"],
+            crit_ll["failure_surface"], crit_ll["solver_result"])
+
+    # Direction, where it bites: the same load on the 1:1 face, read both ways.
+    face = {}
+    for word in ("normal", "vertical"):
+        fd = copy.deepcopy(sd)
+        fd["dloads"] = copy.deepcopy(FACE_LOAD)
+        fd["dload_dirs"] = [word]
+        fs_f, _, _ = _lem02_search(fd)
+        face[word] = fs_f[0]
+        capture("lem02_face_%s.png" % word, plot_solution, fd, face[word]["slices"],
+                face[word]["failure_surface"], face[word]["solver_result"])
+
+    # A second kind of demand on the same model.
+    sk = copy.deepcopy(sd)
+    sk["k_seismic"] = LEM02_K
+    fs_k, _, _ = _lem02_search(sk)
+    crit_k = fs_k[0]
+    capture("lem02_solution_seismic.png", plot_solution, sk, crit_k["slices"],
+            crit_k["failure_surface"], crit_k["solver_result"])
+
+    # The design sweep: the cohesion that would hold the target under the load.
+    # Drawn from the same run the page quotes, so the crossing on the figure is
+    # the number in the sentence beside it.
+    from xslope.sensitivity import design
+    from xslope.plot import plot_sensitivity
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = design(copy.deepcopy(sd), param="mat:soil:c", low=500.0,
+                         high=1200.0, steps=8, target_fs=LEM02_TARGET_FS,
+                         method="spencer", search=True, num_slices=LEM02_SLICES)
+    if not ok:
+        raise SystemExit("LEM-2 design sweep failed: %s" % (res,))
+    capture("lem02_design.png", plot_sensitivity, res["df"],
+            target_fs=LEM02_TARGET_FS)
+
+    print("   surcharge %.4f · line load %.4f · face normal %.4f · face vertical "
+          "%.4f · k=%.2f %.4f · c(FS %.1f) = %.1f"
+          % (crit["FS"], crit_ll["FS"], face["normal"]["FS"], face["vertical"]["FS"],
+             LEM02_K, crit_k["FS"], LEM02_TARGET_FS, res["crossing"]))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
     "lem01_plots": lem01_plots,
     "lem01_placeholders": lem01_placeholders,
+    "lem02_sheets": lem02_sheets,
+    "lem02_plots": lem02_plots,
 }
 
 

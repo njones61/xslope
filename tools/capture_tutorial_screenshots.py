@@ -320,6 +320,80 @@ def t0_unpack_exists():
 SHOTS["t0_unpack_exists"] = t0_unpack_exists
 
 
+# --------------------------------------------------------------------------- #
+# LEM-2 — Loads on the Crest
+# --------------------------------------------------------------------------- #
+LEM02 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_crest_surcharge.xlsx")
+
+
+def lem02_dloads():
+    """The distributed-loads editor holding the crest surcharge.
+
+    The model arrives with the load already in it, because this is the state the
+    Studio path's step *ends* in and the figure is what the reader checks their
+    own screen against: the two points, the intensity in both, and the Direction
+    the level crest makes irrelevant. The preview beside the table draws the load
+    on the section, which is where a mistyped X shows up.
+    """
+    from studio.editors import DloadsEditor
+
+    dlg = DloadsEditor().build(_load(LEM02), None)
+    dlg.resize(1000, 620)
+    return _grab(dlg, "lem02_studio_dloads.png")
+
+
+def lem02_lloads():
+    """The line-loads editor with the surcharge re-stated as a single force.
+
+    Built on the model with its distributed load REMOVED, since the page's line
+    load replaces the surcharge rather than joining it — the preview would
+    otherwise draw a section carrying twice the force the step describes.
+    """
+    from studio.editors import LineLoadsEditor
+
+    d = _load(LEM02)
+    d["dloads"], d["dload_dirs"] = [], []
+    d["line_loads"] = [{"x": 30.0, "y": 20.0, "P": 7500.0, "angle": -90.0,
+                        "label": "footing"}]
+    dlg = LineLoadsEditor().build(d, None)
+    dlg.resize(1000, 620)
+    return _grab(dlg, "lem02_studio_lloads.png")
+
+
+def lem02_parametric():
+    """The Parametric dialog in **Design** mode, set up for the page's sweep.
+
+    Every control is driven the way a reader drives it rather than pre-filled:
+    the mode is chosen, then the material and the property, and only then the
+    bounds — because the dialog seeds From/To from the property the picker lands
+    on, and a dialog whose fields were written before its parameter was picked
+    photographs a range the reader could not have got to. The **Sweeping** echo
+    reads the picked parameter for the same reason: it is the picker's answer,
+    not a caption.
+    """
+    from studio.dialogs import SensitivityDialog
+
+    dlg = SensitivityDialog(defaults={"mode": "design", "method": "spencer",
+                                      "num_slices": 40, "search": True},
+                            slope_data=_load(LEM02))
+    for combo, text in ((dlg.mode, "Design"), (dlg.material, "soil")):
+        i = next(n for n in range(combo.count()) if text in combo.itemText(n))
+        combo.setCurrentIndex(i)
+    i = next(n for n in range(dlg.prop.count()) if dlg.prop.itemText(n) == "c")
+    dlg.prop.setCurrentIndex(i)
+    dlg.d_from.setValue(500.0)
+    dlg.d_to.setValue(1200.0)
+    dlg.d_steps.setValue(8)
+    dlg.d_target.setValue(1.5)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem02_studio_parametric.png")
+
+
+SHOTS["lem02_dloads"] = lem02_dloads
+SHOTS["lem02_lloads"] = lem02_lloads
+SHOTS["lem02_parametric"] = lem02_parametric
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

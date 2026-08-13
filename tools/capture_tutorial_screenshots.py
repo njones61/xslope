@@ -443,6 +443,70 @@ def lem03_circles():
 SHOTS["lem03_materials"] = lem03_materials
 SHOTS["lem03_circles"] = lem03_circles
 
+
+# --------------------------------------------------------------------------- #
+# LEM-5 — A Weak Layer, Non-Circular
+# --------------------------------------------------------------------------- #
+LEM05 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_noncircular.xlsx")
+
+
+def lem05_noncirc():
+    """The non-circular editor holding the four points, as the step leaves it.
+
+    The model arrives with the surface already in it, because this is the state
+    the Studio path's step ends in: the vertex table, the Movement column, and the
+    preview drawing the polyline across the section so the reader can see the
+    track lying inside the clay seam before anything is run.
+    """
+    from studio.editors import NonCircEditor
+
+    dlg = NonCircEditor().build(_load(LEM05), None)
+    dlg.resize(1100, 640)
+    return _grab(dlg, "lem05_studio_noncirc.png")
+
+
+def lem05_generate():
+    """The same editor just after **Generate from the weak zone…** is pressed.
+
+    The table arrives empty — the state a reader who has entered no surface is in
+    — so the generator fills it without asking, and the summary line under the
+    button is the answer to the press rather than a caption: which zone it chose,
+    the strengths it compared to choose it, and the ramp angles it built. Pressing
+    the button is the whole point of the shot; pre-loading the rows would lose
+    the line the page teaches the reader to read.
+    """
+    from studio.editors import NonCircEditor
+
+    d = _load(LEM05)
+    d["non_circ"] = []
+    dlg = NonCircEditor().build(d, None)
+    with contextlib.redirect_stdout(io.StringIO()):
+        dlg._run_generate()
+    dlg.resize(1100, 640)
+    return _grab(dlg, "lem05_studio_generate.png")
+
+
+def lem05_run_lem():
+    """Run LEM on the finished model, filled the way the step beside it dictates.
+
+    **Surface** is the row that differs from every earlier tutorial: this model
+    defines a non-circular surface and no circles, so the selector is a fixed
+    label reading *Non-circular*, the mirror of the fixed *Circular* label LEM-2's
+    model produces.
+    """
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "single_surface",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM05))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem05_studio_run_lem.png")
+
+
+SHOTS["lem05_noncirc"] = lem05_noncirc
+SHOTS["lem05_generate"] = lem05_generate
+SHOTS["lem05_run_lem"] = lem05_run_lem
+
 SHOTS["lem02_dloads"] = lem02_dloads
 SHOTS["lem02_lloads"] = lem02_lloads
 SHOTS["lem02_parametric"] = lem02_parametric

@@ -538,6 +538,116 @@ def lem03_plots():
           % (crit["FS"], crit["Depth"], LEM03_WEAK_C, crit_w["FS"], crit_w["Depth"]))
 
 
+# --------------------------------------------------------------------------- #
+# LEM-5 — A Weak Layer, Non-Circular
+# --------------------------------------------------------------------------- #
+#: LEM-5's model is the non-circular sample — one file, two pages, as LEM-1's and
+#: LEM-3's are.
+LEM05 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_noncircular.xlsx")
+LEM05_SLICES = 40
+
+#: Where the page pulls the entry point to, to show what a steep toe wedge does.
+#: 1 ft of horizontal run against 5 ft of drop is a 78.7 degree leading segment —
+#: still sliceable, still solvable, and the answer it returns is nonsense.
+LEM05_SLIVER_X = -1.0
+
+
+def _lem05_solve(model, non_circ, method="spencer"):
+    """One surface, one method, no search: what this page runs everywhere."""
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = generate_slices(model, non_circ=non_circ,
+                                  num_slices=LEM05_SLICES)
+        if not ok:
+            raise SystemExit("LEM-5: slicing failed — %s" % (res,))
+        slice_df, surface = res
+        result = solve_selected(method, slice_df)
+    if not isinstance(result, dict):
+        raise SystemExit("LEM-5: %s failed — %s" % (method, result))
+    return slice_df, surface, result
+
+
+def lem05_sheets():
+    """The four worksheets LEM-5's Excel path fills.
+
+    ``non-circ`` is the one this page is about, and its window runs to column F
+    rather than stopping at the three columns the reader types: E2:F5 is the
+    sheet's own legend for the Movement column — *Free / Horiz / Fixed* against
+    what each one does — which is the vocabulary the step beside the figure
+    teaches.
+
+    ``mat`` takes LEM-3's frame (row 10 down, through the ``u`` column) with one
+    column more, because this model's fourth material fills ``ru``'s neighbour
+    and a window that stopped at O would cut the pore-pressure pair in half.
+    ``profile`` runs to L: four lines at three columns each, the fourth ending
+    there.
+    """
+    render("lem05_sheet_mat.png", LEM05, "mat", rows=(10, 15), cols="A:P")
+    render("lem05_sheet_profile.png", LEM05, "profile", rows=(1, 12), cols="A:L")
+    render("lem05_sheet_piezo.png", LEM05, "piezo", rows=(1, 7), cols="A:E")
+    render("lem05_sheet_noncirc.png", LEM05, "non-circ", rows=(1, 8), cols="A:F")
+
+
+def lem05_plots():
+    """The states LEM-5 compares against — every one a single surface, solved once.
+
+    No search anywhere in this group. The page teaches the surface a reader
+    enters, so each figure is that surface (or a deliberately damaged version of
+    it) run through Spencer's method at 40 slices, which is the method and the
+    slice count the prose quotes.
+
+    The arc: the model as delivered, the generator's own proposal beside it, the
+    best circle this section admits, and the same surface with its entry point
+    pulled in until the leading segment is a sliver.
+    """
+    sd = load_slope_data(LEM05)
+
+    capture("lem05_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
+
+    slices, surface, result = _lem05_solve(sd, sd["non_circ"])
+    capture("lem05_solution.png", plot_solution, sd, slices, surface, result)
+
+    # The generator's proposal, solved the same way — the audit the Studio path
+    # asks the reader to make against the surface they entered by hand.
+    from xslope.generators import generate_noncircular_surface
+    gen = generate_noncircular_surface(sd, report=True)
+    if not gen["surface"]:
+        raise SystemExit("LEM-5: the weak-zone generator built nothing — %s"
+                         % (gen["reason"],))
+    gs, gsurf, gres = _lem05_solve(sd, gen["surface"])
+    capture("lem05_solution_generated.png", plot_solution, sd, gs, gsurf, gres)
+
+    # What a circle gets on the same section. The file defines no circles — it is
+    # a non-circular model — so the question is asked with the starting circles
+    # the geometry itself proposes, refined by the ordinary circular search.
+    from xslope.generators import generate_starting_circles
+    circ = copy.deepcopy(sd)
+    circ["circles"] = generate_starting_circles(circ)
+    circ["circular"] = True
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(circ, "spencer",
+                                            num_slices=LEM05_SLICES,
+                                            diagnostic=False)
+    best = fs_cache[0]
+    capture("lem05_solution_circle.png", plot_solution, circ, best["slices"],
+            best["failure_surface"], best["solver_result"])
+
+    # The hazard: the same four points with the entry pulled in to x = -1, which
+    # stands the leading segment up at 78.7 degrees. Drawn rather than described,
+    # because the tell is the shape of the leading slices.
+    sliver = copy.deepcopy(sd["non_circ"])
+    sliver[0]["X"] = LEM05_SLIVER_X
+    ss, ssurf, sres = _lem05_solve(sd, sliver)
+    capture("lem05_sliver.png", plot_solution, sd, ss, ssurf, sres)
+
+    print("   as entered %.4f · generated %.4f · best circle %.4f (depth %.3f) · "
+          "entry at x = %g %.4f"
+          % (result["FS"], gres["FS"], best["FS"], best["Depth"],
+             LEM05_SLIVER_X, sres["FS"]))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -547,6 +657,8 @@ GROUPS = {
     "lem02_plots": lem02_plots,
     "lem03_sheets": lem03_sheets,
     "lem03_plots": lem03_plots,
+    "lem05_sheets": lem05_sheets,
+    "lem05_plots": lem05_plots,
 }
 
 

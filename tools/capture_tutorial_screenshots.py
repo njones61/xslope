@@ -220,33 +220,104 @@ def t0_studio_window():
     real screen), on LEM-1's model, so the reader recognises the section when they
     reach their first build.
 
-    The dock's caption reads the provider and model stored on the machine that runs
-    this, which is the dock's own behaviour ("the dock shows the active provider ·
-    model") rather than anything the shot arranges — so a re-capture elsewhere shows
-    that machine's choice, and the page never quotes the caption's contents.
+    The dock's caption names the active provider and model, which it reads from the
+    machine's stored settings — so an uncaptioned capture photographs whatever the
+    person running it happens to have selected, which for this figure meant a model
+    a reader could neither find in the list nor reach. The capture therefore pins
+    the selection to the shipped default (Claude, and the first entry of the
+    provider's static list) for the length of the grab and puts the machine's own
+    settings back afterwards, whatever happens. The pinned model is read from the
+    provider table rather than spelled here, so the figure follows the default if it
+    changes.
+
+    Pinned rather than deleted: with no model stored, the dock falls back to the
+    recommendations manifest when one has been fetched into these same settings,
+    which is again machine-dependent.
     """
+    from PySide6.QtCore import QSettings
+
+    from studio.ai.config import PROVIDERS
     from studio.main_window import MainWindow
-    win = MainWindow()
-    win.resize(1600, 1000)
-    win.open_path(LEM01)
-    win.show()
-    _settle()
-    win.canvas.render_inputs(win.doc.slope_data)
-    _settle()
-    win.canvas._render_timer.stop()
-    win.canvas._render_current()
-    win.log.clear()
-    _settle()
-    pix = win.grab()
-    out = os.path.join(OUT_DIR, "t0_studio_window.png")
-    pix.save(out)
-    print("-> t0_studio_window.png  (%dx%d, offscreen main window)"
-          % (pix.width(), pix.height()))
-    win.close()
-    return out
+
+    #: The settings the app itself uses — the real ones, which is why every write
+    #: below is undone in the finally block.
+    settings = QSettings("XSlope", "XSlope Studio")
+    pinned = {"ai/provider": "anthropic",
+              "ai/model/anthropic": PROVIDERS["anthropic"]["models"][0]}
+    # `None` records "this key was not set", which must be restored by REMOVING it
+    # again rather than by writing an empty string.
+    stashed = {k: (settings.value(k) if settings.contains(k) else None)
+               for k in pinned}
+    win = None
+    try:
+        for key, value in pinned.items():
+            settings.setValue(key, value)
+        settings.sync()
+
+        win = MainWindow()
+        win.resize(1600, 1000)
+        win.open_path(LEM01)
+        win.show()
+        _settle()
+        win.canvas.render_inputs(win.doc.slope_data)
+        _settle()
+        win.canvas._render_timer.stop()
+        win.canvas._render_current()
+        win.log.clear()
+        _settle()
+        pix = win.grab()
+        out = os.path.join(OUT_DIR, "t0_studio_window.png")
+        pix.save(out)
+        print("-> t0_studio_window.png  (%dx%d, offscreen main window, %s)"
+              % (pix.width(), pix.height(), pinned["ai/model/anthropic"]))
+        return out
+    finally:
+        for key, value in stashed.items():
+            if value is None:
+                settings.remove(key)
+            else:
+                settings.setValue(key, value)
+        settings.sync()
+        if win is not None:
+            win.close()
 
 
 SHOTS["t0_studio_window"] = t0_studio_window
+
+
+def t0_unpack_exists():
+    """The package-open dialog on a destination that is ALREADY THERE.
+
+    The two states are mutually exclusive — ``UnpackPackageDialog._refresh`` hides
+    **Unpack and Open** exactly when **Open Existing** and **Extract Fresh** appear
+    — so the Studio reference page's capture (a free destination) cannot illustrate
+    the question this state asks, and the tutorial shows both.
+
+    The path in the figure is the same stand-in its sibling uses, so the two read as
+    one dialog in two states rather than two dialogs. Making that path *exist* is
+    the whole difficulty: the dialog asks the filesystem. So the filesystem's answer
+    is stubbed for the one path, rather than the dialog being driven into the state
+    by hand — the visibility rule, the status line and the numbered fresh folder are
+    then all the dialog's own work, which is what the tutorial's prose describes.
+    The stub answers True for that path ONLY: ``_fresh_dest`` probes ``-2``, ``-3``
+    … for the first free name and would not terminate against a blanket True.
+    """
+    from studio import dialogs
+    from studio.dialogs import UnpackPackageDialog
+
+    dest = "/Users/you/Projects/xslope_earth_dam"
+    dlg = UnpackPackageDialog(dest + ".xslz")
+    real_exists = dialogs.os.path.exists
+    dialogs.os.path.exists = lambda p: p == dest or real_exists(p)
+    try:
+        dlg._refresh()
+        dlg.resize(dlg.sizeHint())
+        return _grab(dlg, "t0_unpack_exists.png")
+    finally:
+        dialogs.os.path.exists = real_exists
+
+
+SHOTS["t0_unpack_exists"] = t0_unpack_exists
 
 
 def main(argv=None):

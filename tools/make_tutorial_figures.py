@@ -258,15 +258,21 @@ TEMPLATE = os.path.join(REPO_ROOT, "docs/inputs/input_template.xlsx")
 
 
 def t0_template():
-    """The template's ``main`` worksheet as it is downloaded, with the tab strip.
+    """The template's ``main`` worksheet as it is downloaded, out to column G.
 
-    The strip is the point of this one: it names every worksheet in the workbook,
-    which is what the tutorial's paragraph beside it is describing. Same row/column
-    window as LEM-1's filled ``main`` capture — content stops at the Water-loads
-    row, below which the sheet holds the hidden source data behind the dropdowns.
+    The window is wider than LEM-1's ``A:D`` because the sheet carries its own
+    **Sheet / Description** table in ``F7:G21`` — the workbook naming and
+    describing every worksheet in itself, which is what the tutorial's paragraph
+    beside this figure is about. The tab strip would say the same thing less well:
+    it names the sheets without describing them, and it pads a narrow capture out
+    to its own fixed width with empty grid columns, which the owner's review of the
+    LEM-1 captures rejected.
+
+    Rows stop at 24 (the Surface-family row) for the same reason LEM-1's do —
+    below it the sheet holds the hidden source data behind the dropdowns, which is
+    not part of what a reader fills in.
     """
-    render("t0_template_main.png", TEMPLATE, "main", rows=(1, 24), cols="A:D",
-           tab_strip=True)
+    render("t0_template_main.png", TEMPLATE, "main", rows=(1, 24), cols="A:G")
 
 
 GROUPS = {

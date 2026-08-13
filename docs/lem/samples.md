@@ -29,7 +29,7 @@ Excel input file: [xslope_simple_embankment.xlsx](files/xslope_simple_embankment
 
 Inputs plotted with the XSLOPE plot_inputs() function:
 
-![simple_embankment_inputs1.png](sample_images/simple_embankment_inputs1.png)
+![simple_embankment_inputs1.png](sample_images/simple_embankment_inputs1.png){width=700}
 
 Solution (critical surface and factor of safety). The green bars on the base of each slice represent the effective 
 stress on the base of the slice. The red bars correspond to tension at the base of the slice. The red dashed line 
@@ -320,7 +320,7 @@ This problem features a dam with a shell and a clay core on top of a foundation 
 This problem was featured on page 121 of Shear Strength and Slope Stability - Second Edition by Duncan, Wright, and 
 Brandon. 
 
-![earth_dam.png](sample_images/earth_dam.png)
+![earth_dam.png](sample_images/earth_dam.png){width=700}
 
 The material properties are as follows:
 

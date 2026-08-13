@@ -74,7 +74,7 @@ from xslope.fileio import load_slope_data
 from xslope.fem import build_fem_data, solve_ssrm, export_fem_solution
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_point_constraints,
-                         export_mesh_to_json)
+                         extract_size_regions, export_mesh_to_json)
 from xslope.style import resolve_style, material_style
 # The composite is ONE figure whose four panels are drawn into axes the composite
 # owns (fixed positions), so all four plot rectangles come out pixel-identical.
@@ -321,10 +321,16 @@ def _build(tag):
             if feats:
                 refine_kw['refine_features'] = [s.strip() for s in str(feats).split(';')
                                                 if s.strip()]
+        # The model's own mesh refinement polygons (polygon sheet Type='refine')
+        # travel with the file the same way its material zones do, so they belong
+        # here for the same reason refine_factor does: a file that refines a band
+        # is solved on the refined mesh by the suite, and a figure built without
+        # the overlay would draw a coarser mesh and report a different FS.
         mesh = build_mesh_from_polygons(
             polys, target_size=target,
             element_type=tag.get('element_type', 'tri6'), lines=lines,
-            point_constraints=extract_point_constraints(sd), **refine_kw)
+            point_constraints=extract_point_constraints(sd),
+            size_regions=extract_size_regions(sd), **refine_kw)
     # `sd` (unmodified) is what the inputs panel draws; the FEM build gets the
     # dry-beyond-the-line spelling where a piezo line stops short of the mesh.
     return sd, build_fem_data(_declare_dry_beyond_piezo(sd, mesh), mesh), path, mesh

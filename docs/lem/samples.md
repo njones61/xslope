@@ -225,7 +225,7 @@ Here is the solution for just the starting circle (to match the problem descript
 ![method_slices_problem_results.png](sample_images/method_slices_problem_results.png){width=900}
 
 <!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
+**Factor of safety by method** (each method on the same specified circle):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|

@@ -1,12 +1,12 @@
 {
   "benchmark": "RS2-66a-deep",
   "analysis": "ssrm",
-  "FS": 1.2687500000000003,
-  "expected_fs": "1.194",
+  "FS": 1.13125,
+  "expected_fs": "1.131",
   "file": "files/rocscience/rs2_66a.xlsx",
   "unit_system": "si",
   "converged": true,
-  "iterations": 14096,
-  "residual": 7.668881431508035e-05,
-  "max_displacement": 3.8165882968452163
+  "iterations": 1276,
+  "residual": 0.0008597617808796692,
+  "max_displacement": 0.11297191952142344
 }

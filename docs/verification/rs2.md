@@ -298,7 +298,7 @@ independently verifiable.
 | [49](#rs2-49) | <span class="nodata">⊘</span> | Geotextile wall, fill-quality variant | | *reported, no lock* — converges inside the family band, no comparison derived. |
 | [50](#rs2-50) | <span class="nodata">⊘</span> | Geotextile wall, 4.2 m reinforcement variant | | *reported, no lock* — refinement-sensitive, not converged. |
 | [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type | | *reported, no lock* — refinement-sensitive, not converged. |
-| [52](#rs2-52) | <span class="nodata">⊘</span> | Geotextile wall, weak-foundation variant |  | *reported, no lock* — bearing failure on the c = 0 / φ = 18° foundation, and the one variant with a derived comparison: SSRM 0.783 against RS2's own SSR 0.84 and the L&H FLAC referee 0.86, and 0.760 on the vendor's own 24 m section. Neither reading is locked, so no dot rests on them. Trimming the section to the vendor's extent moves the factor down, not up, so the front-of-toe foundation run is not the explanation. |
+| [52](#rs2-52) | <span class="nodata">⊘</span> | Geotextile wall, weak-foundation variant |  | *reported, no lock* — bearing failure on the c = 0 / φ = 18° foundation: SSRM 0.783, and 0.760 on the vendor's own 24 m section, recorded beside RS2's own SSR 0.84 and the L&H FLAC referee 0.86. Those come from the split-interface wall [RS2-48](#rs2-48) describes, so they are not scored against XSLOPE's bonded continuum, and neither reading is locked. |
 | [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant | | *reported, no lock* — converges inside the family band, no comparison derived. |
 | [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant | | *reported, no lock* — refinement-sensitive, not converged. |
 | [55](#rs2-55) | <span class="nodata">⊘</span> | Geotextile wall, tier-count variant | | *reported, no lock* — converges inside the family band, no comparison derived. |
@@ -1969,6 +1969,14 @@ XSLOPE counterpart, and no XSLOPE run stands opposite RS2's factor. The limit-eq
 the same wall is built and locked ([VP87](rocscience.md#vp87): Bishop 1.031 vs Slide2 1.040),
 where the sheets enter as forces rather than through interfaces.
 
+**The whole family is built that way.** `#049` through `#055` carry the same split mesh and the
+same c = 0 / φ = 28.35° joints as `#048`; what changes case by case is the sheet — Ft 22 on the
+fill-quality variant, EA 4200 / Ft 11.4 and a shorter split (135 node pairs, 75 beams) on the
+4.2 m one, two sheet types at Ft 7.5 and 11 with two joint stiffnesses on the dual-type wall, and
+Ft 10 / 9.25 / 10 / 10.1 on the rest. So every RS2 SSR value quoted in the variant sections below
+comes from the split-interface wall and XSLOPE's from a bonded continuum: they are recorded side
+by side, never scored against each other.
+
 **What the wall reads under the vendor's inputs.** The corpus file carries them: tensile caps on
 every material (T = 0 on the reinforced granular fill, 10 on the foundation, 2.5 on the blocks),
 E = 50,000 kPa and ν = 0.4 on all three materials read from the `.fez` rather than estimated from
@@ -2013,17 +2021,18 @@ does not change this: on these wished-in-place walls the geotextile bars are not
 their pull-out capacity at the incipient failure state, so re-capping the pull-out envelope
 leaves every one of those factors byte-identical.
 
-The vendor `.fez` files for those three (`#050`/`#051`/`#054`) rule out three modelling
-differences. **Element type** — RS2 meshes these walls with
+The vendor `.fez` files for those three (`#050`/`#051`/`#054`) settle three questions about the
+modelling; the fourth difference, the split mesh at the sheets, is the family's own and is
+described above. **Element type** — RS2 meshes these walls with
 `lst_element` (the Linear Strain Triangle, the same 6-node quadratic triangle XSLOPE uses), so it is
 not a tri3-vs-tri6 order gap. **Facing columns** — the vendor's `Blocks` material is ordinary
 Mohr-Coulomb (c = 2.5, φ = 34) with `Apply_SSR` on, **not** a linear-elastic "can't-fail" zone; all
 three materials are reduced, with no SSR exclusion or search area, so the facing is not holding the
 mechanism up. **Tension cutoff** — the vendor carries a Rankine cutoff T = c on every material
 (fill T = 0, foundation T = 10, blocks T = 2.5), and applying it faithfully
-(`tension_cutoff_by_material`) leaves these three variants further below the published ≈ 1.0 and
-still refinement-dependent, so the tension model is not what reconciles them (RS2 applies the same
-cutoff and still reads ≈ 1.0). What remains is a **shear localization through the
+(`tension_cutoff_by_material`) leaves these three variants lower still and no less
+refinement-dependent, so the tension model is not what drives that dependence. In XSLOPE's own
+runs what governs is a **shear localization through the
 c = 0 reinforced granular fill**: a cohesionless mass has no intrinsic length scale, so the failing
 band collapses onto the element size and the factor tracks the mesh rather than converging. The three
 variants are therefore reported rather than locked: the controlling difference is that fill
@@ -2078,18 +2087,19 @@ two refinements returns a collapse rather than a factor of safety. Reported with
 #### RS2-52: Geotextile wall, weak foundation (vp091) {#rs2-52}
 
 The foundation is c = 0, φ = 18°, and the wall fails in bearing rather than through the reinforced
-mass — the lowest factor in the family, and the one variant with a derived comparison.
+mass — the lowest factor in the family, and the only variant whose published values sit close
+enough to measure a difference against.
 
 | Model | XSLOPE | RS2 SSR | L&H FLAC referee |
 |---|---|---|---|
 | vp091 — the LEM file's 30 m section (reported, not locked) | 0.783 | 0.84 (−6.8%) | 0.86 (−9.0%) |
 | vp091_fem — the vendor's own 24 m section (reported) | 0.760 | 0.84 (−9.5%) | 0.86 (−11.6%) |
 
-RS2 publishes its own SSR for this variant — 0.84, alongside Spencer 0.96 and GLE 0.98 — so the
-comparison that governs is strength reduction against strength reduction. Leshchinsky & Han's FLAC
-referee 0.86 is the problem's published answer and reads wider still. Their FLAC drops on this case
-for the same reason XSLOPE's SSRM does, so all three codes agree the mechanism moves into the
-foundation.
+Those differences are recorded, not scored: RS2's 0.84 — published alongside its Spencer 0.96 and
+GLE 0.98 — comes from the `#052` split-interface wall the section above describes, and
+Leshchinsky & Han's FLAC referee 0.86 is the source paper's own answer on its own model. What the
+three codes agree on is the mechanism: their FLAC drops on this case as XSLOPE's SSRM does, into
+the foundation.
 
 **Two sections.** vp091 is the only file in this family whose foundation runs from x = −6 rather
 than x = 0: the extra 36 m² exists so that Slide's printed critical circle, which daylights at
@@ -2097,11 +2107,11 @@ x = −1.6, can be seated for the LEM comparison. RS2's own #052 and the seven s
 are all the 24 m section, and it is built here too
 ([vp091_fem.xlsx](files/rocscience/vp091_fem.xlsx)). A bearing mechanism is sensitive to the run of
 ground in front of the toe, so the two sections could have been expected to differ widely; they do
-not, and the shorter one reads **lower**, 0.783 → 0.760, further from RS2's 0.84 rather than nearer
-it. The bearing capacity of a cohesionless foundation under a strength-reduced wall is
-mesh-dependent in XSLOPE, which is why neither reading is locked.
+not, and the shorter one reads **lower**, 0.783 → 0.760. The bearing capacity of a cohesionless
+foundation under a strength-reduced wall is mesh-dependent in XSLOPE, which is why neither reading
+is locked.
 
-![RS2-52: cohesionless foundation (vp091, c = 0, φ = 18°), SSRM 0.783 vs RS2's own SSR 0.84 and Leshchinsky & Han's FLAC referee 0.86 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The strain band leaves the reinforced mass and runs down through the foundation to daylight beyond the toe: the bearing mechanism both codes find on this variant](images/RS2-52.png)
+![RS2-52: cohesionless foundation (vp091, c = 0, φ = 18°), SSRM 0.783, recorded beside RS2's own SSR 0.84 and Leshchinsky & Han's FLAC referee 0.86 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The strain band leaves the reinforced mass and runs down through the foundation to daylight beyond the toe: the bearing mechanism both codes find on this variant](images/RS2-52.png)
 
 #### RS2-53: Geotextile wall, water (vp092) {#rs2-53}
 

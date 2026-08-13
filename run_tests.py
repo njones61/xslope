@@ -6831,8 +6831,11 @@ def run_docs_links_test(test):
     reduced to a plain file name; a real MkDocs build over a scratch docs tree,
     asserting the packages, the pairs (whose two hrefs must name the same package),
     the escape hatch and the one-time note; and Studio's flow in order — refuse, ask,
-    fetch, then the ordinary unpack-then-open path. No network: the download is
-    stubbed, and the build writes only to a temporary directory.
+    fetch, then the ordinary unpack-then-open path. It also pins the Studio labels
+    the tutorials tell a reader to press — the File-menu actions, the Inputs-tree
+    rows, the package dialog's buttons — since a rewording there turns a tutorial
+    sentence into an instruction to press something that is not there. No network:
+    the download is stubbed, and the build writes only to a temporary directory.
 
     Returns (0.0, None) on success, else (None, message) — a pass/fail test.
     """

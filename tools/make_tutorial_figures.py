@@ -302,6 +302,53 @@ LEM02_K = 0.15                     #: the seismic coefficient the page runs
 LEM02_TARGET_FS = 1.5              #: the design target the page solves for
 
 
+@contextlib.contextmanager
+def _hold_show():
+    """Let a plot function return without saving, so the caller can draw on it.
+
+    ``capture`` saves at ``plt.show()``; a figure that gets annotations after the
+    plot function has drawn it has to suppress that first show and let capture's
+    fallback save the finished figure instead.
+    """
+    orig = plt.show
+    plt.show = lambda *a, **k: None
+    try:
+        yield
+    finally:
+        plt.show = orig
+
+
+def _lem02_problem_sketch(model):
+    """The page's opening sketch: the section, the surcharge, and the numbers.
+
+    ``frame="content"`` crops the panel to the model rather than padding the
+    section out to the figure's aspect. The strength and the load are read off
+    the model rather than written here, so the sketch cannot print a property
+    the file does not carry.
+    """
+    with _hold_show():
+        plot_inputs(model, title="Slope Geometry and Inputs", frame="content")
+    ax = plt.gcf().axes[0]
+    mat = model["materials"][0]
+    ax.text(30.0, 9.0,
+            "γ = %g pcf\nc = %g psf\nφ = %g" % (mat["gamma"], mat["c"],
+                                                          mat["phi"]),
+            ha="center", va="center", fontsize=11)
+    band = model["dloads"][0]
+    x0, x1 = band[0]["X"], band[-1]["X"]
+    q = max(pt["Normal"] for pt in band)
+    crest = max(pt["Y"] for pt in band)
+    top = crest + q / model["gamma_water"]        # how tall plot_dloads draws it
+    # The strip's width is dimensioned BELOW the loaded surface, where nothing
+    # else is drawn: above it the arrows run to the top of the frame.
+    ax.annotate("", xy=(x0, crest - 1.6), xytext=(x1, crest - 1.6),
+                arrowprops=dict(arrowstyle="<->", color="0.25", linewidth=1.0))
+    ax.text(0.5 * (x0 + x1), crest - 2.2, "%g ft" % (x1 - x0),
+            ha="center", va="top", fontsize=10, color="0.25")
+    ax.text(x1 + 1.5, 0.5 * (crest + top), "%g psf" % q,
+            ha="left", va="center", fontsize=11)
+
+
 def _lem02_search(model, method="spencer"):
     with contextlib.redirect_stdout(io.StringIO()):
         fs_cache, _, path, circles = circular_search(
@@ -349,7 +396,7 @@ def lem02_plots():
     # carry only what they are being asked about.
     problem = copy.deepcopy(sd)
     problem["circles"], problem["circular"] = [], False
-    capture("lem02_problem.png", plot_inputs, problem, title="Slope Geometry and Inputs")
+    capture("lem02_problem.png", _lem02_problem_sketch, problem)
 
     # Where the three paths rejoin: the same model with the circle back.
     capture("lem02_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
@@ -389,17 +436,24 @@ def lem02_plots():
 
     # The design sweep: the cohesion that would hold the target under the load.
     # Drawn from the same run the page quotes, so the crossing on the figure is
-    # the number in the sentence beside it.
+    # the number in the sentence beside it — and drawn the way Studio's Design
+    # view draws it (SweepCanvas.render_design): plot_sensitivity for the curve,
+    # then annotate_design_crossing for the answer. A design sweep whose figure
+    # showed only the curve would leave its own result off the picture.
     from xslope.sensitivity import design
-    from xslope.plot import plot_sensitivity
+    from xslope.plot import plot_sensitivity, annotate_design_crossing
     with contextlib.redirect_stdout(io.StringIO()):
         ok, res = design(copy.deepcopy(sd), param="mat:soil:c", low=500.0,
                          high=1200.0, steps=8, target_fs=LEM02_TARGET_FS,
                          method="spencer", search=True, num_slices=LEM02_SLICES)
     if not ok:
         raise SystemExit("LEM-2 design sweep failed: %s" % (res,))
-    capture("lem02_design.png", plot_sensitivity, res["df"],
-            target_fs=LEM02_TARGET_FS)
+
+    def _design_figure(summary):
+        fig = plot_sensitivity(summary["df"], target_fs=LEM02_TARGET_FS)
+        annotate_design_crossing(fig.axes[0], LEM02_TARGET_FS, summary)
+
+    capture("lem02_design.png", _design_figure, res)
 
     print("   surcharge %.4f · line load %.4f · face normal %.4f · face vertical "
           "%.4f · k=%.2f %.4f · c(FS %.1f) = %.1f"

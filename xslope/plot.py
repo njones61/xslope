@@ -4981,6 +4981,49 @@ def plot_sensitivity(df, target_fs=None, figsize=(8, 5), save_png=False,
     return fig
 
 
+def annotate_design_crossing(ax, target_fs, summary):
+    """Mark a design() sweep's output=target crossing on a plot_sensitivity axes.
+
+    plot_sensitivity draws the target as a horizontal guide; a DESIGN sweep also
+    has an answer — the parameter value where the curve meets that guide,
+    interpolated between two solved points — and this puts it on the picture: a
+    vertical guide at the crossing, a diamond where the two meet, and the value
+    beside it. A sweep that never reached its target gets the reason instead, in
+    the empty band, so a figure never implies an answer the sweep did not find.
+
+    Parameters:
+        ax: the axes plot_sensitivity drew into.
+        target_fs: the design target (an FS in LEM/FEM, a discharge q in seepage).
+        summary: the design() result dict — 'param', 'output', 'bracketed',
+            'crossing', 'fs_range' and 'message' are read.
+    """
+    param = summary.get("param", "")
+    short = param.split(":")[-1] or param
+    out = summary.get("output", "FS")                # 'FS' or 'q'
+    if summary.get("bracketed") and summary.get("crossing") is not None:
+        xc = summary["crossing"]
+        ax.axvline(xc, color="#0a7d2c", linestyle="--", linewidth=1.0)
+        ax.plot([xc], [target_fs], marker="D", color="#0a7d2c", ms=9, zorder=8)
+        ax.annotate(f"{short} = {xc:.4g}\nfor {out} = {target_fs:g}",
+                    xy=(xc, target_fs), xytext=(8, 14),
+                    textcoords="offset points", color="#0a7d2c", fontsize=9,
+                    fontweight="bold", zorder=9,
+                    bbox=dict(boxstyle="round,pad=0.3", fc="white",
+                              ec="#0a7d2c", alpha=0.9))
+    else:
+        # Put the note in the empty band: just under the target line when the
+        # curve sits below the target (need a higher FS), else near the bottom.
+        fs_min = (summary.get("fs_range") or (None, None))[0]
+        below_range = fs_min is not None and target_fs < fs_min
+        y, va = (0.05, "bottom") if below_range else (0.95, "top")
+        ax.text(0.5, y, summary.get("message", "Target FS not reached."),
+                transform=ax.transAxes, ha="center", va=va, fontsize=9,
+                color="#7a5200", wrap=True, zorder=9,
+                bbox=dict(boxstyle="round,pad=0.4", fc="#fff4d6",
+                          ec="#e0b400", alpha=0.95))
+    return ax
+
+
 def _bar_chart_height_in(n_bars, per_bar_in=0.5, margin_in=1.4, min_in=2.4,
                          max_in=None):
     """Content-proportionate figure height for a categorical bar chart (tornado,

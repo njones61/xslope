@@ -246,34 +246,18 @@ class SweepCanvas(MplCanvas):
         self._draw(draw, dxf=False)
 
     def _annotate_crossing(self, fig, target_fs, summary):
-        """Mark the interpolated output=target crossing (or an honest miss note)."""
+        """Mark the interpolated output=target crossing (or an honest miss note).
+
+        The drawing itself is ``xslope.plot.annotate_design_crossing`` — pure
+        matplotlib, so anything that draws a design sweep outside Studio (the
+        tutorial figure producer) puts the same crossing on the same curve
+        rather than a lookalike of it.
+        """
+        from xslope.plot import annotate_design_crossing
         ax = self._main_axes()
         if ax is None:
             return
-        param = summary.get("param", "")
-        short = param.split(":")[-1] or param
-        out = summary.get("output", "FS")            # 'FS' or 'q'
-        if summary.get("bracketed") and summary.get("crossing") is not None:
-            xc = summary["crossing"]
-            ax.axvline(xc, color="#0a7d2c", linestyle="--", linewidth=1.0)
-            ax.plot([xc], [target_fs], marker="D", color="#0a7d2c", ms=9, zorder=8)
-            ax.annotate(f"{short} = {xc:.4g}\nfor {out} = {target_fs:g}",
-                        xy=(xc, target_fs), xytext=(8, 14),
-                        textcoords="offset points", color="#0a7d2c", fontsize=9,
-                        fontweight="bold", zorder=9,
-                        bbox=dict(boxstyle="round,pad=0.3", fc="white",
-                                  ec="#0a7d2c", alpha=0.9))
-        else:
-            # Put the note in the empty band: just under the target line when the
-            # curve sits below the target (need a higher FS), else near the bottom.
-            fs_min = (summary.get("fs_range") or (None, None))[0]
-            below_range = fs_min is not None and target_fs < fs_min
-            y, va = (0.05, "bottom") if below_range else (0.95, "top")
-            ax.text(0.5, y, summary.get("message", "Target FS not reached."),
-                    transform=ax.transAxes, ha="center", va=va, fontsize=9,
-                    color="#7a5200", wrap=True, zorder=9,
-                    bbox=dict(boxstyle="round,pad=0.4", fc="#fff4d6",
-                              ec="#e0b400", alpha=0.95))
+        annotate_design_crossing(ax, target_fs, summary)
 
 
 class MainWindow(QMainWindow):

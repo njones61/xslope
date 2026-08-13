@@ -11365,91 +11365,6 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP32: Reinforced embankment, (7) materials, geosynthetic",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp32"
-        },
-        {
-          "anchor": "rs2-24",
-          "checks": [
-            "RS2-24a"
-          ],
-          "level": 3,
-          "page": "verification/rs2/",
-          "resolution": "input-link",
-          "source_md": "docs/verification/rs2.md",
-          "title": "RS2-24: Layered slope with geosynthetic reinforcement",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-24"
-        }
-      ],
-      "topics": [
-        "reinforcement"
-      ]
-    },
-    {
-      "features": {
-        "circular": true,
-        "cutoff_walls": 0,
-        "dloads": 0,
-        "element_type": null,
-        "hoek_brown": false,
-        "homogeneous": false,
-        "k0": null,
-        "line_loads": 0,
-        "material_options": [
-          "mc"
-        ],
-        "n_materials": 9,
-        "non_circular": false,
-        "piezo_line": false,
-        "pile_fixities": [],
-        "piles": 0,
-        "polygon_geometry": true,
-        "probabilistic": false,
-        "rapid_drawdown": false,
-        "reinforcement": {
-          "appls": [
-            "passive"
-          ],
-          "count": 1,
-          "dirs": [
-            "axial"
-          ],
-          "discrete_spacing": false,
-          "end_anchorage": false,
-          "pullout": true,
-          "residual_drop": false,
-          "types": [
-            "geosynthetic"
-          ]
-        },
-        "ru": false,
-        "seepage_coupled": false,
-        "seepage_problem": false,
-        "seismic_k": 0.0,
-        "sigmas": [],
-        "ssr_zones": 0,
-        "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": true,
-        "tension_crack": false,
-        "tension_crack_water": false,
-        "transient_seepage": false,
-        "unit_system": "si",
-        "unsaturated_models": [
-          "lf"
-        ]
-      },
-      "model": "docs/verification/files/rocscience/vp032a_skin.xlsx",
-      "references": [
-        {
-          "anchor": "rs2-24",
-          "checks": [
-            "RS2-24a-skin"
-          ],
-          "level": 3,
-          "page": "verification/rs2/",
-          "resolution": "input-link",
-          "source_md": "docs/verification/rs2.md",
-          "title": "RS2-24: Layered slope with geosynthetic reinforcement",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-24"
         }
       ],
       "topics": [
@@ -11596,91 +11511,6 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP32: Reinforced embankment, (7) materials, geosynthetic",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp32"
-        },
-        {
-          "anchor": "rs2-24",
-          "checks": [
-            "RS2-24b"
-          ],
-          "level": 3,
-          "page": "verification/rs2/",
-          "resolution": "input-link",
-          "source_md": "docs/verification/rs2.md",
-          "title": "RS2-24: Layered slope with geosynthetic reinforcement",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-24"
-        }
-      ],
-      "topics": [
-        "reinforcement"
-      ]
-    },
-    {
-      "features": {
-        "circular": true,
-        "cutoff_walls": 0,
-        "dloads": 0,
-        "element_type": null,
-        "hoek_brown": false,
-        "homogeneous": false,
-        "k0": null,
-        "line_loads": 0,
-        "material_options": [
-          "mc"
-        ],
-        "n_materials": 9,
-        "non_circular": false,
-        "piezo_line": false,
-        "pile_fixities": [],
-        "piles": 0,
-        "polygon_geometry": true,
-        "probabilistic": false,
-        "rapid_drawdown": false,
-        "reinforcement": {
-          "appls": [
-            "passive"
-          ],
-          "count": 1,
-          "dirs": [
-            "axial"
-          ],
-          "discrete_spacing": false,
-          "end_anchorage": false,
-          "pullout": true,
-          "residual_drop": false,
-          "types": [
-            "geosynthetic"
-          ]
-        },
-        "ru": false,
-        "seepage_coupled": false,
-        "seepage_problem": false,
-        "seismic_k": 0.0,
-        "sigmas": [],
-        "ssr_zones": 0,
-        "suction_strength": false,
-        "template_version": 22,
-        "tensile_cutoff": true,
-        "tension_crack": false,
-        "tension_crack_water": false,
-        "transient_seepage": false,
-        "unit_system": "si",
-        "unsaturated_models": [
-          "lf"
-        ]
-      },
-      "model": "docs/verification/files/rocscience/vp032c_skin.xlsx",
-      "references": [
-        {
-          "anchor": "rs2-24",
-          "checks": [
-            "RS2-24b-skin"
-          ],
-          "level": 3,
-          "page": "verification/rs2/",
-          "resolution": "input-link",
-          "source_md": "docs/verification/rs2.md",
-          "title": "RS2-24: Layered slope with geosynthetic reinforcement",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-24"
         }
       ],
       "topics": [
@@ -17820,21 +17650,6 @@
           "source_md": "docs/verification/rocscience.md",
           "title": "VP87–VP94: Geosynthetic multitiered MSE walls (Leshchinsky & Han 2004)",
           "url": "https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87"
-        },
-        {
-          "anchor": "rs2-48",
-          "checks": [
-            "RS2-48",
-            "RS2-48-elastic-facing",
-            "RS2-48-m0.7",
-            "RS2-48-m1.5"
-          ],
-          "level": 3,
-          "page": "verification/rs2/",
-          "resolution": "input-link",
-          "source_md": "docs/verification/rs2.md",
-          "title": "RS2-48–55: Multi-tiered geotextile walls (Leshchinsky & Han 2004)",
-          "url": "https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-48"
         }
       ],
       "topics": [
@@ -22607,7 +22422,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 318,
+    "models": 316,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -22621,7 +22436,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 545,
+    "tags": 537,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
@@ -22630,7 +22445,7 @@
       "piles": 15,
       "probabilistic": 15,
       "rapid-drawdown": 6,
-      "reinforcement": 23,
+      "reinforcement": 21,
       "seepage-coupled": 67,
       "seismic": 10,
       "soil-nails": 5,
@@ -22906,10 +22721,8 @@
       "docs/verification/files/rocscience/vp030a.xlsx",
       "docs/verification/files/rocscience/vp030b.xlsx",
       "docs/verification/files/rocscience/vp032a.xlsx",
-      "docs/verification/files/rocscience/vp032a_skin.xlsx",
       "docs/verification/files/rocscience/vp032b.xlsx",
       "docs/verification/files/rocscience/vp032c.xlsx",
-      "docs/verification/files/rocscience/vp032c_skin.xlsx",
       "docs/verification/files/rocscience/vp039b.xlsx",
       "docs/verification/files/rocscience/vp039d.xlsx",
       "docs/verification/files/rocscience/vp086.xlsx",

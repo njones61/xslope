@@ -1487,8 +1487,8 @@ def vp029_split():
     the vendor's 48.9% element fraction) and the two elastic pieces outside it, which
     carry the SAME properties and are named so the runner can pass them to
     solve_ssrm(elastic_materials=...). The split is INERT to a normal Mohr-Coulomb
-    solve; it exists only to give the constraint two addressable zones, the
-    vp032a_skin construction. E/nu are the vendor's own (nu 0.4, E 1e6 psf) and the
+    solve; it exists only to give the constraint two addressable zones.
+    E/nu are the vendor's own (nu 0.4, E 1e6 psf) and the
     Mohr-Coulomb band carries rock1's cap T = 100 psf. vp029.xlsx and its LEM locks
     are untouched."""
     from shapely.geometry import Polygon
@@ -1602,8 +1602,10 @@ def _vp032_slope_data(case):
     three published circles. Clays Cu 43/31/30/32/32 (phi=0), embankment
     upper (el>=1) 0/35/21.9 over lower 0/33/17.2. Geosynthetic at el 0.9
     spanning the fill base, T=200, interface friction 30.96 deg -> pullout
-    1.3 m, axial/passive per B&C. Elastic constants carried for the RS2 SSR
-    tags that share these files."""
+    1.3 m, axial/passive per B&C. Elastic constants are the vendor model's own;
+    the RS2 SSR rows for this problem are not attempted (RS2 meshes it as two
+    bodies joined by a slip interface), so these files carry the Slide2 LEM
+    locks only."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     def mat(name, c, phi, g):
@@ -1669,62 +1671,6 @@ def vp032a():
     return 'vp032a.xlsx'
 
 
-def vp032a_skin():
-    """RS2-24a WITH the vendor's elastic face-skin, for the constrained-SSRM
-    head-to-head against RS2's published SSR 1.15.
-
-    Geometrically and materially IDENTICAL to vp032a (same seven soil zones,
-    same geosynthetic, same circle) EXCEPT the ~0.75-1 m strip inboard of the
-    39.1 deg embankment face is carved into its OWN two zones -- 'Upper
-    embankment (elastic skin)' / 'Lower embankment (elastic skin)' -- carrying
-    the SAME c/phi/gamma as the embankment fills they duplicate. The strip
-    follows the RS2 vendor .fez (#024_01) internal boundary 9,
-    (-9.5,7)->(-2.214,1)->(-2.093,0.9)->(-1,0), inboard of the true face
-    (-8.61,7)->(-1.23,1)->(-1.107,0.9)->(0,0); it meshes to 10 upper + 4 lower
-    elements, matching the vendor's own element bboxes. In RS2 those elements
-    are assigned duplicate materials 8/9 ("embankment lower/upper elastic")
-    with 'Plasticity Specifications: Non' -- purely elastic, no Apply_SSR field
-    -- so the SRF sweep can never fail the cohesionless face skin and the
-    mechanism is forced onto the deep reinforced surface (RS2's locked 1.15).
-
-    The split is INERT to a normal MC solve (skin = embankment soil); its only
-    purpose is to give the runner two named zones to pass to elastic_materials,
-    mirroring vp067c's ssr_exclude construction. E/nu come from the elastic
-    classifier (same soil type as the embankment -> identical). vp032a.xlsx and
-    its 0.905 unconstrained lock are untouched. Do NOT edit vp032a.xlsx."""
-    from shapely.geometry import Polygon
-    from xslope.mesh import get_material_polygons
-    from xslope.fileio import build_ground_surface_from_polygons
-    sd = _vp032_slope_data(1)
-    # base soil zones from the profile representation (before adding skin mats)
-    base = get_material_polygons(sd)
-    # two elastic-skin duplicates of the embankment fills (identical properties)
-    upper = dict(sd['materials'][0]); upper['name'] = 'Upper embankment (elastic skin)'
-    lower = dict(sd['materials'][1]); lower['name'] = 'Lower embankment (elastic skin)'
-    sd['materials'] = list(sd['materials']) + [upper, lower]
-    # carve the face skin out of the two embankment zones; add it as mats 7/8
-    upper_skin = Polygon([(-8.61, 7.0), (-9.5, 7.0), (-2.214, 1.0), (-1.23, 1.0)])
-    lower_skin = Polygon([(-1.23, 1.0), (-1.107, 0.9), (0.0, 0.0), (-1.0, 0.0),
-                          (-2.093, 0.9), (-2.214, 1.0)])
-    polys = []
-    for p in base:
-        poly = Polygon(p['coords'])
-        if p['mat_id'] == 0:
-            poly = poly.difference(upper_skin)
-        elif p['mat_id'] == 1:
-            poly = poly.difference(lower_skin)
-        polys.append({'polygon': poly, 'mat_id': p['mat_id']})
-    polys.append({'polygon': upper_skin, 'mat_id': 7})
-    polys.append({'polygon': lower_skin, 'mat_id': 8})
-    sd['polygons'] = polys
-    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
-    sd['ground_surface'], sd['domain_polygon'] = gs, dom
-    sd['profile_lines'] = []
-    sd['circles'] = [{'Xo': -4.8, 'Yo': 8.0, 'Depth': 8.0 - 21.83, 'R': 21.83}]
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032a_skin.xlsx'))
-    return 'vp032a_skin.xlsx'
-
-
 def vp032b():
     """Slide #32 case 1 (H=7), circle B (printed: (-3.8, 15) R 31.47):
     Bishop/Spencer 1.216 vs Slide2 1.22 / Borges & Cardoso 1.19."""
@@ -1741,66 +1687,6 @@ def vp032c():
     sd['circles'] = [{'Xo': -4.8, 'Yo': 14.0, 'Depth': 14.0 - 28.8, 'R': 28.8}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032c.xlsx'))
     return 'vp032c.xlsx'
-
-
-def vp032c_skin():
-    """RS2-24 case 2 (H = 8.75) WITH the vendor's elastic face skin — the same
-    construction vp032a_skin carries for H = 7, which RS2's own '#024_02' model
-    defines just as '#024_01' does.
-
-    '#024_02' internal boundary 9 runs (-11.7, 8.75) -> (-2.22286, 1.0) ->
-    (-2.10057, 0.9) -> (-1.0, 0.0), inboard of the true 39.1 deg face
-    (-10.7625, 8.75) -> (0, 0), and the elements between the two are assigned
-    duplicate materials rock8/rock9 ("Plasticity Specifications: Non", gamma
-    17.2 / 21.9 — the two embankment fills) so the strength-reduction sweep can
-    never fail the cohesionless face skin. The strip carved here is 7.4801 +
-    0.9964 = 8.4766 m2 against the vendor's own 8.4766 m2.
-
-    Identical to vp032c in every other respect; the split is inert to a normal
-    Mohr-Coulomb solve and exists only to name two zones for elastic_materials."""
-    from shapely.geometry import Polygon
-    from xslope.mesh import get_material_polygons
-    from xslope.fileio import build_ground_surface_from_polygons
-    sd = _vp032_slope_data(2)
-    base = get_material_polygons(sd)
-    upper = dict(sd['materials'][0]); upper['name'] = 'Upper embankment (elastic skin)'
-    lower = dict(sd['materials'][1]); lower['name'] = 'Lower embankment (elastic skin)'
-    sd['materials'] = list(sd['materials']) + [upper, lower]
-    upper_skin = Polygon([(-10.7625, 8.75), (-11.7, 8.75), (-2.22285714285714, 1.0),
-                          (-1.23, 1.0)])
-    # The vendor's third vertex (-2.10057, 0.9) is exactly collinear with the two it
-    # sits between — RS2 breaks boundary 9 there only because that is where the
-    # geotextile meets it — so it changes no area, and carrying it makes gmsh collapse
-    # two elements onto the 0.157 m segment above it (a singular stiffness matrix at
-    # every mesh size tried, 2.2 m through 0.8 m). Dropped: same polygon, meshable.
-    lower_skin = Polygon([(-1.23, 1.0), (-1.107, 0.9), (0.0, 0.0), (-1.0, 0.0),
-                          (-2.22285714285714, 1.0)])
-    polys = []
-    for p in base:
-        poly = Polygon(p['coords'])
-        if p['mat_id'] == 0:
-            poly = poly.difference(upper_skin)
-        elif p['mat_id'] == 1:
-            poly = poly.difference(lower_skin)
-        if poly.geom_type != 'Polygon':
-            # The H = 8.75 face is one straight run, so the skin's top edge lands on
-            # the crest and the difference leaves a zero-area collapsed piece beside
-            # the real zone. Keep the zone; refuse to discard anything with area.
-            parts = sorted(poly.geoms, key=lambda g: g.area, reverse=True)
-            if sum(g.area for g in parts[1:]) > 1e-9:
-                raise ValueError('vp032c_skin: carving the face skin split material '
-                                 f'{p["mat_id"]} into more than one real zone')
-            poly = parts[0]
-        polys.append({'polygon': poly, 'mat_id': p['mat_id']})
-    polys.append({'polygon': upper_skin, 'mat_id': 7})
-    polys.append({'polygon': lower_skin, 'mat_id': 8})
-    sd['polygons'] = polys
-    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
-    sd['ground_surface'], sd['domain_polygon'] = gs, dom
-    sd['profile_lines'] = []
-    sd['circles'] = [{'Xo': -4.8, 'Yo': 14.0, 'Depth': 14.0 - 28.8, 'R': 28.8}]
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032c_skin.xlsx'))
-    return 'vp032c_skin.xlsx'
 
 
 def vp033():
@@ -5190,7 +5076,7 @@ BUILDERS = [
     vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp010, vp015, vp016, vp017, vp018,
     vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp026, vp027,
     vp027_fem, vp028a, vp028b, vp028c, vp029, vp029_split, vp030a, vp030b, vp032a,
-    vp032a_skin, vp032b, vp032c, vp032c_skin, vp033, vp034, vp035, vp036, vp037, vp039a,
+    vp032b, vp032c, vp033, vp034, vp035, vp036, vp037, vp039a,
     vp039b, vp039c, vp039d, vp040, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp045a,
     vp045b, vp046, vp047, vp048, vp049, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b,
     vp055, vp056, vp057, vp058, vp059, vp060, vp061a, vp061b, vp062a, vp062b, vp063, vp064,

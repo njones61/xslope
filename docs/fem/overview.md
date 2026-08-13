@@ -518,11 +518,10 @@ a checkbox and a value. Blank everywhere means the gravity turn-on.
 
 ### What to expect
 
-$K_0$ initialization is **off by default**, and all but two locked factors of safety in the
-verification suite are computed without it. The exceptions are both vendor reproductions: the
-[RS2-48](../verification/rs2.md#rs2-48) geotextile wall, authored at $K_x = 1$, and the second
-[RS2-4](../verification/rs2.md#rs2-4) row, which reproduces RS2's own settings on the Talbingo dam.
-It is a modelling choice, not a correction.
+$K_0$ initialization is **off by default**. Every SSRM row on the
+[RS2 corpus page](../verification/rs2.md) runs with it, because RS2 authors its verification
+models at $K_x = K_z = 1$; the rest of the verification suite is computed without it. It is a
+modelling choice, not a correction.
 
 How much it changes is a property of the model, and the pattern is **cohesion**. Raising the
 confinement raises the initial deviatoric demand as well as the frictional capacity, so a slope
@@ -898,7 +897,7 @@ evidence and the extra test simply agrees with non-convergence.
 |---|---|---|---|
 | [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) | 1.366 | 1.366 | Nothing — the 99-row majority case |
 | [RS2-62c](../verification/rs2.md#rs2-62) as locked | 0.769 | 0.781 | Exit suppression only: with its full budget the $F = 0.775$ trial *converges* at 29,786 iterations, where the no-progress exit had stopped it at 11,834 and called it failed |
-| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | An outright rescue. Under the vendor's $T = 0$ cap the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect: it drives the auto-bracket to its floor and returns no factor of safety, while the hybrid brackets the same model within 0.4% of the problem's published referee |
+| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | An outright rescue. Under the vendor's $T = 0$ cap the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect: it drives the auto-bracket to its floor and returns no factor of safety, while the hybrid brackets the same model |
 
 Pass `failure_criterion="non_convergence"` for the classical Griffiths & Lane verdict; it remains
 fully supported, and every criterion returns the same per-trial records.

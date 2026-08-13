@@ -265,10 +265,11 @@ The preview draws the polyline on the section, in the order the rows were
 entered, and marks each vertex with the shape of its Movement — ○ Free,
 ◇ Horiz-only, □ Fixed — which is where a mistyped Y shows up: the two interior
 vertices should sit between the green and red contacts, not above or below them.
-It is also the one drawing in XSLOPE that shows a doubled-back table as doubled
-back — the solver [sorts the vertices before slicing](#the-surface-the-solver-read),
-so nothing downstream will. Clicking a vertex selects its row, and selecting a
-row enlarges the vertex.
+Like the inputs plot, it draws the rows as entered, so a doubled-back table
+shows up here as a tangle — the solver
+[sorts the vertices before slicing](#the-surface-the-solver-read), so the
+results plot will not show it. Clicking a vertex selects its row, and selecting
+a row enlarges the vertex.
 
 ### 3. Generating the surface instead
 
@@ -384,9 +385,10 @@ to the ground surface before slicing, and neither step reports itself:
   (−10, 0) in the last — sorts back into the surface above and returns the
   identical five numbers.
 - **The exit mistyped above the ground at (40, 14)** returns a clean
-  **FS = 1.788** — for a surface whose exit the clipping moved 3.16 ft, to
-  (36.8, 10), where the typed polyline crosses the crest. The five methods
-  spread 11.0% instead of 9.0%, and every warning list on the run is empty.
+  **FS = 1.788** — for a surface whose exit the clipping moved to (36.8, 10),
+  where the typed polyline crosses the crest: 5.1 ft from the typed point,
+  3.2 ft of it back along the crest. The five methods spread 11.0% instead of
+  9.0%, and every warning list on the run is empty.
 - **A seam run typed doubled back** — its interior rows at x = 25 and then
   x = 10 — draws a polyline that crosses itself. Sorted, it becomes a clean
   surface entering the seam at x = 10, and solves to **FS = 1.871**, again

@@ -43,8 +43,6 @@ CONFIG = PageConfig(
         ('+11.3', 'above PLAXIS on #58 case 3', '0.59', '0.53'),
         ('+11.6', 'overshoots all', '7.836', '7.02'),
         ('+12.6', 'overshoots all', '7.836', '6.96'),
-        ('−2.9', 'recovers 1.156', '1.156', '1.19'),
-        ('+7.9', 'an 8 m cutoff takes', '1.219', '1.13'),
         ('+4.2', "the paper's 2.5 × 10⁻⁵", '2.605', '2.5'),
     ],
 
@@ -81,7 +79,6 @@ CONFIG = PageConfig(
         ('+0.25', 'to within 0.25%'),
         ('+39.2', 'larger than the Mohr-Coulomb corridor'),
         ('+3.5', 'Every case lands within 3.5% of unity'),
-        ('+1', 'lands four of the five deep stations within 1%'),
         ('+1.6', 'stages land within 1.6%'),
         ('+1', 'and four of the six within 1%'),
         ('+0.8', 'land within 0.8%'),

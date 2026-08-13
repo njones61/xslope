@@ -4,5 +4,9 @@
   "FS": 1.43125,
   "expected_fs": "1.431",
   "file": "files/rocscience/vp079.xlsx",
-  "unit_system": "imperial"
+  "unit_system": "imperial",
+  "converged": true,
+  "iterations": 9070,
+  "residual": 2.913534915621905e-06,
+  "max_displacement": 0.047003847134059466
 }

@@ -5,5 +5,9 @@
   "expected_fs": "2.687",
   "file": "files/rocscience/vp102t_1500.xlsx",
   "unit_system": "si",
-  "time_unit": "hr"
+  "time_unit": "hr",
+  "converged": true,
+  "iterations": 2426,
+  "residual": 1.3511568090431383e-06,
+  "max_displacement": 0.05113212890595295
 }

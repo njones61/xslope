@@ -4,5 +4,9 @@
   "FS": 1.274609375,
   "expected_fs": "1.280",
   "file": "../lem/files/xslope_acads_weak_layer.xlsx",
-  "unit_system": "si"
+  "unit_system": "si",
+  "converged": true,
+  "iterations": 12089,
+  "residual": 1.6950054564117126e-06,
+  "max_displacement": 0.026372970767118947
 }

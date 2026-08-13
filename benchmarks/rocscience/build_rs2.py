@@ -519,6 +519,11 @@ def _rs2_66_slope_data(h1):
     Geometry transcribed from the RS2 vendor models 'slope stability #066_0N (h=..).fez':
     external domain 150 m wide, bearing stratum 0..10 m, soft stratum 10..(10+h1),
     embankment base at y = 10 + h1 from x = 50..100, crest y = 20 + h1 from x = 65..85.
+
+    A mesh refinement polygon covers the soft stratum at 1.05 m, the band density of
+    RS2's own '#066_01' (508 elements across its 2 m band, characteristic size
+    1.087 m). Both mechanisms run through that band, and at the model's global size
+    it would otherwise carry about one element row -- see docs/verification/rs2.md#rs2-66.
     """
     top = 10.0 + h1
     crest = 20.0 + h1
@@ -536,6 +541,7 @@ def _rs2_66_slope_data(h1):
         circle={'Xo': 75.0, 'Yo': crest + 20.0, 'Depth': 9.0,
                 'R': crest + 20.0 - 9.0},
         max_depth=0.0)
+    sd['refine_zones'] = [{'polygon': list(soft), 'size': 1.05}]
     return sd
 
 

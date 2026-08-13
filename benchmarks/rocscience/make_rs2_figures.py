@@ -74,7 +74,7 @@ from xslope.fileio import load_slope_data
 from xslope.fem import build_fem_data, solve_ssrm, export_fem_solution
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_point_constraints,
-                         export_mesh_to_json)
+                         extract_size_regions, export_mesh_to_json)
 from xslope.style import resolve_style, material_style
 # The composite is ONE figure whose four panels are drawn into axes the composite
 # owns (fixed positions), so all four plot rectangles come out pixel-identical.
@@ -84,7 +84,7 @@ from xslope.style import resolve_style, material_style
 from xslope.plot import (
     plot_base_geometry, plot_piezo_line, plot_dloads, plot_tcrack_surface, plot_ssr_zones,
     plot_reinforcement_lines as _plot_input_reinf_lines, plot_piles, plot_line_loads,
-    get_dload_legend_handler, adaptive_colorbar_ticks, adaptive_edge_linewidth,
+    adaptive_colorbar_ticks, adaptive_edge_linewidth,
 )
 from xslope.plot_fem import (
     plot_shear_strain_contours, plot_displacement_vectors,
@@ -281,6 +281,14 @@ def _declare_dry_beyond_piezo(sd, mesh):
     return out
 
 
+def _uses_seep(sd):
+    """True where a material reads its pore pressures off stored nodal seepage
+    values. Such a model carries its mesh as part of its definition: the solve has
+    to reuse that discretization, and the inputs panel has to show it."""
+    return any(str(m.get('u', '')).strip().lower() == 'seep'
+               for m in sd.get('materials', []))
+
+
 def _build(tag):
     """Mesh + fem_data exactly as run_tests.run_fem_test does. Returns
     ``(sd, fem_data, path, mesh)`` — ``path`` is the resolved case xlsx, so the
@@ -291,9 +299,7 @@ def _build(tag):
     sd = load_slope_data(path)
 
     # seepage-coupled models must reuse the stored mesh (nodal seep_u)
-    uses_seep = any(str(m.get('u', '')).strip().lower() == 'seep'
-                    for m in sd.get('materials', []))
-    if uses_seep and sd.get('mesh') is not None:
+    if _uses_seep(sd) and sd.get('mesh') is not None:
         mesh = sd['mesh']
     else:
         target = tag.get('target_size')
@@ -315,10 +321,16 @@ def _build(tag):
             if feats:
                 refine_kw['refine_features'] = [s.strip() for s in str(feats).split(';')
                                                 if s.strip()]
+        # The model's own mesh refinement polygons (polygon sheet Type='refine')
+        # travel with the file the same way its material zones do, so they belong
+        # here for the same reason refine_factor does: a file that refines a band
+        # is solved on the refined mesh by the suite, and a figure built without
+        # the overlay would draw a coarser mesh and report a different FS.
         mesh = build_mesh_from_polygons(
             polys, target_size=target,
             element_type=tag.get('element_type', 'tri6'), lines=lines,
-            point_constraints=extract_point_constraints(sd), **refine_kw)
+            point_constraints=extract_point_constraints(sd),
+            size_regions=extract_size_regions(sd), **refine_kw)
     # `sd` (unmodified) is what the inputs panel draws; the FEM build gets the
     # dry-beyond-the-line spelling where a piezo line stops short of the mesh.
     return sd, build_fem_data(_declare_dry_beyond_piezo(sd, mesh), mesh), path, mesh
@@ -547,9 +559,16 @@ def _draw_inputs_panel(ax, sd, style):
     from matplotlib.collections import LineCollection
     from xslope.style import feature_style
 
-    # Background mesh (only if the case carries one, e.g. seep-coupled) — same as
-    # plot_inputs. Width finalized after layout so a dense grid stays a hairline.
-    mesh = sd.get('mesh')
+    # Background mesh, drawn only where the mesh is part of the MODEL: a seep-coupled
+    # case reads its pore pressures off stored nodal values, so the discretization is
+    # an input the reader has to see. The test is what the model does with the mesh,
+    # not whether a {stem}_mesh.json happens to lie beside the xlsx — since make_figure
+    # writes exactly that file, keying on the file's presence made the panel depend on
+    # whether the builder had run before: the first row on a shared file drew a clean
+    # section and the next row on the SAME file drew a meshed one (RS2-4 / RS2-4-zone),
+    # and a second pass over the corpus would mesh every panel that a first pass left
+    # clean. Width finalized after layout so a dense grid stays a hairline.
+    mesh = sd.get('mesh') if _uses_seep(sd) else None
     bg_lc, bg_segs = None, None
     if mesh is not None:
         m_nodes, m_elems, m_et = mesh['nodes'], mesh['elements'], mesh['element_types']
@@ -597,12 +616,22 @@ def _draw_inputs_panel(ax, sd, style):
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow',
                           edgecolor='orange', linewidth=1.0, alpha=0.9))
 
+    # The legend is read off the DRAWN artists and nothing else, de-duplicated by
+    # label — the discipline plot_inputs and _legend_below hold in the package. Every
+    # layer above names what it draws, the load sets included: plot_dloads labels the
+    # surface line of EACH block with its set's key, so a model with several typed
+    # blocks put several identical entries in this list, and an entry appended here
+    # from sd['dloads'] put one more on top of them. vp009 printed "Distributed Load"
+    # three times, rs2_29clay twice. One drawn thing, one key.
     handles, labels = ax.get_legend_handles_labels()
-    if sd.get('dloads'):
-        _handler, dummy = get_dload_legend_handler()
-        handles.append(dummy)
-        labels.append('Distributed Load')
-    return handles, labels, (bg_lc, bg_segs)
+    seen, dh, dl = set(), [], []
+    for h, l in zip(handles, labels):
+        if l in seen or (isinstance(l, str) and l.startswith('_')):
+            continue
+        seen.add(l)
+        dh.append(h)
+        dl.append(l)
+    return dh, dl, (bg_lc, bg_segs)
 
 
 def _draw_mesh_panel(ax, fem_data, style, alpha=0.6):

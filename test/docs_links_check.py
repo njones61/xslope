@@ -82,6 +82,10 @@ SINGLE_FILE = os.path.join(_REPO, "docs/inputs/slope/xslope_simple1.xlsx")
 #: the distributed-loads editor has a Direction to report only on a model that
 #: carries a load.
 LEM02_FILE = os.path.join(_REPO, "docs/lem/files/xslope_crest_surcharge.xlsx")
+#: Tutorial LEM-3's completed model — two materials and two profile lines, which is
+#: what its label pins need: the materials table read as a pair of rows, and a
+#: profile editor with a material to assign each line to.
+LEM03_FILE = os.path.join(_REPO, "docs/lem/files/xslope_simple_mult_layers.xlsx")
 
 #: A URL on the docs site — what the docs build emits.
 GOOD = "https://xslope.readthedocs.io/en/latest/lem/files/xslope_simple1.xslz"
@@ -862,6 +866,98 @@ LEM02_DESIGN_RUN = "Run"
 LEM02_DESIGN_SEARCH = "Re-search the critical surface at each step"
 
 
+#: The materials-editor controls LEM-3's Studio path uses. It builds two materials
+#: in the view LEM-1 does not use — the table, where the row order is what fixes the
+#: Mat IDs the profile lines reference — so both the view toggle and the button that
+#: adds a row are labels the page tells the reader to press.
+LEM03_MATERIALS_BUTTONS = ("Table view", "Add row")
+
+#: The profile-lines editor's controls, in the order LEM-3 drives them: add a line,
+#: give it a material, add its vertices — plus the bottom-boundary field, whose
+#: wording carries the fact that the value is an elevation.
+LEM03_PROFILE_BUTTONS = ("Add line", "Add row")
+LEM03_PROFILE_LABELS = ("Material:", "Max depth (bottom boundary elevation):")
+
+#: The material choices the page dictates, as the combo spells them. A profile line
+#: names its material by ID and name together, which is the notation the page's
+#: numbered steps quote.
+LEM03_PROFILE_MATERIALS = ("1: embankment", "2: foundation")
+
+#: What the starting-circle generator reports on LEM-3's two-layer section, quoted
+#: verbatim on the page beside a capture of the same line. The count and the phrasing
+#: are both load-bearing: the page's audit table walks the three circles it announces
+#: (one through the toe, one at the base of each layer) row by row.
+LEM03_GENERATE_SUMMARY = "3 on the left-facing face (toe at x = 0, height 20)"
+LEM03_GENERATE_DEPTHS = (-4.72136, -10.0, 0.0)
+
+
+def _lem03_editor_labels():
+    """The three editors Tutorial LEM-3 drives, read for what it tells a reader to
+    press — and the generator run, since the page prints its answer.
+
+    The circles editor is driven the way the tutorial's step drives it: the model
+    arrives with its circles dropped (the state the geometry steps leave), and the
+    generator is *pressed*, because the summary line the page quotes exists only as
+    the answer to a press.
+    """
+    from PySide6.QtWidgets import QComboBox, QLabel, QPushButton
+
+    from xslope.fileio import load_slope_data
+
+    from studio.editors import CirclesEditor, MaterialsEditor, ProfileEditor
+
+    fails = []
+    data = _quiet(load_slope_data, LEM03_FILE)
+
+    mats = MaterialsEditor().build(data, None)
+    buttons = {b.text() for b in mats.findChildren(QPushButton)}
+    for label in LEM03_MATERIALS_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the materials editor has no {label!r} button; Tutorial "
+                         f"LEM-3 tells the reader to press it. Its buttons read "
+                         f"{sorted(buttons)}")
+    mats.deleteLater()
+
+    prof = ProfileEditor().build(data, None)
+    buttons = {b.text() for b in prof.findChildren(QPushButton)}
+    for label in LEM03_PROFILE_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the profile-lines editor has no {label!r} button; "
+                         f"Tutorial LEM-3 tells the reader to press it. Its buttons "
+                         f"read {sorted(buttons)}")
+    labels = {lab.text() for lab in prof.findChildren(QLabel)}
+    for name in LEM03_PROFILE_LABELS:
+        if name not in labels:
+            fails.append(f"the profile-lines editor has no {name!r} field; Tutorial "
+                         f"LEM-3 names it. Its labels read "
+                         f"{sorted(l for l in labels if l)}")
+    choices = {combo.itemText(i) for combo in prof.findChildren(QComboBox)
+               for i in range(combo.count())}
+    for name in LEM03_PROFILE_MATERIALS:
+        if name not in choices:
+            fails.append(f"no profile-line material reads {name!r}, which Tutorial "
+                         f"LEM-3 tells the reader to select. The choices read "
+                         f"{sorted(choices)}")
+    prof.deleteLater()
+
+    circles_data = dict(data)
+    circles_data["circles"], circles_data["circular"] = [], False
+    circles = CirclesEditor().build(circles_data, None)
+    _quiet(circles._run_generate)
+    summary = " ".join(lab.text() for lab in circles.findChildren(QLabel))
+    if LEM03_GENERATE_SUMMARY not in summary:
+        fails.append(f"the starting-circle generator no longer reports "
+                     f"{LEM03_GENERATE_SUMMARY!r} on LEM-3's section, which the page "
+                     f"quotes. It reports {summary.strip()!r}")
+    depths = tuple(round(float(c["Depth"]), 5) for c in circles.result_rows())
+    if depths != LEM03_GENERATE_DEPTHS:
+        fails.append(f"the generator proposes circles at depths {depths} on LEM-3's "
+                     f"section; the page's audit table walks "
+                     f"{LEM03_GENERATE_DEPTHS}")
+    circles.deleteLater()
+    return fails
+
+
 def _lem02_editor_labels(mw):
     """The two dialogs Tutorial LEM-2 drives, read for the labels it quotes.
 
@@ -1007,6 +1103,7 @@ def test_tutorial_labels():
                              f"the label Tutorial LEM-2 quotes")
 
         fails += _lem02_editor_labels(mw)
+        fails += _lem03_editor_labels()
 
         from PySide6.QtWidgets import QPushButton
 

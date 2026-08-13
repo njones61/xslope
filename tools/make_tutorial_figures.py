@@ -665,12 +665,6 @@ LEM04_SLICES = 40
 #: readings differ by the water and by nothing else.
 LEM04_CIRCLE = dict(Xo=182.37, Yo=88.32, Depth=26.90, R=88.32 - 26.90)
 
-#: The ±5% / 7-point sweep the parametric step runs on the foundation clay's
-#: saturated unit weight, with the found circle held.
-LEM04_SWEEP_PARAM = "mat:soil 3:gamma_sat"
-LEM04_SWEEP_REL = 0.05
-LEM04_SWEEP_N = 7
-
 
 def _lem04_solve(model, method="spencer", circle=None):
     """One circle, one method, no search: what this page runs after the search.
@@ -719,9 +713,8 @@ def lem04_plots():
 
     The search runs first, from the file's own seed, and what it finds is the
     surface the rest of the page is about: every remaining figure is that one
-    circle solved by Spencer at 40 slices — wet (as the file ships), dry (u =
-    none in all three materials), and swept (soil 3's γ_sat ±5% with the surface
-    held).
+    circle solved by Spencer at 40 slices — wet (as the file ships) and dry
+    (u = none in all three materials).
     """
     sd = load_slope_data(LEM04)
 
@@ -752,23 +745,6 @@ def lem04_plots():
     capture("lem04_solution_dry.png", plot_solution, dry, d_slices, d_surface,
             d_result)
 
-    # The γ_sat sweep on the held surface: the page's parametric step, drawn the
-    # way Studio's Sensitivity · Curve view draws it (SweepCanvas.render_curve =
-    # plot_sensitivity on the sweep's df). The model carries the found circle,
-    # because that is the state the page's pin step leaves it in.
-    from xslope.plot import plot_sensitivity
-    from xslope.sensitivity import sensitivity
-    pinned = copy.deepcopy(sd)
-    pinned["circles"] = [dict(LEM04_CIRCLE)]
-    with contextlib.redirect_stdout(io.StringIO()):
-        ok, sweep = sensitivity(pinned, param=LEM04_SWEEP_PARAM,
-                                rel_range=LEM04_SWEEP_REL, n=LEM04_SWEEP_N,
-                                search=False, methods=("spencer",),
-                                num_slices=LEM04_SLICES)
-    if not ok:
-        raise SystemExit("LEM-4 γ_sat sweep failed: %s" % (sweep,))
-    capture("lem04_sweep.png", plot_sensitivity, sweep["df"])
-
     # What the γ_sat column is worth on this circle: the same surface with the
     # saturated weights withheld, which is the comparison the weight-split step
     # reports.
@@ -776,14 +752,11 @@ def lem04_plots():
     for m in blank["materials"]:
         m["gamma_sat"] = None
     b_slices, _, b_result = _lem04_solve(blank)
-    pts = sweep["df"].loc[~sweep["df"]["is_base"]].sort_values("value")
     print("   search finds %.4f (Xo %.2f Yo %.2f depth %.2f) · that circle wet "
-          "%.4f (ΣW %.0f) · dry %.4f · γ_sat withheld %.4f (ΣW %.0f) · sweep %s "
-          "%.4f→%.4f"
+          "%.4f (ΣW %.0f) · dry %.4f · γ_sat withheld %.4f (ΣW %.0f)"
           % (crit["FS"], crit["Xo"], crit["Yo"], crit["Depth"], w_result["FS"],
              w_slices["w"].sum(), d_result["FS"], b_result["FS"],
-             b_slices["w"].sum(), LEM04_SWEEP_PARAM, pts["fs"].iloc[0],
-             pts["fs"].iloc[-1]))
+             b_slices["w"].sum()))
 
 
 GROUPS = {

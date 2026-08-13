@@ -189,14 +189,6 @@ The next tutorial's completed model is published as a package:
 
 [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx)
 
-From Python, `load_slope_data` reads a package directly, unpacking it on the way:
-
-```python
-from xslope.fileio import load_slope_data
-
-slope_data = load_slope_data("slope1.xslz")   # unpacks to slope1/, loads slope1.xlsx
-```
-
 ---
 
 ## Your first real build

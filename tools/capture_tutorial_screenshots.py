@@ -518,10 +518,6 @@ SHOTS["lem02_parametric"] = lem02_parametric
 LEM04 = os.path.join(REPO_ROOT,
                      "docs/lem/files/xslope_method_slices_problem.xlsx")
 
-#: The circle the page's pin step puts in the model before the sweep: the one
-#: the search found, to the two decimals the page prints.
-LEM04_CIRCLE = dict(Xo=182.37, Yo=88.32, Depth=26.90, R=88.32 - 26.90)
-
 
 def lem04_piezo():
     """The piezometric-lines editor holding the eight points, as the step leaves it.
@@ -539,39 +535,7 @@ def lem04_piezo():
     return _grab(dlg, "lem04_studio_piezo.png")
 
 
-def lem04_parametric():
-    """The Parametric dialog in **Sensitivity** mode, set up for the page's sweep.
-
-    Driven the way a reader drives it, in the page's order: the mode, then the
-    material and the property, then the range narrowed to ±5% and 7 points, then
-    **Add parameter** — pressed, so the table row is the button's answer rather
-    than a pre-load — and finally the re-search box unticked, because the page's
-    question is the surface it just pinned. The model carries that surface, which
-    is the state the step before this one leaves it in.
-    """
-    from studio.dialogs import SensitivityDialog
-
-    d = _load(LEM04)
-    d["circles"] = [dict(LEM04_CIRCLE)]
-    dlg = SensitivityDialog(defaults={"mode": "sensitivity", "method": "spencer",
-                                      "num_slices": 40},
-                            slope_data=d)
-    for combo, text in ((dlg.mode, "Sensitivity"), (dlg.material, "soil 3")):
-        i = next(n for n in range(combo.count()) if text in combo.itemText(n))
-        combo.setCurrentIndex(i)
-    i = next(n for n in range(dlg.prop.count())
-             if dlg.prop.itemText(n) == "gamma_sat")
-    dlg.prop.setCurrentIndex(i)
-    dlg.pct.setValue(5.0)
-    dlg.n_points.setValue(7)
-    dlg.add_btn.click()
-    dlg.search.setChecked(False)
-    dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "lem04_studio_parametric.png")
-
-
 SHOTS["lem04_piezo"] = lem04_piezo
-SHOTS["lem04_parametric"] = lem04_parametric
 
 
 def main(argv=None):

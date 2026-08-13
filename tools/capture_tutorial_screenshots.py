@@ -205,6 +205,50 @@ def lem01_canvas():
 
 SHOTS["lem01_canvas"] = lem01_canvas
 
+
+# --------------------------------------------------------------------------- #
+# Tutorial 0 — Building Models Three Ways
+# --------------------------------------------------------------------------- #
+def t0_studio_window():
+    """The whole Studio window, with both of the paths it hosts on screen at once.
+
+    Tutorial 0's claim is that the editors and the assistant are two ways into one
+    open project, so this shot keeps the Assistant dock rather than hiding it the
+    way LEM-1's canvas figure does — the Inputs tree on the left, the section in the
+    middle, the assistant on the right, all of one document. Same offscreen
+    main-window technique as ``lem01_canvas`` (forced synchronous canvas render, no
+    real screen), on LEM-1's model, so the reader recognises the section when they
+    reach their first build.
+
+    The dock's caption reads the provider and model stored on the machine that runs
+    this, which is the dock's own behaviour ("the dock shows the active provider ·
+    model") rather than anything the shot arranges — so a re-capture elsewhere shows
+    that machine's choice, and the page never quotes the caption's contents.
+    """
+    from studio.main_window import MainWindow
+    win = MainWindow()
+    win.resize(1600, 1000)
+    win.open_path(LEM01)
+    win.show()
+    _settle()
+    win.canvas.render_inputs(win.doc.slope_data)
+    _settle()
+    win.canvas._render_timer.stop()
+    win.canvas._render_current()
+    win.log.clear()
+    _settle()
+    pix = win.grab()
+    out = os.path.join(OUT_DIR, "t0_studio_window.png")
+    pix.save(out)
+    print("-> t0_studio_window.png  (%dx%d, offscreen main window)"
+          % (pix.width(), pix.height()))
+    win.close()
+    return out
+
+
+SHOTS["t0_studio_window"] = t0_studio_window
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

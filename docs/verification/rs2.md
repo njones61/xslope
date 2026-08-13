@@ -321,7 +321,7 @@ independently verifiable.
 | [63](#rs2-63) | 🟢 | Homogeneous slope assessment | Spencer 1.398 vs Slide2 1.380 (+1.3%) · SSRM 1.409 vs RS2 SSRM 1.38 (+2.1%) | Cheng et al. (2007), 11 m homogeneous slope. |
 | [64](#rs2-64) | 🔴 | Three homogeneous landslides | C1: SSRM 5.166 vs RS2 SSR 5.14 (+0.5%) · C3: SSRM 4.783 vs RS2 SSR 4.69 (+2.0%) · C5: SSRM 5.579 vs RS2 SSR 5.47 (+2.0%) · C7: SSRM 1.639 vs RS2 SSR 1.70 (−3.6%) · C11: SSRM 1.403 vs RS2 SSR 1.46 (−3.9%) · C12: SSRM 1.147 vs RS2 SSR 1.22 (−6.0%) · C2: SSRM 6.486 vs RS2 SSR 6.10 (+6.3%) · C4: SSRM 5.336 vs RS2 SSR 4.95 (+7.8%) | **partial** (8 of 12 locked; C6 and C8–C10 blocked). Teoman et al. (2004) Ankara clay E90 highway, each case pinned by RS2 to a digitized proposed slip surface. C4 sets the dot; on it and C2 the Teoman and Slide2 Bishop columns (5.32 / 5.32 and 6.67 / 6.64) sit beside XSLOPE, but they are cross-method and cannot carry the comparison. |
 | [65](#rs2-65) | 🟢 | Tailings dam | SSRM 1.306 vs RS2 SSRM 1.29 (+1.2%) | Tzenkov (2008) Padina dam, 8 materials on a 225 × 77 m section, locked at the vendor's own mesh density. The reference FEM 1.41 and the LEM columns are cross-bearings that do not govern. |
-| [66](#rs2-66) | 🟢 | Embankment basal stability | Face skin, h₁ = 2 m: SSRM 1.044 vs closed form 1.050 (−0.6%) | **built** — two mechanisms, both locked across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m, and every file meshes its soft band at 1.05 m. The dot is the face skin's, against a closed form that does not depend on the flow rule. The deep family (1.131 at h₁ = 2 and 4 m, 1.031 at 10 m) is recorded beside RS2's SSR column rather than scored against it: every published strength-reduction solution of this problem runs associated flow, ψ = φ, where XSLOPE runs ψ = 0. The section also reads the family on RS2's own published meshes. |
+| [66](#rs2-66) | 🟢 | Embankment basal stability | Face skin, worst leg (h₁ = 10 m): SSRM 1.019 vs closed form 1.050 (−3.0%) · thinnest band (h₁ = 2 m): SSRM 1.044 vs 1.050 (−0.6%) | **built** — two mechanisms, both locked across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m, and every file meshes its soft band at 1.05 m. The dot is the face skin's, against a closed form that does not depend on the flow rule, and the worst of the five legs sets it: none is wider, the thinnest band is the narrowest, and the printed worst rounds up from a raw difference that stays inside the green band. The deep family (1.131 at h₁ = 2 and 4 m, 1.031 at 10 m) is recorded beside RS2's SSR column rather than scored against it: every published strength-reduction solution of this problem runs associated flow, ψ = φ, where XSLOPE runs ψ = 0. The section also reads the family on RS2's own published meshes. |
 | [67](#rs2-67) | 🟢 | Earth dam under steady & transient unsaturated seepage | Case 1 (dry): SSRM 2.479 vs RS2 SSR 2.48 (0.0%) · Case 2 (steady): SSRM 1.680 vs RS2 SSR 1.70 (−1.2%) · Case 3 (90 h, downstream): SSRM 1.820 vs RS2 SSR 1.83 (−0.5%) · Case 3 (90 h, upstream): SSRM 2.008 vs RS2 SSR 2.04 (−1.6%) · Case 4 (1500 h, downstream): SSRM 2.320 vs RS2 SSR 2.34 (−0.9%) · Case 4 (1500 h, upstream): SSRM 2.742 vs RS2 SSR 2.76 (−0.7%) | **built** (6 of 6 locked). Three run on RS2's own imported drawdown pore-pressure fields; three reconstruct the flow by an own steady solve from the vendor's boundary conditions. |
 | [68](#rs2-68) | 🔴 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.433 vs Loukidis Spencer 0.431 (+0.5%) · Case 3 Bishop: k꜀ 0.169 vs Slide2 Bishop 0.155 (+9.0%) · Case 3 Spencer: k꜀ 0.167 vs Loukidis Spencer 0.155 (+7.7%) | The target is a **critical seismic coefficient** k꜀, not a factor of safety, reached by a `critical_kc` bisection. Case 3 sets the dot on its Bishop leg. Loukidis publishes a Spencer k꜀ but no Bishop k꜀ for this example — the RS2 manual columns it the other way round — so Slide2 is the Bishop authority. Every input class verifies against the vendor `#068_03` model; RS2's own SSRM k꜀ 0.161 is a strength-reduction number and stays a cross-bearing. |
 
@@ -2092,8 +2092,8 @@ enough to measure a difference against.
 
 | Model | XSLOPE | RS2 SSR | L&H FLAC referee |
 |---|---|---|---|
-| vp091 — the LEM file's 30 m section (reported, not locked) | 0.783 | 0.84 (−6.8%) | 0.86 (−9.0%) |
-| vp091_fem — the vendor's own 24 m section (reported) | 0.760 | 0.84 (−9.5%) | 0.86 (−11.6%) |
+| vp091 — the LEM file's 30 m section (reported, not locked) | 0.783 | 0.84 | 0.86 |
+| vp091_fem — the vendor's own 24 m section (reported) | 0.760 | 0.84 | 0.86 |
 
 Those differences are recorded, not scored: RS2's 0.84 — published alongside its Spencer 0.96 and
 GLE 0.98 — comes from the `#052` split-interface wall the section above describes, and
@@ -2896,15 +2896,15 @@ Both mechanisms are locked:
 
 | h₁ (m) | XSLOPE SSRM, filter off (face skin) | XSLOPE SSRM, `min_slip_depth` = 4 m (deep) | RS2 SSR | Slide2 Spencer | Nakamura LEM | Nakamura FEM |
 |---|---|---|---|---|---|---|
-| 2 | 1.044 | 1.131 | 1.13 (+0.1%) | 1.05 | 1.21 | 1.24 (−8.8%) |
-| 4 | 1.031 | 1.131 | 1.19 (−5.0%) | 1.16 | 1.22 | 1.16 (−2.5%) |
-| 6 | 1.031 | 1.094 | 1.13 (−3.2%) | 1.10 | 1.22 | 1.16 (−5.7%) |
-| 8 | 1.031 | 1.056 | 1.08 (−2.2%) | 1.13 | 1.10 | 1.10 (−4.0%) |
-| 10 | 1.019 | 1.031 | 1.05 (−1.8%) | 1.05 | 1.08 | 1.08 (−4.5%) |
+| 2 | 1.044 | 1.131 | 1.13 | 1.05 | 1.21 | 1.24 |
+| 4 | 1.031 | 1.131 | 1.19 | 1.16 | 1.22 | 1.16 |
+| 6 | 1.031 | 1.094 | 1.13 | 1.10 | 1.22 | 1.16 |
+| 8 | 1.031 | 1.056 | 1.08 | 1.13 | 1.10 | 1.10 |
+| 10 | 1.019 | 1.031 | 1.05 | 1.05 | 1.08 | 1.08 |
 
 **Which mechanism each published column reports.** RS2's SSR column is the deep mechanism
-throughout, and the filtered XSLOPE row runs +0.1 / −5.0 / −3.2 / −2.2 / −1.8% from it at
-h₁ = 2 / 4 / 6 / 8 / 10 m. Those differences are recorded beside the published values, not scored
+throughout: the filtered XSLOPE row lands on it at the thinnest band and sits 1 to 5% below it at
+the other four thicknesses. Those differences are recorded beside the published values, not scored
 against them: every published strength-reduction solution of this problem runs associated flow
 where XSLOPE runs ψ = 0 (the *flow rule* below), so the deep column measures a stated modelling
 difference as well as a solver one. This row's dot is the face skin's, whose closed form carries no flow rule at all.
@@ -2943,11 +2943,11 @@ so was the band left unrefined:
 
 | h₁ (m) | RS2 SSR | deep, band unrefined | deep, band at 1.05 m | deep, at the detector's target | filter off, band unrefined | filter off, band at 1.05 m |
 |---|---|---|---|---|---|---|
-| 2 | 1.13 | 1.269 (+12.3%) | 1.131 (+0.1%) | 1.081 (−4.3%) | 1.031 | 1.044 |
-| 4 | 1.19 | 1.181 (−0.8%) | 1.131 (−5.0%) | 1.119 (−6.0%) | 1.044 | 1.031 |
-| 6 | 1.13 | 1.106 (−2.1%) | 1.094 (−3.2%) | 1.069 (−5.4%) | 1.044 | 1.031 |
-| 8 | 1.08 | 1.081 (+0.1%) | 1.056 (−2.2%) | 1.069 (−1.0%) | 1.044 | 1.031 |
-| 10 | 1.05 | 1.044 (−0.6%) | 1.031 (−1.8%) | 1.044 (−0.6%) | 1.044 | 1.019 |
+| 2 | 1.13 | 1.269 | 1.131 | 1.081 | 1.031 | 1.044 |
+| 4 | 1.19 | 1.181 | 1.131 | 1.119 | 1.044 | 1.031 |
+| 6 | 1.13 | 1.106 | 1.094 | 1.069 | 1.044 | 1.031 |
+| 8 | 1.08 | 1.081 | 1.056 | 1.069 | 1.044 | 1.031 |
+| 10 | 1.05 | 1.044 | 1.031 | 1.044 | 1.044 | 1.019 |
 
 The unrefined column sits nearer the SSR column at four of the five thicknesses, and that nearness
 carries no weight: it comes from a band the mesh does not resolve, and the h₁ = 2 m station shows
@@ -2980,11 +2980,11 @@ under the same 4 m cutoff, the deep family reads:
 
 | h₁ (m) | XSLOPE SSRM on RS2's mesh | RS2 SSR |
 |---|---|---|
-| 2 | 1.094 | 1.13 (−3.2%) |
-| 4 | 1.106 | 1.19 (−7.1%) |
-| 6 | 1.106 | 1.13 (−2.1%) |
-| 8 | 1.069 | 1.08 (−1.0%) |
-| 10 | 1.031 | 1.05 (−1.8%) |
+| 2 | 1.094 | 1.13 |
+| 4 | 1.106 | 1.19 |
+| 6 | 1.106 | 1.13 |
+| 8 | 1.069 | 1.08 |
+| 10 | 1.031 | 1.05 |
 
 The residual is one-signed: with the mesh held identical, XSLOPE sits below the SSR column at
 every thickness. The flow rule above runs in that direction: an associated fill dilates on

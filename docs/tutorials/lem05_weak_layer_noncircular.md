@@ -340,8 +340,8 @@ just above the base of the weakest, and ramps up to the ground at both ends.
 On an empty table it fills it without asking, and reports what it did under the
 button:
 
-> Generated 6 points: seeding on 'Soft Clay' -- mobilisable strength 200 against
-> 570 for the next weakest ('Sand Fill'); a 6-point surface tracking 10% of the
+> Generated 4 points: seeding on 'Soft Clay' -- mobilisable strength 200 against
+> 570 for the next weakest ('Sand Fill'); a 4-point surface tracking 10% of the
 > zone's thickness above its base from x = 0 to 39.1221, with a 28 degree ramp to
 > the ground at the toe; a 60 degree ramp to the ground at the crest.
 
@@ -350,8 +350,15 @@ the zone it chose and the margin it chose it by, where in the seam the track
 runs, how far it reaches, and the angle of each end ramp. The rows land in the
 table, so they can be edited before **OK**, and **Cancel** discards them.
 
+Four points is the whole shape: two on the ground and two where the end ramps
+meet the track. The seam here is flat, so a vertex partway along the track would
+sit on a straight horizontal run — it would not bend the surface, and the search
+could not use it either, since an interior vertex may only slide horizontally and
+that slide would leave it on the same line. On a seam that dips, the same track
+keeps its intermediate vertices, because there sliding one does change the shape.
+
 What it proposes is not what this page runs. The generator derives a viable
-shape from the geometry — six points tracking near the base of the seam, at
+shape from the geometry — a track near the base of the seam, at
 y = −5.8 — where the taught surface runs mid-seam at −5, and the two are
 different surfaces with different answers:
 [the results below](#where-the-track-belongs-inside-the-seam) measure the

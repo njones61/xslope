@@ -933,13 +933,16 @@ LEM05_NONCIRC_MOVEMENTS = ("Free", "Horiz", "Fixed")
 #: What the weak-zone generator reports on LEM-5's section, quoted verbatim on the
 #: page beside a capture of the same line — the zone it seeds on, the two strengths
 #: it compared to get there, and the ramp angles it built. The point count is
-#: pinned with it because the summary opens by announcing it.
+#: pinned with it because the summary opens by announcing it. Four on this section:
+#: the seam is flat, so the track between the two end ramps is one straight
+#: horizontal segment and a vertex partway along it would be one the surface does
+#: not bend at and the search cannot move.
 LEM05_GENERATE_SUMMARY = (
     "seeding on 'Soft Clay' -- mobilisable strength 200 against 570 for the next "
     "weakest ('Sand Fill')")
 LEM05_GENERATE_RAMPS = ("a 28 degree ramp to the ground at the toe",
                         "a 60 degree ramp to the ground at the crest")
-LEM05_GENERATE_POINTS = 6
+LEM05_GENERATE_POINTS = 4
 
 #: The Run LEM readings LEM-5's run step quotes: the analysis it chooses, and the
 #: fixed Surface label a model carrying a non-circular surface and no circles

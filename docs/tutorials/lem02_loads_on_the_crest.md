@@ -49,18 +49,20 @@ applied along a line of points on the ground surface, per unit width of slope.
 Two points are the whole load here, because the intensity is uniform between
 them:
 
-| Point | X (ft) | Y (ft) | Normal (psf) |
-|---|---:|---:|---:|
-| 1 | 25 | 20 | 750 |
-| 2 | 35 | 20 | 750 |
+| X (ft) | Y (ft) | N (psf) |
+|---:|---:|---:|
+| 25 | 20 | 750 |
+| 35 | 20 | 750 |
 
 Between x = 25 and x = 35 the ground carries 750 psf; outside that strip it
 carries nothing. **A distributed load stops where its points stop** — the
 intensity is not spread over the rest of the crest, and it is not tapered at the
 ends unless you enter a point saying so.
 
-The table is the input: copy the two rows straight from it into the `dloads`
-worksheet or Studio's loads editor rather than retyping them.
+The table is the input, laid out exactly as the `dloads` worksheet and Studio's
+loads editor are — **X**, **Y**, **N**, one point per row. Select the two rows
+of values, copy, and paste them straight into the sheet or editor rather than
+retyping them.
 
 ---
 
@@ -241,13 +243,17 @@ surface the search is able to report.
 A **line load** is a concentrated force per unit width, acting at one point on
 the ground surface: a footing, or the weight of a wall facing. The surcharge
 above amounts to 750 psf × 10 ft = **7500 lb/ft**. Put all of it on the single
-point at the middle of the strip instead:
+point at the middle of the strip instead — one row, in the columns the `lloads`
+worksheet and Studio's line-loads editor share:
+
+| Label | x (ft) | y (ft) | P (lb/ft) | Angle (deg) |
+|---|---:|---:|---:|---:|
+| footing | 30 | 20 | 7500 | -90 |
 
 - **Studio** — click **Line loads** in the **Inputs** tree, **Add row**, and
-  enter **Label** `footing`, **x** `30`, **y** `20`, **P** `7500`, **Angle**
-  `-90`.
-- **Excel** — on the **lloads** worksheet, row 3: `x` = `30`, `y` = `20`,
-  `P` = `7500`, `Angle` = `-90`. Delete the distributed load from `dloads`.
+  enter the row above.
+- **Excel** — on the **lloads** worksheet, paste the row into `B3:F3`. Delete
+  the distributed load from `dloads`.
 - **Assistant** — say: *"Replace the distributed load with a line load of 7500
   lb/ft at x = 30, pointing straight down."*
 

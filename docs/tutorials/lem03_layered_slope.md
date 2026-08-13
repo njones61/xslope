@@ -46,12 +46,23 @@ it, down to the next line or the maximum depth, is that layer's material, so a
 two-layer section takes two lines and the second is the boundary between the
 layers. Geometry can be entered as profile lines or as polygons — one closed
 region per material — but profile lines are the faster input for simple layered
-sections like this one. One line per material, listed top down:
+sections like this one. One line per material, listed top down, each table one
+vertex per row in the paired `x` / `y` columns its worksheet block carries.
 
-| Line | Material | Points (x, y) |
-|---|---|---|
-| 1 | 1 `embankment` | (0, 0), (40, 20), (90, 20) |
-| 2 | 2 `foundation` | (-30, 0), (90, 0) |
+**Profile Line 1 — material 1 (`embankment`):**
+
+| x (ft) | y (ft) |
+|---:|---:|
+| 0 | 0 |
+| 40 | 20 |
+| 90 | 20 |
+
+**Profile Line 2 — material 2 (`foundation`):**
+
+| x (ft) | y (ft) |
+|---:|---:|
+| -30 | 0 |
+| 90 | 0 |
 
 Line 1 is the ground surface: the toe, the crest break at the top of the 2:1
 face, and the back of the crest. Line 2 is the contact — the top of the
@@ -70,13 +81,15 @@ toe would have nowhere to put the deep mechanism this problem is about.
 **Starting circles** — two, sharing a center above the middle of the face at
 twice the slope height, one tangent to the base of each layer:
 
-| Circle | Xo | Yo | Option | Depth |
-|---|---:|---:|---|---:|
-| 1 | 20 | 40 | Depth | 0 |
-| 2 | 20 | 40 | Depth | -10 |
+| Xo | Yo | Option | Depth |
+|---:|---:|---|---:|
+| 20 | 40 | Depth | 0 |
+| 20 | 40 | Depth | -10 |
 
-The tables are the model: copy the values straight from them into the template's
-worksheets or Studio's editors rather than retyping them.
+The tables are the model, and each is laid out exactly as its destination is —
+the template's worksheets and Studio's editors, same columns in the same order.
+Select a table's block of values, copy, and paste it straight into the sheet or
+editor rather than retyping it.
 
 ---
 

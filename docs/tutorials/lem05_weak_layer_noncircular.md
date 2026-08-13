@@ -45,14 +45,37 @@ looks like when the answer it returns is meaningless.
 
 **Geometry** — entered as profile lines, one per material and each the top of
 its layer (the faster of the two geometry inputs for layered ground; polygons
-are the other), with the maximum depth at `-10`:
+are the other), with the maximum depth at `-10`. Each table is one vertex per
+row, in the paired `x` / `y` columns its worksheet block carries.
 
-| Line | Material | Points (x, y) |
-|---|---|---|
-| 1 | 1 `Sand Fill` | (0, 0), (30, 10), (50, 10) |
-| 2 | 2 `Sand` | (-20, 0), (50, 0) |
-| 3 | 3 `Soft Clay` | (-20, -4), (50, -4) |
-| 4 | 4 `Dense Sand` | (-20, -6), (50, -6) |
+**Profile Line 1 — material 1 (`Sand Fill`):**
+
+| x (ft) | y (ft) |
+|---:|---:|
+| 0 | 0 |
+| 30 | 10 |
+| 50 | 10 |
+
+**Profile Line 2 — material 2 (`Sand`):**
+
+| x (ft) | y (ft) |
+|---:|---:|
+| -20 | 0 |
+| 50 | 0 |
+
+**Profile Line 3 — material 3 (`Soft Clay`):**
+
+| x (ft) | y (ft) |
+|---:|---:|
+| -20 | -4 |
+| 50 | -4 |
+
+**Profile Line 4 — material 4 (`Dense Sand`):**
+
+| x (ft) | y (ft) |
+|---:|---:|
+| -20 | -6 |
+| 50 | -6 |
 
 Line 1 is the ground surface — the toe, the crest break at the top of the 3:1
 face, and the back of the crest — and the other three are horizontal contacts
@@ -60,25 +83,27 @@ running the full width of the section. By the
 [top-of-a-layer rule](lem03_layered_slope.md#the-problem), line 3 at y = −4 and
 line 4 at y = −6 are what make the clay a 2 ft seam.
 
-**Water** — a piezometric line, level at elevation −2 across the full section:
+**Water** — a piezometric line, level at elevation −2 across the full section,
+one point per row as the `piezo` worksheet and Studio's editor take them:
 
-| Point | x (ft) | y (ft) |
-|---|---:|---:|
-| 1 | -20 | -2 |
-| 2 | 50 | -2 |
+| x (ft) | y (ft) |
+|---:|---:|
+| -20 | -2 |
+| 50 | -2 |
 
 Only the `Sand` reads it. The clay's strength is undrained — τ = S<sub>u</sub>
 whatever the pore pressure — and no surface in this problem reaches the dense
 sand; a surface that did would need that material's `u` set to `piezo` as well.
 
-**The failure surface** — four points, ordered left to right:
+**The failure surface** — four points, ordered left to right, in the three
+columns the `non-circ` worksheet and Studio's editor share:
 
-| Point | X (ft) | Y (ft) | Movement |
-|---|---:|---:|---|
-| 1 | -10 | 0 | `Free` |
-| 2 | 0 | -5 | `Horiz` |
-| 3 | 25 | -5 | `Horiz` |
-| 4 | 40 | 10 | `Free` |
+| X (ft) | Y (ft) | Movement |
+|---:|---:|---|
+| -10 | 0 | Free |
+| 0 | -5 | Horiz |
+| 25 | -5 | Horiz |
+| 40 | 10 | Free |
 
 The two interior points sit inside the clay, so the segment between them is 25 ft
 of base running flat along the middle of the seam. The two end segments are
@@ -86,8 +111,10 @@ ramps: one down from the flat ground 10 ft beyond the toe, one up to the back of
 the crest. That shape — ramp down, run along the seam, ramp up — is the whole of
 a weak-layer mechanism, and it is the shape no circle has.
 
-The tables are the model: copy the values straight from them into the template's
-worksheets or Studio's editors rather than retyping them.
+The tables are the model, and each is laid out exactly as its destination is —
+the template's worksheets and Studio's editors, same columns in the same order.
+Select a table's block of values, copy, and paste it straight into the sheet or
+editor rather than retyping it.
 
 Three rules govern the table:
 
@@ -255,7 +282,7 @@ Click **Materials**, and in **Table view** press **Add row** four times for the
 four soils in the order the table above lists them — the row order is what fixes
 the Mat IDs. Then **Profile lines**: set **Max depth (bottom boundary
 elevation):** to `-10`, and press **Add line** four times, each line taking its
-**Material:** and its vertices from the geometry table above. The mechanics are
+**Material:** and its vertices from the geometry tables above. The mechanics are
 [LEM-3's](lem03_layered_slope.md#c-building-it-in-studio), twice over.
 
 Click **Piezometric lines** and, on the **Line 1** tab, **Add row** twice for

@@ -38,18 +38,22 @@ The problem features the following geometry and material properties:
 |---|---|---:|---:|---:|---|
 | 1 | `soil` | 125 | 500 | 0 | `none` |
 
-**Geometry** — one profile line, on material 1:
+**Geometry** — Profile Line 1, on material 1 (`soil`), one vertex per row:
 
-| Point | x (ft) | y (ft) | |
-|---|---:|---:|---|
-| 1 | 0 | 0 | the toe |
-| 2 | 20 | 20 | the crest break — 20 ft up over 20 ft across, a 1:1 face |
-| 3 | 60 | 20 | the back of the crest |
+| x (ft) | y (ft) |
+|---:|---:|
+| 0 | 0 |
+| 20 | 20 |
+| 60 | 20 |
 
-Maximum depth = `0`, the elevation of the rigid base.
+The three vertices are the toe, the crest break — 20 ft up over 20 ft across, a
+1:1 face — and the back of the crest. Maximum depth = `0`, the elevation of the
+rigid base.
 
-The tables are the model: copy the values straight from them into the template's
-worksheets or Studio's editors rather than retyping them.
+The tables are the model, and each is laid out exactly as its destination is —
+the template's worksheets and Studio's editors, same columns in the same order.
+Select a table's block of values, copy, and paste it straight into the sheet or
+editor rather than retyping it.
 
 ---
 

@@ -53,13 +53,32 @@ than the two layers above it, and it is where the critical surface goes.
 
 **Geometry** — entered as profile lines, one per material and each the top of
 its layer (the faster of the two geometry inputs for layered ground; polygons
-are the other), with the maximum depth at `0`, the elevation of the rigid base:
+are the other), with the maximum depth at `0`, the elevation of the rigid base.
+Each table is one vertex per row, in the paired `x` / `y` columns its worksheet
+block carries.
 
-| Line | Material | Points (x, y) |
-|---|---|---|
-| 1 | 1 `soil 1` | (0, 84), (150, 84), (174.7, 64) |
-| 2 | 2 `soil 2` | (0, 64), (174.7, 64), (204.3, 40) |
-| 3 | 3 `soil 3` | (0, 40), (320, 40) |
+**Profile Line 1 — material 1 (`soil 1`):**
+
+| x (ft) | y (ft) |
+|---:|---:|
+| 0 | 84 |
+| 150 | 84 |
+| 174.7 | 64 |
+
+**Profile Line 2 — material 2 (`soil 2`):**
+
+| x (ft) | y (ft) |
+|---:|---:|
+| 0 | 64 |
+| 174.7 | 64 |
+| 204.3 | 40 |
+
+**Profile Line 3 — material 3 (`soil 3`):**
+
+| x (ft) | y (ft) |
+|---:|---:|
+| 0 | 40 |
+| 320 | 40 |
 
 The ground surface is the top edge of the section the three lines make
 together: level crest at 84, a face falling through the break at (174.7, 64)
@@ -68,11 +87,19 @@ the [top-of-a-layer rule](lem03_layered_slope.md#the-problem), lines 2 and 3
 are the contacts — soil 1 is 20 ft thick, soil 2 is 24 ft, and soil 3 runs 40
 ft down to the base.
 
-**Water** — a piezometric line of eight points, spanning the full section:
+**Water** — a piezometric line of eight points, spanning the full section, one
+point per row as the `piezo` worksheet and Studio's editor take them:
 
-| x | 0 | 75 | 112 | 140 | 170 | 189.5 | 204.3 | 320 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| y | 80 | 79 | 76 | 70 | 61 | 52 | 40 | 40 |
+| x (ft) | y (ft) |
+|---:|---:|
+| 0 | 80 |
+| 75 | 79 |
+| 112 | 76 |
+| 140 | 70 |
+| 170 | 61 |
+| 189.5 | 52 |
+| 204.3 | 40 |
+| 320 | 40 |
 
 It starts 4 ft below the crest, steepens as it approaches the face, and comes
 down to the toe — from x = 189.5 on, it lies *on* the lower face and the flat
@@ -85,9 +112,11 @@ this page measures is the one the search finds, not this one:
 |---:|---:|---|---:|
 | 195 | 150 | Depth | 18.1 |
 
-Every number the model needs is in the tables above — copy the values straight
-from them into the template's worksheets or Studio's editors rather than
-retyping them; the eight-point piezometric line is the one most worth pasting.
+Every number the model needs is in the tables above, and each table is laid out
+exactly as its destination is — the template's worksheets and Studio's editors,
+same columns in the same order. Select a table's block of values, copy, and
+paste it straight into the sheet or editor rather than retyping it; the
+eight-point piezometric line is the one most worth pasting.
 
 ---
 
@@ -237,7 +266,7 @@ the Mat IDs. Fill both unit-weight columns, **γ** and **gsat**, and set every
 row's **u** to `piezo`. Then **Profile lines**: set
 **Max depth (bottom boundary elevation):** to `0`, and press **Add line**
 three times, each line taking its **Material:** and its vertices from the
-geometry table above. The mechanics are
+geometry tables above. The mechanics are
 [LEM-3's](lem03_layered_slope.md#c-building-it-in-studio), one line more.
 
 ### 2. The piezometric line

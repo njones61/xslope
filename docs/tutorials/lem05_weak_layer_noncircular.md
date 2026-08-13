@@ -382,8 +382,8 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 label, because the model defines a non-circular surface and no circles. The
 dialog's own note says what the two analyses do — *"Single surface analyzes the
 first circle / the non-circular surface as entered. Auto-search refines from
-there to the critical surface."* **Single surface** solves the polyline
-[as the solver reads it](#the-surface-the-solver-read).
+there to the critical surface."* **Single surface** solves the surface entered without perturbing it as part of
+a search algorithm.
 
 ---
 

@@ -89,6 +89,10 @@ LEM01_FILE = os.path.join(_REPO, "docs/lem/files/xslope_simple_embankment.xlsx")
 #: what its label pins need: the materials table read as a pair of rows, and a
 #: profile editor with a material to assign each line to.
 LEM03_FILE = os.path.join(_REPO, "docs/lem/files/xslope_simple_mult_layers.xlsx")
+#: Tutorial LEM-5's completed model — four material zones with a soft seam among
+#: them, which is what its pins need: a non-circular surface to read the vertex
+#: table against, and a weak zone for the generator to find.
+LEM05_FILE = os.path.join(_REPO, "docs/lem/files/xslope_noncircular.xlsx")
 
 #: A URL on the docs site — what the docs build emits.
 GOOD = "https://xslope.readthedocs.io/en/latest/lem/files/xslope_simple1.xslz"
@@ -904,6 +908,39 @@ LEM03_PROFILE_MATERIALS = ("1: embankment", "2: foundation")
 LEM03_GENERATE_SUMMARY = "3 on the left-facing face (toe at x = 0, height 20)"
 LEM03_GENERATE_DEPTHS = (-4.72136, -10.0, 0.0)
 
+#: The Inputs-tree rows LEM-5 sends the reader to. Both are added unconditionally,
+#: so an empty model still lists them — the state its reader is in when they go
+#: looking for the failure surface.
+LEM05_INPUT_CATEGORIES = ("Non-circular pts", "Piezometric lines")
+
+#: The non-circular editor's controls, in the order LEM-5 drives them: add the four
+#: vertices, then the generator that builds a surface from the weak zone instead.
+LEM05_NONCIRC_BUTTONS = ("Add row", "Generate from the weak zone…")
+
+#: The vertex table's columns and the Movement settings the page dictates into
+#: them. Movement is pinned option by option because the page's closing section
+#: measures what each one does to a search, so a renamed option leaves that table
+#: describing choices the reader cannot make.
+LEM05_NONCIRC_HEADERS = ("X", "Y", "Movement")
+LEM05_NONCIRC_MOVEMENTS = ("Free", "Horiz", "Fixed")
+
+#: What the weak-zone generator reports on LEM-5's section, quoted verbatim on the
+#: page beside a capture of the same line — the zone it seeds on, the two strengths
+#: it compared to get there, and the ramp angles it built. The point count is
+#: pinned with it because the summary opens by announcing it.
+LEM05_GENERATE_SUMMARY = (
+    "seeding on 'Soft Clay' -- mobilisable strength 200 against 570 for the next "
+    "weakest ('Sand Fill')")
+LEM05_GENERATE_RAMPS = ("a 28 degree ramp to the ground at the toe",
+                        "a 60 degree ramp to the ground at the crest")
+LEM05_GENERATE_POINTS = 6
+
+#: The Run LEM readings LEM-5's run step quotes: the analysis it chooses, and the
+#: fixed Surface label a model carrying a non-circular surface and no circles
+#: produces (the mirror of the fixed "Circular" LEM-2's model shows).
+LEM05_RUN_ANALYSIS = "Single surface"
+LEM05_RUN_SURFACE = "Non-circular"
+
 
 def _lem01_editor_labels():
     """The materials editor as Tutorial LEM-1 drives it: opened, switched, added to.
@@ -1029,6 +1066,89 @@ def _lem03_editor_labels():
                      f"section; the page's audit table walks "
                      f"{LEM03_GENERATE_DEPTHS}")
     circles.deleteLater()
+    return fails
+
+
+def _lem05_editor_labels():
+    """The non-circular editor and the Run LEM dialog, as Tutorial LEM-5 drives them.
+
+    The generator is *pressed* rather than its rows pre-loaded, for the reason
+    LEM-1's and LEM-3's shots document: the summary line the page quotes exists
+    only as the answer to a press. It is pressed on a table emptied of the file's
+    own surface, which is the state a reader who has entered nothing is in — and
+    the state the page's figure shows.
+
+    Run LEM is read on the file as it ships, because the fixed **Surface** label
+    the page quotes is produced by a model carrying a non-circular surface and no
+    circles; a model with both would show a chooser instead.
+    """
+    from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QTableWidget
+
+    from xslope.fileio import load_slope_data
+
+    from studio.dialogs import RunLemDialog
+    from studio.editors import NonCircEditor
+
+    fails = []
+    data = _quiet(load_slope_data, LEM05_FILE)
+
+    dlg = NonCircEditor().build(data, None)
+    buttons = {b.text() for b in dlg.findChildren(QPushButton)}
+    for label in LEM05_NONCIRC_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the non-circular editor has no {label!r} button; "
+                         f"Tutorial LEM-5 tells the reader to press it. Its buttons "
+                         f"read {sorted(buttons)}")
+    headers = [t.horizontalHeaderItem(i).text() if t.horizontalHeaderItem(i) else ""
+               for t in dlg.findChildren(QTableWidget)
+               for i in range(t.columnCount())]
+    for name in LEM05_NONCIRC_HEADERS:
+        if name not in headers:
+            fails.append(f"the non-circular table has no {name!r} column; Tutorial "
+                         f"LEM-5 dictates a value into it. Its columns read "
+                         f"{headers}")
+    movements = {combo.itemText(i) for combo in dlg.findChildren(QComboBox)
+                 for i in range(combo.count())}
+    for name in LEM05_NONCIRC_MOVEMENTS:
+        if name not in movements:
+            fails.append(f"no Movement setting reads {name!r}, which Tutorial LEM-5 "
+                         f"tells the reader to choose. The options read "
+                         f"{sorted(movements)}")
+    dlg.deleteLater()
+
+    empty = dict(data)
+    empty["non_circ"] = []
+    gen = NonCircEditor().build(empty, None)
+    _quiet(gen._run_generate)
+    summary = " ".join(lab.text() for lab in gen.findChildren(QLabel))
+    for quoted in (LEM05_GENERATE_SUMMARY,) + LEM05_GENERATE_RAMPS:
+        if quoted not in summary:
+            fails.append(f"the weak-zone generator no longer reports {quoted!r} on "
+                         f"LEM-5's section, which the page quotes. It reports "
+                         f"{summary.strip()!r}")
+    built = len(gen.result_rows())
+    if built != LEM05_GENERATE_POINTS:
+        fails.append(f"the weak-zone generator builds {built} points on LEM-5's "
+                     f"section; the page quotes a summary announcing "
+                     f"{LEM05_GENERATE_POINTS}")
+    gen.deleteLater()
+
+    run = RunLemDialog(defaults={}, slope_data=data)
+    analyses = {run.analysis.itemText(i) for i in range(run.analysis.count())}
+    if LEM05_RUN_ANALYSIS not in analyses:
+        fails.append(f"Run LEM offers no {LEM05_RUN_ANALYSIS!r} analysis, which "
+                     f"Tutorial LEM-5 tells the reader to choose. It offers "
+                     f"{sorted(analyses)}")
+    if run.surface is not None:
+        fails.append("Run LEM offers a Surface chooser on LEM-5's model; the page "
+                     "says the row is a fixed label, which is what a model with one "
+                     "surface family produces")
+    labels = {lab.text() for lab in run.findChildren(QLabel)}
+    if LEM05_RUN_SURFACE not in labels:
+        fails.append(f"Run LEM's fixed Surface label does not read "
+                     f"{LEM05_RUN_SURFACE!r} on LEM-5's model, which the page "
+                     f"quotes. Its labels read {sorted(l for l in labels if l)}")
+    run.deleteLater()
     return fails
 
 
@@ -1165,6 +1285,10 @@ def test_tutorial_labels():
             if name not in rows:
                 fails.append(f"the Inputs tree has no {name!r} row; Tutorial LEM-2 "
                              f"tells the reader to click it. It reads {rows}")
+        for name in LEM05_INPUT_CATEGORIES:
+            if name not in rows:
+                fails.append(f"the Inputs tree has no {name!r} row; Tutorial LEM-5 "
+                             f"tells the reader to click it. It reads {rows}")
 
         for attr, label in LEM02_RUN_ACTIONS.items():
             action = getattr(mw, attr, None)
@@ -1179,6 +1303,7 @@ def test_tutorial_labels():
         fails += _lem01_editor_labels()
         fails += _lem02_editor_labels(mw)
         fails += _lem03_editor_labels()
+        fails += _lem05_editor_labels()
 
         from PySide6.QtWidgets import QPushButton
 

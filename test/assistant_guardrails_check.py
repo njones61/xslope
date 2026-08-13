@@ -40,10 +40,14 @@ does regardless of the model, and that is what this file covers:
   H. THE DELTA — a finding is quoted in full once. On later edits the block quotes
      what is new or changed and names the rest by rule key on one line, so a build
      on a deck with standing faults does not re-read the same paragraphs after
-     every edit. What must survive that: a run-blocking ERROR is quoted every
-     time, a changed finding un-collapses, the staged-by-a-run label survives the
-     collapse, nothing is ever dropped without being named, and a new session
-     starts from silence. Mutations for each.
+     every edit. The honesty of that line is what these legs are for: it says
+     "reported in full earlier", so a finding may collapse only once it has been
+     QUOTED — never merely counted on the overflow line the quote cap produces —
+     and two faults that differ only in a digit belonging to a field name (Lp1
+     against Lp2) must not read as one finding. What else must survive: an
+     edit-answerable ERROR is quoted every time, a changed finding un-collapses,
+     the staged-by-a-run label survives the collapse, nothing is dropped without
+     being named, and a new session starts from silence. Mutations for each.
 
 Everything runs offscreen against the real Assistant, the real PythonKernel and
 the real document; no provider is contacted and no network is touched (the agent
@@ -163,6 +167,15 @@ SNIPPET_MOVE_DEAD_CIRCLE = """
 slope_data['circles'][2] = {'Xo': 15.0, 'Yo': 50.0, 'Depth': 6.0, 'R': 44.0}
 slope_data['circles'][1] = {'Xo': 15.0, 'Yo': 50.0, 'Depth': -300.0, 'R': 350.0}
 print('moved the dead circle from row 3 to row 2')
+"""
+
+#: Eight more circles, every one of them under the base: more findings than one
+#: block quotes, which is what makes the quote cap decide anything.
+SNIPPET_MANY_DEAD_CIRCLES = """
+for i in range(8):
+    slope_data['circles'].append(
+        {'Xo': 15.0, 'Yo': 50.0, 'Depth': -100.0 - 10.0 * i, 'R': 150.0 + 10.0 * i})
+print('added 8 circles below the base')
 """
 
 #: A material that reads a seepage field there is no run to supply: the staged
@@ -584,9 +597,11 @@ print('both families present')
         text = A.model_checks_text(sd)
     finally:
         A.MAX_CHECK_FINDINGS = real_max
-    line = [ln for ln in text.splitlines() if "more —" in ln]
+    line = [ln for ln in text.splitlines() if "not quoted here" in ln]
     if not line:
         out.append("no overflow line was produced to check")
+    elif "print(preflight(" not in line[0]:
+        out.append(f"the overflow line lost the command that reads them: {line[0]!r}")
     elif repr(sel) not in line[0]:
         out.append(f"the follow-up command drops the selection: {line[0]!r}")
     mw.deleteLater()
@@ -668,12 +683,15 @@ CIRCLE_FULL = "below the bottom of the model domain"
 SEEP_FULL = "takes pore pressure from a seepage solution"
 
 
+def _collapsed_lines(blk):
+    """Every one-line summary of findings the block reported earlier."""
+    return [ln for ln in (blk or "").splitlines() if "earlier finding" in ln]
+
+
 def _collapsed(blk):
     """The block's one-line summary of findings already reported, or None."""
-    for line in (blk or "").splitlines():
-        if "earlier finding" in line:
-            return line
-    return None
+    lines = _collapsed_lines(blk)
+    return lines[0] if lines else None
 
 
 def check_delta_identity_is_the_row():
@@ -903,6 +921,116 @@ def check_staged_collapse_keeps_the_label():
     return out
 
 
+def check_every_finding_is_quoted_once():
+    """A finding may collapse only once it has been QUOTED — never merely once it
+    has been counted.
+
+    The quote cap is what makes this a live risk: a model carrying more findings
+    than one block quotes names the rest on the overflow line, and if that counted
+    as telling the model, the next block would file them under "reported in full
+    earlier" — a claim about text the model never received. So the cap rotates:
+    what was named and not quoted is quoted in a later block, and until then the
+    line naming it carries the command that prints it.
+    """
+    from studio.ai import assistant as A
+    from xslope.preflight import preflight
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+
+    blocks = [_block(_run(asst, SNIPPET_MANY_DEAD_CIRCLES))]
+    for gamma in (126.0, 127.0, 128.0, 129.0):
+        blocks.append(_block(_run(asst, f"slope_data['materials'][0]['gamma'] = "
+                                        f"{gamma}\nprint('nudged')")))
+    sd = mw.doc.slope_data
+    standing = [f for f in preflight(sd, "lem", A._checks_selection(sd)).findings
+                if f.severity in ("error", "warning")]
+    if len(standing) <= A.MAX_CHECK_FINDINGS:
+        out.append(f"{len(standing)} findings do not overflow the cap of "
+                   f"{A.MAX_CHECK_FINDINGS} — this leg proves nothing")
+
+    quoted = set()
+    for n, blk in enumerate(blocks, 1):
+        blk = blk or ""
+        for line in _collapsed_lines(blk):
+            claimed = int(line.split()[0])
+            if claimed > len(quoted):
+                out.append(f"block {n}: {claimed} finding(s) filed as reported in "
+                           f"full earlier, but only {len(quoted)} have been quoted")
+        if "not quoted here" in blk and "print(preflight(" not in blk:
+            out.append(f"block {n}: named findings it did not quote without the "
+                       f"command that reads them")
+        quoted |= {f.message for f in standing if f.message in blk}
+    never = [f.rule_id for f in standing if f.message not in quoted]
+    if never:
+        out.append(f"{len(never)} finding(s) were never quoted in full across "
+                   f"{len(blocks)} blocks: {never}")
+    mw.deleteLater()
+    return out
+
+
+def check_two_faults_on_one_row():
+    """Two different faults about one row are two findings.
+
+    vp047 states one pullout length per end, and both exceed the line: the same
+    rule fires twice on one reinforcement line, once for Lp1 and once for Lp2. The
+    messages differ only in a digit that belongs to a FIELD NAME, so blanking it
+    with the values made the pair one finding — the second was never reported, and
+    repairing the first left the model reading the survivor as unchanged text it
+    had already been given. Digit-suffixed names run through the whole schema
+    (x1/y1, x2/y2, lp1/lp2, k1/k2), so this is a class, not a case.
+    """
+    from studio.ai import assistant as A
+    from xslope.preflight import preflight
+    out = []
+    deck = os.path.join(_REPO, "docs", "verification", "files", "rocscience",
+                        "vp047.xlsx")
+    if not os.path.exists(deck):
+        return [f"the regression deck is missing: {deck}"]
+    mw, asst = _session()
+    mw.doc.load(deck)
+    sd = mw.doc.slope_data
+    pair = [f for f in preflight(sd, "lem", A._checks_selection(sd)).findings
+            if f.rule_id == "reinforce.envelope_inconsistent"
+            and f.message.startswith("Reinforcement line 1 ")]
+    if len(pair) != 2 or not ("Lp1 =" in pair[0].message
+                              and "Lp2 =" in pair[1].message):
+        mw.deleteLater()
+        return [f"vp047 no longer carries the Lp1/Lp2 pair on one row: "
+                f"{[f.message[:60] for f in pair]}"]
+    if A._finding_sig(pair[0]) == A._finding_sig(pair[1]):
+        out.append("the Lp1 and Lp2 faults read as the same finding")
+    if len(set(A.ChecksMemo.keys(pair))) != 2:
+        out.append("the two faults on one row share a key")
+
+    # ... and through the real path: both quoted, and repairing Lp1 leaves the
+    # Lp2 fault quoted in full rather than filed under the text of Lp1.
+    blk = _block(_run(asst, "slope_data['materials'][0]['gamma'] += 1.0\n"
+                            "print('unit weight nudged')"))
+    for f in pair:
+        if f.message not in (blk or ""):
+            out.append(f"a fault on the pair was not quoted: {f.message[:80]!r}")
+
+    blk = _block(_run(asst, """
+for line in slope_data['reinforcement_lines']:
+    line['lp1'] = 1.0
+print('first pullout length repaired on every line')
+"""))
+    left = [f for f in preflight(mw.doc.slope_data, "lem",
+                                 A._checks_selection(mw.doc.slope_data)).findings
+            if f.rule_id == "reinforce.envelope_inconsistent"]
+    if not left or any("Lp1 =" in f.message for f in left):
+        out.append(f"the repair did not leave the Lp2 faults standing alone: "
+                   f"{[f.message[:40] for f in left]}")
+    for f in left:
+        if f.message not in (blk or ""):
+            out.append(f"the surviving fault was written off as already reported: "
+                       f"{f.message[:80]!r}")
+    mw.deleteLater()
+    return out
+
+
 def check_nothing_is_dropped_unnamed():
     """The cap on quoted findings is a cap on paragraphs, not on accountability:
     what it leaves out is still named by rule key, so iron rule 5 stays literally
@@ -921,7 +1049,10 @@ def check_nothing_is_dropped_unnamed():
     finally:
         A.MAX_CHECK_FINDINGS = real_max
     from xslope.preflight import preflight
-    ids = {f.rule_id for f in preflight(sd, "lem", A._checks_selection(sd)).findings}
+    # Errors and warnings only: INFO rows are not what the block reports, so
+    # requiring them here would fail on a model that trips one.
+    ids = {f.rule_id for f in preflight(sd, "lem", A._checks_selection(sd)).findings
+           if f.severity in ("error", "warning")}
     if len(ids) < 2:
         out.append("this model carries too few findings to overflow the cap")
     for rid in ids:
@@ -932,7 +1063,7 @@ def check_nothing_is_dropped_unnamed():
 
 
 def check_delta_mutations():
-    """Four mutations, one leg each. Every one of them is a plausible reading of
+    """Six mutations, one leg each. Every one of them is a plausible reading of
     'collapse repeats', and each breaks something the block has to keep."""
     from studio.ai import assistant as A
     out = []
@@ -941,16 +1072,29 @@ def check_delta_mutations():
         keys = self.keys(findings)
         return keys, set(keys)
 
+    def _mark_all_seen(self, keys, findings, quoted):
+        self._seen = {k: A._finding_sig(f) for k, f in zip(keys, findings)}
+
     mutations = (
         ("nothing is exempt: errors collapse too", A, "_never_collapses",
          lambda f: False, check_error_never_collapses,
          "an ERROR is quoted every time"),
-        ("nothing ever collapses", A.ChecksMemo, "report", _all_fresh,
+        ("nothing ever collapses", A.ChecksMemo, "delta", _all_fresh,
          check_unchanged_finding_collapses, "an unchanged finding collapses"),
         ("tracking never resets", A.ChecksMemo, "reset", lambda self: None,
          check_fresh_session_reports_in_full, "a fresh session reports in full"),
         ("identity is the rule alone", A, "_finding_key", lambda f: (f.rule_id,),
          check_changed_finding_uncollapses, "a changed finding un-collapses"),
+        # Counted is not quoted: mark everything the block SAW as told and the
+        # findings the quote cap left out are collapsed having never been read.
+        ("counted is treated as quoted", A.ChecksMemo, "record", _mark_all_seen,
+         check_every_finding_is_quoted_once,
+         "every finding is quoted in full at least once"),
+        # The digits inside a field name are part of its name: blank them and the
+        # Lp1 and Lp2 faults on one row become one finding.
+        ("field-name digits are values", A, "_NUMBER_RE",
+         __import__("re").compile(r"-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?"),
+         check_two_faults_on_one_row, "two faults on one row stay two"),
     )
     for name, target, attr, mutant, leg, legname in mutations:
         real = getattr(target, attr)
@@ -1047,7 +1191,10 @@ CHECKS = [
     ("H. a fresh session reports in full", check_fresh_session_reports_in_full),
     ("H. the staged label survives collapse", check_staged_collapse_keeps_the_label),
     ("H. nothing is dropped unnamed", check_nothing_is_dropped_unnamed),
-    ("H. mutation: the delta's four seams", check_delta_mutations),
+    ("H. every finding is quoted, not just counted",
+     check_every_finding_is_quoted_once),
+    ("H. two faults on one row stay two", check_two_faults_on_one_row),
+    ("H. mutation: the delta's six seams", check_delta_mutations),
 ]
 
 

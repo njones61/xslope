@@ -423,13 +423,26 @@ MAX_CHECK_FINDINGS = 6
 
 
 # --- what has already been said ---------------------------------------------
-# A finding is quoted in full the first time it is reported. After that it is a
-# standing fault, and a long build re-reads the same paragraphs after every edit
-# — attention spent on findings that have not moved, and the new one arrives in
-# the middle of the pile. So each block quotes what is NEW or CHANGED and names
-# the rest by rule key on one line. Two things never collapse: an ERROR, which
-# refuses the run and so is live business on every edit, and a finding the block
-# has not reported before.
+# A finding is quoted in full the first time a block has room for it. After that
+# it is a standing fault, and a long build re-reads the same paragraphs after
+# every edit — attention spent on findings that have not moved, and the new one
+# arrives in the middle of the pile. So each block quotes what is NEW or CHANGED
+# and names the rest by rule key on one line.
+#
+# What may collapse is bounded by one rule: a finding collapses only after it has
+# been QUOTED, never merely after it has been counted. The block quotes at most
+# MAX_CHECK_FINDINGS paragraphs, so on a model carrying more than that the rest
+# are named on the overflow line with the command that prints them — and they
+# stay unrecorded, so the next block quotes them instead. A model with twelve
+# findings receives all twelve in full over two or three blocks rather than the
+# same six forever. Findings never yet quoted take the quota first, which is what
+# makes that rotation terminate.
+#
+# An edit-answerable ERROR is also never collapsed: it refuses the run until it
+# is answered, so it is live business on every edit rather than history. A
+# finding STAGED BY A RUN is an error too, and it does block the run, but no edit
+# can answer it — so it collapses like a warning, onto a line that keeps saying
+# it is staged.
 #
 # Keying is the whole difficulty. A finding is "the same one" when it is the same
 # rule about the same row — NOT when its message text matches, because a message
@@ -454,12 +467,24 @@ _NOT_A_SUBJECT = {
 _SUBJECT_RE = re.compile(
     r"^([A-Z][\w'’-]*(?: [\w'’-]+){0,2} \d+)(?![\d.])( \('[^']*'\))?")
 
-_NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
+#: Values, for blanking. A digit glued to letters is part of a FIELD NAME, not a
+#: value: "Lp1 = 7.9" and "Lp2 = 7.9" are two different faults on one row, and
+#: blanking both digits made them one finding — the second was never reported and
+#: the model was pointed at the text of the first. Digit-suffixed field names are
+#: everywhere in the schema (x1/y1, x2/y2, lp1/lp2, k1/k2), so the lookbehind is
+#: load-bearing, not tidiness.
+_NUMBER_RE = re.compile(r"(?<![A-Za-z])-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
 
 
 def _finding_subject(message):
     """The row a finding is about (``"Circle 2"``, ``"Material 3 ('Core')"``), or
-    None when the message does not lead with one."""
+    None when the message does not lead with one.
+
+    One row per label, deliberately: a message that opens on two rows ("Circle 2
+    and 3 have …") matches no label and falls back to the message skeleton, which
+    is a correct key for a finding about a pair. No rule writes one today; this is
+    what happens if one starts.
+    """
     m = _SUBJECT_RE.match(message or "")
     if not m:
         return None
@@ -489,12 +514,15 @@ def _finding_sig(f):
 
 
 def _never_collapses(f):
-    """True for a finding that is quoted in full in every block.
+    """True for a finding that is quoted in full in every block that has room.
 
-    A run-blocking ERROR is: it refuses the analysis until it is answered, so it
-    is live business on every edit, not history. A finding STAGED BY A RUN is not
-    — it blocks no edit and no edit resolves it (see :data:`xslope.preflight
-    .STAGED_BY_RUN`), so it collapses like a warning once it has been reported.
+    The test is whether an EDIT can answer it, not whether it blocks a run. An
+    ordinary ERROR is answerable by the edit being made, and it refuses the run
+    until it is, so it stays live business on every edit rather than becoming
+    history. A finding STAGED BY A RUN is an error and refuses the run too, but
+    no edit resolves it — its cure is the analysis it names (see
+    :data:`xslope.preflight.STAGED_BY_RUN`) — so it collapses like a warning
+    once it has been quoted, onto a line that keeps the staged label.
     """
     from xslope.preflight import STAGED_BY_RUN
     return f.severity == "error" and f.rule_id not in STAGED_BY_RUN
@@ -526,15 +554,35 @@ class ChecksMemo:
             out.append(key + (counts[key],))
         return out
 
-    def report(self, findings):
-        """Record ``findings`` as the block being written, and return
-        ``(keys, fresh)`` — every finding's key, and the keys of the ones that are
-        new or changed since the last block (all of them, the first time)."""
+    def delta(self, findings):
+        """``(keys, fresh)`` — every finding's key, and the keys of the ones this
+        session has not been given in full, or has been given differently.
+        Records nothing: what a block actually quotes is decided after this."""
         keys = self.keys(findings)
-        now = {k: _finding_sig(f) for k, f in zip(keys, findings)}
-        fresh = {k for k, sig in now.items() if self._seen.get(k) != sig}
-        self._seen = now
+        fresh = {k for k, f in zip(keys, findings)
+                 if self._seen.get(k) != _finding_sig(f)}
         return keys, fresh
+
+    def record(self, keys, findings, quoted):
+        """Remember the block that was just written.
+
+        Only the findings in ``quoted`` (a set of indices) become history — a
+        finding the block merely counted was never given to the model, so it must
+        stay eligible to be quoted in a later block. A finding that was quoted in
+        an earlier block and only counted in this one keeps the entry it already
+        had, and one that has disappeared from the model loses its entry.
+        """
+        now = {}
+        for i, (k, f) in enumerate(zip(keys, findings)):
+            if i in quoted:
+                now[k] = _finding_sig(f)
+            elif k in self._seen:
+                now[k] = self._seen[k]
+        self._seen = now
+
+    def quoted_before(self, key):
+        """True when this session has already been given that finding in full."""
+        return key in self._seen
 
 
 def _rule_key_list(findings):
@@ -634,37 +682,49 @@ def model_checks_text(slope_data, memo=None):
     # pore-pressure option — which does not supply the missing field, it deletes the
     # requirement and silently analyses a different problem. So they are labelled
     # for what they are and routed to the only honest response: offer the run.
-    # What this block quotes in full: whatever is new or changed since the last
-    # one, plus every run-blocking error. The rest was reported in full already
-    # and is named on one line at the end of its own section. Kept per ROW rather
-    # than per finding, so two findings that read alike are still two.
-    keys, fresh = memo.report(rows)
-    quoted = [k in fresh or _never_collapses(f) for f, k in zip(rows, keys)]
-    staged = [(f, q) for f, q in zip(rows, quoted) if f.rule_id in STAGED_BY_RUN]
-    faults = [(f, q) for f, q in zip(rows, quoted) if f.rule_id not in STAGED_BY_RUN]
+    # What this block wants to quote in full: whatever is new, changed, or not yet
+    # quoted, plus every edit-answerable error. Kept as ROW INDICES rather than
+    # findings, so two findings that read alike are still two.
+    keys, fresh = memo.delta(rows)
+    idx = range(len(rows))
+    wanted = [i for i in idx if keys[i] in fresh or _never_collapses(rows[i])]
+    # The quota goes to findings this session has never been given first. Without
+    # that, a model carrying more findings than the cap would re-quote the same
+    # first few every block and the tail would never be read at all — and it is
+    # the tail that then gets counted as "reported in full earlier".
+    wanted.sort(key=lambda i: memo.quoted_before(keys[i]))
+    staged_wanted = [i for i in wanted if rows[i].rule_id in STAGED_BY_RUN]
+    fault_wanted = [i for i in wanted if rows[i].rule_id not in STAGED_BY_RUN]
+    shown_i = sorted(fault_wanted[:MAX_CHECK_FINDINGS])
+    over_i = sorted(fault_wanted[MAX_CHECK_FINDINGS:])
+    memo.record(keys, rows, set(shown_i) | set(staged_wanted))
+
+    staged = [i for i in idx if rows[i].rule_id in STAGED_BY_RUN]
+    faults = [i for i in idx if rows[i].rule_id not in STAGED_BY_RUN]
     sel_arg = f", {selection!r}" if selection else ""
     parts = [MODEL_CHECKS_OPEN]
     if faults:
-        new_faults = [f for f, q in faults if q]
-        old_faults = [f for f, q in faults if not q]
-        if new_faults:
-            shown = new_faults[:MAX_CHECK_FINDINGS]
+        old_faults = [rows[i] for i in faults if i not in fault_wanted]
+        if shown_i:
             parts.append(f"The input checks found {len(faults)} problem(s) in the "
                          f"model as it now stands. Fix them, or put them to the user "
                          f"with your reason for leaving them — do not report this "
                          f"model ready over them.")
-            parts += [f"  {f.severity.upper()} [{f.rule_id}] {f.message}"
-                      for f in shown]
-            if len(new_faults) > len(shown):
-                rest = new_faults[len(shown):]
-                parts.append(f"  (+{len(rest)} more — {_rule_key_list(rest)} — "
-                             f"`from xslope.preflight import preflight; "
-                             f"print(preflight(slope_data, 'lem'{sel_arg}).format())`)")
+            parts += [f"  {rows[i].severity.upper()} [{rows[i].rule_id}] "
+                      f"{rows[i].message}" for i in shown_i]
+        if over_i:
+            # Named, not quoted — so the command that prints them rides on this
+            # line every time it appears, and none of them is recorded as told.
+            rest = [rows[i] for i in over_i]
+            parts.append(f"  (+{len(rest)} more, not quoted here — "
+                         f"{_rule_key_list(rest)} — read them with "
+                         f"`from xslope.preflight import preflight; "
+                         f"print(preflight(slope_data, 'lem'{sel_arg}).format())`)")
         if old_faults:
             parts.append(_unchanged_line(old_faults, "still unresolved"))
     if staged:
-        new_staged = [f for f, q in staged if q]
-        old_staged = [f for f, q in staged if not q]
+        new_staged = [rows[i] for i in staged_wanted]
+        old_staged = [rows[i] for i in staged if i not in staged_wanted]
         if new_staged:
             parts.append(
                 f"STAGED BY A RUN, not by an edit ({len(staged)}). These name an "

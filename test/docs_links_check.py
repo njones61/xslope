@@ -968,9 +968,12 @@ LEM04_SENS_LABELS = ("Default ±%", "Points")
 LEM04_SENS_ADD = "Add parameter"
 LEM04_SENS_NOTE = "Double-click a bar for that parameter's curve."
 LEM04_SENS_PROPERTY = "gamma_sat"
-#: The saturated unit weights the page's γ/γ_sat step enters (soils 1..3) — the
-#: state the sweep step's model is in when the picker offers gamma_sat.
-LEM04_GSAT = (135.0, 125.0, 140.0)
+
+#: The circles-editor columns LEM-4's pin step types the found circle into, and
+#: the dock the page tells the reader to read the search's own statement of that
+#: circle out of.
+LEM04_CIRCLE_COLUMNS = ("Xo", "Yo", "Option", "Depth")
+LEM04_LOG_DOCK = "Log"
 
 
 def _lem01_editor_labels():
@@ -1183,27 +1186,51 @@ def _lem05_editor_labels():
     return fails
 
 
-def _lem04_editor_labels():
-    """The piezo editor, Run LEM and the Parametric dialog, as Tutorial LEM-4
-    drives them.
+def _lem04_editor_labels(mw):
+    """The piezo and circles editors, the Log dock, Run LEM and the Parametric
+    dialog, as Tutorial LEM-4 drives them.
 
-    The Parametric dialog is built on the model in the state the page's γ/γ_sat
-    step leaves it — saturated unit weights entered in memory — because the
-    property the sweep step picks is ``gamma_sat``, and on the file as shipped
-    (γ_sat blank) the picker rightly refuses a relative range about nothing.
-    Run LEM is read on the file as it ships: the fixed **Circular** label the
-    page describes is produced by a model carrying circles and no non-circular
-    surface.
+    Everything is read on the file as it ships. The model carries both unit
+    weights, so the Parametric property picker offers ``gamma_sat`` without any
+    state being staged for it; the fixed **Circular** label the page describes is
+    what a model carrying circles and no non-circular surface produces; and the
+    circles editor's columns are the ones the page's pin step types the search's
+    critical circle into.
     """
-    from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QTabWidget
+    from PySide6.QtWidgets import (QComboBox, QLabel, QPushButton, QTableWidget,
+                                   QTabWidget)
 
     from xslope.fileio import load_slope_data
 
     from studio.dialogs import RunLemDialog, SensitivityDialog
-    from studio.editors import PiezoEditor
+    from studio.editors import CirclesEditor, PiezoEditor
 
     fails = []
     data = _quiet(load_slope_data, LEM04_FILE)
+
+    if not all(m.get("gamma_sat") for m in data["materials"]):
+        fails.append("LEM-4's model no longer states a saturated unit weight for "
+                     "every material; the page's weight-split section reads the "
+                     "gsat column as the file ships it")
+
+    circles = CirclesEditor().build(data, None)
+    headers = set()
+    for table in circles.findChildren(QTableWidget):
+        headers.update(table.horizontalHeaderItem(i).text()
+                       for i in range(table.columnCount())
+                       if table.horizontalHeaderItem(i) is not None)
+    for name in LEM04_CIRCLE_COLUMNS:
+        if name not in headers:
+            fails.append(f"the circles editor has no {name!r} column; Tutorial "
+                         f"LEM-4 tells the reader to type the search's critical "
+                         f"circle into it. Its columns read {sorted(headers)}")
+    circles.deleteLater()
+
+    dock = getattr(mw, "log_dock", None)
+    if dock is None or dock.windowTitle() != LEM04_LOG_DOCK:
+        fails.append(f"the main window has no {LEM04_LOG_DOCK!r} dock; Tutorial "
+                     f"LEM-4 tells the reader to read the search's own statement "
+                     f"of its critical circle there")
 
     piezo = PiezoEditor().build(data, None)
     tabs = [t.tabText(i) for t in piezo.findChildren(QTabWidget)
@@ -1236,11 +1263,7 @@ def _lem04_editor_labels():
                      f"quotes. Its labels read {sorted(l for l in labels if l)}")
     run.deleteLater()
 
-    gs_data = dict(data)
-    gs_data["materials"] = [dict(m) for m in data["materials"]]
-    for m, v in zip(gs_data["materials"], LEM04_GSAT):
-        m["gamma_sat"] = v
-    sens = SensitivityDialog(defaults={"mode": "sensitivity"}, slope_data=gs_data)
+    sens = SensitivityDialog(defaults={"mode": "sensitivity"}, slope_data=data)
     modes = {sens.mode.itemText(i) for i in range(sens.mode.count())}
     if LEM04_SENS_MODE not in modes:
         fails.append(f"the Parametric dialog offers no {LEM04_SENS_MODE!r} mode, "
@@ -1266,7 +1289,7 @@ def _lem04_editor_labels():
         props.update(combo.itemText(i) for i in range(combo.count()))
     if LEM04_SENS_PROPERTY not in props:
         fails.append(f"no Parametric property reads {LEM04_SENS_PROPERTY!r} on "
-                     f"LEM-4's γ_sat-filled model, which Tutorial LEM-4 tells the "
+                     f"LEM-4's model, which Tutorial LEM-4 tells the "
                      f"reader to pick")
     sens.deleteLater()
     return fails
@@ -1424,7 +1447,7 @@ def test_tutorial_labels():
         fails += _lem02_editor_labels(mw)
         fails += _lem03_editor_labels()
         fails += _lem05_editor_labels()
-        fails += _lem04_editor_labels()
+        fails += _lem04_editor_labels(mw)
 
         from PySide6.QtWidgets import QPushButton
 

@@ -392,6 +392,33 @@
 .tut-glance .tgm-obj > p { margin: 0 0 10px; font-size: 103%; }
 .tut-glance .tgm-model > p { margin: 8px 0 0; font-size: 94%; }
 
+/* The tutorial roster tables on tutorials/index.md — one per category, six columns:
+   # | Tutorial | What it covers | Analysis | Features | Time. Wrap the table's
+   markdown in <div class="tut-summary" markdown> … </div> (md_in_html).
+
+   Same construction as .corpus-summary above and for the same reason: the RTD theme
+   sets `white-space: nowrap` on cells and lets a content-sized table run past the
+   content column, so six columns of prose overflow the page instead of wrapping.
+   Fixed layout plus declared widths is what makes them wrap.
+
+   The widths sum to exactly 100% — over-declared widths are rescaled by the browser
+   and the last column loses the remainder. The split follows the real cells: the
+   two prose columns (What it covers, Features) carry ~70–105 characters each and
+   take a third and a quarter, while Tutorial holds a title, Analysis one or two
+   words, and Time a range. */
+.tut-summary table { table-layout: fixed; width: 100%; }
+.tut-summary th, .tut-summary td {
+    text-align: left; vertical-align: top;
+    overflow-wrap: break-word; word-wrap: break-word;
+    white-space: normal !important;
+}
+.tut-summary th:nth-child(1), .tut-summary td:nth-child(1) { width: 4%; text-align: center; }
+.tut-summary th:nth-child(2), .tut-summary td:nth-child(2) { width: 17%; }
+.tut-summary th:nth-child(3), .tut-summary td:nth-child(3) { width: 32%; }
+.tut-summary th:nth-child(4), .tut-summary td:nth-child(4) { width: 12%; }
+.tut-summary th:nth-child(5), .tut-summary td:nth-child(5) { width: 23%; }
+.tut-summary th:nth-child(6), .tut-summary td:nth-child(6) { width: 12%; }
+
 
 
 /* feature pills — one base rule, containers may recolor */

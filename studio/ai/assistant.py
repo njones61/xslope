@@ -585,6 +585,22 @@ class ChecksMemo:
         return key in self._seen
 
 
+def _quote_order(rows, keys, memo):
+    """How a block spends its quote cap: a sort key over row indices, two tiers.
+
+    An edit-answerable error takes the quota first, whatever else is waiting. It
+    refuses the run, and a block that pushed it onto the overflow line to make
+    room for a batch of new warnings would be the one block the model reads while
+    the run stays refused.
+
+    Below that, findings this session has never been given go before findings it
+    has. That is what makes a model carrying more findings than the cap work
+    through them over successive blocks instead of re-quoting the same few and
+    counting the tail as "reported in full earlier".
+    """
+    return lambda i: (not _never_collapses(rows[i]), memo.quoted_before(keys[i]))
+
+
 def _rule_key_list(findings):
     """``"mat.option_missing ×2, main.seismic_missing"`` — every finding named by
     its rule key, so nothing is dropped without being named."""
@@ -688,11 +704,7 @@ def model_checks_text(slope_data, memo=None):
     keys, fresh = memo.delta(rows)
     idx = range(len(rows))
     wanted = [i for i in idx if keys[i] in fresh or _never_collapses(rows[i])]
-    # The quota goes to findings this session has never been given first. Without
-    # that, a model carrying more findings than the cap would re-quote the same
-    # first few every block and the tail would never be read at all — and it is
-    # the tail that then gets counted as "reported in full earlier".
-    wanted.sort(key=lambda i: memo.quoted_before(keys[i]))
+    wanted.sort(key=_quote_order(rows, keys, memo))
     staged_wanted = [i for i in wanted if rows[i].rule_id in STAGED_BY_RUN]
     fault_wanted = [i for i in wanted if rows[i].rule_id not in STAGED_BY_RUN]
     shown_i = sorted(fault_wanted[:MAX_CHECK_FINDINGS])

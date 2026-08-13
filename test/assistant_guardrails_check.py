@@ -828,6 +828,44 @@ def check_error_never_collapses():
     return out
 
 
+def check_error_survives_the_quote_cap():
+    """The error exemption outranks the rotation.
+
+    Both rules are right on their own and they compete for the same six slots:
+    the rotation puts never-quoted findings first so nothing is counted as told
+    without being read, and an error already quoted has been read. Order by that
+    alone and a batch of new warnings pushes the error off the quoted list
+    entirely — the block the model reads carries no error line while the run is
+    still refused. So the error takes the quota first and the rotation orders
+    what is left.
+    """
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    blk = _block(_run(asst, SNIPPET_RAISE_BASE))
+    if blk is None or "ERROR [surface.circle_below_domain_floor]" not in blk:
+        out.append(f"the stranded circle did not arrive as an error: {blk!r}")
+
+    # Now bury it: more never-quoted warnings arrive at once than a block quotes.
+    blocks = [_block(_run(asst, SNIPPET_MANY_DEAD_CIRCLES))]
+    blocks.append(_block(_run(asst, SNIPPET_NEUTRAL_EDIT)))
+    if "not quoted here" not in (blocks[0] or ""):
+        out.append("the warnings did not overflow the quote cap — the leg proves "
+                   "nothing")
+    for n, blk in enumerate(blocks, 2):
+        quoted = [ln for ln in (blk or "").splitlines()
+                  if ln.startswith("  ERROR [surface.circle_below_domain_floor]")]
+        if not quoted:
+            out.append(f"block {n}: the error is not quoted at all: "
+                       f"{(blk or '')[:300]!r}")
+        elif CIRCLE_FULL not in quoted[0]:
+            out.append(f"block {n}: the error line lost its message: "
+                       f"{quoted[0][:120]!r}")
+    mw.deleteLater()
+    return out
+
+
 def check_changed_finding_uncollapses():
     """The same rule, the same wording, the same numbers — on a different row. It
     is a different fault about a different circle, and it is quoted in full."""
@@ -999,10 +1037,16 @@ def check_two_faults_on_one_row():
         mw.deleteLater()
         return [f"vp047 no longer carries the Lp1/Lp2 pair on one row: "
                 f"{[f.message[:60] for f in pair]}"]
+    # Precisely: the two share a _finding_key, because identity is the rule plus
+    # the row and both are about row 1. What separates them is the occurrence
+    # counter ChecksMemo.keys appends — which makes them two entries rather than
+    # one — and the signature, which is what decides whether the survivor of the
+    # pair is a finding the model has been given or a new one.
     if A._finding_sig(pair[0]) == A._finding_sig(pair[1]):
-        out.append("the Lp1 and Lp2 faults read as the same finding")
+        out.append("the Lp1 and Lp2 faults carry the same signature, so the "
+                   "survivor of the pair reads as one already reported")
     if len(set(A.ChecksMemo.keys(pair))) != 2:
-        out.append("the two faults on one row share a key")
+        out.append("the two faults on one row are tracked as one entry")
 
     # ... and through the real path: both quoted, and repairing Lp1 leaves the
     # Lp2 fault quoted in full rather than filed under the text of Lp1.
@@ -1063,7 +1107,7 @@ def check_nothing_is_dropped_unnamed():
 
 
 def check_delta_mutations():
-    """Six mutations, one leg each. Every one of them is a plausible reading of
+    """Seven mutations, one leg each. Every one of them is a plausible reading of
     'collapse repeats', and each breaks something the block has to keep."""
     from studio.ai import assistant as A
     out = []
@@ -1095,6 +1139,12 @@ def check_delta_mutations():
         ("field-name digits are values", A, "_NUMBER_RE",
          __import__("re").compile(r"-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?"),
          check_two_faults_on_one_row, "two faults on one row stay two"),
+        # Rotation without the error tier: an error already quoted sorts behind
+        # every new warning and is pushed off the quoted list by a batch of them.
+        ("the rotation outranks the error exemption", A, "_quote_order",
+         lambda rows, keys, memo: (lambda i: memo.quoted_before(keys[i])),
+         check_error_survives_the_quote_cap,
+         "an ERROR is quoted even when the cap is full"),
     )
     for name, target, attr, mutant, leg, legname in mutations:
         real = getattr(target, attr)
@@ -1187,6 +1237,7 @@ CHECKS = [
     ("H. a new finding arrives in full", check_new_finding_is_reported_in_full),
     ("H. an unchanged finding collapses", check_unchanged_finding_collapses),
     ("H. an ERROR never collapses", check_error_never_collapses),
+    ("H. an ERROR outranks the quote cap", check_error_survives_the_quote_cap),
     ("H. a changed finding un-collapses", check_changed_finding_uncollapses),
     ("H. a fresh session reports in full", check_fresh_session_reports_in_full),
     ("H. the staged label survives collapse", check_staged_collapse_keeps_the_label),
@@ -1194,7 +1245,7 @@ CHECKS = [
     ("H. every finding is quoted, not just counted",
      check_every_finding_is_quoted_once),
     ("H. two faults on one row stay two", check_two_faults_on_one_row),
-    ("H. mutation: the delta's six seams", check_delta_mutations),
+    ("H. mutation: the delta's seven seams", check_delta_mutations),
 ]
 
 

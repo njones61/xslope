@@ -74,6 +74,37 @@ Solution (critical surface and factor of safety):
 
 <!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.985, fs_bishop=0.985, fs_janbu=0.969, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.985 -->
 
+And here is a copy carrying variation (a) alone — a 750 psf distributed load over
+the 10 ft strip of crest between x = 25 and x = 35, with no tension crack and no
+submergence. It is the model built in
+[Tutorial LEM-2](../tutorials/lem02_loads_on_the_crest.md), which takes the load
+further: the same resultant as a line load, the same intensity read as a normal
+pressure and as a dead weight, a seismic coefficient, and the cohesion that would
+carry it all at FS = 1.5.
+
+Excel input file: [xslope_crest_surcharge.xlsx](files/xslope_crest_surcharge.xlsx)
+
+Inputs:
+
+![crest_surcharge_inputs.png](../tutorials/images/lem02_inputs.png){width=700}
+
+Solution (critical surface and factor of safety):
+
+![crest_surcharge_results.png](../tutorials/images/lem02_solution_load.png){width=700}
+
+The critical circle exits the crest at the far edge of the loaded strip: it
+carries the whole surcharge and no soil beyond it.
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.918 | 0.918 | 0.950 | 0.953 | 0.939 | 0.918 | 0.918 |
+<!-- /fs-table -->
+
+<!-- test: file=files/xslope_crest_surcharge.xlsx, type=circular_search, num_slices=40, fs_oms=0.918, fs_bishop=0.918, fs_janbu=0.950, fs_corps=0.953, fs_lowe=0.939, fs_spencer=0.918, fs_mprice=0.918 -->
+
 ### 2. Simple Slope with Foundation
 
 This problem involves a uniform material extending below the toe of the slope. 

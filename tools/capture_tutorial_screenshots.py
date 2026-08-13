@@ -149,11 +149,20 @@ def lem01_circles():
 
 
 def lem01_run_lem():
-    """The Run LEM dialog on the complete model, set up for the tutorial's first run:
-    Bishop, a single surface, 40 slices — and a clean model-checks column."""
+    """The Run LEM dialog on the complete model, filled in the way the step beside
+    it dictates: Spencer, an auto search, 40 slices — and a clean model-checks
+    column.
+
+    The dialog is photographed in the state the reader's own dialog is in when
+    they press **Run**, not in the state it opens in: the page's numbered list is
+    read against this figure, and a capture showing the defaults would have the
+    reader checking their choices against a picture of the choices not yet made.
+    Surface takes no default — this model defines circles and no non-circular
+    surface, so the row is the fixed label the step describes.
+    """
     from studio.dialogs import RunLemDialog
 
-    dlg = RunLemDialog(defaults={"method": "bishop", "analysis": "single_surface",
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
                                  "num_slices": 40},
                        slope_data=_load(LEM01))
     dlg.resize(dlg.sizeHint())

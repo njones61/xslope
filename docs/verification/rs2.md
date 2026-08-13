@@ -321,7 +321,7 @@ independently verifiable.
 | [63](#rs2-63) | 🟢 | Homogeneous slope assessment | Spencer 1.398 vs Slide2 1.380 (+1.3%) · SSRM 1.409 vs RS2 SSRM 1.38 (+2.1%) | Cheng et al. (2007), 11 m homogeneous slope. |
 | [64](#rs2-64) | 🔴 | Three homogeneous landslides | C1: SSRM 5.166 vs RS2 SSR 5.14 (+0.5%) · C3: SSRM 4.783 vs RS2 SSR 4.69 (+2.0%) · C5: SSRM 5.579 vs RS2 SSR 5.47 (+2.0%) · C7: SSRM 1.639 vs RS2 SSR 1.70 (−3.6%) · C11: SSRM 1.403 vs RS2 SSR 1.46 (−3.9%) · C12: SSRM 1.147 vs RS2 SSR 1.22 (−6.0%) · C2: SSRM 6.486 vs RS2 SSR 6.10 (+6.3%) · C4: SSRM 5.336 vs RS2 SSR 4.95 (+7.8%) | **partial** (8 of 12 locked; C6 and C8–C10 blocked). Teoman et al. (2004) Ankara clay E90 highway, each case pinned by RS2 to a digitized proposed slip surface. C4 sets the dot; on it and C2 the Teoman and Slide2 Bishop columns (5.32 / 5.32 and 6.67 / 6.64) sit beside XSLOPE, but they are cross-method and cannot carry the comparison. |
 | [65](#rs2-65) | 🟢 | Tailings dam | SSRM 1.306 vs RS2 SSRM 1.29 (+1.2%) | Tzenkov (2008) Padina dam, 8 materials on a 225 × 77 m section, locked at the vendor's own mesh density. The reference FEM 1.41 and the LEM columns are cross-bearings that do not govern. |
-| [66](#rs2-66) | 🟢 | Embankment basal stability | Face skin, h₁ = 2 m: SSRM 1.044 vs closed form 1.050 (−0.6%) | **built** — two mechanisms, both locked across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m, and every file meshes its soft band at 1.05 m. The dot is the face skin's, against a closed form that does not depend on the flow rule. The deep family (1.131 at h₁ = 2 and 4 m, 1.031 at 10 m) is recorded beside RS2's SSR column rather than scored against it: every published solution of this problem runs associated flow, ψ = φ, where XSLOPE runs ψ = 0. The section also reads the family on RS2's own published meshes. |
+| [66](#rs2-66) | 🟢 | Embankment basal stability | Face skin, h₁ = 2 m: SSRM 1.044 vs closed form 1.050 (−0.6%) | **built** — two mechanisms, both locked across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m, and every file meshes its soft band at 1.05 m. The dot is the face skin's, against a closed form that does not depend on the flow rule. The deep family (1.131 at h₁ = 2 and 4 m, 1.031 at 10 m) is recorded beside RS2's SSR column rather than scored against it: every published strength-reduction solution of this problem runs associated flow, ψ = φ, where XSLOPE runs ψ = 0. The section also reads the family on RS2's own published meshes. |
 | [67](#rs2-67) | 🟢 | Earth dam under steady & transient unsaturated seepage | Case 1 (dry): SSRM 2.479 vs RS2 SSR 2.48 (0.0%) · Case 2 (steady): SSRM 1.680 vs RS2 SSR 1.70 (−1.2%) · Case 3 (90 h, downstream): SSRM 1.820 vs RS2 SSR 1.83 (−0.5%) · Case 3 (90 h, upstream): SSRM 2.008 vs RS2 SSR 2.04 (−1.6%) · Case 4 (1500 h, downstream): SSRM 2.320 vs RS2 SSR 2.34 (−0.9%) · Case 4 (1500 h, upstream): SSRM 2.742 vs RS2 SSR 2.76 (−0.7%) | **built** (6 of 6 locked). Three run on RS2's own imported drawdown pore-pressure fields; three reconstruct the flow by an own steady solve from the vendor's boundary conditions. |
 | [68](#rs2-68) | 🔴 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.433 vs Loukidis Spencer 0.431 (+0.5%) · Case 3 Bishop: k꜀ 0.169 vs Slide2 Bishop 0.155 (+9.0%) · Case 3 Spencer: k꜀ 0.167 vs Loukidis Spencer 0.155 (+7.7%) | The target is a **critical seismic coefficient** k꜀, not a factor of safety, reached by a `critical_kc` bisection. Case 3 sets the dot on its Bishop leg. Loukidis publishes a Spencer k꜀ but no Bishop k꜀ for this example — the RS2 manual columns it the other way round — so Slide2 is the Bishop authority. Every input class verifies against the vendor `#068_03` model; RS2's own SSRM k꜀ 0.161 is a strength-reduction number and stays a cross-bearing. |
 
@@ -1088,8 +1088,8 @@ The problem is a 7 m and an 8.75 m embankment of two cohesionless fills on five 
 with a single geosynthetic sheet at the fill base (Borges & Cardoso 2002). RS2 publishes an
 SSR factor for both heights, and Part IV publishes three more for the same problem.
 
-**The SSR rows are not attempted.** RS2 does not mesh the section as one body. Its models split
-the solid mesh along the geotextile into two, 39 coincident node pairs joined by frictional slip
+**The SSR rows are not attempted.** RS2 does not mesh the section as one body. Its `#024` models
+split the solid mesh along the geotextile into two, 39 coincident node pairs joined by frictional slip
 joints (c = 0, φ = 30.96°), with the geotextile itself as tension-only beam elements
 (EA = 200 000 kN/m, Ft = 200 kN/m) running along the split — so the load path between embankment
 and foundation passes through a sliding interface. XSLOPE meshes a bonded continuum and has no
@@ -2007,10 +2007,10 @@ puts the LEM well below Slide2's published 1.037; the drained-fill model is the 
 references use and the one the file carries.
 
 Across the seven parametric variants (vp088–vp094 — fill quality, reinforcement length/type,
-foundation soil, water, surcharge, tier count), the SSRM converges on four, landing 0.78–1.14
-and bracketing the published ≈1.0 (as RS2's own four-program spread, 0.86–1.04, does — the
-lowest, vp091, is the c = 0/φ = 18° foundation case that fails in bearing, where L&H's FLAC
-likewise drops to 0.86). Three do not reach equilibrium on this mesh — vp089 (short 4.2 m
+foundation soil, water, surcharge, tier count), the SSRM converges on four, landing 0.78–1.14;
+RS2's own four-program spread on the same variants runs 0.86–1.04. The lowest of XSLOPE's four,
+vp091, is the c = 0/φ = 18° foundation case that fails in bearing, where L&H's FLAC likewise drops
+to 0.86. Three do not reach equilibrium on this mesh — vp089 (short 4.2 m
 reinforcement), vp090 (dual geotextile type) and vp093 (crest surcharge) drop to the
 auto-bracket floor, a mesh/reinforcement-geometry convergence gap. With feature-aware mesh refinement near the reinforcement lines
 (`refine_factor`), all three do reach equilibrium, but at refinement-sensitive rather than
@@ -2905,9 +2905,9 @@ Both mechanisms are locked:
 **Which mechanism each published column reports.** RS2's SSR column is the deep mechanism
 throughout, and the filtered XSLOPE row runs +0.1 / −5.0 / −3.2 / −2.2 / −1.8% from it at
 h₁ = 2 / 4 / 6 / 8 / 10 m. Those differences are recorded beside the published values, not scored
-against them: every published solution of this problem runs associated flow where XSLOPE runs
-ψ = 0 (the *flow rule* below), so the deep column measures a stated modelling difference as well
-as a solver one. This row's dot is the face skin's, whose closed form carries no flow rule at all.
+against them: every published strength-reduction solution of this problem runs associated flow
+where XSLOPE runs ψ = 0 (the *flow rule* below), so the deep column measures a stated modelling
+difference as well as a solver one. This row's dot is the face skin's, whose closed form carries no flow rule at all.
 The Slide2 Spencer column in the same table is **not one mechanism**: at
 h₁ = 2 m and h₁ = 10 m it reports 1.05, the face-skin closed form to three significant figures, and
 the manual's h₁ = 2 m figure draws its critical surface as a thin sliver on the embankment face;
@@ -2967,8 +2967,9 @@ The cutoff is therefore read on the model in hand rather than carried across the
 
 **The flow rule is the one modelling difference this build cannot follow.** Nakamura and RS2 run
 associated (ψ = φ) where XSLOPE is non-associated throughout (ψ = 0, the Griffiths convention this
-corpus uses). Both sources state it: the vendor models carry dilation 35° in the fill and zero in
-both clays, and Nakamura's paper names its method SSR-FEM (ψ = φ). It is
+corpus uses). All three sources state it: the vendor models carry dilation 35° in the fill and
+zero in both clays, the manual's own problem statement ends "For all soils the Dilation angle (ψ)
+= Friction angle (φ)", and Nakamura's paper names its method SSR-FEM (ψ = φ). It is
 confined to the granular fill, because both φ = 0 clays are dilationless either
 way. Everything else — the boundary fixity, the isotropic K = 1 field stress and the vendor's flat
 50 kPa tensile cap — is transcribed from the vendor model and carried in every lock above.

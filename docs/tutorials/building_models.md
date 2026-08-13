@@ -68,8 +68,9 @@ Every cell of every sheet is catalogued in the
 ## Studio's editors
 
 Studio is a structured editor over the same workbook. The **Inputs** tree lists every
-input category with how many of each the model holds; clicking a category — **Global
-parameters**, **Materials**, **Profile lines**, **Circles** — opens its editor.
+input category, most of them with a count of what the model holds; clicking a
+category — **Global parameters**, **Materials**, **Profile lines**, **Circles** —
+opens its editor.
 
 ![Studio on a model, with the Inputs tree, the section and the Assistant dock](images/t0_studio_window.png)
 
@@ -102,17 +103,22 @@ result.
 
 It is **bring-your-own-model** — it does nothing until you give it a provider and
 credentials. Press **Settings…** in the dock to choose a provider and enter an API
-key, which is stored in your operating system's keychain. With no API key to be had,
-choose **Ollama**, which runs a model on your own machine. The provider library
-ships in the packaged app; a `pip` install needs the `ai` extra. See
+key, which is stored in your operating system's keychain; see
+[Choosing a model](../studio/assistant.md#choosing-a-model) for what each provider
+can do. With no API key to be had, choose **Ollama**, which runs a model on your own
+machine. The provider library ships in the packaged app; a `pip` install needs the
+`ai` extra — see
 [Getting the assistant](../studio/assistant.md#getting-the-assistant).
 
 What matters for building models is where its work lands:
 
 - It **edits the open project**, not a file. Its changes appear on the canvas
   immediately, exactly as if you had typed them into the editors.
-- Its edits go on the **same undo stack**, as labeled steps (*"Assistant: materials,
-  dloads"*), so anything you did not want is one undo away.
+- Its edits go on the **same undo stack**. It works by running one small snippet at
+  a time, and each snippet that changes the model becomes its own labeled step
+  (*"Assistant: materials, dloads"*) — so a single request usually leaves several,
+  each named for what it touched, and you can undo back to any one of them. A
+  snippet that only reads the model leaves no step at all.
 - **Nothing is saved until you use Save As.** The assistant writes no file.
 
 An assistant draft is a draft. Read what it built against what you gave it, and
@@ -125,8 +131,10 @@ audit on a real model, and the checking is most of what that path teaches.
 
 **Save As** writes a new `.xlsx` through the bundled blank template, which is what
 turns an in-memory project — however it was built — into a file. **Save** writes back
-to the same file afterwards. Until the first **Save As**, a new project exists only
-in Studio.
+to the same file afterwards, and on a project that has never been saved it routes to
+**Save As**, since there is no file to write back to. Until that first write, a new
+project exists only in Studio: closing it, or opening something else, prompts you to
+save, discard or cancel.
 
 That workbook is the model. Everything an analysis *produces* is written beside it,
 in files named after it:
@@ -153,25 +161,31 @@ its sidecars, and nothing else. It exists so a project can be emailed or archive
 one file, with everything in it guaranteed to agree — a project sent as loose
 attachments can arrive with a workbook from Tuesday and a mesh from Monday.
 
-**File → Export Project Package…** writes `{base}.xslz` beside the current project.
-The package is built from the files on disk, so Studio offers to save first if the
-session has unsaved edits.
+**File → Export Project Package…** opens a save dialog with `{base}.xslz` filled in
+beside the current project; where it actually goes is yours to choose. The package
+is built from the files **on disk**, so Studio offers to save first whenever the
+session is holding something that has not been written out — unsaved edits, or a
+mesh or a solution whose sidecar does not exist yet.
 
 A package is transport, not a place to work. **File → Open** accepts `.xslz`
-alongside `.xlsx`, and opening one unpacks it to loose files first — into a folder
-named for the package, beside it — then opens the extracted workbook the ordinary
-way:
+alongside `.xlsx`, and opening one unpacks it to loose files first. The dialog shows
+where they will go — a folder named for the package, beside it — and **Change…**
+picks somewhere else:
 
 ![The Open project package dialog](../studio/images/usage_unpack_package_dialog.png)
 
-**Change…** picks a different folder. If the destination already exists it may hold
-edits of your own, so the dialog asks rather than guessing: **Open Existing** leaves
-the folder untouched and opens the project already in it, and **Extract Fresh**
-unpacks into a new folder beside it.
+Studio then opens the extracted workbook through its ordinary open path, so
+everything afterwards refers to that loose workbook rather than to the package.
 
-Every input file on this documentation site is offered as a package, so what you get
-is the whole model rather than a workbook that has to be re-solved. The next
-tutorial's completed model is one of them.
+If the folder is already there it may hold edits of your own, so the dialog asks
+rather than guessing:
+
+![The same dialog when the destination already exists](images/t0_unpack_exists.png)
+
+**Open Existing** leaves that folder untouched and opens the project already in it;
+**Extract Fresh** unpacks into a numbered folder beside it.
+
+The next tutorial's completed model is published as a package:
 
 [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx)
 

@@ -43,6 +43,7 @@ nav:
     - Simple Embankment (LEM): tutorials/lem01_simple_embankment.md
     - Loads on the Crest (LEM): tutorials/lem02_loads_on_the_crest.md
     - A Layered Slope (LEM): tutorials/lem03_layered_slope.md
+    - A Weak Layer, Non-Circular (LEM): tutorials/lem05_weak_layer_noncircular.md
   - XSLOPE Studio:
     - Overview: studio/index.md
     - The Interface: studio/interface.md

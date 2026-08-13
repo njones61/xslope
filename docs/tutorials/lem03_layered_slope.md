@@ -444,8 +444,10 @@ This tutorial demonstrated:
 - Moment-equilibrium methods agreeing exactly on a φ = 0 circle, with the
   force-equilibrium procedures 3–7% higher on circles of their own.
 
-**Where to go next:** the [tutorials index](index.md) lists the rest of the
-series. The sample problems carry the layering further —
+**Where to go next:** [Tutorial LEM-5](lem05_weak_layer_noncircular.md) makes one
+of the layers a weak seam thin enough that no circle can follow it, and enters the
+failure surface as a table of vertices instead. The sample problems carry the
+layering further —
 [three layers with a piezometric line](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
 through them, a section whose
 [layers are polygons](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)

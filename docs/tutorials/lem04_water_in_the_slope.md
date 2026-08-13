@@ -303,8 +303,8 @@ strength as cohesion (φ′ = 12°), and a circle that dives into it trades a
 longer, heavier arc for 82 ft of weak sliding base. Circles that stay out of it
 do not compete: sweep centers across the face for circles tangent to the top of
 the foundation at elevation 40 — sliding entirely through soil 1 and soil 2, on
-two-thirds of the base and a third of the weight — and the lowest they give is
-**1.373**.
+two-thirds of the base and 38% of the weight — and the lowest they give is
+about **1.37**.
 
 Read the figure with the search path in mind. The grey arcs are the circles
 the search tried, the black dots are their centers, the green line is the path
@@ -553,7 +553,7 @@ This tutorial demonstrated:
   every slice base of the solution plot.
 - A search finding the mechanism a layered section really has: a deep circle
   through the soft foundation clay at 1.301, 81.7 ft of its base in that one
-  layer, against 1.373 for the best circle that stays above it.
+  layer, against about 1.37 for the best circle that stays above it.
 - Effective stress doing the work: the same circle reads 1.667 with `u` off and
   1.301 with the line on, with c′, φ′ and the driving weight identical — 22% of
   the factor of safety, all of it out of friction (Σ u Δℓ tan φ′ =

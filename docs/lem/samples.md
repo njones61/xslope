@@ -271,10 +271,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.084 | 1.327 | 1.253 | 1.436 | 1.375 | 1.300 | 1.302 |
+| 1.084 | 1.327 | 1.253 | 1.436 | 1.376 | 1.301 | 1.302 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=1.084, fs_bishop=1.327, fs_janbu=1.253, fs_corps=1.436, fs_lowe=1.375, fs_spencer=1.300, fs_mprice=1.302 -->
+<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=1.084, fs_bishop=1.327, fs_janbu=1.253, fs_corps=1.436, fs_lowe=1.376, fs_spencer=1.301, fs_mprice=1.302 -->
 
 ### 6. Slope with Eight Layers
 

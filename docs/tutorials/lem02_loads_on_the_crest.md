@@ -101,6 +101,10 @@ written to disk until you use **Save As**.
 - **The points sit on the ground surface**, at the crest elevation y = 20. A load
   line floating above the ground is applied where you drew it, not where the
   ground is.
+- **The points run left to right**, x = 25 first and x = 35 second. The
+  intensity between two points is interpolated along the line, so the order
+  decides which end carries which value on a load that is not uniform. If they
+  came back reversed, say: *"List the load points in increasing x."*
 - **Nothing else moved.** The material, the profile line, the maximum depth and
   the starting circle are LEM-1's, unchanged.
 
@@ -163,8 +167,10 @@ However you added it, you now hold the same model:
 
 ![The finished model](images/lem02_inputs.png){width=1000}
 
-Click **Run LEM…** and choose **Method** = `Spencer's Method`, **Surface** =
-`Auto search`, `Circular`, 40 slices. From Python:
+Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
+`Auto search`, with the slice count left at 40. **Surface** is not a choice on
+this model: it reads `Circular` as a fixed label, because the model defines
+circles and no non-circular surface. From Python:
 
 ```python
 from xslope.fileio import load_slope_data
@@ -216,11 +222,16 @@ Morgenstern-Price and all three return **0.918 on the same circle** as Spencer,
 and no trial circle below the minimum goes unsolved.
 
 The surcharge is what changed: pressing down on the crest is the opposite of the
-tension that was breaking those solutions. The most tensile base stress falls
-from −1404 psf to −54 psf, and the line-of-thrust warning clears. The interslice
-tension warning is still there, smaller — the crest of a φ = 0 slope is a place
-where tension is always near — but it no longer decides which surface the search
-can report.
+tension that was breaking those solutions, and it shows up between the slices
+rather than under them. On LEM-1's critical surface Spencer's most tensile
+interslice force was −3258 lb/ft against a largest compression of 5568 — 58% of
+it. Under the surcharge it is −822 lb/ft against 6234, or 13%, and Spencer's
+line-of-thrust warning clears. The base itself barely moves: the most tensile
+base stress goes from −666 psf to −561 psf. So the interslice tension warning is
+still there, smaller — the crest of a φ = 0 slope is a place where tension is
+always near, and Morgenstern-Price still puts its line of thrust outside the
+slice on 15% of the boundaries — but no tensile boundary now decides which
+surface the search is able to report.
 
 ### The same force as a line load
 
@@ -237,7 +248,7 @@ point at the middle of the strip instead:
 - **Assistant** — say: *"Replace the distributed load with a line load of 7500
   lb/ft at x = 30, pointing straight down."*
 
-![The line-loads editor](images/lem02_studio_lloads.png){width=1000}
+![The line-loads editor](images/lem02_studio_lloads.png)
 
 **Angle is measured from horizontal**, and −90 is straight down — the default a
 blank cell takes, and the only value a dead weight ever needs. `P` is a
@@ -309,8 +320,10 @@ With the crest surcharge back in place:
 
 **k is unconditionally driving.** It is applied in the direction that reduces the
 factor of safety, and it acts on the whole sliding mass rather than on the loaded
-strip — which is why a coefficient of 0.15 costs about as much here as the entire
-surcharge did.
+strip: at k = 0.15 that is 0.15 × 40,925 = 6,139 lb/ft of horizontal force,
+against the 7,500 lb/ft the surcharge itself weighs. Pushed sideways rather than
+pressed down, the same order of force costs less — 0.144 off the factor of
+safety, where the surcharge took 0.358.
 
 ### What strength would carry it
 
@@ -325,15 +338,19 @@ would hold FS = 1.5 under the surcharge.
 
 In Studio, click **Run → Parametric…**:
 
-![The Parametric dialog set up for the design sweep](images/lem02_studio_parametric.png){width=1000}
+![The Parametric dialog set up for the design sweep](images/lem02_studio_parametric.png)
 
 1. **Mode** = `Design (FS target)`.
 2. Under **Parameter**, **Material** = `soil` and **Property** = `c`. The
    **Sweeping** line echoes back what that resolves to, `mat:soil:c`.
 3. **From** `500`, **To** `1200`, **Steps** `8`, **Target FS** `1.5`.
-4. Leave **Re-search the critical surface at each step** ticked. **A stronger
-   soil fails on a different circle** — a sweep that re-solves one fixed surface
-   is answering about a surface that stopped being critical several steps ago.
+4. Leave **Re-search the critical surface at each step** ticked. On this model it
+   changes nothing: one uniform φ = 0 soil, so raising c raises the resistance
+   along every surface at once and every step comes back on the same circle.
+   That is the exception. **Give the model layers, or a friction angle, and the
+   critical surface migrates as the parameter moves** — and a sweep that
+   re-solves one fixed surface is then answering about a surface that stopped
+   being critical several steps ago.
 5. **Run**.
 
 From Python, the same study:
@@ -354,9 +371,10 @@ to carry this stockpile at a factor of safety of 1.5.
 Two things about the curve are worth reading:
 
 - **It is a straight line.** With φ = 0 the strength along the surface is c ×
-  length and the driving side does not involve c at all, so the factor of safety
-  is exactly proportional to cohesion. A sweep on a φ > 0 soil, or one that moves
-  the geometry, bends.
+  length and the driving side does not involve c at all; the search returns the
+  same circle at every step, so that length is the same one throughout and the
+  factor of safety is exactly proportional to cohesion. A sweep on a φ > 0 soil,
+  or one whose critical surface moves, bends.
 - **The target is bracketed.** The sweep crossed 1.5 inside the range it was
   given, so 817 psf is interpolated between two solved points rather than
   extrapolated past the last one. A target that never crosses is reported as
@@ -388,8 +406,9 @@ This tutorial demonstrated:
 - Design mode: sweeping one input across a range to find the value that meets a
   target factor of safety, re-searching the critical surface at every step.
 - Reading a load through the surface it moves: the critical circle reorganised
-  itself around the loaded strip, and the compression it added settled the
-  crest-tension anomaly that made LEM-1's methods disagree.
+  itself around the loaded strip, and the compression it added narrowed the
+  disagreement between the methods from 9.9% to 3.8% — LEM-1's crest tension is
+  reduced, not gone.
 
 **Where to go next:** the [tutorials index](index.md) lists the rest of the
 series. [Design Mode](../parametric/design.md) and

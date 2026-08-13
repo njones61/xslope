@@ -319,10 +319,12 @@ Click **Run LEM…**. Choose:
 
 ![The Run LEM dialog](images/lem01_studio_run_lem.png)
 
-1. **Method** = `Spencer's Method` — the method that satisfies both force and moment
+1. **Method** = `Spencer` — the method that satisfies both force and moment
    equilibrium, and the one to reach for by default.
-2. **Surface** = `Auto search`, `Circular`. The search starts from your circle and
-   refines toward the critical one.
+2. **Analysis** = `Auto search`. The search starts from your circle and refines
+   toward the critical one. **Surface** below it is a fixed label reading
+   `Circular`, not a choice: this model defines circles and no non-circular
+   surface, so there is only one family to run.
 3. Leave the slice count at its default of 40.
 4. Click **Run**.
 

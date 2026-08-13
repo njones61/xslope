@@ -205,11 +205,11 @@ from a piezometric line.
 
 ![method_slices_problem.png](sample_images/method_slices_problem.png){width=900}
 
-| Material | γ (pcf) | γ_sat (pcf) | c′ (psf) | φ′ (deg) | u |
-|---|---:|---:|---:|---:|---|
-| soil 1 | 125 | 130 | 400 | 30 | `piezo` |
-| soil 2 | 122 | 127 | 600 | 28 | `piezo` |
-| soil 3 | 115 | 118 | 900 | 12 | `piezo` |
+| Material | Layer | γ (pcf) | γ_sat (pcf) | c′ (psf) | φ′ (deg) | u |
+|---|---|---:|---:|---:|---:|---|
+| soil 1 | Upper, 20 ft | 125 | 130 | 400 | 30 | `piezo` |
+| soil 2 | Middle, 24 ft | 122 | 127 | 600 | 28 | `piezo` |
+| soil 3 | Foundation, 40 ft | 115 | 118 | 900 | 12 | `piezo` |
 
 A firm embankment and middle layer sit on a soft foundation clay, and the critical surface is a deep circle cutting 
 into that clay rather than anything on the face. Every material states both unit weights, so each slice's weight is 

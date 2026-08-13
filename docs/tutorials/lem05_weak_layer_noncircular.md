@@ -43,14 +43,16 @@ looks like when the answer it returns is meaningless.
 | 3 | `Soft Clay` | 118 | 200 | 0 | `none` |
 | 4 | `Dense Sand` | 131 | 0 | 37 | `none` |
 
-**Geometry** — one profile line per material, and the maximum depth at `-10`:
+**Geometry** — entered as profile lines, one per material and each the top of
+its layer (the faster of the two geometry inputs for layered ground; polygons
+are the other), with the maximum depth at `-10`:
 
 | Line | Material | Points (x, y) |
 |---|---|---|
 | 1 | 1 `Sand Fill` | (0, 0), (30, 10), (50, 10) |
-| 2 | 2 `Sand` | (−20, 0), (50, 0) |
-| 3 | 3 `Soft Clay` | (−20, −4), (50, −4) |
-| 4 | 4 `Dense Sand` | (−20, −6), (50, −6) |
+| 2 | 2 `Sand` | (-20, 0), (50, 0) |
+| 3 | 3 `Soft Clay` | (-20, -4), (50, -4) |
+| 4 | 4 `Dense Sand` | (-20, -6), (50, -6) |
 
 Line 1 is the ground surface — the toe, the crest break at the top of the 3:1
 face, and the back of the crest — and the other three are horizontal contacts
@@ -58,18 +60,24 @@ running the full width of the section. By the
 [top-of-a-layer rule](lem03_layered_slope.md#the-problem), line 3 at y = −4 and
 line 4 at y = −6 are what make the clay a 2 ft seam.
 
-**Water** — a piezometric line at elevation −2, from x = −20 to x = 50. Only the
-`Sand` reads it. The clay's strength is undrained — τ = S<sub>u</sub> whatever
-the pore pressure — and no surface in this problem reaches the dense sand; a
-surface that did would need that material's `u` set to `piezo` as well.
+**Water** — a piezometric line, level at elevation −2 across the full section:
+
+| Point | x (ft) | y (ft) |
+|---|---:|---:|
+| 1 | -20 | -2 |
+| 2 | 50 | -2 |
+
+Only the `Sand` reads it. The clay's strength is undrained — τ = S<sub>u</sub>
+whatever the pore pressure — and no surface in this problem reaches the dense
+sand; a surface that did would need that material's `u` set to `piezo` as well.
 
 **The failure surface** — four points, ordered left to right:
 
 | Point | X (ft) | Y (ft) | Movement |
 |---|---:|---:|---|
-| 1 | −10 | 0 | `Free` |
-| 2 | 0 | −5 | `Horiz` |
-| 3 | 25 | −5 | `Horiz` |
+| 1 | -10 | 0 | `Free` |
+| 2 | 0 | -5 | `Horiz` |
+| 3 | 25 | -5 | `Horiz` |
 | 4 | 40 | 10 | `Free` |
 
 The two interior points sit inside the clay, so the segment between them is 25 ft
@@ -77,6 +85,9 @@ of base running flat along the middle of the seam. The two end segments are
 ramps: one down from the flat ground 10 ft beyond the toe, one up to the back of
 the crest. That shape — ramp down, run along the seam, ramp up — is the whole of
 a weak-layer mechanism, and it is the shape no circle has.
+
+The tables are the model: copy the values straight from them into the template's
+worksheets or Studio's editors rather than retyping them.
 
 Three rules govern the table:
 
@@ -597,11 +608,9 @@ This tutorial demonstrated:
   opens from 9% to 144% on a surface whose leading segment has been stood up to
   59°.
 
-**Where to go next:** [Tutorial LEM-4](lem04_water_in_the_slope.md) turns to
-the input this page entered in passing — the piezometric line — and measures
-what the water is worth on the circle a search finds: the same surface with the
-pore pressures on and off, the two unit-weight columns, and a sweep on a
-saturated unit weight.
+**Where to go next:** this page closes the tutorial series — the
+[tutorials index](index.md) lists all five, and the sample problems carry each
+one further.
 [Sample Problem 7](../lem/samples.md#7-non-circular-failure-surface)
 carries this same model into an automated search, and
 [Sample Problem 13](../lem/samples.md#13-multiple-local-minima) is the circular

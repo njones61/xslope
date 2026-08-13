@@ -48,6 +48,9 @@ The problem features the following geometry and material properties:
 
 Maximum depth = `0`, the elevation of the rigid base.
 
+The tables are the model: copy the values straight from them into the template's
+worksheets or Studio's editors rather than retyping them.
+
 ---
 
 ## Choose how you want to build it
@@ -180,7 +183,10 @@ one material, so we'll use the first row of the table:
 ### 3. The `profile` worksheet
 
 A profile line is the *top* of a material layer: everything below it, down to the
-next profile line or the maximum depth, is that layer's material. That is why
+next profile line or the maximum depth, is that layer's material. Geometry can be
+entered as profile lines or as polygons — one closed region per material — but
+profile lines are the faster input for simple layered geometry, and they are what
+this model uses. That is why
 entering the ground surface here defines the whole body of the embankment — one line
 on material 1, with the rigid base closing it from below.
 
@@ -257,7 +263,10 @@ one you meant.
 ### 3. Profile lines
 
 A profile line is the *top* of a material layer: everything below it, down to the
-next profile line or the maximum depth, is that layer's material. Entering the
+next profile line or the maximum depth, is that layer's material. Geometry can be
+entered as profile lines or as polygons — one closed region per material — but
+profile lines are the faster input for simple layered geometry, and they are what
+this model uses. Entering the
 ground surface here therefore defines the whole body of the embankment — one line
 on the material you just created, closed from below by the rigid base. Click
 **Profile lines**, then **Add line**:

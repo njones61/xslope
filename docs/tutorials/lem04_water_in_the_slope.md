@@ -51,8 +51,9 @@ The third soil — the drawing's **Foundation** — is the one to watch: a soft
 clay, φ′ = 12°, carrying almost all of its strength as cohesion. It is weaker
 than the two layers above it, and it is where the critical surface goes.
 
-**Geometry** — one profile line per material, and the maximum depth at `0`,
-the elevation of the rigid base:
+**Geometry** — entered as profile lines, one per material and each the top of
+its layer (the faster of the two geometry inputs for layered ground; polygons
+are the other), with the maximum depth at `0`, the elevation of the rigid base:
 
 | Line | Material | Points (x, y) |
 |---|---|---|
@@ -77,9 +78,16 @@ It starts 4 ft below the crest, steepens as it approaches the face, and comes
 down to the toe — from x = 189.5 on, it lies *on* the lower face and the flat
 ground beyond it. That stretch is where the water reaches the surface.
 
-**The starting circle** — center (195, 150), **Depth** = `18.1`, one seed for
-the search to begin from. The surface this page measures is the one the search
-finds, not this one.
+**The starting circle** — one seed for the search to begin from; the surface
+this page measures is the one the search finds, not this one:
+
+| Xo | Yo | Option | Depth |
+|---:|---:|---|---:|
+| 195 | 150 | Depth | 18.1 |
+
+Every number the model needs is in the tables above — copy the values straight
+from them into the template's worksheets or Studio's editors rather than
+retyping them; the eight-point piezometric line is the one most worth pasting.
 
 ---
 
@@ -568,8 +576,10 @@ This tutorial demonstrated:
   re-search checkbox as the difference between sweeping the surface you entered
   and sweeping the one that governs.
 
-**Where to go next:** the [tutorials index](index.md) lists the rest of the
-series. [Sample Problem 5](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
+**Where to go next:** [Tutorial LEM-5](lem05_weak_layer_noncircular.md) puts the
+failure surface itself in your hands — a 2 ft seam of soft clay no circle can
+follow, entered as a table of vertices.
+[Sample Problem 5](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
 carries this same section into a three-seed search and reports every method on
 both surfaces, and the
 [seepage documentation](../seep/overview.md) replaces the hand-drawn line

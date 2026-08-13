@@ -59,6 +59,9 @@ carries nothing. **A distributed load stops where its points stop** — the
 intensity is not spread over the rest of the crest, and it is not tapered at the
 ends unless you enter a point saying so.
 
+The table is the input: copy the two rows straight from it into the `dloads`
+worksheet or Studio's loads editor rather than retyping them.
+
 ---
 
 ## Choose how you want to build it

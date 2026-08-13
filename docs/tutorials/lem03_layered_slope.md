@@ -41,27 +41,42 @@ answer.
 | 1 | `embankment` | 130 | 400 | 0 | `none` |
 | 2 | `foundation` | 135 | 800 | 0 | `none` |
 
-**Geometry** — one profile line per material, listed top down:
+**Geometry** — a profile line is the *top* of a material layer: everything below
+it, down to the next line or the maximum depth, is that layer's material, so a
+two-layer section takes two lines and the second is the boundary between the
+layers. Geometry can be entered as profile lines or as polygons — one closed
+region per material — but profile lines are the faster input for simple layered
+sections like this one. One line per material, listed top down:
 
 | Line | Material | Points (x, y) |
 |---|---|---|
 | 1 | 1 `embankment` | (0, 0), (40, 20), (90, 20) |
-| 2 | 2 `foundation` | (−30, 0), (90, 0) |
+| 2 | 2 `foundation` | (-30, 0), (90, 0) |
 
 Line 1 is the ground surface: the toe, the crest break at the top of the 2:1
 face, and the back of the crest. Line 2 is the contact — the top of the
 foundation, running the full width of the section. Maximum depth = `-10`, the
 elevation of the rigid rock.
 
-A profile line is the *top* of a material layer, so a two-layer section takes two
-of them and the second one is the boundary between the layers. **Lines go where
-the material changes, and nowhere else.** The toe and the crest break are corners
-of the ground surface, not layer boundaries: they are vertices of line 1.
+**Lines go where the material changes, and nowhere else.** The toe and the crest
+break are corners of the ground surface, not layer boundaries: they are vertices
+of line 1.
 
 The ground runs 30 ft past the toe at elevation 0 because the foundation
 continues there. A surface that dips into the foundation has to come back up
 somewhere, and it comes up on that flat ground — a section that stopped at the
 toe would have nowhere to put the deep mechanism this problem is about.
+
+**Starting circles** — two, sharing a center above the middle of the face at
+twice the slope height, one tangent to the base of each layer:
+
+| Circle | Xo | Yo | Option | Depth |
+|---|---:|---:|---|---:|
+| 1 | 20 | 40 | Depth | 0 |
+| 2 | 20 | 40 | Depth | -10 |
+
+The tables are the model: copy the values straight from them into the template's
+worksheets or Studio's editors rather than retyping them.
 
 ---
 
@@ -233,12 +248,8 @@ says so: *"Generated 3 circles: 3 on the left-facing face (toe at x = 0, height
 | 2 | −10 | tangent to the rigid rock, the base of the foundation |
 | 3 | 0 | tangent to the top of the foundation, the base of the embankment |
 
-**Nothing was dropped here.** The toe circle is the candidate that usually goes —
-on [LEM-1](lem01_simple_embankment.md)'s embankment, whose rigid base is at the
-toe, the arc through the toe bottoms out below the model and the same summary
-line reports *"1 candidate dropped for not daylighting inside the model"*. This
-section has 10 ft of foundation under the toe and 30 ft of ground beyond it, so
-all three candidates survive. Click **OK**.
+The summary reports all three candidates kept — on a section where a circle
+cannot daylight inside the model, it says so instead. Click **OK**.
 
 Continue below.
 
@@ -276,7 +287,11 @@ plot_solution(sd, crit["slices"], crit["failure_surface"], crit["solver_result"]
 
 Each starting circle is a complete failure surface in its own right, and solving
 the three of them — the two the file carries, plus the generator's toe circle —
-is the fastest read on which mechanism this section has:
+is the fastest read on which mechanism this section has. **The table below is
+this page's own comparison, not something the program prints.** Each row is a
+run you can repeat: solve that circle alone with **Run LEM…** and **Analysis** =
+`Single surface`; the factor of safety is the number on that run's solution
+plot, and the weight is ΣW summed over the run's slices:
 
 | Circle | Depth | Factor of safety | Weight of the sliding mass (lb/ft) |
 |---|---:|---:|---:|
@@ -444,10 +459,10 @@ This tutorial demonstrated:
 - Moment-equilibrium methods agreeing exactly on a φ = 0 circle, with the
   force-equilibrium procedures 3–7% higher on circles of their own.
 
-**Where to go next:** [Tutorial LEM-5](lem05_weak_layer_noncircular.md) makes one
-of the layers a weak seam thin enough that no circle can follow it, and enters the
-failure surface as a table of vertices instead. The sample problems carry the
-layering further —
+**Where to go next:** [Tutorial LEM-4](lem04_water_in_the_slope.md) adds the
+input every layer here went without — a piezometric line through a three-layer
+section, and a measure of what the pore pressure it produces is worth on the
+critical circle. The sample problems carry the layering further —
 [three layers with a piezometric line](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
 through them, a section whose
 [layers are polygons](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)

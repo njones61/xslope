@@ -470,5 +470,6 @@ This tutorial demonstrated:
   slope is a modeling omission, fixed with a tension crack at $z_c = 2c/\gamma$,
   after which every method agrees on a lower, defensible answer.
 
-**Where to go next:** Tutorial LEM-2 adds loads to this same section — a surcharge
-on the crest and water above the toe.
+**Where to go next:** [Tutorial LEM-2](lem02_loads_on_the_crest.md) adds loads to
+this same section — a surcharge on the crest, the same force as a line load, an
+earthquake, and the strength it would take to carry them.

@@ -200,10 +200,21 @@ Solution (critical surface and factor of safety):
 
 ### 5. Slope with Multiple Materials and Piezometric Line
 
-This problem features three layers of material with an effective stress analysis where pore pressures are derives 
+This problem features three layers of material with an effective stress analysis where pore pressures are derived 
 from a piezometric line. 
 
 ![method_slices_problem.png](sample_images/method_slices_problem.png){width=900}
+
+| Material | γ (pcf) | γ_sat (pcf) | c′ (psf) | φ′ (deg) | u |
+|---|---:|---:|---:|---:|---|
+| soil 1 | 125 | 130 | 400 | 30 | `piezo` |
+| soil 2 | 122 | 127 | 600 | 28 | `piezo` |
+| soil 3 | 115 | 118 | 900 | 12 | `piezo` |
+
+A firm embankment and middle layer sit on a soft foundation clay, and the critical surface is a deep circle cutting 
+into that clay rather than anything on the face. Every material states both unit weights, so each slice's weight is 
+split at the piezometric line — γ above it, γ_sat below — the behavior [Problem 16](#16-saturated-vs-moist-unit-weight-_sat) 
+isolates.
 
 This problem is featured as part of a graduate course on slope stability analysis (CE 544 - Slope Stability Analysis)
 at Brigham Young University. The problem used in two exercises to illustrate how to solve limit equilibrium slope 
@@ -220,19 +231,22 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 
 ![method_slices_problem_inputs.png](sample_images/method_slices_problem_inputs.png){width=900}
 
-Here is the solution for just the starting circle (to match the problem description) using Bishop's simplified procedure:
+Here is the solution for just the starting circle (to match the problem description), solved with Spencer's method:
 
 ![method_slices_problem_results.png](sample_images/method_slices_problem_results.png){width=900}
+
+The specified circle enters the crest at x = 80.8 and exits on the flat ground at x = 267.8, 215 ft of base carrying 
+696,000 lb/ft. It is not the critical surface — the search below finds one 11% lower.
 
 <!-- fs-table -->
 **Factor of safety by method** (each method on the same specified circle):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.303 | 1.576 | 1.533 | 1.766 | 1.641 | 1.579 | 1.579 |
+| 1.310 | 1.475 | 1.469 | 1.641 | 1.522 | 1.462 | 1.464 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=40, fs_oms=1.303, fs_bishop=1.576, fs_janbu=1.533, fs_corps=1.766, fs_lowe=1.641, fs_spencer=1.579, fs_mprice=1.579 -->
+<!-- test: file=files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=40, fs_oms=1.310, fs_bishop=1.475, fs_janbu=1.469, fs_corps=1.641, fs_lowe=1.522, fs_spencer=1.462, fs_mprice=1.464 -->
 
 Here is the Excel input file with multiple starting circles for a global search for the critical surface:
 
@@ -242,8 +256,9 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 
 ![method_slices_problem_inputs2.png](sample_images/method_slices_problem_inputs2.png){width=900}
 
-Sarch results. This problem is a good example of the search path and the large number of circles that are sometimes 
-tested in the search algorithm. In this case, the critical surface is isolated to sloughing of the 2nd layer.
+Search results. This problem is a good example of the search path and the large number of circles that are sometimes 
+tested in the search algorithm. The three seeds converge on one mechanism: a deep circle entering the crest at 
+x = 121, bottoming out 13 ft into the foundation clay, and exiting on the flat ground at x = 220.
 
 ![method_slices_problem_search_results2.png](sample_images/method_slices_problem_search_results2.png){width=900}
 
@@ -256,10 +271,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0.628 | 0.762 | 0.734 | 0.721 | 0.788 | 0.770 | 0.767 |
+| 1.084 | 1.327 | 1.253 | 1.436 | 1.375 | 1.300 | 1.302 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=0.628, fs_bishop=0.762, fs_janbu=0.734, fs_corps=0.721, fs_lowe=0.788, fs_spencer=0.770, fs_mprice=0.767 -->
+<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=1.084, fs_bishop=1.327, fs_janbu=1.253, fs_corps=1.436, fs_lowe=1.375, fs_spencer=1.300, fs_mprice=1.302 -->
 
 ### 6. Slope with Eight Layers
 

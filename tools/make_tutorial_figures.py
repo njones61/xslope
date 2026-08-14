@@ -1281,6 +1281,8 @@ def lem10_plots():
     # finds the deep circle through all three clays. Both at the Run dialog's
     # default 40 slices, which is the flow the page walks.
     vp75 = load_slope_data(LEM10_VP75)
+    capture("lem10_vp75_inputs.png", plot_inputs, vp75,
+            title="Slope Geometry and Inputs")
     gen75 = generate_starting_circles(vp75)
     # The trap the page shows is the SINGLE plausible seed: the per-layer circle
     # tangent to the marine-clay top (the one an engineer might place, expecting

@@ -34,8 +34,6 @@ with no seeds at all (Part B).
 
 ## Part A — An embankment on soft clay
 
-![A cohesionless embankment on a soft clay foundation](../lem/sample_images/mult_min_inputs1.png){width=700}
-
 A 15 ft embankment of clean sand — 120 pcf, cohesionless, φ = 30° — stands at
 2.25:1 on 20 ft of soft undrained clay, 120 pcf with c = 450 psf and φ = 0.
 **c = 0 in the fill** is what makes the section interesting: nothing in the
@@ -152,11 +150,22 @@ granular fill embankment — c′ = 0, φ′ = 30° — with a wide berm, restin
 three soft φ = 0 clays: a 4 m crust at c = 41 kN/m², 8 m of marine clay at
 34.5 kN/m², and 7 m of lacustrine clay at 31.2 kN/m². Two deep mechanisms
 compete here too: a circle that exits through the wide berm, and a wider one
-that runs beneath it and daylights beyond. Download
-[vp075.xlsx](../verification/files/rocscience/vp075.xlsx) and open it.
+that runs beneath it and daylights beyond.
 
-Replace the file's three circles with a single one an engineer might
-reasonably place — mid-depth, under the crest:
+### Opening the model
+
+Download
+[vp075.xlsx](../verification/files/rocscience/vp075.xlsx) and open it in
+Studio — **File → Open**. The Inputs plot draws the four profile lines in
+their materials' colors, with the file's three starting circles spanning
+shallow to deep:
+
+![The loaded dyke](images/lem10_vp75_inputs.png){width=1000}
+
+### A single plausible seed
+
+Open **Circles** and replace the file's three rows with a single circle an
+engineer might reasonably place — mid-depth, under the crest:
 
 | Xo | Yo | Option | Depth |
 |:---:|:---:|---|:---:|
@@ -171,6 +180,8 @@ Run **Spencer**, `Auto search`, with **Ignore surficial failures** on and
 base of the model, cuts all three clays, and converged cleanly. It exits
 through the berm — and that is exactly what is wrong with it, because the berm
 is there to hold that mechanism.
+
+### Grid search
 
 Now the seeding-independent tool. **Grid search (auto-seed the circular
 search)**, the checkbox beside the surficial filter, sweeps a grid of circle

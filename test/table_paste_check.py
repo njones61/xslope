@@ -939,6 +939,42 @@ def test_lem07_profile_to_constant():
         method="bishop", num_slices=50, expected_fs=1.075, occurrence=1)
 
 
+def test_lem10_seed_circle():
+    """LEM-10 Part A's edit: the file's deep circle replaced by the embankment
+    seed. Same shape as LEM-7's legs — the page ships the pre-edit model, so the
+    searched factor of safety is the oracle: the page prints 1.299 for the moved
+    seed, and a wrong cell or a dropped digit moves it."""
+    from studio.editors import CirclesEditor
+    from xslope.search import circular_search, file_search_window
+
+    page = "lem10_global_minimum.md"
+    printed = _taught(page, ["Xo", "Yo", "Option", "Depth"])
+    model = _load(os.path.join(_MODELS, "xslope_mult_min_KEY.xlsx"))
+    out = _fail(len(printed) == 1,
+                f"LEM-10 seed: the page prints {len(printed)} rows; the edit is one")
+    before = model["circles"][0]
+    out += _fail(abs(float(before["Xo"]) - float(printed[0][0])) > 1e-9,
+                 "LEM-10 seed: the shipped circle already sits at the page's "
+                 "seed — the page teaches a change")
+
+    editor = CirclesEditor()
+    dlg = editor.build(model, None)
+    _paste(dlg._editable, _tsv(printed))
+    out += _fail(_summary(dlg._editable) == "Pasted 1 row × 4 columns.",
+                 f"LEM-10 seed: the status line read {_summary(dlg._editable)!r}")
+    landed = dict(model)
+    editor.apply(landed, dlg)
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(landed, "spencer", num_slices=40,
+                                            diagnostic=False,
+                                            **file_search_window(landed))
+    fs = fs_cache[0]["FS"] if fs_cache else float("nan")
+    out += _fail(abs(fs - 1.299) < 5e-4,
+                 f"LEM-10 seed: the pasted seed searches to {fs:.6f}, not the "
+                 f"1.299 the page prints for it")
+    return out
+
+
 def test_lem08_reinforcement_blocks():
     """LEM-8's two reinforcement blocks pasted into the real editor's table view: the
     Label..y2 table whole (Label is the editor's first column, as it is the sheet's),
@@ -1093,6 +1129,7 @@ CHECKS = [
     ("LEM-6 materials", test_lem06_materials),
     ("LEM-7 power -> Mohr-Coulomb", test_lem07_power_to_mohr_coulomb),
     ("LEM-7 c/p -> constant", test_lem07_profile_to_constant),
+    ("LEM-10 seed circle", test_lem10_seed_circle),
     ("LEM-8 materials", test_lem08_materials),
     ("LEM-9 materials", test_lem09_materials),
     ("LEM-3 profile lines and circles", test_lem03_profile_lines_and_circles),

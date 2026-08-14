@@ -660,6 +660,18 @@ LEM08 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_reinforce.xlsx")
 
 
 
+def _all_usages(dlg):
+    """Tick every usage toggle except Reliability — the app's own default.
+
+    Explicit for the same reason the paste tests pin it: toggle state persists
+    per editor, so a dry page's _lem_only capture earlier in the same batch
+    would otherwise leak into a wet page's shot and hide the columns its
+    14-column paste needs."""
+    for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(tag != "rel")
+    return dlg
+
+
 def _lem_only(dlg):
     """Untick every non-LEM usage toggle so the capture shows the LEM problem.
 
@@ -939,7 +951,7 @@ def lem04_materials():
     """
     from studio.editors import MaterialsEditor
 
-    return _grab(_mat_table(MaterialsEditor().build(_load(LEM04), None)),
+    return _grab(_mat_table(_all_usages(MaterialsEditor().build(_load(LEM04), None))),
                  "lem04_studio_materials.png")
 
 
@@ -975,7 +987,7 @@ def lem05_materials():
     clay among them, told from the sand fill by its cohesion."""
     from studio.editors import MaterialsEditor
 
-    return _grab(_mat_table(MaterialsEditor().build(_load(LEM05), None)),
+    return _grab(_mat_table(_all_usages(MaterialsEditor().build(_load(LEM05), None))),
                  "lem05_studio_materials.png")
 
 

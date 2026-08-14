@@ -25,7 +25,7 @@ use grid seeding and a minimum slip depth to find the mechanism a design is
 sized for.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">grid seeding</span><span class="tg-pill">minimum slip depth</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) — the same file used by [LEM Sample Problem 13](../lem/samples.md#13-multiple-local-minima)</div>
+<div class="tgm-model" markdown>**Completed models** — [xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) (the same file used by [LEM Sample Problem 13](../lem/samples.md#13-multiple-local-minima)) and, for the closing example, [vp075.xlsx](../verification/files/rocscience/vp075.xlsx), the James Bay dyke of [verification problem VP75](../verification/rocscience.md#vp75)</div>
 </div>
 
 ---
@@ -169,10 +169,15 @@ both boxes and set the depth to `5`:
 
 With grid seeding on and a minimum slip depth of `5`, the search returns
 **1.376** on the deep circle — the foundation mechanism, found without being
-seeded. From the embankment circle alone the same 5 ft filter returns 1.455, on
-a 33 ft circle inside the fill, and only at 8 ft reaches 1.376. The filter
-decides which surfaces are admissible; the seeding decides which of them the
-search ever looks at.
+seeded. From the embankment circle alone, the same 5 ft filter returns
+**1.455**, on a 33 ft circle that stays inside the fill — deeper than the
+sliver it rejected, still clear of the foundation:
+
+![Spencer on the filtered fill circle](images/lem10_solution_filter5.png){width=1000}
+
+Only at 8 ft does the embankment seed reach 1.376. The filter decides which
+surfaces are admissible; the seeding decides which of them the search ever
+looks at.
 
 ### Which answer the model reports
 
@@ -180,6 +185,49 @@ Run every circle in one search and it reports the lowest surface any seed
 reached — here, the 1.299 sliver. **Several starting circles, and agreement
 between them, is the check**; where they disagree, the surfaces decide, and the
 design number is the deep one.
+
+---
+
+## The same lesson at full scale: the James Bay dyke
+
+The section above was built to hold two mechanisms.
+[Verification problem VP75](../verification/rocscience.md#vp75) is a real one
+that does: one of the planned James Bay dykes, from Duncan & Wright's
+Fig. 7.16 — a granular fill embankment with a wide berm resting on three soft
+φ = 0 clays, in metric units. Download
+[vp075.xlsx](../verification/files/rocscience/vp075.xlsx) and open it.
+
+Replace the file's three circles with a single one an engineer might
+reasonably place — mid-depth, under the crest:
+
+| Xo | Yo | Option | Depth |
+|:---:|:---:|---|:---:|
+| 86 | 43 | Depth | 15 |
+
+Run **Spencer**, `Auto search`, with **Ignore surficial failures** on and
+**Min slip depth** = `2` — the metric counterpart of the last section's 5 ft:
+
+![Spencer from the single mid-depth seed](images/lem10_vp75_single.png){width=1000}
+
+**FS = 1.744**, and nothing about it looks wrong: the circle bottoms on the
+base of the model, cuts all three clays, and converged cleanly. It exits
+through the berm — and that is exactly what is wrong with it, because the berm
+is there to hold that mechanism.
+
+Now tick **Grid search** and run again; the grid ignores the circles sheet, so
+it does not matter what is seeded:
+
+![Spencer with grid seeding](images/lem10_vp75_grid.png){width=1000}
+
+**FS = 1.420**, on a wider circle that runs under the berm and daylights beyond
+it — 23% below the single seed's answer, against Slide's 1.464 and Duncan &
+Wright's published 1.45. The wrongly seeded search missed by far more than the
+programs and the textbook differ among themselves, and it reported nothing
+unusual. The full **Generate starting circles…** set also finds 1.420 with the
+2 m filter on — the deep member of the per-layer family reaches it, which is
+[LEM-3's rule](lem03_layered_slope.md#guarding-against-local-minima) doing its
+job. Grid search is the version of that rule that does not depend on any
+circle having been placed at all.
 
 ---
 
@@ -199,6 +247,10 @@ This tutorial demonstrated:
   together returning **1.376**.
 - Reading a search by the surface it converged on, since two answers on one model
   can be 6% apart and describe entirely different failures.
+- The James Bay dyke ([VP75](../verification/rocscience.md#vp75)) at full
+  scale: a single credible seed converging at **1.744** — 23% above the
+  **1.420** that grid seeding, the generated per-layer set, Slide (1.464) and
+  Duncan & Wright (1.45) all agree on.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Sample Problem 13](../lem/samples.md#13-multiple-local-minima) catalogues this

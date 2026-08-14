@@ -1193,6 +1193,18 @@ def lem09_plots():
     capture("lem09_solution_bare.png", plot_solution, bare, crit_b["slices"],
             crit_b["failure_surface"], crit_b["solver_result"])
 
+    # The circular cross-check: the wedge family is a modeling choice, and the
+    # page tests it — one generated seed, the same Janbu, on circles.
+    circ = copy.deepcopy(sd)
+    with contextlib.redirect_stdout(io.StringIO()):
+        circ["circles"] = generate_starting_circles(circ)
+        fs_c, _, _, _ = circular_search(circ, LEM09_METHOD,
+                                        num_slices=LEM09_SLICES,
+                                        diagnostic=False)
+    crit_c = fs_c[0]
+    capture("lem09_solution_circle.png", plot_solution, circ, crit_c["slices"],
+            crit_c["failure_surface"], crit_c["solver_result"])
+
     print("   searched %.4f (ΣW %.0f, ΣT_x %.0f, pile %.0f) · manual's wedge "
           "%.4f · no tiebacks %.4f"
           % (crit["FS"], crit["slices"]["w"].sum(),
@@ -1208,6 +1220,8 @@ def lem09_plots():
 #: searched from the generated circle set and from the deep circle the file
 #: carries, so each answer sits on the surface its own seed converged to.
 LEM10 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_mult_min_KEY.xlsx")
+LEM10_VP75 = os.path.join(REPO_ROOT,
+                          "docs/verification/files/rocscience/vp075.xlsx")
 LEM10_SLICES = 40
 
 
@@ -1254,11 +1268,51 @@ def lem10_plots():
     capture("lem10_solution_deep.png", plot_solution, sd, crit_d["slices"],
             crit_d["failure_surface"], crit_d["solver_result"])
 
+    # The tools section's middle answer: the embankment seed with the 5 ft
+    # surficial filter on — the search stays in the fill and returns the 33 ft
+    # circle, deeper than the sliver and shallower than the foundation.
+    fs_f5, _, _ = _lem10_search(sd, shallow, min_slip_depth=5.0)
+    crit_f = fs_f5[0]
+    capture("lem10_solution_filter5.png", plot_solution, sd, crit_f["slices"],
+            crit_f["failure_surface"], crit_f["solver_result"])
+
+    # The second slope: VP75, the James Bay dyke — the corpus's local-minimum
+    # showcase. The generated per-layer seeds settle in the fill; the grid
+    # finds the deep circle through all three clays. Both at the Run dialog's
+    # default 40 slices, which is the flow the page walks.
+    vp75 = load_slope_data(LEM10_VP75)
+    gen75 = generate_starting_circles(vp75)
+    # The trap the page shows is the SINGLE plausible seed: the per-layer circle
+    # tangent to the marine-clay top (the one an engineer might place, expecting
+    # the failure in the fill), searched alone with the 2 m surficial filter.
+    single = [c for c in gen75 if abs(c["Depth"] - 15.0) < 1e-6]
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_1, _, _, _ = circular_search(dict(vp75, circles=single), "spencer",
+                                        num_slices=40, min_slip_depth=2.0,
+                                        diagnostic=False)
+        fs_all, _, _, _ = circular_search(dict(vp75, circles=gen75), "spencer",
+                                          num_slices=40, min_slip_depth=2.0,
+                                          diagnostic=False)
+        fs_grid, _, _, _ = circular_search(copy.deepcopy(vp75), "spencer",
+                                           num_slices=40, seed="grid",
+                                           diagnostic=False)
+    crit_1, crit_all, crit_grid = fs_1[0], fs_all[0], fs_grid[0]
+    capture("lem10_vp75_single.png", plot_solution, vp75,
+            crit_1["slices"], crit_1["failure_surface"],
+            crit_1["solver_result"])
+    capture("lem10_vp75_grid.png", plot_solution, vp75,
+            crit_grid["slices"], crit_grid["failure_surface"],
+            crit_grid["solver_result"])
+    print("   vp75 single-seed %.4f · full set+filter %.4f · grid %.4f"
+          % (crit_1["FS"], crit_all["FS"], crit_grid["FS"]))
+
     print("   shallow seed %.4f (Xo %.2f Yo %.2f depth %.3f, ΣW %.0f) · "
-          "deep seed %.4f (Xo %.2f Yo %.2f depth %.3f, ΣW %.0f)"
+          "deep seed %.4f (Xo %.2f Yo %.2f depth %.3f, ΣW %.0f) · "
+          "filter-5 %.4f (Xo %.2f Yo %.2f depth %.3f)"
           % (crit_g["FS"], crit_g["Xo"], crit_g["Yo"], crit_g["Depth"],
              crit_g["slices"]["w"].sum(), crit_d["FS"], crit_d["Xo"],
-             crit_d["Yo"], crit_d["Depth"], crit_d["slices"]["w"].sum()))
+             crit_d["Yo"], crit_d["Depth"], crit_d["slices"]["w"].sum(),
+             crit_f["FS"], crit_f["Xo"], crit_f["Yo"], crit_f["Depth"]))
 
 
 GROUPS = {

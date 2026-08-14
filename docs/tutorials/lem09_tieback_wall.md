@@ -435,6 +435,22 @@ Morgenstern–Price is absent for a different reason — its solver fails on the
 starting wedge itself, so the search never starts and the run reports that the
 starting surface is not viable.
 
+### Why not a circle?
+
+The wedge family is a modeling choice, and it can be tested. Open **Circles**
+and click **Generate starting circles…** to give the search one circular seed —
+the model now holds both surface families, so **Surface** in the Run dialog
+becomes a choice — and run the same Janbu auto search on `Circular`:
+
+![Janbu on the best circle](images/lem09_solution_circle.png){width=1000}
+
+The best circle bottoms out deep and climbs back to the crest break, because a
+circle cannot run flat along a plane. It reads **FS = 1.473, 3% above the
+wedge's 1.431**, and the other methods agree: Spencer 1.473 against 1.412, and
+Bishop — which joins the list because a circle restores its moment arm — 1.487.
+Searched only in circles, this wall would look 3 to 4% safer than it is; the
+non-circular surface is not a nicety, it is the mechanism.
+
 ### The wedge the reference manual gives
 
 The three points entered are a specified surface from the manual this problem

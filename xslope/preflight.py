@@ -4096,7 +4096,10 @@ def _reinf_fem_incomplete(ctx):
                f"{_AT_REINF}.")
 
 
-@rule("reinforce.fem_incomplete_on_lem", WARNING, ("lem",),
+# INFO, not WARNING: on an LEM run this model is complete — a missing FEM-only
+# input is not a defect of the analysis being run (owner ruling 2026-08-14).
+# The FEM's own preflight refuses the file with the full explanation.
+@rule("reinforce.fem_incomplete_on_lem", INFO, ("lem",),
       "Reinforcement complete for the LEM can still be incomplete for the FEM.")
 def _reinf_incomplete_cross(ctx):
     bad = []

@@ -329,9 +329,11 @@ analysis software developed by Stephen G. Wright at the University of Texas at A
 ![noncircular.png](sample_images/noncircular.png){width=900}
 
 The non-circular failure surface is modeled with the following Excel input file. The failure surface is defined by 
-four points. The first and last point are assigned the "Free" option, which causes them to be automatically 
-calculated based on the slope geometry. The two middle points are assigned the "Horiz" option, which causes them to 
-be moved horizontally inside the weak layer.
+four points — the surface the weak-zone generator builds on this section: a track running just above the base of the 
+clay seam at elevation −5.8, entering the ground at the toe and ramping up to the back of the crest. The first and 
+last point are assigned the "Free" option, which causes them to be automatically calculated based on the slope 
+geometry. The two middle points are assigned the "Horiz" option, which causes them to be moved horizontally inside 
+the weak layer.
 
 Excel input file: [xslope_noncircular.xlsx](files/xslope_noncircular.xlsx)
 
@@ -356,11 +358,11 @@ Solution (critical surface and factor of safety):
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| — | — | 1.657 | 1.794 | 1.369 | 1.739 | 1.710 |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| — | — | 1.575 | 1.523 | 1.315 | 1.656 | 1.634 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.657, fs_corps=1.794, fs_lowe=1.369, fs_spencer=1.739, fs_mprice=1.710 -->
+<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.575, fs_corps=1.523, fs_lowe=1.315, fs_spencer=1.656, fs_mprice=1.634 -->
 
 ### 8. Earth Dam 
 

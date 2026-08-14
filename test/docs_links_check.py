@@ -959,11 +959,11 @@ LEM05_RUN_SURFACE = "Non-circular"
 #: steeper than the search's own ``max_base_angle``: the Run box's message (the
 #: ``AnalysisError`` Studio's LEM runner turns into a "LEM run failed" box) and the
 #: Log pane's line under it. The page quotes both verbatim in its end-ramp section,
-#: demonstrated on the crest point pulled in to x = 30 -- a 71.6 degree exit ramp,
+#: demonstrated on the crest point pulled in to x = 35 -- a 72.4 degree exit ramp,
 #: past the 65 degree limit -- so the seed is pinned with them. The starting
 #: surface is rejected before any iteration runs, which is why this pin costs a
 #: rejected slice-generation rather than a search.
-LEM05_STEEP_EXIT_X = 30.0
+LEM05_STEEP_EXIT_X = 35.0
 LEM05_SEARCH_FAILED = "Search produced no valid surfaces."
 LEM05_SEARCH_LOG = ("the starting surface is not viable (slice generation or the "
                     "solver failed on it)")
@@ -1212,7 +1212,7 @@ def _lem05_editor_labels():
             run_lem_analysis(steep, "spencer", analysis="auto_search",
                              surface="noncircular", num_slices=40)
         fails.append(f"a non-circular search seeded with a "
-                     f"{LEM05_STEEP_EXIT_X:g}-exit surface (a 71.6 degree end ramp, "
+                     f"{LEM05_STEEP_EXIT_X:g}-exit surface (a 72.4 degree end ramp, "
                      f"past the search's 65 degree limit) now runs; Tutorial LEM-5 "
                      f"shows it being refused")
     except AnalysisError as e:

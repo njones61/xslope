@@ -302,29 +302,12 @@ as a fixed label — the model defines circles and no non-circular surface.
 
 ![The circular search](images/lem04_search.png){width=1000}
 
-**FS = 1.301**, and the critical circle is not the one you entered. The search
-walked the seed's center down and to the left and settled on a deep foundation
-mechanism: **Xo = 182.37, Yo = 88.32, Depth = 26.90**. It enters the crest at
-x = 121.1, bottoms out at elevation 26.9 — 13.1 ft down into soil 3 — and
-exits on the flat ground at x = 220.3, well beyond the toe. Its base is
-131.4 ft long: 19.1 ft of that in soil 1, 30.5 ft in soil 2 and **81.7 ft in
-soil 3**, and the mass above it weighs 349,677 lb/ft.
-
-That is the soft foundation clay doing what soft foundation clay does. Soil 3
-is the weakest soil in the section and the only one carrying nearly all of its
-strength as cohesion (φ′ = 12°), and a circle that dives into it trades a
-longer, heavier arc for 82 ft of weak sliding base. Circles that stay out of it
-do not compete: sweep centers across the face for circles tangent to the top of
-the foundation at elevation 40 — sliding entirely through soil 1 and soil 2, on
-two-thirds of the base and 38% of the weight — and the lowest they give is
-about **1.37**.
-
-Read the figure with the search path in mind. The grey arcs are the circles
-the search tried, the black dots are their centers, the green line is the path
-its refinement took from the seed at (195, 150), and the red arc is the winner.
-A search that ends with its critical center in the middle of a well-populated
-cloud of dots has genuinely bracketed the minimum; one that ends on the edge of
-its own grid has not.
+**FS = 1.301**, and the critical circle is not the one you entered: the search
+settled on a deep circle through the soft foundation clay — **Xo = 182.37,
+Yo = 88.32, Depth = 26.90** — entering the crest well behind the shoulder and
+exiting past the toe, with most of its base in soil 3. That is where the answer
+should live: soil 3 is the weakest soil in the section, and circles that stay
+above it come back around 1.37 or higher.
 
 ### Holding the circle still {#holding-the-circle-still}
 
@@ -391,27 +374,26 @@ Run the other methods on both states and the pattern holds everywhere:
 | u = `none` | 1.502 | 1.696 | 1.633 | 2.084 | 1.810 | 1.667 | 1.669 |
 | Piezometric line | 1.115 | 1.328 | 1.266 | 1.690 | 1.421 | 1.301 | 1.303 |
 
-Two readings worth taking. **Spencer and Morgenstern-Price agree to 0.2% wet or
-dry** — the two methods that satisfy force *and* moment equilibrium, so where
-they agree either is defensible. Spencer is the one to report because it reaches
-the same complete equilibrium on the simpler assumption — one constant
-interslice force inclination, where Morgenstern-Price assumes an interslice
-force distribution function — which is what makes it the standard reference
-method. Bishop, which satisfies moment equilibrium alone,
-sits 2% above them on this circle. And **the water widens the spread**: OMS
-sits 10% under Spencer dry but 14% under it wet. OMS computes
-each slice's normal force from the weight alone and then subtracts the full
-u·dℓ from it, and on a deep circle under high pore pressure that
-approximation sheds too much normal force — a known conservatism of the
-method, at its worst exactly here.
+Spencer and Morgenstern-Price agree to 0.2% wet or dry — both satisfy force
+*and* moment equilibrium, so where they agree either is defensible. Spencer is
+the one to report because it reaches the same complete equilibrium on the
+simpler assumption — one constant interslice force inclination, where
+Morgenstern-Price assumes an interslice force distribution function — which is
+what makes it the standard reference method. Bishop, which satisfies moment
+equilibrium alone, sits 2% above them on this circle. The water also widens the
+spread between methods: OMS sits 10% under Spencer dry but 14% under it wet,
+because OMS computes each slice's normal force from the weight alone and then
+subtracts the full u·dℓ from it — on a deep circle under high pore pressure
+that approximation sheds too much normal force, a known conservatism of the
+method at its worst exactly here.
 
-One thing a held surface cannot show: the water does not only change the
-strength of a mechanism, it changes *which* mechanism is critical. Set the
-three `u` cells to `none` and run **Auto search** rather than the single
-surface, and the dry slope's own critical circle is a shorter, shallower one
-that never reaches as far into the foundation — 1.651, on a mass of
-241,357 lb/ft. Isolating a variable and finding the critical surface are two
-different runs, and they answer two different questions.
+A held surface also cannot show that the water changes *which* mechanism is
+critical, not just how strong it is. Set the three `u` cells to `none` and run
+**Auto search** rather than the single surface, and the dry slope's own
+critical circle is a shorter, shallower one that never reaches as far into the
+foundation — 1.651, on a mass of 241,357 lb/ft. Isolating a variable and
+finding the critical surface are two different runs, and they answer two
+different questions.
 
 Put the water back — the three cells, returned to `piezo` — before going on.
 

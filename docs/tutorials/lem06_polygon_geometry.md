@@ -286,13 +286,22 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 
 ### What the search finds
 
+When the search completes, the search-results plot shows every circle it
+tried in grey, the path its refinement walked in green, and the critical
+circle in red:
+
 ![The circular search](images/lem06_search.png){width=1000}
 
-**FS = 1.244**, on a circle centered at (18.5, 43.75) with a radius of 43.75. Its
-lowest point is at elevation 0.000 — tangent to the contact between the two
+**FS = 1.244**, on a circle centered at (18.5, 43.75) with a radius of 43.75.
+The solution plot draws that circle with the slice base stresses:
+
+![Spencer on the critical circle](images/lem06_solution.png){width=1000}
+
+Its lowest point is at elevation 0.000 — tangent to the contact between the two
 soils, running along the top of the foundation without entering it. All 40 slice
-bases carry c = 400 psf, the fill's strength, and the sliding mass weighs 61,393
-lb/ft.
+bases carry c = 400 psf, the fill's strength (the green bars are the effective
+normal stress on each base; the dashed red curve is the line of thrust), and
+the sliding mass weighs 61,393 lb/ft.
 
 The dipping base is nowhere near it. Beneath the circle's lowest point the
 bedrock is at −10.97, so the critical surface bottoms out about 11 ft above it,

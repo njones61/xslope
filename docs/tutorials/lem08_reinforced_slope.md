@@ -325,9 +325,14 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 
 ### What the search finds
 
+When the search completes, the search-results plot shows the circles it tried
+in grey and the critical circle in red:
+
 ![The circular search](images/lem08_search.png){width=1000}
 
 **FS = 1.587**, on a circle centered at (−5.13, 46.98) with a radius of 47.26.
+The solution plot draws that circle with the base stresses, the reinforcement
+lines it crosses (grey bars, tension points in red), and the line of thrust:
 
 ![Spencer on the critical circle](images/lem08_solution.png){width=1000}
 

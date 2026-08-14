@@ -177,7 +177,11 @@ sliver it rejected, still clear of the foundation:
 
 Only at 8 ft does the embankment seed reach 1.376. The filter decides which
 surfaces are admissible; the seeding decides which of them the search ever
-looks at.
+looks at. Commercial searches carry the same filter for the same reason: on
+[verification problem VP107](../verification/rocscience.md#vp107), Slide2's
+unfiltered optimization reports minima near 1.03 on small surfaces at a gabion
+wall's face, and the manual excludes them with its own limit sets before
+reporting the answer.
 
 ### Which answer the model reports
 

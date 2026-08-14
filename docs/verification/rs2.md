@@ -142,26 +142,27 @@ cross-bearings.
 
 ## Methodology
 
-Same discipline as the [Slide2 corpus](rocscience.md): geometry from the manuals'
-coordinate-labeled figures, or reused directly from the Slide2 corpus input files where the
-problem is shared, and every value below re-verified automatically whenever XSLOPE changes.
-An SSRM run costs minutes rather than seconds, so the corpus leans on coarse meshes, with
-tolerances wide enough to cover the mesh dependence those meshes carry.
+Geometry comes from the manuals' coordinate-labeled figures, or directly from the
+[Slide2 corpus](rocscience.md) input files where the two manuals share a problem.
+Strength-reduction runs are meshed coarsely — an SSRM solve costs minutes rather
+than seconds — and the stated tolerances cover the mesh dependence that
+coarseness carries.
 
-The SSRM figures in the problem details below carry four panels in a 2 × 2 grid: the FEM
-inputs (geometry, material zones, water, reinforcement, loads) and the maximum shear strain at
-the critical SRF above, the mesh with its material zones and boundary conditions and the
-displacement vectors at the same SRF below. The three variants that reach no equilibrium show
-the inputs panel alone, because there is no failure mechanism to plot, and the three
-limit-equilibrium figures are side-by-side pairs. Each caption says which it is.
+The SSRM figures below carry four panels in a 2 × 2 grid: the FEM inputs
+(geometry, material zones, water, reinforcement, loads) and the maximum shear
+strain at the critical SRF above; the mesh with its material zones and boundary
+conditions, and the displacement vectors at the same SRF, below. Variants that
+reach no equilibrium show the inputs panel alone — there is no failure mechanism
+to plot — and limit-equilibrium figures are side-by-side pairs. Each caption
+says which it is.
 
 **Constraint without a polygon.** RS2 states most of its strength-reduction constraints as an
 `SSR_polygonal_zones` ring, which reads out of the vendor file exactly and is what the rows above
 carry. It states some of them a second way instead: by duplicating a material as a linear-elastic
 twin and assigning it to part of the mesh, so that region cannot yield however far the strength is
-reduced. That is the same constraint in strength terms and it is invisible to any polygon audit, so
-the archive's cases are recorded here as a class. Twelve vendor models constrain this way with no
-polygon at all, and this is where each one's problem is treated:
+reduced. That is the same constraint in strength terms, stated without a polygon. Twelve
+vendor models constrain only this way; each is treated at the row named beside
+it:
 
 | Vendor model | Set | Domain held elastic | Where it is treated |
 |---|---|---:|---|
@@ -175,19 +176,19 @@ polygon at all, and this is where each one's problem is treated:
 | `#079…inf-s` | import | 70.9% | [RS2-41](#rs2-39) |
 | `#081…inf-s` | import | 57.7% | [RS2-43](#rs2-39) |
 
-Where a row reproduces the partition it says so and carries it — as the
-`elastic_materials` run option, or as a file-level elastic material where the vendor splits
-the mesh; where it does not, the row's published value came from a constrained vendor run and
-the row says that too.
+A row that reproduces the partition carries it — as the `elastic_materials` run
+option, or as a file-level elastic material where the vendor splits the mesh; a
+row that does not notes that its published value came from a constrained vendor
+run.
 
-Every value below is bracketed the same way: equilibrium at each trial strength is judged by
-the per-node out-of-balance force test (Dawson, Roth & Drescher 1999), and the verdict on a
-trial that does not reach it is the solver's default **hybrid** criterion, which requires
-displacement evidence before calling the trial failed. The iteration budget is 16 000, and
-40 000 on the one case that needs a refined band ([RS2-62](#rs2-62)).
-Some sections also quote secondary mesh-sweep
-values obtained under a global-norm convergence test, which are indicative of the mesh
-trend rather than directly comparable with the locked values.
+Equilibrium at each trial strength is judged by the per-node out-of-balance
+force test (Dawson, Roth & Drescher 1999); a trial that does not reach it is
+judged by the solver's **hybrid** criterion, which requires displacement
+evidence before calling the trial failed. The iteration budget is 16 000, and
+40 000 on the one case that needs a refined band ([RS2-62](#rs2-62)). Some
+sections also quote secondary mesh-sweep values obtained under a global-norm
+convergence test; these indicate the mesh trend and are not directly comparable
+with the primary values.
 
 ## Status
 

@@ -250,7 +250,7 @@ Results for the methods applicable to non-circular surfaces:
 | Spencer | 1.258 | — | ~1.26 (−0.2%) | — |
 | Morgenstern-Price | 1.248 | 1.261 (−1.0%) | ~1.26 (−1.0%) | SLOPE/W's Bishop on this problem reads 1.269 |
 | Corps of Engineers | 1.336 | — | ~1.26 (+6.0%) | — |
-| Lowe & Karafiath | 1.249 | — | ~1.26 (−0.9%) | — |
+| Lowe & Karafiath | 1.296 | — | ~1.26 (+2.9%) | rides the base-angle admissibility bound — see note |
 | Simplified Janbu | 1.278 | — | ~1.26 (+1.4%) | — |
 
 The two interior surface points are seeded just above the base of the weak
@@ -264,7 +264,10 @@ methods land within ~1% of SLOPE/W's Morgenstern-Price value (1.261): Spencer at
 Engineers reads modestly
 high here, consistent with ground-parallel side-force inclinations on a surface
 with a steep back scarp (XSLOPE uses the standard "Corps #2" convention — see
-[Force Equilibrium Methods](../lem/force_eq.md)).
+[Force Equilibrium Methods](../lem/force_eq.md)). Lowe & Karafiath also reads
+high, and is bound-sensitive on this section: its factor of safety falls
+monotonically as the entry scarp steepens, so its search rides the 65°
+base-inclination admissibility limit and its value reflects that bound.
 
 **Sources:** GeoStudio [SLOPE/W Verification Manual](https://files.seequent.com/GeoStudio/Manuals/Slope%20Stability%20Verification%20Manual.pdf),
 sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.
@@ -274,10 +277,10 @@ sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| — | — | 1.278 | 1.336 | 1.249 | 1.258 | 1.248 |
+| — | — | 1.278 | 1.336 | 1.296 | 1.258 | 1.248 |
 <!-- /fs-table -->
 
-<!-- test: file=../lem/files/xslope_acads_weak_layer.xlsx, type=noncircular_search, num_slices=50, fs_janbu=1.278, fs_corps=1.336, fs_lowe=1.249, fs_spencer=1.258, fs_mprice=1.248, benchmark=LEM-2 -->
+<!-- test: file=../lem/files/xslope_acads_weak_layer.xlsx, type=noncircular_search, num_slices=50, fs_janbu=1.278, fs_corps=1.336, fs_lowe=1.296, fs_spencer=1.258, fs_mprice=1.248, benchmark=LEM-2 -->
 
 ### 2.8 — ACADS Weak Layer – Specified Surface {#gs-2-8}
 

@@ -222,12 +222,20 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 ## C — Building it in Studio {#c-building-it-in-studio}
 
-Enter the materials first, as in the earlier tutorials, then click
-**Polygons** in the **Inputs** tree. On a new project the editor opens empty:
-**Add polygon** starts the first zone — which makes this a polygon project —
-and **Add row** adds vertices. Enter (or copy-paste) the embankment ring from
-the table above, set **Material:** to `1: embankment`, and leave **Type:** at
-`material`. **Add polygon** again for the foundation ring, on `2: foundation`:
+### 1. Materials
+
+Click **Materials** in the **Inputs** tree. The editor opens on **Table view**;
+press **Add row** twice and enter (or copy-paste) the two materials from the
+table above — `embankment` then `foundation`, γ, `mc`, c and φ. The row order
+fixes the Mat IDs the polygons reference next.
+
+### 2. Polygons
+
+Click **Polygons**. On a new project the editor opens empty: **Add polygon**
+starts the first zone — which makes this a polygon project — and **Add row**
+adds vertices. Enter (or copy-paste) the embankment ring from the table above,
+set **Material:** to `1: embankment`, and leave **Type:** at `material`.
+**Add polygon** again for the foundation ring, on `2: foundation`:
 
 ![The polygons editor on the foundation zone](images/lem06_studio_polygons.png)
 
@@ -240,8 +248,14 @@ point. There is no **Max depth** field, because a polygon model's bottom
 boundary is drawn rather than typed. And the preview beside the table draws
 filled zones instead of lines — the selected zone outlined and hatched, the
 other dimmed — with the hatched base beneath them following the dip. Click a
-zone or a vertex in that preview to select it. Click **OK**, then enter the
-starting circles from the table above via **Circles**.
+zone or a vertex in that preview to select it. Click **OK**.
+
+### 3. Starting circles
+
+Click **Circles**, press **Add row** twice, and enter (or copy-paste) the two
+circles from the table above — the shared center at (20, 40), one tangent to
+the layer contact at Depth `0` and one reaching down toward the sloping
+bedrock at Depth `-10.7887`. Click **OK**.
 
 Geometry drawn in CAD takes the other road in: **File → Import DXF…** builds a
 polygon project from a drawing's closed regions —

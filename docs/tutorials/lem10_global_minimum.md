@@ -13,7 +13,6 @@ full scale on a real section, the James Bay dyke, where a single credible seed
 reads 23% high. **The lower of the two numbers is not necessarily the
 answer.**
 
-![A cohesionless embankment on a soft clay foundation](../lem/sample_images/mult_min_inputs1.png){width=700}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -34,6 +33,8 @@ with no seeds at all (Part B).
 ---
 
 ## Part A — An embankment on soft clay
+
+![A cohesionless embankment on a soft clay foundation](../lem/sample_images/mult_min_inputs1.png){width=700}
 
 A 15 ft embankment of clean sand — 120 pcf, cohesionless, φ = 30° — stands at
 2.25:1 on 20 ft of soft undrained clay, 120 pcf with c = 450 psf and φ = 0.

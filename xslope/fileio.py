@@ -208,6 +208,25 @@ POLYGON_TYPE_WORDS = {
     'refine': 'refine',
 }
 
+# === v12 reinforcement support-type presets (reinforce sheet, Type column) ===
+# type -> (dir, appl). The same table the sheet holds in its hidden lookup block
+# (reinforce!Z8:AB11), which its Dir and Appl formulas VLOOKUP: picking a Type
+# fills both, and typing over either keeps what was typed until the Type is picked
+# again. Module level rather than local to the loader so the Studio's reinforcement
+# editor fills its Dir/Appl combos from THIS table instead of restating it -- the
+# file, the sheet and the editor cannot then disagree about what a Type means.
+#
+# A blank Type is a generic tensile line: the sheet leaves Dir/Appl blank for it and
+# the loader falls back to ('tangent', 'active'), the pre-v12 behavior.
+REINFORCE_TYPE_PRESETS = {
+    'geosynthetic': ('tangent', 'active'),
+    'nail':         ('axial',   'passive'),
+    'tieback':      ('axial',   'active'),
+    'anchor':       ('axial',   'active'),
+}
+#: What a line with no Type gets: a generic tensile line.
+REINFORCE_TYPE_DEFAULT = ('tangent', 'active')
+
 
 def _opt_size_cell(df, row_idx, col_idx, where):
     """Optional local mesh size cell. Blank -> None; a non-numeric or non-positive
@@ -1950,13 +1969,9 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     reinforcement_lines = []    # FEM format: list of dicts with raw line endpoints and properties
 
     # Type presets fill Dir/Appl when those cells are blank (mirrors the in-sheet
-    # default formulas); explicit values win. Same table as the template legend.
-    _TYPE_PRESETS = {
-        'geosynthetic': ('tangent', 'active'),
-        'nail':         ('axial',   'passive'),
-        'tieback':      ('axial',   'active'),
-        'anchor':       ('axial',   'active'),
-    }
+    # default formulas); explicit values win. REINFORCE_TYPE_PRESETS (module level)
+    # is the one table -- the sheet's lookup block and the Studio editor's fill.
+    _TYPE_PRESETS = REINFORCE_TYPE_PRESETS
 
     for i, row in reinforce_df.iterrows():
         excel_row = i + 3
@@ -1988,7 +2003,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 f"Reinforcement line '{label}' (reinforce sheet, Excel row {excel_row}) has "
                 f"an unrecognized Type='{rtype}'. Expected one of: "
                 f"{', '.join(_TYPE_PRESETS)} (or leave blank for a generic line).")
-        _dir_def, _appl_def = _TYPE_PRESETS.get(rtype, ('tangent', 'active'))
+        _dir_def, _appl_def = _TYPE_PRESETS.get(rtype, REINFORCE_TYPE_DEFAULT)
 
         direction = _choice(row.get('dir'), _dir_def)
         if direction not in ('tangent', 'axial'):
@@ -3083,13 +3098,9 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     # Dir/Appl carry in-sheet default formulas driven by Type: those cells are
     # written ONLY when the value differs from what the Type preset (or the
     # generic default) would produce, so the formulas survive a round-trip and
-    # the preset behavior stays live for hand editing.
-    _REINF_PRESETS = {
-        'geosynthetic': ('tangent', 'active'),
-        'nail':         ('axial',   'passive'),
-        'tieback':      ('axial',   'active'),
-        'anchor':       ('axial',   'active'),
-    }
+    # the preset behavior stays live for hand editing. Same table as the loader,
+    # the sheet's lookup block and the Studio editor's fill.
+    _REINF_PRESETS = REINFORCE_TYPE_PRESETS
     reinf = {}
     for n, r in enumerate(slope_data.get('reinforcement_lines') or []):
         row = 3 + n
@@ -3110,7 +3121,7 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             cell_ref(row, 17): _f(r['E']), cell_ref(row, 18): _f(r['area']) * sp,
         })
         rtype = str(r.get('type', '') or '')
-        d_def, a_def = _REINF_PRESETS.get(rtype, ('tangent', 'active'))
+        d_def, a_def = _REINF_PRESETS.get(rtype, REINFORCE_TYPE_DEFAULT)
         if rtype:
             reinf[cell_ref(row, 7)] = rtype.capitalize()
         if str(r.get('dir', d_def)) != d_def:

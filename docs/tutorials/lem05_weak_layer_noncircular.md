@@ -34,14 +34,16 @@ how deep in the seam the track belongs.
 
 ## The problem
 
-**Materials** — four Mohr-Coulomb (`mc`) soils, listed top down:
+**Materials** — four Mohr-Coulomb (`mc`) soils, listed top down. Unit weights are
+pcf and cohesions psf; the row order is the Mat ID, and the columns none of the
+four use stay blank:
 
-| Mat ID | Name | γ (pcf) | c (psf) | φ (deg) | Pore pressure |
-|:---:|---|:---:|:---:|:---:|---|
-| 1 | `Sand Fill` | 120 | 0 | 37 | `piezo` |
-| 2 | `Sand` | 123 | 0 | 33 | `piezo` |
-| 3 | `Soft Clay` | 118 | 200 | 0 | `none` |
-| 4 | `Dense Sand` | 131 | 0 | 37 | `piezo` |
+| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
+|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| `Sand Fill` | 120 |  | `mc` | 0 | 37 |  |  |  |  |  |  |  | `piezo` |
+| `Sand` | 123 |  | `mc` | 0 | 33 |  |  |  |  |  |  |  | `piezo` |
+| `Soft Clay` | 118 |  | `mc` | 200 | 0 |  |  |  |  |  |  |  | `none` |
+| `Dense Sand` | 131 |  | `mc` | 0 | 37 |  |  |  |  |  |  |  | `piezo` |
 
 Every sand in the drawing is marked c′/φ′ —
 drained, effective-stress strengths — because sand is highly permeable: pore
@@ -301,15 +303,26 @@ Start with **File → New** and work down the **Inputs** tree.
 
 ### 1. Materials, profile lines and water
 
-Click **Materials**, and in **Table view** press **Add row** four times for the
-four soils in the order the table above lists them — the row order is what fixes
-the Mat IDs. Then **Profile lines**: set **Max depth (bottom boundary
-elevation):** to `-10`, and press **Add line** four times, each line taking its
-**Material:** and its vertices from the geometry tables above. The mechanics are
-[LEM-3's](lem03_layered_slope.md#c-building-it-in-studio), twice over.
+Click **Materials**, and in **Table view** press **Add row** four times and
+enter (or copy-paste) the four soils in the order the table above lists them —
+the row order is what fixes the Mat IDs. The seam is the row to check: `Soft
+Clay` is the only one carrying cohesion, and the only one whose `u` is `none`:
+
+![The materials editor on this problem's four soils](images/lem05_studio_materials.png){width=1000}
+
+Then **Profile lines**: set **Max depth (bottom boundary elevation):** to `-10`,
+and press **Add line** four times, each line taking its **Material:** and its
+vertices from the geometry tables above. The mechanics are
+[LEM-3's](lem03_layered_slope.md#c-building-it-in-studio), twice over. Selecting
+line 3 puts the top of the clay in the table, and the preview draws the seam
+inside the section:
+
+![The profile lines editor on the top of the clay seam](images/lem05_studio_profile.png)
 
 Click **Piezometric lines** and, on the **Line 1** tab, **Add row** twice for
-`-20, -2` and `50, -2`. **Line 2 (rapid drawdown)** stays empty.
+`-20, -2` and `50, -2`. **Line 2 (rapid drawdown)** stays empty:
+
+![The piezometric-lines editor holding the flat water table](images/lem05_studio_piezo.png)
 
 ### 2. The failure surface
 
@@ -405,6 +418,9 @@ to hold the surface still.
 ## Exploring the results
 
 ### What the search found {#what-the-search-found}
+
+When the search completes, the search-results plot shows every surface it tried
+and the critical one in red:
 
 ![The Spencer search on the four points](images/lem05_search.png){width=1000}
 

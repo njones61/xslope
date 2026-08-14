@@ -907,6 +907,12 @@ LEM02_DESIGN_SEARCH = "Re-search the critical surface at each step"
 #: per-material form the page's numbered fields belong to, and **Add** is that
 #: form's button — the table's reads "Add row", so a step that pressed the wrong one
 #: would be pressing a button that is not in the view it just asked for.
+#: The two Global-parameters rows LEM-1's first step names by label — the one the
+#: reader sets, and the one the step tells them to leave empty. Both are read off
+#: the same form the page's figure photographs, so a renamed row is a step pointing
+#: at a control the picture no longer shows.
+LEM01_GLOBAL_ROWS = ("Units", "Time")
+
 LEM01_MATERIALS_OPENS_ON = "table"
 LEM01_MATERIALS_VIEWS = ("Table view", "List view")
 LEM01_MATERIALS_ADD = "Add"
@@ -1136,7 +1142,7 @@ def _lem01_editor_labels():
     view for the session, so the remembered value is saved and restored: this
     check must not decide which view the next editor built here opens on.
     """
-    from PySide6.QtWidgets import QPushButton
+    from PySide6.QtWidgets import QLabel, QPushButton
 
     from xslope.fileio import load_slope_data
 
@@ -1182,6 +1188,18 @@ def _lem01_editor_labels():
                          f"reader to press it there. Its buttons read "
                          f"{sorted(listed)}")
         mats.deleteLater()
+
+        # The global-parameters form the page's first step fills, and photographs.
+        from studio.editors import GlobalEditor
+
+        glob = GlobalEditor().build(data, None)
+        rows = {lab.text() for lab in glob.findChildren(QLabel)}
+        for label in LEM01_GLOBAL_ROWS:
+            if label not in rows:
+                fails.append(f"Global parameters has no {label!r} row; Tutorial "
+                             f"LEM-1's first step names it. Its rows read "
+                             f"{sorted(r for r in rows if r)}")
+        glob.deleteLater()
     finally:
         editors_mod._LAST_MATERIALS_VIEW = remembered
     return fails

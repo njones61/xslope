@@ -34,12 +34,14 @@ answer.
 
 ## The problem
 
-**Materials** — two Mohr-Coulomb (`mc`) soils, both undrained:
+**Materials** — two Mohr-Coulomb (`mc`) soils, both undrained. Unit weights are
+pcf and cohesions psf; the row order is the Mat ID the profile lines reference,
+and the columns neither soil uses stay blank:
 
-| Mat ID | Name | γ (pcf) | c (psf) | φ (deg) | Pore pressure |
-|---|---|:---:|:---:|:---:|---|
-| 1 | `embankment` | 130 | 400 | 0 | `none` |
-| 2 | `foundation` | 135 | 800 | 0 | `none` |
+| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
+|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| `embankment` | 130 |  | `mc` | 400 | 0 |  |  |  |  |  |  |  | `none` |
+| `foundation` | 135 |  | `mc` | 800 | 0 |  |  |  |  |  |  |  | `none` |
 
 **Geometry** — a profile line is the *top* of a material layer: everything below
 it, down to the next line or the maximum depth, is that layer's material, so a
@@ -206,9 +208,9 @@ Click **Materials**. The editor opens on **Table view**, which mirrors the `mat`
 worksheet one material per row — the right shape here, because the two soils are
 read against each other and the row order is what fixes the Mat IDs.
 
-Press **Add row** twice and fill them: `embankment`, γ `130`, option `mc`,
-c `400`, f `0`, u `none`; then `foundation`, γ `135`, option `mc`, c `800`,
-f `0`, u `none`.
+Press **Add row** twice and enter (or copy-paste) the two materials from the
+table above — the block starts at the first `name` cell, and its columns are the
+editor's own:
 
 ![The materials editor on this problem's two materials](images/lem03_studio_materials.png)
 
@@ -226,10 +228,15 @@ Click **Profile lines**, and set **Max depth (bottom boundary elevation):** to
    row** twice for `-30, 0` and `90, 0`.
 
 The second line is the contact: by the [top-of-a-layer rule](#the-problem),
-everything below it down to the maximum depth is foundation. The preview redraws
-as you type: two lines in the two materials'
-colors, the second running the full width of the section, and the hatched line
-marking the bottom boundary at elevation −10 beneath both. Click **OK**.
+everything below it down to the maximum depth is foundation. With it selected,
+the editor holds its two vertices and the preview draws it running the full
+width of the section:
+
+![The profile lines editor on the contact](images/lem03_studio_profile.png)
+
+The preview redraws as you type: two lines in the two materials' colors, and the
+hatched line marking the bottom boundary at elevation −10 beneath both. Click
+**OK**.
 
 ### 3. Starting circles
 
@@ -268,7 +275,12 @@ center the two circles share, (20, 40), sits above it — twice the height of a 
 ft slope.
 
 Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40.
+`Auto search`, with the slice count left at 40:
+
+![The Run LEM dialog on the layered model](images/lem03_studio_run_lem.png)
+
+**Surface** reads `Circular` as a fixed label — the model defines circles and no
+non-circular surface.
 
 ---
 
@@ -296,6 +308,9 @@ twice the cohesion of the fill along every extra foot of base. On this section
 the shallow mechanism controls before the search starts.
 
 ### The search result
+
+When the search completes, the search-results plot shows every circle it tried and
+the critical one in red:
 
 ![The circular search](images/lem03_search.png){width=1000}
 

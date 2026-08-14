@@ -171,15 +171,21 @@ However you added it, you now hold the same model:
 ![The finished model](images/lem02_inputs.png){width=1000}
 
 Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40. **Surface** is not a choice on
-this model: it reads `Circular` as a fixed label, because the model defines
-circles and no non-circular surface.
+`Auto search`, with the slice count left at 40:
+
+![The Run LEM dialog on the loaded model](images/lem02_studio_run_lem.png)
+
+**Surface** is not a choice on this model: it reads `Circular` as a fixed label,
+because the model defines circles and no non-circular surface.
 
 ---
 
 ## Exploring the results
 
 ### What the surcharge did
+
+The solution plot draws the critical circle the search settled on, with the base
+stresses under it and the surcharge standing on the crest:
 
 ![Spencer on the loaded model](images/lem02_solution_load.png){width=1000}
 

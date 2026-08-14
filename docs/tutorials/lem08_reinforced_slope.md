@@ -41,10 +41,13 @@ never touches.
 **Materials** — two Mohr-Coulomb (`mc`) soils at the same unit weight, told
 apart by their cohesion:
 
-| Mat ID | Name | γ (pcf) | c (psf) | φ (deg) | Pore pressure |
-|---|---|:---:|:---:|:---:|---|
-| 1 | `shell` | 130 | 300 | 37 | `none` |
-| 2 | `base` | 130 | 0 | 37 | `none` |
+Unit weights are pcf and cohesions psf; the row order is the Mat ID the profile
+lines reference, and the columns neither soil uses stay blank:
+
+| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
+|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| `shell` | 130 |  | `mc` | 300 | 37 |  |  |  |  |  |  |  | `none` |
+| `base` | 130 |  | `mc` | 0 | 37 |  |  |  |  |  |  |  | `none` |
 
 The reinforced fill is material 2 — clean sand, no cohesion at all. Material 1
 is the 2 ft band of cohesive fill along the face, and its 300 psf is there to
@@ -296,20 +299,29 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 ### 1. Materials
 
 Click **Materials** in the **Inputs** tree, press **Add row** twice, and enter
-the two materials from the table above — `shell` then `base`, both at γ = 130
-and φ = 37, told apart by c = 300 and 0.
+(or copy-paste) the two materials from the table above — both at γ = 130 and
+φ = 37, told apart by c = 300 and 0:
+
+![The materials editor on this problem's two soils](images/lem08_studio_materials.png){width=1000}
 
 ### 2. Profile lines
 
 Click **Profile lines**. Two lines, top down — the face band's three vertices,
 then the base's four — each on its material, with **Max depth (bottom boundary
-elevation):** set to `-10`.
+elevation):** set to `-10`. With the face band selected, the preview draws it as
+the narrow wedge along the face, line 2 running out in front of the toe and back
+along the crest behind it:
+
+![The profile lines editor on the face band](images/lem08_studio_profile.png)
 
 ### 3. The surcharge
 
 Click **Distributed loads** and enter the two points from the table above,
 leaving **Direction:** at `Normal (perpendicular to the line)` — on the level
-crest that is straight down.
+crest that is straight down. The preview draws the arrows standing on the crest
+from the crest break to the right-hand edge:
+
+![The distributed-loads editor holding the crest surcharge](images/lem08_studio_dloads.png)
 
 ### 4. Reinforcement lines
 
@@ -347,7 +359,10 @@ same lines, so switching between them loses nothing. Click **OK**.
 Click **Circles** and enter the two circles from the table above, or paste the
 block into the first cell — its four columns are the editor's first four, and
 the rows come with it. **Depth is an elevation**: 0 is the toe, -10 the bottom
-of the model.
+of the model. The `R` column answers on its own, and the preview draws both arcs
+on the section:
+
+![The circles editor on the two starting circles](images/lem08_studio_circles.png)
 
 Continue below.
 
@@ -363,7 +378,14 @@ purple arrows are the crest surcharge, and the two dashed red arcs are the
 starting circles.
 
 Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40.
+`Auto search`, with the slice count left at 40:
+
+![The Run LEM dialog on the reinforced model](images/lem08_studio_run_lem.png)
+
+**Surface** reads `Circular` as a fixed label — the model defines circles and no
+non-circular surface. The model checks beside the controls report one warning on
+this file: the six lines carry a tensile capacity but no axial stiffness, which
+is complete for a limit-equilibrium run and incomplete for a finite element one.
 
 ---
 
@@ -449,6 +471,43 @@ the soil below the sliding mass. A layer the critical surface never crosses is
 not in the analysis — which is what makes the plotted lines worth reading
 against the plotted surface rather than counting the rows in the sheet.
 
+### How long the lines have to be
+
+Re-cut all six layers to a different length and search again — the face end of
+each line held, the back end moved, so length is the only thing changing. Every
+length gets its own search and its own critical circle:
+
+| Line length (ft) | FS | Tension mobilized (lb/ft) | Lines crossed |
+|:---:|:---:|:---:|:---:|
+| 10 | 1.270 | 532 | 2 of 6 |
+| 15 | 1.426 | 1,466 | 4 of 6 |
+| 20 | 1.587 | 4,000 | 5 of 6 |
+| 25 | 1.587 | 4,000 | 5 of 6 |
+| 30 | 1.587 | 4,000 | 5 of 6 |
+| 40 | 1.587 | 4,000 | 5 of 6 |
+
+Beyond 20 ft the answer stops moving, and the four searches that produced it say
+why: each settles on the same circle — center (−5.13, 46.98), the same five
+crossings at the same x — and every one of those crossings already lies at least
+8.4 ft from the nearer end of its line, twice the 4 ft it takes to develop Tmax.
+All five deliver the full 800 lb/ft before anything is lengthened. Adding length
+moves the back end further from crossings the back end never governed. What caps
+the reinforcement on this section is rupture capacity, and length cannot buy more
+of it.
+
+Short lines fail the other way. At 10 ft the critical surface passes *behind* the
+back ends of most of the layers:
+
+![Spencer on the same section with 10 ft geogrids](images/lem08_solution_short.png){width=1000}
+
+The grey bars stop well short of the surface in the middle of the face: only two
+of the six lines are crossed at all, and both crossings are caught within 1.7 ft
+of a tip, inside the pullout ramp, where they mobilize 193 and 340 lb/ft instead
+of 800. At 1.270 that section is barely better than the 1.167 of no reinforcement at
+all. Between the two regimes — 15 ft, four crossings, 1,466 lb/ft — length is
+buying reach and anchorage together, and it is the only part of the range where
+lengthening a geogrid changes the answer.
+
 ### What Dir and Appl change
 
 Both settings are per line, and both move this answer. Switch all six lines to
@@ -488,6 +547,10 @@ This tutorial demonstrated:
   clear of their development zones and unaffected by pullout, one layer at the
   toe the surface never reaches, and 1.539 on the same circle once the pullout
   lengths are long enough to bite.
+- A length study, searched at each length: **1.270** at 10 ft, **1.426** at 15 ft
+  and **1.587** from 20 ft on, flat to 40 — because past 20 ft every crossing is
+  already outside its pullout ramp and carrying the full 800 lb/ft, so the limit
+  is rupture capacity rather than embedment.
 
 **Where to go next:** [LEM-9](lem09_tieback_wall.md) is the other reinforced
 problem — a tieback wall, where the support is discrete and stiff rather than

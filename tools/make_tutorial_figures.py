@@ -38,6 +38,7 @@ import contextlib
 import copy
 import importlib.util
 import io
+import math
 import os
 import sys
 
@@ -986,6 +987,79 @@ def lem08_plots():
              crit_b["Yo"], crit_b["Depth"]))
 
 
+#: The line lengths LEM-8's length study searches, in feet. The face end of every
+#: geogrid is held and the back end moved, so the length IS the variable.
+LEM08_LENGTHS = (10, 15, 20, 25, 30, 40)
+
+
+def _lem08_at_length(model, length):
+    """A copy of the model with every geogrid re-cut to ``length``, face end held.
+
+    Every line in this problem is horizontal, so moving the back end to
+    ``x1 + length`` changes the length and nothing else. The capacity envelope is
+    rebuilt from the new endpoints rather than carried over — the pullout ramps
+    are measured from the ends, so a line whose end moved has a different envelope
+    even though Tmax, Lp1 and Lp2 are untouched.
+    """
+    from xslope.fileio import build_reinforce_lines
+
+    out = copy.deepcopy(model)
+    for r in out["reinforcement_lines"]:
+        r["x2"] = r["x1"] + length
+    out["reinforce_lines"] = build_reinforce_lines(out["reinforcement_lines"])
+    return out
+
+
+def lem08_lengths():
+    """LEM-8's line-length study: a Spencer search per length, and the figure the
+    plateau is read off.
+
+    Each length is its own search — the critical circle is free to move, and below
+    20 ft it does. The numbers printed here are the page's table: the factor of
+    safety, the tension the found surface actually mobilizes, and how many of the
+    six lines it crosses at all, which is what separates the two regimes.
+
+    The figure is the SHORTEST length rather than the longest. At 40 ft the
+    critical circle is the one ``lem08_solution.png`` already shows — identical
+    center, identical radius — so a shot of it would repeat a figure the page
+    carries. At 10 ft the surface is the one the reader cannot otherwise picture:
+    it passes behind the back ends, crossing only two of the six lines and both of
+    those within a couple of feet of a tip.
+    """
+    from shapely.geometry import LineString
+
+    from xslope.fileio import reinforce_available_tension
+
+    sd = load_slope_data(LEM08)
+    for length in LEM08_LENGTHS:
+        model = _lem08_at_length(sd, length)
+        crit = _lem08_search(model)[0][0]
+        crossed, tension = 0, []
+        for r in model["reinforcement_lines"]:
+            hit = crit["failure_surface"].intersection(
+                LineString([(r["x1"], r["y1"]), (r["x2"], r["y2"])]))
+            if hit.is_empty:
+                continue
+            crossed += 1
+            pt = hit if hit.geom_type == "Point" else list(hit.geoms)[0]
+            d1 = math.hypot(pt.x - r["x1"], pt.y - r["y1"])
+            d2 = math.hypot(pt.x - r["x2"], pt.y - r["y2"])
+            tension.append((pt.x, min(d1, d2),
+                            reinforce_available_tension(d1, d2, r["t_max"],
+                                                        r["lp1"], r["lp2"],
+                                                        r.get("tend1", 0.0),
+                                                        r.get("tend2", 0.0))))
+        print("   %2d ft  FS %.4f  ΣT %5.0f  crossings %d  (Xo %.2f Yo %.2f "
+              "depth %.3f)  nearest end %s"
+              % (length, crit["FS"], crit["slices"]["p"].sum(), crossed,
+                 crit["Xo"], crit["Yo"], crit["Depth"],
+                 " ".join("%.1f" % d for _x, d, _t in tension)))
+        if length == LEM08_LENGTHS[0]:
+            capture("lem08_solution_short.png", plot_solution, model,
+                    crit["slices"], crit["failure_surface"],
+                    crit["solver_result"])
+
+
 # --------------------------------------------------------------------------- #
 # LEM-9 — A Tieback Wall
 # --------------------------------------------------------------------------- #
@@ -1198,6 +1272,7 @@ GROUPS = {
     "lem06_plots": lem06_plots,
     "lem08_sheets": lem08_sheets,
     "lem08_plots": lem08_plots,
+    "lem08_lengths": lem08_lengths,
     "lem09_sheets": lem09_sheets,
     "lem09_plots": lem09_plots,
     "lem10_plots": lem10_plots,

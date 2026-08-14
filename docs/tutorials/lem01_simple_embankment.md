@@ -32,11 +32,14 @@ the results carefully enough to catch what the first model gets wrong.
 
 The problem features the following geometry and material properties:
 
-**Material** — one material, Mohr-Coulomb (`mc`):
+**Material** — one material, Mohr-Coulomb (`mc`), at 125 pcf with c = 500 psf and
+φ = 0. The columns are the `mat` worksheet's own, in its order, so the row goes in
+as one block; the row order is the Mat ID, and the columns this problem does not
+use stay blank:
 
-| Mat ID | Name | γ (pcf) | c (psf) | φ (deg) | Pore pressure |
-|---|---|:---:|:---:|:---:|---|
-| 1 | `soil` | 125 | 500 | 0 | `none` |
+| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
+|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| `soil` | 125 |  | `mc` | 500 | 0 |  |  |  |  |  |  |  | `none` |
 
 **Geometry** — Profile Line 1, on material 1 (`soil`), one vertex per row:
 
@@ -232,8 +235,13 @@ The global parameters declare what every number after them means. Click
 **Global parameters** and set **Units** to `Imperial` — XSLOPE never converts
 between unit systems; the declaration states what the numbers you type already
 mean, and drives the unit labels on the plots. The unit weight of water fills
-itself with `62.4`. Leave the tension crack and seismic fields at `0`, and click
-**OK**.
+itself with `62.4`. Leave the tension crack and seismic fields at `0`. The
+finished form carries the declaration and nothing else — **Time** and the two FEM
+fields stay empty on a limit-equilibrium model:
+
+![The global parameters form](images/lem01_studio_global.png)
+
+Click **OK**.
 
 ### 2. Materials
 
@@ -340,6 +348,8 @@ Click **Run LEM…**. Choose:
 ## Exploring the results
 
 ### The search result — and the warnings that come with it
+
+When the search completes, the search-results plot shows every circle it tried:
 
 ![The circular search](images/lem01_search.png){width=1000}
 

@@ -715,6 +715,116 @@ def test_lem06_polygon_rings():
     return out
 
 
+#: The header row every tutorial's materials table carries — the 'mat' worksheet's
+#: own, from the first column a reader fills through the last one any of these pages
+#: teaches. The sheet's leading 'mat' column is not in it: that column is prefilled
+#: with the row number in the template, and the materials editor's first data column
+#: is 'name', so a block starting one column earlier lands every value one field to
+#: the right (the same reason the circles tables start at Xo rather than at #).
+_MAT_HEADERS = ["name", "g", "gsat", "option", "c", "f", "c/p", "r-elev", "d",
+                "psi", "t_cut", "E", "nu", "u"]
+#: The editor field each of those columns is, in the same order.
+_MAT_KEYS = ["name", "gamma", "gamma_sat", "option", "c", "phi", "cp", "r_elev",
+             "d", "psi", "t_cut", "E", "nu", "u"]
+
+
+def _materials_leg(label, page, model_path, occurrence=0):
+    """One page's materials table, pasted into the real materials editor.
+
+    The table is written as a contiguous run of the destination's columns, blanks
+    included, because that is the only shape a single rectangular copy can have:
+    ``u`` is eight columns right of ``f``, so a table that listed only the values it
+    teaches would land its pore-pressure option in ``c/p``. Both halves are checked
+    here — a filled cell against the completed model's own value, and a blank cell
+    against the editor, which must come back holding nothing.
+
+    A blank is NOT checked against the model, because a tutorial teaches the LEM
+    inputs and some of these models also carry FEM ones (``E`` and ``nu`` on LEM-5's
+    soils). The claim under test is the page's: paste this block and the material
+    rows the page teaches are the rows you get. What a blank IS checked against is a
+    cell nobody touched, read out of the same editor — an untouched numeric field
+    comes back as None or 0.0 depending on whether its zero is meaningful, and the
+    distinction belongs to the editor rather than to this file.
+    """
+    from studio.editors import MaterialsEditor, _mat_dim_keys, _new_material
+
+    printed = _taught(page, _MAT_HEADERS, occurrence)
+    model = _load(model_path)
+    editor = MaterialsEditor()
+    dlg = editor.build(dict(model, materials=[]), None)
+    _paste(dlg._table, _tsv(printed))
+    landed = dict(model, materials=[])
+    editor.apply(landed, dlg)
+    rows = landed["materials"]
+
+    # The same-width block with only its first cell filled: every other field then
+    # holds what this editor reads a PASTED blank back as, which is what the page's
+    # empty cells are. It is not the same as an untouched cell — a blank clears the
+    # field — and the value differs by field type, None where a zero would have
+    # meant something and 0.0 where it would not.
+    probe = _new_table(MaterialsEditor.FIELDS, new_row=_new_material,
+                       dim_rule=_mat_dim_keys)
+    _paste(probe, _tsv([["blank"] + [""] * (len(_MAT_HEADERS) - 1)]))
+    untouched = probe.result_rows()[0]
+
+    n = len(printed)
+    out = _fail(_summary(dlg._table)
+                == "Pasted %d %s × %d columns." % (n, "row" if n == 1 else "rows",
+                                                   len(_MAT_HEADERS)),
+                f"{label}: the status line read {_summary(dlg._table)!r}")
+    out += _fail(len(rows) == len(model["materials"]),
+                 f"{label}: the page's table built {len(rows)} materials, "
+                 f"the completed model has {len(model['materials'])}")
+    for i, (got, cells, want) in enumerate(zip(rows, printed, model["materials"])):
+        for key, cell in zip(_MAT_KEYS, cells):
+            if cell == "":
+                out += _fail(got[key] == untouched[key],
+                             f"{label}: row {i + 1} {key} came back {got[key]!r} "
+                             f"from a blank cell, not {untouched[key]!r}")
+            else:
+                out += _fail(_matches(got[key], cell, want[key]),
+                             f"{label}: row {i + 1} {key} pasted as {got[key]!r} "
+                             f"from {cell!r}; the model has {want[key]!r}")
+    return out
+
+
+def test_lem01_materials():
+    return _materials_leg("LEM-1 materials", "lem01_simple_embankment.md",
+                          os.path.join(_MODELS, "xslope_simple_embankment.xlsx"))
+
+
+def test_lem03_materials():
+    return _materials_leg("LEM-3 materials", "lem03_layered_slope.md",
+                          os.path.join(_MODELS, "xslope_simple_mult_layers.xlsx"))
+
+
+def test_lem04_materials():
+    """LEM-4's three soils — the first page whose rows fill BOTH unit-weight columns
+    and set ``u`` to ``piezo``, which is what makes the columns between ``f`` and
+    ``u`` load-bearing rather than decorative."""
+    return _materials_leg("LEM-4 materials", "lem04_water_in_the_slope.md",
+                          os.path.join(_MODELS, "xslope_method_slices_problem.xlsx"))
+
+
+def test_lem05_materials():
+    return _materials_leg("LEM-5 materials", "lem05_weak_layer_noncircular.md",
+                          os.path.join(_MODELS, "xslope_noncircular.xlsx"))
+
+
+def test_lem06_materials():
+    return _materials_leg("LEM-6 materials", "lem06_polygon_geometry.md",
+                          os.path.join(_MODELS, "xslope_sloping_bottom.xlsx"))
+
+
+def test_lem08_materials():
+    return _materials_leg("LEM-8 materials", "lem08_reinforced_slope.md",
+                          os.path.join(_MODELS, "xslope_reinforce.xlsx"))
+
+
+def test_lem09_materials():
+    return _materials_leg("LEM-9 materials", "lem09_tieback_wall.md", LEM09_MODEL)
+
+
 def test_lem08_reinforcement_blocks():
     """LEM-8's two reinforcement blocks pasted into the real editor's table view: the
     Label..y2 table whole (Label is the editor's first column, as it is the sheet's),
@@ -857,6 +967,13 @@ CHECKS = [
     ("a pasted Type fills Dir and Appl", test_a_pasted_type_fills_dir_and_appl),
     ("the list view fills Dir and Appl too",
      test_the_list_view_fills_dir_and_appl_too),
+    ("LEM-1 materials", test_lem01_materials),
+    ("LEM-3 materials", test_lem03_materials),
+    ("LEM-4 materials", test_lem04_materials),
+    ("LEM-5 materials", test_lem05_materials),
+    ("LEM-6 materials", test_lem06_materials),
+    ("LEM-8 materials", test_lem08_materials),
+    ("LEM-9 materials", test_lem09_materials),
     ("LEM-3 profile lines and circles", test_lem03_profile_lines_and_circles),
     ("LEM-4 piezometric line", test_lem04_piezometric_line),
     ("LEM-5 non-circular surface", test_lem05_noncircular_surface),

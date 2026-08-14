@@ -92,6 +92,71 @@ def _list_view(dlg, width):
     return dlg
 
 
+def _mat_table(dlg, through="u"):
+    """Put the materials editor in its TABLE view, wide enough to reach ``through``
+    and tall enough for every row.
+
+    Both dimensions are measured off the built table rather than guessed. The width
+    is taken to the right edge of the column named ``through`` — the last one the
+    tutorial's own material rows fill — because a shot cut off at ``c`` photographs
+    a table whose pore-pressure column the reader is being told to set. The height
+    is the rows' own, so the last material never falls below the scroll.
+
+    The view is set explicitly for the reason ``_list_view`` documents: the editor
+    opens on the last one used.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg._set_mode("table")
+    dlg.show()
+    _settle()
+    tbl = dlg._table.table
+    hh = tbl.horizontalHeader()
+    col = [f.key for f in MaterialsEditor.FIELDS].index(through)
+    rows = sum(tbl.rowHeight(r) for r in range(tbl.rowCount()))
+    # Twice: the first resize takes the slack out of the layout's stretches, and
+    # the chrome measured against a roomy dialog is larger than the chrome of the
+    # tight one it produces. The second pass measures the tight one.
+    for _ in range(2):
+        w = (hh.sectionPosition(col) + hh.sectionSize(col)
+             + (dlg.width() - tbl.viewport().width()))
+        dlg.resize(w, rows + (dlg.height() - tbl.viewport().height()))
+        _settle()
+    return dlg
+
+
+@contextlib.contextmanager
+def _app_defaults():
+    """Run a capture against the app's OWN defaults, not this machine's stored ones.
+
+    The usage toggles above an editor's table — LEM / FEM / Seepage / Reliability —
+    decide WHICH COLUMNS the table view shows, and each is remembered in QSettings
+    the moment anyone clicks it. A capture that simply opened the editor would
+    therefore photograph whatever the person running the producer last had ticked,
+    and the material rows a tutorial teaches would gain or lose columns between one
+    machine and the next. Every ``editor_toggles`` key is removed for the length of
+    the run — each dialog then falls back to the default coded beside it — and the
+    machine's own settings are put back afterwards, whatever happens.
+    """
+    from PySide6.QtCore import QSettings
+
+    settings = QSettings("XSlope", "XSlope Studio")
+    settings.beginGroup("editor_toggles")
+    stashed = {k: settings.value(k) for k in settings.allKeys()}
+    for key in stashed:
+        settings.remove(key)
+    settings.endGroup()
+    settings.sync()
+    try:
+        yield
+    finally:
+        settings.beginGroup("editor_toggles")
+        for key, value in stashed.items():
+            settings.setValue(key, value)
+        settings.endGroup()
+        settings.sync()
+
+
 def _load(path):
     from xslope.fileio import load_slope_data
     with contextlib.redirect_stdout(io.StringIO()):
@@ -433,10 +498,8 @@ def lem03_materials():
     """
     from studio.editors import MaterialsEditor
 
-    dlg = MaterialsEditor().build(_load(LEM03), None)
-    dlg._set_mode("table")
-    dlg.resize(1180, 380)
-    return _grab(dlg, "lem03_studio_materials.png")
+    return _grab(_mat_table(MaterialsEditor().build(_load(LEM03), None)),
+                 "lem03_studio_materials.png")
 
 
 def lem03_circles():
@@ -654,6 +717,294 @@ SHOTS["lem09_reinforcement"] = lem09_reinforcement
 SHOTS["lem09_piles"] = lem09_piles
 
 
+# --------------------------------------------------------------------------- #
+# Studio-path parity — a completed dialog for every build step
+#
+# The Excel path shows the finished worksheet under each of its steps; the Studio
+# path shows the finished dialog under each of its. The shots below fill in the
+# steps that carried none, and every one of them photographs the editor in the
+# state its own step ends in, on that tutorial's own model.
+#
+# The Run LEM dialog is captured per page for the same reason: the numbered choices
+# under "Running the analysis" are read against a picture of the choices MADE, so
+# each page's shot carries that page's method and that page's surface row — which
+# is a fixed label on a model defining one surface family and a selector on a model
+# defining both.
+# --------------------------------------------------------------------------- #
+def _run_lem(model, name, method="spencer", analysis="auto_search"):
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": method, "analysis": analysis,
+                                 "num_slices": 40},
+                       slope_data=_load(model))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, name)
+
+
+def lem01_global():
+    """The global-parameters form as LEM-1's first Studio step leaves it.
+
+    The model carries the answers the step dictates — Imperial, water at 62.4, and
+    the tension crack and seismic fields at 0 — so the shot is the form filled,
+    which is what the reader checks their own against. The unit-weight field is the
+    one Units autofills, and it is photographed holding the autofilled value rather
+    than a typed one.
+    """
+    from studio.editors import GlobalEditor
+
+    dlg = GlobalEditor().build(_load(LEM01), None)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem01_studio_global.png")
+
+
+def lem02_run_lem():
+    return _run_lem(LEM02, "lem02_studio_run_lem.png")
+
+
+def lem03_profile():
+    """The profile-lines editor with both of LEM-3's lines entered, the CONTACT
+    selected.
+
+    The second line rather than the first: it is the one the step's paragraph is
+    about — the top of the foundation, and by the top-of-a-layer rule everything
+    beneath it down to the maximum depth — and selecting it puts its two vertices
+    in the table while the preview draws it running the full width of the section
+    under the embankment.
+    """
+    from studio.editors import ProfileEditor
+
+    dlg = ProfileEditor().build(_load(LEM03), None, select=1)
+    dlg.resize(1180, 720)
+    return _grab(dlg, "lem03_studio_profile.png")
+
+
+def lem03_run_lem():
+    return _run_lem(LEM03, "lem03_studio_run_lem.png")
+
+
+def lem04_materials():
+    """The materials editor, table view, on LEM-4's three soils.
+
+    Table view for the reason LEM-3's shot documents — the row order is what fixes
+    the Mat IDs, and three rows are read against each other. This is the first
+    tutorial whose materials fill BOTH unit-weight columns and set ``u`` to
+    ``piezo``, so the frame runs through the ``u`` column rather than stopping at
+    the strength values.
+    """
+    from studio.editors import MaterialsEditor
+
+    return _grab(_mat_table(MaterialsEditor().build(_load(LEM04), None)),
+                 "lem04_studio_materials.png")
+
+
+def lem04_profile():
+    """The profile-lines editor on LEM-4's three lines, the first selected — the
+    ground surface, whose vertices carry the crest, the face and the toe."""
+    from studio.editors import ProfileEditor
+
+    dlg = ProfileEditor().build(_load(LEM04), None, select=0)
+    dlg.resize(1180, 720)
+    return _grab(dlg, "lem04_studio_profile.png")
+
+
+def lem04_circles():
+    """The circles editor holding LEM-4's single starting circle.
+
+    Typed rather than generated: this page's step enters one circle by hand, and
+    the preview below the table is where its Depth is read — an elevation, drawn
+    bottoming out below the toe.
+    """
+    from studio.editors import CirclesEditor
+
+    return _grab(CirclesEditor().build(_load(LEM04), None),
+                 "lem04_studio_circles.png")
+
+
+def lem04_run_lem():
+    return _run_lem(LEM04, "lem04_studio_run_lem.png")
+
+
+def lem05_materials():
+    """The materials editor, table view, on LEM-5's four soils — the seam of soft
+    clay among them, told from the sand fill by its cohesion."""
+    from studio.editors import MaterialsEditor
+
+    return _grab(_mat_table(MaterialsEditor().build(_load(LEM05), None)),
+                 "lem05_studio_materials.png")
+
+
+def lem05_profile():
+    """The profile-lines editor on LEM-5's four lines, the clay seam selected.
+
+    Line 3 is the top of the soft clay — the layer the whole page is about — so it
+    is the one selected: its two vertices are in the table, and the preview draws
+    the seam inside the section with the other three lines behind it.
+    """
+    from studio.editors import ProfileEditor
+
+    dlg = ProfileEditor().build(_load(LEM05), None, select=2)
+    dlg.resize(1180, 720)
+    return _grab(dlg, "lem05_studio_profile.png")
+
+
+def lem05_piezo():
+    """The piezometric-lines editor holding LEM-5's two-point water table.
+
+    The first tab is selected explicitly: the second is the rapid-drawdown line,
+    which this model leaves empty, and the shot's subject is the pair — a flat
+    line at elevation −2 on Line 1, nothing on Line 2.
+    """
+    from studio.editors import PiezoEditor
+
+    dlg = PiezoEditor().build(_load(LEM05), None)
+    dlg._tabs.setCurrentIndex(0)
+    dlg.resize(1100, 560)
+    return _grab(dlg, "lem05_studio_piezo.png")
+
+
+def lem06_materials():
+    """The materials editor, table view, on LEM-6's two soils — the pair the
+    polygon rings reference by the Mat ID their row order fixes."""
+    from studio.editors import MaterialsEditor
+
+    return _grab(_mat_table(MaterialsEditor().build(_load(LEM06), None)),
+                 "lem06_studio_materials.png")
+
+
+def lem06_circles():
+    """The circles editor as LEM-6's step leaves it: the generator's pair with the
+    toe circle's Depth typed over.
+
+    The generator cannot propose the deep seed on a dipping base — there is no
+    single base elevation to target — so the step presses it and then edits one
+    cell. The model as delivered carries exactly that result, which is why the shot
+    is built on the model rather than on a press: the table holds the edited value
+    the step ends with, not the value the button produced.
+    """
+    from studio.editors import CirclesEditor
+
+    return _grab(CirclesEditor().build(_load(LEM06), None),
+                 "lem06_studio_circles.png")
+
+
+def lem06_run_lem():
+    return _run_lem(LEM06, "lem06_studio_run_lem.png")
+
+
+def lem08_materials():
+    """The materials editor, table view, on LEM-8's two soils — the same γ and φ on
+    both rows, told apart by the cohesion of the face band."""
+    from studio.editors import MaterialsEditor
+
+    return _grab(_mat_table(MaterialsEditor().build(_load(LEM08), None)),
+                 "lem08_studio_materials.png")
+
+
+def lem08_profile():
+    """The profile-lines editor on LEM-8's two lines, the face band selected.
+
+    Line 1 is the band of cohesive fill along the face — three vertices, the toe,
+    the top of the 1.25:1 face and 2 ft of crest — and the preview draws it against
+    line 2 running out in front of the toe and back along the crest, which is the
+    pair the step describes.
+    """
+    from studio.editors import ProfileEditor
+
+    dlg = ProfileEditor().build(_load(LEM08), None, select=0)
+    dlg.resize(1180, 720)
+    return _grab(dlg, "lem08_studio_profile.png")
+
+
+def lem08_dloads():
+    """The distributed-loads editor holding LEM-8's crest surcharge — two points at
+    240 psf, and the Direction the level crest makes irrelevant."""
+    from studio.editors import DloadsEditor
+
+    dlg = DloadsEditor().build(_load(LEM08), None)
+    dlg.resize(1000, 620)
+    return _grab(dlg, "lem08_studio_dloads.png")
+
+
+def lem08_circles():
+    """The circles editor holding LEM-8's two starting circles, typed rather than
+    generated: one tangent to the toe elevation, one to the bottom of the model."""
+    from studio.editors import CirclesEditor
+
+    return _grab(CirclesEditor().build(_load(LEM08), None),
+                 "lem08_studio_circles.png")
+
+
+def lem08_run_lem():
+    return _run_lem(LEM08, "lem08_studio_run_lem.png")
+
+
+def lem09_materials():
+    """The materials editor, table view, on LEM-9's two soils — both unit-weight
+    columns filled at the same value, and no water in either row."""
+    from studio.editors import MaterialsEditor
+
+    return _grab(_mat_table(MaterialsEditor().build(_load(LEM09), None)),
+                 "lem09_studio_materials.png")
+
+
+def lem09_profile():
+    """The profile-lines editor on LEM-9's two lines, the lower layer selected.
+
+    Line 2 carries the wall face itself — the vertical run at x = 0 — so it is the
+    one selected, and the preview draws the face against the ground surface behind
+    it, which is the shape a reader most needs to check on this model.
+    """
+    from studio.editors import ProfileEditor
+
+    dlg = ProfileEditor().build(_load(LEM09), None, select=1)
+    dlg.resize(1180, 720)
+    return _grab(dlg, "lem09_studio_profile.png")
+
+
+def lem09_noncirc():
+    """The non-circular editor holding LEM-9's failure surface as entered — the
+    wedge running back from the wall toe, one vertex per row with its Movement."""
+    from studio.editors import NonCircEditor
+
+    dlg = NonCircEditor().build(_load(LEM09), None)
+    dlg.resize(1100, 640)
+    return _grab(dlg, "lem09_studio_noncirc.png")
+
+
+def lem09_run_lem():
+    """Run LEM on the wall, filled as LEM-9's step dictates — Janbu (Corrected)
+    rather than Spencer, on a model whose Surface row is the fixed non-circular
+    label."""
+    return _run_lem(LEM09, "lem09_studio_run_lem.png", method="janbu")
+
+
+SHOTS.update({
+    "lem01_global": lem01_global,
+    "lem02_run_lem": lem02_run_lem,
+    "lem03_profile": lem03_profile,
+    "lem03_run_lem": lem03_run_lem,
+    "lem04_materials": lem04_materials,
+    "lem04_profile": lem04_profile,
+    "lem04_circles": lem04_circles,
+    "lem04_run_lem": lem04_run_lem,
+    "lem05_materials": lem05_materials,
+    "lem05_profile": lem05_profile,
+    "lem05_piezo": lem05_piezo,
+    "lem06_materials": lem06_materials,
+    "lem06_circles": lem06_circles,
+    "lem06_run_lem": lem06_run_lem,
+    "lem08_materials": lem08_materials,
+    "lem08_profile": lem08_profile,
+    "lem08_dloads": lem08_dloads,
+    "lem08_circles": lem08_circles,
+    "lem08_run_lem": lem08_run_lem,
+    "lem09_materials": lem09_materials,
+    "lem09_profile": lem09_profile,
+    "lem09_noncirc": lem09_noncirc,
+    "lem09_run_lem": lem09_run_lem,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -661,8 +1012,9 @@ def main(argv=None):
     if not names:
         print("no shot matching %s; known shots: %s" % (argv, ", ".join(sorted(SHOTS))))
         return 1
-    for name in names:
-        SHOTS[name]()
+    with _app_defaults():
+        for name in names:
+            SHOTS[name]()
     print("\nwrote %d screenshot(s) to docs/tutorials/images/" % len(names))
     return 0
 

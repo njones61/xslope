@@ -56,10 +56,13 @@ it — and three things about it are different from a geogrid:
 **Materials** — two Mohr-Coulomb (`mc`) soils: the upper one more cohesive, the
 lower one more frictional and heavier.
 
-| mat | name | g | gsat | option | c | f | u |
-|---|---|:---:|:---:|---|:---:|:---:|---|
-| 1 | Layer 1 | 120 | 120 | `mc` | 600 | 24 | `none` |
-| 2 | Layer 2 | 130 | 130 | `mc` | 300 | 34 | `none` |
+Unit weights are pcf, cohesions psf and φ degrees; the row order is the Mat ID,
+and the columns neither soil uses stay blank:
+
+| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
+|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| `Layer 1` | 120 | 120 | `mc` | 600 | 24 |  |  |  |  |  |  |  | `none` |
+| `Layer 2` | 130 | 130 | `mc` | 300 | 34 |  |  |  |  |  |  |  | `none` |
 
 There is no water in this model: both pore-pressure options are `none`.
 
@@ -288,9 +291,31 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 ## C — Building it in Studio {#c-building-it-in-studio}
 
-Build the materials and the profile lines as [LEM-3](lem03_layered_slope.md) does
-and the failure surface as [LEM-5](lem05_weak_layer_noncircular.md) does, then
-open **Reinforcement lines** in the **Inputs** tree:
+### 1. Materials and profile lines
+
+Build them as [LEM-3](lem03_layered_slope.md#c-building-it-in-studio) does. In
+**Materials**, two rows take the table above, both unit-weight columns filled at
+the same value because there is no water in this model:
+
+![The materials editor on the wall's two soils](images/lem09_studio_materials.png){width=1000}
+
+In **Profile lines**, the lower layer is the one carrying the wall face — a
+vertical run at x = 0, which the preview draws against the ground surface behind
+it:
+
+![The profile lines editor on the lower layer](images/lem09_studio_profile.png)
+
+### 2. The failure surface
+
+Build it as [LEM-5](lem05_weak_layer_noncircular.md#2-the-failure-surface) does:
+**Non-circular pts**, three rows from the table above, `Free` on every one. The
+preview draws the wedge running back and up from the wall toe:
+
+![The non-circular editor holding the wall's wedge](images/lem09_studio_noncirc.png)
+
+### 3. Reinforcement lines
+
+Open **Reinforcement lines** in the **Inputs** tree:
 
 ![The reinforcement editor on the upper tieback](images/lem09_studio_reinforcement.png){width=1000}
 
@@ -312,7 +337,9 @@ to `anchor` on both rows, then click the first `Tmax` cell and paste the capacit
 block. Both views edit the same lines, so switching between them loses nothing.
 Click **OK**.
 
-Then open **Piles** in the same tree:
+### 4. The soldier pile
+
+Open **Piles** in the same tree:
 
 ![The piles editor on the soldier pile](images/lem09_studio_piles.png){width=1000}
 
@@ -336,9 +363,14 @@ soldier pile, labelled with its 5,900 lb/ft; and the red dashed polyline from th
 wall toe is the failure surface as entered.
 
 Click **Run LEM…** and choose **Method** = `Janbu (Corrected)` and **Analysis** =
-`Auto search`, with the slice count left at 40. **Surface** is not a choice on this
-model: it reads `Non-circular` as a fixed label, because the model defines a
-non-circular surface and no circles.
+`Auto search`, with the slice count left at 40:
+
+![The Run LEM dialog on the wall](images/lem09_studio_run_lem.png)
+
+**Surface** is not a choice on this model: it reads `Non-circular` as a fixed
+label, because the model defines a non-circular surface and no circles. The model
+checks report one warning — the tiebacks carry a tensile capacity but no axial
+stiffness, which is complete for this run and incomplete for a finite element one.
 
 ---
 

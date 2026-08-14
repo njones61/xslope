@@ -40,11 +40,18 @@ effective-stress strength reading the piezometric line. Each states **two** unit
 weights: γ, what the soil weighs above the water table, and γ_sat, what it
 weighs below it.
 
-| Mat ID | Name | γ (pcf) | γ_sat (pcf) | c′ (psf) | φ′ (deg) | Pore pressure |
-|---|---|:---:|:---:|:---:|:---:|---|
-| 1 | `soil 1` | 125 | 130 | 400 | 30 | `piezo` |
-| 2 | `soil 2` | 122 | 127 | 600 | 28 | `piezo` |
-| 3 | `soil 3` | 115 | 118 | 900 | 12 | `piezo` |
+Unit weights are pcf, cohesions psf and φ′ degrees; the row order is the Mat ID,
+and the columns none of the three soils use stay blank:
+
+| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
+|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| `soil 1` | 125 | 130 | `mc` | 400 | 30 |  |  |  |  |  |  |  | `piezo` |
+| `soil 2` | 122 | 127 | `mc` | 600 | 28 |  |  |  |  |  |  |  | `piezo` |
+| `soil 3` | 115 | 118 | `mc` | 900 | 12 |  |  |  |  |  |  |  | `piezo` |
+
+`c` and `f` hold the effective-stress strengths c′ and φ′ — the sheet names the
+columns for the Mohr-Coulomb pair, and `u` says which stresses they are measured
+against.
 
 The third soil — the drawing's **Foundation** — is the one to watch: a soft
 clay, φ′ = 12°, carrying almost all of its strength as cohesion. It is weaker
@@ -247,14 +254,21 @@ Start with **File → New** and work down the **Inputs** tree.
 
 ### 1. Materials and profile lines
 
-Click **Materials**, and in **Table view** press **Add row** three times for
-the three soils in the order the table above lists them — the row order fixes
-the Mat IDs. Fill both unit-weight columns, **γ** and **gsat**, and set every
-row's **u** to `piezo`. Then **Profile lines**: set
-**Max depth (bottom boundary elevation):** to `0`, and press **Add line**
-three times, each line taking its **Material:** and its vertices from the
-geometry tables above. The mechanics are
-[LEM-3's](lem03_layered_slope.md#c-building-it-in-studio), one line more.
+Click **Materials**, and in **Table view** press **Add row** three times and
+enter (or copy-paste) the three soils in the order the table above lists them —
+the row order fixes the Mat IDs. Both unit-weight columns are filled here and
+every row's **u** is `piezo`:
+
+![The materials editor on this problem's three soils](images/lem04_studio_materials.png){width=1000}
+
+Then **Profile lines**: set **Max depth (bottom boundary elevation):** to `0`,
+and press **Add line** three times, each line taking its **Material:** and its
+vertices from the geometry tables above. The mechanics are
+[LEM-3's](lem03_layered_slope.md#c-building-it-in-studio), one line more. With
+the ground surface selected, the editor holds its vertices and the preview draws
+the three lines stacked down the section:
+
+![The profile lines editor on the ground surface](images/lem04_studio_profile.png)
 
 ### 2. The piezometric line
 
@@ -273,9 +287,13 @@ one rule the table has — points ordered left to right. Click **OK**.
 ### 3. The circle
 
 Click **Circles**, press **Add row**, and enter **Xo** `195`, **Yo** `150`,
-**Option** `Depth`, **Depth** `18.1`. The preview draws it bottoming out 21.9 ft
-below the toe elevation. One circle is enough here: it is the seed the search
-starts from, and the search moves it. Click **OK**.
+**Option** `Depth`, **Depth** `18.1`. The preview below the table draws it
+bottoming out 21.9 ft below the toe elevation:
+
+![The circles editor on this problem's one starting circle](images/lem04_studio_circles.png)
+
+One circle is enough here: it is the seed the search starts from, and the search
+moves it. Click **OK**.
 
 Continue below.
 
@@ -291,14 +309,21 @@ the lower face outward — and the red dashed arc is the circle, its center at
 (195, 150) above the frame.
 
 Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40. **Surface** reads `Circular`
-as a fixed label — the model defines circles and no non-circular surface.
+`Auto search`, with the slice count left at 40:
+
+![The Run LEM dialog on the wet model](images/lem04_studio_run_lem.png)
+
+**Surface** reads `Circular` as a fixed label — the model defines circles and no
+non-circular surface.
 
 ---
 
 ## Exploring the results
 
 ### What the search finds
+
+When the search completes, the search-results plot shows every circle it tried and
+the critical one in red:
 
 ![The circular search](images/lem04_search.png){width=1000}
 

@@ -94,10 +94,13 @@ the zones drew themselves, and it does not have to be flat.
 **Materials** — two Mohr-Coulomb (`mc`) soils, both undrained, the fill weaker
 than the ground it stands on:
 
-| Mat ID | Name | γ (pcf) | c (psf) | φ (deg) | Pore pressure |
-|---|---|:---:|:---:|:---:|---|
-| 1 | `embankment` | 130 | 400 | 0 | `none` |
-| 2 | `foundation` | 135 | 800 | 0 | `none` |
+Unit weights are pcf and cohesions psf; the row order is the Mat ID the polygon
+rings reference, and the columns neither soil uses stay blank:
+
+| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
+|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| `embankment` | 130 |  | `mc` | 400 | 0 |  |  |  |  |  |  |  | `none` |
+| `foundation` | 135 |  | `mc` | 800 | 0 |  |  |  |  |  |  |  | `none` |
 
 **Starting circles** — two, sharing a center above the middle of the face at
 twice the slope height:
@@ -226,8 +229,10 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 Click **Materials** in the **Inputs** tree. The editor opens on **Table view**;
 press **Add row** twice and enter (or copy-paste) the two materials from the
-table above — `embankment` then `foundation`, γ, `mc`, c and φ. The row order
-fixes the Mat IDs the polygons reference next.
+table above — the block starts at the first `name` cell. The row order fixes the
+Mat IDs the polygons reference next:
+
+![The materials editor on this problem's two soils](images/lem06_studio_materials.png){width=1000}
 
 ### 2. Polygons
 
@@ -262,8 +267,12 @@ it proposes two circles at the shared center (20, 40): one through the toe and
 one tangent to the layer contact. What it cannot propose is the deep seed —
 a dipping polygon base has no single base elevation to target — so change the
 toe circle's **Depth** to `-10.7887`, reaching down toward the bedrock. The
-table now matches the one above, and the search starts from both candidate
-mechanisms. Click **OK**.
+table then matches the one above, and the preview draws the deeper arc reaching
+under the dipping base:
+
+![The circles editor after the deep seed is typed in](images/lem06_studio_circles.png)
+
+The search starts from both candidate mechanisms. Click **OK**.
 
 Continue below.
 
@@ -279,7 +288,12 @@ the two dashed red arcs are the starting circles. Their radius arrows run off th
 top of the frame: the center the two share, (20, 40), sits above it.
 
 Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40.
+`Auto search`, with the slice count left at 40:
+
+![The Run LEM dialog on the polygon model](images/lem06_studio_run_lem.png)
+
+**Surface** reads `Circular` as a fixed label — the model defines circles and no
+non-circular surface.
 
 ---
 

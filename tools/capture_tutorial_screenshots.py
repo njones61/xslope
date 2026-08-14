@@ -176,7 +176,7 @@ def lem01_materials():
     """
     from studio.editors import MaterialsEditor
 
-    dlg = MaterialsEditor().build(_load(LEM01), None)
+    dlg = _lem_only(MaterialsEditor().build(_load(LEM01), None))
     dlg._set_mode("list")
     dlg.resize(1180, 720)
     return _grab(dlg, "lem01_studio_materials.png")
@@ -498,7 +498,7 @@ def lem03_materials():
     """
     from studio.editors import MaterialsEditor
 
-    return _grab(_mat_table(MaterialsEditor().build(_load(LEM03), None)),
+    return _grab(_mat_table(_lem_only(MaterialsEditor().build(_load(LEM03), None))),
                  "lem03_studio_materials.png")
 
 
@@ -900,7 +900,7 @@ def lem06_materials():
     polygon rings reference by the Mat ID their row order fixes."""
     from studio.editors import MaterialsEditor
 
-    return _grab(_mat_table(MaterialsEditor().build(_load(LEM06), None)),
+    return _grab(_mat_table(_lem_only(MaterialsEditor().build(_load(LEM06), None))),
                  "lem06_studio_materials.png")
 
 
@@ -929,7 +929,7 @@ def lem08_materials():
     both rows, told apart by the cohesion of the face band."""
     from studio.editors import MaterialsEditor
 
-    return _grab(_mat_table(MaterialsEditor().build(_load(LEM08), None)),
+    return _grab(_mat_table(_lem_only(MaterialsEditor().build(_load(LEM08), None))),
                  "lem08_studio_materials.png")
 
 
@@ -976,7 +976,7 @@ def lem09_materials():
     columns filled at the same value, and no water in either row."""
     from studio.editors import MaterialsEditor
 
-    return _grab(_mat_table(MaterialsEditor().build(_load(LEM09), None)),
+    return _grab(_mat_table(_lem_only(MaterialsEditor().build(_load(LEM09), None))),
                  "lem09_studio_materials.png")
 
 

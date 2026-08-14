@@ -310,9 +310,10 @@ the same value because there is no water in this model:
 
 ![The materials editor on the wall's two soils](images/lem09_studio_materials.png){width=1000}
 
-In **Profile lines**, the lower layer is the one carrying the wall face — a
-vertical run at x = 0, which the preview draws against the ground surface behind
-it:
+In **Profile lines**, paste each layer's block from the table above as its own
+line. The lower layer's block includes the wall face — the vertical run at
+x = 0 — and the preview draws the finished line against the ground surface
+behind it:
 
 ![The profile lines editor on the lower layer](images/lem09_studio_profile.png)
 

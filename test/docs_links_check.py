@@ -1037,12 +1037,12 @@ LEM06_DOMAIN_REFUSAL = "Failure surface extends outside the domain polygon"
 
 #: The reinforcement editor as LEM-8's Studio step drives it: the two buttons
 #: that build the list of lines, the view the page sends the reader to for a
-#: tiered wall, and the four form groups the page walks in order. The group
+#: tiered wall, and the five form groups the page walks in order. The group
 #: titles are pinned because the page teaches a line *as* those groups —
-#: geometry, capacity, anchorage, type.
+#: identity, geometry, capacity, anchorage, type.
 LEM08_REINF_BUTTONS = ("Add", "Remove")
 LEM08_REINF_VIEWS = ("Table view", "List view")
-LEM08_REINF_GROUPS = ("Geometry", "Capacity", "Anchorage", "Type")
+LEM08_REINF_GROUPS = ("Identity", "Geometry", "Capacity", "Anchorage", "Type")
 
 #: The capacity fields the page names, as label *prefixes*: the list view appends
 #: the units the model implies ("Tmax (per unit width, lb/ft)"), which the page

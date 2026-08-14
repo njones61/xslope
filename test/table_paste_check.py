@@ -32,6 +32,7 @@ Skips cleanly (exit 0) when PySide6 is not installed.
 """
 import contextlib
 import io
+import itertools
 import os
 import re
 import sys
@@ -45,6 +46,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 _TUTORIALS = os.path.join(_REPO, "docs", "tutorials")
 _MODELS = os.path.join(_REPO, "docs", "lem", "files")
+#: LEM-9's completed model — the tieback wall lives with the verification corpus it
+#: comes from (Rocscience VP49), not in docs/lem/files.
+LEM09_MODEL = os.path.join(_REPO, "docs", "verification", "files", "rocscience",
+                           "vp049.xlsx")
 
 
 def _fail(cond, message):
@@ -190,7 +195,7 @@ def test_hidden_columns_are_not_filled():
 
     t = _new_table(ReinforcementEditor.FIELDS, new_row=_new_reinf_row)
     t.apply_usage_filter({"lem"})          # the FEM tail (Tres, E, Area) folds away
-    _paste(t, _tsv([[0, 0, 20, 0, "geosynthetic", "tangent", "active",
+    _paste(t, _tsv([["layer 1", 0, 0, 20, 0, "geosynthetic", "tangent", "active",
                      800, 4, 4, 0, 0, 1, 77, 77, 77]]))
     row = t.result_rows()[0]
     out = _fail(row["spacing"] == 1.0, f"the last visible column took {row['spacing']}")
@@ -310,14 +315,16 @@ def _new_reinf_row():
 
 def test_the_reinforcement_two_block_paste():
     """LEM-8's reinforcement table goes in as TWO blocks, because the sheet's Dir and
-    Appl sit between them and are filled from Type. The endpoints anchor at x1, the
-    capacity values at Tmax — and the capacity block only lands contiguously while
-    the editor's columns stay in the worksheet's order."""
+    Appl sit between them and are filled from Type. The first block starts at Label —
+    the editor's first column, as it is the sheet's — and the capacity values anchor
+    at Tmax; the capacity block only lands contiguously while the editor's columns
+    stay in the worksheet's order."""
     from studio.editors import ReinforcementEditor
 
     t = _new_table(ReinforcementEditor.FIELDS, new_row=_new_reinf_row)
-    ends = [(0, 0, 20, 0), (5, 4, 25, 4), (10, 8, 30, 8),
-            (15, 12, 35, 12), (20, 16, 40, 16), (25, 20, 45, 20)]
+    ends = [("layer 1", 0, 0, 20, 0), ("layer 2", 5, 4, 25, 4),
+            ("layer 3", 10, 8, 30, 8), ("layer 4", 15, 12, 35, 12),
+            ("layer 5", 20, 16, 40, 16), ("layer 6", 25, 20, 45, 20)]
     _paste(t, _tsv(ends))
     keys = [f.key for f in ReinforcementEditor.FIELDS]
     _paste(t, _tsv([(800, 4, 4, 0, 0, 1)] * 6), row=0, col=keys.index("t_max"))
@@ -326,12 +333,189 @@ def test_the_reinforcement_two_block_paste():
     out += _fail(_summary(t) == "Pasted 6 rows × 6 columns.",
                  f"the second block reported {_summary(t)!r}")
     for i, r in enumerate(rows[:6]):
+        out += _fail(r["label"] == ends[i][0],
+                     f"line {i + 1} label came back as {r['label']!r}")
         got = (r["x1"], r["y1"], r["x2"], r["y2"])
-        out += _fail(got == tuple(float(v) for v in ends[i]),
+        out += _fail(got == tuple(float(v) for v in ends[i][1:]),
                      f"line {i + 1} endpoints came back as {got}")
         cap = (r["t_max"], r["lp1"], r["lp2"], r["tend1"], r["tend2"], r["spacing"])
         out += _fail(cap == (800.0, 4.0, 4.0, 0.0, 0.0, 1.0),
                      f"line {i + 1} capacities came back as {cap}")
+    return out
+
+
+def test_the_support_editors_columns_are_the_worksheets():
+    """The reinforcement and piles editors' columns, in order, against the sheets
+    they mirror — read out of the template rather than restated here.
+
+    This is what makes every block on this page's tutorials land: the tables are
+    printed in the worksheet's column order and pasted into the editor, so the two
+    orders are one fact. A column added, dropped or moved on either side shifts a
+    reader's values one field to the left with nothing on screen saying so.
+
+    Only ``#`` (the sheet's row number) and the piles sheet's ``qp`` are dropped: qp
+    is the pile force angle, which the editor derives from the pile's own axis on
+    save, and which is why LEM-9's pile goes in as two blocks."""
+    import openpyxl
+
+    from studio.editors import PilesEditor, ReinforcementEditor
+
+    template = os.path.join(_REPO, "docs", "inputs", "input_template.xlsx")
+    wb = openpyxl.load_workbook(template, read_only=True)
+    out = []
+    for sheet, editor, derived in (("reinforce", ReinforcementEditor, ()),
+                                   ("piles", PilesEditor, ("qp",))):
+        ws = wb[sheet]
+        # The header run from column A, stopping at the first empty cell: both sheets
+        # keep their drop-down source lists in the same row, far off to the right.
+        headers = [str(c.value).strip() for c in itertools.takewhile(
+            lambda c: c.value is not None,
+            next(ws.iter_rows(min_row=2, max_row=2)))]
+        want = [h for h in headers if h != "#" and h not in derived]
+        got = [f.header for f in editor.FIELDS]
+        out += _fail(got == want,
+                     f"the {editor.label} editor's columns are {got}, the {sheet!r} "
+                     f"sheet's are {want}")
+    wb.close()
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# A2. The Type preset — the sheet's Dir/Appl formulas, in the editor
+#
+# reinforce!H and !I are VLOOKUPs on the Type column, so on the worksheet a support
+# type is one pick that answers both. The editor has to do the same thing, or the
+# Type a reader picks in Studio is a label with no physics behind it: an Anchor
+# whose Dir stayed 'tangent' is solved as a geosynthetic, at a different force
+# direction, with nothing on screen saying so.
+# --------------------------------------------------------------------------- #
+def _preset_combos(t):
+    """The (type, dir, appl) combo widgets of a reinforcement table's first row."""
+    from studio.editors import ReinforcementEditor
+    keys = [f.key for f in ReinforcementEditor.FIELDS]
+    return tuple(t.table.cellWidget(0, keys.index(k))
+                 for k in ("type", "dir", "appl"))
+
+
+def test_type_preset_fills_dir_and_appl():
+    """Picking a Type fills Dir and Appl from the preset table; changing either
+    afterwards is an override that STAYS (nothing rewrites it); picking the same Type
+    again re-asserts the preset over that override, which is what the sheet's formula
+    does to a cell that has not been overtyped."""
+    from studio.editors import ReinforcementEditor
+
+    t = _new_table(ReinforcementEditor.FIELDS, new_row=_new_reinf_row,
+                   preset_spec=ReinforcementEditor.PRESET_SPEC)
+    t._add_row()
+    typ, direction, appl = _preset_combos(t)
+    typ.setCurrentText("anchor")
+    out = _fail((direction.currentText(), appl.currentText()) == ("axial", "active"),
+                f"picking anchor left Dir/Appl at "
+                f"({direction.currentText()!r}, {appl.currentText()!r})")
+    # nail is the preset that differs in BOTH columns, so a fill that only ever wrote
+    # one of them cannot pass this.
+    typ.setCurrentText("nail")
+    out += _fail((direction.currentText(), appl.currentText()) == ("axial", "passive"),
+                 f"picking nail left Dir/Appl at "
+                 f"({direction.currentText()!r}, {appl.currentText()!r})")
+    # An override survives: the user's own answer is not overwritten while the Type
+    # stands.
+    direction.setCurrentText("tangent")
+    row = t.result_rows()[0]
+    out += _fail((row["dir"], row["appl"]) == ("tangent", "passive"),
+                 f"an overridden Dir came back as {row['dir']!r}/{row['appl']!r}")
+    # ...until the Type is picked again. Emitting `activated` is what a user's pick of
+    # the entry already showing does; it changes no index, so only that signal carries
+    # it.
+    typ.activated.emit(typ.currentIndex())
+    row = t.result_rows()[0]
+    out += _fail((row["dir"], row["appl"]) == ("axial", "passive"),
+                 f"re-picking nail left Dir/Appl at {row['dir']!r}/{row['appl']!r}")
+    # A blank Type fills nothing — the sheet leaves those cells empty for a generic
+    # line, and the values standing in them are the loader's defaults for one.
+    typ.setCurrentText("")
+    row = t.result_rows()[0]
+    out += _fail((row["dir"], row["appl"]) == ("axial", "passive"),
+                 f"a blank Type rewrote Dir/Appl to {row['dir']!r}/{row['appl']!r}")
+    return out
+
+
+def test_a_pasted_type_fills_dir_and_appl():
+    """A pasted Type fills exactly as a picked one does — the paths a reader actually
+    uses are the drop-down and the block, and the tutorials teach the block. A block
+    that carries Dir or Appl itself still wins, because those columns are written
+    after the Type that filled them."""
+    from studio.editors import ReinforcementEditor
+
+    keys = [f.key for f in ReinforcementEditor.FIELDS]
+    # Two lines already entered (the endpoints block is what puts them there), then
+    # the Type column pasted down them -- LEM-8's and LEM-9's Studio flow.
+    t = _new_table(ReinforcementEditor.FIELDS,
+                   [_new_reinf_row(), _new_reinf_row()], new_row=_new_reinf_row,
+                   preset_spec=ReinforcementEditor.PRESET_SPEC)
+    _paste(t, _tsv([["Anchor"], ["Nail"]]), row=0, col=keys.index("type"))
+    rows = t.result_rows()
+    out = _fail(len(rows) == 2, f"a 2-row Type block left {len(rows)} rows")
+    out += _fail([(r["type"], r["dir"], r["appl"]) for r in rows]
+                 == [("anchor", "axial", "active"), ("nail", "axial", "passive")],
+                 f"the pasted Types came back as "
+                 f"{[(r['type'], r['dir'], r['appl']) for r in rows]}")
+    # Pasting the SAME type over a row that already holds it re-asserts the preset:
+    # the combo's index does not change, so this only works if the paste fills
+    # explicitly rather than riding the index-changed signal.
+    t.table.cellWidget(0, keys.index("dir")).setCurrentText("tangent")
+    _paste(t, _tsv([["Anchor"]]), row=0, col=keys.index("type"))
+    out += _fail(t.result_rows()[0]["dir"] == "axial",
+                 f"re-pasting the same Type left Dir at "
+                 f"{t.result_rows()[0]['dir']!r}")
+    # A block spanning Type, Dir and Appl: the block's own values are the answer.
+    t2 = _new_table(ReinforcementEditor.FIELDS, [_new_reinf_row()],
+                    new_row=_new_reinf_row,
+                    preset_spec=ReinforcementEditor.PRESET_SPEC)
+    _paste(t2, _tsv([["Anchor", "Tangent", "Passive"]]), row=0, col=keys.index("type"))
+    got = t2.result_rows()[0]
+    out += _fail((got["dir"], got["appl"]) == ("tangent", "passive"),
+                 f"a block carrying Dir/Appl came back as "
+                 f"{got['dir']!r}/{got['appl']!r} — the preset overwrote it")
+    return out
+
+
+def test_the_list_view_fills_dir_and_appl_too():
+    """The same fill in the list view, where a reader entering one anchor at a time
+    meets it: the two views edit the same rows, so a Type picked in either has to mean
+    the same thing."""
+    from studio.editors import ReinforcementEditor
+
+    model = _load(os.path.join(_MODELS, "xslope_reinforce.xlsx"))
+    editor = ReinforcementEditor()
+    dlg = editor.build(dict(model, reinforcement_lines=[_new_reinf_row()]), None)
+    dlg.set_view_mode("list")
+    edits = dlg._list_view._edits
+    edits["type"].setCurrentText("anchor")
+    out = _fail((edits["dir"].currentText(), edits["appl"].currentText())
+                == ("axial", "active"),
+                f"picking anchor in the list view left Dir/Appl at "
+                f"({edits['dir'].currentText()!r}, {edits['appl'].currentText()!r})")
+    landed = dict(model, reinforcement_lines=[])
+    dlg.accept()
+    editor.apply(landed, dlg)
+    row = landed["reinforcement_lines"][0]
+    out += _fail((row["type"], row["dir"], row["appl"])
+                 == ("anchor", "axial", "active"),
+                 f"the list view's Anchor reached the model as "
+                 f"{(row['type'], row['dir'], row['appl'])}")
+    # A line loaded with an override is NOT re-filled by being looked at: selecting it
+    # must not rewrite what the file says.
+    over = dict(_new_reinf_row(), type="anchor", dir="tangent", appl="passive")
+    dlg2 = editor.build(dict(model, reinforcement_lines=[over]), None)
+    dlg2.set_view_mode("list")
+    landed2 = dict(model, reinforcement_lines=[])
+    dlg2.accept()
+    editor.apply(landed2, dlg2)
+    got = landed2["reinforcement_lines"][0]
+    out += _fail((got["dir"], got["appl"]) == ("tangent", "passive"),
+                 f"opening the editor on an overridden line rewrote it to "
+                 f"{got['dir']!r}/{got['appl']!r}")
     return out
 
 
@@ -532,10 +716,9 @@ def test_lem06_polygon_rings():
 
 
 def test_lem08_reinforcement_blocks():
-    """LEM-8's two reinforcement blocks pasted into the real editor's table view:
-    the endpoints from the Label..y2 table (its Label column is the row's name, not
-    one of the editor's fields), then Type set per line, then the capacity block at
-    Tmax."""
+    """LEM-8's two reinforcement blocks pasted into the real editor's table view: the
+    Label..y2 table whole (Label is the editor's first column, as it is the sheet's),
+    then Type set per line, then the capacity block at Tmax."""
     from studio.editors import ReinforcementEditor
 
     page = "lem08_reinforced_slope.md"
@@ -547,24 +730,108 @@ def test_lem08_reinforcement_blocks():
     dlg.set_view_mode("table")
     dlg._table.apply_usage_filter({"lem", "fem"})
     keys = [f.key for f in ReinforcementEditor.FIELDS]
-    _paste(dlg._table, _tsv([r[1:] for r in ends]))            # x1..y2
+    _paste(dlg._table, _tsv(ends))                             # Label..y2, whole
+    out = _fail(_summary(dlg._table) == "Pasted 6 rows × 5 columns.",
+                f"LEM-8's endpoint block reported {_summary(dlg._table)!r}")
     _paste(dlg._table, _tsv([["Geosynthetic"]] * len(ends)),
            row=0, col=keys.index("type"))
     _paste(dlg._table, _tsv(caps), row=0, col=keys.index("t_max"))
-    out = _fail(_summary(dlg._table) == "Pasted 6 rows × 6 columns.",
-                f"LEM-8's capacity block reported {_summary(dlg._table)!r}")
+    out += _fail(_summary(dlg._table) == "Pasted 6 rows × 6 columns.",
+                 f"LEM-8's capacity block reported {_summary(dlg._table)!r}")
     landed = dict(model, reinforcement_lines=[])
     dlg.accept()
     editor.apply(landed, dlg)
     rows = landed["reinforcement_lines"]
-    out += _compare("LEM-8 endpoints", rows, [r[1:] for r in ends],
-                    model["reinforcement_lines"], ["x1", "y1", "x2", "y2"])
+    out += _compare("LEM-8 labels and endpoints", rows, ends,
+                    model["reinforcement_lines"],
+                    ["label", "x1", "y1", "x2", "y2"])
     out += _compare("LEM-8 capacities", rows, caps, model["reinforcement_lines"],
                     ["t_max", "lp1", "lp2", "tend1", "tend2", "spacing"])
     for i, (got, want) in enumerate(zip(rows, model["reinforcement_lines"])):
         for k in ("type", "dir", "appl"):
             out += _fail(str(got[k]).lower() == str(want[k]).lower(),
                          f"LEM-8 line {i + 1} {k}: {got[k]!r} against {want[k]!r}")
+    return out
+
+
+def test_lem09_anchor_blocks():
+    """LEM-9's two anchors, built the way its Studio step now tells the reader to: the
+    Label..y2 block, the Type set to Anchor, the capacity block at Tmax — and then
+    every field measured against the model the page ships.
+
+    This is the leg the preset is FOR. The page says picking Anchor answers Dir and
+    Appl; vp049 carries dir='axial', appl='active' on both lines; and a reader who
+    never types either has to land on exactly that, or the page teaches a model
+    different from the one it publishes results for."""
+    from studio.editors import ReinforcementEditor
+
+    page = "lem09_tieback_wall.md"
+    model = _load(LEM09_MODEL)
+    ends = _taught(page, ["Label", "x1", "y1", "x2", "y2"])
+    caps = _taught(page, ["Tmax", "Lp1", "Lp2", "Tend1", "Tend2", "Spacing"])
+    editor = ReinforcementEditor()
+    dlg = editor.build(dict(model, reinforcement_lines=[]), None)
+    dlg.set_view_mode("table")
+    dlg._table.apply_usage_filter({"lem", "fem"})
+    keys = [f.key for f in ReinforcementEditor.FIELDS]
+    _paste(dlg._table, _tsv(ends))                             # Label..y2, whole
+    _paste(dlg._table, _tsv([["Anchor"]] * len(ends)), row=0, col=keys.index("type"))
+    _paste(dlg._table, _tsv(caps), row=0, col=keys.index("t_max"))
+    out = _fail(_summary(dlg._table) == "Pasted 2 rows × 6 columns.",
+                f"LEM-9's capacity block reported {_summary(dlg._table)!r}")
+    landed = dict(model, reinforcement_lines=[])
+    dlg.accept()
+    editor.apply(landed, dlg)
+    rows = landed["reinforcement_lines"]
+    want = model["reinforcement_lines"]
+    out += _compare("LEM-9 labels and endpoints", rows, ends, want,
+                    ["label", "x1", "y1", "x2", "y2"])
+    out += _compare("LEM-9 capacities", rows, caps, want,
+                    ["t_max", "lp1", "lp2", "tend1", "tend2", "spacing"])
+    for i, (got, w) in enumerate(zip(rows, want)):
+        for k in ("type", "dir", "appl"):
+            out += _fail(str(got[k]).lower() == str(w[k]).lower(),
+                         f"LEM-9 anchor {i + 1} {k}: pasted {got[k]!r}, the model "
+                         f"has {w[k]!r} — neither Dir nor Appl is typed by the reader")
+    return out
+
+
+def test_lem09_pile_row():
+    """LEM-9's soldier pile, in two blocks either side of the sheet's qp and Appl —
+    the columns the page leaves empty and the editor derives or defaults. The second
+    block lands contiguously only while the piles editor's columns are the piles
+    sheet's."""
+    from studio.editors import PilesEditor
+
+    page = "lem09_tieback_wall.md"
+    model = _load(LEM09_MODEL)
+    head = _taught(page, ["Label", "x1", "y1", "x2", "y2", "H"])
+    size = _taught(page, ["D", "S"])
+    editor = PilesEditor()
+    dlg = editor.build(dict(model, pile_lines=[]), None)
+    dlg.set_view_mode("table")
+    dlg._table.apply_usage_filter({"lem", "fem"})
+    keys = [f.key for f in PilesEditor.FIELDS]
+    _paste(dlg._table, _tsv(head))
+    _paste(dlg._table, _tsv(size), row=0, col=keys.index("D_pile"))
+    out = _fail(_summary(dlg._table) == "Pasted 1 row × 2 columns.",
+                f"LEM-9's pile size block reported {_summary(dlg._table)!r}")
+    landed = dict(model, pile_lines=[])
+    dlg.accept()
+    editor.apply(landed, dlg)
+    out += _compare("LEM-9 pile", landed["pile_lines"], head, model["pile_lines"],
+                    ["label", "x1", "y1", "x2", "y2", "H"])
+    out += _compare("LEM-9 pile size", landed["pile_lines"], size,
+                    model["pile_lines"], ["D_pile", "S"])
+    got = landed["pile_lines"][0]
+    # The two columns the blocks step over: Appl defaults to active (a blank cell on
+    # the sheet means the same), and θ is derived from the axis rather than pasted.
+    out += _fail(got["appl"] == "active",
+                 f"the pile's Appl came back {got['appl']!r}; the page leaves the "
+                 f"column empty and a blank Appl is active")
+    out += _fail(abs(got["theta_p"] - float(model["pile_lines"][0]["theta_p"])) < 1e-9,
+                 f"the pile's θ came back {got['theta_p']!r}, the model has "
+                 f"{model['pile_lines'][0]['theta_p']!r}")
     return out
 
 
@@ -584,11 +851,19 @@ CHECKS = [
     ("copy round-trips through paste", test_copy_round_trips),
     ("cancel discards a paste", test_cancel_discards_a_paste),
     ("the reinforcement two-block paste", test_the_reinforcement_two_block_paste),
+    ("the support editors' columns are the sheets'",
+     test_the_support_editors_columns_are_the_worksheets),
+    ("a picked Type fills Dir and Appl", test_type_preset_fills_dir_and_appl),
+    ("a pasted Type fills Dir and Appl", test_a_pasted_type_fills_dir_and_appl),
+    ("the list view fills Dir and Appl too",
+     test_the_list_view_fills_dir_and_appl_too),
     ("LEM-3 profile lines and circles", test_lem03_profile_lines_and_circles),
     ("LEM-4 piezometric line", test_lem04_piezometric_line),
     ("LEM-5 non-circular surface", test_lem05_noncircular_surface),
     ("LEM-6 polygon rings", test_lem06_polygon_rings),
     ("LEM-8 reinforcement blocks", test_lem08_reinforcement_blocks),
+    ("LEM-9 anchor blocks", test_lem09_anchor_blocks),
+    ("LEM-9 pile row", test_lem09_pile_row),
 ]
 
 

@@ -28,8 +28,10 @@ from PySide6.QtWidgets import (
 from .picking import _line_dist
 # The polygon-overlay vocabulary lives with the loader; the Studio imports it rather
 # than restating it, so the Type words, the sentinel codes and their display strings
-# can never drift.
-from xslope.fileio import POLYGON_TYPE_WORDS, SSR_ZONE_LABELS, SSR_ZONE_SENTINELS
+# can never drift. Same for the reinforcement support-type presets: the table the
+# Type column fills Dir/Appl from is the loader's, which is the sheet's.
+from xslope.fileio import (POLYGON_TYPE_WORDS, REINFORCE_TYPE_PRESETS,
+                           SSR_ZONE_LABELS, SSR_ZONE_SENTINELS)
 
 # Column "usage" tags: which analysis a field applies to. Header text is colored
 # to mirror the input template's header coloring (red = LEM-specific inputs,
@@ -443,10 +445,14 @@ class _EditableTable(QWidget):
     preserved. Reused standalone (TableEditorDialog) and per-tab (TabbedTableEditorDialog)."""
 
     def __init__(self, fields, rows, new_row, parent=None, swatch_state=None,
-                 on_change=None, on_select=None, dim_rule=None, unit_labels=None):
+                 on_change=None, on_select=None, dim_rule=None, unit_labels=None,
+                 preset_spec=None):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
+        # Optional preset rule: one choice column FILLS others (reinforcement's Type
+        # -> Dir/Appl). See _apply_preset_row for what picking one does.
+        self._preset = preset_spec or None
         # Units-plan (phase 4) label dict, or None when the project declares no unit
         # system. Only affects the displayed column headers (see below); None keeps
         # them byte-identical to today.
@@ -647,6 +653,14 @@ class _EditableTable(QWidget):
             for k in range(w.count()):
                 if w.itemText(k).strip().lower() == text.lower():
                     w.setCurrentIndex(k)
+                    # A pasted Type fills Dir/Appl exactly as a picked one does —
+                    # called rather than left to the index-changed signal, which does
+                    # not fire when the block names the type the cell already holds.
+                    # (Idempotent when it did fire.) A block that also carries Dir or
+                    # Appl still wins: those columns come after this one, so they are
+                    # written over the fill.
+                    if self._preset is not None and f.key == self._preset["driver"]:
+                        self._apply_preset_row(w)
                     return ""
             return "not a listed choice"
         it = self.table.item(i, j)
@@ -721,6 +735,18 @@ class _EditableTable(QWidget):
                 _txt = f.to_text(val)
                 if _txt in f.choices:
                     combo.setCurrentText(_txt)
+                # A preset driver fills its dependent columns BEFORE the general
+                # notify, so one edit is one redraw of the finished row. Connected
+                # here (after the initial setCurrentText above) so populating a table
+                # from a file never re-fills a Dir/Appl the file overrode; `activated`
+                # as well as `currentIndexChanged` because re-picking the SAME Type is
+                # the user re-asserting the preset over an override, and that fires no
+                # index change.
+                if self._preset is not None and f.key == self._preset["driver"]:
+                    combo.activated.connect(
+                        lambda *_, w=combo: self._apply_preset_row(w))
+                    combo.currentIndexChanged.connect(
+                        lambda *_, w=combo: self._apply_preset_row(w))
                 # A combo edit (e.g. the strength 'option') can change which cells are
                 # applicable, so re-evaluate the disable rule for every row, then
                 # notify. Re-dimming all rows keeps this correct across add/remove
@@ -766,6 +792,36 @@ class _EditableTable(QWidget):
                               palette=MATERIAL_PALETTE)
             btn.colorChanged.connect(lambda h, idx=i: self._swatch.set(idx, h))
             self.table.setCellWidget(i, col, btn)
+
+    def _apply_preset_row(self, combo):
+        """Fill this row's dependent columns from the preset the driver combo now
+        names — the reinforcement sheet's ``Dir``/``Appl`` formulas, in the table.
+
+        Picking a Type SETS Dir and Appl; typing over either afterwards keeps what
+        was typed, because nothing rewrites them until the Type is picked again. A
+        driver value with no preset (a blank Type — a generic tensile line) fills
+        nothing: the sheet's formula leaves those cells empty for it, and the values
+        already in them are the loader's defaults for exactly that line.
+
+        Row is resolved from the widget rather than captured, so a row inserted or
+        removed above this one cannot make an old index fill the wrong line."""
+        if self._preset is None:
+            return
+        driver_col = self._key_column(self._preset["driver"])
+        i = next((r for r in range(self.table.rowCount())
+                  if self.table.cellWidget(r, driver_col) is combo), -1)
+        if i < 0:
+            return
+        preset = self._preset["presets"].get(combo.currentText().strip().lower())
+        if preset is None:
+            return
+        for key, value in zip(self._preset["fills"], preset):
+            col = self._key_column(key)
+            if col is not None:
+                self._set_cell_text(i, col, value)
+
+    def _key_column(self, key):
+        return next((j for j, f in enumerate(self._fields) if f.key == key), None)
 
     def _on_combo_changed(self):
         self._apply_dim_all()
@@ -3775,9 +3831,12 @@ class _LineListView(QWidget):
 
     def __init__(self, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, preview_caption=None, parent=None,
-                 unit_labels=None, dynamic_spec=None):
+                 unit_labels=None, dynamic_spec=None, preset_spec=None):
         super().__init__(parent)
         self._field_by_key = {f.key: f for f in fields}
+        # Same preset rule the table view carries (reinforcement's Type -> Dir/Appl),
+        # so the two views fill identically — see _apply_preset.
+        self._preset = preset_spec or None
         self._unit_labels = unit_labels
         self._new_row = new_row
         self._rows = [dict(r) for r in rows]
@@ -3848,6 +3907,12 @@ class _LineListView(QWidget):
         if f.kind in Field.COMBO_KINDS:
             w = QComboBox()
             w.addItems(f.choices)               # blank-tolerant: a "" choice is a real
+            if self._preset is not None and key == self._preset["driver"]:
+                # Fill the dependent combos FIRST, so the commit below writes the row
+                # with them already set. `activated` too: re-picking the same Type is
+                # the user re-asserting the preset, and fires no index change.
+                w.activated.connect(self._apply_preset)
+                w.currentIndexChanged.connect(self._apply_preset)
             w.currentIndexChanged.connect(self._on_edit)   # (empty) entry, as in the table
         else:
             w = QLineEdit()
@@ -4005,6 +4070,30 @@ class _LineListView(QWidget):
         self._commit()
         self._load(idx)
 
+    def _apply_preset(self, *_):
+        """Fill the dependent combos from the preset the driver combo now names —
+        the table view's ``_apply_preset_row``, on the one row this view shows.
+
+        Picking a Type SETS Dir and Appl; editing either afterwards keeps what was
+        entered, since nothing rewrites them until a Type is picked again. A driver
+        value with no preset (blank Type) fills nothing. Silent while a row loads:
+        ``_load`` blocks every widget's signals, so switching lines never re-fills a
+        Dir/Appl the file overrode."""
+        if self._preset is None or self._cur < 0:
+            return
+        driver = self._edits.get(self._preset["driver"])
+        if driver is None:
+            return
+        preset = self._preset["presets"].get(driver.currentText().strip().lower())
+        if preset is None:
+            return
+        for key, value in zip(self._preset["fills"], preset):
+            w = self._edits.get(key)
+            if isinstance(w, QComboBox):
+                j = w.findText(value)
+                if j >= 0:
+                    w.setCurrentIndex(j)     # its own edit signal commits the row
+
     def _on_edit(self, *_):
         self._commit()
         self._refresh_list_item(self._cur)   # label/type edits update the list line
@@ -4067,7 +4156,8 @@ class _LineEditorDialog(QDialog):
     def __init__(self, title, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, view_state, parent=None,
                  help_text=None, usage_toggles=None, preview_caption=None,
-                 field_help=None, unit_labels=None, dynamic_spec=None):
+                 field_help=None, unit_labels=None, dynamic_spec=None,
+                 preset_spec=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -4076,6 +4166,9 @@ class _LineEditorDialog(QDialog):
         # Per-element/per-unit-width labeling spec for the list view (see
         # _LineListView); None for editors whose fields aren't scaled by spacing.
         self._dynamic_spec = dynamic_spec
+        # Preset rule handed to BOTH views, so a Type picked in either fills the same
+        # two columns from the same table (reinforcement; None elsewhere).
+        self._preset_spec = preset_spec
         self._new_row = new_row
         self._groups = groups
         self._item_label = item_label
@@ -4210,7 +4303,8 @@ class _LineEditorDialog(QDialog):
         self._table = _EditableTable(self._fields, self._rows, self._new_row,
                                      on_change=self._schedule_table_preview,
                                      on_select=self._schedule_table_preview,
-                                     unit_labels=self._unit_labels)
+                                     unit_labels=self._unit_labels,
+                                     preset_spec=self._preset_spec)
         self._table_preview = PreviewPane(
             lambda ax: self._preview_draw(ax, self._table.result_rows(),
                                           self._table.selected_row()),
@@ -4238,7 +4332,7 @@ class _LineEditorDialog(QDialog):
                 self._fields, self._rows, self._new_row, self._groups,
                 self._item_label, self._preview_draw, self._pick_resolve,
                 preview_caption=self._preview_caption, unit_labels=self._unit_labels,
-                dynamic_spec=self._dynamic_spec)
+                dynamic_spec=self._dynamic_spec, preset_spec=self._preset_spec)
             self._list_lay.addWidget(self._list_view)
         else:
             self._list_view.set_rows(self._rows)
@@ -5117,22 +5211,28 @@ class PilesEditor(CategoryEditor):
     label = "Piles"
     # tooltip=PILES_HELP[key] gives the table-header hover and the list-view
     # label/edit hover; the same dict feeds the context-sensitive help strip.
+    # Field order mirrors the piles sheet's columns (Label, the endpoints, H, Appl,
+    # D, S, Vcap, Mcap, then the FEM tail E, I, Area, Fixity) so a block copied from
+    # the sheet or the docs' tables pastes straight in. The sheet's qp (θ) sits
+    # between H and Appl and has no column here: θ is derived from the pile axis on
+    # save, so a block spanning it goes in as two — the endpoints through H, then D
+    # onward, which is how the tutorials print it.
     FIELDS = [
         Field("label", "Label", "str", tooltip=PILES_HELP["label"]),
         Field("x1", "x1", tooltip=PILES_HELP["x1"]), Field("y1", "y1", tooltip=PILES_HELP["y1"]),
         Field("x2", "x2", tooltip=PILES_HELP["x2"]), Field("y2", "y2", tooltip=PILES_HELP["y2"]),
         Field("H", "H", "optfloat", tooltip=PILES_HELP["H"]),
-        Field("D_pile", "D", "optfloat", usage="lem", tooltip=PILES_HELP["D_pile"]),
-        Field("S", "S", "optfloat", usage="lem", tooltip=PILES_HELP["S"]),
-        Field("E", "E", "optfloat", usage="fem", tooltip=PILES_HELP["E"]),
-        Field("I", "I", "optfloat", usage="fem", tooltip=PILES_HELP["I"]),
-        Field("area", "Area", "optfloat", usage="fem", tooltip=PILES_HELP["area"]),
-        Field("V_cap", "Vcap", "optfloat", usage="lem", tooltip=PILES_HELP["V_cap"]),
-        Field("M_cap", "Mcap", "optfloat", usage="lem", tooltip=PILES_HELP["M_cap"]),
         # Force application (v12, LEM only): active = allowable force applied as-is;
         # passive = ultimate capacity divided by FS (loader default 'active').
         Field("appl", "Appl", "choice", choices=["active", "passive"], usage="lem",
               tooltip=PILES_HELP["appl"]),
+        Field("D_pile", "D", "optfloat", usage="lem", tooltip=PILES_HELP["D_pile"]),
+        Field("S", "S", "optfloat", usage="lem", tooltip=PILES_HELP["S"]),
+        Field("V_cap", "Vcap", "optfloat", usage="lem", tooltip=PILES_HELP["V_cap"]),
+        Field("M_cap", "Mcap", "optfloat", usage="lem", tooltip=PILES_HELP["M_cap"]),
+        Field("E", "E", "optfloat", usage="fem", tooltip=PILES_HELP["E"]),
+        Field("I", "I", "optfloat", usage="fem", tooltip=PILES_HELP["I"]),
+        Field("area", "Area", "optfloat", usage="fem", tooltip=PILES_HELP["area"]),
         Field("fixity", "Fixity", "choice", choices=["free", "fixed"], usage="fem",
               tooltip=PILES_HELP["fixity"]),
     ]
@@ -5828,16 +5928,19 @@ class PolygonEditor(CategoryEditor):
 def _new_reinf():
     # A generic tensile line (blank type -> tangent/active via the loader presets,
     # spacing 1 -> no per-width division); mirrors the pre-v12 default row.
-    return {"x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0, "t_max": 0.0, "t_res": 0.0,
+    return {"label": "", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0,
+            "t_max": 0.0, "t_res": 0.0,
             "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0,
             "type": "", "dir": "tangent", "appl": "active",
             "tend1": 0.0, "tend2": 0.0, "spacing": 1.0}
 
 
 # List-view form layout for a reinforcement line: every ReinforcementEditor.FIELDS
-# key grouped (Geometry / Capacity / Anchorage / Type). The Type combos are blank-
-# tolerant exactly as the table enums are (a "" type is a real, selectable entry).
+# key grouped (Identity / Geometry / Capacity / Anchorage / Type). The Type combos
+# are blank-tolerant exactly as the table enums are (a "" type is a real, selectable
+# entry).
 _REINF_FORM_GROUPS = [
+    ("Identity", [["label"]]),
     ("Geometry", [["x1", "y1"], ["x2", "y2"]]),
     ("Capacity", [["t_max", "t_res"], ["E", "area"]]),
     ("Anchorage", [["lp1", "lp2"], ["tend1", "tend2"], ["spacing"]]),
@@ -5860,6 +5963,7 @@ def _reinf_item_label(i, row):
 # header color is "LEM only" red — so they aren't tagged that way here. Type/Dir/
 # Appl are truly LEM only (FEM ignores them); Tres/E/Area are truly FEM only.
 REINFORCE_HELP = {
+    "label": "Name used in error messages, summaries, and plots (optional).",
     "x1": "Start point X-coordinate.",
     "y1": "Start point Y-coordinate.",
     "x2": "End point X-coordinate.",
@@ -5897,20 +6001,23 @@ REINFORCE_HELP = {
 class ReinforcementEditor(CategoryEditor):
     label = "Reinforcement"
     LF = {"lem", "fem"}
-    # Support-type columns (v12). `type` choices are the loader's _TYPE_PRESETS keys
-    # (fileio.py) plus a blank entry — a blank type is a generic line whose Dir/Appl
-    # default via the presets; offering '' as an empty combo entry lets a blank type
-    # round-trip unchanged (same treatment as the materials blank option). Dir/Appl
-    # mirror the loader's accepted values.
+    # Support-type columns (v12). `type` choices are REINFORCE_TYPE_PRESETS' keys
+    # (the loader's, which are the sheet's) plus a blank entry — a blank type is a
+    # generic line whose Dir/Appl default via the presets; offering '' as an empty
+    # combo entry lets a blank type round-trip unchanged (same treatment as the
+    # materials blank option). Dir/Appl mirror the loader's accepted values.
     # tooltip=REINFORCE_HELP[key] gives the table-header hover and the list-view
     # label/edit hover; the same dict feeds the context-sensitive help strip.
+    # Column order is the reinforce sheet's, Label first, so a block copied from the
+    # sheet or the docs' tables pastes straight in.
     FIELDS = [
+        Field("label", "Label", "str", tooltip=REINFORCE_HELP["label"]),
         Field("x1", "x1", tooltip=REINFORCE_HELP["x1"]),
         Field("y1", "y1", tooltip=REINFORCE_HELP["y1"]),
         Field("x2", "x2", tooltip=REINFORCE_HELP["x2"]),
         Field("y2", "y2", tooltip=REINFORCE_HELP["y2"]),
         Field("type", "Type", "choice",
-              choices=["", "geosynthetic", "nail", "tieback", "anchor"], applies=LF,
+              choices=[""] + list(REINFORCE_TYPE_PRESETS), applies=LF,
               tooltip=REINFORCE_HELP["type"]),
         Field("dir", "Dir", "choice", choices=["tangent", "axial"], applies=LF,
               tooltip=REINFORCE_HELP["dir"]),
@@ -5934,6 +6041,12 @@ class ReinforcementEditor(CategoryEditor):
         Field("E", "E", usage="fem", unit="stress", tooltip=REINFORCE_HELP["E"]),
         Field("area", "Area", usage="fem", tooltip=REINFORCE_HELP["area"]),
     ]
+    # The sheet's Dir/Appl formulas, in the editor: picking a Type fills both from
+    # the loader's own table; typing over either keeps it until a Type is picked
+    # again. Handed to BOTH views (and used by a pasted Type), so the three ways a
+    # reader can set a support type mean one thing.
+    PRESET_SPEC = {"driver": "type", "fills": ("dir", "appl"),
+                   "presets": REINFORCE_TYPE_PRESETS}
 
     def build(self, slope_data, parent):
         style = _doc_style(parent)
@@ -5950,13 +6063,15 @@ class ReinforcementEditor(CategoryEditor):
                           "fields": {"t_max": "force", "t_res": "force",
                                      "tend1": "force", "tend2": "force",
                                      "area": "area"}},
+            preset_spec=self.PRESET_SPEC,
             help_text="List view edits one line at a time as a grouped form beside a "
                       "live section preview; the table view is available for bulk entry "
                       "of the many lines of a tiered wall. Both views edit the same rows, "
                       "so switching is lossless. Lp1/Lp2 are the pullout lengths at each "
                       "end (0 = fully anchored); the LEM tension distribution on the "
-                      "preview is derived from these. Type defaults Dir/Appl when blank; "
-                      "leave Type blank for a generic tensile line. Tend1/Tend2 are the "
+                      "preview is derived from these. Picking a Type fills Dir and Appl "
+                      "— change either afterwards to override it — and a blank Type is a "
+                      "generic tensile line. Tend1/Tend2 are the "
                       "end-anchorage capacities; capacities and E/Area are per-unit-width "
                       "(Spacing divides discrete supports).",
             usage_toggles=["lem", "fem"],

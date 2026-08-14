@@ -321,56 +321,24 @@ about which surface is critical, and unlike LEM-1's uncracked embankment it neve
 prevented one from being solved: Spencer answered on all 529 trial surfaces the
 search tried.
 
-### The audit at depth
+### Guarding against local minima
 
-The tangent depth is the dimension the layering acts on, so it is the one worth
-auditing. Hold the critical circle's center and vary only how deep it reaches:
+A search walks downhill from its starting circle, so what it returns is the best
+surface in the neighborhood it started in — not necessarily the model's minimum.
+The guard is simple: **try several starting circle locations and confirm they
+agree.** That is what the per-layer set is for. Run the search from the shallow
+circle, the deep circle, or the generator's toe circle and every one returns the
+same surface here — tangent to the contact, FS = 1.244.
 
-| Tangent depth (elevation) | +2 | +1 | +0.5 | **0** | −0.25 | −0.5 | −1 | −2 | −10 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Factor of safety (Spencer) | 1.389 | 1.311 | 1.276 | **1.244** | 1.426 | 1.487 | 1.556 | 1.619 | 1.670 |
+The failure this guards against looks like success. Seed the search with an arc
+wildly out of scale with the section — a center 220 ft above the slope, R = 269
+ft — and it converges without complaint, reporting **1.784**, 43% high, on a
+long flat surface that is only a local minimum. Nothing in the output says so.
+Circles built from the section, like the generated per-layer set, keep the
+start in scale; agreement across several starts is the check.
 
-The minimum sits exactly on the contact, and the curve is not symmetric about it:
-approaching from above the factor of safety falls smoothly, and a quarter of a
-foot past it the answer jumps 14.6%. **A circle is flat near its lowest point**, so
-dipping 3 in. below the contact does not put 3 in. of base into the foundation —
-it puts 9.4 ft of base there, 16% of the surface, at twice the cohesion. The
-strong layer acts as a floor, and the search settles on the deepest surface that
-stays off it.
-
-That single basin is why the search barely notices which circle it starts from.
-Eleven seeds run alone as the model's only starting circle — the file's two
-circles, the generator's toe circle, and eight deliberately bad guesses:
-
-| Starting circle (Xo, Yo), tangent elevation | R (ft) | What it is | FS returned |
-|---|---:|---|---:|
-| (20, 40), 0 | 40 | the file's shallow circle | 1.2441 |
-| (20, 40), −10 | 50 | the file's deep circle | 1.2442 |
-| (20, 40), −4.72 | 44.7 | the generator's toe circle | 1.2441 |
-| (20, 30), +10 | 20 | a shallow arc on the face | 1.2441 |
-| (45, 35), +15 | 20 | a small arc inside the crest | 1.2441 |
-| (20, 25), 0 | 25 | the right tangent, center 5 ft up | 1.2441 |
-| (−10, 45), 0 | 45 | a center 10 ft beyond the toe | 1.2442 |
-| (35, 55), −5 | 60 | a center over the crest break | 1.2441 |
-| (70, 60), 0 | 60 | a center 30 ft back along the crest | 1.2441 |
-| (50, 80), −10 | 90 | a wide arc from high behind the crest | 1.2441 |
-| (20, 120), −9 | 129 | a 129 ft arc centered 120 ft up | 1.2440 |
-
-All eleven end on the same surface — tangent to the contact within 0.001 ft,
-factor of safety within 0.0002 of Spencer's 1.2441.
-
-The tolerance has an edge. Seeds hold out to about R = 219, eleven times the
-height of the slope; much beyond that the refinement can settle in the far
-field — a seed at (20, 260) with R = 269 comes back as a credible-looking 222 ft
-arc at **FS = 1.784**, 43% high, and larger seeds are worse (2.034 at R = 509).
-A trapped run reports convergence and carries no warning that says so. That is
-the argument for seeding with circles built from the section: the generated set
-here reaches at most 50 ft and cannot propose a far-field seed. **The per-layer
-circles are not what finds this answer; they are what makes it checkable**, and
-the tables above are the check.
-
-A section whose depth profile has two basins gives no such tolerance at all, and
-layering is the usual way to get one — [Sample Problem 13](../lem/samples.md#13-multiple-local-minima)
+Some sections genuinely hold two competing mechanisms, and layering is the
+usual way to get one — [Sample Problem 13](../lem/samples.md#13-multiple-local-minima)
 is a cohesionless embankment on soft clay where a free search collapses onto a
 shallow sliver on the face and the deep foundation mechanism has to be seeded to
 be found at all. Which is why the rule is per layer rather than per model: the
@@ -389,9 +357,8 @@ below the fill's 400 — with everything else unchanged:
 now tangent to the rock at elevation −10; it exits 9 ft beyond the toe, on the
 flat ground the section provides for it, and reaches back to x = 64 in the crest.
 It weighs 152,758 lb/ft against the 61,393 of the answer above, and its base runs
-through both soils. Run the same depth audit and the curve has turned over: at
-the contact 1.250, a foot below it 1.105, five feet below 0.875, and at the rock
-0.792.
+through both soils. Deeper is now lower: a circle held at the contact gives
+1.250 against the 0.792 at the rock.
 
 Two things follow. **A layered model has one candidate mechanism per layer**, and
 a set of starting circles that names them all is how the model states that — the
@@ -429,8 +396,9 @@ This tutorial demonstrated:
   of the face — and the generator that derives that set, plus a toe circle, from
   the geometry.
 - Reading a search result at depth: the critical surface is tangent to the
-  contact, its base entirely in the weaker fill, and the factor of safety jumps
-  14.6% a quarter of a foot below it.
+  contact with its base entirely in the weaker fill — and trying several
+  starting circle locations to confirm the search found the minimum, not a
+  local one.
 - Why a strong layer under a weak one puts a floor under the answer, and why
   softening it to 300 psf moves the critical surface to the base of the
   foundation and the factor of safety from 1.244 to 0.792.

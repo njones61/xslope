@@ -146,14 +146,21 @@ the plate is already expressed as Lp1 = 0.
 **Soldier pile** — a separate input, on its own sheet and its own editor, because
 a pile resists in shear and bending rather than in tension:
 
-| Label | x1 | y1 | x2 | y2 | H | qp | Appl | D | S |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 | | | 0.5 | 1 |
+| Label | x1 | y1 | x2 | y2 | H |
+|---|:---:|:---:|:---:|:---:|:---:|
+| soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 |
 
 **H** is the shear the pile delivers, per foot of wall, to any surface that crosses
 its axis; leaving it blank asks for an Ito & Matsui estimate from `D` and `S`
-instead. `qp` and `Appl` stay empty, and a blank **Appl** is `active` — the same
-allowable-force meaning it has on an anchor.
+instead. `qp` — the angle the force acts at — and `Appl` come next and both stay
+empty: a blank `qp` is derived from the pile's own axis, and a blank **Appl** is
+`active`, the same allowable-force meaning it has on an anchor. So the pile's
+diameter and spacing start again after them, as a second block:
+
+| D | S |
+|:---:|:---:|
+| 0.5 | 1 |
+
 [Piles and Concrete Piers](../lem/piles.md) covers the family.
 
 **Failure surface** — a bilinear wedge from the wall toe, given by the reference
@@ -287,26 +294,33 @@ open **Reinforcement lines** in the **Inputs** tree:
 
 ![The reinforcement editor on the upper tieback](images/lem09_studio_reinforcement.png){width=1000}
 
-The editor opens on its **List view**, one line at a time as a form in four
-groups — **Geometry**, **Capacity**, **Anchorage**, **Type** — with the list on
-the left labelling each line by its support type and the x-range it spans. Setting
-**Type** to `anchor` at the bottom of the form fills **Dir** with `axial` and
-**Appl** with `active` beside it. The preview draws the anchors on the section
-with the selected one bold: a marker at each end, and one more where its capacity
-envelope reaches full Tmax, 8.87 ft in from the grouted end. There is no such
-marker at the wall end, because Lp1 = 0 puts full capacity there already.
+The editor opens on its **List view**, one line at a time as a form in five
+groups — **Identity**, **Geometry**, **Capacity**, **Anchorage**, **Type** — with
+the list on the left labelling each line by its support type and the x-range it
+spans. Setting **Type** to `anchor` at the bottom of the form fills **Dir** with
+`axial` and **Appl** with `active` beside it; typing over either afterwards keeps
+what you typed, and choosing the Type again puts the preset back. The preview draws
+the anchors on the section with the selected one bold: a marker at each end, and one
+more where its capacity envelope reaches full Tmax, 8.87 ft in from the grouted end.
+There is no such marker at the wall end, because Lp1 = 0 puts full capacity there
+already.
 
-**Add** appends a line and **Remove** deletes the selected one. **Table view**
-puts every line on one grid, which is the faster way in for a wall with many rows
-of anchors; both views edit the same lines, so switching between them loses
-nothing. Click **OK**.
+**Add** appends a line and **Remove** deletes the selected one. **Table view** puts
+every line on one grid in the worksheet's column order, and takes the tables above
+as blocks: click the first `Label` cell and paste the endpoint block, set **Type**
+to `anchor` on both rows, then click the first `Tmax` cell and paste the capacity
+block. Both views edit the same lines, so switching between them loses nothing.
+Click **OK**.
 
 Then open **Piles** in the same tree:
 
 ![The piles editor on the soldier pile](images/lem09_studio_piles.png){width=1000}
 
 Its form runs **Identity**, **Geometry**, **Capacity / design**, **Behavior**, and
-`H`, `D` and `S` are the three fields this problem fills. Click **OK**.
+`H`, `D` and `S` are the three fields this problem fills. Its table view is the
+piles worksheet's columns in the worksheet's order, so the pile's two blocks paste
+into it the same way: the `Label`–`H` block at the first cell, then `D` and `S` at
+the `D` cell. Click **OK**.
 
 Continue below.
 

@@ -559,6 +559,89 @@ def capture_dxf_wizard():
     return _grab(dlg, "analysis_dxf_import_wizard.png")
 
 
+# --------------------------------------------------------------------------- #
+# The two-view line editors (reinforcement, piles)
+#
+# Both views of each, on the rich samples: the LIST view is what the editor opens
+# on and what the reference page describes, the TABLE view is the bulk-entry path
+# and is shot with EVERY column on show (both usage toggles) and the preview
+# collapsed, because its subject is the column run itself — which is the sheet's,
+# and which is what makes a block copied out of a worksheet or a tutorial land.
+# --------------------------------------------------------------------------- #
+REINFORCE = os.path.join(REPO_ROOT, "docs/lem/files/xslope_reinforce.xlsx")
+PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
+
+
+def _line_editor(editor_cls, path, mode, size):
+    """A two-view line editor on ``path``, switched to ``mode`` and sized for a shot."""
+    from xslope.fileio import load_slope_data
+
+    dlg = editor_cls().build(_quiet(load_slope_data, path), None)
+    dlg.set_view_mode(mode)
+    for cb in dlg._toggles.values():        # every column, LEM and FEM
+        if not cb.isChecked():
+            cb.setChecked(True)
+    dlg.resize(*size)
+    if mode == "table":
+        # Collapse the preview: the table's columns are the subject here, and the
+        # section beside them is already on the list-view shot. The dialog is then
+        # widened to whatever the columns need, measured — every column has to be on
+        # the shot, and which columns there are is the point of it.
+        from PySide6.QtWidgets import QHeaderView
+
+        dlg._table_split.setSizes([size[0], 0])
+        table = dlg._table.table
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        _settle()
+        chrome = dlg.width() - table.viewport().width()   # everything but the columns
+        dlg.resize(table.horizontalHeader().length() + chrome, size[1])
+        dlg._table_split.setSizes([dlg.width(), 0])
+    else:
+        dlg._list_view.list.setCurrentRow(0)
+        # Tall enough for the whole form: the groups are the shot's subject, and the
+        # last of them (Type, with the Dir and Appl its preset fills) must not be
+        # below the scroll. Measured from the form itself rather than guessed.
+        _settle()
+        scroll = dlg._list_view._form_scroll
+        chrome = dlg.height() - scroll.viewport().height()
+        dlg.resize(size[0], scroll.widget().sizeHint().height() + chrome)
+    return dlg
+
+
+def capture_reinforcement_editor():
+    """Reinforcement editor, list view: the five form groups on the first geogrid
+    layer, with the Type group's filled Dir/Appl and the preview's pullout markers."""
+    from studio.editors import ReinforcementEditor
+
+    return _grab(_line_editor(ReinforcementEditor, REINFORCE, "list", (1240, 660)),
+                 "editing_reinforcement_editor.png")
+
+
+def capture_reinforcement_table():
+    """Reinforcement editor, table view: every column, in the reinforce sheet's
+    order, Label first."""
+    from studio.editors import ReinforcementEditor
+
+    return _grab(_line_editor(ReinforcementEditor, REINFORCE, "table", (930, 460)),
+                 "editing_reinforcement_table.png")
+
+
+def capture_piles_editor():
+    """Piles editor, list view: the four form groups on the first pile."""
+    from studio.editors import PilesEditor
+
+    return _grab(_line_editor(PilesEditor, PILES, "list", (1240, 660)),
+                 "editing_piles_editor.png")
+
+
+def capture_piles_table():
+    """Piles editor, table view: every column, in the piles sheet's order."""
+    from studio.editors import PilesEditor
+
+    return _grab(_line_editor(PilesEditor, PILES, "table", (830, 460)),
+                 "editing_piles_table.png")
+
+
 def capture_global_form():
     """The Global parameters form: the Units / Time / Tension SRF selectors above
     the numeric fields, on a sample that declares a unit system (so the unit-weight
@@ -783,6 +866,8 @@ def main():
                capture_run_seep_dialog, capture_unpack_package_dialog,
                capture_welcome_dialog,
                capture_report_dialog,
+               capture_reinforcement_editor, capture_reinforcement_table,
+               capture_piles_editor, capture_piles_table,
                capture_dxf_wizard, capture_global_form,
                capture_assistant_settings, capture_assistant_confirm,
                capture_inputs_tree, capture_display_panel_seep,

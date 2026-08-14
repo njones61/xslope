@@ -73,6 +73,25 @@ def _grab(dlg, name, settle=True):
     return out
 
 
+def _list_view(dlg, width):
+    """Put a two-view line editor in its LIST view and size it to the whole form.
+
+    The view is set explicitly because the editor opens on the last one USED (a
+    session setting), and the height is measured off the form rather than guessed:
+    the shot's subject is the groups, and the last of them must not fall below the
+    scroll when a group is added.
+    """
+    dlg.set_view_mode("list")
+    dlg.resize(width, dlg.height())
+    dlg.show()
+    _settle()
+    scroll = dlg._list_view._form_scroll
+    chrome = dlg.height() - scroll.viewport().height()
+    dlg.resize(width, scroll.widget().sizeHint().height() + chrome)
+    _settle()
+    return dlg
+
+
 def _load(path):
     from xslope.fileio import load_slope_data
     with contextlib.redirect_stdout(io.StringIO()):
@@ -580,8 +599,8 @@ def lem08_reinforcement():
     """The reinforcement editor on the six geogrid layers, in its list view.
 
     The list view rather than the table, because it is the view the editor opens
-    on and the one that groups a line the way the page teaches it — Geometry,
-    Capacity, Anchorage, Type — beside a preview that draws the pullout
+    on and the one that groups a line the way the page teaches it — Identity,
+    Geometry, Capacity, Anchorage, Type — beside a preview that draws the pullout
     breakpoints the capacity envelope is built from. The first line is selected,
     which is the line the page reads the envelope on: the one the critical
     surface passes beneath.
@@ -589,10 +608,7 @@ def lem08_reinforcement():
     from studio.editors import ReinforcementEditor
 
     dlg = ReinforcementEditor().build(_load(LEM08), None)
-    # Tall enough that the form's last group — Type, with the Dir and Appl the
-    # preset fills — is on the shot rather than below the scroll.
-    dlg.resize(1400, 820)
-    return _grab(dlg, "lem08_studio_reinforcement.png")
+    return _grab(_list_view(dlg, 1400), "lem08_studio_reinforcement.png")
 
 
 SHOTS["lem08_reinforcement"] = lem08_reinforcement
@@ -618,8 +634,7 @@ def lem09_reinforcement():
     from studio.editors import ReinforcementEditor
 
     dlg = ReinforcementEditor().build(_load(LEM09), None)
-    dlg.resize(1400, 820)
-    return _grab(dlg, "lem09_studio_reinforcement.png")
+    return _grab(_list_view(dlg, 1400), "lem09_studio_reinforcement.png")
 
 
 def lem09_piles():
@@ -632,8 +647,7 @@ def lem09_piles():
     from studio.editors import PilesEditor
 
     dlg = PilesEditor().build(_load(LEM09), None)
-    dlg.resize(1400, 760)
-    return _grab(dlg, "lem09_studio_piles.png")
+    return _grab(_list_view(dlg, 1400), "lem09_studio_piles.png")
 
 
 SHOTS["lem09_reinforcement"] = lem09_reinforcement

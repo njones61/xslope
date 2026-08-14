@@ -214,12 +214,15 @@ entry of many lines. Both views edit the same rows, so switching is lossless, an
 the **Show columns for** (LEM / FEM) toggles hide the columns an analysis doesn't
 use in the table.
 
-**Reinforcement** lines are grouped as **Geometry** (endpoints), **Capacity**
-(Tmax, Tres, E, Area), **Anchorage** (Lp1/Lp2 pullout lengths, Tend1/Tend2 end
-capacities, Spacing), and **Type** — picking a Type (geosynthetic, nail, tieback,
-anchor) defaults **Dir** and **Appl**, and a blank Type means a generic tensile
-line. The preview draws the lines on the section with the selected one emphasized
-and its pullout breakpoints marked:
+**Reinforcement** lines are grouped as **Identity** (the line's label),
+**Geometry** (endpoints), **Capacity** (Tmax, Tres, E, Area), **Anchorage**
+(Lp1/Lp2 pullout lengths, Tend1/Tend2 end capacities, Spacing), and **Type** —
+picking a Type (geosynthetic, nail, tieback, anchor) fills **Dir** and **Appl**
+with that support's pair, exactly as the `reinforce` worksheet's formulas do.
+Change either afterwards and the change stands; picking a Type again puts the
+preset back. A blank Type means a generic tensile line, tangent and active. The
+preview draws the lines on the section with the selected one emphasized and its
+pullout breakpoints marked:
 
 ![Reinforcement editor (list view)](images/editing_reinforcement_editor.png)
 
@@ -228,8 +231,8 @@ lines of a tiered wall:
 
 ![Reinforcement editor (table view)](images/editing_reinforcement_table.png)
 
-**Piles** group their fields as **Geometry**, **Capacity / design** (H, D, S, Vcap,
-Mcap, and the FEM E/I/Area), and **Behavior** — the **Appl** dropdown chooses how
+**Piles** group their fields as **Identity**, **Geometry**, **Capacity / design**
+(H, D, S, Vcap, Mcap, and the FEM E/I/Area), and **Behavior** — the **Appl** dropdown chooses how
 the pile resistance enters the analysis (active = allowable force; passive =
 ultimate capacity ÷ FS), and leaving **H** blank auto-computes the Ito & Matsui
 force. A model rarely has more than a few piles, so the list view is usually all

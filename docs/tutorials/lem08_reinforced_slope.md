@@ -317,11 +317,13 @@ Open **Reinforcement lines** in the **Inputs** tree:
 
 ![The reinforcement editor on the first geogrid layer](images/lem08_studio_reinforcement.png){width=1000}
 
-The editor opens on its **List view**, one line at a time as a form in four
-groups. **Geometry** is the two endpoints. **Capacity** is `Tmax`, with the
-`Tres`, `E` and `Area` the FEM reads. **Anchorage** is the pullout lengths, the
-end capacities and the spacing. **Type** is the preset, with the `Dir` and
-`Appl` it fills — `geosynthetic`, `tangent` and `active` on these lines.
+The editor opens on its **List view**, one line at a time as a form in five
+groups. **Identity** is the line's name. **Geometry** is the two endpoints.
+**Capacity** is `Tmax`, with the `Tres`, `E` and `Area` the FEM reads.
+**Anchorage** is the pullout lengths, the end capacities and the spacing.
+**Type** is the preset: choosing `geosynthetic` sets `Dir` to `tangent` and
+`Appl` to `active` beside it. Change either afterwards and the change stands —
+choosing a Type again puts the preset back.
 
 **Add** appends a line and **Remove** deletes the selected one; six lines make
 six entries in the list on the left, each labelled by its type and the x-range
@@ -333,12 +335,12 @@ capacity envelope, in place on the slope. Click a line in the preview to select
 it.
 
 **Table view** puts all six on one grid, the columns in the worksheet's order,
-and takes the tables above as blocks. Click the first `x1` cell and paste the
-`x1`–`y2` columns: the six rows arrive with the block. Set **Type** to
-`geosynthetic` on each, then click the first `Tmax` cell and paste the capacity
-block — the same `Tmax` through `Spacing` span the worksheet has, which is why
-those values start again rather than running on from the endpoints. Both views
-edit the same lines, so switching between them loses nothing. Click **OK**.
+and takes the tables above as blocks. Click the first `Label` cell and paste the
+endpoint block: the six rows arrive with it, named. Set **Type** to
+`geosynthetic` on each — `Dir` and `Appl` answer as they do in the form — then
+click the first `Tmax` cell and paste the capacity block, which starts again
+there because `Type`, `Dir` and `Appl` lie between the two. Both views edit the
+same lines, so switching between them loses nothing. Click **OK**.
 
 ### 5. Starting circles
 

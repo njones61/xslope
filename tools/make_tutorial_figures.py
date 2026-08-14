@@ -949,7 +949,8 @@ def lem08_sheets():
     render("lem08_sheet_mat.png", LEM08, "mat", rows=(10, 13), cols="A:O")
     render("lem08_sheet_profile.png", LEM08, "profile", rows=(1, 13), cols="A:H")
     render("lem08_sheet_dloads.png", LEM08, "dloads", rows=(4, 10), cols="A:H")
-    render("lem08_sheet_reinforce.png", LEM08, "reinforce", rows=(2, 10), cols="A:R")
+    # LEM problem: the render stops before the FEM-only columns (Tres, E, Area).
+    render("lem08_sheet_reinforce.png", LEM08, "reinforce", rows=(2, 10), cols="A:O")
     render("lem08_sheet_circles.png", LEM08, "circles", rows=(1, 5), cols="A:H")
 
 
@@ -1142,8 +1143,9 @@ def lem09_sheets():
     render("lem09_sheet_mat.png", LEM09, "mat", rows=(10, 13), cols="A:O")
     render("lem09_sheet_profile.png", LEM09, "profile", rows=(1, 14), cols="A:H")
     render("lem09_sheet_noncirc.png", LEM09, "non-circ", rows=(1, 6), cols="A:F")
-    render("lem09_sheet_reinforce.png", LEM09, "reinforce", rows=(2, 6), cols="A:R")
-    render("lem09_sheet_piles.png", LEM09, "piles", rows=(2, 6), cols="A:Q")
+    render("lem09_sheet_reinforce.png", LEM09, "reinforce", rows=(2, 6), cols="A:O")
+    # LEM problem: stop before the FEM-only pile columns (E, I, Area, Fixity).
+    render("lem09_sheet_piles.png", LEM09, "piles", rows=(2, 6), cols="A:M")
 
 
 def lem09_plots():

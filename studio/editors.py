@@ -3962,6 +3962,7 @@ class _LineListView(QWidget):
         if tip:
             edit.setToolTip(tip)
         h.addWidget(edit, 1)
+        self._cells[key] = cell
         return cell
 
     @staticmethod
@@ -3978,6 +3979,8 @@ class _LineListView(QWidget):
         scroll.setWidgetResizable(True)
         body = QWidget()
         v = QVBoxLayout(body)
+        self._cells = {}
+        self._group_boxes = []
         for title, group_rows in self._groups:
             g = QGroupBox(title)
             gv = QVBoxLayout(g)
@@ -3990,6 +3993,7 @@ class _LineListView(QWidget):
                 else:
                     for k in keys:
                         gv.addWidget(self._cell(k))
+            self._group_boxes.append((g, [k for row in group_rows for k in row]))
             v.addWidget(g)
         v.addStretch(1)
         scroll.setWidget(body)
@@ -4000,6 +4004,17 @@ class _LineListView(QWidget):
         if driver is not None and hasattr(driver, "textChanged"):
             driver.textChanged.connect(lambda *_: self._relabel_dynamic())
         return scroll
+
+    def apply_usage_filter(self, enabled):
+        """Hide the form cells of fields whose usage tag is not enabled — the
+        list-view half of the toggle bar's contract, mirroring the table's
+        column filter. A group whose every field hides, hides whole."""
+        for key, cell in getattr(self, "_cells", {}).items():
+            f = self._field_by_key[key]
+            cell.setVisible((not f.usage) or (f.usage in enabled))
+        for g, keys in getattr(self, "_group_boxes", []):
+            g.setVisible(any(self._cells[k].isVisible() for k in keys
+                             if k in self._cells))
 
     def _relabel_dynamic(self):
         """Re-word every spacing-scaled label from the current Spacing/S entry: set ->
@@ -4276,8 +4291,10 @@ class _LineEditorDialog(QDialog):
         s = QSettings("XSlope", "XSlope Studio")
         for t, cb in self._toggles.items():
             s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
-        if self._mode == "table" and self._table is not None:
+        if self._table is not None:
             self._table.apply_usage_filter(self._enabled_usage())
+        if self._list_view is not None:
+            self._list_view.apply_usage_filter(self._enabled_usage())
 
     # --- view switching --------------------------------------------------
     def _harvest(self):
@@ -4334,6 +4351,10 @@ class _LineEditorDialog(QDialog):
                 preview_caption=self._preview_caption, unit_labels=self._unit_labels,
                 dynamic_spec=self._dynamic_spec, preset_spec=self._preset_spec)
             self._list_lay.addWidget(self._list_view)
+            # A lazily built list view starts under whatever the toggle bar
+            # already says — the same filter the table is showing.
+            if getattr(self, "_toggles", None):
+                self._on_toggle()
         else:
             self._list_view.set_rows(self._rows)
 

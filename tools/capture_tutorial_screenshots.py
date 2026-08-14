@@ -658,6 +658,21 @@ SHOTS["lem06_polygons"] = lem06_polygons
 LEM08 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_reinforce.xlsx")
 
 
+
+
+def _lem_only(dlg):
+    """Untick every non-LEM usage toggle so the capture shows the LEM problem.
+
+    The owner's rule for the LEM tutorials: an LEM page's editor capture carries
+    no FEM or seepage columns. The toggles are real checkboxes, so unticking
+    them is the same action a reader takes, and the toggle bar in the capture
+    shows the state that produced it.
+    """
+    toggles = getattr(dlg, "_toggles", None) or {}
+    for tag, cb in toggles.items():
+        cb.setChecked(tag == "lem")
+    return dlg
+
 def lem08_reinforcement():
     """The reinforcement editor on the six geogrid layers, in its list view.
 
@@ -671,7 +686,7 @@ def lem08_reinforcement():
     from studio.editors import ReinforcementEditor
 
     dlg = ReinforcementEditor().build(_load(LEM08), None)
-    return _grab(_list_view(dlg, 1400), "lem08_studio_reinforcement.png")
+    return _grab(_list_view(_lem_only(dlg), 1400), "lem08_studio_reinforcement.png")
 
 
 SHOTS["lem08_reinforcement"] = lem08_reinforcement
@@ -697,7 +712,7 @@ def lem09_reinforcement():
     from studio.editors import ReinforcementEditor
 
     dlg = ReinforcementEditor().build(_load(LEM09), None)
-    return _grab(_list_view(dlg, 1400), "lem09_studio_reinforcement.png")
+    return _grab(_list_view(_lem_only(dlg), 1400), "lem09_studio_reinforcement.png")
 
 
 def lem09_piles():
@@ -710,7 +725,7 @@ def lem09_piles():
     from studio.editors import PilesEditor
 
     dlg = PilesEditor().build(_load(LEM09), None)
-    return _grab(_list_view(dlg, 1400), "lem09_studio_piles.png")
+    return _grab(_list_view(_lem_only(dlg), 1400), "lem09_studio_piles.png")
 
 
 SHOTS["lem09_reinforcement"] = lem09_reinforcement

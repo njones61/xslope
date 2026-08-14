@@ -402,6 +402,37 @@ comes out on the crest at x ≈ 36, behind the last geogrid. It weighs 29,706
 lb/ft, and the reinforcement it crosses contributes 4,000 lb/ft of tension —
 five lines at the full 800.
 
+### Where the surface meets the lines
+
+The critical circle crosses five of the six layers, and the capacity envelope
+decides what each one gives:
+
+| Line | Crossing x | To the nearer end (ft) | T (lb/ft) |
+|:---:|:---:|:---:|:---:|
+| 2 | 14.52 | 9.52 | 800 |
+| 3 | 21.59 | 8.41 | 800 |
+| 4 | 26.65 | 8.35 | 800 |
+| 5 | 30.56 | 9.44 | 800 |
+| 6 | 33.67 | 8.67 | 800 |
+
+Every crossing lands more than 8 ft from the nearer end of its line, twice the
+4 ft it takes to develop the full capacity, so pullout limits nothing here and
+all five deliver 800 lb/ft.
+
+To see the pullout lengths at work, solve this same circle as a **Single
+surface** run — no search, so changing `Lp1` and `Lp2` is the only thing that
+moves — at two other values. At `Lp1` = `Lp2` = 0, fully anchored, the answer
+stays **1.587**: anchorage had nothing to add. At 10 ft, a longer development
+length than this fill would give, the five crossings fall inside their
+development zones, mobilize 3,553 lb/ft between them rather than 4,000, and
+the factor of safety drops to **1.539**.
+
+Line 1 gives nothing at all. It runs from the toe at elevation 0, and the
+surface daylights at the toe and climbs away from it, so the whole line lies in
+the soil below the sliding mass. A layer the critical surface never crosses is
+not in the analysis — which is what makes the plotted lines worth reading
+against the plotted surface rather than counting the rows in the sheet.
+
 ### What the other methods say
 
 Each method gets its own search and its own critical circle:
@@ -434,37 +465,6 @@ Solved on the reinforced model's own critical circle instead — one surface, no
 search — the unreinforced section returns 1.247. The gap between that and the
 searched 1.167 is the part of the loss that comes from the slope having a worse
 mechanism available, not from the missing tension.
-
-### Where the surface meets the lines
-
-The critical circle crosses five of the six layers, and the capacity envelope
-decides what each one gives:
-
-| Line | Crossing x | To the nearer end (ft) | T (lb/ft) |
-|:---:|:---:|:---:|:---:|
-| 2 | 14.52 | 9.52 | 800 |
-| 3 | 21.59 | 8.41 | 800 |
-| 4 | 26.65 | 8.35 | 800 |
-| 5 | 30.56 | 9.44 | 800 |
-| 6 | 33.67 | 8.67 | 800 |
-
-Every crossing lands more than 8 ft from the nearer end of its line, twice the
-4 ft it takes to develop the full capacity, so pullout limits nothing here and
-all five deliver 800 lb/ft.
-
-To see the pullout lengths at work, solve this same circle as a **Single
-surface** run — no search, so changing `Lp1` and `Lp2` is the only thing that
-moves — at two other values. At `Lp1` = `Lp2` = 0, fully anchored, the answer
-stays **1.587**: anchorage had nothing to add. At 10 ft, a longer development
-length than this fill would give, the five crossings fall inside their
-development zones, mobilize 3,553 lb/ft between them rather than 4,000, and
-the factor of safety drops to **1.539**.
-
-Line 1 gives nothing at all. It runs from the toe at elevation 0, and the
-surface daylights at the toe and climbs away from it, so the whole line lies in
-the soil below the sliding mass. A layer the critical surface never crosses is
-not in the analysis — which is what makes the plotted lines worth reading
-against the plotted surface rather than counting the rows in the sheet.
 
 ### How long the lines have to be
 

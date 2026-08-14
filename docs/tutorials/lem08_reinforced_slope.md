@@ -481,11 +481,11 @@ length gets its own search and its own critical circle:
 | 30 | 1.587 | 4,000 | 5 of 6 |
 | 40 | 1.587 | 4,000 | 5 of 6 |
 
-At 20 ft — the length the model uses — the search returns the circle this page
-has been reading all along, crossing five of the six lines with every crossing
-deep enough to deliver its full 800 lb/ft:
+At 40 ft — double the design length — the search returns the same circle and
+the same 1.587, with the lines reaching far past every crossing: the picture
+of length buying nothing.
 
-![Spencer at the 20 ft design length](images/lem08_solution.png){width=1000}
+![Spencer with 40 ft geogrids](images/lem08_solution_long.png){width=1000}
 
 Beyond 20 ft the answer stops moving, and the four searches that produced it say
 why: each settles on the same circle — center (−5.13, 46.98), the same five

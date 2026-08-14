@@ -1059,6 +1059,10 @@ def lem08_lengths():
             capture("lem08_solution_short.png", plot_solution, model,
                     crit["slices"], crit["failure_surface"],
                     crit["solver_result"])
+        if length == LEM08_LENGTHS[-1]:
+            capture("lem08_solution_long.png", plot_solution, model,
+                    crit["slices"], crit["failure_surface"],
+                    crit["solver_result"])
 
 
 # --------------------------------------------------------------------------- #

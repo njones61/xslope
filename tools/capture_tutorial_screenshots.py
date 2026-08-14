@@ -700,9 +700,9 @@ def lem08_reinforcement_table():
     dlg = ReinforcementEditor().build(_load(LEM08), None)
     _lem_only(dlg)
     dlg._set_mode("table")
-    # Wide enough that every LEM column (Label through Spacing) is on the
-    # capture — the paste teaching needs the capacity block visible.
-    dlg.resize(2470, 520)
+    # The preview stacks below the table, so the width is just the columns:
+    # wide enough that every LEM column (Label through Spacing) shows.
+    dlg.resize(1460, 760)
     return _grab(dlg, "lem08_studio_reinforcement_table.png")
 
 

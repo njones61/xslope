@@ -4327,12 +4327,20 @@ class _LineEditorDialog(QDialog):
                                           self._table.selected_row()),
             caption=self._preview_caption)
         self._table_preview.clicked.connect(self._on_table_preview_click)
-        split = QSplitter(Qt.Horizontal)
+        # The preview sits BELOW the table: these editors carry a dozen or more
+        # columns, and a side-by-side preview forced the dialog wider than a
+        # screen (owner ruling 2026-08-14). The table keeps the height its rows
+        # ask for; the preview absorbs the rest, so a taller dialog grows the
+        # picture — the circles editor's stacked pattern.
+        split = QSplitter(Qt.Vertical)
         split.addWidget(self._table)
         split.addWidget(self._table_preview)
-        split.setStretchFactor(0, 1)
+        split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
-        split.setSizes([640, 460])
+        self._table_preview.setMinimumHeight(220)
+        # Open with every row visible: the table's opening share is its own
+        # measured hint, not a constant, so six rows show six rows.
+        split.setSizes([self._table.sizeHint().height(), 400])
         self._table_split = split
         self._table_lay.addWidget(split)
         self._table.apply_usage_filter(self._enabled_usage())

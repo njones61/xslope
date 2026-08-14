@@ -280,8 +280,6 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 
 ![The Run LEM dialog on the layered model](images/lem03_studio_run_lem.png)
 
-**Surface** reads `Circular` as a fixed label — the model defines circles and no
-non-circular surface.
 
 ---
 

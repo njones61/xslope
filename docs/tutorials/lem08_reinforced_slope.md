@@ -377,10 +377,6 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 
 ![The Run LEM dialog on the reinforced model](images/lem08_studio_run_lem.png)
 
-**Surface** reads `Circular` as a fixed label — the model defines circles and no
-non-circular surface. The model checks beside the controls report one warning on
-this file: the six lines carry a tensile capacity but no axial stiffness, which
-is complete for a limit-equilibrium run and incomplete for a finite element one.
 
 ---
 

@@ -293,8 +293,6 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 
 ![The Run LEM dialog on the polygon model](images/lem06_studio_run_lem.png)
 
-**Surface** reads `Circular` as a fixed label — the model defines circles and no
-non-circular surface.
 
 ---
 

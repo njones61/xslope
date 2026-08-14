@@ -390,10 +390,6 @@ with the slice count left at 40:
 
 ![The Run LEM dialog on the wall](images/lem09_studio_run_lem.png)
 
-**Surface** is not a choice on this model: it reads `Non-circular` as a fixed
-label, because the model defines a non-circular surface and no circles. The model
-checks report one warning — the tiebacks carry a tensile capacity but no axial
-stiffness, which is complete for this run and incomplete for a finite element one.
 
 ---
 

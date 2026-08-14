@@ -757,6 +757,11 @@ def _materials_leg(label, page, model_path, occurrence=0, headers=None):
     model = _load(model_path)
     editor = MaterialsEditor()
     dlg = editor.build(dict(model, materials=[]), None)
+    # Pin the usage toggles to the app default (all shown): the paste maps by
+    # visible column position, so the machine's remembered toggle state would
+    # otherwise decide whether a 14-column block lands straight.
+    for cb in (getattr(dlg, "_toggles", None) or {}).values():
+        cb.setChecked(True)
     _paste(dlg._table, _tsv(printed))
     landed = dict(model, materials=[])
     editor.apply(landed, dlg)

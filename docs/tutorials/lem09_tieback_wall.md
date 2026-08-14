@@ -402,19 +402,19 @@ plot draws every surface it tried in grey with the one it kept in red:
 
 ![The Janbu search on the wall](images/lem09_search.png){width=1000}
 
-**FS = 1.417**, on a surface that runs from the wall toe at (0, 0) through
-(30.80, 38.98) and out at (45.79, 59.16). The kink barely bends it — the lower leg
-rises at 52° and the upper at 53° — so the search has straightened the manual's
+**FS = 1.431**, on a surface that runs from the wall toe at (0, 0) through
+(32.64, 37.52) and out at (55.05, 63.62). The kink barely bends it — the lower leg
+rises at 49.0° and the upper at 49.4° — so the search has straightened the manual's
 two-part wedge into what is very nearly a single plane from the toe, and pulled
-the exit point 15 ft closer to the wall.
+the exit point 6 ft closer to the wall.
 
 The solution plot draws that surface with its base stresses, the anchors it
 crosses, and the point where it cuts the pile:
 
 ![Janbu on the surface the search found](images/lem09_solution.png){width=1000}
 
-The sliding mass weighs 98,994 lb/ft on a 74.8 ft base. The surface crosses the
-lower anchor 5.1 ft out from the face and the upper one 12.7 ft out, and both
+The sliding mass weighs 119,150 lb/ft on an 84.1 ft base. The surface crosses the
+lower anchor 5.0 ft out from the face and the upper one 12.4 ft out, and both
 deliver their full capacity — 35,570 lb/ft between them, which at 25° below
 horizontal resolves into 32,238 lb/ft holding the mass back and 15,033 lb/ft
 pressing down on it. Neither crossing is anywhere near a bond zone: more than 20 ft
@@ -426,9 +426,9 @@ Each method runs its own search and finds its own critical surface:
 
 | Janbu | Corps | Lowe | Spencer |
 |:---:|:---:|:---:|:---:|
-| 1.417 | 1.393 | 1.396 | 1.395 |
+| 1.431 | 1.415 | 1.412 | 1.412 |
 
-All four land between 1.393 and 1.417. The Ordinary Method of Slices and Bishop's
+All four land between 1.412 and 1.431. The Ordinary Method of Slices and Bishop's
 simplified method are not on the list: both take moments about a circle centre,
 which a polyline does not have, so they refuse the run rather than approximate it.
 Morgenstern–Price is absent for a different reason — its solver fails on the
@@ -447,10 +447,10 @@ to 60:
 **FS = 1.469** with Janbu's correction factor f₀ = 1.024 applied, 1.434 without
 it, and 1.439 with Spencer's method — the values
 [verification problem VP49](../verification/rocscience.md#vp49) records against
-the published solutions. The wedge carries 157,936 lb/ft on a 90.1 ft base, 60%
+the published solutions. The wedge carries 157,936 lb/ft on a 90.1 ft base, 33%
 more soil than the searched surface, and takes the same 35,570 lb/ft from the
 anchors, since a crossing anywhere in the free length gives full capacity. Its
-lower leg leaves the toe at 42° against the search's 52°. A specified surface is a
+lower leg leaves the toe at 42° against the search's 49°. A specified surface is a
 candidate, not an answer, which is why the search comes first.
 
 ### What the tiebacks are worth
@@ -460,23 +460,23 @@ starting points, a separate search with its own critical surface:
 
 ![Janbu on the wall with no tiebacks](images/lem09_solution_bare.png){width=1000}
 
-**FS = 0.862** against 1.417 — an unstable wall. The mechanism moves with the
-anchors, not just the number: without them the critical surface exits right at the
-top of the cut slope, at (32.22, 52.61) rather than 14 ft further back, and cuts
-64,718 lb/ft of soil against 98,994.
+**FS = 0.921** against 1.431 — an unstable wall. The mechanism moves with the
+anchors, not just the number: without them the critical surface exits at
+(41.77, 57.22) on the cut slope, 13 ft closer to the wall, and cuts 87,264 lb/ft
+of soil against 119,150.
 
 Removing supports one at a time separates the two contributions, each answer on
 its own searched surface:
 
 | Support present | Janbu FS |
 |---|:---:|
-| Anchors and pile | 1.417 |
-| Anchors only | 1.287 |
-| Pile only | 0.862 |
-| Neither | 0.751 |
+| Anchors and pile | 1.431 |
+| Anchors only | 1.325 |
+| Pile only | 0.921 |
+| Neither | 0.831 |
 
 The wall does not stand at all without the anchors, and the pile is worth about
-0.13 on top of them.
+0.11 on top of them.
 
 ### Active or passive
 
@@ -519,9 +519,9 @@ This tutorial demonstrated:
   letting XSLOPE divide once.
 - A soldier pile as a separate shear input beside the tensile ones, contributing
   5,900 lb/ft where the surface crosses it.
-- A search settling at **FS = 1.417** on a near-planar wedge from the wall toe,
-  against **1.469** for the specified wedge solved as entered, **0.862** for the
-  same wall searched with the anchors removed, and **0.751** with no support at
+- A search settling at **FS = 1.431** on a near-planar wedge from the wall toe,
+  against **1.469** for the specified wedge solved as entered, **0.921** for the
+  same wall searched with the anchors removed, and **0.831** with no support at
   all.
 - **Appl** measured on a held surface: 1.567 active against 1.331 passive on one
   circle, from an ultimate capacity divided by the factor of safety rather than

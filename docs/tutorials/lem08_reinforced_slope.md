@@ -481,6 +481,12 @@ length gets its own search and its own critical circle:
 | 30 | 1.587 | 4,000 | 5 of 6 |
 | 40 | 1.587 | 4,000 | 5 of 6 |
 
+At 20 ft — the length the model uses — the search returns the circle this page
+has been reading all along, crossing five of the six lines with every crossing
+deep enough to deliver its full 800 lb/ft:
+
+![Spencer at the 20 ft design length](images/lem08_solution.png){width=1000}
+
 Beyond 20 ft the answer stops moving, and the four searches that produced it say
 why: each settles on the same circle — center (−5.13, 46.98), the same five
 crossings at the same x — and every one of those crossings already lies at least

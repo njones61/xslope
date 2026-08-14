@@ -546,14 +546,9 @@ def lem03_plots():
 LEM05 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_noncircular.xlsx")
 LEM05_SLICES = 40
 
-#: Where the page pulls the entry point to, to show what a steep toe wedge does.
-#: 1 ft of horizontal run against 5 ft of drop is a 78.7 degree leading segment —
-#: still sliceable, still solvable, and the answer it returns is nonsense.
-LEM05_SLIVER_X = -1.0
-
 
 def _lem05_solve(model, non_circ, method="spencer"):
-    """One surface, one method, no search: what this page runs everywhere."""
+    """One surface, one method, no search — the page's held-surface comparisons."""
     from xslope.slice import generate_slices
     from xslope.solve import solve_selected
 
@@ -591,26 +586,43 @@ def lem05_sheets():
 
 
 def lem05_plots():
-    """The states LEM-5 compares against — every one a single surface, solved once.
+    """LEM-5's arc: the search first, then the comparisons it frames.
 
-    No search anywhere in this group. The page teaches the surface a reader
-    enters, so each figure is that surface (or a deliberately damaged version of
-    it) run through Spencer's method at 40 slices, which is the method and the
-    slice count the prose quotes.
+    The page runs the automated search before anything else, so the first two
+    figures are that search — the trial surfaces it walked through and the
+    critical one it settled on, Spencer at 40 slices, which is the method and the
+    slice count the prose quotes. Everything after them is a comparison against
+    it: the circular search on the same section, and the weak-zone generator's own
+    proposal solved as entered, which is the surface the page uses to say a
+    generated shape is viable rather than critical.
 
-    The arc: the model as delivered, the generator's own proposal beside it, the
-    best circle this section admits, and the same surface with its entry point
-    pulled in until the leading segment is a sliver.
+    The generator's figure is deliberately a SINGLE-SURFACE solve. Its number is
+    the one the page reads against the searched minimum, and a search from that
+    seed would answer about a third surface again.
     """
     sd = load_slope_data(LEM05)
 
     capture("lem05_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
 
-    slices, surface, result = _lem05_solve(sd, sd["non_circ"])
-    capture("lem05_solution.png", plot_solution, sd, slices, surface, result)
+    # The first analysis the page runs: Auto search, Spencer, from the four points
+    # the model carries. The search plot is where the Movement column shows its
+    # work — the entered surface among the trials, the critical one in red.
+    from xslope.plot import plot_noncircular_search_results
+    from xslope.search import noncircular_search
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path = noncircular_search(sd, "spencer",
+                                               num_slices=LEM05_SLICES,
+                                               diagnostic=False)
+    if not fs_cache:
+        raise SystemExit("LEM-5: the non-circular search found no valid surface")
+    crit = fs_cache[0]
+    capture("lem05_search.png", plot_noncircular_search_results, sd, fs_cache, path)
+    capture("lem05_solution.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
 
-    # The generator's proposal, solved the same way — the audit the Studio path
-    # asks the reader to make against the surface they entered by hand.
+    # The generator's proposal, solved as entered — the audit the Studio path asks
+    # the reader to make, and the page's evidence that a generated surface is a
+    # starting shape rather than an answer.
     from xslope.generators import generate_noncircular_surface
     gen = generate_noncircular_surface(sd, report=True)
     if not gen["surface"]:
@@ -619,33 +631,25 @@ def lem05_plots():
     gs, gsurf, gres = _lem05_solve(sd, gen["surface"])
     capture("lem05_solution_generated.png", plot_solution, sd, gs, gsurf, gres)
 
-    # What a circle gets on the same section. The file defines no circles — it is
-    # a non-circular model — so the question is asked with the starting circles
-    # the geometry itself proposes, refined by the ordinary circular search.
+    # What a circle gets on the same section — search against search, which is the
+    # only fair pairing. The file defines no circles (it is a non-circular model),
+    # so the question is asked with the starting circles the geometry itself
+    # proposes, refined by the ordinary circular search.
     from xslope.generators import generate_starting_circles
     circ = copy.deepcopy(sd)
     circ["circles"] = generate_starting_circles(circ)
     circ["circular"] = True
     with contextlib.redirect_stdout(io.StringIO()):
-        fs_cache, _, _, _ = circular_search(circ, "spencer",
-                                            num_slices=LEM05_SLICES,
-                                            diagnostic=False)
-    best = fs_cache[0]
+        fs_circ, _, _, _ = circular_search(circ, "spencer",
+                                           num_slices=LEM05_SLICES,
+                                           diagnostic=False)
+    best = fs_circ[0]
     capture("lem05_solution_circle.png", plot_solution, circ, best["slices"],
             best["failure_surface"], best["solver_result"])
 
-    # The hazard: the same four points with the entry pulled in to x = -1, which
-    # stands the leading segment up at 78.7 degrees. Drawn rather than described,
-    # because the tell is the shape of the leading slices.
-    sliver = copy.deepcopy(sd["non_circ"])
-    sliver[0]["X"] = LEM05_SLIVER_X
-    ss, ssurf, sres = _lem05_solve(sd, sliver)
-    capture("lem05_sliver.png", plot_solution, sd, ss, ssurf, sres)
-
-    print("   as entered %.4f · generated %.4f · best circle %.4f (depth %.3f) · "
-          "entry at x = %g %.4f"
-          % (result["FS"], gres["FS"], best["FS"], best["Depth"],
-             LEM05_SLIVER_X, sres["FS"]))
+    print("   searched %.4f · generated as entered %.4f · best circle %.4f "
+          "(depth %.3f)"
+          % (crit["FS"], gres["FS"], best["FS"], best["Depth"]))
 
 
 # --------------------------------------------------------------------------- #

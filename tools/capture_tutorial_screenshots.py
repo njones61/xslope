@@ -493,10 +493,15 @@ def lem05_run_lem():
     defines a non-circular surface and no circles, so the selector is a fixed
     label reading *Non-circular*, the mirror of the fixed *Circular* label LEM-2's
     model produces.
+
+    **Analysis** is *Auto search*, which is the first analysis the page runs: the
+    four points the model carries are where a search starts, not what it answers.
+    The page's held-surface comparisons switch the same row to *Single surface*
+    and say so.
     """
     from studio.dialogs import RunLemDialog
 
-    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "single_surface",
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
                                  "num_slices": 40},
                        slope_data=_load(LEM05))
     dlg.resize(dlg.sizeHint())

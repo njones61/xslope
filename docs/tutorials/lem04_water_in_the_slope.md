@@ -500,7 +500,7 @@ This tutorial demonstrated:
 
 **Where to go next:** [Tutorial LEM-5](lem05_weak_layer_noncircular.md) puts the
 failure surface itself in your hands — a 2 ft seam of soft clay no circle can
-follow, entered as a table of vertices.
+follow, entered as a table of vertices and searched from there.
 [Sample Problem 5](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
 carries this same section into a three-seed search and reports every method on
 both surfaces, and the

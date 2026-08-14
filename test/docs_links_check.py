@@ -924,9 +924,11 @@ LEM05_INPUT_CATEGORIES = ("Non-circular pts", "Piezometric lines")
 LEM05_NONCIRC_BUTTONS = ("Add row", "Generate from the weak zone…")
 
 #: The vertex table's columns and the Movement settings the page dictates into
-#: them. Movement is pinned option by option because the page's closing section
-#: measures what each one does to a search, so a renamed option leaves that table
-#: describing choices the reader cannot make.
+#: them. Movement is pinned option by option because the page's search reading
+#: measures what each one does to the search -- `Horiz` sliding the seam points
+#: along the clay, `Free` walking the ends along the ground, `Fixed` pinning them
+#: -- so a renamed option leaves that reading describing choices the reader cannot
+#: make.
 LEM05_NONCIRC_HEADERS = ("X", "Y", "Movement")
 LEM05_NONCIRC_MOVEMENTS = ("Free", "Horiz", "Fixed")
 
@@ -944,15 +946,32 @@ LEM05_GENERATE_RAMPS = ("a 28 degree ramp to the ground at the toe",
                         "a 60 degree ramp to the ground at the crest")
 LEM05_GENERATE_POINTS = 4
 
-#: The Run LEM readings LEM-5's run step quotes: the analysis it chooses, and the
-#: fixed Surface label a model carrying a non-circular surface and no circles
-#: produces (the mirror of the fixed "Circular" LEM-2's model shows).
-LEM05_RUN_ANALYSIS = "Single surface"
+#: The Run LEM readings LEM-5's run step quotes. BOTH analyses are pinned because
+#: the page names both by label: it runs *Auto search* first, as the normal way to
+#: run a model, and switches to *Single surface* for the comparisons it announces
+#: as holding the surface still. With them, the fixed Surface label a model
+#: carrying a non-circular surface and no circles produces (the mirror of the fixed
+#: "Circular" LEM-2's model shows).
+LEM05_RUN_ANALYSES = ("Auto search", "Single surface")
 LEM05_RUN_SURFACE = "Non-circular"
 
-#: The Run LEM readings LEM-4's pivot step quotes: the same Single-surface
-#: analysis LEM-5 pins, chosen here on a circles-only model whose Surface row is
-#: the fixed *Circular* label the page describes.
+#: What a reader sees when a non-circular search is seeded with an end ramp
+#: steeper than the search's own ``max_base_angle``: the Run box's message (the
+#: ``AnalysisError`` Studio's LEM runner turns into a "LEM run failed" box) and the
+#: Log pane's line under it. The page quotes both verbatim in its end-ramp section,
+#: demonstrated on the crest point pulled in to x = 30 -- a 71.6 degree exit ramp,
+#: past the 65 degree limit -- so the seed is pinned with them. The starting
+#: surface is rejected before any iteration runs, which is why this pin costs a
+#: rejected slice-generation rather than a search.
+LEM05_STEEP_EXIT_X = 30.0
+LEM05_SEARCH_FAILED = "Search produced no valid surfaces."
+LEM05_SEARCH_LOG = ("the starting surface is not viable (slice generation or the "
+                    "solver failed on it)")
+
+#: The Run LEM readings LEM-4's pivot step quotes: the Single-surface analysis it
+#: chooses on a circles-only model, whose Surface row is the fixed *Circular* label
+#: the page describes.
+LEM04_RUN_ANALYSIS = "Single surface"
 LEM04_RUN_SURFACE = "Circular"
 
 #: The piezometric-lines editor as LEM-4's Studio path drives it: the tab the
@@ -1161,10 +1180,11 @@ def _lem05_editor_labels():
 
     run = RunLemDialog(defaults={}, slope_data=data)
     analyses = {run.analysis.itemText(i) for i in range(run.analysis.count())}
-    if LEM05_RUN_ANALYSIS not in analyses:
-        fails.append(f"Run LEM offers no {LEM05_RUN_ANALYSIS!r} analysis, which "
-                     f"Tutorial LEM-5 tells the reader to choose. It offers "
-                     f"{sorted(analyses)}")
+    for name in LEM05_RUN_ANALYSES:
+        if name not in analyses:
+            fails.append(f"Run LEM offers no {name!r} analysis, which Tutorial "
+                         f"LEM-5 tells the reader to choose. It offers "
+                         f"{sorted(analyses)}")
     if run.surface is not None:
         fails.append("Run LEM offers a Surface chooser on LEM-5's model; the page "
                      "says the row is a fixed label, which is what a model with one "
@@ -1175,6 +1195,35 @@ def _lem05_editor_labels():
                      f"{LEM05_RUN_SURFACE!r} on LEM-5's model, which the page "
                      f"quotes. Its labels read {sorted(l for l in labels if l)}")
     run.deleteLater()
+
+    # The end-ramp refusal, in the two texts the page quotes: what the Run box
+    # says and what the Log pane says under it. Run through the same
+    # ``run_lem_analysis`` Studio's LEM runner calls, on the same steep seed the
+    # page describes, because the Run box shows exactly the AnalysisError it
+    # raises.
+    from xslope.search import AnalysisError, run_lem_analysis
+
+    steep = dict(data)
+    steep["non_circ"] = [dict(p) for p in data["non_circ"]]
+    steep["non_circ"][-1]["X"] = LEM05_STEEP_EXIT_X
+    log = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(log):
+            run_lem_analysis(steep, "spencer", analysis="auto_search",
+                             surface="noncircular", num_slices=40)
+        fails.append(f"a non-circular search seeded with a "
+                     f"{LEM05_STEEP_EXIT_X:g}-exit surface (a 71.6 degree end ramp, "
+                     f"past the search's 65 degree limit) now runs; Tutorial LEM-5 "
+                     f"shows it being refused")
+    except AnalysisError as e:
+        if str(e) != LEM05_SEARCH_FAILED:
+            fails.append(f"a search refused for a too-steep end ramp reports "
+                         f"{str(e)!r}; Tutorial LEM-5 quotes {LEM05_SEARCH_FAILED!r} "
+                         f"as the message the Run box shows")
+    if LEM05_SEARCH_LOG not in log.getvalue():
+        fails.append(f"the Log pane no longer carries {LEM05_SEARCH_LOG!r} when a "
+                     f"search is seeded with a too-steep end ramp, which Tutorial "
+                     f"LEM-5 quotes. It reads {log.getvalue().strip()!r}")
     return fails
 
 
@@ -1239,8 +1288,8 @@ def _lem04_editor_labels(mw):
 
     run = RunLemDialog(defaults={}, slope_data=data)
     analyses = {run.analysis.itemText(i) for i in range(run.analysis.count())}
-    if LEM05_RUN_ANALYSIS not in analyses:
-        fails.append(f"Run LEM offers no {LEM05_RUN_ANALYSIS!r} analysis on "
+    if LEM04_RUN_ANALYSIS not in analyses:
+        fails.append(f"Run LEM offers no {LEM04_RUN_ANALYSIS!r} analysis on "
                      f"LEM-4's model, which its pivot step chooses. It offers "
                      f"{sorted(analyses)}")
     if run.surface is not None:

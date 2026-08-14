@@ -808,9 +808,8 @@ def _ground_snap(slope_data, ground, x):
     result lies on it are two different calculations, and on a long steep ground
     segment they disagree in the last bits: the slicer then reports "expected at
     least 2 intersection points, but got 1" and refuses a surface whose geometry is
-    visibly correct. Cutting the ground with a vertical line, which is what
-    ``noncircular_search`` itself does when it slides an end point, gives an
-    answer shapely agrees with.
+    visibly correct. Cutting the ground with a vertical line -- letting shapely
+    do the arithmetic -- gives an answer shapely agrees with.
     """
     surface = (slope_data or {}).get("ground_surface")
     if surface is not None and not getattr(surface, "is_empty", True):

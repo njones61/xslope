@@ -26,7 +26,7 @@ from .advanced import rapid_drawdown, validate_rapid_drawdown
 from .generators import (generate_noncircular_surface, generate_starting_circles,
                          rank_weak_zones, slope_geometry)
 from .preflight import preflight
-from .slice import generate_slices, get_y_from_intersection
+from .slice import generate_slices
 
 # A valid limit-equilibrium failure surface must have a meaningful net gravitational
 # driving force. A surface under flat ground (e.g. a circle in a reservoir bottom)
@@ -1154,13 +1154,17 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
         
         # For endpoints, ensure they stay on ground surface
         if i == 0 or i == len(points)-1:
-            # Create vertical line at new_x
-            vertical_line = LineString([(new_x, 0), (new_x, 1000)])  # Arbitrary high y value
-            intersection = ground_surface.intersection(vertical_line)
-            y = get_y_from_intersection(intersection)
-            if y is None:
+            # An end point daylights ON the ground surface, so it steps ALONG the
+            # surface polyline rather than in x: dx is its signed arc-length step
+            # (dy is unused). A vertical face -- a wall, a cut -- has no x extent
+            # to step across, so re-anchoring an x step by vertical intersection
+            # would skip the whole face and land on the crest above it, leaving
+            # every elevation on the face unreachable.
+            s = ground_surface.project(Point(point[0], point[1])) + dx
+            if s < 0 or s > ground_surface.length:
                 return False
-            new_y = y
+            moved = ground_surface.interpolate(s)
+            new_x, new_y = moved.x, moved.y
         else:
             # For middle points, ensure they stay below ground surface but above the
             # domain floor (surfaces leaving an irregular bottom are rejected later
@@ -1309,8 +1313,14 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
                 
                 # Get movement direction based on point type
                 if i == 0 or i == len(points)-1:  # End points
-                    dx = direction * movement_distance
-                    dy = 0  # y will be determined by ground surface
+                    # 'Fixed' pins an end point where the input put it, the same
+                    # as for an interior point. 'Free' and 'Horiz' are one and the
+                    # same here: an end point's only admissible direction is along
+                    # the ground surface, which is what move_point walks it down.
+                    if movements[i] == 'Fixed':
+                        continue
+                    dx = direction * movement_distance  # arc length, not x
+                    dy = 0
                 elif movements[i] == 'Horiz':
                     dx = direction * movement_distance
                     dy = 0

@@ -157,9 +157,9 @@ that runs beneath it and daylights beyond.
 Download
 [xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the dyke's
 model, carrying a single starting circle an engineer might reasonably place:
-mid-depth, under the crest — and open it in Studio with **File → Open**. The
-Inputs plot draws the four profile lines in their materials' colors with that
-one seed:
+centered over the slope face, reaching mid-depth into the clays — and open it
+in Studio with **File → Open**. The Inputs plot draws the four profile lines
+in their materials' colors with that one seed:
 
 ![The loaded dyke](images/lem10_vp75_inputs.png){width=1000}
 

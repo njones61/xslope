@@ -108,6 +108,9 @@ LEM06_FILE = os.path.join(_REPO, "docs/lem/files/xslope_sloping_bottom.xlsx")
 #: pins need: an Inputs tree row that counts them and an editor with a line to
 #: read the capacity fields off.
 LEM08_FILE = os.path.join(_REPO, "docs/lem/files/xslope_reinforce.xlsx")
+#: Tutorial LEM-10's completed model — a cohesionless embankment on soft clay,
+#: the section its generator quote and its two Run LEM search options are read on.
+LEM10_FILE = os.path.join(_REPO, "docs/lem/files/xslope_mult_min_KEY.xlsx")
 #: The editable master template, whose ``reinforce`` sheet carries the support-type
 #: lookup block LEM-8 reproduces as a table.
 TEMPLATE_FILE = os.path.join(_REPO, "docs/inputs/input_template.xlsx")
@@ -1050,6 +1053,62 @@ LEM08_TYPE_PRESETS = (("Geosynthetic", "Tangent", "Active"),
                       ("Anchor", "Axial", "Active"))
 
 
+#: The two Run LEM search options LEM-10 tells the reader to use, and the field
+#: that carries the depth. The page's last section is written as instructions to
+#: tick these — a rewording would leave it naming controls that are not there,
+#: and the numbers beside them (1.327 seeded from the grid, 1.376 with the filter)
+#: are measured with exactly these two settings.
+LEM10_GRID_CHECKBOX = "Grid search (auto-seed the circular search)"
+LEM10_SKIN_CHECKBOX = "Ignore surficial (skin) failures"
+LEM10_MIN_SLIP_LABEL = "Min slip depth"
+
+#: What the starting-circle generator reports on LEM-10's section, quoted verbatim
+#: on the page. The skim clause is the load-bearing half: the page takes the
+#: generated circle at the base of the embankment as its shallow seed, and the
+#: summary is how a reader knows the generator saw a cohesionless face at all.
+LEM10_GENERATE_SUMMARY = ("4 on the left-facing face (toe at x = 0, height 15), "
+                          "one of them skimming its 24 degree cohesionless face")
+
+
+def _lem10_run_labels():
+    """The Run LEM search options Tutorial LEM-10's last section drives.
+
+    Read on LEM-10's own model, because the dialog enables both options only for
+    a circular auto-search — which is the run the page is describing — and the
+    generator summary the page quotes is a property of this section's geometry.
+    """
+    from PySide6.QtWidgets import QCheckBox, QLabel
+
+    from xslope.fileio import load_slope_data
+    from xslope.generators import generate_starting_circles
+
+    from studio.dialogs import RunLemDialog
+
+    fails = []
+    data = _quiet(load_slope_data, LEM10_FILE)
+
+    run = RunLemDialog(defaults={}, slope_data=data)
+    boxes = {b.text() for b in run.findChildren(QCheckBox)}
+    for label in (LEM10_GRID_CHECKBOX, LEM10_SKIN_CHECKBOX):
+        if label not in boxes:
+            fails.append(f"Run LEM has no {label!r} checkbox; Tutorial LEM-10 "
+                         f"tells the reader to tick it. Its checkboxes read "
+                         f"{sorted(boxes)}")
+    labels = {lab.text() for lab in run.findChildren(QLabel)}
+    if LEM10_MIN_SLIP_LABEL not in labels:
+        fails.append(f"Run LEM has no {LEM10_MIN_SLIP_LABEL!r} field; Tutorial "
+                     f"LEM-10 names it as where the depth goes. Its labels read "
+                     f"{sorted(l for l in labels if l)}")
+    run.deleteLater()
+
+    summary = _quiet(generate_starting_circles, data, report=True).get("summary")
+    if summary != LEM10_GENERATE_SUMMARY:
+        fails.append(f"the circle generator reports {summary!r} on LEM-10's "
+                     f"section, not {LEM10_GENERATE_SUMMARY!r} — the line the "
+                     f"page quotes")
+    return fails
+
+
 def _lem01_editor_labels():
     """The materials editor as Tutorial LEM-1 drives it: opened, switched, added to.
 
@@ -1733,6 +1792,7 @@ def test_tutorial_labels():
         fails += _lem03_editor_labels()
         fails += _lem05_editor_labels()
         fails += _lem04_editor_labels(mw)
+        fails += _lem10_run_labels()
         # Last of the editor legs: these are the ones that change which project
         # the window holds, and each opens the model its own pins are read on.
         fails += _lem06_editor_labels(mw)

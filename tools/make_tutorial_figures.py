@@ -50,6 +50,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt                                      # noqa: E402
 
 from xslope.fileio import load_slope_data                            # noqa: E402
+from xslope.generators import generate_starting_circles              # noqa: E402
 from xslope.search import circular_search, file_search_window        # noqa: E402
 from xslope.plot import (plot_inputs, plot_solution,                 # noqa: E402
                          plot_circular_search_results)
@@ -985,6 +986,67 @@ def lem08_plots():
              crit_b["Yo"], crit_b["Depth"]))
 
 
+# --------------------------------------------------------------------------- #
+# LEM-10 — Finding the Global Minimum
+# --------------------------------------------------------------------------- #
+#: LEM-10's model is the multiple-local-minima sample — one file, two pages. The
+#: page's comparison is a seeding change, not a model change: the same section
+#: searched from the generated circle set and from the deep circle the file
+#: carries, so each answer sits on the surface its own seed converged to.
+LEM10 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_mult_min_KEY.xlsx")
+LEM10_SLICES = 40
+
+
+def _lem10_search(model, circles=None, **kwargs):
+    """Spencer's search on the model, optionally re-seeded with ``circles``."""
+    m = copy.deepcopy(model)
+    if circles is not None:
+        m["circles"] = circles
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path, circle_cache = circular_search(
+            m, "spencer", num_slices=LEM10_SLICES, diagnostic=False,
+            **dict(file_search_window(m), **kwargs))
+    return fs_cache, path, circle_cache
+
+
+def lem10_plots():
+    """The two answers LEM-10 puts side by side, each on its own search.
+
+    The first search is seeded with the generator's embankment circle — tangent
+    to the top of the foundation, the shallower of the two mechanisms this
+    section holds. It collapses onto the infinite-slope sliver, so its figure is
+    the search plot: the story is the family of trial circles shrinking onto the
+    face, not the surface that won. The generator's set as a whole reaches the
+    same sliver, but the skim circle in it has a center 500 ft above the section
+    and drawing that search puts the model in a corner of the frame.
+
+    The second is seeded with the deep circle the file carries, tangent to the
+    limiting depth, and finds the foundation mechanism. That one is drawn as a
+    solution, because the mass it moves is the point.
+    """
+    sd = load_slope_data(LEM10)
+
+    capture("lem10_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
+
+    generated = generate_starting_circles(sd, report=True)["circles"]
+    shallow = [c for c in generated if abs(c["Depth"]) < 1e-9]
+    fs_gen, path_gen, circles_gen = _lem10_search(sd, shallow)
+    crit_g = fs_gen[0]
+    capture("lem10_search_shallow.png", plot_circular_search_results, sd,
+            fs_gen, path_gen, circle_cache=circles_gen)
+
+    fs_deep, _, _ = _lem10_search(sd)
+    crit_d = fs_deep[0]
+    capture("lem10_solution_deep.png", plot_solution, sd, crit_d["slices"],
+            crit_d["failure_surface"], crit_d["solver_result"])
+
+    print("   shallow seed %.4f (Xo %.2f Yo %.2f depth %.3f, ΣW %.0f) · "
+          "deep seed %.4f (Xo %.2f Yo %.2f depth %.3f, ΣW %.0f)"
+          % (crit_g["FS"], crit_g["Xo"], crit_g["Yo"], crit_g["Depth"],
+             crit_g["slices"]["w"].sum(), crit_d["FS"], crit_d["Xo"],
+             crit_d["Yo"], crit_d["Depth"], crit_d["slices"]["w"].sum()))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -1002,6 +1064,7 @@ GROUPS = {
     "lem06_plots": lem06_plots,
     "lem08_sheets": lem08_sheets,
     "lem08_plots": lem08_plots,
+    "lem10_plots": lem10_plots,
 }
 
 

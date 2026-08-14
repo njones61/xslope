@@ -47,6 +47,7 @@ nav:
     - A Weak Layer, Non-Circular (LEM): tutorials/lem05_weak_layer_noncircular.md
     - Polygon Geometry (LEM): tutorials/lem06_polygon_geometry.md
     - A Reinforced Slope (LEM): tutorials/lem08_reinforced_slope.md
+    - Finding the Global Minimum (LEM): tutorials/lem10_global_minimum.md
   - XSLOPE Studio:
     - Overview: studio/index.md
     - The Interface: studio/interface.md

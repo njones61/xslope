@@ -37,7 +37,7 @@ answer.
 **Materials** — two Mohr-Coulomb (`mc`) soils, both undrained:
 
 | Mat ID | Name | γ (pcf) | c (psf) | φ (deg) | Pore pressure |
-|---|---|---:|---:|---:|---|
+|---|---|:---:|:---:|:---:|---|
 | 1 | `embankment` | 130 | 400 | 0 | `none` |
 | 2 | `foundation` | 135 | 800 | 0 | `none` |
 
@@ -52,7 +52,7 @@ vertex per row in the paired `x` / `y` columns its worksheet block carries.
 **Profile Line 1 — material 1 (`embankment`):**
 
 | x (ft) | y (ft) |
-|---:|---:|
+|:---:|:---:|
 | 0 | 0 |
 | 40 | 20 |
 | 90 | 20 |
@@ -60,7 +60,7 @@ vertex per row in the paired `x` / `y` columns its worksheet block carries.
 **Profile Line 2 — material 2 (`foundation`):**
 
 | x (ft) | y (ft) |
-|---:|---:|
+|:---:|:---:|
 | -30 | 0 |
 | 90 | 0 |
 
@@ -82,7 +82,7 @@ toe would have nowhere to put the deep mechanism this problem is about.
 twice the slope height, one tangent to the base of each layer:
 
 | Xo | Yo | Option | Depth |
-|---:|---:|---|---:|
+|:---:|:---:|---|:---:|
 | 20 | 40 | Depth | 0 |
 | 20 | 40 | Depth | -10 |
 
@@ -245,7 +245,7 @@ says so: *"Generated 3 circles: 3 on the left-facing face (toe at x = 0, height
 20)."* Read the **Depth** column, which is the elevation each one reaches:
 
 | # | Depth | What it is |
-|---|---:|---|
+|---|:---:|---|
 | 1 | −4.72136 | the toe circle — from this center, the arc through the toe bottoms out 4.7 ft inside the foundation |
 | 2 | −10 | tangent to the rigid rock, the base of the foundation |
 | 3 | 0 | tangent to the top of the foundation, the base of the embankment |
@@ -285,7 +285,7 @@ run you can repeat: solve that circle alone with **Run LEM…** and **Analysis**
 plot, and the weight is ΣW summed over the run's slices:
 
 | Circle | Depth | Factor of safety | Weight of the sliding mass (lb/ft) |
-|---|---:|---:|---:|
+|---|:---:|:---:|:---:|
 | Base of the embankment | 0 | **1.247** | 61,224 |
 | Through the toe | −4.72 | 1.646 | 100,872 |
 | Base of the foundation | −10 | 1.656 | 157,486 |
@@ -373,7 +373,7 @@ and what it ran through.
 The search finds each method its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |
 
 The four methods that satisfy moment equilibrium — OMS, Bishop, Spencer and

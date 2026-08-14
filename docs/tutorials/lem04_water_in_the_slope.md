@@ -41,7 +41,7 @@ weights: γ, what the soil weighs above the water table, and γ_sat, what it
 weighs below it.
 
 | Mat ID | Name | γ (pcf) | γ_sat (pcf) | c′ (psf) | φ′ (deg) | Pore pressure |
-|---|---|---:|---:|---:|---:|---|
+|---|---|:---:|:---:|:---:|:---:|---|
 | 1 | `soil 1` | 125 | 130 | 400 | 30 | `piezo` |
 | 2 | `soil 2` | 122 | 127 | 600 | 28 | `piezo` |
 | 3 | `soil 3` | 115 | 118 | 900 | 12 | `piezo` |
@@ -59,7 +59,7 @@ block carries.
 **Profile Line 1 — material 1 (`soil 1`):**
 
 | x (ft) | y (ft) |
-|---:|---:|
+|:---:|:---:|
 | 0 | 84 |
 | 150 | 84 |
 | 174.7 | 64 |
@@ -67,7 +67,7 @@ block carries.
 **Profile Line 2 — material 2 (`soil 2`):**
 
 | x (ft) | y (ft) |
-|---:|---:|
+|:---:|:---:|
 | 0 | 64 |
 | 174.7 | 64 |
 | 204.3 | 40 |
@@ -75,7 +75,7 @@ block carries.
 **Profile Line 3 — material 3 (`soil 3`):**
 
 | x (ft) | y (ft) |
-|---:|---:|
+|:---:|:---:|
 | 0 | 40 |
 | 320 | 40 |
 
@@ -90,7 +90,7 @@ ft down to the base.
 point per row as the `piezo` worksheet and Studio's editor take them:
 
 | x (ft) | y (ft) |
-|---:|---:|
+|:---:|:---:|
 | 0 | 80 |
 | 75 | 79 |
 | 112 | 76 |
@@ -108,7 +108,7 @@ ground beyond it. That stretch is where the water reaches the surface.
 this page measures is the one the search finds, not this one:
 
 | Xo | Yo | Option | Depth |
-|---:|---:|---|---:|
+|:---:|:---:|---|:---:|
 | 195 | 150 | Depth | 18.1 |
 
 Every number the model needs is in the tables above, and each table is laid out
@@ -387,7 +387,7 @@ wet figure the blue bars visibly hollow out the green ones.
 Run the other methods on both states and the pattern holds everywhere:
 
 | | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---|---:|---:|---:|---:|---:|---:|---:|
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | u = `none` | 1.502 | 1.696 | 1.633 | 2.084 | 1.810 | 1.667 | 1.669 |
 | Piezometric line | 1.115 | 1.328 | 1.266 | 1.690 | 1.421 | 1.301 | 1.303 |
 
@@ -430,7 +430,7 @@ That split is already in every number on this page. To see what it is worth,
 clear the three **gsat** cells and run the held circle again:
 
 | | ΣW (lb/ft) | FS (Spencer) |
-|---|---:|---:|
+|---|:---:|:---:|
 | γ only (gsat blank) | 340,385 | 1.311 |
 | γ above the line, γ_sat below | 349,677 | 1.301 |
 

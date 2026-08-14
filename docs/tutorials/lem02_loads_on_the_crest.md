@@ -50,7 +50,7 @@ Two points are the whole load here, because the intensity is uniform between
 them:
 
 | X (ft) | Y (ft) | N (psf) |
-|---:|---:|---:|
+|:---:|:---:|:---:|
 | 25 | 20 | 750 |
 | 35 | 20 | 750 |
 
@@ -189,7 +189,7 @@ small-looking input, and the reason is visible in the figure rather than in the
 number: **the surface moved to find the load.**
 
 | | unloaded | with the surcharge |
-|---|---:|---:|
+|---|:---:|:---:|
 | Factor of safety (Spencer) | 1.276 | 0.918 |
 | Circle radius (ft) | 40.4 | 33.8 |
 | Surface exits the crest at x = | 44.5 | 35.0 |
@@ -234,7 +234,7 @@ point at the middle of the strip instead — one row, in the columns the `lloads
 worksheet and Studio's line-loads editor share:
 
 | Label | x (ft) | y (ft) | P (lb/ft) | Angle (deg) |
-|---|---:|---:|---:|---:|
+|---|:---:|:---:|:---:|:---:|
 | footing | 30 | 20 | 7500 | -90 |
 
 - **Studio** — click **Line loads** in the **Inputs** tree, **Add row**, and
@@ -309,7 +309,7 @@ earthquake would do. It is a single global number:
 With the crest surcharge back in place:
 
 | k | 0.00 | 0.10 | 0.15 |
-|---|---:|---:|---:|
+|---|:---:|:---:|:---:|
 | Factor of safety (Spencer) | 0.918 | 0.817 | 0.774 |
 
 ![Spencer at k = 0.15](images/lem02_solution_seismic.png){width=1000}

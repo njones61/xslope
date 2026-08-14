@@ -2148,13 +2148,22 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             alpha = comp.alpha_deg(x_c)
         else:
             # For non-circular failure surface, use geometric intersection
+            # Clamp the probe inside the surface span: an end slice narrower than
+            # delta otherwise sends a probe past the surface, the lookup returns
+            # None, and the fallback scores a near-vertical end segment as flat
+            # with dl = its sliver width — the base resistance vanishes and a
+            # search chases the artifact (vp103d measured 6% low; the same bug
+            # let acads' 89 deg scarp under the max_base_angle guard).
             failure_line = clipped_surface
+            xs_min, _, xs_max, _ = failure_line.bounds
+            xl = max(x_c - delta, xs_min)
+            xr = min(x_c + delta, xs_max)
             y1 = get_y_from_intersection(
-                failure_line.intersection(LineString([(x_c - delta, -1e6), (x_c - delta, 1e6)])))
+                failure_line.intersection(LineString([(xl, -1e6), (xl, 1e6)])))
             y2 = get_y_from_intersection(
-                failure_line.intersection(LineString([(x_c + delta, -1e6), (x_c + delta, 1e6)])))
-            if y1 is not None and y2 is not None:
-                alpha = degrees(atan2(y2 - y1, 2 * delta))
+                failure_line.intersection(LineString([(xr, -1e6), (xr, 1e6)])))
+            if y1 is not None and y2 is not None and xr > xl:
+                alpha = degrees(atan2(y2 - y1, xr - xl))
             else:
                 alpha = 0
 

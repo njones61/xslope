@@ -7,8 +7,8 @@ description: "Build a 30 ft soldier-pile tieback wall in XSLOPE — two grouted 
 
 A 30 ft vertical cut held open by a soldier-pile wall, with the ground behind it
 rising another 50 ft to a plateau. Two rows of grouted tiebacks, declined 25° into
-the slope, hold the face — 120,000 and 164,000 lb bars on 8 ft centers, which is
-15,043 and 20,527 lb per foot of wall. The soldier pile at the face carries their
+the slope, hold the face — the manual's 120,344.9 and 164,217.3 lb bars on 8 ft
+centers, 15,043 and 20,527 lb per foot of wall. The soldier pile at the face carries their
 heads and 5,900 lb/ft of shear across any surface that cuts it. The problem comes from the Caltrans SNAILZ
 reference manual, by way of the Rocscience Slide2 verification corpus — it is
 [verification problem VP49](../verification/rocscience.md#vp49), and this page

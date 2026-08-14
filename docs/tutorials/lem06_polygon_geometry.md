@@ -222,36 +222,30 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 ## C — Building it in Studio {#c-building-it-in-studio}
 
-Studio edits polygons on a project that has them. A project started from
-**File → New** is a profile-line project until it does — the **Polygons** row of
-the **Inputs** tree counts the zones and opens no editor while that count is
-zero — so the two ways into a polygon model are to open one and to import one:
-
-- **Open the workbook.** The file from
-  [path B](#b-building-the-excel-file) above, or the completed model at the top
-  of this page. **Polygons** then reads `2` and opens the editor.
-- **File → Import DXF…** builds a project from a CAD drawing, mapping each DXF
-  layer of closed regions to a material zone. That is the other reason polygon
-  geometry exists, and it has its own page:
-  [DXF Import/Export](../usage/dxf.md#importing-polygons-from-a-dxf).
-
-With the model open, click **Polygons**, then **Polygon 2  (mat 2: foundation)**
-in the list on the left:
+Enter the materials first, as in the earlier tutorials, then click
+**Polygons** in the **Inputs** tree. On a new project the editor opens empty:
+**Add polygon** starts the first zone — which makes this a polygon project —
+and **Add row** adds vertices. Enter (or copy-paste) the embankment ring from
+the table above, set **Material:** to `1: embankment`, and leave **Type:** at
+`material`. **Add polygon** again for the foundation ring, on `2: foundation`:
 
 ![The polygons editor on the foundation zone](images/lem06_studio_polygons.png)
 
-The four rows are that zone's ring, and the help line above them states the rule
-the table depends on: *"Each polygon is a closed region (the ring closes
-automatically, so list each vertex once)."* **Add polygon** starts another zone,
-**Add row** another vertex; **Material:** assigns the zone its soil and
-**Type:** stays at `material`.
+The help line above the rows states the rule the table depends on: *"Each
+polygon is a closed region (the ring closes automatically, so list each vertex
+once)."*
 
-Two things the profile-lines editor has are missing here, and both are the point.
-There is no **Max depth** field, because a polygon model's bottom boundary is
-drawn rather than typed. And the preview beside the table draws filled zones
-instead of lines — the selected zone outlined and hatched, the other dimmed — with
-the hatched base beneath them following the dip. Click a zone or a vertex in that
-preview to select it. Click **OK**.
+Two things the profile-lines editor has are missing here, and both are the
+point. There is no **Max depth** field, because a polygon model's bottom
+boundary is drawn rather than typed. And the preview beside the table draws
+filled zones instead of lines — the selected zone outlined and hatched, the
+other dimmed — with the hatched base beneath them following the dip. Click a
+zone or a vertex in that preview to select it. Click **OK**, then enter the
+starting circles from the table above via **Circles**.
+
+Geometry drawn in CAD takes the other road in: **File → Import DXF…** builds a
+polygon project from a drawing's closed regions —
+[DXF Import/Export](../usage/dxf.md#importing-polygons-from-a-dxf).
 
 Continue below.
 

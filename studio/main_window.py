@@ -1697,15 +1697,18 @@ class MainWindow(QMainWindow):
         add("Global parameters", "", category="global")
         add("Materials", len(d.get("materials", [])), category="materials")
         # A project is profile-based unless it has polygons but no profile lines.
-        # An empty (new) project defaults to profile-based so the user can add the
-        # first profile line; polygons are then derived from it.
+        # An empty (new) project can start down either path, so both rows are
+        # live until the first geometry lands; the first profile line makes the
+        # file profile-based, the first polygon makes it polygon-based.
         profile_based = bool(profile_lines) or not polygons
+        empty_geometry = not profile_lines and not polygons
         add("Profile lines", len(profile_lines),
             category="profile" if profile_based else None)
         # Polygons are derived from profile lines for profile-based files (edit them
-        # via the profile editor); only polygon-based files edit polygons directly.
+        # via the profile editor); polygon-based files — and an empty project —
+        # edit polygons directly.
         add("Polygons", len(polygons),
-            category="polygons" if not profile_based else None)
+            category="polygons" if (not profile_based or empty_geometry) else None)
         # SSR zones are polygon-sheet rows with sentinel Mat IDs, edited in the same
         # dialog as the material zones (appended after them). Listed separately
         # because they are analysis overlays, not geometry — the Polygons count must

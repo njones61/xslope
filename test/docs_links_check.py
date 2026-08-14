@@ -1464,10 +1464,19 @@ def _lem06_editor_labels(mw):
     mw.doc._dirty = False
     mw.new_project()
     _, category = _polygons_row()
+    if category != "polygons":
+        fails.append("a project started from File > New does not open the "
+                     "Polygons editor; Tutorial LEM-6's Studio path builds the "
+                     "model from scratch through that row")
+    # The guard the empty-project liveness must NOT have removed: on a
+    # profile-based file, polygons are derived and the row stays inert.
+    mw.doc._dirty = False
+    _quiet(mw.open_path, os.path.join(_REPO,
+           "docs/lem/files/xslope_simple_mult_layers.xlsx"))
+    _, category = _polygons_row()
     if category is not None:
-        fails.append("a project started from File > New now opens the Polygons "
-                     "editor; Tutorial LEM-6's Studio path tells the reader it "
-                     "does not, and sends them to an opened model or a DXF import")
+        fails.append("the Polygons row opens an editor on a profile-based "
+                     "model; derived polygons must stay read-only there")
     mw.doc._dirty = False
     _quiet(mw.open_path, LEM06_FILE)
     count, category = _polygons_row()

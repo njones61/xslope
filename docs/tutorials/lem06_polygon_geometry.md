@@ -250,16 +250,19 @@ filled zones instead of lines — the selected zone outlined and hatched, the
 other dimmed — with the hatched base beneath them following the dip. Click a
 zone or a vertex in that preview to select it. Click **OK**.
 
-### 3. Starting circles
-
-Click **Circles**, press **Add row** twice, and enter (or copy-paste) the two
-circles from the table above — the shared center at (20, 40), one tangent to
-the layer contact at Depth `0` and one reaching down toward the sloping
-bedrock at Depth `-10.7887`. Click **OK**.
-
-Geometry drawn in CAD takes the other road in: **File → Import DXF…** builds a
+Geometry drawn in CAD takes the same road in: **File → Import DXF…** builds a
 polygon project from a drawing's closed regions —
 [DXF Import/Export](../usage/dxf.md#importing-polygons-from-a-dxf).
+
+### 3. Starting circles
+
+Click **Circles** and press **Generate starting circles…** — on this section
+it proposes two circles at the shared center (20, 40): one through the toe and
+one tangent to the layer contact. What it cannot propose is the deep seed —
+a dipping polygon base has no single base elevation to target — so change the
+toe circle's **Depth** to `-10.7887`, reaching down toward the bedrock. The
+table now matches the one above, and the search starts from both candidate
+mechanisms. Click **OK**.
 
 Continue below.
 

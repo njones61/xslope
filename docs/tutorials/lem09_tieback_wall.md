@@ -135,11 +135,9 @@ blocks, one either side of the three columns the preset owns.
 | 15043.1 | 0 | 8.86735 | 0 | 0 | 1 |
 | 20527.2 | 0 | 12.1 | 0 | 0 | 1 |
 
-**Tmax is per foot of wall**, the anchor's bar capacity divided by the 8 ft
-horizontal spacing between anchors, which is why **Spacing** stays at 1 — the
-division has already been done. Entering the per-anchor capacity with Spacing = 8
-instead gives the same forces and the same answers; the division happens once,
-wherever it is written.
+**Tmax is per foot of wall** — the anchor's bar capacity divided by the 8 ft
+horizontal spacing between anchors — which is why **Spacing** stays at 1: the
+division has already been done.
 
 **Lp1 = 0 is the plate.** A pullout length of zero means *fully anchored*: the
 whole capacity is available right at that end, which is what a bearing plate on

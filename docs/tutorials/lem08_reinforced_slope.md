@@ -293,9 +293,27 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 ## C — Building it in Studio {#c-building-it-in-studio}
 
-Build the materials, the profile lines, the distributed load and the circles as
-[LEM-3](lem03_layered_slope.md) and [LEM-2](lem02_loads_on_the_crest.md) do,
-then open **Reinforcement lines** in the **Inputs** tree:
+### 1. Materials
+
+Click **Materials** in the **Inputs** tree, press **Add row** twice, and enter
+the two materials from the table above — `shell` then `base`, both at γ = 130
+and φ = 37, told apart by c = 300 and 0.
+
+### 2. Profile lines
+
+Click **Profile lines**. Two lines, top down — the face band's three vertices,
+then the base's four — each on its material, with **Max depth (bottom boundary
+elevation):** set to `-10`.
+
+### 3. The surcharge
+
+Click **Distributed loads** and enter the two points from the table above,
+leaving **Direction:** at `Normal (perpendicular to the line)` — on the level
+crest that is straight down.
+
+### 4. Reinforcement lines
+
+Open **Reinforcement lines** in the **Inputs** tree:
 
 ![The reinforcement editor on the first geogrid layer](images/lem08_studio_reinforcement.png){width=1000}
 
@@ -303,21 +321,27 @@ The editor opens on its **List view**, one line at a time as a form in four
 groups. **Geometry** is the two endpoints. **Capacity** is `Tmax`, with the
 `Tres`, `E` and `Area` the FEM reads. **Anchorage** is the pullout lengths, the
 end capacities and the spacing. **Type** is the preset, with the `Dir` and
-`Appl` it fills — `geosynthetic`, `tangent` and `active` on these lines, and the
-list on the left labels each entry by that type and the x-range it spans.
+`Appl` it fills — `geosynthetic`, `tangent` and `active` on these lines.
 
 **Add** appends a line and **Remove** deletes the selected one; six lines make
-six entries in the list on the left, each labelled by the x-range it spans. The
-capacity fields carry their units — `Tmax (per unit width, lb/ft)` — so a
-per-element capacity entered without a spacing is visible as the wrong quantity.
-The preview draws the lines on the section, the selected one bold with a marker
-at each end and at its pullout breakpoints: the shape of its capacity envelope,
-in place on the slope. Click a line in the preview to select it.
+six entries in the list on the left, each labelled by its type and the x-range
+it spans. The capacity fields carry their units — `Tmax (per unit width,
+lb/ft)` — so a per-element capacity entered without a spacing is visible as the
+wrong quantity. The preview draws the lines on the section, the selected one
+bold with a marker at each end and at its pullout breakpoints: the shape of its
+capacity envelope, in place on the slope. Click a line in the preview to select
+it.
 
-**Table view** puts all six on one grid, the faster way in for a wall with
-fifteen layers of the same product: the columns are the worksheet's, so a block
-of rows pastes in at once. Both views edit the same lines, so switching between
-them loses nothing. Click **OK**.
+**Table view** puts all six on one grid, the columns in the worksheet's order —
+the faster view for entering six lines that differ only in their endpoints.
+Both views edit the same lines, so switching between them loses nothing. Click
+**OK**.
+
+### 5. Starting circles
+
+Click **Circles**, press **Add row** twice, and enter the two circles from the
+table above. **Depth is an elevation**: 0 is the toe, -10 the bottom of the
+model.
 
 Continue below.
 

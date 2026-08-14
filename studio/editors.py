@@ -5690,13 +5690,16 @@ class ReinforcementEditor(CategoryEditor):
               tooltip=REINFORCE_HELP["dir"]),
         Field("appl", "Appl", "choice", choices=["active", "passive"], applies=LF,
               tooltip=REINFORCE_HELP["appl"]),
+        # Field order past Type/Dir/Appl mirrors the reinforce sheet's columns
+        # (Tmax, Lp1, Lp2, Tend1, Tend2, Spacing, then the FEM-only tail) so a
+        # block copied from the sheet or the docs' tables pastes straight in.
         Field("t_max", "Tmax", usage="lem", tooltip=REINFORCE_HELP["t_max"]),
-        Field("t_res", "Tres", usage="fem", tooltip=REINFORCE_HELP["t_res"]),
-        Field("tend1", "Tend1", usage="lem", tooltip=REINFORCE_HELP["tend1"]),
-        Field("tend2", "Tend2", usage="lem", tooltip=REINFORCE_HELP["tend2"]),
         Field("lp1", "Lp1", usage="lem", tooltip=REINFORCE_HELP["lp1"]),
         Field("lp2", "Lp2", usage="lem", tooltip=REINFORCE_HELP["lp2"]),
+        Field("tend1", "Tend1", usage="lem", tooltip=REINFORCE_HELP["tend1"]),
+        Field("tend2", "Tend2", usage="lem", tooltip=REINFORCE_HELP["tend2"]),
         Field("spacing", "Spacing", applies=LF, tooltip=REINFORCE_HELP["spacing"]),
+        Field("t_res", "Tres", usage="fem", tooltip=REINFORCE_HELP["t_res"]),
         # E is a Young's modulus (stress). Area (a cross-section, length²) has no
         # xslope.units.labels() key -- the labels() contract is length/stress/
         # unit_weight/force_per_len/k/flowrate/time -- so it is deliberately left

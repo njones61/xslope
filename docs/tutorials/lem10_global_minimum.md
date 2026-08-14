@@ -27,7 +27,7 @@ watch a single plausible seed miss the global minimum that grid seeding finds
 with no seeds at all (Part B).
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">grid seeding</span><span class="tg-pill">minimum slip depth</span></p>
-<div class="tgm-model" markdown>**Completed models** — [xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) (the same file used by [LEM Sample Problem 13](../lem/samples.md#13-multiple-local-minima)) and, for the closing example, [vp075.xlsx](../verification/files/rocscience/vp075.xlsx), the James Bay dyke of [verification problem VP75](../verification/rocscience.md#vp75)</div>
+<div class="tgm-model" markdown>**Completed models** — [xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) (the same file used by [LEM Sample Problem 13](../lem/samples.md#13-multiple-local-minima)) and, for Part B, [xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the James Bay dyke of [verification problem VP75](../verification/rocscience.md#vp75), with a single mid-depth starting circle</div>
 </div>
 
 ---
@@ -155,24 +155,23 @@ that runs beneath it and daylights beyond.
 ### Opening the model
 
 Download
-[vp075.xlsx](../verification/files/rocscience/vp075.xlsx) and open it in
-Studio — **File → Open**. The Inputs plot draws the four profile lines in
-their materials' colors, with the file's three starting circles spanning
-shallow to deep:
+[xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the dyke's
+model, carrying a single starting circle an engineer might reasonably place:
+mid-depth, under the crest — and open it in Studio with **File → Open**. The
+Inputs plot draws the four profile lines in their materials' colors with that
+one seed:
 
 ![The loaded dyke](images/lem10_vp75_inputs.png){width=1000}
 
-### A single plausible seed
+### Running the analysis
 
-Open **Circles** and replace the file's three rows with a single circle an
-engineer might reasonably place — mid-depth, under the crest:
+Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
+`Auto search`, with **Ignore surficial (skin) failures** on and
+**Min slip depth** = `2` — the metric counterpart of Part A's 5 ft:
 
-| Xo | Yo | Option | Depth |
-|:---:|:---:|---|:---:|
-| 86 | 43 | Depth | 15 |
+![The Run LEM dialog on the dyke](images/lem10_jb_run_lem.png)
 
-Run **Spencer**, `Auto search`, with **Ignore surficial failures** on and
-**Min slip depth** = `2` — the metric counterpart of the last section's 5 ft:
+Click **Run**:
 
 ![Spencer from the single mid-depth seed](images/lem10_vp75_single.png){width=1000}
 
@@ -186,9 +185,13 @@ is there to hold that mechanism.
 Now the seeding-independent tool. **Grid search (auto-seed the circular
 search)**, the checkbox beside the surficial filter, sweeps a grid of circle
 centers against a range of tangent elevations before refining, instead of
-refining only the neighborhood of the circles on the sheet. Tick it and run
-again — the grid ignores the circles sheet entirely, so it does not matter
-what is seeded:
+refining only the neighborhood of the circles on the sheet. Back in
+**Run LEM…**, tick it — the grid ignores the circles sheet entirely, so it
+does not matter what is seeded:
+
+![The Run LEM dialog with grid search on](images/lem10_jb_run_lem_grid.png)
+
+Run again:
 
 ![Spencer with grid seeding](images/lem10_vp75_grid.png){width=1000}
 

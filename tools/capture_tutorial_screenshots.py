@@ -853,9 +853,38 @@ def lem10_circles():
     return _grab(dlg, "lem10_studio_circles.png")
 
 
+LEM10_JB = os.path.join(REPO_ROOT, "docs/lem/files/xslope_james_bay.xlsx")
+
+
+def lem10_jb_run_lem():
+    """Part B's first run: the dyke's single seed, Spencer auto search with the
+    surficial filter at the metric 2 m — the state the step dictates."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40, "min_slip_depth": 2.0},
+                       slope_data=_load(LEM10_JB))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem10_jb_run_lem.png")
+
+
+def lem10_jb_run_lem_grid():
+    """Part B's second run: the same dialog with Grid search ticked."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40, "min_slip_depth": 2.0,
+                                 "grid_seed": True},
+                       slope_data=_load(LEM10_JB))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem10_jb_run_lem_grid.png")
+
+
 SHOTS["lem10_run_lem"] = lem10_run_lem
 SHOTS["lem10_run_lem_filtered"] = lem10_run_lem_filtered
 SHOTS["lem10_circles"] = lem10_circles
+SHOTS["lem10_jb_run_lem"] = lem10_jb_run_lem
+SHOTS["lem10_jb_run_lem_grid"] = lem10_jb_run_lem_grid
 
 
 def lem01_global():

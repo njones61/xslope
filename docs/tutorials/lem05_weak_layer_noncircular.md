@@ -607,9 +607,11 @@ This tutorial demonstrated:
   families are within 7%, and what the polyline adds is the 23 ft it spends
   *inside* the clay.
 
-**Where to go next:** this page closes the tutorial series — the
-[tutorials index](index.md) lists all five, and the sample problems carry each one
-further. [Sample Problem 7](../lem/samples.md#7-non-circular-failure-surface)
+**Where to go next:** [Tutorial LEM-6](lem06_polygon_geometry.md) changes how the
+section itself is entered — closed material-zone polygons instead of profile
+lines, on bedrock that dips across the model and refuses the circles that would
+cut below it. The sample problems carry each page further:
+[Sample Problem 7](../lem/samples.md#7-non-circular-failure-surface)
 catalogues this same model and its per-method searches, and
 [Sample Problem 13](../lem/samples.md#13-multiple-local-minima) is the circular
 counterpart of the same hazard — a section where the surface a search settles on

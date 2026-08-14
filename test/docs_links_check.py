@@ -99,6 +99,11 @@ LEM05_FILE = os.path.join(_REPO, "docs/lem/files/xslope_noncircular.xlsx")
 #: as the page's weight-split section reads it.
 LEM04_FILE = os.path.join(_REPO,
                           "docs/lem/files/xslope_method_slices_problem.xlsx")
+#: Tutorial LEM-6's completed model — two material-zone polygons on a dipping
+#: base, which is what its pins need: a polygon-based project (the only kind
+#: whose Polygons row opens an editor) and a domain whose floor a circle can be
+#: pushed below.
+LEM06_FILE = os.path.join(_REPO, "docs/lem/files/xslope_sloping_bottom.xlsx")
 
 #: A URL on the docs site — what the docs build emits.
 GOOD = "https://xslope.readthedocs.io/en/latest/lem/files/xslope_simple1.xslz"
@@ -986,6 +991,34 @@ LEM04_PIEZO_ADD = "Add row"
 LEM04_CIRCLE_COLUMNS = ("Xo", "Yo", "Option", "Depth")
 LEM04_LOG_DOCK = "Log"
 
+#: The polygons editor as LEM-6's Studio step drives it: the two buttons that
+#: build a zone, and the three fields the step names beside them. **Type:** is
+#: pinned because the step tells the reader to leave it where it is, which is an
+#: instruction about a control that has to exist.
+LEM06_POLYGON_BUTTONS = ("Add polygon", "Add row")
+LEM06_POLYGON_LABELS = ("Type:", "Material:", "Size:")
+
+#: The zone list's own wording, quoted on the page as the item the reader clicks,
+#: and the closed-region rule quoted from the editor's help line. Both are the
+#: dialog's text rather than the page's paraphrase of it.
+LEM06_POLYGON_ITEM = "Polygon 2  (mat 2: foundation)"
+LEM06_POLYGON_HELP = ("Each polygon is a closed region (the ring closes "
+                      "automatically, so list each vertex once)")
+
+#: The profile-lines field that must be ABSENT from the polygons editor. The page
+#: makes a teaching point of it — a polygon model's bottom boundary is drawn, not
+#: typed — so a Max depth field appearing here would leave that paragraph wrong.
+LEM06_POLYGON_NO_MAX_DEPTH = "Max depth (bottom boundary elevation):"
+
+#: The Run LEM checkbox LEM-6's composite section tells the reader to tick, and
+#: what a reader sees when a circle is pushed below the domain floor without it:
+#: the message the ``AnalysisError`` Studio's LEM runner turns into a "LEM run
+#: failed" box. The page quotes both verbatim, demonstrated on the file's deeper
+#: starting circle taken 1.2 ft further down, so that circle is pinned with them.
+LEM06_COMPOSITE_CHECKBOX = "Composite surfaces (truncate circles at the base)"
+LEM06_DEEP_CIRCLE = {"Xo": 20.0, "Yo": 40.0, "Depth": -12.0, "R": 52.0}
+LEM06_DOMAIN_REFUSAL = "Failure surface extends outside the domain polygon"
+
 
 def _lem01_editor_labels():
     """The materials editor as Tutorial LEM-1 drives it: opened, switched, added to.
@@ -1305,6 +1338,125 @@ def _lem04_editor_labels(mw):
     return fails
 
 
+def _lem06_editor_labels(mw):
+    """The polygons editor and the composite option, as Tutorial LEM-6 drives them.
+
+    Read on a polygon-based model, because that is the only kind whose Polygons
+    row opens an editor — which is itself what the page's Studio path says, so
+    the tree row is checked in both states: editable on this model, and inert on
+    a project that has no zones yet.
+
+    The refusal is *provoked* rather than quoted from a constant: the page's
+    composite section is built on a circle that will not fit, so the check pushes
+    the file's deeper starting circle 1.2 ft below the base and confirms the run
+    still stops on the message the page prints, and still solves with the option
+    the page tells the reader to tick.
+    """
+    from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton
+
+    from xslope.fileio import load_slope_data
+    from xslope.search import AnalysisError, run_lem_analysis
+
+    from studio.dialogs import RunLemDialog
+    from studio.editors import PolygonEditor
+
+    fails = []
+
+    def _polygons_row():
+        """The Inputs tree's Polygons row: (count, editor category | None)."""
+        from studio.main_window import CATEGORY_ROLE as ROLE
+        tree = mw.inputs_tree
+        for i in range(tree.topLevelItemCount()):
+            item = tree.topLevelItem(i)
+            if item.text(0) == "Polygons":
+                return item.text(1), item.data(0, ROLE)
+        return None, None
+
+    mw.doc._dirty = False
+    mw.new_project()
+    _, category = _polygons_row()
+    if category is not None:
+        fails.append("a project started from File > New now opens the Polygons "
+                     "editor; Tutorial LEM-6's Studio path tells the reader it "
+                     "does not, and sends them to an opened model or a DXF import")
+    mw.doc._dirty = False
+    _quiet(mw.open_path, LEM06_FILE)
+    count, category = _polygons_row()
+    if category != "polygons":
+        fails.append("the Polygons row does not open an editor on LEM-6's own "
+                     "model; its Studio path is written on the model being open")
+    if count != "2":
+        fails.append(f"the Polygons row reads {count!r} on LEM-6's model; the page "
+                     f"says it reads '2' once the model is open")
+
+    data = _quiet(load_slope_data, LEM06_FILE)
+    if len(data.get("polygons") or []) != 2 or data.get("profile_lines"):
+        fails.append("LEM-6's model is no longer two polygons and no profile "
+                     "lines; the page's whole geometry section reads it as the "
+                     "polygon-input case")
+
+    poly = PolygonEditor().build(data, None, select=1)
+    buttons = {b.text() for b in poly.findChildren(QPushButton)}
+    for label in LEM06_POLYGON_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the polygons editor has no {label!r} button; Tutorial "
+                         f"LEM-6 tells the reader to press it. Its buttons read "
+                         f"{sorted(buttons)}")
+    labels = {lab.text() for lab in poly.findChildren(QLabel)}
+    for name in LEM06_POLYGON_LABELS:
+        if name not in labels:
+            fails.append(f"the polygons editor has no {name!r} field; Tutorial "
+                         f"LEM-6 names it. Its labels read "
+                         f"{sorted(l for l in labels if l)}")
+    if LEM06_POLYGON_NO_MAX_DEPTH in labels:
+        fails.append(f"the polygons editor now offers "
+                     f"{LEM06_POLYGON_NO_MAX_DEPTH!r}; Tutorial LEM-6 tells the "
+                     f"reader it is absent, because a polygon model's bottom "
+                     f"boundary is drawn rather than typed")
+    help_text = " ".join(lab.text() for lab in poly.findChildren(QLabel))
+    if LEM06_POLYGON_HELP not in help_text:
+        fails.append(f"the polygons editor no longer states "
+                     f"{LEM06_POLYGON_HELP!r}, which Tutorial LEM-6 quotes as the "
+                     f"closed-region rule")
+    items = [poly.list.item(i).text() for i in range(poly.list.count())]
+    if LEM06_POLYGON_ITEM not in items:
+        fails.append(f"the polygons editor's zone list has no "
+                     f"{LEM06_POLYGON_ITEM!r} entry, which Tutorial LEM-6 tells "
+                     f"the reader to click. It reads {items}")
+    poly.deleteLater()
+
+    run = RunLemDialog(defaults={}, slope_data=data)
+    boxes = {b.text() for b in run.findChildren(QCheckBox)}
+    if LEM06_COMPOSITE_CHECKBOX not in boxes:
+        fails.append(f"Run LEM has no {LEM06_COMPOSITE_CHECKBOX!r} checkbox; "
+                     f"Tutorial LEM-6 tells the reader to tick it. Its checkboxes "
+                     f"read {sorted(boxes)}")
+    run.deleteLater()
+
+    # The circle the page pushes below the base: refused as an ordinary circle,
+    # truncated against the base when composite surfaces are allowed.
+    deep = dict(data)
+    deep["circles"] = [dict(LEM06_DEEP_CIRCLE)]
+    try:
+        _quiet(run_lem_analysis, deep, "spencer", analysis="single_surface",
+               surface="circular", num_slices=40, composite=False)
+        fails.append("a circle below LEM-6's domain floor now solves without the "
+                     "composite option; the page's composite section is built on "
+                     "its refusal")
+    except AnalysisError as exc:
+        if LEM06_DOMAIN_REFUSAL not in str(exc):
+            fails.append(f"a circle below LEM-6's domain floor is refused with "
+                         f"{str(exc)!r}, not {LEM06_DOMAIN_REFUSAL!r} — the "
+                         f"message the page quotes")
+    bundle = _quiet(run_lem_analysis, deep, "spencer", analysis="single_surface",
+                    surface="circular", num_slices=40, composite=True)
+    if (bundle.get("results") or {}).get("FS") is None:
+        fails.append("the same circle no longer solves with composite surfaces "
+                     "on; Tutorial LEM-6 reports the truncated surface's factor "
+                     "of safety")
+    return fails
+
+
 def _lem02_editor_labels(mw):
     """The two dialogs Tutorial LEM-2 drives, read for the labels it quotes.
 
@@ -1458,6 +1610,9 @@ def test_tutorial_labels():
         fails += _lem03_editor_labels()
         fails += _lem05_editor_labels()
         fails += _lem04_editor_labels(mw)
+        # Last of the editor legs: it is the one that changes which project the
+        # window holds, and nothing after it reads the tree.
+        fails += _lem06_editor_labels(mw)
 
         from PySide6.QtWidgets import QPushButton
 

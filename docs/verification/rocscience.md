@@ -1669,7 +1669,7 @@ Slide #51 / GS 2.31: Zhu, Lee & Jiang (2003) four-layer slope, wet, k=0.1, 5 m d
 
 | Method | XSLOPE | Slide | Zhu | SLOPE/W |
 |---|---|---|---|---|
-| Ordinary | 1.069 | 1.145 (−6.6%) | 1.066 (+0.3%) | 1.284 (no Ordinary value is published for SLOPE/W — this is its Bishop entry, cross-method here) |
+| Ordinary | 1.069 | 1.145 (−6.6%) | 1.066 (+0.3%) | — (not published) |
 | Bishop | 1.278 | 1.278 (0.0%) | 1.278 (0.0%) | 1.284 (−0.5%) |
 | Janbu (corrected) | 1.205 | 1.112 (simplified — cross-method; ×f₀ ≈ 1.20) | 1.112 (simplified — cross-method) | 1.115 (uncorrected — cross-method) |
 | Corps #2 | 1.404 | 1.422 (−1.3%) | 1.377 (+2.0%) | 1.368 (+2.6%) |

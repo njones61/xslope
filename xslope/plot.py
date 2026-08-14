@@ -3086,7 +3086,7 @@ def plot_line_loads(ax, slope_data, style=None):
             ax.plot([], [], color='purple', lw=2, label='Line Load')
 
 
-def plot_piles(ax, slope_data, slice_df=None, style=None):
+def plot_piles(ax, slope_data, slice_df=None, style=None, label_h=True):
     """
     Plots pile lines from slope_data and optionally marks failure surface intersections.
 
@@ -3096,6 +3096,10 @@ def plot_piles(ax, slope_data, slice_df=None, style=None):
         slice_df: Optional DataFrame — if provided, marks pile-failure surface intersection points
         style: optional style sheet (see xslope.style); None → defaults. Piles are
             structural, so color + width only (always solid).
+        label_h: annotate each pile with its explicit H value. On by default —
+            the inputs plot keeps it; the solution plot passes False, where the
+            label lands on the stress hatching and the number is an input, not
+            a result.
     """
     if 'pile_lines' not in slope_data or not slope_data['pile_lines']:
         return
@@ -3112,7 +3116,7 @@ def plot_piles(ax, slope_data, slice_df=None, style=None):
                 alpha=0.9, solid_capstyle='butt',
                 label='Pile' if i == 0 else "")
         # Annotate with H value
-        if pile.get('H') is not None:
+        if label_h and pile.get('H') is not None:
             mid_x = (pile['x1'] + pile['x2']) / 2
             mid_y = (pile['y1'] + pile['y2']) / 2
             ax.annotate(f"H={pile['H']:.0f}", (mid_x, mid_y),
@@ -3940,7 +3944,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_tcrack_surface(ax, slope_data, style=style)
     plot_tcrack_water_force(ax, slice_df, slope_data)
     plot_reinforcement_lines(ax, slope_data, style=style)
-    plot_piles(ax, slope_data, slice_df=slice_df, style=style)
+    plot_piles(ax, slope_data, slice_df=slice_df, style=style, label_h=False)
     plot_line_loads(ax, slope_data, style=style)
     # Slice numbers go on last of all, once the frame and the layout are final —
     # they are sized against the slice widths as they will actually print.

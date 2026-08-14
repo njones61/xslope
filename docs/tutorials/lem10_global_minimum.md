@@ -1,6 +1,6 @@
 ---
 title: "Tutorial LEM-10 — Finding the Global Minimum"
-description: "Search a cohesionless embankment on soft clay in XSLOPE from two different starting circles and get two different answers — a surficial sliver on the sand face and the deep foundation failure — then use grid seeding and a minimum slip depth to find the one a design is sized for."
+description: "Open a completed XSLOPE model of a cohesionless embankment on soft clay, search it from the circle the file carries, then move the seed and get a different answer — a surficial sliver on the sand face vs the deep foundation failure — and use grid seeding and a minimum slip depth to find the one a design is sized for."
 ---
 
 # Tutorial LEM-10 — Finding the Global Minimum
@@ -15,14 +15,14 @@ and an automated search returns whichever of them its starting circle is near.
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>
-<div class="tgt-tile"><span class="tg-label">Assistant</span><p>~5 min</p></div>
-<div class="tgt-tile"><span class="tg-label">By hand</span><p>10–15 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Open & run</span><p>~10 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build a section that holds two competing failure mechanisms,
-search it from a circle in the embankment and from a circle in the foundation,
-and read why the two searches disagree — then find the deep mechanism with grid
-seeding and a minimum slip depth.
+**Objectives** — Open the completed model and search it from the circle the
+file carries — the deep foundation seed — then move the seed into the
+embankment and get a different answer; read why the two searches disagree, and
+use grid seeding and a minimum slip depth to find the mechanism a design is
+sized for.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">grid seeding</span><span class="tg-pill">minimum slip depth</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) — the same file used by [LEM Sample Problem 13](../lem/samples.md#13-multiple-local-minima)</div>
@@ -74,69 +74,66 @@ foundation:
 |:---:|:---:|---|:---:|
 | 11.25 | 40 | Depth | -20 |
 
-The tables are the model, and each is laid out exactly as its destination is —
-the template's worksheets and Studio's editors, same columns in the same order.
-Select a table's block of values, copy, and paste it straight into the sheet or
-editor rather than retyping it.
+This tutorial starts from the completed file rather than building it: the
+tables above are what the file already holds, laid out as the worksheets and
+Studio's editors show them. The starting circle is the one input the tutorial
+changes.
 
 ---
 
-## Building the model
+## Opening the model
 
-Three ways in, all producing the same file; they meet again at
-[Running the analysis](#running-the-analysis).
+Download
+[xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) and open it
+in Studio — **File → Open**. (It is an ordinary input workbook: the same file
+opens in Excel, one worksheet per table above.) The Inputs plot draws what
+loaded:
 
-**The AI assistant.** Paste the drawing at the top of this page into the chat box
-and type `Build this model`, or describe it:
+![The loaded model](images/lem10_inputs.png){width=1000}
 
-<div class="prompt-block" markdown>
-```text
-Build a model for a 15 ft embankment with a 2.25:1 face on a 20 ft soft clay foundation. The embankment is 120 pcf, cohesionless, with phi = 30; the foundation is 120 pcf with c = 450 psf, phi = 0. The crest runs 50 ft back from the top of the face, the ground continues 50 ft beyond the toe, and the bottom of the clay is at elevation -20. Add a starting circle tangent to the bottom of the clay.
-```
-</div>
-
-Audit what it entered against the tables above, as
-[LEM-3](lem03_layered_slope.md#a-building-it-with-the-ai-assistant) does: the fill
-first so the Mat IDs match the profile lines, **c = 0 and φ = 30 in the fill**
-(a drawing that says "sand" says neither), φ = 0 in the clay, and a maximum depth
-of `-20` — an elevation, not a thickness.
-
-**The Excel file.** Start from
-[input_template.xlsx](../inputs/input_template.xlsx) and fill `mat`, `profile`
-and `circles` from the tables above, as
-[LEM-3's Excel path](lem03_layered_slope.md#b-building-the-excel-file) walks them.
-`profile!B2` **Max Depth** = `-20` is the one cell worth checking twice.
-
-**Studio.** Work down the **Inputs** tree — **Materials**, **Profile lines**,
-**Circles** — entering the same tables in the same order, as in
-[LEM-3's Studio path](lem03_layered_slope.md#c-building-it-in-studio).
+The two profile lines are drawn in their materials' colors and the dashed red arc
+is the starting circle, bottoming out on the hatched maximum depth at elevation
+−20.
 
 ---
 
 ## Running the analysis
 
-However you built it, you now hold the same model:
+Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
+`Auto search`, with the slice count left at 40:
 
-![The finished model](images/lem10_inputs.png){width=1000}
+![The Run LEM dialog on the loaded model](images/lem10_studio_run_lem.png)
 
-The two profile lines are drawn in their materials' colors and the dashed red arc
-is the starting circle, bottoming out on the hatched maximum depth at elevation
-−20. Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40.
+The circle the file carries reaches the bottom of the clay, and the search it
+seeds finds the deep mechanism:
+
+![Spencer on the deep foundation surface](images/lem10_solution_deep.png){width=1000}
+
+**FS = 1.376**, on a circle centered at (16.90, 26.22) with a radius of 46.22 —
+tangent to the limiting depth at elevation −20, entering at the crest and exiting
+21 ft beyond the toe, 82.9 ft of failure surface carrying 204,041 lb/ft of soil.
+The starting circle is a seed and not an answer — solved as entered it gives
+1.426, and the search deepens and lengthens it to 1.376.
 
 ---
 
 ## Exploring the results
 
-### Searching from a circle in the embankment
+### Move the seed and the answer moves
 
 [LEM-3's rule](lem03_layered_slope.md#guarding-against-local-minima) is one
-starting circle per layer, and Studio's **Generate starting circles…** builds
-that set from the geometry. On this section it reports *"4 on the left-facing
-face (toe at x = 0, height 15), one of them skimming its 24 degree cohesionless
-face"*. Take the one that is the embankment's own mechanism — **Xo** `16.875`,
-**Yo** `30`, **Option** `Depth`, **Depth** `0`, tangent to the top of the
-foundation — and search from it alone:
+starting circle per layer, and this model's second layer has a mechanism of its
+own. Open **Circles** and replace the file's circle with one that belongs to
+the embankment — tangent to the top of the foundation instead of the bottom of
+the clay:
+
+| Xo | Yo | Option | Depth |
+|:---:|:---:|---|:---:|
+| 16.875 | 30 | Depth | 0 |
+
+![The circles editor holding the embankment circle](images/lem10_studio_circles.png)
+
+Click **OK** and run the same Spencer auto search again:
 
 ![The search from the embankment circle](images/lem10_search_shallow.png){width=1000}
 
@@ -149,36 +146,9 @@ That number is not an artifact of the search. On a cohesionless face the factor
 of safety against an infinitely shallow slide is tan φ′ / tan β, which is
 tan 30° / tan 23.96° = **1.299** for this 2.25:1 face. The search is converging on
 a real limit — and the limit belongs to a slide with no mass in it. It is the
-minimum of this model and not a mechanism anything is designed against.
-
-### Searching from a circle in the foundation
-
-The circle the file carries reaches the bottom of the clay. Searching from that
-one instead, with everything else unchanged:
-
-![Spencer on the deep foundation surface](images/lem10_solution_deep.png){width=1000}
-
-**FS = 1.376**, on a circle centered at (16.90, 26.22) with a radius of 46.22 —
-tangent to the limiting depth at elevation −20, entering at the crest and exiting
-21 ft beyond the toe, 82.9 ft of failure surface carrying 204,041 lb/ft of soil.
-Two searches on one model, 6% apart, on mechanisms that share almost nothing: the
-sliver rides the sand face; this one cuts the full depth of the clay.
-
-The starting circle is a seed and not an answer — solved as entered it gives
-1.426, and the search deepens and lengthens it to 1.376.
-
-### The methods on the seeded circle
-
-All seven solution methods answer on the starting circle as entered. **This is a
-single-surface run — no search**, so the geometry is identical in every column:
-
-| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1.354 | 1.434 | 1.417 | 1.719 | 1.524 | 1.426 | 1.431 |
-
-Spencer, Morgenstern-Price and Bishop land within 0.01 of each other, OMS 5%
-below them and the Corps of Engineers method 21% above — interslice-force
-assumptions on one surface, not a disagreement about which surface it is.
+minimum of this model and not a mechanism anything is designed against. Two
+searches on one model, 6% apart, on mechanisms that share almost nothing: the
+sliver rides the sand face; the deep circle cuts the full depth of the clay.
 
 ### Two tools for exactly this section
 
@@ -192,12 +162,17 @@ lowest surfaces.
 
 **Ignore surficial (skin) failures**, with a **Min slip depth** beside it, is the
 filter that removes them: a trial surface whose deepest point is less than that
-far below the ground is rejected during the search. With grid seeding on and a
-minimum slip depth of `5`, the search returns **1.376** on the deep circle — the
-foundation mechanism, found without being seeded. From the embankment circle
-alone the same 5 ft filter returns 1.455, on a 33 ft circle inside the fill, and
-only at 8 ft reaches 1.376. The filter decides which surfaces are admissible; the
-seeding decides which of them the search ever looks at.
+far below the ground is rejected during the search. Back in **Run LEM…**, tick
+both boxes and set the depth to `5`:
+
+![The Run LEM dialog with grid seeding and the surficial filter on](images/lem10_studio_run_lem_filtered.png)
+
+With grid seeding on and a minimum slip depth of `5`, the search returns
+**1.376** on the deep circle — the foundation mechanism, found without being
+seeded. From the embankment circle alone the same 5 ft filter returns 1.455, on
+a 33 ft circle inside the fill, and only at 8 ft reaches 1.376. The filter
+decides which surfaces are admissible; the seeding decides which of them the
+search ever looks at.
 
 ### Which answer the model reports
 

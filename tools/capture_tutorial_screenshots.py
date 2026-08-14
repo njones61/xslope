@@ -807,6 +807,57 @@ def _run_lem(model, name, method="spencer", analysis="auto_search"):
     return _grab(dlg, name)
 
 
+# --------------------------------------------------------------------------- #
+# LEM-10 — Finding the Global Minimum (open-and-run: the file is the start)
+# --------------------------------------------------------------------------- #
+LEM10 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_mult_min_KEY.xlsx")
+
+
+def lem10_run_lem():
+    """The Run LEM dialog on the loaded file, in the state the first run is made
+    in: Spencer, auto search, 40 slices — nothing else touched, because the
+    whole point of the first run is the file exactly as downloaded."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM10))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem10_studio_run_lem.png")
+
+
+def lem10_run_lem_filtered():
+    """The same dialog with the section's two tools on: grid seeding and the
+    surficial filter at 5 ft — the state the tools section tells the reader to
+    put it in."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40, "grid_seed": True,
+                                 "min_slip_depth": 5.0},
+                       slope_data=_load(LEM10))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem10_studio_run_lem_filtered.png")
+
+
+def lem10_circles():
+    """The circles editor after the tutorial's one edit: the file's deep circle
+    replaced by the embankment circle (16.875, 30, Depth 0) — tangent to the top
+    of the foundation, the seed the second search runs from."""
+    from studio.editors import CirclesEditor
+
+    d = _load(LEM10)
+    shallow = dict(d["circles"][0])
+    shallow.update({"Xo": 16.875, "Yo": 30.0, "Depth": 0.0, "R": None})
+    dlg = CirclesEditor().build(dict(d, circles=[shallow]), None)
+    return _grab(dlg, "lem10_studio_circles.png")
+
+
+SHOTS["lem10_run_lem"] = lem10_run_lem
+SHOTS["lem10_run_lem_filtered"] = lem10_run_lem_filtered
+SHOTS["lem10_circles"] = lem10_circles
+
+
 def lem01_global():
     """The global-parameters form as LEM-1's first Studio step leaves it.
 

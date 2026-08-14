@@ -19,17 +19,17 @@ page, and the [Studio section](../studio/index.md) documents the interface.
 The [tutorials](../tutorials/index.md) teach it alongside the other entry
 paths.
 
-**Colab notebooks** — run analyses in the browser with nothing installed.
-Each notebook loads an input file, offers the analysis options as form
-inputs, and plots the results — well suited to quick checks, teaching, and
-trying XSLOPE against the [sample problems](../lem/samples.md). See
-[Colab Notebooks](notebooks.md).
-
 **The Python package** — `pip install xslope` for scripting, automation, and
 anything the interfaces don't expose: batch runs, custom plots, parameter
 studies, integration into your own tools. The
 [package install page](installation.md) covers setup and the
 [API reference](../api/fileio.md) documents the modules.
+
+**Colab notebooks** — run analyses in the browser with nothing installed.
+Each notebook loads an input file, offers the analysis options as form
+inputs, and plots the results — well suited to quick checks, teaching, and
+trying XSLOPE against the [sample problems](../lem/samples.md). See
+[Colab Notebooks](notebooks.md).
 
 If you are new to XSLOPE: install [Studio](../getting_started/install.md),
 then start with the [first tutorial](../tutorials/lem01_simple_embankment.md).

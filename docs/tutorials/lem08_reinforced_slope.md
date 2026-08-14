@@ -1,14 +1,16 @@
 ---
-title: "Tutorial LEM-8 — A Reinforced Slope"
+title: "Tutorial LEM-8 — A Reinforced Slope (Geogrids)"
 description: "Build a 24 ft sand fill held up by six layers of geogrid in XSLOPE — reinforcement lines with a tensile capacity and a pullout length at each end — then search it, measure what the reinforcement is worth against the same slope without it, and read where the critical surface meets the lines."
 ---
 
-# Tutorial LEM-8 — A Reinforced Slope
+# Tutorial LEM-8 — A Reinforced Slope (Geogrids)
 
 A 24 ft embankment of clean sand — c = 0, φ = 37° — standing at 1.25:1 under a
 240 psf surcharge. Sand alone cannot stand that steep at those numbers; six
 layers of geogrid do, each 20 ft long, 4 ft apart vertically, developing 800
-lb/ft of tension. The face is wrapped in a 2 ft band of cohesive fill.
+lb/ft of tension. The face is wrapped in a 2 ft band of cohesive fill. The
+problem and the drawing below are Example 5 from the UTEXASED user manual,
+S. G. Wright's educational version of UTEXAS.
 
 ![A reinforced sand fill: six geogrid layers, a cohesive face wrap, and a crest surcharge](../lem/sample_images/reinforce.png){width=700}
 
@@ -101,9 +103,35 @@ fill, the lowest at the toe:
 | Line 5 | 20 | 16 | 40 | 16 |
 | Line 6 | 25 | 20 | 45 | 20 |
 
+**Type** comes next in the sheet, and it is `Geosynthetic` on every line — a
+preset over two settings:
+
+| Type | Dir | Appl |
+|---|---|---|
+| Geosynthetic | Tangent | Active |
+| Nail | Axial | Passive |
+| Tieback | Axial | Active |
+| Anchor | Axial | Active |
+
+**Dir** is the direction the force acts in at the crossing. *Tangent*, which
+`Geosynthetic` sets, is flexible reinforcement: a geogrid cannot resist bending,
+so as the mass moves the sheet deforms with it and pulls along the slip surface
+whatever its own inclination. *Axial* is a nail or a tieback, stiff enough to
+hold its own line. **Appl** is whether the force is divided by the factor of
+safety: *Active* is an allowable working load applied against the driving side,
+*Passive* an ultimate capacity that mobilizes with the soil.
+[Soil Reinforcement in LEM](../lem/reinforcement.md) derives both. A line left
+with no Type at all is a generic tensile line, and behaves as *Tangent* and
+*Active* — the same physics, without saying what the reinforcement is.
+
+**Dir and Appl are not typed.** Both are formula columns that read Type and fill
+themselves from the table above, which is why the values below start again at
+**Tmax** rather than running on from the endpoints: the paste goes in as two
+blocks, one either side of the three columns the preset owns.
+
 **How much force is available depends on where the surface crosses.** A geogrid
 does not carry its full capacity at its free end — the tension is developed by
-friction against the soil, over some length of embedment. That is what the next
+friction against the soil, over some length of embedment. That is what the second
 block says, the same six values on every line:
 
 | Tmax | Lp1 | Lp2 | Tend1 | Tend2 | Spacing |
@@ -124,25 +152,6 @@ for discrete supports installed at a spacing out of the page; geogrid properties
 are already per foot of slope, so it stays at 1. Together the five make the
 line's *capacity envelope*, whose breakpoints are drawn on every plot as tension
 points.
-
-**Type** is left blank, which is a generic tensile line. Filling it in is a
-preset over two settings:
-
-| Type | Dir | Appl |
-|---|---|---|
-| Geosynthetic | Tangent | Active |
-| Nail | Axial | Passive |
-| Tieback | Axial | Active |
-| Anchor | Axial | Active |
-
-**Dir** is the direction the force acts in at the crossing. *Tangent* — the
-default, and what a blank Type gives — is flexible reinforcement: a geogrid
-cannot resist bending, so as the mass moves the sheet deforms with it and pulls
-along the slip surface whatever its own inclination. *Axial* is a nail or a
-tieback, stiff enough to hold its own line. **Appl** is whether the force is
-divided by the factor of safety: *Active* is an allowable working load applied
-against the driving side, *Passive* an ultimate capacity that mobilizes with the
-soil. [Soil Reinforcement in LEM](../lem/reinforcement.md) derives both.
 
 **Starting circles** — two, sharing a center above the face at twice the slope
 height:
@@ -187,7 +196,7 @@ surcharge and the reinforcement layout. Paste it into the chat box and type
 
 <div class="prompt-block" markdown>
 ```text
-Build a model for a 24 ft embankment with a 1.25:1 face, toe at (0, 0) and crest break at (30, 24). The fill is 130 pcf sand with c = 0, phi = 37; a 2 ft wide band along the face is the same 130 pcf with c = 300 psf, phi = 37. The crest runs back to x = 100 and the ground continues 30 ft in front of the toe; the bottom of the model is elevation -10. Put a 240 psf surcharge on the crest from x = 30 to x = 100. Add six horizontal geogrid layers at elevations 0, 4, 8, 12, 16 and 20, each starting on the slope face and 20 ft long, with a tensile capacity of 800 lb/ft and a pullout length of 4 ft at each end. Add starting circles for a critical-surface search.
+Build a model for a 24 ft embankment with a 1.25:1 face, toe at (0, 0) and crest break at (30, 24). The fill is 130 pcf sand with c = 0, phi = 37; a 2 ft wide band along the face is the same 130 pcf with c = 300 psf, phi = 37. The crest runs back to x = 100 and the ground continues 30 ft in front of the toe; the bottom of the model is elevation -10. Put a 240 psf surcharge on the crest from x = 30 to x = 100. Add six horizontal geogrid layers of support type Geosynthetic at elevations 0, 4, 8, 12, 16 and 20, each starting on the slope face and 20 ft long, with a tensile capacity of 800 lb/ft and a pullout length of 4 ft at each end. Add starting circles for a critical-surface search.
 ```
 </div>
 
@@ -197,6 +206,10 @@ Build a model for a 24 ft embankment with a 1.25:1 face, toe at (0, 0) and crest
   first x is 1.25 times its elevation: 0, 5, 10, 15, 20, 25. A layer that starts
   at the same x on every row is a stack of lines hanging in space at the bottom
   and buried at the top.
+- **Type is `Geosynthetic` on all six lines.** It is the column that says what
+  the reinforcement *is*, and it fills `Dir` with tangent and `Appl` with
+  active. If it came back empty, say: *"Set the support type to Geosynthetic on
+  every reinforcement line."*
 - **Both ends have a pullout length.** `Lp1` and `Lp2` = 4 on every line. A
   blank or 0 means *fully anchored* — the whole 800 lb/ft available right at the
   free end on the face, which is the opposite of what a geogrid does. If they
@@ -256,11 +269,10 @@ columns and the capacity values into `Tmax` through `Spacing`:
 
 ![The finished reinforce worksheet](images/lem08_sheet_reinforce.png)
 
-**Leave the three columns between them alone.** **Type** stays empty here, and
-**Dir** and **Appl** hold a formula that reads it — pick a Type from the
-drop-down and they answer on their own. Typing into either replaces the formula,
-which is how a preset gets overridden; pasting blanks across them erases it for
-nothing.
+Pick `Geosynthetic` from the **Type** drop-down, and **leave Dir and Appl
+alone**: both hold a formula that reads Type and answers on its own. Typing into
+either replaces the formula, which is how a preset gets overridden deliberately;
+pasting blanks across them erases it for nothing.
 
 The header colors say which engine reads a column: green for the LEM alone, red
 for both, blue for the FEM alone — `Tres`, `E` and `Area` model the lines as
@@ -288,7 +300,8 @@ The editor opens on its **List view**, one line at a time as a form in four
 groups. **Geometry** is the two endpoints. **Capacity** is `Tmax`, with the
 `Tres`, `E` and `Area` the FEM reads. **Anchorage** is the pullout lengths, the
 end capacities and the spacing. **Type** is the preset, with the `Dir` and
-`Appl` it fills — blank, `tangent` and `active` on these lines.
+`Appl` it fills — `geosynthetic`, `tangent` and `active` on these lines, and the
+list on the left labels each entry by that type and the x-range it spans.
 
 **Add** appends a line and **Remove** deletes the selected one; six lines make
 six entries in the list on the left, each labelled by the x-range it spans. The
@@ -431,8 +444,9 @@ This tutorial demonstrated:
   capacity into force per foot of slope.
 - The **Type** presets — Geosynthetic, Nail, Tieback, Anchor — as one column
   filling **Dir** (tangent to the slip surface, or along the line's own axis)
-  and **Appl** (a working load, or an ultimate capacity divided by F), worth
-  1.606 axial and 1.453 passive against the tangent, active **1.587**.
+  and **Appl** (a working load, or an ultimate capacity divided by F): these six
+  lines are Geosynthetic, worth **1.587** against 1.606 axial and 1.453
+  passive.
 - A search settling at **FS = 1.587** with 4,000 lb/ft of tension on it, against
   **1.167** for the same section searched with the lines removed — and a
   different mechanism at that number, a face sliver rather than a surface

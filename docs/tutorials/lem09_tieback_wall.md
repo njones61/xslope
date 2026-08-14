@@ -103,6 +103,27 @@ elevation 8 and runs 33 ft. Both are declined 25°:
 | tieback y=20 | 0 | 20 | 31.7208 | 5.20836 |
 | tieback y=8 | 0 | 8 | 29.9082 | -5.9464 |
 
+**Type** comes next in the sheet, and it is `Anchor` on both lines — a preset
+over two settings:
+
+| Type | Dir | Appl |
+|---|---|---|
+| Geosynthetic | Tangent | Active |
+| Nail | Axial | Passive |
+| Tieback | Axial | Active |
+| Anchor | Axial | Active |
+
+Picking `Anchor` fills **Dir** with `Axial` — the force acts along the bar, not
+along the slip surface — and **Appl** with `Active`, meaning the capacity is an
+allowable working load applied as it stands rather than an ultimate capacity
+divided by the factor of safety. [Soil Reinforcement in LEM](../lem/reinforcement.md)
+derives what each choice does to the equilibrium equations.
+
+**Dir and Appl are not typed.** Both are formula columns that read Type and fill
+themselves from the table above, which is why the values below start again at
+**Tmax** rather than running on from the endpoints: the paste goes in as two
+blocks, one either side of the three columns the preset owns.
+
 | Tmax | Lp1 | Lp2 | Tend1 | Tend2 | Spacing |
 |:---:|:---:|:---:|:---:|:---:|:---:|
 | 15043.1 | 0 | 8.86735 | 0 | 0 | 1 |
@@ -121,22 +142,6 @@ it takes to develop Tmax — so the tension available tapers from full capacity 
 to zero over the last 8.87 ft of the upper anchor and the last 12.1 ft of the
 lower one. **Tend1** and **Tend2**, the end anchorage capacities, are 0 because
 the plate is already expressed as Lp1 = 0.
-
-**Type** is `Anchor`, and it is a preset over two settings:
-
-| Type | Dir | Appl |
-|---|---|---|
-| Geosynthetic | Tangent | Active |
-| Nail | Axial | Passive |
-| Tieback | Axial | Active |
-| Anchor | Axial | Active |
-
-Picking `Anchor` fills **Dir** with `Axial` — the force acts along the bar, not
-along the slip surface — and **Appl** with `Active`, meaning the capacity is an
-allowable working load applied as it stands rather than an ultimate capacity
-divided by the factor of safety. Both are left blank in the sheet and the preset
-answers for them. [Soil Reinforcement in LEM](../lem/reinforcement.md) derives
-what each choice does to the equilibrium equations.
 
 **Soldier pile** — a separate input, on its own sheet and its own editor, because
 a pile resists in shear and bending rather than in tension:
@@ -247,16 +252,15 @@ thickness below the toe.
 
 ### 3. The `reinforce` worksheet
 
-One row per anchor, entered in two blocks. Enter (or copy-paste) the endpoints
-into the `Label` through `y2` columns, pick `Anchor` from the **Type** drop-down,
-and enter the capacity values from `Tmax` through `Spacing`:
+One row per anchor. Enter (or copy-paste) the endpoints into the `Label` through
+`y2` columns, pick `Anchor` from the **Type** drop-down, and enter (or copy-paste)
+the capacity values from `Tmax` through `Spacing`:
 
 ![The finished reinforce worksheet](images/lem09_sheet_reinforce.png)
 
-**Leave Dir and Appl alone.** Both hold a formula that reads Type, so choosing
-`Anchor` fills them with `Axial` and `Active` on their own; typing into either
-replaces the formula, which is how a preset gets overridden deliberately, and
-pasting blanks across them erases it for nothing.
+**Leave Dir and Appl alone.** Typing into either replaces the formula, which is
+how a preset gets overridden deliberately, and pasting blanks across them erases
+it for nothing.
 
 ### 4. The `piles` worksheet
 

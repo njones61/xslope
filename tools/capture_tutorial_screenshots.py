@@ -749,6 +749,23 @@ def lem09_reinforcement():
     return _grab(_list_view(_lem_only(dlg), 1400), "lem09_studio_reinforcement.png")
 
 
+def lem09_piles_table():
+    """The piles editor's table view on the soldier pile — the view the page
+    teaches first: the worksheet's columns minus the derived θp, taking the
+    Problem-section row as two pieces. LEM columns only, per the page's
+    toggles."""
+    from studio.editors import PilesEditor
+
+    dlg = PilesEditor().build(_load(LEM09), None)
+    _lem_only(dlg)
+    dlg._set_mode("table")
+    dlg.resize(1460, 700)
+    return _grab(dlg, "lem09_studio_piles_table.png")
+
+
+SHOTS["lem09_piles_table"] = lem09_piles_table
+
+
 def lem09_piles():
     """The piles editor on the soldier pile, in its list view.
 

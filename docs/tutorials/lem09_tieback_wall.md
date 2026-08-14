@@ -354,16 +354,21 @@ between them loses nothing. Click **OK**.
 
 ### 4. The soldier pile
 
-Open **Piles** in the same tree:
+Open **Piles** in the same tree and press **Table view**. Its columns are the
+piles worksheet's except `θp`, which Studio derives from the pile's endpoints —
+so the row from the table above pastes in as two pieces: `Label` through `H` at
+the first cell, then `D` and `S` at the `D` cell:
+
+![The piles editor's table view on the soldier pile](images/lem09_studio_piles_table.png)
+
+Press **List view** to read the row as a form — **Identity**, **Geometry**,
+**Capacity / design**, **Behavior**, with `H`, `D` and `S` the three fields
+this problem fills beyond the endpoints — beside the preview drawing the pile
+on the section:
 
 ![The piles editor on the soldier pile](images/lem09_studio_piles.png){width=1000}
 
-Its form runs **Identity**, **Geometry**, **Capacity / design**, **Behavior**, and
-`H`, `D` and `S` are the three fields this problem fills beyond the endpoints.
-The table view is the piles worksheet's columns except `θp` — Studio derives
-that from the pile's endpoints — so a paste from the table above goes in as two
-pieces: `Label` through `H` at the first cell, then `D` and `S` at the `D`
-cell. Click **OK**.
+Click **OK**.
 
 Continue below.
 

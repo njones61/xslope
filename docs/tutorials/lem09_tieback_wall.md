@@ -383,8 +383,10 @@ point where its envelope reaches full capacity; the green bar at x = 0.5 is the
 soldier pile, labelled with its 5,900 lb/ft; and the red dashed polyline from the
 wall toe is the failure surface as entered.
 
-Click **Run LEM…** and choose **Method** = `Janbu (Corrected)` and **Analysis** =
-`Auto search`, with the slice count left at 40:
+Click **Run LEM…** and choose **Method** = `Janbu (Corrected)` — the method
+both of this problem's references report their factor of safety in, so the
+results here read directly against theirs — and **Analysis** = `Auto search`,
+with the slice count left at 40:
 
 ![The Run LEM dialog on the wall](images/lem09_studio_run_lem.png)
 

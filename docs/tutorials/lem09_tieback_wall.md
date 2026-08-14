@@ -183,9 +183,12 @@ manual this problem comes from, entered as three points:
 | 37 | 33.6 | Free |
 | 61 | 67.069 | Free |
 
-`Free` lets a search move a point in any direction;
-[LEM-5](lem05_weak_layer_noncircular.md) covers the column and what the other two
-options do.
+`Free` lets a search move a point, and the two end vertices can never leave
+the ground: the search walks an end point horizontally and re-anchors its Y to
+the ground surface at the new x, so a `Free` end tracks the ground
+automatically — the behavior some programs mark with an `Auto` vertex is built
+in. [LEM-5](lem05_weak_layer_noncircular.md) covers the column and what the
+other two options do.
 
 The tables are the model, and each is laid out exactly as its destination is — the
 template's worksheets and Studio's editors, same columns in the same order. Select

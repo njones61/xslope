@@ -325,34 +325,27 @@ from the crest break to the right-hand edge:
 
 ### 4. Reinforcement lines
 
-Open **Reinforcement lines** in the **Inputs** tree:
+Open **Reinforcement lines** in the **Inputs** tree and press **Table view** —
+the columns are the worksheet's, in the same order, so the two blocks from the
+tables above paste straight in. Paste the endpoint block (`Label` through `y2`)
+into the first cell — the rows come with it — then set each row's **Type** to
+`geosynthetic`, which fills **Dir** and **Appl** on its own, and paste the
+capacity block into the first `Tmax` cell:
 
-![The reinforcement editor on the first geogrid layer](images/lem08_studio_reinforcement.png){width=1000}
+![The reinforcement editor's table view on the six layers](images/lem08_studio_reinforcement_table.png)
 
-The editor opens on its **List view**, one line at a time as a form in five
-groups. **Identity** is the line's name. **Geometry** is the two endpoints.
-**Capacity** is `Tmax`, with the `Tres`, `E` and `Area` the FEM reads.
-**Anchorage** is the pullout lengths, the end capacities and the spacing.
-**Type** is the preset: choosing `geosynthetic` sets `Dir` to `tangent` and
-`Appl` to `active` beside it. Change either afterwards and the change stands —
-choosing a Type again puts the preset back.
+Press **List view** to read what was entered one line at a time, as a form in
+five groups — Identity, Geometry, Capacity, Anchorage, Type — beside a preview
+that draws the lines on the section:
 
-**Add** appends a line and **Remove** deletes the selected one; six lines make
-six entries in the list on the left, each labelled by its type and the x-range
-it spans. The capacity fields carry their units — `Tmax (per unit width,
-lb/ft)` — so a per-element capacity entered without a spacing is visible as the
-wrong quantity. The preview draws the lines on the section, the selected one
-bold with a marker at each end and at its pullout breakpoints: the shape of its
-capacity envelope, in place on the slope. Click a line in the preview to select
-it.
+![The reinforcement editor's list view on the first layer](images/lem08_studio_reinforcement.png){width=1000}
 
-**Table view** puts all six on one grid, the columns in the worksheet's order,
-and takes the tables above as blocks. Click the first `Label` cell and paste the
-endpoint block: the six rows arrive with it, named. Set **Type** to
-`geosynthetic` on each — `Dir` and `Appl` answer as they do in the form — then
-click the first `Tmax` cell and paste the capacity block, which starts again
-there because `Type`, `Dir` and `Appl` lie between the two. Both views edit the
-same lines, so switching between them loses nothing. Click **OK**.
+The capacity fields carry their units — `Tmax (per unit width, lb/ft)` — so a
+per-element capacity entered without a spacing is visible as the wrong
+quantity. The preview draws the selected line bold with a marker at each end
+and at its pullout breakpoints: the shape of its capacity envelope, in place on
+the slope. Click a line in the preview to select it, and click **OK** when the
+six lines read as the tables above.
 
 ### 5. Starting circles
 
@@ -457,13 +450,15 @@ decides what each one gives:
 
 Every crossing lands more than 8 ft from the nearer end of its line, twice the
 4 ft it takes to develop the full capacity, so pullout limits nothing here and
-all five deliver 800 lb/ft. The next two runs hold that circle and change one
-input — a single surface each time, no search, so the only thing moving is the
-pullout length. Set `Lp1` and `Lp2` to 0, fully anchored, and the answer does not
-move: **1.587**, because there was nothing for anchorage to add. Set them to 10 ft
-instead, a longer development length than this fill would give, and the five
-crossings fall inside their development zones, mobilize 3,553 lb/ft between them
-rather than 4,000, and the factor of safety drops to **1.539**.
+all five deliver 800 lb/ft.
+
+To see the pullout lengths at work, solve this same circle as a **Single
+surface** run — no search, so changing `Lp1` and `Lp2` is the only thing that
+moves — at two other values. At `Lp1` = `Lp2` = 0, fully anchored, the answer
+stays **1.587**: anchorage had nothing to add. At 10 ft, a longer development
+length than this fill would give, the five crossings fall inside their
+development zones, mobilize 3,553 lb/ft between them rather than 4,000, and
+the factor of safety drops to **1.539**.
 
 Line 1 gives nothing at all. It runs from the toe at elevation 0, and the
 surface daylights at the toe and climbs away from it, so the whole line lies in

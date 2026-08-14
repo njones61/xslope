@@ -691,6 +691,24 @@ def lem08_reinforcement():
 
 SHOTS["lem08_reinforcement"] = lem08_reinforcement
 
+def lem08_reinforcement_table():
+    """The reinforcement editor's table view on the six geogrid layers — the
+    view the page teaches first, because the two Problem-section blocks paste
+    straight into it. LEM columns only, per the page's toggles."""
+    from studio.editors import ReinforcementEditor
+
+    dlg = ReinforcementEditor().build(_load(LEM08), None)
+    _lem_only(dlg)
+    dlg._set_mode("table")
+    # Wide enough that every LEM column (Label through Spacing) is on the
+    # capture — the paste teaching needs the capacity block visible.
+    dlg.resize(2470, 520)
+    return _grab(dlg, "lem08_studio_reinforcement_table.png")
+
+
+SHOTS["lem08_reinforcement_table"] = lem08_reinforcement_table
+
+
 
 # --------------------------------------------------------------------------- #
 # LEM-9 — A Tieback Wall

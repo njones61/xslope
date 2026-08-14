@@ -543,6 +543,33 @@ def lem04_piezo():
 SHOTS["lem04_piezo"] = lem04_piezo
 
 
+# --------------------------------------------------------------------------- #
+# LEM-6 — Polygon Geometry
+# --------------------------------------------------------------------------- #
+LEM06 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_sloping_bottom.xlsx")
+
+
+def lem06_polygons():
+    """The polygons editor on the foundation zone, as LEM-6's Studio step leaves it.
+
+    The second zone is selected rather than the first, because the foundation's
+    ring is the one this page is about: its four vertices are where the dipping
+    base is entered, and the preview draws that base under the section while the
+    other zone is dimmed behind it. The editor is built on a model that already
+    carries both zones — Studio edits polygons on a polygon-based project, so
+    this is the state a reader reaches by opening one, which is what the step
+    says.
+    """
+    from studio.editors import PolygonEditor
+
+    dlg = PolygonEditor().build(_load(LEM06), None, select=1)
+    dlg.resize(1400, 560)
+    return _grab(dlg, "lem06_studio_polygons.png")
+
+
+SHOTS["lem06_polygons"] = lem06_polygons
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

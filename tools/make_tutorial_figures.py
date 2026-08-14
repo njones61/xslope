@@ -763,6 +763,155 @@ def lem04_plots():
              b_slices["w"].sum()))
 
 
+# --------------------------------------------------------------------------- #
+# LEM-6 — Polygon Geometry
+# --------------------------------------------------------------------------- #
+#: LEM-6's model is the polygon sample — one file, two pages, as every tutorial's
+#: is. Its two states beyond the delivered file (a circle pushed below the base,
+#: and a softened foundation) are edits the page has the reader make, so both are
+#: built in memory here rather than as files.
+LEM06 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_sloping_bottom.xlsx")
+LEM06_SLICES = 40
+
+#: A circle 1.2 ft deeper than the deepest one that fits inside the domain — the
+#: file's second starting circle is tangent to the dipping base at Depth
+#: −10.7887, so this one crosses it. It is the page's demonstration of both
+#: halves of the composite option: refused without it, truncated with it.
+LEM06_DEEP = dict(Xo=20.0, Yo=40.0, Depth=-12.0, R=52.0)
+
+#: The foundation's cohesion in the page's what-if, against the 800 psf the file
+#: carries. Below the fill's 400 psf, which is what puts the critical mechanism
+#: on the dipping base instead of on the contact above it.
+LEM06_WEAK_C = 300.0
+
+
+def _lem06_search(model, method="spencer", composite=False):
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path, circles = circular_search(
+            model, method, num_slices=LEM06_SLICES, diagnostic=False,
+            composite=composite, **file_search_window(model))
+    return fs_cache, path, circles
+
+
+def _lem06_solve(model, circle, composite=False, method="spencer"):
+    """One circle, no search — the page's composite demonstration.
+
+    Returns ``None`` when the surface cannot be built, because that refusal is
+    itself one of the two states the page shows.
+    """
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = generate_slices(model, circle=circle, num_slices=LEM06_SLICES,
+                                  composite=composite)
+        if not ok:
+            return None, res
+        slice_df, surface = res
+        result = solve_selected(method, slice_df)
+    if not isinstance(result, dict):
+        raise SystemExit("LEM-6: %s failed — %s" % (method, result))
+    return (slice_df, surface, result), None
+
+
+def lem06_sheets():
+    """The three worksheets LEM-6's Excel path fills.
+
+    ``polygon`` is the one this page is about. Its window runs to H — three
+    polygon blocks at three columns each — so the two filled zones are shown
+    beside an empty third, the frame LEM-3 and LEM-4 use on the profile sheet.
+    Rows run to 14 so the last vertex row sits above a blank one rather than on
+    the frame's edge, which is what tells a reader the block is not full.
+
+    The window starts at row 3 rather than row 1: A2 carries the sheet's
+    instruction line, which is text long enough to force the frame out to column
+    AB, and 28 columns of empty grid leave the eight the reader fills unreadable
+    at the page's width. What A2 says is short enough to quote in the prose.
+
+    ``mat`` and ``circles`` take LEM-3's frames; this section carries the same
+    two soils, and its circles sheet fills the same four columns.
+    """
+    render("lem06_sheet_mat.png", LEM06, "mat", rows=(10, 13), cols="A:O")
+    render("lem06_sheet_polygon.png", LEM06, "polygon", rows=(3, 14), cols="A:H")
+    render("lem06_sheet_circles.png", LEM06, "circles", rows=(1, 6), cols="A:H")
+
+
+def _lem06_problem_sketch(model):
+    """The page's opening sketch: the two zones, their strengths, and the base.
+
+    The starting circles are dropped from the model the sketch is drawn on — the
+    sketch states the problem, and the circles are an input the reader has not
+    entered yet. The strengths are read off the file rather than written here, so
+    the sketch cannot print a property the model does not carry.
+    """
+    bare = copy.deepcopy(model)
+    bare["circles"], bare["circular"] = [], False
+    with _hold_show():
+        plot_inputs(bare, title="Slope Geometry and Inputs", frame="content")
+    ax = plt.gcf().axes[0]
+    embankment, foundation = model["materials"][0], model["materials"][1]
+    # Each label sits inside the zone it names, where that zone is thickest: the
+    # embankment under its level crest, the foundation at the left edge where the
+    # base has dipped away from it and nothing else is drawn.
+    ax.text(80.0, 10.0, "%s\nγ = %g pcf\nc = %g psf\nφ = %g"
+            % (embankment["name"], embankment["gamma"], embankment["c"],
+               embankment["phi"]),
+            ha="center", va="center", fontsize=10)
+    ax.text(-25.0, -7.5, "%s\nγ = %g pcf\nc = %g psf\nφ = %g"
+            % (foundation["name"], foundation["gamma"], foundation["c"],
+               foundation["phi"]),
+            ha="center", va="center", fontsize=10)
+    # The two ends of the dipping base, called out below the hatching that draws it.
+    ax.text(-49.0, -17.5, "El. −15", ha="left", va="top", fontsize=10, color="0.25")
+    ax.text(119.0, -8.0, "El. −5", ha="right", va="top", fontsize=10, color="0.25")
+
+
+def lem06_plots():
+    """The states LEM-6 reads, in the order the page walks them.
+
+    The search runs first, on the model as delivered, and settles well above the
+    dipping base. The two figures after it are what makes the base do something:
+    a circle pushed below it and truncated against it (the composite option), and
+    the same section with the foundation softened below the fill, where the
+    critical mechanism drops onto the base itself.
+    """
+    sd = load_slope_data(LEM06)
+
+    capture("lem06_problem.png", _lem06_problem_sketch, sd)
+    capture("lem06_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
+
+    fs_cache, path, circles = _lem06_search(sd)
+    crit = fs_cache[0]
+    capture("lem06_search.png", plot_circular_search_results, sd, fs_cache, path,
+            circle_cache=circles)
+    capture("lem06_solution.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+
+    # The circle that will not fit, truncated at the base. The same circle with
+    # composite off is the page's refusal, and it produces no figure.
+    refused, why = _lem06_solve(sd, LEM06_DEEP, composite=False)
+    built, _ = _lem06_solve(sd, LEM06_DEEP, composite=True)
+    c_slices, c_surface, c_result = built
+    capture("lem06_solution_composite.png", plot_solution, sd, c_slices,
+            c_surface, c_result)
+
+    # The what-if: the foundation weaker than the fill it carries, which is what
+    # sends the critical surface down to the base the rest of the page describes.
+    weak = copy.deepcopy(sd)
+    weak["materials"][1]["c"] = LEM06_WEAK_C
+    fs_weak, _, _ = _lem06_search(weak)
+    crit_w = fs_weak[0]
+    capture("lem06_solution_weak.png", plot_solution, weak, crit_w["slices"],
+            crit_w["failure_surface"], crit_w["solver_result"])
+
+    print("   as delivered %.4f (Xo %.2f Yo %.2f depth %.3f) · circle at depth %g "
+          "refused (%s) / truncated %.4f · foundation at c = %g psf %.4f "
+          "(depth %.3f)"
+          % (crit["FS"], crit["Xo"], crit["Yo"], crit["Depth"],
+             LEM06_DEEP["Depth"], why, c_result["FS"], LEM06_WEAK_C,
+             crit_w["FS"], crit_w["Depth"]))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -776,6 +925,8 @@ GROUPS = {
     "lem05_plots": lem05_plots,
     "lem04_sheets": lem04_sheets,
     "lem04_plots": lem04_plots,
+    "lem06_sheets": lem06_sheets,
+    "lem06_plots": lem06_plots,
 }
 
 

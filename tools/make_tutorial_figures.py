@@ -912,6 +912,79 @@ def lem06_plots():
              crit_w["FS"], crit_w["Depth"]))
 
 
+# --------------------------------------------------------------------------- #
+# LEM-8 — A Reinforced Slope
+# --------------------------------------------------------------------------- #
+#: LEM-8's model is the reinforced sample — one file, two pages. The page's two
+#: comparisons are edits made in memory: the same section with the reinforcement
+#: taken out, and the same lines with a longer pullout length.
+LEM08 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_reinforce.xlsx")
+LEM08_SLICES = 40
+
+
+def _lem08_search(model, method="spencer"):
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path, circles = circular_search(
+            model, method, num_slices=LEM08_SLICES, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache, path, circles
+
+
+def lem08_sheets():
+    """The five worksheets LEM-8's Excel path fills.
+
+    ``reinforce`` is the one this page is about. Its window runs from the
+    column-name row (row 2) to column R, the last input column — the six lines
+    plus two blank rows under them, so the block reads as unfilled below the
+    last line. Columns beyond R hold the Type preset's lookup table, which is
+    the sheet's own machinery rather than an input.
+
+    ``mat`` and ``profile`` take LEM-3's frames — the same two-material shape,
+    and the same window through the empty Line #3 beside the two filled ones —
+    ``dloads`` takes LEM-2's four-columns-per-load frame, and ``circles`` the
+    frame LEM-3 and LEM-6 use.
+    """
+    render("lem08_sheet_mat.png", LEM08, "mat", rows=(10, 13), cols="A:O")
+    render("lem08_sheet_profile.png", LEM08, "profile", rows=(1, 13), cols="A:H")
+    render("lem08_sheet_dloads.png", LEM08, "dloads", rows=(4, 10), cols="A:H")
+    render("lem08_sheet_reinforce.png", LEM08, "reinforce", rows=(2, 10), cols="A:R")
+    render("lem08_sheet_circles.png", LEM08, "circles", rows=(1, 5), cols="A:H")
+
+
+def lem08_plots():
+    """The states LEM-8 reads, in the order the page walks them.
+
+    The search on the model as delivered comes first. The figure beside it is the
+    same search run on a copy with the reinforcement lines removed — the page's
+    measure of what the six layers are worth, searched rather than borrowed, so
+    each answer sits on its own critical circle.
+    """
+    sd = load_slope_data(LEM08)
+
+    capture("lem08_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
+
+    fs_cache, path, circles = _lem08_search(sd)
+    crit = fs_cache[0]
+    capture("lem08_search.png", plot_circular_search_results, sd, fs_cache, path,
+            circle_cache=circles)
+    capture("lem08_solution.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+
+    # The comparison: the same section, the same search, no reinforcement.
+    bare = copy.deepcopy(sd)
+    bare["reinforcement_lines"], bare["reinforce_lines"] = [], []
+    fs_bare, _, _ = _lem08_search(bare)
+    crit_b = fs_bare[0]
+    capture("lem08_solution_bare.png", plot_solution, bare, crit_b["slices"],
+            crit_b["failure_surface"], crit_b["solver_result"])
+
+    print("   reinforced %.4f (Xo %.2f Yo %.2f depth %.3f, ΣP %.0f) · "
+          "unreinforced %.4f (Xo %.2f Yo %.2f depth %.3f)"
+          % (crit["FS"], crit["Xo"], crit["Yo"], crit["Depth"],
+             crit["slices"]["p"].sum(), crit_b["FS"], crit_b["Xo"],
+             crit_b["Yo"], crit_b["Depth"]))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -927,6 +1000,8 @@ GROUPS = {
     "lem04_plots": lem04_plots,
     "lem06_sheets": lem06_sheets,
     "lem06_plots": lem06_plots,
+    "lem08_sheets": lem08_sheets,
+    "lem08_plots": lem08_plots,
 }
 
 

@@ -570,6 +570,34 @@ def lem06_polygons():
 SHOTS["lem06_polygons"] = lem06_polygons
 
 
+# --------------------------------------------------------------------------- #
+# LEM-8 — A Reinforced Slope
+# --------------------------------------------------------------------------- #
+LEM08 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_reinforce.xlsx")
+
+
+def lem08_reinforcement():
+    """The reinforcement editor on the six geogrid layers, in its list view.
+
+    The list view rather than the table, because it is the view the editor opens
+    on and the one that groups a line the way the page teaches it — Geometry,
+    Capacity, Anchorage, Type — beside a preview that draws the pullout
+    breakpoints the capacity envelope is built from. The first line is selected,
+    which is the line the page reads the envelope on: the one the critical
+    surface passes beneath.
+    """
+    from studio.editors import ReinforcementEditor
+
+    dlg = ReinforcementEditor().build(_load(LEM08), None)
+    # Tall enough that the form's last group — Type, with the Dir and Appl the
+    # preset fills — is on the shot rather than below the scroll.
+    dlg.resize(1400, 820)
+    return _grab(dlg, "lem08_studio_reinforcement.png")
+
+
+SHOTS["lem08_reinforcement"] = lem08_reinforcement
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

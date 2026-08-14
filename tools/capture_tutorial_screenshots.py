@@ -1151,6 +1151,103 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# LEM-7 — Strength Options Beyond Mohr-Coulomb (open-and-run, one edit per part)
+#
+# Every materials shot is the LIST view: the subject of this page is the strength
+# option, and only the list view puts the option's own fields and the strength plot
+# that confirms them beside each other. Each part is photographed twice — the row
+# as the file carries it, and the row after the page's one edit — so the reader
+# checks both states against a picture.
+# --------------------------------------------------------------------------- #
+LEM07_A = os.path.join(REPO_ROOT, "docs/lem/files/xslope_baker_clay.xlsx")
+LEM07_B = os.path.join(REPO_ROOT, "docs/lem/files/xslope_low_clay.xlsx")
+
+
+def _lem07_material(model, name, row=0, edit=None, width=1180, height=760):
+    """The materials editor in list view, on one material of ``model``.
+
+    ``edit`` is applied to that material's row before the editor is built, so the
+    shot carries the state the tutorial's step ends in rather than a pre-edit row
+    dressed up in prose. The LEM-only toggles are the owner's rule for an LEM
+    page's editor captures.
+    """
+    from studio.editors import MaterialsEditor
+
+    d = _load(model)
+    if edit:
+        mats = [dict(m) for m in d["materials"]]
+        mats[row].update(edit)
+        d = dict(d, materials=mats)
+    dlg = _lem_only(MaterialsEditor().build(d, None))
+    dlg.set_view_mode("list")
+    dlg._list_view.list.setCurrentRow(row)
+    dlg.resize(width, height)
+    return _grab(dlg, name)
+
+
+def lem07_materials_pow():
+    """Part A's material as the file carries it: option `pow`, with the power-curve
+    coefficients and the strength plot that draws the curve they define."""
+    return _lem07_material(LEM07_A, "lem07_studio_materials_pow.png")
+
+
+def lem07_materials_mc():
+    """The same material after Part A's one edit — option `mc` with Baker's fitted
+    c′ = 11.64 kPa and φ′ = 24.7°. The power-curve fields are gone from the form
+    and the plot is a straight line."""
+    return _lem07_material(LEM07_A, "lem07_studio_materials_mc.png",
+                           edit={"option": "mc", "c": 11.64, "phi": 24.7})
+
+
+def lem07_run_lem():
+    """Part A's run: Spencer, auto search, the dialog's own 40 slices — the state
+    the first run is made in, on the file exactly as downloaded."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM07_A))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem07_studio_run_lem.png")
+
+
+def lem07_low_materials_cp():
+    """Part B's lower layer as the file carries it: option `cp`, with the c/p rate
+    and the reference elevation the profile is measured from."""
+    return _lem07_material(LEM07_B, "lem07_studio_low_materials_cp.png", row=2)
+
+
+def lem07_low_materials_const():
+    """The same layer after Part B's edit — option `mc` at a constant 22.5 kN/m²,
+    φ = 0. The c/p and r-elev fields leave the form with the option that read
+    them."""
+    return _lem07_material(LEM07_B, "lem07_studio_low_materials_const.png", row=2,
+                           edit={"option": "mc", "c": 22.5})
+
+
+def lem07_low_run_lem():
+    """Part B's run: Bishop's Simplified, auto search, 50 slices — the slice count
+    the step raises from the dialog's default."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "bishop", "analysis": "auto_search",
+                                 "num_slices": 50},
+                       slope_data=_load(LEM07_B))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem07_studio_low_run_lem.png")
+
+
+SHOTS.update({
+    "lem07_materials_pow": lem07_materials_pow,
+    "lem07_materials_mc": lem07_materials_mc,
+    "lem07_run_lem": lem07_run_lem,
+    "lem07_low_materials_cp": lem07_low_materials_cp,
+    "lem07_low_materials_const": lem07_low_materials_const,
+    "lem07_low_run_lem": lem07_low_run_lem,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

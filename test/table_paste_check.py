@@ -848,6 +848,97 @@ def test_lem09_materials():
                           headers=_MAT_HEADERS_DRY)
 
 
+#: LEM-7 teaches a strength-option EDIT rather than a material build: the block is
+#: the three adjacent mat columns option/c/φ, pasted onto a row the file already
+#: carries. The header run is contiguous, so a rectangular copy still lands.
+_MAT_HEADERS_STRENGTH = ["option", "c", "φ"]
+
+
+def _strength_edit_leg(label, page, model_path, row, was, method, num_slices,
+                       expected_fs, occurrence=0):
+    """One of LEM-7's strength-option edits, pasted onto the real material row.
+
+    The page ships the model in its PRE-edit state, so — unlike every other
+    materials leg — there is no completed file to compare the pasted values
+    against, and comparing them to themselves would check nothing. Three claims
+    are checked instead, and each of them can fail:
+
+    * The row's option in the shipped file is still ``was``. A page teaching a
+      change from `pow` to `mc` stops being true the moment the file it ships
+      already holds `mc`.
+    * The block lands in option, c and φ and nowhere else — every other field on
+      the row comes back exactly as the file had it, which is what makes a
+      three-column slice safe to print.
+    * The pasted model reproduces ``expected_fs``, the factor of safety the page
+      prints beside the figure for the edited state, to the digits the page
+      prints. That is the oracle: a block that lands in the wrong columns, drops
+      a digit or names the wrong option moves the answer.
+    """
+    from studio.editors import MaterialsEditor
+    from xslope.search import circular_search
+
+    printed = _taught(page, _MAT_HEADERS_STRENGTH, occurrence)
+    model = _load(model_path)
+    before = model["materials"][row]
+    out = _fail(str(before["option"]).lower() == was,
+                f"{label}: the shipped file's row {row + 1} carries option "
+                f"{before['option']!r}, but the page teaches an edit from {was!r}")
+    out += _fail(len(printed) == 1,
+                 f"{label}: the page prints {len(printed)} rows; the edit is one")
+
+    editor = MaterialsEditor()
+    dlg = editor.build(model, None)
+    for cb in (getattr(dlg, "_toggles", None) or {}).values():
+        cb.setChecked(True)
+    keys = [f.key for f in MaterialsEditor.FIELDS]
+    _paste(dlg._table, _tsv(printed), row=row, col=keys.index("option"))
+    out += _fail(_summary(dlg._table) == "Pasted 1 row × 3 columns.",
+                 f"{label}: the status line read {_summary(dlg._table)!r}")
+
+    landed = dict(model)
+    editor.apply(landed, dlg)
+    got = landed["materials"][row]
+    for key, cell in zip(("option", "c", "phi"), printed[0]):
+        want = cell if key == "option" else float(cell)
+        out += _fail(_matches(got[key], cell, want),
+                     f"{label}: {key} came back {got[key]!r} from {cell!r}")
+    # Nothing outside the three-column block moved.
+    for key in keys:
+        if key in ("option", "c", "phi"):
+            continue
+        out += _fail(got[key] == before[key],
+                     f"{label}: the block also changed {key}, {before[key]!r} "
+                     f"-> {got[key]!r}")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(landed, method,
+                                            num_slices=num_slices,
+                                            diagnostic=False)
+    fs = fs_cache[0]["FS"] if fs_cache else float("nan")
+    out += _fail(abs(fs - expected_fs) < 5e-4,
+                 f"{label}: the pasted block searches to {fs:.6f}, not the "
+                 f"{expected_fs:.3f} the page prints for it")
+    return out
+
+
+def test_lem07_power_to_mohr_coulomb():
+    """Part A's edit: the power-curve clay's row swapped to the fitted Mohr-Coulomb
+    envelope, pasted onto the one material the file carries."""
+    return _strength_edit_leg(
+        "LEM-7 power -> Mohr-Coulomb", "lem07_strength_envelopes.md",
+        os.path.join(_MODELS, "xslope_baker_clay.xlsx"), row=0, was="pow",
+        method="spencer", num_slices=40, expected_fs=1.518)
+
+
+def test_lem07_profile_to_constant():
+    """Part B's edit: the depth-varying lower clay flattened to one undrained
+    strength — the third material row, and the second such block on the page."""
+    return _strength_edit_leg(
+        "LEM-7 c/p -> constant", "lem07_strength_envelopes.md",
+        os.path.join(_MODELS, "xslope_low_clay.xlsx"), row=2, was="cp",
+        method="bishop", num_slices=50, expected_fs=1.075, occurrence=1)
+
+
 def test_lem08_reinforcement_blocks():
     """LEM-8's two reinforcement blocks pasted into the real editor's table view: the
     Label..y2 table whole (Label is the editor's first column, as it is the sheet's),
@@ -1000,6 +1091,8 @@ CHECKS = [
     ("LEM-4 materials", test_lem04_materials),
     ("LEM-5 materials", test_lem05_materials),
     ("LEM-6 materials", test_lem06_materials),
+    ("LEM-7 power -> Mohr-Coulomb", test_lem07_power_to_mohr_coulomb),
+    ("LEM-7 c/p -> constant", test_lem07_profile_to_constant),
     ("LEM-8 materials", test_lem08_materials),
     ("LEM-9 materials", test_lem09_materials),
     ("LEM-3 profile lines and circles", test_lem03_profile_lines_and_circles),

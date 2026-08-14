@@ -1316,6 +1316,127 @@ def lem10_plots():
              crit_f["FS"], crit_f["Xo"], crit_f["Yo"], crit_f["Depth"]))
 
 
+# --------------------------------------------------------------------------- #
+# LEM-7 — Strength Options Beyond Mohr-Coulomb
+# --------------------------------------------------------------------------- #
+#: Part A is Baker's compacted-clay slope (VP44) — the file carries the power
+#: curve, and the page's one edit swaps it for the Mohr-Coulomb envelope fitted to
+#: the same triaxial data. Part B is Low's layered undrained slope (VP23), whose
+#: lower layer carries a strength that grows with depth; the page's edit replaces
+#: that profile with a single constant. Both are tutorial copies of the corpus
+#: models, so each figure is the verification answer the reader reproduces.
+LEM07_A = os.path.join(REPO_ROOT, "docs/lem/files/xslope_baker_clay.xlsx")
+LEM07_B = os.path.join(REPO_ROOT, "docs/lem/files/xslope_low_clay.xlsx")
+#: The counterpoint pair — Baker's London clay (VP61), results only, no download.
+LEM07_L_POW = os.path.join(REPO_ROOT, "docs/verification/files/rocscience/vp061a.xlsx")
+LEM07_L_MC = os.path.join(REPO_ROOT, "docs/verification/files/rocscience/vp061b.xlsx")
+#: Slice counts are the corpus tags': VP44 runs Spencer at 40, VP23 runs at 50.
+LEM07_A_SLICES = 40
+LEM07_B_SLICES = 50
+#: Part B's edit: the constant an engineer reaches for when a linear su profile is
+#: replaced by one number — the average of the layer's 15 kN/m² top and 30 kN/m²
+#: bottom.
+LEM07_B_CONST = 22.5
+
+
+def _lem07_search(model, method, num_slices, **kwargs):
+    """The page's search: the model's own circle, refined, nothing else set."""
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(
+            copy.deepcopy(model), method, num_slices=num_slices, diagnostic=False,
+            **dict(file_search_window(model), **kwargs))
+    return fs_cache[0]
+
+
+def _lem07_solution(name, model, crit):
+    capture(name, plot_solution, model, crit["slices"], crit["failure_surface"],
+            crit["solver_result"])
+
+
+def _lem07_reading(crit, model=None, mat=None):
+    """The numbers the page quotes off one search: FS, the circle, the surface.
+
+    ``mat`` is a 1-based material id; when given, the length-weighted mean of the
+    strength actually mobilized in that material — the honest single number for a
+    layer whose strength varies along the surface — is reported with the mean base
+    elevation it was mobilized at.
+    """
+    s = crit["slices"]
+    out = ("FS %.6f · Xo %.4f Yo %.4f · tangent elev %.4f · L %.2f · ΣW %.1f"
+           % (crit["FS"], crit["Xo"], crit["Yo"], crit["Depth"],
+              s["dl"].sum(), s["w"].sum()))
+    if mat is not None:
+        m = s[s["mat"] == mat]
+        if len(m):
+            out += ("  |  mat %d: %.2f of the surface, mean strength %.4f at mean "
+                    "base elev %.4f" % (mat, m["dl"].sum(),
+                                        (m["c"] * m["dl"]).sum() / m["dl"].sum(),
+                                        (m["y_cb"] * m["dl"]).sum() / m["dl"].sum()))
+    return out
+
+
+def lem07_plots():
+    """Both parts' searches, each figure drawn with the method the prose quotes.
+
+    Part A's two answers come off the same file: as downloaded (the power curve)
+    and after the page's one edit (the fitted Mohr-Coulomb envelope). The London
+    clay pair is the counterpoint — the same 43° slope with a data set that
+    includes low-stress measurements, where the two envelopes nearly agree — and
+    is shown as results only, so its models are read from the corpus rather than
+    copied into the tutorial's file set.
+
+    Part B's two answers likewise come off one file: the lower layer's strength
+    profile as shipped, and that profile flattened to a constant. The interesting
+    quantity there is not only the factor of safety but the tangent elevation, so
+    the diagnostics print it for every run.
+    """
+    # ---- Part A: Baker example 1, compacted Israeli clays ------------------ #
+    a = load_slope_data(LEM07_A)
+    capture("lem07_baker_inputs.png", plot_inputs, a,
+            title="Slope Geometry and Inputs")
+
+    crit_pow = _lem07_search(a, "spencer", LEM07_A_SLICES)
+    _lem07_solution("lem07_baker_pow.png", a, crit_pow)
+
+    # The edit the page teaches: option pow -> mc, with Baker's fitted envelope.
+    # The power-curve coefficients are left on the row exactly as a reader would
+    # leave them — inert under mc, and the answer is identical either way.
+    mc = dict(a["materials"][0])
+    mc.update({"option": "mc", "c": 11.64, "phi": 24.7})
+    a_mc = dict(a, materials=[mc])
+    crit_mc = _lem07_search(a_mc, "spencer", LEM07_A_SLICES)
+    _lem07_solution("lem07_baker_mc.png", a_mc, crit_mc)
+
+    # The counterpoint: London clay, both envelopes, results only.
+    london = {}
+    for tag, path in (("pow", LEM07_L_POW), ("mc", LEM07_L_MC)):
+        d = load_slope_data(path)
+        crit = _lem07_search(d, "spencer", LEM07_A_SLICES)
+        _lem07_solution("lem07_london_%s.png" % tag, d, crit)
+        london[tag] = crit
+
+    # ---- Part B: Low's layered undrained slope ---------------------------- #
+    b = load_slope_data(LEM07_B)
+    capture("lem07_low_inputs.png", plot_inputs, b,
+            title="Slope Geometry and Inputs")
+
+    crit_cp = _lem07_search(b, "bishop", LEM07_B_SLICES)
+    _lem07_solution("lem07_low_cp.png", b, crit_cp)
+
+    const = dict(b["materials"][2])
+    const.update({"option": "mc", "c": LEM07_B_CONST})
+    b_const = dict(b, materials=list(b["materials"][:2]) + [const])
+    crit_const = _lem07_search(b_const, "bishop", LEM07_B_SLICES)
+    _lem07_solution("lem07_low_const.png", b_const, crit_const)
+
+    print("   A power  %s" % _lem07_reading(crit_pow))
+    print("   A M-C    %s" % _lem07_reading(crit_mc))
+    print("   London   power %.6f · M-C %.6f"
+          % (london["pow"]["FS"], london["mc"]["FS"]))
+    print("   B c/p    %s" % _lem07_reading(crit_cp, mat=3))
+    print("   B su=%.1f %s" % (LEM07_B_CONST, _lem07_reading(crit_const, mat=3)))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -1331,6 +1452,7 @@ GROUPS = {
     "lem04_plots": lem04_plots,
     "lem06_sheets": lem06_sheets,
     "lem06_plots": lem06_plots,
+    "lem07_plots": lem07_plots,
     "lem08_sheets": lem08_sheets,
     "lem08_plots": lem08_plots,
     "lem08_lengths": lem08_lengths,

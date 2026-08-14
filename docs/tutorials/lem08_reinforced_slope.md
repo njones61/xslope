@@ -8,7 +8,9 @@ description: "Build a 24 ft sand fill held up by six layers of geogrid in XSLOPE
 A 24 ft embankment of clean sand — c = 0, φ = 37° — standing at 1.25:1 under a
 240 psf surcharge. Sand alone cannot stand that steep at those numbers; six
 layers of geogrid do, each 20 ft long, 4 ft apart vertically, developing 800
-lb/ft of tension. The face is wrapped in a 2 ft band of cohesive fill. The
+lb/ft of tension. The face is wrapped in a 2 ft band of cohesive fill, and the
+base of the problem is 10 ft below the bottom of the slope — not pictured in
+the drawing. The
 problem and the drawing below are Example 5 from the UTEXASED user manual,
 S. G. Wright's educational version of UTEXAS.
 
@@ -245,12 +247,13 @@ material properties from the table above, as shown below:
 ### 2. The `profile` worksheet
 
 One block per profile line, with its **Mat ID** above the coordinates. Enter (or
-copy-paste) the vertices from the geometry tables above:
+copy-paste) the vertices from the geometry tables above, and set `profile!B2`
+**Max Depth** to `-10`:
 
 ![The finished profile worksheet](images/lem08_sheet_profile.png)
 
-`profile!B2` **Max Depth** is an elevation — `-10`, the bottom of the model, not
-a thickness below the toe.
+**Max Depth** is an elevation — `-10` is the bottom of the model, not a
+thickness below the toe.
 
 ### 3. The `dloads` worksheet
 

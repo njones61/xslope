@@ -327,27 +327,30 @@ preview draws the wedge running back and up from the wall toe:
 
 ### 3. Reinforcement lines
 
-Open **Reinforcement lines** in the **Inputs** tree:
+Open **Reinforcement lines** in the **Inputs** tree and press **Table view** —
+the columns are the worksheet's, in the same order, so the two blocks from the
+table above paste straight in. Paste the endpoint block (`Label` through `y2`)
+into the first cell — the rows come with it — then set each row's **Type** to
+`anchor`, which fills **Dir** with `axial` and **Appl** with `active` on its
+own, and paste the capacity block into the first `Tmax` cell:
 
-![The reinforcement editor on the upper tieback](images/lem09_studio_reinforcement.png){width=1000}
+![The reinforcement editor's table view on the two tiebacks](images/lem09_studio_reinforcement_table.png)
 
-The editor opens on its **List view**, one line at a time as a form in five
-groups — **Identity**, **Geometry**, **Capacity**, **Anchorage**, **Type** — with
-the list on the left labelling each line by its support type and the x-range it
-spans. Setting **Type** to `anchor` at the bottom of the form fills **Dir** with
-`axial` and **Appl** with `active` beside it; typing over either afterwards keeps
-what you typed, and choosing the Type again puts the preset back. The preview draws
-the anchors on the section with the selected one bold: a marker at each end, and one
-more where its capacity envelope reaches full Tmax, 8.87 ft in from the grouted end.
-There is no such marker at the wall end, because Lp1 = 0 puts full capacity there
-already.
+Press **List view** to read what was entered one line at a time, as a form in
+five groups — **Identity**, **Geometry**, **Capacity**, **Anchorage**, **Type**
+— with the list on the left labelling each line by its support type and the
+x-range it spans:
 
-**Add** appends a line and **Remove** deletes the selected one. **Table view** puts
-every line on one grid in the worksheet's column order, and takes the tables above
-as blocks: click the first `Label` cell and paste the endpoint block, set **Type**
-to `anchor` on both rows, then click the first `Tmax` cell and paste the capacity
-block. Both views edit the same lines, so switching between them loses nothing.
-Click **OK**.
+![The reinforcement editor's list view on the upper tieback](images/lem09_studio_reinforcement.png){width=1000}
+
+In the **Type** group the preset shows its work: **Dir** reads `axial` and
+**Appl** `active` beside the `anchor` Type; typing over either afterwards keeps
+what you typed, and choosing the Type again puts the preset back. The preview
+draws the anchors on the section with the selected one bold: a marker at each
+end, and one more where its capacity envelope reaches full Tmax, 8.87 ft in
+from the grouted end. There is no such marker at the wall end, because Lp1 = 0
+puts full capacity there already. Both views edit the same lines, so switching
+between them loses nothing. Click **OK**.
 
 ### 4. The soldier pile
 

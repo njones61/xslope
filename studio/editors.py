@@ -4013,7 +4013,10 @@ class _LineListView(QWidget):
             f = self._field_by_key[key]
             cell.setVisible((not f.usage) or (f.usage in enabled))
         for g, keys in getattr(self, "_group_boxes", []):
-            g.setVisible(any(self._cells[k].isVisible() for k in keys
+            # isHidden, not isVisible: the filter runs on a lazily built list view
+            # before it is shown, where isVisible() is False for every cell and
+            # would hide every group.
+            g.setVisible(any(not self._cells[k].isHidden() for k in keys
                              if k in self._cells))
 
     def _relabel_dynamic(self):

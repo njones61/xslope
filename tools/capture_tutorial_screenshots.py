@@ -717,6 +717,22 @@ LEM09 = os.path.join(REPO_ROOT,
                      "docs/verification/files/rocscience/vp049.xlsx")
 
 
+def lem09_reinforcement_table():
+    """The reinforcement editor's table view on the two tiebacks — the view the
+    page teaches first, because the two Problem-section blocks paste straight
+    into it. LEM columns only, per the page's toggles."""
+    from studio.editors import ReinforcementEditor
+
+    dlg = ReinforcementEditor().build(_load(LEM09), None)
+    _lem_only(dlg)
+    dlg._set_mode("table")
+    dlg.resize(1460, 760)
+    return _grab(dlg, "lem09_studio_reinforcement_table.png")
+
+
+SHOTS["lem09_reinforcement_table"] = lem09_reinforcement_table
+
+
 def lem09_reinforcement():
     """The reinforcement editor on the upper tieback, in its list view.
 

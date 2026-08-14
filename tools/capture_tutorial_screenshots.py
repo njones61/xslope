@@ -598,6 +598,48 @@ def lem08_reinforcement():
 SHOTS["lem08_reinforcement"] = lem08_reinforcement
 
 
+# --------------------------------------------------------------------------- #
+# LEM-9 — A Tieback Wall
+# --------------------------------------------------------------------------- #
+LEM09 = os.path.join(REPO_ROOT,
+                     "docs/verification/files/rocscience/vp049.xlsx")
+
+
+def lem09_reinforcement():
+    """The reinforcement editor on the upper tieback, in its list view.
+
+    The same editor LEM-8 photographs, on a row whose Type is ``anchor`` rather
+    than blank: the shot's subject is the Type group at the bottom of the form,
+    where the preset has filled Dir with ``axial`` and Appl with ``active``, and
+    the Anchorage group above it, where the two pullout lengths are 0 at the wall
+    and the bond length at the far end. The first line is selected because it is
+    the one the page reads its capacity off.
+    """
+    from studio.editors import ReinforcementEditor
+
+    dlg = ReinforcementEditor().build(_load(LEM09), None)
+    dlg.resize(1400, 820)
+    return _grab(dlg, "lem09_studio_reinforcement.png")
+
+
+def lem09_piles():
+    """The piles editor on the soldier pile, in its list view.
+
+    Built on LEM-9's model, so the form holds the pile the page enters — the
+    vertical axis at the wall face, the shear force per foot of wall, and the
+    diameter and spacing beside it — rather than an empty row.
+    """
+    from studio.editors import PilesEditor
+
+    dlg = PilesEditor().build(_load(LEM09), None)
+    dlg.resize(1400, 760)
+    return _grab(dlg, "lem09_studio_piles.png")
+
+
+SHOTS["lem09_reinforcement"] = lem09_reinforcement
+SHOTS["lem09_piles"] = lem09_piles
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

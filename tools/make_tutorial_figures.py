@@ -987,6 +987,140 @@ def lem08_plots():
 
 
 # --------------------------------------------------------------------------- #
+# LEM-9 — A Tieback Wall
+# --------------------------------------------------------------------------- #
+#: LEM-9's model is the tieback-wall verification problem — one file, two pages
+#: (the tutorial builds it, ``docs/verification/rocscience.md`` VP49 catalogues
+#: it against the SNAILZ manual and Slide). Nothing is copied, and nothing here
+#: writes to it: the page's comparisons are edits made on in-memory copies.
+LEM09 = os.path.join(REPO_ROOT,
+                     "docs/verification/files/rocscience/vp049.xlsx")
+#: The search runs at Studio's default slice count; the wedge the manual gives is
+#: solved at the 60 the verification row locks, so the page's two numbers are each
+#: produced the way their own sentence describes them.
+LEM09_SLICES = 40
+LEM09_WEDGE_SLICES = 60
+LEM09_METHOD = "janbu"
+
+
+def _lem09_search(model, method=LEM09_METHOD):
+    from xslope.search import noncircular_search
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path = noncircular_search(model, method,
+                                               num_slices=LEM09_SLICES,
+                                               diagnostic=False)
+    if not fs_cache:
+        raise SystemExit("LEM-9: the non-circular search found no valid surface")
+    return fs_cache, path
+
+
+def _lem09_wedge(model, method=LEM09_METHOD):
+    """The manual's wedge, solved as entered — one surface, no search."""
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = generate_slices(model, non_circ=model["non_circ"],
+                                  num_slices=LEM09_WEDGE_SLICES)
+        if not ok:
+            raise SystemExit("LEM-9: slicing failed — %s" % (res,))
+        slice_df, surface = res
+        result = solve_selected(method, slice_df)
+    if not isinstance(result, dict):
+        raise SystemExit("LEM-9: %s failed on the wedge — %s" % (method, result))
+    return slice_df, surface, result
+
+
+def _lem09_problem_sketch(model):
+    """The page's opening sketch: the wall, the two layers, the two tiebacks.
+
+    The strengths are read off the model, so the sketch cannot print a property
+    the file does not carry, and the wall height is measured from the profile
+    line's own vertical run rather than written here.
+    """
+    with _hold_show():
+        plot_inputs(model, title="Slope Geometry and Inputs", frame="content")
+    ax = plt.gcf().axes[0]
+    for mat, (x, y) in zip(model["materials"], ((135.0, 62.0), (95.0, 20.0))):
+        ax.text(x, y, "%s\nγ = %g pcf\nc = %g psf\nφ = %g" % (
+            mat["name"], mat["gamma"], mat["c"], mat["phi"]),
+            ha="center", va="center", fontsize=10)
+    face = [pt for pt in model["profile_lines"][1]["coords"] if pt[0] == 0.0]
+    top = max(y for _, y in face)
+    ax.annotate("", xy=(-6.0, 0.0), xytext=(-6.0, top),
+                arrowprops=dict(arrowstyle="<->", color="0.25", linewidth=1.0))
+    ax.text(-7.5, 0.5 * top, "%g ft wall" % top, ha="right", va="center",
+            rotation=90, fontsize=10, color="0.25")
+    for line in model["reinforcement_lines"]:
+        ax.text(line["x2"] + 2.0, line["y2"], "%s lb/ft" % f"{line['t_max']:,.0f}",
+                ha="left", va="center", fontsize=10)
+
+
+def lem09_sheets():
+    """The five worksheets LEM-9's Excel path fills.
+
+    ``reinforce`` and ``piles`` are the two this page is about, and both windows
+    run to the last input column so the reader sees the columns they are told to
+    leave alone as well as the ones they fill. ``non-circ`` runs to F for the
+    sheet's own Movement legend, as LEM-5's does. ``mat`` and ``profile`` take
+    the two-material frames LEM-3 and LEM-8 use.
+    """
+    render("lem09_sheet_mat.png", LEM09, "mat", rows=(10, 13), cols="A:O")
+    render("lem09_sheet_profile.png", LEM09, "profile", rows=(1, 14), cols="A:H")
+    render("lem09_sheet_noncirc.png", LEM09, "non-circ", rows=(1, 6), cols="A:F")
+    render("lem09_sheet_reinforce.png", LEM09, "reinforce", rows=(2, 6), cols="A:R")
+    render("lem09_sheet_piles.png", LEM09, "piles", rows=(2, 6), cols="A:Q")
+
+
+def lem09_plots():
+    """LEM-9's arc: the search first, then the two things it is read against.
+
+    The automated search on the model as built comes first — Janbu at 40 slices,
+    the method the wall's published comparison uses — and its two figures are the
+    surfaces the search walked and the critical one it kept. The wedge the
+    reference manual gives is a SINGLE-SURFACE solve at the verification row's 60
+    slices, announced as such on the page. The last figure is the same search on
+    a copy with the tiebacks removed, so the page's measure of what they are
+    worth sits on its own critical surface rather than on borrowed geometry.
+    """
+    from xslope.plot import plot_noncircular_search_results
+
+    sd = load_slope_data(LEM09)
+
+    # The sketch a reader decides the page by carries the question, not a step
+    # toward the answer: the entered wedge is dropped from it, as LEM-2 drops its
+    # starting circle.
+    problem = copy.deepcopy(sd)
+    problem["non_circ"] = []
+    capture("lem09_problem.png", _lem09_problem_sketch, problem)
+
+    capture("lem09_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
+
+    fs_cache, path = _lem09_search(sd)
+    crit = fs_cache[0]
+    capture("lem09_search.png", plot_noncircular_search_results, sd, fs_cache, path)
+    capture("lem09_solution.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+
+    ws, wsurf, wres = _lem09_wedge(sd)
+    capture("lem09_solution_wedge.png", plot_solution, sd, ws, wsurf, wres)
+
+    # The comparison: the same wall, the same search, no tiebacks.
+    bare = copy.deepcopy(sd)
+    bare["reinforcement_lines"], bare["reinforce_lines"] = [], []
+    fs_bare, _ = _lem09_search(bare)
+    crit_b = fs_bare[0]
+    capture("lem09_solution_bare.png", plot_solution, bare, crit_b["slices"],
+            crit_b["failure_surface"], crit_b["solver_result"])
+
+    print("   searched %.4f (ΣW %.0f, ΣT_x %.0f, pile %.0f) · manual's wedge "
+          "%.4f · no tiebacks %.4f"
+          % (crit["FS"], crit["slices"]["w"].sum(),
+             crit["slices"]["pa_cx"].sum(), crit["slices"]["h_pile"].sum(),
+             wres["FS"], crit_b["FS"]))
+
+
+# --------------------------------------------------------------------------- #
 # LEM-10 — Finding the Global Minimum
 # --------------------------------------------------------------------------- #
 #: LEM-10's model is the multiple-local-minima sample — one file, two pages. The
@@ -1064,6 +1198,8 @@ GROUPS = {
     "lem06_plots": lem06_plots,
     "lem08_sheets": lem08_sheets,
     "lem08_plots": lem08_plots,
+    "lem09_sheets": lem09_sheets,
+    "lem09_plots": lem09_plots,
     "lem10_plots": lem10_plots,
 }
 

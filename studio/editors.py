@@ -14,7 +14,7 @@ import copy
 import math
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QIcon, QPixmap
+from PySide6.QtGui import QColor, QIcon, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QHeaderView,
@@ -28,8 +28,10 @@ from PySide6.QtWidgets import (
 from .picking import _line_dist
 # The polygon-overlay vocabulary lives with the loader; the Studio imports it rather
 # than restating it, so the Type words, the sentinel codes and their display strings
-# can never drift.
-from xslope.fileio import POLYGON_TYPE_WORDS, SSR_ZONE_LABELS, SSR_ZONE_SENTINELS
+# can never drift. Same for the reinforcement support-type presets: the table the
+# Type column fills Dir/Appl from is the loader's, which is the sheet's.
+from xslope.fileio import (POLYGON_TYPE_WORDS, REINFORCE_TYPE_PRESETS,
+                           SSR_ZONE_LABELS, SSR_ZONE_SENTINELS)
 
 # Column "usage" tags: which analysis a field applies to. Header text is colored
 # to mirror the input template's header coloring (red = LEM-specific inputs,
@@ -362,15 +364,95 @@ class FormEditorDialog(QDialog):
                 for f in self._fields}
 
 
+# --------------------------------------------------------------------------- #
+# Table clipboard — a block of cells in, a block of cells out
+#
+# The inputs of a slope model are tables of numbers, and they nearly always exist
+# somewhere else first: a worksheet, a page of coordinates, a set of vertices out
+# of a report. Retyping such a block is where a model gains a digit it was never
+# given, so every editor table takes a block from the clipboard and fills itself
+# from it — the same block a spreadsheet copies, tabs between columns and newlines
+# between rows.
+#
+# Tabs and newlines ONLY: that is what Excel puts on the clipboard and what a table
+# copied out of a browser carries, and runs of spaces are what a column of typed
+# numbers is padded with, not what separates them.
+# --------------------------------------------------------------------------- #
+def _parse_clipboard_block(text):
+    """Clipboard ``text`` as a list of rows of cell strings, or ``[]`` for nothing
+    pastable.
+
+    Tabs separate columns, newlines separate rows (all three line endings), and
+    trailing newlines — which every spreadsheet appends to a copied block — are
+    dropped rather than read as an empty last row. Rows are left RAGGED: a row with
+    fewer cells than its neighbours fills fewer columns rather than blanking the
+    rest, so a block whose last column is empty on some rows leaves those cells
+    alone."""
+    if not text:
+        return []
+    body = text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
+    if body == "":
+        return []
+    return [line.split("\t") for line in body.split("\n")]
+
+
+#: Why a cell in a pasted block was not written, in the order the status line lists
+#: them. Each is a thing the block asked for that the table will not do.
+_PASTE_SKIP_REASONS = ("past the last column", "not a listed choice", "read-only")
+
+
+def _paste_skip_phrase(counts):
+    """"2 past the last column, 1 read-only" — the skipped cells named by reason,
+    or "" when nothing was skipped."""
+    parts = [f"{counts[r]} {r}" for r in _PASTE_SKIP_REASONS if counts.get(r)]
+    return ", ".join(parts)
+
+
+def _plural(n, noun):
+    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
+
+
+class _ClipboardTable(QTableWidget):
+    """The editors' table widget, with Copy and Paste over a block of cells.
+
+    Subclassed rather than wired to a QShortcut on purpose: a key event reaches the
+    focused widget first, so while a cell is open for editing its line edit keeps
+    its own Ctrl/Cmd+V (pasting text into the cell being typed in) and this handler
+    runs only when the TABLE itself has the keystroke. A shortcut would take the
+    keystroke off the line edit and paste a block over the cell instead.
+
+    ``QKeySequence.Paste`` rather than a literal Ctrl+V so the platform's own
+    binding is what works — Cmd+V on macOS, Ctrl+V elsewhere."""
+
+    def __init__(self, rows, cols, owner):
+        super().__init__(rows, cols)
+        self._owner = owner
+
+    def keyPressEvent(self, event):
+        if event.matches(QKeySequence.Copy):
+            self._owner.copy_selection()
+            event.accept()
+            return
+        if event.matches(QKeySequence.Paste):
+            self._owner.paste_clipboard()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+
 class _EditableTable(QWidget):
     """A table over a list of dict records with Add/Remove rows. Unshown keys are
     preserved. Reused standalone (TableEditorDialog) and per-tab (TabbedTableEditorDialog)."""
 
     def __init__(self, fields, rows, new_row, parent=None, swatch_state=None,
-                 on_change=None, on_select=None, dim_rule=None, unit_labels=None):
+                 on_change=None, on_select=None, dim_rule=None, unit_labels=None,
+                 preset_spec=None):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
+        # Optional preset rule: one choice column FILLS others (reinforcement's Type
+        # -> Dir/Appl). See _apply_preset_row for what picking one does.
+        self._preset = preset_spec or None
         # Units-plan (phase 4) label dict, or None when the project declares no unit
         # system. Only affects the displayed column headers (see below); None keeps
         # them byte-identical to today.
@@ -397,7 +479,7 @@ class _EditableTable(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.table = QTableWidget(len(rows), ncols)
+        self.table = _ClipboardTable(len(rows), ncols, self)
         self.table.setHorizontalHeaderLabels(
             [f.display_header(self._unit_labels) for f in fields])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -441,6 +523,164 @@ class _EditableTable(QWidget):
         bar.addWidget(rem)
         bar.addStretch(1)
         layout.addLayout(bar)
+        # What the last paste did, written into the pane under the buttons rather
+        # than into a box to dismiss: a paste that filled fewer cells than the block
+        # held is something to READ against the rows it landed in. Hidden until
+        # there is one, so a dialog that has not been pasted into measures and lays
+        # out exactly as it did before.
+        self.paste_summary = QLabel()
+        self.paste_summary.setObjectName("paste_summary")
+        self.paste_summary.setWordWrap(True)
+        self.paste_summary.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.paste_summary.setVisible(False)
+        layout.addWidget(self.paste_summary)
+
+    # ---------------------------------------------------------------- #
+    # Clipboard
+    # ---------------------------------------------------------------- #
+    def _clipboard_columns(self):
+        """The data columns a copy or paste walks, left to right AS THE TABLE SHOWS
+        THEM.
+
+        Hidden columns are not walked: a usage toggle is the user saying which
+        parameters they are working with, and a block pasted over a table with the
+        FEM columns folded away belongs to the columns in front of them. The
+        Materials swatch is skipped for a different reason — it is a display color,
+        not a field, so it is not a column a block can carry. Visual order, because
+        that swatch is moved to the front of the table and "rightward" means what
+        the eye means by it."""
+        header = self.table.horizontalHeader()
+        return sorted((j for j in range(len(self._fields))
+                       if not self.table.isColumnHidden(j)),
+                      key=header.visualIndex)
+
+    def _cell_text(self, i, j):
+        """The text column ``j`` of row ``i`` currently shows."""
+        w = self.table.cellWidget(i, j)
+        if isinstance(w, QComboBox):
+            return w.currentText()
+        it = self.table.item(i, j)
+        return it.text() if it is not None else ""
+
+    def copy_selection(self):
+        """The selected block onto the clipboard as tab-separated text — the shape
+        this table's own paste reads back, and the shape a spreadsheet takes.
+
+        These tables select whole rows (the selection drives the preview's
+        emphasis), so a selection is a run of rows across every column on show; with
+        no selection at all, the current cell alone is copied."""
+        cols = self._clipboard_columns()
+        if not cols:
+            return
+        chosen = {(ix.row(), ix.column()) for ix in self.table.selectedIndexes()}
+        if chosen:
+            rows = sorted({r for r, _ in chosen})
+            cols = [c for c in cols if any((r, c) in chosen for r in rows)]
+        else:
+            r, c = self.table.currentRow(), self.table.currentColumn()
+            if r < 0 or c not in cols:
+                return
+            rows, cols = [r], [c]
+        block = "\n".join("\t".join(self._cell_text(r, c) for c in cols) for r in rows)
+        QApplication.clipboard().setText(block)
+
+    def paste_clipboard(self):
+        """Fill the table from a tab-separated block on the clipboard, starting at
+        the current cell and running right and down.
+
+        ROWS GROW to fit the block; COLUMNS DO NOT. A block is a set of records, and
+        a table that would not lengthen for one could only ever be pasted into after
+        the rows had been added by hand — which is most of the typing the paste is
+        there to avoid, and the whole of it when the table starts empty. Columns are
+        the opposite case: the columns are the fields this input HAS, and a block
+        wider than they are is a block that came from somewhere else. Its extra
+        columns are dropped and counted rather than shifted onto fields they do not
+        name.
+
+        Every value goes in the way a typed one does — the cell's text for a number
+        (so the field's own parser reads it, and a pasted rendering of the stored
+        value is kept the way an untouched cell is), the matching entry for a choice
+        column, matched without regard to case. Text that names no choice, and a
+        column held read-only by the row's own state, leave their cells as they
+        were and are counted. One change notification for the whole block, so a
+        preview redraws for the finished table rather than for every cell of a
+        half-filled one."""
+        block = _parse_clipboard_block(QApplication.clipboard().text())
+        cols = self._clipboard_columns()
+        if not block or not cols:
+            return
+        anchor_col = self.table.currentColumn()
+        start = cols.index(anchor_col) if anchor_col in cols else 0
+        start_row = max(0, self.table.currentRow())
+        skipped = {r: 0 for r in _PASTE_SKIP_REASONS}
+        width = 0
+
+        prev = self._suppress_notify
+        self._suppress_notify = True
+        try:
+            grow = start_row + len(block) - self.table.rowCount()
+            for _ in range(max(0, grow)):
+                i = self.table.rowCount()
+                self.table.insertRow(i)
+                base = self._new_row()
+                self._bases.append(base)
+                self._set_row(i, base)
+            for dr, cells in enumerate(block):
+                for dc, text in enumerate(cells):
+                    if start + dc >= len(cols):
+                        skipped["past the last column"] += 1
+                        continue
+                    width = max(width, dc + 1)
+                    reason = self._set_cell_text(start_row + dr, cols[start + dc], text)
+                    if reason:
+                        skipped[reason] += 1
+            self._rebuild_swatches()
+            self._apply_dim_all()
+        finally:
+            self._suppress_notify = prev
+        self._show_paste_summary(len(block), width, skipped)
+        self._emit_change()
+
+    def _set_cell_text(self, i, j, text):
+        """Write one pasted cell. Returns "" when it landed, else the reason it did
+        not — the wording the status line counts under."""
+        f = self._fields[j]
+        text = (text or "").strip()
+        w = self.table.cellWidget(i, j)
+        if isinstance(w, QComboBox):
+            if not w.isEnabled():
+                return "read-only"
+            for k in range(w.count()):
+                if w.itemText(k).strip().lower() == text.lower():
+                    w.setCurrentIndex(k)
+                    # A pasted Type fills Dir/Appl exactly as a picked one does —
+                    # called rather than left to the index-changed signal, which does
+                    # not fire when the block names the type the cell already holds.
+                    # (Idempotent when it did fire.) A block that also carries Dir or
+                    # Appl still wins: those columns come after this one, so they are
+                    # written over the fill.
+                    if self._preset is not None and f.key == self._preset["driver"]:
+                        self._apply_preset_row(w)
+                    return ""
+            return "not a listed choice"
+        it = self.table.item(i, j)
+        if it is None:
+            it = QTableWidgetItem("")
+            self.table.setItem(i, j, it)
+        if not (it.flags() & Qt.ItemIsEditable):
+            return "read-only"
+        it.setText(text)
+        return ""
+
+    def _show_paste_summary(self, rows, cols, skipped):
+        """"Pasted 6 rows × 4 columns" — plus what the block asked for that the
+        table did not do, and why."""
+        text = f"Pasted {_plural(rows, 'row')} × {_plural(cols, 'column')}"
+        phrase = _paste_skip_phrase(skipped)
+        if phrase:
+            text += f"; {_plural(sum(skipped.values()), 'cell')} skipped ({phrase})"
+        self.paste_summary.setText(text + ".")
+        self.paste_summary.setVisible(True)
 
     def _emit_change(self):
         if not self._suppress_notify and self._on_change is not None:
@@ -495,6 +735,18 @@ class _EditableTable(QWidget):
                 _txt = f.to_text(val)
                 if _txt in f.choices:
                     combo.setCurrentText(_txt)
+                # A preset driver fills its dependent columns BEFORE the general
+                # notify, so one edit is one redraw of the finished row. Connected
+                # here (after the initial setCurrentText above) so populating a table
+                # from a file never re-fills a Dir/Appl the file overrode; `activated`
+                # as well as `currentIndexChanged` because re-picking the SAME Type is
+                # the user re-asserting the preset over an override, and that fires no
+                # index change.
+                if self._preset is not None and f.key == self._preset["driver"]:
+                    combo.activated.connect(
+                        lambda *_, w=combo: self._apply_preset_row(w))
+                    combo.currentIndexChanged.connect(
+                        lambda *_, w=combo: self._apply_preset_row(w))
                 # A combo edit (e.g. the strength 'option') can change which cells are
                 # applicable, so re-evaluate the disable rule for every row, then
                 # notify. Re-dimming all rows keeps this correct across add/remove
@@ -540,6 +792,36 @@ class _EditableTable(QWidget):
                               palette=MATERIAL_PALETTE)
             btn.colorChanged.connect(lambda h, idx=i: self._swatch.set(idx, h))
             self.table.setCellWidget(i, col, btn)
+
+    def _apply_preset_row(self, combo):
+        """Fill this row's dependent columns from the preset the driver combo now
+        names — the reinforcement sheet's ``Dir``/``Appl`` formulas, in the table.
+
+        Picking a Type SETS Dir and Appl; typing over either afterwards keeps what
+        was typed, because nothing rewrites them until the Type is picked again. A
+        driver value with no preset (a blank Type — a generic tensile line) fills
+        nothing: the sheet's formula leaves those cells empty for it, and the values
+        already in them are the loader's defaults for exactly that line.
+
+        Row is resolved from the widget rather than captured, so a row inserted or
+        removed above this one cannot make an old index fill the wrong line."""
+        if self._preset is None:
+            return
+        driver_col = self._key_column(self._preset["driver"])
+        i = next((r for r in range(self.table.rowCount())
+                  if self.table.cellWidget(r, driver_col) is combo), -1)
+        if i < 0:
+            return
+        preset = self._preset["presets"].get(combo.currentText().strip().lower())
+        if preset is None:
+            return
+        for key, value in zip(self._preset["fills"], preset):
+            col = self._key_column(key)
+            if col is not None:
+                self._set_cell_text(i, col, value)
+
+    def _key_column(self, key):
+        return next((j for j, f in enumerate(self._fields) if f.key == key), None)
 
     def _on_combo_changed(self):
         self._apply_dim_all()
@@ -3439,8 +3721,8 @@ class MaterialsEditor(CategoryEditor):
     LF = {"lem", "fem"}
     FIELDS = [
         Field("name", "name", "str"),
-        Field("gamma", "g", "optfloat", applies=LF, unit="unit_weight"),
-        Field("gamma_sat", "gsat", "optfloat", applies=LF, unit="unit_weight"),
+        Field("gamma", "γ", "optfloat", applies=LF, unit="unit_weight"),
+        Field("gamma_sat", "γsat", "optfloat", applies=LF, unit="unit_weight"),
         # A BLANK option is valid for seep-only material rows (the loader keeps ''
         # via _choice; document._blank_material produces it for DXF imports). Offer
         # it as an empty combo entry so the editor round-trips it instead of
@@ -3448,7 +3730,7 @@ class MaterialsEditor(CategoryEditor):
         # strength/t_cut/u cells gray out. Kept last so the default stays 'mc'.
         Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb", "elastic", ""], applies=LF),
         Field("c", "c", "optfloat", applies=LF, unit="stress"),
-        Field("phi", "f", "optfloat", applies=LF),
+        Field("phi", "φ", "optfloat", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
         Field("d", "d", "optfloat", usage="lem"),
         Field("psi", "psi", "optfloat", usage="lem"),
@@ -3549,9 +3831,12 @@ class _LineListView(QWidget):
 
     def __init__(self, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, preview_caption=None, parent=None,
-                 unit_labels=None, dynamic_spec=None):
+                 unit_labels=None, dynamic_spec=None, preset_spec=None):
         super().__init__(parent)
         self._field_by_key = {f.key: f for f in fields}
+        # Same preset rule the table view carries (reinforcement's Type -> Dir/Appl),
+        # so the two views fill identically — see _apply_preset.
+        self._preset = preset_spec or None
         self._unit_labels = unit_labels
         self._new_row = new_row
         self._rows = [dict(r) for r in rows]
@@ -3622,6 +3907,12 @@ class _LineListView(QWidget):
         if f.kind in Field.COMBO_KINDS:
             w = QComboBox()
             w.addItems(f.choices)               # blank-tolerant: a "" choice is a real
+            if self._preset is not None and key == self._preset["driver"]:
+                # Fill the dependent combos FIRST, so the commit below writes the row
+                # with them already set. `activated` too: re-picking the same Type is
+                # the user re-asserting the preset, and fires no index change.
+                w.activated.connect(self._apply_preset)
+                w.currentIndexChanged.connect(self._apply_preset)
             w.currentIndexChanged.connect(self._on_edit)   # (empty) entry, as in the table
         else:
             w = QLineEdit()
@@ -3671,6 +3962,7 @@ class _LineListView(QWidget):
         if tip:
             edit.setToolTip(tip)
         h.addWidget(edit, 1)
+        self._cells[key] = cell
         return cell
 
     @staticmethod
@@ -3687,6 +3979,8 @@ class _LineListView(QWidget):
         scroll.setWidgetResizable(True)
         body = QWidget()
         v = QVBoxLayout(body)
+        self._cells = {}
+        self._group_boxes = []
         for title, group_rows in self._groups:
             g = QGroupBox(title)
             gv = QVBoxLayout(g)
@@ -3699,6 +3993,7 @@ class _LineListView(QWidget):
                 else:
                     for k in keys:
                         gv.addWidget(self._cell(k))
+            self._group_boxes.append((g, [k for row in group_rows for k in row]))
             v.addWidget(g)
         v.addStretch(1)
         scroll.setWidget(body)
@@ -3709,6 +4004,20 @@ class _LineListView(QWidget):
         if driver is not None and hasattr(driver, "textChanged"):
             driver.textChanged.connect(lambda *_: self._relabel_dynamic())
         return scroll
+
+    def apply_usage_filter(self, enabled):
+        """Hide the form cells of fields whose usage tag is not enabled — the
+        list-view half of the toggle bar's contract, mirroring the table's
+        column filter. A group whose every field hides, hides whole."""
+        for key, cell in getattr(self, "_cells", {}).items():
+            f = self._field_by_key[key]
+            cell.setVisible((not f.usage) or (f.usage in enabled))
+        for g, keys in getattr(self, "_group_boxes", []):
+            # isHidden, not isVisible: the filter runs on a lazily built list view
+            # before it is shown, where isVisible() is False for every cell and
+            # would hide every group.
+            g.setVisible(any(not self._cells[k].isHidden() for k in keys
+                             if k in self._cells))
 
     def _relabel_dynamic(self):
         """Re-word every spacing-scaled label from the current Spacing/S entry: set ->
@@ -3779,6 +4088,30 @@ class _LineListView(QWidget):
         self._commit()
         self._load(idx)
 
+    def _apply_preset(self, *_):
+        """Fill the dependent combos from the preset the driver combo now names —
+        the table view's ``_apply_preset_row``, on the one row this view shows.
+
+        Picking a Type SETS Dir and Appl; editing either afterwards keeps what was
+        entered, since nothing rewrites them until a Type is picked again. A driver
+        value with no preset (blank Type) fills nothing. Silent while a row loads:
+        ``_load`` blocks every widget's signals, so switching lines never re-fills a
+        Dir/Appl the file overrode."""
+        if self._preset is None or self._cur < 0:
+            return
+        driver = self._edits.get(self._preset["driver"])
+        if driver is None:
+            return
+        preset = self._preset["presets"].get(driver.currentText().strip().lower())
+        if preset is None:
+            return
+        for key, value in zip(self._preset["fills"], preset):
+            w = self._edits.get(key)
+            if isinstance(w, QComboBox):
+                j = w.findText(value)
+                if j >= 0:
+                    w.setCurrentIndex(j)     # its own edit signal commits the row
+
     def _on_edit(self, *_):
         self._commit()
         self._refresh_list_item(self._cur)   # label/type edits update the list line
@@ -3841,7 +4174,8 @@ class _LineEditorDialog(QDialog):
     def __init__(self, title, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, view_state, parent=None,
                  help_text=None, usage_toggles=None, preview_caption=None,
-                 field_help=None, unit_labels=None, dynamic_spec=None):
+                 field_help=None, unit_labels=None, dynamic_spec=None,
+                 preset_spec=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -3850,6 +4184,9 @@ class _LineEditorDialog(QDialog):
         # Per-element/per-unit-width labeling spec for the list view (see
         # _LineListView); None for editors whose fields aren't scaled by spacing.
         self._dynamic_spec = dynamic_spec
+        # Preset rule handed to BOTH views, so a Type picked in either fills the same
+        # two columns from the same table (reinforcement; None elsewhere).
+        self._preset_spec = preset_spec
         self._new_row = new_row
         self._groups = groups
         self._item_label = item_label
@@ -3957,8 +4294,10 @@ class _LineEditorDialog(QDialog):
         s = QSettings("XSlope", "XSlope Studio")
         for t, cb in self._toggles.items():
             s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
-        if self._mode == "table" and self._table is not None:
+        if self._table is not None:
             self._table.apply_usage_filter(self._enabled_usage())
+        if self._list_view is not None:
+            self._list_view.apply_usage_filter(self._enabled_usage())
 
     # --- view switching --------------------------------------------------
     def _harvest(self):
@@ -3984,18 +4323,27 @@ class _LineEditorDialog(QDialog):
         self._table = _EditableTable(self._fields, self._rows, self._new_row,
                                      on_change=self._schedule_table_preview,
                                      on_select=self._schedule_table_preview,
-                                     unit_labels=self._unit_labels)
+                                     unit_labels=self._unit_labels,
+                                     preset_spec=self._preset_spec)
         self._table_preview = PreviewPane(
             lambda ax: self._preview_draw(ax, self._table.result_rows(),
                                           self._table.selected_row()),
             caption=self._preview_caption)
         self._table_preview.clicked.connect(self._on_table_preview_click)
-        split = QSplitter(Qt.Horizontal)
+        # The preview sits BELOW the table: these editors carry a dozen or more
+        # columns, and a side-by-side preview forced the dialog wider than a
+        # screen (owner ruling 2026-08-14). The table keeps the height its rows
+        # ask for; the preview absorbs the rest, so a taller dialog grows the
+        # picture — the circles editor's stacked pattern.
+        split = QSplitter(Qt.Vertical)
         split.addWidget(self._table)
         split.addWidget(self._table_preview)
-        split.setStretchFactor(0, 1)
+        split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
-        split.setSizes([640, 460])
+        self._table_preview.setMinimumHeight(220)
+        # Open with every row visible: the table's opening share is its own
+        # measured hint, not a constant, so six rows show six rows.
+        split.setSizes([self._table.sizeHint().height(), 400])
         self._table_split = split
         self._table_lay.addWidget(split)
         self._table.apply_usage_filter(self._enabled_usage())
@@ -4012,8 +4360,12 @@ class _LineEditorDialog(QDialog):
                 self._fields, self._rows, self._new_row, self._groups,
                 self._item_label, self._preview_draw, self._pick_resolve,
                 preview_caption=self._preview_caption, unit_labels=self._unit_labels,
-                dynamic_spec=self._dynamic_spec)
+                dynamic_spec=self._dynamic_spec, preset_spec=self._preset_spec)
             self._list_lay.addWidget(self._list_view)
+            # A lazily built list view starts under whatever the toggle bar
+            # already says — the same filter the table is showing.
+            if getattr(self, "_toggles", None):
+                self._on_toggle()
         else:
             self._list_view.set_rows(self._rows)
 
@@ -4891,22 +5243,28 @@ class PilesEditor(CategoryEditor):
     label = "Piles"
     # tooltip=PILES_HELP[key] gives the table-header hover and the list-view
     # label/edit hover; the same dict feeds the context-sensitive help strip.
+    # Field order mirrors the piles sheet's columns (Label, the endpoints, H, Appl,
+    # D, S, Vcap, Mcap, then the FEM tail E, I, Area, Fixity) so a block copied from
+    # the sheet or the docs' tables pastes straight in. The sheet's qp (θ) sits
+    # between H and Appl and has no column here: θ is derived from the pile axis on
+    # save, so a block spanning it goes in as two — the endpoints through H, then D
+    # onward, which is how the tutorials print it.
     FIELDS = [
         Field("label", "Label", "str", tooltip=PILES_HELP["label"]),
         Field("x1", "x1", tooltip=PILES_HELP["x1"]), Field("y1", "y1", tooltip=PILES_HELP["y1"]),
         Field("x2", "x2", tooltip=PILES_HELP["x2"]), Field("y2", "y2", tooltip=PILES_HELP["y2"]),
         Field("H", "H", "optfloat", tooltip=PILES_HELP["H"]),
-        Field("D_pile", "D", "optfloat", usage="lem", tooltip=PILES_HELP["D_pile"]),
-        Field("S", "S", "optfloat", usage="lem", tooltip=PILES_HELP["S"]),
-        Field("E", "E", "optfloat", usage="fem", tooltip=PILES_HELP["E"]),
-        Field("I", "I", "optfloat", usage="fem", tooltip=PILES_HELP["I"]),
-        Field("area", "Area", "optfloat", usage="fem", tooltip=PILES_HELP["area"]),
-        Field("V_cap", "Vcap", "optfloat", usage="lem", tooltip=PILES_HELP["V_cap"]),
-        Field("M_cap", "Mcap", "optfloat", usage="lem", tooltip=PILES_HELP["M_cap"]),
         # Force application (v12, LEM only): active = allowable force applied as-is;
         # passive = ultimate capacity divided by FS (loader default 'active').
         Field("appl", "Appl", "choice", choices=["active", "passive"], usage="lem",
               tooltip=PILES_HELP["appl"]),
+        Field("D_pile", "D", "optfloat", usage="lem", tooltip=PILES_HELP["D_pile"]),
+        Field("S", "S", "optfloat", usage="lem", tooltip=PILES_HELP["S"]),
+        Field("V_cap", "Vcap", "optfloat", usage="lem", tooltip=PILES_HELP["V_cap"]),
+        Field("M_cap", "Mcap", "optfloat", usage="lem", tooltip=PILES_HELP["M_cap"]),
+        Field("E", "E", "optfloat", usage="fem", tooltip=PILES_HELP["E"]),
+        Field("I", "I", "optfloat", usage="fem", tooltip=PILES_HELP["I"]),
+        Field("area", "Area", "optfloat", usage="fem", tooltip=PILES_HELP["area"]),
         Field("fixity", "Fixity", "choice", choices=["free", "fixed"], usage="fem",
               tooltip=PILES_HELP["fixity"]),
     ]
@@ -5602,16 +5960,19 @@ class PolygonEditor(CategoryEditor):
 def _new_reinf():
     # A generic tensile line (blank type -> tangent/active via the loader presets,
     # spacing 1 -> no per-width division); mirrors the pre-v12 default row.
-    return {"x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0, "t_max": 0.0, "t_res": 0.0,
+    return {"label": "", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0,
+            "t_max": 0.0, "t_res": 0.0,
             "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0,
             "type": "", "dir": "tangent", "appl": "active",
             "tend1": 0.0, "tend2": 0.0, "spacing": 1.0}
 
 
 # List-view form layout for a reinforcement line: every ReinforcementEditor.FIELDS
-# key grouped (Geometry / Capacity / Anchorage / Type). The Type combos are blank-
-# tolerant exactly as the table enums are (a "" type is a real, selectable entry).
+# key grouped (Identity / Geometry / Capacity / Anchorage / Type). The Type combos
+# are blank-tolerant exactly as the table enums are (a "" type is a real, selectable
+# entry).
 _REINF_FORM_GROUPS = [
+    ("Identity", [["label"]]),
     ("Geometry", [["x1", "y1"], ["x2", "y2"]]),
     ("Capacity", [["t_max", "t_res"], ["E", "area"]]),
     ("Anchorage", [["lp1", "lp2"], ["tend1", "tend2"], ["spacing"]]),
@@ -5634,6 +5995,7 @@ def _reinf_item_label(i, row):
 # header color is "LEM only" red — so they aren't tagged that way here. Type/Dir/
 # Appl are truly LEM only (FEM ignores them); Tres/E/Area are truly FEM only.
 REINFORCE_HELP = {
+    "label": "Name used in error messages, summaries, and plots (optional).",
     "x1": "Start point X-coordinate.",
     "y1": "Start point Y-coordinate.",
     "x2": "End point X-coordinate.",
@@ -5671,32 +6033,38 @@ REINFORCE_HELP = {
 class ReinforcementEditor(CategoryEditor):
     label = "Reinforcement"
     LF = {"lem", "fem"}
-    # Support-type columns (v12). `type` choices are the loader's _TYPE_PRESETS keys
-    # (fileio.py) plus a blank entry — a blank type is a generic line whose Dir/Appl
-    # default via the presets; offering '' as an empty combo entry lets a blank type
-    # round-trip unchanged (same treatment as the materials blank option). Dir/Appl
-    # mirror the loader's accepted values.
+    # Support-type columns (v12). `type` choices are REINFORCE_TYPE_PRESETS' keys
+    # (the loader's, which are the sheet's) plus a blank entry — a blank type is a
+    # generic line whose Dir/Appl default via the presets; offering '' as an empty
+    # combo entry lets a blank type round-trip unchanged (same treatment as the
+    # materials blank option). Dir/Appl mirror the loader's accepted values.
     # tooltip=REINFORCE_HELP[key] gives the table-header hover and the list-view
     # label/edit hover; the same dict feeds the context-sensitive help strip.
+    # Column order is the reinforce sheet's, Label first, so a block copied from the
+    # sheet or the docs' tables pastes straight in.
     FIELDS = [
+        Field("label", "Label", "str", tooltip=REINFORCE_HELP["label"]),
         Field("x1", "x1", tooltip=REINFORCE_HELP["x1"]),
         Field("y1", "y1", tooltip=REINFORCE_HELP["y1"]),
         Field("x2", "x2", tooltip=REINFORCE_HELP["x2"]),
         Field("y2", "y2", tooltip=REINFORCE_HELP["y2"]),
         Field("type", "Type", "choice",
-              choices=["", "geosynthetic", "nail", "tieback", "anchor"], applies=LF,
+              choices=[""] + list(REINFORCE_TYPE_PRESETS), applies=LF,
               tooltip=REINFORCE_HELP["type"]),
         Field("dir", "Dir", "choice", choices=["tangent", "axial"], applies=LF,
               tooltip=REINFORCE_HELP["dir"]),
         Field("appl", "Appl", "choice", choices=["active", "passive"], applies=LF,
               tooltip=REINFORCE_HELP["appl"]),
+        # Field order past Type/Dir/Appl mirrors the reinforce sheet's columns
+        # (Tmax, Lp1, Lp2, Tend1, Tend2, Spacing, then the FEM-only tail) so a
+        # block copied from the sheet or the docs' tables pastes straight in.
         Field("t_max", "Tmax", usage="lem", tooltip=REINFORCE_HELP["t_max"]),
-        Field("t_res", "Tres", usage="fem", tooltip=REINFORCE_HELP["t_res"]),
-        Field("tend1", "Tend1", usage="lem", tooltip=REINFORCE_HELP["tend1"]),
-        Field("tend2", "Tend2", usage="lem", tooltip=REINFORCE_HELP["tend2"]),
         Field("lp1", "Lp1", usage="lem", tooltip=REINFORCE_HELP["lp1"]),
         Field("lp2", "Lp2", usage="lem", tooltip=REINFORCE_HELP["lp2"]),
+        Field("tend1", "Tend1", usage="lem", tooltip=REINFORCE_HELP["tend1"]),
+        Field("tend2", "Tend2", usage="lem", tooltip=REINFORCE_HELP["tend2"]),
         Field("spacing", "Spacing", applies=LF, tooltip=REINFORCE_HELP["spacing"]),
+        Field("t_res", "Tres", usage="fem", tooltip=REINFORCE_HELP["t_res"]),
         # E is a Young's modulus (stress). Area (a cross-section, length²) has no
         # xslope.units.labels() key -- the labels() contract is length/stress/
         # unit_weight/force_per_len/k/flowrate/time -- so it is deliberately left
@@ -5705,6 +6073,12 @@ class ReinforcementEditor(CategoryEditor):
         Field("E", "E", usage="fem", unit="stress", tooltip=REINFORCE_HELP["E"]),
         Field("area", "Area", usage="fem", tooltip=REINFORCE_HELP["area"]),
     ]
+    # The sheet's Dir/Appl formulas, in the editor: picking a Type fills both from
+    # the loader's own table; typing over either keeps it until a Type is picked
+    # again. Handed to BOTH views (and used by a pasted Type), so the three ways a
+    # reader can set a support type mean one thing.
+    PRESET_SPEC = {"driver": "type", "fills": ("dir", "appl"),
+                   "presets": REINFORCE_TYPE_PRESETS}
 
     def build(self, slope_data, parent):
         style = _doc_style(parent)
@@ -5721,13 +6095,15 @@ class ReinforcementEditor(CategoryEditor):
                           "fields": {"t_max": "force", "t_res": "force",
                                      "tend1": "force", "tend2": "force",
                                      "area": "area"}},
+            preset_spec=self.PRESET_SPEC,
             help_text="List view edits one line at a time as a grouped form beside a "
                       "live section preview; the table view is available for bulk entry "
                       "of the many lines of a tiered wall. Both views edit the same rows, "
                       "so switching is lossless. Lp1/Lp2 are the pullout lengths at each "
                       "end (0 = fully anchored); the LEM tension distribution on the "
-                      "preview is derived from these. Type defaults Dir/Appl when blank; "
-                      "leave Type blank for a generic tensile line. Tend1/Tend2 are the "
+                      "preview is derived from these. Picking a Type fills Dir and Appl "
+                      "— change either afterwards to override it — and a blank Type is a "
+                      "generic tensile line. Tend1/Tend2 are the "
                       "end-anchorage capacities; capacities and E/Area are per-unit-width "
                       "(Spacing divides discrete supports).",
             usage_toggles=["lem", "fem"],

@@ -633,10 +633,12 @@ def _circle_usable(slope_data, circle):
         return False
 
 
-# GeoStudio reinforcement Type -> xslope (type, dir, appl). These mirror fileio's
-# _TYPE_PRESETS, which is local to load_slope_data and so cannot be imported: 'axial'
-# acts along the bar, 'tangent' reorients to the slip surface; 'passive' means the force
-# is divided by the factor of safety (an ultimate capacity), 'active' means it is not.
+# GeoStudio reinforcement Type -> xslope (type, dir, appl). Deliberately NOT
+# fileio.REINFORCE_TYPE_PRESETS: these are GeoStudio's conventions for the same four
+# words, and they differ (a GeoStudio geosynthetic acts axially, an xslope one
+# tangentially). 'axial' acts along the bar, 'tangent' reorients to the slip surface;
+# 'passive' means the force is divided by the factor of safety (an ultimate capacity),
+# 'active' means it is not.
 #
 # The file does NOT record a direction or an F-of-S dependence: GeoStudio implies both
 # from the Type. So does this table, and each row is measured against SLOPE/W's own

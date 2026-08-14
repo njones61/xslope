@@ -246,34 +246,18 @@ class SweepCanvas(MplCanvas):
         self._draw(draw, dxf=False)
 
     def _annotate_crossing(self, fig, target_fs, summary):
-        """Mark the interpolated output=target crossing (or an honest miss note)."""
+        """Mark the interpolated output=target crossing (or an honest miss note).
+
+        The drawing itself is ``xslope.plot.annotate_design_crossing`` — pure
+        matplotlib, so anything that draws a design sweep outside Studio (the
+        tutorial figure producer) puts the same crossing on the same curve
+        rather than a lookalike of it.
+        """
+        from xslope.plot import annotate_design_crossing
         ax = self._main_axes()
         if ax is None:
             return
-        param = summary.get("param", "")
-        short = param.split(":")[-1] or param
-        out = summary.get("output", "FS")            # 'FS' or 'q'
-        if summary.get("bracketed") and summary.get("crossing") is not None:
-            xc = summary["crossing"]
-            ax.axvline(xc, color="#0a7d2c", linestyle="--", linewidth=1.0)
-            ax.plot([xc], [target_fs], marker="D", color="#0a7d2c", ms=9, zorder=8)
-            ax.annotate(f"{short} = {xc:.4g}\nfor {out} = {target_fs:g}",
-                        xy=(xc, target_fs), xytext=(8, 14),
-                        textcoords="offset points", color="#0a7d2c", fontsize=9,
-                        fontweight="bold", zorder=9,
-                        bbox=dict(boxstyle="round,pad=0.3", fc="white",
-                                  ec="#0a7d2c", alpha=0.9))
-        else:
-            # Put the note in the empty band: just under the target line when the
-            # curve sits below the target (need a higher FS), else near the bottom.
-            fs_min = (summary.get("fs_range") or (None, None))[0]
-            below_range = fs_min is not None and target_fs < fs_min
-            y, va = (0.05, "bottom") if below_range else (0.95, "top")
-            ax.text(0.5, y, summary.get("message", "Target FS not reached."),
-                    transform=ax.transAxes, ha="center", va=va, fontsize=9,
-                    color="#7a5200", wrap=True, zorder=9,
-                    bbox=dict(boxstyle="round,pad=0.4", fc="#fff4d6",
-                              ec="#e0b400", alpha=0.95))
+        annotate_design_crossing(ax, target_fs, summary)
 
 
 class MainWindow(QMainWindow):
@@ -1713,15 +1697,18 @@ class MainWindow(QMainWindow):
         add("Global parameters", "", category="global")
         add("Materials", len(d.get("materials", [])), category="materials")
         # A project is profile-based unless it has polygons but no profile lines.
-        # An empty (new) project defaults to profile-based so the user can add the
-        # first profile line; polygons are then derived from it.
+        # An empty (new) project can start down either path, so both rows are
+        # live until the first geometry lands; the first profile line makes the
+        # file profile-based, the first polygon makes it polygon-based.
         profile_based = bool(profile_lines) or not polygons
+        empty_geometry = not profile_lines and not polygons
         add("Profile lines", len(profile_lines),
             category="profile" if profile_based else None)
         # Polygons are derived from profile lines for profile-based files (edit them
-        # via the profile editor); only polygon-based files edit polygons directly.
+        # via the profile editor); polygon-based files — and an empty project —
+        # edit polygons directly.
         add("Polygons", len(polygons),
-            category="polygons" if not profile_based else None)
+            category="polygons" if (not profile_based or empty_geometry) else None)
         # SSR zones are polygon-sheet rows with sentinel Mat IDs, edited in the same
         # dialog as the material zones (appended after them). Listed separately
         # because they are analysis overlays, not geometry — the Polygons count must

@@ -134,7 +134,25 @@ used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
 
 </div>
 
-## Results
+## Methodology
+
+Each problem is built from the manual's tabulated data and coordinate-labeled
+figures; where a figure is unlabeled, the geometry is extracted by
+axis-calibrated pixel measurement and validated against printed solution
+quantities. Seepage problems are compared on flow rates, phreatic-surface
+positions, and head or pressure profiles rather than factors of safety;
+transient problems are additionally compared at the published save times.
+
+Where a published answer is itself a chart, the treatment depends on what the
+chart resolves. A contour plate with a numeric key gives a band per sampled
+point, and the comparison reports the fraction of points falling inside the
+vendor's band (GW5's Fig 5-4); a plate without a key supports only a
+qualitative reading (GW17's Fig 19-4). A line or marker plot on labeled axes is
+digitized and compared numerically, and where the model fixes a value the chart
+must show — an initial condition, a boundary head — that value calibrates the
+digitization (GW7's Fig 22.7, GW18's Fig 20.5, GW19's Fig 21.9).
+
+## Steady-state problems {#steady-state}
 
 ### GW1: Shallow unconfined flow with rainfall {#gw1}
 
@@ -1204,7 +1222,7 @@ The tags lock the closed-form head at five stations, tolerance 0.05 ft.
 <!-- test: file=files/rocscience_gw/gw021a.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:103.592;20:2.5:102.354;30:2.5:101.397;40:2.5:100.746;50:2.5:100.357, tolerance=0.05, benchmark=GW21a -->
 <!-- test: file=files/rocscience_gw/gw021b.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:108.592;20:2.5:107.354;30:2.5:106.397;40:2.5:105.746;50:2.5:105.357, tolerance=0.05, benchmark=GW21b -->
 
-## The SEEP2D cross-check: where does the free surface daylight? {#seep2d-crosscheck}
+## SEEP2D cross-check: free-surface daylight point {#seep2d-crosscheck}
 
 Several problems on this page reproduce a published profile in shape but sit a little
 high, and what they share is a free surface on a steep exit face. The question is whether
@@ -1245,7 +1263,7 @@ integrated flux differs, the likely cause is where each code evaluates the stron
 nonlinear kr(ψ) when it forms an element's conductivity. It does not affect pore
 pressures or stability, which read the head field.
 
-### The specified-flux boundary, against SEEP2D {#flux-crosscheck}
+## SEEP2D cross-check: the specified-flux boundary {#flux-crosscheck}
 
 The same harness verifies the
 [specified-flux (Neumann) boundary](../seep/overview.md#specified-flux-boundary-conditions-neumann),
@@ -1274,28 +1292,3 @@ load vector, so an incorrect distribution along an edge (½, ½, 0 across a quad
 would still sum to *q·L* and pass a total-flux check while breaking the solution. It does not.
 The quadratic weights (⅙, ⅙, ⅔ at corner, corner and midside) are verified the same way, and a
 zero flux reproduces the no-flux answer bitwise.
-
-## Methodology
-
-Same rules as the [Slide2 corpus](rocscience.md): problems are built from the manual's tabulated
-data and coordinate-labeled figures; where a figure is unlabeled, geometry is extracted by
-axis-calibrated pixel measurement and validated against printed solution quantities; every built
-problem is locked into `run_tests.py` via test tags. Seepage problems compare flow rates,
-phreatic-surface positions, and head/pressure profiles rather than factors of safety. Three tag
-types carry the locks: `type=seep` (flowrate, live mesh + solve at `target_size`),
-`type=seep_head` (solved total head at named `x:y:h` points, interpolated from the four nearest
-nodes), and `type=tseep_head` — the transient sibling of `seep_head`, which meshes and samples
-head the identical way but pulls the field from the frame of a transient solve at a given save
-time `t` (`time=…`, an entry the solver lands on exactly). A `type=tseep_head` tag names a file
-carrying a v18 `tseep` sheet; optional `dt_max` / `max_head_change_frac` / `theta` tune the
-stepper.
-
-Where a problem's published answer is itself a chart, how it is handled depends on what the
-chart resolves. A contour plate with a numeric key gives a band per point, and the comparison
-is reported as the fraction of sampled points falling inside the vendor's own band (GW5's
-Fig 5-4); a plate without one supports only a qualitative reading (GW17's Fig 19-4). A line or
-marker plot on labeled axes is digitized and compared numerically — and where the model itself
-fixes a value the chart must show (an initial condition, a boundary head), that value calibrates
-the digitization, so its precision is a measured quantity rather than an estimate (GW7's
-Fig 22.7, GW18's Fig 20.5, GW19's Fig 21.9). In every chart-target case the tag locks XSLOPE's
-own solved field; the vendor comparison is reported in the row text with its precision.

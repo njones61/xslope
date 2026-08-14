@@ -37,19 +37,8 @@ hooks:
 nav:
   - Home: index.md
   - Install: getting_started/install.md
-  - Tutorials:
-    - Overview: tutorials/index.md
-    - Building Models Three Ways: tutorials/building_models.md
-    - Simple Embankment (LEM): tutorials/lem01_simple_embankment.md
-  - XSLOPE Studio:
-    - Overview: studio/index.md
-    - The Interface: studio/interface.md
-    - Editing Inputs: studio/editing.md
-    - Running Analyses: studio/analysis.md
-    - Analysis Report: studio/reports.md
-    - AI Assistant: studio/assistant.md
-    - App Management: studio/app_management.md
   - Usage Guide:
+    - Ways to Use XSLOPE: usage/index.md
     - Python Package Install: usage/installation.md
     - Input Template: usage/input_template.md
     - Project Packaging: usage/packaging.md
@@ -58,6 +47,27 @@ nav:
     - Claude Code Skill: usage/claude/index.md
     - DXF Import/Export: usage/dxf.md
     - GeoStudio Import/Export: usage/geostudio.md
+  - XSLOPE Studio:
+    - Overview: studio/index.md
+    - The Interface: studio/interface.md
+    - Editing Inputs: studio/editing.md
+    - Running Analyses: studio/analysis.md
+    - Analysis Report: studio/reports.md
+    - AI Assistant: studio/assistant.md
+    - App Management: studio/app_management.md
+  - Tutorials:
+    - Overview: tutorials/index.md
+    - Building Models Three Ways: tutorials/building_models.md
+    - Limit Equilibrium:
+      - Simple Embankment: tutorials/lem01_simple_embankment.md
+      - Loads on the Crest: tutorials/lem02_loads_on_the_crest.md
+      - A Layered Slope: tutorials/lem03_layered_slope.md
+      - Water in the Slope: tutorials/lem04_water_in_the_slope.md
+      - A Weak Layer, Non-Circular: tutorials/lem05_weak_layer_noncircular.md
+      - Polygon Geometry: tutorials/lem06_polygon_geometry.md
+      - A Reinforced Slope (Geogrids): tutorials/lem08_reinforced_slope.md
+      - A Tieback Wall: tutorials/lem09_tieback_wall.md
+      - Finding the Global Minimum: tutorials/lem10_global_minimum.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md
@@ -71,16 +81,6 @@ nav:
     - Rapid Drawdown Analysis: lem/rapid.md
     - Automated Search Algorithms: lem/search.md
     - Sample Problems: lem/samples.md
-  - Reliability:
-    - Overview: reliability/index.md
-    - Taylor Series (TSPM): reliability/taylor.md
-    - Monte Carlo: reliability/monte_carlo.md
-    - FEM Reliability (SSRM): reliability/fem.md
-  - Parametric:
-    - Overview: parametric/index.md
-    - Sensitivity: parametric/sensitivity.md
-    - Design Mode: parametric/design.md
-    - Back-Analysis: parametric/back_analysis.md
   - Seepage Analysis:
     - Overview: seep/overview.md
     - Transient Seepage: seep/transient.md
@@ -92,6 +92,16 @@ nav:
     - Piles and Concrete Piers: fem/piles.md
     - Mesh Generation: fem/mesh.md
     - Sample Problems: fem/samples.md
+  - Reliability:
+    - Overview: reliability/index.md
+    - Taylor Series (TSPM): reliability/taylor.md
+    - Monte Carlo: reliability/monte_carlo.md
+    - FEM Reliability (SSRM): reliability/fem.md
+  - Parametric:
+    - Overview: parametric/index.md
+    - Sensitivity: parametric/sensitivity.md
+    - Design Mode: parametric/design.md
+    - Back-Analysis: parametric/back_analysis.md
   - Verification:
     - Overview: verification/index.md
     - FE Seepage: verification/seep.md

@@ -74,6 +74,37 @@ Solution (critical surface and factor of safety):
 
 <!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.985, fs_bishop=0.985, fs_janbu=0.969, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.985 -->
 
+And here is a copy carrying variation (a) alone — a 750 psf distributed load over
+the 10 ft strip of crest between x = 25 and x = 35, with no tension crack and no
+submergence. It is the model built in
+[Tutorial LEM-2](../tutorials/lem02_loads_on_the_crest.md), which takes the load
+further: the same resultant as a line load, the same intensity read as a normal
+pressure and as a dead weight, a seismic coefficient, and the cohesion that would
+carry it all at FS = 1.5.
+
+Excel input file: [xslope_crest_surcharge.xlsx](files/xslope_crest_surcharge.xlsx)
+
+Inputs:
+
+![crest_surcharge_inputs.png](../tutorials/images/lem02_inputs.png){width=700}
+
+Solution (critical surface and factor of safety):
+
+![crest_surcharge_results.png](../tutorials/images/lem02_solution_load.png){width=700}
+
+The critical circle exits the crest at the far edge of the loaded strip: it
+carries the whole surcharge and no soil beyond it.
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.918 | 0.918 | 0.950 | 0.953 | 0.939 | 0.918 | 0.918 |
+<!-- /fs-table -->
+
+<!-- test: file=files/xslope_crest_surcharge.xlsx, type=circular_search, num_slices=40, fs_oms=0.918, fs_bishop=0.918, fs_janbu=0.950, fs_corps=0.953, fs_lowe=0.939, fs_spencer=0.918, fs_mprice=0.918 -->
+
 ### 2. Simple Slope with Foundation
 
 This problem involves a uniform material extending below the toe of the slope. 
@@ -169,19 +200,32 @@ Solution (critical surface and factor of safety):
 
 ### 5. Slope with Multiple Materials and Piezometric Line
 
-This problem features three layers of material with an effective stress analysis where pore pressures are derives 
+This problem features three layers of material with an effective stress analysis where pore pressures are derived 
 from a piezometric line. 
 
 ![method_slices_problem.png](sample_images/method_slices_problem.png){width=900}
 
-This problem is featured as part of a graduate course on slope stability analysis (CE 544 - Slope Stability Analysis)
-at Brigham Young University. The problem used in two exercises to illustrate how to solve limit equilibrium slope 
-stability problems using the method of slices and an Excel spreadsheet. The problem descriptions are here:
+| Material | Layer | γ (pcf) | γ_sat (pcf) | c′ (psf) | φ′ (deg) | u |
+|---|---|---:|---:|---:|---:|---|
+| soil 1 | Upper, 20 ft | 125 | 130 | 400 | 30 | `piezo` |
+| soil 2 | Middle, 24 ft | 122 | 127 | 600 | 28 | `piezo` |
+| soil 3 | Foundation, 40 ft | 115 | 118 | 900 | 12 | `piezo` |
+
+A firm embankment and middle layer sit on a soft foundation clay, and the critical surface is a deep circle cutting 
+into that clay rather than anything on the face. Every material states both unit weights, so each slice's weight is 
+split at the piezometric line — γ above it, γ_sat below — the behavior [Problem 16](#16-saturated-vs-moist-unit-weight-_sat) 
+isolates.
+
+This problem is similar to one used in two exercises in a graduate course on slope stability analysis
+(CE 544 - Slope Stability Analysis) at Brigham Young University, where limit equilibrium problems are solved
+with the method of slices in an Excel spreadsheet. The exercise descriptions are here:
 
 [Ordinary Method of Slices Exercise](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_class/)<br>
 [Bishop Simplified Procedure Homework](https://byu-ce544.readthedocs.io/en/latest/unit2/04_limiteq2/limiteq2_hw/)
 
-In these exercises, a single circular surface was analyzed. The following Excel input file illustrates the problem:
+This sample shares the exercises' geometry but carries a different set of material properties, including both
+moist and saturated unit weights. In the exercises, a single circular surface was analyzed. The following Excel
+input file illustrates the problem:
 
 Excel input file: [xslope_method_slices_problem.xlsx](files/xslope_method_slices_problem.xlsx)
 
@@ -189,19 +233,22 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 
 ![method_slices_problem_inputs.png](sample_images/method_slices_problem_inputs.png){width=900}
 
-Here is the solution for just the starting circle (to match the problem description) using Bishop's simplified procedure:
+Here is the solution for just the starting circle (to match the problem description), solved with Spencer's method:
 
 ![method_slices_problem_results.png](sample_images/method_slices_problem_results.png){width=900}
 
+The specified circle enters the crest at x = 80.8 and exits on the flat ground at x = 267.8, 215 ft of base carrying 
+696,000 lb/ft. It is not the critical surface — the search below finds one 11% lower.
+
 <!-- fs-table -->
-**Factor of safety by method** (each method's own critical surface):
+**Factor of safety by method** (each method on the same specified circle):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.303 | 1.576 | 1.533 | 1.766 | 1.641 | 1.579 | 1.579 |
+| 1.310 | 1.475 | 1.469 | 1.641 | 1.522 | 1.462 | 1.464 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=40, fs_oms=1.303, fs_bishop=1.576, fs_janbu=1.533, fs_corps=1.766, fs_lowe=1.641, fs_spencer=1.579, fs_mprice=1.579 -->
+<!-- test: file=files/xslope_method_slices_problem.xlsx, type=single_circle, num_slices=40, fs_oms=1.310, fs_bishop=1.475, fs_janbu=1.469, fs_corps=1.641, fs_lowe=1.522, fs_spencer=1.462, fs_mprice=1.464 -->
 
 Here is the Excel input file with multiple starting circles for a global search for the critical surface:
 
@@ -211,8 +258,9 @@ Inputs plotted with the XSLOPE plot_inputs() function:
 
 ![method_slices_problem_inputs2.png](sample_images/method_slices_problem_inputs2.png){width=900}
 
-Sarch results. This problem is a good example of the search path and the large number of circles that are sometimes 
-tested in the search algorithm. In this case, the critical surface is isolated to sloughing of the 2nd layer.
+Search results. This problem is a good example of the search path and the large number of circles that are sometimes 
+tested in the search algorithm. The three seeds converge on one mechanism: a deep circle entering the crest at 
+x = 121, bottoming out 13 ft into the foundation clay, and exiting on the flat ground at x = 220.
 
 ![method_slices_problem_search_results2.png](sample_images/method_slices_problem_search_results2.png){width=900}
 
@@ -225,10 +273,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0.628 | 0.762 | 0.734 | 0.721 | 0.788 | 0.770 | 0.767 |
+| 1.084 | 1.327 | 1.253 | 1.436 | 1.376 | 1.301 | 1.302 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=0.628, fs_bishop=0.762, fs_janbu=0.734, fs_corps=0.721, fs_lowe=0.788, fs_spencer=0.770, fs_mprice=0.767 -->
+<!-- test: file=files/xslope_method_slices_problem2.xlsx, type=circular_search, num_slices=40, fs_oms=1.084, fs_bishop=1.327, fs_janbu=1.253, fs_corps=1.436, fs_lowe=1.376, fs_spencer=1.301, fs_mprice=1.302 -->
 
 ### 6. Slope with Eight Layers
 
@@ -281,9 +329,11 @@ analysis software developed by Stephen G. Wright at the University of Texas at A
 ![noncircular.png](sample_images/noncircular.png){width=900}
 
 The non-circular failure surface is modeled with the following Excel input file. The failure surface is defined by 
-four points. The first and last point are assigned the "Free" option, which causes them to be automatically 
-calculated based on the slope geometry. The two middle points are assigned the "Horiz" option, which causes them to 
-be moved horizontally inside the weak layer.
+four points — the surface the weak-zone generator builds on this section: a track running just above the base of the 
+clay seam at elevation −5.8, entering the ground at the toe and ramping up to the back of the crest. The first and 
+last point are assigned the "Free" option, which causes them to be automatically calculated based on the slope 
+geometry. The two middle points are assigned the "Horiz" option, which causes them to be moved horizontally inside 
+the weak layer.
 
 Excel input file: [xslope_noncircular.xlsx](files/xslope_noncircular.xlsx)
 
@@ -308,11 +358,11 @@ Solution (critical surface and factor of safety):
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|---:|---:|---:|---:|---:|---:|---:|
-| — | — | 1.657 | 1.794 | 1.369 | 1.739 | 1.710 |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| — | — | 1.575 | 1.523 | 1.315 | 1.656 | 1.634 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.657, fs_corps=1.794, fs_lowe=1.369, fs_spencer=1.739, fs_mprice=1.710 -->
+<!-- test: file=files/xslope_noncircular.xlsx, type=noncircular_search, num_slices=40, fs_janbu=1.575, fs_corps=1.523, fs_lowe=1.315, fs_spencer=1.656, fs_mprice=1.634 -->
 
 ### 8. Earth Dam 
 
@@ -551,7 +601,7 @@ pile design.
 
 This problem demonstrates two features together: **polygon-based geometry input** and a
 **sloping (non-horizontal) bottom boundary**. Rather than profile lines and a horizontal
-`max_depth`, the cross-section is defined directly on the `polygons` sheet as two
+`max_depth`, the cross-section is defined directly on the `polygon` sheet as two
 material-zone polygons — an embankment over a foundation — whose shared base dips from
 left to right (elevation −15 on the left to −5 on the right). With polygon input there is
 no `max_depth`; the union of the polygons forms the **domain polygon**, and its lower

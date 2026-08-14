@@ -2247,25 +2247,33 @@ def _editor_fixture():
         "dload2_dirs": ["vertical"],
         # One row per support type (blank/geosynthetic/nail/tieback/anchor) so the
         # editor exercises every Type value plus both Dir (tangent/axial) and Appl
-        # (active/passive) enums and the tend1/tend2/spacing numerics.
+        # (active/passive) enums and the tend1/tend2/spacing numerics. The LAST row is
+        # an anchor with appl='passive' -- an OVERRIDE of the anchor preset's 'active'.
+        # Opening the editor on it must not re-fill it: the Type preset answers when a
+        # Type is PICKED, and a value the file already carries is the user's.
         "reinforcement_lines": [
-            {"x1": 0.0, "y1": 5.0, "x2": 40.0, "y2": 5.0, "t_max": 1000.0,
+            {"label": "generic line", "x1": 0.0, "y1": 5.0, "x2": 40.0, "y2": 5.0,
+             "t_max": 1000.0,
              "t_res": 800.0, "lp1": 2.0, "lp2": 3.0, "E": 2000.0, "area": 1.2,
              "type": "", "dir": "tangent", "appl": "active",
              "tend1": 0.0, "tend2": 0.0, "spacing": 1.0},
-            {"x1": 0.0, "y1": 6.0, "x2": 38.0, "y2": 6.0, "t_max": 900.0,
+            {"label": "geogrid 1", "x1": 0.0, "y1": 6.0, "x2": 38.0, "y2": 6.0,
+             "t_max": 900.0,
              "t_res": 700.0, "lp1": 1.5, "lp2": 2.5, "E": 1800.0, "area": 1.1,
              "type": "geosynthetic", "dir": "tangent", "appl": "active",
              "tend1": 5.0, "tend2": 6.0, "spacing": 1.0},
-            {"x1": 0.0, "y1": 7.0, "x2": 36.0, "y2": 7.0, "t_max": 800.0,
+            {"label": "soil nail 1", "x1": 0.0, "y1": 7.0, "x2": 36.0, "y2": 7.0,
+             "t_max": 800.0,
              "t_res": 600.0, "lp1": 1.0, "lp2": 2.0, "E": 1600.0, "area": 1.0,
              "type": "nail", "dir": "axial", "appl": "passive",
              "tend1": 10.0, "tend2": 12.0, "spacing": 1.5},
-            {"x1": 0.0, "y1": 8.0, "x2": 34.0, "y2": 8.0, "t_max": 700.0,
+            {"label": "tieback 1", "x1": 0.0, "y1": 8.0, "x2": 34.0, "y2": 8.0,
+             "t_max": 700.0,
              "t_res": 500.0, "lp1": 0.5, "lp2": 1.5, "E": 1400.0, "area": 0.9,
              "type": "tieback", "dir": "axial", "appl": "active",
              "tend1": 15.0, "tend2": 18.0, "spacing": 2.0},
-            {"x1": 0.0, "y1": 9.0, "x2": 32.0, "y2": 9.0, "t_max": 600.0,
+            {"label": "anchor 1", "x1": 0.0, "y1": 9.0, "x2": 32.0, "y2": 9.0,
+             "t_max": 600.0,
              "t_res": 400.0, "lp1": 0.5, "lp2": 1.0, "E": 1200.0, "area": 0.8,
              "type": "anchor", "dir": "axial", "appl": "passive",
              "tend1": 20.0, "tend2": 22.0, "spacing": 2.5},
@@ -6769,6 +6777,50 @@ def run_circles_editor_test(test):
     return 0.0, None
 
 
+def run_table_paste_test(test):
+    """The table clipboard every Studio editor shares, and the tutorials' tables
+    against it.
+
+    The tutorial pages lay each table out column for column as its destination and
+    tell the reader to copy the block and paste it rather than retype it. That
+    instruction is only true while two things hold: the paste itself does what the
+    reader expects — rows grow to fit a block, a choice column takes the word the
+    page prints whatever its case, a cell that will not take a value says so instead
+    of quietly holding 22 of 24 — and the pages' own tables still match the editors
+    they name. Both fail silently. A paste that fills the wrong columns builds a
+    model nobody typed; a page that gains a column builds it in every reader's copy.
+
+    The check itself lives in test/table_paste_check.py: the mechanics (row growth,
+    the anchor cell, case-insensitive choices, dropped extra columns, hidden and
+    read-only cells, a pasted display rounding that keeps the stored value, one
+    change notification per block, copy round-tripping through paste, Cancel
+    discarding a paste), then LEM-3's profile lines and circles, LEM-4's eight-point
+    piezometric line, LEM-5's non-circular surface, LEM-6's polygon rings and LEM-8's
+    two reinforcement blocks — each read out of the page, pasted into the real
+    editor offscreen, and compared with the completed model that page ships.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'table_paste_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('table_paste_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_project_package_test(test):
     """Project packaging: a project collected into one ``.xslz`` and taken apart
     again.
@@ -11163,6 +11215,8 @@ def _dispatch_test(test):
         return run_noncircular_generator_test(test)
     if test_type == 'circles_editor':
         return run_circles_editor_test(test)
+    if test_type == 'table_paste':
+        return run_table_paste_test(test)
     if test_type == 'project_package':
         return run_project_package_test(test)
     if test_type == 'docs_links':
@@ -11287,7 +11341,7 @@ def _expected_and_tol(test, default_tolerance):
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
                        'project_package', 'docs_links',
-                       'noncircular_generator', 'circles_editor',
+                       'noncircular_generator', 'circles_editor', 'table_paste',
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
                        'assistant_models', 'assistant_guardrails',
@@ -11894,6 +11948,13 @@ def main():
         # rows the user already has. Builds dialogs offscreen and solves nothing.
         tests.append({'type': 'circles_editor', 'file': 'Studio circles editor',
                       'method': '-', 'source': 'circles_editor'})
+        # Guard the table clipboard every editor shares — what a pasted block fills,
+        # what it refuses to fill and says so about — and the tutorials' own tables
+        # against it: each taught block is read out of its page, pasted into the real
+        # editor, and compared with the completed model that page ships. The pages
+        # tell the reader to paste rather than retype; this is what keeps that true.
+        tests.append({'type': 'table_paste', 'file': 'Studio table copy/paste',
+                      'method': '-', 'source': 'table_paste'})
         # Guard Studio's in-app updater: the version comparison, the platform
         # artifact key, the minimum_version gate, the checksum refusal, and the
         # command each platform branch would spawn. Touches no network — the

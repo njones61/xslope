@@ -32,6 +32,19 @@ open its editor:
 Editors are forms (for scalars) or tables (for tabular data). Tabular editors let
 you add, remove, and reorder rows.
 
+**Every table takes a block from the clipboard.** Click the cell the block starts
+at and press `Ctrl+V` (`⌘V` on macOS). Columns are separated by tabs and
+rows by newlines — what a spreadsheet copies, and how the tables in the
+[tutorials](../tutorials/index.md) are laid out — and the values fill right and
+down from the cell you clicked. Rows are added when the block runs past the last
+one, so pasting into an empty table is the whole of filling it; columns are not,
+and a block wider than the table has its extra columns dropped. A column of
+choices (Option, Movement, Type, …) takes any spelling of one of its own entries;
+text naming none of them, and a cell the row's own settings hold read-only, are
+left as they were. A line under the table reports what landed, and counts
+anything that did not. `Ctrl+C` (`⌘C`) copies the selected rows back out in the same
+form, and the paste is an edit like any other — **Cancel** discards it.
+
 The materials editor has two interchangeable views. **Table view** mirrors the
 `mat` worksheet row-for-row, with **Show columns for** toggles (LEM / Seepage /
 FEM / Reliability) that hide the columns an analysis doesn't use:
@@ -133,7 +146,9 @@ list) plus a live preview of the feature on the section.
 
 **Failure surfaces** is one editor or the other depending on the family the model
 uses: a circle table, or the **non-circular surface** as a list of vertices ordered
-left→right, each with a **Movement** the search obeys (*Free*, *Horiz*, *Fixed*).
+left→right, each with a **Movement** setting (*Free*, *Horiz*, *Fixed*). Movement
+governs what the search may do with the interior vertices; the entry and exit
+points always slide along the ground surface, whatever their Movement says.
 Clicking a vertex in the preview selects its row, and vice versa. The circle table
 has seven columns, so its preview sits below the table rather than beside it.
 
@@ -154,7 +169,10 @@ passes through that mechanism — the surface runs flat inside the seam and turn
 sharply at each end — so a model with a weak seam needs a surface a circular search
 cannot produce. The button builds one: it ranks the material zones by the shear
 strength each can mobilise at the stress it actually carries, lays a track just above
-the base of the weakest, and ramps up to the ground surface at both ends. It reports
+the base of the weakest, and ramps up to the ground surface at both ends. It puts a
+vertex only where one earns its place — where the track bends, or where the search
+could move it — so a flat seam comes out as the two ends of its track rather than a
+subdivision of a straight line. It reports
 which zone it chose and why, under the button, so the surface can be read against the
 reasoning that produced it. On an empty table it simply builds the surface; where
 there are points already, it asks first. Either way the generated points land in the
@@ -196,12 +214,15 @@ entry of many lines. Both views edit the same rows, so switching is lossless, an
 the **Show columns for** (LEM / FEM) toggles hide the columns an analysis doesn't
 use in the table.
 
-**Reinforcement** lines are grouped as **Geometry** (endpoints), **Capacity**
-(Tmax, Tres, E, Area), **Anchorage** (Lp1/Lp2 pullout lengths, Tend1/Tend2 end
-capacities, Spacing), and **Type** — picking a Type (geosynthetic, nail, tieback,
-anchor) defaults **Dir** and **Appl**, and a blank Type means a generic tensile
-line. The preview draws the lines on the section with the selected one emphasized
-and its pullout breakpoints marked:
+**Reinforcement** lines are grouped as **Identity** (the line's label),
+**Geometry** (endpoints), **Capacity** (Tmax, Tres, E, Area), **Anchorage**
+(Lp1/Lp2 pullout lengths, Tend1/Tend2 end capacities, Spacing), and **Type** —
+picking a Type (geosynthetic, nail, tieback, anchor) fills **Dir** and **Appl**
+with that support's pair, exactly as the `reinforce` worksheet's formulas do.
+Change either afterwards and the change stands; picking a Type again puts the
+preset back. A blank Type means a generic tensile line, tangent and active. The
+preview draws the lines on the section with the selected one emphasized and its
+pullout breakpoints marked:
 
 ![Reinforcement editor (list view)](images/editing_reinforcement_editor.png)
 
@@ -210,8 +231,8 @@ lines of a tiered wall:
 
 ![Reinforcement editor (table view)](images/editing_reinforcement_table.png)
 
-**Piles** group their fields as **Geometry**, **Capacity / design** (H, D, S, Vcap,
-Mcap, and the FEM E/I/Area), and **Behavior** — the **Appl** dropdown chooses how
+**Piles** group their fields as **Identity**, **Geometry**, **Capacity / design**
+(H, D, S, Vcap, Mcap, and the FEM E/I/Area), and **Behavior** — the **Appl** dropdown chooses how
 the pile resistance enters the analysis (active = allowable force; passive =
 ultimate capacity ÷ FS), and leaving **H** blank auto-computes the Ito & Matsui
 force. A model rarely has more than a few piles, so the list view is usually all

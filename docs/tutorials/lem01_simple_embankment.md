@@ -32,21 +32,31 @@ the results carefully enough to catch what the first model gets wrong.
 
 The problem features the following geometry and material properties:
 
-**Material** — one material, Mohr-Coulomb (`mc`):
+**Material** — one material, Mohr-Coulomb (`mc`), at 125 pcf with c = 500 psf and
+φ = 0. The columns are the `mat` worksheet's own, in its order, so the row goes in
+as one block; the row order is the Mat ID. There are no pore pressures — `u`
+stays `none` — so the table ends at φ:
 
-| Mat ID | Name | γ (pcf) | c (psf) | φ (deg) | Pore pressure |
-|---|---|---:|---:|---:|---|
-| 1 | `soil` | 125 | 500 | 0 | `none` |
+| name | γ | γsat | option | c | φ |
+|---|:---:|:---:|---|:---:|:---:|
+| `soil` | 125 |  | `mc` | 500 | 0 |
 
-**Geometry** — one profile line, on material 1:
+**Geometry** — Profile Line 1, on material 1 (`soil`), one vertex per row:
 
-| Point | x (ft) | y (ft) | |
-|---|---:|---:|---|
-| 1 | 0 | 0 | the toe |
-| 2 | 20 | 20 | the crest break — 20 ft up over 20 ft across, a 1:1 face |
-| 3 | 60 | 20 | the back of the crest |
+| x (ft) | y (ft) |
+|:---:|:---:|
+| 0 | 0 |
+| 20 | 20 |
+| 60 | 20 |
 
-Maximum depth = `0`, the elevation of the rigid base.
+The three vertices are the toe, the crest break — 20 ft up over 20 ft across, a
+1:1 face — and the back of the crest. Maximum depth = `0`, the elevation of the
+rigid base.
+
+The tables are the model, and each is laid out exactly as its destination is —
+the template's worksheets and Studio's editors, same columns in the same order.
+Select a table's block of values, copy, and paste it straight into the sheet or
+editor rather than retyping it.
 
 ---
 
@@ -162,34 +172,33 @@ Most of this sheet is already right:
 ### 2. The `mat` worksheet
 
 In the `mat` worksheet, we name each of the materials in the model and enter their
-properties, including unit weight and strength parameters. For this problem, we have
-one material, so we'll use the first row of the table:
-
-1. `mat!A11` = `1` and `mat!B11` = `soil` — the ID the geometry will reference, and
-   a name for the legends.
-2. `mat!C11` **γ** = `125`.
-3. `mat!E11` **option** = `mc`, the traditional Mohr-Coulomb envelope.
-4. `mat!F11` **c** = `500` and `mat!G11` **φ** = `0`. Together these are the
-   undrained strength: the envelope is flat, so the strength is 500 psf at every
-   depth.
-5. `mat!O11` **u** = `none`. There is no pore pressure to compute.
-6. Leave every other column in the row blank.
+properties, including unit weight and strength parameters. This problem has one
+material, on the first row of the table. Enter (or copy-paste) the material
+properties from the table above, as shown below:
 
 ![The finished mat worksheet](images/lem01_sheet_mat.png)
+
+The ID is what the geometry will reference and the name is what the legends
+show. **option** = `mc` is the traditional Mohr-Coulomb envelope, and c = 500
+with φ = 0 is the undrained strength: the envelope is flat, so the strength is
+500 psf at every depth. **u** = `none` means there is no pore pressure to
+compute. Every other column in the row stays blank.
 
 ### 3. The `profile` worksheet
 
 A profile line is the *top* of a material layer: everything below it, down to the
-next profile line or the maximum depth, is that layer's material. That is why
+next profile line or the maximum depth, is that layer's material. Geometry can be
+entered as profile lines or as polygons — one closed region per material — but
+profile lines are the faster input for simple layered geometry, and they are what
+this model uses. That is why
 entering the ground surface here defines the whole body of the embankment — one line
 on material 1, with the rigid base closing it from below.
 
 1. `profile!B2` **Max Depth** = `0`. This is an *elevation*, not a thickness: it
    places a horizontal rigid base at the toe of the slope.
-2. `profile!B5` **Mat ID** = `1` for Profile Line #1 — the ID you gave the material
-   above.
-3. Enter the three ground-surface points in the `x` / `y` columns beneath, left to
-   right: `0, 0` then `20, 20` then `60, 20`.
+2. Profile Line #1 — set its **Mat ID** to `1`, the ID you gave the material
+   above, and enter (or copy-paste) the three ground-surface points from the
+   table above into the `x` / `y` columns beneath, left to right.
 
 ![The finished profile worksheet](images/lem01_sheet_profile.png)
 
@@ -201,19 +210,16 @@ first, and the rest stay empty.
 Next, we enter a starting circle for the search. A starting circle is a *guess* at
 the critical surface, and the search will refine it. A good strategy: put the
 center's x-coordinate above the middle of the slope face, put its y-coordinate at
-twice the slope's height, and size the circle so it just touches the rigid base.
-
-1. `circles!B3` **Xo** = `10` and `circles!C3` **Yo** = `40` — the center of the
-   trial circle, above the middle of the face at twice the slope height.
-2. `circles!D3` **Option** = `Depth`, and `circles!E3` **Depth** = `0`.
-   **Depth** is the *elevation of the circle's lowest point*, not a distance below
-   ground — so `0` sets the circle tangent to the rigid base, and the loader forms
-   the radius as R = Yo − Depth = 40.
+twice the slope's height, and size the circle so it just touches the rigid base —
+here, a center at (10, 40). Enter the circle as shown below, with **Option** =
+`Depth`. **Depth** is the *elevation of the circle's lowest point*, not a distance
+below ground — so `0` sets the circle tangent to the rigid base, and the loader
+forms the radius as R = Yo − Depth = 40.
 
 ![The finished circles worksheet](images/lem01_sheet_circles.png)
 
 Save the file, and continue at [Running the analysis](#running-the-analysis) —
-open the file in Studio, or run it from Python as shown there.
+open the file in Studio and run it there.
 
 ---
 
@@ -229,15 +235,21 @@ The global parameters declare what every number after them means. Click
 **Global parameters** and set **Units** to `Imperial` — XSLOPE never converts
 between unit systems; the declaration states what the numbers you type already
 mean, and drives the unit labels on the plots. The unit weight of water fills
-itself with `62.4`. Leave the tension crack and seismic fields at `0`, and click
-**OK**.
+itself with `62.4`. Leave the tension crack and seismic fields at `0`. The
+finished form carries the declaration and nothing else — **Time** and the two FEM
+fields stay empty on a limit-equilibrium model:
+
+![The global parameters form](images/lem01_studio_global.png)
+
+Click **OK**.
 
 ### 2. Materials
 
 Here you name each material in the model and enter its properties — unit weight
 and strength parameters. Everything else will reference the material by its ID,
-which is why it comes first. This problem has one material. Click **Materials** →
-**Add**, then switch to **List view**:
+which is why it comes first. This problem has one material. Click **Materials**.
+The editor opens on **Table view**, a material per row; press **List view** for
+the per-material form, then **Add**:
 
 1. **Name** = `soil`.
 2. **γ** = `125`.
@@ -256,24 +268,27 @@ one you meant.
 ### 3. Profile lines
 
 A profile line is the *top* of a material layer: everything below it, down to the
-next profile line or the maximum depth, is that layer's material. Entering the
+next profile line or the maximum depth, is that layer's material. Geometry can be
+entered as profile lines or as polygons — one closed region per material — but
+profile lines are the faster input for simple layered geometry, and they are what
+this model uses. Entering the
 ground surface here therefore defines the whole body of the embankment — one line
 on the material you just created, closed from below by the rigid base. Click
 **Profile lines**, then **Add line**:
 
-1. Set **Max depth (bottom boundary elevation)** to `0`. This is an *elevation*,
+1. Set **Max depth (bottom boundary elevation):** to `0`. This is an *elevation*,
    not a thickness: it places a horizontal rigid base at the toe of the slope.
-2. Set **Material** to `1: soil`.
+2. Set **Material:** to `1: soil`.
 3. **Add row** three times and enter `0, 0` / `20, 20` / `60, 20` — the toe, the
    crest break at the top of the 1:1 face, and the back of the crest.
 
 ![The profile lines editor](images/lem01_studio_profile.png)
 
 The preview redraws as you type, so a mistyped vertex shows up before you commit
-it: the line in the material's color, and the hatched **Max depth** line at y = 0
-beneath it. Click **OK**, and the canvas draws the same two things. Profile-line
-geometry is drawn as lines; the shaded material zones you may have seen in other
-XSLOPE figures are how *polygon* input is drawn.
+it: the line in the material's color, and the hatched line marking the bottom
+boundary at y = 0 beneath it. Click **OK**, and the canvas draws the same two
+things. Profile-line geometry is drawn as lines; the shaded material zones you
+may have seen in other XSLOPE figures are how *polygon* input is drawn.
 
 ![The canvas after the profile line](images/lem01_studio_canvas.png)
 
@@ -319,31 +334,22 @@ Click **Run LEM…**. Choose:
 
 ![The Run LEM dialog](images/lem01_studio_run_lem.png)
 
-1. **Method** = `Spencer's Method` — the method that satisfies both force and moment
+1. **Method** = `Spencer` — the method that satisfies both force and moment
    equilibrium, and the one to reach for by default.
-2. **Surface** = `Auto search`, `Circular`. The search starts from your circle and
-   refines toward the critical one.
+2. **Analysis** = `Auto search`. The search starts from your circle and refines
+   toward the critical one. **Surface** below it is a fixed label reading
+   `Circular`, not a choice: this model defines circles and no non-circular
+   surface, so there is only one family to run.
 3. Leave the slice count at its default of 40.
 4. Click **Run**.
-
-From Python, the same run is:
-
-```python
-from xslope.fileio import load_slope_data
-from xslope.search import circular_search
-from xslope.plot import plot_solution
-
-sd = load_slope_data("my_embankment.xlsx")
-fs_cache, _, path, circles = circular_search(sd, "spencer", num_slices=40)
-crit = fs_cache[0]
-plot_solution(sd, crit["slices"], crit["failure_surface"], crit["solver_result"])
-```
 
 ---
 
 ## Exploring the results
 
 ### The search result — and the warnings that come with it
+
+When the search completes, the search-results plot shows every circle it tried:
 
 ![The circular search](images/lem01_search.png){width=1000}
 
@@ -470,5 +476,6 @@ This tutorial demonstrated:
   slope is a modeling omission, fixed with a tension crack at $z_c = 2c/\gamma$,
   after which every method agrees on a lower, defensible answer.
 
-**Where to go next:** Tutorial LEM-2 adds loads to this same section — a surcharge
-on the crest and water above the toe.
+**Where to go next:** [Tutorial LEM-2](lem02_loads_on_the_crest.md) adds loads to
+this same section — a surcharge on the crest, the same force as a line load, an
+earthquake, and the strength it would take to carry them.

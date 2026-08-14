@@ -78,6 +78,48 @@ from studio import urlscheme                                     # noqa: E402
 WITH_SIDECARS = os.path.join(_REPO, "docs/seep/files/xslope_rface_SEEP_KEY.xlsx")
 #: A project that is a workbook and nothing else (single-file samples package too).
 SINGLE_FILE = os.path.join(_REPO, "docs/inputs/slope/xslope_simple1.xlsx")
+#: Tutorial LEM-2's completed model, which its label pins in H are read against —
+#: the distributed-loads editor has a Direction to report only on a model that
+#: carries a load.
+LEM02_FILE = os.path.join(_REPO, "docs/lem/files/xslope_crest_surcharge.xlsx")
+#: Tutorial LEM-1's completed model — one material, which is the state its Studio
+#: path leaves the materials editor in and the state its figure shows.
+LEM01_FILE = os.path.join(_REPO, "docs/lem/files/xslope_simple_embankment.xlsx")
+#: Tutorial LEM-3's completed model — two materials and two profile lines, which is
+#: what its label pins need: the materials table read as a pair of rows, and a
+#: profile editor with a material to assign each line to.
+LEM03_FILE = os.path.join(_REPO, "docs/lem/files/xslope_simple_mult_layers.xlsx")
+#: Tutorial LEM-5's completed model — four material zones with a soft seam among
+#: them, which is what its pins need: a non-circular surface to read the vertex
+#: table against, and a weak zone for the generator to find.
+LEM05_FILE = os.path.join(_REPO, "docs/lem/files/xslope_noncircular.xlsx")
+#: Tutorial LEM-4's completed model — three piezo-reading materials, an eight-point
+#: piezometric line, and one specified circle: what its pins need is a model whose
+#: Run LEM Surface row is the fixed *Circular* label, with the γ_sat column filled
+#: as the page's weight-split section reads it.
+LEM04_FILE = os.path.join(_REPO,
+                          "docs/lem/files/xslope_method_slices_problem.xlsx")
+#: Tutorial LEM-6's completed model — two material-zone polygons on a dipping
+#: base, which is what its pins need: a polygon-based project (the only kind
+#: whose Polygons row opens an editor) and a domain whose floor a circle can be
+#: pushed below.
+LEM06_FILE = os.path.join(_REPO, "docs/lem/files/xslope_sloping_bottom.xlsx")
+#: Tutorial LEM-8's completed model — six reinforcement lines, which is what its
+#: pins need: an Inputs tree row that counts them and an editor with a line to
+#: read the capacity fields off.
+LEM08_FILE = os.path.join(_REPO, "docs/lem/files/xslope_reinforce.xlsx")
+#: Tutorial LEM-9's completed model — two Anchor-type reinforcement lines and one
+#: soldier pile, which is what its pins need: a reinforcement row whose Type preset
+#: has filled Dir/Appl, and a Piles row in the Inputs tree with a pile to read the
+#: editor's fields off.
+LEM09_FILE = os.path.join(_REPO,
+                          "docs/verification/files/rocscience/vp049.xlsx")
+#: Tutorial LEM-10's completed model — a cohesionless embankment on soft clay,
+#: the section its generator quote and its two Run LEM search options are read on.
+LEM10_FILE = os.path.join(_REPO, "docs/lem/files/xslope_mult_min_KEY.xlsx")
+#: The editable master template, whose ``reinforce`` sheet carries the support-type
+#: lookup block LEM-8 reproduces as a table.
+TEMPLATE_FILE = os.path.join(_REPO, "docs/inputs/input_template.xlsx")
 
 #: A URL on the docs site — what the docs build emits.
 GOOD = "https://xslope.readthedocs.io/en/latest/lem/files/xslope_simple1.xslz"
@@ -811,6 +853,1003 @@ T0_PACKAGE_BUTTONS = ("Change…", "Open Existing", "Extract Fresh")
 #: The Inputs-tree rows Tutorial 0 names as the way into an editor.
 T0_INPUT_CATEGORIES = ("Global parameters", "Materials", "Profile lines", "Circles")
 
+#: The Inputs-tree rows LEM-2 sends the reader to. Both are added unconditionally,
+#: so an empty model still lists them — which is the state the tutorial's reader is
+#: in when they go looking.
+LEM02_INPUT_CATEGORIES = ("Distributed loads", "Line loads")
+
+#: The Run-menu actions LEM-2 tells the reader to press — the run itself, and the
+#: sweep its design section ends on. Same source-string convention as
+#: ``T0_FILE_ACTIONS``: Qt's ``&`` removed, the trailing ellipsis kept (the page
+#: writes **Run LEM…** and **Parametric…** too, since neither is one of the
+#: familiar File verbs that drop it).
+LEM02_RUN_ACTIONS = {"act_run": "Run LEM…", "act_sensitivity": "Parametric…"}
+
+#: The two buttons LEM-2's Studio path presses to get a load into the model, and
+#: the Direction reading it leaves selected. The direction wording is the pinned
+#: one because the page's face-load section turns on the difference between the two
+#: options — a reworded combo would leave that section describing a choice the
+#: reader cannot find.
+LEM02_DLOAD_BUTTONS = ("Add load", "Add row")
+LEM02_DLOAD_DIRECTION = "Normal (perpendicular to the line)"
+
+#: The two tabs the page names in the distributed-loads editor, and the label on
+#: the Direction chooser. The page tells the reader which tab the ordinary load
+#: goes on and which one is the rapid-drawdown stage that stays empty, so a
+#: renamed tab leaves those sentences pointing at nothing.
+LEM02_DLOAD_TABS = ("Set 1", "Set 2 (rapid drawdown)")
+LEM02_DLOAD_DIRECTION_LABEL = "Direction:"
+
+#: The Global-parameters row LEM-2's seismic section sends the reader to.
+LEM02_GLOBAL_ROW = "Seismic coefficient k"
+
+#: The line-loads table's column headers, in the order the page dictates values
+#: into them (**Label** `footing`, **x** `30`, **y** `20`, **P** `7500`,
+#: **Angle** `-90`).
+LEM02_LLOAD_HEADERS = ("Label", "x", "y", "P", "Angle")
+
+#: The Parametric dialog in the state LEM-2 walks: the Design mode entry, every
+#: form label the page names in order, and the button that starts the sweep.
+LEM02_DESIGN_MODE = "Design (FS target)"
+LEM02_DESIGN_ROWS = ("Mode", "Method", "Number of slices", "Material", "Property",
+                     "Sweeping", "From", "To", "Steps", "Target FS")
+LEM02_DESIGN_RUN = "Run"
+
+#: The checkbox the design step tells the reader to leave ticked, and whose
+#: wording the step's explanation of when re-searching matters is built on.
+LEM02_DESIGN_SEARCH = "Re-search the critical surface at each step"
+
+
+#: The materials-editor controls LEM-1's Studio path uses, and the view it opens on.
+#: The page sends the reader from the view the editor opens on to the one its figure
+#: shows, so the order is the guarded part: **Table view** is where a first open
+#: lands (``editors._LAST_MATERIALS_VIEW`` starts there), **List view** is the
+#: per-material form the page's numbered fields belong to, and **Add** is that
+#: form's button — the table's reads "Add row", so a step that pressed the wrong one
+#: would be pressing a button that is not in the view it just asked for.
+#: The two Global-parameters rows LEM-1's first step names by label — the one the
+#: reader sets, and the one the step tells them to leave empty. Both are read off
+#: the same form the page's figure photographs, so a renamed row is a step pointing
+#: at a control the picture no longer shows.
+LEM01_GLOBAL_ROWS = ("Units", "Time")
+
+LEM01_MATERIALS_OPENS_ON = "table"
+LEM01_MATERIALS_VIEWS = ("Table view", "List view")
+LEM01_MATERIALS_ADD = "Add"
+
+#: The materials-editor controls LEM-3's Studio path uses. It builds two materials
+#: in the view LEM-1 does not use — the table, where the row order is what fixes the
+#: Mat IDs the profile lines reference — so both the view toggle and the button that
+#: adds a row are labels the page tells the reader to press.
+LEM03_MATERIALS_BUTTONS = ("Table view", "Add row")
+
+#: The profile-lines editor's controls, in the order LEM-3 drives them: add a line,
+#: give it a material, add its vertices — plus the bottom-boundary field, whose
+#: wording carries the fact that the value is an elevation.
+LEM03_PROFILE_BUTTONS = ("Add line", "Add row")
+LEM03_PROFILE_LABELS = ("Material:", "Max depth (bottom boundary elevation):")
+
+#: The material choices the page dictates, as the combo spells them. A profile line
+#: names its material by ID and name together, which is the notation the page's
+#: numbered steps quote.
+LEM03_PROFILE_MATERIALS = ("1: embankment", "2: foundation")
+
+#: What the starting-circle generator reports on LEM-3's two-layer section, quoted
+#: verbatim on the page beside a capture of the same line. The count and the phrasing
+#: are both load-bearing: the page's audit table walks the three circles it announces
+#: (one through the toe, one at the base of each layer) row by row.
+LEM03_GENERATE_SUMMARY = "3 on the left-facing face (toe at x = 0, height 20)"
+LEM03_GENERATE_DEPTHS = (-4.72136, -10.0, 0.0)
+
+#: The Inputs-tree rows LEM-5 sends the reader to. Both are added unconditionally,
+#: so an empty model still lists them — the state its reader is in when they go
+#: looking for the failure surface.
+LEM05_INPUT_CATEGORIES = ("Non-circular pts", "Piezometric lines")
+
+#: The non-circular editor's controls, in the order LEM-5 drives them: add the four
+#: vertices, then the generator that builds a surface from the weak zone instead.
+LEM05_NONCIRC_BUTTONS = ("Add row", "Generate from the weak zone…")
+
+#: The vertex table's columns and the Movement settings the page dictates into
+#: them. Movement is pinned option by option because the page's search reading
+#: measures what each one does to the search -- `Horiz` sliding the seam points
+#: along the clay, `Free` walking the ends along the ground, `Fixed` pinning them
+#: -- so a renamed option leaves that reading describing choices the reader cannot
+#: make.
+LEM05_NONCIRC_HEADERS = ("X", "Y", "Movement")
+LEM05_NONCIRC_MOVEMENTS = ("Free", "Horiz", "Fixed")
+
+#: What the weak-zone generator reports on LEM-5's section, quoted verbatim on the
+#: page beside a capture of the same line — the zone it seeds on, the two strengths
+#: it compared to get there, and the ramp angles it built. The point count is
+#: pinned with it because the summary opens by announcing it. Four on this section:
+#: the seam is flat, so the track between the two end ramps is one straight
+#: horizontal segment and a vertex partway along it would be one the surface does
+#: not bend at and the search cannot move.
+LEM05_GENERATE_SUMMARY = (
+    "seeding on 'Soft Clay' -- mobilisable strength 200 against 570 for the next "
+    "weakest ('Sand Fill')")
+LEM05_GENERATE_RAMPS = ("a 28 degree ramp to the ground at the toe",
+                        "a 60 degree ramp to the ground at the crest")
+LEM05_GENERATE_POINTS = 4
+
+#: The Run LEM readings LEM-5's run step quotes. BOTH analyses are pinned because
+#: the page names both by label: it runs *Auto search* first, as the normal way to
+#: run a model, and switches to *Single surface* for the comparisons it announces
+#: as holding the surface still. With them, the fixed Surface label a model
+#: carrying a non-circular surface and no circles produces (the mirror of the fixed
+#: "Circular" LEM-2's model shows).
+LEM05_RUN_ANALYSES = ("Auto search", "Single surface")
+LEM05_RUN_SURFACE = "Non-circular"
+
+#: What a reader sees when a non-circular search is seeded with an end ramp
+#: steeper than the search's own ``max_base_angle``: the Run box's message (the
+#: ``AnalysisError`` Studio's LEM runner turns into a "LEM run failed" box) and the
+#: Log pane's line under it. The page quotes both verbatim in its end-ramp section,
+#: demonstrated on the crest point pulled in to x = 35 -- a 72.4 degree exit ramp,
+#: past the 65 degree limit -- so the seed is pinned with them. The starting
+#: surface is rejected before any iteration runs, which is why this pin costs a
+#: rejected slice-generation rather than a search.
+LEM05_STEEP_EXIT_X = 35.0
+LEM05_SEARCH_FAILED = "Search produced no valid surfaces."
+LEM05_SEARCH_LOG = ("the starting surface is not viable (slice generation or the "
+                    "solver failed on it)")
+
+#: The Run LEM readings LEM-4's pivot step quotes: the Single-surface analysis it
+#: chooses on a circles-only model, whose Surface row is the fixed *Circular* label
+#: the page describes.
+LEM04_RUN_ANALYSIS = "Single surface"
+LEM04_RUN_SURFACE = "Circular"
+
+#: The piezometric-lines editor as LEM-4's Studio path drives it: the tab the
+#: water table goes on, the rapid-drawdown tab the page says stays empty, and the
+#: button pressed eight times to enter the points.
+LEM04_PIEZO_TABS = ("Line 1", "Line 2 (rapid drawdown)")
+LEM04_PIEZO_ADD = "Add row"
+
+#: The circles-editor columns LEM-4's pin step types the found circle into, and
+#: the dock the page tells the reader to read the search's own statement of that
+#: circle out of.
+LEM04_CIRCLE_COLUMNS = ("Xo", "Yo", "Option", "Depth")
+LEM04_LOG_DOCK = "Log"
+
+#: The polygons editor as LEM-6's Studio step drives it: the two buttons that
+#: build a zone, and the three fields the step names beside them. **Type:** is
+#: pinned because the step tells the reader to leave it where it is, which is an
+#: instruction about a control that has to exist.
+LEM06_POLYGON_BUTTONS = ("Add polygon", "Add row")
+LEM06_POLYGON_LABELS = ("Type:", "Material:", "Size:")
+
+#: The zone list's own wording, quoted on the page as the item the reader clicks,
+#: and the closed-region rule quoted from the editor's help line. Both are the
+#: dialog's text rather than the page's paraphrase of it.
+LEM06_POLYGON_ITEM = "Polygon 2  (mat 2: foundation)"
+LEM06_POLYGON_HELP = ("Each polygon is a closed region (the ring closes "
+                      "automatically, so list each vertex once)")
+
+#: The profile-lines field that must be ABSENT from the polygons editor. The page
+#: makes a teaching point of it — a polygon model's bottom boundary is drawn, not
+#: typed — so a Max depth field appearing here would leave that paragraph wrong.
+LEM06_POLYGON_NO_MAX_DEPTH = "Max depth (bottom boundary elevation):"
+
+#: The Run LEM checkbox LEM-6's composite section tells the reader to tick, and
+#: what a reader sees when a circle is pushed below the domain floor without it:
+#: the message the ``AnalysisError`` Studio's LEM runner turns into a "LEM run
+#: failed" box. The page quotes both verbatim, demonstrated on the file's deeper
+#: starting circle taken 1.2 ft further down, so that circle is pinned with them.
+LEM06_COMPOSITE_CHECKBOX = "Composite surfaces (truncate circles at the base)"
+LEM06_DEEP_CIRCLE = {"Xo": 20.0, "Yo": 40.0, "Depth": -12.0, "R": 52.0}
+LEM06_DOMAIN_REFUSAL = "Failure surface extends outside the domain polygon"
+
+#: The reinforcement editor as LEM-8's Studio step drives it: the two buttons
+#: that build the list of lines, the view the page sends the reader to for a
+#: tiered wall, and the five form groups the page walks in order. The group
+#: titles are pinned because the page teaches a line *as* those groups —
+#: identity, geometry, capacity, anchorage, type.
+LEM08_REINF_BUTTONS = ("Add", "Remove")
+LEM08_REINF_VIEWS = ("Table view", "List view")
+LEM08_REINF_GROUPS = ("Identity", "Geometry", "Capacity", "Anchorage", "Type")
+
+#: The capacity fields the page names, as label *prefixes*: the list view appends
+#: the units the model implies ("Tmax (per unit width, lb/ft)"), which the page
+#: quotes for Tmax and which must therefore stay attached to it.
+LEM08_REINF_FIELDS = ("Tmax", "Lp1", "Lp2", "Tend1", "Tend2", "Spacing")
+LEM08_REINF_TMAX_LABEL = "Tmax (per unit width, lb/ft)"
+
+#: The support-type preset table the page reproduces, as the template's own
+#: lookup block (reinforce!Z8:AB11) — the values the Type drop-down offers and
+#: the Dir/Appl its formula fills for each. The page's table is this table.
+LEM08_TYPE_PRESETS = (("Geosynthetic", "Tangent", "Active"),
+                      ("Nail", "Axial", "Passive"),
+                      ("Tieback", "Axial", "Active"),
+                      ("Anchor", "Axial", "Active"))
+
+#: The Inputs tree row Tutorial LEM-9's Studio path sends the reader to for the
+#: soldier pile, and the piles editor as that step drives it: the four form groups
+#: the page names in order, and the three capacity fields this problem fills. The
+#: group titles are pinned because the page walks the form by them.
+LEM09_INPUT_CATEGORY = "Piles"
+LEM09_PILE_GROUPS = ("Identity", "Geometry", "Capacity / design", "Behavior")
+LEM09_PILE_FIELDS = ("H", "D", "S")
+#: What LEM-9's page asserts the Anchor preset does: the Type column reads
+#: ``anchor`` on both lines, and Dir/Appl come back filled without either being
+#: typed. Read through the loader, which is where the preset is applied.
+LEM09_ANCHOR_PRESET = ("anchor", "axial", "active")
+
+
+#: The two Run LEM search options LEM-10 tells the reader to use, and the field
+#: that carries the depth. The page's last section is written as instructions to
+#: tick these — a rewording would leave it naming controls that are not there,
+#: and the numbers beside them (1.327 seeded from the grid, 1.376 with the filter)
+#: are measured with exactly these two settings.
+LEM10_GRID_CHECKBOX = "Grid search (auto-seed the circular search)"
+LEM10_SKIN_CHECKBOX = "Ignore surficial (skin) failures"
+LEM10_MIN_SLIP_LABEL = "Min slip depth"
+
+#: What the starting-circle generator reports on LEM-10's section, quoted verbatim
+#: on the page. The skim clause is the load-bearing half: the page takes the
+#: generated circle at the base of the embankment as its shallow seed, and the
+#: summary is how a reader knows the generator saw a cohesionless face at all.
+LEM10_GENERATE_SUMMARY = ("4 on the left-facing face (toe at x = 0, height 15), "
+                          "one of them skimming its 24 degree cohesionless face")
+
+
+def _lem10_run_labels():
+    """The Run LEM search options Tutorial LEM-10's last section drives.
+
+    Read on LEM-10's own model, because the dialog enables both options only for
+    a circular auto-search — which is the run the page is describing — and the
+    generator summary the page quotes is a property of this section's geometry.
+    """
+    from PySide6.QtWidgets import QCheckBox, QLabel
+
+    from xslope.fileio import load_slope_data
+    from xslope.generators import generate_starting_circles
+
+    from studio.dialogs import RunLemDialog
+
+    fails = []
+    data = _quiet(load_slope_data, LEM10_FILE)
+
+    run = RunLemDialog(defaults={}, slope_data=data)
+    boxes = {b.text() for b in run.findChildren(QCheckBox)}
+    for label in (LEM10_GRID_CHECKBOX, LEM10_SKIN_CHECKBOX):
+        if label not in boxes:
+            fails.append(f"Run LEM has no {label!r} checkbox; Tutorial LEM-10 "
+                         f"tells the reader to tick it. Its checkboxes read "
+                         f"{sorted(boxes)}")
+    labels = {lab.text() for lab in run.findChildren(QLabel)}
+    if LEM10_MIN_SLIP_LABEL not in labels:
+        fails.append(f"Run LEM has no {LEM10_MIN_SLIP_LABEL!r} field; Tutorial "
+                     f"LEM-10 names it as where the depth goes. Its labels read "
+                     f"{sorted(l for l in labels if l)}")
+    run.deleteLater()
+
+    summary = _quiet(generate_starting_circles, data, report=True).get("summary")
+    if summary != LEM10_GENERATE_SUMMARY:
+        fails.append(f"the circle generator reports {summary!r} on LEM-10's "
+                     f"section, not {LEM10_GENERATE_SUMMARY!r} — the line the "
+                     f"page quotes")
+    return fails
+
+
+def _lem01_editor_labels():
+    """The materials editor as Tutorial LEM-1 drives it: opened, switched, added to.
+
+    Driven rather than read, because the page's step is a *route* — the editor
+    opens on one view and the reader is sent to the other — and only the route is
+    wrong when the two views' buttons drift apart. The module remembers the last
+    view for the session, so the remembered value is saved and restored: this
+    check must not decide which view the next editor built here opens on.
+    """
+    from PySide6.QtWidgets import QLabel, QPushButton
+
+    from xslope.fileio import load_slope_data
+
+    import studio.editors as editors_mod
+    from studio.editors import MaterialsEditor
+
+    fails = []
+    remembered = editors_mod._LAST_MATERIALS_VIEW
+    try:
+        if remembered != LEM01_MATERIALS_OPENS_ON:
+            fails.append(f"the materials editor's first open lands on "
+                         f"{remembered!r}, not {LEM01_MATERIALS_OPENS_ON!r} — "
+                         f"Tutorial LEM-1 tells the reader which view they arrive "
+                         f"in before sending them to the other one")
+        data = _quiet(load_slope_data, LEM01_FILE)
+        mats = MaterialsEditor().build(data, None)
+        if mats._mode != remembered:
+            fails.append(f"the materials editor opened on {mats._mode!r} with "
+                         f"{remembered!r} remembered; Tutorial LEM-1's step assumes "
+                         f"the view it opens on is the remembered one")
+        # Both panes live in the same stack, so every button exists whichever view
+        # is up; what the page's route turns on is which of them the reader can
+        # actually press, which is visibility within the dialog.
+        def shown():
+            return {b.text() for b in mats.findChildren(QPushButton)
+                    if b.text() and b.isVisibleTo(mats)}
+
+        opened = shown()
+        for label in LEM01_MATERIALS_VIEWS:
+            if label not in opened:
+                fails.append(f"the materials editor has no {label!r} button; "
+                             f"Tutorial LEM-1 names both views. Its buttons read "
+                             f"{sorted(opened)}")
+        if LEM01_MATERIALS_ADD in opened:
+            fails.append(f"the view the materials editor opens on already offers "
+                         f"{LEM01_MATERIALS_ADD!r}; Tutorial LEM-1 sends the reader "
+                         f"to the list view for it. Its buttons read {sorted(opened)}")
+        mats.set_view_mode("list")
+        listed = shown()
+        if LEM01_MATERIALS_ADD not in listed:
+            fails.append(f"the materials editor's list view has no "
+                         f"{LEM01_MATERIALS_ADD!r} button; Tutorial LEM-1 tells the "
+                         f"reader to press it there. Its buttons read "
+                         f"{sorted(listed)}")
+        mats.deleteLater()
+
+        # The global-parameters form the page's first step fills, and photographs.
+        from studio.editors import GlobalEditor
+
+        glob = GlobalEditor().build(data, None)
+        rows = {lab.text() for lab in glob.findChildren(QLabel)}
+        for label in LEM01_GLOBAL_ROWS:
+            if label not in rows:
+                fails.append(f"Global parameters has no {label!r} row; Tutorial "
+                             f"LEM-1's first step names it. Its rows read "
+                             f"{sorted(r for r in rows if r)}")
+        glob.deleteLater()
+    finally:
+        editors_mod._LAST_MATERIALS_VIEW = remembered
+    return fails
+
+
+def _lem03_editor_labels():
+    """The three editors Tutorial LEM-3 drives, read for what it tells a reader to
+    press — and the generator run, since the page prints its answer.
+
+    The circles editor is driven the way the tutorial's step drives it: the model
+    arrives with its circles dropped (the state the geometry steps leave), and the
+    generator is *pressed*, because the summary line the page quotes exists only as
+    the answer to a press.
+    """
+    from PySide6.QtWidgets import QComboBox, QLabel, QPushButton
+
+    from xslope.fileio import load_slope_data
+
+    from studio.editors import CirclesEditor, MaterialsEditor, ProfileEditor
+
+    fails = []
+    data = _quiet(load_slope_data, LEM03_FILE)
+
+    mats = MaterialsEditor().build(data, None)
+    buttons = {b.text() for b in mats.findChildren(QPushButton)}
+    for label in LEM03_MATERIALS_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the materials editor has no {label!r} button; Tutorial "
+                         f"LEM-3 tells the reader to press it. Its buttons read "
+                         f"{sorted(buttons)}")
+    mats.deleteLater()
+
+    prof = ProfileEditor().build(data, None)
+    buttons = {b.text() for b in prof.findChildren(QPushButton)}
+    for label in LEM03_PROFILE_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the profile-lines editor has no {label!r} button; "
+                         f"Tutorial LEM-3 tells the reader to press it. Its buttons "
+                         f"read {sorted(buttons)}")
+    labels = {lab.text() for lab in prof.findChildren(QLabel)}
+    for name in LEM03_PROFILE_LABELS:
+        if name not in labels:
+            fails.append(f"the profile-lines editor has no {name!r} field; Tutorial "
+                         f"LEM-3 names it. Its labels read "
+                         f"{sorted(l for l in labels if l)}")
+    choices = {combo.itemText(i) for combo in prof.findChildren(QComboBox)
+               for i in range(combo.count())}
+    for name in LEM03_PROFILE_MATERIALS:
+        if name not in choices:
+            fails.append(f"no profile-line material reads {name!r}, which Tutorial "
+                         f"LEM-3 tells the reader to select. The choices read "
+                         f"{sorted(choices)}")
+    prof.deleteLater()
+
+    circles_data = dict(data)
+    circles_data["circles"], circles_data["circular"] = [], False
+    circles = CirclesEditor().build(circles_data, None)
+    _quiet(circles._run_generate)
+    summary = " ".join(lab.text() for lab in circles.findChildren(QLabel))
+    if LEM03_GENERATE_SUMMARY not in summary:
+        fails.append(f"the starting-circle generator no longer reports "
+                     f"{LEM03_GENERATE_SUMMARY!r} on LEM-3's section, which the page "
+                     f"quotes. It reports {summary.strip()!r}")
+    depths = tuple(round(float(c["Depth"]), 5) for c in circles.result_rows())
+    if depths != LEM03_GENERATE_DEPTHS:
+        fails.append(f"the generator proposes circles at depths {depths} on LEM-3's "
+                     f"section; the page's audit table walks "
+                     f"{LEM03_GENERATE_DEPTHS}")
+    circles.deleteLater()
+    return fails
+
+
+def _lem05_editor_labels():
+    """The non-circular editor and the Run LEM dialog, as Tutorial LEM-5 drives them.
+
+    The generator is *pressed* rather than its rows pre-loaded, for the reason
+    LEM-1's and LEM-3's shots document: the summary line the page quotes exists
+    only as the answer to a press. It is pressed on a table emptied of the file's
+    own surface, which is the state a reader who has entered nothing is in — and
+    the state the page's figure shows.
+
+    Run LEM is read on the file as it ships, because the fixed **Surface** label
+    the page quotes is produced by a model carrying a non-circular surface and no
+    circles; a model with both would show a chooser instead.
+    """
+    from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QTableWidget
+
+    from xslope.fileio import load_slope_data
+
+    from studio.dialogs import RunLemDialog
+    from studio.editors import NonCircEditor
+
+    fails = []
+    data = _quiet(load_slope_data, LEM05_FILE)
+
+    dlg = NonCircEditor().build(data, None)
+    buttons = {b.text() for b in dlg.findChildren(QPushButton)}
+    for label in LEM05_NONCIRC_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the non-circular editor has no {label!r} button; "
+                         f"Tutorial LEM-5 tells the reader to press it. Its buttons "
+                         f"read {sorted(buttons)}")
+    headers = [t.horizontalHeaderItem(i).text() if t.horizontalHeaderItem(i) else ""
+               for t in dlg.findChildren(QTableWidget)
+               for i in range(t.columnCount())]
+    for name in LEM05_NONCIRC_HEADERS:
+        if name not in headers:
+            fails.append(f"the non-circular table has no {name!r} column; Tutorial "
+                         f"LEM-5 dictates a value into it. Its columns read "
+                         f"{headers}")
+    movements = {combo.itemText(i) for combo in dlg.findChildren(QComboBox)
+                 for i in range(combo.count())}
+    for name in LEM05_NONCIRC_MOVEMENTS:
+        if name not in movements:
+            fails.append(f"no Movement setting reads {name!r}, which Tutorial LEM-5 "
+                         f"tells the reader to choose. The options read "
+                         f"{sorted(movements)}")
+    dlg.deleteLater()
+
+    empty = dict(data)
+    empty["non_circ"] = []
+    gen = NonCircEditor().build(empty, None)
+    _quiet(gen._run_generate)
+    summary = " ".join(lab.text() for lab in gen.findChildren(QLabel))
+    for quoted in (LEM05_GENERATE_SUMMARY,) + LEM05_GENERATE_RAMPS:
+        if quoted not in summary:
+            fails.append(f"the weak-zone generator no longer reports {quoted!r} on "
+                         f"LEM-5's section, which the page quotes. It reports "
+                         f"{summary.strip()!r}")
+    built = len(gen.result_rows())
+    if built != LEM05_GENERATE_POINTS:
+        fails.append(f"the weak-zone generator builds {built} points on LEM-5's "
+                     f"section; the page quotes a summary announcing "
+                     f"{LEM05_GENERATE_POINTS}")
+    gen.deleteLater()
+
+    run = RunLemDialog(defaults={}, slope_data=data)
+    analyses = {run.analysis.itemText(i) for i in range(run.analysis.count())}
+    for name in LEM05_RUN_ANALYSES:
+        if name not in analyses:
+            fails.append(f"Run LEM offers no {name!r} analysis, which Tutorial "
+                         f"LEM-5 tells the reader to choose. It offers "
+                         f"{sorted(analyses)}")
+    if run.surface is not None:
+        fails.append("Run LEM offers a Surface chooser on LEM-5's model; the page "
+                     "says the row is a fixed label, which is what a model with one "
+                     "surface family produces")
+    labels = {lab.text() for lab in run.findChildren(QLabel)}
+    if LEM05_RUN_SURFACE not in labels:
+        fails.append(f"Run LEM's fixed Surface label does not read "
+                     f"{LEM05_RUN_SURFACE!r} on LEM-5's model, which the page "
+                     f"quotes. Its labels read {sorted(l for l in labels if l)}")
+    run.deleteLater()
+
+    # The end-ramp refusal, in the two texts the page quotes: what the Run box
+    # says and what the Log pane says under it. Run through the same
+    # ``run_lem_analysis`` Studio's LEM runner calls, on the same steep seed the
+    # page describes, because the Run box shows exactly the AnalysisError it
+    # raises.
+    from xslope.search import AnalysisError, run_lem_analysis
+
+    steep = dict(data)
+    steep["non_circ"] = [dict(p) for p in data["non_circ"]]
+    steep["non_circ"][-1]["X"] = LEM05_STEEP_EXIT_X
+    log = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(log):
+            run_lem_analysis(steep, "spencer", analysis="auto_search",
+                             surface="noncircular", num_slices=40)
+        fails.append(f"a non-circular search seeded with a "
+                     f"{LEM05_STEEP_EXIT_X:g}-exit surface (a 72.4 degree end ramp, "
+                     f"past the search's 65 degree limit) now runs; Tutorial LEM-5 "
+                     f"shows it being refused")
+    except AnalysisError as e:
+        if str(e) != LEM05_SEARCH_FAILED:
+            fails.append(f"a search refused for a too-steep end ramp reports "
+                         f"{str(e)!r}; Tutorial LEM-5 quotes {LEM05_SEARCH_FAILED!r} "
+                         f"as the message the Run box shows")
+    if LEM05_SEARCH_LOG not in log.getvalue():
+        fails.append(f"the Log pane no longer carries {LEM05_SEARCH_LOG!r} when a "
+                     f"search is seeded with a too-steep end ramp, which Tutorial "
+                     f"LEM-5 quotes. It reads {log.getvalue().strip()!r}")
+    return fails
+
+
+def _lem04_editor_labels(mw):
+    """The piezo and circles editors, the Log dock and Run LEM, as Tutorial
+    LEM-4 drives them.
+
+    Everything is read on the file as it ships. The model carries both unit
+    weights, which the page's weight-split section reads as the file's own
+    gsat column; the fixed **Circular** label the page describes is what a
+    model carrying circles and no non-circular surface produces; and the
+    circles editor's columns are the ones the page's pin step types the
+    search's critical circle into.
+    """
+    from PySide6.QtWidgets import QLabel, QPushButton, QTableWidget, QTabWidget
+
+    from xslope.fileio import load_slope_data
+
+    from studio.dialogs import RunLemDialog
+    from studio.editors import CirclesEditor, PiezoEditor
+
+    fails = []
+    data = _quiet(load_slope_data, LEM04_FILE)
+
+    if not all(m.get("gamma_sat") for m in data["materials"]):
+        fails.append("LEM-4's model no longer states a saturated unit weight for "
+                     "every material; the page's weight-split section reads the "
+                     "gsat column as the file ships it")
+
+    circles = CirclesEditor().build(data, None)
+    headers = set()
+    for table in circles.findChildren(QTableWidget):
+        headers.update(table.horizontalHeaderItem(i).text()
+                       for i in range(table.columnCount())
+                       if table.horizontalHeaderItem(i) is not None)
+    for name in LEM04_CIRCLE_COLUMNS:
+        if name not in headers:
+            fails.append(f"the circles editor has no {name!r} column; Tutorial "
+                         f"LEM-4 tells the reader to type the search's critical "
+                         f"circle into it. Its columns read {sorted(headers)}")
+    circles.deleteLater()
+
+    dock = getattr(mw, "log_dock", None)
+    if dock is None or dock.windowTitle() != LEM04_LOG_DOCK:
+        fails.append(f"the main window has no {LEM04_LOG_DOCK!r} dock; Tutorial "
+                     f"LEM-4 tells the reader to read the search's own statement "
+                     f"of its critical circle there")
+
+    piezo = PiezoEditor().build(data, None)
+    tabs = [t.tabText(i) for t in piezo.findChildren(QTabWidget)
+            for i in range(t.count())]
+    for name in LEM04_PIEZO_TABS:
+        if name not in tabs:
+            fails.append(f"the piezometric-lines editor has no {name!r} tab; "
+                         f"Tutorial LEM-4 names it. Its tabs read {tabs}")
+    buttons = {b.text() for b in piezo.findChildren(QPushButton)}
+    if LEM04_PIEZO_ADD not in buttons:
+        fails.append(f"the piezometric-lines editor has no {LEM04_PIEZO_ADD!r} "
+                     f"button; Tutorial LEM-4 tells the reader to press it eight "
+                     f"times. Its buttons read {sorted(buttons)}")
+    piezo.deleteLater()
+
+    run = RunLemDialog(defaults={}, slope_data=data)
+    analyses = {run.analysis.itemText(i) for i in range(run.analysis.count())}
+    if LEM04_RUN_ANALYSIS not in analyses:
+        fails.append(f"Run LEM offers no {LEM04_RUN_ANALYSIS!r} analysis on "
+                     f"LEM-4's model, which its pivot step chooses. It offers "
+                     f"{sorted(analyses)}")
+    if run.surface is not None:
+        fails.append("Run LEM offers a Surface chooser on LEM-4's model; the page "
+                     "says the row is a fixed label, which is what a circles-only "
+                     "model produces")
+    labels = {lab.text() for lab in run.findChildren(QLabel)}
+    if LEM04_RUN_SURFACE not in labels:
+        fails.append(f"Run LEM's fixed Surface label does not read "
+                     f"{LEM04_RUN_SURFACE!r} on LEM-4's model, which the page "
+                     f"quotes. Its labels read {sorted(l for l in labels if l)}")
+    run.deleteLater()
+    return fails
+
+
+def _lem06_editor_labels(mw):
+    """The polygons editor and the composite option, as Tutorial LEM-6 drives them.
+
+    Read on a polygon-based model, because that is the only kind whose Polygons
+    row opens an editor — which is itself what the page's Studio path says, so
+    the tree row is checked in both states: editable on this model, and inert on
+    a project that has no zones yet.
+
+    The refusal is *provoked* rather than quoted from a constant: the page's
+    composite section is built on a circle that will not fit, so the check pushes
+    the file's deeper starting circle 1.2 ft below the base and confirms the run
+    still stops on the message the page prints, and still solves with the option
+    the page tells the reader to tick.
+    """
+    from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton
+
+    from xslope.fileio import load_slope_data
+    from xslope.search import AnalysisError, run_lem_analysis
+
+    from studio.dialogs import RunLemDialog
+    from studio.editors import PolygonEditor
+
+    fails = []
+
+    def _polygons_row():
+        """The Inputs tree's Polygons row: (count, editor category | None)."""
+        from studio.main_window import CATEGORY_ROLE as ROLE
+        tree = mw.inputs_tree
+        for i in range(tree.topLevelItemCount()):
+            item = tree.topLevelItem(i)
+            if item.text(0) == "Polygons":
+                return item.text(1), item.data(0, ROLE)
+        return None, None
+
+    mw.doc._dirty = False
+    mw.new_project()
+    _, category = _polygons_row()
+    if category != "polygons":
+        fails.append("a project started from File > New does not open the "
+                     "Polygons editor; Tutorial LEM-6's Studio path builds the "
+                     "model from scratch through that row")
+    # The guard the empty-project liveness must NOT have removed: on a
+    # profile-based file, polygons are derived and the row stays inert.
+    mw.doc._dirty = False
+    _quiet(mw.open_path, os.path.join(_REPO,
+           "docs/lem/files/xslope_simple_mult_layers.xlsx"))
+    _, category = _polygons_row()
+    if category is not None:
+        fails.append("the Polygons row opens an editor on a profile-based "
+                     "model; derived polygons must stay read-only there")
+    mw.doc._dirty = False
+    _quiet(mw.open_path, LEM06_FILE)
+    count, category = _polygons_row()
+    if category != "polygons":
+        fails.append("the Polygons row does not open an editor on LEM-6's own "
+                     "model; its Studio path is written on the model being open")
+    if count != "2":
+        fails.append(f"the Polygons row reads {count!r} on LEM-6's model; the page "
+                     f"says it reads '2' once the model is open")
+
+    data = _quiet(load_slope_data, LEM06_FILE)
+    if len(data.get("polygons") or []) != 2 or data.get("profile_lines"):
+        fails.append("LEM-6's model is no longer two polygons and no profile "
+                     "lines; the page's whole geometry section reads it as the "
+                     "polygon-input case")
+
+    poly = PolygonEditor().build(data, None, select=1)
+    buttons = {b.text() for b in poly.findChildren(QPushButton)}
+    for label in LEM06_POLYGON_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the polygons editor has no {label!r} button; Tutorial "
+                         f"LEM-6 tells the reader to press it. Its buttons read "
+                         f"{sorted(buttons)}")
+    labels = {lab.text() for lab in poly.findChildren(QLabel)}
+    for name in LEM06_POLYGON_LABELS:
+        if name not in labels:
+            fails.append(f"the polygons editor has no {name!r} field; Tutorial "
+                         f"LEM-6 names it. Its labels read "
+                         f"{sorted(l for l in labels if l)}")
+    if LEM06_POLYGON_NO_MAX_DEPTH in labels:
+        fails.append(f"the polygons editor now offers "
+                     f"{LEM06_POLYGON_NO_MAX_DEPTH!r}; Tutorial LEM-6 tells the "
+                     f"reader it is absent, because a polygon model's bottom "
+                     f"boundary is drawn rather than typed")
+    help_text = " ".join(lab.text() for lab in poly.findChildren(QLabel))
+    if LEM06_POLYGON_HELP not in help_text:
+        fails.append(f"the polygons editor no longer states "
+                     f"{LEM06_POLYGON_HELP!r}, which Tutorial LEM-6 quotes as the "
+                     f"closed-region rule")
+    items = [poly.list.item(i).text() for i in range(poly.list.count())]
+    if LEM06_POLYGON_ITEM not in items:
+        fails.append(f"the polygons editor's zone list has no "
+                     f"{LEM06_POLYGON_ITEM!r} entry, which Tutorial LEM-6 tells "
+                     f"the reader to click. It reads {items}")
+    poly.deleteLater()
+
+    run = RunLemDialog(defaults={}, slope_data=data)
+    boxes = {b.text() for b in run.findChildren(QCheckBox)}
+    if LEM06_COMPOSITE_CHECKBOX not in boxes:
+        fails.append(f"Run LEM has no {LEM06_COMPOSITE_CHECKBOX!r} checkbox; "
+                     f"Tutorial LEM-6 tells the reader to tick it. Its checkboxes "
+                     f"read {sorted(boxes)}")
+    run.deleteLater()
+
+    # The circle the page pushes below the base: refused as an ordinary circle,
+    # truncated against the base when composite surfaces are allowed.
+    deep = dict(data)
+    deep["circles"] = [dict(LEM06_DEEP_CIRCLE)]
+    try:
+        _quiet(run_lem_analysis, deep, "spencer", analysis="single_surface",
+               surface="circular", num_slices=40, composite=False)
+        fails.append("a circle below LEM-6's domain floor now solves without the "
+                     "composite option; the page's composite section is built on "
+                     "its refusal")
+    except AnalysisError as exc:
+        if LEM06_DOMAIN_REFUSAL not in str(exc):
+            fails.append(f"a circle below LEM-6's domain floor is refused with "
+                         f"{str(exc)!r}, not {LEM06_DOMAIN_REFUSAL!r} — the "
+                         f"message the page quotes")
+    bundle = _quiet(run_lem_analysis, deep, "spencer", analysis="single_surface",
+                    surface="circular", num_slices=40, composite=True)
+    if (bundle.get("results") or {}).get("FS") is None:
+        fails.append("the same circle no longer solves with composite surfaces "
+                     "on; Tutorial LEM-6 reports the truncated surface's factor "
+                     "of safety")
+    return fails
+
+
+def _lem08_editor_labels(mw):
+    """The reinforcement editor and the Type presets, as Tutorial LEM-8 uses them.
+
+    Read on LEM-8's own model, because the page's Studio step is written on a
+    project that already carries the six lines: the Inputs tree row counts them,
+    and the editor's list has one entry per line. Runs after the LEM-6 leg, since
+    both change which project the window holds.
+
+    The preset table is read from the template's own lookup block rather than
+    from a constant of ours, so the page's table and the sheet's drop-down cannot
+    drift apart without this failing.
+    """
+    import openpyxl
+    from PySide6.QtWidgets import QComboBox, QGroupBox, QLabel, QPushButton
+
+    from xslope.fileio import load_slope_data
+
+    from studio.editors import ReinforcementEditor
+
+    fails = []
+
+    mw.doc._dirty = False
+    _quiet(mw.open_path, LEM08_FILE)
+    count, category = None, None
+    from studio.main_window import CATEGORY_ROLE as ROLE
+    tree = mw.inputs_tree
+    for i in range(tree.topLevelItemCount()):
+        item = tree.topLevelItem(i)
+        if item.text(0) == "Reinforcement lines":
+            count, category = item.text(1), item.data(0, ROLE)
+            break
+    if category != "reinforce":
+        fails.append("the Inputs tree has no 'Reinforcement lines' row opening an "
+                     "editor on LEM-8's model; its Studio path tells the reader to "
+                     "click it")
+    if count != "6":
+        fails.append(f"the Reinforcement lines row reads {count!r} on LEM-8's "
+                     f"model; the page builds six geogrid layers")
+
+    data = _quiet(load_slope_data, LEM08_FILE)
+    lines = data.get("reinforcement_lines") or []
+    if len(lines) != 6:
+        fails.append(f"LEM-8's model carries {len(lines)} reinforcement lines, not "
+                     f"the six the page enters and reads its crossings against")
+
+    dlg = ReinforcementEditor().build(data, None)
+    if dlg.windowTitle() != "Reinforcement":
+        fails.append(f"the reinforcement editor is titled {dlg.windowTitle()!r}, "
+                     f"not 'Reinforcement'")
+    buttons = {b.text() for b in dlg.findChildren(QPushButton)}
+    for label in LEM08_REINF_BUTTONS + LEM08_REINF_VIEWS:
+        if label not in buttons:
+            fails.append(f"the reinforcement editor has no {label!r} button; "
+                         f"Tutorial LEM-8 names it. Its buttons read "
+                         f"{sorted(buttons)}")
+    groups = {g.title() for g in dlg.findChildren(QGroupBox)}
+    for title in LEM08_REINF_GROUPS:
+        if title not in groups:
+            fails.append(f"the reinforcement editor's list view has no {title!r} "
+                         f"group; Tutorial LEM-8 walks the form group by group. "
+                         f"Its groups read {sorted(groups)}")
+    labels = [lab.text() for lab in dlg.findChildren(QLabel)]
+    for field in LEM08_REINF_FIELDS:
+        if not any(text == field or text.startswith(field + " ")
+                   for text in labels):
+            fails.append(f"the reinforcement editor has no {field!r} field; "
+                         f"Tutorial LEM-8 tells the reader what to put in it")
+    if LEM08_REINF_TMAX_LABEL not in labels:
+        fails.append(f"the reinforcement editor no longer labels Tmax "
+                     f"{LEM08_REINF_TMAX_LABEL!r}; Tutorial LEM-8 quotes that "
+                     f"label as how a per-element capacity shows up as the wrong "
+                     f"quantity")
+    combo_items = set()
+    for combo in dlg.findChildren(QComboBox):
+        combo_items.update(combo.itemText(i) for i in range(combo.count()))
+    for choice in ("geosynthetic", "nail", "tieback", "anchor",
+                   "tangent", "axial", "active", "passive"):
+        if choice not in combo_items:
+            fails.append(f"the reinforcement editor offers no {choice!r} choice; "
+                         f"Tutorial LEM-8's preset table names it")
+    dlg.deleteLater()
+
+    # The Type preset table, read from the template's own lookup block.
+    sheet = openpyxl.load_workbook(TEMPLATE_FILE)["reinforce"]
+    presets = tuple(tuple(str(sheet.cell(row=r, column=c).value)
+                          for c in (26, 27, 28))          # Z, AA, AB
+                    for r in range(8, 12))
+    if presets != LEM08_TYPE_PRESETS:
+        fails.append(f"the template's support-type presets read {presets}, not "
+                     f"{LEM08_TYPE_PRESETS} — the table Tutorial LEM-8 reproduces")
+    return fails
+
+
+def _lem09_editor_labels(mw):
+    """The piles editor and the Anchor preset, as Tutorial LEM-9 uses them.
+
+    Read on LEM-9's own model, because the page's Studio step is written on a
+    project that already carries the two anchors and the soldier pile: the Inputs
+    tree counts them, and each editor has a row to read its fields off. Runs with
+    the other legs that change which project the window holds.
+
+    The preset is checked through the loader rather than against a constant of
+    ours, so the page's claim — pick Anchor and Dir/Appl answer on their own —
+    fails here if the preset stops filling them.
+    """
+    from PySide6.QtWidgets import QGroupBox, QLabel
+
+    from xslope.fileio import load_slope_data
+
+    from studio.editors import PilesEditor
+
+    fails = []
+
+    mw.doc._dirty = False
+    _quiet(mw.open_path, LEM09_FILE)
+    from studio.main_window import CATEGORY_ROLE as ROLE
+    tree = mw.inputs_tree
+    count, category = None, None
+    for i in range(tree.topLevelItemCount()):
+        item = tree.topLevelItem(i)
+        if item.text(0) == LEM09_INPUT_CATEGORY:
+            count, category = item.text(1), item.data(0, ROLE)
+            break
+    if category != "piles":
+        fails.append(f"the Inputs tree has no {LEM09_INPUT_CATEGORY!r} row opening "
+                     f"an editor on LEM-9's model; its Studio path tells the reader "
+                     f"to click it")
+    if count != "1":
+        fails.append(f"the Piles row reads {count!r} on LEM-9's model; the page "
+                     f"enters one soldier pile")
+
+    data = _quiet(load_slope_data, LEM09_FILE)
+    lines = data.get("reinforcement_lines") or []
+    if len(lines) != 2:
+        fails.append(f"LEM-9's model carries {len(lines)} reinforcement lines, not "
+                     f"the two tiebacks the page enters")
+    for line in lines:
+        got = (str(line.get("type")), str(line.get("dir")), str(line.get("appl")))
+        if got != LEM09_ANCHOR_PRESET:
+            fails.append(f"an Anchor line on LEM-9's model reads {got}, not "
+                         f"{LEM09_ANCHOR_PRESET} — the page tells the reader to pick "
+                         f"the Type and let Dir and Appl fill themselves")
+
+    dlg = PilesEditor().build(data, None)
+    if dlg.windowTitle() != "Piles":
+        fails.append(f"the piles editor is titled {dlg.windowTitle()!r}, not 'Piles'")
+    groups = {g.title() for g in dlg.findChildren(QGroupBox)}
+    for title in LEM09_PILE_GROUPS:
+        if title not in groups:
+            fails.append(f"the piles editor's list view has no {title!r} group; "
+                         f"Tutorial LEM-9 names the form's groups in order. Its "
+                         f"groups read {sorted(groups)}")
+    labels = [lab.text() for lab in dlg.findChildren(QLabel)]
+    for field in LEM09_PILE_FIELDS:
+        if not any(text == field or text.startswith(field + " ")
+                   for text in labels):
+            fails.append(f"the piles editor has no {field!r} field; Tutorial LEM-9 "
+                         f"tells the reader what to put in it")
+    dlg.deleteLater()
+    return fails
+
+
+def _lem02_editor_labels(mw):
+    """The two dialogs Tutorial LEM-2 drives, read for the labels it quotes.
+
+    Both are built on the tutorial's own model rather than on an empty one: the
+    distributed-loads editor's Direction combo belongs to a selected load block,
+    and there is nothing to select until the model carries one.
+    """
+    from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QLabel,
+                                   QPushButton, QTableWidget, QTabWidget)
+
+    from xslope.fileio import load_slope_data
+
+    from studio.dialogs import SensitivityDialog
+    from studio.editors import DloadsEditor, GlobalEditor, LineLoadsEditor
+
+    fails = []
+    data = _quiet(load_slope_data, LEM02_FILE)
+
+    dlg = DloadsEditor().build(data, None)
+    buttons = {b.text() for b in dlg.findChildren(QPushButton)}
+    for label in LEM02_DLOAD_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the distributed-loads editor has no {label!r} button; "
+                         f"Tutorial LEM-2 tells the reader to press it. Its buttons "
+                         f"read {sorted(buttons)}")
+    directions = {combo.itemText(i)
+                  for combo in dlg.findChildren(QComboBox)
+                  for i in range(combo.count())}
+    if LEM02_DLOAD_DIRECTION not in directions:
+        fails.append(f"no distributed-load Direction reads "
+                     f"{LEM02_DLOAD_DIRECTION!r}, which Tutorial LEM-2 quotes. The "
+                     f"options read {sorted(directions)}")
+    tabs = [t.tabText(i) for t in dlg.findChildren(QTabWidget)
+            for i in range(t.count())]
+    for name in LEM02_DLOAD_TABS:
+        if name not in tabs:
+            fails.append(f"the distributed-loads editor has no {name!r} tab; "
+                         f"Tutorial LEM-2 names it. Its tabs read {tabs}")
+    dl_labels = {lab.text() for lab in dlg.findChildren(QLabel)}
+    if LEM02_DLOAD_DIRECTION_LABEL not in dl_labels:
+        fails.append(f"the distributed-loads editor labels its direction chooser "
+                     f"something other than {LEM02_DLOAD_DIRECTION_LABEL!r}, which "
+                     f"Tutorial LEM-2 tells the reader to leave alone")
+    dlg.deleteLater()
+
+    glob = GlobalEditor().build(data, None)
+    rows = {lab.text() for lab in glob.findChildren(QLabel)}
+    if LEM02_GLOBAL_ROW not in rows:
+        fails.append(f"Global parameters has no {LEM02_GLOBAL_ROW!r} row; Tutorial "
+                     f"LEM-2 tells the reader to set it. Its rows read "
+                     f"{sorted(r for r in rows if r)}")
+    glob.deleteLater()
+
+    # The line-loads editor is built on the model with its distributed load
+    # replaced by the page's line load — the state the step it photographs ends in.
+    ll_data = dict(data)
+    ll_data["dloads"], ll_data["dload_dirs"] = [], []
+    ll_data["line_loads"] = [{"x": 30.0, "y": 20.0, "P": 7500.0, "angle": -90.0,
+                              "label": "footing"}]
+    lloads = LineLoadsEditor().build(ll_data, None)
+    headers = [t.horizontalHeaderItem(i).text() if t.horizontalHeaderItem(i) else ""
+               for t in lloads.findChildren(QTableWidget)
+               for i in range(t.columnCount())]
+    for name in LEM02_LLOAD_HEADERS:
+        if name not in headers:
+            fails.append(f"the line-loads table has no {name!r} column; Tutorial "
+                         f"LEM-2 dictates a value into it. Its columns read "
+                         f"{headers}")
+    lloads.deleteLater()
+
+    sens = SensitivityDialog(defaults={"mode": "design"}, slope_data=data)
+    modes = {sens.mode.itemText(i) for i in range(sens.mode.count())}
+    if LEM02_DESIGN_MODE not in modes:
+        fails.append(f"the Parametric dialog offers no {LEM02_DESIGN_MODE!r} mode, "
+                     f"which Tutorial LEM-2 selects. It offers {sorted(modes)}")
+    rows = set()
+    for form in sens.findChildren(QFormLayout):
+        for r in range(form.rowCount()):
+            label = form.itemAt(r, QFormLayout.LabelRole)
+            if label is not None and label.widget() is not None:
+                rows.add(label.widget().text().replace("&", ""))
+    for name in LEM02_DESIGN_ROWS:
+        if name not in rows:
+            fails.append(f"the Parametric dialog has no {name!r} row; Tutorial LEM-2 "
+                         f"names it. Its rows read {sorted(rows)}")
+    boxes = {c.text() for c in sens.findChildren(QCheckBox)}
+    if LEM02_DESIGN_SEARCH not in boxes:
+        fails.append(f"the Parametric dialog has no {LEM02_DESIGN_SEARCH!r} "
+                     f"checkbox; Tutorial LEM-2 tells the reader to leave it "
+                     f"ticked. Its checkboxes read {sorted(boxes)}")
+    if sens._ok.text() != LEM02_DESIGN_RUN:
+        fails.append(f"the Parametric dialog's accept button reads "
+                     f"{sens._ok.text()!r}, not {LEM02_DESIGN_RUN!r} — the label "
+                     f"Tutorial LEM-2 tells the reader to press")
+    sens.deleteLater()
+    return fails
+
 
 def test_tutorial_labels():
     """Studio still reads the way the tutorials say it does."""
@@ -843,6 +1882,36 @@ def test_tutorial_labels():
             if name not in rows:
                 fails.append(f"the Inputs tree has no {name!r} row; Tutorial 0 tells "
                              f"the reader to click it. It reads {rows}")
+        for name in LEM02_INPUT_CATEGORIES:
+            if name not in rows:
+                fails.append(f"the Inputs tree has no {name!r} row; Tutorial LEM-2 "
+                             f"tells the reader to click it. It reads {rows}")
+        for name in LEM05_INPUT_CATEGORIES:
+            if name not in rows:
+                fails.append(f"the Inputs tree has no {name!r} row; Tutorial LEM-5 "
+                             f"tells the reader to click it. It reads {rows}")
+
+        for attr, label in LEM02_RUN_ACTIONS.items():
+            action = getattr(mw, attr, None)
+            if action is None:
+                fails.append(f"MainWindow has no {attr}, which Tutorial LEM-2 calls "
+                             f"{label!r}")
+            elif action.text().replace("&", "") != label:
+                fails.append(f"the {attr} action reads "
+                             f"{action.text().replace('&', '')!r}, not {label!r} — "
+                             f"the label Tutorial LEM-2 quotes")
+
+        fails += _lem01_editor_labels()
+        fails += _lem02_editor_labels(mw)
+        fails += _lem03_editor_labels()
+        fails += _lem05_editor_labels()
+        fails += _lem04_editor_labels(mw)
+        fails += _lem10_run_labels()
+        # Last of the editor legs: these are the ones that change which project
+        # the window holds, and each opens the model its own pins are read on.
+        fails += _lem06_editor_labels(mw)
+        fails += _lem08_editor_labels(mw)
+        fails += _lem09_editor_labels(mw)
 
         from PySide6.QtWidgets import QPushButton
 

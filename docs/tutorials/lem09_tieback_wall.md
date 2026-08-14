@@ -9,7 +9,10 @@ A 30 ft vertical cut held open by a soldier-pile wall, with the ground behind it
 rising another 50 ft to a plateau. Two rows of grouted tiebacks, declined 25° into
 the slope, hold the face: the upper row develops 15,043 lb per foot of wall, the
 lower 20,527. The soldier pile at the face carries their heads and 5,900 lb/ft of
-shear across any surface that cuts it.
+shear across any surface that cuts it. The problem comes from the Caltrans SNAILZ
+reference manual, by way of the Rocscience Slide2 verification corpus — it is
+[verification problem VP49](../verification/rocscience.md#vp49), and this page
+reproduces that row's locked values.
 
 ![A soldier-pile tieback wall: two anchor rows in two soil layers](images/lem09_problem.png){width=1000}
 
@@ -153,9 +156,14 @@ a pile resists in shear and bending rather than in tension:
 |---|:---:|:---:|:---:|:---:|:---:|
 | soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 |
 
-**H** is the shear the pile delivers, per foot of wall, to any surface that crosses
-its axis; leaving it blank asks for an Ito & Matsui estimate from `D` and `S`
-instead. `qp` — the angle the force acts at — and `Appl` come next and both stay
+A real soldier-pile wall is discrete — piles at intervals along the wall, with
+the anchors seating on them. The reference states no pile spacing; it models
+the row as Slide does, a micro-pile smeared per foot of wall — which is what
+this table enters. **H** is the shear the wall delivers per foot to any surface
+that crosses the pile axis, and **S** = 1 because the division by spacing is
+already in that number: a continuous-equivalent of the discrete row, exactly as
+the anchors are entered. Leaving `H` blank instead asks for an Ito & Matsui
+estimate from `D` and `S`. `qp` — the angle the force acts at — and `Appl` come next and both stay
 empty: a blank `qp` is derived from the pile's own axis, and a blank **Appl** is
 `active`, the same allowable-force meaning it has on an anchor. So the pile's
 diameter and spacing start again after them, as a second block:

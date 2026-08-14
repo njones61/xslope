@@ -239,8 +239,7 @@ against the ACADS accepted band.
 | Unit weight, $\gamma$ (kN/m³) | 18.84 | 18.84 |
 
 Excel input file: [xslope_acads_weak_layer.xlsx](../lem/files/xslope_acads_weak_layer.xlsx) ·
-**Rocscience detail:** [Slide2 #7](rocscience.md) · **LEM sample:**
-[non-circular failure surface](../lem/samples.md#7-non-circular-failure-surface)
+**Rocscience corpus:** Slide2 #7 resolves here
 
 ![xslope_acads_weak_layer: inputs and representative solution](images/xslope_acads_weak_layer.png)
 

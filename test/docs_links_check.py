@@ -104,6 +104,13 @@ LEM04_FILE = os.path.join(_REPO,
 #: whose Polygons row opens an editor) and a domain whose floor a circle can be
 #: pushed below.
 LEM06_FILE = os.path.join(_REPO, "docs/lem/files/xslope_sloping_bottom.xlsx")
+#: Tutorial LEM-8's completed model — six reinforcement lines, which is what its
+#: pins need: an Inputs tree row that counts them and an editor with a line to
+#: read the capacity fields off.
+LEM08_FILE = os.path.join(_REPO, "docs/lem/files/xslope_reinforce.xlsx")
+#: The editable master template, whose ``reinforce`` sheet carries the support-type
+#: lookup block LEM-8 reproduces as a table.
+TEMPLATE_FILE = os.path.join(_REPO, "docs/inputs/input_template.xlsx")
 
 #: A URL on the docs site — what the docs build emits.
 GOOD = "https://xslope.readthedocs.io/en/latest/lem/files/xslope_simple1.xslz"
@@ -1019,6 +1026,29 @@ LEM06_COMPOSITE_CHECKBOX = "Composite surfaces (truncate circles at the base)"
 LEM06_DEEP_CIRCLE = {"Xo": 20.0, "Yo": 40.0, "Depth": -12.0, "R": 52.0}
 LEM06_DOMAIN_REFUSAL = "Failure surface extends outside the domain polygon"
 
+#: The reinforcement editor as LEM-8's Studio step drives it: the two buttons
+#: that build the list of lines, the view the page sends the reader to for a
+#: tiered wall, and the four form groups the page walks in order. The group
+#: titles are pinned because the page teaches a line *as* those groups —
+#: geometry, capacity, anchorage, type.
+LEM08_REINF_BUTTONS = ("Add", "Remove")
+LEM08_REINF_VIEWS = ("Table view", "List view")
+LEM08_REINF_GROUPS = ("Geometry", "Capacity", "Anchorage", "Type")
+
+#: The capacity fields the page names, as label *prefixes*: the list view appends
+#: the units the model implies ("Tmax (per unit width, lb/ft)"), which the page
+#: quotes for Tmax and which must therefore stay attached to it.
+LEM08_REINF_FIELDS = ("Tmax", "Lp1", "Lp2", "Tend1", "Tend2", "Spacing")
+LEM08_REINF_TMAX_LABEL = "Tmax (per unit width, lb/ft)"
+
+#: The support-type preset table the page reproduces, as the template's own
+#: lookup block (reinforce!Z8:AB11) — the values the Type drop-down offers and
+#: the Dir/Appl its formula fills for each. The page's table is this table.
+LEM08_TYPE_PRESETS = (("Geosynthetic", "Tangent", "Active"),
+                      ("Nail", "Axial", "Passive"),
+                      ("Tieback", "Axial", "Active"),
+                      ("Anchor", "Axial", "Active"))
+
 
 def _lem01_editor_labels():
     """The materials editor as Tutorial LEM-1 drives it: opened, switched, added to.
@@ -1457,6 +1487,99 @@ def _lem06_editor_labels(mw):
     return fails
 
 
+def _lem08_editor_labels(mw):
+    """The reinforcement editor and the Type presets, as Tutorial LEM-8 uses them.
+
+    Read on LEM-8's own model, because the page's Studio step is written on a
+    project that already carries the six lines: the Inputs tree row counts them,
+    and the editor's list has one entry per line. Runs after the LEM-6 leg, since
+    both change which project the window holds.
+
+    The preset table is read from the template's own lookup block rather than
+    from a constant of ours, so the page's table and the sheet's drop-down cannot
+    drift apart without this failing.
+    """
+    import openpyxl
+    from PySide6.QtWidgets import QComboBox, QGroupBox, QLabel, QPushButton
+
+    from xslope.fileio import load_slope_data
+
+    from studio.editors import ReinforcementEditor
+
+    fails = []
+
+    mw.doc._dirty = False
+    _quiet(mw.open_path, LEM08_FILE)
+    count, category = None, None
+    from studio.main_window import CATEGORY_ROLE as ROLE
+    tree = mw.inputs_tree
+    for i in range(tree.topLevelItemCount()):
+        item = tree.topLevelItem(i)
+        if item.text(0) == "Reinforcement lines":
+            count, category = item.text(1), item.data(0, ROLE)
+            break
+    if category != "reinforce":
+        fails.append("the Inputs tree has no 'Reinforcement lines' row opening an "
+                     "editor on LEM-8's model; its Studio path tells the reader to "
+                     "click it")
+    if count != "6":
+        fails.append(f"the Reinforcement lines row reads {count!r} on LEM-8's "
+                     f"model; the page builds six geogrid layers")
+
+    data = _quiet(load_slope_data, LEM08_FILE)
+    lines = data.get("reinforcement_lines") or []
+    if len(lines) != 6:
+        fails.append(f"LEM-8's model carries {len(lines)} reinforcement lines, not "
+                     f"the six the page enters and reads its crossings against")
+
+    dlg = ReinforcementEditor().build(data, None)
+    if dlg.windowTitle() != "Reinforcement":
+        fails.append(f"the reinforcement editor is titled {dlg.windowTitle()!r}, "
+                     f"not 'Reinforcement'")
+    buttons = {b.text() for b in dlg.findChildren(QPushButton)}
+    for label in LEM08_REINF_BUTTONS + LEM08_REINF_VIEWS:
+        if label not in buttons:
+            fails.append(f"the reinforcement editor has no {label!r} button; "
+                         f"Tutorial LEM-8 names it. Its buttons read "
+                         f"{sorted(buttons)}")
+    groups = {g.title() for g in dlg.findChildren(QGroupBox)}
+    for title in LEM08_REINF_GROUPS:
+        if title not in groups:
+            fails.append(f"the reinforcement editor's list view has no {title!r} "
+                         f"group; Tutorial LEM-8 walks the form group by group. "
+                         f"Its groups read {sorted(groups)}")
+    labels = [lab.text() for lab in dlg.findChildren(QLabel)]
+    for field in LEM08_REINF_FIELDS:
+        if not any(text == field or text.startswith(field + " ")
+                   for text in labels):
+            fails.append(f"the reinforcement editor has no {field!r} field; "
+                         f"Tutorial LEM-8 tells the reader what to put in it")
+    if LEM08_REINF_TMAX_LABEL not in labels:
+        fails.append(f"the reinforcement editor no longer labels Tmax "
+                     f"{LEM08_REINF_TMAX_LABEL!r}; Tutorial LEM-8 quotes that "
+                     f"label as how a per-element capacity shows up as the wrong "
+                     f"quantity")
+    combo_items = set()
+    for combo in dlg.findChildren(QComboBox):
+        combo_items.update(combo.itemText(i) for i in range(combo.count()))
+    for choice in ("geosynthetic", "nail", "tieback", "anchor",
+                   "tangent", "axial", "active", "passive"):
+        if choice not in combo_items:
+            fails.append(f"the reinforcement editor offers no {choice!r} choice; "
+                         f"Tutorial LEM-8's preset table names it")
+    dlg.deleteLater()
+
+    # The Type preset table, read from the template's own lookup block.
+    sheet = openpyxl.load_workbook(TEMPLATE_FILE)["reinforce"]
+    presets = tuple(tuple(str(sheet.cell(row=r, column=c).value)
+                          for c in (26, 27, 28))          # Z, AA, AB
+                    for r in range(8, 12))
+    if presets != LEM08_TYPE_PRESETS:
+        fails.append(f"the template's support-type presets read {presets}, not "
+                     f"{LEM08_TYPE_PRESETS} — the table Tutorial LEM-8 reproduces")
+    return fails
+
+
 def _lem02_editor_labels(mw):
     """The two dialogs Tutorial LEM-2 drives, read for the labels it quotes.
 
@@ -1610,9 +1733,10 @@ def test_tutorial_labels():
         fails += _lem03_editor_labels()
         fails += _lem05_editor_labels()
         fails += _lem04_editor_labels(mw)
-        # Last of the editor legs: it is the one that changes which project the
-        # window holds, and nothing after it reads the tree.
+        # Last of the editor legs: these are the ones that change which project
+        # the window holds, and each opens the model its own pins are read on.
         fails += _lem06_editor_labels(mw)
+        fails += _lem08_editor_labels(mw)
 
         from PySide6.QtWidgets import QPushButton
 

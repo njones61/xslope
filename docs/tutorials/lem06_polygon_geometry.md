@@ -392,8 +392,10 @@ This tutorial demonstrated:
   truncation is worth 0.2% on a 3.4° dip and much more on a steep or irregular
   one.
 
-**Where to go next:** the [tutorials index](index.md) lists the series, and the
-sample problems carry each page further.
+**Where to go next:**
+[LEM-8 — A Reinforced Slope](lem08_reinforced_slope.md) builds a slope that only
+stands because of what is buried in it. The [tutorials index](index.md) lists the
+series, and the sample problems carry each page further.
 [Sample Problem 11](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)
 catalogues this model, [DXF Import/Export](../usage/dxf.md) is the route from a
 CAD drawing to the `polygon` sheet this page filled by hand, and

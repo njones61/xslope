@@ -601,7 +601,7 @@ pile design.
 
 This problem demonstrates two features together: **polygon-based geometry input** and a
 **sloping (non-horizontal) bottom boundary**. Rather than profile lines and a horizontal
-`max_depth`, the cross-section is defined directly on the `polygons` sheet as two
+`max_depth`, the cross-section is defined directly on the `polygon` sheet as two
 material-zone polygons — an embankment over a foundation — whose shared base dips from
 left to right (elevation −15 on the left to −5 on the right). With polygon input there is
 no `max_depth`; the union of the polygons forms the **domain polygon**, and its lower

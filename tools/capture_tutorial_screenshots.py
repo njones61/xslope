@@ -827,13 +827,13 @@ def lem10_run_lem():
 
 
 def lem10_run_lem_filtered():
-    """The same dialog with the section's two tools on: grid seeding and the
-    surficial filter at 5 ft — the state the tools section tells the reader to
-    put it in."""
+    """The same dialog with the surficial filter on at 5 ft — the state Part A's
+    filter step tells the reader to put it in. Grid search stays unticked; that
+    tool belongs to Part B."""
     from studio.dialogs import RunLemDialog
 
     dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
-                                 "num_slices": 40, "grid_seed": True,
+                                 "num_slices": 40,
                                  "min_slip_depth": 5.0},
                        slope_data=_load(LEM10))
     dlg.resize(dlg.sizeHint())

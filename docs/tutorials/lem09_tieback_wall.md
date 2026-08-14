@@ -424,13 +424,16 @@ pile adds its 5,900 lb/ft of shear where the surface passes it at the toe.
 
 Each method runs its own search and finds its own critical surface:
 
-| Janbu | Corps | Lowe | Spencer | M-P |
-|:---:|:---:|:---:|:---:|:---:|
-| 1.417 | 1.393 | 1.396 | 1.395 | 1.439 |
+| Janbu | Corps | Lowe | Spencer |
+|:---:|:---:|:---:|:---:|
+| 1.417 | 1.393 | 1.396 | 1.395 |
 
-All five land between 1.393 and 1.439. The Ordinary Method of Slices and Bishop's
+All four land between 1.393 and 1.417. The Ordinary Method of Slices and Bishop's
 simplified method are not on the list: both take moments about a circle centre,
 which a polyline does not have, so they refuse the run rather than approximate it.
+Morgenstern–Price is absent for a different reason — its solver fails on the
+starting wedge itself, so the search never starts and the run reports that the
+starting surface is not viable.
 
 ### The wedge the reference manual gives
 

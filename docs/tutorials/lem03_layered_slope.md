@@ -36,12 +36,13 @@ answer.
 
 **Materials** — two Mohr-Coulomb (`mc`) soils, both undrained. Unit weights are
 pcf and cohesions psf; the row order is the Mat ID the profile lines reference,
-and the columns neither soil uses stay blank:
+and neither soil carries pore pressures — `u` stays `none` — so the table ends
+at φ:
 
-| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
-|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
-| `embankment` | 130 |  | `mc` | 400 | 0 |  |  |  |  |  |  |  | `none` |
-| `foundation` | 135 |  | `mc` | 800 | 0 |  |  |  |  |  |  |  | `none` |
+| name | γ | γsat | option | c | φ |
+|---|:---:|:---:|---|:---:|:---:|
+| `embankment` | 130 |  | `mc` | 400 | 0 |
+| `foundation` | 135 |  | `mc` | 800 | 0 |
 
 **Geometry** — a profile line is the *top* of a material layer: everything below
 it, down to the next line or the maximum depth, is that layer's material, so a

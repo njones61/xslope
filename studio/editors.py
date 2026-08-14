@@ -3721,8 +3721,8 @@ class MaterialsEditor(CategoryEditor):
     LF = {"lem", "fem"}
     FIELDS = [
         Field("name", "name", "str"),
-        Field("gamma", "g", "optfloat", applies=LF, unit="unit_weight"),
-        Field("gamma_sat", "gsat", "optfloat", applies=LF, unit="unit_weight"),
+        Field("gamma", "γ", "optfloat", applies=LF, unit="unit_weight"),
+        Field("gamma_sat", "γsat", "optfloat", applies=LF, unit="unit_weight"),
         # A BLANK option is valid for seep-only material rows (the loader keeps ''
         # via _choice; document._blank_material produces it for DXF imports). Offer
         # it as an empty combo entry so the editor round-trips it instead of
@@ -3730,7 +3730,7 @@ class MaterialsEditor(CategoryEditor):
         # strength/t_cut/u cells gray out. Kept last so the default stays 'mc'.
         Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb", "elastic", ""], applies=LF),
         Field("c", "c", "optfloat", applies=LF, unit="stress"),
-        Field("phi", "f", "optfloat", applies=LF),
+        Field("phi", "φ", "optfloat", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
         Field("d", "d", "optfloat", usage="lem"),
         Field("psi", "psi", "optfloat", usage="lem"),

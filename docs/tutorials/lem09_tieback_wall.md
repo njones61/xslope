@@ -60,14 +60,13 @@ it — and three things about it are different from a geogrid:
 lower one more frictional and heavier.
 
 Unit weights are pcf, cohesions psf and φ degrees; the row order is the Mat ID,
-and the columns neither soil uses stay blank:
+and neither soil carries pore pressures — `u` stays `none` — so the table ends
+at φ:
 
-| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
-|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
-| `Layer 1` | 120 | 120 | `mc` | 600 | 24 |  |  |  |  |  |  |  | `none` |
-| `Layer 2` | 130 | 130 | `mc` | 300 | 34 |  |  |  |  |  |  |  | `none` |
-
-There is no water in this model: both pore-pressure options are `none`.
+| name | γ | γsat | option | c | φ |
+|---|:---:|:---:|---|:---:|:---:|
+| `Layer 1` | 120 | 120 | `mc` | 600 | 24 |
+| `Layer 2` | 130 | 130 | `mc` | 300 | 34 |
 
 **Geometry** — a profile line is the *top* of a material layer. Layer 1 is the
 upper wedge of ground, so its line is the ground surface behind the wall; Layer 2
@@ -125,10 +124,11 @@ allowable working load applied as it stands rather than an ultimate capacity
 divided by the factor of safety. [Soil Reinforcement in LEM](../lem/reinforcement.md)
 derives what each choice does to the equilibrium equations.
 
-**Dir and Appl are not typed.** Both are formula columns that read Type and fill
-themselves from the table above, which is why the values below start again at
-**Tmax** rather than running on from the endpoints: the paste goes in as two
-blocks, one either side of the three columns the preset owns.
+**Dir and Appl are not entered.** Choosing a Type sets both — in the worksheet
+by formula, in Studio's editor by the same preset — and either can be overtyped
+afterwards to override it. That is why the capacity values below are their own
+table rather than running on from the endpoints: Type and its two settings sit
+between.
 
 | Tmax | Lp1 | Lp2 | Tend1 | Tend2 | Spacing |
 |:---:|:---:|:---:|:---:|:---:|:---:|
@@ -150,27 +150,29 @@ the plate is already expressed as Lp1 = 0.
 **Soldier pile** — a separate input, on its own sheet and its own editor, because
 a pile resists in shear and bending rather than in tension:
 
-| Label | x1 | y1 | x2 | y2 | H |
-|---|:---:|:---:|:---:|:---:|:---:|
-| soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 |
+| Label | x1 | y1 | x2 | y2 | H | θp | Appl | D | S |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 |  |  | 0.5 | 1 |
 
 A real soldier-pile wall is discrete — piles at intervals along the wall, with
 the anchors seating on them. The reference states no pile spacing; it models
-the row as Slide does, a micro-pile smeared per foot of wall — which is what
-this table enters. **H** is the shear the wall delivers per foot to any surface
-that crosses the pile axis, and **S** = 1 because the division by spacing is
-already in that number: a continuous-equivalent of the discrete row, exactly as
-the anchors are entered. Leaving `H` blank instead asks for an Ito & Matsui
-estimate from `D` and `S`. `qp` — the angle the force acts at — and `Appl` come next and both stay
-empty: a blank `qp` is derived from the pile's own axis, and a blank **Appl** is
-`active`, the same allowable-force meaning it has on an anchor. So the pile's
-diameter and spacing start again after them, as a second block:
+the row as Slide does, a micro-pile smeared per foot of wall, and this row
+enters it the same way. **H** = 5900 is the reference's shear resistance, per
+foot of wall, delivered to any surface that crosses the pile axis; **S** = 1
+because the division by spacing is already in that number — a
+continuous-equivalent of the discrete row, exactly as the anchors are entered —
+and **D** = 0.5 is the pile diameter. `θp` and `Appl` stay empty, and blank
+means what this model wants: the force acts along the pile's own axis, applied
+`active` — an allowable working load, the same meaning it has on an anchor.
 
-| D | S |
-|:---:|:---:|
-| 0.5 | 1 |
-
-[Piles and Concrete Piers](../lem/piles.md) covers the family.
+`H` does not have to be given. Left blank, xslope computes the limiting force
+itself by the Ito & Matsui (1975) method, which treats the soil uphill of the
+pile row as squeezing plastically through the gaps between piles and integrates
+the resulting pressure on the pile from the ground surface down to each trial
+surface. That is the route to take when the design gives a diameter and spacing
+but no resistance number, and [Piles and Concrete Piers](../lem/piles.md)
+derives it. Here the reference publishes the 5,900 lb/ft itself, so the row
+uses it directly.
 
 **Failure surface** — a bilinear wedge from the wall toe, given by the reference
 manual this problem comes from, entered as three points:
@@ -350,10 +352,11 @@ Open **Piles** in the same tree:
 ![The piles editor on the soldier pile](images/lem09_studio_piles.png){width=1000}
 
 Its form runs **Identity**, **Geometry**, **Capacity / design**, **Behavior**, and
-`H`, `D` and `S` are the three fields this problem fills. Its table view is the
-piles worksheet's columns in the worksheet's order, so the pile's two blocks paste
-into it the same way: the `Label`–`H` block at the first cell, then `D` and `S` at
-the `D` cell. Click **OK**.
+`H`, `D` and `S` are the three fields this problem fills beyond the endpoints.
+The table view is the piles worksheet's columns except `θp` — Studio derives
+that from the pile's endpoints — so a paste from the table above goes in as two
+pieces: `Label` through `H` at the first cell, then `D` and `S` at the `D`
+cell. Click **OK**.
 
 Continue below.
 

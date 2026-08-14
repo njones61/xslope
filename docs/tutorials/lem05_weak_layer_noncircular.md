@@ -38,7 +38,7 @@ how deep in the seam the track belongs.
 pcf and cohesions psf; the row order is the Mat ID, and the columns none of the
 four use stay blank:
 
-| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
+| name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
 |---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
 | `Sand Fill` | 120 |  | `mc` | 0 | 37 |  |  |  |  |  |  |  | `piezo` |
 | `Sand` | 123 |  | `mc` | 0 | 33 |  |  |  |  |  |  |  | `piezo` |

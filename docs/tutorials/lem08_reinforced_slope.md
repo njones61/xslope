@@ -42,12 +42,13 @@ never touches.
 apart by their cohesion:
 
 Unit weights are pcf and cohesions psf; the row order is the Mat ID the profile
-lines reference, and the columns neither soil uses stay blank:
+lines reference, and neither soil carries pore pressures — `u` stays `none` —
+so the table ends at φ:
 
-| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
-|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
-| `shell` | 130 |  | `mc` | 300 | 37 |  |  |  |  |  |  |  | `none` |
-| `base` | 130 |  | `mc` | 0 | 37 |  |  |  |  |  |  |  | `none` |
+| name | γ | γsat | option | c | φ |
+|---|:---:|:---:|---|:---:|:---:|
+| `shell` | 130 |  | `mc` | 300 | 37 |
+| `base` | 130 |  | `mc` | 0 | 37 |
 
 The reinforced fill is material 2 — clean sand, no cohesion at all. Material 1
 is the 2 ft band of cohesive fill along the face, and its 300 psf is there to
@@ -129,10 +130,11 @@ safety: *Active* is an allowable working load applied against the driving side,
 with no Type at all is a generic tensile line, and behaves as *Tangent* and
 *Active* — the same physics, without saying what the reinforcement is.
 
-**Dir and Appl are not typed.** Both are formula columns that read Type and fill
-themselves from the table above, which is why the values below start again at
-**Tmax** rather than running on from the endpoints: the paste goes in as two
-blocks, one either side of the three columns the preset owns.
+**Dir and Appl are not entered.** Choosing a Type sets both — in the worksheet
+by formula, in Studio's editor by the same preset — and either can be overtyped
+afterwards to override it. That is why the capacity values below are their own
+table rather than running on from the endpoints: Type and its two settings sit
+between.
 
 **How much force is available depends on where the surface crosses.** A geogrid
 does not carry its full capacity at its free end — the tension is developed by

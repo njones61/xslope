@@ -95,12 +95,13 @@ the zones drew themselves, and it does not have to be flat.
 than the ground it stands on:
 
 Unit weights are pcf and cohesions psf; the row order is the Mat ID the polygon
-rings reference, and the columns neither soil uses stay blank:
+rings reference, and neither soil carries pore pressures — `u` stays `none` —
+so the table ends at φ:
 
-| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
-|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
-| `embankment` | 130 |  | `mc` | 400 | 0 |  |  |  |  |  |  |  | `none` |
-| `foundation` | 135 |  | `mc` | 800 | 0 |  |  |  |  |  |  |  | `none` |
+| name | γ | γsat | option | c | φ |
+|---|:---:|:---:|---|:---:|:---:|
+| `embankment` | 130 |  | `mc` | 400 | 0 |
+| `foundation` | 135 |  | `mc` | 800 | 0 |
 
 **Starting circles** — two, sharing a center above the middle of the face at
 twice the slope height:

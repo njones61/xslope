@@ -43,7 +43,7 @@ weighs below it.
 Unit weights are pcf, cohesions psf and φ′ degrees; the row order is the Mat ID,
 and the columns none of the three soils use stay blank:
 
-| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
+| name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
 |---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
 | `soil 1` | 125 | 130 | `mc` | 400 | 30 |  |  |  |  |  |  |  | `piezo` |
 | `soil 2` | 122 | 127 | `mc` | 600 | 28 |  |  |  |  |  |  |  | `piezo` |

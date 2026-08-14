@@ -34,12 +34,12 @@ The problem features the following geometry and material properties:
 
 **Material** — one material, Mohr-Coulomb (`mc`), at 125 pcf with c = 500 psf and
 φ = 0. The columns are the `mat` worksheet's own, in its order, so the row goes in
-as one block; the row order is the Mat ID, and the columns this problem does not
-use stay blank:
+as one block; the row order is the Mat ID. There are no pore pressures — `u`
+stays `none` — so the table ends at φ:
 
-| name | g | gsat | option | c | f | c/p | r-elev | d | psi | t_cut | E | nu | u |
-|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
-| `soil` | 125 |  | `mc` | 500 | 0 |  |  |  |  |  |  |  | `none` |
+| name | γ | γsat | option | c | φ |
+|---|:---:|:---:|---|:---:|:---:|
+| `soil` | 125 |  | `mc` | 500 | 0 |
 
 **Geometry** — Profile Line 1, on material 1 (`soil`), one vertex per row:
 

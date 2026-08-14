@@ -721,14 +721,18 @@ def test_lem06_polygon_rings():
 #: with the row number in the template, and the materials editor's first data column
 #: is 'name', so a block starting one column earlier lands every value one field to
 #: the right (the same reason the circles tables start at Xo rather than at #).
-_MAT_HEADERS = ["name", "g", "gsat", "option", "c", "f", "c/p", "r-elev", "d",
+_MAT_HEADERS = ["name", "γ", "γsat", "option", "c", "φ", "c/p", "r-elev", "d",
                 "psi", "t_cut", "E", "nu", "u"]
 #: The editor field each of those columns is, in the same order.
 _MAT_KEYS = ["name", "gamma", "gamma_sat", "option", "c", "phi", "cp", "r_elev",
              "d", "psi", "t_cut", "E", "nu", "u"]
+#: The prefix a page with no pore pressures prints — the table ends at φ because
+#: everything to its right is either blank or the editor's own defaults, and the
+#: default the truncation leans on (u = 'none' on a new row) is asserted below.
+_MAT_HEADERS_DRY = _MAT_HEADERS[:6]
 
 
-def _materials_leg(label, page, model_path, occurrence=0):
+def _materials_leg(label, page, model_path, occurrence=0, headers=None):
     """One page's materials table, pasted into the real materials editor.
 
     The table is written as a contiguous run of the destination's columns, blanks
@@ -748,7 +752,8 @@ def _materials_leg(label, page, model_path, occurrence=0):
     """
     from studio.editors import MaterialsEditor, _mat_dim_keys, _new_material
 
-    printed = _taught(page, _MAT_HEADERS, occurrence)
+    headers = headers or _MAT_HEADERS
+    printed = _taught(page, headers, occurrence)
     model = _load(model_path)
     editor = MaterialsEditor()
     dlg = editor.build(dict(model, materials=[]), None)
@@ -764,13 +769,13 @@ def _materials_leg(label, page, model_path, occurrence=0):
     # meant something and 0.0 where it would not.
     probe = _new_table(MaterialsEditor.FIELDS, new_row=_new_material,
                        dim_rule=_mat_dim_keys)
-    _paste(probe, _tsv([["blank"] + [""] * (len(_MAT_HEADERS) - 1)]))
+    _paste(probe, _tsv([["blank"] + [""] * (len(headers) - 1)]))
     untouched = probe.result_rows()[0]
 
     n = len(printed)
     out = _fail(_summary(dlg._table)
                 == "Pasted %d %s × %d columns." % (n, "row" if n == 1 else "rows",
-                                                   len(_MAT_HEADERS)),
+                                                   len(headers)),
                 f"{label}: the status line read {_summary(dlg._table)!r}")
     out += _fail(len(rows) == len(model["materials"]),
                  f"{label}: the page's table built {len(rows)} materials, "
@@ -785,22 +790,32 @@ def _materials_leg(label, page, model_path, occurrence=0):
                 out += _fail(_matches(got[key], cell, want[key]),
                              f"{label}: row {i + 1} {key} pasted as {got[key]!r} "
                              f"from {cell!r}; the model has {want[key]!r}")
+        if len(headers) < len(_MAT_HEADERS):
+            # A truncated table is sound only because nothing right of φ needed
+            # entering — which for the pore-pressure option means the new-row
+            # default is doing the work the page says it does.
+            out += _fail(got["u"] == "none",
+                         f"{label}: row {i + 1} u came back {got['u']!r} on a "
+                         f"page whose table ends at φ; the truncation is only "
+                         f"honest if the editor's default is 'none'")
     return out
 
 
 def test_lem01_materials():
     return _materials_leg("LEM-1 materials", "lem01_simple_embankment.md",
-                          os.path.join(_MODELS, "xslope_simple_embankment.xlsx"))
+                          os.path.join(_MODELS, "xslope_simple_embankment.xlsx"),
+                          headers=_MAT_HEADERS_DRY)
 
 
 def test_lem03_materials():
     return _materials_leg("LEM-3 materials", "lem03_layered_slope.md",
-                          os.path.join(_MODELS, "xslope_simple_mult_layers.xlsx"))
+                          os.path.join(_MODELS, "xslope_simple_mult_layers.xlsx"),
+                          headers=_MAT_HEADERS_DRY)
 
 
 def test_lem04_materials():
     """LEM-4's three soils — the first page whose rows fill BOTH unit-weight columns
-    and set ``u`` to ``piezo``, which is what makes the columns between ``f`` and
+    and set ``u`` to ``piezo``, which is what makes the columns between ``φ`` and
     ``u`` load-bearing rather than decorative."""
     return _materials_leg("LEM-4 materials", "lem04_water_in_the_slope.md",
                           os.path.join(_MODELS, "xslope_method_slices_problem.xlsx"))
@@ -813,16 +828,19 @@ def test_lem05_materials():
 
 def test_lem06_materials():
     return _materials_leg("LEM-6 materials", "lem06_polygon_geometry.md",
-                          os.path.join(_MODELS, "xslope_sloping_bottom.xlsx"))
+                          os.path.join(_MODELS, "xslope_sloping_bottom.xlsx"),
+                          headers=_MAT_HEADERS_DRY)
 
 
 def test_lem08_materials():
     return _materials_leg("LEM-8 materials", "lem08_reinforced_slope.md",
-                          os.path.join(_MODELS, "xslope_reinforce.xlsx"))
+                          os.path.join(_MODELS, "xslope_reinforce.xlsx"),
+                          headers=_MAT_HEADERS_DRY)
 
 
 def test_lem09_materials():
-    return _materials_leg("LEM-9 materials", "lem09_tieback_wall.md", LEM09_MODEL)
+    return _materials_leg("LEM-9 materials", "lem09_tieback_wall.md", LEM09_MODEL,
+                          headers=_MAT_HEADERS_DRY)
 
 
 def test_lem08_reinforcement_blocks():
@@ -907,16 +925,21 @@ def test_lem09_anchor_blocks():
 
 
 def test_lem09_pile_row():
-    """LEM-9's soldier pile, in two blocks either side of the sheet's qp and Appl —
-    the columns the page leaves empty and the editor derives or defaults. The second
-    block lands contiguously only while the piles editor's columns are the piles
-    sheet's."""
+    """LEM-9's soldier pile: ONE table in the piles sheet's own columns, its θp and
+    Appl cells printed empty (the editor derives one and defaults the other). The
+    Studio step slices it into two pieces around θp/Appl, and the second piece lands
+    contiguously only while the piles editor's columns are the piles sheet's."""
     from studio.editors import PilesEditor
 
     page = "lem09_tieback_wall.md"
     model = _load(LEM09_MODEL)
-    head = _taught(page, ["Label", "x1", "y1", "x2", "y2", "H"])
-    size = _taught(page, ["D", "S"])
+    whole = _taught(page, ["Label", "x1", "y1", "x2", "y2", "H", "θp", "Appl",
+                           "D", "S"])
+    out = _fail(all(r[6] == "" and r[7] == "" for r in whole),
+                "LEM-9's pile table printed something in θp or Appl; the page "
+                "teaches both stay empty")
+    head = [r[:6] for r in whole]
+    size = [r[8:10] for r in whole]
     editor = PilesEditor()
     dlg = editor.build(dict(model, pile_lines=[]), None)
     dlg.set_view_mode("table")
@@ -924,8 +947,8 @@ def test_lem09_pile_row():
     keys = [f.key for f in PilesEditor.FIELDS]
     _paste(dlg._table, _tsv(head))
     _paste(dlg._table, _tsv(size), row=0, col=keys.index("D_pile"))
-    out = _fail(_summary(dlg._table) == "Pasted 1 row × 2 columns.",
-                f"LEM-9's pile size block reported {_summary(dlg._table)!r}")
+    out += _fail(_summary(dlg._table) == "Pasted 1 row × 2 columns.",
+                 f"LEM-9's pile size block reported {_summary(dlg._table)!r}")
     landed = dict(model, pile_lines=[])
     dlg.accept()
     editor.apply(landed, dlg)

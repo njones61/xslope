@@ -332,16 +332,20 @@ bold with a marker at each end and at its pullout breakpoints: the shape of its
 capacity envelope, in place on the slope. Click a line in the preview to select
 it.
 
-**Table view** puts all six on one grid, the columns in the worksheet's order —
-the faster view for entering six lines that differ only in their endpoints.
-Both views edit the same lines, so switching between them loses nothing. Click
-**OK**.
+**Table view** puts all six on one grid, the columns in the worksheet's order,
+and takes the tables above as blocks. Click the first `x1` cell and paste the
+`x1`–`y2` columns: the six rows arrive with the block. Set **Type** to
+`geosynthetic` on each, then click the first `Tmax` cell and paste the capacity
+block — the same `Tmax` through `Spacing` span the worksheet has, which is why
+those values start again rather than running on from the endpoints. Both views
+edit the same lines, so switching between them loses nothing. Click **OK**.
 
 ### 5. Starting circles
 
-Click **Circles**, press **Add row** twice, and enter the two circles from the
-table above. **Depth is an elevation**: 0 is the toe, -10 the bottom of the
-model.
+Click **Circles** and enter the two circles from the table above, or paste the
+block into the first cell — its four columns are the editor's first four, and
+the rows come with it. **Depth is an elevation**: 0 is the toe, -10 the bottom
+of the model.
 
 Continue below.
 

@@ -233,8 +233,9 @@ fixes the Mat IDs the polygons reference next.
 
 Click **Polygons**. On a new project the editor opens empty: **Add polygon**
 starts the first zone — which makes this a polygon project — and **Add row**
-adds vertices. Enter (or copy-paste) the embankment ring from the table above,
-set **Material:** to `1: embankment`, and leave **Type:** at `material`.
+adds vertices, though a pasted block brings its own. Enter the embankment ring
+from the table above, or click the first `x` cell and paste it; set
+**Material:** to `1: embankment`, and leave **Type:** at `material`.
 **Add polygon** again for the foundation ring, on `2: foundation`:
 
 ![The polygons editor on the foundation zone](images/lem06_studio_polygons.png)

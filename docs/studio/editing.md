@@ -32,6 +32,19 @@ open its editor:
 Editors are forms (for scalars) or tables (for tabular data). Tabular editors let
 you add, remove, and reorder rows.
 
+**Every table takes a block from the clipboard.** Click the cell the block starts
+at and press `Ctrl+V` (`⌘V` on macOS). Columns are separated by tabs and
+rows by newlines — what a spreadsheet copies, and how the tables in the
+[tutorials](../tutorials/index.md) are laid out — and the values fill right and
+down from the cell you clicked. Rows are added when the block runs past the last
+one, so pasting into an empty table is the whole of filling it; columns are not,
+and a block wider than the table has its extra columns dropped. A column of
+choices (Option, Movement, Type, …) takes any spelling of one of its own entries;
+text naming none of them, and a cell the row's own settings hold read-only, are
+left as they were. A line under the table reports what landed, and counts
+anything that did not. `Ctrl+C` (`⌘C`) copies the selected rows back out in the same
+form, and the paste is an edit like any other — **Cancel** discards it.
+
 The materials editor has two interchangeable views. **Table view** mirrors the
 `mat` worksheet row-for-row, with **Show columns for** toggles (LEM / Seepage /
 FEM / Reliability) that hide the columns an analysis doesn't use:

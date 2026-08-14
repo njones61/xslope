@@ -108,6 +108,12 @@ LEM06_FILE = os.path.join(_REPO, "docs/lem/files/xslope_sloping_bottom.xlsx")
 #: pins need: an Inputs tree row that counts them and an editor with a line to
 #: read the capacity fields off.
 LEM08_FILE = os.path.join(_REPO, "docs/lem/files/xslope_reinforce.xlsx")
+#: Tutorial LEM-9's completed model — two Anchor-type reinforcement lines and one
+#: soldier pile, which is what its pins need: a reinforcement row whose Type preset
+#: has filled Dir/Appl, and a Piles row in the Inputs tree with a pile to read the
+#: editor's fields off.
+LEM09_FILE = os.path.join(_REPO,
+                          "docs/verification/files/rocscience/vp049.xlsx")
 #: Tutorial LEM-10's completed model — a cohesionless embankment on soft clay,
 #: the section its generator quote and its two Run LEM search options are read on.
 LEM10_FILE = os.path.join(_REPO, "docs/lem/files/xslope_mult_min_KEY.xlsx")
@@ -1052,6 +1058,18 @@ LEM08_TYPE_PRESETS = (("Geosynthetic", "Tangent", "Active"),
                       ("Tieback", "Axial", "Active"),
                       ("Anchor", "Axial", "Active"))
 
+#: The Inputs tree row Tutorial LEM-9's Studio path sends the reader to for the
+#: soldier pile, and the piles editor as that step drives it: the four form groups
+#: the page names in order, and the three capacity fields this problem fills. The
+#: group titles are pinned because the page walks the form by them.
+LEM09_INPUT_CATEGORY = "Piles"
+LEM09_PILE_GROUPS = ("Identity", "Geometry", "Capacity / design", "Behavior")
+LEM09_PILE_FIELDS = ("H", "D", "S")
+#: What LEM-9's page asserts the Anchor preset does: the Type column reads
+#: ``anchor`` on both lines, and Dir/Appl come back filled without either being
+#: typed. Read through the loader, which is where the preset is applied.
+LEM09_ANCHOR_PRESET = ("anchor", "axial", "active")
+
 
 #: The two Run LEM search options LEM-10 tells the reader to use, and the field
 #: that carries the depth. The page's last section is written as instructions to
@@ -1648,6 +1666,75 @@ def _lem08_editor_labels(mw):
     return fails
 
 
+def _lem09_editor_labels(mw):
+    """The piles editor and the Anchor preset, as Tutorial LEM-9 uses them.
+
+    Read on LEM-9's own model, because the page's Studio step is written on a
+    project that already carries the two anchors and the soldier pile: the Inputs
+    tree counts them, and each editor has a row to read its fields off. Runs with
+    the other legs that change which project the window holds.
+
+    The preset is checked through the loader rather than against a constant of
+    ours, so the page's claim — pick Anchor and Dir/Appl answer on their own —
+    fails here if the preset stops filling them.
+    """
+    from PySide6.QtWidgets import QGroupBox, QLabel
+
+    from xslope.fileio import load_slope_data
+
+    from studio.editors import PilesEditor
+
+    fails = []
+
+    mw.doc._dirty = False
+    _quiet(mw.open_path, LEM09_FILE)
+    from studio.main_window import CATEGORY_ROLE as ROLE
+    tree = mw.inputs_tree
+    count, category = None, None
+    for i in range(tree.topLevelItemCount()):
+        item = tree.topLevelItem(i)
+        if item.text(0) == LEM09_INPUT_CATEGORY:
+            count, category = item.text(1), item.data(0, ROLE)
+            break
+    if category != "piles":
+        fails.append(f"the Inputs tree has no {LEM09_INPUT_CATEGORY!r} row opening "
+                     f"an editor on LEM-9's model; its Studio path tells the reader "
+                     f"to click it")
+    if count != "1":
+        fails.append(f"the Piles row reads {count!r} on LEM-9's model; the page "
+                     f"enters one soldier pile")
+
+    data = _quiet(load_slope_data, LEM09_FILE)
+    lines = data.get("reinforcement_lines") or []
+    if len(lines) != 2:
+        fails.append(f"LEM-9's model carries {len(lines)} reinforcement lines, not "
+                     f"the two tiebacks the page enters")
+    for line in lines:
+        got = (str(line.get("type")), str(line.get("dir")), str(line.get("appl")))
+        if got != LEM09_ANCHOR_PRESET:
+            fails.append(f"an Anchor line on LEM-9's model reads {got}, not "
+                         f"{LEM09_ANCHOR_PRESET} — the page tells the reader to pick "
+                         f"the Type and let Dir and Appl fill themselves")
+
+    dlg = PilesEditor().build(data, None)
+    if dlg.windowTitle() != "Piles":
+        fails.append(f"the piles editor is titled {dlg.windowTitle()!r}, not 'Piles'")
+    groups = {g.title() for g in dlg.findChildren(QGroupBox)}
+    for title in LEM09_PILE_GROUPS:
+        if title not in groups:
+            fails.append(f"the piles editor's list view has no {title!r} group; "
+                         f"Tutorial LEM-9 names the form's groups in order. Its "
+                         f"groups read {sorted(groups)}")
+    labels = [lab.text() for lab in dlg.findChildren(QLabel)]
+    for field in LEM09_PILE_FIELDS:
+        if not any(text == field or text.startswith(field + " ")
+                   for text in labels):
+            fails.append(f"the piles editor has no {field!r} field; Tutorial LEM-9 "
+                         f"tells the reader what to put in it")
+    dlg.deleteLater()
+    return fails
+
+
 def _lem02_editor_labels(mw):
     """The two dialogs Tutorial LEM-2 drives, read for the labels it quotes.
 
@@ -1806,6 +1893,7 @@ def test_tutorial_labels():
         # the window holds, and each opens the model its own pins are read on.
         fails += _lem06_editor_labels(mw)
         fails += _lem08_editor_labels(mw)
+        fails += _lem09_editor_labels(mw)
 
         from PySide6.QtWidgets import QPushButton
 

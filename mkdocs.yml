@@ -66,6 +66,7 @@ nav:
       - A Weak Layer, Non-Circular: tutorials/lem05_weak_layer_noncircular.md
       - Polygon Geometry: tutorials/lem06_polygon_geometry.md
       - A Reinforced Slope: tutorials/lem08_reinforced_slope.md
+      - A Tieback Wall: tutorials/lem09_tieback_wall.md
       - Finding the Global Minimum: tutorials/lem10_global_minimum.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md

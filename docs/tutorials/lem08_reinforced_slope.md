@@ -442,10 +442,11 @@ This tutorial demonstrated:
   toe the surface never reaches, and 1.539 on the same circle once the pullout
   lengths are long enough to bite.
 
-**Where to go next:** [LEM-10](lem10_global_minimum.md) searches a section that
-holds two competing mechanisms, where the surface a search returns depends on the
-circle it started from. The [tutorials index](index.md) lists the series, and the
-sample problems carry each page further.
+**Where to go next:** [LEM-9](lem09_tieback_wall.md) is the other reinforced
+problem — a tieback wall, where the support is discrete and stiff rather than
+continuous and flexible, and the Type preset that describes it changes both **Dir**
+and **Appl**. The [tutorials index](index.md) lists the series, and the sample
+problems carry each page further.
 [Sample Problem 9](../lem/samples.md#9-reinforced-slope) catalogues this model
 alongside the published solution it comes from,
 [Soil Reinforcement in LEM](../lem/reinforcement.md) derives the capacity

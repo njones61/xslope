@@ -14,7 +14,7 @@ import copy
 import math
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QIcon, QPixmap
+from PySide6.QtGui import QColor, QIcon, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QHeaderView,
@@ -362,6 +362,82 @@ class FormEditorDialog(QDialog):
                 for f in self._fields}
 
 
+# --------------------------------------------------------------------------- #
+# Table clipboard — a block of cells in, a block of cells out
+#
+# The inputs of a slope model are tables of numbers, and they nearly always exist
+# somewhere else first: a worksheet, a page of coordinates, a set of vertices out
+# of a report. Retyping such a block is where a model gains a digit it was never
+# given, so every editor table takes a block from the clipboard and fills itself
+# from it — the same block a spreadsheet copies, tabs between columns and newlines
+# between rows.
+#
+# Tabs and newlines ONLY: that is what Excel puts on the clipboard and what a table
+# copied out of a browser carries, and runs of spaces are what a column of typed
+# numbers is padded with, not what separates them.
+# --------------------------------------------------------------------------- #
+def _parse_clipboard_block(text):
+    """Clipboard ``text`` as a list of rows of cell strings, or ``[]`` for nothing
+    pastable.
+
+    Tabs separate columns, newlines separate rows (all three line endings), and
+    trailing newlines — which every spreadsheet appends to a copied block — are
+    dropped rather than read as an empty last row. Rows are left RAGGED: a row with
+    fewer cells than its neighbours fills fewer columns rather than blanking the
+    rest, so a block whose last column is empty on some rows leaves those cells
+    alone."""
+    if not text:
+        return []
+    body = text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
+    if body == "":
+        return []
+    return [line.split("\t") for line in body.split("\n")]
+
+
+#: Why a cell in a pasted block was not written, in the order the status line lists
+#: them. Each is a thing the block asked for that the table will not do.
+_PASTE_SKIP_REASONS = ("past the last column", "not a listed choice", "read-only")
+
+
+def _paste_skip_phrase(counts):
+    """"2 past the last column, 1 read-only" — the skipped cells named by reason,
+    or "" when nothing was skipped."""
+    parts = [f"{counts[r]} {r}" for r in _PASTE_SKIP_REASONS if counts.get(r)]
+    return ", ".join(parts)
+
+
+def _plural(n, noun):
+    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
+
+
+class _ClipboardTable(QTableWidget):
+    """The editors' table widget, with Copy and Paste over a block of cells.
+
+    Subclassed rather than wired to a QShortcut on purpose: a key event reaches the
+    focused widget first, so while a cell is open for editing its line edit keeps
+    its own Ctrl/Cmd+V (pasting text into the cell being typed in) and this handler
+    runs only when the TABLE itself has the keystroke. A shortcut would take the
+    keystroke off the line edit and paste a block over the cell instead.
+
+    ``QKeySequence.Paste`` rather than a literal Ctrl+V so the platform's own
+    binding is what works — Cmd+V on macOS, Ctrl+V elsewhere."""
+
+    def __init__(self, rows, cols, owner):
+        super().__init__(rows, cols)
+        self._owner = owner
+
+    def keyPressEvent(self, event):
+        if event.matches(QKeySequence.Copy):
+            self._owner.copy_selection()
+            event.accept()
+            return
+        if event.matches(QKeySequence.Paste):
+            self._owner.paste_clipboard()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+
 class _EditableTable(QWidget):
     """A table over a list of dict records with Add/Remove rows. Unshown keys are
     preserved. Reused standalone (TableEditorDialog) and per-tab (TabbedTableEditorDialog)."""
@@ -397,7 +473,7 @@ class _EditableTable(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.table = QTableWidget(len(rows), ncols)
+        self.table = _ClipboardTable(len(rows), ncols, self)
         self.table.setHorizontalHeaderLabels(
             [f.display_header(self._unit_labels) for f in fields])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -441,6 +517,156 @@ class _EditableTable(QWidget):
         bar.addWidget(rem)
         bar.addStretch(1)
         layout.addLayout(bar)
+        # What the last paste did, written into the pane under the buttons rather
+        # than into a box to dismiss: a paste that filled fewer cells than the block
+        # held is something to READ against the rows it landed in. Hidden until
+        # there is one, so a dialog that has not been pasted into measures and lays
+        # out exactly as it did before.
+        self.paste_summary = QLabel()
+        self.paste_summary.setObjectName("paste_summary")
+        self.paste_summary.setWordWrap(True)
+        self.paste_summary.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.paste_summary.setVisible(False)
+        layout.addWidget(self.paste_summary)
+
+    # ---------------------------------------------------------------- #
+    # Clipboard
+    # ---------------------------------------------------------------- #
+    def _clipboard_columns(self):
+        """The data columns a copy or paste walks, left to right AS THE TABLE SHOWS
+        THEM.
+
+        Hidden columns are not walked: a usage toggle is the user saying which
+        parameters they are working with, and a block pasted over a table with the
+        FEM columns folded away belongs to the columns in front of them. The
+        Materials swatch is skipped for a different reason — it is a display color,
+        not a field, so it is not a column a block can carry. Visual order, because
+        that swatch is moved to the front of the table and "rightward" means what
+        the eye means by it."""
+        header = self.table.horizontalHeader()
+        return sorted((j for j in range(len(self._fields))
+                       if not self.table.isColumnHidden(j)),
+                      key=header.visualIndex)
+
+    def _cell_text(self, i, j):
+        """The text column ``j`` of row ``i`` currently shows."""
+        w = self.table.cellWidget(i, j)
+        if isinstance(w, QComboBox):
+            return w.currentText()
+        it = self.table.item(i, j)
+        return it.text() if it is not None else ""
+
+    def copy_selection(self):
+        """The selected block onto the clipboard as tab-separated text — the shape
+        this table's own paste reads back, and the shape a spreadsheet takes.
+
+        These tables select whole rows (the selection drives the preview's
+        emphasis), so a selection is a run of rows across every column on show; with
+        no selection at all, the current cell alone is copied."""
+        cols = self._clipboard_columns()
+        if not cols:
+            return
+        chosen = {(ix.row(), ix.column()) for ix in self.table.selectedIndexes()}
+        if chosen:
+            rows = sorted({r for r, _ in chosen})
+            cols = [c for c in cols if any((r, c) in chosen for r in rows)]
+        else:
+            r, c = self.table.currentRow(), self.table.currentColumn()
+            if r < 0 or c not in cols:
+                return
+            rows, cols = [r], [c]
+        block = "\n".join("\t".join(self._cell_text(r, c) for c in cols) for r in rows)
+        QApplication.clipboard().setText(block)
+
+    def paste_clipboard(self):
+        """Fill the table from a tab-separated block on the clipboard, starting at
+        the current cell and running right and down.
+
+        ROWS GROW to fit the block; COLUMNS DO NOT. A block is a set of records, and
+        a table that would not lengthen for one could only ever be pasted into after
+        the rows had been added by hand — which is most of the typing the paste is
+        there to avoid, and the whole of it when the table starts empty. Columns are
+        the opposite case: the columns are the fields this input HAS, and a block
+        wider than they are is a block that came from somewhere else. Its extra
+        columns are dropped and counted rather than shifted onto fields they do not
+        name.
+
+        Every value goes in the way a typed one does — the cell's text for a number
+        (so the field's own parser reads it, and a pasted rendering of the stored
+        value is kept the way an untouched cell is), the matching entry for a choice
+        column, matched without regard to case. Text that names no choice, and a
+        column held read-only by the row's own state, leave their cells as they
+        were and are counted. One change notification for the whole block, so a
+        preview redraws for the finished table rather than for every cell of a
+        half-filled one."""
+        block = _parse_clipboard_block(QApplication.clipboard().text())
+        cols = self._clipboard_columns()
+        if not block or not cols:
+            return
+        anchor_col = self.table.currentColumn()
+        start = cols.index(anchor_col) if anchor_col in cols else 0
+        start_row = max(0, self.table.currentRow())
+        skipped = {r: 0 for r in _PASTE_SKIP_REASONS}
+        width = 0
+
+        prev = self._suppress_notify
+        self._suppress_notify = True
+        try:
+            grow = start_row + len(block) - self.table.rowCount()
+            for _ in range(max(0, grow)):
+                i = self.table.rowCount()
+                self.table.insertRow(i)
+                base = self._new_row()
+                self._bases.append(base)
+                self._set_row(i, base)
+            for dr, cells in enumerate(block):
+                for dc, text in enumerate(cells):
+                    if start + dc >= len(cols):
+                        skipped["past the last column"] += 1
+                        continue
+                    width = max(width, dc + 1)
+                    reason = self._set_cell_text(start_row + dr, cols[start + dc], text)
+                    if reason:
+                        skipped[reason] += 1
+            self._rebuild_swatches()
+            self._apply_dim_all()
+        finally:
+            self._suppress_notify = prev
+        self._show_paste_summary(len(block), width, skipped)
+        self._emit_change()
+
+    def _set_cell_text(self, i, j, text):
+        """Write one pasted cell. Returns "" when it landed, else the reason it did
+        not — the wording the status line counts under."""
+        f = self._fields[j]
+        text = (text or "").strip()
+        w = self.table.cellWidget(i, j)
+        if isinstance(w, QComboBox):
+            if not w.isEnabled():
+                return "read-only"
+            for k in range(w.count()):
+                if w.itemText(k).strip().lower() == text.lower():
+                    w.setCurrentIndex(k)
+                    return ""
+            return "not a listed choice"
+        it = self.table.item(i, j)
+        if it is None:
+            it = QTableWidgetItem("")
+            self.table.setItem(i, j, it)
+        if not (it.flags() & Qt.ItemIsEditable):
+            return "read-only"
+        it.setText(text)
+        return ""
+
+    def _show_paste_summary(self, rows, cols, skipped):
+        """"Pasted 6 rows × 4 columns" — plus what the block asked for that the
+        table did not do, and why."""
+        text = f"Pasted {_plural(rows, 'row')} × {_plural(cols, 'column')}"
+        phrase = _paste_skip_phrase(skipped)
+        if phrase:
+            text += f"; {_plural(sum(skipped.values()), 'cell')} skipped ({phrase})"
+        self.paste_summary.setText(text + ".")
+        self.paste_summary.setVisible(True)
 
     def _emit_change(self):
         if not self._suppress_notify and self._on_change is not None:

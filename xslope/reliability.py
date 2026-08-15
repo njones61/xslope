@@ -1018,8 +1018,13 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
             slope_data, method, rapid=rapid, cancel_check=cancel_check, **_circ_kwargs)
         if not fs_cache:
             return False, "Monte Carlo: critical-surface search failed."
-        crit = (ccache[0] if ccache else fs_cache[0])
-        fixed_circle = {'Xo': crit['Xo'], 'Yo': crit['Yo'], 'R': crit['R'],
+        # The circle every realization is evaluated on is the CRITICAL one. It is
+        # taken from circle_cache rather than fs_cache because only circle_cache
+        # carries the radius — and by lowest FS rather than by position, because
+        # circle_cache is in the order the circles were TRIED: its first entry is
+        # the search's first trial circle, which is not an answer to anything.
+        crit = min(ccache, key=lambda c: c['FS']) if ccache else fs_cache[0]
+        fixed_circle = {'Xo': crit['Xo'], 'Yo': crit['Yo'], 'R': crit.get('R'),
                         'Depth': crit.get('Depth')}
 
     def _eval(sd):

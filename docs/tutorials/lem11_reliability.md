@@ -15,6 +15,7 @@ model instead of leaving it in the report. The analysis carries it through the
 computation, and the answer comes back correspondingly richer: a distribution
 of factors of safety, summarized by a **probability of failure** and a
 **reliability index** rather than by one number.
+[Reliability Analysis](../reliability/index.md) gives the theory behind both.
 
 A probability is also the more meaningful number to act on. In design and
 retrofitting, "FS = 1.35" says nothing about how likely the slope is to fail
@@ -43,7 +44,7 @@ Taylor series over 1 + 2N searches and a 10,000-realization Monte Carlo campaign
 drives the answer, and halve it.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">undrained strength</span><span class="tg-pill">distributed load</span><span class="tg-pill">standard deviations</span><span class="tg-pill">Taylor series (TSPM)</span><span class="tg-pill">Monte Carlo</span><span class="tg-pill">variance Pareto</span><span class="tg-pill">circular search</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_prob_submerged_KEY.xlsx](../lem/files/xslope_prob_submerged_KEY.xlsx), the same file used by [LEM Sample Problem 15](../lem/samples.md#15-reliability-analysis-submerged-slope)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_reliability.xlsx](../lem/files/xslope_reliability.xlsx) — essentially the same problem as [LEM Sample Problem 15](../lem/samples.md#15-reliability-analysis-submerged-slope), with the standing water entered as a piezometric line instead of hand-typed surface loads</div>
 </div>
 
 ---
@@ -53,12 +54,14 @@ drives the answer, and halve it.
 One soil: an undrained clay, γ = 120 pcf, c = 400 psf, φ = 0, over a rigid base
 20 ft below the toe. The face rises 30 ft at 1.5:1, and the whole section is
 under water — the free surface stands at elevation 40, so there is 40 ft of water
-on the flat in front of the toe and 10 ft over the crest. That water is modelled
-as a distributed load on the ground surface rather than as a pore-pressure model,
-which is why the clay's **u** is `none`: a total-stress φ = 0 analysis carries no
-pore pressures on its slice bases, and the water's weight arrives as the load it
-is. [LEM-4](lem04_water_in_the_slope.md) covers the pore-pressure inputs this
-model deliberately does without.
+on the flat in front of the toe and 10 ft over the crest. The water surface is
+entered once, as a flat piezometric line at elevation 40, and the model's
+**Water loads** option is `auto`: at solve time the engine turns the standing
+water above the ground into the surface loads it is. The clay's **u** stays
+`none`, because a total-stress φ = 0 analysis carries no pore pressures on its
+slice bases — here the line defines the reservoir, not a pore-pressure field.
+[LEM-4](lem04_water_in_the_slope.md) covers the pore-pressure inputs this model
+deliberately does without.
 
 What makes the slope a reliability problem is the two extra pieces of data
 beside those strengths: the site investigation supports a standard deviation of
@@ -69,9 +72,12 @@ carried nothing.
 ### Opening the model
 
 Download
-[xslope_prob_submerged_KEY.xlsx](../lem/files/xslope_prob_submerged_KEY.xlsx)
+[xslope_reliability.xlsx](../lem/files/xslope_reliability.xlsx)
 and open it in Studio — **File → Open**. The Inputs plot draws the section, the
-starting circle the file carries, and the water as two blocks of load arrows:
+starting circle the file carries, the piezometric line at elevation 40 with the
+water-table symbol on it, and the surface loads the water derives — drawn in
+water blue and labelled as derived, because they are computed from the line
+rather than entered:
 
 ![The loaded model](images/lem11_inputs.png){width=1000}
 
@@ -134,8 +140,13 @@ the σ columns into a reliability index. Open it and leave the **Method** on
 ![The Reliability dialog on the Taylor series](images/lem11_studio_reliability_taylor.png)
 
 **Search the critical surface at the mean values** is ticked by default and
-should stay ticked: the surface is found once, at the most-likely values, and the
-uncertainty is then evaluated on it. Below the controls, **Standard deviations in
+should stay ticked — and for the Taylor series it means more than its label
+says: every one of the 1 + 2N solves runs its **own search**, so each
+perturbed model finds its own critical surface rather than inheriting the
+mean-value one. Unticked, the entered circle is evaluated as-is at every
+solve. (The sampling engines later on this page behave differently — there
+the surface really is found once at the mean values and held, because
+re-searching per realization is prohibitive at ten thousand solves.) Below the controls, **Standard deviations in
 this file** lists what the run will actually vary — `mat:soil:c = 400 ± 100
 (COV 25%)` and `mat:soil:gamma = 120 ± 8 (COV 7%)`. If that box says no standard
 deviations are set, **Run** is disabled; a reliability analysis with nothing
@@ -403,10 +414,12 @@ default convergence stop, and reach for the response surface when the tail
 itself is the question — checking it against a Monte Carlo run once, since the
 two sampling engines share their draws by construction.
 
-Neither sampling engine randomizes the failure surface. The slip surface is a decision, not a
-random variable: it is found once at the most-likely values and then held while
-the parameters vary, which is what both engines above did and what the commercial
-limit-equilibrium codes do in their probabilistic modes.
+No engine randomizes the failure surface — the slip surface is a decision, not
+a random variable. The Taylor series searches at every one of its 1 + 2N
+solves, each perturbation finding its own critical surface; the two sampling
+engines find the surface once, at the most-likely values, and hold it across
+their realizations, which is what the commercial limit-equilibrium codes do in
+their probabilistic modes.
 
 ---
 

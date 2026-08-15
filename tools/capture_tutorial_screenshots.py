@@ -1270,7 +1270,7 @@ SHOTS.update({
 # unticks it too) — a page whose sentence is "tick Reliability and the σ columns
 # appear" cannot be illustrated by an editor with the box clear.
 # --------------------------------------------------------------------------- #
-LEM11 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_prob_submerged_KEY.xlsx")
+LEM11 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_reliability.xlsx")
 
 
 def _lem_and_rel(dlg):

@@ -1445,7 +1445,7 @@ def lem07_plots():
 # page's edit halves the standard deviation the variance Pareto measures as dominant,
 # so the last two figures are the same Monte Carlo histogram before and after.
 # --------------------------------------------------------------------------- #
-LEM11 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_prob_submerged_KEY.xlsx")
+LEM11 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_reliability.xlsx")
 LEM11_METHOD = "spencer"
 #: The page's edit: s(c) halved, 100 -> 50 psf.
 LEM11_SIGMA_C = 50.0

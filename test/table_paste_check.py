@@ -1215,7 +1215,7 @@ def test_lem11_sigma_block():
 
     page = "lem11_reliability.md"
     printed = _taught(page, ["s(g)", "s(c)"])
-    model = _load(os.path.join(_MODELS, "xslope_prob_submerged_KEY.xlsx"))
+    model = _load(os.path.join(_MODELS, "xslope_reliability.xlsx"))
     before = model["materials"][0]
     out = _fail(len(printed) == 1,
                 f"LEM-11 σ block: the page prints {len(printed)} rows; the edit "

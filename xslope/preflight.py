@@ -1762,6 +1762,13 @@ def _piezo_no_consumer(ctx):
         # splits moist from saturated unit weight (the gamma_sat "sidecar" model),
         # which is independent of any material's pore-pressure option.
         return None
+    if ctx.water_loads_mode == "auto":
+        # A third legitimate job (v22): under Water loads = auto the line IS the
+        # reservoir definition — the engine derives the ponded-water surface
+        # loads from it at solve time. A submerged total-stress model carries
+        # exactly this shape: u = none everywhere and the water arriving as
+        # load, defined once by the line.
+        return None
     return (f"Piezometric Line 1 is drawn, but no material uses u = piezo, so the "
             f"line produces no pore pressure anywhere and the model runs dry. Set "
             f"u = piezo on the materials below the water table {_AT_MAT}, or delete "

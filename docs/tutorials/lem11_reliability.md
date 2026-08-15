@@ -7,12 +7,13 @@ description: "A submerged clay slope in XSLOPE whose factor of safety is 1.354 a
 
 Every tutorial before this one ends in a single number: enter the best
 estimate of each soil property and a deterministic analysis returns one factor
-of safety. But soil properties are never known exactly — they are estimated
-from a handful of tests and judgment, and two engineers' estimates of the same
-clay would differ. A stochastic analysis carries that uncertainty through the
-computation instead of discarding it: each uncertain input gets a standard
-deviation beside its value, and the answer comes back as a distribution of
-factors of safety, summarized by a **probability of failure** and a
+of safety. A stochastic analysis starts from **more** data, not less. A site
+investigation yields not just a best estimate of each property but a sense of
+its spread — the scatter of the tests, the range two engineers would defend —
+and a standard deviation entered beside the value puts that knowledge into the
+model instead of leaving it in the report. The analysis carries it through the
+computation, and the answer comes back correspondingly richer: a distribution
+of factors of safety, summarized by a **probability of failure** and a
 **reliability index** rather than by one number.
 
 This page's slope — 30 ft of undrained clay standing under 40 ft of water —
@@ -52,9 +53,11 @@ pore pressures on its slice bases, and the water's weight arrives as the load it
 is. [LEM-4](lem04_water_in_the_slope.md) covers the pore-pressure inputs this
 model deliberately does without.
 
-What makes the slope a reliability problem is the two extra numbers beside those
-strengths. The unit weight carries a standard deviation of 8 pcf and the cohesion
-one of 100 psf — 7% and 25% of their own values.
+What makes the slope a reliability problem is the two extra pieces of data
+beside those strengths: the site investigation supports a standard deviation of
+8 pcf on the unit weight and 100 psf on the cohesion — 7% and 25% of their own
+values — and the sheet carries them where a deterministic model would have
+carried nothing.
 
 ### Opening the model
 

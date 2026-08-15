@@ -1019,7 +1019,7 @@ class ReliabilityRunner(RunnerThread):
         print(f"Running Monte Carlo reliability — {o['method'].upper()}, "
               f"{o.get('n_samples')} samples, seed {o.get('rng_seed')}, "
               f"{o.get('distribution', 'normal')}"
-              + (f", stop at P_f ±{conv*100:.2f} pp" if conv else "") + "…")
+              + (f", stop at P_f ±{conv*100:.2f} %-points" if conv else "") + "…")
         ok, result = reliability(
             sd, o["method"], engine="mc", rapid=o.get("rapid", False),
             circular=circular, search=o.get("search", True),

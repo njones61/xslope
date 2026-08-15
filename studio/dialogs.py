@@ -2163,7 +2163,7 @@ class ReliabilityDialog(QDialog):
         self.mc_converge_tol.setDecimals(2)
         self.mc_converge_tol.setRange(0.05, 5.0)
         self.mc_converge_tol.setSingleStep(0.25)
-        self.mc_converge_tol.setSuffix(" pp")
+        self.mc_converge_tol.setSuffix(" % points")
         self.mc_converge_tol.setValue(
             float(defaults.get("converge_pf") or 0.01) * 100)
         self.mc_converge_tol.setToolTip(
@@ -2175,7 +2175,7 @@ class ReliabilityDialog(QDialog):
             form.addRow("MC seed", self.seed)
             form.addRow("MC distribution", self.distribution)
             form.addRow("", self.mc_converge)
-            form.addRow("P_f tolerance", self.mc_converge_tol)
+            form.addRow("P_f tolerance (±)", self.mc_converge_tol)
 
         # --- FEM SSRM bracket + tolerance (FEM only) -----------------------
         self.f_min = QDoubleSpinBox()

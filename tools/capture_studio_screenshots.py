@@ -855,8 +855,34 @@ def capture_display_dock_fem():
     return _grab_display_dock(mw, panel, "interface_display_dock.png")
 
 
+
+def analysis_reliability_dialog_lem():
+    """The LEM Reliability dialog for the Studio docs — engine, MC controls
+    including the convergence stop, and the read-only σ summary. Generated so
+    the image tracks the dialog; the FEM variant's image predates this producer
+    and its dialog is unchanged by the LEM-only rows."""
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    import contextlib, io
+    from xslope.fileio import load_slope_data
+    from studio.dialogs import ReliabilityDialog
+    with contextlib.redirect_stdout(io.StringIO()):
+        d = load_slope_data(os.path.join(REPO_ROOT, "docs/lem/files/xslope_prob_submerged_KEY.xlsx"))
+    dlg = ReliabilityDialog(defaults={"engine": "mc", "method": "spencer",
+                                      "num_slices": 40, "search": True},
+                            slope_data=d, app_mode="lem")
+    dlg.resize(dlg.sizeHint())
+    dlg.show()
+    app.processEvents()
+    pix = dlg.grab()
+    out = os.path.join(REPO_ROOT, "docs/studio/images/analysis_reliability_dialog_lem.png")
+    pix.save(out)
+    print("  wrote", os.path.relpath(out, REPO_ROOT))
+
+
 def main():
     print("capture_studio_screenshots: regenerating Studio dialog images")
+    analysis_reliability_dialog_lem()
     for fn in (capture_run_dialog, capture_playbar, capture_transient_editor,
                capture_polygon_editor, capture_polygon_editor_refine,
                capture_profile_editor, capture_dloads_editor,

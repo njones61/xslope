@@ -1173,10 +1173,11 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
         if converge_pf is not None:
             if n_used < n_samples:
                 print(f"Converged at n = {n_used}: P_f {pf_empirical*100:.2f}% "
-                      f"± {pf_ci_half*100:.2f} pp (95% CI ≤ ±{converge_pf*100:.2f} pp)")
+                      f"± {pf_ci_half*100:.2f} percentage points "
+                      f"(95% CI ≤ ±{converge_pf*100:.2f})")
             else:
-                print(f"Convergence tolerance ±{converge_pf*100:.2f} pp not met "
-                      f"within the {n_samples}-sample cap.")
+                print(f"Convergence tolerance ±{converge_pf*100:.2f} percentage "
+                      f"points not met within the {n_samples}-sample cap.")
         print(f"Mean FS: {mean_FS:.4f}   σ_F: {sigma_F:.4f}   COV_F: {COV_F:.4f}")
         print(f"β (normal): {beta_normal:.4f}   β (lognormal): {beta_ln:.4f}")
         print(f"PF empirical: {pf_empirical*100:.3f}%   "

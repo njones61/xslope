@@ -5,12 +5,21 @@ description: "A submerged clay slope in XSLOPE whose factor of safety is 1.354 a
 
 # Tutorial LEM-11 — Reliability
 
-A 30 ft slope in undrained clay, standing under 40 ft of water, with a factor of
-safety of 1.354. The clay's strength and unit weight were not measured exactly —
-they carry standard deviations on the materials sheet — and running those
-standard deviations through the analysis says the slope has roughly one chance in
-six of failing. **The factor of safety does not change; what changes is what is
-known about it.**
+Every tutorial before this one ends in a single number: enter the best
+estimate of each soil property and a deterministic analysis returns one factor
+of safety. But soil properties are never known exactly — they are estimated
+from a handful of tests and judgment, and two engineers' estimates of the same
+clay would differ. A stochastic analysis carries that uncertainty through the
+computation instead of discarding it: each uncertain input gets a standard
+deviation beside its value, and the answer comes back as a distribution of
+factors of safety, summarized by a **probability of failure** and a
+**reliability index** rather than by one number.
+
+This page's slope — 30 ft of undrained clay standing under 40 ft of water —
+makes the difference concrete. The deterministic answer is FS = 1.354; the
+stochastic answer is that the slope has roughly one chance in six of failing.
+**The factor of safety does not change; what changes is what is known about
+it.**
 
 
 <div class="tut-glance" markdown>

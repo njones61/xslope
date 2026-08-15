@@ -1046,9 +1046,63 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
         fixed_circle = {'Xo': crit['Xo'], 'Yo': crit['Yo'], 'R': crit.get('R'),
                         'Depth': crit.get('Depth')}
 
+    # The slice-template fast path: the fixed surface means the geometry of the
+    # slice table never changes across realizations — only the material
+    # properties multiplied onto it. Generate once with the per-band breakdown
+    # and rewrite the material-derived columns per realization; realizations
+    # fall back to a full rebuild whenever the model declines the shortcut
+    # (stress-dependent envelopes, ru pore pressure, suction), and the template
+    # is verified against a rebuilt table at the most-likely values before it
+    # is trusted at all.
+    from .slice import update_slice_materials
+    _template = None
+    if not rapid:
+        try:
+            if circular:
+                okt, rest = generate_slices(slope_data, circle=fixed_circle,
+                                            num_slices=num_slices,
+                                            composite=composite,
+                                            check_inputs=False,
+                                            material_breakdown=True)
+            else:
+                okt, rest = generate_slices(slope_data, non_circ=fixed_noncirc,
+                                            num_slices=num_slices,
+                                            check_inputs=False,
+                                            material_breakdown=True)
+            if okt:
+                cand = rest[0]
+                probe = cand.copy()
+                update_slice_materials(probe, slope_data['materials'])
+                same = all(
+                    np.allclose(probe[col].astype(float),
+                                cand[col].astype(float),
+                                rtol=0, atol=1e-9, equal_nan=True)
+                    for col in ('w', 'kw', 'y_cg', 'c', 'phi', 'c1', 'phi1',
+                                'd', 'psi'))
+                if same:
+                    _template = cand
+        except (ValueError, KeyError):
+            _template = None
+
     def _eval(sd):
         # check_inputs=False: every Monte Carlo realization is a sampled model, so
         # the same reasoning as the Taylor path applies.
+        if _template is not None:
+            df = _template.copy()
+            try:
+                update_slice_materials(df, sd['materials'])
+            except ValueError:
+                return _eval_rebuild(sd)
+            ok2, r = solver(df)
+            if not ok2:
+                return None
+            fs = r.get('FS')
+            if fs is None or not np.isfinite(fs):
+                return None
+            return float(fs)
+        return _eval_rebuild(sd)
+
+    def _eval_rebuild(sd):
         if circular:
             ok, res = generate_slices(sd, circle=fixed_circle, num_slices=num_slices,
                                       composite=composite, check_inputs=False)

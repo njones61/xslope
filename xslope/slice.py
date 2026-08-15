@@ -475,6 +475,77 @@ def generate_failure_surface(ground_surface, circular, circle=None, non_circ=Non
     return True, (x_min, x_max, y_left, y_right, clipped_surface)
 
 
+def update_slice_materials(slice_df, materials):
+    """Rewrite the material-derived slice columns for a new materials list, on a
+    slice table generated with ``material_breakdown=True`` — the fast path a
+    Monte Carlo campaign takes instead of re-slicing an unchanged geometry.
+
+    Updates w, kw, y_cg (from the stored per-band heights and moments, in the
+    same band order and arithmetic the generator used) and the base-strength
+    columns c/phi/c1/phi1/d/psi (mc and cp options). Raises ValueError when the
+    table cannot honestly take the shortcut — no breakdown stored, a base
+    material on a stress-dependent envelope (pow/hb), a weight-dependent pore
+    pressure (ru), or suction strength — and the caller falls back to a full
+    rebuild.
+    """
+    mb = slice_df.attrs.get('mat_breakdown')
+    if mb is None:
+        raise ValueError("slice table carries no material breakdown")
+    if mb.get('suction'):
+        raise ValueError("suction strength depends on u; rebuild")
+    base = mb['base_idx']
+    if (base < 0).any():
+        raise ValueError("a slice has no base material; rebuild")
+    for bi in np.unique(base):
+        opt = materials[bi].get('option')
+        if opt not in ('mc', 'cp'):
+            raise ValueError(f"base material option {opt!r} is stress-dependent; rebuild")
+    for m in materials:
+        if (m.get('u') or 'none') == 'ru':
+            raise ValueError("ru pore pressure depends on weight; rebuild")
+
+    gam = [m['gamma'] for m in materials]
+    gsat = [m.get('gamma_sat') if m.get('gamma_sat') is not None else m['gamma']
+            for m in materials]
+    Hm, Hs, HYm, HYs = mb['Hm'], mb['Hs'], mb['HYm'], mb['HYs']
+    dx = slice_df['dx'].to_numpy()
+    n = len(slice_df)
+    w = np.zeros(n)
+    sgh = np.zeros(n)
+    sghy = np.zeros(n)
+    # Accumulate per band in band order — the generator's own summation order,
+    # so a realization at the most-likely values reproduces it exactly.
+    for p, mi in enumerate(mb['mat_of_poly']):
+        g, gs = gam[mi], gsat[mi]
+        band = gs * Hs[:, p] + g * Hm[:, p]
+        w += band * dx
+        sgh += band
+        sghy += gs * HYs[:, p] + g * HYm[:, p]
+    slice_df['w'] = w
+    slice_df['kw'] = abs(mb['k_seismic']) * w
+    with np.errstate(invalid='ignore', divide='ignore'):
+        slice_df['y_cg'] = np.where(sgh > 0, sghy / np.maximum(sgh, 1e-300), np.nan)
+
+    y_cb = slice_df['y_cb'].to_numpy()
+    c = np.empty(n); phi = np.empty(n)
+    c1 = np.zeros(n); phi1 = np.zeros(n)
+    dcol = np.zeros(n); psi = np.zeros(n)
+    for bi in np.unique(base):
+        mask = base == bi
+        m = materials[bi]
+        if m['option'] == 'mc':
+            c[mask] = m['c']; phi[mask] = m['phi']
+            c1[mask] = m['c']; phi1[mask] = m['phi']
+            dcol[mask] = m['d']; psi[mask] = m['psi']
+        else:  # cp
+            c[mask] = m['c'] + np.maximum(0.0, m['r_elev'] - y_cb[mask]) * m['cp']
+            phi[mask] = 0.0
+    slice_df['c'] = c; slice_df['phi'] = phi
+    slice_df['c1'] = c1; slice_df['phi1'] = phi1
+    slice_df['d'] = dcol; slice_df['psi'] = psi
+    return slice_df
+
+
 def get_y_from_intersection(geom):
     """
     Extracts the maximum Y-coordinate from a geometric intersection result.
@@ -888,7 +959,8 @@ def build_composite_surface(slope_data, circle, x_min, x_max, n=2000):
 
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
                     composite=False, right_facing=None,
-                    suction_phi_b=None, suction_cap=None, check_inputs=True):
+                    suction_phi_b=None, suction_cap=None, check_inputs=True,
+                    material_breakdown=False):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -1580,6 +1652,14 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
     # Generate slices
     slices = []
+    # Per-slice, per-band geometry the material-derived columns are built from,
+    # captured only on request (material_breakdown=True): the moist/saturated
+    # heights and their first moments, per polygon band, in band order. They are
+    # what update_slice_materials() needs to rebuild w, y_cg, kw and the base
+    # strengths for a new materials list without re-slicing — the geometry never
+    # changes, only the properties multiplied onto it.
+    mb_Hm, mb_Hs, mb_HYm, mb_HYs, mb_base = ([], [], [], [], []) \
+        if material_breakdown else (None, None, None, None, None)
     # Coverage tally for u='seep' base points. A single base outside the seepage
     # mesh is a warning (a mesh that stops short of one end of a long surface is a
     # modelling judgement); EVERY base outside it is not a judgement, it is a
@@ -1620,6 +1700,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         heights = [0] * n_polygons
         soil_weight = 0
         base_material_idx = None
+        if material_breakdown:
+            _hm = [0.0] * len(poly_edges)
+            _hs = [0.0] * len(poly_edges)
+            _hym = [0.0] * len(poly_edges)
+            _hys = [0.0] * len(poly_edges)
         base_overlap_bot = float('inf')  # elevation of the deepest present layer's base
         sum_gam_h_y = 0  # for calculating center of gravity of slice
         sum_gam_h = 0    # ditto
@@ -1660,10 +1745,18 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                                     + gamma * h_moist * (overlap_top + y_split) / 2)
                     sum_gam_h += g_sat * h_sat + gamma * h_moist
                     soil_weight += (g_sat * h_sat + gamma * h_moist) * dx
+                    if material_breakdown:
+                        _hs[p_idx] = h_sat
+                        _hm[p_idx] = h_moist
+                        _hys[p_idx] = h_sat * (y_split + overlap_bot) / 2
+                        _hym[p_idx] = h_moist * (overlap_top + y_split) / 2
                 else:
                     sum_gam_h_y += h * gamma * (overlap_top + overlap_bot) / 2
                     sum_gam_h += h * gamma
                     soil_weight += h * gamma * dx
+                    if material_breakdown:
+                        _hm[p_idx] = h
+                        _hym[p_idx] = h * (overlap_top + overlap_bot) / 2
                 # Base material = the DEEPEST present layer (smallest base
                 # elevation), independent of polygon iteration order. The
                 # previous "last h>0 layer wins" relied on polygons being
@@ -2366,6 +2459,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 'yo': None,  # not applicable for non-circular failure surface
             })
         slices.append(slice_data)
+        if material_breakdown:
+            mb_Hm.append(_hm)
+            mb_Hs.append(_hs)
+            mb_HYm.append(_hym)
+            mb_HYs.append(_hys)
+            mb_base.append(-1 if base_material_idx is None else base_material_idx)
 
     # Every u='seep' base point outside the seepage mesh: the field was not read at
     # all, so the whole surface priced as dry. The per-point warning above cannot
@@ -2386,6 +2485,21 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Surface a flat-arc facing note in the returned data (rather than guessing
     # silently). Only set on a symmetric flat arc with no override; None otherwise.
     df.attrs['facing_note'] = facing_note
+    if material_breakdown:
+        _mats_of_poly = []
+        for pe in poly_edges:
+            mat_id = pe['mat_id']
+            _mats_of_poly.append(mat_id if (mat_id is not None
+                                            and 0 <= mat_id < len(materials))
+                                 else pe['poly_index'])
+        df.attrs['mat_breakdown'] = {
+            'Hm': np.asarray(mb_Hm), 'Hs': np.asarray(mb_Hs),
+            'HYm': np.asarray(mb_HYm), 'HYs': np.asarray(mb_HYs),
+            'base_idx': np.asarray(mb_base, dtype=int),
+            'mat_of_poly': _mats_of_poly,
+            'k_seismic': k_seismic,
+            'suction': bool(suction_phi_b),
+        }
     if facing_note and debug:
         print("WARNING: " + facing_note)
 

@@ -284,7 +284,7 @@ deterministic what-ifs, Reliability turns the material standard deviations (the
 of failure**. It is available in **LEM** and **FEM** modes (not Seepage); the FEM run
 needs a built mesh, like Run.
 
-The dialog offers a **Method** selector with two engines:
+The dialog offers a **Method** selector with three engines:
 
 ![Reliability dialog (LEM)](images/analysis_reliability_dialog_lem.png)
 
@@ -296,6 +296,14 @@ The dialog offers a **Method** selector with two engines:
   Carlo needs ~10⁴ solves, which is affordable with a limit-equilibrium solve but not
   with the finite-element SSRM, so it is **disabled in FEM mode** (a one-line note
   explains why, and FEM reliability stays on the Taylor series):
+- **Response surface (RS)** — the same sampling with the factor of safety taken from
+  a quadratic surrogate, fitted to a few dozen real solves and measured against
+  held-out ones before it is used. Ten million realizations at no sampling cost, so
+  a small probability of failure is resolved; a surrogate that fails its accuracy
+  gate refuses the run rather than answering (the [Monte Carlo
+  page](../reliability/monte_carlo.md#sampling-a-fitted-response-surface) gives the
+  design, the gate and the measured accuracy). Limit-equilibrium only, for the same
+  reason as Monte Carlo:
 
 ![Reliability dialog (FEM)](images/analysis_reliability_dialog_fem.png)
 
@@ -309,8 +317,12 @@ a normal / lognormal **distribution** choice, and an optional convergence stop �
 itself* ends the campaign once the 95% confidence half-width on the empirical
 probability of failure is inside that fraction, with the samples count as the cap
 (the [Monte Carlo page](../reliability/monte_carlo.md) gives the rule, its
-rare-event guard, and the convergence plot). **FEM** shows the SSRM `F_min` / `F_max`
-bracket and a tight reliability tolerance. Settings are remembered for the session.
+rare-event guard, and the convergence plot). The **Response surface** engine shares
+the seed and distribution controls and ignores the sample count and the convergence
+stop — its realization count is fixed at ten million, which costs seconds of
+arithmetic rather than solves, and its accuracy is set by the fit rather than by the
+count. **FEM** shows the SSRM `F_min` / `F_max` bracket and a tight reliability
+tolerance. Settings are remembered for the session.
 
 The run reports β, the probability of failure, and the mean / σ of the factor of
 safety in a summary, with the per-parameter table in the Log pane. The result view
@@ -320,6 +332,7 @@ follows the engine:
 | --- | --- |
 | **Taylor series (LEM)** | **LEM · Reliability** — the most-likely-value surface with the F⁺/F⁻ perturbation surfaces. |
 | **Monte Carlo (LEM)** | **Reliability · MC** — the FS histogram with the FS = 1 line, the mean, and fitted normal / lognormal overlays (a display-panel toggle). β in both conventions and the probability of failure are in the title. |
+| **Response surface (LEM)** | **Reliability · RS** — the same FS histogram, drawn from a 10,000-realization subsample of the surrogate draws. The fit and gate summary — design solves, $R^2$, RMS error, the failure-region check — is in the Log pane and the run summary. |
 | **Taylor series (FEM)** | **FEM · Results** — the deformation at the most-likely values; β and the probability of failure are in the run summary. |
 
 ![LEM Reliability view](images/analysis_lem_reliability.png)
@@ -327,7 +340,7 @@ follows the engine:
 ![Monte Carlo reliability histogram](images/analysis_reliability_mc_histogram.png)
 
 The engines are the same ones the library exposes — `reliability` (the front door),
-`reliability_taylor`, `reliability_mc`, and `reliability_fem`; see
+`reliability_taylor`, `reliability_mc`, `reliability_rs`, and `reliability_fem`; see
 [Reliability Analysis](../reliability/index.md) for the theory and worked examples.
 
 ---

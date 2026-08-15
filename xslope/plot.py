@@ -4451,9 +4451,14 @@ def plot_reliability_histogram(result, figsize=(9, 5.5), bins='auto', show_fits=
         line2 = ", ".join(beta_bits + [f"$P_f$ = {pf * 100:.2f}%"])
         n_txt = ""
         if result.get('n_valid') is not None:
-            n_txt = f"   (n = {result.get('n_valid')})"
-        ax.set_title("Monte Carlo Reliability — FS distribution\n"
-                     + ", ".join(bits) + n_txt + "\n" + line2)
+            n_txt = f"   (n = {result.get('n_valid'):,})"
+        # A response-surface result carries the same keys, but its realizations
+        # came from the fitted surrogate: n is the count the statistics were
+        # formed from, while the bars are drawn from a subsample of it.
+        head = ("Response-Surface Reliability — FS distribution"
+                if result.get('engine') == 'rs'
+                else "Monte Carlo Reliability — FS distribution")
+        ax.set_title(head + "\n" + ", ".join(bits) + n_txt + "\n" + line2)
 
     if show_legend:
         ax.legend(loc='best', fontsize=8, framealpha=0.9)

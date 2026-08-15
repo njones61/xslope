@@ -338,6 +338,7 @@ from .reliability import (  # noqa: F401  (re-exported for backward compatibilit
     reliability,
     reliability_taylor,
     reliability_mc,
+    reliability_rs,
     reliability_fem,
     MC_DEFAULT_SEED,
     MC_DEFAULT_SAMPLES,

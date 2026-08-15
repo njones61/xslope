@@ -937,6 +937,7 @@ class ReliabilityRunner(RunnerThread):
 
       * app_mode 'lem', engine 'taylor' -> ``reliability(engine='taylor')`` (TSPM).
       * app_mode 'lem', engine 'mc'      -> ``reliability(engine='mc')`` (Monte Carlo).
+      * app_mode 'lem', engine 'rs'      -> ``reliability(engine='rs')`` (response surface).
       * app_mode 'fem'                   -> ``reliability_fem`` (Taylor / SSRM).
 
     Emits ``succeeded`` with a bundle ``{engine, app_mode, reliability, ...}``,
@@ -965,6 +966,8 @@ class ReliabilityRunner(RunnerThread):
                 self._run_fem()
             elif self._opts.get("engine") == "mc":
                 self._run_mc()
+            elif self._opts.get("engine") == "rs":
+                self._run_rs()
             else:
                 self._run_taylor()
         except AnalysisCancelled:
@@ -1033,6 +1036,34 @@ class ReliabilityRunner(RunnerThread):
             self.failed.emit(str(result))
             return
         self.succeeded.emit({"engine": "mc", "app_mode": "lem",
+                             "reliability": result})
+
+    def _run_rs(self):
+        from xslope.reliability import reliability, RS_DEFAULT_SURROGATE
+        o, sd = self._opts, self._sd
+        circular = o.get("surface", "circular") == "circular"
+        print(f"Running response-surface reliability — {o['method'].upper()}, "
+              f"{RS_DEFAULT_SURROGATE:,} surrogate realizations, "
+              f"seed {o.get('rng_seed')}, {o.get('distribution', 'normal')}…")
+        ok, result = reliability(
+            sd, o["method"], engine="rs", rapid=o.get("rapid", False),
+            circular=circular, search=o.get("search", True),
+            rng_seed=int(o.get("rng_seed", 20240117)),
+            distribution=o.get("distribution", "normal"),
+            num_slices=int(o.get("num_slices", 40)), debug_level=0,
+            progress_callback=self._progress_cb(), cancel_check=self._cancel.is_set)
+        if not ok:
+            # A surrogate that fails its accuracy gate reports the measured errors
+            # in the same message; the run is not degraded silently into an answer.
+            self.failed.emit(str(result))
+            return
+        print(f"Surrogate accepted: {result['n_design']} design solves + "
+              f"{result['n_gate_valid']} gate solves, R² = {result['gate_r2']:.6f}, "
+              f"RMS error {result['gate_rms']:.5f} of a spread of "
+              f"{result['gate_sigma']:.4f}, "
+              f"{result['gate_pf_disagree_n']} gate draw(s) on the wrong side of "
+              f"F = 1.")
+        self.succeeded.emit({"engine": "rs", "app_mode": "lem",
                              "reliability": result})
 
     def _run_fem(self):

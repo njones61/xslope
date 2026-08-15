@@ -1604,6 +1604,48 @@ def run_reliability_mc_test(test):
     return result['beta_ln'], None
 
 
+def run_reliability_rs_test(test):
+    """Response-surface reliability regression: fit the quadratic surrogate to its
+    central composite design, put it through its accuracy gate, sample it, and
+    return the lognormal reliability index beta_ln (compared to expected_beta). The
+    surrogate is fitted to deterministic design points and sampled from a fixed
+    seed, so a given (file, n_surrogate, seed) is bit-reproducible. An optional
+    expected_pf/pf_tol pair additionally checks the probability of failure. A
+    surrogate that fails its gate returns a refusal, which fails the test — the
+    engine is never allowed to degrade into an answer."""
+    from xslope.fileio import load_slope_data
+    from xslope.advanced import reliability_rs
+
+    file_path = test['file']
+    method = test.get('method', 'spencer')
+    circular = str(test.get('circular', 'true')).lower() not in ('false', '0', 'no')
+    do_search = str(test.get('search', 'true')).lower() not in ('false', '0', 'no')
+    distribution = test.get('distribution', 'normal')
+    num_slices = int(test.get('num_slices', 40))
+    composite = str(test.get('composite', 'false')).lower() in ('true', '1', 'yes')
+    kw = {}
+    for key, cast in (('n_surrogate', int), ('n_gate', int), ('alpha', float),
+                      ('rng_seed', int)):
+        if key in test:
+            kw[key] = cast(test[key])
+
+    slope_data = load_slope_data(file_path)
+    success, result = reliability_rs(slope_data, method, circular=circular,
+                                     search=do_search, distribution=distribution,
+                                     num_slices=num_slices, composite=composite,
+                                     debug_level=-1, **kw)
+    if not success:
+        return None, f"reliability_rs failed: {result}"
+
+    exp_pf = test.get('expected_pf')
+    if exp_pf is not None:
+        pf_tol = float(test.get('pf_tol', 0.01))
+        if abs(result['pf_empirical'] - float(exp_pf)) > pf_tol:
+            return None, (f"pf_empirical {result['pf_empirical']:.5f} vs expected "
+                          f"{float(exp_pf):.5f} (tol {pf_tol})")
+    return result['beta_ln'], None
+
+
 def run_fem_reliability_test(test):
     """FEM reliability regression: run reliability_fem on a mesh and return the
     lognormal reliability index beta_ln (compared to expected_beta). Guards the
@@ -4200,6 +4242,7 @@ PREFLIGHT_TAG_ANALYSIS = {
     'sensitivity': ('sensitivity', {}),
     'reliability': ('reliability', {}),
     'reliability_mc': ('reliability', {}),
+    'reliability_rs': ('reliability', {}),
     'fem_reliability': ('reliability', {'base': 'fem'}),
     'seep': ('seep', {}),
     'seep_head': ('seep', {}),
@@ -11303,6 +11346,8 @@ def _dispatch_test(test):
         return run_reliability_test(test)
     elif test_type == 'reliability_mc':
         return run_reliability_mc_test(test)
+    elif test_type == 'reliability_rs':
+        return run_reliability_rs_test(test)
     elif test_type == 'design_search':
         return run_design_test(test)
     elif test_type == 'design_callable':
@@ -11321,7 +11366,8 @@ def _expected_and_tol(test, default_tolerance):
     if test_type == 'seep':
         expected = test.get('expected_flowrate')
         tol = test.get('tolerance', 0.05) * abs(expected) if expected else 0
-    elif test_type in ('reliability', 'fem_reliability', 'reliability_mc'):
+    elif test_type in ('reliability', 'fem_reliability', 'reliability_mc',
+                       'reliability_rs'):
         expected = test.get('expected_beta')
         tol = test.get('tolerance', 0.02)
     elif test_type == 'critical_kc':
@@ -11366,7 +11412,7 @@ def _expected_and_tol(test, default_tolerance):
 
 # Rough per-type cost ranks so the parallel scheduler starts the slow tests
 # first (wall time is otherwise dominated by an FEM case landing last).
-_COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'fem_ssrm': 5, 'fem_elements': 5,
+_COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_elements': 5,
               'preflight_corpus': 5, 'preflight_rules': 4,
               'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'fs_vs_time': 5,
               'transient_seep': 4, 'seep_elements': 3, 'seep': 3,

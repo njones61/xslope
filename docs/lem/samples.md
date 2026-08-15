@@ -830,6 +830,7 @@ analysis summary:
 
 <!-- test: file=files/xslope_prob_submerged_KEY.xlsx, type=reliability, method=spencer, expected_beta=0.935, tolerance=0.03 -->
 <!-- test: file=files/xslope_prob_submerged_KEY.xlsx, type=reliability_mc, method=spencer, search=true, n_samples=10000, converge_rel=0.10, expected_beta=0.985, tolerance=0.02, expected_pf=0.169, pf_tol=0.02 -->
+<!-- test: file=files/xslope_prob_submerged_KEY.xlsx, type=reliability_rs, method=spencer, search=true, n_surrogate=10000000, expected_beta=0.998, tolerance=0.01, expected_pf=0.1656, pf_tol=0.005 -->
 
 ### 16. Saturated vs. Moist Unit Weight (γ_sat)
 

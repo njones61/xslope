@@ -17,10 +17,10 @@ where:
 In reliability analysis, we consider the uncertainties in the parameters that affect the stability of the slope. These uncertainties can arise from various sources, such as variations in soil properties, loading conditions, and environmental factors. By incorporating these uncertainties into our analysis, we can obtain a more comprehensive understanding of the slope's stability. The **xslope** package provides a function to calculate the reliability of a slope using the limit equilibrium method. This function takes into account the uncertainties in the soil properties ($\gamma$, $c$, $\phi$, etc.) and provides a probability of failure (Pf) and reliability (R) for the slope. It can be used with any of the limit equilibrium methods implemented in the package, such as Bishop's method, Janbu's method, or Spencer's method. It can also be combined with a rapid drawdown analysis.
 
 In XSLOPE Studio this lives behind the **Reliability…** button, beside
-**Parametric…** on the Run menu and toolbar: pick the Taylor series or Monte Carlo
-engine, review the standard deviations pulled from the mat sheet, and view the results
-in a dedicated tab — the perturbation-surface plot for the Taylor series, the FS
-histogram for Monte Carlo. See
+**Parametric…** on the Run menu and toolbar: pick the Taylor series, Monte Carlo or
+response-surface engine, review the standard deviations pulled from the mat sheet, and
+view the results in a dedicated tab — the perturbation-surface plot for the Taylor
+series, the FS histogram for the two sampling engines. See
 [Studio → Running Analyses](../studio/analysis.md#reliability-analysis).
 
 ## The reliability family
@@ -30,22 +30,24 @@ All of the methods described in this section are reached through a single front 
 >>`reliability(slope_data, method, engine='taylor')`
 
 The `engine` argument selects the analysis engine. `engine='taylor'` (the default)
-runs the Taylor Series Probability Method; `engine='mc'` runs a Monte Carlo campaign.
+runs the Taylor Series Probability Method; `engine='mc'` runs a Monte Carlo campaign;
+`engine='rs'` runs the same campaign against a fitted response surface.
 Because the default is the Taylor series, an existing call such as
-`reliability(slope_data, 'bishop')` keeps its exact meaning. The two engines are also
-public directly, under their own honest names, so a script can call whichever it wants:
+`reliability(slope_data, 'bishop')` keeps its exact meaning. Every engine is also
+public directly, under its own honest name, so a script can call whichever it wants:
 
 | Function | Method | Solver | Cost | Page |
 |----------|--------|--------|------|------|
 | `reliability_taylor` | Taylor Series Probability Method | limit equilibrium | 1 + 2N searches | [Taylor Series (TSPM)](taylor.md) |
 | `reliability_mc`     | Monte Carlo                      | limit equilibrium | N (≈ 10⁴) evaluations | [Monte Carlo](monte_carlo.md) |
+| `reliability_rs`     | Response surface                 | limit equilibrium | ~10² solves, then 10⁷ surrogate evaluations | [Monte Carlo](monte_carlo.md#sampling-a-fitted-response-surface) |
 | `reliability_fem`    | Taylor Series Probability Method | finite-element SSRM | 1 + 2N solves | [Reliability Analysis (FEM)](fem.md) |
 
 `reliability_fem` is the finite-element counterpart of the Taylor series — each factor
 of safety comes from a strength-reduction (SSRM) solve rather than a limit-equilibrium
-search (see [Reliability Analysis (FEM)](fem.md)). Monte Carlo is a
-limit-equilibrium path only, for the compute reason discussed under
-[Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope). All three engines read the *same*
+search (see [Reliability Analysis (FEM)](fem.md)). The two sampling engines are
+limit-equilibrium paths only, for the compute reason discussed under
+[Monte Carlo in xslope](monte_carlo.md#monte-carlo-in-xslope). All four engines read the *same*
 inputs — the material most-likely values and the standard-deviation columns of the mat
 sheet — so choosing an engine never changes the data you enter.
 

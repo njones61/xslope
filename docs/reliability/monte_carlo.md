@@ -118,6 +118,99 @@ estimates for this problem — a case the Taylor series simply has no number for
 plot XSLOPE Studio renders on the **Reliability · MC** result tab — see
 [Reliability analysis](../studio/analysis.md#reliability-analysis).
 
+## Sampling a fitted response surface
+
+The resolution of a sampling campaign is set by its count: the 95% confidence
+half-width on an empirical probability of failure is $1.96\sqrt{p(1-p)/n}$, so a
+$P_f$ near 17% is known to ±1.6 percentage points after 2,000 realizations, ±0.7
+after 10,000, and reaching ±0.01 would take about **53 million** real
+factor-of-safety solves — a day of limit-equilibrium solving for one number.
+
+The **response surface** engine — `reliability_rs`, or `reliability(...,
+engine='rs')` — takes the count out of the cost. It fits a quadratic surrogate to a
+few dozen real solves and samples that surrogate ten million times, which moves the
+error budget from sampling noise, which no longer registers, to the fit, which is
+measured and reported. Everything else is the campaign above: the same fixed
+surface, the same uncertain parameters, and the same draws — both engines generate
+their realizations through one routine, so the distributions, the physical floors
+and the $\phi \le 89°$ cap are identical by construction.
+
+**The design.** A central composite design about the most-likely values — the $2^d$
+factorial corners at ±1σ, $2d$ axial points at ±2σ, and the centre, where $d$ is the
+number of parameters carrying a standard deviation. That is 9 real solves for two
+uncertain parameters, 15 for three, 25 for four. Each is solved with the full
+pipeline on the fixed surface. A design point that lands below a parameter's
+physical floor is solved *at* the floor and fitted at the coordinate that was
+solved. The axial distance of 2σ is a measured choice: across four corpus models,
+tried at 1.5, 2, 2.5 and 3σ, it gives the lowest fit error on every one of them.
+
+**The fit.** A full quadratic in the $d$ parameters — $1 + d + d(d+1)/2$
+coefficients — by least squares. A design point with no analyzable solution ends the
+run with a message naming it: the surrogate is fitted to the whole design, so a
+corner that cannot be solved leaves the fit undefined over part of the sampled
+range.
+
+**The gate.** The surrogate answers nothing until it has been measured against the
+real pipeline, in two places:
+
+- **500 held-out realizations**, drawn from the sampling distributions on an
+  independent stream of the same seed and never used in the fit, solved for real.
+  The surrogate is accepted when its root-mean-square error is within 5% of the real
+  spread of the factor of safety over those draws, its $R^2$ is at least 0.995, and
+  at most 2% of the draws are put on the wrong side of $F = 1$.
+- **200 realizations from the failure region** — draws the surrogate itself counted
+  as $F < 1$ — solved for real. A gate drawn from the whole population barely visits
+  that region, and the region is the entire answer. The run is refused when more
+  than 5% of them have no analyzable solution, or the solver puts more than 10% of
+  them back above $F = 1$.
+
+Both thresholds are calibrated against what the fit error costs the answer, measured
+by solving tens of thousands of realizations for real and predicting the same draws
+with the surrogate. On the submerged-slope model below the surrogate fits to 0.042
+of the real spread ($R^2$ = 0.9982) and its probability of failure differs from the
+solver's, over the same 30,000 realizations, by **0.10 percentage points** — 0.6% of
+its own value, well inside the sampling noise of the Monte Carlo campaign it
+replaces. Every gate measurement is reported with the answer, in the console
+summary and in the result dictionary.
+
+**A refusal is the answer when the surrogate cannot be honest.** No result is
+degraded silently: a failed gate returns a message naming the measured errors, and
+the choice of what to run instead belongs to the caller. VP34 is refused for the
+second gate — a third of the realizations its surrogate counts as failures have no
+analyzable solution at all, so its $P_f$ would be a count of realizations the model
+cannot solve. Monte Carlo reports that model, excluding those draws and counting
+them separately.
+
+**Sample 15 (the submerged slope), both engines, Spencer's method:**
+
+| | Monte Carlo | Response surface |
+|---|---:|---:|
+| Real limit-equilibrium solves | 2,000 | 710 |
+| Realizations counted | 2,000 | 10,000,000 |
+| Wall time | 6.3 s | 4.2 s |
+| Mean FS | 1.385 | 1.381 |
+| $\sigma_F$ | 0.408 | 0.400 |
+| $\beta_{LN}$ | 0.985 | 0.998 |
+| $P_f$ | 16.85% | 16.56% |
+| 95% sampling half-width on $P_f$ | ±1.64 pp | ±0.02 pp |
+
+```python
+from xslope.fileio import load_slope_data
+from xslope.reliability import reliability
+
+slope_data = load_slope_data("xslope_prob_submerged_KEY.xlsx")
+success, result = reliability(slope_data, "spencer", engine="rs", search=True)
+if success:
+    print(result["pf_empirical"], result["beta_ln"], result["gate_r2"])
+```
+
+The result carries the Monte Carlo keys, so a histogram or a rank correlation reads
+it unchanged; `fs_samples` and `param_samples` are a fixed-stride subsample of
+10,000 realizations, for plotting, while every reported statistic comes from all ten
+million. In **XSLOPE Studio** the engine is the third entry of the Reliability
+dialog's **Method** selector, sharing the seed and distribution controls with Monte
+Carlo — see [Reliability analysis](../studio/analysis.md#reliability-analysis).
+
 ## Surface treatment
 
 The slip surface is a **decision variable, not a random variable** — its geometry is

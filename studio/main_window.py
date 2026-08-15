@@ -2907,6 +2907,13 @@ class MainWindow(QMainWindow):
             panel.changed.connect(self._rerender_reliability_histogram)
             self.display_stack.addWidget(panel)
             self._display_panels[self.reliability_hist_canvas] = panel
+        # One tab serves both sampling engines, named for the one that filled it.
+        bundle = self.doc.results.get("reliability") or {}
+        idx = self.view_tabs.indexOf(self.reliability_hist_canvas)
+        if idx >= 0:
+            self.view_tabs.setTabText(
+                idx, "Reliability · RS" if bundle.get("engine") == "rs"
+                else "Reliability · MC")
         self._rerender_reliability_histogram()
 
     def _rerender_reliability_histogram(self):
@@ -2944,8 +2951,8 @@ class MainWindow(QMainWindow):
         self._last_rel_opts[self._mode] = opts
         self.act_reliability.setEnabled(False)
         self.act_run.setEnabled(False)
-        eng = {"taylor": "Taylor series", "mc": "Monte Carlo"}.get(opts["engine"],
-                                                                   opts["engine"])
+        eng = {"taylor": "Taylor series", "mc": "Monte Carlo",
+               "rs": "Response surface"}.get(opts["engine"], opts["engine"])
         self.statusBar().showMessage(f"Reliability ({eng}) …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
@@ -2965,7 +2972,10 @@ class MainWindow(QMainWindow):
         rel = bundle["reliability"]
         engine = bundle.get("engine")
         app_mode = bundle.get("app_mode")
-        if engine == "mc":
+        if engine in ("mc", "rs"):
+            # Both sampling engines report an FS distribution; the response
+            # surface's histogram is drawn from a fixed-stride subsample of its
+            # ten million realizations.
             self._show_reliability_histogram()
             lead = self.reliability_hist_canvas
         elif app_mode == "fem":
@@ -3003,9 +3013,9 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _reliability_status(rel, engine):
-        if engine == "mc":
-            return (f"Reliability (MC) — mean FS = {rel['mean_FS']:.3f}, "
-                    f"β_ln = {rel['beta_ln']:.3f}, "
+        if engine in ("mc", "rs"):
+            return (f"Reliability ({'MC' if engine == 'mc' else 'RS'}) — mean FS = "
+                    f"{rel['mean_FS']:.3f}, β_ln = {rel['beta_ln']:.3f}, "
                     f"Pf = {rel['pf_empirical'] * 100:.2f}%")
         return (f"Reliability — F_MLV = {rel['F_MLV']:.3f}, "
                 f"β_ln = {rel['beta_ln']:.3f}, "
@@ -3013,6 +3023,24 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _reliability_summary(rel, engine, app_mode):
+        if engine == "rs":
+            return (
+                f"Response surface ({rel.get('distribution', 'normal')}, "
+                f"{rel.get('n_surrogate', 0):,} surrogate realizations)\n\n"
+                f"mean FS = {rel['mean_FS']:.3f}\n"
+                f"σ_F = {rel['sigma_F']:.3f}    COV_F = {rel['COV_F']:.3f}\n"
+                f"β (normal) = {rel['beta_normal']:.3f}\n"
+                f"β (lognormal) = {rel['beta_ln']:.3f}\n"
+                f"Pf (empirical) = {rel['pf_empirical'] * 100:.3f}%\n"
+                f"Pf (normal) = {rel['pf_normal'] * 100:.3f}%    "
+                f"Pf (lognormal) = {rel['pf_lognormal'] * 100:.3f}%\n\n"
+                f"Surrogate: {rel['n_design']} design solves, checked against "
+                f"{rel['n_gate_valid']} held-out solves — R² = {rel['gate_r2']:.5f}, "
+                f"RMS error {rel['gate_rms']:.4f} of a spread of "
+                f"{rel['gate_sigma']:.3f}, {rel['gate_pf_disagree_n']} draw(s) on "
+                f"the wrong side of F = 1.\n\n"
+                "The FS histogram is on the Reliability · RS tab; the fit and gate "
+                "summary is in the Log pane.")
         if engine == "mc":
             return (
                 f"Monte Carlo ({rel.get('distribution', 'normal')}, "

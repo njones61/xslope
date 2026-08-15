@@ -2021,7 +2021,12 @@ class SensitivityDialog(QDialog):
 
 
 RELIABILITY_ENGINES = [("taylor", "Taylor series (TSPM)"),
-                       ("mc", "Monte Carlo")]
+                       ("mc", "Monte Carlo"),
+                       ("rs", "Response surface (RS)")]
+#: The reliability engines that sample the standard deviations rather than
+#: perturbing them. Both are limit-equilibrium only and share the seed and
+#: distribution controls.
+RELIABILITY_SAMPLING_ENGINES = ("mc", "rs")
 MC_DISTRIBUTIONS = [("normal", "Normal"), ("lognormal", "Lognormal")]
 
 
@@ -2030,7 +2035,7 @@ class ReliabilityDialog(QDialog):
 
     Where the Parametric study answers deterministic what-ifs, this dialog turns
     the material standard deviations (the ``s(·)`` columns of the mat sheet) into a
-    reliability index and a probability of failure. It offers two engines:
+    reliability index and a probability of failure. It offers three engines:
 
     - **Taylor series (TSPM)** — ``1 + 2N`` limit-equilibrium searches (or FEM SSRM
       solves in FEM mode): the mean-value factor of safety plus a ±σ perturbation
@@ -2040,6 +2045,11 @@ class ReliabilityDialog(QDialog):
       Carlo needs ~10⁴ factor-of-safety evaluations, which is affordable with a
       limit-equilibrium solve but not with the finite-element SSRM, so it is
       disabled in FEM mode (FEM reliability stays on the Taylor series).
+    - **Response surface (RS)** — the same sampling, with the factor of safety taken
+      from a quadratic surrogate fitted to a few dozen real solves and measured
+      against held-out ones before it is used. Ten million realizations at no
+      sampling cost, so the tail of the distribution is resolved. Limit-equilibrium
+      only, for the same reason as Monte Carlo.
 
     A read-only summary lists the file's σ columns so the user can confirm what the
     analysis will vary before running.
@@ -2067,12 +2077,13 @@ class ReliabilityDialog(QDialog):
         self.engine = QComboBox()
         for key, label in RELIABILITY_ENGINES:
             self.engine.addItem(label, key)
-        # Monte Carlo is limit-equilibrium only; grey it out in FEM mode.
+        # The sampling engines are limit-equilibrium only; grey them out in FEM mode.
         if self.app_mode == "fem":
-            mc_idx = self.engine.findData("mc")
-            item = self.engine.model().item(mc_idx)
-            item.setEnabled(False)
-            item.setToolTip("Monte Carlo needs ~10^4 solves — limit-equilibrium only.")
+            for key in RELIABILITY_SAMPLING_ENGINES:
+                item = self.engine.model().item(self.engine.findData(key))
+                item.setEnabled(False)
+                item.setToolTip("Sampling the standard deviations needs thousands of "
+                                "solves — limit-equilibrium only.")
         want = defaults.get("engine", "taylor")
         if self.app_mode == "fem":
             want = "taylor"
@@ -2082,8 +2093,8 @@ class ReliabilityDialog(QDialog):
         form.addRow("Method", self.engine)
 
         self._mc_disabled_note = QLabel(
-            "Monte Carlo is disabled for FEM — ~10⁴ SSRM solves is prohibitive; FEM "
-            "reliability uses the Taylor series.")
+            "Monte Carlo and the response surface are disabled for FEM — ~10⁴ SSRM "
+            "solves is prohibitive; FEM reliability uses the Taylor series.")
         self._mc_disabled_note.setWordWrap(True)
         self._mc_disabled_note.setVisible(self.app_mode == "fem")
 
@@ -2138,11 +2149,16 @@ class ReliabilityDialog(QDialog):
         self.n_samples.setRange(100, 500000)
         self.n_samples.setSingleStep(1000)
         self.n_samples.setValue(int(defaults.get("n_samples", 10000)))
-        self.n_samples.setToolTip("Number of sampled realizations (10000 by default).")
+        self.n_samples.setToolTip(
+            "Number of sampled realizations (10000 by default). Monte Carlo only: "
+            "the response surface samples ten million realizations of its "
+            "surrogate, a count that costs seconds of arithmetic rather than "
+            "solves, so there is no trade-off to set here.")
         self.seed = QSpinBox()
         self.seed.setRange(0, 2_000_000_000)
         self.seed.setValue(int(defaults.get("rng_seed", 20240117)))
-        self.seed.setToolTip("Random seed — a fixed value makes the run reproducible.")
+        self.seed.setToolTip("Random seed — a fixed value makes the run reproducible. "
+                             "Applies to Monte Carlo and to the response surface.")
         self.distribution = self._combo(MC_DISTRIBUTIONS,
                                         defaults.get("distribution", "normal"))
         # Statistical-convergence stopping (off by default): check the empirical
@@ -2226,7 +2242,9 @@ class ReliabilityDialog(QDialog):
         note = QLabel(
             "Reliability turns the σ columns into a reliability index β and a "
             "probability of failure. The Taylor series runs 1+2N solves; Monte Carlo "
-            "samples the σ's and reports an FS histogram.")
+            "samples the σ's and reports an FS histogram; the response surface fits "
+            "a surrogate to a few dozen solves, checks it against held-out ones, and "
+            "samples it ten million times.")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -2294,10 +2312,18 @@ class ReliabilityDialog(QDialog):
                                        if self.surface is not None else "circular")
 
     def _sync_enabled(self):
-        mc = self._engine_value() == "mc" and self.app_mode == "lem"
-        # Monte Carlo controls only matter for the MC engine.
-        for w in (self.n_samples, self.seed, self.distribution,
-                  self.mc_converge):
+        lem = self.app_mode == "lem"
+        engine = self._engine_value()
+        mc = engine == "mc" and lem
+        # The seed and the distribution describe the DRAWS, so they apply to both
+        # sampling engines. The sample count and the convergence stop describe how
+        # many realizations are solved, which is a Monte Carlo question only: the
+        # response surface samples a fixed ten million realizations of its
+        # surrogate and its accuracy is set by the fit, not by the count.
+        sampling = engine in RELIABILITY_SAMPLING_ENGINES and lem
+        for w in (self.seed, self.distribution):
+            w.setEnabled(sampling)
+        for w in (self.n_samples, self.mc_converge):
             w.setEnabled(mc)
         self.mc_converge_tol.setEnabled(mc and self.mc_converge.isChecked())
 

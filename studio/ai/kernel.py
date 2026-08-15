@@ -99,8 +99,12 @@ class PythonKernel:
           Method (1+2N solves); renders the MLV / F± surface plot.
         - ``reliability_mc(method='bishop', n_samples=..., ...)`` — Monte Carlo
           sampling on a fixed surface; renders the FS histogram.
-        - ``reliability(method='bishop', engine='taylor'|'mc')`` — the front door
-          (kept under the plain name for back-compat).
+        - ``reliability_rs(method='bishop', ...)`` — response-surface sampling on a
+          fixed surface: a quadratic surrogate fitted to a few dozen real solves,
+          gated against held-out ones, then sampled ten million times; renders the
+          FS histogram.
+        - ``reliability(method='bishop', engine='taylor'|'mc'|'rs')`` — the front
+          door (kept under the plain name for back-compat).
         """
         doc = self._doc
 
@@ -558,16 +562,46 @@ class PythonKernel:
                 plot_reliability_histogram(res, fig=plt.figure(figsize=(9, 5.5)))
             return res
 
+        def reliability_rs(method="bishop", rng_seed=None, distribution="normal",
+                           rapid=False, circular=True, search=True, num_slices=40,
+                           plot=True, slope_data=None, **kwargs):
+            """Response-surface reliability — fits a quadratic surrogate to a central
+            composite design of real solves, measures it against held-out real solves
+            and against the realizations it counts as failures, then samples it ten
+            million times (limit-equilibrium only). Thin wrapper over
+            `xslope.reliability.reliability_rs`. A surrogate that fails its accuracy
+            gate raises with the measured errors rather than returning a degraded
+            answer. Renders the FS histogram when `plot=True`. Returns the result dict
+            (the Monte Carlo keys plus `gate_r2`, `gate_rms`, `n_design`, …).
+            """
+            from xslope.reliability import reliability_rs as _rrs
+            from xslope.plot import plot_reliability_histogram
+            import matplotlib.pyplot as plt
+            sd = doc.slope_data if slope_data is None else slope_data
+            kw = dict(kwargs)
+            if rng_seed is not None:
+                kw["rng_seed"] = int(rng_seed)
+            ok, res = _rrs(sd, method, rapid=rapid, circular=circular, search=search,
+                           distribution=distribution, num_slices=num_slices, **kw)
+            if not ok:
+                raise RuntimeError(res)
+            if plot:
+                plot_reliability_histogram(res, fig=plt.figure(figsize=(9, 5.5)))
+            return res
+
         def reliability(method="bishop", engine="taylor", **kwargs):
             """Front door to the reliability family (mirrors
             `xslope.reliability.reliability`): `engine='taylor'` (default) runs the
-            Taylor Series Probability Method, `engine='mc'` runs Monte Carlo. Kept
-            under the plain name for back-compat; prefer `reliability_taylor` /
-            `reliability_mc` directly.
+            Taylor Series Probability Method, `engine='mc'` runs Monte Carlo, and
+            `engine='rs'` runs the response surface. Kept under the plain name for
+            back-compat; prefer `reliability_taylor` / `reliability_mc` /
+            `reliability_rs` directly.
             """
-            if str(engine).lower().replace("-", "_") in ("mc", "monte_carlo",
-                                                          "montecarlo"):
+            key = str(engine).lower().replace("-", "_")
+            if key in ("mc", "monte_carlo", "montecarlo"):
                 return reliability_mc(method=method, **kwargs)
+            if key in ("rs", "rsm", "response_surface", "responsesurface"):
+                return reliability_rs(method=method, **kwargs)
             return reliability_taylor(method=method, **kwargs)
 
         return {"run_lem": run_lem, "resync_geometry": resync_geometry,
@@ -578,7 +612,8 @@ class PythonKernel:
                 "parametric_back_analysis": parametric_back_analysis,
                 "reliability": reliability,
                 "reliability_taylor": reliability_taylor,
-                "reliability_mc": reliability_mc}
+                "reliability_mc": reliability_mc,
+                "reliability_rs": reliability_rs}
 
     @staticmethod
     def _normalize(code):

@@ -17,9 +17,12 @@ Carlo), plus the variance-decomposition helpers the Parametric study reuses.
 
 Public entry points:
 
-* :func:`reliability` -- the front door; ``engine='taylor'`` (default) or ``'mc'``.
+* :func:`reliability` -- the front door; ``engine='taylor'`` (default), ``'mc'`` or ``'rs'``.
 * :func:`reliability_taylor` -- Taylor Series Probability Method (limit equilibrium).
 * :func:`reliability_mc` -- Monte Carlo reliability on a fixed surface.
+* :func:`reliability_rs` -- response-surface reliability on a fixed surface: a
+  quadratic surrogate fitted to a few dozen real solves, gated against held-out
+  real solves, then sampled millions of times.
 * :func:`reliability_fem` -- Taylor series driven by the finite-element SSRM.
 
 Historically this code lived in :mod:`xslope.advanced`, which now re-exports every
@@ -68,32 +71,39 @@ def reliability(slope_data, method='bishop', *args, engine='taylor', **kwargs):
         The usual slope-data dictionary.
     method : str
         The limit-equilibrium solver name ('oms', 'bishop', 'janbu', 'corps',
-        'lowe', 'spencer', 'mprice'). Both engines take it as their first analysis
+        'lowe', 'spencer', 'mprice'). Every engine takes it as its first analysis
         argument. (Passed as the second positional/keyword, exactly as before.)
-    engine : {'taylor', 'mc'}, keyword-only
+    engine : {'taylor', 'mc', 'rs'}, keyword-only
         Which reliability engine to run:
 
         * ``'taylor'`` (default) -> :func:`reliability_taylor`, the Taylor Series
           Probability Method (1 + 2N limit-equilibrium searches).
         * ``'mc'`` -> :func:`reliability_mc`, a Monte Carlo sampling campaign on a
           fixed failure surface.
+        * ``'rs'`` -> :func:`reliability_rs`, a response-surface campaign: a
+          quadratic surrogate fitted to a few dozen real solves, sampled millions
+          of times, and checked against held-out real solves before it is used.
 
         Aliases are accepted case-insensitively ('tspm' for Taylor;
-        'monte_carlo' / 'montecarlo' for MC).
+        'monte_carlo' / 'montecarlo' for MC; 'response_surface' / 'rsm' for RS).
     *args, **kwargs
         Forwarded verbatim to the selected engine. See each engine's signature for
         the accepted options (they overlap but are not identical — e.g. Monte Carlo
-        adds ``n_samples`` / ``rng_seed`` / ``distribution``).
+        adds ``n_samples`` / ``rng_seed`` / ``distribution``, and the response
+        surface adds ``n_surrogate`` / ``n_gate`` / ``alpha``).
 
     Returns
     -------
     (success, result) : tuple
-        Whatever the selected engine returns.
+        Whatever the selected engine returns. A response-surface run whose
+        surrogate fails its accuracy gate returns ``(False, message)`` like any
+        other refusal — the caller decides whether to fall back to Monte Carlo.
 
     See Also
     --------
     reliability_taylor : Taylor Series Probability Method (limit equilibrium).
     reliability_mc : Monte Carlo reliability on a fixed surface (limit equilibrium).
+    reliability_rs : Response-surface reliability on a fixed surface (limit equilibrium).
     reliability_fem : Taylor series with the finite-element SSRM factor of safety.
     """
     key = str(engine).lower().replace('-', '_')
@@ -101,9 +111,12 @@ def reliability(slope_data, method='bishop', *args, engine='taylor', **kwargs):
         return reliability_taylor(slope_data, method, *args, **kwargs)
     if key in ('mc', 'monte_carlo', 'montecarlo'):
         return reliability_mc(slope_data, method, *args, **kwargs)
+    if key in ('rs', 'rsm', 'response_surface', 'responsesurface'):
+        return reliability_rs(slope_data, method, *args, **kwargs)
     raise ValueError(
         f"reliability(): unknown engine={engine!r}. Use 'taylor' (default, the "
-        f"Taylor Series Probability Method) or 'mc' (Monte Carlo).")
+        f"Taylor Series Probability Method), 'mc' (Monte Carlo) or 'rs' "
+        f"(response surface).")
 
 
 def _reliability_gate(slope_data, selection, base='lem', check_inputs=True):
@@ -849,6 +862,259 @@ def _mc_sampled_slope_data(slope_data, materials, param_info, values):
     return sd
 
 
+def _draw_sample_matrix(param_info, n, rng, distribution):
+    """Draw ``n`` realizations of every uncertain parameter — the ONE place the
+    input distributions are defined.
+
+    Returns ``(matrix, error)``: an ``n x len(param_info)`` array whose column j is
+    ``param_info[j]``, or ``(None, message)`` for an unusable distribution.
+
+    Both sampling engines draw here, which is the point: a response surface that
+    was sampled from anything other than the distribution the real path draws from
+    would answer a different question, however well the surrogate fitted. That
+    includes the truncations — every draw is floored at :data:`_MC_FLOOR` (a
+    strength or unit weight cannot go negative) and a friction angle is additionally
+    capped at 89 degrees, so the samples the surrogate sees are the samples the
+    solver would have been handed.
+
+    Drawing is column-by-column and stateless apart from ``rng``, so a long campaign
+    may draw in chunks (``_draw_sample_matrix(..., chunk, rng, ...)`` repeatedly)
+    without changing the distribution — only the ordering of the stream.
+    """
+    npar = len(param_info)
+    out = np.empty((n, npar))
+    for j, p in enumerate(param_info):
+        mlv, std = p['mlv'], p['std']
+        if distribution == 'lognormal':
+            if mlv <= 0:
+                return None, (f"lognormal distribution requires a positive mean "
+                              f"(material {p['material_id']} {p['param']} mean={mlv}).")
+            s_ln = np.sqrt(np.log(1.0 + (std / mlv) ** 2))
+            m_ln = np.log(mlv) - 0.5 * s_ln ** 2
+            col = rng.lognormal(m_ln, s_ln, n)
+        elif distribution == 'normal':
+            col = rng.normal(mlv, std, n)
+        else:
+            return None, f"Unknown distribution '{distribution}'. Use 'normal' or 'lognormal'."
+        out[:, j] = _truncate_samples(col, p['param'])
+    return out, None
+
+
+def _truncate_samples(col, param):
+    """Apply the physical floor (and the friction-angle cap) to a column of draws.
+
+    Split out from :func:`_draw_sample_matrix` because the response surface has to
+    truncate its DESIGN points the same way: a design point at MLV - 2 sigma that
+    lands below the floor is solved at the floor, and the surrogate is fitted
+    against the coordinate that was actually solved.
+    """
+    col = np.maximum(col, _MC_FLOOR.get(param, 0.0))
+    if param == 'phi':
+        col = np.minimum(col, 89.0)
+    return col
+
+
+def _fixed_surface_context(slope_data, method, label, rapid=False, circular=True,
+                           search=True, num_slices=40, composite=False, seed='circles',
+                           fs_tol=None, tol=None, max_iter=None, search_opts=None,
+                           use_file_window=True, cancel_check=None, debug_level=0):
+    """Everything a fixed-surface sampling campaign needs before it can sample.
+
+    Resolves the one failure surface every realization is evaluated on, builds the
+    slice template that makes a realization cost milliseconds, evaluates the factor
+    of safety at the most-likely values, and works out what the solver can be seeded
+    with. Returns ``(True, ctx)`` or ``(False, message)``; ``ctx`` carries
+
+    ``evaluate``
+        ``sd -> float | None``, the factor of safety of a sampled slope-data dict on
+        the fixed surface (None when the model has no admissible solution).
+    ``F_MLV``
+        The factor of safety at the most-likely values, evaluated WITHOUT a solver
+        seed so it is the same number the engine has always reported.
+    ``circle`` / ``non_circ``
+        The fixed surface, for the record.
+    ``template``
+        The slice template, or None when the model declined the shortcut.
+
+    ``label`` names the engine in the refusal messages ("Monte Carlo", "Response
+    surface"), which is the only thing that differs between the two callers.
+    """
+    from .search import circular_search
+    from .slice import generate_slices, update_slice_materials
+    from . import solve
+
+    solver = getattr(solve, method)
+
+    # Only forward tolerances the caller actually set.
+    _search_kwargs = {}
+    if fs_tol is not None:
+        _search_kwargs['fs_tol'] = fs_tol
+    if max_iter is not None:
+        _search_kwargs['max_iter'] = max_iter
+    _circ_kwargs = dict(_search_kwargs)
+    if tol is not None:
+        _circ_kwargs['tol'] = tol
+    if composite:
+        _circ_kwargs['composite'] = True
+    if seed != 'circles':
+        _circ_kwargs['seed'] = seed
+
+    # The model's own search window, read the same way every other searching path
+    # reads it. The one search this engine runs fixes the surface all realizations
+    # are evaluated on, so the window decides which mechanism the reported
+    # distribution belongs to. Only the circular branch searches here at all --
+    # search=True is refused for noncircular below -- so there is nothing to hand
+    # the non-circular subset to.
+    _win = dict(search_opts or {})
+    if use_file_window:
+        from .search import file_search_window
+        _win.update(file_search_window(slope_data, already=_win))
+    _circ_kwargs.update(_win)
+
+    # ---- Resolve the fixed evaluation surface -----------------------------
+    fixed_circle = None
+    fixed_noncirc = None
+    if not search:
+        if circular:
+            circs = slope_data.get('circles')
+            if not circs:
+                return False, f"{label} (search=False): no circle is specified in the input."
+            fixed_circle = circs[0]
+        else:
+            fixed_noncirc = slope_data.get('non_circ')
+            if not fixed_noncirc:
+                return False, f"{label} (search=False): no non-circular surface is specified."
+    else:
+        if not circular:
+            return False, (f"{label} with search=True is only supported for circular "
+                           f"surfaces; specify the surface and use search=False for "
+                           f"noncircular problems.")
+        if debug_level >= 1:
+            print("Finding the critical circle at the most-likely values…")
+        fs_cache, _conv, _path, ccache = circular_search(
+            slope_data, method, rapid=rapid, cancel_check=cancel_check, **_circ_kwargs)
+        if not fs_cache:
+            return False, f"{label}: critical-surface search failed."
+        # The circle every realization is evaluated on is the CRITICAL one. It is
+        # taken from circle_cache rather than fs_cache because only circle_cache
+        # carries the radius — and by lowest FS rather than by position, because
+        # circle_cache is in the order the circles were TRIED: its first entry is
+        # the search's first trial circle, which is not an answer to anything.
+        crit = min(ccache, key=lambda c: c['FS']) if ccache else fs_cache[0]
+        fixed_circle = {'Xo': crit['Xo'], 'Yo': crit['Yo'], 'R': crit.get('R'),
+                        'Depth': crit.get('Depth')}
+
+    # The slice-template fast path: the fixed surface means the geometry of the
+    # slice table never changes across realizations — only the material
+    # properties multiplied onto it. Generate once with the per-band breakdown
+    # and rewrite the material-derived columns per realization; realizations
+    # fall back to a full rebuild whenever the model declines the shortcut
+    # (stress-dependent envelopes, ru pore pressure, suction), and the template
+    # is verified against a rebuilt table at the most-likely values before it
+    # is trusted at all.
+    _template = None
+    if not rapid:
+        try:
+            if circular:
+                okt, rest = generate_slices(slope_data, circle=fixed_circle,
+                                            num_slices=num_slices,
+                                            composite=composite,
+                                            check_inputs=False,
+                                            material_breakdown=True)
+            else:
+                okt, rest = generate_slices(slope_data, non_circ=fixed_noncirc,
+                                            num_slices=num_slices,
+                                            check_inputs=False,
+                                            material_breakdown=True)
+            if okt:
+                cand = rest[0]
+                probe = cand.copy()
+                update_slice_materials(probe, slope_data['materials'])
+                same = all(
+                    np.allclose(probe[col].astype(float),
+                                cand[col].astype(float),
+                                rtol=0, atol=1e-9, equal_nan=True)
+                    for col in ('w', 'kw', 'y_cg', 'c', 'phi', 'c1', 'phi1',
+                                'd', 'psi'))
+                if same:
+                    _template = cand
+        except (ValueError, KeyError):
+            _template = None
+
+    _seed_kw = {}
+
+    def _eval(sd):
+        # check_inputs=False: every realization is a sampled model, so the same
+        # reasoning as the Taylor path applies.
+        if _template is not None:
+            df = _template.copy()
+            try:
+                update_slice_materials(df, sd['materials'])
+            except ValueError:
+                return _eval_rebuild(sd)
+            ok2, r = solver(df, **_seed_kw)
+            if not ok2:
+                return None
+            fs = r.get('FS')
+            if fs is None or not np.isfinite(fs):
+                return None
+            return float(fs)
+        return _eval_rebuild(sd)
+
+    def _eval_rebuild(sd):
+        if circular:
+            ok, res = generate_slices(sd, circle=fixed_circle, num_slices=num_slices,
+                                      composite=composite, check_inputs=False)
+        else:
+            ok, res = generate_slices(sd, non_circ=fixed_noncirc,
+                                      num_slices=num_slices, check_inputs=False)
+        if not ok:
+            return None
+        ok2, r = solver(res[0], **_seed_kw)
+        if not ok2:
+            return None
+        fs = r.get('FS')
+        if fs is None or not np.isfinite(fs):
+            return None
+        return float(fs)
+
+    F_MLV = _eval(slope_data)
+    if F_MLV is None:
+        return False, f"{label}: evaluation at the most-likely values failed."
+
+    # Seed every realization's iterative solve from the most-likely-values
+    # solution: each sampled model's root sits within a few percent of it, so
+    # Newton (Spencer) and the fixed-point loop (Bishop) start almost converged.
+    # Methods whose signatures take no seed run exactly as before.
+    import inspect as _inspect
+    _mlv_theta = None
+    _solver_params = set(_inspect.signature(solver).parameters)
+    if 'theta_seed' in _solver_params and _template is not None:
+        # One extra solve at the most-likely values fetches Spencer's theta for
+        # the seed; the F_MLV above stays the seedless, historical evaluation.
+        try:
+            _df0 = _template.copy()
+            update_slice_materials(_df0, slope_data['materials'])
+            _ok0, _r0 = solver(_df0)
+            if _ok0 and isinstance(_r0, dict):
+                _mlv_theta = _r0.get('theta')
+        except ValueError:
+            pass
+    if 'fs_seed' in _solver_params:
+        _seed_kw['fs_seed'] = F_MLV
+    if 'theta_seed' in _solver_params and _mlv_theta is not None:
+        _seed_kw['theta_seed'] = _mlv_theta
+
+    return True, {'evaluate': _eval, 'F_MLV': F_MLV, 'circle': fixed_circle,
+                  'non_circ': fixed_noncirc, 'template': _template}
+
+
+#: The limit-equilibrium solvers a sampling engine will run. Both Monte Carlo and
+#: the response surface need thousands to millions of factor-of-safety evaluations,
+#: which is a limit-equilibrium proposition only.
+_LEM_METHODS = {'oms', 'bishop', 'janbu', 'corps', 'lowe', 'spencer', 'mprice'}
+
+
 def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0,
                    n_samples=MC_DEFAULT_SAMPLES, rng_seed=MC_DEFAULT_SEED,
                    distribution='normal', search=True, num_slices=40,
@@ -954,9 +1220,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     reliability : the front door — ``engine='mc'`` routes here.
     reliability_taylor : the Taylor-series counterpart (1 + 2N searches).
     """
-    from .search import circular_search, noncircular_search, _check_cancel
-    from .slice import generate_slices
-    from . import solve
+    from .search import _check_cancel
 
     def _progress(done, total, label):
         if progress_callback is not None:
@@ -980,173 +1244,21 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     if err:
         return False, err
 
-    _LEM_METHODS = {'oms', 'bishop', 'janbu', 'corps', 'lowe', 'spencer', 'mprice'}
     if method not in _LEM_METHODS:
         return False, (f"Monte Carlo reliability is limit-equilibrium only; '{method}' "
                        f"is not an LEM solver. Use one of {sorted(_LEM_METHODS)}. FEM "
                        "reliability uses the Taylor series (reliability_fem).")
-    solver = getattr(solve, method)
 
-    # Only forward tolerances the caller actually set.
-    _search_kwargs = {}
-    if fs_tol is not None:
-        _search_kwargs['fs_tol'] = fs_tol
-    if max_iter is not None:
-        _search_kwargs['max_iter'] = max_iter
-    _circ_kwargs = dict(_search_kwargs)
-    if tol is not None:
-        _circ_kwargs['tol'] = tol
-    if composite:
-        _circ_kwargs['composite'] = True
-    if seed != 'circles':
-        _circ_kwargs['seed'] = seed
-
-    # The model's own search window, read the same way every other searching path
-    # reads it. The one search this engine runs fixes the surface all n_samples
-    # realizations are evaluated on, so the window decides which mechanism the
-    # reported distribution belongs to. Only the circular branch searches here at
-    # all -- search=True is refused for noncircular below -- so there is nothing
-    # to hand the non-circular subset to.
-    _win = dict(search_opts or {})
-    if use_file_window:
-        from .search import file_search_window
-        _win.update(file_search_window(slope_data, already=_win))
-    _circ_kwargs.update(_win)
-
-    # ---- Resolve the fixed evaluation surface -----------------------------
-    fixed_circle = None
-    fixed_noncirc = None
-    if not search:
-        if circular:
-            circs = slope_data.get('circles')
-            if not circs:
-                return False, "Monte Carlo (search=False): no circle is specified in the input."
-            fixed_circle = circs[0]
-        else:
-            fixed_noncirc = slope_data.get('non_circ')
-            if not fixed_noncirc:
-                return False, "Monte Carlo (search=False): no non-circular surface is specified."
-    else:
-        if not circular:
-            return False, ("Monte Carlo with search=True is only supported for circular "
-                           "surfaces; specify the surface and use search=False for "
-                           "noncircular problems.")
-        if debug_level >= 1:
-            print("Finding the critical circle at the most-likely values…")
-        fs_cache, _conv, _path, ccache = circular_search(
-            slope_data, method, rapid=rapid, cancel_check=cancel_check, **_circ_kwargs)
-        if not fs_cache:
-            return False, "Monte Carlo: critical-surface search failed."
-        # The circle every realization is evaluated on is the CRITICAL one. It is
-        # taken from circle_cache rather than fs_cache because only circle_cache
-        # carries the radius — and by lowest FS rather than by position, because
-        # circle_cache is in the order the circles were TRIED: its first entry is
-        # the search's first trial circle, which is not an answer to anything.
-        crit = min(ccache, key=lambda c: c['FS']) if ccache else fs_cache[0]
-        fixed_circle = {'Xo': crit['Xo'], 'Yo': crit['Yo'], 'R': crit.get('R'),
-                        'Depth': crit.get('Depth')}
-
-    # The slice-template fast path: the fixed surface means the geometry of the
-    # slice table never changes across realizations — only the material
-    # properties multiplied onto it. Generate once with the per-band breakdown
-    # and rewrite the material-derived columns per realization; realizations
-    # fall back to a full rebuild whenever the model declines the shortcut
-    # (stress-dependent envelopes, ru pore pressure, suction), and the template
-    # is verified against a rebuilt table at the most-likely values before it
-    # is trusted at all.
-    from .slice import update_slice_materials
-    _template = None
-    if not rapid:
-        try:
-            if circular:
-                okt, rest = generate_slices(slope_data, circle=fixed_circle,
-                                            num_slices=num_slices,
-                                            composite=composite,
-                                            check_inputs=False,
-                                            material_breakdown=True)
-            else:
-                okt, rest = generate_slices(slope_data, non_circ=fixed_noncirc,
-                                            num_slices=num_slices,
-                                            check_inputs=False,
-                                            material_breakdown=True)
-            if okt:
-                cand = rest[0]
-                probe = cand.copy()
-                update_slice_materials(probe, slope_data['materials'])
-                same = all(
-                    np.allclose(probe[col].astype(float),
-                                cand[col].astype(float),
-                                rtol=0, atol=1e-9, equal_nan=True)
-                    for col in ('w', 'kw', 'y_cg', 'c', 'phi', 'c1', 'phi1',
-                                'd', 'psi'))
-                if same:
-                    _template = cand
-        except (ValueError, KeyError):
-            _template = None
-
-    def _eval(sd):
-        # check_inputs=False: every Monte Carlo realization is a sampled model, so
-        # the same reasoning as the Taylor path applies.
-        if _template is not None:
-            df = _template.copy()
-            try:
-                update_slice_materials(df, sd['materials'])
-            except ValueError:
-                return _eval_rebuild(sd)
-            ok2, r = solver(df, **_seed_kw)
-            if not ok2:
-                return None
-            fs = r.get('FS')
-            if fs is None or not np.isfinite(fs):
-                return None
-            return float(fs)
-        return _eval_rebuild(sd)
-
-    def _eval_rebuild(sd):
-        if circular:
-            ok, res = generate_slices(sd, circle=fixed_circle, num_slices=num_slices,
-                                      composite=composite, check_inputs=False)
-        else:
-            ok, res = generate_slices(sd, non_circ=fixed_noncirc,
-                                      num_slices=num_slices, check_inputs=False)
-        if not ok:
-            return None
-        ok2, r = solver(res[0], **_seed_kw)
-        if not ok2:
-            return None
-        fs = r.get('FS')
-        if fs is None or not np.isfinite(fs):
-            return None
-        return float(fs)
-
-    _mlv_theta = None
-    _seed_kw = {}
-
-    F_MLV = _eval(slope_data)
-    if F_MLV is None:
-        return False, "Monte Carlo: evaluation at the most-likely values failed."
-
-    # Seed every realization's iterative solve from the most-likely-values
-    # solution: each sampled model's root sits within a few percent of it, so
-    # Newton (Spencer) and the fixed-point loop (Bishop) start almost converged.
-    # Methods whose signatures take no seed run exactly as before.
-    import inspect as _inspect
-    _solver_params = set(_inspect.signature(solver).parameters)
-    if 'theta_seed' in _solver_params and _template is not None:
-        # One extra solve at the most-likely values fetches Spencer's theta for
-        # the seed; the F_MLV above stays the seedless, historical evaluation.
-        try:
-            _df0 = _template.copy()
-            update_slice_materials(_df0, slope_data['materials'])
-            _ok0, _r0 = solver(_df0)
-            if _ok0 and isinstance(_r0, dict):
-                _mlv_theta = _r0.get('theta')
-        except ValueError:
-            pass
-    if 'fs_seed' in _solver_params:
-        _seed_kw['fs_seed'] = F_MLV
-    if 'theta_seed' in _solver_params and _mlv_theta is not None:
-        _seed_kw['theta_seed'] = _mlv_theta
+    okc, ctx = _fixed_surface_context(
+        slope_data, method, "Monte Carlo", rapid=rapid, circular=circular,
+        search=search, num_slices=num_slices, composite=composite, seed=seed,
+        fs_tol=fs_tol, tol=tol, max_iter=max_iter, search_opts=search_opts,
+        use_file_window=use_file_window, cancel_check=cancel_check,
+        debug_level=debug_level)
+    if not okc:
+        return False, ctx
+    _eval = ctx['evaluate']
+    F_MLV = ctx['F_MLV']
 
     if debug_level >= 1:
         print("=== MONTE CARLO RELIABILITY ANALYSIS ===")
@@ -1156,25 +1268,9 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
 
     # ---- Draw the sample matrix (n_samples x n_params) --------------------
     rng = np.random.default_rng(rng_seed)
-    npar = len(param_info)
-    sample_matrix = np.empty((n_samples, npar))
-    for j, p in enumerate(param_info):
-        mlv, std = p['mlv'], p['std']
-        if distribution == 'lognormal':
-            if mlv <= 0:
-                return False, (f"lognormal distribution requires a positive mean "
-                               f"(material {p['material_id']} {p['param']} mean={mlv}).")
-            s_ln = np.sqrt(np.log(1.0 + (std / mlv) ** 2))
-            m_ln = np.log(mlv) - 0.5 * s_ln ** 2
-            col = rng.lognormal(m_ln, s_ln, n_samples)
-        elif distribution == 'normal':
-            col = rng.normal(mlv, std, n_samples)
-        else:
-            return False, f"Unknown distribution '{distribution}'. Use 'normal' or 'lognormal'."
-        col = np.maximum(col, _MC_FLOOR.get(p['param'], 0.0))
-        if p['param'] == 'phi':
-            col = np.minimum(col, 89.0)
-        sample_matrix[:, j] = col
+    sample_matrix, err = _draw_sample_matrix(param_info, n_samples, rng, distribution)
+    if err:
+        return False, err
 
     # ---- Evaluate every realization on the fixed surface ------------------
     fs_vals = np.empty(n_samples)
@@ -1296,5 +1392,599 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     }
 
     print(f"\nMonte Carlo reliability analysis completed in "
+          f"{time.time() - start_time:.2f} seconds.")
+    return True, result
+
+
+# ---------------------------------------------------------------------------
+# Response surface
+# ---------------------------------------------------------------------------
+
+#: Realizations the surrogate is sampled at. Ten million is not a cost decision —
+#: evaluating a polynomial that many times is a few seconds of vector arithmetic —
+#: it is a resolution decision: at this count the sampling half-width on a
+#: probability of failure of 17% is +/-0.02% absolute, which is far below the
+#: surrogate's own fit error, so the answer's uncertainty is the FIT and nothing
+#: else. Reaching the same sampling resolution with real solves would take ~53
+#: million of them.
+RS_DEFAULT_SURROGATE = 10_000_000
+
+#: Realizations evaluated per vectorized chunk. The chunk is drawn, standardized,
+#: expanded into the quadratic basis and reduced to running totals, so peak memory
+#: is chunk x (number of polynomial terms) doubles rather than n_surrogate of them.
+RS_DEFAULT_CHUNK = 1_000_000
+
+#: Held-out REAL solves the fitted surrogate is measured against before any of its
+#: answers are believed. Drawn from the same distributions as the surrogate sampling
+#: and never used in the fit.
+RS_GATE_SAMPLES = 500
+
+#: Axial (star) distance of the central composite design, in standard deviations.
+#: The corners sit at +/-1 sigma; the axial points reach further out so the
+#: curvature the quadratic has to carry is fitted over the range the campaign
+#: actually samples rather than extrapolated into it.
+RS_DEFAULT_ALPHA = 2.0
+
+#: The surrogate is accepted when its root-mean-square error over the held-out
+#: gate draws is within this fraction of the real spread of the factor of safety
+#: over those same draws, AND its coefficient of determination is at least
+#: :data:`RS_R2_MIN`, AND at most :data:`RS_PF_DISAGREE_MAX` of the gate draws are
+#: put on the wrong side of F = 1. All three are measured, never assumed.
+#:
+#: The two fit thresholds are calibrated against what the fit error costs the
+#: ANSWER, measured by solving tens of thousands of realizations for real and
+#: predicting the same draws with the surrogate: at an axial distance of 2 sigma
+#: the submerged-slope model (two parameters, 50,000 paired realizations) fits to
+#: 0.042 of the real spread with R^2 = 0.9982 and lands its probability of failure
+#: within 0.5% of its own value, and Duncan's LASH terminal (VP29, 20,000 paired
+#: realizations) fits to 0.016 with R^2 = 0.9997 for the same 0.5%. A 10,000-sample
+#: Monte Carlo of either carries a 95% sampling half-width of about +/-4% of P_f, so
+#: a surrogate admitted at these thresholds is well inside the noise of the campaign
+#: it replaces. A tighter R^2 bar (0.999) would refuse the first of those two
+#: surrogates while it was answering to 0.5%.
+RS_RMS_FRACTION = 0.05
+RS_R2_MIN = 0.995
+
+#: Fraction of the gate draws the surrogate may put on the wrong side of F = 1.
+#: This is the fit error measured in the units the answer is reported in: each
+#: disagreement is a realization the surrogate counts as a failure and the solver
+#: does not, or the reverse, so the disagreement rate BOUNDS the error in the
+#: probability of failure (the two directions partly cancel in the count itself —
+#: measured, the net error is under half the disagreement rate). The two models
+#: above disagree on 0.2-0.5% of their draws.
+RS_PF_DISAGREE_MAX = 0.02
+
+#: A gate draw the real pipeline cannot solve has no surrogate counterpart — the
+#: polynomial answers everywhere. A few such draws are excluded and reported; more
+#: than this fraction means a material part of the sampled population is
+#: inadmissible, which a surrogate defined over the whole space cannot represent,
+#: and the run is refused rather than quietly answering for the admissible part.
+RS_MAX_GATE_INVALID = 0.02
+
+#: Realizations from the FAILURE REGION the surrogate is additionally checked on:
+#: draws the surrogate itself counted as F < 1, taken from the sampling pass and
+#: solved for real. A gate drawn uniformly from the input distributions barely
+#: visits that region — it is a few percent of the population — and the region is
+#: the whole of the answer, so it is measured separately. On VP34 a uniform gate
+#: found 1.4% of its draws inadmissible while 36% of the realizations the surrogate
+#: was counting as failures had no real solution at all: inadmissibility is
+#: concentrated exactly where P_f is counted.
+RS_TAIL_SAMPLES = 200
+
+#: The failure-region checks. Above either fraction the run is refused: the
+#: surrogate is either counting realizations the model cannot solve, or classifying
+#: them differently from the solver where the classification IS the answer.
+RS_TAIL_INVALID_MAX = 0.05
+RS_TAIL_DISAGREE_MAX = 0.10
+
+#: Fewest failure-region draws that make those rates worth testing. Below this the
+#: numbers are reported and the refusal is not applied — a model with almost no
+#: predicted failures has almost no counted mass to get wrong.
+RS_TAIL_MIN = 20
+
+#: Surrogate realizations retained for plotting. The histogram is drawn from a
+#: fixed-stride subsample so the result dict stays a few hundred kilobytes instead
+#: of hundreds of megabytes; every reported statistic still comes from the full
+#: n_surrogate draws.
+RS_PLOT_SAMPLES = 10_000
+
+#: Upper bound on the design size. The factorial part of a central composite design
+#: doubles with every uncertain parameter, so a model with many sigmas would spend
+#: its afternoon solving corners. Refused rather than run.
+RS_MAX_DESIGN = 4096
+
+
+def _ccd_design(d, alpha):
+    """Coded coordinates of the central composite design in ``d`` parameters.
+
+    Rows are, in order: the ``2^d`` factorial corners at +/-1, the ``2d`` axial
+    points at +/-``alpha``, and the centre. Coded units are standard deviations
+    about the most-likely values.
+    """
+    import itertools
+    corners = np.array(list(itertools.product((-1.0, 1.0), repeat=d)), dtype=float)
+    axial = np.zeros((2 * d, d))
+    for j in range(d):
+        axial[2 * j, j] = -alpha
+        axial[2 * j + 1, j] = alpha
+    return np.vstack([corners, axial, np.zeros((1, d))])
+
+
+def _quad_terms(z):
+    """Full quadratic basis of the standardized coordinates ``z`` (n x d).
+
+    Columns are the constant, the ``d`` linear terms, then the ``d(d+1)/2``
+    quadratic terms (squares and cross products) in row-major order — the same
+    order the fitted coefficient vector is stored in.
+    """
+    n, d = z.shape
+    cols = [np.ones(n)]
+    for j in range(d):
+        cols.append(z[:, j])
+    for j in range(d):
+        for k in range(j, d):
+            cols.append(z[:, j] * z[:, k])
+    return np.column_stack(cols)
+
+
+def _quad_term_labels(param_info):
+    """Human-readable names for the columns of :func:`_quad_terms`."""
+    names = [f"m{p['material_id']}.{p['param']}" for p in param_info]
+    labels = ['1'] + list(names)
+    for j, a in enumerate(names):
+        for b in names[j:]:
+            labels.append(f"{a}*{b}" if a != b else f"{a}^2")
+    return labels
+
+
+def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0,
+                   n_surrogate=RS_DEFAULT_SURROGATE, n_gate=RS_GATE_SAMPLES,
+                   alpha=RS_DEFAULT_ALPHA, chunk=RS_DEFAULT_CHUNK,
+                   rng_seed=MC_DEFAULT_SEED, distribution='normal', search=True,
+                   num_slices=40, progress_callback=None, cancel_check=None,
+                   fs_tol=None, tol=None, max_iter=None, composite=False,
+                   seed='circles', search_opts=None, use_file_window=True,
+                   check_inputs=True):
+    """Response-surface reliability analysis — a Monte Carlo campaign whose factor
+    of safety comes from a fitted surrogate instead of a solve, with the surrogate
+    measured against real solves before any of its answers are used.
+
+    The engine samples the same distributions as :func:`reliability_mc`, on the same
+    fixed failure surface, and reports the same statistics. What changes is where
+    the factor of safety comes from:
+
+    1. **Design.** A central composite design about the most-likely values — the
+       ``2^d`` factorial corners at +/-1 sigma, ``2d`` axial points at
+       +/-``alpha`` sigma, and the centre — each solved with the real pipeline.
+    2. **Fit.** A full quadratic in the ``d`` uncertain parameters
+       (``1 + d + d(d+1)/2`` coefficients), least squares.
+    3. **Gate.** ``n_gate`` further realizations, drawn from the sampling
+       distributions and never used in the fit, solved for real and compared with
+       the surrogate. The run is REFUSED unless the root-mean-square error is
+       within :data:`RS_RMS_FRACTION` of the real spread over those draws, the
+       coefficient of determination is at least :data:`RS_R2_MIN`, and no more
+       than :data:`RS_PF_DISAGREE_MAX` of the draws are put on the wrong side of
+       F = 1.
+    4. **Sampling.** ``n_surrogate`` realizations (default ten million) evaluated
+       through the polynomial in vectorized chunks.
+
+    The arithmetic that motivates it: the 95% half-width on an empirical
+    probability of failure is ``1.96*sqrt(p(1-p)/n)``, so resolving a P_f near 17%
+    to +/-0.01% absolute needs ~53 million real solves — days of them. The
+    surrogate reaches that resolution for a few dozen real solves plus the gate,
+    and moves the error budget from sampling noise, which the report can no longer
+    see, to fit error, which the gate measures and prints.
+
+    Parameters
+    ----------
+    n_surrogate : int
+        Realizations drawn from the surrogate (default ten million).
+    n_gate : int
+        Held-out real solves the surrogate is measured against (default 500).
+    alpha : float
+        Axial distance of the design, in standard deviations (default 2.0).
+    chunk : int
+        Surrogate realizations evaluated per vectorized pass. Reduced
+        automatically for a model with many parameters, whose quadratic basis is
+        wider.
+    rng_seed : int
+        Seed for the surrogate draws. The gate draws come from an independent
+        stream of the same seed, so both are reproducible and the gate is never
+        fitted.
+
+    Everything else is interpreted exactly as in :func:`reliability_mc`
+    (``distribution``, ``search``, ``num_slices``, ``search_opts``,
+    ``use_file_window``, the solver tolerances).
+
+    Returns
+    -------
+    (success, result) : tuple
+        On success ``result`` carries the Monte Carlo result keys — ``mean_FS``,
+        ``sigma_F``, ``COV_F``, ``beta_normal``, ``beta_ln``, ``pf_empirical``,
+        ``pf_normal``, ``pf_lognormal``, ``F_MLV``, ``param_info`` — so a
+        histogram or a rank correlation reads it unchanged, plus the surrogate's
+        credentials: ``n_design`` and ``n_real_solves``, ``gate_rms``,
+        ``gate_max_error``, ``gate_r2``, ``gate_sigma``, ``gate_pf_disagree``,
+        ``rs_coefficients`` and ``rs_terms``. ``fs_samples`` and ``param_samples`` are a fixed-stride
+        SUBSAMPLE of the surrogate draws (``fs_samples_stride`` realizations
+        apart, :data:`RS_PLOT_SAMPLES` of them) so plotting stays light; every
+        statistic reported comes from all ``n_surrogate``.
+
+        A surrogate that fails the gate returns ``(False, message)`` naming the
+        measured errors.
+
+    See Also
+    --------
+    reliability : the front door — ``engine='rs'`` routes here.
+    reliability_mc : the same campaign with every realization solved for real.
+    """
+    from .search import _check_cancel
+
+    def _progress(done, total, label):
+        if progress_callback is not None:
+            try:
+                progress_callback(done, total, label)
+            except Exception:
+                pass
+
+    start_time = time.time()
+    materials = slope_data['materials']
+
+    gate_msg = _reliability_gate(
+        slope_data,
+        {'engine': 'rs', 'rapid': rapid, 'search': search,
+         'surface': 'circular' if circular else 'noncircular'},
+        check_inputs=check_inputs)
+    if gate_msg:
+        return False, gate_msg
+
+    param_info, err = _mc_param_info(materials)
+    if err:
+        return False, err
+
+    if method not in _LEM_METHODS:
+        return False, (f"Response-surface reliability is limit-equilibrium only; "
+                       f"'{method}' is not an LEM solver. Use one of "
+                       f"{sorted(_LEM_METHODS)}. FEM reliability uses the Taylor "
+                       f"series (reliability_fem).")
+
+    d = len(param_info)
+    n_design = 2 ** d + 2 * d + 1
+    if n_design > RS_MAX_DESIGN:
+        return False, (
+            f"Response surface: this model carries {d} uncertain parameters, so the "
+            f"central composite design would be {n_design} real solves "
+            f"(2^{d} corners + {2 * d} axial + 1 centre), past the {RS_MAX_DESIGN} "
+            f"limit. Monte Carlo samples the same distributions without a design "
+            f"that doubles with every parameter.")
+    n_terms = 1 + d + d * (d + 1) // 2
+
+    okc, ctx = _fixed_surface_context(
+        slope_data, method, "Response surface", rapid=rapid, circular=circular,
+        search=search, num_slices=num_slices, composite=composite, seed=seed,
+        fs_tol=fs_tol, tol=tol, max_iter=max_iter, search_opts=search_opts,
+        use_file_window=use_file_window, cancel_check=cancel_check,
+        debug_level=debug_level)
+    if not okc:
+        return False, ctx
+    _eval = ctx['evaluate']
+    F_MLV = ctx['F_MLV']
+
+    mlv = np.array([p['mlv'] for p in param_info], dtype=float)
+    std = np.array([p['std'] for p in param_info], dtype=float)
+
+    if debug_level >= 1:
+        print("=== RESPONSE-SURFACE RELIABILITY ANALYSIS ===")
+        print(f"Method: {method} | parameters: {d} | design: {n_design} solves | "
+              f"surrogate draws: {n_surrogate} | seed: {rng_seed} | {distribution}")
+        print(f"F at most-likely values: {F_MLV:.4f}")
+
+    # ---- 1. Design: solve the central composite design for real -----------
+    coded = _ccd_design(d, float(alpha))
+    # Physical coordinates, truncated exactly as a sampled realization is: a design
+    # point below a parameter's physical floor is SOLVED at the floor, and the fit
+    # is then carried out against the coordinate that was actually solved rather
+    # than the nominal one that was not.
+    phys = mlv + coded * std
+    for j, p in enumerate(param_info):
+        phys[:, j] = _truncate_samples(phys[:, j], p['param'])
+
+    # Peak memory during sampling is one chunk of the quadratic basis; a model with
+    # many parameters has a wider basis, so the chunk narrows to hold the product
+    # roughly constant. Settled here so the progress total counts real passes.
+    chunk = int(max(50_000, min(int(chunk), 12_000_000 // max(1, n_terms))))
+    n_chunks = max(1, -(-int(n_surrogate) // chunk))
+    total_steps = n_design + int(n_gate) + n_chunks + RS_TAIL_SAMPLES
+    fs_design = np.empty(n_design)
+    for i in range(n_design):
+        if i % 8 == 0:
+            _check_cancel(cancel_check)
+            _progress(i, total_steps, f"Design solve {i + 1}/{n_design}")
+        sd_i = _mc_sampled_slope_data(slope_data, materials, param_info, phys[i])
+        fi = _eval(sd_i)
+        if fi is None:
+            where = ", ".join(
+                f"material {p['material_id']} {p['param']}={phys[i, j]:.4g}"
+                for j, p in enumerate(param_info))
+            return False, (
+                f"Response surface: the design point {i + 1} of {n_design} has no "
+                f"analyzable solution ({where}). The surrogate is fitted to the "
+                f"whole design, so a design point that cannot be solved leaves the "
+                f"fit undefined over part of the sampled range. Monte Carlo can "
+                f"report on such a model — it excludes the inadmissible draws and "
+                f"counts them.")
+        fs_design[i] = fi
+
+    # ---- 2. Fit the quadratic ---------------------------------------------
+    z_design = (phys - mlv) / std
+    X = _quad_terms(z_design)
+    coef, _res, rank, _sv = np.linalg.lstsq(X, fs_design, rcond=None)
+
+    def _surrogate(x_phys):
+        """Factor of safety of physical parameter rows through the fitted quadratic."""
+        return _quad_terms((x_phys - mlv) / std) @ coef
+
+    # ---- 3. The gate: held-out real solves ---------------------------------
+    # An independent stream of the same seed: reproducible, and never drawn from
+    # the stream the surrogate is sampled with, so no gate point can also be a
+    # sampled point by construction.
+    gate_rng = np.random.default_rng([int(rng_seed), 1])
+    gate_x, err = _draw_sample_matrix(param_info, int(n_gate), gate_rng, distribution)
+    if err:
+        return False, err
+    gate_real = np.empty(int(n_gate))
+    gate_ok = np.ones(int(n_gate), dtype=bool)
+    for i in range(int(n_gate)):
+        if i % 25 == 0:
+            _check_cancel(cancel_check)
+            _progress(n_design + i, total_steps, f"Gate solve {i + 1}/{n_gate}")
+        sd_i = _mc_sampled_slope_data(slope_data, materials, param_info, gate_x[i])
+        fi = _eval(sd_i)
+        if fi is None:
+            gate_ok[i] = False
+            gate_real[i] = np.nan
+        else:
+            gate_real[i] = fi
+    n_gate_valid = int(np.count_nonzero(gate_ok))
+    n_gate_invalid = int(n_gate) - n_gate_valid
+    if n_gate_valid < max(20, n_terms + 1):
+        return False, (
+            f"Response surface: only {n_gate_valid} of {n_gate} gate realizations "
+            f"could be solved, which is too few to measure the surrogate against. "
+            f"A surrogate that cannot be checked is not used.")
+    if n_gate_invalid > RS_MAX_GATE_INVALID * int(n_gate):
+        return False, (
+            f"Response surface: {n_gate_invalid} of {n_gate} gate realizations "
+            f"({n_gate_invalid / n_gate * 100:.1f}%) have no analyzable solution, "
+            f"past the {RS_MAX_GATE_INVALID * 100:.0f}% limit. The surrogate returns "
+            f"a factor of safety everywhere, so it would answer for a population "
+            f"that part of the real model cannot. Use Monte Carlo, which excludes "
+            f"and counts the inadmissible draws.")
+
+    gate_pred = _surrogate(gate_x[gate_ok])
+    gate_truth = gate_real[gate_ok]
+    resid = gate_pred - gate_truth
+    gate_rms = float(np.sqrt(np.mean(resid ** 2)))
+    gate_max = float(np.max(np.abs(resid)))
+    gate_sigma = float(np.std(gate_truth, ddof=1))
+    ss_tot = float(np.sum((gate_truth - np.mean(gate_truth)) ** 2))
+    gate_r2 = float(1.0 - np.sum(resid ** 2) / ss_tot) if ss_tot > 0 else float('nan')
+    # The fit error in the units the answer is reported in: a gate draw the
+    # surrogate and the solver disagree about is a realization that would be
+    # counted into the probability of failure by one and not the other.
+    n_disagree = int(np.count_nonzero((gate_pred < 1.0) != (gate_truth < 1.0)))
+    pf_disagree = n_disagree / n_gate_valid
+
+    rms_limit = RS_RMS_FRACTION * gate_sigma
+    if not (gate_rms <= rms_limit and gate_r2 >= RS_R2_MIN
+            and pf_disagree <= RS_PF_DISAGREE_MAX):
+        return False, (
+            f"Response surface: the fitted surrogate did not pass its accuracy gate "
+            f"on {n_gate_valid} held-out real solves. RMS error {gate_rms:.5f} "
+            f"(limit {rms_limit:.5f} = {RS_RMS_FRACTION:.0%} of the real spread "
+            f"sigma = {gate_sigma:.4f}), maximum error {gate_max:.5f}, R^2 = "
+            f"{gate_r2:.6f} (minimum {RS_R2_MIN}), and {n_disagree} of "
+            f"{n_gate_valid} draws ({pf_disagree * 100:.1f}%, limit "
+            f"{RS_PF_DISAGREE_MAX * 100:.0f}%) put on the wrong side of F = 1. A "
+            f"quadratic in {d} parameter(s) does not describe this model's factor "
+            f"of safety well enough for its tail to be trusted; run Monte Carlo, "
+            f"which evaluates every realization.")
+
+    # ---- 4. Sample the surrogate ------------------------------------------
+    stride = max(1, int(n_surrogate) // RS_PLOT_SAMPLES)
+    rng = np.random.default_rng(rng_seed)
+    n_left = int(n_surrogate)
+    offset = 0
+    n_fail = 0
+    sum_d = 0.0
+    sum_d2 = 0.0
+    keep_fs = []
+    keep_x = []
+    # The first realizations the surrogate itself counts as failures, kept for the
+    # failure-region gate below. They are the head of an i.i.d. stream, so they are
+    # a fair sample of the region the probability of failure is a count of.
+    tail_x = []
+    n_tail_want = int(RS_TAIL_SAMPLES)
+    step = n_design + int(n_gate)
+    while n_left > 0:
+        _check_cancel(cancel_check)
+        m = min(chunk, n_left)
+        xs, err = _draw_sample_matrix(param_info, m, rng, distribution)
+        if err:
+            return False, err
+        fs = _surrogate(xs)
+        failed = fs < 1.0
+        n_fail += int(np.count_nonzero(failed))
+        if len(tail_x) < n_tail_want and failed.any():
+            tail_x.extend(xs[failed][:n_tail_want - len(tail_x)])
+        dev = fs - F_MLV
+        sum_d += float(dev.sum())
+        sum_d2 += float((dev ** 2).sum())
+        i0 = (-offset) % stride
+        if i0 < m:
+            keep_fs.append(fs[i0::stride])
+            keep_x.append(xs[i0::stride])
+        offset += m
+        n_left -= m
+        step += 1
+        _progress(step, total_steps,
+                  f"Surrogate realizations {offset:,}/{n_surrogate:,}")
+
+    n_tot = int(n_surrogate)
+    mean_FS = F_MLV + sum_d / n_tot
+    var = (sum_d2 - n_tot * (mean_FS - F_MLV) ** 2) / (n_tot - 1)
+    sigma_F = float(np.sqrt(max(var, 0.0)))
+    COV_F = sigma_F / mean_FS if mean_FS else 0.0
+    pf_empirical = n_fail / n_tot
+
+    beta_normal = (mean_FS - 1.0) / sigma_F if sigma_F > 0 else float('inf')
+    pf_normal = float(norm.cdf(-beta_normal))
+    if COV_F > 0:
+        beta_ln = float(np.log(mean_FS / np.sqrt(1 + COV_F ** 2)) /
+                        np.sqrt(np.log(1 + COV_F ** 2)))
+    else:
+        beta_ln = float('inf')
+    pf_lognormal = float(norm.cdf(-beta_ln))
+
+    fs_samples = np.concatenate(keep_fs) if keep_fs else np.empty(0)
+    param_samples = (np.vstack(keep_x) if keep_x
+                     else np.empty((0, d)))
+
+    # ---- 5. The failure-region gate ---------------------------------------
+    # Everything above is a statement about a region a uniform gate hardly
+    # visits. These are the realizations the surrogate COUNTED, solved for real.
+    tail_n = len(tail_x)
+    tail_invalid = tail_disagree = None
+    tail_rms = None
+    if tail_n:
+        tail_arr = np.asarray(tail_x)
+        tail_real = np.empty(tail_n)
+        tail_ok = np.ones(tail_n, dtype=bool)
+        for i in range(tail_n):
+            if i % 25 == 0:
+                _check_cancel(cancel_check)
+                _progress(n_design + int(n_gate) + n_chunks + i, total_steps,
+                          f"Failure-region check {i + 1}/{tail_n}")
+            sd_i = _mc_sampled_slope_data(slope_data, materials, param_info, tail_arr[i])
+            fi = _eval(sd_i)
+            if fi is None:
+                tail_ok[i] = False
+                tail_real[i] = np.nan
+            else:
+                tail_real[i] = fi
+        n_tail_invalid = int(tail_n - np.count_nonzero(tail_ok))
+        tail_invalid = n_tail_invalid / tail_n
+        n_tail_valid = int(np.count_nonzero(tail_ok))
+        if n_tail_valid:
+            tail_pred = _surrogate(tail_arr[tail_ok])
+            tail_disagree = float(np.count_nonzero(tail_real[tail_ok] >= 1.0)
+                                  / n_tail_valid)
+            tail_rms = float(np.sqrt(np.mean((tail_pred - tail_real[tail_ok]) ** 2)))
+        if tail_n >= RS_TAIL_MIN:
+            if tail_invalid > RS_TAIL_INVALID_MAX:
+                return False, (
+                    f"Response surface: {n_tail_invalid} of {tail_n} realizations the "
+                    f"surrogate counts as failures ({tail_invalid * 100:.0f}%, limit "
+                    f"{RS_TAIL_INVALID_MAX * 100:.0f}%) have no analyzable solution at "
+                    f"all. The probability of failure would be a count of realizations "
+                    f"the model cannot solve, and the surrogate cannot tell them from "
+                    f"the ones it can. Use Monte Carlo, which excludes and counts the "
+                    f"inadmissible draws — note that its probability of failure is then "
+                    f"a fraction of the ADMISSIBLE realizations.")
+            if tail_disagree is not None and tail_disagree > RS_TAIL_DISAGREE_MAX:
+                return False, (
+                    f"Response surface: the solver puts {tail_disagree * 100:.0f}% of "
+                    f"the realizations the surrogate counts as failures back above "
+                    f"F = 1 (limit {RS_TAIL_DISAGREE_MAX * 100:.0f}%), with an RMS "
+                    f"error of {tail_rms:.5f} there against {gate_rms:.5f} over the "
+                    f"population as a whole. The surrogate is least accurate exactly "
+                    f"where the answer is counted; run Monte Carlo.")
+
+    if debug_level >= 0:
+        print("\n=== RESPONSE-SURFACE RELIABILITY RESULTS ===")
+        table = [[f"Mat {p['material_id']} {p['param']}", f"{p['mlv']:.3f}",
+                  f"{p['std']:.3f}", f"{p['std'] / p['mlv'] * 100:.1f}%" if p['mlv'] else "—"]
+                 for p in param_info]
+        print(tabulate(table, headers=["Parameter", "MLV", "σ", "COV"],
+                       tablefmt="grid", colalign=["left", "center", "center", "center"]))
+        print(f"\nDesign: {n_design} real solves (2^{d} corners at ±1σ, {2 * d} axial "
+              f"at ±{alpha:g}σ, 1 centre) | quadratic terms: {n_terms} | rank {rank}")
+        print(f"Gate: {n_gate_valid} held-out real solves | R² = {gate_r2:.6f} | "
+              f"RMS = {gate_rms:.5f} (≤ {rms_limit:.5f}) | max = {gate_max:.5f} | "
+              f"real σ over the gate draws = {gate_sigma:.4f}")
+        print(f"Gate F<1 disagreement: {n_disagree} of {n_gate_valid} draws "
+              f"({pf_disagree * 100:.2f}%, limit {RS_PF_DISAGREE_MAX * 100:.0f}%) — "
+              f"the measured bound on the error in P_f")
+        if tail_n:
+            print(f"Failure region: {tail_n} counted failures solved for real | "
+                  f"inadmissible {tail_invalid * 100:.1f}% "
+                  f"(limit {RS_TAIL_INVALID_MAX * 100:.0f}%) | solver disputes "
+                  f"{tail_disagree * 100:.1f}% of them "
+                  f"(limit {RS_TAIL_DISAGREE_MAX * 100:.0f}%) | RMS there "
+                  f"{tail_rms:.5f}")
+        else:
+            print("Failure region: the surrogate predicts no failures, so there is "
+                  "nothing to check there.")
+        print(f"Surrogate: {n_tot:,} realizations | seed {rng_seed} | {distribution} "
+              f"| real solves in total: {n_design + int(n_gate) + tail_n + 1}")
+        print(f"Mean FS: {mean_FS:.4f}   σ_F: {sigma_F:.4f}   COV_F: {COV_F:.4f}")
+        print(f"β (normal): {beta_normal:.4f}   β (lognormal): {beta_ln:.4f}")
+        print(f"PF empirical: {pf_empirical * 100:.3f}%   "
+              f"PF normal: {pf_normal * 100:.3f}%   PF lognormal: {pf_lognormal * 100:.3f}%")
+
+    result = {
+        'method': f'{method}_reliability_rs',
+        'engine': 'rs',
+        'F_MLV': F_MLV,
+        'mean_FS': mean_FS,
+        'sigma_F': sigma_F,
+        'COV_F': COV_F,
+        'beta_ln': beta_ln,
+        'beta_normal': beta_normal,
+        'reliability': 1.0 - pf_empirical,
+        'prob_failure': pf_empirical,
+        'pf_empirical': pf_empirical,
+        'pf_normal': pf_normal,
+        'pf_lognormal': pf_lognormal,
+        'n_surrogate': n_tot,
+        'n_samples': n_tot,
+        'n_used': n_tot,
+        'n_valid': n_tot,
+        'n_invalid': 0,
+        'rng_seed': rng_seed,
+        'distribution': distribution,
+        'param_info': param_info,
+        # The design and its verdict — the credentials of every number above.
+        'n_design': n_design,
+        'n_gate': int(n_gate),
+        'n_gate_valid': n_gate_valid,
+        'n_gate_invalid': n_gate_invalid,
+        'n_real_solves': n_design + int(n_gate) + tail_n + 1,
+        'alpha': float(alpha),
+        'gate_rms': gate_rms,
+        'gate_max_error': gate_max,
+        'gate_r2': gate_r2,
+        'gate_sigma': gate_sigma,
+        'gate_rms_limit': rms_limit,
+        'gate_pf_disagree': pf_disagree,
+        'gate_pf_disagree_n': n_disagree,
+        # The failure-region check: how many of the realizations the surrogate
+        # counted as failures the solver cannot solve, and how many it puts back
+        # above F = 1.
+        'tail_n': tail_n,
+        'tail_invalid': tail_invalid,
+        'tail_disagree': tail_disagree,
+        'tail_rms': tail_rms,
+        'rs_coefficients': coef,
+        'rs_terms': _quad_term_labels(param_info),
+        # A fixed-stride subsample of the surrogate draws, for plotting only: the
+        # histogram reads fs_samples and a rank correlation reads both, while every
+        # statistic above comes from all n_surrogate realizations.
+        'fs_samples': fs_samples,
+        'param_samples': param_samples,
+        'fs_samples_stride': stride,
+    }
+
+    print(f"\nResponse-surface reliability analysis completed in "
           f"{time.time() - start_time:.2f} seconds.")
     return True, result

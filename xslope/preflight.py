@@ -1295,14 +1295,26 @@ class _Ctx:
 
     @property
     def reliability_engine(self):
-        """``"taylor"`` (default) or ``"mc"`` -- which reliability engine runs.
+        """``"taylor"`` (default), ``"mc"`` or ``"rs"`` -- which reliability engine runs.
 
-        The two have genuinely different preconditions: the Taylor series must
-        decline a standard deviation larger than its mean, while Monte Carlo
-        handles it by truncating the draws at the physical floor.
+        They have genuinely different preconditions: the Taylor series must
+        decline a standard deviation larger than its mean, while the two sampling
+        engines handle it by truncating the draws at the physical floor.
         """
         key = str(self.selection.get("engine") or "taylor").lower().replace("-", "_")
-        return "mc" if key in ("mc", "monte_carlo", "montecarlo") else "taylor"
+        if key in ("mc", "monte_carlo", "montecarlo"):
+            return "mc"
+        if key in ("rs", "rsm", "response_surface", "responsesurface"):
+            return "rs"
+        return "taylor"
+
+    @property
+    def reliability_samples_sigmas(self):
+        """True when the selected reliability engine DRAWS from the sigmas rather
+        than perturbing them -- Monte Carlo and the response surface both do, and
+        every rule about truncation, drawdown or the fixed surface applies to both.
+        """
+        return self.reliability_engine in ("mc", "rs")
 
     # -- mesh --------------------------------------------------------------
     def element_centroids(self):
@@ -4586,10 +4598,10 @@ def _rel_dead_sigmas(ctx):
       capability="analysis",
       summary="The Taylor series cannot take a parameter below zero at MLV - sigma.")
 def _rel_sigma_exceeds_mean(ctx):
-    if ctx.reliability_engine == "mc":
-        # Monte Carlo truncates every draw at its physical floor, which IS how the
-        # published high-COV treatments handle the bound, so the same model that
-        # the Taylor series must decline is admissible here.
+    if ctx.reliability_samples_sigmas:
+        # The sampling engines truncate every draw at its physical floor, which IS
+        # how the published high-COV treatments handle the bound, so the same model
+        # that the Taylor series must decline is admissible there.
         return None
     used = {"mc": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("phi", "sigma_phi")),
             "cp": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("cp", "sigma_cp"))}
@@ -4614,8 +4626,10 @@ def _rel_sigma_exceeds_mean(ctx):
 def _rel_rapid_noop(ctx):
     if not ctx.selection.get("rapid"):
         return None
-    if ctx.reliability_engine == "mc":
-        return ("This run asks for rapid drawdown, but the Monte Carlo engine "
+    if ctx.reliability_samples_sigmas:
+        name = ("Monte Carlo" if ctx.reliability_engine == "mc"
+                else "response-surface")
+        return (f"This run asks for rapid drawdown, but the {name} engine "
                 "applies it only to the single critical-surface search at the "
                 "most-likely values: every sampled realization is then solved "
                 "WITHOUT drawdown, so the probability of failure describes the "

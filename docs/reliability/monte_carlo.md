@@ -64,13 +64,14 @@ empirical probability of failure is $1.96\sqrt{p(1-p)/n}$. The optional
 convergence stop — `converge_rel` in the API, the **Stop when P_f converges**
 checkbox and its tolerance in Studio's Reliability dialog — checks that
 half-width every 100 realizations and ends the campaign once $P_f$ is known to
-the stated fraction **of itself** (default ±10%), with the sample count as the
+the stated fraction **of itself** (default ±5%), with the sample count as the
 cap. The tolerance is relative because an absolute one is miscalibrated across
 the $P_f$ range: half a percentage point is ±3% of a 17% probability of
 failure but ±25% of a 2% one. Relative, the demanded sample count self-scales
-as $(1-p)/p$ — the submerged-slope model below converges at ±10% in about
-2,000 realizations at $P_f \approx 17$%, and the same rule would ask roughly
-20,000 of a 2% problem. The rule never fires before 500 realizations or before
+as $(1-p)/p$ — the submerged-slope model below converges at the default ±5% in about
+7,600 realizations at $P_f \approx 17$% (18 s), and the same rule would ask
+roughly 75,000 of a 2% problem — raise the sample cap when a small $P_f$
+meets a tight tolerance. The rule never fires before 500 realizations or before
 10 failures have been observed, so a rare-event problem — where the normal
 approximation behind the half-width is not yet credible — runs to its cap
 instead of stopping on false confidence. Because the whole sample matrix is
@@ -80,7 +81,7 @@ stopping $n$ and its achieved resolution in the console summary.
 
 The running estimate and its confidence band can be read off any Monte Carlo
 result with `plot_reliability_convergence` — the sample-15 campaign, drawn in
-full with the ±10% stop target it would have satisfied at n ≈ 2,000:
+full with the ±5% stop target it satisfies at n = 7,600:
 
 ![Running P_f with its 95% confidence band](images/mc_convergence_trace.png)
 

@@ -2165,7 +2165,7 @@ class ReliabilityDialog(QDialog):
         self.mc_converge_tol.setSingleStep(5.0)
         self.mc_converge_tol.setSuffix(" % of P_f")
         self.mc_converge_tol.setValue(
-            float(defaults.get("converge_rel") or 0.10) * 100)
+            float(defaults.get("converge_rel") or 0.05) * 100)
         self.mc_converge_tol.setToolTip(
             "Stop when the probability of failure is known to this fraction of "
             "itself (95% confidence half-width ≤ tolerance × P_f). Relative, so "

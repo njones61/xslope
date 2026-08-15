@@ -170,8 +170,8 @@ exactly — and **MC distribution** `Normal` is how each σ is read: as the stan
 deviation of a normal distribution about the material's own value, truncated at
 zero so a draw can never hand the solver a negative strength. **Stop when P_f
 converges** ends the campaign early once the probability of failure is known
-to a stated fraction of itself — at the default ±10%, this model stops near
-2,000 realizations — with the samples field as the cap; the
+to a stated fraction of itself — at the default ±5%, this model stops at
+7,600 realizations — with the samples field as the cap; the
 [Monte Carlo page](../reliability/monte_carlo.md) gives the rule and its
 convergence plot. Leave it unticked here, and **Run**.
 

@@ -164,8 +164,12 @@ line is a detail; where they do not, it is the answer.
 
 A 2:1 slope 8 m high, standing on a bench at elevation 8 and topping out at
 16, over two soft clays that reach down to a rigid base at elevation 0. This is
-Low (1989)'s three-layer problem,
-[verification problem VP23](../verification/rocscience.md#vp23).
+a worked example from Low (1989), "Stability analysis of embankments on soft
+ground" (ASCE Journal of Geotechnical Engineering 115(2)) — a paper about
+exactly this part's subject, undrained clays whose strength grows with the
+overburden pressing on them — and it is
+[verification problem VP23](../verification/rocscience.md#vp23) in the
+Slide2 corpus.
 
 The slope body itself is a stiff soil — γ = 20 kN/m³, c = 95 kPa, φ = 15° —
 and the clay directly beneath it, from elevation 8 down to 4, is undrained at a
@@ -209,9 +213,12 @@ Click **Run**:
 
 ![Bishop on the depth-varying strength](images/lem07_low_cp.png){width=1000}
 
-**FS = 1.130**, against Slide's 1.192, Low's published 1.14 and Kim's 1.17 —
-the published values themselves spread 1.14 to 1.19 on this deep φ = 0
-problem. The circle is centered at (18.00, 16.04), 38.09 m of surface carrying
+**FS = 1.130**, against Low's published 1.14, the 1.17 that Kim, Salgado &
+Lee (2002) later found for the same section by finite-element limit analysis,
+and Slide's 1.192 — the published values themselves spread 1.14 to 1.19 on
+this deep φ = 0 problem, and
+[VP23's page](../verification/rocscience.md#vp23) measures where the spread
+comes from. The circle is centered at (18.00, 16.04), 38.09 m of surface carrying
 4943.5 kN/m of soil, and the number to watch is where it stops: **tangent at
 elevation 0.82**, four fifths of a metre above the rigid base it could have
 reached. Of the 38.09 m of surface, 20.05 m lies in the lowest clay, and the

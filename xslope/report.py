@@ -2505,12 +2505,21 @@ def _pile_fields(slope_data):
     label = _unit_labels(slope_data)
     au = f" ({label['length']}²)" if lu else ""
     iu = f" ({label['length']}⁴)" if lu else ""
-    # A moment capacity per unit width of slope, spelled the one way the report
-    # spells it: force x length per length (:func:`~xslope.fem_details.units`).
-    # "lb/ft·ft" is the same quantity written so that it reads as force per area,
-    # and the forces table beside this one already spelled it out.
+    # The capacity columns follow the editor's own spacing rule: a pile row with
+    # a Spacing set is a discrete shaft, and its V_cap/M_cap are per element (lb,
+    # lb·ft); at Spacing 1 (or none) the row is a smeared per-unit-width pile and
+    # the capacities read per foot of slope, the way every other force column
+    # does. The Ito & Matsui capacity check compares per shaft, which is why the
+    # per-element spelling is the honest one whenever a spacing is in play.
     force = (label['force_per_len'] or "").split("/")[0]
-    mu = f" ({force}·{label['length']} per {label['length']})" if fu and lu else ""
+    per_element = any(float(p.get("S") or 1) != 1.0
+                      for p in (slope_data.get("pile_lines") or []))
+    if per_element and fu and lu:
+        vu = f" (per element, {force})"
+        mu = f" (per element, {force}·{label['length']})"
+    else:
+        vu = fu
+        mu = f" ({force}·{label['length']} per {label['length']})" if fu and lu else ""
     return {
         "label": ("label", "Label", lambda m: str(m.get("label") or ""), True),
         "top": ("x1", "Top (x, y)", lambda m: _point(m, "x1", "y1"), True),
@@ -2522,7 +2531,7 @@ def _pile_fields(slope_data):
         "D_pile": ("D_pile", f"D{lu}",
                    lambda m: _fmt(m.get("D_pile"), "{:g}"), True),
         "S": ("S", f"Spacing{lu}", lambda m: _fmt(m.get("S"), "{:g}"), True),
-        "V_cap": ("V_cap", f"V_cap{fu}",
+        "V_cap": ("V_cap", f"V_cap{vu}",
                   lambda m: _fmt(m.get("V_cap"), "{:g}"), False),
         "M_cap": ("M_cap", f"M_cap{mu}",
                   lambda m: _fmt(m.get("M_cap"), "{:g}"), False),

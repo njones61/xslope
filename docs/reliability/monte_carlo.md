@@ -42,6 +42,11 @@ independently (**Random**, the default) or by **Latin hypercube**: each
 parameter's distribution is cut into $n$ equal-probability bins with exactly one
 draw per bin, so the sample covers the distribution by construction instead of
 by luck. Both run through the same inverse CDFs, truncations and fixed seed.
+The difference is visible in the draws themselves — the same two
+distributions, one seed each:
+
+![Random against Latin hypercube draws](images/lhs_vs_random.png){width=800}
+
 Measured on the submerged-slope model (twenty repeated 1,000-realization
 campaigns), Latin hypercube cut the across-campaign scatter of $P_f$ by a
 factor of 1.84 — the information of roughly **3.4×** the sample count for the
@@ -157,11 +162,22 @@ physical floor is solved *at* the floor and fitted at the coordinate that was
 solved. The axial distance of 2σ is a measured choice: across four corpus models,
 tried at 1.5, 2, 2.5 and 3σ, it gives the lowest fit error on every one of them.
 
-**The fit.** A full quadratic in the $d$ parameters — $1 + d + d(d+1)/2$
-coefficients — by least squares. A design point with no analyzable solution ends the
+**The fit.** A full quadratic in the $d$ parameters,
+
+$$\hat F(x_1,\ldots,x_d) \;=\; \beta_0 \;+\; \sum_i \beta_i x_i \;+\; \sum_{i \le j} \beta_{ij}\, x_i x_j$$
+
+— $1 + d + d(d+1)/2$ coefficients — by least squares. A design point with no analyzable solution ends the
 run with a message naming it: the surrogate is fitted to the whole design, so a
 corner that cannot be solved leaves the fit undefined over part of the sampled
 range.
+
+On the submerged-slope model the whole construction fits in one picture: the
+nine design solves (diamonds), the surface they define, the ten-million-draw
+cloud it is sampled with, and the $F = 1$ boundary the tail count happens
+against — beside 300 fresh real solves scattered on the surrogate's own
+prediction:
+
+![The fitted surface and its validation](images/rs_surface_fit.png)
 
 **The gate.** The surrogate answers nothing until it has been measured against the
 real pipeline, in two places:

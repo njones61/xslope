@@ -168,7 +168,11 @@ controls below the surface options come live:
 the random seed — fixed rather than taken from the clock, so the run reproduces
 exactly — and **MC distribution** `Normal` is how each σ is read: as the standard
 deviation of a normal distribution about the material's own value, truncated at
-zero so a draw can never hand the solver a negative strength. **Stop when P_f
+zero so a draw can never hand the solver a negative strength. **MC sampling**
+chooses how the draws are laid down: `Random` is independent draws; `Latin
+hypercube` cuts each distribution into equal-probability bins with one draw
+per bin, which the [Monte Carlo page](../reliability/monte_carlo.md) measures
+at roughly three times the information per realization on this model. **Stop when P_f
 converges** ends the campaign early once the probability of failure is known
 to a stated fraction of itself — at the default ±5%, this model stops at
 7,600 realizations — with the samples field as the cap; the
@@ -208,6 +212,34 @@ exactly linear in c and a symmetric perturbation of it cancels. The unit weight'
 pair averages **+0.0266 above** F<sub>MLV</sub>, and the Monte Carlo mean sits
 **+0.0268 above** it. **The whole gap is the curvature in γ**, which a
 first-order method drops by construction and a sampling method does not.
+
+---
+
+## The response surface
+
+Ten thousand real solves resolved P<sub>f</sub> to about ±0.7 percentage
+points. The third engine gets rid of the count altogether: it solves the real
+model a **handful** of times, fits a quadratic to those answers, and samples
+the fitted surface ten million times — arithmetic, not solves. Open
+**Reliability…** once more and set **Method** to `Response surface (RS)`; the
+sample count and convergence stop gray out, because a surrogate's realizations
+are nearly free:
+
+![The Reliability dialog on the response surface](images/lem11_studio_reliability_rs.png)
+
+Click **Run**. On this model the engine makes 9 design solves (two uncertain
+parameters), then 700 more to *check itself* — 500 across the whole
+distribution and 200 in the failure region — and reports in about four
+seconds: **P<sub>f</sub> = 16.6%**, β<sub>LN</sub> = 0.998, with the fit's
+credentials beside the answer: R² = 0.998, an rms fit error of 0.018 on the
+factor of safety, and 1 of the 500 checked draws on the wrong side of
+FS = 1. Paired against thirty thousand real solves of the identical draws,
+the surrogate's P<sub>f</sub> is 0.10 percentage points low — the sampling
+error is gone and the *fit* error is what remains, measured. The
+[response-surface section](../reliability/monte_carlo.md#sampling-a-fitted-response-surface)
+draws the fitted surface, the sample cloud and the F = 1 boundary in one
+figure, and states the gate that makes the engine refuse a model it cannot
+fit honestly.
 
 ---
 
@@ -317,25 +349,42 @@ repeating rather than doing once.
 
 ## When to use which
 
-Both estimators read the same two columns and neither needs an input the other
-does not, so the choice is about cost and about what is being asked.
+All three engines read the same σ columns and none needs an input the others do
+not, so the choice is about cost and about what is being asked.
 
-- **The Taylor series** costs 1 + 2N solves — five here, seconds — and returns β
-  and a lognormal P<sub>f</sub>. It is a first-order method: it summarizes F by
-  its slope at the mean values, and everything above shows what that discards
-  (the curvature in γ) and what it does not (the ranking of the parameters, the
-  variance, β itself). It is the default, and the engine behind both the variance
-  Pareto and the finite-element reliability path.
-- **Monte Carlo** costs 10⁴ solves and returns the whole distribution, with
-  P<sub>f</sub> counted from the tail rather than fitted to it. It earns that
-  cost where the first-order assumptions break: a coefficient of variation so
-  large that x − σ is not a physical value and the Taylor series declines the
-  analysis outright, a strongly non-linear factor-of-safety response, or a
-  wanted empirical tail. [VP34](../verification/rocscience.md#vp34) is the
-  worked case of the first — a fill whose friction angle carries a 124%
-  coefficient of variation.
+| Engine | Real solves here | What it returns | What it assumes |
+|---|:---:|---|---|
+| Taylor series | 5 | β, lognormal P<sub>f</sub>, the per-parameter table | F is first-order near the means |
+| Monte Carlo | 2,000–10,000 | the whole distribution; P<sub>f</sub> *counted* | only the input distributions |
+| Response surface | ~710 | MC-grade statistics with sampling error removed | F is quadratic — and it *checks* |
 
-Neither randomizes the failure surface. The slip surface is a decision, not a
+- **The Taylor series** is the screen: five solves, seconds, and the engine
+  behind both the variance Pareto and the finite-element reliability path. It
+  summarizes F by its slope at the mean values, and everything above shows what
+  that discards (the curvature in γ) and what it keeps (the ranking, the
+  variance, β itself).
+- **Monte Carlo** is the reference: nothing assumed about the shape of F, the
+  tail counted rather than fitted. The convergence stop sets its cost to the
+  resolution actually asked, and Latin hypercube stretches each solve about
+  three-fold. It is the engine to reach for when the first-order assumptions
+  break — a coefficient of variation so large that x − σ is not a physical
+  value ([VP34](../verification/rocscience.md#vp34), a fill whose friction
+  angle carries a 124% COV), a strongly non-linear response, or a wanted
+  empirical tail — and it is the arbiter when the other two disagree.
+- **The response surface** is the precision instrument: tail resolution no
+  count can afford, for a few hundred real solves — *when its gate accepts*.
+  It refuses exactly the models Monte Carlo exists for (VP34's gate finds a
+  third of the surrogate's failures have no real solution, and refuses), and
+  its β differs from Monte Carlo's in the third decimal because a quadratic
+  slightly under-disperses σ<sub>F</sub>. Quote its P<sub>f</sub> with the
+  gate credentials it prints beside it.
+
+A working habit: screen with the Taylor series, decide with Monte Carlo at the
+default convergence stop, and reach for the response surface when the tail
+itself is the question — checking it against a Monte Carlo run once, since the
+two sampling engines share their draws by construction.
+
+Neither sampling engine randomizes the failure surface. The slip surface is a decision, not a
 random variable: it is found once at the most-likely values and then held while
 the parameters vary, which is what both engines above did and what the commercial
 limit-equilibrium codes do in their probabilistic modes.
@@ -362,6 +411,10 @@ This tutorial demonstrated:
   **24.2%** onto the unit weight, and what halving the dominant σ does — P<sub>f</sub>
   from **17.48% to 6.36%** (TSPM) and **16.71% to 5.34%** (Monte Carlo) with the
   factor of safety fixed at 1.354.
+- The response surface reaching the same answer from **709 real solves** —
+  P<sub>f</sub> = 16.6% with its fit credentials printed beside it — and the
+  three-engine habit: screen with the Taylor series, decide with Monte Carlo,
+  bring in the response surface when the tail is the question.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Reliability Analysis](../reliability/index.md) gives the theory and the equation

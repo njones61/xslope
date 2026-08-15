@@ -1356,6 +1356,13 @@ def lem11_reliability_mc():
     return _lem11_reliability_dialog("mc", "lem11_studio_reliability_mc.png")
 
 
+def lem11_reliability_rs():
+    """The dialog on the response surface: seed, distribution and sampling stay
+    live (they describe the draws); the sample count and the convergence stop
+    gray out, because a surrogate's realizations cost arithmetic."""
+    return _lem11_reliability_dialog("rs", "lem11_studio_reliability_rs.png")
+
+
 def lem11_parametric_variance():
     """The Parametric dialog set to the variance Pareto — the plot type that is
     offered only because this model carries standard deviations.
@@ -1378,6 +1385,7 @@ SHOTS.update({
     "lem11_run_lem": lem11_run_lem,
     "lem11_reliability_taylor": lem11_reliability_taylor,
     "lem11_reliability_mc": lem11_reliability_mc,
+    "lem11_reliability_rs": lem11_reliability_rs,
     "lem11_parametric_variance": lem11_parametric_variance,
 })
 

@@ -819,7 +819,20 @@ Two cases: dry, and r<sub>u</sub> = 0.25 in both materials.
 
 ## VP23: Slope, (3) materials {#vp23}
 
-Slide #23: Low (1989) slope over two undrained layers; the lower layer's cu grows linearly 15->30 kPa from y=4 to y=0 (xslope 'cp' option: Su = c + cp*(r_elev - y)). Circular search.
+Slide #23 / Low (1989): a stiff upper slope (c = 95 kPa, φ = 15°) standing on two
+soft undrained clays, γ = 20 kN/m³ throughout — the middle layer a constant
+cu = 15 kPa, and the lowest gaining strength linearly from 15 kPa at its top
+(y = 4) to 30 kPa at the model base (xslope `cp` option:
+Su = c + cp·(r_elev − y)). Circular search.
+
+Low, B. (1989), "Stability analysis of embankments on soft ground," ASCE
+Journal of Geotechnical Engineering 115(2), 211–227, develops simplified
+stability methods for embankments on soft clays whose undrained strength
+increases with depth; Slide takes this problem and [#24](#vp24) from the
+paper's examples. The Kim column is Kim, Salgado & Lee (2002), "Stability
+analysis of complex soil slopes using limit analysis," Journal of Geotechnical
+and Geoenvironmental Engineering 128(7), 546–557, which reanalyzed the section
+by finite-element limit analysis and reports 1.17.
 
 **Input files:** [vp023.xlsx](files/rocscience/vp023.xlsx)
 
@@ -828,13 +841,17 @@ Slide #23: Low (1989) slope over two undrained layers; the lower layer's cu grow
 | Ordinary | 1.357 | 1.370 (−0.9%) | 1.36 (−0.2%) | — |
 | Bishop | 1.130 | 1.192 (−5.2%) | 1.14 (−0.9%) | 1.17 (−3.4%) |
 
-*Published Bishop values themselves spread 1.14–1.19 on this deep φ=0 problem.*
+*The published Bishop-family values themselves spread 1.14–1.19 on this deep φ = 0 problem — Low's 1.14, Kim's limit-analysis 1.17, Slide's 1.192.*
 
 ![vp023: inputs and representative solution](images/vp023.png)
 
 ## VP24: Slope, (3) materials {#vp24}
 
-Slide #24: Low (1989) three-layer undrained slope (phi=0). Circular search.
+Slide #24 / Low (1989), the companion example to [#23](#vp23): a three-layer
+undrained slope, φ = 0 and γ = 18 kN/m³ throughout, with cu = 30 kPa in the
+upper layer, 20 kPa in the middle band, and 150 kPa in the stiff bottom layer.
+Circular search. On a φ = 0 section the Ordinary and Bishop methods coincide,
+and Low's published 1.44 is the same for both.
 
 **Input files:** [vp024.xlsx](files/rocscience/vp024.xlsx)
 

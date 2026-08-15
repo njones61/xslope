@@ -1260,6 +1260,128 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# LEM-11 — Reliability (open-and-run, one edit)
+#
+# The only tutorial whose subject is a column set that is HIDDEN by default: the
+# mat sheet's standard deviations appear when the materials editor's Reliability
+# toggle is ticked. Every materials shot here therefore pins LEM *and* Reliability
+# rather than reusing _lem_only (which unticks Reliability) or _all_usages (which
+# unticks it too) — a page whose sentence is "tick Reliability and the σ columns
+# appear" cannot be illustrated by an editor with the box clear.
+# --------------------------------------------------------------------------- #
+LEM11 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_prob_submerged_KEY.xlsx")
+
+
+def _lem_and_rel(dlg):
+    """Tick LEM and Reliability, untick FEM and Seepage.
+
+    Pinned rather than defaulted for the reason ``_all_usages`` documents: the
+    toggles persist per editor, and Reliability's coded default is OFF, so this
+    page's subject would vanish from the shot on any machine that had not just
+    ticked it by hand.
+    """
+    for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(tag in ("lem", "rel"))
+    return dlg
+
+
+def _lem11_materials(name, sigma_c=None):
+    """The materials editor in list view with the Reliability toggle on.
+
+    List view rather than the table: the σ of a parameter is a property OF that
+    parameter, and only the list view puts the two in one field — ``γ`` and its
+    ``± σ`` box side by side — where the table separates them by twenty columns.
+    ``sigma_c`` applies the page's edit before the editor is built, so the second
+    shot carries the state its step ends in.
+    """
+    from studio.editors import MaterialsEditor
+
+    d = _load(LEM11)
+    if sigma_c is not None:
+        mats = [dict(m) for m in d["materials"]]
+        mats[0]["sigma_c"] = sigma_c
+        d = dict(d, materials=mats)
+    dlg = _lem_and_rel(MaterialsEditor().build(d, None))
+    dlg.set_view_mode("list")
+    dlg._list_view.list.setCurrentRow(0)
+    dlg.resize(1180, 620)
+    return _grab(dlg, name)
+
+
+def lem11_materials():
+    """The clay as the file carries it — γ = 120 ± 8, c = 400 ± 100 — with the
+    Reliability toggle ticked so both σ boxes are on the form."""
+    return _lem11_materials("lem11_studio_materials.png")
+
+
+def lem11_materials_edit():
+    """The clay after the page's one edit: s(c) halved to 50 psf, everything else
+    — γ, its σ, c itself — untouched."""
+    return _lem11_materials("lem11_studio_materials_edit.png", sigma_c=50.0)
+
+
+def lem11_run_lem():
+    """The deterministic run the page makes first: Spencer, auto search, the
+    dialog's own 40 slices, on the file exactly as downloaded."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM11))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem11_studio_run_lem.png")
+
+
+def _lem11_reliability_dialog(engine, name):
+    from studio.dialogs import ReliabilityDialog
+
+    dlg = ReliabilityDialog(defaults={"engine": engine, "method": "spencer",
+                                      "num_slices": 40, "search": True},
+                            slope_data=_load(LEM11), app_mode="lem")
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, name)
+
+
+def lem11_reliability_taylor():
+    """The Reliability dialog on the Taylor series, Spencer — including the
+    read-only σ summary, which is where the run states what it will vary."""
+    return _lem11_reliability_dialog("taylor",
+                                     "lem11_studio_reliability_taylor.png")
+
+
+def lem11_reliability_mc():
+    """The same dialog switched to Monte Carlo: the sample count, seed and
+    distribution come live, which is the whole difference in the inputs."""
+    return _lem11_reliability_dialog("mc", "lem11_studio_reliability_mc.png")
+
+
+def lem11_parametric_variance():
+    """The Parametric dialog set to the variance Pareto — the plot type that is
+    offered only because this model carries standard deviations.
+
+    The sweep table is left empty, which is the state the step's two changes
+    (Method, Plot type) actually leave behind: the Pareto reads every σ-carrying
+    material and ignores the table, as the dialog's own note under it says.
+    """
+    from studio.dialogs import SensitivityDialog
+
+    dlg = SensitivityDialog(slope_data=_load(LEM11), app_mode="lem",
+                            defaults={"method": "spencer", "plot_type": "variance"})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem11_studio_parametric_variance.png")
+
+
+SHOTS.update({
+    "lem11_materials": lem11_materials,
+    "lem11_materials_edit": lem11_materials_edit,
+    "lem11_run_lem": lem11_run_lem,
+    "lem11_reliability_taylor": lem11_reliability_taylor,
+    "lem11_reliability_mc": lem11_reliability_mc,
+    "lem11_parametric_variance": lem11_parametric_variance,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

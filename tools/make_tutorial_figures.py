@@ -1437,6 +1437,117 @@ def lem07_plots():
     print("   B su=%.1f %s" % (LEM07_B_CONST, _lem07_reading(crit_const, mat=3)))
 
 
+# --------------------------------------------------------------------------- #
+# LEM-11 — Reliability (open-and-run, one edit)
+#
+# One model, three analyses of it: the deterministic search, the Taylor series over
+# the same search, and a Monte Carlo campaign on the surface that search found. The
+# page's edit halves the standard deviation the variance Pareto measures as dominant,
+# so the last two figures are the same Monte Carlo histogram before and after.
+# --------------------------------------------------------------------------- #
+LEM11 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_prob_submerged_KEY.xlsx")
+LEM11_METHOD = "spencer"
+#: The page's edit: s(c) halved, 100 -> 50 psf.
+LEM11_SIGMA_C = 50.0
+
+
+def _lem11_sigma_c(model, value):
+    """The model with the clay's s(c) set to ``value`` — the page's one edit."""
+    mats = [dict(m) for m in model["materials"]]
+    mats[0]["sigma_c"] = value
+    return dict(model, materials=mats)
+
+
+def _lem11_reliability(model, engine):
+    """One reliability run, quiet. ``engine`` is 'taylor' or 'mc'; both are called
+    with the dialog's own defaults, so the figures carry what Studio's Run produces."""
+    from xslope.reliability import reliability_mc, reliability_taylor
+
+    fn = reliability_taylor if engine == "taylor" else reliability_mc
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = fn(copy.deepcopy(model), LEM11_METHOD, debug_level=-1)
+    if not ok:
+        raise RuntimeError("lem11 %s reliability failed: %s" % (engine, res))
+    return res
+
+
+def lem11_plots():
+    """The submerged clay slope's deterministic answer and the two estimators of
+    what it is worth.
+
+    The deterministic figure is a solution rather than a search plot: the surface
+    the search settles on is the one the whole page is about, because both
+    estimators evaluate the uncertainty on it. The Taylor figure is that surface
+    with the F+ / F- perturbation surfaces over it — the 1 + 2N searches the method
+    runs, drawn — and the Pareto beside it is where the dominant standard deviation
+    is measured rather than guessed. The two histograms are the same Monte Carlo
+    campaign before and after the page's edit, so the narrowing is read off one pair
+    of pictures.
+    """
+    from xslope.plot import (plot_reliability_histogram, plot_reliability_results,
+                             plot_variance_pareto)
+    from xslope.sensitivity import variance_contribution
+
+    sd = load_slope_data(LEM11)
+    capture("lem11_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(
+            copy.deepcopy(sd), LEM11_METHOD, num_slices=40, diagnostic=False,
+            **file_search_window(sd))
+    crit = fs_cache[0]
+    capture("lem11_solution.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+
+    taylor = _lem11_reliability(sd, "taylor")
+    capture("lem11_taylor.png", plot_reliability_results, sd, taylor)
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, var = variance_contribution(copy.deepcopy(sd), method=LEM11_METHOD)
+    if not ok:
+        raise RuntimeError("lem11 variance contribution failed: %s" % var)
+    capture("lem11_variance.png", plot_variance_pareto, var)
+
+    mc = _lem11_reliability(sd, "mc")
+    capture("lem11_mc.png", plot_reliability_histogram, mc)
+
+    tight = _lem11_sigma_c(sd, LEM11_SIGMA_C)
+    taylor_t = _lem11_reliability(tight, "taylor")
+    mc_t = _lem11_reliability(tight, "mc")
+    capture("lem11_mc_tightened.png", plot_reliability_histogram, mc_t)
+
+    s = crit["slices"]
+    print("   deterministic  FS %.6f · Xo %.4f Yo %.4f · tangent elev %.4f · "
+          "L %.2f · ΣW %.1f"
+          % (crit["FS"], crit["Xo"], crit["Yo"], crit["Depth"],
+             s["dl"].sum(), s["w"].sum()))
+    for tag, r in (("s(c) = 100", taylor), ("s(c) = %g" % LEM11_SIGMA_C, taylor_t)):
+        print("   Taylor %-12s F_MLV %.6f · sigma_F %.6f · COV_F %.6f · beta_ln "
+              "%.6f · R %.4f%% · Pf %.4f%%"
+              % (tag, r["F_MLV"], r["sigma_F"], r["COV_F"], r["beta_ln"],
+                 r["reliability"] * 100, r["prob_failure"] * 100))
+        for p in r["param_info"]:
+            print("      %-6s mlv %.4f sigma %.4f · F+ %.6f · F- %.6f · dF %.6f"
+                  % (p["param"], p["mlv"], p["std"], p["F_plus"], p["F_minus"],
+                     p["delta_F"]))
+    for b in var["bars"]:
+        print("   variance %-14s %.4f%% of Var(FS)  (cumulative %.4f%%)"
+              % (b["label"], b["pct"], b["cumulative"]))
+    for tag, r in (("s(c) = 100", mc), ("s(c) = %g" % LEM11_SIGMA_C, mc_t)):
+        print("   MC     %-12s F_MLV %.6f · mean %.6f · sigma_F %.6f · beta_n "
+              "%.6f · beta_ln %.6f · Pf %.4f%% (%d of %d below 1)"
+              % (tag, r["F_MLV"], r["mean_FS"], r["sigma_F"], r["beta_normal"],
+                 r["beta_ln"], r["pf_empirical"] * 100,
+                 round(r["pf_empirical"] * r["n_valid"]), r["n_valid"]))
+    # The second-order term the first-order Taylor series drops by construction:
+    # the mean of a parameter's own F+ / F- pair against F_MLV. A parameter FS is
+    # linear in contributes nothing; the curvature is what the MC mean picks up.
+    for p in taylor["param_info"]:
+        print("   curvature %-6s (F+ + F-)/2 - F_MLV = %+.6f"
+              % (p["param"], (p["F_plus"] + p["F_minus"]) / 2 - taylor["F_MLV"]))
+    print("   MC mean - F_MLV = %+.6f" % (mc["mean_FS"] - taylor["F_MLV"]))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -1459,6 +1570,7 @@ GROUPS = {
     "lem09_sheets": lem09_sheets,
     "lem09_plots": lem09_plots,
     "lem10_plots": lem10_plots,
+    "lem11_plots": lem11_plots,
 }
 
 

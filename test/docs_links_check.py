@@ -117,6 +117,11 @@ LEM09_FILE = os.path.join(_REPO,
 #: Tutorial LEM-10's completed model — a cohesionless embankment on soft clay,
 #: the section its generator quote and its two Run LEM search options are read on.
 LEM10_FILE = os.path.join(_REPO, "docs/lem/files/xslope_mult_min_KEY.xlsx")
+#: Tutorial LEM-11's completed model — the submerged clay slope, the only tutorial
+#: section that carries reliability standard deviations, which is what gates the
+#: dialog controls and the plot type its pins are read on.
+LEM11_FILE = os.path.join(_REPO,
+                          "docs/lem/files/xslope_prob_submerged_KEY.xlsx")
 #: The editable master template, whose ``reinforce`` sheet carries the support-type
 #: lookup block LEM-8 reproduces as a table.
 TEMPLATE_FILE = os.path.join(_REPO, "docs/inputs/input_template.xlsx")
@@ -1133,6 +1138,140 @@ def _lem10_run_labels():
     return fails
 
 
+#: The Run-menu action LEM-11 sends the reader to, in the same source-string
+#: convention as ``LEM02_RUN_ACTIONS`` (Qt's ``&`` removed, the ellipsis kept).
+LEM11_RUN_ACTIONS = {"act_reliability": "Reliability…"}
+
+#: The Reliability dialog as LEM-11 walks it: the two engines by the names the page
+#: writes in its two section headings, the search toggle the page tells the reader
+#: to leave ticked, the σ summary box it reads the run's inputs out of, and the
+#: three Monte Carlo controls it names one by one. A rewording of any of them turns
+#: those steps into instructions to press something that is not there.
+LEM11_ENGINES = ("Taylor series (TSPM)", "Monte Carlo")
+LEM11_SEARCH_CHECKBOX = "Search the critical surface at the mean values"
+LEM11_SIGMA_GROUP = "Standard deviations in this file"
+LEM11_MC_ROWS = ("MC samples", "MC seed", "MC distribution")
+
+#: The materials-editor usage toggle whose default is OFF and whose ticking is the
+#: page's first step — the σ boxes do not exist in the editor until it is on — and
+#: the Parametric plot type the variance section selects, which the dialog offers
+#: only for a model carrying standard deviations.
+LEM11_RELIABILITY_TOGGLE = "Reliability"
+LEM11_VARIANCE_PLOT = "Variance Pareto (σ)"
+
+
+@contextlib.contextmanager
+def _default_editor_toggles():
+    """Read an editor against the app's OWN toggle defaults, not this machine's.
+
+    Every usage toggle is written to QSettings as soon as it is clicked — including
+    by an earlier check in this same process — so a pin on a coded default has to
+    take the remembered state out of the way first and put it back afterwards,
+    whatever happens.
+    """
+    from PySide6.QtCore import QSettings
+
+    settings = QSettings("XSlope", "XSlope Studio")
+    settings.beginGroup("editor_toggles")
+    stashed = {k: settings.value(k) for k in settings.allKeys()}
+    for key in stashed:
+        settings.remove(key)
+    settings.endGroup()
+    settings.sync()
+    try:
+        yield
+    finally:
+        settings.beginGroup("editor_toggles")
+        for key, value in stashed.items():
+            settings.setValue(key, value)
+        settings.endGroup()
+        settings.sync()
+
+
+def _lem11_reliability_labels():
+    """The reliability controls Tutorial LEM-11 drives, read on its own model.
+
+    On its own model rather than on any other, because every one of them is gated
+    by the file carrying a standard deviation: the Monte Carlo engine, the σ
+    summary's contents, and the Parametric dialog's variance plot type all appear
+    only for a model with a σ in it, and LEM-11's is the only tutorial section that
+    has one. Read on a σ-less file the pins would pass for the wrong reason or fail
+    for one the page is not making.
+    """
+    from PySide6.QtWidgets import QCheckBox, QGroupBox, QLabel
+
+    from xslope.fileio import load_slope_data
+
+    from studio.dialogs import ReliabilityDialog, SensitivityDialog
+    from studio.editors import MaterialsEditor
+
+    fails = []
+    data = _quiet(load_slope_data, LEM11_FILE)
+
+    dlg = ReliabilityDialog(defaults={}, slope_data=data, app_mode="lem")
+    engines = [dlg.engine.itemText(i) for i in range(dlg.engine.count())]
+    for label in LEM11_ENGINES:
+        if label not in engines:
+            fails.append(f"the Reliability dialog offers no {label!r} engine; "
+                         f"Tutorial LEM-11 gives it a section. It offers {engines}")
+    boxes = {b.text() for b in dlg.findChildren(QCheckBox)}
+    if LEM11_SEARCH_CHECKBOX not in boxes:
+        fails.append(f"the Reliability dialog has no {LEM11_SEARCH_CHECKBOX!r} "
+                     f"checkbox; Tutorial LEM-11 tells the reader to leave it "
+                     f"ticked. Its checkboxes read {sorted(boxes)}")
+    groups = {g.title() for g in dlg.findChildren(QGroupBox)}
+    if LEM11_SIGMA_GROUP not in groups:
+        fails.append(f"the Reliability dialog has no {LEM11_SIGMA_GROUP!r} box; "
+                     f"Tutorial LEM-11 reads the run's inputs out of it. Its "
+                     f"boxes read {sorted(groups)}")
+    labels = {lab.text() for lab in dlg.findChildren(QLabel)}
+    for row in LEM11_MC_ROWS:
+        if row not in labels:
+            fails.append(f"the Reliability dialog has no {row!r} row; Tutorial "
+                         f"LEM-11 names it in its Monte Carlo step")
+    # The page says the three Monte Carlo controls "come live" on the MC engine and
+    # are inert on the Taylor series. That is the sentence, so that is the pin.
+    if dlg.n_samples.isEnabled():
+        fails.append("the MC sample count is live on the Taylor-series engine; "
+                     "Tutorial LEM-11 says it comes live when Monte Carlo is "
+                     "chosen")
+    dlg.engine.setCurrentIndex(dlg.engine.findData("mc"))
+    if not dlg.n_samples.isEnabled():
+        fails.append("the MC sample count stays disabled on the Monte Carlo "
+                     "engine; Tutorial LEM-11 tells the reader to read it there")
+    dlg.deleteLater()
+
+    # The toggle states persist in QSettings the moment anyone clicks one, so the
+    # coded default is only readable with this machine's remembered state out of
+    # the way — the same reason tools/capture_tutorial_screenshots._app_defaults
+    # clears it. Without this the pin reads whoever ran Studio last, not the app.
+    with _default_editor_toggles():
+        mat = MaterialsEditor().build(data, None)
+        toggles = {cb.text()
+                   for cb in (getattr(mat, "_toggles", None) or {}).values()}
+        if LEM11_RELIABILITY_TOGGLE not in toggles:
+            fails.append(f"the materials editor has no "
+                         f"{LEM11_RELIABILITY_TOGGLE!r} toggle; Tutorial LEM-11's "
+                         f"first step is to tick it. Its toggles read "
+                         f"{sorted(toggles)}")
+        else:
+            rel = (getattr(mat, "_toggles", None) or {}).get("rel")
+            if rel is not None and rel.isChecked():
+                fails.append("the materials editor opens with Reliability already "
+                             "ticked; Tutorial LEM-11 tells the reader it is the "
+                             "one that is off by default")
+        mat.deleteLater()
+
+    sens = SensitivityDialog(slope_data=data, app_mode="lem", defaults={})
+    plots = [sens.plot_type.itemText(i) for i in range(sens.plot_type.count())]
+    if LEM11_VARIANCE_PLOT not in plots:
+        fails.append(f"the Parametric dialog offers no {LEM11_VARIANCE_PLOT!r} "
+                     f"plot type on a model carrying sigmas; Tutorial LEM-11 "
+                     f"tells the reader to select it. It offers {plots}")
+    sens.deleteLater()
+    return fails
+
+
 def _lem01_editor_labels():
     """The materials editor as Tutorial LEM-1 drives it: opened, switched, added to.
 
@@ -1906,7 +2045,18 @@ def test_tutorial_labels():
         fails += _lem03_editor_labels()
         fails += _lem05_editor_labels()
         fails += _lem04_editor_labels(mw)
+        for attr, label in LEM11_RUN_ACTIONS.items():
+            action = getattr(mw, attr, None)
+            if action is None:
+                fails.append(f"MainWindow has no {attr}, which Tutorial LEM-11 "
+                             f"calls {label!r}")
+            elif action.text().replace("&", "") != label:
+                fails.append(f"the {attr} action reads "
+                             f"{action.text().replace('&', '')!r}, not {label!r} — "
+                             f"the label Tutorial LEM-11 quotes")
+
         fails += _lem10_run_labels()
+        fails += _lem11_reliability_labels()
         # Last of the editor legs: these are the ones that change which project
         # the window holds, and each opens the model its own pins are read on.
         fails += _lem06_editor_labels(mw)

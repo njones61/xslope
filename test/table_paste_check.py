@@ -1100,6 +1100,73 @@ def test_lem09_pile_row():
     return out
 
 
+def test_lem11_sigma_block():
+    """LEM-11's edit: the mat sheet's two-column Standard Deviations block, with
+    the cohesion's σ halved.
+
+    Same shape as LEM-7's strength legs — the page ships the model in its PRE-edit
+    state, so the pasted values have nothing in the file to be compared against and
+    the oracle has to be an OUTPUT the edit moves. Here that is the reliability
+    index: the page prints β = 1.526 for the edited model, and a block that lands
+    one column over, drops a digit, or never lands at all moves it.
+
+    Never landing at all is the failure worth naming, because it is silent.
+    ``s(g)`` and ``s(c)`` are ``usage="rel"`` columns, hidden until the materials
+    editor's **Reliability** toggle is ticked, and a paste does not fill a hidden
+    column (``test_hidden_columns_are_not_filled``) — so a reader who skips the
+    page's first step pastes the block, is told it pasted, and gets the pre-edit
+    0.935. The toggle is ticked here the way the page tells the reader to tick it,
+    and it is β rather than the status line that would notice if it were not.
+    """
+    from studio.editors import MaterialsEditor
+    from xslope.reliability import reliability_taylor
+
+    page = "lem11_reliability.md"
+    printed = _taught(page, ["s(g)", "s(c)"])
+    model = _load(os.path.join(_MODELS, "xslope_prob_submerged_KEY.xlsx"))
+    before = model["materials"][0]
+    out = _fail(len(printed) == 1,
+                f"LEM-11 σ block: the page prints {len(printed)} rows; the edit "
+                f"is one")
+    out += _fail(abs(float(before["sigma_c"]) - float(printed[0][1])) > 1e-9,
+                 "LEM-11 σ block: the shipped file already carries the page's "
+                 "s(c) — the page teaches a change")
+
+    editor = MaterialsEditor()
+    dlg = editor.build(model, None)
+    for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(tag in ("lem", "rel"))
+    keys = [f.key for f in MaterialsEditor.FIELDS]
+    _paste(dlg._table, _tsv(printed), row=0, col=keys.index("sigma_gamma"))
+    out += _fail(_summary(dlg._table) == "Pasted 1 row × 2 columns.",
+                 f"LEM-11 σ block: the status line read {_summary(dlg._table)!r}")
+
+    landed = dict(model)
+    editor.apply(landed, dlg)
+    got = landed["materials"][0]
+    for key, cell in zip(("sigma_gamma", "sigma_c"), printed[0]):
+        out += _fail(_matches(got[key], cell, float(cell)),
+                     f"LEM-11 σ block: {key} came back {got[key]!r} from {cell!r}")
+    for key in keys:                       # nothing outside the two-column block
+        if key in ("sigma_gamma", "sigma_c"):
+            continue
+        out += _fail(got[key] == before[key],
+                     f"LEM-11 σ block: the block also changed {key}, "
+                     f"{before[key]!r} -> {got[key]!r}")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = reliability_taylor(landed, "spencer", debug_level=-1)
+    beta = res["beta_ln"] if ok else float("nan")
+    out += _fail(ok and abs(beta - 1.526) < 5e-4,
+                 f"LEM-11 σ block: the pasted block gives β = {beta:.6f}, not the "
+                 f"1.526 the page prints for it")
+    out += _fail(ok and abs(res["F_MLV"] - 1.354) < 5e-4,
+                 f"LEM-11 σ block: the pasted block moved the factor of safety to "
+                 f"{res.get('F_MLV', float('nan')):.6f}; the page's whole point is "
+                 f"that a σ edit leaves it at 1.354")
+    return out
+
+
 CHECKS = [
     ("a block fills an empty table, growing rows",
      test_paste_fills_an_empty_table_and_grows_rows),
@@ -1130,6 +1197,7 @@ CHECKS = [
     ("LEM-7 power -> Mohr-Coulomb", test_lem07_power_to_mohr_coulomb),
     ("LEM-7 c/p -> constant", test_lem07_profile_to_constant),
     ("LEM-10 seed circle", test_lem10_seed_circle),
+    ("LEM-11 σ block", test_lem11_sigma_block),
     ("LEM-8 materials", test_lem08_materials),
     ("LEM-9 materials", test_lem09_materials),
     ("LEM-3 profile lines and circles", test_lem03_profile_lines_and_circles),

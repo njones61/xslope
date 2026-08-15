@@ -69,6 +69,7 @@ nav:
       - A Reinforced Slope (Geogrids): tutorials/lem08_reinforced_slope.md
       - A Tieback Wall: tutorials/lem09_tieback_wall.md
       - Finding the Global Minimum: tutorials/lem10_global_minimum.md
+      - Reliability: tutorials/lem11_reliability.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

@@ -1586,6 +1586,8 @@ def run_reliability_mc_test(test):
         kw['rng_seed'] = int(test['rng_seed'])
     if 'converge_rel' in test:
         kw['converge_rel'] = float(test['converge_rel'])
+    if 'sampling' in test:
+        kw['sampling'] = test['sampling']
 
     slope_data = load_slope_data(file_path)
     success, result = reliability_mc(slope_data, method, circular=circular, search=do_search,
@@ -1624,6 +1626,8 @@ def run_reliability_rs_test(test):
     num_slices = int(test.get('num_slices', 40))
     composite = str(test.get('composite', 'false')).lower() in ('true', '1', 'yes')
     kw = {}
+    if 'sampling' in test:
+        kw['sampling'] = test['sampling']
     for key, cast in (('n_surrogate', int), ('n_gate', int), ('alpha', float),
                       ('rng_seed', int)):
         if key in test:

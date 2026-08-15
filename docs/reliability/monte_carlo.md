@@ -37,6 +37,19 @@ samples), but the empirical probability of failure — a count of the tail — c
 more slowly, so a small $P_f$ needs more samples to resolve. Increase `n_samples`
 until the reported $P_f$ is stable to the precision you need.
 
+**Sampling: random or Latin hypercube.** Realizations are drawn either
+independently (**Random**, the default) or by **Latin hypercube**: each
+parameter's distribution is cut into $n$ equal-probability bins with exactly one
+draw per bin, so the sample covers the distribution by construction instead of
+by luck. Both run through the same inverse CDFs, truncations and fixed seed.
+Measured on the submerged-slope model (twenty repeated 1,000-realization
+campaigns), Latin hypercube cut the across-campaign scatter of $P_f$ by a
+factor of 1.84 — the information of roughly **3.4×** the sample count for the
+same cost. One interaction to know: the convergence stop's confidence band
+assumes independent draws, so under Latin hypercube it overstates the
+uncertainty and the stop errs conservative — a converged LHS campaign is at
+least as resolved as its band claims.
+
 **Deterministic (seeded) sampling.** The random-number generator is seeded from a
 fixed constant (never the clock), so a given input file reproduces the same $\beta$
 and $P_f$ on every run — the results are regression-lockable. Pass a different

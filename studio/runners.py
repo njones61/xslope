@@ -1050,6 +1050,7 @@ class ReliabilityRunner(RunnerThread):
             circular=circular, search=o.get("search", True),
             rng_seed=int(o.get("rng_seed", 20240117)),
             distribution=o.get("distribution", "normal"),
+            sampling=o.get("sampling", "random"),
             num_slices=int(o.get("num_slices", 40)), debug_level=0,
             progress_callback=self._progress_cb(), cancel_check=self._cancel.is_set)
         if not ok:

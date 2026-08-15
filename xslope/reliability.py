@@ -862,7 +862,7 @@ def _mc_sampled_slope_data(slope_data, materials, param_info, values):
     return sd
 
 
-def _draw_sample_matrix(param_info, n, rng, distribution):
+def _draw_sample_matrix(param_info, n, rng, distribution, sampling='random'):
     """Draw ``n`` realizations of every uncertain parameter — the ONE place the
     input distributions are defined.
 
@@ -880,8 +880,25 @@ def _draw_sample_matrix(param_info, n, rng, distribution):
     Drawing is column-by-column and stateless apart from ``rng``, so a long campaign
     may draw in chunks (``_draw_sample_matrix(..., chunk, rng, ...)`` repeatedly)
     without changing the distribution — only the ordering of the stream.
+
+    ``sampling='lhs'`` draws by Latin hypercube instead: each marginal is
+    stratified into ``n`` equal-probability bins with one draw per bin
+    (scipy's ``qmc.LatinHypercube``, seeded from ``rng`` — deterministic like
+    everything else), pushed through the same inverse CDFs and the same
+    truncations. Stratification reduces the sampling variance of the
+    estimates; chunked draws stratify per chunk, which is valid but weaker
+    than one full-campaign hypercube. NOTE: LHS draws are not independent, so
+    the convergence stop's i.i.d. confidence half-width OVERSTATES the
+    uncertainty under LHS — the stop errs conservative (runs longer than
+    strictly needed), never the other way.
     """
     npar = len(param_info)
+    if sampling not in ('random', 'lhs'):
+        return None, f"Unknown sampling '{sampling}'. Use 'random' or 'lhs'."
+    u = None
+    if sampling == 'lhs':
+        from scipy.stats import qmc
+        u = qmc.LatinHypercube(d=npar, seed=rng).random(n)
     out = np.empty((n, npar))
     for j, p in enumerate(param_info):
         mlv, std = p['mlv'], p['std']
@@ -891,9 +908,15 @@ def _draw_sample_matrix(param_info, n, rng, distribution):
                               f"(material {p['material_id']} {p['param']} mean={mlv}).")
             s_ln = np.sqrt(np.log(1.0 + (std / mlv) ** 2))
             m_ln = np.log(mlv) - 0.5 * s_ln ** 2
-            col = rng.lognormal(m_ln, s_ln, n)
+            if u is None:
+                col = rng.lognormal(m_ln, s_ln, n)
+            else:
+                col = np.exp(m_ln + s_ln * norm.ppf(u[:, j]))
         elif distribution == 'normal':
-            col = rng.normal(mlv, std, n)
+            if u is None:
+                col = rng.normal(mlv, std, n)
+            else:
+                col = norm.ppf(u[:, j], loc=mlv, scale=std)
         else:
             return None, f"Unknown distribution '{distribution}'. Use 'normal' or 'lognormal'."
         out[:, j] = _truncate_samples(col, p['param'])
@@ -1122,7 +1145,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                    fs_tol=None, tol=None, max_iter=None, composite=False,
                    seed='circles', search_opts=None, use_file_window=True,
                    check_inputs=True, converge_rel=None, converge_check=100,
-                   converge_min=500):
+                   converge_min=500, sampling='random'):
     """Monte Carlo reliability analysis — the sampling counterpart to the
     Taylor-series :func:`reliability`.
 
@@ -1268,7 +1291,8 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
 
     # ---- Draw the sample matrix (n_samples x n_params) --------------------
     rng = np.random.default_rng(rng_seed)
-    sample_matrix, err = _draw_sample_matrix(param_info, n_samples, rng, distribution)
+    sample_matrix, err = _draw_sample_matrix(param_info, n_samples, rng,
+                                             distribution, sampling=sampling)
     if err:
         return False, err
 
@@ -1544,7 +1568,7 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
                    num_slices=40, progress_callback=None, cancel_check=None,
                    fs_tol=None, tol=None, max_iter=None, composite=False,
                    seed='circles', search_opts=None, use_file_window=True,
-                   check_inputs=True):
+                   check_inputs=True, sampling='random'):
     """Response-surface reliability analysis — a Monte Carlo campaign whose factor
     of safety comes from a fitted surrogate instead of a solve, with the surrogate
     measured against real solves before any of its answers are used.
@@ -1809,7 +1833,8 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
     while n_left > 0:
         _check_cancel(cancel_check)
         m = min(chunk, n_left)
-        xs, err = _draw_sample_matrix(param_info, m, rng, distribution)
+        xs, err = _draw_sample_matrix(param_info, m, rng, distribution,
+                                      sampling=sampling)
         if err:
             return False, err
         fs = _surrogate(xs)

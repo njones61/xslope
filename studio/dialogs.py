@@ -2161,6 +2161,16 @@ class ReliabilityDialog(QDialog):
                              "Applies to Monte Carlo and to the response surface.")
         self.distribution = self._combo(MC_DISTRIBUTIONS,
                                         defaults.get("distribution", "normal"))
+        self.mc_sampling = self._combo(
+            [("Random", "random"), ("Latin hypercube", "lhs")],
+            defaults.get("sampling", "random"))
+        self.mc_sampling.setToolTip(
+            "How realizations are drawn. Latin hypercube stratifies each "
+            "parameter into equal-probability bins (one draw per bin), which "
+            "reduces sampling scatter for the same count; draws stay "
+            "reproducible under the fixed seed. The convergence stop's "
+            "confidence band assumes independent draws, so under LHS it errs "
+            "conservative.")
         # Statistical-convergence stopping (off by default): check the empirical
         # P_f every 100 realizations and stop when its 95% confidence half-width
         # falls inside the tolerance — the samples field becomes the cap. The
@@ -2191,6 +2201,7 @@ class ReliabilityDialog(QDialog):
             form.addRow("MC samples", self.n_samples)
             form.addRow("MC seed", self.seed)
             form.addRow("MC distribution", self.distribution)
+            form.addRow("MC sampling", self.mc_sampling)
             form.addRow("", self.mc_converge)
             form.addRow("P_f tolerance (±)", self.mc_converge_tol)
 
@@ -2321,7 +2332,7 @@ class ReliabilityDialog(QDialog):
         # response surface samples a fixed ten million realizations of its
         # surrogate and its accuracy is set by the fit, not by the count.
         sampling = engine in RELIABILITY_SAMPLING_ENGINES and lem
-        for w in (self.seed, self.distribution):
+        for w in (self.seed, self.distribution, self.mc_sampling):
             w.setEnabled(sampling)
         for w in (self.n_samples, self.mc_converge):
             w.setEnabled(mc)
@@ -2339,6 +2350,7 @@ class ReliabilityDialog(QDialog):
             "n_samples": self.n_samples.value(),
             "rng_seed": self.seed.value(),
             "distribution": self.distribution.currentData(),
+            "sampling": self.mc_sampling.currentData(),
             "converge_rel": (self.mc_converge_tol.value() / 100
                              if self.mc_converge.isChecked() else None),
             "F_min": self.f_min.value(),

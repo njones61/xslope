@@ -94,10 +94,11 @@ the slope face:
 
 **FS = 0.958** — below one, on a circle centered at (−5.22, 12.61) tangent at
 elevation −1.04, 9.18 m of failure surface carrying 98.6 kN/m of soil. Those
-two totals are not on the plot — they come from the slice table: **Reports…**
-in Studio builds one for the solved surface, and its Total row sums the base
-lengths and the slice weights, per metre of section. The mass figures quoted
-through the rest of this page are read the same way. Slide
+two totals print with the factor of safety when the run completes —
+`Sliding mass = 98.6 kN/m over 9.18 m of failure surface` in Studio's Log
+pane, or on the console for a scripted run — and the slice table a
+**Reports…** export builds itemizes them slice by slice. The mass figures
+quoted through the rest of this page are read the same way. Slide
 reports 0.960 on this case and Baker's own solution is 0.97. The surface is
 shallow, and the effective normal stress along its slice bases averages
 8.3 kPa: the low-stress end of the envelope, where a curve running into the

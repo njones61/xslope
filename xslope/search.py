@@ -1428,6 +1428,23 @@ def analysis_search_kwargs(slope_data, circular=True, fs_tol=None, tol=None,
     return kw
 
 
+def _sliding_mass_line(slice_df, slope_data):
+    """The one-line mass summary printed with the factor of safety: the sliding
+    mass's weight and its base length, summed from the solved slices, in the
+    model's own units. These totals are otherwise visible only in a report's
+    slice table."""
+    from .units import labels
+    try:
+        u = labels(slope_data.get("unit_system") or None)
+        w = float(slice_df["w"].sum())
+        length = float(slice_df["dl"].sum())
+    except Exception:
+        return None
+    fu, lu = u.get("force_per_len", ""), u.get("length", "")
+    return (f"Sliding mass = {w:,.1f} {fu} over {length:,.2f} {lu} "
+            f"of failure surface").replace("  ", " ")
+
+
 def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circular",
                      num_slices=40, rapid=False, composite=False, grid_seed=False,
                      diagnostic=False, cancel_check=None, fs_tol=None, tol=None,
@@ -1545,6 +1562,9 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         if announce:
             tail = "" if converged else "  (search did not fully converge)"
             print(f"Critical FS = {results.get('FS'):.3f}{tail}")
+            mass = _sliding_mass_line(critical.get("slices"), slope_data)
+            if mass:
+                print(mass)
         return {"slice_df": critical.get("slices"),
                 "failure_surface": critical.get("failure_surface"),
                 "results": results, "search": search, "method": method,
@@ -1584,6 +1604,11 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     bundle = {"slice_df": slice_df, "failure_surface": failure_surface,
               "results": results if isinstance(results, dict) else None,
               "search": None, "method": method, "options": made_under}
+    if bundle["results"] is not None and announce:
+        print(f"FS = {bundle['results'].get('FS'):.3f}")
+        mass = _sliding_mass_line(slice_df, slope_data)
+        if mass:
+            print(mass)
     if bundle["results"] is None:
         # The surface was built and the method was given it: it ran, and it did
         # not converge. The bundle keeps the surface so that answer can be

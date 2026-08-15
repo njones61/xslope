@@ -16,6 +16,13 @@ computation, and the answer comes back correspondingly richer: a distribution
 of factors of safety, summarized by a **probability of failure** and a
 **reliability index** rather than by one number.
 
+A probability is also the more meaningful number to act on. In design and
+retrofitting, "FS = 1.35" says nothing about how likely the slope is to fail
+or what a proposed fix buys — one slope at 1.35 can be far riskier than
+another at the same value — while "one chance in six, and the retrofit takes
+it to one in a hundred" is a statement a decision can rest on, and one that
+can be weighed against cost and consequence.
+
 This page's slope — 30 ft of undrained clay standing under 40 ft of water —
 makes the difference concrete. The deterministic answer is FS = 1.354; the
 stochastic answer is that the slope has roughly one chance in six of failing.

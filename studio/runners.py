@@ -1015,15 +1015,18 @@ class ReliabilityRunner(RunnerThread):
         from xslope.reliability import reliability
         o, sd = self._opts, self._sd
         circular = o.get("surface", "circular") == "circular"
+        conv = o.get("converge_pf")
         print(f"Running Monte Carlo reliability — {o['method'].upper()}, "
               f"{o.get('n_samples')} samples, seed {o.get('rng_seed')}, "
-              f"{o.get('distribution', 'normal')}…")
+              f"{o.get('distribution', 'normal')}"
+              + (f", stop at P_f ±{conv*100:.2f} pp" if conv else "") + "…")
         ok, result = reliability(
             sd, o["method"], engine="mc", rapid=o.get("rapid", False),
             circular=circular, search=o.get("search", True),
             n_samples=int(o.get("n_samples", 10000)),
             rng_seed=int(o.get("rng_seed", 20240117)),
             distribution=o.get("distribution", "normal"),
+            converge_pf=conv,
             num_slices=int(o.get("num_slices", 40)), debug_level=0,
             progress_callback=self._progress_cb(), cancel_check=self._cancel.is_set)
         if not ok:

@@ -58,6 +58,22 @@ limit-equilibrium solve but not with the finite-element SSRM, so FEM reliability
 stays on the Taylor series (1 + 2N solves — see
 [Reliability Analysis (FEM)](fem.md)).
 
+**Stopping on statistical convergence.** The number of realizations a campaign
+needs is set by the answer, not the input: the 95% confidence half-width on an
+empirical probability of failure is $1.96\sqrt{p(1-p)/n}$, so resolving a
+$P_f$ near 15% to ±1 percentage point takes roughly 5,000 realizations and to
+±0.5 points roughly 21,000. The optional convergence stop does that arithmetic
+live — `converge_pf` (the **Stop when P_f converges** checkbox and its
+tolerance in Studio's Reliability dialog) checks the half-width every 100
+realizations and ends the campaign once it is inside the tolerance, with the
+sample count as the cap. The rule never fires before 500 realizations or
+before 10 failures have been observed, so a rare-event problem — where the
+normal approximation behind the half-width is not yet credible — runs to its
+cap instead of stopping on false confidence. Because the whole sample matrix
+is drawn up front from the fixed seed, a converged run is exactly the first
+$n$ realizations of the full one: still bit-reproducible, and reported with
+its stopping $n$ and half-width in the console summary.
+
 ### Worked example: VP34 (Clarence Cannon Dam)
 
 **VP34** is the corpus case Monte Carlo was added for: Wolff & Harr (1987)'s Phase I

@@ -159,7 +159,7 @@ just the number.
 
 ## Monte Carlo
 
-Open **Reliability…** again and change **Method** to `Monte Carlo`. The three
+Open **Reliability…** again and change **Method** to `Monte Carlo`. The
 controls below the surface options come live:
 
 ![The Reliability dialog on Monte Carlo](images/lem11_studio_reliability_mc.png)
@@ -168,8 +168,12 @@ controls below the surface options come live:
 the random seed — fixed rather than taken from the clock, so the run reproduces
 exactly — and **MC distribution** `Normal` is how each σ is read: as the standard
 deviation of a normal distribution about the material's own value, truncated at
-zero so a draw can never hand the solver a negative strength. Leave all three and
-**Run**.
+zero so a draw can never hand the solver a negative strength. **Stop when P_f
+converges** ends the campaign early once the probability of failure is known to
+a stated resolution — on this model ±1 pp is reached near 5,400 realizations —
+with the samples field as the cap; the
+[Monte Carlo page](../reliability/monte_carlo.md) gives the rule. Leave it
+unticked here, and **Run**.
 
 Ten thousand solves take appreciably longer than five. What comes back is not an
 estimate of the distribution but the distribution itself:

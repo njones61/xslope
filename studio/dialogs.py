@@ -2145,10 +2145,37 @@ class ReliabilityDialog(QDialog):
         self.seed.setToolTip("Random seed — a fixed value makes the run reproducible.")
         self.distribution = self._combo(MC_DISTRIBUTIONS,
                                         defaults.get("distribution", "normal"))
+        # Statistical-convergence stopping (off by default): check the empirical
+        # P_f every 100 realizations and stop when its 95% confidence half-width
+        # falls inside the tolerance — the samples field becomes the cap. The
+        # rule never fires before 500 realizations or 10 observed failures, so a
+        # rare-event campaign runs to the cap rather than stopping on false
+        # confidence.
+        self.mc_converge = QCheckBox("Stop when P_f converges")
+        self.mc_converge.setChecked(defaults.get("converge_pf") is not None)
+        self.mc_converge.setToolTip(
+            "Stop sampling once the 95% confidence half-width on the empirical "
+            "probability of failure is inside the tolerance — further "
+            "realizations no longer move the answer at that resolution. "
+            "MC samples becomes the cap. With a fixed seed the stopped run is "
+            "still exactly reproducible.")
+        self.mc_converge_tol = QDoubleSpinBox()
+        self.mc_converge_tol.setDecimals(2)
+        self.mc_converge_tol.setRange(0.05, 5.0)
+        self.mc_converge_tol.setSingleStep(0.25)
+        self.mc_converge_tol.setSuffix(" pp")
+        self.mc_converge_tol.setValue(
+            float(defaults.get("converge_pf") or 0.01) * 100)
+        self.mc_converge_tol.setToolTip(
+            "Tolerance on P_f as a 95% confidence half-width, in percentage "
+            "points. ±1 pp on a P_f near 15% is reached in a few thousand "
+            "realizations; ±0.5 pp needs roughly four times as many.")
         if self.app_mode == "lem":
             form.addRow("MC samples", self.n_samples)
             form.addRow("MC seed", self.seed)
             form.addRow("MC distribution", self.distribution)
+            form.addRow("", self.mc_converge)
+            form.addRow("P_f tolerance", self.mc_converge_tol)
 
         # --- FEM SSRM bracket + tolerance (FEM only) -----------------------
         self.f_min = QDoubleSpinBox()
@@ -2223,6 +2250,7 @@ class ReliabilityDialog(QDialog):
         two_pane(self, layout, self.preflight, bb, fixed=True)
 
         self.engine.currentIndexChanged.connect(self._sync_enabled)
+        self.mc_converge.toggled.connect(self._sync_enabled)
         self.method.currentIndexChanged.connect(self.preflight.refresh)
         if self.surface is not None:
             self.surface.currentIndexChanged.connect(self.preflight.refresh)
@@ -2267,8 +2295,10 @@ class ReliabilityDialog(QDialog):
     def _sync_enabled(self):
         mc = self._engine_value() == "mc" and self.app_mode == "lem"
         # Monte Carlo controls only matter for the MC engine.
-        for w in (self.n_samples, self.seed, self.distribution):
+        for w in (self.n_samples, self.seed, self.distribution,
+                  self.mc_converge):
             w.setEnabled(mc)
+        self.mc_converge_tol.setEnabled(mc and self.mc_converge.isChecked())
 
     def options(self):
         return {
@@ -2282,6 +2312,8 @@ class ReliabilityDialog(QDialog):
             "n_samples": self.n_samples.value(),
             "rng_seed": self.seed.value(),
             "distribution": self.distribution.currentData(),
+            "converge_pf": (self.mc_converge_tol.value() / 100
+                            if self.mc_converge.isChecked() else None),
             "F_min": self.f_min.value(),
             "F_max": self.f_max.value(),
             "reliability_tol": self.reliability_tol.value(),

@@ -29,6 +29,7 @@ name here for backward compatibility, so ``from xslope.advanced import reliabili
 
 import time
 
+import math
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
@@ -854,7 +855,8 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                    progress_callback=None, cancel_check=None,
                    fs_tol=None, tol=None, max_iter=None, composite=False,
                    seed='circles', search_opts=None, use_file_window=True,
-                   check_inputs=True):
+                   check_inputs=True, converge_pf=None, converge_check=100,
+                   converge_min=500):
     """Monte Carlo reliability analysis — the sampling counterpart to the
     Taylor-series :func:`reliability`.
 
@@ -887,6 +889,21 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     rng_seed : int
         Seed for ``numpy.random.default_rng`` — a fixed constant by default, so the
         result is bit-reproducible. Pass a different int to see sampling scatter.
+    converge_pf : float, optional
+        Statistical-convergence stopping tolerance on the empirical probability
+        of failure, in probability units (0.005 = half a percentage point). When
+        set, the campaign checks every ``converge_check`` realizations and stops
+        as soon as the 95% confidence half-width on P_f,
+        1.96·sqrt(p(1−p)/n), falls inside the tolerance — additional
+        realizations past that point no longer move the answer at the stated
+        resolution. ``n_samples`` becomes the cap. The rule never fires before
+        ``converge_min`` realizations or before 10 failures have been observed
+        (below that the normal approximation behind the half-width is not
+        valid, which protects rare-event problems from stopping on false
+        confidence). Because the whole sample matrix is drawn up front from the
+        fixed seed, a converged run is exactly the first ``n_used`` realizations
+        of the full run — bit-reproducible, like everything else here. Default
+        None: run all ``n_samples``, the previous behavior unchanged.
     distribution : {'normal', 'lognormal'}
         Per-parameter input distribution. Default 'normal' (mean = MLV, std =
         sigma), the same interpretation the Taylor-series method places on the
@@ -1082,6 +1099,10 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     fs_vals = np.empty(n_samples)
     valid = np.ones(n_samples, dtype=bool)
     report_every = max(1, n_samples // 20)
+    n_used = n_samples
+    pf_trace = [] if converge_pf is not None else None
+    pf_ci_half = None
+    run_fail = run_valid = 0
     for k in range(n_samples):
         if k % report_every == 0:
             _check_cancel(cancel_check)
@@ -1093,7 +1114,26 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
             fs_vals[k] = np.nan
         else:
             fs_vals[k] = fk
-    _progress(n_samples, n_samples, "Monte Carlo complete")
+            run_valid += 1
+            if fk < 1.0:
+                run_fail += 1
+        if (converge_pf is not None and (k + 1) % converge_check == 0
+                and run_valid > 0):
+            p = run_fail / run_valid
+            half = 1.96 * math.sqrt(p * (1.0 - p) / run_valid)
+            pf_trace.append((run_valid, p, half))
+            # The half-width is a normal approximation; below ~10 observed
+            # failures it is not credible, so a rare-event campaign keeps
+            # sampling to the cap rather than stopping on false confidence.
+            if (k + 1 >= converge_min and run_fail >= 10
+                    and half <= converge_pf):
+                n_used = k + 1
+                pf_ci_half = half
+                break
+    _progress(n_used, n_used, "Monte Carlo complete")
+    if n_used < n_samples:
+        fs_vals = fs_vals[:n_used]
+        valid = valid[:n_used]
 
     fs_ok = fs_vals[valid]
     n_valid = int(fs_ok.size)
@@ -1128,14 +1168,25 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                  for p in param_info]
         print(tabulate(table, headers=["Parameter", "MLV", "σ", "COV"],
                        tablefmt="grid", colalign=["left", "center", "center", "center"]))
-        print(f"\nSamples: {n_samples} (valid {n_valid}, invalid {n_invalid}) | "
-              f"seed {rng_seed} | {distribution}")
+        print(f"\nSamples: {n_used} of {n_samples} requested "
+              f"(valid {n_valid}, invalid {n_invalid}) | seed {rng_seed} | {distribution}")
+        if converge_pf is not None:
+            if n_used < n_samples:
+                print(f"Converged at n = {n_used}: P_f {pf_empirical*100:.2f}% "
+                      f"± {pf_ci_half*100:.2f} pp (95% CI ≤ ±{converge_pf*100:.2f} pp)")
+            else:
+                print(f"Convergence tolerance ±{converge_pf*100:.2f} pp not met "
+                      f"within the {n_samples}-sample cap.")
         print(f"Mean FS: {mean_FS:.4f}   σ_F: {sigma_F:.4f}   COV_F: {COV_F:.4f}")
         print(f"β (normal): {beta_normal:.4f}   β (lognormal): {beta_ln:.4f}")
         print(f"PF empirical: {pf_empirical*100:.3f}%   "
               f"PF normal: {pf_normal*100:.3f}%   PF lognormal: {pf_lognormal*100:.3f}%")
 
     result = {
+        'n_requested': n_samples,
+        'n_used': n_used,
+        'pf_ci_half': pf_ci_half,
+        'pf_trace': pf_trace,
         'method': f'{method}_reliability_mc',
         'F_MLV': F_MLV,
         'mean_FS': mean_FS,

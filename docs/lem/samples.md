@@ -535,41 +535,40 @@ failure surface, the Ito & Matsui soil forces far exceed the structural capacity
 controls:
 
 ```text
-  === Ito & Matsui Summary (Pile 1) ===
+  === Ito & Matsui Summary (pile) ===
   Pile diameter (D)          = 2.0
   Pile spacing (S)           = 6.0
   Clear spacing (D1 = S - D) = 4.0
-  Depth to failure surface   = 9.5
+  Depth to failure surface   = 10.1
   Coefficients: A1 = 7.569, A2 = 4.755
-  Force per pile (F_pile)    = 39810
-  Force per unit width (H)   = 6635.1
+  Force per pile (F_pile)    = 44178
+  Force per unit width (H)   = 7363.0
   --- Structural Capacity Check ---
   V_cap = 46000  (F_pile within shear capacity)
-  M_cap = 60000, L_m = 3.72, F_limit = M_cap/L_m = 16139  (F_pile exceeds moment capacity)
+  M_cap = 60000, L_m = 3.94, F_limit = M_cap/L_m = 15244  (F_pile exceeds moment capacity)
   Controlled by moment (M_cap/L_m)
-  F_pile: 39810 -> 16139 (capped)
-  H:      6635.1 -> 2689.8 (capped)
-
-  === Ito & Matsui Summary (Pile 2) ===
+  F_pile: 44178 -> 15244 (capped)
+  H:      7363.0 -> 2540.7 (capped)
+  === Ito & Matsui Summary (pile) ===
   Pile diameter (D)          = 2.0
   Pile spacing (S)           = 6.0
   Clear spacing (D1 = S - D) = 4.0
-  Depth to failure surface   = 13.9
+  Depth to failure surface   = 14.5
   Coefficients: A1 = 7.569, A2 = 4.755
-  Force per pile (F_pile)    = 76447
-  Force per unit width (H)   = 12741.2
+  Force per pile (F_pile)    = 81729
+  Force per unit width (H)   = 13621.5
   --- Structural Capacity Check ---
   V_cap = 46000  (F_pile exceeds shear capacity)
-  M_cap = 60000, L_m = 5.28, F_limit = M_cap/L_m = 11356  (F_pile exceeds moment capacity)
+  M_cap = 60000, L_m = 5.47, F_limit = M_cap/L_m = 10962  (F_pile exceeds moment capacity)
   Controlled by moment (M_cap/L_m)
-  F_pile: 76447 -> 11356 (capped)
-  H:      12741.2 -> 1892.6 (capped)
+  F_pile: 81729 -> 10962 (capped)
+  H:      13621.5 -> 1827.0 (capped)
 ```
 
-The Ito & Matsui soil forces (39,810 and 76,447 lb per pile) represent the theoretical upper bound on what the soil
-can push onto the pile. These greatly exceed both the shear and moment capacities. After capping, the effective
-pile forces are reduced by 59% and 85% respectively, with the moment capacity ($M_{\text{cap}} / L_m$) controlling
-in both cases. Without the capacity checks, the LEM would overestimate the pile resistance and produce an
+The Ito & Matsui soil forces (44,178 and 81,729 lb per pile) represent the theoretical upper bound on what the soil
+can push onto the pile. These greatly exceed the moment capacity, and the deeper pile exceeds the shear capacity as
+well. After capping, the effective pile forces are reduced by 65% and 87% respectively, with the moment capacity
+($M_{\text{cap}} / L_m$) controlling in both cases. Without the capacity checks, the LEM would overestimate the pile resistance and produce an
 unconservatively high factor of safety.
 
 #### LEM vs. FEM Comparison

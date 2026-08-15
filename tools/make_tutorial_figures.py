@@ -1548,6 +1548,209 @@ def lem11_plots():
     print("   MC mean - F_MLV = %+.6f" % (mc["mean_FS"] - taylor["F_MLV"]))
 
 
+# --------------------------------------------------------------------------- #
+# LEM-12 — Piles (open-and-explore)
+#
+# The model ships with H blank on both piles, so every run below computes the pile
+# force from the diameter and the spacing by Ito & Matsui, at the depth each trial
+# surface reaches at each pile. The page's comparisons are therefore of two kinds,
+# and the producer keeps them apart: SEARCHES, where the surface is free to move
+# and the force moves with it, and HELD solves on the auto search's own critical
+# circle, where the one variable named in the prose is the only thing that changes.
+# Nothing here writes to the file — every edit is made on an in-memory copy.
+# --------------------------------------------------------------------------- #
+LEM12 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
+LEM12_METHOD = "spencer"
+LEM12_SLICES = 40
+#: The page's specified-force edit: the two forces the auto run develops at its own
+#: critical surface, to the digits the report's slice table prints them at.
+LEM12_H = (2540.7, 1827.0)
+#: The page's spacing edit: 6 ft out to 12 ft, S/D from 3 to 6.
+LEM12_S = 12.0
+#: The held spacing sweep, in feet. D = 2, so this is S/D from 1.5 to 8 — either
+#: side of the 2-8 band Ito & Matsui is derived for.
+LEM12_SPACINGS = (3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 16.0)
+
+
+def _lem12_piles(model, H=None, **over):
+    """``model`` with every pile row overridden. ``H`` is a per-pile sequence."""
+    rows = []
+    for i, p in enumerate(model["pile_lines"]):
+        row = dict(p, **over)
+        if H is not None:
+            row["H"] = H[i]
+        rows.append(row)
+    return dict(model, pile_lines=rows)
+
+
+def _lem12_search(model, **kwargs):
+    """The page's search: Spencer from the circle the file carries, 40 slices."""
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(
+            copy.deepcopy(model), LEM12_METHOD, num_slices=LEM12_SLICES,
+            diagnostic=False, **dict(file_search_window(model), **kwargs))
+    return fs_cache[0]
+
+
+def _lem12_held(model, circle):
+    """One solve on a stated circle — no search. Returns ``(FS, slice_df)``."""
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = generate_slices(model, circle=circle, num_slices=LEM12_SLICES)
+        if not ok:
+            return None, res
+        slice_df, _ = res
+        result = solve_selected(LEM12_METHOD, slice_df)
+    if isinstance(result, str):
+        return None, result
+    return result["FS"], slice_df
+
+
+def _lem12_reading(crit):
+    """FS, the circle, the surface and the pile force the page quotes off a search."""
+    s = crit["slices"]
+    nz = s[s["h_pile"] > 0]
+    return ("FS %.6f · Xo %.4f Yo %.4f R %.4f · tangent elev %.4f · L %.2f · "
+            "ΣW %.1f · ΣH %.4f (%s)"
+            % (crit["FS"], crit["Xo"], crit["Yo"], crit["Yo"] - crit["Depth"],
+               crit["Depth"], s["dl"].sum(), s["w"].sum(), nz["h_pile"].sum(),
+               " + ".join("%.4f" % v for v in nz["h_pile"])))
+
+
+def lem12_plots():
+    """The pile-stabilized slope's five searches and the two held studies.
+
+    The first search is the file exactly as it downloads — H blank on both piles,
+    so the force comes from Ito & Matsui at whatever depth each trial surface
+    reaches. Both the search plot and the solution are drawn: the trial family is
+    where the force is being recomputed, and the solution is where the two pile
+    crossings are marked.
+
+    The other four searches are each one edit away from it, and each is drawn
+    because its critical surface is somewhere else: the piles taken out, the
+    spacing widened to 12 ft, the force stated instead of computed, and the same
+    model searched from a grid of seeds rather than from the circle on the sheet.
+
+    The two held studies — the spacing sweep and the structural caps — change one
+    input on the auto search's own critical circle and are printed rather than
+    drawn, because what they measure is a column of numbers.
+    """
+    from xslope.ito_matsui import (compute_ito_matsui_force_and_moment_arm,
+                                   intersect_pile_with_materials,
+                                   ito_matsui_coefficients)
+
+    sd = load_slope_data(LEM12)
+    capture("lem12_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path, cache = circular_search(
+            copy.deepcopy(sd), LEM12_METHOD, num_slices=LEM12_SLICES,
+            diagnostic=False, **file_search_window(sd))
+    crit = fs_cache[0]
+    capture("lem12_search.png", plot_circular_search_results, sd, fs_cache, path,
+            circle_cache=cache)
+    capture("lem12_solution.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    deep = {"Xo": crit["Xo"], "Yo": crit["Yo"], "Depth": crit["Depth"],
+            "R": crit["Yo"] - crit["Depth"]}
+
+    bare = _lem12_search(dict(sd, pile_lines=[]))
+    capture("lem12_solution_nopiles.png", plot_solution, dict(sd, pile_lines=[]),
+            bare["slices"], bare["failure_surface"], bare["solver_result"])
+
+    wide = _lem12_piles(sd, S=LEM12_S)
+    crit_w = _lem12_search(wide)
+    capture("lem12_solution_wide.png", plot_solution, wide, crit_w["slices"],
+            crit_w["failure_surface"], crit_w["solver_result"])
+
+    stated = _lem12_piles(sd, H=LEM12_H)
+    crit_h = _lem12_search(stated)
+    capture("lem12_solution_statedh.png", plot_solution, stated, crit_h["slices"],
+            crit_h["failure_surface"], crit_h["solver_result"])
+
+    grid = _lem12_search(sd, seed="grid")
+    capture("lem12_solution_bypass.png", plot_solution, sd, grid["slices"],
+            grid["failure_surface"], grid["solver_result"])
+
+    print("   auto      %s" % _lem12_reading(crit))
+    print("   no piles  %s" % _lem12_reading(bare))
+    print("   S = %-5g %s" % (LEM12_S, _lem12_reading(crit_w)))
+    print("   stated H  %s" % _lem12_reading(crit_h))
+    print("   grid seed %s" % _lem12_reading(grid))
+
+    # What the two piles are worth on ONE surface — the auto search's own critical
+    # circle, so the only thing changing is which piles are present.
+    for tag, rows in (("neither", []), ("pile 1", sd["pile_lines"][:1]),
+                      ("pile 2", sd["pile_lines"][1:]), ("both", sd["pile_lines"])):
+        fs, _ = _lem12_held(dict(sd, pile_lines=list(rows)), deep)
+        print("   held, %-8s FS %.6f" % (tag, fs))
+
+    # The stated force against the computed one, on two stated circles: the auto
+    # search's own, where they agree, and the shallower circle the stated-force
+    # search settles on, where the frozen number is a force for the wrong depth.
+    shallow = {"Xo": crit_h["Xo"], "Yo": crit_h["Yo"], "Depth": crit_h["Depth"],
+               "R": crit_h["Yo"] - crit_h["Depth"]}
+    for label, circle in (("deep", deep), ("shallow", shallow)):
+        for tag, model in (("computed", sd), ("stated", stated),
+                           ("no piles", dict(sd, pile_lines=[]))):
+            fs, df = _lem12_held(model, circle)
+            nz = df[df["h_pile"] > 0] if fs is not None else None
+            print("   held %-8s %-9s FS %.6f · ΣH %.4f"
+                  % (label, tag, fs, nz["h_pile"].sum() if nz is not None else 0))
+
+    # The spacing sweep, held on the deep circle: the arching coefficients, the
+    # uncapped soil force per pile, and what survives the moment cap.
+    gs = sd["ground_surface"].coords
+    xs = [p[0] for p in gs]
+    ys = [p[1] for p in gs]
+    for S in LEM12_SPACINGS:
+        model = _lem12_piles(sd, S=S)
+        fs, df = _lem12_held(model, deep)
+        nz = df[df["h_pile"] > 0]
+        A1, A2 = ito_matsui_coefficients(S - model["pile_lines"][0]["D_pile"],
+                                         model["pile_lines"][0]["D_pile"],
+                                         sd["materials"][0]["phi"])
+        parts = []
+        for pile, (_, ps) in zip(model["pile_lines"], nz.iterrows()):
+            y_g = _interp(ps["x_pile"], xs, ys)
+            segs = intersect_pile_with_materials(ps["x_pile"], y_g, ps["y_pile"],
+                                                 model["polygons"], model["materials"])
+            _H, F, L_m = compute_ito_matsui_force_and_moment_arm(pile["D_pile"], S, segs)
+            parts.append("z %.3f F_pile %.1f L_m %.3f M/L_m %.1f"
+                         % (y_g - ps["y_pile"], F, L_m,
+                            pile["M_cap"] / L_m if L_m else float("inf")))
+        print("   S = %-5g S/D %.1f · A1 %.4f A2 %.4f · %s · ΣH %.4f · FS %.6f"
+              % (S, S / model["pile_lines"][0]["D_pile"], A1, A2, " | ".join(parts),
+                 nz["h_pile"].sum(), fs))
+
+    # The structural caps, held on the same circle: which of the two governs, and
+    # what the uncapped Ito & Matsui force alone would have read.
+    for tag, over in (("as shipped", {}), ("V_cap only", {"M_cap": None}),
+                      ("M_cap only", {"V_cap": None}),
+                      ("neither cap", {"V_cap": None, "M_cap": None})):
+        fs, df = _lem12_held(_lem12_piles(sd, **over), deep)
+        if fs is None:
+            print("   caps %-12s no solution: %s" % (tag, df))
+            continue
+        nz = df[df["h_pile"] > 0]
+        print("   caps %-12s FS %.6f · ΣH %.4f (%s)"
+              % (tag, fs, nz["h_pile"].sum(),
+                 " + ".join("%.1f" % v for v in nz["h_pile"])))
+
+
+def _interp(x, xs, ys):
+    """Ground elevation at ``x`` along the ground surface's own vertices."""
+    for i in range(len(xs) - 1):
+        if xs[i] <= x <= xs[i + 1]:
+            if xs[i + 1] == xs[i]:
+                return ys[i]
+            t = (x - xs[i]) / (xs[i + 1] - xs[i])
+            return ys[i] + t * (ys[i + 1] - ys[i])
+    return ys[-1] if x > xs[-1] else ys[0]
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -1571,6 +1774,7 @@ GROUPS = {
     "lem09_plots": lem09_plots,
     "lem10_plots": lem10_plots,
     "lem11_plots": lem11_plots,
+    "lem12_plots": lem12_plots,
 }
 
 

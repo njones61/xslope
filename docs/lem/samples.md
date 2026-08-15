@@ -717,7 +717,7 @@ profile, never trust a single free search — seed circles tangent to each candi
 failure depth and compare.
 
 **Single-seed searches can also trap on problems with concentrated forces.** The
-pile-stabilized sample ([Problem 10](#10-pile-reinforced-slope)) is a measured
+pile-stabilized sample ([Problem 10](#10-slope-stabilized-with-piles)) is a measured
 example: seeded from its circles sheet, the search converges to the deep surface
 tabulated there (Spencer 1.842, Lowe 1.978), but the grid-seeded global search
 (`seed='grid'`, which sweeps a coarse grid of centers and tangent depths before

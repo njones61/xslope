@@ -122,6 +122,10 @@ LEM10_FILE = os.path.join(_REPO, "docs/lem/files/xslope_mult_min_KEY.xlsx")
 #: dialog controls and the plot type its pins are read on.
 LEM11_FILE = os.path.join(_REPO,
                           "docs/lem/files/xslope_prob_submerged_KEY.xlsx")
+#: Tutorial LEM-12's completed model — the pile-stabilized clay slope, the only
+#: tutorial model whose pile force is left to be computed, which is the state its
+#: pins are read in.
+LEM12_FILE = os.path.join(_REPO, "docs/lem/files/xslope_piles.xlsx")
 #: The editable master template, whose ``reinforce`` sheet carries the support-type
 #: lookup block LEM-8 reproduces as a table.
 TEMPLATE_FILE = os.path.join(_REPO, "docs/inputs/input_template.xlsx")
@@ -1159,6 +1163,22 @@ LEM11_MC_ROWS = ("MC samples", "MC seed", "MC distribution")
 LEM11_RELIABILITY_TOGGLE = "Reliability"
 LEM11_VARIANCE_PLOT = "Variance Pareto (σ)"
 
+#: Tutorial LEM-12 sends the reader to the Analysis Report to read a pile force
+#: that is computed rather than entered — the force appears nowhere else a reader
+#: looks. Its File-menu action in the same source-string convention as
+#: ``LEM02_RUN_ACTIONS``, the word the Piles table prints where the input would be,
+#: and the slice-table column that carries the force with the legend sentence the
+#: page quotes.
+LEM12_REPORT_ACTION = ("act_report", "Generate Report…")
+LEM12_COMPUTED_CELL = "computed"
+LEM12_HP_HEADER = "H_p (lb/ft)"
+LEM12_HP_LEGEND = ("Pile resistance mobilised at the slice base, per unit "
+                   "thickness.")
+#: The two capacity fields LEM-12 quotes in full, unit suffix included: the suffix
+#: is what says a capacity belongs to one shaft rather than to a foot of slope,
+#: which is the distinction the page's capacity section is built on.
+LEM12_PILE_FIELDS = ("Vcap (per element, lb)", "Mcap (per element, lb·ft)")
+
 
 @contextlib.contextmanager
 def _default_editor_toggles():
@@ -1892,6 +1912,75 @@ def _lem09_editor_labels(mw):
     return fails
 
 
+def _lem12_pile_force_labels(mw):
+    """Where Tutorial LEM-12 sends the reader to READ the computed pile force.
+
+    The force the Ito & Matsui calculation produces is not on any plot and not in
+    the Log pane: the page's "Where the computed force appears" section sends the
+    reader to the Analysis Report for it, and quotes three strings verbatim — the
+    menu action that writes the report, the word the Piles table prints in the H
+    cell of a row whose force is computed, and the slice table's own column header
+    and legend sentence for that force. Each is pinned at its source rather than
+    by building a report, which would cost a search and a document per run.
+
+    The two capacity fields are pinned with their unit suffixes, which the page
+    quotes in full because they are what say the capacities belong to one shaft
+    and not to a foot of slope.
+    """
+    from PySide6.QtWidgets import QLabel
+
+    from xslope.columns import SLICE_COLUMNS, header
+    from xslope.fileio import load_slope_data
+    from xslope.report import _pile_fields
+
+    from studio.editors import PilesEditor
+
+    fails = []
+
+    action = getattr(mw, LEM12_REPORT_ACTION[0], None)
+    if action is None:
+        fails.append(f"MainWindow has no {LEM12_REPORT_ACTION[0]}, which Tutorial "
+                     f"LEM-12 calls {LEM12_REPORT_ACTION[1]!r}")
+    elif action.text().replace("&", "") != LEM12_REPORT_ACTION[1]:
+        fails.append(f"the {LEM12_REPORT_ACTION[0]} action reads "
+                     f"{action.text().replace('&', '')!r}, not "
+                     f"{LEM12_REPORT_ACTION[1]!r} — the label Tutorial LEM-12 quotes")
+
+    # The Piles table's H cell on a row that states no force. Driven through the
+    # report's own formatter, so a change from "computed" to anything else is the
+    # failure rather than a constant of ours agreeing with itself.
+    fmt = _pile_fields({"unit_system": "imperial"})["H"][2]
+    got = fmt({"H": None})
+    if got != LEM12_COMPUTED_CELL:
+        fails.append(f"the report's Piles table prints {got!r} for a blank H, not "
+                     f"{LEM12_COMPUTED_CELL!r} — the word Tutorial LEM-12 tells the "
+                     f"reader to look for")
+
+    column = next((c for c in SLICE_COLUMNS if c.key == "h_pile"), None)
+    got = header(column, {"force_per_len": "lb/ft"}) if column else None
+    if got != LEM12_HP_HEADER:
+        fails.append(f"the slice table's pile-force column is headed {got!r}, not "
+                     f"{LEM12_HP_HEADER!r} — the column Tutorial LEM-12 names")
+    legend = column.description if column else None
+    if legend != LEM12_HP_LEGEND:
+        fails.append(f"the slice table's pile-force legend reads {legend!r}, not "
+                     f"{LEM12_HP_LEGEND!r} — the sentence Tutorial LEM-12 quotes")
+
+    data = _quiet(load_slope_data, LEM12_FILE)
+    if not all(p.get("H") is None for p in (data.get("pile_lines") or [])):
+        fails.append("LEM-12's model states a pile force on some row; the page's "
+                     "whole subject is that both rows leave H blank")
+    dlg = PilesEditor().build(data, None)
+    labels = [lab.text() for lab in dlg.findChildren(QLabel)]
+    for field in LEM12_PILE_FIELDS:
+        if field not in labels:
+            fails.append(f"the piles editor has no {field!r} field label; Tutorial "
+                         f"LEM-12 quotes it to say the capacity is per shaft. Its "
+                         f"labels read {sorted(l for l in labels if l)}")
+    dlg.deleteLater()
+    return fails
+
+
 def _lem02_editor_labels(mw):
     """The two dialogs Tutorial LEM-2 drives, read for the labels it quotes.
 
@@ -2057,6 +2146,7 @@ def test_tutorial_labels():
 
         fails += _lem10_run_labels()
         fails += _lem11_reliability_labels()
+        fails += _lem12_pile_force_labels(mw)
         # Last of the editor legs: these are the ones that change which project
         # the window holds, and each opens the model its own pins are read on.
         fails += _lem06_editor_labels(mw)

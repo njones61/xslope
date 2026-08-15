@@ -1382,6 +1382,108 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# LEM-12 — Piles (open-and-explore)
+#
+# The subject is a column that is EMPTY in the shipped file: H is blank on both
+# pile rows, which is what puts the run on the Ito & Matsui path. Every piles shot
+# here pins LEM only, so the FEM tail (E, I, Area, Fixity) is out of the way and
+# the blank H sits among the columns that feed it — D, S, Vcap and Mcap.
+# --------------------------------------------------------------------------- #
+LEM12 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
+#: The page's two edits, each applied before its editor is built so the shot
+#: carries the state its own step ends in.
+LEM12_H = (2540.7, 1827.0)
+LEM12_S = 12.0
+
+
+def _lem12_model(H=None, S=None):
+    d = _load(LEM12)
+    rows = []
+    for i, p in enumerate(d["pile_lines"]):
+        row = dict(p)
+        if H is not None:
+            row["H"] = H[i]
+        if S is not None:
+            row["S"] = S
+        rows.append(row)
+    return dict(d, pile_lines=rows)
+
+
+def _lem12_piles_table(name, **edit):
+    """The piles editor's table view on both rows, LEM columns only."""
+    from studio.editors import PilesEditor
+
+    dlg = PilesEditor().build(_lem12_model(**edit), None)
+    _lem_only(dlg)
+    dlg._set_mode("table")
+    dlg.resize(1180, 620)
+    return _grab(dlg, name)
+
+
+def lem12_piles_table():
+    """The two pile rows as the file carries them: H empty on both, D = 2 and
+    S = 6 beside it, and the two structural capacities at the end of the LEM
+    columns. The empty H is the shot's subject."""
+    return _lem12_piles_table("lem12_studio_piles_table.png")
+
+
+def lem12_piles_h():
+    """The same table after the page's specified-force edit — one number typed
+    into each row's H — with every other cell as it was."""
+    return _lem12_piles_table("lem12_studio_piles_h.png", H=LEM12_H)
+
+
+def lem12_piles_spacing():
+    """The same table after the spacing edit: S = 12 on both rows, H still
+    blank, so the force is recomputed at the wider spacing."""
+    return _lem12_piles_table("lem12_studio_piles_spacing.png", S=LEM12_S)
+
+
+def lem12_piles():
+    """The upper pile in the editor's list view, where the Capacity / design
+    group puts the blank H above the D and S it is computed from and the two
+    capacities that bound it."""
+    from studio.editors import PilesEditor
+
+    dlg = PilesEditor().build(_load(LEM12), None)
+    return _grab(_list_view(_lem_only(dlg), 1400), "lem12_studio_piles.png")
+
+
+def lem12_run_lem():
+    """The first run: Spencer, auto search, 40 slices, on the file as
+    downloaded."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM12))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem12_studio_run_lem.png")
+
+
+def lem12_run_lem_grid():
+    """The same dialog with Grid search ticked — the state the bypass step
+    leaves behind, everything else unchanged."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40, "grid_seed": True},
+                       slope_data=_load(LEM12))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem12_studio_run_lem_grid.png")
+
+
+SHOTS.update({
+    "lem12_piles_table": lem12_piles_table,
+    "lem12_piles": lem12_piles,
+    "lem12_piles_h": lem12_piles_h,
+    "lem12_piles_spacing": lem12_piles_spacing,
+    "lem12_run_lem": lem12_run_lem,
+    "lem12_run_lem_grid": lem12_run_lem_grid,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

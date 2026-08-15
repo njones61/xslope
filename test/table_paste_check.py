@@ -1100,6 +1100,98 @@ def test_lem09_pile_row():
     return out
 
 
+def test_lem12_stated_pile_force():
+    """LEM-12's edit: the pile force stated instead of computed, pasted into the
+    piles editor's H column.
+
+    Same shape as LEM-7's strength legs and LEM-11's σ block — the page ships the
+    model in its PRE-edit state (H blank on both rows, which is what selects the
+    Ito & Matsui calculation), so the pasted cells have nothing in the file to be
+    compared against and the oracle has to be an OUTPUT the edit moves. Two are
+    checked, because the page's whole argument is that they differ:
+
+    * On the auto search's own critical circle, one solve and no search, the
+      stated force reproduces the computed one — the page prints 1.842 for both,
+      and a block landing one column over would not.
+    * Searched, the stated force settles somewhere else — the page prints 1.752,
+      which is the number a frozen force produces and the computed force does
+      not.
+    """
+    from studio.editors import PilesEditor
+    from xslope.search import circular_search
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    page = "lem12_piles.md"
+    printed = _taught(page, ["H"])
+    model = _load(os.path.join(_MODELS, "xslope_piles.xlsx"))
+    before = [dict(p) for p in model["pile_lines"]]
+    out = _fail(len(printed) == len(before),
+                f"LEM-12 stated H: the page prints {len(printed)} rows; the file "
+                f"carries {len(before)} piles")
+    out += _fail(all(p["H"] is None for p in before),
+                 "LEM-12 stated H: the shipped file already states a pile force — "
+                 "the page teaches a change from blank")
+
+    editor = PilesEditor()
+    dlg = editor.build(model, None)
+    dlg.set_view_mode("table")
+    dlg._table.apply_usage_filter({"lem", "fem"})
+    keys = [f.key for f in PilesEditor.FIELDS]
+    _paste(dlg._table, _tsv(printed), row=0, col=keys.index("H"))
+    out += _fail(_summary(dlg._table) == "Pasted 2 rows × 1 column.",
+                 f"LEM-12 stated H: the status line read {_summary(dlg._table)!r}")
+
+    landed = dict(model)
+    dlg.accept()
+    editor.apply(landed, dlg)
+    for i, (got, cell) in enumerate(zip(landed["pile_lines"], printed)):
+        out += _fail(got["H"] is not None
+                     and _matches(got["H"], cell[0], float(cell[0])),
+                     f"LEM-12 stated H: pile {i + 1} came back H = {got['H']!r} "
+                     f"from {cell[0]!r}")
+        for key in ("x1", "y1", "x2", "y2", "D_pile", "S", "V_cap", "M_cap"):
+            out += _fail(got[key] == before[i][key],
+                         f"LEM-12 stated H: the block also changed pile {i + 1}'s "
+                         f"{key}, {before[i][key]!r} -> {got[key]!r}")
+    if out:
+        # A block that did not land where the page says it does is reported as
+        # that, rather than as whatever the solver makes of the wrong model.
+        return out
+
+    # The circle the page's held comparison is made on: the auto search's own
+    # critical surface, found here rather than hard-coded so the leg fails if the
+    # search moves rather than quietly comparing against a stale circle.
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(_load(os.path.join(
+            _MODELS, "xslope_piles.xlsx")), "spencer", num_slices=40,
+            diagnostic=False)
+    crit = fs_cache[0] if fs_cache else None
+    out += _fail(crit is not None and abs(crit["FS"] - 1.842) < 5e-4,
+                 f"LEM-12 stated H: the computed-force search gives "
+                 f"{crit['FS'] if crit else float('nan'):.6f}, not the 1.842 the "
+                 f"page prints")
+    circle = {"Xo": crit["Xo"], "Yo": crit["Yo"], "Depth": crit["Depth"],
+              "R": crit["Yo"] - crit["Depth"]}
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = generate_slices(landed, circle=circle, num_slices=40)
+        held = solve_selected("spencer", res[0]) if ok else res
+    out += _fail(ok and not isinstance(held, str)
+                 and abs(held["FS"] - 1.842) < 5e-4,
+                 f"LEM-12 stated H: on the search's own circle the stated force "
+                 f"gives {held['FS'] if ok and not isinstance(held, str) else held}, "
+                 f"not the 1.842 the page prints for both ways of entering it")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_stated, _, _, _ = circular_search(landed, "spencer", num_slices=40,
+                                             diagnostic=False)
+    fs = fs_stated[0]["FS"] if fs_stated else float("nan")
+    out += _fail(abs(fs - 1.752) < 5e-4,
+                 f"LEM-12 stated H: the stated-force search gives {fs:.6f}, not "
+                 f"the 1.752 the page prints for it")
+    return out
+
+
 def test_lem11_sigma_block():
     """LEM-11's edit: the mat sheet's two-column Standard Deviations block, with
     the cohesion's σ halved.
@@ -1198,6 +1290,7 @@ CHECKS = [
     ("LEM-7 c/p -> constant", test_lem07_profile_to_constant),
     ("LEM-10 seed circle", test_lem10_seed_circle),
     ("LEM-11 σ block", test_lem11_sigma_block),
+    ("LEM-12 stated pile force", test_lem12_stated_pile_force),
     ("LEM-8 materials", test_lem08_materials),
     ("LEM-9 materials", test_lem09_materials),
     ("LEM-3 profile lines and circles", test_lem03_profile_lines_and_circles),

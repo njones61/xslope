@@ -2135,17 +2135,19 @@ class ReliabilityDialog(QDialog):
         if self.app_mode == "lem":
             form.addRow("", self.rapid)
 
-        self.search = QCheckBox("Search the critical surface at the mean values")
+        self.search = QCheckBox("Search for the critical surface")
         self.search.setChecked(bool(defaults.get("search", True)))
         self.search.setToolTip(
-            "On (default): search for the critical surface. The Taylor series "
-            "searches at EVERY one of its 1+2N solves, so each perturbed model "
-            "finds its own critical surface; the sampling engines (Monte Carlo, "
-            "response surface) search once at the most-likely values and hold "
-            "that surface across their realizations, where a re-search per "
-            "realization would be prohibitive.\n\n"
-            "Off: evaluate the entered circle / non-circular surface as-is, "
-            "everywhere.")
+            "On (default): the Taylor series solves the model 1+2N times — at "
+            "the mean values and at ±σ for each uncertain parameter — and every "
+            "one of those solves is a fresh search for that perturbed model's "
+            "own critical surface. The sampling engines (Monte Carlo, response "
+            "surface) search once, at the mean values, and hold that surface "
+            "across all realizations.\n\n"
+            "Off: every solve evaluates the surface entered on the sheet, with "
+            "no search — the right mode when the surface itself is prescribed: "
+            "a published benchmark's circle, an observed failure surface, a "
+            "geologically controlled plane.")
         if self.app_mode == "lem":
             form.addRow("", self.search)
 

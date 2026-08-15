@@ -139,14 +139,15 @@ the σ columns into a reliability index. Open it and leave the **Method** on
 
 ![The Reliability dialog on the Taylor series](images/lem11_studio_reliability_taylor.png)
 
-**Search the critical surface at the mean values** is ticked by default and
-should stay ticked — and for the Taylor series it means more than its label
-says: every one of the 1 + 2N solves runs its **own search**, so each
-perturbed model finds its own critical surface rather than inheriting the
-mean-value one. Unticked, the entered circle is evaluated as-is at every
-solve. (The sampling engines later on this page behave differently — there
-the surface really is found once at the mean values and held, because
-re-searching per realization is prohibitive at ten thousand solves.) Below the controls, **Standard deviations in
+The search is not done once. The Taylor series solves the model 1 + 2N
+times — once at the most-likely values, then twice more for each uncertain
+parameter, at MLV + σ and at MLV − σ — and with **Search for the critical
+surface** ticked, **every one of those solves is a fresh search**: each
+perturbed model finds its own critical surface. Leave it ticked here.
+Unticked, every solve evaluates the circle entered on the sheet instead —
+the right mode when the surface itself is prescribed, as on a published
+benchmark's circle, an observed failure surface, or a bedding-controlled
+plane, where the question is that surface's own reliability. Below the controls, **Standard deviations in
 this file** lists what the run will actually vary — `mat:soil:c = 400 ± 100
 (COV 25%)` and `mat:soil:gamma = 120 ± 8 (COV 7%)`. If that box says no standard
 deviations are set, **Run** is disabled; a reliability analysis with nothing

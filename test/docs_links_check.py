@@ -1152,7 +1152,7 @@ LEM11_RUN_ACTIONS = {"act_reliability": "Reliability…"}
 #: three Monte Carlo controls it names one by one. A rewording of any of them turns
 #: those steps into instructions to press something that is not there.
 LEM11_ENGINES = ("Taylor series (TSPM)", "Monte Carlo")
-LEM11_SEARCH_CHECKBOX = "Search the critical surface at the mean values"
+LEM11_SEARCH_CHECKBOX = "Search for the critical surface"
 LEM11_SIGMA_GROUP = "Standard deviations in this file"
 LEM11_MC_ROWS = ("MC samples", "MC seed", "MC distribution")
 

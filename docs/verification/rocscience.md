@@ -844,11 +844,11 @@ by finite-element limit analysis and reports 1.17.
 *The published Bishop values spread 1.14–1.19 on this deep φ = 0 problem —
 Low's 1.14, Kim's limit-analysis 1.17, Slide's 1.192 — and the spread is not a
 surface disagreement: the two searches settle on the same center (XSLOPE
-(18.00, 16.04), Slide (18.001, 16.000)), and evaluated on Slide's own printed
-Bishop circle (R = 15.556) XSLOPE reads 1.131 against Slide's 1.192, while the
-same test on Slide's printed Ordinary circle agrees to 0.7% (1.361 vs 1.370,
-with Low at 1.36). XSLOPE's Bishop stands within 0.8% of the original
-publication; Slide's reads 4.6% above it.*
+(18.00, 16.04), Slide (18.001, 16.000)). Evaluated on Slide's own printed
+Bishop circle (R = 15.556), XSLOPE's Bishop is 1.131 vs Low 1.14 (−0.8%); on
+Slide's printed Ordinary circle, XSLOPE's Ordinary is 1.361 vs Slide 1.370
+(−0.7%), with Low at 1.36. The outlier is Slide's own Bishop, 1.192 vs
+Low 1.14 (+4.6%), above the publication its manual cites.*
 
 ![vp023: inputs and representative solution](images/vp023.png)
 

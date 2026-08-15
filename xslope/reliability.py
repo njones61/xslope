@@ -1093,7 +1093,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                 update_slice_materials(df, sd['materials'])
             except ValueError:
                 return _eval_rebuild(sd)
-            ok2, r = solver(df)
+            ok2, r = solver(df, **_seed_kw)
             if not ok2:
                 return None
             fs = r.get('FS')
@@ -1111,7 +1111,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                                       num_slices=num_slices, check_inputs=False)
         if not ok:
             return None
-        ok2, r = solver(res[0])
+        ok2, r = solver(res[0], **_seed_kw)
         if not ok2:
             return None
         fs = r.get('FS')
@@ -1119,9 +1119,34 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
             return None
         return float(fs)
 
+    _mlv_theta = None
+    _seed_kw = {}
+
     F_MLV = _eval(slope_data)
     if F_MLV is None:
         return False, "Monte Carlo: evaluation at the most-likely values failed."
+
+    # Seed every realization's iterative solve from the most-likely-values
+    # solution: each sampled model's root sits within a few percent of it, so
+    # Newton (Spencer) and the fixed-point loop (Bishop) start almost converged.
+    # Methods whose signatures take no seed run exactly as before.
+    import inspect as _inspect
+    _solver_params = set(_inspect.signature(solver).parameters)
+    if 'theta_seed' in _solver_params and _template is not None:
+        # One extra solve at the most-likely values fetches Spencer's theta for
+        # the seed; the F_MLV above stays the seedless, historical evaluation.
+        try:
+            _df0 = _template.copy()
+            update_slice_materials(_df0, slope_data['materials'])
+            _ok0, _r0 = solver(_df0)
+            if _ok0 and isinstance(_r0, dict):
+                _mlv_theta = _r0.get('theta')
+        except ValueError:
+            pass
+    if 'fs_seed' in _solver_params:
+        _seed_kw['fs_seed'] = F_MLV
+    if 'theta_seed' in _solver_params and _mlv_theta is not None:
+        _seed_kw['theta_seed'] = _mlv_theta
 
     if debug_level >= 1:
         print("=== MONTE CARLO RELIABILITY ANALYSIS ===")

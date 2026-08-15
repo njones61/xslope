@@ -529,7 +529,7 @@ def oms(slice_df, debug=False):
     # 9) Return success and the FS
     return True, {'method': 'oms', 'FS': FS}
 
-def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
+def bishop(slice_df, debug=False, tol=1e-6, max_iter=100, fs_seed=None):
     """
     Computes FS using the complete Bishop's Simplified Method (Equation 10) and computes N_eff (Equation 8).
     Requires circular slip surface and full input data structure consistent with OMS.
@@ -664,8 +664,9 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     # Vertical component of pile force (upward, reduces net downward force on slice)
     H_sin_tp = H_pile * np.sin(theta_p)
 
-    # Iterative solution
-    F = 1.0
+    # Iterative solution — from the caller's seed when one is given (Monte
+    # Carlo passes the most-likely-values FS), else the historical start.
+    F = 1.0 if fs_seed is None else float(fs_seed)
     for _ in range(max_iter):
         # Compute N_eff — H·sin(θp) enters vertical equilibrium
         # Vertical equilibrium: known loads at full value; passive support
@@ -1561,7 +1562,7 @@ def lowe(slice_df, debug=False):
         return success, results
 
 def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=None,
-            existence_test=True):
+            existence_test=True, fs_seed=None, theta_seed=None):
     """
     Spencer's Method using Steve G. Wright's formulation from the UTEXAS v2  user manual.
 
@@ -2246,9 +2247,14 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0, residual_hook=Non
         # refusal keeps its own message below wherever the cascade does run.
         return False, f"{SPENCER_NO_ADMISSIBLE_SOLUTION}: {_no_solution_detail[0]}."
 
-    # Strategy 1: Newton with default initial guess
-    F0 = 1.5
-    theta0_rad = np.radians(-8.0) if right_facing else np.radians(8)
+    # Strategy 1: Newton from the caller's seed when one is given (a Monte
+    # Carlo campaign passes the most-likely-values solution, which sits within
+    # a few percent of every realization's root), else the default start.
+    F0 = 1.5 if fs_seed is None else float(fs_seed)
+    if theta_seed is None:
+        theta0_rad = np.radians(-8.0) if right_facing else np.radians(8)
+    else:
+        theta0_rad = np.radians(float(theta_seed))
 
     converged, F, theta_rad, iteration = newton_solve(F0, theta0_rad, max_iter, tol, debug_level)
     if converged and not accept_or_save(F, theta_rad, "Newton default: "):

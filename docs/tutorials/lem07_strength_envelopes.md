@@ -39,7 +39,10 @@ constant, and measure what the search does when depth no longer buys strength
 A straight 43° slope, H = 6 m, cut in compacted Israeli clays at
 γ = 18 kN/m³, dry, with no layering: one soil, one profile line, a maximum
 depth 4 m below the toe, and a single starting circle. This is example problem
-1 of Baker (2003), and the whole problem is the strength.
+1 of Baker (2003), "Inter-relations between experimental and computational
+aspects of slope stability analysis" (International Journal for Numerical and
+Analytical Methods in Geomechanics 27, 379–401), and the whole problem is the
+strength.
 
 The clay was tested in triaxial compression, and the results were fitted twice.
 The completed file carries the first fit — a **power curve**, τ = 1.107·σ′^0.86
@@ -62,7 +65,12 @@ carries.
 Open **Materials** and switch to **List view**, which puts the strength
 parameters beside a plot of the envelope they define. The clay's
 **Model (option)** is `pow`, and the four coefficients under it are the power
-curve's — `pow_a` = 1.107 and `pow_b` = 0.86, with `pow_c` and `pow_d` at zero:
+curve's. The option's full form is
+
+$$\tau = a\,(\sigma' + d)^{\,b} + c$$
+
+and here `pow_a` = 1.107 and `pow_b` = 0.86 with `pow_c` and `pow_d` at zero,
+which reduces it to τ = 1.107·σ′^0.86:
 
 ![The power-curve material](images/lem07_studio_materials_pow.png)
 
@@ -85,7 +93,8 @@ the slope face:
 ![Spencer on the power envelope](images/lem07_baker_pow.png){width=1000}
 
 **FS = 0.958** — below one, on a circle centered at (−5.22, 12.61) tangent at
-elevation −1.04, 9.18 m of failure surface carrying 98.6 kN/m of soil. Slide
+elevation −1.04, 9.18 m of failure surface carrying 98.6 kN/m of soil — the
+sliding mass's weight per metre of section, summed over the solved slices. Slide
 reports 0.960 on this case and Baker's own solution is 0.97. The surface is
 shallow, and the effective normal stress along its slice bases averages
 8.3 kPa: the low-stress end of the envelope, where a curve running into the
@@ -101,10 +110,10 @@ are three adjacent cells:
 |---|:---:|:---:|
 | mc | 11.64 | 24.7 |
 
-The power-curve coefficients can be left on the row — under `mc` nothing reads
-them, and the answer is the same whether they are cleared or not. In Studio's
-list view they leave the form entirely, replaced by the two fields the new
-option uses:
+The power-curve coefficients do not need to be deleted — under `mc` nothing
+reads them, and the answer is the same whether they are cleared or not. In the
+list view they leave the form with the option that read them, replaced by the
+two fields `mc` uses:
 
 ![The Mohr-Coulomb material](images/lem07_studio_materials_mc.png)
 
@@ -162,8 +171,9 @@ line is a detail; where they do not, it is the answer.
 
 ## Part B — Strength that grows with depth
 
-A 2:1 slope 8 m high, standing on a bench at elevation 8 and topping out at
-16, over two soft clays that reach down to a rigid base at elevation 0. This is
+In this problem, a 2:1 slope 8 m high stands on a bench at elevation 8 and
+tops out at 16, over two soft clays that reach down to a rigid base at
+elevation 0. This is
 a worked example from Low (1989), "Stability analysis of embankments on soft
 ground" (ASCE Journal of Geotechnical Engineering 115(2)) — a paper about
 exactly this part's subject, undrained clays whose strength grows with the
@@ -198,7 +208,9 @@ elevation — and the three fields under it are what that law needs:
 elevation, and `c/p` = 3.75 is the rate the strength gains per unit of
 elevation below it:
 s<sub>u</sub> = c + c/p·max(0, r-elev − y), so at or above elevation 4 the
-strength is simply c. The plot beside the fields draws it as a profile against
+strength is simply c. The option's name is the classical **c/p ratio** — c the
+undrained strength, p the effective overburden pressure — the proportionality
+a normally consolidated clay holds as both grow with depth. The plot beside the fields draws it as a profile against
 elevation, with the reference elevation marked, running from 15 kPa at the top
 of the layer to 30 kPa at the model floor.
 

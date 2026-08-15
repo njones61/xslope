@@ -4466,6 +4466,67 @@ def plot_reliability_histogram(result, figsize=(9, 5.5), bins='auto', show_fits=
     return fig
 
 
+def plot_reliability_convergence(result, figsize=(9, 5.5), save_png=False,
+                                 dpi=300, show_title=True, show_legend=True,
+                                 fig=None, converge_rel=None):
+    """Running probability of failure against realization count, from the same
+    Monte Carlo samples the histogram draws.
+
+    The line is the cumulative empirical P_f after each realization; the band is
+    its 95% confidence interval, 1.96·sqrt(p(1-p)/n). The plot is readable off
+    ANY :func:`xslope.reliability.reliability_mc` result — the running estimate
+    is recomputed from ``fs_samples`` in order, so a run made without the
+    convergence option still shows how (and whether) its answer settled. When
+    the result carries a stopping point (``n_used`` < ``n_requested``), a marker
+    names it; passing ``converge_rel`` draws the ±target band around the final
+    estimate.
+    """
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
+    samples = np.asarray(result.get('fs_samples', []), dtype=float)
+    ok = np.isfinite(samples)
+    fails = np.cumsum((samples < 1.0) & ok)
+    valid = np.cumsum(ok)
+    n = np.arange(1, samples.size + 1)
+    keep = valid > 0
+    p = np.where(keep, fails / np.maximum(valid, 1), np.nan)
+    half = 1.96 * np.sqrt(np.maximum(p * (1 - p), 0.0) / np.maximum(valid, 1))
+    ax.plot(n, p * 100, color='tab:blue', lw=1.4,
+            label='running $P_f$ (empirical)')
+    ax.fill_between(n, (p - half) * 100, (p + half) * 100, color='tab:blue',
+                    alpha=0.18, label='95% confidence band')
+    p_final = p[-1] if samples.size else float('nan')
+    ax.axhline(p_final * 100, color='k', lw=0.8, ls='--',
+               label=f'final $P_f$ = {p_final*100:.2f}%')
+    if converge_rel:
+        ax.axhspan((1 - converge_rel) * p_final * 100,
+                   (1 + converge_rel) * p_final * 100, color='tab:green',
+                   alpha=0.12,
+                   label=f'±{converge_rel*100:.0f}% of $P_f$ (stop target)')
+    n_used, n_req = result.get('n_used'), result.get('n_requested')
+    if n_used and n_req and n_used < n_req:
+        ax.axvline(n_used, color='tab:red', lw=1.2, ls=':',
+                   label=f'converged at n = {n_used:,}')
+    ax.set_xlabel('Realizations, n')
+    ax.set_ylabel('Probability of failure (%)')
+    ax.grid(True, alpha=0.3)
+    if show_title:
+        ax.set_title("Monte Carlo convergence — running $P_f$ with 95% CI")
+    if show_legend:
+        ax.legend(loc='best', fontsize=8, framealpha=0.9)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig('plot_reliability_convergence.png', dpi=dpi,
+                    bbox_inches='tight')
+    if own_fig:
+        plt.show()
+    return fig
+
+
 def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=True, label_elements=False, label_nodes=False, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
     """
     Plot the finite element mesh with material regions.

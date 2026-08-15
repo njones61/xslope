@@ -60,19 +60,29 @@ stays on the Taylor series (1 + 2N solves — see
 
 **Stopping on statistical convergence.** The number of realizations a campaign
 needs is set by the answer, not the input: the 95% confidence half-width on an
-empirical probability of failure is $1.96\sqrt{p(1-p)/n}$, so resolving a
-$P_f$ near 15% to ±1 percentage point takes roughly 5,000 realizations and to
-±0.5 points roughly 21,000. The optional convergence stop does that arithmetic
-live — `converge_pf` (the **Stop when P_f converges** checkbox and its
-tolerance in Studio's Reliability dialog) checks the half-width every 100
-realizations and ends the campaign once it is inside the tolerance, with the
-sample count as the cap. The rule never fires before 500 realizations or
-before 10 failures have been observed, so a rare-event problem — where the
-normal approximation behind the half-width is not yet credible — runs to its
-cap instead of stopping on false confidence. Because the whole sample matrix
-is drawn up front from the fixed seed, a converged run is exactly the first
-$n$ realizations of the full one: still bit-reproducible, and reported with
-its stopping $n$ and half-width in the console summary.
+empirical probability of failure is $1.96\sqrt{p(1-p)/n}$. The optional
+convergence stop — `converge_rel` in the API, the **Stop when P_f converges**
+checkbox and its tolerance in Studio's Reliability dialog — checks that
+half-width every 100 realizations and ends the campaign once $P_f$ is known to
+the stated fraction **of itself** (default ±10%), with the sample count as the
+cap. The tolerance is relative because an absolute one is miscalibrated across
+the $P_f$ range: half a percentage point is ±3% of a 17% probability of
+failure but ±25% of a 2% one. Relative, the demanded sample count self-scales
+as $(1-p)/p$ — the submerged-slope model below converges at ±10% in about
+2,000 realizations at $P_f \approx 17$%, and the same rule would ask roughly
+20,000 of a 2% problem. The rule never fires before 500 realizations or before
+10 failures have been observed, so a rare-event problem — where the normal
+approximation behind the half-width is not yet credible — runs to its cap
+instead of stopping on false confidence. Because the whole sample matrix is
+drawn up front from the fixed seed, a converged run is exactly the first $n$
+realizations of the full one: still bit-reproducible, and reported with its
+stopping $n$ and its achieved resolution in the console summary.
+
+The running estimate and its confidence band can be read off any Monte Carlo
+result with `plot_reliability_convergence` — the sample-15 campaign, drawn in
+full with the ±10% stop target it would have satisfied at n ≈ 2,000:
+
+![Running P_f with its 95% confidence band](images/mc_convergence_trace.png)
 
 ### Worked example: VP34 (Clarence Cannon Dam)
 

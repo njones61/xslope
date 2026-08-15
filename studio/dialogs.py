@@ -2152,7 +2152,7 @@ class ReliabilityDialog(QDialog):
         # rare-event campaign runs to the cap rather than stopping on false
         # confidence.
         self.mc_converge = QCheckBox("Stop when P_f converges")
-        self.mc_converge.setChecked(defaults.get("converge_pf") is not None)
+        self.mc_converge.setChecked(defaults.get("converge_rel") is not None)
         self.mc_converge.setToolTip(
             "Stop sampling once the 95% confidence half-width on the empirical "
             "probability of failure is inside the tolerance — further "
@@ -2160,16 +2160,17 @@ class ReliabilityDialog(QDialog):
             "MC samples becomes the cap. With a fixed seed the stopped run is "
             "still exactly reproducible.")
         self.mc_converge_tol = QDoubleSpinBox()
-        self.mc_converge_tol.setDecimals(2)
-        self.mc_converge_tol.setRange(0.05, 5.0)
-        self.mc_converge_tol.setSingleStep(0.25)
-        self.mc_converge_tol.setSuffix(" % points")
+        self.mc_converge_tol.setDecimals(0)
+        self.mc_converge_tol.setRange(1.0, 50.0)
+        self.mc_converge_tol.setSingleStep(5.0)
+        self.mc_converge_tol.setSuffix(" % of P_f")
         self.mc_converge_tol.setValue(
-            float(defaults.get("converge_pf") or 0.01) * 100)
+            float(defaults.get("converge_rel") or 0.10) * 100)
         self.mc_converge_tol.setToolTip(
-            "Tolerance on P_f as a 95% confidence half-width, in percentage "
-            "points. ±1 pp on a P_f near 15% is reached in a few thousand "
-            "realizations; ±0.5 pp needs roughly four times as many.")
+            "Stop when the probability of failure is known to this fraction of "
+            "itself (95% confidence half-width ≤ tolerance × P_f). Relative, so "
+            "it self-scales: a small P_f automatically demands more "
+            "realizations than a large one, roughly (1−p)/p of them.")
         if self.app_mode == "lem":
             form.addRow("MC samples", self.n_samples)
             form.addRow("MC seed", self.seed)
@@ -2312,8 +2313,8 @@ class ReliabilityDialog(QDialog):
             "n_samples": self.n_samples.value(),
             "rng_seed": self.seed.value(),
             "distribution": self.distribution.currentData(),
-            "converge_pf": (self.mc_converge_tol.value() / 100
-                            if self.mc_converge.isChecked() else None),
+            "converge_rel": (self.mc_converge_tol.value() / 100
+                             if self.mc_converge.isChecked() else None),
             "F_min": self.f_min.value(),
             "F_max": self.f_max.value(),
             "reliability_tol": self.reliability_tol.value(),

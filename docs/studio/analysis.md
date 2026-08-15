@@ -305,11 +305,11 @@ will vary. **LEM** adds the solver method, surface, slice count, rapid-drawdown 
 and a *search the critical surface at the mean values* toggle; **Monte Carlo** adds an
 **MC samples** count, a **seed** (fixed by default, so the result is reproducible),
 a normal / lognormal **distribution** choice, and an optional convergence stop —
-**Stop when P_f converges** with a **P_f tolerance (±)** in percentage points ends
-the campaign once the 95% confidence half-width on the empirical probability of
-failure is inside the tolerance, with the samples count as the cap (the
-[Monte Carlo page](../reliability/monte_carlo.md) gives the rule and its
-rare-event guard). **FEM** shows the SSRM `F_min` / `F_max`
+**Stop when P_f converges** with a **P_f tolerance (±)** as a percentage *of P_f
+itself* ends the campaign once the 95% confidence half-width on the empirical
+probability of failure is inside that fraction, with the samples count as the cap
+(the [Monte Carlo page](../reliability/monte_carlo.md) gives the rule, its
+rare-event guard, and the convergence plot). **FEM** shows the SSRM `F_min` / `F_max`
 bracket and a tight reliability tolerance. Settings are remembered for the session.
 
 The run reports β, the probability of failure, and the mean / σ of the factor of

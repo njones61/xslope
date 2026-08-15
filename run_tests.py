@@ -1584,8 +1584,8 @@ def run_reliability_mc_test(test):
     kw = {}
     if 'rng_seed' in test:
         kw['rng_seed'] = int(test['rng_seed'])
-    if 'converge_pf' in test:
-        kw['converge_pf'] = float(test['converge_pf'])
+    if 'converge_rel' in test:
+        kw['converge_rel'] = float(test['converge_rel'])
 
     slope_data = load_slope_data(file_path)
     success, result = reliability_mc(slope_data, method, circular=circular, search=do_search,

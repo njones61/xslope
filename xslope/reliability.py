@@ -855,7 +855,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                    progress_callback=None, cancel_check=None,
                    fs_tol=None, tol=None, max_iter=None, composite=False,
                    seed='circles', search_opts=None, use_file_window=True,
-                   check_inputs=True, converge_pf=None, converge_check=100,
+                   check_inputs=True, converge_rel=None, converge_check=100,
                    converge_min=500):
     """Monte Carlo reliability analysis — the sampling counterpart to the
     Taylor-series :func:`reliability`.
@@ -889,14 +889,16 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     rng_seed : int
         Seed for ``numpy.random.default_rng`` — a fixed constant by default, so the
         result is bit-reproducible. Pass a different int to see sampling scatter.
-    converge_pf : float, optional
+    converge_rel : float, optional
         Statistical-convergence stopping tolerance on the empirical probability
-        of failure, in probability units (0.005 = half a percentage point). When
-        set, the campaign checks every ``converge_check`` realizations and stops
-        as soon as the 95% confidence half-width on P_f,
-        1.96·sqrt(p(1−p)/n), falls inside the tolerance — additional
-        realizations past that point no longer move the answer at the stated
-        resolution. ``n_samples`` becomes the cap. The rule never fires before
+        of failure, RELATIVE to its own value (0.10 = stop when P_f is known to
+        ±10% of itself at 95% confidence). A relative rule self-scales: an
+        absolute half-percentage-point on a P_f of 17% and of 2% are entirely
+        different amounts of knowledge, and the sample count the rule demands
+        grows as (1−p)/p, roughly ten times more realizations at 2% than at
+        17%. When set, the campaign checks every ``converge_check``
+        realizations and stops once 1.96·sqrt(p(1−p)/n) ≤ converge_rel·p;
+        ``n_samples`` becomes the cap. The rule never fires before
         ``converge_min`` realizations or before 10 failures have been observed
         (below that the normal approximation behind the half-width is not
         valid, which protects rare-event problems from stopping on false
@@ -1100,7 +1102,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     valid = np.ones(n_samples, dtype=bool)
     report_every = max(1, n_samples // 20)
     n_used = n_samples
-    pf_trace = [] if converge_pf is not None else None
+    pf_trace = [] if converge_rel is not None else None
     pf_ci_half = None
     run_fail = run_valid = 0
     for k in range(n_samples):
@@ -1117,7 +1119,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
             run_valid += 1
             if fk < 1.0:
                 run_fail += 1
-        if (converge_pf is not None and (k + 1) % converge_check == 0
+        if (converge_rel is not None and (k + 1) % converge_check == 0
                 and run_valid > 0):
             p = run_fail / run_valid
             half = 1.96 * math.sqrt(p * (1.0 - p) / run_valid)
@@ -1125,8 +1127,8 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
             # The half-width is a normal approximation; below ~10 observed
             # failures it is not credible, so a rare-event campaign keeps
             # sampling to the cap rather than stopping on false confidence.
-            if (k + 1 >= converge_min and run_fail >= 10
-                    and half <= converge_pf):
+            if (k + 1 >= converge_min and run_fail >= 10 and p > 0
+                    and half <= converge_rel * p):
                 n_used = k + 1
                 pf_ci_half = half
                 break
@@ -1170,14 +1172,14 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                        tablefmt="grid", colalign=["left", "center", "center", "center"]))
         print(f"\nSamples: {n_used} of {n_samples} requested "
               f"(valid {n_valid}, invalid {n_invalid}) | seed {rng_seed} | {distribution}")
-        if converge_pf is not None:
+        if converge_rel is not None:
             if n_used < n_samples:
                 print(f"Converged at n = {n_used}: P_f {pf_empirical*100:.2f}% "
-                      f"± {pf_ci_half*100:.2f} percentage points "
-                      f"(95% CI ≤ ±{converge_pf*100:.2f})")
+                      f"known to ±{pf_ci_half/pf_empirical*100:.1f}% of itself "
+                      f"(target ±{converge_rel*100:.0f}%, 95% CI)")
             else:
-                print(f"Convergence tolerance ±{converge_pf*100:.2f} percentage "
-                      f"points not met within the {n_samples}-sample cap.")
+                print(f"Convergence target ±{converge_rel*100:.0f}% of P_f not "
+                      f"met within the {n_samples}-sample cap.")
         print(f"Mean FS: {mean_FS:.4f}   σ_F: {sigma_F:.4f}   COV_F: {COV_F:.4f}")
         print(f"β (normal): {beta_normal:.4f}   β (lognormal): {beta_ln:.4f}")
         print(f"PF empirical: {pf_empirical*100:.3f}%   "

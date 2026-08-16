@@ -34,7 +34,8 @@ search returns when it is allowed to look above the pile row.
 
 ## The slope
 
-The slope is a single soil — a medium-stiff clay with γ = 120 pcf,
+The slope itself is kept simple so that everything interesting on this page
+comes from the piles. It is a single soil — a medium-stiff clay with γ = 120 pcf,
 c = 200 psf, and φ = 20° — over a rigid
 base 10 ft below the toe. The face rises 20 ft at 1:1 from (0, 0) to (20, 20),
 with level ground either side. There is no water — the clay's **u** is `none` —
@@ -61,7 +62,9 @@ it beside the bar.
 
 ### The pile rows
 
-Open **Piles** in the **Inputs** tree and press **Table view**. Its columns are
+Everything XSLOPE needs to know about the two shafts sits in two rows of the
+piles sheet, and reading those rows is most of what this page teaches. Open
+**Piles** in the **Inputs** tree and press **Table view**. Its columns are
 the piles worksheet's, minus the `θp` Studio derives from the pile's endpoints,
 and — with **Show parameters for:** set to **LEM** — the columns only the
 finite element engine reads (`E`, `I`, `Area`, `Fixity`) are hidden:
@@ -107,7 +110,8 @@ per-shaft units in their labels: **Vcap (per element, lb)** and
 
 ## Running the analysis
 
-Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
+With the inputs understood, run the search and see what the piled slope
+does. Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 `Auto search`, with the slice count left at 40:
 
 ![The Run LEM dialog on the loaded model](images/lem12_studio_run_lem.png)
@@ -131,6 +135,10 @@ one — 10.07 ft and 14.48 ft of soil above the surface at each pile, which is t
 depth the force is computed over.
 
 ### What the two rows are worth
+
+FS = 1.842 describes the reinforced slope, but it does not say what the
+piles contributed. Measuring that takes two comparisons: first the slope
+without any piles, then the same surface with each row removed in turn.
 
 Taking the piles out and searching the same slope again — same clay, same
 geometry, same starting circle, a separate search with its own critical surface —
@@ -163,8 +171,9 @@ where the base is flatter and the force resolves more directly against sliding.
 
 ## Where the computed force appears
 
-The factor of safety is on the plot; the force behind it is in the **Analysis
-Report**. With the run still loaded, **File → Generate Report…** writes a Word
+So far the pile force has been invisible: the plot shows its effect on the
+factor of safety, but not the force itself. To see the number, generate the
+**Analysis Report**. With the run still loaded, **File → Generate Report…** writes a Word
 document whose limit equilibrium section carries the pile inputs and the solved
 slice table ([Analysis Report](../studio/reports.md) documents the whole
 document).
@@ -188,6 +197,11 @@ one line.
 ---
 
 ## How the force is computed
+
+The report says what the piles delivered. This section explains where those
+numbers come from, because understanding the calculation is what makes the
+rest of the page — the capacity limits, the spacing study — predictable
+rather than mysterious.
 
 Ito & Matsui treat the soil between two adjacent piles as squeezing plastically
 through the gap between them, and derive from Mohr-Coulomb plasticity the lateral
@@ -272,7 +286,9 @@ times the moment their sections are designed for.
 
 ## What the spacing is worth
 
-Pile spacing affects the computed force in two ways: closer piles arch more
+The capacities are fixed by the concrete section, but the spacing is a
+choice — it is the main variable a designer adjusts once the diameter is
+set. Pile spacing affects the computed force in two ways: closer piles arch more
 strongly, so each pile takes a larger share of the
 soil force, and closer spacing puts more shafts under each foot of slope. Both
 effects work in the same direction.
@@ -327,7 +343,8 @@ Slide2 and against the paper.
 
 ## Giving the force yourself
 
-The other way to enter a pile is to state its force outright, as
+Everything so far has used the computed path. The other way to enter a pile
+is to state its force outright, as
 [LEM-9's soldier pile](lem09_tieback_wall.md#the-problem) does — a number from
 a p-y analysis (a lateral load–deflection model of the shaft), a structural
 check or a published chart, entered per foot of slope.
@@ -381,7 +398,9 @@ directly.
 
 ## Looking above the pile row
 
-The search so far has started from the circle on the sheet, and that circle
+One question remains before the design can be trusted: did the search look
+everywhere it should? Every search so far started from the circle on the
+sheet, and that circle
 reaches the rigid base. **Grid search (auto-seed the circular search)** ignores
 the circles sheet and sweeps a grid of centers against a range of tangent
 elevations instead ([LEM-10](lem10_global_minimum.md#grid-search) is where that
@@ -394,8 +413,9 @@ Run again:
 ![Spencer with grid seeding](images/lem12_solution_bypass.png){width=1000}
 
 **FS = 1.702**, below the 1.842 the seeded search reported, on a surface that
-never engages the piles. It daylights — cuts back up to the ground
-surface — at (10.00, 10.00), the head of the upper shaft — runs back to the crest at x = 24.3, and is 6.5 ft deep at its deepest,
+never engages the piles. It daylights (cuts back up to the ground surface)
+at (10.00, 10.00), the head of the upper shaft, runs back to the crest at
+x = 24.3, and is 6.5 ft deep at its deepest,
 moving 6,867 lb/ft. The depth from the ground surface to the failure surface at
 the pile is zero, so the Ito & Matsui integral over that depth is zero: the whole
 pile row contributes **0.04 lb/ft** to a surface that slides over the top of it.

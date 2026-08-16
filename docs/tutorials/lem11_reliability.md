@@ -500,6 +500,15 @@ the unit weight is twice as powerful — but the cohesion is uncertain over an
 interval nearly four times wider, and because each contribution enters the
 variance squared, the wider interval wins.
 
+The Pareto is Taylor-series arithmetic, and it runs its own five solves no
+matter which reliability engine was used last. It is not the only way to ask
+the question: the same **Plot type** list offers `MC rank correlation`,
+which runs a Monte Carlo campaign and ranks the parameters by how strongly
+each sampled input tracks the factor of safety across all the realizations.
+On this model it returns the same verdict — cohesion at a correlation of
++0.86, unit weight at −0.46 (heavier slope, lower factor of safety) — so the
+cheap plot and the sampled one agree about what matters.
+
 Three quarters of the uncertainty in the answer is therefore in one number, and
 that number is the one further site investigation would narrow. Another round of
 undrained testing on this clay would buy a smaller s(c) and nothing else.

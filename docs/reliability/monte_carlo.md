@@ -149,8 +149,7 @@ $P_f$ near 17% is known to ±1.6 percentage points after 2,000 realizations, ±0
 after 10,000, and reaching ±0.01 would take about **53 million** real
 factor-of-safety solves — a day of limit-equilibrium solving for one number.
 
-The **response surface** engine — `reliability_rs`, or `reliability(...,
-engine='rs')` — takes the count out of the cost. It fits a quadratic surrogate to a
+The **response surface** engine — `reliability_rs`, or `reliability(..., engine='rs')` — takes the count out of the cost. It fits a quadratic surrogate to a
 few dozen real solves and samples that surrogate ten million times, which moves the
 error budget from sampling noise, which no longer registers, to the fit, which is
 measured and reported. Everything else is the campaign above: the same fixed

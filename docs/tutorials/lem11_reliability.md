@@ -297,8 +297,8 @@ cut into equal-probability bins and exactly one draw is taken from each, so
 the whole range is covered by construction. Exploring the parameter space
 more evenly extracts the same information from fewer runs: measured on this
 model, a Latin hypercube campaign matches the precision of a random one
-roughly three times its size
-([Monte Carlo](../reliability/monte_carlo.md) shows the measurement).
+roughly three times its size; the measurement is documented on the
+[Monte Carlo documentation page](../reliability/monte_carlo.md).
 
 **Stop when P_f converges** ends the campaign early once the probability of
 failure is known to within a stated percentage of its own value — ±5% of a

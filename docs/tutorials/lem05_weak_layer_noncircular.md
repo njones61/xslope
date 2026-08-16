@@ -305,8 +305,7 @@ Start with **File → New** and work down the **Inputs** tree.
 
 Click **Materials**, and in **Table view** press **Add row** four times and
 enter (or copy-paste) the four soils in the order the table above lists them —
-the row order is what fixes the Mat IDs. The seam is the row to check: `Soft
-Clay` is the only one carrying cohesion, and the only one whose `u` is `none`:
+the row order is what fixes the Mat IDs. The seam is the row to check: `Soft Clay` is the only one carrying cohesion, and the only one whose `u` is `none`:
 
 ![The materials editor on this problem's four soils](images/lem05_studio_materials.png){width=1000}
 

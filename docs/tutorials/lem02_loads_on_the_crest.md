@@ -19,7 +19,7 @@ input, and it is the one that decides the answer.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Load an existing model four ways — spread over an area, gathered
+**Learning objectives** — Load an existing model four ways — spread over an area, gathered
 onto a point, pushed perpendicular to the ground or straight down, and shaken —
 read what each does to the factor of safety and to the critical surface, then run
 the sweep that says what strength would carry the load at a target factor of

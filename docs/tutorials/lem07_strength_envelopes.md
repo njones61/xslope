@@ -21,7 +21,7 @@ firmly as the geometry does.**
 <div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~15 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Open a completed model carrying a non-linear strength
+**Learning objectives** — Open a completed model carrying a non-linear strength
 envelope, run it, and then swap the strength option for the linear fit of the
 same data and watch the factor of safety and the critical surface both change
 (Part A); and read a strength that varies with elevation, replace it with a

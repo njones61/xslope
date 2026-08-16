@@ -18,7 +18,7 @@ friction angle — a **total-stress undrained** strength.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>25–30 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build the embankment from scratch — the smallest complete XSLOPE
+**Learning objectives** — Build the embankment from scratch — the smallest complete XSLOPE
 model — find its critical circular failure surface with Spencer's method, and read
 the results carefully enough to catch what the first model gets wrong.
 </div>

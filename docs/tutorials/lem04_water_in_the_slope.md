@@ -21,7 +21,7 @@ off and 1.301 with them on.**
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build a layered section whose materials read their pore
+**Learning objectives** — Build a layered section whose materials read their pore
 pressure from a piezometric line, search it for the critical circle, and hold
 that circle while the water assumptions change around it: the line and the u it
 produces on every slice base, the two unit-weight columns and the weight they

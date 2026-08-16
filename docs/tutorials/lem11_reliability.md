@@ -41,7 +41,7 @@ it.**
 <div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~15 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Read the standard-deviation columns a reliability analysis runs
+**Learning objectives** — Read the standard-deviation columns a reliability analysis runs
 on, estimate the reliability index and probability of failure two ways — the
 Taylor series over 1 + 2N searches and a 10,000-realization Monte Carlo campaign
 — on one model and one surface, measure which of the two uncertainties actually

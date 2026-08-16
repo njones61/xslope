@@ -23,7 +23,7 @@ S. G. Wright's educational version of UTEXAS.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Enter soil reinforcement as lines carrying a tensile capacity,
+**Learning objectives** — Enter soil reinforcement as lines carrying a tensile capacity,
 with the pullout length that develops it and the support type that sets how its
 force acts; search the reinforced section for its critical circle; and read the
 result against the same slope with the lines taken out, against the force each

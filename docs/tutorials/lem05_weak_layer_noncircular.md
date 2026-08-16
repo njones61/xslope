@@ -20,7 +20,7 @@ flat along a seam — so the failure surface is entered as a list of points.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build a four-layer section with a weak seam and a water table,
+**Learning objectives** — Build a four-layer section with a weak seam and a water table,
 enter its failure surface as a table of vertices rather than a circle, and search
 it: read where the search moved each vertex and why, which methods support a
 non-circular surface at all, how steep an end ramp a search will start from, and

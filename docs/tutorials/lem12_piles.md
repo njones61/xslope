@@ -21,7 +21,7 @@ recompute it for every trial surface the search tries.
 <div class="tgt-tile"><span class="tg-label">Open &amp; explore</span><p>~15 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Model two rows of drilled shafts whose lateral force XSLOPE
+**Learning objectives** — Model two rows of drilled shafts whose lateral force XSLOPE
 computes by the Ito & Matsui method, find the computed force in the analysis
 report, measure what the piles are worth and what widening their spacing
 costs, see the shafts' moment capacity reduce the soil force to a fifth of

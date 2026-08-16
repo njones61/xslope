@@ -247,10 +247,9 @@ probability of failure is a count, and a count is only as sharp as the pile
 it comes from: with roughly one realization in six failing here, 10,000 of
 them pin P<sub>f</sub> to well under a percentage point. The occasion to
 change it is a *rarer* failure — a P<sub>f</sub> of a couple percent puts
-only a couple hundred failures in the pile, and resolving it to the same
-relative precision takes several times more realizations. Raising the count
-costs only time; lowering it below the default rarely buys enough time to be
-worth the blur. The cleanest habit is to let the campaign size itself: tick
+only a couple hundred failures in the pile, and pinning it down as tightly
+takes several times more realizations. Raising the count costs only time;
+lowering it saves little and costs precision. The cleanest habit is to let the campaign size itself: tick
 the convergence stop described below, and this field becomes the cap rather
 than the count.
 
@@ -263,7 +262,7 @@ two or three other seeds, and P<sub>f</sub> should wobble only in its last
 digits. If a conclusion flips when the seed changes, it was resting on too
 few realizations — the fix is more samples, not a better seed.
 
-**MC distribution** `Normal` sets the shape each σ is read as. `Normal` draws
+**MC distribution** `Normal` sets the shape of the spread each σ describes. `Normal` draws
 from the symmetric bell curve centered on the material's own value with the σ
 column as its spread — the same reading the Taylor series gives those
 columns. The alternative, `Lognormal`, is a skewed relative of the bell curve
@@ -280,8 +279,9 @@ with one draw per bin, which the
 times the information per realization on this model.
 
 **Stop when P_f converges** ends the campaign early once the probability of
-failure is known to a stated fraction of itself — at the default ±5%, this
-model stops at 7,600 realizations — with the samples field as the cap; the
+failure is known to within a stated percentage of its own value — ±5% of a
+17% answer means trusted between about 16% and 18%, which this model reaches
+at 7,600 realizations — with the samples field as the cap; the
 [Monte Carlo page](../reliability/monte_carlo.md) gives the rule and its
 convergence plot. Leave it unticked here, and **Run**.
 

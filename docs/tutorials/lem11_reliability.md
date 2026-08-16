@@ -531,6 +531,12 @@ exactly that.
 
 ### Halve it
 
+Suppose that second round of testing came back and cut the uncertainty in
+the undrained strength in half: the cohesion is still 400 psf, but it is now
+known to ±50 instead of ±100. The model can price that outcome before any
+samples are taken — enter the smaller σ, run the reliability again, and see
+what the testing program would buy.
+
 Open **Materials**, select the clay, and change the **± σ** beside **c** from
 `100` to `50`. In the table view — and on the mat sheet — this is the second cell
 of the two-column **Standard Deviations** block:

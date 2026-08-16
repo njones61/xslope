@@ -327,13 +327,27 @@ draw.
 
 ## The response surface
 
-Ten thousand real solves resolved P<sub>f</sub> to about ±0.7 percentage
-points. The third engine gets rid of the count altogether: it solves the real
-model a **handful** of times, fits a quadratic to those answers, and samples
-the fitted surface ten million times — arithmetic, not solves. Open
-**Reliability…** once more and set **Method** to `Response surface (RS)`; the
-sample count and convergence stop gray out, because a surrogate's realizations
-are nearly free:
+Monte Carlo's answer still carries a sampling wobble. The 16.71% rests on a
+count — 1,671 failing realizations — and rerunning with different seeds moves
+that count; at 10,000 realizations, P<sub>f</sub> can land anywhere in a band
+about ±0.7 percentage points wide (the same statistical band the convergence
+stop watches). The only way to shrink it is more solves.
+
+The third engine takes a different route to the same answer. Instead of
+solving the real model for every realization, it solves it a **handful** of
+times at chosen combinations of the uncertain parameters — the mean values,
+plus points one and two standard deviations out in each direction — and fits
+a smooth curved formula through those answers. That formula becomes a
+stand-in for the solver: hand it any unit weight and cohesion and it predicts
+the factor of safety instantly. The Monte Carlo campaign then runs on the
+*formula* — ten million realizations, each one arithmetic rather than a
+solve — and the counting wobble all but disappears. What is left is a new
+question, whether the formula faithfully reproduces the real model, and the
+engine spends most of its real solves answering exactly that.
+
+Open **Reliability…** once more and set **Method** to `Response surface
+(RS)`; the sample count and convergence stop gray out, because realizations
+on the formula are nearly free:
 
 ![The Reliability dialog on the response surface](images/lem11_studio_reliability_rs.png)
 

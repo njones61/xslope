@@ -532,10 +532,9 @@ how hard it leans. The next section does exactly that.
 
 ### Halving σ(c)
 
-Ask the what-if directly: with the cohesion still 400 psf but its spread
-set to 50 instead of 100, how much does the reliability move? One cell
-changes, the run repeats, and the size of the move measures how sensitive
-the results are to the σ estimate.
+How much do the results depend on the value of σ(c)? The quickest way to
+find out is to change it and re-run. Set the spread to 50 instead of 100,
+leave the cohesion itself at 400 psf, and compare.
 
 Open **Materials**, select the clay, and change the **± σ** beside **c** from
 `100` to `50`. In the table view — and on the mat sheet — this is the second cell

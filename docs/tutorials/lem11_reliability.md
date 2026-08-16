@@ -319,9 +319,10 @@ safety — the actual distribution of FS, not an assumed shape:
 
 ![The Monte Carlo FS histogram](images/lem11_mc.png){width=1000}
 
-**Mean FS = 1.381, σ<sub>F</sub> = 0.402**, and the shaded tail left of the
-FS = 1 line holds **1,642 of the 10,000 realizations — P<sub>f</sub> = 16.42%**,
-counted rather than inferred. The reliability index comes in two conventions:
+**Mean FS = 1.381, σ<sub>F</sub> = 0.402**, and the shaded region left of
+the FS = 1 line — the **tail** of the distribution, where the unlucky
+combinations of draws landed — holds **1,642 of the 10,000 realizations —
+P<sub>f</sub> = 16.42%**, counted rather than inferred. The reliability index comes in two conventions:
 β<sub>normal</sub> = (F̄ − 1)/σ<sub>F</sub> = **0.947**, and the lognormal
 β<sub>LN</sub> = **0.988** computed from the same sample moments as the Taylor
 series uses.
@@ -660,7 +661,8 @@ This tutorial demonstrated:
 - The response surface reaching the same answer from **710 real solves** —
   P<sub>f</sub> = 16.6% with its fit credentials printed beside it — and the
   three-engine habit: screen with the Taylor series, decide with Monte Carlo,
-  bring in the response surface when the tail is the question.
+  bring in the response surface when the probability of failure is too
+  small to count affordably.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Reliability Analysis](../reliability/index.md) gives the theory and the equation

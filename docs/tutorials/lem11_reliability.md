@@ -168,9 +168,7 @@ every solve evaluates the first circle on the circles sheet instead — the
 same surface a `Single surface` run solves — which is the right mode when
 the surface itself is prescribed, as on a published benchmark's circle, an
 observed failure surface, or a bedding-controlled plane, where the question
-is that surface's own reliability. The checkbox restates
-itself when the engine changes, because the sampling engines answer the
-question differently — watch its label in the Monte Carlo step below. Below the controls, **Standard deviations in
+is that surface's own reliability. Below the controls, **Standard deviations in
 this file** lists what the run will actually vary — `mat:soil:c = 400 ± 100
 (COV 25%)` and `mat:soil:gamma = 120 ± 8 (COV 7%)`. If that box says no standard
 deviations are set, **Run** is disabled; a reliability analysis with nothing

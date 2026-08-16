@@ -255,7 +255,9 @@ controls below the surface options come live:
 ![The Reliability dialog on Monte Carlo](images/lem11_studio_reliability_mc.png)
 
 The search checkbox now reads **Search for the critical surface at the mean
-values** — the once-at-most search described above.
+values** — the once-at-most search described above. Unticked, there is no
+search at all: every realization is solved on the first circle on the
+circles sheet, the same surface a `Single surface` run uses.
 
 **MC samples** `10000` is the number of realizations — how many versions of
 the slope will be built and solved. Ten thousand is the default because the

@@ -140,8 +140,9 @@ the σ columns into a reliability index. Open it and leave the **Method** on
 ![The Reliability dialog on the Taylor series](images/lem11_studio_reliability_taylor.png)
 
 The search is not done once. The Taylor series solves the model 1 + 2N
-times — once at the most-likely values, then twice more for each uncertain
-parameter, at MLV + σ and at MLV − σ — and with **Search for the critical
+times — once at the most-likely values (MLV, the values entered on the mat
+sheet), then twice more for each uncertain parameter, at MLV + σ and at
+MLV − σ — and with **Search for the critical
 surface at each solve (MLV and MLV ± σ)** ticked, that is exactly what
 happens: **every one of those solves is a fresh search**, each perturbed
 model finding its own critical surface. Leave it ticked here. Unticked,

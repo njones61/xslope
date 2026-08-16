@@ -443,14 +443,17 @@ P<sub>f</sub> = Φ(−β) and the two always move together:
 | Monte Carlo, 10,000 samples (random) | 1.381 | 0.408 | 0.969 (lognormal) | 16.71% (counted) |
 | Response surface, 10⁷ formula realizations | 1.381 | 0.400 | 0.997 (lognormal) | 16.57% (counted on the formula) |
 
-Which one should be quoted? β is the steadier of the two. The two numbers
-always move together, but not at the same rate: β = 0.935 corresponds to
-P<sub>f</sub> = 17.5%, β = 2 to 2.3%, and β = 3 to 0.13%. For a safe slope,
-a small shift in β changes P<sub>f</sub> by a large fraction of its own
-value, so two analyses that barely disagree about β can look far apart on
-P<sub>f</sub>.
+Of the two, P<sub>f</sub> is the one that communicates. A one-in-six chance
+of failure means something to a client, a review board, or the public; a
+reliability index does not. β plays a narrower, more technical role — it is
+the number reliability-based design manuals set targets with — and its
+convenience is that it stays numerically steady where a small
+P<sub>f</sub> becomes awkward to write down. The two always move together,
+but not at the same rate: β = 0.935 corresponds to P<sub>f</sub> = 17.5%,
+β = 2 to 2.3%, and β = 3 to 0.13%, so for a safe slope two analyses that
+barely disagree about β can look far apart on P<sub>f</sub>.
 
-For Monte Carlo there is a second, practical reason: a counted probability
+Monte Carlo adds a practical wrinkle to a small P<sub>f</sub>: a counted probability
 can only be as fine as the count behind it. With 10,000 realizations, each
 one represents 0.01 percentage points of probability — one part in ten
 thousand. This model's 16.42% is a count of 1,642 failed realizations, which

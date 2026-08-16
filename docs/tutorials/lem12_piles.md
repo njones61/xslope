@@ -62,8 +62,8 @@ it beside the bar.
 
 Open **Piles** in the **Inputs** tree and press **Table view**. Its columns are
 the piles worksheet's, minus the `θp` Studio derives from the pile's endpoints,
-and with **Show parameters for:** on **LEM** only the finite element tail
-(`E`, `I`, `Area`, `Fixity`) is out of the way:
+and — with **Show parameters for:** set to **LEM** — the columns only the
+finite element engine reads (`E`, `I`, `Area`, `Fixity`) are hidden:
 
 ![The two pile rows as the file carries them](images/lem12_studio_piles_table.png)
 
@@ -78,10 +78,13 @@ endpoints are what this page is about:
 **H is empty on both rows, and that is what selects the Ito & Matsui
 calculation.** With `H` blank and a diameter `D` and spacing `S` given, XSLOPE
 computes the force itself; with a number in `H`, that number is used instead.
-`θp` is the angle of the pile force from horizontal and is left empty, so the
-force is horizontal — the usual case for a stabilizing pile — and a blank `Appl`
-means `active`: the force is applied as it stands rather than divided by the
-factor of safety.
+`θp` is the angle of the pile force from horizontal. Left empty, it defaults
+to perpendicular to the pile's own axis — for these vertical shafts,
+horizontal, the usual case for a stabilizing pile. A blank `Appl` means
+`active`: the force enters the equilibrium equations as it stands. The
+alternative, `passive`, treats the force as a resistance and divides it by
+the factor of safety, so the support carries the same margin as the soil
+strength.
 
 **Vcap and Mcap are properties of one shaft**, not of a foot of slope: 46,000 lb
 of shear capacity and 60,000 ft·lb of moment capacity, consistent with a 2 ft
@@ -312,8 +315,8 @@ answer somewhere else entirely:
 on: it leaves the toe, reaches 10.1 ft below the ground at its deepest, exits
 8.5 ft behind the crest, and carries 20,525 lb/ft against the deep surface's
 62,198. Weakening the pile row hands the slope back to a
-mechanism the piles were holding, which is why a spacing study is run as
-searches once the held sweep has shown the trend.
+mechanism the piles were holding — which is why the held sweep is for reading
+the trend, and any spacing actually being considered gets its own search.
 [VP106](../verification/rocscience.md#vp106) is this same sweep on Cai & Ugai's
 pile-reinforced slope, at four spacings, with the computed forces checked against
 Slide2 and against the paper.

@@ -472,7 +472,11 @@ assumed distribution shape — free, but only as good as the assumption.
 
 ## Which uncertainty is worth reducing
 
-σ<sub>F</sub> = 0.389 is built from two contributions, and they are not equal.
+The Taylor series put the spread of the factor of safety at
+σ<sub>F</sub> = 0.389. That spread comes from two sources — the uncertainty
+in the unit weight and the uncertainty in the cohesion — and they do not
+contribute equally. Knowing the split is worth money: it says which
+parameter another round of testing should chase.
 The **Parametric…** dialog computes the split: set **Method** to `Spencer` and
 **Plot type** to `Variance Pareto (σ)`, which is offered only for a model that
 carries standard deviations. The sweep table below it stays empty — this plot

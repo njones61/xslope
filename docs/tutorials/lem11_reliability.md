@@ -303,7 +303,10 @@ roughly three times its size; the measurement is documented on the
 **Stop when P_f converges** ends the campaign early once the probability of
 failure is known to within a stated percentage of its own value — ±5% of a
 17% answer means trusted between about 16% and 18%, which this model reaches
-at 7,600 realizations — with the samples field as the cap; the
+at 7,600 realizations — with the samples field as the cap. The tolerance
+sets the cost, and steeply: halving it takes four times the realizations, so
+±2.5% on this model would need roughly 30,000 — when tightening the
+tolerance, raise the samples cap to match. The
 [Monte Carlo page](../reliability/monte_carlo.md) gives the rule and its
 convergence plot. Leave it unticked here, and **Run**.
 

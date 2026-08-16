@@ -5,12 +5,13 @@ description: "A 20 ft clay slope stabilized by two rows of drilled shafts in XSL
 
 # Tutorial LEM-12 — Piles
 
-A 20 ft slope in medium-stiff clay that stands at a factor of safety of 1.149 on
-its own, with two rows of 2 ft drilled shafts through the face bringing it to
-1.842. The pile force is not entered anywhere in this model. The force
-column is left blank, which tells XSLOPE to compute the lateral force the
-soil can push onto each pile — from the pile diameter and the
-center-to-center spacing, by the Ito & Matsui (1975) method — and to
+This tutorial shows how to model stabilizing piles in a limit equilibrium
+analysis. The example is a 20 ft slope in medium-stiff clay that stands at a
+factor of safety of 1.149 on its own; two rows of 2 ft drilled shafts
+through the face bring it to 1.842. The pile force is not entered anywhere
+in the model. The force column is left blank, which tells XSLOPE to compute
+the lateral force the soil can push onto each pile — from the pile diameter
+and the center-to-center spacing, by the Ito & Matsui (1975) method — and to
 recompute it for every trial surface the search tries.
 
 

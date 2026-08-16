@@ -601,15 +601,16 @@ not, so the choice is about cost and about what is being asked.
   summarizes F by how it changes near the mean values, and everything above
   shows what that discards (the bend in the γ response) and what it keeps
   (the ranking, the variance, β itself).
-- **Monte Carlo** is the reference: nothing assumed about the shape of F, the
-  tail counted rather than fitted. The convergence stop sets its cost to the
-  resolution actually asked, and its default Latin hypercube sampling
-  stretches each solve about three-fold over purely random draws. It is the engine to reach for when the straight-line shortcut
-  breaks — a coefficient of variation so large that x − σ is not a physical
-  value ([VP34](../verification/rocscience.md#vp34), a fill whose friction
-  angle carries a 124% COV), a response that bends strongly, or a tail that
-  must be counted rather than fitted — and it is the tie-breaker when the
-  other two disagree.
+- **Monte Carlo** is the reference answer. It assumes nothing about how the
+  factor of safety is distributed — it solves the model ten thousand times
+  and counts. The convergence stop keeps the run no longer than the answer
+  requires, and the default Latin hypercube sampling makes each solve count
+  for roughly three. Reach for it when the Taylor series' straight-line
+  treatment cannot hold: an uncertainty so large that the mean minus one σ
+  is not a physical value ([VP34](../verification/rocscience.md#vp34) is a
+  fill whose friction angle carries a 124% COV, so φ − σ is negative), or a
+  response that bends strongly. And when the other two engines disagree,
+  this is the one that settles it.
 - **The response surface** is the precision instrument: tail resolution no
   count can afford, for a few hundred real solves — *when its self-checks
   pass*. It refuses exactly the models Monte Carlo exists for (on

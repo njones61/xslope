@@ -596,11 +596,11 @@ not, so the choice is about cost and about what is being asked.
 | Monte Carlo | 2,000–10,000 | the whole distribution; P<sub>f</sub> *counted* | only the input distributions |
 | Response surface | ~710 | MC-grade statistics with sampling error removed | F fits a curved formula — an assumption it checks |
 
-- **The Taylor series** is the screen: five solves, seconds, and the engine
-  behind both the variance Pareto and the finite-element reliability path. It
-  summarizes F by how it changes near the mean values, and everything above
-  shows what that discards (the bend in the γ response) and what it keeps
-  (the ranking, the variance, β itself).
+- **The Taylor series** is the quick first look: five solves, a few seconds,
+  and it also powers the variance Pareto and the finite-element reliability
+  path. Its straight-line treatment misses some detail — the bend in the γ
+  response, on this model — but it gets the ranking, the variance, and β
+  close enough to steer the rest of the work.
 - **Monte Carlo** is the reference answer. It assumes nothing about how the
   factor of safety is distributed — it solves the model ten thousand times
   and counts. The convergence stop keeps the run no longer than the answer
@@ -611,20 +611,20 @@ not, so the choice is about cost and about what is being asked.
   fill whose friction angle carries a 124% COV, so φ − σ is negative), or a
   response that bends strongly. And when the other two engines disagree,
   this is the one that settles it.
-- **The response surface** is the precision instrument: tail resolution no
-  count can afford, for a few hundred real solves — *when its self-checks
-  pass*. It refuses exactly the models Monte Carlo exists for (on
-  [VP34](../verification/rocscience.md#vp34) the checks find that a third of
-  the formula's predicted failures have no real solution, so the engine
-  declines to answer), and its β differs from Monte Carlo's in the third
-  decimal because the fitted formula slightly narrows the spread
-  σ<sub>F</sub>. Quote its P<sub>f</sub> together with the fit-quality
-  numbers it prints beside it.
+- **The response surface** is for probabilities too small to count: it
+  reaches resolution no affordable number of real solves could, for a few
+  hundred of them — *when its self-checks pass*. It refuses the models it
+  cannot fit honestly (on [VP34](../verification/rocscience.md#vp34) the
+  checks find that a third of the formula's predicted failures have no real
+  solution, so the engine declines to answer), and its β differs from Monte
+  Carlo's only in the third decimal. Quote its P<sub>f</sub> together with
+  the fit-quality numbers it prints beside it.
 
-A working habit: screen with the Taylor series, decide with Monte Carlo at the
-default convergence stop, and reach for the response surface when the tail
-itself is the question — checking it against a Monte Carlo run once, since the
-two sampling engines share their draws by construction.
+A working habit: start with the Taylor series, decide with Monte Carlo at
+the default convergence stop, and bring in the response surface when the
+probability of failure is too small for counting to be affordable — checking
+it against a Monte Carlo run once, since the two sampling engines draw the
+same realizations.
 
 No engine randomizes the failure surface — the slip surface is a decision, not
 a random variable. The Taylor series searches at every one of its 1 + 2N

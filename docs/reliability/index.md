@@ -163,7 +163,8 @@ codes do reliability by direct **Monte Carlo**: Rocscience **Slide2** and GeoStu
 distributions, evaluate the factor of safety of each realization, and report the
 probability of failure as the fraction of realizations with FoS < 1 — the same
 fixed-surface campaign as xslope's `reliability_mc`. Both offer **Latin Hypercube**
-sampling as a more efficient alternative to plain Monte Carlo (SLOPE/W added it in
+sampling as a more efficient alternative to plain Monte Carlo — the same sampling
+`reliability_mc` uses by default (SLOPE/W added it in
 GeoStudio 2024.1), and Slide2 adds a machine-learning **response surface** to
 accelerate the sampling and a **spatial-variability** (random-field) mode
 ([Slide2 Probabilistic Analysis](https://www.rocscience.com/help/slide2/documentation/slide-model/project-settings/statistics/probabilistic-analysis);

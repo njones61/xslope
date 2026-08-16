@@ -2205,14 +2205,15 @@ class ReliabilityDialog(QDialog):
         self.distribution = self._combo(MC_DISTRIBUTIONS,
                                         defaults.get("distribution", "normal"))
         self.mc_sampling = self._combo(
-            [("Random", "random"), ("Latin hypercube", "lhs")],
-            defaults.get("sampling", "random"))
+            [("lhs", "Latin hypercube"), ("random", "Random")],
+            defaults.get("sampling", "lhs"))
         self.mc_sampling.setToolTip(
-            "How realizations are drawn. Latin hypercube stratifies each "
-            "parameter into equal-probability bins (one draw per bin), which "
-            "reduces sampling scatter for the same count; draws stay "
-            "reproducible under the fixed seed. The convergence stop's "
-            "confidence band assumes independent draws, so under LHS it errs "
+            "How realizations are drawn. Latin hypercube (the default) "
+            "stratifies each parameter into equal-probability bins (one draw "
+            "per bin), which reduces sampling scatter for the same count; "
+            "draws stay reproducible under the fixed seed. Random draws every "
+            "value independently. The convergence stop's confidence band "
+            "assumes independent draws, so under Latin hypercube it errs "
             "conservative.")
         # Statistical-convergence stopping (off by default): check the empirical
         # P_f every 100 realizations and stop when its 95% confidence half-width

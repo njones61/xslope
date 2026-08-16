@@ -68,13 +68,13 @@ verifiable.
 <!-- test: file=files/rocscience/vp038c.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.413, benchmark=VP38-h63 -->
 <!-- test: file=files/rocscience/vp028a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.129, benchmark=VP28a -->
 <!-- test: file=files/rocscience/vp028a.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.768, tolerance=0.03, benchmark=VP28a-beta -->
-<!-- test: file=files/rocscience/vp028a.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.761, tolerance=0.02, expected_pf=0.219, pf_tol=0.02, benchmark=VP28a-mc -->
+<!-- test: file=files/rocscience/vp028a.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.774, tolerance=0.02, expected_pf=0.215, pf_tol=0.02, benchmark=VP28a-mc -->
 <!-- test: file=files/rocscience/vp028b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.158, benchmark=VP28b -->
 <!-- test: file=files/rocscience/vp028b.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.787, tolerance=0.03, benchmark=VP28b-beta -->
-<!-- test: file=files/rocscience/vp028b.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.794, tolerance=0.02, expected_pf=0.208, pf_tol=0.02, benchmark=VP28b-mc -->
+<!-- test: file=files/rocscience/vp028b.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.800, tolerance=0.02, expected_pf=0.206, pf_tol=0.02, benchmark=VP28b-mc -->
 <!-- test: file=files/rocscience/vp028c.xlsx, type=single_circle, num_slices=60, fs_bishop=1.177, benchmark=VP28c -->
 <!-- test: file=files/rocscience/vp028c.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.798, tolerance=0.03, benchmark=VP28c-beta -->
-<!-- test: file=files/rocscience/vp028c.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.783, tolerance=0.02, expected_pf=0.211, pf_tol=0.02, benchmark=VP28c-mc -->
+<!-- test: file=files/rocscience/vp028c.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.789, tolerance=0.02, expected_pf=0.209, pf_tol=0.02, benchmark=VP28c-mc -->
 <!-- test: file=files/rocscience/vp029.xlsx, type=single_circle, num_slices=60, fs_spencer=1.145, fs_mprice=1.145, benchmark=VP29-det -->
 <!-- test: file=files/rocscience/vp029.xlsx, type=reliability, method=spencer, circular=true, search=false, expected_beta=0.936, tolerance=0.03, benchmark=VP29-beta -->
 <!-- test: file=files/rocscience/vp030a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.679, benchmark=VP30a -->
@@ -953,15 +953,15 @@ method, and reliability uses the Taylor-series procedure on the same surfaces.
 
 | Case | XSLOPE FS | Slide FS | C&X FS | XSLOPE TSPM β_ln / PF | XSLOPE MC β_ln / PF | Slide RI_ln / MC PF (cross-estimator) | C&X PF (cross-estimator) |
 |---|---|---|---|---|---|---|---|
-| Congress St., tangent clay-2 base | 1.129 | 1.128 (+0.1%) | 1.128 (+0.1%) | 0.768 / 22.1% | 0.761 / 21.9% | 0.650 / 24.6% | 26.6% |
-| Embankment, tangent interface | 1.158 | 1.160 (−0.2%) | 1.1625 (−0.4%) | 0.787 / 21.6% | 0.794 / 20.8% | 0.799 / 21.2% | 20.2% |
-| Embankment, tangent foundation base | 1.177 | 1.185 (−0.7%) | 1.1479 (+2.5%) | 0.798 / 21.2% | 0.783 / 21.1% | 0.820 / 19.9% | 19.7% |
+| Congress St., tangent clay-2 base | 1.129 | 1.128 (+0.1%) | 1.128 (+0.1%) | 0.768 / 22.1% | 0.774 / 21.5% | 0.650 / 24.6% | 26.6% |
+| Embankment, tangent interface | 1.158 | 1.160 (−0.2%) | 1.1625 (−0.4%) | 0.787 / 21.6% | 0.800 / 20.6% | 0.799 / 21.2% | 20.2% |
+| Embankment, tangent foundation base | 1.177 | 1.185 (−0.7%) | 1.1479 (+2.5%) | 0.798 / 21.2% | 0.789 / 20.9% | 0.820 / 19.9% | 19.7% |
 
 The **XSLOPE MC** column is a 10,000-sample Monte Carlo run on the same fixed circles and the
 same normal input distributions the Taylor series uses (seeded, so the values are
 regression-locked). It separates the estimator from the inputs in the cross-source
 disagreement below: XSLOPE's Taylor series and Monte Carlo, given identical inputs, land on
-top of each other — σ_F 0.163 vs 0.164 and β_ln 0.768 vs 0.761 on the Congress St. circle, and
+top of each other — σ_F 0.163 vs 0.162 and β_ln 0.768 vs 0.774 on the Congress St. circle, and
 within ±0.015 of β_ln on all three cases.
 
 *Input provenance — the vendor SLOPE/W model settles it.* C&X's paper states no unit
@@ -1253,8 +1253,8 @@ and Slide's Monte-Carlo 3.55×10⁻³ — the two published values themselves di
 the estimator choice. Monte Carlo is the right tool past that boundary, and XSLOPE's
 `reliability_mc` carries it: sampling each parameter normally and truncating
 the negative φ draws at zero — exactly the φ ≥ 0 bound the published samplers apply —
-a 10,000-sample run on W&H's noncircular surface (Spencer) returns a mean FS of 2.54,
-σ_F ≈ 0.81, and an empirical probability of failure of about 2% (2–3% depending on
+a 10,000-sample run on W&H's noncircular surface (Spencer) returns a mean FS of 2.53,
+σ_F ≈ 0.80, and an empirical probability of failure of about 1.5% (1.5–2.7% depending on
 whether the ~1% of realizations whose extreme low-strength draws drive Spencer to
 non-convergence are counted as failures). That lands inside the 0.36%–6.2% band the
 three published estimates span, so the case is reproducible once the estimator

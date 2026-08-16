@@ -42,11 +42,12 @@ samples), but the empirical probability of failure — a count of the tail — c
 more slowly, so a small $P_f$ needs more samples to resolve. Increase `n_samples`
 until the reported $P_f$ is stable to the precision you need.
 
-**Sampling: random or Latin hypercube.** Realizations are drawn either
-independently (**Random**, the default) or by **Latin hypercube**: each
-parameter's distribution is cut into $n$ equal-probability bins with exactly one
-draw per bin, so the sample covers the distribution by construction instead of
-by luck. Both run through the same inverse CDFs, truncations and fixed seed.
+**Sampling: Latin hypercube or random.** Realizations are drawn by **Latin
+hypercube** (the default): each parameter's distribution is cut into $n$
+equal-probability bins with exactly one draw per bin, so the sample covers the
+distribution by construction instead of by luck. `sampling='random'` draws
+every value independently instead. Both run through the same inverse CDFs,
+truncations and fixed seed.
 The difference is visible in the draws themselves — the same two
 distributions, one seed each:
 
@@ -55,7 +56,7 @@ distributions, one seed each:
 Measured on the submerged-slope model (twenty repeated 1,000-realization
 campaigns), Latin hypercube cut the across-campaign scatter of $P_f$ by a
 factor of 1.84 — the information of roughly **3.4×** the sample count for the
-same cost. One interaction to know: the convergence stop's confidence band
+same cost, which is why it is the default. One interaction to know: the convergence stop's confidence band
 assumes independent draws, so under Latin hypercube it overstates the
 uncertainty and the stop errs conservative — a converged LHS campaign is at
 least as resolved as its band claims.
@@ -91,8 +92,8 @@ the stated fraction **of itself** (default ±5%), with the sample count as the
 cap. The tolerance is relative because an absolute one is miscalibrated across
 the $P_f$ range: half a percentage point is ±3% of a 17% probability of
 failure but ±25% of a 2% one. Relative, the demanded sample count self-scales
-as $(1-p)/p$ — the submerged-slope model below converges at the default ±5% in about
-7,600 realizations at $P_f \approx 17$% (18 s), and the same rule would ask
+as $(1-p)/p$ — the submerged-slope model below converges at the default ±5% in
+8,000 realizations at $P_f \approx 16$% (18 s), and the same rule would ask
 roughly 75,000 of a 2% problem — raise the sample cap when a small $P_f$
 meets a tight tolerance. The rule never fires before 500 realizations or before
 10 failures have been observed, so a rare-event problem — where the normal
@@ -104,7 +105,7 @@ stopping $n$ and its achieved resolution in the console summary.
 
 The running estimate and its confidence band can be read off any Monte Carlo
 result with `plot_reliability_convergence` — the sample-15 campaign, drawn in
-full with the ±5% stop target it satisfies at n = 7,600:
+full with the ±5% stop target it satisfies at n = 8,000:
 
 ![Running P_f with its 95% confidence band](images/mc_convergence_trace.png)
 
@@ -132,8 +133,8 @@ plot_reliability_histogram(result)
 ![Monte Carlo FS distribution — VP34 Phase I fill, COV(phi) = 124%](images/reliability_mc_vp034.png){width=800}
 
 The distribution is strongly right-skewed, the signature of a large-COV input pushed
-through a nonlinear factor-of-safety response: mean FS = 2.542, $\sigma_F$ = 0.809,
-and an empirical probability of failure of 1.94% (9,874 of the 10,000 draws
+through a nonlinear factor-of-safety response: mean FS = 2.532, $\sigma_F$ = 0.801,
+and an empirical probability of failure of 1.49% (9,880 of the 10,000 draws
 converged to a valid Spencer solution; the rest are excluded rather than counted as
 failures). That lands inside the 0.36%–6.2% band spanned by the three published
 estimates for this problem — a case the Taylor series simply has no number for (see
@@ -201,7 +202,7 @@ Both thresholds are calibrated against what the fit error costs the answer, meas
 by solving tens of thousands of realizations for real and predicting the same draws
 with the surrogate. On the submerged-slope model below the surrogate fits to 0.042
 of the real spread ($R^2$ = 0.9982) and its probability of failure differs from the
-solver's, over the same 30,000 realizations, by **0.10 percentage points** — 0.6% of
+solver's, over the same 30,000 realizations, by **0.07 percentage points** — 0.4% of
 its own value, well inside the sampling noise of the Monte Carlo campaign it
 replaces. Every gate measurement is reported with the answer, in the console
 summary and in the result dictionary.
@@ -220,12 +221,12 @@ them separately.
 |---|---:|---:|
 | Real limit-equilibrium solves | 2,000 | 710 |
 | Realizations counted | 2,000 | 10,000,000 |
-| Wall time | 6.3 s | 4.2 s |
-| Mean FS | 1.385 | 1.381 |
-| $\sigma_F$ | 0.408 | 0.400 |
-| $\beta_{LN}$ | 0.985 | 0.998 |
-| $P_f$ | 16.85% | 16.56% |
-| 95% sampling half-width on $P_f$ | ±1.64 pp | ±0.02 pp |
+| Wall time | 6.3 s | 4.9 s |
+| Mean FS | 1.378 | 1.381 |
+| $\sigma_F$ | 0.402 | 0.400 |
+| $\beta_{LN}$ | 0.979 | 0.997 |
+| $P_f$ | 16.50% | 16.57% |
+| 95% sampling half-width on $P_f$ | ±1.63 pp | ±0.02 pp |
 
 ```python
 from xslope.fileio import load_slope_data

@@ -1253,6 +1253,19 @@ def _lem11_reliability_labels():
             fails.append(f"on the Monte Carlo engine the search checkbox reads "
                          f"{dlg.search.text()!r}, not the "
                          f"{LEM11_SEARCH_CHECKBOX_MC!r} the page teaches")
+        # The sampling combo must open on Latin hypercube (the page says the
+        # dialog shows the default) and both items must map to values the
+        # engines accept — the display/value order was once reversed, which
+        # showed the raw 'lhs' and handed the engines an invalid string.
+        if dlg.mc_sampling.currentText() != "Latin hypercube":
+            fails.append(f"the MC sampling combo opens on "
+                         f"{dlg.mc_sampling.currentText()!r}, not the "
+                         f"'Latin hypercube' default Tutorial LEM-11 shows")
+        _vals = {dlg.mc_sampling.itemData(i)
+                 for i in range(dlg.mc_sampling.count())}
+        if _vals != {"lhs", "random"}:
+            fails.append(f"the MC sampling combo's item data is {_vals}, not "
+                         f"the {{'lhs', 'random'}} the engines accept")
         dlg.engine.setCurrentIndex(dlg.engine.findData("taylor"))
     groups = {g.title() for g in dlg.findChildren(QGroupBox)}
     if LEM11_SIGMA_GROUP not in groups:

@@ -1145,12 +1145,13 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                    fs_tol=None, tol=None, max_iter=None, composite=False,
                    seed='circles', search_opts=None, use_file_window=True,
                    check_inputs=True, converge_rel=None, converge_check=100,
-                   converge_min=500, sampling='random'):
+                   converge_min=500, sampling='lhs'):
     """Monte Carlo reliability analysis — the sampling counterpart to the
     Taylor-series :func:`reliability`.
 
-    Draws ``n_samples`` independent realizations of every uncertain material
-    parameter from the standard deviations in the mat sheet (s(g), s(c), s(f),
+    Draws ``n_samples`` realizations of every uncertain material parameter
+    (Latin hypercube by default; ``sampling='random'`` for independent draws)
+    from the standard deviations in the mat sheet (s(g), s(c), s(f),
     s(c/p)), evaluates the factor of safety of each realization on a FIXED failure
     surface, and reports the sample statistics.
 
@@ -1568,7 +1569,7 @@ def reliability_rs(slope_data, method, rapid=False, circular=True, debug_level=0
                    num_slices=40, progress_callback=None, cancel_check=None,
                    fs_tol=None, tol=None, max_iter=None, composite=False,
                    seed='circles', search_opts=None, use_file_window=True,
-                   check_inputs=True, sampling='random'):
+                   check_inputs=True, sampling='lhs'):
     """Response-surface reliability analysis — a Monte Carlo campaign whose factor
     of safety comes from a fitted surrogate instead of a solve, with the surrogate
     measured against real solves before any of its answers are used.

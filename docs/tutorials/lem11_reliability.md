@@ -289,21 +289,22 @@ zero. That is not the case here — the largest COV on this model is the
 cohesion's 25% — and either way every draw is cut off at zero, so a sample
 can never hand the solver a negative strength.
 
-**MC sampling** chooses how the draws are laid down. `Random` draws every
-value independently, which is simple but uneven: by chance, some parts of a
+**MC sampling** `Latin hypercube` chooses how the draws are laid down.
+Purely random draws are simple but uneven: by chance, some parts of a
 distribution get sampled repeatedly while others are missed.
-`Latin hypercube` is a structured alternative — each parameter's distribution is
-cut into equal-probability bins and exactly one draw is taken from each, so
-the whole range is covered by construction. Exploring the parameter space
-more evenly extracts the same information from fewer runs: measured on this
-model, a Latin hypercube campaign matches the precision of a random one
-roughly three times its size; the measurement is documented on the
+`Latin hypercube`, the default, is structured sampling — each parameter's
+distribution is cut into equal-probability bins and exactly one draw is
+taken from each, so the whole range is covered by construction. Exploring
+the parameter space more evenly extracts the same information from fewer
+runs: measured on this model, a Latin hypercube campaign matches the
+precision of a purely random one roughly three times its size; the
+measurement is documented on the
 [Monte Carlo documentation page](../reliability/monte_carlo.md).
 
 **Stop when P_f converges** ends the campaign early once the probability of
 failure is known to within a stated percentage of its own value — ±5% of a
 17% answer means trusted between about 16% and 18%, which this model reaches
-at 7,600 realizations — with the samples field as the cap. The tolerance
+at 8,000 realizations — with the samples field as the cap. The tolerance
 sets the cost, and steeply: halving it takes four times the realizations, so
 ±2.5% on this model would need roughly 30,000 — when tightening the
 tolerance, raise the samples cap to match. The
@@ -318,15 +319,15 @@ safety — the actual distribution of FS, not an assumed shape:
 
 ![The Monte Carlo FS histogram](images/lem11_mc.png){width=1000}
 
-**Mean FS = 1.381, σ<sub>F</sub> = 0.408**, and the shaded tail left of the
-FS = 1 line holds **1,671 of the 10,000 realizations — P<sub>f</sub> = 16.71%**,
+**Mean FS = 1.381, σ<sub>F</sub> = 0.402**, and the shaded tail left of the
+FS = 1 line holds **1,642 of the 10,000 realizations — P<sub>f</sub> = 16.42%**,
 counted rather than inferred. The reliability index comes in two conventions:
-β<sub>normal</sub> = (F̄ − 1)/σ<sub>F</sub> = **0.932**, and the lognormal
-β<sub>LN</sub> = **0.969** computed from the same sample moments as the Taylor
+β<sub>normal</sub> = (F̄ − 1)/σ<sub>F</sub> = **0.947**, and the lognormal
+β<sub>LN</sub> = **0.988** computed from the same sample moments as the Taylor
 series uses.
 
-Against 17.48% from five solves, 16.71% from ten thousand. The two estimators
-agree to eight tenths of a percentage point on the answer that matters, which is
+Against 17.48% from five solves, 16.42% from ten thousand. The two estimators
+agree to about a percentage point on the answer that matters, which is
 the ordinary result — the [reliability
 overview](../reliability/index.md#when-to-use-monte-carlo-versus-the-taylor-series)
 sets out the cases where they part company, and the case study in
@@ -348,21 +349,21 @@ land back on F<sub>MLV</sub>. The cohesion's pair does exactly that — 1.354
 to seven digits, because with φ = 0 the factor of safety really is a straight
 line in c. The unit weight's pair averages **+0.0266 above**
 F<sub>MLV</sub> — its response bends — and the Monte Carlo mean sits
-**+0.0268 above** it. **The whole gap is the bend in the γ response**, which
+**+0.0272 above** it. **The whole gap is the bend in the γ response**, which
 the straight-line shortcut cannot see and a sampling method feels on every
 draw.
 
-### Trying Latin hypercube
+### Trying random sampling
 
-The **MC sampling** control is one click to test. Set it to
-`Latin hypercube` and **Run** again. The result is **P<sub>f</sub> = 16.42%**, with
-the mean and σ<sub>F</sub> matching the random run to three digits. That is
-the expected outcome: both runs estimate the same number, and both landed
-inside the ±0.7-point band that a count of 10,000 can resolve.
+The **MC sampling** control is one click to test. Set it to `Random` and
+**Run** again. The result is **P<sub>f</sub> = 16.71%**, with the mean and
+σ<sub>F</sub> nearly unchanged. That is the expected outcome: both runs
+estimate the same number, and both landed inside the ±0.7-point band that a
+count of 10,000 can resolve.
 
-What the structured sampling buys is consistency. A random campaign lands
-somewhere different in that band every time the seed changes; a Latin
-hypercube campaign lands closer to the same place every time. The
+What the default's structured sampling buys is consistency. A random
+campaign lands somewhere different in that band every time the seed changes;
+a Latin hypercube campaign lands closer to the same place every time. The
 [Monte Carlo documentation page](../reliability/monte_carlo.md) repeats both
 campaigns twenty times and measures the difference: the Latin hypercube
 answers scatter about half as widely. Half the scatter at the same cost is
@@ -374,11 +375,12 @@ repeatable.
 
 ## The response surface
 
-Monte Carlo's answer still carries a sampling wobble. The 16.71% rests on a
-count — 1,671 failing realizations — and rerunning with different seeds moves
-that count; at 10,000 realizations, P<sub>f</sub> can land anywhere in a band
-about ±0.7 percentage points wide (the same statistical band the convergence
-stop watches). The only way to shrink it is more solves.
+Monte Carlo's answer still carries a sampling wobble. The 16.42% rests on a
+count — 1,642 failing realizations — and rerunning with different seeds moves
+that count; at 10,000 realizations the statistics promise P<sub>f</sub> only
+to about ±0.7 percentage points (the band the convergence stop watches —
+Latin hypercube usually lands tighter, but no firmer promise comes with it).
+The only way to shrink it is more solves.
 
 The third engine takes a different route to the same answer. Instead of
 solving the real model for every realization, it solves it a **handful** of
@@ -408,13 +410,13 @@ of the formula:
 
 ![The response-surface FS histogram](images/lem11_rs.png){width=1000}
 
-**P<sub>f</sub> = 16.6%** and **β<sub>LN</sub> = 0.998**, beside Monte
-Carlo's 16.71% and 0.969. The checks are reported with the answer, and they
+**P<sub>f</sub> = 16.6%** and **β<sub>LN</sub> = 0.997**, beside Monte
+Carlo's 16.42% and 0.988. The checks are reported with the answer, and they
 are worth reading: across the 500 checking solves the formula reproduced the
 real factor of safety with a typical error of 0.018 (R² = 0.998), and only
 1 of the 500 landed on the other side of FS = 1 from where the formula put
 it. In a fuller test run for this page, thirty thousand of the draws were
-re-solved with the real model: the formula's P<sub>f</sub> came out 0.10
+re-solved with the real model: the formula's P<sub>f</sub> came out 0.07
 percentage points low. The counting wobble is gone, and that small fit error
 is what remains. The
 [response-surface section](../reliability/monte_carlo.md#sampling-a-fitted-response-surface)
@@ -437,15 +439,15 @@ P<sub>f</sub> = Φ(−β) and the two always move together:
 | Estimator | F | σ<sub>F</sub> | β | P<sub>f</sub> |
 |---|:---:|:---:|:---:|:---:|
 | Taylor series (TSPM) | 1.354 | 0.389 | 0.935 (lognormal) | 17.48% |
-| Monte Carlo, 10,000 samples | 1.381 | 0.408 | 0.969 (lognormal) | 16.71% (counted) |
-| Monte Carlo, 10,000 Latin hypercube samples | 1.381 | 0.402 | 0.988 (lognormal) | 16.42% (counted) |
-| Response surface, 10⁷ formula realizations | 1.381 | 0.400 | 0.998 (lognormal) | 16.56% (counted on the formula) |
+| Monte Carlo, 10,000 samples (Latin hypercube) | 1.381 | 0.402 | 0.988 (lognormal) | 16.42% (counted) |
+| Monte Carlo, 10,000 samples (random) | 1.381 | 0.408 | 0.969 (lognormal) | 16.71% (counted) |
+| Response surface, 10⁷ formula realizations | 1.381 | 0.400 | 0.997 (lognormal) | 16.57% (counted on the formula) |
 
 β is the more stable of the two to quote, because P<sub>f</sub> is exponentially
 sensitive to it: β = 0.935 is 17.5%, β = 2 is 2.3%, β = 3 is 0.13%. The
 consequence for a sampled estimate is a resolution limit. Each of the 10,000
 realizations carries 0.01 percentage points — one part in ten thousand — so
-the 16.71% above rests on 1,671
+the 16.42% above rests on 1,642
 of them and is solid, while a P<sub>f</sub> near 0.05% would rest on five and
 would move by a fifth of itself if one realization landed differently. The same
 limit is visible from the other side on
@@ -514,14 +516,14 @@ it:
 |---|:---:|:---:|:---:|:---:|
 | TSPM, s(c) = 100 | 1.354 | 0.389 | 0.935 | 17.48% |
 | TSPM, s(c) = 50 | 1.354 | 0.256 | 1.526 | 6.36% |
-| Monte Carlo, s(c) = 100 | 1.381 | 0.408 | 0.969 | 16.71% |
-| Monte Carlo, s(c) = 50 | 1.381 | 0.270 | 1.567 | 5.34% |
+| Monte Carlo, s(c) = 100 | 1.381 | 0.402 | 0.988 | 16.42% |
+| Monte Carlo, s(c) = 50 | 1.381 | 0.267 | 1.588 | 5.01% |
 
 **The factor of safety is unchanged at 1.354, to every digit.** Nothing about the
 slope moved — the same clay at the same strength on the same critical circle. The
-probability of failure fell from roughly one in six to roughly one in sixteen,
-11.1 percentage points, and the failed count in the Monte Carlo campaign fell
-from 1,671 realizations to 534. What was bought was not strength but knowledge of
+probability of failure fell from roughly one in six to roughly one in twenty,
+11.4 percentage points, and the failed count in the Monte Carlo campaign fell
+from 1,642 realizations to 501. What was bought was not strength but knowledge of
 it, and only a probabilistic analysis can show that purchase at all.
 
 The unit weight's contribution is what remains. Its ΔF is 0.383 before the edit
@@ -551,8 +553,8 @@ not, so the choice is about cost and about what is being asked.
   (the ranking, the variance, β itself).
 - **Monte Carlo** is the reference: nothing assumed about the shape of F, the
   tail counted rather than fitted. The convergence stop sets its cost to the
-  resolution actually asked, and Latin hypercube stretches each solve about
-  three-fold. It is the engine to reach for when the straight-line shortcut
+  resolution actually asked, and its default Latin hypercube sampling
+  stretches each solve about three-fold over purely random draws. It is the engine to reach for when the straight-line shortcut
   breaks — a coefficient of variation so large that x − σ is not a physical
   value ([VP34](../verification/rocscience.md#vp34), a fill whose friction
   angle carries a 124% COV), a response that bends strongly, or a tail that
@@ -594,16 +596,17 @@ This tutorial demonstrated:
   0.389**, **β<sub>LN</sub> = 0.935**, **P<sub>f</sub> = 17.48%** from 1 + 2N =
   five solves.
 - Monte Carlo on the same surface: **mean FS = 1.381**, **σ<sub>F</sub> =
-  0.408**, **β<sub>LN</sub> = 0.969**, and **P<sub>f</sub> = 16.71%** counted as
-  1,671 of 10,000 realizations — within a percentage point of the Taylor series.
+  0.402**, **β<sub>LN</sub> = 0.988**, and **P<sub>f</sub> = 16.42%** counted as
+  1,642 of 10,000 realizations — within about a percentage point of the Taylor
+  series.
 - Where the two means differ: the +0.027 gap comes from the bend in the γ
   response, matched to the digit by the average of the Taylor table's own γ
   perturbations.
 - The variance Pareto measuring **75.8%** of σ<sub>F</sub>² onto the cohesion and
   **24.2%** onto the unit weight, and what halving the dominant σ does — P<sub>f</sub>
-  from **17.48% to 6.36%** (TSPM) and **16.71% to 5.34%** (Monte Carlo) with the
+  from **17.48% to 6.36%** (TSPM) and **16.42% to 5.01%** (Monte Carlo) with the
   factor of safety fixed at 1.354.
-- The response surface reaching the same answer from **709 real solves** —
+- The response surface reaching the same answer from **710 real solves** —
   P<sub>f</sub> = 16.6% with its fit credentials printed beside it — and the
   three-engine habit: screen with the Taylor series, decide with Monte Carlo,
   bring in the response surface when the tail is the question.

@@ -86,7 +86,8 @@ CONFIG = PageConfig(
         ('+0.15', 'above El-Ramly et al.'),
         # the two estimators run on one surface; neither estimate is printed
         ('+1', 'Taylor series and Monte Carlo on one surface agree to'),
-        ('+3', 'an empirical probability of failure of about 2%'),
+        ('+1.5', 'an empirical probability of failure of about 1.5%'),
+        ('+2.7', 'an empirical probability of failure of about 1.5%'),
         ('+6.2', 'the three published estimates span'),
         ('+0.36', 'the three published estimates span'),
     ],

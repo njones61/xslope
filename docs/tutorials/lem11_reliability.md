@@ -522,9 +522,12 @@ a heavier unit weight tended to come back with a lower factor of safety.
 The two plots agree about which parameter matters; this one also shows
 which way each parameter pushes.
 
-Three quarters of the uncertainty in the answer is therefore in one number, and
-that number is the one further site investigation would narrow. Another round of
-undrained testing on this clay would buy a smaller s(c) and nothing else.
+Three quarters of the uncertainty in the answer traces to a single input:
+the cohesion's standard deviation. That is the number more site
+investigation can shrink. Another round of undrained testing would not
+change the clay's strength — it would narrow how well that strength is
+known, which is a smaller σ on the same cohesion. The next section does
+exactly that.
 
 ### Halve it
 

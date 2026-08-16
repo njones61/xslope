@@ -310,7 +310,10 @@ tolerance, raise the samples cap to match. The
 [Monte Carlo page](../reliability/monte_carlo.md) gives the rule and its
 convergence plot. Leave it unticked here, and **Run**.
 
-Ten thousand solves take appreciably longer than five. What comes back is not an
+The cost is closer to the Taylor series than the counts suggest: its five
+solves are five full searches (about 13 seconds here), while Monte Carlo
+searches once and then solves a held surface ten thousand times (about 22
+seconds). What comes back is not an
 estimate of the distribution but the distribution itself:
 
 ![The Monte Carlo FS histogram](images/lem11_mc.png){width=1000}

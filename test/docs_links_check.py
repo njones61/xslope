@@ -1152,7 +1152,9 @@ LEM11_RUN_ACTIONS = {"act_reliability": "Reliability…"}
 #: three Monte Carlo controls it names one by one. A rewording of any of them turns
 #: those steps into instructions to press something that is not there.
 LEM11_ENGINES = ("Taylor series (TSPM)", "Monte Carlo")
-LEM11_SEARCH_CHECKBOX = "Search for the critical surface"
+LEM11_SEARCH_CHECKBOX_TAYLOR = ("Search for the critical surface at each solve "
+                                "(MLV and MLV ± σ)")
+LEM11_SEARCH_CHECKBOX_MC = "Search for the critical surface at the mean values"
 LEM11_SIGMA_GROUP = "Standard deviations in this file"
 LEM11_MC_ROWS = ("MC samples", "MC seed", "MC distribution")
 
@@ -1235,10 +1237,22 @@ def _lem11_reliability_labels():
             fails.append(f"the Reliability dialog offers no {label!r} engine; "
                          f"Tutorial LEM-11 gives it a section. It offers {engines}")
     boxes = {b.text() for b in dlg.findChildren(QCheckBox)}
-    if LEM11_SEARCH_CHECKBOX not in boxes:
-        fails.append(f"the Reliability dialog has no {LEM11_SEARCH_CHECKBOX!r} "
-                     f"checkbox; Tutorial LEM-11 tells the reader to leave it "
-                     f"ticked. Its checkboxes read {sorted(boxes)}")
+    if LEM11_SEARCH_CHECKBOX_TAYLOR not in boxes:
+        fails.append(f"the Reliability dialog has no "
+                     f"{LEM11_SEARCH_CHECKBOX_TAYLOR!r} checkbox; Tutorial "
+                     f"LEM-11 tells the reader to leave it ticked. Its "
+                     f"checkboxes read {sorted(boxes)}")
+    # The label is dynamic: switching the engine to Monte Carlo must restate
+    # the checkbox in the sampling engines' terms — the page teaches the
+    # difference off exactly this text.
+    _idx = dlg.engine.findData("mc")
+    if _idx >= 0:
+        dlg.engine.setCurrentIndex(_idx)
+        if dlg.search.text() != LEM11_SEARCH_CHECKBOX_MC:
+            fails.append(f"on the Monte Carlo engine the search checkbox reads "
+                         f"{dlg.search.text()!r}, not the "
+                         f"{LEM11_SEARCH_CHECKBOX_MC!r} the page teaches")
+        dlg.engine.setCurrentIndex(dlg.engine.findData("taylor"))
     groups = {g.title() for g in dlg.findChildren(QGroupBox)}
     if LEM11_SIGMA_GROUP not in groups:
         fails.append(f"the Reliability dialog has no {LEM11_SIGMA_GROUP!r} box; "

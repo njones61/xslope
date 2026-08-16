@@ -2030,6 +2030,20 @@ RELIABILITY_SAMPLING_ENGINES = ("mc", "rs")
 MC_DISTRIBUTIONS = [("normal", "Normal"), ("lognormal", "Lognormal")]
 
 
+SEARCH_LABEL_TAYLOR = "Search for the critical surface at each solve (MLV and MLV ± σ)"
+SEARCH_LABEL_SAMPLING = "Search for the critical surface at the mean values"
+#: The unticked alternative, stated under the checkbox — it is the genuinely
+#: non-obvious half, and it differs by engine only in what happens around it:
+#: either way the sampling engines hold ONE surface for every realization.
+SEARCH_HINT_TAYLOR = ("Unticked: every solve evaluates the first circle on the "
+                      "circles sheet (or the non-circular surface) — the same "
+                      "surface a Single surface run solves.")
+SEARCH_HINT_SAMPLING = ("One surface serves every realization — the searched one, "
+                        "or, unticked, the first circle on the circles sheet "
+                        "(or the non-circular surface), as a Single surface run "
+                        "solves it.")
+
+
 class ReliabilityDialog(QDialog):
     """Probabilistic reliability analysis — the sibling of the Parametric study.
 
@@ -2135,7 +2149,12 @@ class ReliabilityDialog(QDialog):
         if self.app_mode == "lem":
             form.addRow("", self.rapid)
 
-        self.search = QCheckBox("Search for the critical surface")
+        # The checkbox's label is DYNAMIC per engine, because the truthful
+        # statement differs: the Taylor series searches at every one of its
+        # 1+2N solves; the sampling engines search once at the mean values and
+        # hold that surface across their realizations. One static label lies
+        # for one engine or the other (owner + pushback, 2026-08-15).
+        self.search = QCheckBox(SEARCH_LABEL_TAYLOR)
         self.search.setChecked(bool(defaults.get("search", True)))
         self.search.setToolTip(
             "On (default): the Taylor series solves the model 1+2N times — at "
@@ -2144,12 +2163,17 @@ class ReliabilityDialog(QDialog):
             "own critical surface. The sampling engines (Monte Carlo, response "
             "surface) search once, at the mean values, and hold that surface "
             "across all realizations.\n\n"
-            "Off: every solve evaluates the surface entered on the sheet, with "
-            "no search — the right mode when the surface itself is prescribed: "
-            "a published benchmark's circle, an observed failure surface, a "
+            "Off: every solve evaluates the first circle on the circles sheet "
+            "(or the non-circular surface), exactly as a Single surface run "
+            "does — the right mode when the surface itself is prescribed: a "
+            "published benchmark's circle, an observed failure surface, a "
             "geologically controlled plane.")
+        self.search_hint = QLabel(SEARCH_HINT_TAYLOR)
+        self.search_hint.setWordWrap(True)
+        self.search_hint.setStyleSheet("color: gray; font-size: 11px;")
         if self.app_mode == "lem":
             form.addRow("", self.search)
+            form.addRow("", self.search_hint)
 
         # --- Monte Carlo controls (LEM only) -------------------------------
         self.n_samples = QSpinBox()
@@ -2341,6 +2365,10 @@ class ReliabilityDialog(QDialog):
         sampling = engine in RELIABILITY_SAMPLING_ENGINES and lem
         for w in (self.seed, self.distribution, self.mc_sampling):
             w.setEnabled(sampling)
+        self.search.setText(SEARCH_LABEL_SAMPLING if sampling
+                            else SEARCH_LABEL_TAYLOR)
+        self.search_hint.setText(SEARCH_HINT_SAMPLING if sampling
+                                 else SEARCH_HINT_TAYLOR)
         for w in (self.n_samples, self.mc_converge):
             w.setEnabled(mc)
         self.mc_converge_tol.setEnabled(mc and self.mc_converge.isChecked())

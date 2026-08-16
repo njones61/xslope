@@ -213,7 +213,8 @@ than the unloaded critical surface while carrying 7500 lb/ft more force.
 LEM-1's uncracked embankment could not be solved cleanly: Spencer and Bishop
 disagreed (1.276 against 1.215) because the crest slices were being asked to
 carry tension, and 26 of the trial circles that ranked below the reported minimum
-admitted no solution at all. Run the loaded model with Bishop, OMS or
+admitted no solution at all. Run the loaded model with Bishop, the Ordinary
+Method of Slices (OMS) or
 Morgenstern-Price and all three return **0.918 on the same circle** as Spencer,
 and no trial circle below the minimum goes unsolved.
 

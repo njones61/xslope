@@ -404,7 +404,8 @@ simpler assumption — one constant interslice force inclination, where
 Morgenstern-Price assumes an interslice force distribution function — which is
 what makes it the standard reference method. Bishop, which satisfies moment
 equilibrium alone, sits 2% above them on this circle. The water also widens the
-spread between methods: OMS sits 10% under Spencer dry but 14% under it wet,
+spread between methods: the Ordinary Method of Slices (OMS) sits 10% under
+Spencer dry but 14% under it wet,
 because OMS computes each slice's normal force from the weight alone and then
 subtracts the full u·dℓ from it — on a deep circle under high pore pressure
 that approximation sheds too much normal force, a known conservatism of the

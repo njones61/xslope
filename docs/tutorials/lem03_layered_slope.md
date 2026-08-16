@@ -259,7 +259,8 @@ says so: *"Generated 3 circles: 3 on the left-facing face (toe at x = 0, height
 | 3 | 0 | tangent to the top of the foundation, the base of the embankment |
 
 The summary reports all three candidates kept — on a section where a circle
-cannot daylight inside the model, it says so instead. Click **OK**.
+cannot daylight — come back up to the ground surface — inside the model, it
+says so instead. Click **OK**.
 
 Continue below.
 
@@ -390,7 +391,8 @@ The search finds each method its own critical circle:
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |
 
-The four methods that satisfy moment equilibrium — OMS, Bishop, Spencer and
+The four methods that satisfy moment equilibrium — the Ordinary Method of
+Slices (OMS), Bishop, Spencer and
 Morgenstern-Price — land on the same circle and the same 1.244. With φ = 0 they
 cannot disagree about a circle, and here nothing stopped any of them solving the
 critical one. The three force-equilibrium procedures each settle on a flatter,

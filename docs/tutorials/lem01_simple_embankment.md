@@ -310,7 +310,8 @@ and the one that survives is the layer-base circle: R = 40, tangent to the rigid
 base at y = 0. Reaching the toe from that same center would take R = 41.23, which
 puts the bottom of the circle 1.23 ft *below* the base, on ground the model does
 not contain — the candidate the generator reports dropping *"for not daylighting
-inside the model"*.
+inside the model"*: its arc never comes back up to the ground surface inside
+the section.
 
 ![The circles editor on the generated circle](images/lem01_studio_circles.png)
 

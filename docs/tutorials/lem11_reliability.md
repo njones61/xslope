@@ -370,9 +370,10 @@ fit honestly.
 ## Reading β against P<sub>f</sub>
 
 The reliability index and the probability of failure are two spellings of one
-result. β is the distance from the mean factor of safety to failure, measured in
-standard deviations of the factor of safety — on the lognormal scale the
-[reliability overview](../reliability/index.md#reliability-equation) gives — and
+result. β is the distance from the mean factor of safety to failure, measured
+in standard deviations of the factor of safety (computed here on the lognormal
+scale; the [reliability overview](../reliability/index.md#reliability-equation)
+gives the equation), and
 P<sub>f</sub> is the area of that distribution below FS = 1, so
 P<sub>f</sub> = Φ(−β) and the two always move together:
 
@@ -384,7 +385,8 @@ P<sub>f</sub> = Φ(−β) and the two always move together:
 β is the more stable of the two to quote, because P<sub>f</sub> is exponentially
 sensitive to it: β = 0.935 is 17.5%, β = 2 is 2.3%, β = 3 is 0.13%. The
 consequence for a sampled estimate is a resolution limit. Each of the 10,000
-realizations is worth 0.01% of P<sub>f</sub>, so the 16.71% above rests on 1,671
+realizations carries 0.01 percentage points — one part in ten thousand — so
+the 16.71% above rests on 1,671
 of them and is solid, while a P<sub>f</sub> near 0.05% would rest on five and
 would move by a fifth of itself if one realization landed differently. The same
 limit is visible from the other side on
@@ -419,7 +421,8 @@ each ΔF by the coefficient of variation that produced it and the unit weight is
 the more powerful parameter: 0.383 over 6.7% is 0.057 of factor of safety per 1%
 of γ, against 0.677 over 25% for 0.027 per 1% of c. Per unit of change γ moves
 the answer twice as far — but c is asked over an interval nearly four times
-wider, and the variance is what the interval is squared into.
+wider, and because each contribution enters the variance squared, the wider
+interval wins.
 
 Three quarters of the uncertainty in the answer is therefore in one number, and
 that number is the one further site investigation would narrow. Another round of
@@ -460,7 +463,7 @@ slope moved — the same clay at the same strength on the same critical circle. 
 probability of failure fell from roughly one in six to roughly one in sixteen,
 11.1 percentage points, and the failed count in the Monte Carlo campaign fell
 from 1,671 realizations to 534. What was bought was not strength but knowledge of
-it, and only a probabilistic analysis can be shown that purchase at all.
+it, and only a probabilistic analysis can show that purchase at all.
 
 The unit weight's contribution is what remains. Its ΔF is 0.383 before the edit
 and 0.383 after — untouched, because nothing about γ changed — and it now carries
@@ -480,7 +483,7 @@ not, so the choice is about cost and about what is being asked.
 |---|:---:|---|---|
 | Taylor series | 5 | β, lognormal P<sub>f</sub>, the per-parameter table | F changes in a straight line near the means |
 | Monte Carlo | 2,000–10,000 | the whole distribution; P<sub>f</sub> *counted* | only the input distributions |
-| Response surface | ~710 | MC-grade statistics with sampling error removed | F is quadratic — and it *checks* |
+| Response surface | ~710 | MC-grade statistics with sampling error removed | F fits a curved formula — an assumption it checks |
 
 - **The Taylor series** is the screen: five solves, seconds, and the engine
   behind both the variance Pareto and the finite-element reliability path. It
@@ -493,15 +496,16 @@ not, so the choice is about cost and about what is being asked.
   three-fold. It is the engine to reach for when the straight-line shortcut
   breaks — a coefficient of variation so large that x − σ is not a physical
   value ([VP34](../verification/rocscience.md#vp34), a fill whose friction
-  angle carries a 124% COV), a response that bends strongly, or a wanted
-  empirical tail — and it is the arbiter when the other two disagree.
+  angle carries a 124% COV), a response that bends strongly, or a tail that
+  must be counted rather than fitted — and it is the arbiter when the other
+  two disagree.
 - **The response surface** is the precision instrument: tail resolution no
   count can afford, for a few hundred real solves — *when its gate accepts*.
   It refuses exactly the models Monte Carlo exists for (VP34's gate finds a
   third of the surrogate's failures have no real solution, and refuses), and
-  its β differs from Monte Carlo's in the third decimal because a quadratic
-  slightly under-disperses σ<sub>F</sub>. Quote its P<sub>f</sub> with the
-  gate credentials it prints beside it.
+  its β differs from Monte Carlo's in the third decimal because the fitted
+  formula slightly narrows the spread σ<sub>F</sub>. Quote its P<sub>f</sub>
+  with the gate credentials it prints beside it.
 
 A working habit: screen with the Taylor series, decide with Monte Carlo at the
 default convergence stop, and reach for the response surface when the tail

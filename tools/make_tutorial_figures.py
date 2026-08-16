@@ -1487,9 +1487,9 @@ def lem11_plots():
     campaign before and after the page's edit, so the narrowing is read off one pair
     of pictures.
     """
-    from xslope.plot import (plot_reliability_histogram, plot_reliability_results,
-                             plot_variance_pareto)
-    from xslope.sensitivity import variance_contribution
+    from xslope.plot import (plot_mc_rank_correlation, plot_reliability_histogram,
+                             plot_reliability_results, plot_variance_pareto)
+    from xslope.sensitivity import mc_rank_correlation, variance_contribution
 
     sd = load_slope_data(LEM11)
     capture("lem11_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
@@ -1510,6 +1510,11 @@ def lem11_plots():
     if not ok:
         raise RuntimeError("lem11 variance contribution failed: %s" % var)
     capture("lem11_variance.png", plot_variance_pareto, var)
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok_rank, rank = mc_rank_correlation(copy.deepcopy(sd), method=LEM11_METHOD, search=True)
+    if not ok_rank:
+        raise RuntimeError("lem11 rank correlation failed: %s" % rank)
+    capture("lem11_rank.png", plot_mc_rank_correlation, rank)
 
     mc = _lem11_reliability(sd, "mc")
     capture("lem11_mc.png", plot_reliability_histogram, mc)

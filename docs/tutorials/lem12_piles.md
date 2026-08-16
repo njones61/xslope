@@ -21,11 +21,12 @@ recompute it for every trial surface the search tries.
 <div class="tgt-tile"><span class="tg-label">Open &amp; explore</span><p>~15 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Read a pile row whose force is computed rather than stated,
-find the computed force in the report the run writes, measure what the two piles
-are worth and what widening their spacing costs, see the shaft's moment
-capacity reduce the soil force to a fifth of its value, and find the surface a
-search returns when it is allowed to look above the pile row.
+**Objectives** — Model two rows of drilled shafts whose lateral force XSLOPE
+computes by the Ito & Matsui method, find the computed force in the analysis
+report, measure what the piles are worth and what widening their spacing
+costs, see the shafts' moment capacity reduce the soil force to a fifth of
+its value, and check for the shallow surface that slides over the top of the
+pile row.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">piles</span><span class="tg-pill">Ito &amp; Matsui</span><span class="tg-pill">pile spacing</span><span class="tg-pill">structural capacity</span><span class="tg-pill">specified pile force</span><span class="tg-pill">circular search</span><span class="tg-pill">grid seeding</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx), the same file used by [LEM Sample Problem 10](../lem/samples.md#10-slope-stabilized-with-piles)</div>

@@ -7,11 +7,11 @@ description: "A 20 ft clay slope stabilized by two rows of drilled shafts in XSL
 
 A 20 ft slope in medium-stiff clay that stands at a factor of safety of 1.149 on
 its own, with two rows of 2 ft drilled shafts through the face bringing it to
-1.842. Neither pile row states the force it delivers. **The force column is
-blank, and that is the input**: from the pile diameter and the center-to-center
-spacing, XSLOPE computes the lateral force the soil can push onto each pile by
-the Ito & Matsui (1975) method, and recomputes it for every trial surface the
-search tries.
+1.842. The pile force is not entered anywhere in this model. The force
+column is left blank, which tells XSLOPE to compute the lateral force the
+soil can push onto each pile — from the pile diameter and the
+center-to-center spacing, by the Ito & Matsui (1975) method — and to
+recompute it for every trial surface the search tries.
 
 
 <div class="tut-glance" markdown>
@@ -22,9 +22,9 @@ search tries.
 <div class="tgm-obj" markdown>
 **Objectives** — Read a pile row whose force is computed rather than stated,
 find the computed force in the report the run writes, measure what the two piles
-are worth and what widening their spacing costs, watch the moment capacity of the
-shaft cut the soil force to a fifth of itself, and see the surface a search finds
-when it is allowed to look above the pile row.
+are worth and what widening their spacing costs, see the shaft's moment
+capacity reduce the soil force to a fifth of its value, and find the surface a
+search returns when it is allowed to look above the pile row.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">piles</span><span class="tg-pill">Ito &amp; Matsui</span><span class="tg-pill">pile spacing</span><span class="tg-pill">structural capacity</span><span class="tg-pill">specified pile force</span><span class="tg-pill">circular search</span><span class="tg-pill">grid seeding</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx), the same file used by [LEM Sample Problem 10](../lem/samples.md#10-slope-stabilized-with-piles)</div>
@@ -34,7 +34,8 @@ when it is allowed to look above the pile row.
 
 ## The slope
 
-One soil: a medium-stiff clay, γ = 120 pcf, c = 200 psf, φ = 20°, over a rigid
+The slope is a single soil — a medium-stiff clay with γ = 120 pcf,
+c = 200 psf, and φ = 20° — over a rigid
 base 10 ft below the toe. The face rises 20 ft at 1:1 from (0, 0) to (20, 20),
 with level ground either side. There is no water — the clay's **u** is `none` —
 so the section is analyzed dry and the strength on every slice base is the
@@ -75,7 +76,7 @@ endpoints are what this page is about:
 | `pile` | 5 | 5 | 5 | -10 | | | | 2 | 6 | 46000 | 60000 |
 | `pile` | 10 | 10 | 10 | -10 | | | | 2 | 6 | 46000 | 60000 |
 
-**H is empty on both rows, and that is what selects the Ito & Matsui
+**H is empty on both rows, which is what selects the Ito & Matsui
 calculation.** With `H` blank and a diameter `D` and spacing `S` given, XSLOPE
 computes the force itself; with a number in `H`, that number is used instead.
 `θp` is the angle of the pile force from horizontal. Left empty, it defaults
@@ -138,12 +139,12 @@ gives the slope on its own:
 ![Spencer on the same slope with no piles](images/lem12_solution_nopiles.png){width=1000}
 
 **FS = 1.149** on a shallower circle from the toe, tangent at elevation −0.04,
-moving 21,166 lb/ft against the piled surface's 62,198. The piles are worth 0.69
-on the answer, and they move the mechanism as well as the number: the surface the
+moving 21,166 lb/ft against the piled surface's 62,198. The piles raise the
+factor of safety by 0.69, and they also change the failure mechanism: the surface the
 search settles on with them present is deeper, longer and three times the mass,
 because the shallower one now has two shafts across it.
 
-Separating the two rows means holding the surface still. On the piled search's
+To separate the two rows' contributions, hold the surface still. On the piled search's
 own critical circle — **one surface, no search, only which piles are present
 changing** — each row can be removed on its own:
 
@@ -168,15 +169,15 @@ document whose limit equilibrium section carries the pile inputs and the solved
 slice table ([Analysis Report](../studio/reports.md) documents the whole
 document).
 
-In the report's **Piles** table, the `H` cell of both rows reads **computed** —
-the report saying the force is an outcome rather than an input:
+In the report's **Piles** table, the `H` cell of both rows reads
+**computed**, meaning the force was calculated rather than entered:
 
 | Label | Top (x, y) | Bottom (x, y) | H (lb/ft) | θ (deg) | D (ft) | Spacing (ft) |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | pile 1 | (5, 5) | (5, −10) | computed | 0 | 2 | 6 |
 | pile 2 | (10, 10) | (10, −10) | computed | 0 | 2 | 6 |
 
-The number itself is in the slice table under Spencer's method, in the column
+The computed force appears in the slice table under Spencer's method, in the column
 **H<sub>p</sub>**, whose legend reads *pile resistance mobilized at the slice
 base, per unit thickness*. Two of the forty slices carry one: slice 16, whose
 center is at x = 5.29, takes **2,540.7 lb/ft**, and slice 20, at x = 10.00,
@@ -208,7 +209,8 @@ pushing on the pile. On the critical surface above:
 | Soil force per pile, F<sub>pile</sub> (lb) | 44,178 | 81,729 |
 | Soil force per foot of slope, F<sub>pile</sub>/S (lb/ft) | 7,363.0 | 13,621.5 |
 
-Deeper surface, more force — the upper row, whose head stands 5 ft higher on the
+The deeper the surface, the larger the force: the upper row, whose head
+stands 5 ft higher on the
 face, has 44% more soil above the surface and develops 85% more force per shaft.
 [Piles and Concrete Piers](../lem/piles.md#ito-matsui-1975-theory)
 gives the derivation, the coefficients in full and the φ = 0 and c = 0 special
@@ -249,7 +251,7 @@ hardest on — ends up delivering *less* than the shallower one, because its
 pressure centroid sits further above the failure surface and the same moment
 capacity buys a smaller force at a longer arm.
 
-Removing the caps measures what they are worth, and this too is a **single-surface
+To see how much the caps matter, remove them. This too is a **single-surface
 run on the search's own critical circle, with only the two capacity cells
 changing**:
 
@@ -270,10 +272,10 @@ times the moment their sections are designed for.
 
 ## What the spacing is worth
 
-Spacing is the design lever the Ito & Matsui calculation exposes, and it acts
-twice: closer piles arch more strongly, so each pile takes a larger share of the
-soil force, and closer piles put more shafts under each foot of slope. Both push
-the same way.
+Pile spacing affects the computed force in two ways: closer piles arch more
+strongly, so each pile takes a larger share of the
+soil force, and closer spacing puts more shafts under each foot of slope. Both
+effects work in the same direction.
 
 Widening the spacing to 12 ft is one cell on each row — **S** from `6` to `12`,
 with **H** still blank so the force is recomputed at the new spacing:
@@ -332,8 +334,8 @@ check or a published chart, entered per foot of slope.
 Typing one into **H** turns the Ito & Matsui calculation off for that row; nothing
 else changes.
 
-The forces the auto run developed are the natural values to try, and they are the
-two the report printed:
+A natural test is to enter the forces the automatic run computed — the
+two values the report printed:
 
 | H |
 |:---:|
@@ -348,7 +350,7 @@ stated force and a computed force enter the equilibrium equations identically.
 The difference is not in the arithmetic but in what happens when the surface
 moves.
 
-The stated-force search finds that out:
+Searching with the stated forces shows the difference:
 
 ![Spencer with the force stated instead of computed](images/lem12_solution_statedh.png){width=1000}
 
@@ -398,12 +400,13 @@ moving 6,867 lb/ft. The depth from the ground surface to the failure surface at
 the pile is zero, so the Ito & Matsui integral over that depth is zero: the whole
 pile row contributes **0.04 lb/ft** to a surface that slides over the top of it.
 
-This is the check pile design owes itself. The piles hold the deep mechanism, and
+This is an important check for any pile design. The piles hold the deep mechanism, and
 holding it promotes whatever the next mechanism is; here the next one runs above
-the pile heads and takes nothing from them. It is not a numerical sliver —
+the pile heads and takes nothing from them. It is not a numerical artifact —
 **Min slip depth** at 5 ft leaves it untouched, because 6.5 ft of clay is moving —
 and the same slope searched without piles at all returns 1.149 from either
-seeding, so the shallow surface is the piles' own doing. The same behavior is
+seeding, so it is adding the piles that makes the shallow surface critical.
+The same behavior is
 recorded on [VP54](../verification/rocscience.md#vp54), where a free search on a
 micro-piled slope finds a circle exiting upslope of the pile row.
 

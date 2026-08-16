@@ -133,17 +133,17 @@ would stop at, and it is the number the rest of this page is about: not whether
 ## The Taylor series
 
 The **Taylor Series Probability Method** (TSPM) is the workhorse of
-geotechnical reliability, popularized in U.S. practice by Duncan: it
-approximates how the factor of safety responds to each uncertain input from a
-first-order Taylor expansion about the most-likely values, which takes only
-1 + 2N solves — five here, seconds of work. It goes first because it is the
-cheapest honest estimate: from nothing but the σ columns it returns β, the
-probability of failure, and a per-parameter breakdown the rest of this page
-is built on. Its weakness is baked into its name: a first-order method
-captures how F *slopes* with each parameter but not how it *curves*, and it
-assumes the shape of the FS distribution instead of observing it. Whether
-those shortcuts matter on this slope is exactly what the Monte Carlo section
-answers, by solving the same problem with no shortcuts at all.
+geotechnical reliability, popularized in U.S. practice by Duncan: it solves
+the model at the most-likely values and again with each uncertain parameter
+moved one standard deviation up and one down — 1 + 2N solves, five here,
+seconds of work. It goes first because it is the cheapest honest estimate:
+from nothing but the σ columns it returns β, the probability of failure, and
+a per-parameter breakdown the rest of this page is built on. It takes two
+shortcuts to get there: it treats the factor of safety as changing in a
+straight line with each parameter over that range, and it assumes the shape
+of the FS distribution instead of observing it. Whether either shortcut
+matters on this slope is exactly what the Monte Carlo section answers, by
+solving the same problem with no shortcuts at all.
 
 **Reliability…** sits beside **Parametric…** on the **Run** menu and on the
 toolbar. Where a parametric sweep answers deterministic what-ifs, this one turns
@@ -232,8 +232,7 @@ model five times at carefully chosen points (the MLV and ±σ probes), then
 *assumed* a shape for the answer to turn those five numbers into a
 probability — so its probability of failure is computed from an assumed
 curve, not observed. Monte Carlo solves ten thousand versions and assumes
-nothing: whatever the distribution of FS really is, curvature and all, it
-emerges. The price is the count,
+nothing: whatever the distribution of FS really is, it emerges. The price is the count,
 and on a fixed surface where each solve costs milliseconds, the price is
 affordable.
 
@@ -282,14 +281,18 @@ The one visible disagreement is the mean: the Taylor series reports
 F<sub>MLV</sub> = 1.354 and Monte Carlo a mean of 1.381, 2% higher. Both are
 right about different things. F<sub>MLV</sub> is the factor of safety *at* the
 mean inputs; the Monte Carlo mean is the *mean of* the factors of safety, and
-those differ whenever F curves. The Taylor table above measures the curvature
-directly, one parameter at a time, by averaging each parameter's own F⁺ and F⁻
-against F<sub>MLV</sub>. The cohesion's pair averages to 1.354, returning
-F<sub>MLV</sub> to seven digits, because with φ = 0 the factor of safety is
-exactly linear in c and a symmetric perturbation of it cancels. The unit weight's
-pair averages **+0.0266 above** F<sub>MLV</sub>, and the Monte Carlo mean sits
-**+0.0268 above** it. **The whole gap is the curvature in γ**, which a
-first-order method drops by construction and a sampling method does not.
+the two differ whenever F does not change in a straight line with a
+parameter. The Taylor table above shows which parameter is responsible.
+Average each parameter's own F⁺ and F⁻ and compare against F<sub>MLV</sub>:
+if the response were a straight line, moving the parameter up and down by the
+same amount would move F by equal and opposite amounts, and the average would
+land back on F<sub>MLV</sub>. The cohesion's pair does exactly that — 1.354
+to seven digits, because with φ = 0 the factor of safety really is a straight
+line in c. The unit weight's pair averages **+0.0266 above**
+F<sub>MLV</sub> — its response bends — and the Monte Carlo mean sits
+**+0.0268 above** it. **The whole gap is the bend in the γ response**, which
+the straight-line shortcut cannot see and a sampling method feels on every
+draw.
 
 ---
 
@@ -432,22 +435,22 @@ not, so the choice is about cost and about what is being asked.
 
 | Engine | Real solves here | What it returns | What it assumes |
 |---|:---:|---|---|
-| Taylor series | 5 | β, lognormal P<sub>f</sub>, the per-parameter table | F is first-order near the means |
+| Taylor series | 5 | β, lognormal P<sub>f</sub>, the per-parameter table | F changes in a straight line near the means |
 | Monte Carlo | 2,000–10,000 | the whole distribution; P<sub>f</sub> *counted* | only the input distributions |
 | Response surface | ~710 | MC-grade statistics with sampling error removed | F is quadratic — and it *checks* |
 
 - **The Taylor series** is the screen: five solves, seconds, and the engine
   behind both the variance Pareto and the finite-element reliability path. It
-  summarizes F by its slope at the mean values, and everything above shows what
-  that discards (the curvature in γ) and what it keeps (the ranking, the
-  variance, β itself).
+  summarizes F by how it changes near the mean values, and everything above
+  shows what that discards (the bend in the γ response) and what it keeps
+  (the ranking, the variance, β itself).
 - **Monte Carlo** is the reference: nothing assumed about the shape of F, the
   tail counted rather than fitted. The convergence stop sets its cost to the
   resolution actually asked, and Latin hypercube stretches each solve about
-  three-fold. It is the engine to reach for when the first-order assumptions
-  break — a coefficient of variation so large that x − σ is not a physical
+  three-fold. It is the engine to reach for when the straight-line shortcut
+  breaks — a coefficient of variation so large that x − σ is not a physical
   value ([VP34](../verification/rocscience.md#vp34), a fill whose friction
-  angle carries a 124% COV), a strongly non-linear response, or a wanted
+  angle carries a 124% COV), a response that bends strongly, or a wanted
   empirical tail — and it is the arbiter when the other two disagree.
 - **The response surface** is the precision instrument: tail resolution no
   count can afford, for a few hundred real solves — *when its gate accepts*.
@@ -485,8 +488,9 @@ This tutorial demonstrated:
 - Monte Carlo on the same surface: **mean FS = 1.381**, **σ<sub>F</sub> =
   0.408**, **β<sub>LN</sub> = 0.969**, and **P<sub>f</sub> = 16.71%** counted as
   1,671 of 10,000 realizations — within a percentage point of the Taylor series.
-- Where the two means differ: the +0.027 gap is the curvature in γ, matched to
-  the digit by the average of the Taylor table's own γ perturbations.
+- Where the two means differ: the +0.027 gap comes from the bend in the γ
+  response, matched to the digit by the average of the Taylor table's own γ
+  perturbations.
 - The variance Pareto measuring **75.8%** of σ<sub>F</sub>² onto the cohesion and
   **24.2%** onto the unit weight, and what halving the dominant σ does — P<sub>f</sub>
   from **17.48% to 6.36%** (TSPM) and **16.71% to 5.34%** (Monte Carlo) with the

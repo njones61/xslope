@@ -292,8 +292,8 @@ can never hand the solver a negative strength.
 
 **MC sampling** chooses how the draws are laid down. `Random` draws every
 value independently, which is simple but uneven: by chance, some parts of a
-distribution get sampled repeatedly while others are missed. `Latin
-hypercube` is a structured alternative — each parameter's distribution is
+distribution get sampled repeatedly while others are missed.
+`Latin hypercube` is a structured alternative — each parameter's distribution is
 cut into equal-probability bins and exactly one draw is taken from each, so
 the whole range is covered by construction. Exploring the parameter space
 more evenly extracts the same information from fewer runs: measured on this

@@ -265,8 +265,10 @@ on how many failures the count contains. Here about one realization in six
 fails, so 10,000 realizations resolve P<sub>f</sub> to well under a
 percentage point. A rarer failure needs more: at a P<sub>f</sub> of a couple
 percent, only a couple hundred realizations fail, and reaching the same
-precision takes several times more. Raising the count costs only time;
-lowering it saves little. The best habit is to tick the convergence stop
+precision takes several times more. Raising the count costs only time, and
+not much of it: the solves are heavily optimized, and this model's full
+ten-thousand-realization campaign — search included — finishes in about
+twenty seconds. The best habit is to tick the convergence stop
 described below and let the campaign decide when to stop — this field then
 becomes the upper limit.
 

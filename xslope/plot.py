@@ -5331,10 +5331,15 @@ def plot_variance_pareto(result, figsize=(8, 5), save_png=False, dpi=300, fig=No
     for xi, p in zip(x, pct):
         ax.annotate(f'{p:.1f}%', (xi, p), textcoords='offset points',
                     xytext=(0, 3), ha='center', va='bottom', fontsize=8)
-    ax2 = ax.twinx()
-    ax2.plot(x, cum, color=_SIGN_NEG_COLOR, marker='o', lw=1.5, label='cumulative')
-    ax2.set_ylim(0, 105)
-    ax2.set_ylabel('Cumulative %')
+    # The cumulative line is for finding the "vital few" cutoff in a long bar
+    # list; over one or two bars it restates them (the last point is 100% by
+    # definition) at the cost of a second axis, so it only draws at three plus.
+    if len(bars) >= 3:
+        ax2 = ax.twinx()
+        ax2.plot(x, cum, color=_SIGN_NEG_COLOR, marker='o', lw=1.5,
+                 label='cumulative')
+        ax2.set_ylim(0, 105)
+        ax2.set_ylabel('Cumulative %')
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=20, ha='right')
     ax.set_ylabel('% of FS variance')

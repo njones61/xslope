@@ -484,8 +484,7 @@ reads every σ-carrying material and ignores the table, as the note under it say
 
 ![The Parametric dialog set to the variance Pareto](images/lem11_studio_parametric_variance.png)
 
-Click **Run**. The bars are the two parameters, tallest first, with the running
-total over them:
+Click **Run**. The bars are the two parameters, tallest first:
 
 ![Each parameter's share of the factor-of-safety variance](images/lem11_variance.png){width=800}
 
@@ -510,9 +509,16 @@ Run it and the same verdict comes back:
 ![The Monte Carlo rank-correlation bars](images/lem11_rank.png){width=800}
 
 Cohesion at a correlation of +0.86, unit weight at −0.46 — and where the
-Pareto's bars are all positive shares, these carry a sign: more cohesion
-raises the factor of safety, a heavier slope lowers it. The cheap plot and
-the sampled one agree about what matters.
+Pareto's bars are all positive shares, these carry a sign. Cohesion's is the
+obvious one: more strength, higher factor of safety. The unit weight's
+negative sign is the same physics the Taylor table showed when the γ row's
+F⁺ came back the *lower* of its pair. Weight is the driving force, and on
+this φ = 0 clay the resistance is all cohesion, which gains nothing from the
+extra normal stress a heavier soil presses onto the failure surface — every
+added pound drives and none of it resists, so the heavier realizations fail
+more often. In a frictional soil some of that weight would come back as
+frictional resistance and the correlation would be weaker. The cheap plot
+and the sampled one agree about what matters.
 
 Three quarters of the uncertainty in the answer is therefore in one number, and
 that number is the one further site investigation would narrow. Another round of

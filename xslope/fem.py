@@ -1745,7 +1745,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     right_nodes = right_nodes | _on_side
 
         # v21 main!D22 chooses what the side restraint IS. 'rollers' (the default, and
-        # every file that does not declare it) is the historical hardwired behaviour:
+        # every file that does not declare it) is the historical hardwired behavior:
         # u = 0, v free, so the truncated ground can still settle under its own weight.
         # 'fixed' clamps both components, which is what RS2 does on its side
         # boundaries — a vendor-parity option, not a better model: fixing the sides
@@ -5172,7 +5172,7 @@ def print_reinforcement_summary(fem_data, solution):
         "NEAR CAPACITY": "NEAR CAPACITY: Maximum force exceeds 95% of Tmax. Close to yielding.",
         "PULLOUT": "PULLOUT: Elements near the reinforcement ends have reached their embedment-limited (pullout) capacity and are slipping at that force. Interior elements are below capacity.",
         "YIELDED": "YIELDED: One or more elements away from the ends are at the full tensile capacity Tmax and holding it (perfectly plastic). The line is fully mobilized.",
-        "SOFTENED": "SOFTENED: One or more elements yielded and then dropped to the residual capacity Tres entered for this line (Tres = 0 means brittle rupture). Post-peak behaviour is OFF unless Tres is filled in.",
+        "SOFTENED": "SOFTENED: One or more elements yielded and then dropped to the residual capacity Tres entered for this line (Tres = 0 means brittle rupture). Post-peak behavior is OFF unless Tres is filled in.",
         "INACTIVE": "INACTIVE: No elements are carrying tension. The reinforcement is not engaged.",
     }
     notes = [status_notes[s] for s in ["OK", "NEAR CAPACITY", "PULLOUT", "YIELDED",

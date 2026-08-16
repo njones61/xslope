@@ -235,7 +235,7 @@ Build a model for a 30 ft vertical soldier-pile wall with its toe at (0, 0), gro
   grouted end tapers. Both pullout lengths equal, or both zero, is a different
   anchor from this one.
 - **The capacities are per foot of wall**, not per anchor. An anchor at 8 ft
-  centres delivers an eighth of its bar capacity to each foot of wall, and the
+  centers delivers an eighth of its bar capacity to each foot of wall, and the
   numbers above already carry that division with Spacing left at 1.
 - **The pile is on the piles sheet, not the reinforcement sheet.** A soldier pile
   is a shear element; entering its 5,900 lb/ft as a tensile capacity would apply
@@ -378,9 +378,9 @@ However you built it, you now hold the same model:
 
 ![The finished model](images/lem09_inputs.png){width=1000}
 
-The two grey lines run back and down from the wall face, each with a red tension
+The two gray lines run back and down from the wall face, each with a red tension
 point where its envelope reaches full capacity; the green bar at x = 0.5 is the
-soldier pile, labelled with its 5,900 lb/ft; and the red dashed polyline from the
+soldier pile, labeled with its 5,900 lb/ft; and the red dashed polyline from the
 wall toe is the failure surface as entered.
 
 Click **Run LEM…** and choose **Method** = `Janbu (Corrected)` — the method
@@ -398,7 +398,7 @@ with the slice count left at 40:
 ### What the search finds
 
 The search starts from the three points the model carries and walks them, and the
-plot draws every surface it tried in grey with the one it kept in red:
+plot draws every surface it tried in gray with the one it kept in red:
 
 ![The Janbu search on the wall](images/lem09_search.png){width=1000}
 
@@ -429,7 +429,7 @@ Each method runs its own search and finds its own critical surface:
 | 1.431 | 1.415 | 1.412 | 1.412 |
 
 All four land between 1.412 and 1.431. The Ordinary Method of Slices and Bishop's
-simplified method are not on the list: both take moments about a circle centre,
+simplified method are not on the list: both take moments about a circle center,
 which a polyline does not have, so they refuse the run rather than approximate it.
 Morgenstern–Price is absent for a different reason — its solver fails on the
 starting wedge itself, so the search never starts and the run reports that the

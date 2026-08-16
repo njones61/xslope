@@ -256,7 +256,7 @@ ground, which is zero for the fill above the line — and the undrained clay's
 row reads nothing.
 
 The **E** and **nu** columns in the figure carry stiffness values, and the
-sheet's own colour legend marks them *FEM only*: a limit equilibrium run never
+sheet's own color legend marks them *FEM only*: a limit equilibrium run never
 reads them, and they may be left empty.
 
 ### 2. The `profile` worksheet
@@ -350,7 +350,7 @@ a row enlarges the vertex.
 The same editor carries **Generate from the weak zone…**, which builds a surface
 from the geometry rather than from a drawing — and on this section it builds the
 four points the table above holds. It ranks the material zones by the
-shear strength each can mobilise *at the stress it actually carries* — the one
+shear strength each can mobilize *at the stress it actually carries* — the one
 quantity comparable across an undrained clay and a frictional sand — lays a track
 just above the base of the weakest, and ramps up to the ground at both ends.
 
@@ -359,7 +359,7 @@ just above the base of the weakest, and ramps up to the ground at both ends.
 On an empty table it fills it without asking, and reports what it did under the
 button:
 
-> Generated 4 points: seeding on 'Soft Clay' -- mobilisable strength 200 against
+> Generated 4 points: seeding on 'Soft Clay' -- mobilizable strength 200 against
 > 570 for the next weakest ('Sand Fill'); a 4-point surface tracking 10% of the
 > zone's thickness above its base from x = 0 to 39.1221, with a 28 degree ramp to
 > the ground at the toe; a 60 degree ramp to the ground at the crest.

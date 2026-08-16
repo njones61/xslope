@@ -42,7 +42,7 @@ directly — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankme
 |---|---|
 | **Material** | one Mohr-Coulomb soil, γ = 125 pcf, c = 500 psf, φ = 0 |
 | **Geometry** | a 20 ft embankment, 1:1 face, level crest, rigid base at y = 0 |
-| **Failure surface** | one starting circle, centre (10, 40), tangent to the base |
+| **Failure surface** | one starting circle, center (10, 40), tangent to the base |
 
 The surcharge is a **distributed load**: an intensity in force per unit area,
 applied along a line of points on the ground surface, per unit width of slope.
@@ -304,7 +304,7 @@ safety.
 ### A second kind of demand
 
 A **seismic coefficient** applies a horizontal force of k × W to every slice, at
-the slice's centre of gravity — the pseudo-static way of asking what an
+the slice's center of gravity — the pseudo-static way of asking what an
 earthquake would do. It is a single global number:
 
 - **Studio** — open **Global parameters** and set **Seismic coefficient k**.

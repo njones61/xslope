@@ -354,7 +354,7 @@ When the search completes, the search-results plot shows every circle it tried:
 
 ![The circular search](images/lem01_search.png){width=1000}
 
-The search plot shows every circle it tried in grey, the path its center walked in
+The search plot shows every circle it tried in gray, the path its center walked in
 green, and the critical circle it settled on. Spencer's answer:
 
 ![Spencer's critical surface](images/lem01_solution_search.png){width=1000}

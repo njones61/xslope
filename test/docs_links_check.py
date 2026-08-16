@@ -977,7 +977,7 @@ LEM05_NONCIRC_MOVEMENTS = ("Free", "Horiz", "Fixed")
 #: horizontal segment and a vertex partway along it would be one the surface does
 #: not bend at and the search cannot move.
 LEM05_GENERATE_SUMMARY = (
-    "seeding on 'Soft Clay' -- mobilisable strength 200 against 570 for the next "
+    "seeding on 'Soft Clay' -- mobilizable strength 200 against 570 for the next "
     "weakest ('Sand Fill')")
 LEM05_GENERATE_RAMPS = ("a 28 degree ramp to the ground at the toe",
                         "a 60 degree ramp to the ground at the crest")
@@ -1175,7 +1175,7 @@ LEM11_VARIANCE_PLOT = "Variance Pareto (σ)"
 LEM12_REPORT_ACTION = ("act_report", "Generate Report…")
 LEM12_COMPUTED_CELL = "computed"
 LEM12_HP_HEADER = "H_p (lb/ft)"
-LEM12_HP_LEGEND = ("Pile resistance mobilised at the slice base, per unit "
+LEM12_HP_LEGEND = ("Pile resistance mobilized at the slice base, per unit "
                    "thickness.")
 #: The two capacity fields LEM-12 quotes in full, unit suffix included: the suffix
 #: is what says a capacity belongs to one shaft rather than to a foot of slope,

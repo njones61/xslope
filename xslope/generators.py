@@ -69,7 +69,7 @@ most of its length and turns up sharply at each end. :func:`rank_weak_zones` and
 :func:`generate_noncircular_surface` build that shape.
 
 Which layer is the weak one is answered by ranking every zone on the shear
-strength it can mobilise **at the stress it actually carries** -- not on cohesion
+strength it can mobilize **at the stress it actually carries** -- not on cohesion
 and not on friction angle, neither of which is comparable between materials. That
 one quantity spans every strength model the ``mat`` sheet offers, because each
 reduces to a strength at a normal stress: undrained ``cp`` is already one,
@@ -744,7 +744,7 @@ _ZONE_SAMPLES = 25
 class WeakZone:
     """One material zone, with the comparable strength that ranks it.
 
-    ``tau`` is the mobilisable shear strength at the stress the zone actually
+    ``tau`` is the mobilizable shear strength at the stress the zone actually
     carries -- not a cohesion and not a friction angle, neither of which can be
     compared across materials. It is what makes a ``c = 0, phi = 35`` sand and a
     ``c = 50, phi = 0`` clay rankable against each other at all.
@@ -1117,7 +1117,7 @@ def generate_noncircular_surface(slope_data, zone=None, separation=_SEPARATION,
     How the zone is chosen
     ----------------------
     Every zone is ranked by :func:`rank_weak_zones` on the shear strength it can
-    mobilise at the stress it actually carries, which is the only quantity
+    mobilize at the stress it actually carries, which is the only quantity
     comparable across an undrained clay, a frictional sand and a Hoek-Brown rock
     mass. Then:
 
@@ -1225,7 +1225,7 @@ def generate_noncircular_surface(slope_data, zone=None, separation=_SEPARATION,
         ratio = (weakest.tau / runner_up.tau) if runner_up.tau > 0 else 1.0
         if ratio <= separation:
             picked, confident = weakest, True
-            why = (f"seeding on '{weakest.name}' -- mobilisable strength "
+            why = (f"seeding on '{weakest.name}' -- mobilizable strength "
                    f"{weakest.tau:.3g} against {runner_up.tau:.3g} for the next "
                    f"weakest ('{runner_up.name}')")
         else:

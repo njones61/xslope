@@ -301,13 +301,13 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 ### What the search finds
 
 When the search completes, the search-results plot shows every circle it
-tried in grey, the path its refinement walked in green, and the critical
+tried in gray, the path its refinement walked in green, and the critical
 circle in red:
 
 ![The circular search](images/lem06_search.png){width=1000}
 
 **FS = 1.244**, on a circle centered at (18.5, 43.75) with a radius of 43.75.
-Notice how the grey family thins out and stops as it approaches the hatched
+Notice how the gray family thins out and stops as it approaches the hatched
 line: a circle that would cut below the domain is not a surface this model
 has, so the dipping base bounds what the search can try.
 

@@ -1501,7 +1501,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
 
 
 def gsz_style(gsz, analysis_id=None):
-    """The material colours from a .gsz, as an xslope style sidecar.
+    """The material colors from a .gsz, as an xslope style sidecar.
 
     GeoStudio gives every material a colour, and it is how people recognise their own
     model at a glance -- so a model that comes back in xslope's default palette looks

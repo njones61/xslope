@@ -79,7 +79,7 @@ Download
 and open it in Studio — **File → Open**. The Inputs plot draws the section, the
 starting circle the file carries, the piezometric line at elevation 40 with the
 water-table symbol on it, and the surface loads the water derives — drawn in
-water blue and labelled as derived, because they are computed from the line
+water blue and labeled as derived, because they are computed from the line
 rather than entered:
 
 ![The loaded model](images/lem11_inputs.png){width=1000}
@@ -92,7 +92,7 @@ the depth of water above each point.
 ### The standard deviations
 
 Open **Materials** and switch to **List view**. Above the form, the row of
-checkboxes labelled **Show parameters for:** decides which inputs the editor
+checkboxes labeled **Show parameters for:** decides which inputs the editor
 shows; **Reliability** is the one that is off by default, and ticking it puts a
 **± σ** box beside every parameter that can carry a standard deviation:
 

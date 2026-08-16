@@ -124,7 +124,7 @@ SLICE_COLUMNS = (
     Column("p", "P", "Reinforcement force acting on the slice base, resolved "
            "tangent to the failure surface, per unit thickness.",
            "force_per_len", "{:.1f}", True),
-    Column("h_pile", "H_p", "Pile resistance mobilised at the slice base, per "
+    Column("h_pile", "H_p", "Pile resistance mobilized at the slice base, per "
            "unit thickness.", "force_per_len", "{:.1f}", True),
     Column("hw", "h_w", "Height of water above the slice base at its mid-point.",
            "length", "{:.2f}", True),

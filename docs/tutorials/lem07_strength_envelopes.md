@@ -236,14 +236,14 @@ this deep φ = 0 problem, and
 [VP23's page](../verification/rocscience.md#vp23) measures where the spread
 comes from. The circle is centered at (18.00, 16.04), 38.09 m of surface carrying
 4943.5 kN/m of soil, and the number to watch is where it stops: **tangent at
-elevation 0.82**, four fifths of a metre above the rigid base it could have
+elevation 0.82**, four fifths of a meter above the rigid base it could have
 reached. Of the 38.09 m of surface, 20.05 m lies in the lowest clay, and the
 strength mobilized along that stretch averages 22.91 kPa.
 
 ### Flatten the profile
 
 The search stopped short of the base because going deeper costs more than it
-gains: every metre down adds driving weight, but it also buys 3.75 kPa of
+gains: every meter down adds driving weight, but it also buys 3.75 kPa of
 strength along the part of the arc that goes there. Take that trade away and
 the balance changes.
 

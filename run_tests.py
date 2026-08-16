@@ -6751,7 +6751,7 @@ def run_noncircular_generator_test(test):
     point with a blank Movement, reaches the slicer as a TypeError or silently freezes
     the search on the surface it was handed.
 
-    The check itself lives in test/noncircular_generator_check.py: the mobilisable-
+    The check itself lives in test/noncircular_generator_check.py: the mobilizable-
     strength metric across every strength model, the separation threshold asserted
     from both sides against a measured ratio, the geometry invariants on a slope and
     on its mirror image, outcropping and pinched-out zones, determinism, the reason
@@ -11985,7 +11985,7 @@ def main():
         tests.append({'type': 'report_finalize',
                       'file': 'Analysis Report page numbers built',
                       'method': '-', 'source': 'report_finalize'})
-        # Guard the non-circular starting-surface generator: the mobilisable-strength
+        # Guard the non-circular starting-surface generator: the mobilizable-strength
         # metric it ranks zones on, the separation threshold that decides whether it
         # picks or raises the zone picker, the geometry invariants that make the
         # surface usable (explicit Y and Movement on every point), and the Studio

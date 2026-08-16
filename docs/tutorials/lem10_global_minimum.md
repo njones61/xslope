@@ -96,7 +96,7 @@ Click **OK** and run the same Spencer auto search again:
 
 ![The search from the embankment circle](images/lem10_search_shallow.png){width=1000}
 
-**FS = 1.299.** The grey arcs are the trial circles, fanning across the fill and
+**FS = 1.299.** The gray arcs are the trial circles, fanning across the fill and
 shrinking toward the face as the search walks its center up and left; the red
 critical circle is the short mark high on the slope — 1.2 ft long, never more
 than 0.01 ft below the ground surface, moving 1 lb/ft of sand.

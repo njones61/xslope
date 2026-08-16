@@ -583,7 +583,7 @@ LEM_METHODS = ('oms', 'janbu', 'bishop', 'corps', 'lowe', 'spencer', 'mprice', '
 MESH_ELEMENT_TYPES = ('tri3', 'tri6', 'quad4', 'quad8', 'quad9')
 
 # v21 main!D22 -- how the FEM restrains the left/right truncation boundaries.
-# 'rollers' is the historical hardwired behaviour (u = 0, v free); 'fixed' clamps
+# 'rollers' is the historical hardwired behavior (u = 0, v free); 'fixed' clamps
 # both components, which is what RS2 does and what a vendor-parity comparison needs.
 SIDE_BC_OPTIONS = ('rollers', 'fixed')
 
@@ -1110,7 +1110,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # How the FEM restrains the left and right truncation boundaries:
     #   'rollers' (default, and every pre-v21 file)  u = 0, v free
     #   'fixed'                                      u = v = 0
-    # Rollers are the historical hardwired behaviour and stay the default; 'fixed'
+    # Rollers are the historical hardwired behavior and stay the default; 'fixed'
     # exists for vendor parity (RS2 fully fixes side boundaries). Blank means
     # unspecified and the engine default (rollers) applies, so a v21 file with an
     # untouched cell is the same model as its v20 original.
@@ -1740,7 +1740,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # identical layout and are read by the same routine, so the two can never drift.
     #
     # v21 adds a Direction cell per block (the block's N column):
-    # blank/'normal' keeps the historical behaviour — the load acts PERPENDICULAR to
+    # blank/'normal' keeps the historical behavior — the load acts PERPENDICULAR to
     # the loaded surface — and 'vertical' resolves the same resultant straight down
     # (a gravity surcharge: dead weight with no horizontal component). Pre-v21 sheets
     # have no such cell and every block reads 'normal', so an existing file is
@@ -2046,7 +2046,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 # NOT mean zero. Zero is a legitimate, and very aggressive, entry:
                 # it says the bar ruptures brittly and carries nothing afterwards.
                 # Defaulting a blank cell to 0.0 silently made brittle rupture the
-                # behaviour of every file that never mentions Tres. NaN carries the
+                # behavior of every file that never mentions Tres. NaN carries the
                 # "unset" sense through to the FEM, which softens only where t_res
                 # is finite.
                 "t_res": (float(row['tres']) / spacing

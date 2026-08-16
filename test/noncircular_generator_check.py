@@ -6,7 +6,7 @@ A generated starting surface is not checked by looking at it. It is checked by t
 properties that make it usable, and each of these is a property something could
 break in silence:
 
-  A. THE METRIC -- zones are ranked on the shear strength each can mobilise at the
+  A. THE METRIC -- zones are ranked on the shear strength each can mobilize at the
      stress it actually carries, which is the only quantity comparable across a
      frictional sand, an undrained clay and a Hoek-Brown rock mass. Ranking on
      cohesion alone or friction alone picks a different zone, and the check asserts
@@ -209,8 +209,8 @@ def _inert_points(surface):
 # A. The metric
 # ---------------------------------------------------------------------------
 
-def test_metric_ranks_on_mobilisable_strength():
-    """The weakest zone by mobilisable strength, not by c and not by phi.
+def test_metric_ranks_on_mobilizable_strength():
+    """The weakest zone by mobilizable strength, not by c and not by phi.
 
     The synthetic model is built so the three ways of ranking disagree: the seam
     has the LOWEST cohesion and the LOWEST friction angle, but the stiff base has
@@ -833,7 +833,7 @@ def test_studio_zone_picker():
 
 
 CHECKS = [
-    ("metric ranks on mobilisable strength", test_metric_ranks_on_mobilisable_strength),
+    ("metric ranks on mobilizable strength", test_metric_ranks_on_mobilizable_strength),
     ("metric spans every strength model", test_metric_spans_every_strength_model),
     ("threshold picks and asks on both sides", test_threshold_both_sides),
     ("shipped threshold is the tuned one", test_shipped_threshold_is_the_tuned_one),

@@ -8,7 +8,7 @@ description: "A 20 ft clay slope stabilized by two rows of drilled shafts in XSL
 A 20 ft slope in medium-stiff clay that stands at a factor of safety of 1.149 on
 its own, with two rows of 2 ft drilled shafts through the face bringing it to
 1.842. Neither pile row states the force it delivers. **The force column is
-blank, and that is the input**: from the pile diameter and the centre-to-centre
+blank, and that is the input**: from the pile diameter and the center-to-center
 spacing, XSLOPE computes the lateral force the soil can push onto each pile by
 the Ito & Matsui (1975) method, and recomputes it for every trial surface the
 search tries.
@@ -41,7 +41,7 @@ so the section is analyzed dry and the strength on every slice base is the
 Mohr-Coulomb pair above.
 
 Two rows of drilled shafts stand vertically through the face, 2 ft in diameter
-at 6 ft centres, each row taken down to the rigid base. The upper row is at
+at 6 ft centers, each row taken down to the rigid base. The upper row is at
 x = 10, where the ground is at elevation 10; the lower at x = 5, where it is at
 elevation 5.
 
@@ -112,7 +112,7 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 ![The Run LEM dialog on the loaded model](images/lem12_studio_run_lem.png)
 
 Click **Run**. The search walks the circle the file carries down onto the rigid
-base, and the plot draws every circle it tried in grey with the one it kept in
+base, and the plot draws every circle it tried in gray with the one it kept in
 red:
 
 ![The Spencer search on the piled slope](images/lem12_search.png){width=1000}
@@ -177,9 +177,9 @@ the report saying the force is an outcome rather than an input:
 | pile 2 | (10, 10) | (10, −10) | computed | 0 | 2 | 6 |
 
 The number itself is in the slice table under Spencer's method, in the column
-**H<sub>p</sub>**, whose legend reads *pile resistance mobilised at the slice
+**H<sub>p</sub>**, whose legend reads *pile resistance mobilized at the slice
 base, per unit thickness*. Two of the forty slices carry one: slice 16, whose
-centre is at x = 5.29, takes **2,540.7 lb/ft**, and slice 20, at x = 10.00,
+center is at x = 5.29, takes **2,540.7 lb/ft**, and slice 20, at x = 10.00,
 takes **1,827.0 lb/ft**. The column total at the foot of the table is
 **4,367.6 lb/ft** — the whole of what the pile row delivers to this surface, on
 one line.
@@ -192,7 +192,7 @@ Ito & Matsui treat the soil between two adjacent piles as squeezing plastically
 through the gap between them, and derive from Mohr-Coulomb plasticity the lateral
 pressure that flow puts on each pile. The pressure at depth z is
 p(z) = c·A₁ + γz·A₂, with A₁ and A₂ arching coefficients that depend only on the
-friction angle and on the ratio of the centre-to-centre spacing S to the clear
+friction angle and on the ratio of the center-to-center spacing S to the clear
 gap S − D. On this clay at φ = 20° with D = 2 and S = 6, they are **A₁ = 7.569
 ft** and **A₂ = 4.755 ft**.
 
@@ -381,7 +381,7 @@ directly.
 
 The search so far has started from the circle on the sheet, and that circle
 reaches the rigid base. **Grid search (auto-seed the circular search)** ignores
-the circles sheet and sweeps a grid of centres against a range of tangent
+the circles sheet and sweeps a grid of centers against a range of tangent
 elevations instead ([LEM-10](lem10_global_minimum.md#grid-search) is where that
 tool is built). Back in **Run LEM…**, tick it and leave everything else:
 

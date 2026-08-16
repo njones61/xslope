@@ -367,7 +367,7 @@ However you built it, you now hold the same model:
 
 ![The finished model](images/lem08_inputs.png){width=1000}
 
-The six grey lines step up the face, each with a red tension point 4 ft in from
+The six gray lines step up the face, each with a red tension point 4 ft in from
 either end — the points where its envelope reaches the full 800 lb/ft. The
 purple arrows are the crest surcharge, and the two dashed red arcs are the
 starting circles.
@@ -385,13 +385,13 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 ### What the search finds
 
 When the search completes, the search-results plot shows the circles it tried
-in grey and the critical circle in red:
+in gray and the critical circle in red:
 
 ![The circular search](images/lem08_search.png){width=1000}
 
 **FS = 1.587**, on a circle centered at (−5.13, 46.98) with a radius of 47.26.
 The solution plot draws that circle with the base stresses, the reinforcement
-lines it crosses (grey bars, tension points in red), and the line of thrust:
+lines it crosses (gray bars, tension points in red), and the line of thrust:
 
 ![Spencer on the critical circle](images/lem08_solution.png){width=1000}
 
@@ -499,7 +499,7 @@ back ends of most of the layers:
 
 ![Spencer on the same section with 10 ft geogrids](images/lem08_solution_short.png){width=1000}
 
-The grey bars stop well short of the surface in the middle of the face: only two
+The gray bars stop well short of the surface in the middle of the face: only two
 of the six lines are crossed at all, and both crossings are caught within 1.7 ft
 of a tip, inside the pullout ramp, where they mobilize 193 and 340 lb/ft instead
 of 800. At 1.270 that section is barely better than the 1.167 of no reinforcement at

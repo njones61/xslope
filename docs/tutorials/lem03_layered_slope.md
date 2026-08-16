@@ -314,7 +314,7 @@ the critical one in red:
 
 ![The circular search](images/lem03_search.png){width=1000}
 
-The grey circles show both families being tried — the shallow set clustered on
+The gray circles show both families being tried — the shallow set clustered on
 the contact, the deep set running down to the rock. The green arrows trace the
 center's walk from the two circles' shared start at (20, 40) to (18.5, 43.75):
 both seeds are refined together, and both end on the same surface.

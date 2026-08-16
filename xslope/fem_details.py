@@ -16,7 +16,7 @@
 
 The FEM stores reinforcement and pile results one row per 1D element, indexed by
 mesh element id. That is the right storage order for the solver and for the
-force-coloured overlays on the result plots, but it is not the order an engineer
+force-colored overlays on the result plots, but it is not the order an engineer
 reads a structural member in: along the member, from one end to the other.
 
 This module turns the per-element arrays into **per-line profiles** — position
@@ -51,7 +51,7 @@ from .fileio import reinforce_available_tension
 
 # Utilization at or above which a member is reported as at capacity, and the
 # threshold between the "comfortable" and "watch" bands. These set the badge
-# colours in the Studio list and the status word in the profile dicts.
+# colors in the Studio list and the status word in the profile dicts.
 UTIL_AT_CAPACITY = 0.995
 UTIL_WATCH = 0.70
 
@@ -294,7 +294,7 @@ def member_lines(fem_data, slope_data=None, kind="reinforcement"):
 
 
 def _badge(util):
-    """Badge colour name for a utilization ratio (None when unmeasurable)."""
+    """Badge color name for a utilization ratio (None when unmeasurable)."""
     if util is None or not np.isfinite(util):
         return "none"
     if util >= UTIL_AT_CAPACITY:

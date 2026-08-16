@@ -72,7 +72,7 @@ The FEM reliability perturbs the **same strength parameters as the LEM
 reliability** — the cohesion $c$ and friction angle $\phi$ for a Mohr-Coulomb
 (`mc`) material, or $c$ and the rate $c_p$ for the depth-varying undrained (`cp`)
 model, plus the unit weight $\gamma$ for both — using the standard deviations
-`sigma_c`, `sigma_phi` / `sigma_cp`, and `sigma_gamma` from the materials table.
+in the materials table's σ(c), σ(φ) / σ(c/p) and σ(γ) columns.
 Using the same standard deviations keeps the FEM and LEM reliability results
 directly comparable.
 
@@ -110,8 +110,8 @@ analyses.
 
 Provide the standard deviations for the uncertain strength parameters in the
 Materials table exactly as for [Taylor series reliability](taylor.md#data-input)
-— the main parameter values are the most-likely values, and `sigma_c`,
-`sigma_phi` / `sigma_cp`, and `sigma_gamma` give their standard deviations. At
+— the main parameter values are the most-likely values, and the σ(c),
+σ(φ) / σ(c/p) and σ(γ) columns give their standard deviations. At
 least one non-zero standard deviation is required. As in the LEM case, a standard
 deviation may not exceed its mean (a negative $MLV - \sigma$ is non-physical and
 the analysis stops with an error).

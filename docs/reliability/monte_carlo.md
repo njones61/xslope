@@ -150,7 +150,8 @@ $P_f$ near 17% is known to ±1.6 percentage points after 2,000 realizations, ±0
 after 10,000, and reaching ±0.01 would take about **53 million** real
 factor-of-safety solves — a day of limit-equilibrium solving for one number.
 
-The **response surface** engine — `reliability_rs`, or `reliability(..., engine='rs')` — takes the count out of the cost. It fits a quadratic surrogate to a
+The **response surface** engine — `reliability_rs`, or `reliability(..., engine='rs')` — takes the count out of the cost. It fits a quadratic **surrogate** — a
+formula that stands in for the solver — to a
 few dozen real solves and samples that surrogate ten million times, which moves the
 error budget from sampling noise, which no longer registers, to the fit, which is
 measured and reported. Everything else is the campaign above: the same fixed
@@ -242,7 +243,8 @@ The result carries the Monte Carlo keys, so a histogram or a rank correlation re
 it unchanged; `fs_samples` and `param_samples` are a fixed-stride subsample of
 10,000 realizations, for plotting, while every reported statistic comes from all ten
 million. In **XSLOPE Studio** the engine is the third entry of the Reliability
-dialog's **Method** selector, sharing the seed and distribution controls with Monte
+dialog's **Method** selector, sharing the seed, distribution and sampling
+controls with Monte
 Carlo — see [Reliability analysis](../studio/analysis.md#reliability-analysis).
 
 ## Surface treatment

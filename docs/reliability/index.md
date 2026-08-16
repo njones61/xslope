@@ -34,7 +34,7 @@ runs the Taylor Series Probability Method; `engine='mc'` runs a Monte Carlo camp
 `engine='rs'` runs the same campaign against a fitted response surface.
 Because the default is the Taylor series, an existing call such as
 `reliability(slope_data, 'bishop')` keeps its exact meaning. Every engine is also
-public directly, under its own honest name, so a script can call whichever it wants:
+public directly under its own name, so a script can call whichever it wants:
 
 | Function | Method | Solver | Cost | Page |
 |----------|--------|--------|------|------|
@@ -140,7 +140,8 @@ To calculate the $COV_F$, there are two common approaches to calculate these val
 
 For ordinary parameter scatter the two methods agree, and the [Taylor series](taylor.md) is far
 cheaper (1 + 2N solves versus $10^4$), so it is the default. Reach for [Monte Carlo](monte_carlo.md)
-when the first-order Taylor assumptions break down:
+when the Taylor series' straight-line (first-order) treatment of the
+factor of safety breaks down:
 
 - **Large coefficients of variation.** When a standard deviation approaches or
   exceeds its mean, the Taylor series cannot evaluate $F(\text{MLV} - \sigma)$
@@ -149,10 +150,11 @@ when the first-order Taylor assumptions break down:
   whose Phase I fill has a friction-angle COV of 124%: the Taylor series declines,
   while Monte Carlo returns a probability of failure inside the range the published
   studies span.
-- **Skewed or non-linear factor-of-safety response**, where the first-order
-  (central-difference) slope is a poor summary of the true $F(\mathbf{x})$ surface.
-- **Tail probabilities**, where the empirical $P_f$ from the samples is wanted
-  directly rather than inferred from a fitted lognormal.
+- **A strongly curved or skewed response.** When the factor of safety does not
+  change in a straight line with a parameter, a slope measured at ±σ is a poor
+  summary of it.
+- **Counted probabilities.** When $P_f$ should come from counting failed
+  realizations rather than from a fitted lognormal shape.
 
 ## How commercial software does it
 
@@ -183,7 +185,10 @@ xslope's `reliability_fem` sits squarely in this point-estimate family: its 1 + 
 Taylor-series perturbation is a two-point-per-variable estimate of the factor-of-safety
 variance — the same economical strategy the FE vendors adopt in place of mass sampling.
 
-The response-surface half of that vendor strategy is not implemented. The 1 + 2N SSRM
+On the limit-equilibrium side xslope ships the response-surface half of that
+vendor strategy as `reliability_rs`
+([Sampling a fitted response surface](monte_carlo.md#sampling-a-fitted-response-surface));
+on the finite-element side it is not implemented. The 1 + 2N SSRM
 solves that `reliability_fem` already runs trace out a first-order response surface of
 the factor of safety in the uncertain parameters, and fitting that surface would allow
 a Monte Carlo campaign *on the surface* — thousands of samples, no additional

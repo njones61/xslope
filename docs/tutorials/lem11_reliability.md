@@ -443,19 +443,27 @@ P<sub>f</sub> = Φ(−β) and the two always move together:
 | Monte Carlo, 10,000 samples (random) | 1.381 | 0.408 | 0.969 (lognormal) | 16.71% (counted) |
 | Response surface, 10⁷ formula realizations | 1.381 | 0.400 | 0.997 (lognormal) | 16.57% (counted on the formula) |
 
-β is the more stable of the two to quote, because P<sub>f</sub> is exponentially
-sensitive to it: β = 0.935 is 17.5%, β = 2 is 2.3%, β = 3 is 0.13%. The
-consequence for a sampled estimate is a resolution limit. Each of the 10,000
-realizations carries 0.01 percentage points — one part in ten thousand — so
-the 16.42% above rests on 1,642
-of them and is solid, while a P<sub>f</sub> near 0.05% would rest on five and
-would move by a fifth of itself if one realization landed differently. The same
-limit is visible from the other side on
-[VP28](../verification/rocscience.md#vp28), where SLOPE/W's own 10⁴-sample
-campaign reports a 0.04% probability of failure that is four realizations.
-Resolving a small P<sub>f</sub> by counting means paying for the samples; the
-Taylor series gets there by extrapolating a fitted tail from β, which costs
-nothing and assumes the tail's shape.
+Which one should be quoted? β is the steadier of the two. The two numbers
+always move together, but not at the same rate: β = 0.935 corresponds to
+P<sub>f</sub> = 17.5%, β = 2 to 2.3%, and β = 3 to 0.13%. For a safe slope,
+a small shift in β changes P<sub>f</sub> by a large fraction of its own
+value, so two analyses that barely disagree about β can look far apart on
+P<sub>f</sub>.
+
+For Monte Carlo there is a second, practical reason: a counted probability
+can only be as fine as the count behind it. With 10,000 realizations, each
+one represents 0.01 percentage points of probability — one part in ten
+thousand. This model's 16.42% is a count of 1,642 failed realizations, which
+is plenty to trust. Now picture a much safer slope with a P<sub>f</sub> near
+0.05%: the same campaign would catch only about five failures, and if a
+single realization had landed on the other side of FS = 1, the reported
+probability would change by a fifth of its own value.
+[VP28](../verification/rocscience.md#vp28) shows the same limit in a
+commercial code: SLOPE/W's own 10,000-sample campaign reports a probability
+of failure of 0.04% — a count of four. Getting a small P<sub>f</sub> right
+by counting means running many more realizations. The Taylor series sidesteps
+the cost by computing β and converting it to a probability through an
+assumed distribution shape — free, but only as good as the assumption.
 
 ---
 

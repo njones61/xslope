@@ -260,16 +260,15 @@ search at all: every realization is solved on the first circle on the
 circles sheet, the same surface a `Single surface` run uses.
 
 **MC samples** `10000` is the number of realizations — how many versions of
-the slope will be built and solved. Ten thousand is the default because the
-probability of failure is a count, and a count is only as sharp as the pile
-it comes from: with roughly one realization in six failing here, 10,000 of
-them pin P<sub>f</sub> to well under a percentage point. The occasion to
-change it is a *rarer* failure — a P<sub>f</sub> of a couple percent puts
-only a couple hundred failures in the pile, and pinning it down as tightly
-takes several times more realizations. Raising the count costs only time;
-lowering it saves little and costs precision. The cleanest habit is to let the campaign size itself: tick
-the convergence stop described below, and this field becomes the cap rather
-than the count.
+the slope will be built and solved. The precision of P<sub>f</sub> depends
+on how many failures the count contains. Here about one realization in six
+fails, so 10,000 realizations resolve P<sub>f</sub> to well under a
+percentage point. A rarer failure needs more: at a P<sub>f</sub> of a couple
+percent, only a couple hundred realizations fail, and reaching the same
+precision takes several times more. Raising the count costs only time;
+lowering it saves little. The best habit is to tick the convergence stop
+described below and let the campaign decide when to stop — this field then
+becomes the upper limit.
 
 **MC seed** `20240117` starts the random-number generator. The value itself
 means nothing — any integer serves — but keeping it fixed means the same

@@ -267,8 +267,7 @@ percentage point. A rarer failure needs more: at a P<sub>f</sub> of a couple
 percent, only a couple hundred realizations fail, and reaching the same
 precision takes several times more. Raising the count costs only time, and
 not much of it: the solves are heavily optimized, and this model's full
-ten-thousand-realization campaign — search included — finishes in about
-twenty seconds. The best habit is to tick the convergence stop
+ten-thousand-realization campaign finishes in about twenty seconds. The best habit is to tick the convergence stop
 described below and let the campaign decide when to stop — this field then
 becomes the upper limit.
 
@@ -291,11 +290,16 @@ zero. That is not the case here — the largest COV on this model is the
 cohesion's 25% — and either way every draw is cut off at zero, so a sample
 can never hand the solver a negative strength.
 
-**MC sampling** chooses how the draws are laid down: `Random` is independent
-draws; `Latin hypercube` cuts each distribution into equal-probability bins
-with one draw per bin, which the
-[Monte Carlo page](../reliability/monte_carlo.md) measures at roughly three
-times the information per realization on this model.
+**MC sampling** chooses how the draws are laid down. `Random` draws every
+value independently, which is simple but uneven: by chance, some parts of a
+distribution get sampled repeatedly while others are missed. `Latin
+hypercube` is a structured alternative — each parameter's distribution is
+cut into equal-probability bins and exactly one draw is taken from each, so
+the whole range is covered by construction. Exploring the parameter space
+more evenly extracts the same information from fewer runs: measured on this
+model, a Latin hypercube campaign matches the precision of a random one
+roughly three times its size
+([Monte Carlo](../reliability/monte_carlo.md) shows the measurement).
 
 **Stop when P_f converges** ends the campaign early once the probability of
 failure is known to within a stated percentage of its own value — ±5% of a

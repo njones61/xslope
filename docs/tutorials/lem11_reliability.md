@@ -140,8 +140,10 @@ geotechnical reliability, popularized in U.S. practice by Duncan: it solves
 the model at the most-likely values and again with each uncertain parameter
 moved one standard deviation up and one down — 1 + 2N solves, five here,
 seconds of work. It goes first because it is the cheapest honest estimate:
-from nothing but the σ columns it returns β, the probability of failure, and
-a per-parameter breakdown the rest of this page is built on. It takes two
+from nothing but the σ columns it returns the **reliability index β** — how
+many standard deviations the factor of safety sits above failure, so bigger
+is safer — the probability of failure, and a per-parameter breakdown the
+rest of this page is built on. It takes two
 shortcuts to get there: it treats the factor of safety as changing in a
 straight line with each parameter over that range, and it assumes the shape
 of the FS distribution instead of observing it. Whether either shortcut

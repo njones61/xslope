@@ -132,6 +132,16 @@ would stop at, and it is the number the rest of this page is about: not whether
 
 ## The Taylor series
 
+The **Taylor Series Probability Method** (TSPM) is the workhorse of
+geotechnical reliability, popularized in U.S. practice by Duncan: it
+approximates how the factor of safety responds to each uncertain input from a
+first-order Taylor expansion about the most-likely values, which takes only
+1 + 2N solves — five here, seconds of work. It goes first because it is the
+cheapest honest estimate: from nothing but the σ columns it returns β, the
+probability of failure, and a per-parameter breakdown the rest of this page
+is built on. What its first-order assumption discards, the Monte Carlo
+section measures directly.
+
 **Reliability…** sits beside **Parametric…** on the **Run** menu and on the
 toolbar. Where a parametric sweep answers deterministic what-ifs, this one turns
 the σ columns into a reliability index. Open it and leave the **Method** on
@@ -194,6 +204,14 @@ just the number.
 ---
 
 ## Monte Carlo
+
+Monte Carlo makes no approximation about how the factor of safety responds:
+it draws every uncertain parameter from its distribution, solves the model,
+and repeats — thousands of times — so the distribution of FS is built
+empirically and the probability of failure is *counted* rather than fitted.
+It is the check on everything the Taylor series assumed, at roughly a
+thousand times the solves; on a fixed surface each solve costs milliseconds,
+which is what makes the check affordable.
 
 Open **Reliability…** again and change **Method** to `Monte Carlo`. The
 controls below the surface options come live:

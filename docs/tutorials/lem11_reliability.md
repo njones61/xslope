@@ -329,9 +329,10 @@ Against 17.48% from five solves, 16.71% from ten thousand. The two estimators
 agree to eight tenths of a percentage point on the answer that matters, which is
 the ordinary result — the [reliability
 overview](../reliability/index.md#when-to-use-monte-carlo-versus-the-taylor-series)
-sets out the cases where they part company, and
-[VP29](../verification/rocscience.md#vp29) reaches the same conclusion on
-Duncan's LASH terminal, where the choice of σ inputs moves the probability of
+sets out the cases where they part company, and the case study in
+verification problem [VP29](../verification/rocscience.md#vp29) — Duncan's
+LASH terminal, an underwater slope in San Francisco Bay mud — reaches the
+same conclusion: the choice of σ inputs moves the probability of
 failure further than the choice of estimator does.
 
 The one visible disagreement is the mean: the Taylor series reports

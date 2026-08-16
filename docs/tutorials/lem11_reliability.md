@@ -335,6 +335,16 @@ LASH terminal, an underwater slope in San Francisco Bay mud — reaches the
 same conclusion: the choice of σ inputs moves the probability of
 failure further than the choice of estimator does.
 
+The sampling choice is one click to test. Set **MC sampling** to
+`Latin hypercube` and **Run** again: **P<sub>f</sub> = 16.42%**, with the
+mean and σ<sub>F</sub> unchanged to three digits — the same answer, inside
+the random run's ±0.7-point band. A single campaign cannot show what the
+structure buys, because the benefit is consistency rather than a different
+answer: run twenty campaigns each way, as the
+[Monte Carlo documentation page](../reliability/monte_carlo.md) does, and
+the Latin hypercube results scatter about half as widely around their common
+center. The three-fold figure quoted at the control is that measurement.
+
 The one visible disagreement is the mean: the Taylor series reports
 F<sub>MLV</sub> = 1.354 and Monte Carlo a mean of 1.381, 2% higher. Both are
 right about different things. F<sub>MLV</sub> is the factor of safety *at* the
@@ -420,6 +430,7 @@ P<sub>f</sub> = Φ(−β) and the two always move together:
 |---|:---:|:---:|:---:|:---:|
 | Taylor series (TSPM) | 1.354 | 0.389 | 0.935 (lognormal) | 17.48% |
 | Monte Carlo, 10,000 samples | 1.381 | 0.408 | 0.969 (lognormal) | 16.71% (counted) |
+| Response surface, 10⁷ formula realizations | 1.381 | 0.400 | 0.998 (lognormal) | 16.56% (counted on the formula) |
 
 β is the more stable of the two to quote, because P<sub>f</sub> is exponentially
 sensitive to it: β = 0.935 is 17.5%, β = 2 is 2.3%, β = 3 is 0.13%. The

@@ -242,7 +242,17 @@ controls below the surface options come live:
 ![The Reliability dialog on Monte Carlo](images/lem11_studio_reliability_mc.png)
 
 **MC samples** `10000` is the number of realizations — how many versions of
-the slope will be built and solved.
+the slope will be built and solved. Ten thousand is the default because the
+probability of failure is a count, and a count is only as sharp as the pile
+it comes from: with roughly one realization in six failing here, 10,000 of
+them pin P<sub>f</sub> to well under a percentage point. The occasion to
+change it is a *rarer* failure — a P<sub>f</sub> of a couple percent puts
+only a couple hundred failures in the pile, and resolving it to the same
+relative precision takes several times more realizations. Raising the count
+costs only time; lowering it below the default rarely buys enough time to be
+worth the blur. The cleanest habit is to let the campaign size itself: tick
+the convergence stop described below, and this field becomes the cap rather
+than the count.
 
 **MC seed** `20240117` starts the random-number generator. The value itself
 means nothing — any integer serves — but keeping it fixed means the same

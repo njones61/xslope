@@ -1445,8 +1445,7 @@ it the call returns `False` with a "build a mesh first" message.
 
 - **`mode='fem'`** — a full **SSRM** solve per point (`xslope.fem`); output is still FS,
   but each point is MINUTES of compute, so keep the point count tiny (2-3 for a design
-  sweep, not the default 11). `fem_opts={'F_min':.., 'F_max':.., 'tolerance':..,
-  'failure_criterion':.., 'min_slip_depth':..}` forwards the SSRM knobs (defaults mirror
+  sweep, not the default 11). `fem_opts={'F_min':.., 'F_max':.., 'tolerance':.., 'failure_criterion':.., 'min_slip_depth':..}` forwards the SSRM knobs (defaults mirror
   `solve_ssrm`, except `failure_criterion`, which stays at `'non_convergence'` here so a
   sweep's shape is not redefined by the solver default; pass it explicitly to opt in). In Studio the sweep runs on a background thread with a live progress bar
   and a Cancel button; a headless script blocks until it finishes.
@@ -1806,8 +1805,7 @@ Rules:
   the SAME mesh and export `<name>_mesh.json`, `<name>_seep.csv` (full pool), and
   `<name>_seep2.csv` (drawn down) — `load_slope_data()` then imports all three automatically.
 - Or from a **transient** march: set `stage_1` and `stage_2` on the tseep sheet (both, with
-  `stage_1 < stage_2`) and call `apply_transient_stability_frame(slope_data, solution,
-  rapid=True)` — it stages `seep_u`/`seep_u2` from those two instants, and takes precedence
+  `stage_1 < stage_2`) and call `apply_transient_stability_frame(slope_data, solution, rapid=True)` — it stages `seep_u`/`seep_u2` from those two instants, and takes precedence
   over the `_seep.csv` / `_seep2.csv` files. See "Stability at one instant of a transient march".
 - dloads set 1 = full-pool reservoir load; dloads (2) = drawn-down load (recompute the
   water-line intercept on the slope face for the lower pool) — **in `manual` water-load mode

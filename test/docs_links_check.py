@@ -55,6 +55,7 @@ No network: the download is stubbed in F and the redirect handler is exercised
 directly in C. The MkDocs build in E writes only into a temporary directory.
 """
 import contextlib
+import glob
 import io
 import os
 import re
@@ -2192,6 +2193,26 @@ def test_tutorial_labels():
     return fails
 
 
+def test_split_code_spans():
+    """No inline code span may wrap across a source line: the renderer keeps the
+    break inside the backticks, splitting phrases like `Latin hypercube` mid-word
+    on the published page. Fenced blocks are skipped; only single-backtick spans
+    that open and close on different lines fail."""
+    fails = []
+    for path in sorted(glob.glob(os.path.join(_REPO, "docs", "**", "*.md"),
+                                 recursive=True)):
+        text = open(path, encoding="utf-8").read()
+        # strip fenced code blocks so their backticks cannot pair across lines
+        text = re.sub(r"```.*?```", "", text, flags=re.S)
+        for m in re.finditer(r"(?<!`)`(?!`)([^`]*)`(?!`)", text):
+            if "\n" in m.group(1):
+                rel = os.path.relpath(path, _REPO)
+                line = text[:m.start()].count("\n") + 1
+                fails.append("%s:%d code span wraps across a line: `%s`"
+                             % (rel, line, m.group(1).replace("\n", "\\n")))
+    return fails
+
+
 CHECKS = [
     ("A. one verb, and it is named", test_verb_gate),
     ("B. only XSLOPE's own sites", test_allowlist),
@@ -2201,6 +2222,7 @@ CHECKS = [
     ("F. refuse, ask, fetch, open", test_studio_flow),
     ("G. argv and FileOpen end in one call", test_arrival),
     ("H. Studio reads as the tutorials say", test_tutorial_labels),
+    ("I. code spans stay on one line", test_split_code_spans),
 ]
 
 

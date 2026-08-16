@@ -1435,8 +1435,7 @@ Slide2 counterpart: [VP44](rocscience.md#vp44). Built, four cases.
 **The power-curve problem is solved with two different strength models, and RS2 says so in
 print.** Its Part 1 results table labels the row itself — "Power Curve | SRF (Generalized
 Hoek-Brown) | 1.11" — and the vendor model matches: `slope stability #031-powecurve.fea` carries
-`Plasticity Specifications: GeneralizedHoekBrown / ucs: 113.132 mb: 1.68063 s: 2.60484e-05
-a: 0.61921`. RS2 fits a Generalized Hoek-Brown envelope to Baker's curve and reduces that.
+`Plasticity Specifications: GeneralizedHoekBrown / ucs: 113.132 mb: 1.68063 s: 2.60484e-05 a: 0.61921`. RS2 fits a Generalized Hoek-Brown envelope to Baker's curve and reduces that.
 The Slide2-import twin of the same problem keeps the literal law instead
 (`#044-powercurve.fea`: `Plasticity Specifications: PowerCurve / a: 1.10721 b: 0.86`), which is
 what vp044a carries — so the two vendor files confirm which *criterion* each program applies. They
@@ -2587,8 +2586,7 @@ vertex-for-vertex; XSLOPE's Spencer on the toe-exit band surface independently g
 here is decided by displacement runaway with a wide margin rather than by a marginal convergence
 verdict — the two kernels differ by 0.58 on a configuration that sits on that knife-edge.
 
-The mesh requirements stand: the ≈ 0.4 m band must be resolved (`refine_factor=3,
-refine_features=thin_zones`; an unresolved band reads ≈ 1.0), and the far field is bounded by
+The mesh requirements stand: the ≈ 0.4 m band must be resolved (`refine_factor=3, refine_features=thin_zones`; an unresolved band reads ≈ 1.0), and the far field is bounded by
 the global size ceiling. Analyses I and II remain unlocked — band-only refinement does not
 capture their wider-domain mechanism.
 

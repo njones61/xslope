@@ -354,8 +354,8 @@ draw.
 
 ### Trying Latin hypercube
 
-The **MC sampling** control is one click to test. Set it to `Latin
-hypercube` and **Run** again. The result is **P<sub>f</sub> = 16.42%**, with
+The **MC sampling** control is one click to test. Set it to
+`Latin hypercube` and **Run** again. The result is **P<sub>f</sub> = 16.42%**, with
 the mean and σ<sub>F</sub> matching the random run to three digits. That is
 the expected outcome: both runs estimate the same number, and both landed
 inside the ±0.7-point band that a count of 10,000 can resolve.

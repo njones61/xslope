@@ -99,7 +99,7 @@ shows; **Reliability** is the one that is off by default, and ticking it puts a
 ![The clay with its standard deviations](images/lem11_studio_materials.png)
 
 The clay reads **γ** = `120` **± σ** `8` and **c** = `400` **± σ** `100`. Those
-are the mat sheet's `s(g)` and `s(c)` columns, which the table view shows as two
+are the mat sheet's σ(γ) and σ(c) columns, which the table view shows as two
 columns in a **Standard Deviations** block at the right of the sheet and which
 the list view puts next to the values they belong to. A blank or zero σ means the
 parameter is treated as known exactly and is not varied.
@@ -541,7 +541,7 @@ Open **Materials**, select the clay, and change the **± σ** beside **c** from
 `100` to `50`. In the table view — and on the mat sheet — this is the second cell
 of the two-column **Standard Deviations** block:
 
-| s(g) | s(c) |
+| σ(γ) | σ(c) |
 |:---:|:---:|
 | 8 | 50 |
 
@@ -560,10 +560,10 @@ it:
 
 | Run | F | σ<sub>F</sub> | β<sub>LN</sub> | P<sub>f</sub> |
 |---|:---:|:---:|:---:|:---:|
-| TSPM, s(c) = 100 | 1.354 | 0.389 | 0.935 | 17.48% |
-| TSPM, s(c) = 50 | 1.354 | 0.256 | 1.526 | 6.36% |
-| Monte Carlo, s(c) = 100 | 1.381 | 0.402 | 0.988 | 16.42% |
-| Monte Carlo, s(c) = 50 | 1.381 | 0.267 | 1.588 | 5.01% |
+| TSPM, σ(c) = 100 | 1.354 | 0.389 | 0.935 | 17.48% |
+| TSPM, σ(c) = 50 | 1.354 | 0.256 | 1.526 | 6.36% |
+| Monte Carlo, σ(c) = 100 | 1.381 | 0.402 | 0.988 | 16.42% |
+| Monte Carlo, σ(c) = 50 | 1.381 | 0.267 | 1.588 | 5.01% |
 
 **The factor of safety is unchanged at 1.354, to every digit.** Nothing about the
 slope moved — the same clay at the same strength on the same critical circle. The
@@ -575,7 +575,7 @@ it, and only a probabilistic analysis can show that purchase at all.
 The unit weight's contribution is what remains. Its ΔF is 0.383 before the edit
 and 0.383 after — untouched, because nothing about γ changed — and it now carries
 56% of a smaller variance instead of 24% of a larger one. A second halving of
-s(c) would buy correspondingly less; the parameter to attack next is the one the
+σ(c) would buy correspondingly less; the parameter to attack next is the one the
 Pareto puts first *after* the edit, which is why the measurement is worth
 repeating rather than doing once.
 
@@ -635,7 +635,7 @@ their probabilistic modes.
 This tutorial demonstrated:
 
 - The **± σ** boxes the materials editor's **Reliability** toggle reveals, on
-  this clay's `s(g)` = 8 and `s(c)` = 100 — coefficients of variation of 6.7% and
+  this clay's σ(γ) = 8 and σ(c) = 100 — coefficients of variation of 6.7% and
   25%.
 - A deterministic Spencer search at **FS = 1.354** on a circle tangent to the
   rigid base, and the Taylor series over that same search: **σ<sub>F</sub> =

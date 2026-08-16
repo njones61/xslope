@@ -24,8 +24,8 @@ values."*
 
 **Sampling model.** Each uncertain parameter is drawn independently from a
 distribution whose **mean is the material's base value** (the MLV in the mat sheet)
-and whose **standard deviation is the matching s(·) column** — s(g) for $\gamma$,
-s(c) for $c$, s(f) for $\phi$, s(c/p) for $c_p$. The default distribution is
+and whose **standard deviation is the matching σ(·) column** — σ(γ) for $\gamma$,
+σ(c) for $c$, σ(φ) for $\phi$, σ(c/p) for $c_p$. The default distribution is
 **normal**, the same interpretation the Taylor series places on those columns; a
 `distribution='lognormal'` option draws lognormal samples matched to the same mean
 and standard deviation. Every draw is truncated at its physical floor — a strength

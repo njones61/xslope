@@ -211,24 +211,29 @@ just the number.
 Monte Carlo answers the same question by brute honesty instead of
 approximation. One realization works like this:
 
-1. **Draw** a value for each uncertain parameter from its distribution —
-   here, a unit weight from the normal centered at 120 with σ = 8, and a
-   cohesion from the normal centered at 400 with σ = 100.
-2. **Build and solve.** That pair of draws is one complete, equally likely
-   version of the slope; its factor of safety is computed the ordinary way.
+1. **Draw** a value for each uncertain parameter from its probability
+   distribution — here, a unit weight from the bell-shaped curve centered at
+   120 with σ = 8, and a cohesion from the one centered at 400 with σ = 100.
+2. **Build and solve.** That pair of draws is one complete version of the
+   slope; its factor of safety is computed the ordinary way.
 3. **Repeat** — ten thousand times — and keep every answer.
 
-The pile of ten thousand factors of safety *is* the distribution: its
-histogram is the result, its mean and spread are read off directly, and the
-probability of failure is simply the fraction of realizations that came back
-below FS = 1 — **counted, not inferred**.
+Because every value was drawn from its parameter's own probability
+distribution — likely values drawn often, unlikely ones rarely — **each
+realization is an equally probable version of the slope**. The objective is
+to explore an exhaustive set of these versions and determine what portion of
+them fail. The pile of ten thousand factors of safety *is* the answer: its
+histogram is the distribution of FS, its mean and spread are read off
+directly, and the probability of failure is simply the fraction of versions
+that came back below FS = 1 — **counted, not inferred**.
 
 The contrast with the Taylor series is the whole lesson. TSPM solved the
 model five times at carefully chosen points (the MLV and ±σ probes), then
-*assumed* a shape — first-order response, lognormal FS — to turn those five
-numbers into a probability; its tail is an extrapolation. Monte Carlo solves
-ten thousand random versions and assumes nothing about the shape: whatever
-the distribution is, curvature and all, it emerges. The price is the count,
+*assumed* a shape for the answer to turn those five numbers into a
+probability — so its probability of failure is computed from an assumed
+curve, not observed. Monte Carlo solves ten thousand versions and assumes
+nothing: whatever the distribution of FS really is, curvature and all, it
+emerges. The price is the count,
 and on a fixed surface where each solve costs milliseconds, the price is
 affordable.
 

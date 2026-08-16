@@ -1,6 +1,11 @@
 # Monte Carlo Reliability Analysis
 
-The Monte Carlo method is a statistical technique that uses random sampling to estimate the probability of failure. It involves generating a large number of random samples for the uncertain parameters. Then we do the following steps:
+The Monte Carlo method is a statistical technique that uses random sampling to
+estimate the probability of failure. Each uncertain parameter is drawn from its
+own probability distribution — likely values drawn often, unlikely ones rarely —
+so every assembled model instance is an equally probable version of the slope.
+The objective is to explore an exhaustive set of these versions and determine
+what portion of them fail. The steps:
 
 1. Generate N random samples for the uncertain parameters (e.g., soil unit weight, cohesion, angle of internal friction) based on their probability distributions.
 2. Combine random values for each uncertain parameter to create N "model instances". Each of these instances represents a unique combination of parameter values and is considered to be equally likely.

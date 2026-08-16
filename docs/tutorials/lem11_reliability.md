@@ -139,8 +139,11 @@ first-order Taylor expansion about the most-likely values, which takes only
 1 + 2N solves — five here, seconds of work. It goes first because it is the
 cheapest honest estimate: from nothing but the σ columns it returns β, the
 probability of failure, and a per-parameter breakdown the rest of this page
-is built on. What its first-order assumption discards, the Monte Carlo
-section measures directly.
+is built on. Its weakness is baked into its name: a first-order method
+captures how F *slopes* with each parameter but not how it *curves*, and it
+assumes the shape of the FS distribution instead of observing it. Whether
+those shortcuts matter on this slope is exactly what the Monte Carlo section
+answers, by solving the same problem with no shortcuts at all.
 
 **Reliability…** sits beside **Parametric…** on the **Run** menu and on the
 toolbar. Where a parametric sweep answers deterministic what-ifs, this one turns

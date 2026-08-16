@@ -358,11 +358,11 @@ seconds: **P<sub>f</sub> = 16.6%**, β<sub>LN</sub> = 0.998, with the fit's
 credentials beside the answer: R² = 0.998, an rms fit error of 0.018 on the
 factor of safety, and 1 of the 500 checked draws on the wrong side of
 FS = 1. Paired against thirty thousand real solves of the identical draws,
-the surrogate's P<sub>f</sub> is 0.10 percentage points low — the sampling
+the formula's P<sub>f</sub> is 0.10 percentage points low — the sampling
 error is gone and the *fit* error is what remains, measured. The
 [response-surface section](../reliability/monte_carlo.md#sampling-a-fitted-response-surface)
 draws the fitted surface, the sample cloud and the F = 1 boundary in one
-figure, and states the gate that makes the engine refuse a model it cannot
+figure, and lists the checks that make the engine refuse a model it cannot
 fit honestly.
 
 ---
@@ -415,14 +415,14 @@ total over them:
 
 Each bar is that parameter's own (ΔF/2)² term as a share of σ<sub>F</sub>², which
 is the same arithmetic the Taylor series already did — the cohesion carries
-**75.8%** of the variance and the unit weight **24.2%**. Cohesion dominates on
-the width of its uncertainty and not on the slope's sensitivity to it. Divide
-each ΔF by the coefficient of variation that produced it and the unit weight is
-the more powerful parameter: 0.383 over 6.7% is 0.057 of factor of safety per 1%
-of γ, against 0.677 over 25% for 0.027 per 1% of c. Per unit of change γ moves
-the answer twice as far — but c is asked over an interval nearly four times
-wider, and because each contribution enters the variance squared, the wider
-interval wins.
+**75.8%** of the variance and the unit weight **24.2%**. Cohesion dominates
+because its uncertainty is wide, not because the slope is more sensitive to
+it. To see that, divide each ΔF by its own coefficient of variation: a 1%
+change in γ moves the factor of safety by 0.057 (0.383 over 6.7%), while a 1%
+change in c moves it by only 0.027 (0.677 over 25%). Per percent of change,
+the unit weight is twice as powerful — but the cohesion is uncertain over an
+interval nearly four times wider, and because each contribution enters the
+variance squared, the wider interval wins.
 
 Three quarters of the uncertainty in the answer is therefore in one number, and
 that number is the one further site investigation would narrow. Another round of
@@ -497,15 +497,17 @@ not, so the choice is about cost and about what is being asked.
   breaks — a coefficient of variation so large that x − σ is not a physical
   value ([VP34](../verification/rocscience.md#vp34), a fill whose friction
   angle carries a 124% COV), a response that bends strongly, or a tail that
-  must be counted rather than fitted — and it is the arbiter when the other
-  two disagree.
+  must be counted rather than fitted — and it is the tie-breaker when the
+  other two disagree.
 - **The response surface** is the precision instrument: tail resolution no
-  count can afford, for a few hundred real solves — *when its gate accepts*.
-  It refuses exactly the models Monte Carlo exists for (VP34's gate finds a
-  third of the surrogate's failures have no real solution, and refuses), and
-  its β differs from Monte Carlo's in the third decimal because the fitted
-  formula slightly narrows the spread σ<sub>F</sub>. Quote its P<sub>f</sub>
-  with the gate credentials it prints beside it.
+  count can afford, for a few hundred real solves — *when its self-checks
+  pass*. It refuses exactly the models Monte Carlo exists for (on
+  [VP34](../verification/rocscience.md#vp34) the checks find that a third of
+  the formula's predicted failures have no real solution, so the engine
+  declines to answer), and its β differs from Monte Carlo's in the third
+  decimal because the fitted formula slightly narrows the spread
+  σ<sub>F</sub>. Quote its P<sub>f</sub> together with the fit-quality
+  numbers it prints beside it.
 
 A working habit: screen with the Taylor series, decide with Monte Carlo at the
 default convergence stop, and reach for the response surface when the tail

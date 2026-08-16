@@ -326,8 +326,9 @@ Slide2 and against the paper.
 ## Giving the force yourself
 
 The other way to enter a pile is to state its force outright, as
-[LEM-9's soldier pile](lem09_tieback_wall.md#the-problem) does — a number from a
-p-y analysis, a structural check or a published chart, entered per foot of slope.
+[LEM-9's soldier pile](lem09_tieback_wall.md#the-problem) does — a number from
+a p-y analysis (a lateral load–deflection model of the shaft), a structural
+check or a published chart, entered per foot of slope.
 Typing one into **H** turns the Ito & Matsui calculation off for that row; nothing
 else changes.
 
@@ -391,8 +392,8 @@ Run again:
 ![Spencer with grid seeding](images/lem12_solution_bypass.png){width=1000}
 
 **FS = 1.702**, below the 1.842 the seeded search reported, on a surface that
-never engages the piles. It daylights at (10.00, 10.00) — the head of the upper
-shaft — runs back to the crest at x = 24.3, and is 6.5 ft deep at its deepest,
+never engages the piles. It daylights — cuts back up to the ground
+surface — at (10.00, 10.00), the head of the upper shaft — runs back to the crest at x = 24.3, and is 6.5 ft deep at its deepest,
 moving 6,867 lb/ft. The depth from the ground surface to the failure surface at
 the pile is zero, so the Ito & Matsui integral over that depth is zero: the whole
 pile row contributes **0.04 lb/ft** to a surface that slides over the top of it.

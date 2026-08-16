@@ -575,12 +575,13 @@ so they deserve the same care as the strengths themselves — and when a σ is
 soft, running the analysis at a second plausible value shows whether the
 conclusion survives it.
 
-The unit weight's contribution is what remains. Its ΔF is 0.383 before the edit
-and 0.383 after — untouched, because nothing about γ changed — and it now carries
-56% of a smaller variance instead of 24% of a larger one. A second halving of
-σ(c) would buy correspondingly less; the parameter to attack next is the one the
-Pareto puts first *after* the edit, which is why the measurement is worth
-repeating rather than doing once.
+The unit weight's contribution is what remains. Its ΔF is 0.383 before the
+edit and 0.383 after — nothing about γ changed — but it now makes up 56% of
+the smaller total variance instead of 24% of the larger one. The ranking has
+flipped: the unit weight, not the cohesion, is now the bigger contributor.
+That means halving σ(c) a second time would gain much less than the first
+halving did, and it is the reason to re-run the Pareto after any σ changes —
+the answer to "what matters most?" changes with the inputs.
 
 ---
 

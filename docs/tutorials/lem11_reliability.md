@@ -335,16 +335,6 @@ LASH terminal, an underwater slope in San Francisco Bay mud — reaches the
 same conclusion: the choice of σ inputs moves the probability of
 failure further than the choice of estimator does.
 
-The sampling choice is one click to test. Set **MC sampling** to
-`Latin hypercube` and **Run** again: **P<sub>f</sub> = 16.42%**, with the
-mean and σ<sub>F</sub> unchanged to three digits — the same answer, inside
-the random run's ±0.7-point band. A single campaign cannot show what the
-structure buys, because the benefit is consistency rather than a different
-answer: run twenty campaigns each way, as the
-[Monte Carlo documentation page](../reliability/monte_carlo.md) does, and
-the Latin hypercube results scatter about half as widely around their common
-center. The three-fold figure quoted at the control is that measurement.
-
 The one visible disagreement is the mean: the Taylor series reports
 F<sub>MLV</sub> = 1.354 and Monte Carlo a mean of 1.381, 2% higher. Both are
 right about different things. F<sub>MLV</sub> is the factor of safety *at* the
@@ -361,6 +351,24 @@ F<sub>MLV</sub> — its response bends — and the Monte Carlo mean sits
 **+0.0268 above** it. **The whole gap is the bend in the γ response**, which
 the straight-line shortcut cannot see and a sampling method feels on every
 draw.
+
+### Trying Latin hypercube
+
+The **MC sampling** control is one click to test. Set it to `Latin
+hypercube` and **Run** again. The result is **P<sub>f</sub> = 16.42%**, with
+the mean and σ<sub>F</sub> matching the random run to three digits. That is
+the expected outcome: both runs estimate the same number, and both landed
+inside the ±0.7-point band that a count of 10,000 can resolve.
+
+What the structured sampling buys is consistency. A random campaign lands
+somewhere different in that band every time the seed changes; a Latin
+hypercube campaign lands closer to the same place every time. The
+[Monte Carlo documentation page](../reliability/monte_carlo.md) repeats both
+campaigns twenty times and measures the difference: the Latin hypercube
+answers scatter about half as widely. Half the scatter at the same cost is
+the earlier "three times its size" figure from the other direction — a
+random campaign needs roughly three times the realizations to be as
+repeatable.
 
 ---
 

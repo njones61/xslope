@@ -479,8 +479,12 @@ contribute equally. Knowing the split is worth money: it says which
 parameter another round of testing should chase.
 The **Parametric…** dialog computes the split: set **Method** to `Spencer` and
 **Plot type** to `Variance Pareto (σ)`, which is offered only for a model that
-carries standard deviations. The sweep table below it stays empty — this plot
-reads every σ-carrying material and ignores the table, as the note under it says:
+carries standard deviations. The sweep table below it stays empty. Its controls — **Add parameter**, a
+**±%** range per row or the row's **σ range** preset, and the number of
+sweep **Points** — feed the dialog's tornado and spider sweeps
+([Parametric Studies](../parametric/sensitivity.md) covers those); the two
+σ-based plot types read every σ-carrying material directly and ignore the
+table, as the note under it says:
 
 ![The Parametric dialog set to the variance Pareto](images/lem11_studio_parametric_variance.png)
 

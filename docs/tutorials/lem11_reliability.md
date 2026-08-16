@@ -241,18 +241,37 @@ controls below the surface options come live:
 
 ![The Reliability dialog on Monte Carlo](images/lem11_studio_reliability_mc.png)
 
-**MC samples** `10000` is the number of realizations, **MC seed** `20240117` is
-the random seed — fixed rather than taken from the clock, so the run reproduces
-exactly — and **MC distribution** `Normal` is how each σ is read: as the standard
-deviation of a normal distribution about the material's own value, truncated at
-zero so a draw can never hand the solver a negative strength. **MC sampling**
-chooses how the draws are laid down: `Random` is independent draws; `Latin
-hypercube` cuts each distribution into equal-probability bins with one draw
-per bin, which the [Monte Carlo page](../reliability/monte_carlo.md) measures
-at roughly three times the information per realization on this model. **Stop when P_f
-converges** ends the campaign early once the probability of failure is known
-to a stated fraction of itself — at the default ±5%, this model stops at
-7,600 realizations — with the samples field as the cap; the
+**MC samples** `10000` is the number of realizations — how many versions of
+the slope will be built and solved.
+
+**MC seed** `20240117` starts the random-number generator. The value itself
+means nothing — any integer serves — but keeping it fixed means the same
+input file draws the same ten thousand realizations every time, so the
+results repeat to the digit. There is no reason to change it in ordinary
+work. The one good use for a different seed is a scatter check: rerun with
+two or three other seeds, and P<sub>f</sub> should wobble only in its last
+digits. If a conclusion flips when the seed changes, it was resting on too
+few realizations — the fix is more samples, not a better seed.
+
+**MC distribution** `Normal` sets the shape each σ is read as. `Normal` draws
+from the symmetric bell curve centered on the material's own value with the σ
+column as its spread — the same reading the Taylor series gives those
+columns. The alternative, `Lognormal`, is a skewed relative of the bell curve
+that can never produce a negative value, matched to the same mean and σ; it
+is worth considering when a σ is so large that the bell would spill past
+zero. That is not the case here — the largest COV on this model is the
+cohesion's 25% — and either way every draw is cut off at zero, so a sample
+can never hand the solver a negative strength.
+
+**MC sampling** chooses how the draws are laid down: `Random` is independent
+draws; `Latin hypercube` cuts each distribution into equal-probability bins
+with one draw per bin, which the
+[Monte Carlo page](../reliability/monte_carlo.md) measures at roughly three
+times the information per realization on this model.
+
+**Stop when P_f converges** ends the campaign early once the probability of
+failure is known to a stated fraction of itself — at the default ±5%, this
+model stops at 7,600 realizations — with the samples field as the cap; the
 [Monte Carlo page](../reliability/monte_carlo.md) gives the rule and its
 convergence plot. Leave it unticked here, and **Run**.
 

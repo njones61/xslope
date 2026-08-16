@@ -523,19 +523,19 @@ The two plots agree about which parameter matters; this one also shows
 which way each parameter pushes.
 
 Three quarters of the uncertainty in the answer traces to a single input:
-the cohesion's standard deviation. That is the number more site
-investigation can shrink. Another round of undrained testing would not
-change the clay's strength — it would narrow how well that strength is
-known, which is a smaller σ on the same cohesion. The next section does
-exactly that.
+σ(c). That concentration cuts both ways. It says the cohesion's spread is
+what controls the reliability — and it also means the computed
+P<sub>f</sub> leans hard on the σ(c) *estimate*, which is often one of the
+softest numbers in the model, assigned from the scatter of a few tests or
+from published ranges. Before trusting the answer, it is worth measuring
+how hard it leans. The next section does exactly that.
 
 ### Halve it
 
-Suppose that second round of testing came back and cut the uncertainty in
-the undrained strength in half: the cohesion is still 400 psf, but it is now
-known to ±50 instead of ±100. The model can price that outcome before any
-samples are taken — enter the smaller σ, run the reliability again, and see
-what the testing program would buy.
+Ask the what-if directly: with the cohesion still 400 psf but its spread
+set to 50 instead of 100, how much does the reliability move? One cell
+changes, the run repeats, and the size of the move measures how sensitive
+the results are to the σ estimate.
 
 Open **Materials**, select the clay, and change the **± σ** beside **c** from
 `100` to `50`. In the table view — and on the mat sheet — this is the second cell
@@ -569,8 +569,12 @@ it:
 slope moved — the same clay at the same strength on the same critical circle. The
 probability of failure fell from roughly one in six to roughly one in twenty,
 11.4 percentage points, and the failed count in the Monte Carlo campaign fell
-from 1,642 realizations to 501. What was bought was not strength but knowledge of
-it, and only a probabilistic analysis can show that purchase at all.
+from 1,642 realizations to 501. The factor of safety cannot see the σ
+columns at all; the probability of failure moved by a factor of three. That
+is the finding: the computed P<sub>f</sub> leans hard on the σ estimates,
+so they deserve the same care as the strengths themselves — and when a σ is
+soft, running the analysis at a second plausible value shows whether the
+conclusion survives it.
 
 The unit weight's contribution is what remains. Its ΔF is 0.383 before the edit
 and 0.383 after — untouched, because nothing about γ changed — and it now carries

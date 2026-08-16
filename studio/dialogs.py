@@ -2038,6 +2038,29 @@ SEARCH_LABEL_SAMPLING = "Search for the critical surface at the mean values"
 SEARCH_HINT_TAYLOR = ("Unticked: every solve evaluates the first circle on the "
                       "circles sheet (or the non-circular surface) — the same "
                       "surface a Single surface run solves.")
+SEARCH_TIP_TAYLOR = (
+    "On: the Taylor series solves the model 1+2N times — once at the "
+    "most-likely values and at MLV ± σ for each uncertain parameter — and "
+    "every one of those solves is a fresh search, so each perturbed model "
+    "finds its own critical surface. On some models all the searches land on "
+    "one circle; on layered models they separate, and that spread is part of "
+    "the sensitivity.\n\n"
+    "Off: every solve evaluates the first circle on the circles sheet (or the "
+    "non-circular surface), exactly as a Single surface run does. Untick when "
+    "the surface itself is prescribed — a published benchmark's circle, an "
+    "observed failure surface, a geologically controlled plane — and the "
+    "question is that surface's own reliability.")
+SEARCH_TIP_SAMPLING = (
+    "On: the critical surface is searched once, at the most-likely values, "
+    "and every realization is evaluated on it — one surface for the whole "
+    "campaign, because re-searching per realization is prohibitive at "
+    "thousands of solves. This fixed-surface convention is what the "
+    "commercial codes use in their probabilistic modes.\n\n"
+    "Off: the fixed surface is the first circle on the circles sheet (or the "
+    "non-circular surface) instead, exactly as a Single surface run solves "
+    "it. Untick when the surface is prescribed — a published benchmark's "
+    "circle, an observed failure surface — and the question is that "
+    "surface's own reliability.")
 SEARCH_HINT_SAMPLING = ("One surface serves every realization — the searched one, "
                         "or, unticked, the first circle on the circles sheet "
                         "(or the non-circular surface), as a Single surface run "
@@ -2156,18 +2179,7 @@ class ReliabilityDialog(QDialog):
         # for one engine or the other (owner + pushback, 2026-08-15).
         self.search = QCheckBox(SEARCH_LABEL_TAYLOR)
         self.search.setChecked(bool(defaults.get("search", True)))
-        self.search.setToolTip(
-            "On (default): the Taylor series solves the model 1+2N times — at "
-            "the mean values and at ±σ for each uncertain parameter — and every "
-            "one of those solves is a fresh search for that perturbed model's "
-            "own critical surface. The sampling engines (Monte Carlo, response "
-            "surface) search once, at the mean values, and hold that surface "
-            "across all realizations.\n\n"
-            "Off: every solve evaluates the first circle on the circles sheet "
-            "(or the non-circular surface), exactly as a Single surface run "
-            "does — the right mode when the surface itself is prescribed: a "
-            "published benchmark's circle, an observed failure surface, a "
-            "geologically controlled plane.")
+        self.search.setToolTip(SEARCH_TIP_TAYLOR)
         self.search_hint = QLabel(SEARCH_HINT_TAYLOR)
         self.search_hint.setWordWrap(True)
         self.search_hint.setStyleSheet("color: gray; font-size: 11px;")
@@ -2369,6 +2381,8 @@ class ReliabilityDialog(QDialog):
                             else SEARCH_LABEL_TAYLOR)
         self.search_hint.setText(SEARCH_HINT_SAMPLING if sampling
                                  else SEARCH_HINT_TAYLOR)
+        self.search.setToolTip(SEARCH_TIP_SAMPLING if sampling
+                               else SEARCH_TIP_TAYLOR)
         for w in (self.n_samples, self.mc_converge):
             w.setEnabled(mc)
         self.mc_converge_tol.setEnabled(mc and self.mc_converge.isChecked())

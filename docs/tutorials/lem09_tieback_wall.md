@@ -23,7 +23,7 @@ reproduces that row's locked values.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Learning objectives** — Enter discrete grouted anchors as reinforcement lines with the
+**Objectives** — Enter discrete grouted anchors as reinforcement lines with the
 **Anchor** support-type preset, a bond length only at the embedded end and a
 capacity reduced to a per-foot-of-wall force; search the wall for its critical
 wedge; solve the wedge a reference manual specifies; and read the result against

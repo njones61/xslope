@@ -20,7 +20,7 @@ answer.**
 <div class="tgt-tile"><span class="tg-label">Open & run</span><p>~10 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Learning objectives** — Open a completed model and search it from the circle the
+**Objectives** — Open a completed model and search it from the circle the
 file carries, then move the seed and get a different answer; use a minimum
 slip depth to reject surficial slivers (Part A); and on the James Bay dyke,
 watch a single plausible seed miss the global minimum that grid seeding finds

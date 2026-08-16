@@ -20,7 +20,7 @@ model has to be built so the search can ask about both sides of it.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Learning objectives** — Build a section with two material zones, put a profile line on
+**Objectives** — Build a section with two material zones, put a profile line on
 the boundary between them and a starting circle at the base of each, and read the
 search result at depth: which layer the critical surface runs in, why it stops
 where it does, and what would have to change for the deeper circle to be the

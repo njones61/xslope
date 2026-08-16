@@ -20,7 +20,7 @@ one per material zone, and the base of the model is whatever the polygons draw.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Learning objectives** — Enter a section as material-zone polygons rather than profile
+**Objectives** — Enter a section as material-zone polygons rather than profile
 lines, on a base that dips too much for a maximum depth to describe; search it
 for the critical circle; and read what the base does to that search — the
 circles it refuses, the option that lets a circle be truncated against it

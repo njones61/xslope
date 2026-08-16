@@ -18,7 +18,7 @@ follows is the machinery all three share.
 <div class="tgt-tile"><span class="tg-label">Reading time</span><p>~10 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Learning objectives** — Know what the Excel template is, what Studio's editors and its
+**Objectives** — Know what the Excel template is, what Studio's editors and its
 assistant do to a model, what **Save As** actually writes, which files a project
 collects beside its workbook, and how to send a whole project to somebody else.
 </div>

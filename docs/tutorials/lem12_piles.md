@@ -12,7 +12,10 @@ through the face bring it to 1.842. The pile force is not entered anywhere
 in the model. The force column is left blank, which tells XSLOPE to compute
 the lateral force the soil can push onto each pile — from the pile diameter
 and the center-to-center spacing, by the Ito & Matsui (1975) method — and to
-recompute it for every trial surface the search tries.
+recompute it for every trial surface the search tries. This is the second of
+the two ways XSLOPE models a pile: the tieback wall tutorial
+([LEM-9](lem09_tieback_wall.md)) entered its soldier pile the other way,
+with the force stated directly, and this page compares the two routes.
 
 
 <div class="tut-glance" markdown>

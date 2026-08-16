@@ -244,6 +244,10 @@ controls below the surface options come live:
 
 ![The Reliability dialog on Monte Carlo](images/lem11_studio_reliability_mc.png)
 
+The search checkbox now reads **Search for the critical surface at the mean
+values**: the critical surface is found once, at the most-likely values, and
+every realization is solved on it.
+
 **MC samples** `10000` is the number of realizations — how many versions of
 the slope will be built and solved. Ten thousand is the default because the
 probability of failure is a count, and a count is only as sharp as the pile

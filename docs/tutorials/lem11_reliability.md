@@ -11,9 +11,10 @@ of safety. A stochastic analysis starts from **more** data, not less. A site
 investigation yields more than a best estimate of each property: the tests
 scatter, and the width of that scatter says how well the property is known.
 Nor does the scatter have to be measured on site — typical uncertainties for
-the properties of each soil type are well documented, so a defensible
-standard deviation can be assigned from published values without a large
-testing program. Entering a standard deviation beside each value brings that second piece of
+the properties of each soil type are well documented
+([Parameter Uncertainty](../reliability/index.md#parameter-uncertainty)
+tabulates them), so a defensible standard deviation can be assigned from
+published values without a large testing program. Entering a standard deviation beside each value brings that second piece of
 information into the analysis, which carries it through the
 computation — and the answer comes back correspondingly richer: a distribution
 of factors of safety, summarized by a **probability of failure** and a

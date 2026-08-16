@@ -1723,7 +1723,8 @@ class SensitivityDialog(QDialog):
         v.addLayout(pt)
 
         controls = QHBoxLayout()
-        controls.addWidget(QLabel("Default ±%"))
+        self._pct_label = QLabel("Default ±%")
+        controls.addWidget(self._pct_label)
         self.pct = QDoubleSpinBox()
         self.pct.setRange(1.0, 99.0)
         self.pct.setDecimals(0)
@@ -1731,7 +1732,8 @@ class SensitivityDialog(QDialog):
         self.pct.setValue(float(defaults.get("default_pct", 20.0)))
         controls.addWidget(self.pct)
         controls.addSpacing(12)
-        controls.addWidget(QLabel("Points"))
+        self._points_label = QLabel("Points")
+        controls.addWidget(self._points_label)
         self.n_points = QSpinBox()
         self.n_points.setRange(3, 31)
         self.n_points.setValue(int(defaults.get("n", 7)))
@@ -1883,7 +1885,23 @@ class SensitivityDialog(QDialog):
             w.setVisible(scaled)
         for w in (self._mc_label, self.mc_samples):
             w.setVisible(rank)
-        if self.mode.currentData() != "sensitivity":
+        # Gate the sweep controls by what the selected plot type actually reads:
+        # the sigma-based plots (variance, rank) never read the table, and the
+        # scaled bars read only its parameter list (the derivative is a fixed
+        # ±1% central difference), so the ±% ranges and Points gray out with
+        # them. Anything a selection ignores is disabled, not left live.
+        mode_sens = self.mode.currentData() == "sensitivity"
+        table_used = (not mode_sens) or pt not in ("variance", "rank")
+        ranges_used = (not mode_sens) or pt in ("tornado", "spider")
+        for w in (self.material, self.prop, self.add_btn, self.table):
+            w.setEnabled(table_used)
+        for w in (self._pct_label, self.pct, self._points_label, self.n_points):
+            w.setEnabled(ranges_used)
+        for r in self._rows:
+            r["sigma_btn"].setEnabled(ranges_used and r.get("sigma") is not None)
+            r["pct_spin"].setEnabled(ranges_used
+                                     and not r["sigma_btn"].isChecked())
+        if not mode_sens:
             return
         q = self._out_short
         notes = {
@@ -1891,16 +1909,19 @@ class SensitivityDialog(QDialog):
                         f"(or ±σ); bars show the {q} swing, widest on top. Double-click "
                         f"a bar for that parameter's curve."),
             "scaled": ("Scaled-sensitivity bars: one bar per table parameter, height = "
-                       "the chosen scaling of ∂F/∂p (central difference at ±1%), color = "
-                       "sign. Elasticity is unitless and comparable across parameters."),
+                       "the chosen scaling of ∂F/∂p (central difference at a fixed ±1%, "
+                       "so the ±% ranges and Points do not apply), color = sign. "
+                       "Elasticity is unitless and comparable across parameters."),
             "spider": (f"Spider: {q} vs each table parameter over its ±% range, on one "
                        f"normalized axis (% change from base), with a base-case marker."),
             "variance": ("Variance Pareto: each uncertain parameter's share of Var(FS) "
-                         "from the Taylor-series reliability, sorted with a cumulative "
-                         "line. Uses every σ-carrying material (the table is ignored)."),
+                         "from the Taylor-series reliability, sorted tallest first. "
+                         "Uses every σ-carrying material — the sweep table does not "
+                         "apply and is disabled."),
             "rank": ("Monte Carlo rank correlation: Spearman correlation of each sampled "
-                     "input with FS — a GLOBAL measure. Uses every σ-carrying material "
-                     "(the table is ignored); can take a while at high sample counts."),
+                     "input with FS — a GLOBAL measure. Uses every σ-carrying material — "
+                     "the sweep table does not apply and is disabled. Can take a while "
+                     "at high sample counts."),
         }
         self.note.setText(notes.get(pt, ""))
 
@@ -1913,6 +1934,7 @@ class SensitivityDialog(QDialog):
         if any(r["ref"] == ref for r in self._rows):
             return                                   # already added
         self._add_row(e, pct=self.pct.value(), use_sigma=False)
+        self._on_plot_type_changed()
 
     def _add_row(self, entry, pct, use_sigma):
         row = self.table.rowCount()

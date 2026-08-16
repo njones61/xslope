@@ -1316,6 +1316,20 @@ def _lem11_reliability_labels():
         fails.append(f"the Parametric dialog offers no {LEM11_VARIANCE_PLOT!r} "
                      f"plot type on a model carrying sigmas; Tutorial LEM-11 "
                      f"tells the reader to select it. It offers {plots}")
+    # The sigma-based plots ignore the sweep table, and the page says the
+    # dialog shows that by graying it out — so it must actually gray out, and
+    # come back when a table-driven plot type is selected again.
+    _v = sens.plot_type.findData("variance")
+    if _v >= 0:
+        sens.plot_type.setCurrentIndex(_v)
+        if sens.add_btn.isEnabled() or sens.table.isEnabled():
+            fails.append("on the variance Pareto the sweep table stays live; "
+                         "Tutorial LEM-11 says it grays out because the plot "
+                         "ignores it")
+        sens.plot_type.setCurrentIndex(sens.plot_type.findData("tornado"))
+        if not (sens.add_btn.isEnabled() and sens.table.isEnabled()):
+            fails.append("back on the tornado the sweep table stays disabled; "
+                         "the gating must follow the plot type both ways")
     sens.deleteLater()
     return fails
 

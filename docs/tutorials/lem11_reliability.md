@@ -479,12 +479,12 @@ contribute equally. Knowing the split is worth money: it says which
 parameter another round of testing should chase.
 The **Parametric…** dialog computes the split: set **Method** to `Spencer` and
 **Plot type** to `Variance Pareto (σ)`, which is offered only for a model that
-carries standard deviations. The sweep table below it stays empty. Its controls — **Add parameter**, a
-**±%** range per row or the row's **σ range** preset, and the number of
-sweep **Points** — feed the dialog's tornado and spider sweeps
-([Parametric Studies](../parametric/sensitivity.md) covers those); the two
-σ-based plot types read every σ-carrying material directly and ignore the
-table, as the note under it says:
+carries standard deviations. Selecting it grays out the sweep table and its
+controls — **Add parameter**, the **±%** and **σ range** columns, and the
+sweep **Points** feed the dialog's tornado and spider sweeps
+([Parametric Studies](../parametric/sensitivity.md) covers those), and the
+two σ-based plot types read every σ-carrying material directly instead, as
+the note under the table says:
 
 ![The Parametric dialog set to the variance Pareto](images/lem11_studio_parametric_variance.png)
 
@@ -512,17 +512,15 @@ Run it and the same verdict comes back:
 
 ![The Monte Carlo rank-correlation bars](images/lem11_rank.png){width=800}
 
-Cohesion at a correlation of +0.86, unit weight at −0.46 — and where the
-Pareto's bars are all positive shares, these carry a sign. Cohesion's is the
-obvious one: more strength, higher factor of safety. The unit weight's
-negative sign is the same physics the Taylor table showed when the γ row's
-F⁺ came back the *lower* of its pair. Weight is the driving force, and on
-this φ = 0 clay the resistance is all cohesion, which gains nothing from the
-extra normal stress a heavier soil presses onto the failure surface — every
-added pound drives and none of it resists, so the heavier realizations fail
-more often. In a frictional soil some of that weight would come back as
-frictional resistance and the correlation would be weaker. The cheap plot
-and the sampled one agree about what matters.
+Cohesion comes in at +0.86 and unit weight at −0.46, and unlike the
+Pareto's bars, these carry a sign. The cohesion sign is the obvious one:
+stronger clay, safer slope. The unit weight sign says a heavier slope is a
+less safe one. Weight is what drives the sliding, and in a φ = 0 clay it
+adds nothing to the resistance — the strength is all cohesion, no matter
+how hard the soil presses on the failure surface. So realizations that drew
+a heavier unit weight tended to come back with a lower factor of safety.
+The two plots agree about which parameter matters; this one also shows
+which way each parameter pushes.
 
 Three quarters of the uncertainty in the answer is therefore in one number, and
 that number is the one further site investigation would narrow. Another round of

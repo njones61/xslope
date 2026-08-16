@@ -313,8 +313,8 @@ convergence plot. Leave it unticked here, and **Run**.
 The cost is closer to the Taylor series than the counts suggest: its five
 solves are five full searches (about 13 seconds here), while Monte Carlo
 searches once and then solves a held surface ten thousand times (about 22
-seconds). What comes back is not an
-estimate of the distribution but the distribution itself:
+seconds). The result is the histogram of all ten thousand factors of
+safety — the actual distribution of FS, not an assumed shape:
 
 ![The Monte Carlo FS histogram](images/lem11_mc.png){width=1000}
 

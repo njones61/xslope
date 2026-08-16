@@ -242,18 +242,20 @@ nothing: whatever the distribution of FS really is, it emerges. The price is the
 and on a fixed surface where each solve costs milliseconds, the price is
 affordable.
 
+The fixed surface is itself a difference from the Taylor series. There,
+every one of the five solves ran its own search. Here the search runs once
+at most — at the most-likely values — and all ten thousand realizations are
+solved on that one surface while the properties vary. A search tries
+hundreds of trial surfaces to earn its answer; repeating that for every
+realization would be time-prohibitive.
+
 Open **Reliability…** again and change **Method** to `Monte Carlo`. The
 controls below the surface options come live:
 
 ![The Reliability dialog on Monte Carlo](images/lem11_studio_reliability_mc.png)
 
 The search checkbox now reads **Search for the critical surface at the mean
-values**, and the new label marks a real difference from the Taylor series.
-There, every one of the five solves ran its own search. Here the search runs
-once at most — at the most-likely values — and all ten thousand realizations
-are solved on that one surface while the properties vary. A search tries
-hundreds of trial surfaces to earn its answer; repeating that for every
-realization would be time-prohibitive.
+values** — the once-at-most search described above.
 
 **MC samples** `10000` is the number of realizations — how many versions of
 the slope will be built and solved. Ten thousand is the default because the

@@ -430,6 +430,7 @@ P<sub>f</sub> = Φ(−β) and the two always move together:
 |---|:---:|:---:|:---:|:---:|
 | Taylor series (TSPM) | 1.354 | 0.389 | 0.935 (lognormal) | 17.48% |
 | Monte Carlo, 10,000 samples | 1.381 | 0.408 | 0.969 (lognormal) | 16.71% (counted) |
+| Monte Carlo, 10,000 Latin hypercube samples | 1.381 | 0.402 | 0.988 (lognormal) | 16.42% (counted) |
 | Response surface, 10⁷ formula realizations | 1.381 | 0.400 | 0.998 (lognormal) | 16.56% (counted on the formula) |
 
 β is the more stable of the two to quote, because P<sub>f</sub> is exponentially

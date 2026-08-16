@@ -67,11 +67,10 @@ slice bases — here the line defines the reservoir, not a pore-pressure field.
 [LEM-4](lem04_water_in_the_slope.md) covers the pore-pressure inputs this model
 deliberately does without.
 
-What makes the slope a reliability problem is the two extra pieces of data
-beside those strengths: the site investigation supports a standard deviation of
-8 pcf on the unit weight and 100 psf on the cohesion — 7% and 25% of their own
-values — and the sheet carries them where a deterministic model would have
-carried nothing.
+What makes the slope a reliability problem is two extra pieces of data: a
+standard deviation of 8 pcf on the unit weight and 100 psf on the cohesion —
+7% and 25% of their own values. These are the two entries a deterministic
+model would leave blank.
 
 ### Opening the model
 

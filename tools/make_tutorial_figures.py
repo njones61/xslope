@@ -1459,11 +1459,14 @@ def _lem11_sigma_c(model, value):
 
 
 def _lem11_reliability(model, engine):
-    """One reliability run, quiet. ``engine`` is 'taylor' or 'mc'; both are called
-    with the dialog's own defaults, so the figures carry what Studio's Run produces."""
-    from xslope.reliability import reliability_mc, reliability_taylor
+    """One reliability run, quiet. ``engine`` is 'taylor', 'mc' or 'rs'; all are
+    called with the dialog's own defaults, so the figures carry what Studio's Run
+    produces."""
+    from xslope.reliability import (reliability_mc, reliability_rs,
+                                    reliability_taylor)
 
-    fn = reliability_taylor if engine == "taylor" else reliability_mc
+    fn = {"taylor": reliability_taylor, "mc": reliability_mc,
+          "rs": reliability_rs}[engine]
     with contextlib.redirect_stdout(io.StringIO()):
         ok, res = fn(copy.deepcopy(model), LEM11_METHOD, debug_level=-1)
     if not ok:
@@ -1510,6 +1513,9 @@ def lem11_plots():
 
     mc = _lem11_reliability(sd, "mc")
     capture("lem11_mc.png", plot_reliability_histogram, mc)
+
+    rs = _lem11_reliability(sd, "rs")
+    capture("lem11_rs.png", plot_reliability_histogram, rs)
 
     tight = _lem11_sigma_c(sd, LEM11_SIGMA_C)
     taylor_t = _lem11_reliability(tight, "taylor")

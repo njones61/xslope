@@ -380,19 +380,29 @@ on the formula are nearly free:
 
 ![The Reliability dialog on the response surface](images/lem11_studio_reliability_rs.png)
 
-Click **Run**. On this model the engine makes 9 design solves (two uncertain
-parameters), then 700 more to *check itself* — 500 across the whole
-distribution and 200 in the failure region — and reports in about four
-seconds: **P<sub>f</sub> = 16.6%**, β<sub>LN</sub> = 0.998, with the fit's
-credentials beside the answer: R² = 0.998, an rms fit error of 0.018 on the
-factor of safety, and 1 of the 500 checked draws on the wrong side of
-FS = 1. Paired against thirty thousand real solves of the identical draws,
-the formula's P<sub>f</sub> is 0.10 percentage points low — the sampling
-error is gone and the *fit* error is what remains, measured. The
+Click **Run**. The engine solves the real model 9 times to fit the formula —
+the mean values, plus the one- and two-standard-deviation combinations of
+the two parameters — and then 700 more times to check the fit: 500 solves
+spread across the whole range of the inputs, and 200 concentrated where the
+formula predicts failure. About four seconds later the result view shows the
+same histogram Monte Carlo produced, now built from ten million realizations
+of the formula:
+
+![The response-surface FS histogram](images/lem11_rs.png){width=1000}
+
+**P<sub>f</sub> = 16.6%** and **β<sub>LN</sub> = 0.998**, beside Monte
+Carlo's 16.71% and 0.969. The checks are reported with the answer, and they
+are worth reading: across the 500 checking solves the formula reproduced the
+real factor of safety with a typical error of 0.018 (R² = 0.998), and only
+1 of the 500 landed on the other side of FS = 1 from where the formula put
+it. In a fuller test run for this page, thirty thousand of the draws were
+re-solved with the real model: the formula's P<sub>f</sub> came out 0.10
+percentage points low. The counting wobble is gone, and that small fit error
+is what remains. The
 [response-surface section](../reliability/monte_carlo.md#sampling-a-fitted-response-surface)
-draws the fitted surface, the sample cloud and the F = 1 boundary in one
-figure, and lists the checks that make the engine refuse a model it cannot
-fit honestly.
+of the documentation draws the fitted formula over the design points and the
+F = 1 boundary, and lists the checks that make the engine refuse a model it
+cannot fit honestly.
 
 ---
 

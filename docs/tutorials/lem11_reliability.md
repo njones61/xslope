@@ -189,7 +189,10 @@ per-parameter table is written to the Log pane:
 | soil γ | 120 | 8 | 1.189 | 1.572 | 0.383 |
 | soil c | 400 | 100 | 1.692 | 1.015 | 0.677 |
 
-The unit-weight row runs the other way from the strength row: heavier clay is a
+Each row is one of those ±σ pairs: **F⁺** is the factor of safety solved with
+that parameter raised to MLV + σ, **F⁻** with it lowered to MLV − σ (the
+other parameter staying at its MLV both times), and **ΔF** is the swing
+between them. The unit-weight row runs the other way from the strength row: heavier clay is a
 larger driving moment, so **F⁺ is the lower** of its pair. Only the size of
 each swing enters the variance, σ<sub>F</sub>² = Σ(ΔF/2)², which here gives
 **σ<sub>F</sub> = 0.389** and **COV<sub>F</sub> = 0.287**. From the factor of

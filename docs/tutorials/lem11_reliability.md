@@ -530,7 +530,7 @@ softest numbers in the model, assigned from the scatter of a few tests or
 from published ranges. Before trusting the answer, it is worth measuring
 how hard it leans. The next section does exactly that.
 
-### Halve it
+### Halving σ(c)
 
 Ask the what-if directly: with the cohesion still 400 psf but its spread
 set to 50 instead of 100, how much does the reliability move? One cell

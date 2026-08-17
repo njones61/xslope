@@ -1762,6 +1762,282 @@ def _interp(x, xs, ys):
     return ys[-1] if x > xs[-1] else ys[0]
 
 
+# --------------------------------------------------------------------------- #
+# SEEP-1 — Seepage Under a Sheetpile (built from scratch, one model, many meshes)
+#
+# The model is confined: two specified-head boundaries, no exit face, one soil. That
+# makes every number on the page a property of the mesh and of the boundary values
+# alone, and the producer is organised around exactly that. Four states are drawn —
+# the inputs, the mesh the tutorial's first run uses, that run's flow net, and the
+# same flow net on a mesh auto-refined at the sheetpile tip — and three studies are
+# printed: the discharge against the element size, the discharge against the element
+# type, and the discharge against the conductivity.
+#
+# The tip is the reason the page exists. A sheetpile modelled as a slot in the ground
+# surface leaves a re-entrant corner at its toe, where the hydraulic gradient is
+# singular; the discharge therefore keeps falling as the mesh refines, and every
+# quoted discharge names the mesh it was computed on.
+# --------------------------------------------------------------------------- #
+SEEP01 = os.path.join(REPO_ROOT, "docs/seep/files/xslope_clay_blanket.xlsx")
+#: The tutorial's first mesh: tri3 (the seepage default), at the target size Studio's
+#: own auto-size produces on this 50 m section — width / 100 divisions.
+SEEP01_SIZE = 0.5
+SEEP01_ELEMENT = "tri3"
+#: The refinement the page turns on, in the Build mesh dialog's own terms: local
+#: element size = target size / factor near model features, the sheetpile slot's toe
+#: among them.
+SEEP01_REFINE = 4
+#: Element sizes for the mesh study, coarse to fine. 0.4167 is width / 120 — the size
+#: the sample page's regression tag meshes at, and the reason its catalogued discharge
+#: is neither of the neighbouring rows.
+SEEP01_SIZES = (2.0, 1.0, 50.0 / 120.0, 0.5, 0.25, 0.125)
+#: The size the element-type comparison is made at. Coarser than the page's own mesh,
+#: so the difference between the element orders is not buried under a mesh fine enough
+#: to hide it.
+SEEP01_TYPE_SIZE = 1.0
+#: Contour count for the flow net. 9 head drops is what makes the channel count come
+#: out at a whole number here, so the drawn net is a flow net and not a rounding of one.
+SEEP01_LEVELS = 10
+#: The conductivity sweep, two decades either side of the model's own 30 m/day.
+SEEP01_K = (3.0, 10.0, 30.0, 100.0, 300.0)
+#: The sheetpile toe, and the upstream edge of the clay blanket — the model's two
+#: re-entrant corners, and the two places the gradient is measured.
+SEEP01_TIP = (30.0, 7.0)
+SEEP01_BLANKET_EDGE = (20.0, 10.0)
+
+
+def _seep01_mesh(model, size=SEEP01_SIZE, element_type=SEEP01_ELEMENT, **kwargs):
+    """One mesh of the model's material polygons, quiet."""
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model), size, element_type,
+            size_regions=extract_size_regions(model), **kwargs)
+
+
+def _seep01_solve(model, mesh):
+    """One steady seepage solve on a built mesh. Returns ``(seep_data, solution)``."""
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        seep_data = build_seep_data(mesh, model)
+        solution = run_seepage_analysis(seep_data, tol=1e-4)
+    return seep_data, solution
+
+
+def _seep01_run(model, **kwargs):
+    """Mesh and solve in one step, for the studies that only want numbers."""
+    mesh = _seep01_mesh(model, **kwargs)
+    seep_data, solution = _seep01_solve(model, mesh)
+    return mesh, seep_data, solution
+
+
+def _seep01_material(model, **fields):
+    """``model`` with its one soil's seepage fields overridden, in memory only."""
+    mats = [dict(m) for m in model["materials"]]
+    mats[0].update(fields)
+    return dict(model, materials=mats)
+
+
+def _seep01_gradient_near(mesh, solution, point, radius=0.5):
+    """The largest hydraulic-gradient magnitude within ``radius`` of ``point``, and
+    how many nodes the mesh puts there.
+
+    A re-entrant corner has no finite gradient, so this is a mesh measurement as much
+    as a flow one: it says how hard the mesh is resolving the corner, which is what
+    the page's refinement section compares.
+    """
+    import numpy as np
+
+    nodes = np.asarray(mesh["nodes"])
+    dist = np.linalg.norm(nodes - np.asarray(point), axis=1)
+    near = dist < radius
+    i_mag = np.asarray(solution["i_mag"])
+    return float(i_mag[near].max()), int(near.sum()), float(np.sort(dist)[1])
+
+
+def _seep01_tip_zoom(panels, half=1.6):
+    """The meshes of ``panels`` — ``(label, mesh)`` pairs — side by side around the
+    sheetpile toe.
+
+    One figure rather than two, because the comparison IS the subject: the same
+    window, the same axes and the same element edges, so the only difference on the
+    page is the thing the refinement changed. The window is square and centered on the
+    toe, and each panel carries the node count its mesh puts inside it.
+    """
+    import numpy as np
+
+    x0, y0 = SEEP01_TIP
+    fig, axes = plt.subplots(1, len(panels), figsize=(12, 5.2))
+    for ax, (label, mesh) in zip(axes, panels):
+        nodes = np.asarray(mesh["nodes"])
+        tris = [e[:3] for e in np.asarray(mesh["elements"])]
+        ax.triplot(nodes[:, 0], nodes[:, 1], tris, color="#5a6b7a", lw=0.5)
+        inside = ((np.abs(nodes[:, 0] - x0) <= half)
+                  & (np.abs(nodes[:, 1] - y0) <= half))
+        ax.plot([29.9, x0, 30.1], [10.0, y0, 10.0], color="#b03030", lw=2.0,
+                solid_capstyle="round")
+        ax.plot([x0], [y0], "o", color="#b03030", ms=5)
+        ax.set_xlim(x0 - half, x0 + half)
+        ax.set_ylim(y0 - half, y0 + half)
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_xlabel("x (m)")
+        ax.set_title("%s — %d nodes in this window" % (label, int(inside.sum())))
+    axes[0].set_ylabel("y (m)")
+    fig.suptitle("The mesh at the sheetpile toe")
+    fig.tight_layout()
+
+
+def _seep01_q_vs_k(both, k1_only):
+    """The discharge against conductivity, two sweeps on one pair of axes.
+
+    Left: both principal conductivities scaled together, which leaves the head field
+    untouched and makes the discharge exactly proportional to k. Right: k1 swept with
+    k2 held, which changes the anisotropy ratio and therefore the head field, so the
+    same axis is no longer a straight line. The left panel is drawn against the
+    proportional line through the model's own point, so a departure from it would be
+    visible; the right is drawn against the same line, which is what it departs from.
+    """
+    ks = [k for k, _ in both]
+    qs = [q for _, q in both]
+    qs1 = [q for _, q in k1_only]
+    ratio = qs[ks.index(30.0)] / 30.0
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8))
+    line_k = [min(ks), max(ks)]
+    for ax, series, title in (
+            (axes[0], qs, "k₁ and k₂ scaled together"),
+            (axes[1], qs1, "k₁ swept, k₂ held at 30 m/day")):
+        # The reference line is drawn wide and the computed series narrow on top of
+        # it, so a series that IS proportional reads as dots centred in a gray band
+        # rather than as a blue line hiding the gray one underneath.
+        ax.plot(line_k, [ratio * k for k in line_k], "-", color="#b8c1cb", lw=4.0,
+                solid_capstyle="butt", label="q proportional to k")
+        ax.plot(ks, series, "o-", color="#1f6fb4", lw=1.2, ms=6, label="computed q")
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("hydraulic conductivity (m/day)")
+        ax.set_ylabel("total discharge q (m³/day per m)")
+        ax.set_title(title)
+        ax.grid(True, which="both", color="#e3e7eb", lw=0.6)
+        ax.legend(loc="upper left", frameon=False)
+    fig.suptitle("Discharge against hydraulic conductivity")
+    fig.tight_layout()
+
+
+def seep01_plots():
+    """The confined sheetpile problem: four figures and three studies.
+
+    The figures are the four states the page asks the reader to compare their own
+    screen against — the inputs as the boundary conditions leave them, the first
+    mesh with its boundary nodes marked, the flow net that mesh produces, and the
+    flow net after the tip refinement. The gradient field is drawn as well, because
+    it is what says WHERE the mesh has work to do, and the two meshes are drawn
+    together at the toe, because the refinement is otherwise invisible at section
+    scale.
+
+    The three studies are printed rather than tabulated in a figure: what the
+    discharge does as the element size falls, what it does as the element type
+    changes at one size, and what it does as the conductivity moves. Every number
+    the page quotes is on one of these lines.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import plot_seep_data, plot_seep_solution
+
+    sd = load_slope_data(SEEP01)
+    # frame="content" because the section is five times as long as it is deep: the
+    # default fill frame pads the data limits out to the figure's aspect and buries
+    # the model in empty sky. show_mesh=False because this figure is the INPUTS —
+    # the model as it stands before the reader has built a mesh at all, whatever
+    # mesh the loader found beside the file.
+    capture("seep01_inputs.png", plot_inputs, sd, mode="seep",
+            title="Seepage Model Inputs", frame="content", show_mesh=False)
+
+    mesh = _seep01_mesh(sd)
+    seep_data, solution = _seep01_solve(sd, mesh)
+    capture("seep01_mesh.png", plot_seep_data, seep_data, show_bc=True)
+    capture("seep01_solution.png", plot_seep_solution, seep_data, solution,
+            levels=SEEP01_LEVELS, base_mat=1, fill_contours=False, mesh=False)
+    capture("seep01_gradient.png", plot_seep_solution, seep_data, solution,
+            levels=SEEP01_LEVELS, variable="i_mag", mesh=False, flowlines=False)
+
+    head = np.asarray(solution["head"])
+    hdrop = float(head.max() - head.min())
+    k = float(sd["materials"][0]["k1"])
+    drops = SEEP01_LEVELS - 1
+    channels = max(round(solution["flowrate"] * drops / (k * hdrop)) + 1, 2) - 1
+    print("   base mesh   size %.4g %s · %d nodes · %d elements · q %.4f"
+          % (SEEP01_SIZE, SEEP01_ELEMENT, len(mesh["nodes"]),
+             len(mesh["elements"]), solution["flowrate"]))
+    print("   head        %.4f to %.4f (drop %.4f) · u %.3f to %.3f · confined=%s "
+          "converged=%s"
+          % (head.min(), head.max(), hdrop, np.min(solution["u"]),
+             np.max(solution["u"]), not solution.get("unconfined"),
+             solution.get("converged")))
+    print("   flow net    %d drops · %d channels · q = k·Δh·Nf/Nd = %.4f"
+          % (drops, channels, k * hdrop * channels / drops))
+
+    # The mesh study. The discharge falls monotonically, because the two re-entrant
+    # corners have no finite gradient and a coarse mesh cannot see how much of the
+    # flow is being forced through them.
+    print("   -- element size, %s" % SEEP01_ELEMENT)
+    for size in sorted(SEEP01_SIZES, reverse=True):
+        m, _, s = _seep01_run(sd, size=size)
+        print("   size %-7.4g %6d nodes %6d elements · q %.4f"
+              % (size, len(m["nodes"]), len(m["elements"]), s["flowrate"]))
+
+    # The element-type study, at one size, so the only variable is the order of the
+    # element and the node count that comes with it.
+    print("   -- element type, size %.4g" % SEEP01_TYPE_SIZE)
+    for etype in ("tri3", "tri6", "quad4", "quad8", "quad9"):
+        m, _, s = _seep01_run(sd, size=SEEP01_TYPE_SIZE, element_type=etype)
+        print("   %-6s %6d nodes %6d elements · q %.4f"
+              % (etype, len(m["nodes"]), len(m["elements"]), s["flowrate"]))
+
+    # The tip refinement, against the uniform mesh it starts from and against the
+    # uniform mesh that reaches the same answer the expensive way.
+    mesh_r = _seep01_mesh(sd, refine_factor=SEEP01_REFINE)
+    seep_r, solution_r = _seep01_solve(sd, mesh_r)
+    capture("seep01_solution_refined.png", plot_seep_solution, seep_r, solution_r,
+            levels=SEEP01_LEVELS, base_mat=1, fill_contours=False, mesh=False)
+    capture("seep01_tip.png", _seep01_tip_zoom,
+            [("Uniform, target size %.4g m" % SEEP01_SIZE, mesh),
+             ("Refined near features, factor %g" % SEEP01_REFINE, mesh_r)])
+    print("   -- refinement at the toe")
+    for label, m, s in (("uniform", mesh, solution), ("refined", mesh_r, solution_r)):
+        for name, point in (("toe", SEEP01_TIP), ("blanket edge", SEEP01_BLANKET_EDGE)):
+            i_max, count, nearest = _seep01_gradient_near(m, s, point)
+            print("   %-8s %-13s max |i| %.4f · %3d nodes within 0.5 m · nearest "
+                  "node %.4f m" % (label, name, i_max, count, nearest))
+        print("   %-8s %6d nodes %6d elements · q %.4f"
+              % (label, len(m["nodes"]), len(m["elements"]), s["flowrate"]))
+
+    # The conductivity sweep, twice: the whole tensor scaled, and k1 alone.
+    print("   -- discharge against conductivity, size %.4g %s"
+          % (SEEP01_SIZE, SEEP01_ELEMENT))
+    both, k1_only = [], []
+    base_head = None
+    for kk in SEEP01_K:
+        model = _seep01_material(sd, k1=kk, k2=kk)
+        _, s = _seep01_solve(model, mesh)
+        drift = (0.0 if base_head is None
+                 else float(np.abs(np.asarray(s["head"]) - base_head).max()))
+        base_head = np.asarray(s["head"]) if base_head is None else base_head
+        both.append((kk, s["flowrate"]))
+        print("   k1 = k2 = %-6g q %12.6f · q/k %.8f · max head change from the "
+              "first row %.2e" % (kk, s["flowrate"], s["flowrate"] / kk, drift))
+    for kk in SEEP01_K:
+        model = _seep01_material(sd, k1=kk)
+        _, s = _seep01_solve(model, mesh)
+        k1_only.append((kk, s["flowrate"]))
+        print("   k1 = %-6g k2 = 30  q %12.6f · q/k1 %.6f"
+              % (kk, s["flowrate"], s["flowrate"] / kk))
+    capture("seep01_q_vs_k.png", _seep01_q_vs_k, both, k1_only)
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -1786,6 +2062,7 @@ GROUPS = {
     "lem10_plots": lem10_plots,
     "lem11_plots": lem11_plots,
     "lem12_plots": lem12_plots,
+    "seep01_plots": seep01_plots,
 }
 
 

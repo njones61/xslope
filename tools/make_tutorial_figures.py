@@ -2517,6 +2517,43 @@ def _seep02_kr_curves(materials, vg, gard):
     fig.tight_layout()
 
 
+def _seep02_anchors(sdta, sol):
+    """Where the phreatic surface touches the dam: the entry point on the
+    upstream face and the exit point on the seepage face.
+
+    The entry is a boundary fact — the highest fixed-head node standing at the
+    reservoir head, which is where the water line meets the face — and the exit
+    is the highest exit-face node still at positive pressure. Both are read
+    from the solve so a run that moves them (the core sweep moves the exit)
+    carries its own. The drawn curves are anchored on these so they touch the
+    dam at both ends, as the solution plot's own phreatic line does.
+    """
+    import numpy as np
+
+    bct = np.asarray(sdta["bc_type"])
+    nds = np.asarray(sdta["nodes"])
+    p = np.asarray(sol["u"]) / 62.4
+    head = p + nds[:, 1]
+    fixed = np.where(bct == 1)[0]
+    res = fixed[head[fixed] >= head[fixed].max() - 1e-6]
+    entry = (float(nds[res[np.argmax(nds[res, 1])], 0]),
+             float(nds[res[np.argmax(nds[res, 1])], 1]))
+    face = np.where(bct == 2)[0]
+    wet = face[p[face] > -1e-6]
+    exit_pt = (float(nds[wet[np.argmax(nds[wet, 1])], 0]),
+               float(nds[wet[np.argmax(nds[wet, 1])], 1])) if len(wet) else None
+    return entry, exit_pt
+
+
+def _seep02_anchored(ys, entry, exit_pt, stations=SEEP02_STATIONS):
+    """The drawable polyline: entry point, the finite stations, exit point."""
+    import numpy as np
+
+    pts = [entry] + [(x, y) for x, y in zip(stations, ys)
+                     if np.isfinite(y)] + ([exit_pt] if exit_pt else [])
+    return [x for x, _ in pts], [y for _, y in pts]
+
+
 def _seep02_phreatic_figure(series, stations=SEEP02_STATIONS):
     """The phreatic surfaces of the three unsaturated models on the section, with
     the differences between them drawn underneath at a scale that can show them.
@@ -2533,8 +2570,9 @@ def _seep02_phreatic_figure(series, stations=SEEP02_STATIONS):
     colors = {"lf": "#1f6fb4", "vg": "#c1663a", "gard": "#3f8f5a"}
     styles = {"lf": "-", "vg": "--", "gard": ":"}
     base = None
-    for label, ys in series:
-        ax.plot(stations, ys, styles[label], color=colors[label], lw=2.0,
+    for label, ys, entry, exit_pt in series:
+        xs_a, ys_a = _seep02_anchored(ys, entry, exit_pt, stations)
+        ax.plot(xs_a, ys_a, styles[label], color=colors[label], lw=2.0,
                 label="%s" % label)
         if base is None:
             base = np.asarray(ys)
@@ -2628,8 +2666,9 @@ def _seep02_core_figure(series, stations=SEEP02_STATIONS):
     fig, ax = plt.subplots(figsize=(11, 4.6))
     _seep02_section_axes(ax)
     colors = ("#1f6fb4", "#3f8f5a", "#c9a227", "#c1663a")
-    for (k, ys, exit_pt, _q, _n), color in zip(series, colors):
-        ax.plot(stations, ys, "-", color=color, lw=1.8,
+    for (k, ys, entry, exit_pt, _q, _n), color in zip(series, colors):
+        xs_a, ys_a = _seep02_anchored(ys, entry, exit_pt, stations)
+        ax.plot(xs_a, ys_a, "-", color=color, lw=1.8,
                 label="core k = %g ft/day" % k)
         if exit_pt is not None:
             ax.plot([exit_pt[0]], [exit_pt[1]], "o", color=color, ms=7,
@@ -2794,11 +2833,11 @@ def seep02_plots():
     print("   -- the three unsaturated models on one mesh")
     phreatics, histories, refs = [], [], []
     for label, model in models:
-        _, sol, mlog = _seep02_solve(model, mesh)
+        sdta, sol, mlog = _seep02_solve(model, mesh)
         st = _seep02_log_stats(mlog)
         ys = _seep02_phreatic(mesh, sol)
         _tot, _above, share, y_ph = _seep02_unsaturated_flow(mesh, sol)
-        phreatics.append((label, ys))
+        phreatics.append((label, ys, *_seep02_anchors(sdta, sol)))
         histories.append((label, _seep02_history(mlog)))
         if label != "lf":
             refs.append((label, sol["flowrate"]))
@@ -2815,15 +2854,15 @@ def seep02_plots():
                  max(0, st["iterations"] - SEEP02_RELAX_LADDER[0][0]),
                  st["active"][0], st["active"][1],
                  SEEP02_DOWNSTREAM, share, y_ph))
-    for i, (a, ys_a) in enumerate(phreatics):
-        for b, ys_b in phreatics[i + 1:]:
+    for i, (a, ys_a, _e1, _x1) in enumerate(phreatics):
+        for b, ys_b, _e2, _x2 in phreatics[i + 1:]:
             print("   %-4s vs %-4s phreatic surface differs by at most %.2f ft "
                   "over the %d stations"
                   % (a, b, np.nanmax(np.abs(np.asarray(ys_a)
                                             - np.asarray(ys_b))),
                      len(SEEP02_STATIONS)))
     print("   stations    %s" % " ".join("%g" % x for x in SEEP02_STATIONS))
-    for label, ys in phreatics:
+    for label, ys, _entry, _exit in phreatics:
         print("   %-5s       %s" % (label, " ".join("%6.2f" % y for y in ys)))
     capture("seep02_phreatic_models.png", _seep02_phreatic_figure, phreatics)
 
@@ -2913,13 +2952,11 @@ def seep02_plots():
         sdta, sol, clog = _seep02_solve(model, mesh)
         st = _seep02_log_stats(clog)
         bct = np.asarray(sdta["bc_type"])
-        nds = np.asarray(sdta["nodes"])
         p = np.asarray(sol["u"]) / 62.4
         face = np.where(bct == 2)[0]
         wet = face[p[face] > -1e-6]
-        exit_pt = (float(nds[wet[np.argmax(nds[wet, 1])], 0]),
-                   float(nds[wet[np.argmax(nds[wet, 1])], 1])) if len(wet) else None
-        core_series.append((k, _seep02_phreatic(mesh, sol), exit_pt,
+        entry, exit_pt = _seep02_anchors(sdta, sol)
+        core_series.append((k, _seep02_phreatic(mesh, sol), entry, exit_pt,
                             sol["flowrate"], len(wet)))
         print("   core k %-8g q %8.4f · %2d/%d exit-face nodes wet · highest wet "
               "node %s · %s iterations"

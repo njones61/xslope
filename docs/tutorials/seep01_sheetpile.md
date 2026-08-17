@@ -855,8 +855,8 @@ dialog in one control at a time:
   the sweep is one of those runs.
 - **Material / BC** = `soil`. The list holds one entry per material, plus
   **Boundary heads** for sweeping a specified head instead of a soil property.
-- **Property** = `k1`. The list is that material's own numeric properties, so it
-  is the seepage band here rather than a strength table.
+- **Property** = `k1`. In seepage mode the list is the material's seepage
+  properties and nothing else — `k1`, `k2`, `alpha`, `kr0`, `h0`.
 - **From** `30`, **To** `300`, **Steps** `10` — the bounds and the number of solves
   spread across them, starting at the model's own conductivity so the first swept
   point is the run already made.

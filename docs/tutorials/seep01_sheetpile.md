@@ -469,8 +469,10 @@ Click **Build Mesh…**:
 
 ![The Build Mesh dialog](images/seep01_studio_build_mesh.png)
 
-**Element type** decides the order of the interpolation inside each element.
-Choose **Linear triangles (tri3)** — three nodes at the corners, head varying
+**Element type** decides the order of the interpolation inside each element. The
+dialog opens on **Quadratic triangles (tri6)**, which is the safe default because
+it is the one a stability analysis can also use. Change it to **Linear triangles
+(tri3)** — three nodes at the corners, head varying
 linearly across the element. Linear triangles are the right choice for a
 stand-alone seepage analysis: head is a scalar field, so there is nothing for a
 linear element to lock up on, and the smaller system solves faster. The quadratic

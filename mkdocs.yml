@@ -71,6 +71,8 @@ nav:
       - Finding the Global Minimum: tutorials/lem10_global_minimum.md
       - Reliability: tutorials/lem11_reliability.md
       - Piles: tutorials/lem12_piles.md
+    - Seepage:
+      - Seepage Under a Sheetpile: tutorials/seep01_sheetpile.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

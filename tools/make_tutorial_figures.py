@@ -1774,13 +1774,13 @@ def _interp(x, xs, ys):
 #
 # The model is confined: two specified-head boundaries, no exit face, one soil. That
 # makes every number on the page a property of the mesh and of the boundary values
-# alone, and the producer is organised around exactly that. Four states are drawn —
+# alone, and the producer is organized around exactly that. Four states are drawn —
 # the inputs, the mesh the tutorial's first run uses, that run's flow net, and the
 # same flow net on a mesh auto-refined at the sheetpile tip — and three studies are
 # printed: the discharge against the element size, the discharge against the element
 # type, and the discharge against the conductivity.
 #
-# The tip is the reason the page exists. A sheetpile modelled as a slot in the ground
+# The tip is the reason the page exists. A sheetpile modeled as a slot in the ground
 # surface leaves a re-entrant corner at its toe, where the hydraulic gradient is
 # singular; the discharge therefore keeps falling as the mesh refines, and every
 # quoted discharge names the mesh it was computed on.
@@ -1811,6 +1811,9 @@ SEEP01_LEVELS = 10
 SEEP01_K_LOW, SEEP01_K_HIGH, SEEP01_K_STEPS = 30.0, 300.0, 10
 #: The design target the sweep is asked to locate, a discharge in the model's units.
 SEEP01_TARGET_Q = 100.0
+#: The upstream heads the head-drop sweep uses, against a downstream head of 10 —
+#: the other factor of q = k·Δh·Nf/Nd, checked the same way the conductivity is.
+SEEP01_UPSTREAM_HEADS = (11.0, 12.0, 13.0, 14.0, 15.0)
 #: The sheetpile toe, and the upstream edge of the clay blanket — the model's two
 #: re-entrant corners, and the two places the gradient is measured.
 SEEP01_TIP = (30.0, 7.0)
@@ -2022,6 +2025,16 @@ def seep01_plots():
              solution.get("converged")))
     print("   flow net    %d drops · %d channels · q = k·Δh·Nf/Nd = %.4f"
           % (drops, channels, k * hdrop * channels / drops))
+    print("   60 m of wall q %.4f" % (60.0 * solution["flowrate"]))
+
+    # Whether the section was drawn wide enough is a measurement, not a habit: if
+    # the ends are far enough from the wall the head is flat there and nothing is
+    # moving, which is what the no-flow ends assume.
+    xs = np.asarray(mesh["nodes"])[:, 0]
+    i_mag = np.asarray(solution["i_mag"])
+    for label, near in (("upstream", xs <= 5.0), ("downstream", xs >= 45.0)):
+        print("   %-10s end, outer 5 m: max |i| %.4f · head %.4f to %.4f"
+              % (label, i_mag[near].max(), head[near].min(), head[near].max()))
 
     # The mesh study. The discharge falls monotonically, because the two re-entrant
     # corners have no finite gradient and a coarse mesh cannot see how much of the
@@ -2100,6 +2113,19 @@ def seep01_plots():
           % (res["message"], res["bracketed"], res["direction"]))
     capture("seep01_q_vs_k.png", _seep01_q_vs_k, both, k1_only,
             target=SEEP01_TARGET_Q, crossing=res["crossing"])
+
+    # The other half of q = k·Δh·Nf/Nd, measured the same way: the head drop, with
+    # the conductivity left alone. The page states this one rather than drawing it,
+    # so it is printed only.
+    print("   -- discharge against the head drop, size %.4g %s"
+          % (SEEP01_SIZE, SEEP01_ELEMENT))
+    for upstream in SEEP01_UPSTREAM_HEADS:
+        model = copy.deepcopy(sd)
+        model["seepage_bc"]["specified_heads"][0]["head"] = upstream
+        _, s = _seep01_solve(model, mesh)
+        drop = upstream - model["seepage_bc"]["specified_heads"][1]["head"]
+        print("   upstream head %-5g drop %-4g q %12.6f · q/Δh %.8f"
+              % (upstream, drop, s["flowrate"], s["flowrate"] / drop))
 
 
 GROUPS = {

@@ -51,3 +51,13 @@ writes, and how to send a whole project to somebody else.
 | 12 | [Piles](lem12_piles.md) | A 20 ft clay slope stabilized by two rows of drilled shafts whose force column is left blank, so Ito & Matsui computes it from the diameter and the spacing at every trial surface — read in the report the run writes, capped by the shaft's own bending capacity, swept across the spacing band, compared against the same force stated outright, and checked against the shallow surface that slides over the pile row | Limit equilibrium | one material, piles, Ito &amp; Matsui, pile spacing, structural capacity, specified pile force, circular search, grid seeding | ~15 min |
 
 </div>
+
+## Seepage
+
+<div class="tut-summary" markdown>
+
+| # | Tutorial | What it covers | Analysis | Features | Time |
+|---|---|---|---|---|---|
+| 1 | [Seepage Under a Sheetpile](seep01_sheetpile.md) | A sheetpile driven 3 m into a 10 m sand foundation behind an impervious clay blanket, built from scratch and solved for the discharge under it — what makes a problem confined, the four kinds of boundary and the no-flow default that models the blanket, meshing and element order, the flow net read against the hand calculation it reproduces, how much of the answer is mesh, and a conductivity sweep that is exactly proportional | Seepage | one material, confined flow, specified head, no-flow boundaries, mesh generation, element types, flow net, feature refinement, parametric study | 25–30 min |
+
+</div>

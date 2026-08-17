@@ -127,6 +127,9 @@ LEM11_FILE = os.path.join(_REPO,
 #: tutorial model whose pile force is left to be computed, which is the state its
 #: pins are read in.
 LEM12_FILE = os.path.join(_REPO, "docs/lem/files/xslope_piles.xlsx")
+#: Tutorial SEEP-1's completed model — the confined sheetpile problem, whose two
+#: specified-head boundaries and absent exit face are what its pins are read on.
+SEEP01_FILE = os.path.join(_REPO, "docs/seep/files/xslope_clay_blanket.xlsx")
 #: The editable master template, whose ``reinforce`` sheet carries the support-type
 #: lookup block LEM-8 reproduces as a table.
 TEMPLATE_FILE = os.path.join(_REPO, "docs/inputs/input_template.xlsx")
@@ -1183,6 +1186,243 @@ LEM12_HP_LEGEND = ("Pile resistance mobilized at the slice base, per unit "
 LEM12_PILE_FIELDS = ("Vcap (per element, lb)", "Mcap (per element, lb·ft)")
 
 
+#: The Inputs-tree row Tutorial SEEP-1 sends the reader to. Added for every file,
+#: not only a seepage one, which is what the page's Studio path says.
+SEEP01_INPUT_CATEGORIES = ("Seep BC",)
+
+#: The two Run-menu actions SEEP-1 names, in the same source-string convention as
+#: ``LEM02_RUN_ACTIONS`` (Qt's ``&`` removed, the ellipsis kept). The Run action's
+#: text follows the Mode switch, so the seepage label is read with the window put
+#: into seepage mode and the mode restored afterwards.
+SEEP01_BUILD_MESH_ACTION = "Build Mesh…"
+SEEP01_RUN_ACTION_SEEP = "Run Seep…"
+
+#: The Build Mesh dialog as SEEP-1 walks it: the two element types the page tells
+#: the reader to choose between, the auto-size pair the target size comes from, the
+#: refinement pair the tip step turns on, the thin-zone guarantee the page says to
+#: leave alone, and the button that builds. A rewording of any of them turns those
+#: steps into instructions to press something that is not there.
+SEEP01_MESH_ELEMENTS = ("Linear triangles (tri3)", "Quadratic triangles (tri6)")
+SEEP01_MESH_ROWS = ("Element type", "Size divisions", "Target element size",
+                    "Refinement factor")
+SEEP01_MESH_CHECKBOXES = ("Auto-size from geometry", "Refine near features",
+                          "Refine thin zones")
+SEEP01_MESH_BUILD = "Build"
+
+#: The Run Seepage dialog: its title, the two controls the page explains one at a
+#: time, and the button. The title is pinned because the page calls the dialog by
+#: it while the menu action that opens it is worded differently.
+SEEP01_RUN_TITLE = "Run Seepage"
+SEEP01_RUN_ROWS = ("BC set", "Convergence tol")
+SEEP01_RUN_BUTTON = "Run"
+
+#: The seepage boundary-condition editor as the page's build step drives it: the
+#: button that adds a head boundary, the two head types the page contrasts, the two
+#: sets, and the value field — whose label carries the declared length unit, which
+#: is how the page tells the reader their Time and Units declarations took.
+SEEP01_BC_BUTTONS = ("Add head", "Add row")
+SEEP01_BC_TYPES = ("head", "reservoir")
+SEEP01_BC_TABS = ("Set 1", "Set 2 (rapid drawdown)")
+SEEP01_BC_VALUE_LABEL = "Head value (m):"
+
+#: The materials-editor usage toggle SEEP-1 tells the reader to leave ticked while
+#: unticking the rest, and the two conductivity headers the table then shows — with
+#: the unit suffix the model's declared Time puts on them, which the page says to
+#: check for.
+SEEP01_MATERIALS_TOGGLE = "Seepage"
+SEEP01_MATERIALS_COLUMNS = ("k1 (m/day)", "k2 (m/day)")
+
+#: Global parameters' Time row, which is inert on the LEM pages and load-bearing
+#: here: it is what puts the unit suffixes above on the forms and the plots.
+SEEP01_GLOBAL_TIME_ROW = "Time"
+
+#: The Parametric dialog in its seepage mode, as the conductivity sweep uses it:
+#: the mode whose target is a discharge, the parameter picker's own label for a
+#: mode that can sweep a boundary as well as a material, and the four design rows
+#: the page dictates values into.
+SEEP01_PARAMETRIC_MODE = "Design (q target)"
+SEEP01_PARAMETRIC_PICKER = "Material / BC"
+SEEP01_PARAMETRIC_ROWS = ("From", "To", "Steps", "Target q")
+
+
+def _seep01_editor_labels(mw):
+    """The seepage controls Tutorial SEEP-1 drives, read on its own model.
+
+    On its own model rather than on any other because every seepage control the
+    page names is gated by what the file carries: the BC editor's list has an entry
+    per boundary, the materials table's conductivity headers carry the unit the
+    file's Time declaration supplies, and the Parametric dialog offers a seepage
+    parameter set only for a model with a conductivity in it.
+
+    The Run action is the one label here that belongs to the window rather than to
+    a dialog, and its text follows the Mode switch. The window's mode is therefore
+    moved to seepage, read, and put back — the leg leaves the project it was handed
+    exactly as it found it, because the legs after it read their own models through
+    the same window.
+    """
+    from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialogButtonBox,
+                                   QFormLayout, QLabel, QPushButton, QTabWidget,
+                                   QTableWidget)
+
+    from xslope.fileio import load_slope_data
+
+    from studio.dialogs import BuildMeshDialog, RunSeepDialog, SensitivityDialog
+    from studio.editors import GlobalEditor, MaterialsEditor, SeepBcEditor
+
+    fails = []
+    data = _quiet(load_slope_data, SEEP01_FILE)
+
+    action = getattr(mw, "act_build_mesh", None)
+    if action is None:
+        fails.append(f"MainWindow has no act_build_mesh, which Tutorial SEEP-1 "
+                     f"calls {SEEP01_BUILD_MESH_ACTION!r}")
+    elif action.text().replace("&", "") != SEEP01_BUILD_MESH_ACTION:
+        fails.append(f"the act_build_mesh action reads "
+                     f"{action.text().replace('&', '')!r}, not "
+                     f"{SEEP01_BUILD_MESH_ACTION!r} — the label Tutorial SEEP-1 "
+                     f"tells the reader to click")
+    was = mw._mode
+    try:
+        mw._mode = "seep"
+        mw._update_run_actions()
+        got = mw.act_run.text().replace("&", "")
+    finally:
+        mw._mode = was
+        mw._update_run_actions()
+    if got != SEEP01_RUN_ACTION_SEEP:
+        fails.append(f"the Run action reads {got!r} in seepage mode, not "
+                     f"{SEEP01_RUN_ACTION_SEEP!r} — the label Tutorial SEEP-1 quotes")
+
+    mesh = BuildMeshDialog(defaults={})
+    elements = {mesh.element_type.itemText(i)
+                for i in range(mesh.element_type.count())}
+    for label in SEEP01_MESH_ELEMENTS:
+        if label not in elements:
+            fails.append(f"Build Mesh offers no {label!r} element type; Tutorial "
+                         f"SEEP-1 tells the reader to choose between them. It "
+                         f"offers {sorted(elements)}")
+    rows = {lab.text() for lab in mesh.findChildren(QLabel)}
+    for label in SEEP01_MESH_ROWS:
+        if label not in rows:
+            fails.append(f"Build Mesh has no {label!r} row; Tutorial SEEP-1 names "
+                         f"it. Its rows read {sorted(r for r in rows if r)}")
+    boxes = {b.text() for b in mesh.findChildren(QCheckBox)}
+    for label in SEEP01_MESH_CHECKBOXES:
+        if label not in boxes:
+            fails.append(f"Build Mesh has no {label!r} checkbox; Tutorial SEEP-1 "
+                         f"tells the reader what to do with it. Its checkboxes read "
+                         f"{sorted(boxes)}")
+    build = next((b for bb in mesh.findChildren(QDialogButtonBox)
+                  for b in (bb.button(QDialogButtonBox.Ok),) if b is not None), None)
+    if build is None or build.text() != SEEP01_MESH_BUILD:
+        fails.append(f"Build Mesh's accept button reads "
+                     f"{None if build is None else build.text()!r}, not "
+                     f"{SEEP01_MESH_BUILD!r} — the label Tutorial SEEP-1 tells the "
+                     f"reader to press")
+    mesh.deleteLater()
+
+    run = RunSeepDialog(defaults={}, slope_data=data)
+    if run.windowTitle() != SEEP01_RUN_TITLE:
+        fails.append(f"the seepage run dialog is titled {run.windowTitle()!r}, not "
+                     f"{SEEP01_RUN_TITLE!r} — the name Tutorial SEEP-1 calls it by")
+    rows = {lab.text() for lab in run.findChildren(QLabel)}
+    for label in SEEP01_RUN_ROWS:
+        if label not in rows:
+            fails.append(f"the seepage run dialog has no {label!r} row; Tutorial "
+                         f"SEEP-1 explains it. Its rows read "
+                         f"{sorted(r for r in rows if r)}")
+    if run._ok.text() != SEEP01_RUN_BUTTON:
+        fails.append(f"the seepage run dialog's accept button reads "
+                     f"{run._ok.text()!r}, not {SEEP01_RUN_BUTTON!r}")
+    run.deleteLater()
+
+    bc = SeepBcEditor().build(data, None, select=(0, 0))
+    buttons = {b.text() for b in bc.findChildren(QPushButton)}
+    for label in SEEP01_BC_BUTTONS:
+        if label not in buttons:
+            fails.append(f"the Seep BC editor has no {label!r} button; Tutorial "
+                         f"SEEP-1 tells the reader to press it. Its buttons read "
+                         f"{sorted(buttons)}")
+    types = {combo.itemText(i) for combo in bc.findChildren(QComboBox)
+             for i in range(combo.count())}
+    for label in SEEP01_BC_TYPES:
+        if label not in types:
+            fails.append(f"the Seep BC editor offers no {label!r} head type; "
+                         f"Tutorial SEEP-1 contrasts the two. It offers "
+                         f"{sorted(types)}")
+    tabs = [t.tabText(i) for t in bc.findChildren(QTabWidget)
+            for i in range(t.count())]
+    for label in SEEP01_BC_TABS:
+        if label not in tabs:
+            fails.append(f"the Seep BC editor has no {label!r} tab; Tutorial "
+                         f"SEEP-1 names it. Its tabs read {tabs}")
+    labels = {lab.text() for lab in bc.findChildren(QLabel)}
+    if SEEP01_BC_VALUE_LABEL not in labels:
+        fails.append(f"the Seep BC editor's head value is labeled something other "
+                     f"than {SEEP01_BC_VALUE_LABEL!r}, which Tutorial SEEP-1 quotes "
+                     f"with its unit to show the Time and Units declarations took")
+    bc.deleteLater()
+
+    glob = GlobalEditor().build(data, None)
+    rows = {lab.text() for lab in glob.findChildren(QLabel)}
+    if SEEP01_GLOBAL_TIME_ROW not in rows:
+        fails.append(f"Global parameters has no {SEEP01_GLOBAL_TIME_ROW!r} row; "
+                     f"Tutorial SEEP-1 tells the reader to set it. Its rows read "
+                     f"{sorted(r for r in rows if r)}")
+    glob.deleteLater()
+
+    # Read against the app's own toggle defaults, then ticked the way the page's
+    # step leaves them: Seepage on, everything else off.
+    with _default_editor_toggles():
+        mats = MaterialsEditor().build(data, None)
+        toggles = getattr(mats, "_toggles", None) or {}
+        if SEEP01_MATERIALS_TOGGLE not in {cb.text() for cb in toggles.values()}:
+            fails.append(f"the materials editor has no {SEEP01_MATERIALS_TOGGLE!r} "
+                         f"usage toggle; Tutorial SEEP-1 tells the reader to leave "
+                         f"it ticked. Its toggles read "
+                         f"{sorted(cb.text() for cb in toggles.values())}")
+        for tag, cb in toggles.items():
+            cb.setChecked(cb.text() == SEEP01_MATERIALS_TOGGLE)
+        mats._set_mode("table")
+        headers = [t.horizontalHeaderItem(i).text()
+                   if t.horizontalHeaderItem(i) else ""
+                   for t in mats.findChildren(QTableWidget)
+                   for i in range(t.columnCount())]
+        for label in SEEP01_MATERIALS_COLUMNS:
+            if label not in headers:
+                fails.append(f"the materials table has no {label!r} column with the "
+                             f"Seepage toggle on; Tutorial SEEP-1 tells the reader "
+                             f"to type into it and to check the unit suffix. Its "
+                             f"columns read {[h for h in headers if h]}")
+        mats.deleteLater()
+
+    sens = SensitivityDialog(defaults={"mode": "design"}, slope_data=data,
+                             app_mode="seep")
+    modes = {sens.mode.itemText(i) for i in range(sens.mode.count())}
+    if SEEP01_PARAMETRIC_MODE not in modes:
+        fails.append(f"the Parametric dialog offers no {SEEP01_PARAMETRIC_MODE!r} "
+                     f"mode in seepage mode, which Tutorial SEEP-1 selects. It "
+                     f"offers {sorted(modes)}")
+    rows = set()
+    for form in sens.findChildren(QFormLayout):
+        for r in range(form.rowCount()):
+            label = form.itemAt(r, QFormLayout.LabelRole)
+            if label is not None and label.widget() is not None:
+                rows.add(label.widget().text().replace("&", ""))
+    for label in (SEEP01_PARAMETRIC_PICKER,) + SEEP01_PARAMETRIC_ROWS:
+        if label not in rows:
+            fails.append(f"the Parametric dialog has no {label!r} row in seepage "
+                         f"mode; Tutorial SEEP-1 dictates a value into it. Its rows "
+                         f"read {sorted(rows)}")
+    properties = {sens.prop.itemText(i) for i in range(sens.prop.count())}
+    if "k1" not in properties:
+        fails.append(f"the Parametric dialog offers no 'k1' property for this "
+                     f"model's soil; Tutorial SEEP-1 sweeps it. It offers "
+                     f"{sorted(properties)}")
+    sens.deleteLater()
+    return fails
+
+
 @contextlib.contextmanager
 def _default_editor_toggles():
     """Read an editor against the app's OWN toggle defaults, not this machine's.
@@ -2160,6 +2400,12 @@ def test_tutorial_labels():
             if name not in rows:
                 fails.append(f"the Inputs tree has no {name!r} row; Tutorial LEM-5 "
                              f"tells the reader to click it. It reads {rows}")
+        # Read on the same limit-equilibrium file as the rows above, which is the
+        # point: SEEP-1's Studio path says the tree is the same in every mode.
+        for name in SEEP01_INPUT_CATEGORIES:
+            if name not in rows:
+                fails.append(f"the Inputs tree has no {name!r} row; Tutorial SEEP-1 "
+                             f"tells the reader to click it. It reads {rows}")
 
         for attr, label in LEM02_RUN_ACTIONS.items():
             action = getattr(mw, attr, None)
@@ -2189,6 +2435,7 @@ def test_tutorial_labels():
         fails += _lem10_run_labels()
         fails += _lem11_reliability_labels()
         fails += _lem12_pile_force_labels(mw)
+        fails += _seep01_editor_labels(mw)
         # Last of the editor legs: these are the ones that change which project
         # the window holds, and each opens the model its own pins are read on.
         fails += _lem06_editor_labels(mw)

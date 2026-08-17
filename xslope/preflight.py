@@ -2609,8 +2609,8 @@ def _seep_field_node_count(ctx):
     except (TypeError, AttributeError):
         return None
     out = []
-    for key, sheet in (("seep_u", "{base}_seep.csv"),
-                       ("seep_u2", "{base}_seep2.csv")):
+    for key, sheet in (("seep_u", "*_seep.csv"),
+                       ("seep_u2", "*_seep2.csv")):
         u = ctx.sd.get(key)
         if u is None:
             continue
@@ -2620,7 +2620,8 @@ def _seep_field_node_count(ctx):
             continue
         if n_u != n_nodes:
             out.append(
-                f"The stored pore-pressure field '{sheet}' carries {n_u} node "
+                f"The stored pore-pressure field (the '{sheet}' companion "
+                f"file) carries {n_u} node "
                 f"value(s) but the mesh has {n_nodes} node(s), so it was computed on "
                 f"a different mesh. Re-run the seepage analysis on this mesh.")
     return out

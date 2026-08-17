@@ -73,9 +73,7 @@ it beside the bar.
 Everything XSLOPE needs to know about the two pile rows sits in two rows of
 the piles sheet, and reading them is most of what this page teaches. Open
 **Piles** in the **Inputs** tree and press **Table view**. Its columns match
-the piles worksheet with two exceptions: there is no `θp` column, because
-Studio computes the force direction from the pile's endpoints instead of
-asking for it, and — with **Show parameters for:** set to **LEM** — the
+the piles worksheet; with **Show parameters for:** set to **LEM**, the
 columns only the finite element engine reads (`E`, `I`, `Area`, `Fixity`)
 are hidden:
 
@@ -84,17 +82,17 @@ are hidden:
 Each row of the sheet describes one pile row, and the columns after the
 endpoints are what this page is about:
 
-| Label | x1 | y1 | x2 | y2 | H | θp | Appl | D | S | Vcap | Mcap |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
-| `lower row` | 5 | 5 | 5 | -10 | | | | 2 | 6 | 46000 | 60000 |
-| `upper row` | 10 | 10 | 10 | -10 | | | | 2 | 6 | 46000 | 60000 |
+| Label | x1 | y1 | x2 | y2 | H | Appl | D | S | Vcap | Mcap |
+|---|:---:|:---:|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
+| `lower row` | 5 | 5 | 5 | -10 | | | 2 | 6 | 46000 | 60000 |
+| `upper row` | 10 | 10 | 10 | -10 | | | 2 | 6 | 46000 | 60000 |
 
 **H is empty on both rows, which is what selects the Ito & Matsui
 calculation.** With `H` blank and a diameter `D` and spacing `S` given, XSLOPE
 computes the force itself; with a number in `H`, that number is used instead.
-`θp` is the angle of the pile force from horizontal. Left empty, it defaults
-to perpendicular to the pile's own axis — for these vertical shafts,
-horizontal, the usual case for a stabilizing pile. A blank `Appl` means
+The direction of the pile force is not entered: XSLOPE takes it
+perpendicular to the pile's own axis, which for these vertical shafts means
+horizontal — the usual case for a stabilizing pile. A blank `Appl` means
 `active`: the force enters the equilibrium equations as it stands. The
 alternative, `passive`, treats the force as a resistance and divides it by
 the factor of safety, so the support carries the same margin as the soil

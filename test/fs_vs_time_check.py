@@ -49,6 +49,11 @@ def _model():
     same at every instant. That is deliberate — this module checks the TABLE, and
     a constant curve makes an unexplained change in it unmistakable."""
     sd = load_slope_data(str(SAMPLE))
+    # The shipped sample gained FEM sidecars (a *_mesh.json among them, commit
+    # f87cc320) after this check was written, and the loader auto-attaches the
+    # mesh. This fixture wants the bare LEM model — the synthetic 8-node frames
+    # below are the whole field — so the mesh is dropped.
+    sd.pop('mesh', None)
     return sd
 
 

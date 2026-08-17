@@ -873,7 +873,7 @@ Each pile is defined by:
 >>x2, y2 **[L]**: Pile tip (bottom) coordinates<br>
 - **LEM Properties**:<br>
 >>H — **[F/L]** (per unit width of slope): Pile force magnitude. If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
->>$\theta$ — **[deg]**: Force angle from horizontal in degrees (positive = upward). If left blank, $\theta$ is auto-computed as the direction perpendicular to the pile axis (0° for vertical piles).<br>
+>>The force direction $\theta$ is not an input: it is computed as the direction perpendicular to the pile axis (0°, i.e. horizontal, for vertical piles). Files from template v22 and earlier may carry a $\theta$ ("qp") override column, which is still honored when present.<br>
 >>Appl: Force application. **Active** = $H$ is a known *allowable* force, not divided by the factor of safety (the default, and the behavior of earlier xslope versions). **Passive** = $H$ is an *ultimate* capacity added to the resisting side and divided by FS. Has no effect on FEM analysis, where the pile resistance is computed rather than prescribed.<br>
 - **Pile Geometry**:<br>
 >>D **[L]**: Pile diameter. Required for Ito & Matsui auto-computation of $H$. Also used by FEM to compute $I$ and $Area$ if those columns are left blank.<br>

@@ -1203,7 +1203,7 @@ def test_lem11_sigma_block():
     one column over, drops a digit, or never lands at all moves it.
 
     Never landing at all is the failure worth naming, because it is silent.
-    ``s(g)`` and ``s(c)`` are ``usage="rel"`` columns, hidden until the materials
+    The σ(γ) and σ(c) block's ``usage="rel"`` columns are hidden until the materials
     editor's **Reliability** toggle is ticked, and a paste does not fill a hidden
     column (``test_hidden_columns_are_not_filled``) — so a reader who skips the
     page's first step pastes the block, is told it pasted, and gets the pre-edit
@@ -1214,7 +1214,7 @@ def test_lem11_sigma_block():
     from xslope.reliability import reliability_taylor
 
     page = "lem11_reliability.md"
-    printed = _taught(page, ["s(g)", "s(c)"])
+    printed = _taught(page, ["σ(γ)", "σ(c)"])
     model = _load(os.path.join(_MODELS, "xslope_reliability.xlsx"))
     before = model["materials"][0]
     out = _fail(len(printed) == 1,
@@ -1222,7 +1222,7 @@ def test_lem11_sigma_block():
                 f"is one")
     out += _fail(abs(float(before["sigma_c"]) - float(printed[0][1])) > 1e-9,
                  "LEM-11 σ block: the shipped file already carries the page's "
-                 "s(c) — the page teaches a change")
+                 "σ(c) — the page teaches a change")
 
     editor = MaterialsEditor()
     dlg = editor.build(model, None)

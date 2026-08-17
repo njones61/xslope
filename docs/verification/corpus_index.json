@@ -3422,7 +3422,9 @@
         {
           "anchor": "15-reliability-analysis-submerged-slope",
           "checks": [
-            "reliability"
+            "reliability",
+            "reliability_mc",
+            "reliability_rs"
           ],
           "level": 3,
           "page": "lem/samples/",
@@ -22503,7 +22505,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 538,
+    "tags": 540,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

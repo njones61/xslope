@@ -566,7 +566,7 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 22
+SUPPORTED_TEMPLATE_VERSION = 23
 
 # The template version that introduced the water-load mode cell (main!D23). Below it
 # a file cannot say who supplies the weight of standing water, so it always means
@@ -2074,9 +2074,10 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     pile_lines = []
     if 'piles' in xls.sheet_names:
         # Header-name-driven with case-normalized headers, so the v12 column
-        # regrouping (and the v11 layout) both load. The force-angle column is
-        # 'qp' in the template (theta_p rendered via Symbol font) but 'theta' in
-        # some older files -- accept either.
+        # regrouping (and the v11 layout) both load. The force-angle override
+        # column was dropped in v23 (never used; the direction auto-derives
+        # from the pile endpoints) — pre-v23 files may still carry it as 'qp'
+        # ('theta' in some older files) and either is honored when present.
         piles_df = xls.parse('piles', header=1)
         piles_df.columns = [str(c).strip().lower() for c in piles_df.columns]
         _theta_col = 'qp' if 'qp' in piles_df.columns else 'theta'
@@ -2692,8 +2693,9 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     Circle surfaces are always written with ``Option = "Depth"`` (the loader
     collapses every circle to ``Xo/Yo/Depth/R`` with ``R = Yo - Depth``, so this
     reproduces the radius regardless of how the original was specified). The pile
-    ``theta`` (``qp``) column is left blank because the loader auto-derives it
-    from the pile endpoints.
+    force direction is auto-derived by the loader from the pile endpoints (the
+    pre-v23 templates' ``qp`` override column, when the target carries one, is
+    left blank).
     """
     # Always write into a FRESH copy of the standard template rather than editing the
     # destination in place. The template carries no data — only structural helpers the
@@ -3131,26 +3133,38 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     if reinf:
         updates['reinforce'] = reinf
 
-    # === piles ===  (v12 layout: # | Label | x1 y1 x2 y2 | H qp Appl | D S Vcap
-    # Mcap | E I Area Fixity; header row 2, data rows 3+; qp left blank — auto-
-    # derived by the loader from the pile endpoints)
+    # === piles ===  (header row 2, data rows 3+. The piles layout changed at
+    # v23 — the qp force-angle column was dropped, shifting everything after H
+    # one column left — and this writer also fills ARCHIVED older templates
+    # (the legacy round-trip fixtures), so each field's column is read from the
+    # target template's own header row rather than hardcoded. A header the
+    # target does not carry is skipped.)
     piles_u = {}
-    for n, p in enumerate(slope_data.get('pile_lines') or []):
-        row = 3 + n
-        piles_u[cell_ref(row, 1)] = n + 1
-        piles_u[cell_ref(row, 2)] = str(p.get('label', f"Pile {n + 1}"))
-        piles_u[cell_ref(row, 3)] = _f(p['x1'])
-        piles_u[cell_ref(row, 4)] = _f(p['y1'])
-        piles_u[cell_ref(row, 5)] = _f(p['x2'])
-        piles_u[cell_ref(row, 6)] = _f(p['y2'])
-        for key, col in [('H', 7), ('D_pile', 10), ('S', 11), ('V_cap', 12),
-                         ('M_cap', 13), ('E', 14), ('I', 15), ('area', 16)]:
-            val = p.get(key)
-            if val is not None:
-                piles_u[cell_ref(row, col)] = _f(val)
-        if str(p.get('appl', 'active')) == 'passive':
-            piles_u[cell_ref(row, 9)] = 'Passive'
-        piles_u[cell_ref(row, 17)] = str(p.get('fixity', 'free'))
+    if slope_data.get('pile_lines'):
+        _piles_hdr = pd.read_excel(template, sheet_name='piles', header=1,
+                                   nrows=0)
+        _pcol = {str(c).strip().lower(): i + 1
+                 for i, c in enumerate(_piles_hdr.columns)}
+        for n, p in enumerate(slope_data['pile_lines']):
+            row = 3 + n
+            piles_u[cell_ref(row, _pcol.get('#', 1))] = n + 1
+            piles_u[cell_ref(row, _pcol.get('label', 2))] = \
+                str(p.get('label', f"Pile {n + 1}"))
+            for hdr, key in [('x1', 'x1'), ('y1', 'y1'), ('x2', 'x2'),
+                             ('y2', 'y2')]:
+                piles_u[cell_ref(row, _pcol[hdr])] = _f(p[key])
+            for hdr, key in [('h', 'H'), ('d', 'D_pile'), ('s', 'S'),
+                             ('vcap', 'V_cap'), ('mcap', 'M_cap'),
+                             ('e', 'E'), ('i', 'I'), ('area', 'area')]:
+                col = _pcol.get(hdr)
+                val = p.get(key)
+                if col is not None and val is not None:
+                    piles_u[cell_ref(row, col)] = _f(val)
+            if str(p.get('appl', 'active')) == 'passive' and 'appl' in _pcol:
+                piles_u[cell_ref(row, _pcol['appl'])] = 'Passive'
+            if 'fixity' in _pcol:
+                piles_u[cell_ref(row, _pcol['fixity'])] = \
+                    str(p.get('fixity', 'free'))
     if piles_u:
         updates['piles'] = piles_u
 

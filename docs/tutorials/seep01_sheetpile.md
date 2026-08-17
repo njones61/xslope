@@ -576,6 +576,15 @@ Number of exit face nodes: 0
 Zero exit-face nodes is what made it confined, and one direct solve is all it
 took.
 
+The solution view arrives with a **Display** panel in the left dock, holding the
+plot options of whichever result view is showing
+([The Display dock](../studio/interface.md#the-display-dock)). One of them decides
+what the picture can be read for: **set Contour levels to 10**, which opens at
+`20`. It fixes how many lines of both families get drawn, and ten is what makes
+them countable on this problem — [Reading the flow net](#reading-the-flow-net)
+below is the reason, and every seepage figure from here on is drawn at it.
+Changing the setting re-draws the solution already in hand; nothing is re-solved.
+
 ![The seepage solution](images/seep01_solution.png){width=1000}
 
 **The total discharge is 40.111 m³/day per m.** That trailing *per m* states a
@@ -603,19 +612,10 @@ anywhere in the section. That is what being confined looks like in the output.
 The solution plot is a **flow net**: two families of lines that together describe
 the whole head field.
 
-Before reading it, **set Contour levels to 10**. The control is on the **Display**
-panel in the left dock, which carries the plot options of whichever result view is
-showing ([The Display dock](../studio/interface.md#the-display-dock)), and it opens
-at `20`. It sets the number of head contours drawn, and every other count on the
-net follows from it — including how many flow lines get drawn, for the reason the
-end of this section gives. Ten is the value that makes this problem's net a
-readable one: the flow-net rule below only comes out clean when the head drop is
-divided into a number of steps the flow channels can match. Changing the setting
-re-draws the solution already in hand; nothing is re-solved.
-
 The black lines are **equipotentials** — contours of total head. Along one of
 them, the head is the same everywhere, so a standpipe anywhere on it stands to
-the same level. The ten levels are evenly spaced between the two boundary heads.
+the same level. There are as many as **Contour levels** asks for, evenly spaced
+between the two boundary heads, which is where the value of 10 set above lands.
 The outermost two lie on the boundaries themselves, so eight are visible inside
 the ground, and they divide the 3 m head drop into **nine equal drops of
 0.333 m**.
@@ -647,9 +647,10 @@ whole lines:
 
 $$ N_f = \frac{q \, N_d}{k \, \Delta h} = \frac{40.111 \times 9}{30 \times 3} = 4.011 $$
 
-Four channels and nine drops, both whole to within 0.3%. That is what makes this a
-true curvilinear-square net rather than a drawing that approximates one, and it is
-why the arithmetic runs backwards as cleanly as forwards: counting 4 and 9 off the
+Four channels against nine drops, with the channel count landing within 0.3% of a
+whole number rather than somewhere between two. That is what makes this a true
+curvilinear-square net rather than a drawing that approximates one, and it is why
+the arithmetic runs backwards as cleanly as forwards: counting 4 and 9 off the
 screen gives
 
 $$ q = 30 \times 3 \times \frac{4}{9} = 40.0 \text{ m³/day per m} $$
@@ -657,12 +658,13 @@ $$ q = 30 \times 3 \times \frac{4}{9} = 40.0 \text{ m³/day per m} $$
 against the finite element answer of 40.111, and the 0.3% between them is the
 rounding above and nothing else.
 
-At the Display panel's default of 20 levels the same solution gives
-*N<sub>f</sub>* = 8.47 against 19 drops, which rounds to 8 channels and reads back
-as 30 × 3 × 8/19 = 37.9 — 5.5% under the answer it was drawn from. That picture is
-the same head field with more contours on it, but its cells are not square and its
-counts do not reproduce the discharge. A net is worth counting only when the two
-counts come out whole, which is what the 10 was for.
+That is what the contour count was for. Left at the panel's default of 20 levels,
+the same solution gives *N<sub>f</sub>* = 8.47 against 19 drops, which rounds to 8
+channels and reads back as 30 × 3 × 8/19 = 37.9 — 5.5% under the answer it was
+drawn from. That picture is the same head field with more contours on it, but its
+cells are not square and its counts do not reproduce the discharge. A net is worth
+counting only when both counts come out whole, and on this problem 10 levels is
+what does it.
 
 A flow net drawn by hand on graph paper is a legitimate solution to a confined
 seepage problem and was the standard one for decades; what the finite element solve

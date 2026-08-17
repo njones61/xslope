@@ -746,51 +746,54 @@ deal.
 
 Sweeping *kr<sub>0</sub>* changed more than the answer, as the iteration row of
 that table shows. The five coarsest floors converged in 11 to 24 sweeps; the two
-finest took 145 and 148, with the solver falling back to a relaxation factor of
-0.01 to get there. That cost is worth understanding, because it is what stands
-between a plausible set of unsaturated parameters and a run that finishes.
+finest took 145 and 148, far enough into the run for the solver to have dropped
+its step to a hundredth of each new solve. That cost is what stands between a
+plausible set of unsaturated parameters and a run that finishes.
 
 ### The three conditions
 
 An unconfined run stops when all three of these hold at once, and reports
 `converged = False` if it runs out of iterations first.
 
-**Head change.** The largest change in head at any node between sweeps, below the
-tolerance from the **Run Seepage** dialog scaled by the domain height — 0.018 ft
-here. This measures whether the head field has stopped moving.
+**Head change.** The largest change in head at any node between sweeps, divided by
+the largest head in the field, below the tolerance from the **Run Seepage** dialog
+scaled by the domain height — 0.018 here, a ratio rather than a length. This
+measures whether the head field has stopped moving.
 
 **Flow closure.** The unsigned nodal flow residual at the free nodes, recomputed
 with the conductivity rebuilt from the current unrelaxed heads, below a default of
 0.1% of the inflow. This measures whether the *k<sub>r</sub>* field is consistent
-with the head field it was computed from, in flow units. The head test cannot see
-that lag, which is why this one exists: an iterate can sit still while its
-conductivities are still wrong.
+with the head field it was computed from, in flow units. It is not a mass balance
+on the reported discharge: the two are different quantities and differ by orders of
+magnitude on the same solve. The head test cannot see the *k<sub>r</sub>* lag,
+which is why this one exists — an iterate can sit still while its conductivities
+are still wrong.
 
 **Exit-face stability.** The active set unchanged since the previous sweep. A
-discharge computed while nodes are still switching between seeping and no-flow is
-not a discharge of anything.
+discharge computed while nodes are still switching between seeping and no-flow
+belongs to no one set of boundary conditions.
 
-Under-relaxation is the solver's response to slow progress rather than a setting.
-The full step is taken for the first twenty sweeps; after that the step is blended
-with the previous iterate at 0.5, then 0.2, 0.1, 0.05, 0.02 and 0.01 as the
-iteration count climbs. The three runs of the model comparison show it working:
-`lf` finished inside twenty sweeps at full step, and `vg` and `gard` crossed into
-the 0.5 band before finishing.
+The relaxation ladder runs further down than those three runs reached. The step
+drops to 0.5 after sweep 20, and then to 0.2, 0.1, 0.05, 0.02 and 0.01 after
+sweeps 40, 60, 80, 100 and 120. The three model runs finished on sweeps 23, 27 and
+28, so none of them got past the first rung; the two finest floors of the
+*kr<sub>0</sub>* sweep ran to 145 and 148, past the last one.
 
 The head tolerance is the only one of the three the dialog exposes, and it turns
 out to control the iteration count rather than the answer:
 
 | Convergence tol | Scaled to | q | Iterations |
 |---:|---:|---:|---:|
-| 0.001 | 0.18 ft | 1.954617 | 23 |
-| 0.0001 | 0.018 ft | 1.954617 | 23 |
-| 0.00001 | 0.0018 ft | 1.954618 | 24 |
-| 0.000001 | 0.00018 ft | 1.954616 | 28 |
+| 0.001 | 0.18 | 1.954617 | 23 |
+| 0.0001 | 0.018 | 1.954617 | 23 |
+| 0.00001 | 0.0018 | 1.954618 | 24 |
+| 0.000001 | 0.00018 | 1.954616 | 28 |
 
 A thousandfold tightening moves the discharge in the sixth figure and costs five
 extra sweeps. The reason is the flow-closure condition: whichever head tolerance is
-asked for, the run does not stop until the flow balances to 0.1%, and by then the
-head has stopped moving anyway. This is a field to leave at its default.
+asked for, the run does not stop until the conductivity field has stopped lagging
+the head field to within 0.1% of the inflow, and by then the head has stopped
+moving anyway. The default needs no adjustment on a model of this kind.
 
 ### The run that does not finish
 
@@ -804,23 +807,28 @@ stops:
 ```text
 Iteration 400: residual = 1.378519e-04, closure = 6.779e-01, relax = 0.010, 1/31 exit face active
 Warning: Did not converge in 400 iterations
+…
 WARNING: seepage solution did not converge — flowrate is unreliable (solution['converged'] is False).
 ```
 
-The message is worth reading rather than dismissing, and the two numbers on the
-last iteration say exactly which condition failed. The head residual is
-1.38 × 10<sup>−4</sup> ft against a tolerance of 0.018 — inside it by two orders of
-magnitude, and it had gone inside it **by sweep 50**, so it has been satisfied for
-seven eighths of the run. The exit-face set has
-been stable at one active node throughout. What has not converged is the flow
+The elided lines are the solver's own convergence history — every twentieth sweep
+of it — the inflow-against-outflow check on the final head field, and the range of
+the stream function.
+
+The two numbers on the last iteration say which condition failed. The relative head
+change is 1.38 × 10<sup>−4</sup> against a tolerance of 0.018 — inside it by two
+orders of magnitude, and it had gone inside it **by sweep 50**, so it has been
+satisfied for seven eighths of the run. The exit-face set settled to a single
+active node by sweep 7 and has not moved since. What has not converged is the flow
 closure, at 0.678 against a target of 0.001, and it is not creeping toward it:
 
 ![Head change and flow closure per sweep](images/seep02_convergence.png){width=1000}
 
 The left panel is the condition the dialog's tolerance controls, and on this run it
 is satisfied and irrelevant. The right panel is the one that decides. The three
-well-behaved models drop through both thresholds inside thirty sweeps. The hard run
-oscillates between 0.1 and 100 for four hundred sweeps — each sweep computes a
+well-behaved models drop through both thresholds inside thirty sweeps and stop
+there. The hard run oscillates over three decades, between 0.09 and 200, for four
+hundred sweeps — each sweep computes a
 conductivity field from a head field, gets a head field back that implies a
 different conductivity field, and swings between them. A curve that falls four
 decades over ten feet of suction puts most of the unsaturated zone on the steep
@@ -851,10 +859,11 @@ which on a stability model is the usual case.
 The seepage face has been quiet on every run so far: one of its 31 nodes active,
 at (544.5, 102.58), 2.6 ft above the downstream toe. That is a correct answer and a
 poor demonstration, because it makes the exit face look like a boundary condition
-that barely earns its keep. The reason it is quiet is the core. With the shell a
-thousand times more conductive than the core, almost nothing gets through to the
-downstream shell, the phreatic surface inside it sits far below the slope, and the
-face is dry down to the last node.
+that barely earns its keep. The reason it is quiet is the core. The core drops the
+head to within about 13 ft of the tailwater, so the phreatic surface in the
+downstream shell runs low — elevation 113.3 at the downstream edge of the core,
+103.7 at x = 540 — and stays well under the slope above it, meeting the face 2.6 ft
+above the toe. Everything higher up the slope is dry.
 
 Raising the core's conductivity is two cells on one row — **k1** and **k2** on
 material 2 — and it makes the face work. Everything else, including the exit-face
@@ -869,8 +878,10 @@ polyline itself, stays exactly as it was:
 
 ![The phreatic surface and its exit point as the core's conductivity rises](images/seep02_core_sweep.png){width=1000}
 
-With the core given the shell's own conductivity — a dam with no core at all, in
-effect — the discharge is **5.3 times** what the intact core allows, and the water
+With the core given the shell's own conductivity, the embankment becomes one soil
+and the cutoff key becomes a trench of that soil through the foundation, ten times
+more conductive than the foundation around it. The discharge is **5.3 times** what
+the intact core allows, and the water
 comes out **20.6 ft above the toe** instead of 2.6 ft above it, over 8 of the 31
 nodes. Nothing about the boundary condition was changed to produce that. The active
 set found a different discharge point because the head field gave it one, which is
@@ -888,9 +899,8 @@ that carries one.
 
 ## From this head field to a stability analysis
 
-The solution this page produced is not an end in itself. A pore pressure at every
-node of the mesh is what a stability analysis needs, and this file is set up to
-hand it over: all three materials carry `seep` in their **u** column, so every
+A pore pressure at every node of the mesh is what a stability analysis needs, and
+this file is set up to hand it over: all three materials carry `seep` in their **u** column, so every
 slice base and every Gauss point reads the solved field rather than a piezometric
 line.
 
@@ -903,8 +913,8 @@ The one thing that has to be decided before the seepage run, rather than after, 
 the element type. A finite element stability analysis requires quadratic elements,
 so a mesh built at `tri3` for a fast seepage solve has to be rebuilt at `tri6`
 before it can carry one. That is why the mesh shipped with this file is quadratic,
-and why its discharge of 1.9391 differs slightly from the 1.9546 of the linear mesh
-this page built.
+and why its discharge of 1.9391 differs slightly from the 1.9546 of the linear
+tri3 mesh built above.
 
 [Seepage and Slope Stability](../seep/seep_slope.md#worked-example) carries this
 same dam through the rest of the workflow: a Spencer search on the seepage-derived
@@ -929,8 +939,8 @@ This tutorial demonstrated:
   taking **46.13 ft of the 60 ft** head drop across 88 ft of a 750 ft section,
   **90.1%** of
   the centerline flow passing *below* the cutoff key through foundation it does not
-  reach, and **4.5% to 10.3%** of the flow in the downstream shell traveling above
-  the phreatic surface.
+  reach, and somewhere between **5% and 10%** of the flow in the downstream shell
+  traveling above the phreatic surface.
 - A flow net whose channel count is set by the base material: **0.62 channels**
   scaled to the shell, **619** scaled to the core, **6.19** scaled to the
   foundation that carries the through-flow — and the drawn net read back at
@@ -939,16 +949,18 @@ This tutorial demonstrated:
 - Three unsaturated models on one mesh: **1.9546** for the linear front,
   **1.8649** for van Genuchten and **1.8661** for a Gardner curve fitted to it —
   the two calibrated models 0.06% apart and both 4.5 to 4.6% below the linear
-  front — with the phreatic surface moving by at most **0.40 ft** across all three.
+  front — with the phreatic surface moving by at most **0.40 ft** across all three,
+  and in opposite directions either side of the core.
 - That difference traced to the floor of the curve rather than to its shape: the
   linear front swept from **2.6328 at kr₀ = 0.1 down to 1.8707 at 10⁻⁴**, where it
   closes **93%** of its gap to van Genuchten, against a 4.6% spread from sweeping
   h₀ over a twentyfold range.
 - A convergence test of three conditions, of which the exposed tolerance is the
-  least binding — **1.954617 at every tolerance from 10⁻³ to 10⁻⁶** — and a
-  linear front at **kr₀ = 10⁻⁴, h₀ = −10 ft** whose head change sat two orders of
-  magnitude inside tolerance from sweep 50 onward while its flow closure oscillated
-  between 0.1 and 100, stopping at **q = 1.9706 with converged = False** at the
+  least binding — **1.95462 at every tolerance from 10⁻³ to 10⁻⁶** — and a
+  linear front at **kr₀ = 10⁻⁴, h₀ = −10 ft** whose relative head change sat two
+  orders of magnitude inside tolerance from sweep 50 onward while its flow closure
+  oscillated over three decades, from 0.09 to 200, stopping at
+  **q = 1.9706 with converged = False** at the
   default ceiling and reaching **1.9755 in 963 iterations** when the ceiling was
   raised.
 
@@ -956,7 +968,8 @@ This tutorial demonstrated:
 [Seepage Analysis](../seep/overview.md) carries the governing equations, all three
 unsaturated models with their parameter tables, and the convergence conditions in
 full; [Sample Problem 5](../seep/samples.md#johnson-reservoir) catalogues this model
-and reports its cross-check against the USACE SEEP2D program on an identical mesh;
+and reports its cross-check against the USACE SEEP2D program on a mesh identical to
+the one it exported to SEEP2D;
 [Seepage and Slope Stability](../seep/seep_slope.md) takes this head field into a
 limit equilibrium search and a finite element strength reduction on the same file;
 and [Sample Problem 9](../seep/samples.md#9-johnson-reservoir-zoned-drawdown-transient)

@@ -296,9 +296,10 @@ Convergence is a **hybrid** test — all three conditions must hold at once:
    varies from problem to problem.
 2. **Flow closure.** The unsigned nodal flow residual at the free nodes, evaluated with the
    conductivity rebuilt from the current unrelaxed heads, below `closure_tol` (default 0.1%)
-   of the inflow. This measures the remaining $k_r$ lag directly in flow units, so the reported
-   flowrate balances to `closure_tol` on every problem and the converged discharge is
-   tolerance-independent.
+   of the inflow. This measures the remaining $k_r$ lag directly in flow units — it is not a
+   mass balance on the reported flowrate — so a run does not stop until the conductivity field
+   has stopped lagging the head field to within `closure_tol` of the inflow, which is what
+   makes the converged discharge tolerance-independent.
 3. **Exit-face stability.** The active set unchanged from the previous iteration — the
    flowrate is not meaningful while exit nodes are still switching.
 

@@ -681,11 +681,12 @@ front and Gardner by at most **0.35 ft**, and van Genuchten and Gardner by at mo
 
 The lower panel shows where those tenths of a foot are, and they do not all point
 the same way. Over the crest of the core, at x = 370 and x = 390, the two
-calibrated models hold the surface **0.40 ft higher** than the linear front. At the
-downstream toe of the core, at x = 420, they put it **0.29 to 0.33 ft lower**, and
-that deficit decays to under a tenth of a foot by x = 500. The surface pivots about
-the core rather than shifting up or down as a whole, and the two calibrated models
-pivot together, staying within 0.08 ft of each other at every station.
+calibrated models hold the surface **0.32 to 0.40 ft higher** than the linear
+front. At the downstream toe of the core, at x = 420, they put it **0.29 to
+0.33 ft lower**, and that deficit shrinks downstream — 0.21 to 0.25 ft at x = 460,
+about a tenth of a foot at x = 500, less than that at x = 540. The surface pivots
+about the core rather than shifting up or down as a whole, and the two calibrated
+models pivot together, staying within 0.08 ft of each other at every station.
 
 These are differences between three runs on one mesh, so the discretization error
 common to all three cancels out of them. That is what makes a shift smaller than
@@ -773,11 +774,10 @@ are still wrong.
 discharge computed while nodes are still switching between seeping and no-flow
 belongs to no one set of boundary conditions.
 
-The relaxation ladder runs further down than the model comparison reached. The
-step drops to 0.5 after sweep 20, and then to 0.2, 0.1, 0.05, 0.02 and 0.01 after
-sweeps 40, 60, 80, 100 and 120. Those three runs finished on sweeps 23, 27 and 28,
-so none of them got past the first rung; the two finest floors of the
-*kr<sub>0</sub>* sweep ran to 145 and 148, past the last one.
+The relaxation ladder runs further down than the model comparison reached. Below
+the 0.5 those three runs stopped at, the step drops to 0.2, 0.1, 0.05, 0.02 and
+0.01 after sweeps 40, 60, 80, 100 and 120. The two finest floors of the
+*kr<sub>0</sub>* sweep ran to 145 and 148, past the last rung.
 
 The head tolerance is the only one of the three the dialog exposes, and it turns
 out to control the iteration count rather than the answer:

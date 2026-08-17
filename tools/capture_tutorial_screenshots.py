@@ -1555,14 +1555,20 @@ def seep01_materials():
 
     The table rather than the list view, which is what the LEM pages photograph:
     with only the Seepage toggle on, the table IS the seepage row — name, the two
-    principal conductivities, the rotation and the unsaturated model, in the mat
-    sheet's own order — while the list view puts those fields in a group below
-    three strength groups a confined seepage problem never fills.
+    principal conductivities, the rotation, the unsaturated model and its
+    parameters, in the mat sheet's own order — while the list view puts those
+    fields in a group below three strength groups a confined seepage problem never
+    fills.
+
+    Widened through the last seepage column rather than through ``unsat``, because
+    the page's claim is that this view shows the seepage band AND NOTHING ELSE: a
+    shot cut off inside the band shows a column with no header, which is neither
+    the band nor a table.
     """
     from studio.editors import MaterialsEditor
 
     dlg = _seep_only(MaterialsEditor().build(_load(SEEP01), None))
-    return _grab(_mat_table(dlg, through="unsat"),
+    return _grab(_mat_table(dlg, through="vg_n"),
                  "seep01_studio_materials.png")
 
 

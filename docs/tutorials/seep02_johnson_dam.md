@@ -570,8 +570,8 @@ Drawn against each other, on this dam's own soils and parameters:
 ![The three relative-conductivity curves per material](images/seep02_kr_models.png){width=1000}
 
 The van Genuchten and Gardner curves lie close together, which is what the fit was
-for. The linear front does not lie with them, and reading the three off at four suctions on the
-shell's parameters says where they part:
+for. The linear front does not lie with them, and reading the three off at four
+suctions on the shell's parameters says where they part:
 
 | ψ (ft) | −0.5 | −1 | −5 | −20 |
 |---|---:|---:|---:|---:|

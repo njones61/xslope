@@ -22,8 +22,8 @@ where the base material stops being obvious and where the conductivities are far
 enough apart that the choices show up in the numbers.
 
 [Tutorial SEEP-1](seep01_sheetpile.md) built a seepage model from scratch, three
-different ways, and solved a confined one. This page opens a finished file
-instead and spends its length on the physics SEEP-1 stopped short of.
+different ways, and solved a confined one. The model here arrives finished, and
+the work is the physics an unconfined problem adds to it.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -38,7 +38,7 @@ phreatic surface and how much passes under the core, scale the flow net to each
 of the three zones in turn and find the one that reads, run all three unsaturated
 conductivity models against each other and explain the difference between them,
 and watch the iteration fail and then succeed on a curve steep enough to make it
-work.
+struggle.
 </div>
 <p><span class="tg-pill">three materials</span><span class="tg-pill">unconfined flow</span><span class="tg-pill">seepage face</span><span class="tg-pill">phreatic surface</span><span class="tg-pill">unsaturated models</span><span class="tg-pill">relative conductivity</span><span class="tg-pill">flow net base material</span><span class="tg-pill">convergence</span><span class="tg-pill">underseepage</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx), the same file used by [Seepage Sample Problem 5](../seep/samples.md#johnson-reservoir)</div>
@@ -65,9 +65,10 @@ The free surface is the **phreatic surface** — the boundary between the satura
 soil below it and the unsaturated soil above it, which is the locus of points
 where the pore pressure passes through zero. Below it the soil is saturated and
 the pore pressure is positive. Above it the soil is unsaturated: the pores hold
-both air and water, the pore pressure is negative, and that negative pressure is
-called **suction**. Suction is written as the pressure head ψ = *h* − *z*, in feet
-of water, and it is negative wherever the soil is unsaturated.
+both air and water, and the pore pressure is negative. The pressure head there,
+ψ = *h* − *z* in feet of water, is negative; its magnitude −ψ is the **suction**,
+and every suction quoted here is that positive number, which is also the quantity
+Studio's own conductivity curves are plotted against.
 
 Water still moves through the unsaturated zone, but not as freely. The
 conductivity there falls as the suction grows, because the wider pores drain
@@ -96,7 +97,7 @@ the value is a total head measured from the model's own datum, not a depth of
 water.
 
 **Reservoir** (`reservoir`) holds a node at the stated level only while that node
-is submerged, and releases any node the water line drops below to seep. The two
+is submerged, and releases to seep any node left standing above the water. The two
 are identical for a polyline that lies entirely under the water, which is the
 usual steady case, and they differ when the pool falls or the polyline is drawn up
 a slope above it.
@@ -133,7 +134,8 @@ of the exit face is provisionally held saturated at atmospheric pressure. A node
 is released to no-flow if its head would fall below its own elevation, or if the
 boundary would have to push water *into* the domain to hold it — a free-draining
 face can only let water out. A released node is taken back into the face when its
-pressure climbs back to zero. The sweep repeats until the set stops changing,
+pressure climbs back to zero and the sweep is no longer pushing water into it.
+The sweep repeats until the set stops changing,
 which is one of the three conditions the run has to satisfy before it reports an
 answer. [Exit face (seepage face)](../seep/overview.md#exit-face-seepage-face)
 carries the full statement, including how the set is tracked per element edge
@@ -198,11 +200,11 @@ rows:
 
 ![The three zones with the seepage columns showing](images/seep02_studio_materials.png)
 
-| mat | name | k1 | k2 | alpha | unsat | kr0 | h0 |
-|:---:|---|:---:|:---:|:---:|---|:---:|:---:|
-| 1 | `shell` | 1 | 1 | 0 | `lf` | 0.01 | −1 |
-| 2 | `core` | 0.001 | 0.001 | 0 | `lf` | 0.01 | −1 |
-| 3 | `foundation` | 0.1 | 0.1 | 0 | `lf` | 0.01 | −1 |
+| mat | name | k1 | k2 | alpha | unsat | kr0 | h0 | vg_a | vg_n |
+|:---:|---|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
+| 1 | `shell` | 1 | 1 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
+| 2 | `core` | 0.001 | 0.001 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
+| 3 | `foundation` | 0.1 | 0.1 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
 
 All three zones are isotropic — `k1` equals `k2`, so `alpha` means nothing and
 stays at 0 — and the whole of the zoning is in the conductivities. The core is a
@@ -220,13 +222,15 @@ seepage analysis does not read them.
 
 The `unsat` column and the four columns after it are the subject of a later
 section. They are read only above the phreatic surface, so on SEEP-1's confined
-problem they were ignored entirely; here they do work.
+problem they were ignored entirely; here they do work. `vg_a` and `vg_n` sit at 0
+because the model this file selects does not read them.
 
 ### The boundary conditions
 
-Open **Seep BC**. The editor opens on **Set 1**, with every boundary in the set
-listed on the left and the selected one's value and points on the right. This
-model has three entries:
+Open **Seep BC**. The editor opens on **Set 1**. Every boundary in the set is
+listed on the left, and a specified-head entry carries its head value in the list
+entry itself; the table on the right holds the selected entry's points and nothing
+else. This model has three entries:
 
 | Entry | Type | Value (ft) | Points |
 |---|---|:---:|---|
@@ -276,10 +280,28 @@ discharge at. Click **Build Mesh…**:
 
 Set **Element type** to **Linear triangles (tri3)**, which is the right choice for
 a stand-alone seepage run: head is a scalar field, so there is nothing for a
-linear element to lock up on. Leave **Auto-size from geometry** ticked and set
-**Size divisions** to `120`. The section is 750 ft wide, so the target element size
-becomes 750/120 = 6.25 ft and the grayed **Target element size** box shows it.
-Leave **Refine near features** and **Quadrilateral style** alone.
+linear element to lock up on.
+
+Leave **Auto-size from geometry** ticked. It takes the element size from the width
+of the section rather than from a number typed in feet, which is what makes the
+next field the one to set.
+
+Set **Size divisions** to `120`. The section is 750 ft wide, so the target element
+size becomes 750/120 = 6.25 ft, and the grayed **Target element size** box shows
+it.
+
+**Quadrilateral style** is disabled, both of its radio buttons with it. It governs
+how quadrilaterals are laid out, and the element type chosen above is triangular.
+
+Leave **Refine near features** unticked, which leaves **Refinement factor** grayed
+at its default of 3.0. Ticking it would shrink the elements around reinforcement
+lines, crack tips and thin material zones by that factor; this section has none of
+the first two and no zone thin enough to need the third.
+
+**Refine thin zones** is ticked, which is its default. It gives any zone too thin
+to carry about four element rows across its width a local size that will. It finds
+no such zone on this model, so the mesh comes out the same either way.
+
 [SEEP-1](seep01_sheetpile.md#how-fine-the-mesh-has-to-be) is where the element
 type and the element size are studied; here they are set once and left.
 
@@ -290,10 +312,10 @@ the boundary nodes marked on it:
 
 The blue squares are the specified-head nodes, 88 of them across the two head
 boundaries. The red circles are the 31 exit-face nodes on the downstream slope.
-This picture is worth checking rather than skipping, because the three material
-zones and the two boundary types are all visible on it at once: the core and its
-key are drawn in their own color, so a key that failed to reach elevation 60 or a
-core that failed to meet the crest would show here rather than in the answer.
+The three material zones and the two boundary types are all visible on it at once:
+the core and its key are drawn in their own color, so a key that failed to reach
+elevation 60 or a core that failed to reach elevation 165 would show here rather
+than in the answer.
 
 ---
 
@@ -303,12 +325,18 @@ Click **Run Seep…**:
 
 ![The Run Seepage dialog](images/seep02_studio_run_seep.png)
 
-**BC set** stays at `Set 1`; a second set appears in this list only for a file that
+**BC set** stays at `Set 1`. A second set appears in this list only for a file that
 defines one, which is how a rapid drawdown analysis carries its drawn-down
-boundaries. **Convergence tol** is the head-change tolerance the unconfined
-iteration is tested against, and unlike on SEEP-1's confined problem it is live
-here. Leave it at `0.0001` for now — a later section measures what changing it
-does.
+boundaries.
+
+**Convergence tol** is the head-change tolerance the unconfined iteration is
+tested against, and unlike on SEEP-1's confined problem it is live here. Leave it
+at `0.0001` for now — a later section measures what changing it does.
+
+The **Model checks** panel filling the right half of the dialog is the preflight
+report for this run: it reads the geometry, the material table and the boundary
+set before anything is solved, and an error in it blocks the run. On this file it
+reports **No problems found for this run.**
 
 Click **Run**. The Log pane opens with the path the solver took:
 
@@ -320,12 +348,15 @@ Starting unsaturated flow iteration...
 Convergence tolerance: 1.800000e-02
 ```
 
-Thirty-one exit-face nodes is what made this unconfined. The tolerance printed on
-the last line is not the 0.0001 that was typed: the head tolerance is scaled to the
-height of the domain, which is 180 ft here, so 0.0001 × 180 = 0.018 ft is what the
-head change is actually compared against. Asking for a tolerance in fractions of
-the domain rather than in feet is what lets one default work on a 10 m sheetpile
-section and on a 180 ft dam.
+The 31 exit-face nodes are what make this problem unconfined. The tolerance
+printed on the last line is not the 0.0001 that was typed: it is scaled by the
+height of the domain, 180 ft here, to 0.0001 × 180 = 0.018. What that 0.018 is
+compared against is the **relative** head change — the largest change in head at
+any node between sweeps, divided by the largest head in the field — so both sides
+of the test are dimensionless. The largest head here is 160 ft, so the loosest
+head change the test admits is 0.018 × 160 = 2.9 ft at the node that moved most.
+Asking for the tolerance as a fraction of the domain rather than as a length is
+what lets one default work on a 10 m sheetpile section and on a 180 ft dam.
 
 The run finishes in **23 iterations**:
 
@@ -333,6 +364,10 @@ The run finishes in **23 iterations**:
 
 **The total discharge is 1.9546 ft³/day per ft** — per foot of dam measured along
 its axis, the convention every quantity a two-dimensional analysis reports carries.
+The [sample page](../seep/samples.md#johnson-reservoir) reports 1.9575 for the same
+model on the 2,604-node mesh it exported to SEEP2D; the 0.15% between them is the
+mesh, not the physics.
+
 The head ranges from **100.000 ft to 160.000 ft**, which is the two boundary values
 and nothing outside them, because a region with no sources or sinks inside it can
 have no interior maximum or minimum of head.
@@ -341,9 +376,9 @@ The pore pressure runs from **−2,577.9 psf to 9,971.1 psf**. The negative end 
 the difference from SEEP-1: a confined solution cannot produce a pore pressure
 below zero anywhere, and here the whole upper part of the downstream half of the
 dam stands above the phreatic surface and is in suction. The largest suction is
-**−41.31 ft** of pressure head at (401.9, 169.7), on the downstream slope about
-10 ft below the crest, which is the point of the dam standing highest above the
-water inside it.
+**41.31 ft** — a pressure head of −41.31 ft — at (401.9, 169.7), on the downstream
+slope about 10 ft below the crest, where the slope stands well above the phreatic
+surface and the flow through the unsaturated soil is slowest.
 
 The heavy black line across the section is the phreatic surface. It leaves the
 reservoir at elevation 160 where the water meets the upstream slope, runs nearly
@@ -362,24 +397,23 @@ it concrete.
 x = 414, so reading the solved head at x = 315 and x = 425 straddles it with about
 10 ft of shell either side. Those two readings are **159.32 ft** and **113.18 ft**:
 the core absorbs **46.13 ft of the 60 ft** total drop — 77% of it, across 88 ft of
-a 750 ft section. That is what a core is for. The shell either side of it stands at
-nearly the full reservoir head or nearly the full tailwater head, and the steep
-hydraulic gradient that would otherwise run through the embankment is confined to a
-zone built to take it.
+a 750 ft section. The shell either side of it stands at nearly the full reservoir
+head or nearly the full tailwater head, and the steep hydraulic gradient that would
+otherwise run through the embankment is confined to a zone built to take it.
 
 **The key does not stop the underseepage.** Integrating Darcy's horizontal velocity
 up the dam centerline at x = 370 gives **1.9619 ft³/day per ft** crossing that
 section, which is the total discharge to within the discretization. Of it,
 **1.7672 — 90.1% — passes below elevation 60**, the bottom of the cutoff key,
 through foundation the key does not reach. Only a tenth of the water that reaches
-the tailwater goes through the core itself. A 40 ft key into a 100 ft foundation is
-a partial cutoff, and this dam's discharge is a foundation problem rather than an
-embankment one.
+the tailwater goes through the core itself. The key reaches 40 ft into a 100 ft
+foundation, leaving 60 ft of foundation open beneath it, so this dam's discharge is
+set by the foundation rather than by the embankment.
 
-**Some of the flow is above the phreatic surface.** The unsaturated zone is not
-dead ground: its conductivity is reduced by *k<sub>r</sub>*, not switched off.
-Splitting the same velocity integral at the phreatic surface, in the downstream
-shell where the unsaturated zone is thickest:
+**Some of the flow is above the phreatic surface.** Above the phreatic surface the
+conductivity is reduced by *k<sub>r</sub>*, not switched off, so the unsaturated
+soil still carries water. Splitting the same velocity integral at the phreatic
+surface, in the downstream shell where the unsaturated zone is thickest:
 
 | Section | q across it (ft³/day per ft) | Phreatic surface (ft) | Above it | Share |
 |:---:|---:|---:|---:|---:|
@@ -387,9 +421,12 @@ shell where the unsaturated zone is thickest:
 | x = 450 | 1.8955 | 112.31 | 0.0846 | 4.5% |
 | x = 500 | 2.0676 | 108.84 | 0.2139 | 10.3% |
 
-Between a twentieth and a tenth of the flow crossing the downstream shell travels
-through unsaturated soil. That is small, and it is not zero, which is what gives
-the choice of unsaturated model something to act on.
+Each of those section integrals reproduces the reported total discharge only to
+within 6% — x = 400 comes out 0.1% low, x = 450 3.0% low, x = 500 5.8% high — so
+the shares beside them are good to a few points rather than to the tenth. Read
+that way, somewhere between about a twentieth and a tenth of the flow crossing the
+downstream shell travels through unsaturated soil. That is small, and it is not
+zero, which is what gives the choice of unsaturated model something to act on.
 
 The pore-pressure field draws the same story as a field rather than as numbers:
 
@@ -412,9 +449,8 @@ Each sweep recomputes the pressure head from the current head field, evaluates
 *k<sub>r</sub>*(ψ) at each element's integration points and scales that element's
 saturated stiffness by the average, solves the resulting linear system, and updates
 the exit-face active set. Averaging *k<sub>r</sub>* over an element's integration
-points rather than switching it node by node is what smears the wet-to-dry
-transition over one element instead of snapping it across a node, and it is the
-reason the iteration converges at all on a mesh this coarse.
+points rather than switching it node by node smears the wet-to-dry transition over
+one element instead of snapping it across a node.
 
 Two consequences follow for reading the result. The phreatic surface is resolved to
 about one element — 6.25 ft here — so a phreatic elevation quoted to better than

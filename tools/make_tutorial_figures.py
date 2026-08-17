@@ -2340,11 +2340,19 @@ def _seep02_phreatic(mesh, solution, stations=SEEP02_STATIONS):
     """The elevation of the phreatic surface at each station.
 
     The phreatic surface is the pressure-head zero contour, so this walks a
-    vertical line from the base up and returns the highest elevation still at or
-    above zero, interpolating between the two samples that straddle it. Reading it
-    off an interpolator rather than off the nodes matters here: the three
-    unsaturated models move this surface by less than a foot, and a nearest-node
-    reading on a 6.25 ft mesh cannot see a difference that small.
+    vertical line from the base up and returns the elevation where the pressure
+    head crosses zero, interpolating between the two samples that straddle it.
+    Reading it off an interpolator rather than off the nodes matters here: the
+    three unsaturated models move this surface by less than a foot, and a
+    nearest-node reading on a 6.25 ft mesh cannot see a difference that small.
+
+    A column that is saturated all the way to the ground surface has no
+    crossing inside the domain — on this dam that is the submerged upstream
+    face, where the p = 0 level is the reservoir surface standing above the
+    ground. Those stations return NaN so the drawn line starts where the
+    reservoir level meets the face, the same convention as the solution plot's
+    own phreatic line. (Clamping to the topmost sample instead traced the
+    upstream face from the toe — the owner caught it on the published figure.)
     """
     import numpy as np
 
@@ -2364,7 +2372,7 @@ def _seep02_phreatic(mesh, solution, stations=SEEP02_STATIONS):
             out.append(float(ys[i] + (ys[i + 1] - ys[i]) * psi[i]
                              / (psi[i] - psi[i + 1])))
         else:
-            out.append(float(ys[i]))
+            out.append(float("nan"))
     return out
 
 

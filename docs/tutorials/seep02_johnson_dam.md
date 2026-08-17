@@ -476,8 +476,10 @@ $$ q = k \, \Delta h \, \frac{N_f}{N_d} $$
 
 with *N<sub>f</sub>* the number of flow channels and *N<sub>d</sub>* the number of
 head drops. The renderer knows *q*, and *N<sub>d</sub>* is one less than the
-contour count requested through **levels**, so it computes the *N<sub>f</sub>* that
-satisfies the identity and draws that many.
+head-contour count requested through **levels**, so it computes the
+*N<sub>f</sub>* that satisfies the identity and asks the contouring routine for
+*N<sub>f</sub>* + 1 stream-function levels — one more line than channels, and
+never fewer than two.
 
 That leaves one thing to supply — the *k*. On SEEP-1's single-soil problem there
 was only one candidate and the argument was inert. On a zoned section there are
@@ -486,7 +488,7 @@ orders of magnitude with them. That argument is **base_mat**, a 1-based index in
 the `mat` sheet, and this dam is where it matters. With 20 contour levels, so 19
 head drops of 3.158 ft each, and a 60 ft head drop:
 
-| base_mat | Zone | k (ft/day) | N<sub>f</sub> = q·N<sub>d</sub>/(k·Δh) | Flow lines drawn |
+| base_mat | Zone | k (ft/day) | N<sub>f</sub> = q·N<sub>d</sub>/(k·Δh) | φ contour levels requested |
 |:---:|---|:---:|---:|:---:|
 | 1 | shell | 1 | 0.62 | 2 |
 | 2 | core | 0.001 | 618.96 | 620 |
@@ -494,10 +496,11 @@ head drops of 3.158 ft each, and a 60 ft head drop:
 
 ![The same solution with each zone as the base material](images/seep02_base_mat.png){width=1000}
 
-Scaled to the shell, the net asks for less than one flow channel, so the renderer
-draws the two boundary streamlines and nothing between them. The top panel has no
-flow lines in it at all. Scaled to the core, it asks for 619 channels, and the
-lower two-thirds of the section fills with solid blue. Only the foundation gives a
+Scaled to the shell, the net asks for less than one flow channel, so the count
+falls to its floor of two levels, both of them on the extreme values of the stream
+function; the top panel has no flow lines in it at all. Scaled to the core, it asks for 619 channels,
+and nearly the whole section fills with solid blue, with only the core coarse
+enough to show individual lines. Only the foundation gives a
 net that can be read, and the reason is arithmetic rather than aesthetic: 90% of
 the discharge crosses the foundation, so the foundation is the zone the identity
 above is nearly true of, and a net drawn in a zone that carries almost none of the
@@ -532,8 +535,10 @@ group:
 
 ![The conductivity group and the curve it draws](images/seep02_studio_materials_unsat.png)
 
-**Unsat model** is the selector, and the plot on the right redraws as it changes,
-so the curve a choice implies is visible before anything is run. The parameter
+**Unsat model** is the selector, and the lower of the two plots on the right — the
+upper one is the strength envelope — redraws as it changes, so the curve a choice
+implies is visible before anything is run. Its axis is labeled *matric suction, ψ*
+and runs positive, which is the suction rather than the pressure head. The parameter
 fields below it follow the selection: with `lf` chosen, `kr0` and `h0` are shown
 and the van Genuchten and Gardner parameters are hidden, because the linear front
 does not read them.
@@ -542,9 +547,9 @@ does not read them.
 
 **Linear front** (`lf`) is the default and the model this file uses. It holds
 *k<sub>r</sub>* at 1 in the saturated soil, falls linearly to a floor value
-*kr<sub>0</sub>* as the suction reaches a reference head *h<sub>0</sub>*, and stays
-at that floor below it. Two parameters, no special functions, and a transition
-across the phreatic surface that a solver finds easy. It carries no soil physics —
+*kr<sub>0</sub>* as the pressure head reaches *h<sub>0</sub>*, and stays at that
+floor beyond it. It takes two parameters, needs no special functions, and gives a
+transition across the phreatic surface that a solver finds easy. It carries no soil physics —
 it is a shape chosen to be well-behaved — and the
 [seepage overview](../seep/overview.md#linear-front-lf) recommends it for slope
 stability work, where suction is conservatively neglected in the strength anyway
@@ -571,16 +576,26 @@ The van Genuchten and Gardner models share one pair of input columns, `vg_a` and
 ### Parameters for these three soils
 
 Running the three models against each other means giving each of them parameters
-that describe the same soil, and each model gets those parameters a different way.
+for the same soil, and each model gets those parameters a different way — one of
+the three does not get them from the soil at all.
 
 The linear front's are already in the file: *kr<sub>0</sub>* = 0.01 at
-*h<sub>0</sub>* = −1 ft, on all three materials.
+*h<sub>0</sub>* = −1 ft, the same pair on all three materials. That pair is a
+numerical shape rather than a measurement of any of these soils, and the section
+after the comparison turns that difference into the explanation for the gap.
 
-The van Genuchten parameters come from the Carsel & Parrish table, by texture
-matched to conductivity — sandy clay loam for the 1 ft/day shell, clay for the
-0.001 ft/day core, clay loam for the 0.1 ft/day foundation. The table gives α in
-1/cm, and XSLOPE is unit-agnostic, so α is converted to this model's foot by
-multiplying by 30.48. *n* is dimensionless and carries over unchanged.
+The van Genuchten parameters come from the Carsel & Parrish table, each material
+matched to the nearest texture by saturated conductivity — sandy clay loam for the
+1 ft/day shell, clay loam for the 0.1 ft/day foundation, clay for the core. The
+table gives α in 1/cm, and XSLOPE is unit-agnostic, so α is converted to this
+model's foot by multiplying by 30.48. *n* is dimensionless and carries over
+unchanged.
+
+The shell and the foundation match well. The core does not: the clay Carsel &
+Parrish measured is a natural soil of about 0.16 ft/day, over a hundred times this
+core's 0.001, and no texture in that dataset comes down to an engineered clay
+fill. The core's curve is therefore the shape of a clay rather than a measurement
+of this one.
 
 The Gardner parameters have no table to read off, so each material's pair is a
 least-squares fit to that same material's van Genuchten curve, in
@@ -601,13 +616,18 @@ values are not comparable: with *n* fixed, *k<sub>r</sub>* falls to one half at 
 suction of *a*<sup>−1/*n*</sup>, so a large *a* means a curve that starts dropping
 immediately.
 
-Drawn against each other, on this dam's own soils and parameters:
+Drawn against each other, on this dam's own soils and parameters, with both axes
+logarithmic — the curves differ by decades and across decades, and on log axes the
+linear front's straight line reads as the cliff a solver sees:
 
 ![The three relative-conductivity curves per material](images/seep02_kr_models.png){width=1000}
 
-The van Genuchten and Gardner curves lie close together, which is what the fit was
-for. The linear front does not lie with them, and reading the three off at four
-suctions on the shell's parameters says where they part:
+The van Genuchten and Gardner curves lie close together on the shell and the
+foundation, which is what the fit was for. On the core they part by about a
+quarter of a decade over the wet end — 0.18 against 0.45 at a hundredth of a foot
+of suction — and cross near one foot; that gap is the 0.252 in the table above,
+the worst of the three fits. The linear front lies with none of them, and reading
+the three off at four suctions on the shell's parameters says where they part:
 
 | ψ (ft) | −0.5 | −1 | −5 | −20 |
 |---|---:|---:|---:|---:|
@@ -631,11 +651,19 @@ nothing, and run again. The mesh, the geometry, the conductivities and the bound
 conditions are identical across the three runs; only the curve above the phreatic
 surface changes.
 
-| Model | q (ft³/day per ft) | Iterations | Relaxation fell to | Flow above the phreatic surface at x = 500 |
+**Relaxation** in the last column is how much of each new solve the iteration
+actually takes. The full step is taken through sweep 20; past that the new field is
+blended with the previous one, at 0.5 first and lower as the sweep count climbs,
+which is the solver's response to slow progress rather than a setting. All three of
+these runs finish just past sweep 20 — `lf` by three sweeps, `gard` by seven,
+`vg` by eight — so all three take their last step at 0.5 and none reaches the
+next rung.
+
+| Model | q (ft³/day per ft) | Iterations | Flow above the phreatic surface at x = 500 | Relaxation at the last sweep |
 |---|---:|---:|---:|---:|
-| `lf` | 1.9546 | 23 | 1.00 | 10.3% |
-| `vg` | 1.8649 | 28 | 0.50 | 8.3% |
-| `gard` | 1.8661 | 27 | 0.50 | 8.6% |
+| `lf` | 1.9546 | 23 | 10.3% | 0.50 |
+| `vg` | 1.8649 | 28 | 8.3% | 0.50 |
+| `gard` | 1.8661 | 27 | 8.6% | 0.50 |
 
 The two calibrated models agree with each other to **0.06%** in discharge, and
 both sit **4.5 to 4.6% below** the linear front. That gap is the whole of what the
@@ -649,9 +677,19 @@ At section scale the three surfaces are one line. Read station by station, the
 linear front and van Genuchten differ by at most **0.40 ft** anywhere, the linear
 front and Gardner by at most **0.35 ft**, and van Genuchten and Gardner by at most
 **0.08 ft** — on a dam 80 ft tall, under a 60 ft head, on a mesh whose elements are
-6.25 ft. The lower panel shows where those tenths of a foot are: at the crest of
-the core, where the phreatic surface is steepest and a small change in the
-unsaturated conductivity moves where it crosses.
+6.25 ft.
+
+The lower panel shows where those tenths of a foot are, and they do not all point
+the same way. Over the crest of the core, at x = 370 and x = 390, the two
+calibrated models hold the surface **0.40 ft higher** than the linear front. At the
+downstream toe of the core, at x = 420, they put it **0.29 to 0.33 ft lower**, and
+that deficit decays to under a tenth of a foot by x = 500. The surface pivots about
+the core rather than shifting up or down as a whole, and the two calibrated models
+pivot together, staying within 0.08 ft of each other at every station.
+
+These are differences between three runs on one mesh, so the discretization error
+common to all three cancels out of them. That is what makes a shift smaller than
+one element worth reading at all.
 
 Which model to choose follows from those two comparisons, and it is why the
 [overview](../seep/overview.md#unsaturated-flow-formulation) recommends the linear
@@ -665,10 +703,11 @@ parameters can be defended from measurements is the one to use.
 
 ### Why the linear front passes more water
 
-There is an explanation available for that 4.6%: the linear front's floor leaves
-the deep unsaturated zone a hundred times more conductive than the other two
-models, so it carries more water through it. An explanation is only worth having
-if a measurement could contradict it, and this one has an obvious test. If the
+The candidate explanation for that 4.6% is the floor: the linear front holds
+*k<sub>r</sub>* at 0.01 through the deep unsaturated zone, a hundred times more
+conductive than the other two models leave it, so it carries more water through
+that zone. The test of the explanation is a measurement that could contradict it,
+and the next run makes that measurement. If the
 floor is what makes the difference, lowering *kr<sub>0</sub>* to the
 10<sup>−4</sup> the other two models bottom out at should bring the linear front to
 their answer; if the difference is coming from somewhere else, it will not.
@@ -682,7 +721,8 @@ Sweeping *kr<sub>0</sub>* with *h<sub>0</sub>* held at −1 ft:
 
 ![Discharge against the floor of the curve](images/seep02_kr0_sweep.png){width=900}
 
-The series lands on the reference lines. At a floor of 10<sup>−4</sup> the linear
+The series lands on the reference lines, which sit 0.0012 apart and draw as one
+dashed line under two labels. At a floor of 10<sup>−4</sup> the linear
 front gives **1.8707**, against van Genuchten's 1.8649 and Gardner's 1.8661. Of the
 0.090 gap it started with, 0.006 is left, so the floor alone accounts for **93%** of
 the difference between the linear front and the two calibrated models. It works the
@@ -692,8 +732,8 @@ retained everywhere above the phreatic surface, the discharge rises to **2.6328*
 soil. Across the whole thousandfold sweep of the floor the discharge moves by 41%.
 
 The linear front's other parameter behaves the way that explanation predicts.
-Holding *kr<sub>0</sub>* at 0.01 and sweeping *h<sub>0</sub>* — the suction at which
-the floor is reached, and so the entire shape of the curve above it — moves the
+Holding *kr<sub>0</sub>* at 0.01 and sweeping *h<sub>0</sub>* — the pressure head at
+which the floor is reached, and so the entire shape of the curve above it — moves the
 discharge from 1.9487 at −0.5 ft to 2.0382 at −10 ft: a **4.6%** spread across a
 twentyfold change, against the floor's 41% across a thousandfold one. On a dam whose
 unsaturated zone stands tens of feet above the water inside it, what the curve does

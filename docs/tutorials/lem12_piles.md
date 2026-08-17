@@ -72,10 +72,12 @@ it beside the bar.
 
 Everything XSLOPE needs to know about the two pile rows sits in two rows of
 the piles sheet, and reading them is most of what this page teaches. Open
-**Piles** in the **Inputs** tree and press **Table view**. Its columns are
-the piles worksheet's, minus the `θp` Studio derives from the pile's endpoints,
-and — with **Show parameters for:** set to **LEM** — the columns only the
-finite element engine reads (`E`, `I`, `Area`, `Fixity`) are hidden:
+**Piles** in the **Inputs** tree and press **Table view**. Its columns match
+the piles worksheet with two exceptions: there is no `θp` column, because
+Studio computes the force direction from the pile's endpoints instead of
+asking for it, and — with **Show parameters for:** set to **LEM** — the
+columns only the finite element engine reads (`E`, `I`, `Area`, `Fixity`)
+are hidden:
 
 ![The two pile rows as the file carries them](images/lem12_studio_piles_table.png)
 
@@ -84,8 +86,8 @@ endpoints are what this page is about:
 
 | Label | x1 | y1 | x2 | y2 | H | θp | Appl | D | S | Vcap | Mcap |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
-| `pile` | 5 | 5 | 5 | -10 | | | | 2 | 6 | 46000 | 60000 |
-| `pile` | 10 | 10 | 10 | -10 | | | | 2 | 6 | 46000 | 60000 |
+| `lower row` | 5 | 5 | 5 | -10 | | | | 2 | 6 | 46000 | 60000 |
+| `upper row` | 10 | 10 | 10 | -10 | | | | 2 | 6 | 46000 | 60000 |
 
 **H is empty on both rows, which is what selects the Ito & Matsui
 calculation.** With `H` blank and a diameter `D` and spacing `S` given, XSLOPE
@@ -191,8 +193,8 @@ In the report's **Piles** table, the `H` cell of both rows reads
 
 | Label | Top (x, y) | Bottom (x, y) | H (lb/ft) | θ (deg) | D (ft) | Spacing (ft) |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-| pile 1 | (5, 5) | (5, −10) | computed | 0 | 2 | 6 |
-| pile 2 | (10, 10) | (10, −10) | computed | 0 | 2 | 6 |
+| lower row | (5, 5) | (5, −10) | computed | 0 | 2 | 6 |
+| upper row | (10, 10) | (10, −10) | computed | 0 | 2 | 6 |
 
 The computed force appears in the slice table under Spencer's method, in the column
 **H<sub>p</sub>**, whose legend reads *pile resistance mobilized at the slice

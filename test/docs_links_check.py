@@ -1466,7 +1466,7 @@ SEEP02_FILE = os.path.join(_REPO, "docs/seep/files/xslope_johnson_res.xlsx")
 #: linear front's parameters — plus the pair the van Genuchten and Gardner models
 #: share. h0 carries the declared length unit; the conductivity columns do not,
 #: because this file leaves Time blank, which the page tells the reader to expect.
-SEEP02_MATERIALS_COLUMNS = ("k1", "k2", "alpha", "unsat", "kr0", "h0 (ft)",
+SEEP02_MATERIALS_COLUMNS = ("k1 (ft/day)", "k2 (ft/day)", "alpha", "unsat", "kr0", "h0 (ft)",
                             "vg_a", "vg_n")
 
 #: The three unsaturated models, as the `unsat` cell offers them. The page runs all

@@ -197,7 +197,7 @@ rows:
 
 ![The three zones with the seepage columns showing](images/seep02_studio_materials.png)
 
-| mat | name | k1 | k2 | alpha | unsat | kr0 | h0 | vg_a | vg_n |
+| mat | name | k1 (ft/day) | k2 (ft/day) | alpha | unsat | kr0 | h0 (ft) | vg_a | vg_n |
 |:---:|---|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
 | 1 | `shell` | 1 | 1 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
 | 2 | `core` | 0.001 | 0.001 | 0 | `lf` | 0.01 | −1 | 0 | 0 |

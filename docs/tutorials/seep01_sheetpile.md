@@ -18,7 +18,8 @@ The example is a sheetpile wall driven 3 m into a 10 m sand foundation, with an
 impervious clay blanket laid over the ground upstream of it and 3 m of water
 standing behind it. It makes a good first seepage problem because it is small
 enough to read by hand: one soil, no water table inside the ground, and a flow net
-whose channels and head drops both come out as whole numbers.
+whose channel count comes out a whole number, so the discharge can be read off it
+by counting lines.
 
 ![Sheetpile with clay blanket](../seep/images/clay_blanket.png){width=700}
 
@@ -100,7 +101,7 @@ rows:
 | **Exit face** | Water may leave to the atmosphere, and where along the face it starts leaving is part of the answer | The downstream face of a dam, an excavation wall, a slope that seeps |
 | **Specified flux** (`flux`) | The rate at which water crosses the boundary, as a normal Darcy velocity, positive inward | Rainfall infiltration, recharge — anywhere the water-table position is an output and so cannot be imposed |
 
-There is a fourth possibility, and it is entered nowhere: an edge with **no
+There is one further possibility, and it is entered nowhere: an edge with **no
 boundary condition on it is a no-flow boundary**. That is the default rather than
 an omission the solver puts up with, and it is a real physical statement — bedrock,
 an impervious liner, a cutoff wall, a line of symmetry, and the far ends of a
@@ -310,12 +311,12 @@ rotation of those principal directions from the x-axis in degrees. Setting
 `k1 = k2 = 30` makes the soil isotropic, and at that point `alpha` means nothing
 and stays `0`. The `unsat` column selects the relative-conductivity model used
 above the phreatic surface — `lf`, a linear front; `vg`, van Genuchten; or `gard`,
-Gardner — and `kr0`, `h0`, `a` and `n` are its parameters; on a
-confined problem there is no unsaturated zone, so **XSLOPE reads none of them** and
-their values do not affect the answer. Leave them blank as the template ships them
-or fill them in — the capture above is of a file that carries `1`, `-1`, `0` and
-`0` there, and it solves to the same discharge either way. `Ss` and `Sy` are the
-storage properties a transient analysis needs, and this one is steady.
+Gardner — and `kr0`, `h0`, `a` and `n` are its parameters. On a confined problem
+there is no unsaturated zone, so **XSLOPE reads none of them** and their values do
+not affect the answer: leave them blank as the template ships them or fill them
+in. The capture above is of a file carrying `1`, `-1`, `0` and `0` there, and it
+solves to the same discharge either way. The last two columns, `Ss` and `Sy`, are
+the storage properties a transient analysis needs, and this analysis is steady.
 
 Everything to the left of the Seepage band — unit weight, strength option,
 cohesion, friction angle — stays empty. A stability analysis would need them; this
@@ -503,7 +504,8 @@ safety that is too high, by 21% for tri3 and 11% for quad4 on the benchmark unde
 Meshing at tri6 from the start costs nothing but solve time and saves re-meshing
 later.
 
-That one change is the only one this build makes, so the dialog now stands as:
+Element type is the only control this build changes. Everything below it stays at
+its default, so the dialog now stands as your settings leave it:
 
 ![The Build Mesh dialog](images/seep01_studio_build_mesh.png)
 
@@ -534,14 +536,13 @@ Mesh built: 2490 nodes, 4726 elements.
 ![The mesh and its boundary nodes](images/seep01_mesh.png){width=1000}
 
 **2,490 nodes and 4,726 triangles** — the element count is on the figure's title
-as well, and the node count is the log line's. The blue squares are the
+as well, and the node count comes from the log line. The blue squares are the
 specified-head nodes, 82 of them, and the two stretches they cover are the two
-boundaries. Everything
-they do not cover — the base, the two ends, the 10 m of ground under the blanket,
-and both faces of the sheetpile slot — is no-flow, which is why it is worth
-checking this picture rather than trusting the sheet: a no-flow boundary is
-invisible in the input, and the only way to see it is to see where the markers
-stop.
+boundaries. Everything they do not cover — the base, the two ends, the 10 m of
+ground under the blanket, and both faces of the sheetpile slot — is no-flow, which
+is why it is worth checking this picture rather than trusting the sheet: a no-flow
+boundary is invisible in the input, and the only way to see it is to see where the
+markers stop.
 
 ---
 
@@ -729,13 +730,14 @@ from that.
 The first is that the coarse answers are **wrong in a known direction**. Between
 the coarsest mesh and the finest the discharge drops 5.6%, and the 0.5 m mesh the
 run above used is 1.2% above the 0.125 m one. A coarse mesh cannot resolve the
-crowding of the equipotentials at the two corners, so it under-states how much the
-flow has to squeeze around the wall, and over-states how much gets through.
+crowding of the equipotentials at the two singular points, so it under-states how
+much the flow has to squeeze around the wall, and over-states how much gets
+through.
 
 The second is that the sequence does not settle on a value, and it will not. The
-gradient at each of the two singular points is genuinely infinite in the exact
-solution, so each halving of the element size resolves a bit more of a peak that
-has no top, and the discharge keeps creeping down. In practice the refinement stops where the
+gradient at each of those two points is genuinely infinite in the exact solution,
+so each halving of the element size resolves a bit more of a peak that has no top,
+and the discharge keeps creeping down. In practice the refinement stops where the
 change stops mattering: going from 0.25 m to 0.125 m nearly quadrupled the node
 count and moved the discharge by 0.4%.
 
@@ -768,9 +770,9 @@ elements are required anyway, this is free.
 
 ## Refining at the sheetpile toe {#refining-at-the-sheetpile-toe}
 
-Halving the element size everywhere is a blunt way to resolve two corners. The
-gradient plot showed that almost all of the section is flowing gently and that the
-work is concentrated in two small neighborhoods, so the mesh should be too.
+Halving the element size everywhere is a blunt way to resolve two singular points.
+The gradient plot showed that almost all of the section is flowing gently and that
+the work is concentrated in two small neighborhoods, so the mesh should be too.
 
 Open **Build Mesh…** again, leave the element type and the size divisions where
 they are, tick **Refine near features**, and raise **Refinement factor** from its
@@ -824,7 +826,7 @@ gradient within half a meter of the toe reads **0.325** on the uniform mesh and
 **1.068** on the refined one. That is not a better estimate of a real number
 converging — it is a mesh resolving more of a peak that has no top, and it will
 keep climbing at every refinement. That is the reason to judge convergence on the
-discharge rather than on the gradient at the corner: the discharge is an integral
+discharge rather than on the gradient at the toe: the discharge is an integral
 of the flow field over a boundary and converges, while a point value at a
 singularity does not converge to anything.
 

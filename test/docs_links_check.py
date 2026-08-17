@@ -1488,6 +1488,21 @@ SEEP02_MATERIALS_VIEWS = ("Table view", "List view")
 #: way it is not there.
 SEEP02_BC_EXIT_ENTRY = "Exit face"
 
+#: Where a specified-head boundary's VALUE is shown. SEEP-2 tells the reader that
+#: the head rides in the list entry and that the table beside it holds points and
+#: nothing else, so a value moved out of the list entry into a field of its own
+#: makes that sentence wrong about the editor on the screen.
+SEEP02_BC_HEAD_ENTRIES = ("Head 1  (h = 160.0)", "Head 2  (h = 100.0)")
+
+#: Two dialog controls SEEP-2 explains and SEEP-1 does not name. Both are visible
+#: in SEEP-2's own screenshots, which is why the page covers them: Quadrilateral
+#: style is the group that greys out at a triangular element type, and Model checks
+#: is the preflight panel filling half the Run Seepage dialog. Its all-clear line is
+#: pinned too, because the page quotes it as what this model reports.
+SEEP02_MESH_QUAD_GROUP = "Quadrilateral style"
+SEEP02_RUN_CHECKS_GROUP = "Model checks"
+SEEP02_RUN_CHECKS_OK = "No problems found for this run."
+
 
 def _seep02_editor_labels():
     """The seepage controls Tutorial SEEP-2 drives, read on the zoned dam.
@@ -1501,6 +1516,7 @@ def _seep02_editor_labels():
 
     from xslope.fileio import load_slope_data
 
+    from studio.dialogs import BuildMeshDialog, RunSeepDialog
     from studio.editors import MaterialsEditor, SeepBcEditor
 
     fails = []
@@ -1553,7 +1569,33 @@ def _seep02_editor_labels():
                      f"entry for this model; Tutorial SEEP-2 tells the reader to "
                      f"select it and reads its points off it. Its entries read "
                      f"{entries}")
+    for label in SEEP02_BC_HEAD_ENTRIES:
+        if label not in entries:
+            fails.append(f"the Seep BC editor's list has no {label!r} entry; "
+                         f"Tutorial SEEP-2 says a specified head's value rides in "
+                         f"the list entry and the table beside it holds points "
+                         f"only. Its entries read {entries}")
     bc.deleteLater()
+
+    mesh2 = BuildMeshDialog(defaults={})
+    if SEEP02_MESH_QUAD_GROUP not in {g.title()
+                                      for g in mesh2.findChildren(QGroupBox)}:
+        fails.append(f"Build Mesh has no {SEEP02_MESH_QUAD_GROUP!r} group; "
+                     f"Tutorial SEEP-2 tells the reader why it is greyed out at a "
+                     f"triangular element type")
+    mesh2.deleteLater()
+
+    run2 = RunSeepDialog(defaults={}, slope_data=data)
+    if SEEP02_RUN_CHECKS_GROUP not in {g.title()
+                                       for g in run2.findChildren(QGroupBox)}:
+        fails.append(f"the seepage run dialog has no {SEEP02_RUN_CHECKS_GROUP!r} "
+                     f"group; Tutorial SEEP-2 says the preflight report fills the "
+                     f"right half of it")
+    if SEEP02_RUN_CHECKS_OK not in {lab.text() for lab in run2.findChildren(QLabel)}:
+        fails.append(f"the seepage run dialog's checks do not read "
+                     f"{SEEP02_RUN_CHECKS_OK!r} on this model; Tutorial SEEP-2 "
+                     f"quotes that as what it reports for this file")
+    run2.deleteLater()
     return fails
 
 

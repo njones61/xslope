@@ -143,6 +143,38 @@ this form:
 This is the *power* form, not the exponential form $k_r = e^{\alpha\psi}$ that also carries
 Gardner's name. There is no $m = 1 - 1/n$ coupling, so $n$ need only be positive.
 
+**Fitted parameters** by USDA soil-texture class. Gardner has no published texture table of
+its own — its parameters normally arrive with an imported SEEP/W or Slide model, or from
+fitted measurements. The values below are least-squares fits (in $\log_{10} k_r$ over 0.01
+to 100 ft of suction, with $k_r$ floored at $10^{-4}$) to each texture's van Genuchten curve
+from the Carsel & Parrish table above, so the underlying dataset is the same; the RMS column
+is the misfit of the power form to that curve — small for coarse textures, about a quarter
+of a decade for the clays. They are produced by `tools/fit_gardner_table.py`:
+
+| Soil texture | `a` (ψ in m) | `a` (ψ in ft) | `n` | RMS log₁₀k_r |
+| --- | --- | --- | --- | --- |
+| Sand | 4.38e+06 | 1.39e+04 | 4.84 | 0.07 |
+| Loamy sand | 3.18e+05 | 2.7e+03 | 4.01 | 0.08 |
+| Sandy loam | 1.14e+04 | 261 | 3.18 | 0.10 |
+| Loam | 760 | 41.9 | 2.44 | 0.13 |
+| Silt | 154 | 15 | 1.96 | 0.18 |
+| Silt loam | 220 | 18.9 | 2.07 | 0.16 |
+| Sandy clay loam | 2.24e+03 | 155 | 2.25 | 0.14 |
+| Clay loam | 255 | 30.4 | 1.79 | 0.19 |
+| Silty clay loam | 130 | 20.9 | 1.54 | 0.23 |
+| Sandy clay | 602 | 95.4 | 1.55 | 0.21 |
+| Silty clay | 255 | 77.1 | 1.01 | 0.27 |
+| Clay | 408 | 119 | 1.04 | 0.25 |
+
+!!! note "Units of Gardner's `a`"
+    Because $a\,|\psi|^n$ must be dimensionless, `a` carries units of $(1/\text{length})^n$ —
+    so unlike van Genuchten's α, it does not convert between unit systems with a single
+    factor. The exact rule is $a_{\text{ft}} = a_{\text{m}} \times 0.3048^{\,n}$, which is why
+    the table lists both columns rather than a conversion. $n$ is unit-invariant. One more
+    caution: `a` and `n` trade off along a flat valley in the fit, so two quite different
+    $(a, n)$ pairs can describe nearly the same curve — when comparing parameters from
+    different sources, compare the drawn $k_r$ curves rather than the coefficients.
+
 ### Transient flow
 
 The formulation above is steady: a single head field in equilibrium with fixed boundaries, in

@@ -565,7 +565,9 @@ against a code that uses it.
 the legacy option in SEEP/W and Slide. Choose it to reproduce a model imported from
 one of those packages, which will carry *a* and *n* in exactly this form, or to
 match a curve fitted to measured data. It has no published texture table to read
-parameters off.
+parameters off; the [seepage overview](../seep/overview.md#gardner-gard)
+tabulates fitted equivalents for the twelve Carsel & Parrish textures,
+produced the same way as the fits below.
 
 The van Genuchten and Gardner models share one pair of input columns, `vg_a` and
 `vg_n`, read according to whichever is selected.

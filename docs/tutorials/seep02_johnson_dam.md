@@ -182,14 +182,11 @@ with the inverted triangles above them are the water levels those heads stand fo
 downstream slope is the exit face. The hatched line at elevation 0 is the maximum
 depth, the impervious rock the foundation rests on.
 
-The file declares **Units** = `imperial` and leaves **Time** blank, which is
-visible on the plots: the head and pore-pressure color bars are labeled `ft` and
-`psf`, and the flow rate on the solution's subtitle is a bare number. The
-conductivities in this model are feet per day and every discharge on this page is
-cubic feet per day per foot of dam. Setting **Time** to `day` under **Global
-parameters** puts those labels on and changes no arithmetic;
-[SEEP-1](seep01_sheetpile.md#1-global-parameters) is where that field is
-explained.
+The file declares **Units** = `imperial` and **Time** = `day`, so heads and
+pore pressures are labeled `ft` and `psf`, the conductivities are feet per
+day, and every discharge on this page is cubic feet per day per foot of dam;
+[SEEP-1](seep01_sheetpile.md#1-global-parameters) is where those two fields
+are explained.
 
 ### The three zones
 

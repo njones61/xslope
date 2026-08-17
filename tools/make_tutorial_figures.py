@@ -104,16 +104,23 @@ def _render_sheet_module():
     return mod
 
 
-def render(name, src, sheet, rows=None, cols=None, tab_strip=False):
+def render(name, src, sheet, rows=None, cols=None, tab_strip=False,
+           identity_cols=None):
     # Tutorial captures drop the sheet-tab strip by default: with it, a narrow sheet
     # is padded with empty grid columns out to the strip's fixed width, and the
     # owner's review found the padding made the captures hard to read. The exception
     # is a figure whose subject IS the workbook's shape rather than one sheet's
     # cells — Tutorial 0's tour of the template — where the strip is what the reader
     # is being shown.
+    #
+    # identity_cols re-shows a leading band at the left of a distant window, the
+    # split-view idiom the input-template manifest uses for the mat sheet: a capture
+    # of the seepage columns forty across is unreadable without the ID and the name
+    # of the row they belong to.
     mod = _render_sheet_module()
     out = os.path.join(OUT_DIR, name)
-    mod.render_sheet(src, sheet, out, rows=rows, cols=cols, tab_strip=tab_strip)
+    mod.render_sheet(src, sheet, out, rows=rows, cols=cols, tab_strip=tab_strip,
+                     identity_cols=identity_cols)
     print("-> %s  (%s!%s)" % (name, os.path.relpath(src, REPO_ROOT), sheet))
     return out
 
@@ -1810,6 +1817,31 @@ SEEP01_TIP = (30.0, 7.0)
 SEEP01_BLANKET_EDGE = (20.0, 10.0)
 
 
+def seep01_sheets():
+    """The four worksheets SEEP-1's Excel path fills.
+
+    ``main`` and ``profile`` take LEM-1's own windows on those sheets, so a reader
+    coming from that page sees the same frame twice — through the Water-loads row on
+    one, and through the empty Profile Line #2 beside the filled #1 on the other.
+
+    ``mat`` cannot: this problem fills the seepage band at columns AG–AP and nothing
+    in the strength band at all, and a window wide enough to hold both would be forty
+    columns across. It is rendered as the split view the input-template manifest uses
+    for the same band — the seepage columns, with the mat ID and name re-shown at the
+    left so the row is identifiable. Row 10 rather than 9 starts the window under the
+    sheet's merged *Seepage* band header, which a frame ending inside would raise on.
+
+    ``seep bc`` runs through the empty BC #3 beside the two filled blocks, for the
+    reason LEM-1's profile window does: the empty neighbor is what the sheet looks
+    like, and cropping it makes the capture read as a table rather than a worksheet.
+    """
+    render("seep01_sheet_main.png", SEEP01, "main", rows=(1, 24), cols="A:D")
+    render("seep01_sheet_mat.png", SEEP01, "mat", rows=(10, 12), cols="AG:AP",
+           identity_cols="A:B")
+    render("seep01_sheet_profile.png", SEEP01, "profile", rows=(1, 15), cols="A:H")
+    render("seep01_sheet_seep_bc.png", SEEP01, "seep bc", rows=(1, 8), cols="A:L")
+
+
 def _seep01_mesh(model, size=SEEP01_SIZE, element_type=SEEP01_ELEMENT, **kwargs):
     """One mesh of the model's material polygons, quiet."""
     from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
@@ -2094,6 +2126,7 @@ GROUPS = {
     "lem10_plots": lem10_plots,
     "lem11_plots": lem11_plots,
     "lem12_plots": lem12_plots,
+    "seep01_sheets": seep01_sheets,
     "seep01_plots": seep01_plots,
 }
 

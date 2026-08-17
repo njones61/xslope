@@ -1423,6 +1423,108 @@ def _seep01_editor_labels(mw):
     return fails
 
 
+#: SEEP-2's model — the zoned dam whose three materials, exit face and unsaturated
+#: parameters every pin below is read on. Its own file rather than SEEP-1's,
+#: because SEEP-1's has one material, no exit face, and no unsaturated parameters
+#: to show.
+SEEP02_FILE = os.path.join(_REPO, "docs/seep/files/xslope_johnson_res.xlsx")
+
+#: The materials table with the Seepage toggle on, as SEEP-2 reproduces it: the
+#: three columns SEEP-1 does not teach — the model selector and both of the
+#: linear front's parameters — plus the pair the van Genuchten and Gardner models
+#: share. h0 carries the declared length unit; the conductivity columns do not,
+#: because this file leaves Time blank, which the page tells the reader to expect.
+SEEP02_MATERIALS_COLUMNS = ("k1", "k2", "alpha", "unsat", "kr0", "h0 (ft)",
+                            "vg_a", "vg_n")
+
+#: The three unsaturated models, as the `unsat` cell offers them. The page runs all
+#: three and names each by the value that selects it, so a renamed option turns
+#: three whole sections into instructions to pick something that is not there.
+SEEP02_UNSAT_MODELS = ("lf", "vg", "gard")
+
+#: The materials editor's list view, where SEEP-2 changes the model: the group the
+#: page tells the reader to scroll to, the selector inside it, and the two views
+#: the page names. The list view's row labels differ from the table's headers —
+#: `unsat` is a column and **Unsat model** is a form row — so both are pinned.
+SEEP02_MATERIALS_GROUP = "Conductivity"
+SEEP02_MATERIALS_UNSAT_ROW = "Unsat model"
+SEEP02_MATERIALS_VIEWS = ("Table view", "List view")
+
+#: The exit face as the Seep BC editor lists it. SEEP-1 leaves this entry empty and
+#: says so; SEEP-2 selects it, reads its two points off it, and builds a section
+#: around what it does — so the wording of the list entry is load-bearing here in a
+#: way it is not there.
+SEEP02_BC_EXIT_ENTRY = "Exit face"
+
+
+def _seep02_editor_labels():
+    """The seepage controls Tutorial SEEP-2 drives, read on the zoned dam.
+
+    Only the controls SEEP-1's pins do not already cover: that page and this one
+    share the Build Mesh and Run Seepage dialogs, and re-reading their labels here
+    would say the same thing twice and fail twice for one rewording.
+    """
+    from PySide6.QtWidgets import (QComboBox, QGroupBox, QLabel, QListWidget,
+                                   QPushButton, QTableWidget)
+
+    from xslope.fileio import load_slope_data
+
+    from studio.editors import MaterialsEditor, SeepBcEditor
+
+    fails = []
+    data = _quiet(load_slope_data, SEEP02_FILE)
+
+    with _default_editor_toggles():
+        mats = MaterialsEditor().build(data, None)
+        for tag, cb in (getattr(mats, "_toggles", None) or {}).items():
+            cb.setChecked(cb.text() == SEEP01_MATERIALS_TOGGLE)
+        mats._set_mode("table")
+        headers = [t.horizontalHeaderItem(i).text()
+                   if t.horizontalHeaderItem(i) else ""
+                   for t in mats.findChildren(QTableWidget)
+                   for i in range(t.columnCount())]
+        for label in SEEP02_MATERIALS_COLUMNS:
+            if label not in headers:
+                fails.append(f"the materials table has no {label!r} column with the "
+                             f"Seepage toggle on; Tutorial SEEP-2 tabulates this "
+                             f"model's rows against those headers. Its columns read "
+                             f"{[h for h in headers if h]}")
+        mats._set_mode("list")
+        groups = {g.title() for g in mats.findChildren(QGroupBox)}
+        if SEEP02_MATERIALS_GROUP not in groups:
+            fails.append(f"the materials list view has no {SEEP02_MATERIALS_GROUP!r} "
+                         f"group; Tutorial SEEP-2 tells the reader to scroll to it. "
+                         f"Its groups read {sorted(groups)}")
+        rows = {lab.text() for lab in mats.findChildren(QLabel)}
+        if SEEP02_MATERIALS_UNSAT_ROW not in rows:
+            fails.append(f"the materials list view has no "
+                         f"{SEEP02_MATERIALS_UNSAT_ROW!r} row; Tutorial SEEP-2 "
+                         f"calls it the selector for the three unsaturated models")
+        for label in SEEP02_MATERIALS_VIEWS:
+            if label not in {b.text() for b in mats.findChildren(QPushButton)}:
+                fails.append(f"the materials editor has no {label!r} button; "
+                             f"Tutorial SEEP-2 tells the reader to press it")
+        options = {combo.itemText(i) for combo in mats.findChildren(QComboBox)
+                   for i in range(combo.count())}
+        for label in SEEP02_UNSAT_MODELS:
+            if label not in options:
+                fails.append(f"the materials editor offers no {label!r} unsaturated "
+                             f"model; Tutorial SEEP-2 runs all three and names each "
+                             f"by the value that selects it")
+        mats.deleteLater()
+
+    bc = SeepBcEditor().build(data, None, select=(0, 2))
+    entries = [lw.item(i).text() for lw in bc.findChildren(QListWidget)
+               for i in range(lw.count())]
+    if SEEP02_BC_EXIT_ENTRY not in entries:
+        fails.append(f"the Seep BC editor's list has no {SEEP02_BC_EXIT_ENTRY!r} "
+                     f"entry for this model; Tutorial SEEP-2 tells the reader to "
+                     f"select it and reads its points off it. Its entries read "
+                     f"{entries}")
+    bc.deleteLater()
+    return fails
+
+
 @contextlib.contextmanager
 def _default_editor_toggles():
     """Read an editor against the app's OWN toggle defaults, not this machine's.
@@ -2436,6 +2538,7 @@ def test_tutorial_labels():
         fails += _lem11_reliability_labels()
         fails += _lem12_pile_force_labels(mw)
         fails += _seep01_editor_labels(mw)
+        fails += _seep02_editor_labels()
         # Last of the editor legs: these are the ones that change which project
         # the window holds, and each opens the model its own pins are read on.
         fails += _lem06_editor_labels(mw)

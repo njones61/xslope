@@ -2709,6 +2709,21 @@ def seep02_plots():
     capture("seep02_kr_models.png", _seep02_kr_curves, sd["materials"],
             SEEP02_VG, SEEP02_GARD)
 
+    # The two places the curves part company, as numbers rather than as a picture:
+    # near the surface, where the linear front is still on its straight line, and
+    # deep, where it has stopped falling and the other two have not.
+    from xslope.seep import kr_frontal_vec
+
+    print("   -- kr at four suctions, shell parameters")
+    probe = np.array([-0.5, -1.0, -5.0, -20.0])
+    print("   %-6s %s" % ("ψ (ft)", " ".join("%9.1f" % p for p in probe)))
+    for label, values in (
+            ("lf", kr_frontal_vec(probe, sd["materials"][0]["kr0"],
+                                  sd["materials"][0]["h0"])),
+            ("vg", kr_vg_vec(probe, *SEEP02_VG[0], 1e-4)),
+            ("gard", kr_gardner_vec(probe, *SEEP02_GARD[0], 1e-4))):
+        print("   %-6s %s" % (label, " ".join("%9.5f" % v for v in values)))
+
     models = [
         ("lf", sd),
         ("vg", _seep02_materials(sd, [dict(unsat="vg", vg_a=a, vg_n=n)
@@ -2732,12 +2747,13 @@ def seep02_plots():
               "%.2f ft" % (label, sol["flowrate"], st["iterations"],
                            st["relax_min"], st["active"][0], st["active"][1],
                            SEEP02_DOWNSTREAM, share, y_ph))
-    base_ys = np.asarray(phreatics[0][1])
-    for label, ys in phreatics[1:]:
-        print("   %-5s phreatic surface differs from lf by at most %.2f ft over "
-              "the %d stations" % (label, np.nanmax(np.abs(np.asarray(ys)
-                                                           - base_ys)),
-                                   len(SEEP02_STATIONS)))
+    for i, (a, ys_a) in enumerate(phreatics):
+        for b, ys_b in phreatics[i + 1:]:
+            print("   %-4s vs %-4s phreatic surface differs by at most %.2f ft "
+                  "over the %d stations"
+                  % (a, b, np.nanmax(np.abs(np.asarray(ys_a)
+                                            - np.asarray(ys_b))),
+                     len(SEEP02_STATIONS)))
     print("   stations    %s" % " ".join("%g" % x for x in SEEP02_STATIONS))
     for label, ys in phreatics:
         print("   %-5s       %s" % (label, " ".join("%6.2f" % y for y in ys)))
@@ -2783,6 +2799,14 @@ def seep02_plots():
             or ln.startswith("WARNING")]
     print("   default cap q %.4f · converged %s"
           % (sol_hard["flowrate"], sol_hard.get("converged")))
+    # WHICH of the three conditions failed is the lesson, so the sweep the head
+    # test started passing on is measured rather than eyeballed off the figure.
+    # The log prints every fifth sweep after the sixth, so this is the first
+    # REPORTED sweep inside the head tolerance rather than the first one — which is
+    # the right granularity for a page that quotes the log.
+    inside = [i for i, r, _ in _seep02_history(hlog) if r < stats["tol_scaled"]]
+    print("   head change inside the %.4g ft tolerance by reported sweep %s, and "
+          "stayed there" % (stats["tol_scaled"], inside[0] if inside else "never"))
     for line in tail:
         print("     %s" % line)
     histories.append(("lf, kr₀ = 1e−4, h₀ = −10 ft", _seep02_history(hlog)))

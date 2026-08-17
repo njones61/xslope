@@ -1492,6 +1492,170 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# SEEP-1 — Seepage Under a Sheetpile (built from scratch)
+#
+# The first seepage tutorial, so its captures follow the build from an empty
+# project: the global parameters that declare the unit system and the time unit
+# every conductivity and discharge is quoted in, the one soil, the profile line
+# whose notch IS the sheetpile, and the boundary conditions — the step the page
+# says is the one that decides the answer.
+#
+# Every editor shot pins the Seepage toggle and unticks the rest, the mirror of
+# the LEM pages' _lem_only: a seepage page's material row has no business showing
+# a cohesion, and the k columns it does teach are hidden unless Seepage is on.
+#
+# Then the two dialogs that have no LEM counterpart at all — Build Mesh (twice:
+# the uniform mesh, and the same dialog with the tip refinement turned on) and
+# Run Seepage — and the Parametric dialog in its seepage mode, whose output
+# quantity is the discharge rather than a factor of safety.
+# --------------------------------------------------------------------------- #
+SEEP01 = os.path.join(REPO_ROOT, "docs/seep/files/xslope_clay_blanket.xlsx")
+#: The mesh the page builds first, in the Build mesh dialog's own controls:
+#: tri3 (the seepage default), auto-sized at 100 divisions across the 50 m
+#: section, which is the 0.5 m target size the figures are computed at.
+SEEP01_MESH = {"element_type": "tri3", "auto_size": True, "size_divisions": 100,
+               "target_size": 0.5}
+#: The refinement the page turns on afterwards, everything else unchanged.
+SEEP01_REFINE = 4.0
+
+
+def _seep_only(dlg):
+    """Untick every usage toggle but Seepage, so the capture shows the seepage
+    problem.
+
+    The counterpart of ``_lem_only``, and pinned for the same reason: the toggles
+    are remembered per editor in QSettings, so a materials shot that simply opened
+    the editor would carry whatever the last person to click had ticked — and on
+    this page the k columns being visible is the whole point of the shot.
+    """
+    for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(tag == "seep")
+    return dlg
+
+
+def seep01_global():
+    """Global parameters as the seepage build leaves them: SI, and a declared
+    Time of days.
+
+    The time unit is why this shot exists on a page whose LEM siblings skip it —
+    conductivity, flux and discharge all carry a time dimension, and the declared
+    unit is what puts `m/day` on the input forms and `m³/day per m` on the flow
+    net's title.
+    """
+    from studio.editors import GlobalEditor
+
+    dlg = GlobalEditor().build(_load(SEEP01), None)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "seep01_studio_global.png")
+
+
+def seep01_materials():
+    """The one soil in table view, with Seepage ticked and nothing else.
+
+    The table rather than the list view, which is what the LEM pages photograph:
+    with only the Seepage toggle on, the table IS the seepage row — name, the two
+    principal conductivities, the rotation and the unsaturated model, in the mat
+    sheet's own order — while the list view puts those fields in a group below
+    three strength groups a confined seepage problem never fills.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _seep_only(MaterialsEditor().build(_load(SEEP01), None))
+    return _grab(_mat_table(dlg, through="unsat"),
+                 "seep01_studio_materials.png")
+
+
+def seep01_profile():
+    """The profile line, whose six vertices carry the sheetpile: the pair either
+    side of x = 30 and the vertex at (30, 7) between them make the slot the mesh
+    opens as a no-flow face."""
+    from studio.editors import ProfileEditor
+
+    dlg = ProfileEditor().build(_load(SEEP01), None, select=0)
+    dlg.resize(1180, 720)
+    return _grab(dlg, "seep01_studio_profile.png")
+
+
+def seep01_seep_bc():
+    """The seepage boundary conditions on Set 1, upstream boundary selected — the
+    head value and the two points it is held along."""
+    from studio.editors import SeepBcEditor
+
+    dlg = SeepBcEditor().build(_load(SEEP01), None, select=(0, 0))
+    dlg.resize(900, 560)
+    return _grab(dlg, "seep01_studio_seep_bc.png")
+
+
+def _seep01_build_mesh(name, **over):
+    from studio.dialogs import BuildMeshDialog
+
+    dlg = BuildMeshDialog(defaults=dict(SEEP01_MESH, **over))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, name)
+
+
+def seep01_build_mesh():
+    """Build Mesh as the page's first run leaves it: tri3, auto-sized at 100
+    divisions, no refinement. The quadrilateral style is dimmed, because a
+    triangular element type has none."""
+    return _seep01_build_mesh("seep01_studio_build_mesh.png")
+
+
+def seep01_build_mesh_refine():
+    """The same dialog with **Refine near features** ticked and the factor at 4 —
+    the one change the tip-refinement step makes, with the element type and the
+    target size where they were."""
+    return _seep01_build_mesh("seep01_studio_build_mesh_refine.png",
+                              refine_near_features=True,
+                              refine_factor=SEEP01_REFINE)
+
+
+def seep01_run_seep():
+    """Run Seepage on the meshed model: one BC set, the solve tolerance, and the
+    model checks beside them. This file defines no transient sheet and no second
+    BC set, so neither the Run type selector nor the extra BC choices appear."""
+    from studio.dialogs import RunSeepDialog
+
+    data = _load(SEEP01)
+    dlg = RunSeepDialog(defaults={"tol": 1e-4}, slope_data=data,
+                        has_bc2=bool((data.get("seepage_bc2") or {})
+                                     .get("specified_heads")),
+                        has_tseep=bool(data.get("tseep")))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "seep01_studio_run_seep.png")
+
+
+def seep01_parametric():
+    """The Parametric dialog in seepage mode, filled in as the page's conductivity
+    sweep: Design mode, the soil's k₁ swept from 30 to 300 m/day in ten steps, and
+    a target discharge of 100.
+
+    The bounds are pinned rather than left at the dialog's own ±50% default,
+    because the numbers the page's sweep quotes are measured at exactly these
+    ones, and a shot showing 15 to 45 would be a picture of a different study.
+    """
+    from studio.dialogs import SensitivityDialog
+
+    dlg = SensitivityDialog(slope_data=_load(SEEP01), app_mode="seep",
+                            defaults={"mode": "design", "low": 30.0, "high": 300.0,
+                                      "steps": 10, "target_fs": 100.0})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "seep01_studio_parametric.png")
+
+
+SHOTS.update({
+    "seep01_global": seep01_global,
+    "seep01_materials": seep01_materials,
+    "seep01_profile": seep01_profile,
+    "seep01_seep_bc": seep01_seep_bc,
+    "seep01_build_mesh": seep01_build_mesh,
+    "seep01_build_mesh_refine": seep01_build_mesh_refine,
+    "seep01_run_seep": seep01_run_seep,
+    "seep01_parametric": seep01_parametric,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

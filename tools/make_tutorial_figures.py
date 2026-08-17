@@ -1798,8 +1798,12 @@ SEEP01_TYPE_SIZE = 1.0
 #: Contour count for the flow net. 9 head drops is what makes the channel count come
 #: out at a whole number here, so the drawn net is a flow net and not a rounding of one.
 SEEP01_LEVELS = 10
-#: The conductivity sweep, two decades either side of the model's own 30 m/day.
-SEEP01_K = (3.0, 10.0, 30.0, 100.0, 300.0)
+#: The conductivity sweep, in the Parametric dialog's own From / To / Steps: from the
+#: model's own 30 m/day up to ten times it. The first swept value is the model's own,
+#: so both series start from the same measured point.
+SEEP01_K_LOW, SEEP01_K_HIGH, SEEP01_K_STEPS = 30.0, 300.0, 10
+#: The design target the sweep is asked to locate, a discharge in the model's units.
+SEEP01_TARGET_Q = 100.0
 #: The sheetpile toe, and the upstream edge of the clay blanket — the model's two
 #: re-entrant corners, and the two places the gradient is measured.
 SEEP01_TIP = (30.0, 7.0)
@@ -1890,40 +1894,47 @@ def _seep01_tip_zoom(panels, half=1.6):
     fig.tight_layout()
 
 
-def _seep01_q_vs_k(both, k1_only):
+def _seep01_q_vs_k(both, k1_only, target=None, crossing=None):
     """The discharge against conductivity, two sweeps on one pair of axes.
 
-    Left: both principal conductivities scaled together, which leaves the head field
-    untouched and makes the discharge exactly proportional to k. Right: k1 swept with
-    k2 held, which changes the anisotropy ratio and therefore the head field, so the
-    same axis is no longer a straight line. The left panel is drawn against the
-    proportional line through the model's own point, so a departure from it would be
-    visible; the right is drawn against the same line, which is what it departs from.
+    Both series start at the model's own 30 m/day, so the figure's whole content is
+    how they diverge above it. Scaling both principal conductivities together leaves
+    the head field untouched and makes the discharge exactly proportional to k;
+    sweeping k1 alone changes the anisotropy ratio, and with it the head field, so
+    that series bends away from the straight one. Linear axes rather than log,
+    because a straight line through the origin is what proportional LOOKS like and a
+    log plot would draw both series straight.
+
+    The proportional reference is drawn wide and the computed series narrow on top of
+    it, so the series that is proportional reads as markers centered in a gray band
+    rather than as a blue line hiding a gray one underneath.
     """
     ks = [k for k, _ in both]
-    qs = [q for _, q in both]
-    qs1 = [q for _, q in k1_only]
-    ratio = qs[ks.index(30.0)] / 30.0
+    ratio = both[0][1] / both[0][0]
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8))
-    line_k = [min(ks), max(ks)]
-    for ax, series, title in (
-            (axes[0], qs, "k₁ and k₂ scaled together"),
-            (axes[1], qs1, "k₁ swept, k₂ held at 30 m/day")):
-        # The reference line is drawn wide and the computed series narrow on top of
-        # it, so a series that IS proportional reads as dots centred in a gray band
-        # rather than as a blue line hiding the gray one underneath.
-        ax.plot(line_k, [ratio * k for k in line_k], "-", color="#b8c1cb", lw=4.0,
-                solid_capstyle="butt", label="q proportional to k")
-        ax.plot(ks, series, "o-", color="#1f6fb4", lw=1.2, ms=6, label="computed q")
-        ax.set_xscale("log")
-        ax.set_yscale("log")
-        ax.set_xlabel("hydraulic conductivity (m/day)")
-        ax.set_ylabel("total discharge q (m³/day per m)")
-        ax.set_title(title)
-        ax.grid(True, which="both", color="#e3e7eb", lw=0.6)
-        ax.legend(loc="upper left", frameon=False)
-    fig.suptitle("Discharge against hydraulic conductivity")
+    fig, ax = plt.subplots(figsize=(9, 5.4))
+    span = [0.0, max(ks)]
+    ax.plot(span, [ratio * k for k in span], "-", color="#b8c1cb", lw=5.0,
+            solid_capstyle="butt", label="q proportional to k")
+    ax.plot(ks, [q for _, q in both], "o-", color="#1f6fb4", lw=1.2, ms=6,
+            label="k₁ and k₂ scaled together")
+    ax.plot([k for k, _ in k1_only], [q for _, q in k1_only], "s-", color="#c1663a",
+            lw=1.4, ms=5, label="k₁ swept, k₂ held at 30 m/day")
+    if target is not None:
+        ax.axhline(target, color="#7a8592", lw=0.9, ls="--")
+        ax.annotate("target q = %g" % target, (0.0, target), xytext=(4, 4),
+                    textcoords="offset points", color="#5b646f", fontsize=9)
+        if crossing is not None:
+            ax.plot([crossing], [target], "*", color="#c1663a", ms=13)
+            ax.annotate("k₁ = %.1f" % crossing, (crossing, target), xytext=(6, -14),
+                        textcoords="offset points", color="#c1663a", fontsize=9)
+    ax.set_xlim(0, max(ks) * 1.02)
+    ax.set_ylim(0, None)
+    ax.set_xlabel("hydraulic conductivity (m/day)")
+    ax.set_ylabel("total discharge q (m³/day per m)")
+    ax.set_title("Discharge against hydraulic conductivity")
+    ax.grid(True, color="#e3e7eb", lw=0.6)
+    ax.legend(loc="upper left", frameon=False)
     fig.tight_layout()
 
 
@@ -2015,27 +2026,48 @@ def seep01_plots():
         print("   %-8s %6d nodes %6d elements · q %.4f"
               % (label, len(m["nodes"]), len(m["elements"]), s["flowrate"]))
 
-    # The conductivity sweep, twice: the whole tensor scaled, and k1 alone.
+    # The conductivity sweep, twice over the same values: the whole conductivity
+    # tensor scaled, and k1 alone. The second is run through xslope.sensitivity's own
+    # design(), on the same mesh, with the bounds, step count and target the page
+    # dictates into the Parametric dialog — so the crossing the page quotes is the
+    # one that dialog reports rather than a number computed a private way.
+    from xslope.sensitivity import design
+
     print("   -- discharge against conductivity, size %.4g %s"
           % (SEEP01_SIZE, SEEP01_ELEMENT))
-    both, k1_only = [], []
+    ks = list(np.linspace(SEEP01_K_LOW, SEEP01_K_HIGH, SEEP01_K_STEPS))
+    both = []
     base_head = None
-    for kk in SEEP01_K:
-        model = _seep01_material(sd, k1=kk, k2=kk)
-        _, s = _seep01_solve(model, mesh)
+    for kk in ks:
+        _, s = _seep01_solve(_seep01_material(sd, k1=kk, k2=kk), mesh)
         drift = (0.0 if base_head is None
                  else float(np.abs(np.asarray(s["head"]) - base_head).max()))
         base_head = np.asarray(s["head"]) if base_head is None else base_head
         both.append((kk, s["flowrate"]))
         print("   k1 = k2 = %-6g q %12.6f · q/k %.8f · max head change from the "
               "first row %.2e" % (kk, s["flowrate"], s["flowrate"] / kk, drift))
-    for kk in SEEP01_K:
-        model = _seep01_material(sd, k1=kk)
-        _, s = _seep01_solve(model, mesh)
-        k1_only.append((kk, s["flowrate"]))
-        print("   k1 = %-6g k2 = 30  q %12.6f · q/k1 %.6f"
-              % (kk, s["flowrate"], s["flowrate"] / kk))
-    capture("seep01_q_vs_k.png", _seep01_q_vs_k, both, k1_only)
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = design(dict(sd, mesh=mesh), param="seep:%s:k1"
+                         % sd["materials"][0]["name"],
+                         low=SEEP01_K_LOW, high=SEEP01_K_HIGH, steps=SEEP01_K_STEPS,
+                         target_fs=SEEP01_TARGET_Q, mode="seep",
+                         seep_opts={"bc": 1, "tol": 1e-4})
+    if not ok:
+        print("   design sweep refused: %s" % res)
+        return
+    # design() evaluates the model's own unmodified value as well as the swept ones,
+    # and here that value IS the first swept point, so the row appears twice.
+    swept = (res["df"][res["df"]["success"]]
+             .drop_duplicates(subset="value").sort_values("value"))
+    k1_only = [(float(r.value), float(r.fs)) for r in swept.itertuples()
+               if SEEP01_K_LOW <= r.value <= SEEP01_K_HIGH]
+    for kk, q in k1_only:
+        print("   k1 = %-6g k2 = 30  q %12.6f · q/k1 %.6f" % (kk, q, q / kk))
+    print("   design      %s · bracketed %s · %s"
+          % (res["message"], res["bracketed"], res["direction"]))
+    capture("seep01_q_vs_k.png", _seep01_q_vs_k, both, k1_only,
+            target=SEEP01_TARGET_Q, crossing=res["crossing"])
 
 
 GROUPS = {

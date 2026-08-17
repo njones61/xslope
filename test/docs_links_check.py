@@ -1236,6 +1236,16 @@ SEEP01_MATERIALS_COLUMNS = ("k1 (m/day)", "k2 (m/day)")
 #: here: it is what puts the unit suffixes above on the forms and the plots.
 SEEP01_GLOBAL_TIME_ROW = "Time"
 
+#: The seep-solution Display panel's contour-level control, and the value it opens
+#: at. SEEP-1 tells the reader to change it FROM that value TO 10, because the
+#: channel count the renderer derives only lands on a whole number at 10 here and
+#: the page's read-back arithmetic is quoted at it. A changed default silently
+#: turns that step into a no-op or into the wrong number, and the flow net the page
+#: describes would stop being the one on the reader's screen.
+SEEP01_LEVELS_ROW = "Contour levels"
+SEEP01_LEVELS_DEFAULT = 20
+SEEP01_LEVELS_STEP = 10
+
 #: The Parametric dialog in its seepage mode, as the conductivity sweep uses it:
 #: the mode whose target is a discharge, the parameter picker's own label for a
 #: mode that can sweep a boundary as well as a material, and the four design rows
@@ -1267,6 +1277,7 @@ def _seep01_editor_labels(mw):
     from xslope.fileio import load_slope_data
 
     from studio.dialogs import BuildMeshDialog, RunSeepDialog, SensitivityDialog
+    from studio.display_panels import SeepDisplayPanel
     from studio.editors import GlobalEditor, MaterialsEditor, SeepBcEditor
 
     fails = []
@@ -1370,6 +1381,27 @@ def _seep01_editor_labels(mw):
                      f"Tutorial SEEP-1 tells the reader to set it. Its rows read "
                      f"{sorted(r for r in rows if r)}")
     glob.deleteLater()
+
+    panel = SeepDisplayPanel(data.get("materials") or [])
+    rows = {lab.text() for lab in panel.findChildren(QLabel)}
+    if SEEP01_LEVELS_ROW not in rows:
+        fails.append(f"the seep solution's Display panel has no "
+                     f"{SEEP01_LEVELS_ROW!r} row; Tutorial SEEP-1 tells the reader "
+                     f"to set it before reading the flow net. Its rows read "
+                     f"{sorted(r for r in rows if r)}")
+    elif panel.levels.value() != SEEP01_LEVELS_DEFAULT:
+        fails.append(f"the Display panel's {SEEP01_LEVELS_ROW!r} opens at "
+                     f"{panel.levels.value()}, not {SEEP01_LEVELS_DEFAULT} — "
+                     f"Tutorial SEEP-1 says so and tells the reader to change it to "
+                     f"{SEEP01_LEVELS_STEP}, at which the flow net's channel count "
+                     f"comes out whole")
+    elif not (panel.levels.minimum() <= SEEP01_LEVELS_STEP
+              <= panel.levels.maximum()):
+        fails.append(f"the Display panel's {SEEP01_LEVELS_ROW!r} cannot be set to "
+                     f"{SEEP01_LEVELS_STEP}, which Tutorial SEEP-1 tells the reader "
+                     f"to type; it accepts {panel.levels.minimum()} to "
+                     f"{panel.levels.maximum()}")
+    panel.deleteLater()
 
     # Read against the app's own toggle defaults, then ticked the way the page's
     # step leaves them: Seepage on, everything else off.

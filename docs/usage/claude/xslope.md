@@ -48,7 +48,9 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    - Failure surfaces: circle centers/radii, non-circular points
    - Loads: distributed surface loads, water loads
    - Reinforcement: geogrid/nail lines with Tmax, pullout lengths
-   - Piles: locations, diameter, spacing, capacity
+   - Piles: locations, diameter, spacing, capacity. A piles-sheet row is a
+     ROW of shafts running along the slope (that is what the spacing is for);
+     a 2D section can only model a repeating row, never a pair of isolated piles
    - Boundary conditions for seepage: specified heads, specified fluxes, exit faces
    - Unit system (Imperial: psf/pcf/ft or SI: kPa/kN-m3/m)
 

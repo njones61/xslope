@@ -1656,6 +1656,112 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# SEEP-2 — Unconfined Seepage Through a Zoned Dam (open and explore)
+#
+# The reader opens a finished file rather than building one, so these shots
+# photograph what is already in it: three materials with their conductivities and
+# their unsaturated model, the boundary set whose exit face is what makes the
+# problem unconfined, and the two dialogs the run goes through.
+#
+# The materials editor is photographed twice on purpose. The table is where the
+# three zones are read against each other — three conductivities three orders of
+# magnitude apart, on one screen. The list view is where a single zone's
+# unsaturated model is changed, and it draws the kr curve of whichever model is
+# selected, which is the control this page spends its length on.
+# --------------------------------------------------------------------------- #
+SEEP02 = os.path.join(REPO_ROOT, "docs/seep/files/xslope_johnson_res.xlsx")
+#: The mesh the page builds, in the Build mesh dialog's own controls: tri3,
+#: auto-sized at 120 divisions across the 750 ft section — the 6.25 ft target the
+#: sample page's discharge and its SEEP2D cross-check were both computed on.
+SEEP02_MESH = {"element_type": "tri3", "auto_size": True, "size_divisions": 120,
+               "target_size": 6.25}
+
+
+def seep02_materials():
+    """The three zones in table view with only the Seepage columns showing.
+
+    The whole seepage material is on one screen this way: a shell at 1 ft/day, a
+    core a thousand times tighter, a foundation between them, and the unsaturated
+    model and its parameters carried per row rather than once for the model.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _seep_only(MaterialsEditor().build(_load(SEEP02), None))
+    return _grab(_mat_table(dlg, through="vg_n"), "seep02_studio_materials.png")
+
+
+def seep02_materials_unsat():
+    """The shell in list view, where the unsaturated model is chosen.
+
+    List view rather than the table, because this is the one control the page
+    changes and the form draws the selected model's own conductivity curve beside
+    it — so the reader sees what picking `vg` instead of `lf` does to the curve
+    before running anything.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _seep_only(MaterialsEditor().build(_load(SEEP02), None))
+    dlg._set_mode("list")
+    dlg.resize(1180, 780)
+    dlg.show()
+    _settle()
+    # Scrolled to the foot of the form rather than left at its head: the group
+    # this page is about is the last one, and a shot of the Identity fields with
+    # the conductivity model below the fold photographs the wrong end of it.
+    from PySide6.QtWidgets import QScrollArea
+
+    scroll = dlg._list_view.findChildren(QScrollArea)[0]
+    scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
+    _settle()
+    return _grab(dlg, "seep02_studio_materials_unsat.png")
+
+
+def seep02_seep_bc():
+    """The boundary set with the **exit face** selected — the entry that makes this
+    problem unconfined, and the one SEEP-1's confined model left empty."""
+    from studio.editors import SeepBcEditor
+
+    dlg = SeepBcEditor().build(_load(SEEP02), None, select=(0, 2))
+    dlg.resize(900, 560)
+    return _grab(dlg, "seep02_studio_seep_bc.png")
+
+
+def seep02_build_mesh():
+    """Build Mesh as this page sets it: tri3 again, and 120 divisions rather than
+    the dialog's own 100, which is what puts the target size at the 6.25 ft the
+    sample page's discharge was computed on."""
+    from studio.dialogs import BuildMeshDialog
+
+    dlg = BuildMeshDialog(defaults=dict(SEEP02_MESH))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "seep02_studio_build_mesh.png")
+
+
+def seep02_run_seep():
+    """Run Seepage on the meshed dam. The same dialog SEEP-1 photographs, on a
+    model where its **Convergence tol** is not inert: this problem iterates, and
+    the page's convergence section is about what that field is compared against."""
+    from studio.dialogs import RunSeepDialog
+
+    data = _load(SEEP02)
+    dlg = RunSeepDialog(defaults={"tol": 1e-4}, slope_data=data,
+                        has_bc2=bool((data.get("seepage_bc2") or {})
+                                     .get("specified_heads")),
+                        has_tseep=bool(data.get("tseep")))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "seep02_studio_run_seep.png")
+
+
+SHOTS.update({
+    "seep02_materials": seep02_materials,
+    "seep02_materials_unsat": seep02_materials_unsat,
+    "seep02_seep_bc": seep02_seep_bc,
+    "seep02_build_mesh": seep02_build_mesh,
+    "seep02_run_seep": seep02_run_seep,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

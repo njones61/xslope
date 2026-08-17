@@ -2128,6 +2128,697 @@ def seep01_plots():
               % (upstream, drop, s["flowrate"], s["flowrate"] / drop))
 
 
+# --------------------------------------------------------------------------- #
+# SEEP-2 — Unconfined Seepage Through a Zoned Dam (open and explore)
+#
+# The Johnson Reservoir dam of docs/seep/samples.md #5, meshed and solved exactly
+# as run_tests.py::run_seep_test solves it — tri3 at the ground-surface width over
+# 120 — so the discharge this page quotes is the discharge that page's lock and the
+# SEEP2D cross-check were recorded from.
+#
+# Everything here is a comparison, because the page is about choices rather than
+# about one answer: the flow net drawn against each of the three material zones in
+# turn, the three unsaturated conductivity models run on the same mesh, the linear
+# front's floor swept until it reaches the van Genuchten answer, the convergence
+# histories of all four side by side, and the core's conductivity raised until the
+# seepage face on the downstream slope has something to do.
+# --------------------------------------------------------------------------- #
+SEEP02 = os.path.join(REPO_ROOT, "docs/seep/files/xslope_johnson_res.xlsx")
+#: The mesh, in the Build mesh dialog's own controls: tri3, auto-sized at 120
+#: divisions across the 750 ft section, which is the 6.25 ft target size the sample
+#: page's regression tag and the SEEP2D comparison were both computed on.
+SEEP02_DIVISIONS = 120
+SEEP02_ELEMENT = "tri3"
+#: Contour count for the flow net, the same 20 the sample figures are drawn at.
+SEEP02_LEVELS = 20
+#: The flow net's base material, 1-based into the mat sheet: 3 is the foundation,
+#: which is what flownet_base_material picks for this model and what the sample
+#: figure was drawn with. The page draws all three to show why.
+SEEP02_BASE_MAT = 3
+#: van Genuchten α and n per material, after Carsel & Parrish (1988) by texture —
+#: sandy clay loam for the shell, clay for the core, clay loam for the foundation —
+#: with α converted from the paper's 1/cm to this model's 1/ft by ×30.48.
+SEEP02_VG = ((1.798, 1.48), (0.244, 1.09), (0.579, 1.31))
+#: Gardner a and n per material, least-squares fits to each material's own van
+#: Genuchten curve in log kr over 0.01 to 100 ft of suction. Gardner has no texture
+#: table to read off — its parameters arrive with an imported model or from fitted
+#: measurements — so fitting them to the van Genuchten curve is what makes the
+#: three-model comparison a comparison of models rather than of soils. The producer
+#: prints the misfit of these pinned pairs, so the calibration claim is measured.
+SEEP02_GARD = ((115.5, 2.29), (128.2, 1.03), (52.8, 1.61))
+#: The linear front's floor, swept down from its shipped 0.01 toward the 1e-4 the
+#: other two models floor at. This is the test of the page's explanation for why the
+#: linear front passes more water than the other two.
+SEEP02_KR0_SWEEP = (0.1, 0.03, 0.01, 0.003, 0.001, 0.0003, 0.0001)
+#: The linear-front pair that makes this dam hard: a floor four decades down reached
+#: over 10 ft of suction, which is the shape of a van Genuchten curve drawn with
+#: straight lines. It does not converge inside the default iteration ceiling.
+SEEP02_HARD = {"kr0": 1e-4, "h0": -10.0}
+SEEP02_HARD_MAX_ITER = 1000
+#: Core conductivities for the seepage-face study, from the model's own 0.001 ft/day
+#: up to the shell's 1.0 — a core, a poor core, a fill and no core at all.
+SEEP02_CORE_KS = (0.001, 0.01, 0.1, 1.0)
+#: Solve tolerances, to check the claim that the flow-closure condition makes the
+#: converged discharge independent of the head tolerance it is asked for.
+SEEP02_TOLS = (1e-3, 1e-4, 1e-5, 1e-6)
+#: Vertical sections the flow is measured across. 370 is the dam centerline, through
+#: the core and its cutoff key; 500 is in the downstream shell, where the phreatic
+#: surface has dropped well below the slope and the unsaturated zone is thickest.
+SEEP02_CENTERLINE = 370.0
+SEEP02_DOWNSTREAM = 500.0
+#: The bottom of the core's cutoff key, the elevation the underseepage passes below.
+SEEP02_KEY_TOE = 60.0
+#: Stations the phreatic surface is read at, upstream toe to downstream toe.
+SEEP02_STATIONS = (220.0, 260.0, 300.0, 330.0, 355.0, 370.0, 390.0, 420.0,
+                   460.0, 500.0, 540.0)
+
+
+def _seep02_top(x):
+    """Elevation of the top of the section at ``x`` — reservoir floor, upstream
+    slope, crest, downstream slope, tailwater floor — from the model's own outer
+    profile line."""
+    if x <= 200.0:
+        return 100.0
+    if x <= 320.0:
+        return 100.0 + (x - 200.0) * 60.0 / 120.0
+    if x <= 360.0:
+        return 160.0 + (x - 320.0) * 20.0 / 40.0
+    if x <= 380.0:
+        return 180.0
+    if x <= 550.0:
+        return 180.0 - (x - 380.0) * 80.0 / 170.0
+    return 100.0
+
+
+def _seep02_mesh(model, divisions=SEEP02_DIVISIONS, element_type=SEEP02_ELEMENT):
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    xs = [x for x, _ in model["ground_surface"].coords]
+    size = (max(xs) - min(xs)) / divisions
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model), size, element_type,
+            size_regions=extract_size_regions(model))
+
+
+def _seep02_solve(model, mesh, tol=1e-4, max_iter=400):
+    """One steady seepage solve, returning ``(seep_data, solution, log)``.
+
+    The log is kept rather than discarded because on an unconfined problem it is
+    half the result: the iteration count, the relaxation the solver fell back to,
+    how many exit-face nodes ended up active, and — when the run does not
+    converge — the sentence that says so.
+    """
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        seep_data = build_seep_data(mesh, model)
+        solution = run_seepage_analysis(seep_data, tol=tol, max_iter=max_iter)
+    return seep_data, solution, buf.getvalue()
+
+
+def _seep02_log_stats(log):
+    """The unconfined iteration, read off the solver's own log."""
+    import re
+
+    done = re.search(r"Converged in (\d+) iterations \(residual = ([0-9.e+-]+), "
+                     r"closure = ([0-9.e+-]+)", log)
+    relax = [float(r) for r in re.findall(r"relax = ([0-9.]+)", log)]
+    active = re.findall(r"(\d+)/(\d+) exit face active", log)
+    tol = re.search(r"Convergence tolerance: ([0-9.e+-]+)", log)
+    return {
+        "converged": done is not None,
+        "iterations": int(done.group(1)) if done else None,
+        "residual": float(done.group(2)) if done else None,
+        "closure": float(done.group(3)) if done else None,
+        "relax_min": min(relax) if relax else None,
+        "active": (int(active[-1][0]), int(active[-1][1])) if active else None,
+        "tol_scaled": float(tol.group(1)) if tol else None,
+    }
+
+
+def _seep02_history(log):
+    """``(iteration, residual, closure)`` for every sweep the log printed."""
+    import re
+
+    rows = re.findall(r"Iteration (\d+): residual = ([0-9.e+-]+), "
+                      r"closure = ([0-9.e+-]+)", log)
+    return [(int(i), float(r), float(c)) for i, r, c in rows]
+
+
+def _seep02_materials(model, per_mat):
+    """``model`` with each material's seepage fields overridden, in memory only.
+
+    ``per_mat`` is one dict per material, in mat-sheet order; an empty dict leaves
+    that material as the file carries it.
+    """
+    mats = [dict(m) for m in model["materials"]]
+    for mat, fields in zip(mats, per_mat):
+        mat.update(fields)
+    return dict(model, materials=mats)
+
+
+def _seep02_interp(mesh, values):
+    """A linear interpolator over the tri3 mesh, for reading a nodal field along a
+    line the mesh has no nodes on."""
+    import matplotlib.tri as mtri
+    import numpy as np
+
+    nodes = np.asarray(mesh["nodes"])
+    tris = [e[:3] for e in np.asarray(mesh["elements"])]
+    triang = mtri.Triangulation(nodes[:, 0], nodes[:, 1], tris)
+    return mtri.LinearTriInterpolator(triang, np.asarray(values))
+
+
+def _seep02_phreatic(mesh, solution, stations=SEEP02_STATIONS):
+    """The elevation of the phreatic surface at each station.
+
+    The phreatic surface is the pressure-head zero contour, so this walks a
+    vertical line from the base up and returns the highest elevation still at or
+    above zero, interpolating between the two samples that straddle it. Reading it
+    off an interpolator rather than off the nodes matters here: the three
+    unsaturated models move this surface by less than a foot, and a nearest-node
+    reading on a 6.25 ft mesh cannot see a difference that small.
+    """
+    import numpy as np
+
+    ipsi = _seep02_interp(mesh, np.asarray(solution["u"]) / 62.4)
+    out = []
+    for x in stations:
+        ys = np.linspace(0.02, _seep02_top(x) - 0.02, 4000)
+        psi = np.ma.filled(ipsi(np.full(len(ys), x), ys), np.nan)
+        ok = ~np.isnan(psi)
+        ys, psi = ys[ok], psi[ok]
+        wet = np.where(psi >= 0.0)[0]
+        if not len(wet):
+            out.append(float("nan"))
+            continue
+        i = wet[-1]
+        if i + 1 < len(psi):
+            out.append(float(ys[i] + (ys[i + 1] - ys[i]) * psi[i]
+                             / (psi[i] - psi[i + 1])))
+        else:
+            out.append(float(ys[i]))
+    return out
+
+
+def _seep02_section_flow(mesh, solution, x, split=None):
+    """The discharge crossing the vertical line at ``x``, and the share of it below
+    ``split``.
+
+    Darcy's own horizontal velocity integrated up the line, rather than a difference
+    of stream-function values: the stream function is a companion solve whose
+    additive constant is not pinned on an unconfined problem, while this integral
+    reproduces the reported total discharge to within the discretization.
+    """
+    import numpy as np
+
+    trapezoid = getattr(np, "trapezoid", np.trapz)
+    ivx = _seep02_interp(mesh, np.asarray(solution["velocity"])[:, 0])
+    ys = np.linspace(1e-3, _seep02_top(x) - 1e-3, 20001)
+    vx = np.ma.filled(ivx(np.full(len(ys), x), ys), 0.0)
+    total = float(trapezoid(vx, ys))
+    if split is None:
+        return total, None
+    below = ys <= split
+    return total, float(trapezoid(vx[below], ys[below]))
+
+
+def _seep02_unsaturated_flow(mesh, solution, x=SEEP02_DOWNSTREAM):
+    """The share of the flow crossing ``x`` that travels above the phreatic
+    surface — the answer to what the unsaturated zone is carrying, which is the
+    quantity the choice of ``kr`` model acts on."""
+    import numpy as np
+
+    trapezoid = getattr(np, "trapezoid", np.trapz)
+    ivx = _seep02_interp(mesh, np.asarray(solution["velocity"])[:, 0])
+    top = _seep02_top(x)
+    y_phreatic = _seep02_phreatic(mesh, solution, (x,))[0]
+    ys = np.linspace(1e-3, top - 1e-3, 20001)
+    vx = np.ma.filled(ivx(np.full(len(ys), x), ys), 0.0)
+    dry = ys > y_phreatic
+    total = float(trapezoid(vx, ys))
+    above = float(trapezoid(vx[dry], ys[dry]))
+    return total, above, 100.0 * above / total, y_phreatic
+
+
+def _seep02_outline():
+    """The dam's own outline and its two internal zone boundaries, for the figures
+    that draw a phreatic surface on the section rather than through the plotting
+    module."""
+    shell = [(200, 100), (320, 160), (360, 180), (380, 180), (550, 100)]
+    core = [(320, 100), (360, 165), (380, 165), (420, 100)]
+    key = [(320, 100), (360, 60), (380, 60), (420, 100)]
+    ground = [(0, 100), (750, 100)]
+    base = [(0, 0), (750, 0), (750, 100)]
+    return shell, core, key, ground, base
+
+
+def _seep02_section_axes(ax):
+    """One frame for every figure that draws the section by hand: the dam, the core
+    and its key, the foundation, at equal aspect and one scale."""
+    shell, core, key, ground, base = _seep02_outline()
+    for pts, color, lw in ((ground, "#8a939c", 0.9), (base, "#8a939c", 0.9),
+                           (shell, "#4a5560", 1.6), (core, "#7a5a3a", 1.3),
+                           (key, "#7a5a3a", 1.3)):
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], color=color, lw=lw)
+    ax.set_xlim(0, 750)
+    ax.set_ylim(0, 195)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel("x (ft)")
+    ax.set_ylabel("elevation (ft)")
+
+
+def _seep02_figsize(mesh):
+    """The sample figures' own sizing rule — fixed width, height from the meshed
+    domain's aspect — so a SEEP-2 flow net and a samples-page flow net of the same
+    dam come out at the same scale."""
+    import numpy as np
+
+    nodes = np.asarray(mesh["nodes"])
+    width, height = np.ptp(nodes[:, 0]), np.ptp(nodes[:, 1])
+    return (11.0, max(2.6, 11.0 * 0.80 * (height / width) + 2.05))
+
+
+def _seep02_stack(name, panels, dpi=200):
+    """Several already-rendered figures stacked into one image.
+
+    The base-material comparison has to show three flow nets drawn by
+    ``plot_seep_solution`` itself — the point being what that function does with the
+    argument — and it draws one figure at a time. So each panel is rendered on its
+    own and the three are laid up here, which keeps every panel the tool's own
+    output rather than a redrawing of it.
+    """
+    import numpy as np
+
+    images = [plt.imread(p) for p in panels]
+    heights = [im.shape[0] / float(im.shape[1]) for im in images]
+    fig, axes = plt.subplots(len(images), 1, figsize=(11.0, 11.0 * sum(heights)))
+    for ax, im in zip(np.atleast_1d(axes), images):
+        ax.imshow(im)
+        ax.set_axis_off()
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0, hspace=0.02)
+    out = os.path.join(OUT_DIR, name)
+    fig.savefig(out, dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+    # The panels were scratch: the page carries the stack, so leaving three
+    # near-duplicates of it in the image directory would put figures nothing links
+    # to under version control.
+    for path in panels:
+        os.remove(path)
+    print("-> %s  (%d panels)" % (name, len(images)))
+    return out
+
+
+def _seep02_kr_curves(materials, vg, gard):
+    """Each material's three relative-conductivity curves on its own axes.
+
+    Log kr against suction on a log axis, because the models differ by decades and
+    across decades: the linear front is a straight line on linear axes and a cliff
+    on these, which is the shape that matters to a solver. One panel per material
+    rather than one crowded panel, because the three soils' curves overlap.
+    """
+    import numpy as np
+
+    from xslope.seep import kr_frontal_vec, kr_gardner_vec, kr_vg_vec
+
+    suction = np.logspace(-2, 2, 500)
+    psi = -suction
+    fig, axes = plt.subplots(1, len(materials), figsize=(13, 4.2), sharey=True)
+    for ax, mat, (a, n), (ga, gn) in zip(axes, materials, vg, gard):
+        ax.loglog(suction, kr_frontal_vec(psi, mat["kr0"], mat["h0"]),
+                  color="#1f6fb4", lw=2.0,
+                  label="lf  kr₀ = %g, h₀ = %g ft" % (mat["kr0"], mat["h0"]))
+        ax.loglog(suction, kr_vg_vec(psi, a, n, 1e-4), color="#c1663a", lw=1.6,
+                  label="vg  a = %g, n = %g" % (a, n))
+        ax.loglog(suction, kr_gardner_vec(psi, ga, gn, 1e-4), color="#3f8f5a",
+                  lw=1.6, ls="--", label="gard  a = %g, n = %g" % (ga, gn))
+        ax.set_xlabel("suction −ψ (ft)")
+        ax.set_title(mat["name"])
+        ax.grid(True, which="both", color="#e8ebee", lw=0.5)
+        ax.legend(loc="lower left", frameon=False, fontsize=8)
+    axes[0].set_ylabel("relative conductivity $k_r$")
+    axes[0].set_ylim(5e-5, 2.0)
+    fig.suptitle("The three unsaturated models on this dam's three soils")
+    fig.tight_layout()
+
+
+def _seep02_phreatic_figure(series, stations=SEEP02_STATIONS):
+    """The phreatic surfaces of the three unsaturated models on the section, with
+    the differences between them drawn underneath at a scale that can show them.
+
+    Two panels because one cannot: at section scale the three surfaces are one
+    line, and that IS the result — so the lower panel states how far apart they
+    are, in feet, at every station.
+    """
+    import numpy as np
+
+    fig, (ax, ax2) = plt.subplots(
+        2, 1, figsize=(11, 7.4), gridspec_kw={"height_ratios": [2.3, 1.0]})
+    _seep02_section_axes(ax)
+    colors = {"lf": "#1f6fb4", "vg": "#c1663a", "gard": "#3f8f5a"}
+    styles = {"lf": "-", "vg": "--", "gard": ":"}
+    base = None
+    for label, ys in series:
+        ax.plot(stations, ys, styles[label], color=colors[label], lw=2.0,
+                label="%s" % label)
+        if base is None:
+            base = np.asarray(ys)
+        else:
+            ax2.plot(stations, np.asarray(ys) - base, styles[label],
+                     color=colors[label], lw=1.6, marker="o", ms=4,
+                     label="%s − lf" % label)
+    ax.legend(loc="upper right", frameon=False)
+    ax.set_title("The phreatic surface under each unsaturated model")
+    ax2.axhline(0.0, color="#8a939c", lw=0.9)
+    ax2.set_xlim(0, 750)
+    ax2.set_xlabel("x (ft)")
+    ax2.set_ylabel("difference (ft)")
+    ax2.grid(True, color="#e8ebee", lw=0.6)
+    ax2.legend(loc="lower left", frameon=False, fontsize=9)
+    fig.tight_layout()
+
+
+def _seep02_kr0_figure(sweep, references):
+    """The discharge against the linear front's floor, with the two other models'
+    answers drawn across it.
+
+    The floor is what the page's explanation names, so the figure is the test of
+    it: if the explanation is right the swept series lands on the reference lines
+    as the floor reaches theirs, and if it is wrong it does not.
+    """
+    fig, ax = plt.subplots(figsize=(9, 5.2))
+    ax.semilogx([k for k, _ in sweep], [q for _, q in sweep], "o-",
+                color="#1f6fb4", lw=1.4, ms=6, label="linear front, h₀ = −1 ft")
+    # The two reference lines land within 0.0012 of each other, so their labels are
+    # stacked rather than placed on the lines they belong to.
+    for i, ((label, q), color) in enumerate(zip(references, ("#c1663a", "#3f8f5a"))):
+        ax.axhline(q, color=color, lw=1.2, ls="--")
+        ax.annotate("%s: q = %.4f" % (label, q), (1.05e-4, q),
+                    xytext=(0, 8 + 12 * i), textcoords="offset points",
+                    color=color, fontsize=9)
+    ax.set_xlabel("linear-front floor $kr_0$")
+    ax.set_ylabel("total discharge q (ft³/day per ft)")
+    ax.set_title("Discharge against the floor of the relative-conductivity curve")
+    ax.grid(True, which="both", color="#e8ebee", lw=0.6)
+    ax.legend(loc="upper left", frameon=False)
+    fig.tight_layout()
+
+
+def _seep02_convergence_figure(histories, tol_scaled, closure_tol=1e-3):
+    """Head change and flow closure against iteration, for every model the page
+    runs, with the two thresholds they are tested against drawn on.
+
+    Both panels on log axes and both thresholds drawn, because the lesson is that
+    the two conditions fail in different places: the hard run's head change is
+    inside its tolerance for hundreds of sweeps while its flow closure is not.
+    """
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.5, 4.6))
+    colors = {"lf": "#1f6fb4", "vg": "#c1663a", "gard": "#3f8f5a",
+              "lf, kr₀ = 1e−4, h₀ = −10 ft": "#8e44ad"}
+    for label, rows in histories:
+        color = colors.get(label, "#5a6b7a")
+        ax1.semilogy([i for i, _, _ in rows], [r for _, r, _ in rows],
+                     color=color, lw=1.4, label=label)
+        ax2.semilogy([i for i, _, _ in rows], [c for _, _, c in rows],
+                     color=color, lw=1.4, label=label)
+    ax1.axhline(tol_scaled, color="#8a939c", lw=1.0, ls="--")
+    ax1.annotate("head tolerance %.3g ft" % tol_scaled, (1, tol_scaled),
+                 xytext=(4, 4), textcoords="offset points", color="#5b646f",
+                 fontsize=9)
+    ax2.axhline(closure_tol, color="#8a939c", lw=1.0, ls="--")
+    ax2.annotate("closure tolerance %g" % closure_tol, (1, closure_tol),
+                 xytext=(4, 4), textcoords="offset points", color="#5b646f",
+                 fontsize=9)
+    ax1.set_title("Head change per sweep")
+    ax1.set_ylabel("‖Δh‖∞ (ft)")
+    ax2.set_title("Flow closure per sweep")
+    ax2.set_ylabel("closure, fraction of inflow")
+    for ax in (ax1, ax2):
+        ax.set_xlabel("iteration")
+        ax.grid(True, which="both", color="#e8ebee", lw=0.5)
+    ax1.legend(loc="upper right", frameon=False, fontsize=8)
+    fig.tight_layout()
+
+
+def _seep02_core_figure(series, stations=SEEP02_STATIONS):
+    """The phreatic surface and the seepage-face exit point at four core
+    conductivities, on one section.
+
+    One figure rather than four, because what the reader needs to see is the
+    surface climbing the downstream slope as the core stops being a cutoff, and
+    the exit point climbing with it.
+    """
+    fig, ax = plt.subplots(figsize=(11, 4.6))
+    _seep02_section_axes(ax)
+    colors = ("#1f6fb4", "#3f8f5a", "#c9a227", "#c1663a")
+    for (k, ys, exit_pt, _q, _n), color in zip(series, colors):
+        ax.plot(stations, ys, "-", color=color, lw=1.8,
+                label="core k = %g ft/day" % k)
+        if exit_pt is not None:
+            ax.plot([exit_pt[0]], [exit_pt[1]], "o", color=color, ms=7,
+                    markeredgecolor="white", markeredgewidth=0.8)
+    ax.legend(loc="upper right", frameon=False)
+    ax.set_title("The phreatic surface and its exit point as the core's "
+                 "conductivity rises")
+    fig.tight_layout()
+
+
+def seep02_plots():
+    """The zoned dam: the model, the flow net, and the four studies the page runs.
+
+    Printed rather than tabulated in a figure: the base run and where its flow
+    goes, the flow-net channel count each base material asks for, the three
+    unsaturated models against each other, the floor sweep that explains the
+    difference between them, the tolerance ladder, the run that does not converge,
+    and the core sweep that makes the seepage face grow. Every number the page
+    quotes is on one of these lines.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import (flownet_base_material, plot_seep_data,
+                                  plot_seep_solution)
+
+    sd = load_slope_data(SEEP02)
+    capture("seep02_inputs.png", plot_inputs, sd, mode="seep",
+            title="Seepage Model Inputs", frame="content", show_mesh=False)
+
+    # The mesh that travels with the file, before the page builds its own. It is
+    # quadratic, because the same workbook is also run for stability, and the page
+    # says what it gives so a reader who presses Run before meshing knows why their
+    # number is not the catalogued one.
+    companion = sd.get("mesh")
+    if companion is not None:
+        _, sol_c, log_c = _seep02_solve(sd, companion)
+        st_c = _seep02_log_stats(log_c)
+        print("   companion   %d nodes · %d elements · element type %s · q %.4f · "
+              "%s iterations"
+              % (len(companion["nodes"]), len(companion["elements"]),
+                 sorted(set(int(t) for t in companion["element_types"])),
+                 sol_c["flowrate"], st_c["iterations"]))
+
+    mesh = _seep02_mesh(sd)
+    figsize = _seep02_figsize(mesh)
+    seep_data, solution, log = _seep02_solve(sd, mesh)
+    stats = _seep02_log_stats(log)
+    capture("seep02_mesh.png", plot_seep_data, seep_data, figsize=figsize,
+            show_bc=True)
+    capture("seep02_solution.png", plot_seep_solution, seep_data, solution,
+            figsize=figsize, levels=SEEP02_LEVELS, base_mat=SEEP02_BASE_MAT,
+            fill_contours=True, mesh=False)
+    capture("seep02_pressure.png", plot_seep_solution, seep_data, solution,
+            figsize=figsize, levels=SEEP02_LEVELS, variable="u", mesh=False,
+            flowlines=False)
+
+    nodes = np.asarray(mesh["nodes"])
+    head = np.asarray(solution["head"])
+    psi = np.asarray(solution["u"]) / 62.4
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g ft"
+          % (len(nodes), len(mesh["elements"]), SEEP02_ELEMENT, SEEP02_DIVISIONS,
+             750.0 / SEEP02_DIVISIONS))
+    print("   base run    q %.4f · head %.3f to %.3f · u %.1f to %.1f psf"
+          % (solution["flowrate"], head.min(), head.max(),
+             np.min(solution["u"]), np.max(solution["u"])))
+    print("   iteration   %s" % stats)
+    print("   suction     min ψ %.2f ft at (%.1f, %.1f)"
+          % (psi.min(), nodes[np.argmin(psi), 0], nodes[np.argmin(psi), 1]))
+
+    # Where the flow goes. A cutoff core that reaches 40 ft into the foundation is
+    # not a cutoff, and the centerline section says by how much.
+    total, below = _seep02_section_flow(mesh, solution, SEEP02_CENTERLINE,
+                                        SEEP02_KEY_TOE)
+    print("   centerline  x %g: q %.4f · below elevation %g %.4f (%.1f%%)"
+          % (SEEP02_CENTERLINE, total, SEEP02_KEY_TOE, below, 100.0 * below / total))
+    for x in (400.0, 450.0, SEEP02_DOWNSTREAM):
+        tot, above, share, y_ph = _seep02_unsaturated_flow(mesh, solution, x)
+        print("   unsaturated x %g: q %.4f · above the phreatic surface at %.2f ft "
+              "%.4f (%.1f%%)" % (x, tot, y_ph, above, share))
+
+    # The head the core drops, read either side of it at three elevations.
+    ihead = _seep02_interp(mesh, head)
+    for elev in (110.0, 130.0, 150.0):
+        up, down = float(ihead(315.0, elev)), float(ihead(425.0, elev))
+        print("   core drop   elevation %g: %.2f ft upstream, %.2f ft downstream, "
+              "drop %.2f of 60" % (elev, up, down, up - down))
+
+    # The exit face: how much of it the water actually uses.
+    bc_type = np.asarray(seep_data["bc_type"])
+    face = np.where(bc_type == 2)[0]
+    active = face[psi[face] > -1e-6]
+    top = face[np.argmax(nodes[face, 1])]
+    print("   exit face   %d nodes from (%.1f, %.2f) to (%.1f, %.2f) · %d active · "
+          "highest wet (%.1f, %.2f)"
+          % (len(face), nodes[face, 0].max(), nodes[face, 1].min(),
+             nodes[top, 0], nodes[top, 1], len(active),
+             nodes[active[np.argmax(nodes[active, 1])], 0],
+             nodes[active[np.argmax(nodes[active, 1])], 1]))
+
+    # ---- the flow net's base material ------------------------------------- #
+    # Three nets of the same solution, one per zone, because the argument's whole
+    # effect is the channel count and the count is what the three panels differ by.
+    print("   -- flow-net base material, %d contour levels" % SEEP02_LEVELS)
+    drops = SEEP02_LEVELS - 1
+    hdrop = float(head.max() - head.min())
+    panels = []
+    for i, mat in enumerate(sd["materials"], 1):
+        k = math.sqrt(float(mat["k1"]) * float(mat["k2"]))
+        channels = solution["flowrate"] * drops / (k * hdrop)
+        print("   base_mat %d %-11s k %-8g Nf = q·Nd/(k·Δh) = %8.2f · %d φ contours"
+              % (i, mat["name"], k, channels, max(round(channels) + 1, 2)))
+        panels.append(capture("seep02_base_mat_%d.png" % i, plot_seep_solution,
+                              seep_data, solution, figsize=figsize,
+                              levels=SEEP02_LEVELS, base_mat=i,
+                              fill_contours=False, mesh=False))
+    print("   flownet_base_material picks %d"
+          % flownet_base_material(seep_data, solution, levels=SEEP02_LEVELS))
+    _seep02_stack("seep02_base_mat.png", panels)
+
+    # ---- the three unsaturated models ------------------------------------- #
+    from xslope.seep import kr_gardner_vec, kr_vg_vec
+
+    suction = np.logspace(-2, 2, 600)
+    print("   -- Gardner fitted to van Genuchten, per material")
+    for mat, (a, n), (ga, gn) in zip(sd["materials"], SEEP02_VG, SEEP02_GARD):
+        misfit = float(np.sqrt(np.mean(
+            (np.log10(kr_gardner_vec(-suction, ga, gn, 1e-4))
+             - np.log10(kr_vg_vec(-suction, a, n, 1e-4))) ** 2)))
+        print("   %-11s vg a %-6g n %-5g · gard a %-6g n %-5g · rms log10 kr %.3f"
+              % (mat["name"], a, n, ga, gn, misfit))
+    capture("seep02_kr_models.png", _seep02_kr_curves, sd["materials"],
+            SEEP02_VG, SEEP02_GARD)
+
+    models = [
+        ("lf", sd),
+        ("vg", _seep02_materials(sd, [dict(unsat="vg", vg_a=a, vg_n=n)
+                                      for a, n in SEEP02_VG])),
+        ("gard", _seep02_materials(sd, [dict(unsat="gard", vg_a=a, vg_n=n)
+                                        for a, n in SEEP02_GARD])),
+    ]
+    print("   -- the three unsaturated models on one mesh")
+    phreatics, histories, refs = [], [], []
+    for label, model in models:
+        _, sol, mlog = _seep02_solve(model, mesh)
+        st = _seep02_log_stats(mlog)
+        ys = _seep02_phreatic(mesh, sol)
+        _tot, _above, share, y_ph = _seep02_unsaturated_flow(mesh, sol)
+        phreatics.append((label, ys))
+        histories.append((label, _seep02_history(mlog)))
+        if label != "lf":
+            refs.append((label, sol["flowrate"]))
+        print("   %-5s q %.4f · %3d iterations · relax down to %.2f · %d/%d exit "
+              "face active · unsaturated share at x %g %.1f%% · phreatic there "
+              "%.2f ft" % (label, sol["flowrate"], st["iterations"],
+                           st["relax_min"], st["active"][0], st["active"][1],
+                           SEEP02_DOWNSTREAM, share, y_ph))
+    base_ys = np.asarray(phreatics[0][1])
+    for label, ys in phreatics[1:]:
+        print("   %-5s phreatic surface differs from lf by at most %.2f ft over "
+              "the %d stations" % (label, np.nanmax(np.abs(np.asarray(ys)
+                                                           - base_ys)),
+                                   len(SEEP02_STATIONS)))
+    print("   stations    %s" % " ".join("%g" % x for x in SEEP02_STATIONS))
+    for label, ys in phreatics:
+        print("   %-5s       %s" % (label, " ".join("%6.2f" % y for y in ys)))
+    capture("seep02_phreatic_models.png", _seep02_phreatic_figure, phreatics)
+
+    # ---- what the difference between them actually is --------------------- #
+    print("   -- the linear front's floor, swept toward the other models'")
+    sweep = []
+    for kr0 in sorted(SEEP02_KR0_SWEEP, reverse=True):
+        model = _seep02_materials(sd, [dict(unsat="lf", kr0=kr0, h0=-1.0)] * 3)
+        _, sol, slog = _seep02_solve(model, mesh)
+        st = _seep02_log_stats(slog)
+        sweep.append((kr0, sol["flowrate"]))
+        print("   kr0 %-8g q %.4f · %s iterations · relax down to %.2f · %s"
+              % (kr0, sol["flowrate"], st["iterations"], st["relax_min"],
+                 "converged" if st["converged"] else "DID NOT CONVERGE"))
+    capture("seep02_kr0_sweep.png", _seep02_kr0_figure, sweep, refs)
+
+    # The shape of the curve above the floor, at one floor — the other half of the
+    # two-parameter linear front, so the page can say which of them matters.
+    print("   -- the linear front's reference suction, at kr0 = 0.01")
+    for h0 in (-0.5, -1.0, -2.0, -5.0, -10.0):
+        model = _seep02_materials(sd, [dict(unsat="lf", kr0=0.01, h0=h0)] * 3)
+        _, sol, slog = _seep02_solve(model, mesh)
+        st = _seep02_log_stats(slog)
+        print("   h0 %-6g q %.4f · %s iterations" % (h0, sol["flowrate"],
+                                                     st["iterations"]))
+
+    # ---- convergence ------------------------------------------------------ #
+    print("   -- the solve tolerance, and what the converged discharge does with it")
+    for tol in SEEP02_TOLS:
+        _, sol, tlog = _seep02_solve(sd, mesh, tol=tol)
+        st = _seep02_log_stats(tlog)
+        print("   tol %-8g scaled to %.4g ft · q %.6f · %s iterations · relax down "
+              "to %.2f" % (tol, st["tol_scaled"], sol["flowrate"],
+                           st["iterations"], st["relax_min"]))
+
+    print("   -- the run that does not converge inside the default ceiling")
+    hard = _seep02_materials(sd, [dict(unsat="lf", **SEEP02_HARD)] * 3)
+    _, sol_hard, hlog = _seep02_solve(hard, mesh)
+    tail = [ln for ln in hlog.strip().splitlines()
+            if ln.startswith("Iteration 400") or ln.startswith("Warning")
+            or ln.startswith("WARNING")]
+    print("   default cap q %.4f · converged %s"
+          % (sol_hard["flowrate"], sol_hard.get("converged")))
+    for line in tail:
+        print("     %s" % line)
+    histories.append(("lf, kr₀ = 1e−4, h₀ = −10 ft", _seep02_history(hlog)))
+    _, sol_long, llog = _seep02_solve(hard, mesh, max_iter=SEEP02_HARD_MAX_ITER)
+    st_long = _seep02_log_stats(llog)
+    print("   cap %d     q %.4f · %s iterations · relax down to %.2f · converged %s"
+          % (SEEP02_HARD_MAX_ITER, sol_long["flowrate"], st_long["iterations"],
+             st_long["relax_min"], sol_long.get("converged")))
+    print("   the truncated answer is %.2f%% from the converged one"
+          % (100.0 * abs(sol_hard["flowrate"] - sol_long["flowrate"])
+             / sol_long["flowrate"]))
+    capture("seep02_convergence.png", _seep02_convergence_figure, histories,
+            stats["tol_scaled"])
+
+    # ---- the seepage face, given something to do -------------------------- #
+    print("   -- the core's conductivity, and the seepage face it leaves")
+    core_series = []
+    for k in SEEP02_CORE_KS:
+        model = _seep02_materials(sd, [{}, dict(k1=k, k2=k), {}])
+        sdta, sol, clog = _seep02_solve(model, mesh)
+        st = _seep02_log_stats(clog)
+        bct = np.asarray(sdta["bc_type"])
+        nds = np.asarray(sdta["nodes"])
+        p = np.asarray(sol["u"]) / 62.4
+        face = np.where(bct == 2)[0]
+        wet = face[p[face] > -1e-6]
+        exit_pt = (float(nds[wet[np.argmax(nds[wet, 1])], 0]),
+                   float(nds[wet[np.argmax(nds[wet, 1])], 1])) if len(wet) else None
+        core_series.append((k, _seep02_phreatic(mesh, sol), exit_pt,
+                            sol["flowrate"], len(wet)))
+        print("   core k %-8g q %8.4f · %2d/%d exit-face nodes wet · highest wet "
+              "node %s · %s iterations"
+              % (k, sol["flowrate"], len(wet), len(face), exit_pt, st["iterations"]))
+    capture("seep02_core_sweep.png", _seep02_core_figure, core_series)
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -2154,6 +2845,7 @@ GROUPS = {
     "lem12_plots": lem12_plots,
     "seep01_sheets": seep01_sheets,
     "seep01_plots": seep01_plots,
+    "seep02_plots": seep02_plots,
 }
 
 

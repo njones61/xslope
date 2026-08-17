@@ -2260,12 +2260,56 @@ def _seep02_log_stats(log):
 
 
 def _seep02_history(log):
-    """``(iteration, residual, closure)`` for every sweep the log printed."""
+    """``(iteration, residual, closure)`` for every sweep the log reported.
+
+    The per-sweep line is printed only on the first three sweeps, every fifth
+    sweep after that, and whenever the exit-face set changes, so a run that
+    converges on a sweep matching none of those never prints its last one. The
+    terminal ``Converged in N iterations`` line carries the same two numbers, so it
+    is appended here: without it a converging series stops in mid-descent, above
+    the thresholds it actually crossed.
+    """
     import re
 
     rows = re.findall(r"Iteration (\d+): residual = ([0-9.e+-]+), "
                       r"closure = ([0-9.e+-]+)", log)
-    return [(int(i), float(r), float(c)) for i, r, c in rows]
+    out = [(int(i), float(r), float(c)) for i, r, c in rows]
+    done = re.search(r"Converged in (\d+) iterations \(residual = ([0-9.e+-]+), "
+                     r"closure = ([0-9.e+-]+)", log)
+    if done is not None:
+        last = (int(done.group(1)), float(done.group(2)), float(done.group(3)))
+        if not out or out[-1][0] != last[0]:
+            out.append(last)
+    return out
+
+
+def _seep02_active_history(log):
+    """``(iteration, active nodes)`` for every sweep the log reported.
+
+    The exit-face line prints on any sweep the set changed, so this carries every
+    change even though it does not carry every sweep.
+    """
+    import re
+
+    rows = re.findall(r"Iteration (\d+): .*? (\d+)/\d+ exit face active", log)
+    return [(int(i), int(n)) for i, n in rows]
+
+
+#: The solver's relaxation ladder (xslope/seep.py): the full step is taken through
+#: sweep 20, and the factor drops at each of these sweep counts thereafter. Reading
+#: the factor off the ladder rather than off the log is what makes it right on a run
+#: whose last sweeps were not printed.
+SEEP02_RELAX_LADDER = ((20, 0.5), (40, 0.2), (60, 0.1), (80, 0.05),
+                       (100, 0.02), (120, 0.01))
+
+
+def _seep02_relax_at(iteration):
+    """The relaxation factor the ladder gives on sweep ``iteration``."""
+    relax = 1.0
+    for after, value in SEEP02_RELAX_LADDER:
+        if iteration > after:
+            relax = value
+    return relax
 
 
 def _seep02_materials(model, per_mat):
@@ -2545,7 +2589,7 @@ def _seep02_convergence_figure(histories, tol_scaled, closure_tol=1e-3):
         ax2.semilogy([i for i, _, _ in rows], [c for _, _, c in rows],
                      color=color, lw=1.4, label=label)
     ax1.axhline(tol_scaled, color="#8a939c", lw=1.0, ls="--")
-    ax1.annotate("head tolerance %.3g ft" % tol_scaled, (1, tol_scaled),
+    ax1.annotate("head tolerance %.3g" % tol_scaled, (1, tol_scaled),
                  xytext=(4, 4), textcoords="offset points", color="#5b646f",
                  fontsize=9)
     ax2.axhline(closure_tol, color="#8a939c", lw=1.0, ls="--")
@@ -2553,7 +2597,9 @@ def _seep02_convergence_figure(histories, tol_scaled, closure_tol=1e-3):
                  xytext=(4, 4), textcoords="offset points", color="#5b646f",
                  fontsize=9)
     ax1.set_title("Head change per sweep")
-    ax1.set_ylabel("‖Δh‖∞ (ft)")
+    # The solver's head test is on the RELATIVE change — max nodal change over the
+    # largest head in the field — so the axis and the threshold are dimensionless.
+    ax1.set_ylabel("relative head change ‖Δh‖∞ / max|h|")
     ax2.set_title("Flow closure per sweep")
     ax2.set_ylabel("closure, fraction of inflow")
     for ax in (ax1, ax2):
@@ -2653,8 +2699,13 @@ def seep02_plots():
           % (SEEP02_CENTERLINE, total, SEEP02_KEY_TOE, below, 100.0 * below / total))
     for x in (400.0, 450.0, SEEP02_DOWNSTREAM):
         tot, above, share, y_ph = _seep02_unsaturated_flow(mesh, solution, x)
-        print("   unsaturated x %g: q %.4f · above the phreatic surface at %.2f ft "
-              "%.4f (%.1f%%)" % (x, tot, y_ph, above, share))
+        # How far the section integral misses the reported total discharge is the
+        # resolution of the share beside it: a share read off an integral that is
+        # itself several percent out cannot be quoted to the tenth.
+        print("   unsaturated x %g: q %.4f (%+.1f%% of the reported total) · above "
+              "the phreatic surface at %.2f ft %.4f (%.1f%%)"
+              % (x, tot, 100.0 * (tot - solution["flowrate"]) / solution["flowrate"],
+                 y_ph, above, share))
 
     # The head the core drops, read either side of it at three elevations.
     ihead = _seep02_interp(mesh, head)
@@ -2685,7 +2736,8 @@ def seep02_plots():
     for i, mat in enumerate(sd["materials"], 1):
         k = math.sqrt(float(mat["k1"]) * float(mat["k2"]))
         channels = solution["flowrate"] * drops / (k * hdrop)
-        print("   base_mat %d %-11s k %-8g Nf = q·Nd/(k·Δh) = %8.2f · %d φ contours"
+        print("   base_mat %d %-11s k %-8g Nf = q·Nd/(k·Δh) = %8.2f · %d φ contour "
+              "levels requested"
               % (i, mat["name"], k, channels, max(round(channels) + 1, 2)))
         panels.append(capture("seep02_base_mat_%d.png" % i, plot_seep_solution,
                               seep_data, solution, figsize=figsize,
@@ -2742,11 +2794,19 @@ def seep02_plots():
         histories.append((label, _seep02_history(mlog)))
         if label != "lf":
             refs.append((label, sol["flowrate"]))
-        print("   %-5s q %.4f · %3d iterations · relax down to %.2f · %d/%d exit "
-              "face active · unsaturated share at x %g %.1f%% · phreatic there "
-              "%.2f ft" % (label, sol["flowrate"], st["iterations"],
-                           st["relax_min"], st["active"][0], st["active"][1],
-                           SEEP02_DOWNSTREAM, share, y_ph))
+        # The relaxation factor comes off the LADDER at the sweep the run finished
+        # on, not off the log: the log prints a sweep only every fifth one after the
+        # sixth, so a run finishing on sweep 23 never prints sweeps 21-23 and the
+        # scraped minimum reads 1.00 for a run that spent three sweeps at 0.5.
+        print("   %-5s q %.4f · %3d iterations · relax at the last sweep %.2f "
+              "(scraped from the log: %.2f) · %d sweeps past the full step · "
+              "%d/%d exit face active · unsaturated share at x %g %.1f%% · "
+              "phreatic there %.2f ft"
+              % (label, sol["flowrate"], st["iterations"],
+                 _seep02_relax_at(st["iterations"]), st["relax_min"],
+                 max(0, st["iterations"] - SEEP02_RELAX_LADDER[0][0]),
+                 st["active"][0], st["active"][1],
+                 SEEP02_DOWNSTREAM, share, y_ph))
     for i, (a, ys_a) in enumerate(phreatics):
         for b, ys_b in phreatics[i + 1:]:
             print("   %-4s vs %-4s phreatic surface differs by at most %.2f ft "
@@ -2767,8 +2827,10 @@ def seep02_plots():
         _, sol, slog = _seep02_solve(model, mesh)
         st = _seep02_log_stats(slog)
         sweep.append((kr0, sol["flowrate"]))
-        print("   kr0 %-8g q %.4f · %s iterations · relax down to %.2f · %s"
-              % (kr0, sol["flowrate"], st["iterations"], st["relax_min"],
+        print("   kr0 %-8g q %.4f · %s iterations · relax at the last sweep %.2f "
+              "(scraped from the log: %.2f) · %s"
+              % (kr0, sol["flowrate"], st["iterations"],
+                 _seep02_relax_at(st["iterations"]), st["relax_min"],
                  "converged" if st["converged"] else "DID NOT CONVERGE"))
     capture("seep02_kr0_sweep.png", _seep02_kr0_figure, sweep, refs)
 
@@ -2787,9 +2849,10 @@ def seep02_plots():
     for tol in SEEP02_TOLS:
         _, sol, tlog = _seep02_solve(sd, mesh, tol=tol)
         st = _seep02_log_stats(tlog)
-        print("   tol %-8g scaled to %.4g ft · q %.6f · %s iterations · relax down "
-              "to %.2f" % (tol, st["tol_scaled"], sol["flowrate"],
-                           st["iterations"], st["relax_min"]))
+        print("   tol %-8g scaled to %.4g · q %.6f · %s iterations · relax at the "
+              "last sweep %.2f" % (tol, st["tol_scaled"], sol["flowrate"],
+                                   st["iterations"],
+                                   _seep02_relax_at(st["iterations"])))
 
     print("   -- the run that does not converge inside the default ceiling")
     hard = _seep02_materials(sd, [dict(unsat="lf", **SEEP02_HARD)] * 3)
@@ -2805,8 +2868,21 @@ def seep02_plots():
     # REPORTED sweep inside the head tolerance rather than the first one — which is
     # the right granularity for a page that quotes the log.
     inside = [i for i, r, _ in _seep02_history(hlog) if r < stats["tol_scaled"]]
-    print("   head change inside the %.4g ft tolerance by reported sweep %s, and "
+    print("   head change inside the %.4g tolerance by reported sweep %s, and "
           "stayed there" % (stats["tol_scaled"], inside[0] if inside else "never"))
+    # The band the flow closure orbits in, rather than an eyeballed pair of round
+    # numbers off the figure, and the sweep the exit-face set stopped moving on.
+    closures = [c for _, _, c in _seep02_history(hlog)]
+    print("   closure     oscillates between %.4g and %.4g over the %d reported "
+          "sweeps" % (min(closures), max(closures), len(closures)))
+    for label, alog in (("base run", log), ("hard run", hlog)):
+        act = _seep02_active_history(alog)
+        settled = act[-1][1]
+        first = next(i for i, (_it, n) in enumerate(act)
+                     if all(m == settled for _jt, m in act[i:]))
+        print("   %s   exit face %s ... settled to %d from sweep %d"
+              % (label, " ".join("%d" % n for _it, n in act[:6]), settled,
+                 act[first][0]))
     for line in tail:
         print("     %s" % line)
     histories.append(("lf, kr₀ = 1e−4, h₀ = −10 ft", _seep02_history(hlog)))

@@ -773,10 +773,10 @@ are still wrong.
 discharge computed while nodes are still switching between seeping and no-flow
 belongs to no one set of boundary conditions.
 
-The relaxation ladder runs further down than those three runs reached. The step
-drops to 0.5 after sweep 20, and then to 0.2, 0.1, 0.05, 0.02 and 0.01 after
-sweeps 40, 60, 80, 100 and 120. The three model runs finished on sweeps 23, 27 and
-28, so none of them got past the first rung; the two finest floors of the
+The relaxation ladder runs further down than the model comparison reached. The
+step drops to 0.5 after sweep 20, and then to 0.2, 0.1, 0.05, 0.02 and 0.01 after
+sweeps 40, 60, 80, 100 and 120. Those three runs finished on sweeps 23, 27 and 28,
+so none of them got past the first rung; the two finest floors of the
 *kr<sub>0</sub>* sweep ran to 145 and 148, past the last one.
 
 The head tolerance is the only one of the three the dialog exposes, and it turns
@@ -815,12 +815,13 @@ The elided lines are the solver's own convergence history — every twentieth sw
 of it — the inflow-against-outflow check on the final head field, and the range of
 the stream function.
 
-The two numbers on the last iteration say which condition failed. The relative head
-change is 1.38 × 10<sup>−4</sup> against a tolerance of 0.018 — inside it by two
-orders of magnitude, and it had gone inside it **by sweep 50**, so it has been
-satisfied for seven eighths of the run. The exit-face set settled to a single
-active node by sweep 7 and has not moved since. What has not converged is the flow
-closure, at 0.678 against a target of 0.001, and it is not creeping toward it:
+The last iteration line reports all three conditions. The relative head change is
+1.38 × 10<sup>−4</sup> against a tolerance of 0.018 — inside it by two orders of
+magnitude, and it had gone inside it **by sweep 50**, so it has been satisfied for
+seven eighths of the run. The `1/31 exit face active` at the end of the line is the
+third: the set settled to a single active node by sweep 7 and has not moved since.
+What has not converged is the flow closure, at 0.678 against a target of 0.001, and
+it is not creeping toward it:
 
 ![Head change and flow closure per sweep](images/seep02_convergence.png){width=1000}
 

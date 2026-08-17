@@ -67,8 +67,8 @@ it beside the bar.
 
 ### The pile rows
 
-Everything XSLOPE needs to know about the two shafts sits in two rows of the
-piles sheet, and reading those rows is most of what this page teaches. Open
+Everything XSLOPE needs to know about the two pile rows sits in two rows of
+the piles sheet, and reading them is most of what this page teaches. Open
 **Piles** in the **Inputs** tree and press **Table view**. Its columns are
 the piles worksheet's, minus the `θp` Studio derives from the pile's endpoints,
 and — with **Show parameters for:** set to **LEM** — the columns only the
@@ -76,7 +76,8 @@ finite element engine reads (`E`, `I`, `Area`, `Fixity`) are hidden:
 
 ![The two pile rows as the file carries them](images/lem12_studio_piles_table.png)
 
-The two rows are the piles sheet's, one per shaft, and the columns after the
+Each row of the sheet describes one pile row — a line of shafts into the
+page, which is why it carries a spacing — and the columns after the
 endpoints are what this page is about:
 
 | Label | x1 | y1 | x2 | y2 | H | θp | Appl | D | S | Vcap | Mcap |

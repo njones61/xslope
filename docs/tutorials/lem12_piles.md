@@ -56,7 +56,7 @@ elevation 5.
 
 Download [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx) and open it in
 Studio — **File → Open**. The Inputs plot draws the section, the starting circle
-the file carries, and the two piles as green bars:
+the file carries, and the two pile rows as green bars:
 
 ![The loaded model](images/lem12_inputs.png){width=1000}
 

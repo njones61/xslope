@@ -127,8 +127,10 @@ wall stands 3 m above the ground, and the tailwater in front of it stands at
 ground level.
 
 **Material** — one soil, isotropic, with a hydraulic conductivity of 30 m/day.
-The columns are the `mat` worksheet's own seepage band, in its order. The row
-carries no strength properties: this model is analyzed for flow only.
+The columns are the first six of the `mat` worksheet's seepage band, in its order;
+the four after them belong to the unsaturated and transient models this problem
+does not use. The row carries no strength properties: this model is analyzed for
+flow only.
 
 | mat | name | k1 | k2 | alpha | unsat |
 |:---:|---|:---:|:---:|:---:|---|
@@ -397,10 +399,10 @@ Click **OK**.
 Click **Materials**. The editor opens on **Table view**, one material per row, with
 a row of toggles above it labeled **Show parameters for:** that decides which
 columns the table shows. There are four — **LEM**, **Seepage**, **FEM** and
-**Reliability** — and each is remembered between sessions, so the row may not open
-the way it is drawn below. Leave **Seepage** ticked and untick the other three:
-the table then shows the seepage band and nothing else, which on this model is the
-whole material.
+**Reliability** — and each is remembered between sessions, so the table may not
+open with the same ones ticked as the capture below. Leave **Seepage** ticked and
+untick the other three: the table then shows the seepage band and nothing else,
+which on this model is the whole material.
 
 Press **Add row**, and fill it:
 

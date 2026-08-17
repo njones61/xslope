@@ -49,7 +49,9 @@ Mohr-Coulomb pair above.
 
 Two rows of drilled shafts stand vertically through the face, 2 ft in
 diameter at 6 ft centers, each row running along the length of the slope and
-taken down to the rigid base. The upper row is at
+taken down to the rigid base. The 2D section models each row per foot of
+slope — a pair of isolated piles would be a three-dimensional problem and
+does not belong in a tool like this. The upper row is at
 x = 10, where the ground is at elevation 10; the lower at x = 5, where it is at
 elevation 5.
 
@@ -69,12 +71,7 @@ it beside the bar.
 ### The pile rows
 
 Everything XSLOPE needs to know about the two pile rows sits in two rows of
-the piles sheet, and reading them is most of what this page teaches. Be
-clear about what is being modeled: each row is a long line of shafts running
-along the slope, out of the plane of the section, and the 2D analysis
-charges every foot of slope with its share of that row. A pair of isolated
-piles would be a three-dimensional problem; a cross-section tool is the
-right choice only because the row repeats. Open
+the piles sheet, and reading them is most of what this page teaches. Open
 **Piles** in the **Inputs** tree and press **Table view**. Its columns are
 the piles worksheet's, minus the `θp` Studio derives from the pile's endpoints,
 and — with **Show parameters for:** set to **LEM** — the columns only the
@@ -82,8 +79,7 @@ finite element engine reads (`E`, `I`, `Area`, `Fixity`) are hidden:
 
 ![The two pile rows as the file carries them](images/lem12_studio_piles_table.png)
 
-Each row of the sheet describes one pile row — a line of shafts into the
-page, which is why it carries a spacing — and the columns after the
+Each row of the sheet describes one pile row, and the columns after the
 endpoints are what this page is about:
 
 | Label | x1 | y1 | x2 | y2 | H | θp | Appl | D | S | Vcap | Mcap |

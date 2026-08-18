@@ -46,18 +46,20 @@ anything that did not. `Ctrl+C` (`⌘C`) copies the selected rows back out in th
 form, and the paste is an edit like any other — **Cancel** discards it.
 
 The materials editor has two interchangeable views. **Table view** mirrors the
-`mat` worksheet row-for-row, with **Show columns for** toggles (LEM / Seepage /
-FEM / Reliability) that hide the columns an analysis doesn't use:
+`mat` worksheet row-for-row, with **Show parameters for** toggles (LEM / Seepage /
+FEM / Reliability) that hide the parameters an analysis doesn't use — table
+columns here, and fields, groups and plots in the list view:
 
 ![Materials table editor](images/editing_materials_table.png)
 
 **List view** edits one material at a time as a grouped form — Identity, Unit
 weights, Strength, Pore pressure, Conductivity — showing only the fields the
-selected strength and conductivity options use. Turning on the **Reliability**
-toggle here reveals the **± σ** field next to each value instead of hiding
-columns. Two confirmation plots on the right — the strength envelope and the
-unsaturated-conductivity curve — redraw as you type, so a wrong option choice is
-obvious at a glance:
+ticked analyses and the selected strength and conductivity options use; a group
+whose every field hides disappears whole. The **Reliability** toggle reveals the
+**± σ** field next to each value, and is available when LEM or FEM is on, since
+the σ's ride on those parameters. The confirmation plots on the right — the
+strength envelope with LEM or FEM shown, the unsaturated-conductivity curve with
+Seepage — redraw as you type, so a wrong option choice is obvious at a glance:
 
 ![Materials list view](images/editing_materials_list.png)
 

@@ -635,18 +635,19 @@ of 6.19 channels down to the 6 that can actually be drawn.
 
 Above the phreatic surface the governing equation carries *k<sub>r</sub>*(ψ), and
 XSLOPE offers three functions for it, chosen per material through the `unsat`
-column. Open **Materials**, press **List view**, and scroll to the **Conductivity**
-group:
+column. Open **Materials** and press **List view** — with **Seepage** alone
+ticked, the form shows the **Conductivity** group and nothing else:
 
 ![The conductivity group and the curve it draws](images/seep02_studio_materials_unsat.png)
 
-**Unsat model** is the selector, and the lower of the two plots on the right — the
-upper one is the strength envelope — redraws as it changes, so the curve a choice
-implies is visible before anything is run. Its axis is labeled *matric suction, ψ*
-and runs positive, which is the suction rather than the pressure head. The parameter
-fields below it follow the selection: with `lf` chosen, `kr0` and `h0` are shown
-and the van Genuchten and Gardner parameters are hidden, because the linear front
-does not read them.
+**Unsat model** is the selector, and the plot beside the form redraws as it
+changes, so the curve a choice implies is visible before anything is run. Its
+axis is labeled *matric suction, ψ* and runs positive, which is the suction
+rather than the pressure head. (This ψ is not the `mat` sheet's ψ *column* — that
+one is a rapid-drawdown strength parameter, in the LEM band.) The parameter
+fields below the selector follow the selection: with `lf` chosen, `kr0` and `h0`
+are shown and the van Genuchten and Gardner parameters are hidden, because the
+linear front does not read them.
 
 ### What each model assumes
 

@@ -2975,24 +2975,38 @@ class _MaterialListView(QWidget):
     material dicts; edits write through to those dicts immediately, so
     ``result_rows`` (and a view switch) never lose an in-progress edit. All 36
     loader keys have a widget (hidden ones keep their value), so a round-trip
-    preserves every field exactly as the table view does."""
+    preserves every field exactly as the table view does.
 
-    _STRENGTH_KEYS = _MAT_ALL_OPTION_FIELDS + ["d", "psi", "E", "nu"]
+    Two independent rules decide what the form shows, combined in
+    :meth:`_apply_visibility`: the MODEL rules (only the selected strength option's
+    fields, ru only for u='ru', only the selected unsat model's curve parameters)
+    and the USAGE toggles (a field whose ``applies`` set names no ticked analysis is
+    not part of the problem being edited). The usage half mirrors the table's column
+    filter field for field — same ``Field.applies`` tags, so the two views hide the
+    same parameters — and a group whose every field hides, hides whole."""
 
     def __init__(self, fields, rows, new_row, reliability_on, parent=None,
-                 color_state=None, unit_labels=None):
+                 color_state=None, unit_labels=None, enabled_usage=None):
         super().__init__(parent)
         self._field_by_key = {f.key: f for f in fields}
         self._unit_labels = unit_labels
         self._new_row = new_row
         self._rows = [dict(r) for r in rows]
         self._reliability_on = bool(reliability_on)
+        # Ticked analyses (the toggle bar's set). None = built without a filter:
+        # everything the analyses cover is shown, σ per the reliability flag.
+        self._usage = (set(enabled_usage) if enabled_usage is not None
+                       else {"lem", "fem", "seep"} | ({"rel"} if reliability_on else set()))
         self._color = color_state if color_state is not None else _MaterialColorState({})
         self._loading = False     # suppress color write-through while populating a row
         self._cur = -1
         self._edits = {}          # key -> QLineEdit / QComboBox
         self._edit_keys = {}      # focusable widget -> key (help-strip resolver)
         self._cell_widgets = {}   # key -> the labeled cell QWidget (for show/hide)
+        self._cell_keys = {}      # the cell QWidget -> key (pair bookkeeping)
+        self._model_hidden = set()   # keys the model rules hide (option/u/unsat)
+        self._pairs = []          # (side-by-side wrapper, [keys]) — hides when empty
+        self._group_boxes = []    # (QGroupBox, [keys]) — hides when every field hides
         self._sigma_widgets = {}  # base key -> (sigma label, sigma edit)
 
         self._plot_timer = QTimer(self)
@@ -3015,6 +3029,8 @@ class _MaterialListView(QWidget):
 
         self._refresh_list()
         self._update_sigma_visibility()
+        self._apply_visibility()
+        self._apply_plot_visibility()
         if self._rows:
             self.list.setCurrentRow(0)
         else:
@@ -3094,16 +3110,26 @@ class _MaterialListView(QWidget):
             h.addWidget(slab)
             h.addWidget(sedit)
             self._sigma_widgets[key] = (slab, sedit)
-        self._cell_widgets[key] = cell
+        self._register_cell(key, cell)
         return cell
 
-    @staticmethod
-    def _pair(cell_a, cell_b):
+    def _register_cell(self, key, cell):
+        """Record a form cell under ``key`` for the show/hide rules (both
+        directions: the pair/group bookkeeping asks a widget for its key)."""
+        self._cell_widgets[key] = cell
+        self._cell_keys[cell] = key
+        return cell
+
+    def _pair(self, cell_a, cell_b):
+        """Two cells side by side, tracked so the row itself hides when both of its
+        cells do — an empty half-height wrapper is still a gap in the form."""
         w = QWidget()
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 0, 0, 0)
         h.addWidget(cell_a, 1)
         h.addWidget(cell_b, 1)
+        self._pairs.append((w, [self._cell_keys.get(cell_a),
+                                self._cell_keys.get(cell_b)]))
         return w
 
     def _build_color_row(self):
@@ -3129,7 +3155,9 @@ class _MaterialListView(QWidget):
         reset.clicked.connect(self._on_color_reset)
         h.addWidget(reset)
         h.addStretch(1)
-        return cell
+        # Registered under the help strip's swatch key: it carries no field, so it
+        # has no usage tags and is always shown (like the material's name).
+        return self._register_cell("_swatch", cell)
 
     def _on_color_changed(self, hexc):
         if self._loading or not (0 <= self._cur < len(self._rows)):
@@ -3160,6 +3188,7 @@ class _MaterialListView(QWidget):
         gv = QVBoxLayout(g)
         gv.addWidget(self._cell("Name", "name"))
         gv.addWidget(self._build_color_row())
+        self._group_boxes.append((g, ["name", "_swatch"]))
         v.addWidget(g)
 
         # Unit weights (γ | γsat side by side; γ carries its σ)
@@ -3167,6 +3196,7 @@ class _MaterialListView(QWidget):
         gv = QVBoxLayout(g)
         gv.addWidget(self._pair(self._cell("γ", "gamma", sigma=True, label_w=28),
                                 self._cell("γ_sat", "gamma_sat", label_w=44)))
+        self._group_boxes.append((g, ["gamma", "gamma_sat"]))
         v.addWidget(g)
 
         # Strength: option combo, then only the selected option's fields, then
@@ -3182,7 +3212,7 @@ class _MaterialListView(QWidget):
         self._opt_combo = self._make_edit("option")
         self._opt_combo.currentIndexChanged.connect(self._on_option_changed)
         oh.addWidget(self._opt_combo, 1)
-        gv.addWidget(opt_cell)
+        gv.addWidget(self._register_cell("option", opt_cell))
         for key in _MAT_ALL_OPTION_FIELDS:
             gv.addWidget(self._cell(self._label_for(key), key,
                                     sigma=key in _MAT_SIGMA))
@@ -3193,6 +3223,10 @@ class _MaterialListView(QWidget):
         gv.addWidget(self._cell("t_cut", "t_cut", label_w=52))
         gv.addWidget(self._pair(self._cell("E", "E", label_w=18),
                                 self._cell("ν", "nu", label_w=18)))
+        # Mixed-band group: the option fields and d/ψ are LEM(+FEM), t_cut/E/ν FEM,
+        # so per-field hiding decides the group rather than one tag.
+        self._group_boxes.append((g, ["option"] + _MAT_ALL_OPTION_FIELDS
+                                  + ["d", "psi", "t_cut", "E", "nu"]))
         v.addWidget(g)
 
         # Pore pressure (ru only when u = 'ru')
@@ -3208,7 +3242,7 @@ class _MaterialListView(QWidget):
         self._u_combo.currentIndexChanged.connect(self._on_u_changed)
         uh.addWidget(self._u_combo, 1)
         self._u_cell = u_cell            # grayed whole for an elastic material
-        gv.addWidget(u_cell)
+        gv.addWidget(self._register_cell("u", u_cell))
         gv.addWidget(self._cell("ru", "ru"))
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — LEM & FEM).
         # Placed here to mirror the template, where the pair moved right of ru and is
@@ -3217,6 +3251,7 @@ class _MaterialListView(QWidget):
         # _update_suction_disable.
         gv.addWidget(self._pair(self._cell("φ_b", "phi_b", label_w=52),
                                 self._cell("s_cap", "s_cap", label_w=44)))
+        self._group_boxes.append((g, ["u", "ru", "phi_b", "s_cap"]))
         v.addWidget(g)
 
         # Conductivity: k1/k2/alpha, then unsat model + its curve params.
@@ -3234,9 +3269,11 @@ class _MaterialListView(QWidget):
         self._unsat_combo = self._make_edit("unsat")
         self._unsat_combo.currentIndexChanged.connect(self._on_unsat_changed)
         ush.addWidget(self._unsat_combo, 1)
-        gv.addWidget(us_cell)
+        gv.addWidget(self._register_cell("unsat", us_cell))
         for key in _MAT_ALL_UNSAT_FIELDS:
             gv.addWidget(self._cell(self._label_for(key), key))
+        self._group_boxes.append((g, ["k1", "k2", "alpha", "unsat"]
+                                  + _MAT_ALL_UNSAT_FIELDS))
         v.addWidget(g)
 
         v.addStretch(1)
@@ -3251,6 +3288,7 @@ class _MaterialListView(QWidget):
         pane.addWidget(self._strength_canvas)
         pane.addWidget(self._kr_canvas)
         pane.setSizes([320, 320])
+        self._plots_pane = pane
         return pane
 
     # List view shows friendly symbols where the table mirrors the terse 'mat'
@@ -3343,11 +3381,58 @@ class _MaterialListView(QWidget):
                 row[key] = f.read_text(w.text(), row.get(key))
 
     # --- visibility ------------------------------------------------------
+    def _usage_visible(self, key):
+        """Is ``key`` part of a ticked analysis? Universal cells (the name, the color
+        swatch — no ``applies`` tags) are always part of the problem; every other
+        field answers with the same tags the table filters its columns by."""
+        f = self._field_by_key.get(key)
+        if f is None or f.applies is None:
+            return True
+        return bool(f.applies & self._usage)
+
+    def _set_model_hidden(self, key, hidden):
+        """Record the MODEL rules' verdict on ``key`` (the selected strength option /
+        pore-pressure model / unsaturated model). Kept apart from the usage verdict so
+        neither rule can un-hide what the other hid."""
+        if hidden:
+            self._model_hidden.add(key)
+        else:
+            self._model_hidden.discard(key)
+
+    def _apply_visibility(self):
+        """Show a cell only where both rules agree, then fold away the side-by-side
+        rows and the groups left with nothing in them.
+
+        isHidden, not isVisible: this runs on a form that has not been shown yet
+        (the list view is built before the stack switches to it), where isVisible()
+        is False for every cell and would collapse the whole form."""
+        for key, cell in self._cell_widgets.items():
+            cell.setVisible(key not in self._model_hidden
+                            and self._usage_visible(key))
+        for w, keys in self._pairs:
+            w.setVisible(any(not self._cell_widgets[k].isHidden()
+                             for k in keys if k in self._cell_widgets))
+        for g, keys in self._group_boxes:
+            g.setVisible(any(not self._cell_widgets[k].isHidden()
+                             for k in keys if k in self._cell_widgets))
+
+    def _apply_plot_visibility(self):
+        """Gate the two confirmation plots on the bands they confirm: the strength
+        envelope on LEM/FEM, the kr curve on Seepage. With neither band ticked the
+        whole pane goes — a splitter drops a hidden pane's width rather than leaving
+        a blank half-dialog."""
+        strength = bool(self._usage & {"lem", "fem"})
+        kr = "seep" in self._usage
+        self._strength_canvas.setVisible(strength)
+        self._kr_canvas.setVisible(kr)
+        self._plots_pane.setVisible(strength or kr)
+
     def _update_option_visibility(self):
         opt = self._opt_combo.currentText().strip().lower()
         shown = set(_MAT_OPTION_FIELDS.get(opt, []))
         for key in _MAT_ALL_OPTION_FIELDS:
-            self._cell_widgets[key].setVisible(key in shown)
+            self._set_model_hidden(key, key not in shown)
+        self._apply_visibility()
 
     def _update_elastic_disable(self):
         """Gray the fields inert for an option=elastic material (mirrors the mat-sheet
@@ -3378,23 +3463,34 @@ class _MaterialListView(QWidget):
                 w.setEnabled(key not in dim)
 
     def _update_u_visibility(self):
-        self._cell_widgets["ru"].setVisible(
-            self._u_combo.currentText().strip().lower() == "ru")
+        self._set_model_hidden(
+            "ru", self._u_combo.currentText().strip().lower() != "ru")
+        self._apply_visibility()
 
     def _update_unsat_visibility(self):
         um = self._unsat_combo.currentText().strip().lower()
         shown = set(_MAT_UNSAT_FIELDS.get(um, []))
         for key in _MAT_ALL_UNSAT_FIELDS:
-            self._cell_widgets[key].setVisible(key in shown)
+            self._set_model_hidden(key, key not in shown)
+        self._apply_visibility()
 
     def _update_sigma_visibility(self):
         for _key, (slab, sedit) in self._sigma_widgets.items():
             slab.setVisible(self._reliability_on)
             sedit.setVisible(self._reliability_on)
 
-    def set_reliability(self, on):
-        self._reliability_on = bool(on)
+    def apply_usage_filter(self, enabled):
+        """Show only the fields, groups and plots the ticked analyses use — the
+        list-view half of the toggle bar's contract, mirroring the table's column
+        filter. Hidden cells keep their widgets and their values, so toggling never
+        drops data on save. Reliability rides along as it always has: its σ readouts
+        follow the 'rel' tag."""
+        self._usage = set(enabled)
+        self._reliability_on = "rel" in self._usage
         self._update_sigma_visibility()
+        self._apply_visibility()
+        self._apply_plot_visibility()
+        self._refresh_plots()
 
     # --- events ----------------------------------------------------------
     def _on_select(self, idx):
@@ -3591,11 +3687,15 @@ class MaterialsDialog(QDialog):
             cb.setChecked(bool(s.value(f"editor_toggles/{self._title}/{t}",
                                        default, type=bool)))
             cb.setStyleSheet(f"color:{USAGE_COLOR[t]}; font-weight:bold;")
+            if t == "rel":
+                cb.setToolTip("Reliability rides on the LEM/FEM parameters — "
+                              "tick LEM or FEM to show each value's σ.")
             cb.toggled.connect(self._on_toggle)
             self._toggles[t] = cb
             top.addWidget(cb)
         top.addStretch(1)
         layout.addLayout(top)
+        self._sync_rel_enabled()
 
         self._stack = QStackedWidget()
         self._table_holder = QWidget()
@@ -3650,22 +3750,41 @@ class MaterialsDialog(QDialog):
             strip.set_help(MATERIALS_HELP.get(key, "") if key else "")
 
     # --- toggles ---------------------------------------------------------
+    def _rel_applies(self):
+        """Does Reliability have anything to qualify? A σ is the scatter of an
+        LEM/FEM parameter (γ, c, φ, c/p, d, ψ), so with neither of those analyses
+        ticked there is nothing for it to apply to."""
+        return any(self._toggles[t].isChecked()
+                   for t in ("lem", "fem") if t in self._toggles)
+
+    def _sync_rel_enabled(self):
+        """Gray the Reliability toggle while it has nothing to qualify. Its checked
+        state is left alone — untouched in the widget and in QSettings — so ticking
+        LEM or FEM back on restores the σ readouts exactly as they were."""
+        cb = self._toggles.get("rel")
+        if cb is not None:
+            cb.setEnabled(self._rel_applies())
+
     def _reliability_on(self):
         cb = self._toggles.get("rel")
-        return bool(cb.isChecked()) if cb is not None else False
+        return bool(cb is not None and cb.isChecked() and self._rel_applies())
 
     def _enabled_usage(self):
-        return {t for t, cb in self._toggles.items() if cb.isChecked()}
+        on = {t for t, cb in self._toggles.items() if cb.isChecked()}
+        if not self._rel_applies():
+            on.discard("rel")
+        return on
 
     def _on_toggle(self):
         from PySide6.QtCore import QSettings
         s = QSettings("XSlope", "XSlope Studio")
         for t, cb in self._toggles.items():
             s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
+        self._sync_rel_enabled()
         if self._mode == "table" and self._table is not None:
             self._table.apply_usage_filter(self._enabled_usage())
         if self._mode == "list" and self._list_view is not None:
-            self._list_view.set_reliability(self._reliability_on())
+            self._list_view.apply_usage_filter(self._enabled_usage())
 
     # --- view switching --------------------------------------------------
     def _harvest(self):
@@ -3694,9 +3813,13 @@ class MaterialsDialog(QDialog):
             self._list_view = _MaterialListView(self._fields, self._rows,
                                                 self._new_row, self._reliability_on(),
                                                 color_state=self._color,
-                                                unit_labels=self._unit_labels)
+                                                unit_labels=self._unit_labels,
+                                                enabled_usage=self._enabled_usage())
             self._list_lay.addWidget(self._list_view)
         else:
+            # Filter first: set_rows loads a material, and the load re-runs the
+            # form's show/hide against whatever the toggles say now.
+            self._list_view.apply_usage_filter(self._enabled_usage())
             self._list_view.set_rows(self._rows, self._reliability_on())
 
     def _set_mode(self, mode):
@@ -3851,8 +3974,9 @@ class MaterialsEditor(CategoryEditor):
                       "order). List view edits one material at a time as a form with "
                       "strength- and conductivity-model plots that confirm the "
                       "selected options. Both views edit the same rows, so switching "
-                      "is lossless. In list view only 'Reliability' applies — it shows "
-                      "each value's σ; the other toggles hide table columns. The color "
+                      "is lossless. The toggles hide the parameters an analysis does "
+                      "not use — table columns, and list-view fields and plots; "
+                      "'Reliability' adds each value's σ. The color "
                       "swatch sets the material's display color on the Inputs plot.",
             usage_toggles=["lem", "seep", "fem", "rel"], style=style, doc=doc)
 

@@ -725,7 +725,8 @@ suction of *a*<sup>−1/*n*</sup>, so a large *a* means a curve that starts drop
 immediately.
 
 Drawn against each other, on this dam's own soils and parameters, with both axes
-logarithmic — the curves differ by decades and across decades, and on log axes the
+logarithmic — the curves differ by log cycles, over a suction range spanning log
+cycles of its own, and on log axes the
 linear front's straight line reads as the cliff a solver sees:
 
 ![The three relative-conductivity curves per material](images/seep02_kr_models.png){width=1000}
@@ -936,11 +937,11 @@ it is not creeping toward it:
 The left panel is the condition the dialog's tolerance controls, and on this run it
 is satisfied and irrelevant. The right panel is the one that decides. The three
 well-behaved models drop through both thresholds inside thirty sweeps and stop
-there. The hard run oscillates over three decades, between 0.09 and 200, for four
+there. The hard run oscillates over three log cycles, between 0.09 and 200, for four
 hundred sweeps — each sweep computes a
 conductivity field from a head field, gets a head field back that implies a
 different conductivity field, and swings between them. A curve that falls four
-decades over ten feet of suction puts most of the unsaturated zone on the steep
+log cycles over ten feet of suction puts most of the unsaturated zone on the steep
 part of it, where a fraction of a foot of head change moves *k<sub>r</sub>* by a
 factor of several, and the fixed-point iteration is chasing a target that moves
 faster than it does.
@@ -1070,7 +1071,7 @@ This tutorial demonstrated:
   least binding — **1.95462 at every tolerance from 10⁻³ to 10⁻⁶** — and a
   linear front at **kr₀ = 10⁻⁴, h₀ = −10 ft** whose relative head change sat two
   orders of magnitude inside tolerance from sweep 50 onward while its flow closure
-  oscillated over three decades, from 0.09 to 200, stopping at
+  oscillated over three log cycles, from 0.09 to 200, stopping at
   **q = 1.9706 with converged = False** at the
   default ceiling and reaching **1.9755 in 963 iterations** when the ceiling was
   raised.

@@ -664,7 +664,7 @@ automated search and then continuing to iterate from the location with the lowes
 
 ### Search window (optional)
 
-The **Search window** block at the right of the sheet (added in template version 19)
+The **Search window** block at the right of the sheet
 confines the automated circular search to a chosen region of the geometry. This is the
 counterpart to the "search limits" other programs offer, and its purpose is to make the
 search settle on a particular **local** minimum rather than the global one — a benched

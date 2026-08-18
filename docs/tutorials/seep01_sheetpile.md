@@ -14,7 +14,7 @@ fine it has to be, and how to read the **flow net** — the grid of head contour
 flow lines the solution is drawn as, and the form a seepage answer was given in
 long before there were finite elements.
 
-The example is a sheetpile wall driven 3 m into a 10 m sand foundation, with an
+The example is a sheetpile wall driven 3 m into a 10 m silt foundation, with an
 impervious clay blanket laid over the ground upstream of it and 3 m of water
 standing behind it. It makes a good first seepage problem because it is small
 enough to read by hand: one soil, no water table inside the ground, and a flow net
@@ -124,13 +124,13 @@ it.
 
 ## The problem
 
-The section is a 10 m layer of sand on rock, 50 m long. A sheetpile wall is
+The section is a 10 m layer of silt on rock, 50 m long. A sheetpile wall is
 driven 3 m into it at x = 30. Upstream of the wall, a 10 m strip of the ground
 surface is covered by a clay blanket, which is impervious. The pool behind the
 wall stands 3 m above the ground, and the tailwater in front of it stands at
 ground level.
 
-**Material** — one soil, isotropic, with a hydraulic conductivity of 30 m/day.
+**Material** — one soil, isotropic, with a hydraulic conductivity of 30 m/yr.
 The columns are the first six of the `mat` worksheet's seepage band, in its order;
 the four after them belong to the unsaturated and transient models this problem
 does not use. The row carries no strength properties: this model is analyzed for
@@ -178,7 +178,7 @@ tailwater standing at ground level, applied from the far side of the sheetpile s
 out to the end of the section.
 
 The remaining boundaries — the base at elevation 0 and the two vertical ends —
-carry nothing and are therefore no-flow. The base is the rock the sand sits on.
+carry nothing and are therefore no-flow. The base is the rock the silt sits on.
 The ends are the modeler's judgment: the section is drawn far enough either side
 of the wall that the flow has become horizontal by the time it reaches them, so
 nothing crosses.
@@ -230,7 +230,7 @@ with a model that has no vision. Use this instead if you prefer:
 
 <div class="prompt-block" markdown>
 ```text
-Build a seepage model of flow under a sheetpile wall. The foundation is a single sand layer, 50 m long and 10 m deep on impervious rock, with a level ground surface at elevation 10 and the base at elevation 0. Hydraulic conductivity is 30 m/day, isotropic. A sheetpile wall at x = 30 penetrates 3 m, so add a narrow slot in the profile line: vertices at (29.9, 10), (30, 7) and (30.1, 10). Upstream there is 3 m of water on the ground, so put a specified head of 13 m along the ground surface from x = 0 to x = 20. From x = 20 to the wall the ground is covered by an impervious clay blanket, so leave that stretch with no boundary condition at all. Downstream the tailwater is at ground level, so put a specified head of 10 m from x = 30.1 to x = 50. Units are SI and the time unit is days.
+Build a seepage model of flow under a sheetpile wall. The foundation is a single silt layer, 50 m long and 10 m deep on impervious rock, with a level ground surface at elevation 10 and the base at elevation 0. Hydraulic conductivity is 30 m/yr, isotropic. A sheetpile wall at x = 30 penetrates 3 m, so add a narrow slot in the profile line: vertices at (29.9, 10), (30, 7) and (30.1, 10). Upstream there is 3 m of water on the ground, so put a specified head of 13 m along the ground surface from x = 0 to x = 20. From x = 20 to the wall the ground is covered by an impervious clay blanket, so leave that stretch with no boundary condition at all. Downstream the tailwater is at ground level, so put a specified head of 10 m from x = 30.1 to x = 50. Units are SI and the time unit is years.
 ```
 </div>
 
@@ -285,11 +285,12 @@ then the material; then the geometry; then the boundary conditions.
    **Unit weight of water** with that system's value, `9.81` kN/m³ here. XSLOPE
    never converts between systems — the declaration states what the numbers you
    type already mean, and drives the unit labels on the plots.
-2. `main!D9` **Time** already reads `day` in the template, which is what this model
-   needs — confirm it rather than change it. This field matters more on a seepage
+2. `main!D9` **Time** ships as `day` in the template; pick `yr` from its
+   dropdown, which is the base this model's conductivity is stated in. This
+   field matters more on a seepage
    model than on any other: conductivity, specified flux and the computed discharge
    all carry a length-per-time or volume-per-time dimension, and the declared time
-   unit is what puts `m/day` on the material form and `m³/day per m` on the flow
+   unit is what puts `m/yr` on the material form and `m³/yr per m` on the flow
    net's title. Blank it and those quantities are simply unlabeled — the arithmetic
    is unchanged, but nothing on screen says what the answer is in.
 3. Leave **Tension crack depth**, **Depth of water in crack** and **Seismic
@@ -387,9 +388,9 @@ on: settings, then the material, then the geometry, then the boundary conditions
 Click **Global parameters** and set **Units** to `SI`. The unit weight of water
 fills itself with `9.81`.
 
-Then set **Time** to `day`. This field is inert on a limit equilibrium model and
+Then set **Time** to `yr`. This field is inert on a limit equilibrium model and
 load-bearing here: it is what makes the material form label its conductivity boxes
-`k1 (m/day)` and the solution title read `m³/day per m`. XSLOPE never converts, so
+`k1 (m/yr)` and the solution title read `m³/yr per m`. XSLOPE never converts, so
 the declaration states what the conductivity you are about to type already means.
 
 Leave the tension crack and seismic fields at `0`, and the two FEM fields empty.
@@ -411,7 +412,7 @@ which on this model is the whole material.
 Press **Add row**, and fill it:
 
 1. **name** = `soil`.
-2. **k1 (m/day)** = `30` and **k2 (m/day)** = `30`.
+2. **k1 (m/yr)** = `30` and **k2 (m/yr)** = `30`.
 3. **alpha** = `0`.
 4. Leave **unsat** at `lf` — the linear-front relative-conductivity model, one of
    three with `vg` (van Genuchten) and `gard` (Gardner) — and **kr0**, **h0 (m)**,
@@ -594,10 +595,10 @@ Changing the setting re-draws the solution already in hand; nothing is re-solved
 
 ![The seepage solution](images/seep01_solution.png){width=1000}
 
-**The total discharge is 40.111 m³/day per m.** That trailing *per m* states a
+**The total discharge is 40.111 m³/yr per m.** That trailing *per m* states a
 convention. The section has no thickness, so every flow quantity a two-dimensional
 analysis reports is **per meter of wall measured along its length**: the discharge
-under a 60 m stretch of this wall is 60 × 40.111 = 2,406.7 m³/day. Everything else
+under a 60 m stretch of this wall is 60 × 40.111 = 2,406.7 m³/yr. Everything else
 a two-dimensional analysis produces carries the same convention — a slice weight, a
 reinforcement force, a pile row's share of the soil — and it is the easiest place
 to be out by a factor of the wall length.
@@ -660,7 +661,7 @@ curvilinear-square net rather than a drawing that approximates one, and it is wh
 the arithmetic runs backwards as cleanly as forwards: counting 4 and 9 off the
 screen gives
 
-$$ q = 30 \times 3 \times \frac{4}{9} = 40.0 \text{ m³/day per m} $$
+$$ q = 30 \times 3 \times \frac{4}{9} = 40.0 \text{ m³/yr per m} $$
 
 against the finite element answer of 40.111, and the 0.3% between them is the
 rounding above and nothing else.
@@ -714,7 +715,7 @@ way to find out how much of it is mesh is to solve the same model again on a fin
 one. Rebuild the mesh at a range of element sizes — untick **Auto-size from
 geometry** and type each size into **Target element size** — and run each one:
 
-| Target size (m) | Nodes | Triangles | q (m³/day per m) |
+| Target size (m) | Nodes | Triangles | q (m³/yr per m) |
 |:---:|---:|---:|---:|
 | 2.0 | 191 | 316 | 41.978 |
 | 1.0 | 670 | 1,212 | 40.797 |
@@ -755,7 +756,7 @@ it was computed on, which is why that row is stated with its size.
 The element type moves the answer the same way, and more cheaply. Meshing the same
 section at a 1 m target size with each of the five element types gives:
 
-| Element type | Nodes | Elements | q (m³/day per m) |
+| Element type | Nodes | Elements | q (m³/yr per m) |
 |---|---:|---:|---:|
 | `tri3` | 670 | 1,212 | 40.797 |
 | `tri6` | 2,551 | 1,212 | 39.866 |
@@ -820,7 +821,7 @@ Run it again:
 
 ![The seepage solution on the refined mesh](images/seep01_solution_refined.png){width=1000}
 
-**39.775 m³/day per m**, against 40.111 on the uniform mesh of nearly the same size.
+**39.775 m³/yr per m**, against 40.111 on the uniform mesh of nearly the same size.
 The uniform mesh needs to be built at 0.25 m — **9,607 nodes** — to reach 39.786,
 which is the same answer to three figures. The refinement bought a 3.5× smaller
 system for it, and on a problem where the solve is fast that is a convenience; on a
@@ -880,7 +881,7 @@ q = 100 at seep:soil:k1 = 126.1 (interpolated between solves).
 ![Discharge against hydraulic conductivity](images/seep01_q_vs_k.png){width=900}
 
 The orange series is that sweep, and it is **not** a straight line: from 30 to
-300 m/day the discharge only rises from 40.1 to 150.6, so q/k₁ falls from 1.337 to
+300 m/yr the discharge only rises from 40.1 to 150.6, so q/k₁ falls from 1.337 to
 0.502 across the range. The reason is that the sweep changes one principal
 conductivity and not the other. At the start of it the soil is isotropic; by the
 end k₁ is ten times k₂, and the soil is **anisotropic** — water moves more easily
@@ -890,7 +891,7 @@ field itself changes shape, and the shape factor with it.
 Scale **both** principal conductivities together and the answer is exactly
 proportional. The blue series is the same range with k₂ moved to match k₁ at every
 step, and it sits on the proportional line through the origin to eight significant
-figures: q/k = 1.33704613 at 30 m/day and at every one of the ten values up to
+figures: q/k = 1.33704613 at 30 m/yr and at every one of the ten values up to
 300.
 
 That is not a numerical coincidence, and the head field says why. Comparing the
@@ -926,7 +927,7 @@ the conductivities matters; it is one soil that makes *k* cancel completely.
 This tutorial demonstrated:
 
 - A confined seepage model built from three inputs: one soil at
-  k₁ = k₂ = **30 m/day**, a profile line whose 0.2 m slot at x = 30 is the
+  k₁ = k₂ = **30 m/yr**, a profile line whose 0.2 m slot at x = 30 is the
   sheetpile, and two specified-head boundaries at **13 m** and **10 m**. Every
   other edge — the rock base, the two ends, both faces of the slot, and the 10 m of
   ground under the clay blanket — is a no-flow boundary that nothing was entered
@@ -934,9 +935,9 @@ This tutorial demonstrated:
 - The path the solver chose being read off the boundary conditions rather than a
   setting: **zero exit-face nodes**, so one direct confined solve, no phreatic
   surface, and pore pressures from 0 to **126.8 kPa** that never go negative.
-- A discharge of **40.111 m³/day per m** on 2,490 nodes — per meter of wall, the
+- A discharge of **40.111 m³/yr per m** on 2,490 nodes — per meter of wall, the
   convention every quantity a two-dimensional analysis reports carries, and
-  **2,406.7 m³/day** under a 60 m stretch of it.
+  **2,406.7 m³/yr** under a 60 m stretch of it.
 - A flow net drawn at **10 contour levels**, where the channel count the discharge
   implies comes out at **4.011** — whole to within 0.3%, so the cells are
   curvilinear squares and **nine head drops and four flow channels** read back as
@@ -950,7 +951,7 @@ This tutorial demonstrated:
   instead of 0.500 m and reaching **39.775** on 2,753 nodes, where a uniform mesh
   needs **9,607** to reach the same three figures.
 - A discharge exactly proportional to an isotropic conductivity —
-  **q/k = 1.33704613** at every one of ten values from 30 to 300 m/day, with the
+  **q/k = 1.33704613** at every one of ten values from 30 to 300 m/yr, with the
   head field unchanged to 3 × 10⁻¹³ m — against the same sweep of k₁ alone, where
   q/k₁ falls from 1.337 to 0.502 because the anisotropy changes the head field.
 

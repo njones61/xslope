@@ -1230,7 +1230,7 @@ SEEP01_BC_VALUE_LABEL = "Head value (m):"
 #: the unit suffix the model's declared Time puts on them, which the page says to
 #: check for.
 SEEP01_MATERIALS_TOGGLE = "Seepage"
-SEEP01_MATERIALS_COLUMNS = ("k1 (m/day)", "k2 (m/day)")
+SEEP01_MATERIALS_COLUMNS = ("k1 (m/yr)", "k2 (m/yr)")
 
 #: Global parameters' Time row, which is inert on the LEM pages and load-bearing
 #: here: it is what puts the unit suffixes above on the forms and the plots.

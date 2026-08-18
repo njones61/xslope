@@ -860,10 +860,6 @@ Warning: Did not converge in 400 iterations
 WARNING: seepage solution did not converge — flowrate is unreliable (solution['converged'] is False).
 ```
 
-The elided lines are the solver's own convergence history — every twentieth sweep
-of it — the inflow-against-outflow check on the final head field, and the range of
-the stream function.
-
 The last iteration line reports all three conditions. The relative head change is
 1.38 × 10<sup>−4</sup> against a tolerance of 0.018 — inside it by two orders of
 magnitude, and it had gone inside it **by sweep 50**, so it has been satisfied for

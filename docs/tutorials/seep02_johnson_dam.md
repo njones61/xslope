@@ -839,7 +839,10 @@ A thousandfold tightening moves the discharge in the sixth figure and costs five
 extra sweeps. The reason is the flow-closure condition: whichever head tolerance is
 asked for, the run does not stop until the conductivity field has stopped lagging
 the head field to within 0.1% of the inflow, and by then the head has stopped
-moving anyway. The default needs no adjustment on a model of this kind.
+moving anyway. The dialog's tolerance, in other words, is not where convergence
+is won or lost — leave it at its default. What decides whether a run finishes is
+the curve the unsaturated parameters build, and the next run builds one steep
+enough to lose.
 
 ### The run that does not finish
 

@@ -94,12 +94,12 @@ full under [Boundary Conditions](../seep/overview.md#boundary-conditions). The
 specified-head type comes in two flavors, which is why the table below has four
 rows:
 
-| Type | What it states | Where it is used |
+| Type | What it states | Typical use |
 |---|---|---|
-| **Specified head** (`head`) | The total head is held at a stated value along a polyline, at every node, at all times | A reservoir floor, a tailwater surface, a piezometer reading you are matching |
-| **Reservoir** (`reservoir`) | The same, but only while a node is submerged — a node the water line drops below becomes an exit face, free to seep | A pool that falls, and any face that is partly above the water |
-| **Exit face** | Water may leave to the atmosphere, and where along the face it starts leaving is part of the answer | The downstream face of a dam, an excavation wall, a slope that seeps |
-| **Specified flux** (`flux`) | The rate at which water crosses the boundary, as a normal Darcy velocity, positive inward | Rainfall infiltration, recharge — anywhere the water-table position is an output and so cannot be imposed |
+| **Specified head** (`head`) | Total head held at a stated value, every node, all times | Reservoir floor, tailwater, a matched piezometer |
+| **Reservoir** (`reservoir`) | Held only while submerged; nodes above the water line seep freely | A pool that falls; a partly submerged face |
+| **Exit face** | Water may leave to the atmosphere; where it starts leaving is part of the answer | Downstream face of a dam; a seeping slope |
+| **Specified flux** (`flux`) | Flow rate across the boundary (normal Darcy velocity, positive inward) | Rainfall infiltration, recharge |
 
 There is one further possibility, and it is entered nowhere: an edge with **no
 boundary condition on it is a no-flow boundary**. That is the default rather than

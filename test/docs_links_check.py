@@ -1412,7 +1412,7 @@ def _seep01_editor_labels(mw):
     elif panel.fill.isChecked():
         fails.append(f"the Display panel's {SEEP01_FILL_TOGGLE!r} opens ticked — "
                      f"Tutorial SEEP-1 shows the arrival view as the unfilled "
-                     f"line net and has the reader tick the fill on themselves")
+                     f"flow net and has the reader tick the fill on themselves")
     if SEEP01_VARIABLE_ROW not in rows:
         fails.append(f"the Display panel has no {SEEP01_VARIABLE_ROW!r} row; "
                      f"Tutorial SEEP-1's gradient section tells the reader to set "

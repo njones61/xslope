@@ -590,7 +590,7 @@ a colorbar for reading values anywhere in the section:
 ![The same solution with Filled contours ticked](images/seep01_solution_filled.png){width=1000}
 
 Untick it again — the wash is good for seeing the field at a glance, but the
-line net is what this page reads. Every change in the panel re-draws the
+flow net is what this page reads. Every change in the panel re-draws the
 solution already in hand; nothing is re-solved.
 
 The second option decides what the picture can be read for: **set Contour levels
@@ -705,7 +705,7 @@ gradient plot is where the danger shows.
 
 To draw it, make three changes in the **Display** panel: set **Variable** to
 `Hydraulic gradient magnitude`, tick **Filled contours** back on — the gradient
-reads as a filled field, not a line net — and untick **Flow lines**:
+reads as a filled field, not a flow net — and untick **Flow lines**:
 
 ![Hydraulic gradient magnitude](images/seep01_gradient.png){width=1000}
 

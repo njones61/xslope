@@ -718,13 +718,21 @@ moving out there, which is what the no-flow ends assume.
 
 The two peaks are at the sheetpile toe at (30, 7), where the whole flow has to turn
 around the end of the wall, and at (20, 10), the upstream edge of the clay blanket,
-where a boundary held at 13 m meets a boundary that carries nothing. They are two
-different defects. The toe is a **re-entrant corner**, where the boundary turns
-back on itself; the blanket edge is a **boundary-condition change**, where a held
-head meets a no-flow face on smooth ground. Both give a gradient with no finite
-value in the exact solution — a **singularity**, a point the true answer is
-infinite at, so no mesh ever resolves it and every mesh reports whatever its own
-spacing can reach. The next section is about what that does to the answer.
+where the held 13 m head ends and the no-flow blanket begins. Both are
+**singularities** — points where the exact solution's gradient is infinite, so no
+mesh ever resolves them and every mesh reports whatever its own spacing can reach.
+
+What makes a point singular is the angle the boundary turns through there, in
+combination with the boundary conditions on its two sides. A held head meeting a
+no-flow face is not by itself a defect — the same pair meets at (0, 10), where the
+upstream head runs into the no-flow end wall, and the gradient there is part of
+the 0.015 just measured. The difference is the corner. At (0, 10) the flow turns a
+right angle off the end wall onto the surface, and the local solution stays
+smooth; at (20, 10) the ground runs straight through the junction, and switching
+from inflow to no-flow with no corner to turn through is what drives the gradient
+toward infinity. The toe is the other singular shape — a slit tip the boundary
+doubles back around, with the whole flow squeezing past it. The next section is
+about what the two of them do to the answer.
 
 ---
 
@@ -840,9 +848,13 @@ one has **297**. The toe is a node on both meshes; its nearest neighbor moves fr
 **0.500 m away to 0.048 m**, and the count of nodes within half a meter of it goes
 from 1 — the toe itself — to 114. The whole mesh grew from 2,490 nodes to 2,753 —
 11% — because everything more than a couple of meters from the toe is untouched.
-The blanket edge is not one of the feature classes this setting detects, and the
-gradient there says so: the largest within half a meter of (20, 10) reads 0.4297 on
-the uniform mesh and 0.4295 on the refined one.
+The blanket edge is untouched. The detector reads the geometry — notch tips,
+embedded lines, thin zones, material interfaces — and the blanket edge is
+geometrically nothing: a flat stretch of ground whose singularity exists only in
+the boundary-condition table, which the detector never reads. The gradient there
+says the refinement never reached it — the largest within half a meter of
+(20, 10) reads 0.4297 on the uniform mesh and 0.4295 on the refined one — and
+whether that omission costs anything is answered by the discharge below.
 
 Run it again:
 
@@ -850,7 +862,11 @@ Run it again:
 
 **39.775 m³/yr per m**, against 40.111 on the uniform mesh of nearly the same size.
 The uniform mesh needs to be built at 0.25 m — **9,607 nodes** — to reach 39.786,
-which is the same answer to three figures. The refinement bought a 3.5× smaller
+which is the same answer to three figures. That comparison also answers for the
+unrefined blanket edge: the 0.25 m mesh refines it along with everything else, the
+feature-refined mesh leaves it at 0.5 m, and the two discharges differ by 0.03% —
+the toe sits in the throat the whole flow passes through, and it carries
+essentially all of the discharge's mesh error. The refinement bought a 3.5× smaller
 system for it, and on a problem where the solve is fast that is a convenience; on a
 large model, or on the finite element stability analysis that would run on the same
 mesh afterward, it is a large saving in solve time.

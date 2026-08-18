@@ -1245,6 +1245,9 @@ SEEP01_GLOBAL_TIME_ROW = "Time"
 SEEP01_LEVELS_ROW = "Contour levels"
 SEEP01_LEVELS_DEFAULT = 20
 SEEP01_FILL_TOGGLE = "Filled contours"
+SEEP01_VARIABLE_ROW = "Variable"
+SEEP01_GRADIENT_OPTION = "Hydraulic gradient magnitude"
+SEEP01_FLOWLINES_TOGGLE = "Flow lines"
 SEEP01_LEVELS_STEP = 10
 
 #: The Parametric dialog in its seepage mode, as the conductivity sweep uses it:
@@ -1410,6 +1413,23 @@ def _seep01_editor_labels(mw):
         fails.append(f"the Display panel's {SEEP01_FILL_TOGGLE!r} opens ticked — "
                      f"Tutorial SEEP-1 shows the arrival view as the unfilled "
                      f"line net and has the reader tick the fill on themselves")
+    if SEEP01_VARIABLE_ROW not in rows:
+        fails.append(f"the Display panel has no {SEEP01_VARIABLE_ROW!r} row; "
+                     f"Tutorial SEEP-1's gradient section tells the reader to set "
+                     f"it. Its rows read {sorted(r for r in rows if r)}")
+    variables = {panel.variable.itemText(i) for i in range(panel.variable.count())}
+    if SEEP01_GRADIENT_OPTION not in variables:
+        fails.append(f"the Display panel's Variable list has no "
+                     f"{SEEP01_GRADIENT_OPTION!r} entry, which Tutorial SEEP-1 "
+                     f"quotes; it offers {sorted(variables)}")
+    if panel.flowlines.text() != SEEP01_FLOWLINES_TOGGLE:
+        fails.append(f"the Display panel's flow-line toggle reads "
+                     f"{panel.flowlines.text()!r}, not {SEEP01_FLOWLINES_TOGGLE!r} "
+                     f"— the label Tutorial SEEP-1 tells the reader to untick")
+    elif not panel.flowlines.isChecked():
+        fails.append(f"the Display panel's {SEEP01_FLOWLINES_TOGGLE!r} opens "
+                     f"unticked — Tutorial SEEP-1 tells the reader to untick it "
+                     f"for the gradient plot, which presumes it opens on")
     panel.deleteLater()
 
     # Read against the app's own toggle defaults, then ticked the way the page's

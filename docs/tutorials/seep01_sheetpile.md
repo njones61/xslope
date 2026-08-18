@@ -695,12 +695,22 @@ head or on the conductivity, which is the fact the
 
 ## Reading the gradient field
 
-The gradient field says where the flow is working hardest:
+The gradient field says where the flow is working hardest, and it is the field a
+seepage failure is read from. The **hydraulic gradient** is the rate at which
+head falls with distance, and where flow exits the ground at a gradient
+approaching the critical value — about 1.0 for most soils — the seepage force
+starts lifting the soil grains. The backward-eroding channel that starts is
+**piping**, the classic failure of sheetpile-supported excavations, and the
+gradient plot is where the danger shows.
+
+To draw it, make three changes in the **Display** panel: set **Variable** to
+`Hydraulic gradient magnitude`, tick **Filled contours** back on — the gradient
+reads as a filled field, not a line net — and untick **Flow lines**:
 
 ![Hydraulic gradient magnitude](images/seep01_gradient.png){width=1000}
 
-The hydraulic gradient is the rate at which head falls with distance, so it is
-largest where the equipotentials crowd together. It is smallest across the two
+The gradient is largest where the equipotentials of the head plot crowded
+together. It is smallest across the two
 ends: over the outer 5 m at each, the largest gradient anywhere is 0.015 upstream
 and 0.022 downstream, and the head varies by 0.09 m and 0.14 m. That is the check
 on the earlier judgment that the section was drawn wide enough — almost nothing is

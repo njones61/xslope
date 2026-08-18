@@ -95,7 +95,10 @@ uses that number instead.
 The direction of the pile force is not entered: XSLOPE takes it
 perpendicular to the pile's own axis, which for these vertical shafts means
 horizontal — the usual case for a stabilizing pile. A blank `Appl` means
-`active`: the force enters the equilibrium equations as it stands. The
+`active`: the force enters the equilibrium equations as it stands. The sheet
+leaves the cell blank, and Studio's table shows the resolved choice —
+`active` in its dropdown — rather than the blank, which is why the table
+above and the editor screenshot below disagree at a glance. The
 alternative, `passive`, treats the force as a resistance and divides it by
 the factor of safety, so the support carries the same margin as the soil
 strength.

@@ -431,6 +431,19 @@ finishes. [VP54](../verification/rocscience.md#vp54) is the verified case of the
 stated-force route, a micro-pile row entered with its shear resistance given
 directly.
 
+Choosing between the two comes down to where the force should come from.
+Leave `H` blank for the usual stabilizing case — a row of vertical shafts
+with a known diameter and spacing inside the applicable S/D band — so every
+trial surface is credited with the force it would actually receive. State
+`H` when the force comes from a better source than the arching theory: a
+p-y analysis, a load test, or a wall's own structural rating; when the
+member is a wall or a battered pile (Ito & Matsui requires vertical piles
+and a gap to arch across); or when reproducing a model that specifies the
+force, as VP54 does. And whenever a stated force meets a search, check
+that the surface the search returns matches the failure depth the stated
+force was derived for — the comparison above is what happens when it does
+not.
+
 ---
 
 ## Looking above the pile row

@@ -312,27 +312,39 @@ vertices are in. Click **OK**.
 
 Click **Seep BC**. The editor opens on **Set 1** — the dialog SEEP-1's
 [boundary-condition step](seep01_sheetpile.md#4-boundary-conditions) walks
-through — and the set this problem needs is three entries:
+through — and the set this problem needs is three entries. As with the profile
+lines, paste each table into the points grid, or **Add row** and type it.
 
-| Entry | Type | Value (ft) | Points |
-|---|---|:---:|---|
-| Head 1 | `head` | 160 | (0, 100), (200, 100), (320, 160) |
-| Head 2 | `head` | 100 | (550, 100), (750, 100) |
-| Exit face | — | — | (380, 180), (550, 100) |
+**Head 1 — the reservoir.** Press **Add head**, leave **Type:** at `head`, set
+**Head value (ft):** to `160`, and enter the points:
 
-Press **Add head** and build the reservoir boundary: leave **Type:** at `head`,
-set **Head value (ft):** to `160`, and enter the three points. The polyline runs
-along the foundation surface from the upstream end of the section to the
-embankment toe, then up the upstream face to elevation 160 — the vertex the shell
-line carried for exactly this purpose. Everything on that polyline is under
-water, so holding it at a head of 160 is exact.
+| x | y |
+|---:|---:|
+| 0 | 100 |
+| 200 | 100 |
+| 320 | 160 |
 
-Press **Add head** again for the tailwater: **Head value (ft):** = `100`, applied
-along the downstream foundation surface from the toe of the dam out to the end of
-the section.
+The polyline runs along the foundation surface from the upstream end of the
+section to the embankment toe, then up the upstream face to elevation 160 — the
+vertex the shell line carried for exactly this purpose. Everything on that
+polyline is under water, so holding it at a head of 160 is exact.
 
-Select the **Exit face** entry — it is already in the list, waiting for points —
-and enter its two:
+**Head 2 — the tailwater.** Press **Add head** again, with **Head value (ft):**
+= `100`, applied along the downstream foundation surface from the toe of the dam
+out to the end of the section:
+
+| x | y |
+|---:|---:|
+| 550 | 100 |
+| 750 | 100 |
+
+**Exit face.** Select the **Exit face** entry — it is already in the list,
+waiting for points — and enter its two:
+
+| x | y |
+|---:|---:|
+| 380 | 180 |
+| 550 | 100 |
 
 ![The exit face on the downstream slope](images/seep02_studio_seep_bc.png)
 

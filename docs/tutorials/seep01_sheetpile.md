@@ -187,10 +187,10 @@ The ends are the modeler's judgment: the section is drawn far enough either side
 of the wall that the flow has become horizontal by the time it reaches them, so
 nothing crosses.
 
-The tables are the model, and each is laid out exactly as its destination is — the
-template's worksheets and Studio's editors, same columns in the same order. Select
-a table's block of values, copy, and paste it straight into the sheet or editor
-rather than retyping it.
+These tables carry the entire model, and each is laid out exactly as its
+destination is — the template's worksheets and Studio's editors, same
+columns in the same order. Select a table's block of values, copy, and
+paste it straight into the sheet or editor rather than retyping it.
 
 ---
 

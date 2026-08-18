@@ -131,10 +131,14 @@ wall stands 3 m above the ground, and the tailwater in front of it stands at
 ground level.
 
 **Material** — one soil, isotropic, with a hydraulic conductivity of 30 m/yr.
-The columns are the first six of the `mat` worksheet's seepage band, in its order;
-the four after them belong to the unsaturated and transient models this problem
-does not use. The row carries no strength properties: this model is analyzed for
-flow only.
+`k1` and `k2` are the major and minor principal conductivities — the maximum
+permeability and the permeability at right angles to it — and `alpha` is the
+angle of the `k1` direction above horizontal, in degrees. An isotropic soil
+has `k1` = `k2`, which makes `alpha` irrelevant; it is entered here as 0.
+The columns shown are the first six of the `mat` worksheet's seepage band,
+in its order; the four after them belong to the unsaturated and transient
+models this problem does not use. The row carries no strength properties:
+this model is analyzed for flow only.
 
 | mat | name | k1 | k2 | alpha | unsat |
 |:---:|---|:---:|:---:|:---:|---|

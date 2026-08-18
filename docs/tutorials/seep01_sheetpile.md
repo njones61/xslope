@@ -316,17 +316,13 @@ from the table above into the first row of the table, row 11:
 
 ![The seepage band of the finished mat worksheet](images/seep01_sheet_mat.png)
 
-`k1` is the major principal conductivity and `k2` the minor one, with `alpha` the
-rotation of those principal directions from the x-axis in degrees. Setting
-`k1 = k2 = 30` makes the soil isotropic, and at that point `alpha` means nothing
-and stays `0`. The `unsat` column selects the relative-conductivity model used
-above the phreatic surface — `lf`, a linear front; `vg`, van Genuchten; or `gard`,
-Gardner — and `kr0`, `h0`, `a` and `n` are its parameters. On a confined problem
-there is no unsaturated zone, so **XSLOPE reads none of them** and their values do
-not affect the answer: leave them blank as the template ships them or fill them
-in. The capture above is of a file carrying `1`, `-1`, `0` and `0` there, and it
-solves to the same discharge either way. The last two columns, `Ss` and `Sy`, are
-the storage properties a transient analysis needs, and this analysis is steady.
+`k1` is the major principal conductivity and `k2` the minor one, with `alpha`
+the rotation of those principal directions from the x-axis in degrees.
+Setting `k1 = k2 = 30` makes the soil isotropic, and at that point `alpha`
+means nothing and stays `0`. Every column after `unsat` stays blank: they
+belong to the unsaturated and transient analyses of the next tutorials, and
+a confined steady problem reads none of them.
+[SEEP-2](seep02_johnson_dam.md) is where they come into play.
 
 Everything to the left of the Seepage band — unit weight, strength option,
 cohesion, friction angle — stays empty. A stability analysis would need them; this
@@ -417,9 +413,9 @@ Press **Add row**, and fill it:
 1. **name** = `soil`.
 2. **k1 (m/yr)** = `30` and **k2 (m/yr)** = `30`.
 3. **alpha** = `0`.
-4. Leave **unsat** at `lf` — the linear-front relative-conductivity model, one of
-   three with `vg` (van Genuchten) and `gard` (Gardner) — and **kr0**, **h0 (m)**,
-   **vg_a** and **vg_n** as they are. A confined problem evaluates none of them.
+4. Leave **unsat** and everything after it alone. Those columns belong to
+   the unsaturated and transient analyses of the next tutorials; a confined
+   problem evaluates none of them.
 
 ![The materials editor with the Seepage columns showing](images/seep01_studio_materials.png)
 

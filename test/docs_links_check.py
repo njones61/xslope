@@ -1244,6 +1244,7 @@ SEEP01_GLOBAL_TIME_ROW = "Time"
 #: describes would stop being the one on the reader's screen.
 SEEP01_LEVELS_ROW = "Contour levels"
 SEEP01_LEVELS_DEFAULT = 20
+SEEP01_FILL_TOGGLE = "Filled contours"
 SEEP01_LEVELS_STEP = 10
 
 #: The Parametric dialog in its seepage mode, as the conductivity sweep uses it:
@@ -1401,6 +1402,14 @@ def _seep01_editor_labels(mw):
                      f"{SEEP01_LEVELS_STEP}, which Tutorial SEEP-1 tells the reader "
                      f"to type; it accepts {panel.levels.minimum()} to "
                      f"{panel.levels.maximum()}")
+    if panel.fill.text() != SEEP01_FILL_TOGGLE:
+        fails.append(f"the Display panel's contour-fill toggle reads "
+                     f"{panel.fill.text()!r}, not {SEEP01_FILL_TOGGLE!r} — the "
+                     f"label Tutorial SEEP-1 tells the reader to tick")
+    elif panel.fill.isChecked():
+        fails.append(f"the Display panel's {SEEP01_FILL_TOGGLE!r} opens ticked — "
+                     f"Tutorial SEEP-1 shows the arrival view as the unfilled "
+                     f"line net and has the reader tick the fill on themselves")
     panel.deleteLater()
 
     # Read against the app's own toggle defaults, then ticked the way the page's

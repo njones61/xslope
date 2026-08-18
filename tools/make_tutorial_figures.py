@@ -2005,6 +2005,14 @@ def seep01_plots():
     mesh = _seep01_mesh(sd)
     seep_data, solution = _seep01_solve(sd, mesh)
     capture("seep01_mesh.png", plot_seep_data, seep_data, show_bc=True)
+    # The solution as the view first shows it — the Display panel's defaults
+    # (20 contour levels, Filled contours off) — and the same state with the fill
+    # toggled on. The page walks the reader through both before setting the level
+    # count to SEEP01_LEVELS for the flow-net reading.
+    capture("seep01_solution_arrival.png", plot_seep_solution, seep_data, solution,
+            levels=20, base_mat=1, fill_contours=False, mesh=False)
+    capture("seep01_solution_filled.png", plot_seep_solution, seep_data, solution,
+            levels=20, base_mat=1, fill_contours=True, mesh=False)
     capture("seep01_solution.png", plot_seep_solution, seep_data, solution,
             levels=SEEP01_LEVELS, base_mat=1, fill_contours=False, mesh=False)
     capture("seep01_gradient.png", plot_seep_solution, seep_data, solution,

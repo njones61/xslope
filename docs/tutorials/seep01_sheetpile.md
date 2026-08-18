@@ -576,12 +576,29 @@ finishes it.
 
 The solution view arrives with a **Display** panel in the left dock, holding the
 plot options of whichever result view is showing
-([The Display dock](../studio/interface.md#the-display-dock)). One of them decides
-what the picture can be read for: **set Contour levels to 10**, which opens at
-`20`. It fixes how many lines of both families get drawn, and ten is what makes
-them countable on this problem — [Reading the flow net](#reading-the-flow-net)
-below is the reason, and every seepage figure from here on is drawn at it.
-Changing the setting re-draws the solution already in hand; nothing is re-solved.
+([The Display dock](../studio/interface.md#the-display-dock)). This is how the
+view opens:
+
+![The solution as it first draws, at the default 20 contour levels](images/seep01_solution_arrival.png){width=1000}
+
+The black lines are contours of total head and the blue lines are flow lines —
+[Reading the flow net](#reading-the-flow-net) below takes them one family at a
+time. Before reading anything, try two of the Display options. Tick **Filled
+contours**, and the head field becomes a colored wash under the same lines, with
+a colorbar for reading values anywhere in the section:
+
+![The same solution with Filled contours ticked](images/seep01_solution_filled.png){width=1000}
+
+Untick it again — the wash is good for seeing the field at a glance, but the
+line net is what this page reads. Every change in the panel re-draws the
+solution already in hand; nothing is re-solved.
+
+The second option decides what the picture can be read for: **set Contour levels
+to 10**, which opens at `20`. It fixes how many lines of both families get
+drawn, and the arrival view shows what 20 does on this problem — the lines crowd
+together near the wall, where the head changes fastest. Ten is what makes them
+countable — [Reading the flow net](#reading-the-flow-net) below is the reason,
+and every seepage figure from here on is drawn at it.
 
 ![The seepage solution](images/seep01_solution.png){width=1000}
 

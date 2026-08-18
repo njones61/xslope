@@ -316,7 +316,7 @@ through — and the set this problem needs is three entries. As with the profile
 lines, paste each table into the points grid, or **Add row** and type it.
 
 **Head 1 — the reservoir.** Press **Add head**, leave **Type:** at `head`, set
-**Head value (ft):** to `160`, and enter the points:
+**Head value (ft):** to `160`, and enter (or copy-paste) the points:
 
 | x | y |
 |---:|---:|

@@ -752,19 +752,11 @@ nothing, and run again. The mesh, the geometry, the conductivities and the bound
 conditions are identical across the three runs; only the curve above the phreatic
 surface changes.
 
-**Relaxation** in the last column is how much of each new solve the iteration
-actually takes. The full step is taken through sweep 20; past that the new field is
-blended with the previous one, at 0.5 first and lower as the sweep count climbs,
-which is the solver's response to slow progress rather than a setting. All three of
-these runs finish just past sweep 20 — `lf` by three sweeps, `gard` by seven,
-`vg` by eight — so all three take their last step at 0.5 and none reaches the
-next rung.
-
-| Model | q (ft³/day per ft) | Iterations | Flow above the phreatic surface at x = 500 | Relaxation at the last sweep |
-|---|:---:|:---:|:---:|:---:|
-| `lf` | 1.9546 | 23 | 10.3% | 0.50 |
-| `vg` | 1.8649 | 28 | 8.3% | 0.50 |
-| `gard` | 1.8661 | 27 | 8.6% | 0.50 |
+| Model | q (ft³/day per ft) | Iterations | Flow above the phreatic surface at x = 500 |
+|---|:---:|:---:|:---:|
+| `lf` | 1.9546 | 23 | 10.3% |
+| `vg` | 1.8649 | 28 | 8.3% |
+| `gard` | 1.8661 | 27 | 8.6% |
 
 The two calibrated models agree with each other to **0.06%** in discharge, and
 both sit **4.5 to 4.6% below** the linear front. That gap is the whole of what the
@@ -875,10 +867,11 @@ are still wrong.
 discharge computed while nodes are still switching between seeping and no-flow
 belongs to no one set of boundary conditions.
 
-The relaxation ladder runs further down than the model comparison reached. Below
-the 0.5 those three runs stopped at, the step drops to 0.2, 0.1, 0.05, 0.02 and
-0.01 after sweeps 40, 60, 80, 100 and 120. The two finest floors of the
-*kr<sub>0</sub>* sweep ran to 145 and 148, past the last rung.
+Past sweep 20 the iteration also stops taking the full step: each new field is
+blended with the previous one — **relaxation** — at 0.5 first, then 0.2, 0.1,
+0.05, 0.02 and 0.01 after sweeps 40, 60, 80, 100 and 120, the solver's response
+to slow progress rather than a setting. The two finest floors of the
+*kr<sub>0</sub>* sweep ran to 145 and 148 sweeps, past the last rung.
 
 The head tolerance is the only one of the three the dialog exposes, and it turns
 out to control the iteration count rather than the answer:

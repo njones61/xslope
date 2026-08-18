@@ -41,7 +41,9 @@ POLY = "docs/usage/sample_sheets/sheets_polygon.xlsx"
 
 SHEETS = [
     # main comes from the blank template (what that section describes); auto-framed.
-    {"out": "sheet_main.png", "src": TEMPLATE, "sheet": "main"},
+    # rows capped above the hidden dropdown lists (49+): the page documents
+    # the inputs, not the lookup blocks behind the dropdowns.
+    {"out": "sheet_main.png", "src": TEMPLATE, "sheet": "main", "rows": (1, 26)},
     # (Template v22 retired the 'plot' sheet — its live Excel chart was the only
     # entry that needed the "libreoffice"/"manual" renderers. Visual verification of
     # a model now lives in XSLOPE Studio and plot_inputs().)

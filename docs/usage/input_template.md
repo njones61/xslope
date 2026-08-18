@@ -75,9 +75,9 @@ reinforcement, and boundary conditions to scale.
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks template format for compatibility. The current version is **22**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option; version 17 added the `phi_b`/`s_cap` matric-suction columns; version 18 added the **Units** and **Time** selectors on this sheet, the [transient-seepage **tseep** sheet](#worksheet-tseep), and the mat sheet's `Ss`/`Sy` storage columns (see [Worksheet: mat](#worksheet-mat)); version 19 added the eight **run options** below and the optional [search window](#worksheet-circles) on the circles sheet; version 20 added the [SSR zone](#ssr-zones) rows on the polygon sheet; version 21 added the polygon sheet's **Type** and **Size** rows, the profile sheet's **Size** row, the **Direction** option on both dloads sheets, and the **Side BC** selector below; version 22 added the **Water loads** selector below, which lets the engine derive the ponded-water load from the model's own water definition, the **Surface family** selector below, the tseep sheet's [**stability_time**](#worksheet-tseep) control, and removed the preview chart sheet (Studio and `plot_inputs()` draw the model to scale, which a not-to-scale sketch could only approximate). Older files load unchanged: pre-v18 files have no Units/Time selectors, so the unit system is inferred from the unit weight of water and no time unit is assigned, and `t_cut`, `phi_b` and `s_cap` remain blank on every material. A version-20 file's negative [SSR zone](#ssr-zones) Material IDs keep loading exactly as they always did.
+- **Template version**: Tracks the template format for compatibility. The current version is **23**. xslope refuses a file whose version is newer than it understands, so an older install cannot silently mis-read a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
 - **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial), so existing files behave exactly as before.
-- **Time** (`sec`, `min`, `hr`, or `day`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
+- **Time** (`sec`, `min`, `hr`, `day`, or `yr`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
 - **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type wins (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
 - **Tension crack parameters**: Depth **[L]** and water-surface elevation **[L]** within tension cracks at the top of the failure surface
 - **Seismic coefficient** (kh) — **[–]**: Horizontal seismic acceleration coefficient (dimensionless) for pseudo-static earthquake analysis
@@ -97,7 +97,7 @@ A choice you make in a Studio dialog always wins over the value in the file.
 - **Mesh element type** (`tri3`, `tri6`, `quad4`, `quad8`, or `quad9`) — **[–]**: the element type the Build Mesh dialog opens on. Quadratic elements (`tri6`, `quad8`, `quad9`) are strongly preferred for FEM/SSRM; the linear ones lock volumetrically and overestimate the factor of safety.
 - **Mesh target size** — **[L]**: the target element size the Build Mesh dialog opens on. Setting it also turns auto-sizing off, since a size in the file means the file meant that size.
 - **SSRM F min** / **SSRM F max** — **[–]**: the strength-reduction bracket the SSRM search starts from. F min must be less than F max.
-- **Water loads** (`auto` or `manual`) — **[–]**: who supplies the weight of water standing on the slope. `auto` — what a new file carries — hands it to the engine, which derives the ponded-water load at solve time from the model's own water definition: the seepage boundary conditions wherever a seepage analysis is defined, otherwise the piezometric line. The two dloads sheets then carry **non-water** loads only — a surcharge, a footing, traffic — and the derived load is drawn on every plot in its own colour, since a load you did not type is the kind that needs to be more visible rather than less. `manual` leaves the water load to you on the dloads sheets. A blank cell means `auto` in a version-22 file and `manual` in every older one, and that is a correctness requirement rather than a preference: an older file already carries its water load typed in, and deriving a second one under it would count the reservoir twice. Use `manual` for a deliberate exception, and for a vendor-faithful transcription whose point is to reproduce another program's input exactly. See [Automatic water loads](preflight.md#automatic-water-loads).
+- **Water loads** (`auto` or `manual`) — **[–]**: who supplies the weight of water standing on the slope. `auto` — what a new file carries — hands it to the engine, which derives the ponded-water load at solve time from the model's own water definition: the seepage boundary conditions wherever a seepage analysis is defined, otherwise the piezometric line. The two dloads sheets then carry **non-water** loads only — a surcharge, a footing, traffic — and the derived load is drawn on every plot in its own color, since a load you did not type is the kind that needs to be more visible rather than less. `manual` leaves the water load to you on the dloads sheets. A blank cell means `auto` in a version-22-or-newer file and `manual` in every older one, and that is a correctness requirement rather than a preference: an older file already carries its water load typed in, and deriving a second one under it would count the reservoir twice. Use `manual` for a deliberate exception, and for a vendor-faithful transcription whose point is to reproduce another program's input exactly. See [Automatic water loads](preflight.md#automatic-water-loads).
 - **Surface family** (`circular` or `non-circular`) — **[–]**: which failure-surface family a model that defines **both** a circular surface (the [circles](#worksheet-circles) sheet) and a non-circular one (the [non-circ](#worksheet-non-circ) sheet) actually means. Blank — what the template ships, and the normal state — means "whichever family the model defines", which is unambiguous for all but the rare file carrying both; there the circular surface is used and the non-circular one is ignored, and the [model checks](preflight.md) say so. Fill the cell (or answer the **Surface** selector in Studio's Run LEM dialog, which writes your choice here) and that answer travels with the file: the run, the plots and the next session all read the same one. A family named here is only honoured when the model actually defines it, so a value left behind by a surface you later deleted can never claim a surface that is not there.
 - **Side BC** (`rollers` or `fixed`) — **[–]**: how the FEM restrains the left and right truncation boundaries of the model. `rollers` (the default, and what every file that leaves this blank gets) fixes horizontal movement and leaves the face free to settle vertically. `fixed` clamps both directions. Rollers are the usual choice: a truncation boundary is an artificial cut through ground that continues, and the ground on the other side of it does not hold the face up. `fixed` adds shear restraint that ground does not have, and stiffens a domain truncated close to the slope; use it to reproduce a program that fixes its side boundaries. The bottom boundary is fully fixed either way.
 
@@ -136,7 +136,7 @@ and exports are unchanged.
 
 The **mat** worksheet defines material properties for the soil layer defined by the profile lines (see next section). Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
 
-The sheet is wide, so it is shown here in three views, each re-showing the **mat** and **name** identity columns on the left and matching one of the sheet's own column-group headers: **Shear Strength/Stiffness** (the strength-model parameters, the tensile cutoff, the FEM properties E and ν, the pore-pressure option, and the matric-suction pair phi_b/s_cap, shown above), **Standard Deviations** (variability for reliability analysis, further below), and **Seepage** (permeability, the unsaturated-flow model, and the transient-storage pair Ss/Sy, further below still). Cells that do not apply to a material's selected strength or pore-pressure option are automatically greyed out, and a color legend on the sheet marks each column **LEM only**, **LEM & FEM**, or **FEM only**.
+The sheet is wide, so it is shown here in three views, each re-showing the **mat** and **name** identity columns on the left and matching one of the sheet's own column-group headers: **Shear Strength/Stiffness** (the strength-model parameters, the tensile cutoff, the FEM properties E and ν, the pore-pressure option, and the matric-suction pair phi_b/s_cap, shown above), **Standard Deviations** (variability for reliability analysis, further below), and **Seepage** (permeability, the unsaturated-flow model, and the transient-storage pair Ss/Sy, further below still). Cells that do not apply to a material's selected strength or pore-pressure option are automatically grayed out, and a color legend on the sheet marks each column **LEM only**, **LEM & FEM**, or **FEM only**.
 
 **Strength Properties** (for LEM and FEM analysis):
 
@@ -144,21 +144,21 @@ The sheet is wide, so it is shown here in three views, each re-showing the **mat
 - **$\gamma_{sat}$** — **[F/L³]**: Saturated unit weight, used for the portion of each slice below the water table. Leave blank to use $\gamma$ throughout (the pre-v12 behavior). When both are given, $\gamma_{sat} \geq \gamma$ is required.
 - **option**: Strength model to use for this layer. `mc` = Mohr-Coulomb; `cp` = undrained strength that increases
   with depth below a reference elevation; `pow` = nonlinear power-curve envelope; `hb` = generalized Hoek-Brown
-  (rock); `elastic` = elastic / infinite strength — the material cannot fail (added in template version 16; see
+  (rock); `elastic` = elastic / infinite strength — the material cannot fail (see
   below).
 - **c** (cohesion **[F/L²]**) and **φ** (friction angle **[deg]**): Mohr-Coulomb shear strength parameters (option = `mc`).
 - **c** **[F/L²]**, **cp** **[F/L²/L]** (a strength gradient — stress per unit change in depth, e.g. psf/ft), and **r-elev** **[L]** (option = `cp`): undrained strength that increases linearly below a reference
   elevation — see the formula below.
 - **d** — **[F/L²]**: cohesion intercept for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
 - **$\psi$** — **[deg]**: friction angle for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
-- **t_cut** — **[F/L²]**: tensile-strength cutoff, added in template version 16 — see below.
+- **t_cut** — **[F/L²]**: tensile-strength cutoff — see below.
 - **E** — **[F/L²]**: Young's modulus (FEM only).
 - **ν** — **[–]**: Poisson's ratio, dimensionless (FEM only).
 - **u**: pore pressure option (a selector, not a numeric value)
 - **$r_u$** — **[–]**: pore pressure ratio, dimensionless (u = `ru`) — see below.
-- **phi_b** ($\phi^b$) — **[deg]**: Fredlund unsaturated (matric-suction) friction angle, added in template version 17 — see
+- **phi_b** ($\phi^b$) — **[deg]**: Fredlund unsaturated (matric-suction) friction angle — see
   below.
-- **s_cap** — **[F/L²]**: maximum credited suction (stress units), added in template version 17 — see below.
+- **s_cap** — **[F/L²]**: maximum credited suction (stress units) — see below.
 - **pow_a … pow_d** (option = `pow`): power-curve envelope parameters — $pow_c$ and $pow_d$ are **[F/L²]**
   (added to a stress), $pow_b$ is **[–]** (an exponent), and $pow_a$'s units follow from $pow_b$ so that the
   product is a stress — see the formula below.
@@ -229,10 +229,10 @@ still ride along its boundary (e.g. a slide daylighting on top of bedrock), but 
 rejected. This mirrors the "impenetrable" or "plasticity: none" material other slope-stability packages offer for
 bedrock or a structural foundation that is not itself part of the stability question. Only **$\gamma$**,
 **$\gamma_{sat}$**, **E**, and **ν** are read for an elastic material — the strength columns (**c** … **hb_d**,
-including **t_cut**) and the standard-deviation columns are ignored and greyed out automatically. The pore-pressure
+including **t_cut**) and the standard-deviation columns are ignored and grayed out automatically. The pore-pressure
 option is accepted but has no effect (leave it `none`).
 
-**Tensile-strength cutoff (t_cut).** Added in template version 16, **t_cut** is a Rankine cap on the major
+**Tensile-strength cutoff (t_cut).** **t_cut** is a Rankine cap on the major
 principal stress, **[F/L²]**, honored by the **FEM only** — the LEM ignores it (use the
 [tension crack](#worksheet-main) global parameters instead if that is the effect wanted in LEM). It layers on top
 of whichever shear envelope the material's `option` defines and never changes the envelope itself:
@@ -301,7 +301,7 @@ factor of safety as wrong until the water is set, because dropping $u$ is not co
 pressure that was holding the vendor's answer down. When you see one, re-solve the seepage in XSLOPE (material
 **u** = `seep`) or fit a piezometric line before running the model.
 
-**Matric-suction apparent cohesion (phi_b / s_cap).** Added in template version 17, these two columns let a
+**Matric-suction apparent cohesion (phi_b / s_cap).** These two columns let a
 material credit extra shear strength from negative pore pressure (matric suction) above the water table, using
 the Fredlund extended Mohr-Coulomb criterion:
 
@@ -322,8 +322,8 @@ actually go negative:
 
 | option | `u = piezo` or `seep` | `u = none` or `ru` |
 |--------|:---:|:---:|
-| `mc`, `pow`, `hb` | active | inert (greyed) |
-| `cp`, `elastic` | inert (greyed) | inert (greyed) |
+| `mc`, `pow`, `hb` | active | inert (grayed) |
+| `cp`, `elastic` | inert (grayed) | inert (grayed) |
 
 `cp` is a total-stress ($\phi = 0$) undrained model — the field suction its strength already embodies is not a
 separate effective-stress term to layer on top. `elastic` cannot fail, so no strength term applies at all. `none`
@@ -370,7 +370,7 @@ The remaining columns hold the seepage properties, shown in the third view below
 
   The columns are deliberately law-agnostic — one pair serves both models rather than two near-duplicate pairs.
 
-**Transient storage (Ss / Sy).** Added in template version 18, these two columns supply the
+**Transient storage (Ss / Sy).** These two columns supply the
 storage properties that a **transient** (time-dependent) seepage analysis needs — the analysis
 driven by the [**tseep** sheet](#worksheet-tseep). They are read only when the model has a tseep
 sheet; for a steady-state analysis leave both blank. The role each storage term plays in the
@@ -461,7 +461,7 @@ each polygon you provide:
   overlays; `refine` is a [mesh refinement region](#refine-regions). An unrecognized word is
   rejected at load time, never read as a material zone.
 - A **Material ID**, which references one of the materials in the **mat** worksheet. As with the
-  profile sheet, the name below it is filled in automatically. Both cells grey out for any Type
+  profile sheet, the name below it is filled in automatically. Both cells gray out for any Type
   other than `material`, because an overlay has no material.
 - An optional **Size** — a target finite-element size **[L]** inside the polygon, used only when a
   mesh is generated. Blank means the global target size. Size is available on **every** polygon and
@@ -620,7 +620,7 @@ The worksheet provides space for two lines, which supports rapid drawdown analys
 Each line has its own Type cell and requires at least two XY coordinate pairs **[L]**, ordered from left to right. The table
 is formatted for 20 rows, but coordinates can be entered beyond the bottom of the table as needed.
 
-The Type cell was added in template version 13. Older (v8–v12) input files load unchanged: a file with no Type cell
+Older input files load unchanged: a file with no Type cell
 behaves as **piezo**, which reproduces their previous results exactly.
 
 ---

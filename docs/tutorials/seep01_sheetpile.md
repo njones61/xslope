@@ -430,7 +430,8 @@ Click **Profile lines**, then **Add line**:
 1. Set **Max depth (bottom boundary elevation):** to `0`. This is an *elevation*,
    not a thickness: it places the impervious base 10 m below the ground surface.
 2. Set **Material:** to `1: soil`.
-3. **Add row** six times and enter the six vertices from the table above.
+3. Copy the two columns of the vertex table above and paste them into the
+   grid in one stroke — or **Add row** six times and type them.
 
 ![The profile lines editor](images/seep01_studio_profile.png)
 

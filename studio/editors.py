@@ -2613,11 +2613,19 @@ _UNIT_SYSTEM_ITEMS = [("", None), ("SI", "si"), ("Imperial", "imperial")]
 
 # Time selector legend tokens, verbatim from the v18 template list $D$54:$D$57
 # ("sec", not "s"). Blank = time unit undeclared.
-_TIME_UNIT_ITEMS = ["", "sec", "min", "hr", "day"]
+_TIME_UNIT_ITEMS = ["", "sec", "min", "hr", "day", "yr"]
 # Tension SRF (v19, main!D17) is a TRI-STATE: blank means "unspecified", which is
 # not the same as NO. Blank leaves the engine default (reduce the cap) in force and
 # keeps the saved file silent on the question; NO pins the static cap.
 _TENSION_SRF_ITEMS = [("", None), ("YES", True), ("NO", False)]
+
+WATER_LOADS_HELP = (
+    "Who supplies the weight of water standing on the slope. auto derives the "
+    "ponded-water load at solve time from the model's own water definition (the "
+    "seepage boundary conditions, otherwise the piezometric line); manual leaves "
+    "it to the dloads sheets. Switching a model that already draws its reservoir "
+    "as load blocks to auto counts the water twice -- the Model checks warn when "
+    "that happens.")
 
 K0_HELP = (
     "At-rest lateral earth pressure coefficient K0 for the FEM initial stress "
@@ -2690,6 +2698,19 @@ class GlobalParamsDialog(QDialog):
         self._tension_srf.setToolTip(TENSION_SRF_HELP)
         form.addRow("Tension SRF (FEM)", self._tension_srf)
 
+        # Water loads (main!D23) -- auto derives the ponded-water load from
+        # the model's own water definition; manual leaves it on the dloads
+        # sheets. The loader always resolves the mode to one of the two, so
+        # the combo carries no blank entry.
+        self._water_loads = QComboBox()
+        self._water_loads.addItems(["auto", "manual"])
+        _cur_wl = str(values.get("water_loads") or "auto").strip().lower()
+        if _cur_wl not in ("auto", "manual"):
+            _cur_wl = "auto"
+        self._water_loads.setCurrentText(_cur_wl)
+        self._water_loads.setToolTip(WATER_LOADS_HELP)
+        form.addRow("Water loads", self._water_loads)
+
         # Numeric fields (gamma_water first — the Units autofill targets it). The
         # header carries a unit suffix ("Unit weight of water (pcf)") when the project
         # declares a system; unlabeled otherwise. Reflects the STORED declaration at
@@ -2730,6 +2751,7 @@ class GlobalParamsDialog(QDialog):
         t = self._time.currentText().strip()
         out["time_unit"] = t or None
         out["tension_srf"] = _TENSION_SRF_ITEMS[self._tension_srf.currentIndex()][1]
+        out["water_loads"] = self._water_loads.currentText()
         return out
 
 

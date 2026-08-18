@@ -825,12 +825,6 @@ the total inflow.
 discharge computed while nodes are still switching between seeping and no-flow
 belongs to no one set of boundary conditions.
 
-Past sweep 20 the iteration also stops taking the full step: each new field is
-blended with the previous one — **relaxation** — at 0.5 first, then 0.2, 0.1,
-0.05, 0.02 and 0.01 after sweeps 40, 60, 80, 100 and 120, the solver's response
-to slow progress rather than a setting. The 145- and 148-sweep runs above ran
-past the last rung.
-
 The head tolerance is the only one of the three the dialog exposes, and it turns
 out to control the iteration count rather than the answer:
 

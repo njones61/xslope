@@ -25,8 +25,8 @@ with the force stated directly, and this page compares the two routes.
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Model two rows of drilled shafts whose lateral force XSLOPE
-computes by the Ito & Matsui method, find the computed force in the analysis
-report, measure what the piles are worth and what widening their spacing
+computes by the Ito & Matsui method, read the computed forces off the run's
+own Log lines, measure what the piles are worth and what widening their spacing
 costs, see the shafts' moment capacity reduce the soil force to a fifth of
 its value, and check for the shallow surface that slides over the top of the
 pile row.
@@ -157,8 +157,15 @@ Pile row 'upper row': Ito & Matsui soil force = 81,729 lb per pile; bending gove
 Total pile resistance = 4,367.6 lb/ft
 ```
 
-Each piece of those lines gets its own section below: where the soil force
-comes from, and what "bending governs" means for the shafts.
+The **Analysis Report** (**File → Generate Report…**) carries the same
+numbers in full: the pile inputs echoed, with `H` reading *computed* rather
+than a number, and the slice table's **H<sub>p</sub>** column — *pile
+resistance mobilized at the slice base, per unit thickness* — placing
+**2,540.7** and **1,827.0 lb/ft** on the two slices the rows cross
+([Analysis Report](../studio/reports.md)).
+
+Each piece of those Log lines gets its own section below: where the soil
+force comes from, and what "bending governs" means for the shafts.
 
 ### What the two rows are worth
 
@@ -196,36 +203,9 @@ where the base is flatter and the force resolves more directly against sliding.
 
 ---
 
-## Where the computed force appears
-
-The Log lines above give each row's bottom line. The full accounting —
-every pile input echoed, and the force on the slice it acts on — is in the
-**Analysis Report**. With the run still loaded, **File → Generate Report…** writes a Word
-document whose limit equilibrium section carries the pile inputs and the solved
-slice table ([Analysis Report](../studio/reports.md) documents the whole
-document).
-
-In the report's **Piles** table, the `H` cell of both rows reads
-**computed**, meaning the force was calculated rather than entered:
-
-| Label | Top (x, y) | Bottom (x, y) | H (lb/ft) | θ (deg) | D (ft) | Spacing (ft) |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| lower row | (5, 5) | (5, −10) | computed | 0 | 2 | 6 |
-| upper row | (10, 10) | (10, −10) | computed | 0 | 2 | 6 |
-
-The computed force appears in the slice table under Spencer's method, in the column
-**H<sub>p</sub>**, whose legend reads *pile resistance mobilized at the slice
-base, per unit thickness*. Two of the forty slices carry one: slice 16, whose
-center is at x = 5.29, takes **2,540.7 lb/ft**, and slice 20, at x = 10.00,
-takes **1,827.0 lb/ft**. The column total at the foot of the table is
-**4,367.6 lb/ft** — the whole of what the pile row delivers to this surface, on
-one line.
-
----
-
 ## How the force is computed
 
-The report says what the piles delivered. This section explains where those
+The Log lines say what the piles delivered. This section explains where those
 numbers come from, because understanding the calculation is what makes the
 rest of the page — the capacity limits, the spacing study — predictable
 rather than mysterious.
@@ -472,10 +452,10 @@ This tutorial demonstrated:
   at the depth each trial surface reaches at each shaft, and recomputed for every
   surface a search evaluates.
 - Where that force is readable — one Log line per pile row printed with the
-  factor of safety, the report's **Piles** table saying `computed`
-  where an input would be, and the slice table's **H<sub>p</sub>** column carrying
-  **2,540.7** and **1,827.0 lb/ft** on the two slices the piles cross, totalling
-  **4,367.6 lb/ft**.
+  factor of safety, running from the soil force through the governing
+  capacity to the **2,540.7** and **1,827.0 lb/ft** applied, totalling
+  **4,367.6 lb/ft**, with the report carrying the same numbers slice by
+  slice.
 - A Spencer search at **FS = 1.842** against **1.149** for the same slope with the
   piles removed, and each row's own share measured on one held circle: 1.675 for
   the lower alone, 1.613 for the upper, 1.481 for neither.

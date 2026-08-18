@@ -3160,8 +3160,13 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 val = p.get(key)
                 if col is not None and val is not None:
                     piles_u[cell_ref(row, col)] = _f(val)
-            if str(p.get('appl', 'active')) == 'passive' and 'appl' in _pcol:
-                piles_u[cell_ref(row, _pcol['appl'])] = 'Passive'
+            # Appl is written explicitly both ways (like Fixity below): a
+            # blank cell still LOADS as active, but a default a reader cannot
+            # see in the sheet is a trap, so saved files spell the choice out.
+            if 'appl' in _pcol:
+                piles_u[cell_ref(row, _pcol['appl'])] = \
+                    'Passive' if str(p.get('appl', 'active')) == 'passive' \
+                    else 'Active'
             if 'fixity' in _pcol:
                 piles_u[cell_ref(row, _pcol['fixity'])] = \
                     str(p.get('fixity', 'free'))

@@ -847,7 +847,7 @@ steep the run never converges.
 ### The run that does not finish
 
 The trouble comes from a more extreme linear front: the floor lowered from
-0.01 to 10<sup>−4</sup>, and reached at 10 ft of suction instead of one.
+0.01 to 10<sup>−4</sup>, and reached at 10 ft of suction instead of 1 ft.
 Set `unsat` to `lf` with `kr0` = `0.0001` and `h0` = `-10` on all three materials
 and run it. The solver uses all 400 sweeps its default ceiling allows and then
 stops:

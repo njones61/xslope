@@ -298,13 +298,19 @@ times the moment their sections are designed for.
 The capacities are fixed by the concrete section, but the spacing is a
 choice — it is the main variable a designer adjusts once the diameter is
 set. Closing the spacing might be expected to spread the load, each shaft
-carrying less. It does the opposite, because the Ito & Matsui force is not
-a fixed demand being shared among the shafts: it is the resistance the soil
-meets squeezing through the gap between them, and a narrower gap arches
-harder. The sweep below measures it — one pile at 3 ft spacing carries
-188,549 lb, four times what the same pile carries at 6 ft. Closer spacing
-therefore raises the force per pile, and at the same time puts more piles
-under each foot of slope, so the force per foot rises on both counts.
+carrying less. That would be true if the shafts were sharing a fixed
+demand — a required support divided among however many piles are there to
+carry it. The Ito & Matsui force is not a demand. It is a supply: the
+largest force the sliding soil can press onto one pile before it squeezes
+through the gap and escapes downhill. Narrow the gap and escape gets
+harder, so the soil loads each pile more, not less — the sweep below
+measures one pile carrying 188,549 lb at 3 ft spacing, four times what the
+same pile carries at 6 ft. The limiting cases say the same thing: spread
+far apart, the shafts are isolated posts the slope flows around; pushed
+together until they touch, they are a wall, and a wall resists more per
+foot than any row of separated posts. Closer spacing therefore raises the
+force each pile can take and puts more piles under each foot of slope, and
+the resistance per foot rises on both counts.
 
 Widening the spacing to 12 ft is one cell on each row — **S** from `6` to `12`,
 with **H** still blank so the force is recomputed at the new spacing:

@@ -461,8 +461,11 @@ Asking for the tolerance as a fraction of the domain rather than as a length is
 what lets one default work on a 10 m sheetpile section and on a 180 ft dam.
 
 The run finishes in **23 iterations**. In the **Display** panel, tick
-**Filled contours**, which colors the head field under the flow net — worth
-having on a zoned section, where the wash shows the core carrying the drop:
+**Filled contours** — worth having on a zoned section, where the wash shows the
+core carrying the drop — and set **Base material** to `3: foundation`, which is
+what makes the flow lines legible;
+[Scaling the flow net](#scaling-the-flow-net-on-a-zoned-section) below is what
+that control does and why the other two choices fail here:
 
 ![The seepage solution](images/seep02_solution.png){width=1000}
 
@@ -587,11 +590,12 @@ head-contour count requested through **levels**, so it computes the
 never fewer than two.
 
 That leaves one thing to supply — the *k*. On SEEP-1's single-soil problem there
-was only one candidate and the argument was inert. On a zoned section there are
+was only one candidate and the choice was inert. On a zoned section there are
 three, they differ by three orders of magnitude, and the answer changes by three
-orders of magnitude with them. That argument is **base_mat**, a 1-based index into
-the `mat` sheet, and this dam is where it matters. With 20 contour levels, so 19
-head drops of 3.158 ft each, and a 60 ft head drop:
+orders of magnitude with them. The choice is the Display panel's **Base
+material** selector — one entry per material, opening on the first — and this
+dam is where it matters. Try all three. With 20 contour levels, so 19 head
+drops of 3.158 ft each, and a 60 ft head drop:
 
 | base_mat | Zone | k (ft/day) | N<sub>f</sub> = q·N<sub>d</sub>/(k·Δh) | φ contour levels requested |
 |:---:|---|:---:|:---:|:---:|
@@ -611,15 +615,11 @@ the discharge crosses the foundation, so the foundation is the zone the identity
 above is nearly true of, and a net drawn in a zone that carries almost none of the
 flow has to be either impossibly coarse or impossibly fine to satisfy it.
 
-The rule this follows is that **base_mat must name a real material — the zone that
-carries the through-flow — and never a padded or averaged value**. A conductivity
-invented to make a picture look right would draw a net that no longer satisfies the
-flow-net identity, which is the only thing making the picture readable in the first
-place. XSLOPE picks the base material this way when none is named: it takes the
-zone whose channel count lands nearest a readable one, which for a net of
-*N<sub>d</sub>* drops is about *N<sub>d</sub>*/2 channels. On this model that
-choice is the foundation, material 3, which is what the sample figure and every
-flow net on this page are drawn with.
+Figures drawn outside Studio — the sample page's, a report's — pick the base
+material by the same arithmetic: the zone whose channel count lands nearest a
+readable one, which for a net of *N<sub>d</sub>* drops is about
+*N<sub>d</sub>*/2 channels. On this model that is the foundation, which is what
+the sample figure and every flow net on this page are drawn with.
 
 Reading the drawn net back is a check on all of it. The bottom panel has 6 flow
 channels and 19 head drops in the foundation, so

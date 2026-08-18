@@ -141,7 +141,11 @@ flow only.
 | 1 | `soil` | 30 | 30 | 0 | `lf` |
 
 **Geometry** — Profile Line 1, on material 1 (`soil`), one vertex per row, with
-Maximum depth = `0`:
+Maximum depth = `0`. The drawing shows every vertex the line needs, including
+the three that cut the sheetpile slot, and the two base corners the maximum
+depth supplies:
+
+![The profile line's vertices](../seep/images/clay_blanket_geometry.png){width=650}
 
 | x (m) | y (m) |
 |:---:|:---:|

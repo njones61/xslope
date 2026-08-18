@@ -227,8 +227,9 @@ because the model this file selects does not read them.
 
 Open **Seep BC**. The editor opens on **Set 1**. Every boundary in the set is
 listed on the left, and a specified-head entry carries its head value in the list
-entry itself; the table on the right holds the selected entry's points and nothing
-else. This model has three entries:
+entry itself; the table beside the list holds the selected entry's points, and
+the preview on the right highlights the selected boundary on the section. This
+model has three entries:
 
 | Entry | Type | Value (ft) | Points |
 |---|---|:---:|---|

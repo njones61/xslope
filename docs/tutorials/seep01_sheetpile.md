@@ -446,8 +446,10 @@ Click **OK**.
 
 Click **Seep BC**. The editor opens on **Set 1**, with a list on the left holding
 every boundary in the set — each specified-head block, each flux block, and the
-exit face — and the selected one's value and points on the right. (**Set 2** is
-the second boundary set a rapid drawdown analysis uses; it stays empty here.)
+exit face — and the selected one's value and points beside it. The preview on the
+right draws every boundary over the section with the selected one highlighted;
+clicking a boundary in the preview selects it in the list. (**Set 2** is the
+second boundary set a rapid drawdown analysis uses; it stays empty here.)
 
 Press **Add head**, and fill the upstream boundary:
 

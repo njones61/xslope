@@ -245,7 +245,8 @@ you need; the table is there for the exceptions:
 **Seep BC** is a master/detail editor over the two BC sets (Set 2 drives rapid
 drawdown): specified-**head** lines (a head value plus its points),
 specified-**flux** lines (**Add flux**, a **Flux value** plus its points), and
-the **exit face**:
+the **exit face**. The preview draws every boundary in the set over the section
+with the selected one highlighted, and clicking a boundary there selects it:
 
 ![Seep BC editor](images/editing_seep_bc_editor.png)
 

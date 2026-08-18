@@ -1589,7 +1589,7 @@ def seep01_seep_bc():
     from studio.editors import SeepBcEditor
 
     dlg = SeepBcEditor().build(_load(SEEP01), None, select=(0, 0))
-    dlg.resize(900, 560)
+    dlg.resize(1080, 560)
     return _grab(dlg, "seep01_studio_seep_bc.png")
 
 
@@ -1729,7 +1729,7 @@ def seep02_seep_bc():
     from studio.editors import SeepBcEditor
 
     dlg = SeepBcEditor().build(_load(SEEP02), None, select=(0, 2))
-    dlg.resize(900, 560)
+    dlg.resize(1080, 560)
     return _grab(dlg, "seep02_studio_seep_bc.png")
 
 

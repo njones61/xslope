@@ -1464,6 +1464,44 @@ def _draw_line_loads_preview(ax, rows, selected, slope_data, style):
     _finish_preview_axes(ax)
 
 
+def _draw_seep_bc_preview(ax, entries, selected, slope_data, style, set_no=1):
+    """Preview for the seep BC editor: the base geometry with every boundary in the
+    set drawn as its polyline — the selected entry bold (emphasis color) with point
+    markers, the others dimmed in the same hue families the main canvas uses (set-1
+    head navy / reservoir azure / flux green / exit face red; set 2 rose / seagreen /
+    orangered). ``entries`` mirrors the widget's list order (heads … fluxes … exit
+    face) as dicts with 'kind' and 'coords'."""
+    from xslope.plot import _SEEP_BC_RESERVOIR, _SEEP_BC_SET2_HEAD
+    from xslope.style import resolve_style, feature_style
+    rstyle = resolve_style(style)
+    _draw_section_context(ax, slope_data, rstyle)
+    if int(set_no) == 1:
+        colors = {"head": feature_style(rstyle, "seep_bc").get("color", "darkblue"),
+                  "reservoir": _SEEP_BC_RESERVOIR[0],
+                  "flux": feature_style(rstyle, "seep_flux").get("color", "darkgreen"),
+                  "exit": feature_style(rstyle, "seep_exit_face").get("color", "red")}
+    else:
+        colors = {"head": _SEEP_BC_SET2_HEAD[0], "reservoir": _SEEP_BC_SET2_HEAD[0],
+                  "flux": "seagreen", "exit": "orangered"}
+    styles = {"head": "--", "reservoir": "--", "flux": "-.", "exit": "--"}
+    for i, e in enumerate(entries):
+        coords = [c for c in (e.get("coords") or []) if c is not None]
+        if not coords:
+            continue
+        xs = [c[0] for c in coords]
+        ys = [c[1] for c in coords]
+        kind = str(e.get("kind") or "head").strip().lower()
+        if i == selected:
+            ax.plot(xs, ys, color=_PREVIEW_EMPH, linewidth=_PREVIEW_EMPH_LW,
+                    marker="o", markersize=5, markerfacecolor=_PREVIEW_EMPH,
+                    markeredgecolor="white", zorder=20)
+        else:
+            ax.plot(xs, ys, color=colors.get(kind, "darkblue"),
+                    linestyle=styles.get(kind, "--"), linewidth=2.0,
+                    alpha=_PREVIEW_DIM_ALPHA, zorder=6)
+    _finish_preview_axes(ax)
+
+
 _NCPT_MARKER = {"Fixed": "s", "Horiz": "D", "Free": "o"}   # per movement type
 
 
@@ -4894,13 +4932,19 @@ XY_FIELDS = [Field("x", "x"), Field("y", "y")]
 class _SeepBcSetWidget(QWidget):
     """One seepage BC set as a single master/detail: the left list holds each
     specified-head boundary, each specified-flux boundary, AND the exit face; the
-    right side shows one full-height point table plus a value field — "Head value:"
-    for heads, "Flux value:" for fluxes, both hidden for the exit face.
+    middle column shows one full-height point table plus a value field — "Head
+    value:" for heads, "Flux value:" for fluxes, both hidden for the exit face.
 
     List order is heads … fluxes … exit face; picking.py mirrors this so a canvas
-    double-click jumps to the right row."""
+    double-click jumps to the right row.
 
-    def __init__(self, bc, parent=None, unit_labels=None, constant_only=False):
+    With ``slope_data`` the right side is a live section preview (the shared
+    ``PreviewPane``) with the selected boundary emphasized; a click on a boundary in
+    it selects the corresponding list row. The value/points column keeps a fixed
+    narrow width — the points table is only x/y — and the preview absorbs the rest."""
+
+    def __init__(self, bc, parent=None, unit_labels=None, constant_only=False,
+                 slope_data=None, style=None, set_no=1):
         super().__init__(parent)
         bc = bc or {}
         self._unit_labels = unit_labels
@@ -4927,10 +4971,9 @@ class _SeepBcSetWidget(QWidget):
         self._help_strip = None
         self._field_help = None
 
-        body = QHBoxLayout(self)
-        body.setContentsMargins(0, 0, 0, 0)
-        left = QVBoxLayout()
-        body.addLayout(left)
+        left_pane = QWidget()
+        left = QVBoxLayout(left_pane)
+        left.setContentsMargins(0, 0, 0, 0)
         self.list = QListWidget()
         self.list.currentRowChanged.connect(self._on_select)
         left.addWidget(self.list)
@@ -4962,8 +5005,9 @@ class _SeepBcSetWidget(QWidget):
             if unit_labels.get("k"):
                 flux_text = f"Flux value ({unit_labels['k']}):"
 
-        right = QVBoxLayout()
-        body.addLayout(right, 1)
+        mid_pane = QWidget()
+        right = QVBoxLayout(mid_pane)
+        right.setContentsMargins(0, 0, 0, 0)
         # Head TYPE selector (plain Dirichlet head vs submerged-only reservoir).
         # Shown only for head rows; fluxes and the exit face hide it.
         trow = QHBoxLayout()
@@ -5006,8 +5050,40 @@ class _SeepBcSetWidget(QWidget):
         self._holder = QVBoxLayout()
         right.addLayout(self._holder, 1)
 
+        body = QHBoxLayout(self)
+        body.setContentsMargins(0, 0, 0, 0)
+        self._preview = None
+        if slope_data is not None:
+            from .canvas import PreviewPane
+            self._preview = PreviewPane(
+                lambda ax: _draw_seep_bc_preview(
+                    ax, self._pending_entries(), self.list.currentRow(),
+                    slope_data, style, set_no),
+                caption="Preview shows this set's boundaries on the section "
+                        "(selected boundary bold; others dimmed). Click a boundary "
+                        "to select it.")
+            self._preview.clicked.connect(self._on_preview_click)
+            # A type change recolors the selected boundary's family in the preview.
+            self.type_combo.currentIndexChanged.connect(self._schedule_preview)
+            splitter = QSplitter(Qt.Horizontal)
+            splitter.addWidget(left_pane)
+            splitter.addWidget(mid_pane)
+            splitter.addWidget(self._preview)
+            # The value/points column is just a value field over an x/y table, so it
+            # keeps a fixed narrow share; dragging the dialog wider grows the preview.
+            splitter.setStretchFactor(0, 0)
+            splitter.setStretchFactor(1, 0)
+            splitter.setStretchFactor(2, 1)
+            splitter.setSizes([190, 260, 560])
+            body.addWidget(splitter)
+        else:
+            body.addWidget(left_pane)
+            body.addWidget(mid_pane, 1)
+
         self._refresh()
         self.list.setCurrentRow(0)
+        if self._preview is not None:
+            self._preview.refresh_now()
 
     # Index scheme: heads occupy [0, n_heads); fluxes [n_heads, n_heads+n_flux);
     # the exit face is the single trailing row.
@@ -5088,7 +5164,8 @@ class _SeepBcSetWidget(QWidget):
             rows = [{"x": x, "y": y} for (x, y) in f["coords"]]
         else:  # exit face
             rows = [{"x": x, "y": y} for (x, y) in self._exit]
-        self.table = _EditableTable(XY_FIELDS, rows, _new_pt)
+        self.table = _EditableTable(XY_FIELDS, rows, _new_pt,
+                                    on_change=self._schedule_preview)
         self._holder.addWidget(self.table)
         self._wire_help()
 
@@ -5112,6 +5189,39 @@ class _SeepBcSetWidget(QWidget):
         self._commit()
         self._cur = idx
         self._load(idx)
+        self._schedule_preview()
+
+    # --- live preview -----------------------------------------------------
+    def _schedule_preview(self, *_):
+        if self._preview is not None:
+            self._preview.schedule()
+
+    def _pending_entries(self):
+        """The set's boundaries in list order (heads … fluxes … exit face) with the
+        current selection's pending edits committed — what the preview draws."""
+        self._commit()
+        return ([{"kind": h.get("kind", "head"), "coords": h["coords"]}
+                 for h in self._heads]
+                + [{"kind": "flux", "coords": f["coords"]} for f in self._fluxes]
+                + [{"kind": "exit", "coords": self._exit}])
+
+    def _on_preview_click(self, x, y, tol):
+        """Select the boundary nearest the preview click (within tolerance)."""
+        from shapely.geometry import LineString, Point
+        pt = Point(x, y)
+        best, best_d = None, float("inf")
+        for i, e in enumerate(self._pending_entries()):
+            coords = [c for c in (e["coords"] or []) if c is not None]
+            try:
+                d = (LineString(coords).distance(pt) if len(coords) >= 2
+                     else Point(coords[0]).distance(pt) if coords
+                     else float("inf"))
+            except Exception:
+                continue
+            if d < best_d:
+                best, best_d = i, d
+        if best is not None and best_d <= tol:
+            self.list.setCurrentRow(best)
 
     def _add_head(self):
         self._commit()
@@ -5172,7 +5282,7 @@ class SeepBcEditor(CategoryEditor):
     def build(self, slope_data, parent, select=None):
         dlg = QDialog(parent)
         dlg.setWindowTitle("Seep BC")
-        dlg.resize(640, 520)
+        dlg.resize(1080, 560)
         layout = QVBoxLayout(dlg)
         layout.addWidget(_help_label(
             "Seepage boundary conditions: specified-head boundaries (each a head value + "
@@ -5182,11 +5292,18 @@ class SeepBcEditor(CategoryEditor):
             "— reservoir and time-varying (tseep series) boundaries belong on Set 1."))
         tabs = QTabWidget()
         _ul = _unit_labels_for(slope_data)
-        w1 = _SeepBcSetWidget(slope_data.get("seepage_bc"), unit_labels=_ul)
+        _style = _doc_style(parent)
+        w1 = _SeepBcSetWidget(slope_data.get("seepage_bc"), unit_labels=_ul,
+                              slope_data=slope_data, style=_style, set_no=1)
         w2 = _SeepBcSetWidget(slope_data.get("seepage_bc2"), unit_labels=_ul,
-                              constant_only=True)
+                              constant_only=True,
+                              slope_data=slope_data, style=_style, set_no=2)
         tabs.addTab(w1, "Set 1")
         tabs.addTab(w2, "Set 2 (rapid drawdown)")
+        # A tab shown for the first time renders its preview at the real viewport
+        # size (the hidden tab's first paint happened at zero size).
+        tabs.currentChanged.connect(
+            lambda i: (w1, w2)[i]._schedule_preview() if i in (0, 1) else None)
         layout.addWidget(tabs)
         _ok_cancel(dlg, layout)
 

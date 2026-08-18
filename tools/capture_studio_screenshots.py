@@ -642,6 +642,26 @@ def capture_piles_table():
                  "editing_piles_table.png")
 
 
+def capture_seep_bc_editor():
+    """Seep BC editor on the earth dam's boundary set, with a demonstration
+    infiltration flux added across the crest (the no-flow strip between the pool
+    head and the exit face) and selected — so the shot shows the flux value field,
+    its points, and the preview's emphasis on the selected boundary."""
+    from xslope.fileio import load_slope_data
+    from studio.editors import SeepBcEditor
+
+    data = _quiet(load_slope_data, DAM)
+    bc = data["seepage_bc"]
+    x0 = max(x for x, _ in bc["specified_heads"][0]["coords"])
+    x1 = min(x for x, _ in bc["exit_face"])
+    crest = [(x, y) for x, y in data["ground_surface"].coords if x0 <= x <= x1]
+    bc["specified_fluxes"] = [{"flux": 1.5, "coords": crest}]
+    dlg = SeepBcEditor().build(data, None,
+                               select=(0, len(bc["specified_heads"])))
+    dlg.resize(1080, 560)
+    return _grab(dlg, "editing_seep_bc_editor.png")
+
+
 def capture_global_form():
     """The Global parameters form: the Units / Time / Tension SRF selectors above
     the numeric fields, on a sample that declares a unit system (so the unit-weight
@@ -894,6 +914,7 @@ def main():
                capture_report_dialog,
                capture_reinforcement_editor, capture_reinforcement_table,
                capture_piles_editor, capture_piles_table,
+               capture_seep_bc_editor,
                capture_dxf_wizard, capture_global_form,
                capture_assistant_settings, capture_assistant_confirm,
                capture_inputs_tree, capture_display_panel_seep,

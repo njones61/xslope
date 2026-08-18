@@ -718,7 +718,7 @@ what makes the three-way comparison a comparison of models rather than of soils.
 
 The last column is the root-mean-square difference between the Gardner and van
 Genuchten curves in log<sub>10</sub> *k<sub>r</sub>* over that range of suctions —
-about a quarter of a decade at worst, which is as close as a two-parameter power
+about a quarter of a log cycle at worst, which is as close as a two-parameter power
 law gets to a van Genuchten curve. Gardner's *a* is not van Genuchten's α and the
 values are not comparable: with *n* fixed, *k<sub>r</sub>* falls to one half at a
 suction of *a*<sup>−1/*n*</sup>, so a large *a* means a curve that starts dropping
@@ -733,18 +733,10 @@ linear front's straight line reads as the cliff a solver sees:
 
 The van Genuchten and Gardner curves lie close together on the shell and the
 foundation, which is what the fit was for. On the core they part by about a
-quarter of a decade over the wet end — 0.18 against 0.45 at a hundredth of a foot
-of suction — and cross near one foot; that gap is the 0.252 in the table above,
-the worst of the three fits. The linear front lies with none of them, and reading
-the three off at four suctions on the shell's parameters says where they part:
-
-| ψ (ft) | −0.5 | −1 | −5 | −20 |
-|---|:---:|:---:|:---:|:---:|
-| `lf` | 0.50500 | 0.01000 | 0.01000 | 0.01000 |
-| `vg` | 0.04469 | 0.00947 | 0.00010 | 0.00010 |
-| `gard` | 0.04062 | 0.00858 | 0.00022 | 0.00010 |
-
-Between zero and one foot of suction the linear front stays much wetter: at half a
+quarter of a log cycle over the wet end — 0.18 against 0.45 at a hundredth of a
+foot of suction — and cross near one foot; that gap is the 0.252 in the table
+above, the worst of the three fits. The linear front lies with none of them.
+Between zero and one foot of suction it stays much wetter: at half a
 foot it is halfway down its straight line, at
 *k<sub>r</sub>* = 0.01 + 0.99 × 0.5 = 0.505, an order of magnitude above the other
 two. Below one foot it stops falling entirely and holds its floor of 0.01, while

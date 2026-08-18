@@ -2579,32 +2579,6 @@ def _seep02_phreatic_figure(series, stations=SEEP02_STATIONS):
     fig.tight_layout()
 
 
-def _seep02_kr0_figure(sweep, references):
-    """The discharge against the linear front's floor, with the two other models'
-    answers drawn across it.
-
-    The floor is what the page's explanation names, so the figure is the test of
-    it: if the explanation is right the swept series lands on the reference lines
-    as the floor reaches theirs, and if it is wrong it does not.
-    """
-    fig, ax = plt.subplots(figsize=(9, 5.2))
-    ax.semilogx([k for k, _ in sweep], [q for _, q in sweep], "o-",
-                color="#1f6fb4", lw=1.4, ms=6, label="linear front, h₀ = −1 ft")
-    # The two reference lines land within 0.0012 of each other, so their labels are
-    # stacked rather than placed on the lines they belong to.
-    for i, ((label, q), color) in enumerate(zip(references, ("#c1663a", "#3f8f5a"))):
-        ax.axhline(q, color=color, lw=1.2, ls="--")
-        ax.annotate("%s: q = %.4f" % (label, q), (1.05e-4, q),
-                    xytext=(0, 8 + 12 * i), textcoords="offset points",
-                    color=color, fontsize=9)
-    ax.set_xlabel("linear-front floor $kr_0$")
-    ax.set_ylabel("total discharge q (ft³/day per ft)")
-    ax.set_title("Discharge against the floor of the relative-conductivity curve")
-    ax.grid(True, which="both", color="#e8ebee", lw=0.6)
-    ax.legend(loc="upper left", frameon=False)
-    fig.tight_layout()
-
-
 def _seep02_convergence_figure(histories, tol_scaled, closure_tol=1e-3):
     """Head change and flow closure against iteration, for every model the page
     runs, with the two thresholds they are tested against drawn on.
@@ -2867,7 +2841,6 @@ def seep02_plots():
               % (kr0, sol["flowrate"], st["iterations"],
                  _seep02_relax_at(st["iterations"]), st["relax_min"],
                  "converged" if st["converged"] else "DID NOT CONVERGE"))
-    capture("seep02_kr0_sweep.png", _seep02_kr0_figure, sweep, refs)
 
     # The shape of the curve above the floor, at one floor — the other half of the
     # two-parameter linear front, so the page can say which of them matters.

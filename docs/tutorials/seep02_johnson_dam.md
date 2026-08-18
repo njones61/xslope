@@ -787,54 +787,26 @@ collection design, a reservoir loss estimate, a comparison against a measured
 tailwater flow — a 4.6% spread is worth caring about, and the model whose
 parameters can be defended from measurements is the one to use.
 
-### Why the linear front passes more water
-
-The candidate explanation for that 4.6% is the floor: the linear front holds
-*k<sub>r</sub>* at 0.01 through the deep unsaturated zone, a hundred times more
-conductive than the other two models leave it, so it carries more water through
-that zone. The test of the explanation is a measurement that could contradict it,
-and the next run makes that measurement. If the
-floor is what makes the difference, lowering *kr<sub>0</sub>* to the
-10<sup>−4</sup> the other two models bottom out at should bring the linear front to
-their answer; if the difference is coming from somewhere else, it will not.
-
-Sweeping *kr<sub>0</sub>* with *h<sub>0</sub>* held at −1 ft:
-
-| kr<sub>0</sub> | 0.1 | 0.03 | 0.01 | 0.003 | 0.001 | 0.0003 | 0.0001 |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| q | 2.6328 | 2.1136 | 1.9546 | 1.8957 | 1.8782 | 1.8723 | 1.8707 |
-| Iterations | 11 | 14 | 23 | 24 | 22 | 145 | 148 |
-
-![Discharge against the floor of the curve](images/seep02_kr0_sweep.png){width=900}
-
-The series lands on the reference lines, which sit 0.0012 apart and draw as one
-dashed line under two labels. At a floor of 10<sup>−4</sup> the linear
-front gives **1.8707**, against van Genuchten's 1.8649 and Gardner's 1.8661. Of the
-0.090 gap it started with, 0.006 is left, so the floor alone accounts for **93%** of
-the difference between the linear front and the two calibrated models. It works the
-other way too: at *kr<sub>0</sub>* = 0.1, a tenth of the saturated conductivity
-retained everywhere above the phreatic surface, the discharge rises to **2.6328**,
-35% above the shipped answer, on a change that alters nothing about the saturated
-soil. Across the whole thousandfold sweep of the floor the discharge moves by 41%.
-
-The linear front's other parameter behaves the way that explanation predicts.
-Holding *kr<sub>0</sub>* at 0.01 and sweeping *h<sub>0</sub>* — the pressure head at
-which the floor is reached, and so the entire shape of the curve above it — moves the
-discharge from 1.9487 at −0.5 ft to 2.0382 at −10 ft: a **4.6%** spread across a
-twentyfold change, against the floor's 41% across a thousandfold one. On a dam whose
-unsaturated zone stands tens of feet above the water inside it, what the curve does
-in its first foot of suction hardly matters and where it bottoms out matters a great
-deal.
+The 4.6% gap itself is the floor's doing. The linear front holds *k<sub>r</sub>* at its
+floor of 0.01 through the deep unsaturated zone — a hundred times the
+conductivity the other two models leave there — and rerunning it with
+*kr<sub>0</sub>* lowered to the 10<sup>−4</sup> they bottom out at brings its
+discharge to 1.8707, against van Genuchten's 1.8649 and Gardner's 1.8661: 93% of
+the gap closes on that one parameter. The curve's shape barely matters by
+comparison — sweeping *h<sub>0</sub>* twentyfold moves the discharge by the same
+4.6% — because on a dam whose unsaturated zone stands tens of feet above the
+water inside it, what the curve does in its first foot of suction is beside the
+point, and where it bottoms out is most of the answer.
 
 ---
 
 ## What the unsaturated parameters cost in convergence
 
-Sweeping *kr<sub>0</sub>* changed more than the answer, as the iteration row of
-that table shows. The five coarsest floors converged in 11 to 24 sweeps; the two
-finest took 145 and 148, far enough into the run for the solver to have dropped
-its step to a hundredth of each new solve. That cost is what stands between a
-plausible set of unsaturated parameters and a run that finishes.
+Pushing the floor down cost iterations as well as discharge: the runs at
+*kr<sub>0</sub>* = 3×10<sup>−4</sup> and 10<sup>−4</sup> took 145 and 148 sweeps
+against the shipped model's 23, far enough into the run for the solver to have
+dropped its step to a hundredth of each new solve. That cost is what stands
+between a plausible set of unsaturated parameters and a run that finishes.
 
 ### The three conditions
 
@@ -862,8 +834,8 @@ belongs to no one set of boundary conditions.
 Past sweep 20 the iteration also stops taking the full step: each new field is
 blended with the previous one — **relaxation** — at 0.5 first, then 0.2, 0.1,
 0.05, 0.02 and 0.01 after sweeps 40, 60, 80, 100 and 120, the solver's response
-to slow progress rather than a setting. The two finest floors of the
-*kr<sub>0</sub>* sweep ran to 145 and 148 sweeps, past the last rung.
+to slow progress rather than a setting. The 145- and 148-sweep runs above ran
+past the last rung.
 
 The head tolerance is the only one of the three the dialog exposes, and it turns
 out to control the iteration count rather than the answer:

@@ -840,9 +840,9 @@ extra sweeps. The reason is the flow-closure condition: whichever head tolerance
 asked for, the run does not stop until the conductivity field has stopped lagging
 the head field to within 0.1% of the inflow, and by then the head has stopped
 moving anyway. The dialog's tolerance, in other words, is not where convergence
-is won or lost — leave it at its default. What decides whether a run finishes is
-the curve the unsaturated parameters build, and the next run builds one steep
-enough to lose.
+is won or lost — leave it at its default. Whether a run finishes is decided by
+the steepness of the conductivity curve, and the next section shows a curve so
+steep the run never converges.
 
 ### The run that does not finish
 

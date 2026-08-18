@@ -308,9 +308,15 @@ measures one pile carrying 188,549 lb at 3 ft spacing, four times what the
 same pile carries at 6 ft. The limiting cases say the same thing: spread
 far apart, the shafts are isolated posts the slope flows around; pushed
 together until they touch, they are a wall, and a wall resists more per
-foot than any row of separated posts. Closer spacing therefore raises the
-force each pile can take and puts more piles under each foot of slope, and
-the resistance per foot rises on both counts.
+foot than any row of separated posts.
+
+The analysis then works per foot of slope, and one pile serves S feet of
+it, so the force per foot is the per-pile force divided by the spacing. At
+6 ft that is 44,178 / 6 = 7,363 lb/ft. Halving the spacing would double
+that even if the per-pile force stayed put — the same shafts packed twice
+as densely — but the per-pile force also quadruples from the arching, so
+the two together give 188,549 / 3 = 62,850 lb/ft, more than eight times
+the force per foot from half the spacing.
 
 Widening the spacing to 12 ft is one cell on each row — **S** from `6` to `12`,
 with **H** still blank so the force is recomputed at the new spacing:

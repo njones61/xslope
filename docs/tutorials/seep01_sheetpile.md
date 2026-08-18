@@ -925,10 +925,15 @@ along one direction than across it. That is a different flow problem: the head
 field itself changes shape, and the shape factor with it.
 
 Scale **both** principal conductivities together and the answer is exactly
-proportional. The blue series is the same range with k₂ moved to match k₁ at every
-step, and it sits on the proportional line through the origin to eight significant
-figures: q/k = 1.33704613 at 30 m/yr and at every one of the ten values up to
-300.
+proportional. The dialog sweeps one property at a time, so the blue series comes
+from the Python API instead: the same `design` function the dialog drives also
+takes a [`modify=` hook](../parametric/sensitivity.md#sweeping-anything-else-modify)
+— a callable applied at each step — and here it sets k₂ equal to k₁. The series
+sits on the proportional line through the origin to eight significant figures:
+q/k = 1.33704613 at 30 m/yr and at every one of the ten values up to 300.
+Checking the claim in Studio needs no sweep at all: set both conductivities to
+`300` in **Materials** and re-run, and on the same mesh the discharge comes back
+exactly ten times the k = 30 value — 401.11 against this section's 40.111.
 
 That is not a numerical coincidence, and the head field says why. Comparing the
 solved head at every node against the first of the ten runs, the largest difference

@@ -846,7 +846,7 @@ steep the run never converges.
 
 ### The run that does not finish
 
-The parameter set that makes this dam hard is the one that tries to draw a van
+The parameter set that gives this model trouble is the one that tries to draw a van
 Genuchten curve with straight lines: a floor of 10<sup>−4</sup>, matching where the
 other two models bottom out, reached over 10 ft of suction rather than one.
 Set `unsat` to `lf` with `kr0` = `0.0001` and `h0` = `-10` on all three materials

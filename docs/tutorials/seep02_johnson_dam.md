@@ -1,6 +1,6 @@
 ---
 title: "Tutorial SEEP-2 — Unconfined Seepage Through a Zoned Dam"
-description: "Open the Johnson Reservoir dam in XSLOPE and work the choices an unconfined seepage problem forces: the seepage face that decides where the water leaves, the three unsaturated conductivity models run against each other on one mesh, the base material a zoned flow net has to be scaled to, and what the iteration does when the curve gets steep."
+description: "Build the Johnson Reservoir dam in XSLOPE — three stacked profile lines and the boundary set an unconfined problem needs — then work the choices that kind of problem forces: the seepage face that decides where the water leaves, the three unsaturated conductivity models run against each other on one mesh, the base material a zoned flow net has to be scaled to, and what the iteration does when the curve gets steep."
 ---
 
 # Tutorial SEEP-2 — Unconfined Seepage Through a Zoned Dam
@@ -21,18 +21,24 @@ better vehicle for these questions than a one-soil section, because a zoned dam 
 where the base material stops being obvious and where the conductivities are far
 enough apart that the choices show up in the numbers.
 
-[Tutorial SEEP-1](seep01_sheetpile.md) built a seepage model from scratch, three
-different ways, and solved a confined one. The model here arrives finished, and
-the work is the physics an unconfined problem adds to it.
+[Tutorial SEEP-1](seep01_sheetpile.md) built a one-soil model three different
+ways and solved a confined problem on it. This page builds its model too — in
+Studio, once — because the two things a zoned dam adds to the inputs are worth
+doing rather than reading: a **stack of profile lines** that carves one section
+into three materials, and a **boundary set** with the exit face an unconfined
+problem turns on. (To skip the construction and go straight to the analysis,
+download the completed file below and pick the page back up at
+[Building the mesh](#building-the-mesh).)
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Seepage</p></div>
-<div class="tgt-tile"><span class="tg-label">Open &amp; explore</span><p>~25 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Build &amp; explore</span><p>~40 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Solve unconfined flow through a zoned earth dam and read the
-phreatic surface it produces, see what the seepage face on the downstream slope
+**Objectives** — Build a zoned earth dam from three stacked profile lines and
+give it the boundary set an unconfined problem needs, solve the flow through it
+and read the phreatic surface it produces, see what the seepage face on the downstream slope
 does and make it do more, measure how much of the discharge travels above the
 phreatic surface and how much passes under the core, scale the flow net to each
 of the three zones in turn and find the one that reads, run all three unsaturated
@@ -40,9 +46,35 @@ conductivity models against each other and explain the difference between them,
 and watch the iteration fail and then succeed on a curve steep enough to make it
 struggle.
 </div>
-<p><span class="tg-pill">three materials</span><span class="tg-pill">unconfined flow</span><span class="tg-pill">seepage face</span><span class="tg-pill">phreatic surface</span><span class="tg-pill">unsaturated models</span><span class="tg-pill">relative conductivity</span><span class="tg-pill">flow net base material</span><span class="tg-pill">convergence</span><span class="tg-pill">underseepage</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx), the same file used by [Seepage Sample Problem 5](../seep/samples.md#johnson-reservoir)</div>
+<p><span class="tg-pill">three materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">unconfined flow</span><span class="tg-pill">seepage face</span><span class="tg-pill">phreatic surface</span><span class="tg-pill">unsaturated models</span><span class="tg-pill">relative conductivity</span><span class="tg-pill">flow net base material</span><span class="tg-pill">convergence</span><span class="tg-pill">underseepage</span></p>
+<div class="tgm-model" markdown>**Completed model** — [xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx), the same file used by [Seepage Sample Problem 5](../seep/samples.md#johnson-reservoir); open it to skip the construction and start at [Building the mesh](#building-the-mesh)</div>
 </div>
+
+---
+
+## The problem
+
+![The Johnson Reservoir dam](images/seep02_problem.png){width=1000}
+
+The section is 750 ft long and 180 ft tall at the crest. A 100 ft foundation runs
+the whole length of it, on rock at elevation 0. The embankment sits on that
+foundation between the two toes, rising at 2:1 on the upstream face to a 20 ft
+crest at elevation 180 and falling at about 2.1:1 downstream.
+
+Inside the embankment is a clay **core** — a low-conductivity zone whose job is to
+carry the head drop so the shell does not have to. It rises to elevation 165, 15 ft
+below the crest, and it is continued downward as a **cutoff key**: a trench dug
+40 ft into the foundation, from elevation 100 down to 60, and backfilled with the
+same clay. The foundation continues below that key, so the key narrows the
+underseepage path rather than closing it. That distinction is measured further
+down this page.
+
+The reservoir stands at elevation 160, which is 60 ft of water over the foundation
+surface and 20 ft of freeboard below the crest. The tailwater stands at ground
+level, elevation 100. The three zones carry the problem's whole character in
+their conductivities — the shell at 1 ft/day, the core a thousand times tighter
+at 0.001, the foundation between them at 0.1 — and every result on this page
+traces back to those ratios rather than to their absolute size.
 
 ---
 
@@ -148,53 +180,34 @@ beside it. There is nothing to give it a value from.
 
 ---
 
-## The dam
+## Building the model
 
-The section is 750 ft long and 180 ft tall at the crest. A 100 ft foundation runs
-the whole length of it, on rock at elevation 0. The embankment sits on that
-foundation from x = 200 to x = 550, rising at 2:1 upstream from the toe at
-(200, 100) to (320, 160) and on to a 20 ft crest at elevation 180, then falling at
-about 2.1:1 to the downstream toe at (550, 100).
+Start with **File → New**, an empty project, and switch the toolbar's **Mode**
+selector to **Seepage** (`Ctrl+2`) so the run buttons start a seepage analysis.
+Work down the **Inputs** tree in the order the model depends on: settings, then
+the materials, then the geometry, then the boundary conditions. The build below
+runs in Studio; the same tables paste into the
+[Excel template](../usage/input_template.md)'s `mat`, `profile` and `seep bc`
+worksheets just as well. And to skip the construction entirely, download
+[xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx), open it with
+**File → Open**, and pick the page back up at
+[Building the mesh](#building-the-mesh).
 
-Inside the embankment is a clay **core** — a low-conductivity zone whose job is to
-carry the head drop so the shell does not have to. It rises to elevation 165, 15 ft
-below the crest, and it is continued downward as a **cutoff key**: a trench dug
-40 ft into the foundation, from elevation 100 down to 60, and backfilled with the
-same clay. The foundation continues below that key, so the key narrows the
-underseepage path rather than closing it. That distinction is measured further
-down this page.
+### 1. Global parameters
 
-The reservoir stands at elevation 160, which is 60 ft of water over the foundation
-surface and 20 ft of freeboard below the crest. The tailwater stands at ground
-level, elevation 100.
+Click **Global parameters** and set **Units** to `imperial`; the unit weight of
+water fills itself with `62.4`. Set **Time** to `day`. Together the two make
+heads and pore pressures read `ft` and `psf`, put `k1 (ft/day)` on the material
+form, and make every discharge on this page cubic feet per day per foot of dam;
+[SEEP-1](seep01_sheetpile.md#1-global-parameters) is where these fields are
+explained. Leave the rest of the form alone, and click **OK**.
 
-### Opening the model
+### 2. Materials
 
-Download [xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx) and open
-it in Studio with **File → Open**, then switch the toolbar's **Mode** selector to
-**Seepage** (`Ctrl+2`) so the run buttons start a seepage analysis. The Inputs plot
-draws the section, the three zones, and the boundary conditions on it:
-
-![The loaded model](images/seep02_inputs.png){width=1000}
-
-The dark dashed segments are the two specified-head boundaries and the pale lines
-with the inverted triangles above them are the water levels those heads stand for
-— 160 ft upstream, 100 ft downstream. The heavy red dashed line down the whole
-downstream slope is the exit face. The hatched line at elevation 0 is the maximum
-depth, the impervious rock the foundation rests on.
-
-The file declares **Units** = `imperial` and **Time** = `day`, so heads and
-pore pressures are labeled `ft` and `psf`, the conductivities are feet per
-day, and every discharge on this page is cubic feet per day per foot of dam;
-[SEEP-1](seep01_sheetpile.md#1-global-parameters) is where those two fields
-are explained.
-
-### The three zones
-
-Open **Materials** in the **Inputs** tree and press **Table view**, with
-**Show parameters for:** set to **Seepage** alone. The table then shows the
-seepage band of the `mat` worksheet and nothing else, which on this model is three
-rows:
+Click **Materials**. As on SEEP-1, set the **Show parameters for:** toggles to
+**Seepage** alone, so the table shows the seepage band of the `mat` worksheet and
+nothing else. Press **Add row** three times — the zones go in the order the
+profile lines will use, top of the section first — and fill the three rows:
 
 ![The three zones with the seepage columns showing](images/seep02_studio_materials.png)
 
@@ -205,31 +218,96 @@ rows:
 | 3 | `foundation` | 0.1 | 0.1 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
 
 All three zones are isotropic — `k1` equals `k2`, so `alpha` means nothing and
-stays at 0 — and the whole of the zoning is in the conductivities. The core is a
-thousand times tighter than the shell and a hundred times tighter than the
-foundation it is keyed into. Those three numbers are what makes this a zoned dam,
-and every result on this page traces back to their ratios rather than to their
-absolute size.
+stays at 0 — and the whole of the zoning is in the conductivities, as the problem
+statement said. Unlike SEEP-1's confined model, the `unsat` selector and the two
+parameters after it are entered here rather than left blank: they are read above
+the phreatic surface, and an unconfined problem has one. Set **unsat** to `lf`,
+**kr0** to `0.01` and **h0** to `-1` on every row — what those numbers mean, and
+what the other two models in the selector would do instead, is the subject of
+[a later section](#the-three-unsaturated-models). `vg_a` and `vg_n` stay at 0
+because the `lf` model does not read them.
 
-Unlike SEEP-1's model, this file also carries the strength properties for a
-stability run — the shell at γ = 130 pcf, c = 100 psf, φ = 35°, and the other two
-zones their own — because the same workbook is used for the limit equilibrium and
-finite element analyses of the
+(The completed download also carries strength properties — unit weights,
+cohesions, friction angles — because the same workbook feeds the limit
+equilibrium and finite element analyses of the
 [seepage-to-stability worked example](../seep/seep_slope.md#worked-example). A
-seepage analysis does not read them.
+seepage analysis never reads them, so this build leaves them empty.)
 
-The `unsat` column and the four columns after it are the subject of a later
-section. They are read only above the phreatic surface, so on SEEP-1's confined
-problem they were ignored entirely; here they do work. `vg_a` and `vg_n` sit at 0
-because the model this file selects does not read them.
+Click **OK**.
 
-### The boundary conditions
+### 3. Profile lines
 
-Open **Seep BC**. The editor opens on **Set 1**. Every boundary in the set is
-listed on the left, and a specified-head entry carries its head value in the list
-entry itself; the table beside the list holds the selected entry's points, and
-the preview on the right highlights the selected boundary on the section. This
-model has three entries:
+A profile line is the *top* of a material's zone: everything below it, down to
+the next profile line or the maximum depth, is that material.
+[SEEP-1's model](seep01_sheetpile.md#3-profile-lines) needed one line; a zoned
+section takes a **stack** of them, one per row of the material table and in the
+same order, and how the lines share their vertices is what carves a single
+section into shell, core and foundation. Every vertex the three lines need is on
+the drawing:
+
+![The section with every vertex labeled](images/seep02_problem_coords.png){width=1000}
+
+Click **Profile lines**, and set **Max depth (bottom boundary elevation):** to
+`0`. As on SEEP-1, this is an *elevation*, not a thickness: it places the
+impervious rock the foundation rests on. Then press **Add line** once per zone,
+set each line's **Material**, and paste (or type) its vertex table.
+
+**Line 1 — `shell`** is the embankment surface, toe to toe:
+
+| x | y |
+|---:|---:|
+| 200 | 100 |
+| 320 | 160 |
+| 360 | 180 |
+| 380 | 180 |
+| 550 | 100 |
+
+The vertex at (320, 160) is not a bend — the face runs straight through it. It is
+where the reservoir surface meets the slope, and it is in the geometry so that
+the mesh puts a node exactly there, which is where the upstream head boundary
+will end.
+
+**Line 2 — `core`** is the top of the clay:
+
+| x | y |
+|---:|---:|
+| 320 | 100 |
+| 360 | 165 |
+| 380 | 165 |
+| 420 | 100 |
+
+The key does not appear on this line, because a profile line is a *top*: the key
+is carved out from below, by the foundation's own line, next.
+
+**Line 3 — `foundation`** is the ground surface outside the embankment — and
+under the core it dives around the key:
+
+| x | y |
+|---:|---:|
+| 0 | 100 |
+| 320 | 100 |
+| 360 | 60 |
+| 380 | 60 |
+| 420 | 100 |
+| 750 | 100 |
+
+The dive from (320, 100) down to elevation 60 and back up to (420, 100) is the
+key's outline: everything between this line and the core's line above it is clay,
+so the notch this line cuts out of the foundation is exactly the trench the key
+was placed in. Its two rim vertices, (320, 100) and (420, 100), also sit on the
+core's line — shared vertices, entered identically on both, which is what makes
+the two zones meet without a gap or an overlap.
+
+![The profile lines editor on the foundation line](images/seep02_studio_profile.png)
+
+The preview redraws as you type, so the key shows up as soon as the dive's four
+vertices are in. Click **OK**.
+
+### 4. Boundary conditions
+
+Click **Seep BC**. The editor opens on **Set 1** — the dialog SEEP-1's
+[boundary-condition step](seep01_sheetpile.md#4-boundary-conditions) walks
+through — and the set this problem needs is three entries:
 
 | Entry | Type | Value (ft) | Points |
 |---|---|:---:|---|
@@ -237,18 +315,23 @@ model has three entries:
 | Head 2 | `head` | 100 | (550, 100), (750, 100) |
 | Exit face | — | — | (380, 180), (550, 100) |
 
-Head 1 runs along the foundation surface from the upstream end of the section to
-the embankment toe, then up the upstream face to elevation 160, which is where the
-reservoir surface meets the slope. Everything on that polyline is under water, so
-holding it at a head of 160 is exact. Head 2 is the tailwater, applied along the
-downstream foundation surface from the toe of the dam out to the end of the
-section.
+Press **Add head** and build the reservoir boundary: leave **Type:** at `head`,
+set **Head value (ft):** to `160`, and enter the three points. The polyline runs
+along the foundation surface from the upstream end of the section to the
+embankment toe, then up the upstream face to elevation 160 — the vertex the shell
+line carried for exactly this purpose. Everything on that polyline is under
+water, so holding it at a head of 160 is exact.
 
-Select the third entry:
+Press **Add head** again for the tailwater: **Head value (ft):** = `100`, applied
+along the downstream foundation surface from the toe of the dam out to the end of
+the section.
+
+Select the **Exit face** entry — it is already in the list, waiting for points —
+and enter its two:
 
 ![The exit face on the downstream slope](images/seep02_studio_seep_bc.png)
 
-The exit face carries two points and no value, and it covers the whole downstream
+The exit face carries points and no value, and it covers the whole downstream
 slope from the crest at (380, 180) to the toe at (550, 100). Drawing it over the
 entire slope rather than over the part expected to be wet is the correct habit:
 the active set finds the discharge point, and a face drawn short enough to stop
@@ -257,23 +340,40 @@ was never asked to carry it.
 
 Everything else is no-flow — the rock at elevation 0, the two ends of the section,
 and the strip along the top of the dam between the two: the crest, and the part of
-the upstream slope that stands above the reservoir surface.
+the upstream slope that stands above the reservoir surface. Click **OK**.
+
+### 5. The finished inputs
+
+The Inputs plot draws what you built — the section, the three zones, and the
+boundary conditions on them:
+
+![The finished model](images/seep02_inputs.png){width=1000}
+
+The dark dashed segments are the two specified-head boundaries and the pale lines
+with the inverted triangles above them are the water levels those heads stand for
+— 160 ft upstream, 100 ft downstream. The heavy red dashed line down the whole
+downstream slope is the exit face. The hatched line at elevation 0 is the maximum
+depth, the impervious rock the foundation rests on.
+
+Save the model with **File → Save** under any name; the completed file calls it
+`xslope_johnson_res.xlsx`.
 
 ---
 
 ## Building the mesh
 
-The file arrives with a mesh and a solved head field beside it, in
+A model built from scratch has no mesh yet. The completed download, for readers
+who skipped here, arrives with one — and with a solved head field beside it, in
 `xslope_johnson_res_mesh.json` and `xslope_johnson_res_seep.csv`, which is how a
 solved seepage field travels to a stability run. Studio loads both when it opens
-the workbook, so pressing **Run Seep…** immediately would solve on the mesh
-already there. That mesh is quadratic — 3,362 nodes and 1,605 `tri6` elements —
-because the same file is also run through the finite element stability analysis,
-which requires quadratic elements. It gives a discharge of **1.9391**.
+the workbook, so on that file pressing **Run Seep…** immediately would solve on
+the mesh already there. That mesh is quadratic — 3,362 nodes and 1,605 `tri6`
+elements — because the same file is also run through the finite element stability
+analysis, which requires quadratic elements. It gives a discharge of **1.9391**.
 
-This page rebuilds the mesh instead, at the linear element type and the element
-size the [sample page](../seep/samples.md#johnson-reservoir) catalogues its
-discharge at. Click **Build Mesh…**:
+Either way, build the mesh this page runs on: the linear element type and the
+element size the [sample page](../seep/samples.md#johnson-reservoir) catalogues
+its discharge at. Click **Build Mesh…**:
 
 ![The Build Mesh dialog](images/seep02_studio_build_mesh.png)
 
@@ -330,7 +430,7 @@ at `0.0001` for now — a later section measures what changing it does.
 
 The **Model checks** panel filling the right half of the dialog is the preflight
 report for this run: it reads the geometry, the material table and the boundary
-set before anything is solved, and an error in it blocks the run. On this file it
+set before anything is solved, and an error in it blocks the run. On this model it
 reports **No problems found for this run.**
 
 Click **Run**. The Log pane opens with the path the solver took:
@@ -540,7 +640,7 @@ does not read them.
 
 ### What each model assumes
 
-**Linear front** (`lf`) is the default and the model this file uses. It holds
+**Linear front** (`lf`) is the default and the model the build above selected. It holds
 *k<sub>r</sub>* at 1 in the saturated soil, falls linearly to a floor value
 *kr<sub>0</sub>* as the pressure head reaches *h<sub>0</sub>*, and stays at that
 floor beyond it. It takes two parameters, needs no special functions, and gives a
@@ -576,7 +676,7 @@ Running the three models against each other means giving each of them parameters
 for the same soil, and each model gets those parameters a different way — one of
 the three does not get them from the soil at all.
 
-The linear front's are already in the file: *kr<sub>0</sub>* = 0.01 at
+The linear front's were entered in the build: *kr<sub>0</sub>* = 0.01 at
 *h<sub>0</sub>* = −1 ft, the same pair on all three materials. That pair is a
 numerical shape rather than a measurement of any of these soils, and the section
 after the comparison turns that difference into the explanation for the gap.
@@ -898,7 +998,8 @@ that carries one.
 ## From this head field to a stability analysis
 
 A pore pressure at every node of the mesh is what a stability analysis needs, and
-this file is set up to hand it over: all three materials carry `seep` in their **u** column, so every
+the completed file is set up to hand it over: all three materials carry `seep` in the **u** column
+of the material table's LEM band — three cells a builder adds the same way — so every
 slice base and every Gauss point reads the solved field rather than a piezometric
 line.
 
@@ -910,7 +1011,7 @@ download at the top of this page.
 The one thing that has to be decided before the seepage run, rather than after, is
 the element type. A finite element stability analysis requires quadratic elements,
 so a mesh built at `tri3` for a fast seepage solve has to be rebuilt at `tri6`
-before it can carry one. That is why the mesh shipped with this file is quadratic,
+before it can carry one. That is why the mesh shipped with the download is quadratic,
 and why its discharge of 1.9391 differs slightly from the 1.9546 of the linear
 tri3 mesh built above.
 

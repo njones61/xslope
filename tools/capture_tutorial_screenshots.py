@@ -1759,9 +1759,21 @@ def seep02_run_seep():
     return _grab(dlg, "seep02_studio_run_seep.png")
 
 
+def seep02_profile():
+    """The profile-lines editor on the foundation line, whose dive to elevation
+    60 carves the cutoff key out of the foundation. The build step's featured
+    lesson — three stacked lines, the selected one emphasized in the preview."""
+    from studio.editors import ProfileEditor
+
+    dlg = ProfileEditor().build(_load(SEEP02), None, select=2)
+    dlg.resize(1180, 720)
+    return _grab(dlg, "seep02_studio_profile.png")
+
+
 SHOTS.update({
     "seep02_materials": seep02_materials,
     "seep02_materials_unsat": seep02_materials_unsat,
+    "seep02_profile": seep02_profile,
     "seep02_seep_bc": seep02_seep_bc,
     "seep02_build_mesh": seep02_build_mesh,
     "seep02_run_seep": seep02_run_seep,

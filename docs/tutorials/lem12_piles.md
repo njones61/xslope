@@ -364,9 +364,13 @@ answer somewhere else entirely:
 **FS = 1.409**, and the surface is not the deep one the table's 1.648 was measured
 on: it leaves the toe, reaches 10.1 ft below the ground at its deepest, exits
 8.5 ft behind the crest, and carries 20,525 lb/ft against the deep surface's
-62,198. Weakening the pile row hands the slope back to a
-mechanism the piles were holding — which is why the held sweep is for reading
-the trend, and any spacing actually being considered gets its own search.
+62,198. At 6 ft spacing this shallower surface stood above 1.842 — it lost to the
+deep circle, because the rows crossing it supplied enough force to keep it
+up. At 12 ft they supply less, and it drops to 1.409 and becomes the
+answer. Widening the spacing did not just lower the factor of safety on the
+deep circle; it changed which surface governs. That is why the held sweep
+is only for reading the trend, and any spacing actually being considered
+gets its own search.
 [VP106](../verification/rocscience.md#vp106) is this same sweep on Cai & Ugai's
 pile-reinforced slope, at four spacings, with the computed forces checked against
 Slide2 and against the paper.

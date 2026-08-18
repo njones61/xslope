@@ -642,6 +642,63 @@ def capture_piles_table():
                  "editing_piles_table.png")
 
 
+def _materials_demo():
+    """The editing page's four-material demo — one row per strength option
+    (mc / cp / pow / hb), sigmas on the first for the Reliability fields, and a
+    linear-front unsat curve so both confirmation plots draw. No unit system is
+    declared, so the shots stay unit-neutral."""
+    return [
+        {"name": "Embankment (mc)", "gamma": 125.0, "gamma_sat": 128.0,
+         "option": "mc", "c": 12.0, "phi": 28.0, "d": 2.0, "psi": 6.0,
+         "sigma_gamma": 4.0, "sigma_c": 3.0, "sigma_phi": 2.5,
+         "sigma_d": 0.5, "sigma_psi": 1.0,
+         "E": 30000.0, "nu": 0.3, "u": "none",
+         "k1": 0.0001, "k2": 0.0001, "alpha": 0.0,
+         "unsat": "lf", "kr0": 0.001, "h0": -0.4},
+        {"name": "Middle Clay (cp)", "gamma": 118.0, "gamma_sat": 120.0,
+         "option": "cp", "c": 8.49, "cp": -4.70625, "r_elev": -1.0},
+        {"name": "Soil (pow)", "gamma": 120.0, "gamma_sat": 122.0,
+         "option": "pow", "pow_a": 1.107, "pow_b": 0.86},
+        {"name": "Rock (hb)", "gamma": 155.0, "gamma_sat": 158.0, "option": "hb"},
+    ]
+
+
+def _materials_dialog(materials, view, toggles, size):
+    """The Materials editor on a bare model, in ``view``, with exactly the named
+    usage ``toggles`` ticked."""
+    from studio.editors import MaterialsEditor
+
+    dlg = MaterialsEditor().build({"materials": materials}, None)
+    for t, cb in dlg._toggles.items():
+        cb.setChecked(t in toggles)
+    dlg.set_view_mode(view)
+    dlg.resize(*size)
+    return dlg
+
+
+def capture_materials_table():
+    """Materials table view on the four-strength-model demo: the mat worksheet
+    row-for-row, LEM/Seepage/FEM columns showing, Reliability off."""
+    dlg = _materials_dialog(_materials_demo(), "table",
+                            ("lem", "seep", "fem"), (1230, 670))
+    return _grab(dlg, "editing_materials_table.png")
+
+
+def capture_materials_list():
+    """Materials list view on the same demo, everything ticked: the grouped form
+    with the ± sigma fields and both confirmation plots."""
+    dlg = _materials_dialog(_materials_demo(), "list",
+                            ("lem", "seep", "fem", "rel"), (1230, 670))
+    return _grab(dlg, "editing_materials_list.png")
+
+
+def capture_materials_table_color():
+    """The color-swatch column, on three bare rows wearing the default palette."""
+    mats = [{"name": n, "option": ""} for n in ("levee", "grout", "foundation")]
+    dlg = _materials_dialog(mats, "table", ("lem", "seep", "fem"), (760, 420))
+    return _grab(dlg, "editing_materials_table_color.png")
+
+
 def capture_seep_bc_editor():
     """Seep BC editor on the earth dam's boundary set, with a demonstration
     infiltration flux added across the crest (the no-flow strip between the pool
@@ -915,6 +972,8 @@ def main():
                capture_reinforcement_editor, capture_reinforcement_table,
                capture_piles_editor, capture_piles_table,
                capture_seep_bc_editor,
+               capture_materials_table, capture_materials_list,
+               capture_materials_table_color,
                capture_dxf_wizard, capture_global_form,
                capture_assistant_settings, capture_assistant_confirm,
                capture_inputs_tree, capture_display_panel_seep,

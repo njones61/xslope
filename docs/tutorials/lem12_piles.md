@@ -105,11 +105,12 @@ of shear capacity and 60,000 ft·lb of moment capacity, consistent with a 2 ft
 reinforced concrete section at f′<sub>c</sub> = 4,000 psi. They bound whatever
 the soil calculation produces, and on this model they bind hard.
 
-Press **List view** to read one shaft at a time, as a form in four groups —
+Press **List view** to read one pile row at a time, as a form in four
+groups —
 **Identity**, **Geometry**, **Capacity / design**, **Behavior** — with the
 preview drawing the selected pile bold on the section:
 
-![The piles editor on the lower shaft](images/lem12_studio_piles.png){width=1000}
+![The piles editor on the lower row](images/lem12_studio_piles.png){width=1000}
 
 The **Capacity / design** group puts the empty **H** directly above the **D** and
 **S** it will be computed from, and the two capacity fields carry their own

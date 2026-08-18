@@ -350,6 +350,8 @@ class FormEditorDialog(QDialog):
         self._values = dict(values)
         for f in fields:
             edit = QLineEdit(f.to_text(values.get(f.key, f.default)))
+            if f.kind in Field.NUMERIC_KINDS:
+                edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self._edits[f.key] = edit
             form.addRow(f.header, edit)
         layout.addLayout(form)
@@ -2696,6 +2698,7 @@ class GlobalParamsDialog(QDialog):
         for f in numeric_fields:
             _v = values.get(f.key, f.default)
             edit = QLineEdit(f.to_text(_v))
+            edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             if f.tooltip:
                 edit.setToolTip(f.tooltip)
             self._edits[f.key] = edit
@@ -2982,6 +2985,8 @@ class _MaterialListView(QWidget):
             w.addItems(f.choices)
         else:
             w = QLineEdit()
+            if f.kind in Field.NUMERIC_KINDS:
+                w.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             w.editingFinished.connect(self._on_edit)
         self._edits[key] = w
         self._edit_keys[w] = key      # reverse lookup for the help strip
@@ -3923,6 +3928,8 @@ class _LineListView(QWidget):
             w.currentIndexChanged.connect(self._on_edit)   # (empty) entry, as in the table
         else:
             w = QLineEdit()
+            if f.kind in Field.NUMERIC_KINDS:
+                w.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             w.editingFinished.connect(self._on_edit)
         self._edits[key] = w
         self._edit_keys[w] = key      # reverse lookup for the help strip
@@ -4959,6 +4966,7 @@ class _SeepBcSetWidget(QWidget):
         self.head_label = QLabel(head_text)
         hrow.addWidget(self.head_label)
         self.head_edit = QLineEdit()
+        self.head_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         if self._constant_only:
             self.head_edit.setToolTip(
                 "Set 2 is the constant, steady rapid-drawdown boundary set — enter a "
@@ -4970,6 +4978,7 @@ class _SeepBcSetWidget(QWidget):
         self.flux_label = QLabel(flux_text)
         frow.addWidget(self.flux_label)
         self.flux_edit = QLineEdit()
+        self.flux_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         frow.addWidget(self.flux_edit, 1)
         right.addLayout(frow)
         self._holder = QVBoxLayout()
@@ -5298,9 +5307,9 @@ class PilesEditor(CategoryEditor):
                       "axis. Vcap/Mcap require S (spacing). Appl: active = allowable "
                       "force; passive = ultimate capacity ÷ FS.",
             usage_toggles=["lem", "fem"],
-            preview_caption="Preview shows the piles on the section (selected pile bold "
-                            "with □ cap and ▽ tip markers; others dimmed). "
-                            "Click a pile to select it.",
+            preview_caption="Preview shows the pile rows on the section (selected "
+                            "row bold with □ cap and ▽ tip markers; others dimmed). "
+                            "Click a pile row to select it.",
             field_help=PILES_HELP)
 
     def apply(self, slope_data, dlg):
@@ -5445,6 +5454,7 @@ class MatGeometryDialog(QDialog):
             mdrow.addWidget(QLabel("Max depth (bottom boundary elevation):"))
             self._max_depth = max_depth
             self._max_depth_edit = QLineEdit(_display_number(max_depth))
+            self._max_depth_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self._max_depth_edit.setToolTip(
                 "Elevation of the model's bottom boundary, used to build the zone "
                 "polygons from the profile lines.")
@@ -5504,6 +5514,7 @@ class MatGeometryDialog(QDialog):
         _size_help = (self._field_help or {}).get("size", "")
         matrow.addWidget(QLabel("Size:"))
         self.size_edit = QLineEdit()
+        self.size_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.size_edit.setPlaceholderText("global")
         # Fixed, not just capped: the material combo takes the row's stretch, and a
         # merely-capped Size edit collapses under it and scrolls its own value out of
@@ -6301,9 +6312,13 @@ class TransientDialog(QDialog):
         controls = QFormLayout(controls_widget)
         controls.setContentsMargins(0, 0, 0, 0)
         self._duration = QLineEdit(_tseep_fmt(tseep.get("duration")))
+        self._duration.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._save_interval = QLineEdit(_tseep_fmt(tseep.get("save_interval")))
+        self._save_interval.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._stage_1 = QLineEdit(_tseep_fmt(tseep.get("stage_1")))
+        self._stage_1.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._stage_2 = QLineEdit(_tseep_fmt(tseep.get("stage_2")))
+        self._stage_2.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._stability_time = QLineEdit(_tseep_fmt(tseep.get("stability_time")))
         tlab = f" ({self._unit_labels['time']})" if (self._unit_labels
                                                      and self._unit_labels.get("time")) else ""

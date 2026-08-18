@@ -2664,6 +2664,50 @@ def test_split_code_spans():
     return fails
 
 
+def test_lem12_pile_console_block():
+    """LEM-12 quotes the run summary's pile lines verbatim; the quote and the
+    code must not drift apart. The lines are regenerated through the real
+    formatter (xslope.search._pile_report_lines) from the critical circle's
+    own diagnostics records — values pinned from the run the page documents,
+    whose truth the samples-page regression tag locks separately — and every
+    regenerated line must appear character-for-character in the page's text
+    block, in order. Rewording the formatter or editing the quote breaks it.
+    """
+    import pandas as pd
+
+    from xslope.search import _pile_report_lines
+
+    page = os.path.join(_REPO, "docs", "tutorials", "lem12_piles.md")
+    text = open(page, encoding="utf-8").read()
+    df = pd.DataFrame()
+    df.attrs["pile_report"] = [
+        {"label": "lower row", "x": 5.0, "y": -5.070439, "computed": True,
+         "S": 6.0, "appl": "active", "H_width": 2540.651083,
+         "F_soil": 44178.182854, "F_used": 15243.906495,
+         "governed": "bending (Mcap/Lm)", "L_m": 3.935999,
+         "depth": 10.070439},
+        {"label": "upper row", "x": 10.0, "y": -4.478998, "computed": True,
+         "S": 6.0, "appl": "active", "H_width": 1826.978303,
+         "F_soil": 81729.176651, "F_used": 10961.869817,
+         "governed": "bending (Mcap/Lm)", "L_m": 5.473519,
+         "depth": 14.478998},
+    ]
+    lines = _pile_report_lines(df, {"unit_system": "imperial"})
+    fails = []
+    if len(lines) != 3:
+        fails.append(f"the formatter returned {len(lines)} lines for two "
+                     f"computed rows; the page's block quotes three")
+    pos = 0
+    for line in lines:
+        found = text.find(line, pos)
+        if found < 0:
+            fails.append(f"LEM-12 does not quote the run summary's own line "
+                         f"(or not in order): {line!r}")
+        else:
+            pos = found
+    return fails
+
+
 CHECKS = [
     ("A. one verb, and it is named", test_verb_gate),
     ("B. only XSLOPE's own sites", test_allowlist),
@@ -2674,6 +2718,7 @@ CHECKS = [
     ("G. argv and FileOpen end in one call", test_arrival),
     ("H. Studio reads as the tutorials say", test_tutorial_labels),
     ("I. code spans stay on one line", test_split_code_spans),
+    ("J. LEM-12 quotes the pile summary the code prints", test_lem12_pile_console_block),
 ]
 
 

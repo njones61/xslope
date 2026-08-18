@@ -1545,6 +1545,10 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
     AnalysisCancelled
         ``cancel_check`` asked it to stop.
     """
+    if analysis not in ("auto_search", "single_surface"):
+        raise ValueError(
+            f"Unknown analysis {analysis!r}. Use 'auto_search' or "
+            f"'single_surface'.")
     method = str(method or "").lower()
     circular = surface != "noncircular"
     tag = " (rapid drawdown)" if rapid else ""

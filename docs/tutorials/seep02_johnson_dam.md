@@ -547,8 +547,7 @@ negative.
 
 The phreatic surface is not an object the solver tracks. It is the ψ = 0 contour of
 the solved pressure-head field, drawn afterward by the plotting routine on any
-solution whose pore pressure goes negative somewhere. Nothing places it, and
-nothing constrains it to be smooth or single-valued.
+solution whose pore pressure goes negative somewhere.
 
 What the solver iterates on is the two things that make the problem nonlinear.
 Each sweep recomputes the pressure head from the current head field, evaluates

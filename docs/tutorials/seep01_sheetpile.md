@@ -497,7 +497,9 @@ Click **Build Mesh…**.
 
 **Element type** decides the order of the interpolation inside each element. The
 dialog opens on **Quadratic triangles (tri6)**, which is the safe default because
-it is the one a stability analysis can also use. Change it to **Linear triangles
+it is the one a finite element stability analysis can also use; a limit
+equilibrium analysis reads only pore pressures from the seepage solution and is
+just as happy on a linear mesh. Change it to **Linear triangles
 (tri3)** — three nodes at the corners, head varying linearly across the element.
 That is enough for a stand-alone seepage analysis: head is a scalar field, and the
 smaller system solves faster. (Enough, not best — the

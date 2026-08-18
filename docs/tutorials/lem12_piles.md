@@ -121,8 +121,8 @@ per-shaft units in their labels: **Vcap (per element, lb)** and
 
 ## Running the analysis
 
-With the inputs understood, run the search and see what the piled slope
-does. Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
+With the inputs understood, run the search and see what the slope does
+with the pile rows in place. Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 `Auto search`, with the slice count left at 40:
 
 ![The Run LEM dialog on the loaded model](images/lem12_studio_run_lem.png)
@@ -131,7 +131,7 @@ Click **Run**. The search walks the circle the file carries down onto the rigid
 base, and the plot draws every circle it tried in gray with the one it kept in
 red:
 
-![The Spencer search on the piled slope](images/lem12_search.png){width=1000}
+![The Spencer search with the pile rows in place](images/lem12_search.png){width=1000}
 
 **FS = 1.842**, on a circle centered at (3.79, 26.69) with a radius of 31.79,
 tangent at elevation −5.10. The solution plot draws that surface with its base
@@ -158,13 +158,14 @@ gives the slope on its own:
 ![Spencer on the same slope with no piles](images/lem12_solution_nopiles.png){width=1000}
 
 **FS = 1.149** on a shallower circle from the toe, tangent at elevation −0.04,
-moving 21,166 lb/ft against the piled surface's 62,198. The piles raise the
+moving 21,166 lb/ft against the 62,198 on the surface found with the pile
+rows in place. The piles raise the
 factor of safety by 0.69, and they also change the failure mechanism: the surface the
 search settles on with them present is deeper, longer and three times the mass,
 because the shallower one now has two shafts across it.
 
-To separate the two rows' contributions, hold the surface still. On the piled search's
-own critical circle — **one surface, no search, only which piles are present
+To separate the two rows' contributions, hold the surface still. On the
+critical circle from the search with both rows present — **one surface, no search, only which piles are present
 changing** — each row can be removed on its own:
 
 | Piles present | Spencer FS |

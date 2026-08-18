@@ -101,6 +101,14 @@ rows:
 | **Exit face** | Water may leave to the atmosphere; where it starts leaving is part of the answer | Downstream face of a dam; a seeping slope |
 | **Specified flux** (`flux`) | Flow rate across the boundary (normal Darcy velocity, positive inward) | Rainfall infiltration, recharge |
 
+The exit face deserves one more sentence, because it is the condition with
+physics inside it: along the part of the face that is seeping, water leaves
+at atmospheric pressure, so the solver holds **head = elevation** there —
+the pressure head is zero. The part not yet seeping stays no-flow, with the
+head below the elevation, and the boundary between the two is found during
+the solve. This problem is confined and never uses one;
+[SEEP-2](seep02_johnson_dam.md) is built around it.
+
 There is one further possibility, and it is entered nowhere: an edge with **no
 boundary condition on it is a no-flow boundary**. That is the default rather than
 an omission the solver puts up with, and it is a real physical statement — bedrock,

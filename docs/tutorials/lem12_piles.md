@@ -9,8 +9,8 @@ This tutorial shows how to model stabilizing piles in a limit equilibrium
 analysis. The example is a 20 ft slope in medium-stiff clay that stands at a
 factor of safety of 1.149 on its own; two rows of 2 ft drilled shafts
 through the face bring it to 1.842. The pile force is not entered anywhere
-in the model. The force column is left blank, which tells XSLOPE to compute
-the lateral force the soil can push onto each pile — from the pile diameter
+in the model. The force column, `H`, is left blank, which tells XSLOPE to
+compute the lateral force the soil can push onto each pile — from the pile diameter
 and the center-to-center spacing, by the Ito & Matsui (1975) method — and to
 recompute it for every trial surface the search tries. This is the second of
 the two ways XSLOPE models a pile: the tieback wall tutorial
@@ -71,7 +71,7 @@ it beside the bar.
 ### The pile rows
 
 Everything XSLOPE needs to know about the two pile rows sits in two rows of
-the piles sheet, and reading them is most of what this page teaches. Open
+the piles sheet. Read them closely before running anything. Open
 **Piles** in the **Inputs** tree and press **Table view**. Its columns match
 the piles worksheet; with **Show parameters for:** set to **LEM**, the
 columns only the finite element engine reads (`E`, `I`, `Area`, `Fixity`)
@@ -79,17 +79,19 @@ are hidden:
 
 ![The two pile rows as the file carries them](images/lem12_studio_piles_table.png)
 
-Each row of the sheet describes one pile row, and the columns after the
-endpoints are what this page is about:
+Each row of the sheet describes one pile row. The columns after the
+endpoints control how the pile force is computed, limited, and applied:
 
 | Label | x1 | y1 | x2 | y2 | H | Appl | D | S | Vcap | Mcap |
 |---|:---:|:---:|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
 | `lower row` | 5 | 5 | 5 | -10 | | | 2 | 6 | 46000 | 60000 |
 | `upper row` | 10 | 10 | 10 | -10 | | | 2 | 6 | 46000 | 60000 |
 
-**H is empty on both rows, which is what selects the Ito & Matsui
-calculation.** With `H` blank and a diameter `D` and spacing `S` given, XSLOPE
-computes the force itself; with a number in `H`, that number is used instead.
+**H is empty on both rows.** `H` is the pile force per foot of slope — the
+lateral resistance a row contributes to the equilibrium equations. Leaving
+it blank while giving a diameter `D` and a spacing `S` tells XSLOPE to
+compute that force by the Ito & Matsui method; entering a number in `H`
+uses that number instead.
 The direction of the pile force is not entered: XSLOPE takes it
 perpendicular to the pile's own axis, which for these vertical shafts means
 horizontal — the usual case for a stabilizing pile. A blank `Appl` means

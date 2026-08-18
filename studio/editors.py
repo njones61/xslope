@@ -666,6 +666,8 @@ class _EditableTable(QWidget):
         it = self.table.item(i, j)
         if it is None:
             it = QTableWidgetItem("")
+            if f.kind in Field.NUMERIC_KINDS:
+                it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.table.setItem(i, j, it)
         if not (it.flags() & Qt.ItemIsEditable):
             return "read-only"
@@ -754,7 +756,12 @@ class _EditableTable(QWidget):
                 combo.currentIndexChanged.connect(lambda *_: self._on_combo_changed())
                 self.table.setCellWidget(i, j, combo)
             else:
-                self.table.setItem(i, j, QTableWidgetItem(f.to_text(val)))
+                it = QTableWidgetItem(f.to_text(val))
+                if f.kind in Field.NUMERIC_KINDS:
+                    # Numbers right-align, text left — the spreadsheet
+                    # convention, so magnitudes line up down a column.
+                    it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.table.setItem(i, j, it)
 
     def replace_rows(self, rows):
         """Swap the whole table for ``rows``, as one undoable edit of the dialog.

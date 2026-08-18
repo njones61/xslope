@@ -139,8 +139,9 @@ nodes standing above the water — the
 its real work.
 
 **Specified flux** (`flux`) prescribes the rate at which water crosses the
-boundary — rainfall or recharge — rather than the head on it. It is the boundary
-to use wherever the water-table position is an output and so cannot be imposed.
+boundary rather than the head on it. It is the boundary to use when the known
+quantity is a flux: rainfall infiltrating a surface, recharge over a field, a
+drain removing water at a set rate.
 
 A boundary that carries none of these is a **no-flow** boundary, which is a real
 statement rather than an omission: bedrock, an impervious liner, a line of

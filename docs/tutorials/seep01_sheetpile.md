@@ -8,7 +8,7 @@ description: "Build a confined seepage model in XSLOPE from scratch — with the
 This tutorial builds a two-dimensional groundwater flow analysis from nothing and
 carries it through to a discharge you can defend. It teaches what a seepage model
 is made of, the difference between a confined and an unconfined problem, the three
-kinds of boundary condition a flow region can carry and why choosing them is the
+boundary condition types a flow region can carry and why choosing them is the
 part of the job that decides the answer, how a finite element mesh is built and how
 fine it has to be, and how to read the **flow net** — the grid of head contours and
 flow lines the solution is drawn as, and the form a seepage answer was given in
@@ -86,7 +86,7 @@ phreatic surface at all, and a negative pore pressure in one — which happens
 wherever a point stands higher than the head driving it — is ordinary suction in a
 saturated potential field rather than a water table.
 
-### The kinds of boundary
+### Boundary condition types
 
 XSLOPE offers three boundary-condition types, entered on the
 [**seep bc** sheet](../usage/input_template.md#worksheet-seep-bc) and documented in

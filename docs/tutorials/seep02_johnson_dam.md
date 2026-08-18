@@ -87,8 +87,9 @@ iterated, and a model without them is confined and is solved directly.
 
 ## Boundary conditions on an unconfined problem
 
-The four kinds of boundary XSLOPE offers are the same on both kinds of problem,
-and [SEEP-1](seep01_sheetpile.md#the-kinds-of-boundary) tabulates them.
+The boundary condition types XSLOPE offers are the same on both kinds of
+problem, and
+[SEEP-1](seep01_sheetpile.md#boundary-condition-types) tabulates them.
 Three of them place the water:
 
 **Specified head** (`head`) holds the total head at a stated value along a

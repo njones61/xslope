@@ -496,25 +496,14 @@ the maximum depth, and the spike at x = 30 is the sheetpile.
 Click **Build Mesh…**.
 
 **Element type** decides the order of the interpolation inside each element. The
-dialog opens on **Quadratic triangles (tri6)**, which is the safe default because
-it is the one a finite element stability analysis can also use; a limit
-equilibrium analysis reads only pore pressures from the seepage solution and is
-just as happy on a linear mesh. Change it to **Linear triangles
-(tri3)** — three nodes at the corners, head varying linearly across the element.
-That is enough for a stand-alone seepage analysis: head is a scalar field, and the
-smaller system solves faster. (Enough, not best — the
-[mesh study](#how-fine-the-mesh-has-to-be) below measures what the element order is
-worth here and comes back to this choice.) The quadratic types (**tri6**,
-**quad8**, **quad9**) carry extra nodes at the element midsides and let the head
-vary quadratically, which resolves a curving field in fewer elements; **quad4** is
-the linear quadrilateral, the four-cornered counterpart of tri3. **If the same mesh
-will also carry a finite element stability analysis, a quadratic type is required,
-not preferred** — linear triangles and quads become artificially stiff under the
-incompressible plastic flow of a Mohr-Coulomb collapse and return a factor of
-safety that is too high, by 21% for tri3 and 11% for quad4 on the benchmark under
-[Element type and volumetric locking](../fem/overview.md#element-type-selection-and-volumetric-locking).
-Meshing at tri6 from the start costs nothing but solve time and saves re-meshing
-later.
+dialog opens on **Quadratic triangles (tri6)** — the safe default, because a
+finite element stability analysis requires a quadratic mesh (a limit equilibrium
+analysis does not; it reads only pore pressures from the seepage solution).
+Change it to **Linear triangles (tri3)** — three nodes at the corners, head
+varying linearly across the element. That is enough for a stand-alone seepage
+analysis: head is a scalar field, and the smaller system solves faster. The
+[mesh study](#how-fine-the-mesh-has-to-be) below builds this section with all
+five element types and measures what the choice is worth.
 
 Element type is the only control this build changes. Everything below it stays at
 its default, so the dialog now stands as your settings leave it:
@@ -758,8 +747,11 @@ is **39.983**, which is the 50/120 row — that page's regression tag meshes at 
 width divided by 120. A seepage discharge is only meaningful together with the mesh
 it was computed on, which is why that row is stated with its size.
 
-The element type moves the answer the same way, and more cheaply. Meshing the same
-section at a 1 m target size with each of the five element types gives:
+The element type moves the answer the same way, and more cheaply. The quadratic
+types (`tri6`, `quad8`, `quad9`) carry extra nodes at the element midsides and let
+the head vary quadratically across the element; `quad4` is the linear
+quadrilateral, the four-cornered counterpart of tri3. Meshing the same section at
+a 1 m target size with each of the five element types gives:
 
 | Element type | Nodes | Elements | q (m³/yr per m) |
 |---|---:|---:|---:|
@@ -775,8 +767,12 @@ for the quads — because a quadratic element can bend its head field across its
 where a linear one has to stair-step it. Quadratic triangles at 1 m
 reach 39.866 on 2,551 nodes, which is a better answer than linear triangles at
 0.5 m reach on 2,490 — the same size of system, spent on element order instead of
-element count. On a model that will also be run for stability, where quadratic
-elements are required anyway, this is free.
+element count. On a model that will also carry a finite element stability
+analysis, quadratic elements are free — there they are required, not preferred:
+linear triangles and quads become artificially stiff under the incompressible
+plastic flow of a Mohr-Coulomb collapse and return a factor of safety that is too
+high, by 21% for tri3 and 11% for quad4 on the benchmark under
+[Element type and volumetric locking](../fem/overview.md#element-type-selection-and-volumetric-locking).
 
 ---
 

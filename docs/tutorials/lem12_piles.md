@@ -297,10 +297,14 @@ times the moment their sections are designed for.
 
 The capacities are fixed by the concrete section, but the spacing is a
 choice — it is the main variable a designer adjusts once the diameter is
-set. Pile spacing affects the computed force in two ways: closer piles arch more
-strongly, so each pile takes a larger share of the
-soil force, and closer spacing puts more shafts under each foot of slope. Both
-effects work in the same direction.
+set. Closing the spacing might be expected to spread the load, each shaft
+carrying less. It does the opposite, because the Ito & Matsui force is not
+a fixed demand being shared among the shafts: it is the resistance the soil
+meets squeezing through the gap between them, and a narrower gap arches
+harder. The sweep below measures it — one pile at 3 ft spacing carries
+188,549 lb, four times what the same pile carries at 6 ft. Closer spacing
+therefore raises the force per pile, and at the same time puts more piles
+under each foot of slope, so the force per foot rises on both counts.
 
 Widening the spacing to 12 ft is one cell on each row — **S** from `6` to `12`,
 with **H** still blank so the force is recomputed at the new spacing:

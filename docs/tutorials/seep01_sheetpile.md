@@ -319,9 +319,9 @@ from the table above into the first row of the table, row 11:
 `k1` is the major principal conductivity and `k2` the minor one, with `alpha`
 the rotation of those principal directions from the x-axis in degrees.
 Setting `k1 = k2 = 30` makes the soil isotropic, and at that point `alpha`
-means nothing and stays `0`. Every column after `unsat` stays blank: they
-belong to the unsaturated and transient analyses of the next tutorials, and
-a confined steady problem reads none of them.
+means nothing and stays `0`. The `unsat` column and every column after it
+stay blank: they belong to the unsaturated and transient analyses of the
+next tutorials, and a confined steady problem reads none of them.
 [SEEP-2](seep02_johnson_dam.md) is where they come into play.
 
 Everything to the left of the Seepage band — unit weight, strength option,
@@ -413,9 +413,10 @@ Press **Add row**, and fill it:
 1. **name** = `soil`.
 2. **k1 (m/yr)** = `30` and **k2 (m/yr)** = `30`.
 3. **alpha** = `0`.
-4. Leave **unsat** and everything after it alone. Those columns belong to
-   the unsaturated and transient analyses of the next tutorials; a confined
-   problem evaluates none of them.
+4. Leave **unsat** and everything after it alone — the editor shows the
+   `lf` default for the blank cell. Those columns belong to the unsaturated
+   and transient analyses of the next tutorials; a confined problem
+   evaluates none of them.
 
 ![The materials editor with the Seepage columns showing](images/seep01_studio_materials.png)
 

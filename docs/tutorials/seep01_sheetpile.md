@@ -691,6 +691,10 @@ the depth of the sheetpile, the thickness of the layer. It does not depend on th
 head or on the conductivity, which is the fact the
 [conductivity sweep](#discharge-against-conductivity) below measures.
 
+---
+
+## Reading the gradient field
+
 The gradient field says where the flow is working hardest:
 
 ![Hydraulic gradient magnitude](images/seep01_gradient.png){width=1000}

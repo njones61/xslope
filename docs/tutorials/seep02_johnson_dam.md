@@ -47,7 +47,7 @@ and watch the iteration fail and then succeed on a curve steep enough to make it
 struggle.
 </div>
 <p><span class="tg-pill">three materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">unconfined flow</span><span class="tg-pill">seepage face</span><span class="tg-pill">phreatic surface</span><span class="tg-pill">unsaturated models</span><span class="tg-pill">relative conductivity</span><span class="tg-pill">flow net base material</span><span class="tg-pill">convergence</span><span class="tg-pill">underseepage</span></p>
-<div class="tgm-model" markdown>**Completed model** — [xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx), the same file used by [Seepage Sample Problem 5](../seep/samples.md#johnson-reservoir); open it to skip the construction and start at [Building the mesh](#building-the-mesh)</div>
+<div class="tgm-model" markdown>**Completed model** — [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx), the same model as [Seepage Sample Problem 5](../seep/samples.md#johnson-reservoir); open it to skip the construction and start at [Building the mesh](#building-the-mesh)</div>
 </div>
 
 ---
@@ -194,7 +194,7 @@ the materials, then the geometry, then the boundary conditions. The build below
 runs in Studio; the same tables paste into the
 [Excel template](../usage/input_template.md)'s `mat`, `profile` and `seep bc`
 worksheets just as well. And to skip the construction entirely, download
-[xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx), open it with
+[xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx), open it with
 **File → Open**, and pick the page back up at
 [Building the mesh](#building-the-mesh).
 
@@ -388,18 +388,10 @@ Save the model with **File → Save** under any name; the completed file calls i
 
 ## Building the mesh
 
-A model built from scratch has no mesh yet. The completed download, for readers
-who skipped here, arrives with one — and with a solved head field beside it, in
-`xslope_johnson_res_mesh.json` and `xslope_johnson_res_seep.csv`, which is how a
-solved seepage field travels to a stability run. Studio loads both when it opens
-the workbook, so on that file pressing **Run Seep…** immediately would solve on
-the mesh already there. That mesh is quadratic — 3,362 nodes and 1,605 `tri6`
-elements — because the same file is also run through the finite element stability
-analysis, which requires quadratic elements. It gives a discharge of **1.9391**.
-
-Either way, build the mesh this page runs on: the linear element type and the
-element size the [sample page](../seep/samples.md#johnson-reservoir) catalogues
-its discharge at. Click **Build Mesh…**:
+However the model was arrived at, it has no mesh yet. Build the one this page
+runs on — the linear element type and the element size the
+[sample page](../seep/samples.md#johnson-reservoir) catalogues its discharge at.
+Click **Build Mesh…**:
 
 ![The Build Mesh dialog](images/seep02_studio_build_mesh.png)
 
@@ -415,20 +407,9 @@ Set **Size divisions** to `120`. The section is 750 ft wide, so the target eleme
 size becomes 750/120 = 6.25 ft, and the grayed **Target element size** box shows
 it.
 
-**Quadrilateral style** is disabled, both of its radio buttons with it. It governs
-how quadrilaterals are laid out, and the element type chosen above is triangular.
-
-Leave **Refine near features** unticked, which leaves **Refinement factor** grayed
-at its default of 3.0. Ticking it would shrink the elements around reinforcement
-lines, crack tips and thin material zones by that factor; this section has none of
-the first two and no zone thin enough to need the third.
-
-**Refine thin zones** is ticked, which is its default. It gives any zone too thin
-to carry about four element rows across its width a local size that will. It finds
-no such zone on this model, so the mesh comes out the same either way.
-
-[SEEP-1](seep01_sheetpile.md#how-fine-the-mesh-has-to-be) is where the element
-type and the element size are studied; here they are set once and left.
+Leave every other control at its default — SEEP-1's
+[Building the mesh](seep01_sheetpile.md#building-the-mesh) explains each one, and
+none of them does work on this model.
 
 Click **Build**. The mesh comes out at **2,913 nodes and 5,543 triangles**, with
 the boundary nodes marked on it:
@@ -1031,15 +1012,16 @@ line.
 
 The handover is by file. A solved run writes `xslope_johnson_res_mesh.json` and
 `xslope_johnson_res_seep.csv` beside the workbook, and loading the workbook again
-for a stability run picks both up by name. That pair is what arrived with the
-download at the top of this page.
+for a stability run picks both up by name — the run above already wrote that pair
+beside your own file. The [sample page](../seep/samples.md#johnson-reservoir)'s
+copy of this model ships with a pair for the same reason.
 
 The one thing that has to be decided before the seepage run, rather than after, is
 the element type. A finite element stability analysis requires quadratic elements,
 so a mesh built at `tri3` for a fast seepage solve has to be rebuilt at `tri6`
-before it can carry one. That is why the mesh shipped with the download is quadratic,
-and why its discharge of 1.9391 differs slightly from the 1.9546 of the linear
-tri3 mesh built above.
+before it can carry one. That is why the sample page's shipped mesh is quadratic —
+3,362 nodes and 1,605 `tri6` elements — and why its discharge of 1.9391 differs
+slightly from the 1.9546 of the linear tri3 mesh built above.
 
 [Seepage and Slope Stability](../seep/seep_slope.md#worked-example) carries this
 same dam through the rest of the workflow: a Spencer search on the seepage-derived

@@ -1490,6 +1490,12 @@ def _seep01_editor_labels(mw):
 #: to show.
 SEEP02_FILE = os.path.join(_REPO, "docs/seep/files/xslope_johnson_res.xlsx")
 
+#: Tutorial SEEP-2's download is a sidecar-free copy of the sample catalog's
+#: workbook (the catalog copy travels with its mesh/seep companions for the
+#: stability worked example; the tutorial has the reader build both). The two
+#: workbooks must stay byte-identical — an edit to one is an edit to both.
+SEEP02_TUTORIAL_COPY = os.path.join(_REPO, "docs/tutorials/files/xslope_johnson_res.xlsx")
+
 #: The materials table with the Seepage toggle on, as SEEP-2 reproduces it: the
 #: three columns SEEP-1 does not teach — the model selector and both of the
 #: linear front's parameters — plus the pair the van Genuchten and Gardner models
@@ -1549,6 +1555,13 @@ def _seep02_editor_labels():
     from studio.editors import MaterialsEditor, SeepBcEditor
 
     fails = []
+    with open(SEEP02_FILE, "rb") as a, open(SEEP02_TUTORIAL_COPY, "rb") as b:
+        if a.read() != b.read():
+            fails.append("Tutorial SEEP-2's download (docs/tutorials/files/"
+                         "xslope_johnson_res.xlsx) has drifted from the sample "
+                         "catalog's copy (docs/seep/files/) — the two workbooks "
+                         "must stay byte-identical; copy the edited one over the "
+                         "other")
     data = _quiet(load_slope_data, SEEP02_FILE)
 
     with _default_editor_toggles():

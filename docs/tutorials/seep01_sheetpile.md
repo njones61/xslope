@@ -748,16 +748,8 @@ geometry** and type each size into **Target element size** — and run each one:
 | 2.0 | 191 | 316 | 41.978 |
 | 1.0 | 670 | 1,212 | 40.797 |
 | 0.5 | 2,490 | 4,726 | 40.111 |
-| 50/120 | 3,544 | 6,782 | 39.983 |
 | 0.25 | 9,607 | 18,708 | 39.786 |
 | 0.125 | 37,656 | 74,300 | 39.618 |
-
-The fourth row is reached the other way round. **Target element size** takes three
-decimals, and 50/120 = 0.41666… is not one of them, so leave **Auto-size from
-geometry** ticked and set **Size divisions** to `120` instead: the log reads
-`Auto element size: 0.417 (slope width / 120 divisions)` and the mesh it builds is
-the 3,544-node one above. Typing `0.417` builds a different mesh — 3,546 nodes, and
-a discharge of 39.982.
 
 The discharge falls at every refinement and never turns around. Two things follow
 from that.
@@ -777,9 +769,10 @@ change stops mattering: going from 0.25 m to 0.125 m nearly quadrupled the node
 count and moved the discharge by 0.4%.
 
 The cataloged discharge on the [sample page](../seep/samples.md#1-sheetpile-with-clay-blanket)
-is **39.983**, which is the 50/120 row — that page's regression tag meshes at the
-width divided by 120. A seepage discharge is only meaningful together with the mesh
-it was computed on, which is why that row is stated with its size.
+is **39.983**, computed at that page's own meshing convention of the section width
+divided by 120 — an element size of about 0.42 m — and it lands between the 0.5 m
+and 0.25 m rows exactly where the sequence says it should. A seepage discharge is
+only meaningful together with the mesh it was computed on.
 
 The element type moves the answer the same way, and more cheaply. The quadratic
 types (`tri6`, `quad8`, `quad9`) carry extra nodes at the element midsides and let

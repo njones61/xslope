@@ -285,27 +285,22 @@ then the material; then the geometry; then the boundary conditions.
 
 ### 1. The `main` worksheet
 
-1. Set `main!D8` **Units** to `SI`. Choosing a unit system fills `main!D10`
-   **Unit weight of water** with that system's value, `9.81` kN/m³ here. XSLOPE
-   never converts between systems — the declaration states what the numbers you
-   type already mean, and drives the unit labels on the plots.
-2. `main!D9` **Time** ships as `day` in the template; pick `yr` from its
-   dropdown, which is the base this model's conductivity is stated in. This
-   field matters more on a seepage
-   model than on any other: conductivity, specified flux and the computed discharge
-   all carry a length-per-time or volume-per-time dimension, and the declared time
-   unit is what puts `m/yr` on the material form and `m³/yr per m` on the flow
-   net's title. Blank it and those quantities are simply unlabeled — the arithmetic
-   is unchanged, but nothing on screen says what the answer is in.
-3. Leave **Tension crack depth**, **Depth of water in crack** and **Seismic
-   coefficient** at `0`. They belong to a stability analysis.
-4. Leave **Mesh element type** and **Mesh target size** blank. A blank run option
-   means *unspecified — use the default*, and both of these are choices you make
-   at mesh time; filling them in only pre-loads the Build Mesh dialog.
-5. Clear **Tension SRF (FEM)** and **Side BC**, which the template ships as `YES`
-   and `rollers`, and leave **Water loads** at its shipped `auto`. All three are
-   read by a stability analysis and none of them by this one; clearing the two
-   keeps the sheet to the inputs this model actually uses.
+This sheet needs exactly two edits:
+
+1. Set `main!D8` **Units** to `SI`. Choosing a unit system fills
+   **Unit weight of water** with that system's value, `9.81` kN/m³ here.
+   XSLOPE never converts between systems — the declaration states what the
+   numbers you type already mean, and drives the unit labels on the plots.
+2. Set `main!D9` **Time** to `yr`, the base this model's conductivity is
+   stated in. On a seepage model this field is load-bearing: it is what puts
+   `m/yr` on the material form and `m³/yr per m` on the flow net's title.
+   Left blank, the arithmetic is unchanged but the results carry no unit
+   labels.
+
+Nothing else on the sheet applies to this model — the crack and seismic
+entries, the mesh presets, **Tension SRF (FEM)**, **Side BC** and
+**Water loads** all belong to stability analyses or to choices made later at
+mesh time. Leave them however they stand.
 
 ![The finished main worksheet](images/seep01_sheet_main.png)
 

@@ -818,11 +818,8 @@ the largest head in the field, below the tolerance from the **Run Seepage** dial
 scaled by the domain height — 0.018 here, a ratio rather than a length. This
 measures whether the head field has stopped moving.
 
-**Flow closure.** Heads that have stopped moving are not enough, because the
-conductivities are computed *from* the heads and can still be catching up. This
-test rebuilds *k<sub>r</sub>* from the current heads and checks that the flow
-imbalance it leaves at the nodes is below 0.1% of the inflow — the heads and the
-conductivities have to agree with each other, not just hold still.
+**Flow closure.** The flow imbalance left at the nodes, with the conductivities
+rebuilt from the current heads, below 0.1% of the inflow.
 
 **Exit-face stability.** The active set unchanged since the previous sweep. A
 discharge computed while nodes are still switching between seeping and no-flow

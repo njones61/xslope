@@ -9,10 +9,10 @@ This tutorial shows how to model stabilizing piles in a limit equilibrium
 analysis. The example is a 20 ft slope in medium-stiff clay that stands at a
 factor of safety of 1.149 on its own; two rows of 2 ft drilled shafts
 through the face bring it to 1.842. The pile force is not entered anywhere
-in the model. The force column is left blank, which tells XSLOPE to
-compute the lateral force the soil can push onto each pile — from the pile diameter
-and the center-to-center spacing, by the Ito & Matsui (1975) method — and to
-recompute it for every trial surface the search tries. This is the second of
+in the model. XSLOPE computes it instead — the lateral force the soil can
+push onto each pile, from the pile diameter and the center-to-center
+spacing, by the Ito & Matsui (1975) method — and recomputes it for every
+trial surface the search tries. This is the second of
 the two ways XSLOPE models a pile: the tieback wall tutorial
 ([LEM-9](lem09_tieback_wall.md)) entered its soldier pile the other way,
 with the force stated directly, and this page compares the two routes.

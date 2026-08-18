@@ -130,10 +130,13 @@ the value is a total head measured from the model's own datum, not a depth of
 water.
 
 **Reservoir** (`reservoir`) holds a node at the stated level only while that node
-is submerged, and releases to seep any node left standing above the water. The two
-are identical for a polyline that lies entirely under the water, which is the
-usual steady case, and they differ when the pool falls or the polyline is drawn up
-a slope above it.
+is submerged, and releases to seep any node left standing above the water. On a
+steady problem the choice changes nothing: the pool never moves, so a polyline
+drawn under the water stays under it and the two types produce the same solution.
+The distinction is live only on a **transient** run, where a falling pool leaves
+nodes standing above the water — the
+[Transient Seepage](../seep/transient.md) page is where the reservoir type does
+its real work.
 
 **Specified flux** (`flux`) prescribes the rate at which water crosses the
 boundary — rainfall or recharge — rather than the head on it. It is the boundary

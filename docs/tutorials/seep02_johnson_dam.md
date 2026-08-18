@@ -818,8 +818,8 @@ the largest head in the field, below the tolerance from the **Run Seepage** dial
 scaled by the domain height — 0.018 here, a ratio rather than a length. This
 measures whether the head field has stopped moving.
 
-**Flow closure.** The flow imbalance left at the nodes, with the conductivities
-rebuilt from the current heads, below 0.1% of the inflow.
+**Flow closure.** Water in equals water out at every node, to within 0.1% of
+the total inflow.
 
 **Exit-face stability.** The active set unchanged since the previous sweep. A
 discharge computed while nodes are still switching between seeping and no-flow

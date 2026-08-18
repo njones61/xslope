@@ -303,8 +303,9 @@ This corresponds to a triangular pressure distribution (linearly increasing with
 A limit equilibrium run on a model with pile rows prints one line per row
 with the factor of safety, so the applied forces are visible without
 generating a report: the Ito & Matsui soil force per pile, the capacity
-that governed (`bending governs (Mcap/Lm, Lm = ...)` or `shear governs
-(Vcap)`), and the force applied per unit width, with a total when more than
+that governed (`bending governs (Mcap/Lm, Lm = ...)` or
+`shear governs (Vcap)`), and the force applied per unit width, with a total
+when more than
 one row contributes. A row with a user-specified $H$ prints its stated
 value, or — when a capacity binds it — the governing check and the applied
 force. The full per-slice accounting remains in the

@@ -460,7 +460,9 @@ head change the test admits is 0.018 × 160 = 2.9 ft at the node that moved most
 Asking for the tolerance as a fraction of the domain rather than as a length is
 what lets one default work on a 10 m sheetpile section and on a 180 ft dam.
 
-The run finishes in **23 iterations**:
+The run finishes in **23 iterations**. In the **Display** panel, tick
+**Filled contours**, which colors the head field under the flow net — worth
+having on a zoned section, where the wash shows the core carrying the drop:
 
 ![The seepage solution](images/seep02_solution.png){width=1000}
 
@@ -531,8 +533,7 @@ downstream shell travels through unsaturated soil. That is small, and it is not
 zero, which is what gives the choice of unsaturated model something to act on.
 
 The pore-pressure field draws the same story as a field rather than as numbers.
-In the **Display** panel, set **Variable** to `Pore pressure` and tick
-**Filled contours**:
+In the **Display** panel, set **Variable** to `Pore pressure`:
 
 ![Pore pressure and the phreatic surface](images/seep02_pressure.png){width=1000}
 

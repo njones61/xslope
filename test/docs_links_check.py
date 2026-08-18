@@ -1213,7 +1213,7 @@ SEEP01_MESH_BUILD = "Build"
 #: time, and the button. The title is pinned because the page calls the dialog by
 #: it while the menu action that opens it is worded differently.
 SEEP01_RUN_TITLE = "Run Seepage"
-SEEP01_RUN_ROWS = ("BC set", "Convergence tol")
+SEEP01_RUN_ROWS = ("Convergence tol",)
 SEEP01_RUN_BUTTON = "Run"
 
 #: The seepage boundary-condition editor as the page's build step drives it: the

@@ -553,10 +553,6 @@ Click **Run Seep…**:
 
 ![The Run Seepage dialog](images/seep01_studio_run_seep.png)
 
-**BC set** stays at `Set 1`. A second set appears in this list only for a file that
-defines one, which is how a rapid drawdown analysis carries its drawn-down
-boundaries; this model has one set.
-
 **Convergence tol** is the head-change tolerance the unconfined iteration stops
 at, and on a confined problem it is inert — there is no iteration to stop. Leave
 it at `0.0001`.
@@ -856,9 +852,9 @@ dialog in one control at a time:
   either side of their current values and ranks them, and
   `Back-Analysis (target q)`, the same single-parameter sweep run backwards from a
   discharge you have measured.
-- **BC set** = `Set 1` and **Convergence tol** = `0.0001`, the same two solver
-  controls the Run Seepage dialog carries and with the same meaning: every step of
-  the sweep is one of those runs.
+- **Convergence tol** = `0.0001`, the same solver control the Run Seepage dialog
+  carries and with the same meaning: every step of the sweep is one of those
+  runs.
 - **Material / BC** = `soil`. The list holds one entry per material, plus
   **Boundary heads** for sweeping a specified head instead of a soil property.
 - **Property** = `k1`. In seepage mode the list is the material's seepage

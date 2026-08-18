@@ -859,10 +859,13 @@ class RunSeepDialog(QDialog):
     flow lines, base material, …) are not here — they live on the Seep Solution
     view and re-render the cached solution without re-solving.
 
-    When the loaded file defines a ``tseep`` (transient seepage) sheet, a Run type
-    selector adds a **Transient** choice: a time-dependent solve that produces a
-    sequence of saved frames. Transient always uses BC set 1 (its series bindings),
-    so the BC-set selector disables.
+    There is no BC-set selector: a steady run solves every boundary set the file
+    defines — set 1 alone for most files, sets 1 and 2 for a rapid-drawdown pair
+    (each keeps its own results tab and sidecar, and the only workflow that
+    defines a second set needs both solutions anyway). When the loaded file
+    defines a ``tseep`` (transient seepage) sheet, a Run type selector adds a
+    **Transient** choice: a time-dependent solve that produces a sequence of
+    saved frames. Transient always uses BC set 1 (its series bindings).
 
     Transient run PARAMETERS — duration, save schedule, rapid-drawdown stage times,
     and the time-series table — are model INPUTS, edited under **Inputs → Transient**
@@ -893,15 +896,7 @@ class RunSeepDialog(QDialog):
                 self.run_type.setCurrentIndex(j)
             form.addRow("Run type", self.run_type)
 
-        self.bc = QComboBox()
-        self.bc.addItem("Set 1", 1)
-        if has_bc2:
-            self.bc.addItem("Set 2 (rapid drawdown)", 2)
-            self.bc.addItem("Both sets (1 & 2)", "both")
-        idx = self.bc.findData(defaults.get("bc", 1))
-        if idx >= 0:
-            self.bc.setCurrentIndex(idx)
-        form.addRow("BC set", self.bc)
+        self._has_bc2 = bool(has_bc2)
 
         self.tol = QDoubleSpinBox()
         self.tol.setDecimals(8)
@@ -910,6 +905,16 @@ class RunSeepDialog(QDialog):
         form.addRow("Convergence tol", self.tol)
 
         layout.addLayout(form)
+
+        # Two boundary sets means a rapid-drawdown pair; a steady run solves both,
+        # each keeping its own results tab. Stated here because there is nothing
+        # else in the dialog to say so.
+        if self._has_bc2:
+            self.bc2_caption = QLabel(
+                "This file defines two boundary sets; a steady run solves both "
+                "(each keeps its own results tab).")
+            self.bc2_caption.setWordWrap(True)
+            layout.addWidget(self.bc2_caption)
 
         # Where transient inputs live now (the run dialog no longer edits them).
         if self.has_tseep:
@@ -925,7 +930,7 @@ class RunSeepDialog(QDialog):
         self.preflight = PreflightPanel(
             analysis=lambda: "tseep" if self._transient() else "seep",
             slope_data=self._sd, document=document,
-            selection_fn=lambda: {"bc": self.bc.currentData()}, parent=self)
+            selection_fn=lambda: {}, parent=self)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self._ok = bb.button(QDialogButtonBox.Ok)
@@ -936,7 +941,6 @@ class RunSeepDialog(QDialog):
         two_pane(self, layout, self.preflight, bb)      # controls left, checks right
 
         self.run_type.currentIndexChanged.connect(self._sync_mode)
-        self.bc.currentIndexChanged.connect(self.preflight.refresh)
         self.preflight.changed.connect(self._sync_run)
         self._sync_mode()
         self._sync_run()
@@ -950,9 +954,6 @@ class RunSeepDialog(QDialog):
         return self.has_tseep and self.run_type.currentData() == "transient"
 
     def _sync_mode(self, *_):
-        transient = self._transient()
-        # Transient uses BC set 1's series bindings; the BC selector is steady-only.
-        self.bc.setEnabled(not transient)
         # Transient adds its own requirements (a declared time base, storage per
         # material) on top of every steady rule, so the findings follow the mode.
         self.preflight.refresh()
@@ -962,7 +963,9 @@ class RunSeepDialog(QDialog):
             # Stage times are NOT carried here — the runner reads them from the
             # document's tseep data (edited under Inputs → Transient).
             return {"mode": "transient", "bc": 1, "tol": self.tol.value()}
-        return {"mode": "steady", "bc": self.bc.currentData(), "tol": self.tol.value()}
+        # Steady solves every set the file defines (see the class docstring).
+        return {"mode": "steady", "bc": "both" if self._has_bc2 else 1,
+                "tol": self.tol.value()}
 
 
 class BuildMeshDialog(QDialog):
@@ -1664,7 +1667,13 @@ class SensitivityDialog(QDialog):
         self.seep_tol.setDecimals(8)
         self.seep_tol.setRange(1e-10, 1.0)
         self.seep_tol.setValue(float(so.get("tol", 1e-4)))
-        form.addRow("BC set", self.seep_bc)
+        # A sweep tracks ONE discharge per step, so with two boundary sets the set
+        # is a real choice; with one there is nothing to pick and the row is noise
+        # (the hidden combo still answers options() with set 1).
+        if self.seep_bc.count() > 1:
+            form.addRow("BC set", self.seep_bc)
+        else:
+            self.seep_bc.setVisible(False)
         form.addRow("Convergence tol", self.seep_tol)
         note = QLabel("Output quantity = total discharge q through the section. Sweep "
                       "hydraulic conductivity / boundary heads; each step is one "

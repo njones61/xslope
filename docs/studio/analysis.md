@@ -400,10 +400,12 @@ Mesh generation uses **gmsh**, which is installed by the `fem` extra
 
 ## Seepage
 
-In **Seepage** mode, **Run Seep…** opens a dialog with the solve parameters — the
-**BC set** (set 1, set 2, or both — the extra choices appear when the file
-defines a second set) and the **convergence tolerance** — above the
-[model checks](#model-checks-before-a-run). Display choices — the
+In **Seepage** mode, **Run Seep…** opens a dialog with the solve parameter — the
+**convergence tolerance** — above the
+[model checks](#model-checks-before-a-run). A steady run solves every boundary
+set the file defines: set 1 alone for most files, and both sets for a
+rapid-drawdown pair (a caption in the dialog says so when a second set is
+present). Display choices — the
 plotted variable, contour levels, flow lines, vectors, fill, the phreatic
 surface — are not run options; they live on the
 [Display panel](#display-options-per-view) of the solution view and re-render
@@ -436,8 +438,8 @@ submerged-only boundary rule, and the initial condition — is on the
 [Studio](../seep/transient.md#studio) section walks the same workflow from the
 theory side.
 
-Because a transient run drives the flow with BC set 1's time series, the **BC set**
-selector disables for it. The run's other parameters — the duration, save schedule,
+A transient run drives the flow with BC set 1's time series. The run's other
+parameters — the duration, save schedule,
 rapid-drawdown stage times, and the time series themselves — are model inputs, edited
 under **Inputs → Transient** (the [Transient editor](editing.md#transient-seepage)),
 so the dialog carries no stage fields, only a caption pointing there.

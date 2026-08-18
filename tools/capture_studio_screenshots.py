@@ -468,9 +468,9 @@ def capture_welcome_dialog():
 def capture_run_seep_dialog():
     """The Run Seepage dialog in Steady mode, on a model with two BC sets.
 
-    Two sets is what makes the BC-set selector a real choice (set 1, set 2, or
-    both), which is the thing the surrounding prose describes; a one-set model
-    shows a dropdown with nothing to pick."""
+    Two sets is what makes the both-sets caption appear (a steady run solves
+    both automatically), which is the thing the surrounding prose describes; a
+    one-set model shows the tolerance alone."""
     from xslope.fileio import load_slope_data
     from studio.dialogs import RunSeepDialog
 

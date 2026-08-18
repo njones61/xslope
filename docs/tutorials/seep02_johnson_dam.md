@@ -324,10 +324,6 @@ Click **Run Seep…**:
 
 ![The Run Seepage dialog](images/seep02_studio_run_seep.png)
 
-**BC set** stays at `Set 1`. A second set appears in this list only for a file that
-defines one, which is how a rapid drawdown analysis carries its drawn-down
-boundaries.
-
 **Convergence tol** is the head-change tolerance the unconfined iteration is
 tested against, and unlike on SEEP-1's confined problem it is live here. Leave it
 at `0.0001` for now — a later section measures what changing it does.

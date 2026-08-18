@@ -567,7 +567,8 @@ by less than half a foot between them.
 
 ## Scaling the flow net on a zoned section
 
-The blue lines on the solution plot are flow lines, contours of a stream function
+Set **Variable** back to `Total head` to see the flow net again. The blue lines
+on the solution plot are flow lines, contours of a stream function
 computed by a companion solve on the same mesh. Water flows along a flow line and
 never across one, so the strip between two adjacent flow lines is a **flow
 channel** carrying a fixed share of the discharge.

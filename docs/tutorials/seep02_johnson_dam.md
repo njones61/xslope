@@ -530,7 +530,11 @@ that way, somewhere between about a twentieth and a tenth of the flow crossing t
 downstream shell travels through unsaturated soil. That is small, and it is not
 zero, which is what gives the choice of unsaturated model something to act on.
 
-The pore-pressure field draws the same story as a field rather than as numbers:
+The pore-pressure field draws the same story as a field rather than as numbers.
+In the **Display** panel, make the same three moves as
+[SEEP-1's gradient plot](seep01_sheetpile.md#reading-the-gradient-field): set
+**Variable** to `Pore pressure`, tick **Filled contours**, and untick
+**Flow lines**:
 
 ![Pore pressure and the phreatic surface](images/seep02_pressure.png){width=1000}
 

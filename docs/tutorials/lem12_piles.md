@@ -145,6 +145,21 @@ the pile crossings, at elevation −5.07 on the lower shaft and −4.48 on the u
 one — 10.07 ft and 14.48 ft of soil above the surface at each pile, which is the
 depth the force is computed over.
 
+The Log pane prints the computed forces with the answer — one line per pile
+row, running from the soil force through the capacity that governed it to
+the force each row applies:
+
+```text
+Critical FS = 1.842
+Sliding mass = 62,198.1 lb/ft over 61.27 ft of failure surface
+Pile row 'lower row': Ito & Matsui soil force = 44,178 lb per pile; bending governs (Mcap/Lm, Lm = 3.94) -> 15,244 lb per pile = 2,540.7 lb/ft applied
+Pile row 'upper row': Ito & Matsui soil force = 81,729 lb per pile; bending governs (Mcap/Lm, Lm = 5.47) -> 10,962 lb per pile = 1,827.0 lb/ft applied
+Total pile resistance = 4,367.6 lb/ft
+```
+
+Each piece of those lines gets its own section below: where the soil force
+comes from, and what "bending governs" means for the shafts.
+
 ### What the two rows are worth
 
 FS = 1.842 describes the reinforced slope, but it does not say what the
@@ -183,8 +198,8 @@ where the base is flatter and the force resolves more directly against sliding.
 
 ## Where the computed force appears
 
-So far the pile force has been invisible: the plot shows its effect on the
-factor of safety, but not the force itself. To see the number, generate the
+The Log lines above give each row's bottom line. The full accounting —
+every pile input echoed, and the force on the slice it acts on — is in the
 **Analysis Report**. With the run still loaded, **File → Generate Report…** writes a Word
 document whose limit equilibrium section carries the pile inputs and the solved
 slice table ([Analysis Report](../studio/reports.md) documents the whole
@@ -456,7 +471,8 @@ This tutorial demonstrated:
   path: the lateral force computed from the 2 ft diameter and the 6 ft spacing,
   at the depth each trial surface reaches at each shaft, and recomputed for every
   surface a search evaluates.
-- Where that force is readable — the report's **Piles** table saying `computed`
+- Where that force is readable — one Log line per pile row printed with the
+  factor of safety, the report's **Piles** table saying `computed`
   where an input would be, and the slice table's **H<sub>p</sub>** column carrying
   **2,540.7** and **1,827.0 lb/ft** on the two slices the piles cross, totalling
   **4,367.6 lb/ft**.

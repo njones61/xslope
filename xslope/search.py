@@ -1428,6 +1428,47 @@ def analysis_search_kwargs(slope_data, circular=True, fs_tol=None, tol=None,
     return kw
 
 
+def _pile_report_lines(slice_df, slope_data):
+    """One line per pile-row crossing of the solved surface: the Ito & Matsui
+    soil force, the capacity that governed, and the force applied per unit
+    width — plus a total when more than one row contributes. These numbers are
+    otherwise visible only in a report's pile and slice tables."""
+    from .units import labels
+    recs = (slice_df.attrs.get("pile_report")
+            if slice_df is not None and hasattr(slice_df, "attrs") else None)
+    if not recs:
+        return []
+    u = labels(slope_data.get("unit_system") or None)
+    wu = u.get("force_per_len", "")
+    fu = wu.split("/")[0] if "/" in wu else ""    # "lb/ft" -> "lb", "kN/m" -> "kN"
+    out = []
+    for r in recs:
+        name = r["label"] or "pile"
+        if r["computed"] and r["F_soil"] is not None:
+            line = (f"Pile row '{name}': Ito & Matsui soil force = "
+                    f"{r['F_soil']:,.0f} {fu} per pile")
+            if r["governed"] == "bending (Mcap/Lm)":
+                line += (f"; bending governs (Mcap/Lm, Lm = {r['L_m']:.2f}) "
+                         f"-> {r['F_used']:,.0f} {fu} per pile")
+            elif r["governed"] == "shear (Vcap)":
+                line += (f"; shear governs (Vcap) -> {r['F_used']:,.0f} {fu} "
+                         f"per pile")
+            line += f" = {r['H_width']:,.1f} {wu} applied"
+        else:
+            if r["governed"] in ("bending (Mcap/Lm)", "shear (Vcap)"):
+                line = (f"Pile row '{name}': H stated; "
+                        f"{r['governed'].split(' (')[0]} governs -> "
+                        f"{r['H_width']:,.1f} {wu} applied")
+            else:
+                line = (f"Pile row '{name}': H stated = "
+                        f"{r['H_width']:,.1f} {wu}")
+        out.append(line.replace("  ", " ").replace(" ,", ","))
+    if len(recs) > 1:
+        total = sum(r["H_width"] for r in recs)
+        out.append(f"Total pile resistance = {total:,.1f} {wu}")
+    return out
+
+
 def _sliding_mass_line(slice_df, slope_data):
     """The one-line mass summary printed with the factor of safety: the sliding
     mass's weight and its base length, summed from the solved slices, in the
@@ -1565,6 +1606,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
             mass = _sliding_mass_line(critical.get("slices"), slope_data)
             if mass:
                 print(mass)
+            for line in _pile_report_lines(critical.get("slices"), slope_data):
+                print(line)
         return {"slice_df": critical.get("slices"),
                 "failure_surface": critical.get("failure_surface"),
                 "results": results, "search": search, "method": method,
@@ -1609,6 +1652,8 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         mass = _sliding_mass_line(slice_df, slope_data)
         if mass:
             print(mass)
+        for line in _pile_report_lines(slice_df, slope_data):
+            print(line)
     if bundle["results"] is None:
         # The surface was built and the method was given it: it ran, and it did
         # not converge. The bundle keeps the surface so that answer can be

@@ -1189,6 +1189,11 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 "label": pile.get("label", ""),
                 "claimed": set(),
             })
+    # One record per pile-row crossing of the failure surface, carried out on
+    # df.attrs['pile_report'] so the run summary can print the Ito & Matsui
+    # chain (soil force -> governing capacity -> applied force) without a
+    # report round-trip.
+    pile_report = []
 
     # Line loads (v12 'lloads' sheet): concentrated forces per unit width on the
     # ground surface, assigned below to the slice whose top contains each point.
@@ -2025,6 +2030,40 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
                     pile_H = F_capped / S_pile
 
+                # The crossing's diagnostics, for the run summary. 'governed'
+                # names which bound produced the applied force.
+                _rec = {"label": pl["label"], "x": float(intersec.x),
+                        "y": float(intersec.y), "computed": bool(pile_H_was_auto),
+                        "S": pl.get("S"), "appl": pl.get("appl", "active"),
+                        "H_width": float(pile_H), "F_soil": None, "F_used": None,
+                        "governed": None, "L_m": None, "depth": None}
+                try:
+                    _gs = np.array(ground_surface.coords)
+                    _gs = _gs[np.argsort(_gs[:, 0])]
+                    _rec["depth"] = float(np.interp(intersec.x, _gs[:, 0],
+                                                    _gs[:, 1]) - intersec.y)
+                except Exception:
+                    pass
+                if F_pile_single is not None:
+                    _rec["F_soil"] = float(F_pile_single)
+                    _F_used = pile_H * pl["S"] if pl.get("S") else None
+                    _rec["F_used"] = None if _F_used is None else float(_F_used)
+                    if _F_used is not None:
+                        if _F_used >= F_pile_single - 1e-9:
+                            _rec["governed"] = "soil force"
+                        else:
+                            # L_m was computed in the capacity block above
+                            # whenever this row carries an M_cap.
+                            _Vb = V_cap if V_cap is not None else float("inf")
+                            _Mb = (M_cap / L_m) if (M_cap is not None and L_m > 0) \
+                                else float("inf")
+                            if _Mb <= _Vb:
+                                _rec["governed"] = "bending (Mcap/Lm)"
+                                _rec["L_m"] = float(L_m)
+                            else:
+                                _rec["governed"] = "shear (Vcap)"
+                pile_report.append(_rec)
+
                 h_pile += pile_H
                 if pl.get("appl", "active") == "passive":
                     h_pile_pas += pile_H
@@ -2485,6 +2524,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Surface a flat-arc facing note in the returned data (rather than guessing
     # silently). Only set on a symmetric flat arc with no override; None otherwise.
     df.attrs['facing_note'] = facing_note
+    if pile_lines_data:
+        df.attrs['pile_report'] = pile_report
     if material_breakdown:
         _mats_of_poly = []
         for pe in poly_edges:

@@ -772,24 +772,16 @@ front and Gardner by at most **0.35 ft**, and van Genuchten and Gardner by at mo
 **0.08 ft** — on a dam 80 ft tall, under a 60 ft head, on a mesh whose elements are
 6.25 ft.
 
-The lower panel shows where those tenths of a foot are, and they do not all point
-the same way. Over the crest of the core, at x = 370 and x = 390, the two
-calibrated models hold the surface **0.32 to 0.40 ft higher** than the linear
-front. At the downstream toe of the core, at x = 420, they put it **0.29 to
-0.33 ft lower**, and that deficit shrinks downstream — 0.21 to 0.25 ft at x = 460,
-about a tenth of a foot at x = 500, less than that at x = 540. The surface pivots
-about the core rather than shifting up or down as a whole, and the two calibrated
-models pivot together, staying within 0.08 ft of each other at every station.
-
 These are differences between three runs on one mesh, so the discretization error
 common to all three cancels out of them. That is what makes a shift smaller than
 one element worth reading at all.
 
 Which model to choose follows from those two comparisons, and it is why the
 [overview](../seep/overview.md#unsaturated-flow-formulation) recommends the linear
-front for stability work. The pore pressures that drive a stability analysis are
-the ones *below* the phreatic surface, and those are set by the saturated
-conductivities and the boundary conditions. If the deliverable is a factor of
+front for stability work. It is also the simplest of the three — two parameters
+and no measured curve to defend. The pore pressures that drive a stability
+analysis are the ones *below* the phreatic surface, and those are set by the
+saturated conductivities and the boundary conditions. If the deliverable is a factor of
 safety, any of the three gives it. If the deliverable is a discharge — a seepage
 collection design, a reservoir loss estimate, a comparison against a measured
 tailwater flow — a 4.6% spread is worth caring about, and the model whose

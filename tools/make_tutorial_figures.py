@@ -2563,39 +2563,19 @@ def _seep02_anchored(ys, entry, exit_pt, stations=SEEP02_STATIONS):
 
 
 def _seep02_phreatic_figure(series, stations=SEEP02_STATIONS):
-    """The phreatic surfaces of the three unsaturated models on the section, with
-    the differences between them drawn underneath at a scale that can show them.
-
-    Two panels because one cannot: at section scale the three surfaces are one
-    line, and that IS the result — so the lower panel states how far apart they
-    are, in feet, at every station.
-    """
-    import numpy as np
-
-    fig, (ax, ax2) = plt.subplots(
-        2, 1, figsize=(11, 7.4), gridspec_kw={"height_ratios": [2.3, 1.0]})
+    """The phreatic surfaces of the three unsaturated models on the section. At
+    section scale the three surfaces are one line, and that IS the result; the
+    page quotes the per-station maxima rather than charting them."""
+    fig, ax = plt.subplots(figsize=(11, 5.2))
     _seep02_section_axes(ax)
     colors = {"lf": "#1f6fb4", "vg": "#c1663a", "gard": "#3f8f5a"}
     styles = {"lf": "-", "vg": "--", "gard": ":"}
-    base = None
     for label, ys, entry, exit_pt in series:
         xs_a, ys_a = _seep02_anchored(ys, entry, exit_pt, stations)
         ax.plot(xs_a, ys_a, styles[label], color=colors[label], lw=2.0,
                 label="%s" % label)
-        if base is None:
-            base = np.asarray(ys)
-        else:
-            ax2.plot(stations, np.asarray(ys) - base, styles[label],
-                     color=colors[label], lw=1.6, marker="o", ms=4,
-                     label="%s − lf" % label)
     ax.legend(loc="upper right", frameon=False)
     ax.set_title("The phreatic surface under each unsaturated model")
-    ax2.axhline(0.0, color="#8a939c", lw=0.9)
-    ax2.set_xlim(0, 750)
-    ax2.set_xlabel("x (ft)")
-    ax2.set_ylabel("difference (ft)")
-    ax2.grid(True, color="#e8ebee", lw=0.6)
-    ax2.legend(loc="lower left", frameon=False, fontsize=9)
     fig.tight_layout()
 
 

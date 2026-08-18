@@ -518,7 +518,7 @@ soil still carries water. Splitting the same velocity integral at the phreatic
 surface, in the downstream shell where the unsaturated zone is thickest:
 
 | Section | q across it (ft³/day per ft) | Phreatic surface (ft) | Above it | Share |
-|:---:|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|:---:|
 | x = 400 | 1.9531 | 124.98 | 0.0998 | 5.1% |
 | x = 450 | 1.8955 | 112.31 | 0.0846 | 4.5% |
 | x = 500 | 2.0676 | 108.84 | 0.2139 | 10.3% |
@@ -591,7 +591,7 @@ the `mat` sheet, and this dam is where it matters. With 20 contour levels, so 19
 head drops of 3.158 ft each, and a 60 ft head drop:
 
 | base_mat | Zone | k (ft/day) | N<sub>f</sub> = q·N<sub>d</sub>/(k·Δh) | φ contour levels requested |
-|:---:|---|:---:|---:|:---:|
+|:---:|---|:---:|:---:|:---:|
 | 1 | shell | 1 | 0.62 | 2 |
 | 2 | core | 0.001 | 618.96 | 620 |
 | 3 | foundation | 0.1 | 6.19 | 7 |
@@ -734,7 +734,7 @@ the worst of the three fits. The linear front lies with none of them, and readin
 the three off at four suctions on the shell's parameters says where they part:
 
 | ψ (ft) | −0.5 | −1 | −5 | −20 |
-|---|---:|---:|---:|---:|
+|---|:---:|:---:|:---:|:---:|
 | `lf` | 0.50500 | 0.01000 | 0.01000 | 0.01000 |
 | `vg` | 0.04469 | 0.00947 | 0.00010 | 0.00010 |
 | `gard` | 0.04062 | 0.00858 | 0.00022 | 0.00010 |
@@ -764,7 +764,7 @@ these runs finish just past sweep 20 — `lf` by three sweeps, `gard` by seven,
 next rung.
 
 | Model | q (ft³/day per ft) | Iterations | Flow above the phreatic surface at x = 500 | Relaxation at the last sweep |
-|---|---:|---:|---:|---:|
+|---|:---:|:---:|:---:|:---:|
 | `lf` | 1.9546 | 23 | 10.3% | 0.50 |
 | `vg` | 1.8649 | 28 | 8.3% | 0.50 |
 | `gard` | 1.8661 | 27 | 8.6% | 0.50 |
@@ -820,7 +820,7 @@ their answer; if the difference is coming from somewhere else, it will not.
 Sweeping *kr<sub>0</sub>* with *h<sub>0</sub>* held at −1 ft:
 
 | kr<sub>0</sub> | 0.1 | 0.03 | 0.01 | 0.003 | 0.001 | 0.0003 | 0.0001 |
-|---|---:|---:|---:|---:|---:|---:|---:|
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | q | 2.6328 | 2.1136 | 1.9546 | 1.8957 | 1.8782 | 1.8723 | 1.8707 |
 | Iterations | 11 | 14 | 23 | 24 | 22 | 145 | 148 |
 
@@ -887,7 +887,7 @@ The head tolerance is the only one of the three the dialog exposes, and it turns
 out to control the iteration count rather than the answer:
 
 | Convergence tol | Scaled to | q | Iterations |
-|---:|---:|---:|---:|
+|:---:|:---:|:---:|:---:|
 | 0.001 | 0.18 | 1.954617 | 23 |
 | 0.0001 | 0.018 | 1.954617 | 23 |
 | 0.00001 | 0.0018 | 1.954618 | 24 |
@@ -975,7 +975,7 @@ material 2 — and it makes the face work. Everything else, including the exit-f
 polyline itself, stays exactly as it was:
 
 | Core k (ft/day) | q (ft³/day per ft) | Exit-face nodes wet | Highest wet node | Iterations |
-|:---:|---:|:---:|---|---:|
+|:---:|:---:|:---:|---|:---:|
 | 0.001 | 1.9546 | 1 of 31 | (544.5, 102.6) | 23 |
 | 0.01 | 2.2258 | 1 of 31 | (544.5, 102.6) | 17 |
 | 0.1 | 4.3501 | 2 of 31 | (539.0, 105.2) | 20 |

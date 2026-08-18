@@ -183,9 +183,9 @@ out to the end of the section.
 
 The remaining boundaries — the base at elevation 0 and the two vertical ends —
 carry nothing and are therefore no-flow. The base is the rock the silt sits on.
-The ends are the modeler's judgment: the section is drawn far enough either side
-of the wall that the flow has become horizontal by the time it reaches them, so
-nothing crosses.
+Treating the ends as no-flow is a judgment call: the section is drawn far
+enough either side of the wall that the flow has become horizontal by the
+time it reaches them, so nothing crosses.
 
 These tables carry the entire model, and each is laid out exactly as its
 destination is — the template's worksheets and Studio's editors, same
@@ -585,8 +585,8 @@ Number of fixed-head nodes: 82
 Number of exit face nodes: 0
 ```
 
-Zero exit-face nodes is what made it confined, and one direct solve is all it
-took.
+With zero exit-face nodes the problem is confined, so a single direct solve
+finishes it.
 
 The solution view arrives with a **Display** panel in the left dock, holding the
 plot options of whichever result view is showing

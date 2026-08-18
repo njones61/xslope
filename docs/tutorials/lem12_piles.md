@@ -205,7 +205,8 @@ where the base is flatter and the force resolves more directly against sliding.
 
 ## How the force is computed
 
-The Log lines say what the piles delivered. This section explains where those
+The console log and the report say what the piles delivered. This section
+explains where those
 numbers come from, because understanding the calculation is what makes the
 rest of the page — the capacity limits, the spacing study — predictable
 rather than mysterious.

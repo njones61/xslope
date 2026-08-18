@@ -3478,7 +3478,11 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='piezo.extent_short', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, piezo_line=sd['piezo_line'][:3]),
          expect='does not cover the whole section'),
+    # manual_water: the template ships Water loads = auto and the rule stands
+    # down in auto mode (the line then IS the reservoir definition), so the
+    # round-tripped file must be pinned to manual for the mutation to reach it.
     dict(rule='piezo.no_consumer', base=PREFLIGHT_BASE_LEM, mode='excel',
+         manual_water=True,
          mutation=lambda sd: _pf_mats(sd, u='none'),
          expect='no material uses u = piezo'),
     dict(rule='water.ponded_no_dload', base=PREFLIGHT_BASE_LEM, mode='excel',
@@ -3964,6 +3968,11 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=None, S=1.0, D_pile=2.0),
          control=lambda sd: _pf_rows(sd, 'pile_lines', H=None, S=6.0, D_pile=2.0),
          expect='not greater than D'),
+    dict(rule='pile.sd_ratio_outside_band', base=PREFLIGHT_BASE_PILES,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=None, S=17.0, D_pile=2.0),
+         control=lambda sd: _pf_rows(sd, 'pile_lines', H=None, S=6.0, D_pile=2.0),
+         expect='about 2 to 8'),
     dict(rule='pile.fem_incomplete', base=PREFLIGHT_BASE_PILES_FEM, mode='excel',
          analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', E=None),

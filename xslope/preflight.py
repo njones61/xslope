@@ -3975,6 +3975,35 @@ def _pile_spacing_vs_diameter(ctx):
                f"{_AT_PILES}.")
 
 
+@rule("pile.sd_ratio_outside_band", WARNING, ("lem",),
+      "Ito & Matsui is calibrated for S/D between about 2 and 8.",
+      fields=("S", "D"))
+def _pile_sd_ratio_band(ctx):
+    for i, p in enumerate(ctx.piles):
+        if _num(p.get("H")) is not None:
+            continue               # H given: the arching theory is never invoked
+        s, d = _num(p.get("S")), _num(p.get("D_pile"))
+        if s is None or d is None or d <= 0 or s <= d:
+            continue               # blank or wall-like: other rules carry those
+        ratio = s / d
+        if 2.0 <= ratio <= 8.0:
+            continue
+        if ratio < 2.0:
+            yield (f"{ctx.pile_label(i)} has S/D = {ratio:g}, below the S/D of "
+                   f"about 2 to 8 the Ito & Matsui theory is applicable for. "
+                   f"This close, the row acts more like a continuous wall than "
+                   f"a line of piles soil can flow between, and the computed "
+                   f"force can be unrealistically large. Widen the spacing, or "
+                   f"enter H directly for a wall {_AT_PILES}.")
+        else:
+            yield (f"{ctx.pile_label(i)} has S/D = {ratio:g}, above the S/D of "
+                   f"about 2 to 8 the Ito & Matsui theory is applicable for. "
+                   f"This far apart, the soil arching the theory is built on "
+                   f"fades away and the computed force overestimates what the "
+                   f"row can develop. Tighten the spacing, or enter a measured "
+                   f"H directly {_AT_PILES}.")
+
+
 @rule("pile.fem_incomplete", ERROR, ("fem",),
       "A pile the FEM cannot build is deleted from the model without a word.")
 def _pile_fem_incomplete(ctx):

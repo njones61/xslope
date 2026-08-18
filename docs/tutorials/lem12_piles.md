@@ -341,11 +341,15 @@ capacities and reaches the slices:
 
 The arching coefficients fall steeply as the gap opens — A₁ loses nine tenths of
 its value between S/D = 1.5 and 8 — and the force per foot of slope falls with
-them, from 8,386.6 lb/ft to 1,690.7. The two rows at the top of the table are
-outside the method's applicability: at S/D = 1.5 the piles are close enough to act
-as a continuous wall rather than as a row soil can flow between, and XSLOPE prints
-a warning that the computed force is very large. Above S/D = 8 the arching the
-theory is built on is no longer there to compute.
+them, from 8,386.6 lb/ft to 1,690.7. The table touches both limits of
+the applicable band. The top row, at S/D = 1.5, is below it: that close, the
+row acts more like a continuous wall than a line of piles soil can flow
+between. The bottom row sits at the band's upper edge, S/D = 8; spaced any
+wider, the arching the theory is built on fades away and the computed force
+overestimates what the row can develop. XSLOPE says so before the run: enter
+the 3 ft spacing and the **Model checks** panel warns that S/D = 1.5 is
+below the S/D of about 2 to 8 the theory is applicable for, and the Log adds
+a warning at solve time that the computed force is very large.
 
 Widening the spacing does not only lower the number on this surface. Searching
 the model at 12 ft — a separate search with its own critical surface — puts the
@@ -404,17 +408,21 @@ circle, the two ways of entering the pile no longer agree:
 | The auto search's critical circle | 1.842 | 1.842 | 1.481 |
 | The shallower circle above | 1.896 | 1.752 | 1.213 |
 
-On the shallow circle the computed path develops **5,178.6 lb/ft**, more than the
-4,367.6 the stated numbers freeze in, and neither shaft's share is what it was.
-The lower one now has only 4.88 ft of soil above the surface, so its soil force
-of 14,189 lb passes both capacities untouched and it delivers 2,364.9 lb/ft. The
-upper one is still bending-limited, but at a 3.55 ft arm instead of a 5.47 ft
-one, so the same 60,000 ft·lb buys 16,882 lb of force and it delivers 2,813.7.
-The stated numbers were correct for one depth and are 16% low at another, and a
-search cannot tell: it returns 1.752 as the minimum because the frozen force is
-under-crediting the very surface it settles on. A force stated per surface has to
-be stated for the surface that governs, which is not known until the search is
-done. [VP54](../verification/rocscience.md#vp54) is the verified case of the
+Re-running the computed path on this shallow circle shows why the two
+entries part company. The surface now crosses the lower row only 4.88 ft
+below the ground, so its soil force drops to 14,189 lb — small enough to
+pass both capacities — and it delivers 2,364.9 lb/ft. The upper row is
+still limited by bending, but the shallower crossing shortens the moment
+arm from 5.47 to 3.55 ft, and the same 60,000 ft·lb of capacity now
+supplies 16,882 lb, or 2,813.7 lb/ft. Together the computed path delivers
+**5,178.6 lb/ft** on this surface, while the stated numbers stay frozen at
+4,367.6 — 16% less than these piles would really supply here.
+
+That shortfall is why the stated-force search stops at 1.752: the surface
+it settles on is being under-credited by the frozen forces, so it looks
+more critical than it is. A stated force is only correct for the surface it
+was computed from, and the surface that governs is not known until the
+search finishes. [VP54](../verification/rocscience.md#vp54) is the verified case of the
 stated-force route, a micro-pile row entered with its shear resistance given
 directly.
 

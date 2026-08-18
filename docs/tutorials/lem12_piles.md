@@ -416,21 +416,18 @@ circle, the two ways of entering the pile no longer agree:
 | The auto search's critical circle | 1.842 | 1.842 | 1.481 |
 | The shallower circle above | 1.896 | 1.752 | 1.213 |
 
-Re-running the computed path on this shallow circle shows why the two
-entries part company. The surface now crosses the lower row only 4.88 ft
-below the ground, so its soil force drops to 14,189 lb — small enough to
-pass both capacities — and it delivers 2,364.9 lb/ft. The upper row is
-still limited by bending, but the shallower crossing shortens the moment
-arm from 5.47 to 3.55 ft, and the same 60,000 ft·lb of capacity now
-supplies 16,882 lb, or 2,813.7 lb/ft. Together the computed path delivers
-**5,178.6 lb/ft** on this surface, while the stated numbers stay frozen at
-4,367.6 — 16% less than these piles would really supply here.
-
-That shortfall is why the stated-force search stops at 1.752: the surface
-it settles on is being under-credited by the frozen forces, so it looks
-more critical than it is. A stated force is only correct for the surface it
-was computed from, and the surface that governs is not known until the
-search finishes. [VP54](../verification/rocscience.md#vp54) is the verified case of the
+The difference between the two entries is simple. With Ito & Matsui, every
+trial surface gets its own H, because the force depends on how deep the
+surface crosses each row; a stated H never changes. The two searches can
+therefore settle on different circles — and here they do. On this shallow
+circle the computed path develops **5,178.6 lb/ft** (a shallower crossing
+on the lower row, a shorter moment arm on the upper), while the stated
+numbers stay frozen at the 4,367.6 that was right for the deep circle —
+16% less than these piles would supply here. Under-credited, the surface
+reads 1.752 instead of 1.896, and the stated-force search reports it as
+the minimum. A stated force is only correct for the surface it was
+computed from, and the surface that governs is not known until the search
+finishes. [VP54](../verification/rocscience.md#vp54) is the verified case of the
 stated-force route, a micro-pile row entered with its shear resistance given
 directly.
 

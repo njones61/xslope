@@ -239,9 +239,10 @@ gives the derivation, the coefficients in full and the φ = 0 and c = 0 special
 cases; the method is applicable for S/D between about **2 and 8**, and this
 model's S/D = 3 sits in the middle of that band.
 
-Neither of the forces above is what reached the slice table. The 7,363.0 and
-13,621.5 lb/ft the soil is capable of delivering became 2,540.7 and 1,827.0 by
-the time they were applied, and the reason is the shafts themselves.
+These are the forces the soil can deliver, not the forces the run applied.
+The Log lines show 2,540.7 and 1,827.0 lb/ft — a fraction of the 7,363.0
+and 13,621.5 computed above. The difference is the structural capacity of
+the shafts, which the next section covers.
 
 ---
 

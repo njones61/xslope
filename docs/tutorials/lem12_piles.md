@@ -344,7 +344,11 @@ its value between S/D = 1.5 and 8 — and the force per foot of slope falls with
 them, from 8,386.6 lb/ft to 1,690.7. The table touches both limits of
 the applicable band. The top row, at S/D = 1.5, is below it: that close, the
 row acts more like a continuous wall than a line of piles soil can flow
-between. The bottom row sits at the band's upper edge, S/D = 8; spaced any
+between. (A wall itself is modeled the other way — a pile line with its
+resistance stated directly per foot of wall, from the wall's structural
+capacity, the way the soldier-pile wall of
+[LEM-9](lem09_tieback_wall.md#the-problem) enters its 5,900 lb/ft — because
+a wall has no gaps for the soil to arch across.) The bottom row sits at the band's upper edge, S/D = 8; spaced any
 wider, the arching the theory is built on fades away and the computed force
 overestimates what the row can develop. XSLOPE says so before the run: enter
 the 3 ft spacing and the **Model checks** panel warns that S/D = 1.5 is

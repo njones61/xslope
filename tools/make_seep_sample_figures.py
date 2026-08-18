@@ -69,7 +69,9 @@ DPI = 200
 #   Matches the flow-net densities of the pre-existing (Norm-approved) figures.
 CASES = [
     ("clay_blanket",  False, 1),   # saturated: sheetpile + clay blanket (1 material)
-    ("sea_trench",    False, 1),   # saturated: trench, silt is the through-flow layer
+    ("sea_trench",    False, 2),   # saturated: trench; the silty clay below the
+                                   # banks is the through-flow layer (the silt is
+                                   # the upper bank material)
     ("earth_dam1",    True,  2),   # partially saturated: shell + core; base = core
     ("earth_dam1_vg", True,  2),   # same dam, van Genuchten model; base = core
     ("johnson_res",   True,  3),   # shell/core/foundation; base = foundation

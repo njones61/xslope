@@ -657,16 +657,16 @@ count, so it computes the *N<sub>f</sub>* that satisfies the identity and draws
 that many flow lines. The channel count on the screen is therefore derived from
 the discharge rather than an independent check on it.
 
-What the picture does say is the number that was derived before it was rounded to
-whole lines:
+The two counts are not on equal footing. *N<sub>d</sub>* is a whole number by
+construction — the contour count chooses it, and the drops are equal because the
+levels are evenly spaced. *N<sub>f</sub>* is whatever the physics returns,
 
 $$ N_f = \frac{q \, N_d}{k \, \Delta h} = \frac{40.111 \times 9}{30 \times 3} = 4.011 $$
 
-Four channels against nine drops, with the channel count landing within 0.3% of a
-whole number rather than somewhere between two. That is what makes this a true
-curvilinear-square net rather than a drawing that approximates one, and it is why
-the arithmetic runs backwards as cleanly as forwards: counting 4 and 9 off the
-screen gives
+and nothing obliges it to come out whole. On this problem, nine drops happen to
+land it within 0.3% of exactly four — and that near-whole pair is what lets the
+conventional hand calculation run on the picture's counts. Reading 4 and 9 off
+the screen gives
 
 $$ q = 30 \times 3 \times \frac{4}{9} = 40.0 \text{ m³/yr per m} $$
 
@@ -674,12 +674,11 @@ against the finite element answer of 40.111, and the 0.3% between them is the
 rounding above and nothing else.
 
 That is what the contour count was for. Left at the panel's default of 20 levels,
-the same solution gives *N<sub>f</sub>* = 8.47 against 19 drops, which rounds to 8
-channels and reads back as 30 × 3 × 8/19 = 37.9 — 5.5% under the answer it was
-drawn from. That picture is the same head field with more contours on it, but its
-cells are not square and its counts do not reproduce the discharge. A net is worth
-counting only when both counts come out whole, and on this problem 10 levels is
-what does it.
+the same solution gives *N<sub>f</sub>* = 8.47 against 19 drops — nowhere near
+whole — and reading the rounded 8 channels off that picture gives
+30 × 3 × 8/19 = 37.9, 5.5% under the answer it was drawn from. A net is worth
+counting only when the channel count lands close to a whole number, and on this
+problem 10 levels is what does it.
 
 A flow net drawn by hand on graph paper is a legitimate solution to a confined
 seepage problem and was the standard one for decades; what the finite element solve

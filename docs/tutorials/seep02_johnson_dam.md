@@ -121,8 +121,10 @@ iterated, and a model without them is confined and is solved directly.
 
 The boundary condition types XSLOPE offers are the same on both kinds of
 problem, and
-[SEEP-1](seep01_sheetpile.md#boundary-condition-types) tabulates them.
-Three of them place the water:
+[SEEP-1](seep01_sheetpile.md#boundary-condition-types) tabulates them. Every
+boundary condition is defined the same way: by a **polyline** — the sequence of
+points along the boundary where the condition applies — with a value beside it
+where the type takes one. Three of the types place the water:
 
 **Specified head** (`head`) holds the total head at a stated value along a
 polyline, at every node, at all times. A reservoir floor is the usual case, and
@@ -143,10 +145,9 @@ boundary rather than the head on it. It is the boundary to use when the known
 quantity is a flux: rainfall infiltrating a surface, recharge over a field, a
 drain removing water at a set rate.
 
-A boundary that carries none of these is a **no-flow** boundary, which is a real
-statement rather than an omission: bedrock, an impervious liner, a line of
-symmetry, and the far ends of a section drawn wide enough that nothing crosses
-them.
+All other boundaries are **no-flow** by default — the right condition for
+bedrock, an impervious liner, a line of symmetry, or the far ends of a section
+drawn wide enough that nothing crosses them.
 
 ### The seepage face
 

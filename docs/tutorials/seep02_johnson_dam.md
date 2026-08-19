@@ -886,8 +886,9 @@ faster than it does.
 
 Had the run reported a number and stopped, the number would have looked fine:
 **1.9706**, a plausible discharge in the middle of everything else on this page.
-The fix is the ceiling, not the tolerance. Raising `max_iter` from its default of
-400 to 1,000 lets the same model converge in **963 iterations**, at
+Fix it by raising the ceiling, not by loosening the tolerance: raising
+`max_iter` from its default of 400 to 1,000 lets the same model converge in
+**963 iterations**, at
 *q* = **1.9755** — 0.25% from the truncated value, close enough that the truncated
 one was nearly right and far enough that nothing about the run said so. The cost of
 getting there is 963 sweeps against the shipped parameters' 23, on a model of

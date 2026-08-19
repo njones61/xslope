@@ -72,7 +72,7 @@ nav:
       - Reliability: tutorials/lem11_reliability.md
       - Piles: tutorials/lem12_piles.md
     - Seepage:
-      - Seepage Under a Sheetpile: tutorials/seep01_sheetpile.md
+      - Confined Seepage Under a Sheetpile: tutorials/seep01_sheetpile.md
       - Unconfined Seepage Through a Zoned Dam: tutorials/seep02_johnson_dam.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md

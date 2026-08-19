@@ -1,9 +1,9 @@
 ---
-title: "Tutorial SEEP-1 — Seepage Under a Sheetpile"
+title: "Tutorial SEEP-1 — Confined Seepage Under a Sheetpile"
 description: "Build a confined seepage model in XSLOPE from scratch — with the AI assistant, in the Excel template, or in Studio — mesh it, solve it for the discharge under a sheetpile wall, read the flow net it draws, and find out how much of the answer is mesh, on a problem where the sequence never settles."
 ---
 
-# Tutorial SEEP-1 — Seepage Under a Sheetpile
+# Tutorial SEEP-1 — Confined Seepage Under a Sheetpile
 
 This tutorial builds a two-dimensional groundwater flow analysis from nothing and
 carries it through to a discharge you can defend. It teaches what a seepage model

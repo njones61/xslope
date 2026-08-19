@@ -325,7 +325,9 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     # run_transient_seepage resolves them per time step (by the head binding's kind:
     # submerged-only reservoir Dirichlet, or plain time-varying head; scaled unit
     # flux loads for fluxes). Empty on every steady file, so the steady solve is
-    # bit-identical.
+    # bit-identical — and run_seepage_analysis refuses to solve while bindings
+    # exist, so a series-bound node can never be silently left free in a steady
+    # solution.
     head_series_bindings = []   # [{"mask": bool(n_nodes), "series": name, "kind": str}]
     flux_series_bindings = []   # [{"unit_flux_nodal": (n_nodes,), "series": name}]
 
@@ -3831,6 +3833,23 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     report = seep_data.get("_preflight")
     if report is not None:
         report.raise_for_errors()
+
+    # A boundary value bound to a tseep time series has no meaning in a steady
+    # solve — there is no time axis to read the series at, and silently leaving
+    # those nodes free would solve a different problem than the file describes.
+    # Refuse loudly instead. The steady solution at the initial pool level is the
+    # transient run's own first frame (t = 0), so nothing is lost by refusing.
+    _bound = ([b["series"] for b in seep_data.get("head_series_bindings") or []] +
+              [b["series"] for b in seep_data.get("flux_series_bindings") or []])
+    if _bound:
+        _names = ", ".join(f"'{s}'" for s in dict.fromkeys(_bound))
+        raise SeepInputError(
+            f"Cannot run a STEADY seepage analysis: one or more boundary values "
+            f"are bound to time series ({_names}), and a steady solve has no time "
+            f"axis to read them at. Run a TRANSIENT analysis instead — its first "
+            f"saved frame (t = 0) is the steady solution at the initial series "
+            f"values — or replace the series name with a number in the seep bc "
+            f"sheet for a steady run.")
 
     start_time = time.time()
 

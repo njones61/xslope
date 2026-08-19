@@ -3467,6 +3467,28 @@ def _tseep_initial_condition(ctx):
     return out
 
 
+@rule("seep.steady_with_series_bc", ERROR, ("seep",),
+      "A boundary value bound to a time series cannot be solved steady.")
+def _steady_with_series_bc(ctx):
+    # Fires on the STEADY run only. A transient run inherits every seep rule
+    # (analyses expansion), but a series-bound value is exactly what a transient
+    # run is for -- guard on the exact analysis, not the expanded set.
+    if ctx.analysis_name != "seep":
+        return None
+    bc = ctx.seep_bc
+    names = [b.get("head") for b in bc.get("specified_heads") or []]
+    names += [b.get("flux") for b in bc.get("specified_fluxes") or []]
+    bound = list(dict.fromkeys(v for v in names if isinstance(v, str) and v.strip()))
+    if not bound:
+        return None
+    listed = ", ".join(f"'{s}'" for s in bound)
+    return (f"One or more boundary values are bound to a time series ({listed}), "
+            f"and a steady solve has no time axis to read a series at. Run a "
+            f"TRANSIENT analysis instead -- its first saved frame (t = 0) is the "
+            f"steady solution at the initial series values -- or replace the "
+            f"series name with a number for a steady run {_AT_SEEPBC}.")
+
+
 @rule("tseep.reservoir_face_above_level", INFO, ("seep",),
       "A reservoir boundary is submerged-only: nodes above the level become exit faces.")
 def _reservoir_above_level(ctx):
@@ -3490,7 +3512,7 @@ def _reservoir_above_level(ctx):
                    f"y = {top:g}, above its level ({level:g}). A reservoir boundary "
                    f"is submerged-only: nodes at or below the level are held at it, "
                    f"and the nodes above become seepage-exit faces. That is how a "
-                   f"rising pool is modelled -- it is only wrong if the face was "
+                   f"rising pool is modeled -- it is only wrong if the face was "
                    f"meant to be held at the level throughout {_AT_SEEPBC}.")
     return out
 

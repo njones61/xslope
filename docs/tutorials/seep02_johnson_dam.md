@@ -948,40 +948,22 @@ the same mesh and the same field at **FS = 1.25** as well.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- An unconfined problem identified by its boundary conditions rather than by a
-  setting — **31 exit-face nodes**, so an iterated solve, a phreatic surface, and
-  pore pressures from **−2,577.9 to 9,971.1 psf** where a confined solve can produce
-  no negative pressure at all.
-- A seepage face as the only boundary type whose extent is an output: the same
-  31-node polyline down the whole downstream slope, resolved by an active-set sweep
-  to **1 wet node** at (544.5, 102.6) on the dam as built, and to **8 wet nodes**
-  reaching (506.1, 120.6) when the core is given the shell's conductivity.
-- A discharge of **1.9546 ft³/day per ft** in **23 iterations**, with the core
-  taking **46.13 ft of the 60 ft** head drop across 88 ft of a 750 ft section,
-  **90.1%** of
-  the centerline flow passing *below* the cutoff key through foundation it does not
-  reach, and somewhere between **5% and 10%** of the flow in the downstream shell
-  traveling above the phreatic surface.
-- A flow net whose channel count is set by the base material: **0.62 channels**
-  scaled to the shell, **619** scaled to the core, **6.19** scaled to the
-  foundation that carries the through-flow — and the drawn net read back at
-  q = k·Δh·N<sub>f</sub>/N<sub>d</sub> = **1.895**, 3.1% from the computed answer
-  and all of it the rounding of 6.19 channels to 6.
-- Three unsaturated models on one mesh: **1.9546** for the linear front,
-  **1.8649** for van Genuchten and **1.8661** for a Gardner curve fitted to it —
-  the two calibrated models 0.06% apart and both 4.5 to 4.6% below the linear
-  front — with the phreatic surface moving by at most **0.40 ft** across all three,
-  and in opposite directions either side of the core.
-- That difference traced to the floor of the curve rather than to its shape: the
-  linear front swept from **2.6328 at kr₀ = 0.1 down to 1.8707 at 10⁻⁴**, where it
-  closes **93%** of its gap to van Genuchten, against a 4.6% spread from sweeping
-  h₀ over a twentyfold range.
-- A convergence test of three conditions, of which the exposed tolerance is the
-  least binding — **1.95462 at every tolerance from 10⁻³ to 10⁻⁶** — and a
-  linear front at **kr₀ = 10⁻⁴, h₀ = −10 ft** that stops unconverged at the
-  default ceiling of 400 iterations and needs **963** to finish.
+- Building a zoned section from stacked profile lines — each line the top of its
+  material, with shared vertices making the zones meet exactly.
+- The boundary set an unconfined problem needs, with the exit face drawn over the
+  whole downstream slope so the solver can find the discharge point itself.
+- Reading the solution: the phreatic surface, the head drop concentrated in the
+  core, and most of the flow passing under the cutoff key.
+- Scaling the flow net to the zone that carries the through-flow — the one base
+  material that gives a readable net on a zoned section.
+- The three unsaturated conductivity models, which moved the discharge by under
+  5% and the phreatic surface by less than half a foot; the linear front is the
+  simplest and the right default for stability work.
+- What a run that fails to converge looks like, and the habits that matter:
+  check `converged` before quoting a flowrate, and raise **Max iterations**
+  rather than loosening the tolerance when a steep curve needs more sweeps.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Seepage Analysis](../seep/overview.md) carries the governing equations, all three

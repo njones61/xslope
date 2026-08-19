@@ -6585,8 +6585,8 @@ class TransientDialog(QDialog):
             "schedule, the optional rapid-drawdown stage times, and one or more named "
             "time series (a shared time axis with a value per series). A seep BC value "
             "cell that names a series is driven by it — a time-varying boundary "
-            "condition. Leave everything blank for a steady model. The plot previews "
-            "the series as you edit."))
+            "condition. With no times or values entered the model stays steady. The "
+            "plot previews the series as you edit."))
 
         # --- run controls (built here; placed at the TOP of the right column) ---
         controls_widget = QWidget()
@@ -6625,9 +6625,17 @@ class TransientDialog(QDialog):
         self._name_edits = []
         existing = list((tseep.get("series") or {}).keys())
         for i in range(_TSEEP_N_SERIES):
-            e = QLineEdit(existing[i] if i < len(existing) else "")
+            if i < len(existing):
+                name = existing[i]
+            else:
+                # Empty slots carry the input template's default header names
+                # (tseep sheet row 2: t1..t5); a default that collides with a
+                # loaded series name stays blank instead.
+                default = f"t{i + 1}"
+                name = default if default not in existing else ""
+            e = QLineEdit(name)
             e.setToolTip(TSEEP_HELP["series_name"])
-            e.setPlaceholderText(f"series {i + 1}")
+            e.setPlaceholderText(f"t{i + 1}")
             self._name_edits.append(e)
             names_row.addWidget(e)
         sgl.addLayout(names_row)
@@ -6731,7 +6739,7 @@ class TransientDialog(QDialog):
         labels = ["time"]
         for i, e in enumerate(self._name_edits):
             nm = e.text().strip()
-            labels.append(nm if nm else f"(series {i + 1})")
+            labels.append(nm if nm else f"(t{i + 1})")
         self._series_table.setHorizontalHeaderLabels(labels)
         h0 = self._series_table.horizontalHeaderItem(0)
         if h0 is not None:
@@ -6823,7 +6831,7 @@ class TransientDialog(QDialog):
         if any_series:
             ax.legend(fontsize=8, loc="best")
         else:
-            ax.text(0.5, 0.5, "Name a series and enter values to plot it",
+            ax.text(0.5, 0.5, "Enter time/value rows under a named series to plot it",
                     transform=ax.transAxes, ha="center", va="center", color="gray")
 
     # --- result --------------------------------------------------------

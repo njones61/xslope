@@ -256,8 +256,8 @@ with the selected one highlighted, and clicking a boundary there selects it:
 
 **Transient** edits the model's transient-seepage inputs — the data that a
 [transient run](analysis.md#transient-seepage) marches through. There is no on/off
-toggle: leaving every field blank keeps the model steady (the steady-vs-transient
-*run* choice lives on the Run Seepage dialog). It gathers:
+toggle: with no times or values entered the model stays steady (the
+steady-vs-transient *run* choice lives on the Run Seepage dialog). It gathers:
 
 - the **run controls** — **Duration**, **Save interval**, the rapid-drawdown
   **Stage 1** / **Stage 2** times (set both or neither; Stage 1 earlier than Stage 2),
@@ -266,7 +266,9 @@ toggle: leaving every field blank keeps the model steady (the steady-vs-transien
   and the stability time can also be set at their point of use, in the
   [Run LEM and Run FEM dialogs](analysis.md#seepage-time) — both places write the same
   values;
-- the **time-series table** — a shared **time** axis and up to five named series. A
+- the **time-series table** — a shared **time** axis and up to five named series
+  (the names default to **t1**–**t5**, matching the input template's tseep sheet,
+  and can be renamed). A
   seep BC head/flux **value** cell that contains a series name is driven by that
   series (a time-varying boundary condition). A blank cell is no breakpoint (the
   series is linearly interpolated between its own points), and a **repeated time** is

@@ -2849,6 +2849,7 @@ def _new_material():
             "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
             "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
             "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
+            "Ss": None, "Sy": None,
             "t_cut": None, "phi_b": None, "s_cap": None,
             "E": 0.0, "nu": 0.0}
 
@@ -3647,6 +3648,12 @@ MATERIALS_HELP = {
     "h0": "Suction head at which k = kr0 (linear-front, unsat = lf).",
     "vg_a": "Curve parameter a (vg: α in 1/length; gard: power-form a).",
     "vg_n": "Curve parameter n (van Genuchten / Gardner, unsat = vg or gard).",
+    "Ss": "Specific storage — water released per unit volume of saturated soil per "
+          "unit head drop (1/length). Read by a transient seepage run only; "
+          "required on every material then, blank otherwise.",
+    "Sy": "Specific yield — the drainable porosity: the volume fraction released "
+          "as the water table falls (dimensionless). Read by a transient seepage "
+          "run only; required on every material then, blank otherwise.",
     "_swatch": "Display color on the Inputs plot — a style override, not a 'mat' property.",
 }
 
@@ -3977,6 +3984,13 @@ class MaterialsEditor(CategoryEditor):
         Field("unsat", "unsat", "choice", choices=["lf", "vg", "gard"], usage="seep"),
         Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep", unit="length"),
         Field("vg_a", "vg_a", usage="seep"), Field("vg_n", "vg_n", usage="seep"),
+        # v18: transient storage (mat sheet seepage block, after the unsat curve
+        # pair). optfloat so a blank stays None — the loader never defaults these
+        # to 0 (a silent zero would drop the storage term), and preflight demands
+        # them only when a tseep sheet is in use.
+        Field("Ss", "Ss", "optfloat", usage="seep", unit="inv_length",
+              tooltip=MATERIALS_HELP["Ss"]),
+        Field("Sy", "Sy", "optfloat", usage="seep", tooltip=MATERIALS_HELP["Sy"]),
     ]
 
     def build(self, slope_data, parent):

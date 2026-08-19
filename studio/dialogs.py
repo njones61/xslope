@@ -966,6 +966,12 @@ class RunSeepDialog(QDialog):
         # Transient adds its own requirements (a declared time base, storage per
         # material) on top of every steady rule, so the findings follow the mode.
         self.preflight.refresh()
+        # Both solve-parameter fields belong to the STEADY unconfined iteration;
+        # the transient march runs its own step and iteration controls. Dim them
+        # rather than leave live controls the run ignores.
+        steady = not self._transient()
+        self.tol.setEnabled(steady)
+        self.max_iter.setEnabled(steady)
 
     def options(self):
         if self._transient():

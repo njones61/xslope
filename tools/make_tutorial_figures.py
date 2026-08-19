@@ -3096,17 +3096,27 @@ def _seep03_problem_section(model):
 
     The conductivities and the storage are read off the model rather than written
     here, so the graphic cannot state a property the file does not carry.
+
+    The boundary set is deliberately NOT drawn. This panel states the problem, and
+    at the point the reader meets it nothing has been built: a reservoir-boundary
+    overlay, exit-face markers and the t = 0 / t = end waterline pair are the
+    completed model's symbology, and drawn here they would answer the question the
+    page is about to ask. So the panel runs on a copy of the model with the
+    boundary set removed, and draws the full pool and the tailwater itself as
+    single water levels with the package's own water-surface symbol.
     """
     xs = [x for x, _ in model["ground_surface"].coords]
     ys = [y for _, y in model["ground_surface"].coords]
     aspect = (max(ys) - min(ys)) / (max(xs) - min(xs))
+    stated = dict(model)
+    stated["seepage_bc"] = {}
     with _hold_show():
-        plot_inputs(model, mode="seep", show_title=False, frame="content",
+        plot_inputs(stated, mode="seep", show_title=False, frame="content",
                     show_mesh=False, show_legend=True,
                     figsize=(8.6, max(3.2, 8.6 * aspect + 2.0)))
     ax = plt.gcf().axes[0]
     shell, core = model["materials"][0], model["materials"][1]
-    fields = "%s\nk₁ = %g, k₂ = %g ft/day\nS_s = %g /ft, S_y = %g"
+    fields = "%s\nk₁ = %g, k₂ = %g ft/day\n$S_s$ = %g /ft, $S_y$ = %g"
     # The shell label sits inside the upstream shell, where that zone is thickest.
     ax.text(22.0, 4.6, fields % (shell["name"], shell["k1"], shell["k2"],
                                  shell["Ss"], shell["Sy"]),
@@ -3124,6 +3134,32 @@ def _seep03_problem_section(model):
     pool = _seep03_pool(model, 0.0)
     tail = float(model["seepage_bc"]["specified_heads"][1]["head"])
     crest = max(y for _, y in model["ground_surface"].coords)
+    # The two water levels, drawn here because the boundary set is not: each is one
+    # horizontal surface running from the end of the section to where the ground
+    # first rises above it, carrying the package's own apex-down water symbol.
+    from xslope.plot import draw_water_level_symbol
+    from xslope.style import feature_style, resolve_style
+
+    wl = feature_style(resolve_style(None), "seep_water_level")
+    wl_color, wl_lw = wl.get("color", "lightskyblue"), wl.get("linewidth", 2.0)
+
+    def _water_line(level, from_left):
+        pts = list(model["ground_surface"].coords)
+        if not from_left:
+            pts = pts[::-1]
+        x_face = pts[-1][0]
+        for (x0, y0), (x1, y1) in zip(pts[:-1], pts[1:]):
+            if min(y0, y1) <= level <= max(y0, y1) and y1 != y0:
+                x_face = x0 + (level - y0) / (y1 - y0) * (x1 - x0)
+                break
+        x_lo, x_hi = sorted((pts[0][0], x_face))
+        ax.plot([x_lo, x_hi], [level, level], color=wl_color, lw=wl_lw,
+                solid_capstyle="butt", zorder=2)
+        draw_water_level_symbol(ax, 0.5 * (x_lo + x_hi), level, color=wl_color,
+                                markersize=8, extra_gap_points=2.0)
+
+    _water_line(pool, True)
+    _water_line(tail, False)
     ax.text(2.0, pool + 0.9, "full pool  el %g" % pool, fontsize=9,
             color="#2b7bb0", ha="left", va="bottom")
     # The tailwater sits in the corner where the downstream slope, the exit face and

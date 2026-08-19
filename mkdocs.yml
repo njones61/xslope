@@ -74,6 +74,7 @@ nav:
     - Seepage:
       - Confined Seepage Under a Sheetpile: tutorials/seep01_sheetpile.md
       - Unconfined Seepage Through a Zoned Dam: tutorials/seep02_johnson_dam.md
+      - "Transient Seepage: Reservoir Drawdown": tutorials/seep03_reservoir_drawdown.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

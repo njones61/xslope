@@ -414,6 +414,16 @@ def _plural(n, noun):
     return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
 
 
+def _spreadsheet_manners(table):
+    """Cell-level selection and type-to-edit on a QTableWidget: typing into the
+    current cell starts the edit, a second click opens it, Tab moves along the
+    row. Single click never opens an editor, so block paste stays on the grid."""
+    table.setSelectionBehavior(QAbstractItemView.SelectItems)
+    table.setEditTriggers(
+        QAbstractItemView.AnyKeyPressed | QAbstractItemView.EditKeyPressed
+        | QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked)
+
+
 class _ClipboardTable(QTableWidget):
     """The editors' table widget, with Copy and Paste over a block of cells.
 
@@ -484,7 +494,15 @@ class _EditableTable(QWidget):
         self.table = _ClipboardTable(len(rows), ncols, self)
         self.table.setHorizontalHeaderLabels(
             [f.display_header(self._unit_labels) for f in fields])
-        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        # Spreadsheet manners: click selects the CELL (not the row — a row-header
+        # click still selects whole rows for Remove), typing into the current cell
+        # starts the edit, a second click on the current cell opens it, and Tab
+        # commits and moves along the row. Block paste stays on the table itself:
+        # a single click never opens an editor, so Ctrl+V lands on the grid.
+        self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.table.setEditTriggers(
+            QAbstractItemView.AnyKeyPressed | QAbstractItemView.EditKeyPressed
+            | QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked)
         for j, f in enumerate(fields):  # color usage-tagged headers (red=LEM, blue=FEM, …)
             hi = self.table.horizontalHeaderItem(j)
             if hi is None:
@@ -6621,6 +6639,7 @@ class TransientDialog(QDialog):
         series_vals = tseep.get("series") or {}
         n_rows = max(len(times) + 2, 8)
         self._series_table = QTableWidget(n_rows, 1 + _TSEEP_N_SERIES)
+        _spreadsheet_manners(self._series_table)
         self._series_table.setMinimumHeight(220)   # show several breakpoints at once
         self._sync_series_headers()
         for r, t in enumerate(times):
@@ -6649,6 +6668,7 @@ class TransientDialog(QDialog):
         svl = QVBoxLayout(save_group)
         save_times = list(tseep.get("save_times") or [])
         self._save_table = QTableWidget(max(len(save_times) + 1, 8), 1)
+        _spreadsheet_manners(self._save_table)
         self._save_table.setHorizontalHeaderLabels(["save time"])
         self._save_table.horizontalHeaderItem(0).setToolTip(TSEEP_HELP["save_times"])
         for r, v in enumerate(save_times):

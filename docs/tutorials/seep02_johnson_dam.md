@@ -861,7 +861,9 @@ WARNING: seepage solution did not converge — flowrate is unreliable (solution[
 ```
 
 The last iteration line reports all three conditions. The relative head change is
-1.38 × 10<sup>−4</sup> against a tolerance of 0.018 — inside it by two orders of
+1.38 × 10<sup>−4</sup> — the `residual` in the line — against the scaled
+tolerance of 0.018 worked out under
+[the three conditions](#the-three-conditions) above: inside it by two orders of
 magnitude, and it had gone inside it **by sweep 50**, so it has been satisfied for
 seven eighths of the run. The `1/31 exit face active` at the end of the line is the
 third: the set settled to a single active node by sweep 7 and has not moved since.

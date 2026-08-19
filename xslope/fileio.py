@@ -865,12 +865,19 @@ def _parse_tseep_sheet(xls, template_version=18):
     }
 
 
-def load_slope_data(filepath, dest=None, overwrite=False):
+def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=True):
     """
     This function reads input data from various Excel sheets and parses it into
     structured components used throughout the slope stability analysis framework.
     It handles circular and non-circular failure surface data, reinforcement, piezometric
     lines, and distributed loads.
+
+    ``require_analysis_data=False`` loads a model that is not yet runnable — no
+    failure surfaces, no mesh, and no seepage boundary conditions (e.g. a partially
+    built model saved from an editor, or a tutorial starter file). Such a model is
+    validated on the seepage-only path (unit weights may be blank); everything else
+    is checked as usual. The default (True) keeps the analysis-entry behavior: a
+    file with none of the four is rejected.
 
     ``filepath`` is a workbook (.xlsx) or a project package (.xslz). A package is
     unpacked first and the extracted workbook loaded, because the sidecars this
@@ -2281,14 +2288,21 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     has_seepage_bc = (len(seepage_bc.get("specified_heads", [])) > 0 or
                      len(seepage_bc.get("specified_fluxes", [])) > 0 or
                      len(seepage_bc.get("exit_face", [])) > 0)
-    is_seepage_only = has_seepage_bc and not circular and len(non_circ) == 0
+    # An editor load (require_analysis_data=False) of a model with no surfaces takes
+    # the same validation path: it is a seepage model in progress, so unit weights
+    # may still be blank and no failure surfaces are demanded.
+    is_seepage_only = ((has_seepage_bc or not require_analysis_data)
+                       and not circular and len(non_circ) == 0)
     # A mesh-based run with no LEM surfaces is a seepage or FEM (SSRM) analysis;
     # neither needs circular/non-circular failure surfaces.
     is_mesh_analysis = mesh is not None and not circular and len(non_circ) == 0
 
     # Only require circular/non-circular data for a pure LEM run (no seep BCs, no mesh)
     if not is_seepage_only and not is_mesh_analysis and not circular and len(non_circ) == 0:
-        raise ValueError("Input must include either circular or non-circular surface data.")
+        raise ValueError(
+            "Input must include circular or non-circular surface data (for a "
+            "slope-stability run), a mesh, or seepage boundary conditions (for a "
+            "seepage run).")
     if not polygons:
         raise ValueError("Geometry is missing: provide either the 'profile' sheet or the 'polygon' sheet.")
     if not materials:

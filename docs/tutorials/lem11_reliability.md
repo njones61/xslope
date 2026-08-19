@@ -638,31 +638,19 @@ their probabilistic modes.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- The **± σ** boxes the materials editor's **Reliability** toggle reveals, on
-  this clay's σ(γ) = 8 and σ(c) = 100 — coefficients of variation of 6.7% and
-  25%.
-- A deterministic Spencer search at **FS = 1.354** on a circle tangent to the
-  rigid base, and the Taylor series over that same search: **σ<sub>F</sub> =
-  0.389**, **β<sub>LN</sub> = 0.935**, **P<sub>f</sub> = 17.48%** from 1 + 2N =
-  five solves.
-- Monte Carlo on the same surface: **mean FS = 1.381**, **σ<sub>F</sub> =
-  0.402**, **β<sub>LN</sub> = 0.988**, and **P<sub>f</sub> = 16.42%** counted as
-  1,642 of 10,000 realizations — within about a percentage point of the Taylor
-  series.
-- Where the two means differ: the +0.027 gap comes from the bend in the γ
-  response, matched to the digit by the average of the Taylor table's own γ
-  perturbations.
-- The variance Pareto measuring **75.8%** of σ<sub>F</sub>² onto the cohesion and
-  **24.2%** onto the unit weight, and what halving the dominant σ does — P<sub>f</sub>
-  from **17.48% to 6.36%** (TSPM) and **16.42% to 5.01%** (Monte Carlo) with the
-  factor of safety fixed at 1.354.
-- The response surface reaching the same answer from **710 real solves** —
-  P<sub>f</sub> = 16.6% with its fit credentials printed beside it — and the
-  three-engine habit: screen with the Taylor series, decide with Monte Carlo,
-  bring in the response surface when the probability of failure is too
-  small to count affordably.
+- The **± σ** boxes a reliability run reads — a standard deviation on any
+  material property.
+- The Taylor series: a probability of failure from a handful of solves around
+  the deterministic search.
+- Monte Carlo on the same surface, agreeing with the Taylor series to about a
+  percentage point here.
+- The variance Pareto naming which input's uncertainty drives the spread — and
+  what halving that one σ buys.
+- The three-engine habit: screen with the Taylor series, decide with Monte
+  Carlo, and bring in the response surface when failures are too rare to count
+  affordably.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Reliability Analysis](../reliability/index.md) gives the theory and the equation

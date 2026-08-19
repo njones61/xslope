@@ -463,19 +463,17 @@ variant of this model; the cracked model is yours — keep it with **Save As**.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- The smallest complete XSLOPE model: one material, one profile line, a maximum
-  depth, and a starting circle.
-- Three ways to build it — the AI assistant (and how to audit its work), the Excel
-  template, and Studio's editors — all producing the same model.
-- A starting circle is a guess; the automated search refines it to the critical
+- Building the smallest complete model — one material, one profile line, a
+  maximum depth, and a starting circle — three different ways, all producing
+  the same file.
+- A starting circle as a guess the automated search refines to the critical
   surface.
-- Spencer's method as the default: full equilibrium, and admissibility warnings
-  that tell you when the solution required impossible soil behavior.
-- Reading a result past its factor of safety: tension at the crest of a φ = 0
-  slope is a modeling omission, fixed with a tension crack at $z_c = 2c/\gamma$,
-  after which every method agrees on a lower, defensible answer.
+- Spencer's method as the default, with admissibility warnings that flag a
+  solution requiring impossible soil behavior.
+- Reading past the factor of safety: crest tension on a φ = 0 slope is a
+  modeling omission, fixed with a tension crack.
 
 **Where to go next:** [Tutorial LEM-2](lem02_loads_on_the_crest.md) adds loads to
 this same section — a surcharge on the crest, the same force as a line load, an

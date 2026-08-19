@@ -404,27 +404,16 @@ follow it at all.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- Material-zone polygons as the alternative geometry input: one closed ring per
-  zone, each vertex listed once in either direction, chosen over profile lines
-  when the base dips or is irregular, when a lens or a zoned section will not
-  stack into layers, or when the geometry arrives from CAD.
-- A model with no maximum depth and no entered ground surface — both are read off
-  the union of the zones, whose upper edge is the ground and whose lower edge is
-  a bedrock boundary that is free to dip.
-- A search on that section settling at **FS = 1.244**, tangent to the contact
-  with its base entirely in the weaker fill and 11 ft clear of the bedrock, with
-  the moment-equilibrium methods agreeing exactly and the force-equilibrium
-  procedures 3–7% higher on circles of their own.
-- The domain as a hard constraint on the search: a circle 1.2 ft too deep is
-  refused outright, and the **Composite surfaces** option is what truncates it
-  against the bedrock instead — 22.3 ft of base running along the dip, at 1.685
-  where the circle alone had no answer.
-- The change that puts the critical surface on the base: softening the foundation
-  to 300 psf drops the answer to 0.784 on a circle grazing the bedrock, where
-  truncation is worth 0.2% on a 3.4° dip and much more on a steep or irregular
-  one.
+- Material zones entered as polygons — the geometry to reach for when the base
+  dips, a lens will not stack into layers, or the section comes from CAD.
+- The ground surface and maximum depth read off the zones rather than entered.
+- The domain as a hard constraint on the search: a circle deeper than the base
+  is refused, and **Composite surfaces** is what truncates it against the
+  bedrock instead.
+- Softening the foundation to put the mechanism on the base, where truncation
+  starts doing real work.
 
 **Where to go next:**
 [LEM-8 — A Reinforced Slope](lem08_reinforced_slope.md) builds a slope that only

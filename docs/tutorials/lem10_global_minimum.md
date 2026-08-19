@@ -209,24 +209,18 @@ circle having been placed at all.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- A section with two genuine minima — a cohesionless embankment on soft clay —
-  where the search returns whichever mechanism its starting circle sits nearest.
-- The surficial limit a c = 0 face produces: **1.299** on a surface 1.2 ft long
-  carrying 1 lb/ft, matching tan φ′ / tan β for the face angle — a real minimum
-  and not a design case.
-- The deep foundation failure at **1.376**, tangent to the bottom of the clay and
-  moving 204,041 lb/ft, found by seeding a circle at that depth.
-- **Min slip depth** as the filter that rejects the skin — 1.455 from the
-  embankment seed at 5 ft, 1.376 at 8 — and **Grid search** as the
-  seeding-independent sweep that needs no circles at all.
-- Reading a search by the surface it converged on, since two answers on one model
-  can be 6% apart and describe entirely different failures.
-- The James Bay dyke ([VP75](../verification/rocscience.md#vp75)) at full
-  scale: a single credible seed converging at **1.744** — 23% above the
-  **1.420** that grid seeding, the generated per-layer set, Slide (1.464) and
-  Duncan & Wright (1.45) all agree on.
+- A section with two genuine minima, where the search returns whichever
+  mechanism its starting circle sits nearest.
+- The surficial skin slide a cohesionless face produces — a real minimum, and
+  not a design case.
+- **Min slip depth** to reject the skin, and **Grid search** to sweep the whole
+  section with no seed at all.
+- Reading a search by the surface it converged on, since two answers on one
+  model can describe entirely different failures.
+- The same trap at full scale on the James Bay dyke, where a single credible
+  seed converged 23% high.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Sample Problem 13](../lem/samples.md#13-multiple-local-minima) catalogues this

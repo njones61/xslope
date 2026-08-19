@@ -971,36 +971,23 @@ the conductivities matters; it is one soil that makes *k* cancel completely.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- A confined seepage model built from three inputs: one soil at
-  k₁ = k₂ = **30 m/yr**, a profile line whose 0.2 m slot at x = 30 is the
-  sheetpile, and two specified-head boundaries at **13 m** and **10 m**. Every
-  other edge — the rock base, the two ends, both faces of the slot, and the 10 m of
-  ground under the clay blanket — is a no-flow boundary that nothing was entered
-  for.
-- The path the solver chose being read off the boundary conditions rather than a
-  setting: **zero exit-face nodes**, so one direct confined solve, no phreatic
-  surface, and pore pressures from 0 to **126.8 kPa** that never go negative.
-- A discharge of **40.111 m³/yr per m** on 2,490 nodes — per meter of wall, the
-  convention every quantity a two-dimensional analysis reports carries, and
-  **2,406.7 m³/yr** under a 60 m stretch of it.
-- A flow net drawn at **10 contour levels**, where the channel count the discharge
-  implies comes out at **4.011** — whole to within 0.3%, so the cells are
-  curvilinear squares and **nine head drops and four flow channels** read back as
-  q = k·Δh·N<sub>f</sub>/N<sub>d</sub> = **40.0**.
-- A discharge that falls at every refinement — **41.978 at a 2 m element size down
-  to 39.618 at 0.125 m** — and does not settle, because the sheetpile toe is a
-  re-entrant corner and the blanket edge a boundary-condition change on smooth
-  ground, and neither has a finite gradient; and quadratic elements reaching
-  **39.866** on the node count linear ones spend to reach 40.111.
-- Feature refinement at a factor of 4 putting a node **0.048 m** from the toe
-  instead of 0.500 m and reaching **39.775** on 2,753 nodes, where a uniform mesh
-  needs **9,607** to reach the same three figures.
-- A discharge exactly proportional to an isotropic conductivity —
-  **q/k = 1.33704613** at every one of ten values from 30 to 300 m/yr, with the
-  head field unchanged to 3 × 10⁻¹³ m — against the same sweep of k₁ alone, where
-  q/k₁ falls from 1.337 to 0.502 because the anisotropy changes the head field.
+- A confined model built from three inputs — one soil, a profile line whose
+  slot is the sheetpile, and two specified-head boundaries — with every other
+  edge no-flow by default.
+- The solver reading confined off the boundary conditions: no exit-face nodes,
+  so one direct solve and no phreatic surface.
+- A discharge reported per meter of wall — the convention every quantity a
+  two-dimensional analysis carries.
+- Setting the flow net up to be read — ten contour levels making the channel
+  count land near a whole number — and reading the discharge back off it by
+  counting lines.
+- A discharge that keeps falling with refinement, because the section's two
+  singular points never resolve — and what element type and local refinement
+  buy against that.
+- A discharge exactly proportional to an isotropic conductivity, and not
+  proportional when one principal value moves alone.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Seepage Analysis](../seep/overview.md) carries the governing equations, the

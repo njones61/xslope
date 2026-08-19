@@ -488,32 +488,21 @@ searched again from a grid.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- A pile row whose **H is blank**, which is what puts the run on the Ito & Matsui
-  path: the lateral force computed from the 2 ft diameter and the 6 ft spacing,
-  at the depth each trial surface reaches at each shaft, and recomputed for every
-  surface a search evaluates.
-- Where that force is readable — one Log line per pile row printed with the
-  factor of safety, running from the soil force through the governing
-  capacity to the **2,540.7** and **1,827.0 lb/ft** applied, totalling
-  **4,367.6 lb/ft**, with the report carrying the same numbers slice by
-  slice.
-- A Spencer search at **FS = 1.842** against **1.149** for the same slope with the
-  piles removed, and each row's own share measured on one held circle: 1.675 for
-  the lower alone, 1.613 for the upper, 1.481 for neither.
-- The structural capacities cutting the soil force by 65% and 87% — 44,178 and
-  81,729 lb per shaft down to 15,244 and 10,962 — with the moment capacity
-  governing both, against **12.739** for the uncapped soil force alone.
-- Spacing swept from S/D = 1.5 to 8 on one held surface: the force per foot of
-  slope from **8,386.6 lb/ft to 1,690.7**, the factor of safety from **2.354 to
-  1.604**, and a searched answer of **1.409** at 12 ft spacing on a mechanism the
-  closer spacing had suppressed.
-- A stated force against a computed one: identical at **1.842** on the surface the
-  stated numbers came from, and **1.752 against 1.896** one surface away, where
-  the frozen force is 16% below what the same piles would develop.
-- The shallow bypass — grid seeding finding **1.702** on a wedge that daylights at
-  a pile head and takes **0.04 lb/ft** from the row it slides over.
+- A pile row whose **H** is blank, which computes the lateral force from the
+  diameter and spacing by Ito & Matsui, per trial surface — with the chain
+  printed one Log line per row.
+- The piled search against the unpiled one, and each row's own share measured
+  on a held circle.
+- The structural capacities capping the soil force — the moment capacity
+  governed both rows here.
+- Spacing as supply: closer piles arch more and divide by less, and wider
+  spacing can hand the slope back a different mechanism.
+- A stated force against a computed one: identical on the surface it came
+  from, stale one surface away.
+- Checking for the shallow bypass — a surface that daylights at a pile head
+  and takes almost nothing from the row it slides over.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Piles and Concrete Piers](../lem/piles.md) derives the Ito & Matsui equations,

@@ -485,24 +485,17 @@ circle you want the file to carry.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- A piezometric line as the model's water table — its own polyline, spanning
-  the section, entered once and read by every material whose `u` option is
-  `piezo` — and pore pressure as γ<sub>w</sub> times depth below it, drawn on
-  every slice base of the solution plot.
-- A search finding the mechanism a layered section really has: a deep circle
-  through the soft foundation clay at 1.301, 81.7 ft of its base in that one
-  layer, against about 1.37 for the best circle that stays above it.
-- Effective stress doing the work: the same circle reads 1.667 with `u` off and
-  1.301 with the line on, with c′, φ′ and the driving weight identical — 22% of
-  the factor of safety, all of it out of friction (Σ u Δℓ tan φ′ =
-  46,471 lb/ft) and none out of cohesion.
-- The two unit-weight columns: **γ** above the water table, **gsat** below it
-  (blank = **γ** throughout), both *total* unit weights — never buoyant —
-  worth 2.7% of the sliding weight and −0.8% of the factor of safety here.
-- r<sub>u</sub> as the chart-era alternative — u = r<sub>u</sub> σ<sub>v</sub>
-  per material, no line required, scaling with weight where a line does not.
+- A piezometric line as the model's water table — one polyline, read by every
+  material whose `u` option is `piezo`.
+- The search finding the deep mechanism a wet foundation really has.
+- Effective stress doing the work: pore pressure cuts the factor of safety
+  through friction alone — about a fifth of it here.
+- The two unit-weight columns, γ above the water table and gsat below — both
+  *total* unit weights, never buoyant.
+- r<sub>u</sub> as the chart-era alternative: pore pressure from vertical
+  stress, no line required.
 
 **Where to go next:** [Tutorial LEM-5](lem05_weak_layer_noncircular.md) puts the
 failure surface itself in your hands — a 2 ft seam of soft clay no circle can

@@ -383,23 +383,17 @@ them is a model you now know how to build.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- Distributed loads as an intensity along a line of points on the ground surface,
-  applied only between the points that carry it.
-- Line loads as a concentrated force per unit width at one point, with the
-  direction carried by an angle measured from horizontal.
-- Load direction: `normal` is a pressure perpendicular to the loaded line,
-  `vertical` is a dead weight — identical on level ground, worth 28% of the
-  factor of safety on a 1:1 face.
-- The seismic coefficient as a second kind of demand, applied to every slice as
-  k × W and always driving.
-- Design mode: sweeping one input across a range to find the value that meets a
-  target factor of safety, re-searching the critical surface at every step.
-- Reading a load through the surface it moves: the critical circle reorganised
-  itself around the loaded strip, and the compression it added narrowed the
-  disagreement between the methods from 9.9% to 3.8% — LEM-1's crest tension is
-  reduced, not gone.
+- Distributed loads along the ground surface and line loads at a point, each
+  with a direction.
+- The difference direction makes — a normal pressure against a vertical dead
+  weight — and the slopes where it matters.
+- The seismic coefficient as a second kind of demand, applied to every slice
+  and always driving.
+- Design mode: sweeping one input to find the value that meets a target factor
+  of safety, re-searching the surface at every step.
+- Loads reshape the critical surface, so every load case gets its own search.
 
 **Where to go next:** [Tutorial LEM-3](lem03_layered_slope.md) gives the ground
 under the slope a second material — the case this page's design sweep names as

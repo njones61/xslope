@@ -404,22 +404,18 @@ moment equilibrium and is the one to report.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- A section with two material zones: one profile line per material, placed at the
-  boundary where the material changes and nowhere else.
-- Starting circles at the base of each layer, sharing a center above the middle
-  of the face — and the generator that derives that set, plus a toe circle, from
-  the geometry.
-- Reading a search result at depth: the critical surface is tangent to the
-  contact with its base entirely in the weaker fill — and trying several
-  starting circle locations to confirm the search found the minimum, not a
-  local one.
-- Why a strong layer under a weak one puts a floor under the answer, and why
-  softening it to 300 psf moves the critical surface to the base of the
-  foundation and the factor of safety from 1.244 to 0.792.
+- A layered section built from one profile line per material, placed at the
+  boundaries where the material changes and nowhere else.
+- Starting circles at the base of each layer — and trying several to confirm
+  the search found the minimum rather than a local one.
+- Reading a search at depth: the critical surface rides the contact, staying
+  above the stronger layer.
+- A strong layer under a weak one puts a floor under the answer; soften it and
+  both the surface and the factor of safety drop.
 - Moment-equilibrium methods agreeing exactly on a φ = 0 circle, with the
-  force-equilibrium procedures 3–7% higher on circles of their own.
+  force-equilibrium procedures a few percent higher.
 
 **Where to go next:** [Tutorial LEM-4](lem04_water_in_the_slope.md) adds the
 input every layer here went without — a piezometric line through a three-layer

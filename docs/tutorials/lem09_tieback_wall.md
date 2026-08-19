@@ -522,26 +522,17 @@ presets set it rather than leaving it to habit: `Geosynthetic`, `Tieback` and
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- Grouted tiebacks entered as reinforcement lines with the **Anchor** support-type
-  preset, which sets **Dir** to axial — the force along the bar's own 25°, not
-  tangent to the slip surface — and **Appl** to active.
-- Anchorage that is different at the two ends: `Lp1` = 0 for the plate on the wall
-  face, where the full capacity is available immediately, and `Lp2` as the grout
-  bond length over which the far end develops it.
-- A discrete support's capacity reduced to a force per foot of wall, either by
-  dividing by the 8 ft anchor spacing before entry or by declaring that spacing and
-  letting XSLOPE divide once.
-- A soldier pile as a separate shear input beside the tensile ones, contributing
-  5,900 lb/ft where the surface crosses it.
-- A search settling at **FS = 1.431** on a near-planar wedge from the wall toe,
-  against **1.469** for the specified wedge solved as entered, **0.921** for the
-  same wall searched with the anchors removed, and **0.831** with no support at
-  all.
-- **Appl** measured on a held surface: 1.567 active against 1.331 passive on one
-  circle, from an ultimate capacity divided by the factor of safety rather than
-  applied whole.
+- Grouted tiebacks entered with the **Anchor** preset — force along the bar's
+  own axis, applied as a working load.
+- Anchorage different at the two ends: a plate at the wall face, a grout bond
+  length developing the far end.
+- A discrete anchor's capacity divided by its spacing into force per foot of
+  wall.
+- A soldier pile as a separate shear contribution beside the tensile rows.
+- The wall searched with and without its support, and the active/passive
+  application difference measured on one held surface.
 
 **Where to go next:** [LEM-10](lem10_global_minimum.md) searches a section that
 holds two competing mechanisms, where the surface a search returns depends on the

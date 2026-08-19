@@ -297,27 +297,16 @@ alone.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- The `pow` strength option, entered as the four coefficients of
-  τ = a·(σ′+d)^b + c, with Studio's list view drawing the envelope those cells
-  define.
-- Baker's compacted clay at **0.958** on its fitted power curve — a shallow,
-  9.18 m surface carrying 98.6 kN/m — against **1.518** on the Mohr-Coulomb
-  line fitted to the same triaxial data, on a deeper surface carrying
-  306.7 kN/m. The linear fit is extrapolated below the stresses the tests
-  covered, and there it credits the clay with cohesion the curve denies it.
-- The same comparison on London clay ([VP61](../verification/rocscience.md#vp61)),
-  whose data reaches low normal stress: **1.466** and **1.367**, 7% apart on
-  nearly the same surface, because neither fit is extended past what was
-  measured.
-- The `cp` strength option — s<sub>u</sub> = c + c/p·(r-elev − y) — reading
-  15 kPa to 30 kPa across Low's lowest clay, and holding the critical surface
-  at elevation 0.82 for **FS = 1.130**.
-- What replacing that profile with a constant costs: **1.075** at the layer
-  average, **1.086** even at the strength the profile actually mobilized, with
-  the critical circle dropping to the rigid base in both cases. The profile was
-  selecting the surface, not just scaling the resistance.
+- The `pow` strength option — a curved envelope from four coefficients, drawn
+  live in the materials editor.
+- A curved fit against a straight line through the same triaxial data: the
+  linear fit extrapolates cohesion the tests never measured, and on shallow
+  surfaces it can overstate the answer badly.
+- The `cp` option for an undrained strength that grows with depth.
+- Replacing a strength profile with a constant changes the surface the search
+  selects, not just the number it reports.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [LEM-4](lem04_water_in_the_slope.md) covers the other input that changes the

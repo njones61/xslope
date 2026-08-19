@@ -524,32 +524,19 @@ page states which support wants which.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- Soil reinforcement entered as lines: two endpoints and a tensile capacity per
-  line, with the force applied to the sliding mass wherever a trial surface
-  crosses one — six geogrid layers holding up a c = 0 sand fill at 1.25:1.
-- The capacity envelope as the thing that decides how much of Tmax is available:
-  the pullout lengths that taper the tension toward each free end, the end
-  anchorage that starts it above zero, and the spacing that turns a per-element
-  capacity into force per foot of slope.
-- The **Type** presets — Geosynthetic, Nail, Tieback, Anchor — as one column
-  filling **Dir** (tangent to the slip surface, or along the line's own axis)
-  and **Appl** (a working load, or an ultimate capacity divided by F): these six
-  lines are Geosynthetic, worth **1.587** against 1.606 axial and 1.453
-  passive.
-- A search settling at **FS = 1.587** with 4,000 lb/ft of tension on it, against
-  **1.167** for the same section searched with the lines removed — and a
-  different mechanism at that number, a face sliver rather than a surface
-  through the block.
-- Reading the lines against the surface that was found: five crossings well
-  clear of their development zones and unaffected by pullout, one layer at the
-  toe the surface never reaches, and 1.539 on the same circle once the pullout
-  lengths are long enough to bite.
-- A length study, searched at each length: **1.270** at 10 ft, **1.426** at 15 ft
-  and **1.587** from 20 ft on, flat to 40 — because past 20 ft every crossing is
-  already outside its pullout ramp and carrying the full 800 lb/ft, so the limit
-  is rupture capacity rather than embedment.
+- Soil reinforcement entered as lines — two endpoints and a tensile capacity,
+  applied wherever a trial surface crosses one.
+- The capacity envelope: pullout lengths taper the tension toward the ends,
+  end anchorage lifts it, and spacing turns a per-element capacity into force
+  per foot of slope.
+- The **Type** presets — Geosynthetic, Nail, Tieback, Anchor — filling the
+  direction and application columns in one pick.
+- The reinforced search against the unreinforced one: a different factor of
+  safety and a different mechanism.
+- A length study finding where added embedment stops buying anything — once
+  every crossing clears its pullout ramp, rupture capacity governs.
 
 **Where to go next:** [LEM-9](lem09_tieback_wall.md) is the other reinforced
 problem — a tieback wall, where the support is discrete and stiff rather than

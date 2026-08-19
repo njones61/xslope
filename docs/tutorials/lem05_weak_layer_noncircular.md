@@ -595,32 +595,18 @@ more than one starting shape.
 
 ## Conclusion
 
-This tutorial demonstrated:
+This tutorial covered:
 
-- A failure surface entered as a table of vertices rather than a circle: points
-  left to right, straight segments between them, ramps at the ends and a flat run
-  through the weak layer between — with the entry and exit points carrying
-  explicit ground-surface elevations, because a blank Y is a slicing error rather
-  than a request to snap to the ground.
-- The automated search as the first analysis to run, at **FS = 1.656** by
-  Spencer's method, and the **Movement** column as what shapes it: `Horiz` sliding
-  the seam points 6.6 ft and 2.8 ft along the clay without letting either leave
-  it, `Free` walking the ends along the ground surface, and a blank cell meaning
-  `Fixed`.
-- OMS and Bishop declining a non-circular surface outright — both take moments
-  about a circle center — and the five methods that remain, each searched
-  separately, spreading 26% because each one found its own critical surface.
-- The 65° limit on a base segment: a starting surface with a steeper end ramp is
-  refused before the search begins, because surfaces in that range return answers
-  that differ by a factor of six between methods.
-- Two comparisons made deliberately on a held surface: where the track belongs
-  inside the seam, worth 11% between the top of the clay and its base, and what
-  the weak-zone generator's own surface is worth standing still — 2.022, against
-  the 1.656 a search from it reaches.
-- The best circle the same section admits, searched the same way, coming to 1.769
-  on an arc tangent to the base of the seam: on a shallow 2 ft layer the two
-  families are within 7%, and what the polyline adds is the 23 ft it spends
-  *inside* the clay.
+- A failure surface entered as a table of vertices, with explicit
+  ground-surface elevations at its ends.
+- The **Movement** column shaping the search: `Horiz` sliding points along the
+  seam, `Free` walking the ends along the ground, blank holding a point fixed.
+- OMS and Bishop declining a non-circular surface — they take moments about a
+  circle center — and each remaining method searching its own surface.
+- Comparisons made deliberately on a held surface: where the track sits inside
+  the seam matters, and a generated starting surface still needs the search.
+- The best circle on the same section coming close on a shallow seam — what
+  the polyline buys is the distance it spends *inside* the clay.
 
 **Where to go next:** [Tutorial LEM-6](lem06_polygon_geometry.md) changes how the
 section itself is entered — closed material-zone polygons instead of profile

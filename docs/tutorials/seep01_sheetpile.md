@@ -555,7 +555,8 @@ Click **Run Seep…**:
 
 **Convergence tol** is the head-change tolerance the unconfined iteration stops
 at, and on a confined problem it is inert — there is no iteration to stop. Leave
-it at `0.0001`.
+it at `0.0001`, and leave **Max iterations** at `400`; both belong to the
+unconfined iteration SEEP-2 works through.
 
 The **Model checks** column beside the controls reads *No problems found for this
 run*. It is worth reading rather than clicking past: a conductivity of zero, a

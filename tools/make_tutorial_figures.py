@@ -2579,44 +2579,6 @@ def _seep02_phreatic_figure(series, stations=SEEP02_STATIONS):
     fig.tight_layout()
 
 
-def _seep02_convergence_figure(histories, tol_scaled, closure_tol=1e-3):
-    """Head change and flow closure against iteration, for every model the page
-    runs, with the two thresholds they are tested against drawn on.
-
-    Both panels on log axes and both thresholds drawn, because the lesson is that
-    the two conditions fail in different places: the hard run's head change is
-    inside its tolerance for hundreds of sweeps while its flow closure is not.
-    """
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.5, 4.6))
-    colors = {"lf": "#1f6fb4", "vg": "#c1663a", "gard": "#3f8f5a",
-              "lf, kr₀ = 1e−4, h₀ = −10 ft": "#8e44ad"}
-    for label, rows in histories:
-        color = colors.get(label, "#5a6b7a")
-        ax1.semilogy([i for i, _, _ in rows], [r for _, r, _ in rows],
-                     color=color, lw=1.4, label=label)
-        ax2.semilogy([i for i, _, _ in rows], [c for _, _, c in rows],
-                     color=color, lw=1.4, label=label)
-    ax1.axhline(tol_scaled, color="#8a939c", lw=1.0, ls="--")
-    ax1.annotate("head tolerance %.3g" % tol_scaled, (1, tol_scaled),
-                 xytext=(4, 4), textcoords="offset points", color="#5b646f",
-                 fontsize=9)
-    ax2.axhline(closure_tol, color="#8a939c", lw=1.0, ls="--")
-    ax2.annotate("closure tolerance %g" % closure_tol, (1, closure_tol),
-                 xytext=(4, 4), textcoords="offset points", color="#5b646f",
-                 fontsize=9)
-    ax1.set_title("Head change per sweep")
-    # The solver's head test is on the RELATIVE change — max nodal change over the
-    # largest head in the field — so the axis and the threshold are dimensionless.
-    ax1.set_ylabel("relative head change ‖Δh‖∞ / max|h|")
-    ax2.set_title("Flow closure per sweep")
-    ax2.set_ylabel("closure, fraction of inflow")
-    for ax in (ax1, ax2):
-        ax.set_xlabel("iteration")
-        ax.grid(True, which="both", color="#e8ebee", lw=0.5)
-    ax1.legend(loc="upper right", frameon=False, fontsize=8)
-    fig.tight_layout()
-
-
 def _seep02_core_figure(series, stations=SEEP02_STATIONS):
     """The phreatic surface and the seepage-face exit point at four core
     conductivities, on one section.
@@ -2902,8 +2864,6 @@ def seep02_plots():
     print("   the truncated answer is %.2f%% from the converged one"
           % (100.0 * abs(sol_hard["flowrate"] - sol_long["flowrate"])
              / sol_long["flowrate"]))
-    capture("seep02_convergence.png", _seep02_convergence_figure, histories,
-            stats["tol_scaled"])
 
     # ---- the seepage face, given something to do -------------------------- #
     print("   -- the core's conductivity, and the seepage face it leaves")

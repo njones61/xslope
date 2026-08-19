@@ -400,8 +400,9 @@ Mesh generation uses **gmsh**, which is installed by the `fem` extra
 
 ## Seepage
 
-In **Seepage** mode, **Run Seep…** opens a dialog with the solve parameter — the
-**convergence tolerance** — above the
+In **Seepage** mode, **Run Seep…** opens a dialog with the solve parameters —
+the **convergence tolerance** and the iteration ceiling, **Max iterations** —
+above the
 [model checks](#model-checks-before-a-run). A steady run solves every boundary
 set the file defines: set 1 alone for most files, and both sets for a
 rapid-drawdown pair (a caption in the dialog says so when a second set is

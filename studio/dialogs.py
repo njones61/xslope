@@ -904,6 +904,15 @@ class RunSeepDialog(QDialog):
         self.tol.setValue(float(defaults.get("tol", 1e-4)))
         form.addRow("Convergence tol", self.tol)
 
+        self.max_iter = QSpinBox()
+        self.max_iter.setRange(50, 100000)
+        self.max_iter.setValue(int(defaults.get("max_iter", 400)))
+        self.max_iter.setToolTip(
+            "Sweep ceiling for the unconfined iteration. A run that hits it stops "
+            "and reports converged = False; steep unsaturated-conductivity curves "
+            "can need more than the default.")
+        form.addRow("Max iterations", self.max_iter)
+
         layout.addLayout(form)
 
         # Two boundary sets means a rapid-drawdown pair; a steady run solves both,
@@ -965,7 +974,7 @@ class RunSeepDialog(QDialog):
             return {"mode": "transient", "bc": 1, "tol": self.tol.value()}
         # Steady solves every set the file defines (see the class docstring).
         return {"mode": "steady", "bc": "both" if self._has_bc2 else 1,
-                "tol": self.tol.value()}
+                "tol": self.tol.value(), "max_iter": self.max_iter.value()}
 
 
 class BuildMeshDialog(QDialog):

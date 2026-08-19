@@ -860,44 +860,16 @@ Warning: Did not converge in 400 iterations
 WARNING: seepage solution did not converge — flowrate is unreliable (solution['converged'] is False).
 ```
 
-The last iteration line reports all three conditions. The relative head change is
-1.38 × 10<sup>−4</sup> — the `residual` in the line — against the scaled
-tolerance of 0.018 worked out under
-[the three conditions](#the-three-conditions) above: inside it by two orders of
-magnitude, and it had gone inside it **by sweep 50**, so it has been satisfied for
-seven eighths of the run. The `1/31 exit face active` at the end of the line is the
-third: the set settled to a single active node by sweep 7 and has not moved since.
-What has not converged is the flow closure, at 0.678 against a target of 0.001, and
-it is not creeping toward it:
+Nothing is wrong with the model — this combination of parameters simply needs
+more iterations than the default allows. A steep conductivity curve converges
+slowly: each sweep computes conductivities from heads and heads from
+conductivities, and the steeper the curve, the harder the two chase each other.
+Set **Max iterations** on the **Run Seepage** dialog to `1000` and the same run
+converges, in **963 iterations**, at *q* = **1.9755**.
 
-![Head change and flow closure per sweep](images/seep02_convergence.png){width=1000}
-
-The left panel is the condition the dialog's tolerance controls, and on this run it
-is satisfied and irrelevant. The right panel is the one that decides. The three
-well-behaved models drop through both thresholds inside thirty sweeps and stop
-there. The hard run oscillates over three log cycles, between 0.09 and 200, for four
-hundred sweeps — each sweep computes a
-conductivity field from a head field, gets a head field back that implies a
-different conductivity field, and swings between them. A curve that falls four
-log cycles over ten feet of suction puts most of the unsaturated zone on the steep
-part of it, where a fraction of a foot of head change moves *k<sub>r</sub>* by a
-factor of several, and the fixed-point iteration is chasing a target that moves
-faster than it does.
-
-Had the run reported a number and stopped, the number would have looked fine:
-**1.9706**, a plausible discharge in the middle of everything else on this page.
-Fix it by raising the ceiling, not by loosening the tolerance: raising
-`max_iter` from its default of 400 to 1,000 lets the same model converge in
-**963 iterations**, at
-*q* = **1.9755** — 0.25% from the truncated value, close enough that the truncated
-one was nearly right and far enough that nothing about the run said so. The cost of
-getting there is 963 sweeps against the shipped parameters' 23, on a model of
-2,913 nodes.
-
-Three working rules come out of that. Check `converged` before quoting a flowrate,
-because a non-converged run still returns one. When a run does not converge, read
-which of the three conditions failed rather than reaching for the tolerance — the
-one the dialog exposes is often the one already satisfied. And prefer a gentler
+Two habits come out of that. Check `converged` before quoting a flowrate: a run
+that hits the ceiling still returns one — 1.9706 here, only 0.25% from the
+converged answer, with nothing about the number to say so. And prefer a gentler
 relative-conductivity curve when nothing about the result depends on its shape,
 which on a stability model is the usual case.
 
@@ -1008,12 +980,8 @@ This tutorial demonstrated:
   h₀ over a twentyfold range.
 - A convergence test of three conditions, of which the exposed tolerance is the
   least binding — **1.95462 at every tolerance from 10⁻³ to 10⁻⁶** — and a
-  linear front at **kr₀ = 10⁻⁴, h₀ = −10 ft** whose relative head change sat two
-  orders of magnitude inside tolerance from sweep 50 onward while its flow closure
-  oscillated over three log cycles, from 0.09 to 200, stopping at
-  **q = 1.9706 with converged = False** at the
-  default ceiling and reaching **1.9755 in 963 iterations** when the ceiling was
-  raised.
+  linear front at **kr₀ = 10⁻⁴, h₀ = −10 ft** that stops unconverged at the
+  default ceiling of 400 iterations and needs **963** to finish.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Seepage Analysis](../seep/overview.md) carries the governing equations, all three

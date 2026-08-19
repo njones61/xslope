@@ -398,6 +398,7 @@ class SeepRunner(RunnerThread):
             self._run_transient(sd, mesh)
             return
         tol = self._options.get("tol", 1e-4)
+        max_iter = int(self._options.get("max_iter", 400))
         bc_opt = self._options.get("bc", 1)
         bcs = [1, 2] if bc_opt == "both" else [bc_opt]
         errors = []
@@ -407,7 +408,8 @@ class SeepRunner(RunnerThread):
                 print(f"Building seepage data (BC set {bc})…")
                 seep_data = build_seep_data(mesh, sd, seep_bc=bc)
                 print(f"Running seepage analysis (BC set {bc}, tol={tol:g})…")
-                solution = run_seepage_analysis(seep_data, tol=tol)
+                solution = run_seepage_analysis(seep_data, tol=tol,
+                                                max_iter=max_iter)
                 if solution is None:            # defensive: no solver should return None now
                     raise RuntimeError("Seepage analysis returned no solution.")
                 print(f"Seepage analysis complete (BC set {bc}).")

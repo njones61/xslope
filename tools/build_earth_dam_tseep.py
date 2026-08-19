@@ -42,8 +42,30 @@ Physics choices (all stated in the docs entries):
     (full pool) and ``stage_2`` (end of drawdown, the maximum interior lag) are the
     critical rapid-drawdown pair.
 
-Run:  PYTHONPATH=. python3 tools/build_earth_dam_tseep.py            # build both
+The same recipe also builds Tutorial SEEP-3's file PAIR into docs/tutorials/files/,
+from the same base file and the same storage/conductivity choices, so the tutorial
+and the sample can never describe different soils:
+
+  ``seep03_start``  -> docs/tutorials/files/xslope_earth_dam_drawdown_start.xlsx
+      The STARTER. Geometry, zones, units and materials (storage included) of the
+      transient earth dam, with the ``seep bc`` sheet and the ``tseep`` sheet left
+      blank: the reader builds every boundary condition and the whole schedule by
+      hand, and the file loads STEADY until they do.
+
+  ``seep03``        -> docs/tutorials/files/xslope_earth_dam_drawdown.xlsx
+      The COMPLETED file — the skip-ahead download. (A basename distinct from the
+      sample's on purpose: the tutorial file differs from the sample by design,
+      and a shared name invites someone to "fix" the difference.) Identical to the
+      starter plus
+      the boundary set (reservoir bound to the ``pool`` series, tailwater head, exit
+      face) and the transient schedule. It carries NO ``stage_1``/``stage_2`` and no
+      ``stability_time``: SEEP-3 is a seepage page, and the rapid-drawdown staging
+      those flags exist for belongs to the stability tutorial that follows it. Every
+      other physics choice is the sample's.
+
+Run:  PYTHONPATH=. python3 tools/build_earth_dam_tseep.py            # build all
       PYTHONPATH=. python3 tools/build_earth_dam_tseep.py johnson    # build one
+      PYTHONPATH=. python3 tools/build_earth_dam_tseep.py seep03     # the pair
 """
 
 from __future__ import annotations
@@ -56,6 +78,7 @@ from xslope.fileio import (load_slope_data, save_slope_data_to_xlsx,
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILES = os.path.join(REPO_ROOT, "docs", "seep", "files")
+TUTORIAL_FILES = os.path.join(REPO_ROOT, "docs", "tutorials", "files")
 
 # --- representative storage by material type (1/ft, dimensionless) ----------- #
 # From the transient.md storage tables; |h0| = 1 so the drainable band storage ~ Sy.
@@ -118,41 +141,114 @@ SAMPLES = {
 }
 
 
-def build(name):
-    spec = SAMPLES[name]
-    sd = load_slope_data(os.path.join(FILES, spec["base"]))
+def _soil(spec):
+    """The base model with this sample's soil made transient: per-zone storage,
+    ft/day conductivities where the base file is not in /day, declared units and a
+    day time base (required for a transient run).
 
-    # per-zone storage (+ ft/day conductivities where the base file is not in /day)
+    Everything downstream of this — the sample, the tutorial starter and the
+    tutorial's completed file — is the same soil, because it is the same call.
+    """
+    sd = load_slope_data(os.path.join(FILES, spec["base"]))
     for i, upd in enumerate(spec["mat_updates"]):
         sd["materials"][i].update(upd)
-
-    # declared units + a day time base (required for a transient run)
     sd["unit_system"] = "imperial"
     sd["time_unit"] = "day"
+    return sd
 
-    # retype the upstream head boundary as a submerged-only reservoir driven by the
-    # 'pool' series; drawn up the full submerged face, so a node the falling level
-    # leaves above the waterline converts to an exit face.  The downstream tailwater
-    # head and the exit face are left unchanged.
+
+def _bind_reservoir(sd, spec):
+    """Retype the upstream head boundary as a submerged-only reservoir driven by the
+    series the schedule defines.
+
+    Drawn up the full submerged face, so a node the falling level leaves above the
+    waterline converts to an exit face. The downstream tailwater head and the exit
+    face are left unchanged.
+    """
     series_name = next(iter(spec["tseep"]["series"]))
     head = sd["seepage_bc"]["specified_heads"][spec["reservoir_idx"]]
     head["kind"] = "reservoir"
     head["head"] = series_name
+    return sd
 
-    sd["tseep"] = dict(spec["tseep"])
 
-    out = os.path.join(FILES, spec["out"])
+def _write(sd, directory, filename):
+    out = os.path.join(directory, filename)
     save_slope_data_to_xlsx(sd, out, template=default_template_path())
     print(f"wrote {os.path.relpath(out, REPO_ROOT)}")
     return out
 
 
+def build(name):
+    spec = SAMPLES[name]
+    sd = _bind_reservoir(_soil(spec), spec)
+    sd["tseep"] = dict(spec["tseep"])
+    return _write(sd, FILES, spec["out"])
+
+
+# --------------------------------------------------------------------------- #
+#  Tutorial SEEP-3's file pair (docs/tutorials/files/)
+# --------------------------------------------------------------------------- #
+#: Both tutorial files are the ``earth_dam`` sample's soil. The pair differs from
+#: the sample in exactly two ways, both deliberate: the files carry no companion
+#: sidecars (the reader meshes and solves), and the completed file carries no
+#: rapid-drawdown staging — SEEP-3 stops at the pore-pressure field, and the
+#: ``stage_1`` / ``stage_2`` / ``stability_time`` flags belong to the stability
+#: tutorial that consumes it.
+SEEP03 = "earth_dam"
+SEEP03_START_OUT = "xslope_earth_dam_drawdown_start.xlsx"
+SEEP03_OUT = "xslope_earth_dam_drawdown.xlsx"
+#: The tseep controls the completed file keeps, in the schedule's own order. Naming
+#: them here rather than deleting the stage keys afterwards means a stage flag added
+#: to the SAMPLE never leaks into the tutorial file by omission.
+SEEP03_TSEEP_KEYS = ("times", "series", "duration", "save_interval", "save_times")
+
+
+def build_seep03_start():
+    """The starter: the transient soil, no boundary conditions, no schedule.
+
+    Both sheets are left blank rather than partly filled. A ``seep bc`` sheet with
+    the tailwater already in it would make the page's boundary section a correction
+    exercise, and a ``tseep`` sheet with the controls already in it would load the
+    file transient before the reader has entered a series — so the file loads
+    STEADY, with nothing to solve, which is the state the page starts from.
+    """
+    sd = _soil(SAMPLES[SEEP03])
+    sd["seepage_bc"] = {"specified_heads": [], "specified_fluxes": [],
+                        "exit_face": []}
+    sd["seepage_bc2"] = {"specified_heads": [], "specified_fluxes": [],
+                         "exit_face": []}
+    sd["has_seepage_bc2"] = False
+    sd["tseep"] = None
+    return _write(sd, TUTORIAL_FILES, SEEP03_START_OUT)
+
+
+def build_seep03():
+    """The completed file: the sample's boundary set and schedule, no staging."""
+    spec = SAMPLES[SEEP03]
+    sd = _bind_reservoir(_soil(spec), spec)
+    sd["tseep"] = {k: spec["tseep"][k] for k in SEEP03_TSEEP_KEYS}
+    return _write(sd, TUTORIAL_FILES, SEEP03_OUT)
+
+
+TUTORIALS = {
+    "seep03_start": build_seep03_start,
+    "seep03_done": build_seep03,
+}
+
+
 def main(argv):
-    names = argv[1:] or list(SAMPLES)
+    names = argv[1:] or (list(SAMPLES) + list(TUTORIALS))
+    if names == ["seep03"]:
+        names = list(TUTORIALS)
     for name in names:
-        if name not in SAMPLES:
-            raise SystemExit(f"unknown sample {name!r}; choices: {list(SAMPLES)}")
-        build(name)
+        if name in SAMPLES:
+            build(name)
+        elif name in TUTORIALS:
+            TUTORIALS[name]()
+        else:
+            raise SystemExit(f"unknown target {name!r}; choices: "
+                             f"{list(SAMPLES) + list(TUTORIALS)}")
 
 
 if __name__ == "__main__":

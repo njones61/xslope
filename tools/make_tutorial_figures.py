@@ -2462,14 +2462,15 @@ def _seep02_figsize(mesh):
     return (11.0, max(2.6, 11.0 * 0.80 * (height / width) + 2.05))
 
 
-def _seep02_stack(name, panels, dpi=200):
+def _stack_panels(name, panels, dpi=200):
     """Several already-rendered figures stacked into one image.
 
-    The base-material comparison has to show three flow nets drawn by
+    SEEP-2's base-material comparison has to show three flow nets drawn by
     ``plot_seep_solution`` itself — the point being what that function does with the
     argument — and it draws one figure at a time. So each panel is rendered on its
     own and the three are laid up here, which keeps every panel the tool's own
-    output rather than a redrawing of it.
+    output rather than a redrawing of it. SEEP-3's frame series is the same shape of
+    problem, one instant per panel, and uses the same helper.
     """
     import numpy as np
 
@@ -2716,7 +2717,7 @@ def seep02_plots():
                               fill_contours=False, mesh=False))
     print("   flownet_base_material picks %d"
           % flownet_base_material(seep_data, solution, levels=SEEP02_LEVELS))
-    _seep02_stack("seep02_base_mat.png", panels)
+    _stack_panels("seep02_base_mat.png", panels)
 
     # ---- the three unsaturated models ------------------------------------- #
     from xslope.seep import kr_gardner_vec, kr_vg_vec
@@ -2885,6 +2886,518 @@ def seep02_plots():
     capture("seep02_core_sweep.png", _seep02_core_figure, core_series)
 
 
+# --------------------------------------------------------------------------- #
+# SEEP-3 — Transient Seepage: Reservoir Drawdown Through a Cored Earth Dam
+#
+# The first page on which the answer is a sequence rather than a field. The model is
+# the cored earth dam of docs/seep/samples.md #8, in the tutorial's own sidecar-free
+# copy: a granular shell around a compacted clay core, a full pool at el 18 held
+# against the upstream face, a tailwater at el 2, and a reservoir drawn down to the
+# tailwater over 45 days.
+#
+# Every figure here is one of two runs. The steady solve at full pool is the initial
+# condition — the state the dam is in before anything moves, and the state the
+# transient march starts from. The march itself produces the frame series and the
+# time histories, and it is run through the same ``run_transient_seepage`` call the
+# Studio runner makes, on the mesh the page's Build Mesh step produces.
+#
+# The lesson the figures have to carry is the LAG: the pool falls in 45 days, the
+# shell follows it within days, and the core does not. The frame series shows it as
+# a shape and the history shows it as numbers, so both are drawn from the same
+# march rather than from two.
+# --------------------------------------------------------------------------- #
+SEEP03 = os.path.join(REPO_ROOT,
+                      "docs/tutorials/files/xslope_earth_dam_drawdown.xlsx")
+#: The mesh, in the Build mesh dialog's own controls: tri3 (the seepage default),
+#: auto-sized at 64 divisions across the 110 ft section — the 1.71875 ft target the
+#: sample page's own transient figures are computed at.
+SEEP03_DIVISIONS = 64
+SEEP03_ELEMENT = "tri3"
+#: Contour count. Twelve, the count the sample's frame panels use: a transient frame
+#: is not a flow net (see below), so the level count is a readability choice rather
+#: than the flow-channel arithmetic SEEP-1 and SEEP-2 do with it.
+SEEP03_LEVELS = 12
+#: The flow net's base material for the STEADY figure, 1-based into the mat sheet:
+#: 2 is the core, which is what the steady sibling sample (Problem 3) is drawn with.
+SEEP03_BASE_MAT = 2
+#: Per-panel figure size for the stacked frame series, sized to this dam's aspect —
+#: the same panel size the sample's own series figure uses.
+SEEP03_PANEL_SIZE = (8.6, 2.55)
+#: The instants the frame series is drawn at, and what each one is. Full pool is the
+#: initial condition; 15 is mid-drawdown, with the pool already 4.6 ft below the
+#: interior surface; 47 is the end of the drawdown, where the lag is largest; 120 is
+#: the recovery, where the interior mound is draining toward the new steady state.
+SEEP03_FRAMES = ((0.0, "full pool — the initial condition"),
+                 (15.0, "mid drawdown"),
+                 (47.0, "end of drawdown — the largest lag"),
+                 (120.0, "recovery toward the new steady state"))
+#: Vertical stations the phreatic surface is read at, upstream toe to downstream toe.
+#: 46 / 54.5 / 63 straddle the core (its base runs from x = 46 to x = 63), so the
+#: three of them measure what the core is holding against what the shell has let go.
+SEEP03_STATIONS = (10.0, 20.0, 30.0, 40.0, 46.0, 50.0, 54.5, 59.0, 63.0, 70.0,
+                   80.0, 90.0, 100.0)
+#: The three nodes the head history is read at, as target points the mesh is
+#: searched near. One inside the clay core and one in the upstream shell at the SAME
+#: elevation, so the two traces are a like-for-like comparison and their crossing is
+#: the lag itself; the third is in the downstream shell, which the drawdown reaches
+#: last. The producer prints the node ids and the coordinates it actually found.
+SEEP03_NODES = (("clay core", (54.5, 9.0), "#b5460f"),
+                ("upstream shell", (30.0, 9.0), "#1f6fb4"),
+                ("downstream shell", (75.0, 6.0), "#3f8f5a"))
+
+
+def _seep03_mesh(model, divisions=SEEP03_DIVISIONS, element_type=SEEP03_ELEMENT):
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    xs = [x for x, _ in model["ground_surface"].coords]
+    size = (max(xs) - min(xs)) / divisions
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model), size, element_type,
+            size_regions=extract_size_regions(model))
+
+
+def _seep03_steady_model(model):
+    """``model`` with the reservoir boundary pinned at its own t = 0 level, in memory
+    only — the initial condition as a steady problem.
+
+    The transient solver's initial condition IS a steady solve at the t = 0 boundary
+    configuration, and at t = 0 the whole submerged face stands below full pool, so a
+    submerged-only reservoir at el 18 and a fixed head of 18 are the same boundary.
+    Pinning it here is what lets the page run the initial condition as an ordinary
+    steady analysis and read a flowrate off it, which a series-bound value has none of.
+    """
+    bc = {k: (list(v) if isinstance(v, list) else v)
+          for k, v in model["seepage_bc"].items()}
+    heads = [dict(h) for h in bc["specified_heads"]]
+    heads[0] = dict(heads[0], kind="head",
+                    head=float(model["tseep"]["series"]["pool"][0]))
+    bc["specified_heads"] = heads
+    return dict(model, seepage_bc=bc, tseep=None)
+
+
+def _seep03_solve(model, mesh, tol=1e-4, max_iter=400):
+    """One steady seepage solve, returning ``(seep_data, solution, log)`` — the same
+    shape SEEP-2's solver helper returns, and for the same reason: on an unconfined
+    problem the iteration history is half the result."""
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        seep_data = build_seep_data(mesh, model)
+        solution = run_seepage_analysis(seep_data, tol=tol, max_iter=max_iter)
+    return seep_data, solution, buf.getvalue()
+
+
+def _seep03_march(model, mesh):
+    """The transient march, returning ``(seep_data, solution, frames, log)``.
+
+    ``run_transient_seepage`` is the call Studio's ``SeepRunner`` makes, and the
+    per-frame plottable dicts are rebuilt with the same ``_transient_frame_solution``
+    the runner uses, so the frames this producer draws are the frames the reader's
+    play bar shows.
+    """
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             run_transient_seepage, _transient_frame_solution)
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        seep_data = build_seep_data(mesh, model, seep_bc=1)
+        solution = run_transient_seepage(seep_data, build_tseep_data(model),
+                                         verbose=True)
+    unconfined = bool(solution.get("unconfined", False))
+    frames = [_transient_frame_solution(seep_data, fr["head"], fr["u"],
+                                        fr.get("phi"), fr.get("inflow"),
+                                        fr.get("outflow"), unconfined,
+                                        time=fr["time"])
+              for fr in solution["frames"]]
+    return seep_data, solution, frames, buf.getvalue()
+
+
+def _seep03_top(model, x):
+    """Elevation of the top of the section at ``x``, off the model's own outer
+    profile line — so a station's search column cannot run past the ground."""
+    pts = list(model["ground_surface"].coords)
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if x0 <= x <= x1:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    return pts[-1][1]
+
+
+def _seep03_phreatic(model, mesh, solution, stations=SEEP03_STATIONS):
+    """The elevation of the phreatic surface at each station, read off a linear
+    interpolator rather than off the nodes.
+
+    Same construction as SEEP-2's: walk a vertical column and return the elevation
+    where the pressure head crosses zero. A column that is saturated to the ground
+    surface has no crossing inside the domain and returns NaN — on this dam that is
+    the submerged upstream face at full pool, where the p = 0 level is the reservoir
+    standing above the ground.
+    """
+    import matplotlib.tri as mtri
+    import numpy as np
+
+    nodes = np.asarray(mesh["nodes"])
+    tris = [e[:3] for e in np.asarray(mesh["elements"])]
+    triang = mtri.Triangulation(nodes[:, 0], nodes[:, 1], tris)
+    ipsi = mtri.LinearTriInterpolator(triang, np.asarray(solution["u"]) / 62.4)
+    out = []
+    for x in stations:
+        ys = np.linspace(0.02, _seep03_top(model, x) - 0.02, 4000)
+        psi = np.ma.filled(ipsi(np.full(len(ys), x), ys), np.nan)
+        ok = ~np.isnan(psi)
+        ys, psi = ys[ok], psi[ok]
+        wet = np.where(psi >= 0.0)[0]
+        if not len(wet) or wet[-1] + 1 >= len(psi):
+            out.append(float("nan"))
+            continue
+        i = wet[-1]
+        out.append(float(ys[i] + (ys[i + 1] - ys[i]) * psi[i]
+                         / (psi[i] - psi[i + 1])))
+    return out
+
+
+def _seep03_pool(model, t):
+    """The pool level at time ``t``, read off the model's own series with the tseep
+    interpolation rule (linear between breakpoints, held beyond the ends)."""
+    import numpy as np
+
+    return float(np.interp(t, model["tseep"]["times"],
+                           model["tseep"]["series"]["pool"]))
+
+
+def _seep03_pick_nodes(mesh, seep_data):
+    """The nearest mesh node to each target point, with the material it belongs to.
+
+    The targets are written as points rather than as node numbers because the node
+    numbering is the mesher's and changes with the element size; the page quotes the
+    coordinates this returns, which are a property of the dam.
+    """
+    import numpy as np
+
+    nodes = np.asarray(mesh["nodes"])
+    elem_mat = np.asarray(seep_data["element_materials"])
+    node_mat = {}
+    for elem, mat in zip(np.asarray(seep_data["elements"]), elem_mat):
+        for n in elem[:3]:
+            node_mat.setdefault(int(n), set()).add(int(mat))
+    picked = []
+    for label, point, color in SEEP03_NODES:
+        i = int(np.argmin(np.linalg.norm(nodes - np.asarray(point), axis=1)))
+        picked.append((label, i, tuple(float(v) for v in nodes[i]), color,
+                       sorted(node_mat.get(i, set()))))
+    return picked
+
+
+def _seep03_problem_section(model):
+    """The section panel of the problem graphic: the two zones with the properties
+    that make them behave differently, and the two water levels.
+
+    The conductivities and the storage are read off the model rather than written
+    here, so the graphic cannot state a property the file does not carry.
+    """
+    xs = [x for x, _ in model["ground_surface"].coords]
+    ys = [y for _, y in model["ground_surface"].coords]
+    aspect = (max(ys) - min(ys)) / (max(xs) - min(xs))
+    with _hold_show():
+        plot_inputs(model, mode="seep", show_title=False, frame="content",
+                    show_mesh=False, show_legend=True,
+                    figsize=(8.6, max(3.2, 8.6 * aspect + 2.0)))
+    ax = plt.gcf().axes[0]
+    shell, core = model["materials"][0], model["materials"][1]
+    fields = "%s\nk₁ = %g, k₂ = %g ft/day\nS_s = %g /ft, S_y = %g"
+    # The shell label sits inside the upstream shell, where that zone is thickest.
+    ax.text(22.0, 4.6, fields % (shell["name"], shell["k1"], shell["k2"],
+                                 shell["Ss"], shell["Sy"]),
+            ha="center", va="center", fontsize=9)
+    # The core is nine feet wide at its crest and the label is not, so it is called
+    # out from the sky above the downstream slope with a leader into the zone. The
+    # block is anchored ON that slope and grows up and to the RIGHT, where the ground
+    # only falls further away — so it clears the section by construction rather than
+    # by a tuned coordinate.
+    ax.annotate(fields % (core["name"], core["k1"], core["k2"], core["Ss"],
+                          core["Sy"]),
+                xy=(56.0, 12.0), xytext=(74.0, _seep03_top(model, 74.0) + 1.4),
+                fontsize=9, ha="left", va="bottom",
+                arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
+    pool = _seep03_pool(model, 0.0)
+    tail = float(model["seepage_bc"]["specified_heads"][1]["head"])
+    crest = max(y for _, y in model["ground_surface"].coords)
+    ax.text(2.0, pool + 0.9, "full pool  el %g" % pool, fontsize=9,
+            color="#2b7bb0", ha="left", va="bottom")
+    # The tailwater sits in the corner where the downstream slope, the exit face and
+    # the specified-head line all meet, so its label goes in the clear margin under
+    # the section with a leader up to the water line.
+    ax.annotate("tailwater  el %g" % tail, xy=(107.5, tail),
+                xytext=(99.0, -3.2), fontsize=9, color="#2b7bb0",
+                ha="center", va="center",
+                arrowprops=dict(arrowstyle="-|>", color="#2b7bb0", lw=0.9))
+    ax.annotate("crest el %g" % crest, xy=(52.0, crest),
+                xytext=(34.0, crest + 2.0), fontsize=9, color="0.3",
+                ha="center", va="bottom",
+                arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
+
+
+def _seep03_problem_schedule(model):
+    """The schedule panel of the problem graphic: the pool series the reservoir
+    boundary follows, as the reader enters it — three breakpoints and a duration.
+
+    Drawn beneath the section rather than as an inset on it: at equal aspect this
+    dam's section is five times as wide as it is tall, and an inset small enough to
+    sit in its sky is too small to read a schedule off.
+    """
+    times = list(model["tseep"]["times"])
+    pool = list(model["tseep"]["series"]["pool"])
+    duration = float(model["tseep"]["duration"])
+
+    fig, ax = plt.subplots(figsize=(8.6, 2.8))
+    ax.axvspan(times[1], times[-1], color="#eef4f9", zorder=0)
+    ax.plot(times + [duration], pool + [pool[-1]], color="#2b7bb0", lw=2.2,
+            zorder=3)
+    ax.plot(times, pool, "o", ms=6, mfc="white", mec="#2b7bb0", mew=1.8,
+            zorder=4, label="breakpoints entered on the tseep sheet")
+    ax.annotate("held at full pool", xy=(times[1], pool[1]),
+                xytext=(times[1] + 26.0, pool[1] + 1.6), fontsize=9,
+                color="0.3", ha="left",
+                arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
+    ax.annotate("drawn down over %g days" % (times[-1] - times[1]),
+                xy=(0.5 * (times[1] + times[-1]), 0.5 * (pool[1] + pool[-1])),
+                xytext=(times[-1] + 34.0, 0.66 * pool[0]), fontsize=9,
+                color="#2b7bb0", ha="left",
+                arrowprops=dict(arrowstyle="-|>", color="#2b7bb0", lw=0.9))
+    ax.annotate("held for the rest of the %g-day run,\nwhile the dam relaxes"
+                % duration, xy=(0.80 * duration, pool[-1]),
+                xytext=(0.46 * duration, pool[-1] + 2.6), fontsize=9,
+                color="0.3", ha="left",
+                arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
+    ax.set_xlim(-8.0, duration + 8.0)
+    ax.set_ylim(0.0, pool[0] + 5.0)
+    ax.set_xlabel("time (day)")
+    ax.set_ylabel("pool elevation (ft)")
+    ax.grid(alpha=0.22)
+    ax.legend(loc="upper right", frameon=False, fontsize=8.5)
+    fig.tight_layout()
+
+
+def _seep03_frame_panel(seep_data, frame, label, vmin, vmax, pool):
+    """One saved instant, drawn through ``plot_seep_solution`` itself.
+
+    Flow lines are off on every panel: a flow net requires divergence-free
+    through-flow, and a transient state's flow comes out of released storage, so no
+    stream function exists to draw equal-drop channels from. What each panel does
+    show is the head field, the phreatic surface, and the instantaneous water levels
+    — so the pool visibly falls through the series while the interior surface lags.
+    The color scale is pinned across the series so the frames read as one story.
+    """
+    from xslope.plot_seep import plot_seep_solution
+
+    with _hold_show():
+        plot_seep_solution(seep_data, frame, figsize=SEEP03_PANEL_SIZE,
+                           levels=SEEP03_LEVELS, phreatic=True, flowlines=False,
+                           vectors=False, mesh=False, pad_frac=0.04,
+                           cmap="Spectral_r", vmin=vmin, vmax=vmax,
+                           show_title=False, show_legend=False,
+                           show_bc_levels=True)
+    plt.gcf().axes[0].set_title("t = %g day   ·   pool el %.1f ft   —   %s"
+                                % (frame["time"], pool, label), fontsize=11,
+                                pad=5)
+
+
+def _seep03_history_figure(model, times, series, picked):
+    """Total head against time at the three nodes, with the pool schedule over them.
+
+    One axes rather than three: the whole point is that the shell's trace and the
+    core's trace CROSS — the shell starts above the core and ends below it — and a
+    crossing cannot be read off panels side by side.
+    """
+    import numpy as np
+
+    duration = float(model["tseep"]["duration"])
+    t0, t1 = model["tseep"]["times"][1], model["tseep"]["times"][-1]
+    fig, ax = plt.subplots(figsize=(8.6, 5.0))
+    ax.axvspan(t0, t1, color="#eef4f9", zorder=0)
+    # The pool is the driver, not a fourth reading, so it is drawn in neutral gray:
+    # the three colored traces are the dam's response to this one dashed line.
+    ax.plot(times, [_seep03_pool(model, t) for t in times], color="#3f4a55",
+            lw=2.0, ls=(0, (5, 3)), zorder=2, label="pool (the reservoir schedule)")
+    for (label, _i, coords, color, _mats), values in zip(picked, series):
+        ax.plot(times, values, "-o", color=color, lw=1.8, ms=4, zorder=3,
+                label="%s  (%.1f, %.1f)" % (label, coords[0], coords[1]))
+
+    # Where the core's trace passes ABOVE the shell's, interpolated between the two
+    # saved frames that straddle it rather than read off the picture.
+    core, shell = np.asarray(series[0]), np.asarray(series[1])
+    gap = core - shell
+    cross = np.where((gap[:-1] < 0) & (gap[1:] >= 0))[0]
+    if len(cross):
+        j = int(cross[0])
+        tc = (times[j] + (times[j + 1] - times[j]) * (-gap[j])
+              / (gap[j + 1] - gap[j]))
+        ax.axvline(tc, color="0.6", lw=0.9, ls=(0, (2, 3)), zorder=1)
+        ax.annotate("the core's head passes above the shell's\nat t ≈ %.0f day" % tc,
+                    xy=(tc, float(np.interp(tc, times, core))),
+                    xytext=(tc + 55.0, 0.80 * max(core.max(), shell.max())),
+                    fontsize=9, color="0.25", ha="left", va="center",
+                    arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
+    ax.annotate("drawdown", xy=(0.5 * (t0 + t1), 0.98), xycoords=("data",
+                                                                  "axes fraction"),
+                fontsize=8.5, color="#2b7bb0", ha="center", va="top")
+    ax.set_xlim(-8.0, duration + 8.0)
+    ax.set_xlabel("time (day)")
+    ax.set_ylabel("total head (ft)")
+    ax.grid(alpha=0.22)
+    ax.legend(loc="upper right", frameon=False, fontsize=9)
+    ax.set_title("The core holds its head after the shell has let go", fontsize=11.5)
+    fig.tight_layout()
+
+
+def seep03_plots():
+    """The transient dam: the problem, the model, the mesh, the initial condition,
+    the frame series, and the histories that put numbers on the lag.
+
+    Printed rather than drawn: the mesh, the steady discharge and where its phreatic
+    surface sits, the saved-frame schedule, the mass-balance ledger the solver
+    reports, the boundary-flow decay, and the head at the three history nodes at
+    every saved instant. Every number the page quotes is on one of these lines.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import plot_seep_data, plot_seep_solution
+
+    sd = load_slope_data(SEEP03)
+    tseep = sd["tseep"]
+    print("   schedule    pool %s at t %s · duration %g · save_interval %g · "
+          "save_times %s"
+          % (tseep["series"]["pool"], tseep["times"], tseep["duration"],
+             tseep["save_interval"], tseep["save_times"]))
+    print("   staging     stage_1 %s · stage_2 %s · stability_time %s  (SEEP-3 is a "
+          "seepage page; the staging belongs to the stability tutorial)"
+          % (tseep.get("stage_1"), tseep.get("stage_2"),
+             tseep.get("stability_time")))
+
+    capture("seep03_problem_section.png", _seep03_problem_section, sd)
+    capture("seep03_problem_schedule.png", _seep03_problem_schedule, sd)
+    _stack_panels("seep03_problem.png",
+                  [os.path.join(OUT_DIR, "seep03_problem_section.png"),
+                   os.path.join(OUT_DIR, "seep03_problem_schedule.png")])
+    capture("seep03_inputs.png", plot_inputs, sd, mode="seep",
+            title="Seepage Model Inputs", frame="content", show_mesh=False)
+
+    mesh = _seep03_mesh(sd)
+    figsize = _seep02_figsize(mesh)
+    nodes = np.asarray(mesh["nodes"])
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.5g ft"
+          % (len(nodes), len(mesh["elements"]), SEEP03_ELEMENT, SEEP03_DIVISIONS,
+             110.0 / SEEP03_DIVISIONS))
+
+    # ---- the initial condition, as an ordinary steady run ------------------ #
+    steady_model = _seep03_steady_model(sd)
+    seep_data, steady, log = _seep03_solve(steady_model, mesh)
+    stats = _seep02_log_stats(log)
+    capture("seep03_mesh.png", plot_seep_data, seep_data, figsize=figsize,
+            show_bc=True)
+    capture("seep03_steady.png", plot_seep_solution, seep_data, steady,
+            figsize=figsize, levels=SEEP03_LEVELS, base_mat=SEEP03_BASE_MAT,
+            fill_contours=True, mesh=False)
+    head = np.asarray(steady["head"])
+    psi = np.asarray(steady["u"]) / 62.4
+    print("   steady      q %.6f ft³/day per ft · head %.3f to %.3f ft · "
+          "u %.1f to %.1f psf"
+          % (steady["flowrate"], head.min(), head.max(),
+             np.min(steady["u"]), np.max(steady["u"])))
+    print("   iteration   %s" % stats)
+    face = np.where(np.asarray(seep_data["bc_type"]) == 2)[0]
+    wet = face[psi[face] > -1e-6]
+    print("   exit face   %d nodes from (%.2f, %.2f) to (%.2f, %.2f) · %d wet%s"
+          % (len(face), nodes[face][np.argmin(nodes[face, 1])][0],
+             nodes[face, 1].min(),
+             nodes[face][np.argmax(nodes[face, 1])][0], nodes[face, 1].max(),
+             len(wet),
+             "" if len(wet) else " — no seepage face at full pool; the phreatic "
+             "surface reaches the downstream boundary at the tailwater"))
+    ph0 = _seep03_phreatic(sd, mesh, steady)
+    print("   stations    %s" % " ".join("%6g" % x for x in SEEP03_STATIONS))
+    print("   steady ph   %s" % " ".join("%6.2f" % y for y in ph0))
+
+    # ---- the march ---------------------------------------------------------- #
+    tseep_data, solution, frames, tlog = _seep03_march(sd, mesh)
+    times = [float(f["time"]) for f in frames]
+    print("   march       %d saved frames at t = %s · converged %s · %d steps"
+          % (len(frames), " ".join("%g" % t for t in times),
+             solution["converged"], len(solution["dt_history"])))
+    mb = solution["mass_balance"]
+    print("   mass bal    cumulative inflow %.5g · final stored change %.5g · "
+          "final closure %.3e"
+          % (mb["cumulative_inflow"], mb["final_stored_change"],
+             mb["final_closure"]))
+    for row in mb["per_frame"]:
+        print("   t %-6g    stored change %10.4f · cumulative inflow %10.4f · "
+              "closure %.2e" % (row["time"], row["stored_change"],
+                                row["cumulative_inflow"], row["closure"]))
+    print("   solver log (the lines the page quotes):")
+    for line in tlog.strip().splitlines():
+        if "frame saved" in line or line.startswith("Transient"):
+            print("     %s" % line.strip())
+
+    outflow = [float(f.get("outflow") or 0.0) for f in frames]
+    inflow = [float(f.get("inflow") or 0.0) for f in frames]
+    peak = max(outflow)
+    print("   %-8s %10s %10s %10s" % ("t (day)", "pool", "inflow", "outflow"))
+    for t, qi, qo in zip(times, inflow, outflow):
+        print("   %-8g %10.2f %10.5f %10.5f" % (t, _seep03_pool(sd, t), qi, qo))
+    print("   outflow     peaks at %.5f on t = %g, and is %.5f at t = %g "
+          "(%.2f%% of the peak)"
+          % (peak, times[outflow.index(peak)], outflow[-1], times[-1],
+             100.0 * outflow[-1] / peak))
+
+    # ---- the frame series --------------------------------------------------- #
+    all_head = np.concatenate([np.asarray(f["head"], float) for f in frames])
+    vmin, vmax = float(all_head.min()), float(all_head.max())
+    print("   color scale pinned across the series to head %.3f – %.3f ft"
+          % (vmin, vmax))
+    panels = []
+    for t, label in SEEP03_FRAMES:
+        i = int(np.argmin(np.abs(np.asarray(times) - t)))
+        panels.append(capture("seep03_frame_t%g.png" % times[i],
+                              _seep03_frame_panel, tseep_data, frames[i], label,
+                              vmin, vmax, _seep03_pool(sd, times[i])))
+    _stack_panels("seep03_frames.png", panels)
+
+    # ---- the phreatic surface, frame by frame -------------------------------- #
+    print("   phreatic surface elevation (ft) by station and saved instant")
+    print("   %-8s %-6s %s" % ("t (day)", "pool",
+                               " ".join("%6g" % x for x in SEEP03_STATIONS)))
+    for f in frames:
+        ys = _seep03_phreatic(sd, mesh, f)
+        print("   %-8g %-6.2f %s"
+              % (f["time"], _seep03_pool(sd, f["time"]),
+                 " ".join("%6.2f" % y for y in ys)))
+
+    # ---- the head histories -------------------------------------------------- #
+    picked = _seep03_pick_nodes(mesh, tseep_data)
+    for label, i, coords, _color, mats in picked:
+        print("   node        %-17s -> %d at (%.3f, %.3f), material %s"
+              % (label, i, coords[0], coords[1], mats))
+    series = [[float(np.asarray(f["head"])[i]) for f in frames]
+              for _l, i, _c, _col, _m in picked]
+    pressures = [[float(np.asarray(f["u"])[i]) / 62.4 for f in frames]
+                 for _l, i, _c, _col, _m in picked]
+    print("   %-8s %-8s %s" % ("t (day)", "pool",
+                               " ".join("%18s" % l for l, *_ in picked)))
+    for j, t in enumerate(times):
+        print("   %-8g %-8.2f %s"
+              % (t, _seep03_pool(sd, t),
+                 " ".join("%18.4f" % s[j] for s in series)))
+    print("   pressure head ψ = u/γw (ft) at the same nodes")
+    for j, t in enumerate(times):
+        print("   %-8g %-8.2f %s"
+              % (t, _seep03_pool(sd, t),
+                 " ".join("%18.4f" % p[j] for p in pressures)))
+    capture("seep03_history.png", _seep03_history_figure, sd, times, series,
+            picked)
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -2912,6 +3425,7 @@ GROUPS = {
     "seep01_sheets": seep01_sheets,
     "seep01_plots": seep01_plots,
     "seep02_plots": seep02_plots,
+    "seep03_plots": seep03_plots,
 }
 
 

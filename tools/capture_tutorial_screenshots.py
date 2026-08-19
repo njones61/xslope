@@ -1780,6 +1780,164 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# SEEP-3 — Transient Seepage: Reservoir Drawdown Through a Cored Earth Dam
+#
+# The page's build has two halves, and the captures follow them in order. The
+# reader first builds an ordinary STEADY seepage model — three boundary entries on
+# one set — and solves it at full pool; the BC shot photographs that set. Then the
+# model is made transient, and the last three shots are the three controls that do
+# it: the Transient editor where the schedule and the pool series are entered, the
+# Run Seepage dialog with the Run type selector that only a file with a tseep sheet
+# has, and the results view a transient run lands in, which is a canvas with a play
+# bar under it rather than a single picture.
+# --------------------------------------------------------------------------- #
+SEEP03 = os.path.join(REPO_ROOT,
+                      "docs/tutorials/files/xslope_earth_dam_drawdown.xlsx")
+#: The mesh the page builds, in the Build Mesh dialog's own controls: tri3,
+#: auto-sized at 64 divisions across the 110 ft section — the 1.71875 ft target
+#: every SEEP-3 figure is computed at.
+SEEP03_DIVISIONS = 64
+#: The instant the play bar is parked on for its shot: the pool is a third of the
+#: way through its fall and the interior surface is visibly above it, which is what
+#: the page is pointing at when it tells the reader to scrub.
+SEEP03_PLAYBAR_TIME = 30.0
+
+
+def seep03_seep_bc():
+    """The boundary set as the page's STEADY half leaves it: the upstream face held
+    at full pool, the tailwater, and the exit face on the downstream slope, with the
+    upstream entry selected.
+
+    The head is shown as the number 18, not as the ``pool`` series the finished file
+    binds there. That binding is the next section's work — the reader types a series
+    name into this same cell after the schedule exists — so the value is set back to
+    the number here, on the loaded dict only. The file on disk is untouched.
+    """
+    from studio.editors import SeepBcEditor
+
+    data = _load(SEEP03)
+    head = data["seepage_bc"]["specified_heads"][0]
+    head["kind"] = "head"
+    head["head"] = float(data["tseep"]["series"]["pool"][0])
+    dlg = SeepBcEditor().build(data, None, select=(0, 0))
+    dlg.resize(1080, 560)
+    return _grab(dlg, "seep03_studio_seep_bc.png")
+
+
+def seep03_transient_editor():
+    """The Transient editor holding this model's whole schedule.
+
+    Everything the page's transient half asks for is on this one form: the run
+    duration and the save interval, the extra save times, and the series table with
+    its first column renamed from the template's default ``t1`` to ``pool`` — the
+    name the upstream boundary's value cell refers to. The stage-time fields are
+    deliberately EMPTY: they flag the rapid-drawdown states a stability analysis
+    reads, and SEEP-3 stops at the pore-pressure field.
+
+    The preview is rendered explicitly rather than waited for: the pane's redraw is
+    debounced, so a grab taken straight after ``show()`` catches a blank canvas.
+    """
+    from studio.editors import TransientDialog
+
+    data = _load(SEEP03)
+    dlg = TransientDialog(data.get("tseep"), data, None)
+    dlg.resize(1220, 640)
+    dlg.show()
+    _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    dlg._preview.canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, "seep03_studio_transient.png")
+    dlg.grab().save(out)
+    dlg.close()
+    print("-> seep03_studio_transient.png")
+    return out
+
+
+def seep03_run_transient():
+    """Run Seepage in **Transient** mode — the Run type selector the file's tseep
+    sheet adds, and the model checks a transient run is held to.
+
+    Transient checks are stricter than steady ones (a declared time base, storage on
+    every material), so the panel beside the controls is reporting on the transient
+    rules here, not the steady ones.
+    """
+    from studio.dialogs import RunSeepDialog
+
+    data = _load(SEEP03)
+    dlg = RunSeepDialog(defaults={"mode": "transient", "tol": 1e-4},
+                        slope_data=data,
+                        has_bc2=bool((data.get("seepage_bc2") or {})
+                                     .get("specified_heads")),
+                        has_tseep=bool(data.get("tseep")))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "seep03_studio_run_seep.png")
+
+
+def seep03_playbar():
+    """The **Seep · Transient** results tab, parked mid-drawdown.
+
+    The run is the page's own: the tutorial's file on the page's own mesh, marched
+    through ``SeepRunner`` — the same call the Run button makes — so the frame under
+    the play bar is a frame the reader will have. The display options are the
+    transient panel's defaults: no flow lines (a storage-release state has no flow
+    net), the instantaneous water levels on, and velocity vectors, which is how a
+    transient frame's flow direction is read.
+    """
+    from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+    from studio.runners import SeepRunner
+    from studio.transient import TransientSeepView
+
+    data = _load(SEEP03)
+    xs = [x for x, _ in data["ground_surface"].coords]
+    with contextlib.redirect_stdout(io.StringIO()):
+        mesh = build_mesh_from_polygons(get_material_polygons(data),
+                                        (max(xs) - min(xs)) / SEEP03_DIVISIONS,
+                                        "tri3")
+    data["mesh"] = mesh
+    runner = SeepRunner(data, {"mode": "transient"})
+    bundle, err = {}, {}
+    runner.succeeded.connect(lambda b: bundle.update(b))
+    runner.failed.connect(lambda m: err.setdefault("msg", m))
+    with contextlib.redirect_stdout(io.StringIO()):
+        runner._run_transient(data, mesh)
+    if err:
+        raise RuntimeError("seep03_playbar: transient run failed: %s" % err["msg"])
+
+    opts = {"variable": "head", "levels": 12, "flowlines": False,
+            "vectors": True, "phreatic": True, "show_bc_levels": True}
+    view = TransientSeepView()
+    # The canvas sizes its figure to the viewport, and this dam is five times as
+    # wide as it is tall, so a tall view leaves the frame stranded in white space.
+    view.resize(1000, 540)
+    view.set_frames(bundle["seep_data"], bundle["frames"],
+                    opts_getter=lambda: opts, style_getter=lambda: None,
+                    keep_index=False)
+    view.show()
+    _settle()
+    times = [float(f["time"]) for f in bundle["frames"]]
+    view.set_index(min(range(len(times)),
+                       key=lambda i: abs(times[i] - SEEP03_PLAYBAR_TIME)))
+    _settle()
+    view.canvas._render_current()          # force the raster into the scene
+    _settle()
+    out = os.path.join(OUT_DIR, "seep03_studio_playbar.png")
+    view.grab().save(out)
+    view.close()
+    print("-> seep03_studio_playbar.png")
+    return out
+
+
+SHOTS.update({
+    "seep03_seep_bc": seep03_seep_bc,
+    "seep03_transient_editor": seep03_transient_editor,
+    "seep03_run_transient": seep03_run_transient,
+    "seep03_playbar": seep03_playbar,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

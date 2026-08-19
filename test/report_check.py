@@ -11156,14 +11156,25 @@ def test_seep_confined_section():
     if planned != drawn:
         fails.append(f"the confined report planned {planned} figures and built "
                      f"{drawn}")
-    # The materials themselves DO carry unsaturated curves — this model is a linear
-    # front model — so what rules them off is the confined solve and not an empty
-    # column. Read unconfined, the very same model prints both.
+    # The shipped confined samples leave every unsaturated column blank (a
+    # confined solve never reads them — the SEEP-1 review's ruling), so the
+    # suppression proof adds a curve IN MEMORY: with a linear front on every
+    # material, the gate must still return nothing for the confined solve, and
+    # must return the materials when the same solve is read as unconfined —
+    # which is what shows the confined solve, not an empty column, is what
+    # rules the figures off.
     from xslope.report import _kr_materials
-    if not _kr_materials(_slope_data):
-        fails.append("the confined sample's materials carry no unsaturated curve "
-                     "to begin with, so dropping the figures proves nothing")
-    if not _kr_materials(_slope_data, [dict(bundles[0], solution=dict(
+    sd_curves = dict(_slope_data)
+    sd_curves["materials"] = [dict(m, unsat="lf", kr0=0.01, h0=-1.0)
+                              for m in _slope_data["materials"]]
+    if not _kr_materials(sd_curves):
+        fails.append("a linear front added to every material still draws no "
+                     "conductivity curve, so the suppression legs prove nothing")
+    if _kr_materials(sd_curves, bundles):
+        fails.append("a confined solve draws conductivity curves once the "
+                     "materials carry them — the suppression is the column, "
+                     "not the solve")
+    if not _kr_materials(sd_curves, [dict(bundles[0], solution=dict(
             bundles[0]["solution"], unconfined=True))]):
         fails.append("the same model read as an unconfined solve still draws no "
                      "conductivity curves")

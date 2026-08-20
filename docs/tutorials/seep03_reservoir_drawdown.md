@@ -602,8 +602,11 @@ the upstream shell pointing back *toward* the reservoir: with the pool down to
 elevation 8 and still falling, the shell drains out through the face it was filled
 through.
 
-Four of the twelve frames, drawn on one color scale so the panels can be compared
-directly:
+The play bar shows one frame at a time, and it draws each frame on that frame's
+own contour scale. To compare instants side by side, the figure below draws four
+of the saved frames as one picture instead, with a single color scale pinned
+across the panels — which the play bar does not do — so the dam's emptying reads
+as one map fading:
 
 ![Four frames: the initial condition, mid drawdown, the end of drawdown, and recovery](images/seep03_frames.png){width=1000}
 

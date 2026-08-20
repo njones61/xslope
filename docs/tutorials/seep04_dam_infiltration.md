@@ -355,9 +355,13 @@ a polyline drawn on the section is honored at its stated length whatever element
 size is used. A polyline drawn to land on the nodes of one particular mesh is not:
 an element edge carries load only when **both** of its corners lie on the polyline,
 so an endpoint falling part way along an edge drops that edge's water entirely, and
-the model quietly takes in less rain than it was given. The
-[closing section](#where-the-rain-starts-and-stops) measures what that costs on
-this dam.
+the model quietly takes in less rain than it was given. That is not hypothetical
+on this dam: the source problem's own model picks its rain extent off mesh edges
+and stops one edge short of the waterline and one short of the toe, so the
+geometry-drawn boundary built here takes in about 4% more water than the
+published case —
+[the GW6 verification case](../verification/rocscience_groundwater.md#gw6)
+carries the two extents and the comparison.
 
 ### Where the rain meets the reservoir, the head wins
 
@@ -553,43 +557,6 @@ to q/k = 0.2 all return real solutions. Above it, the boundary insists on puttin
 in more water than the section can carry away, and what comes back is a number
 rather than a solution. Check q/k before trusting a rain boundary, and read what the solver
 says about the run.
-
----
-
-## Where the rain starts and stops {#where-the-rain-starts-and-stops}
-
-The rain on this model runs from the waterline (20, 10) to the toe (52, 0), the
-full extent of the exposed surface, because that is the extent of the surface the
-rain falls on. The model this case is verified against arrives at a
-different extent, by applying its rain to **selected element edges on its own
-mesh**: the selection starts one edge above the waterline at
-(22, 11) and stops one edge above the toe at (50, 1). Two meters of horizontal
-footprint at each end therefore carry no rain: 28 m against this page's 32 m, and
-2.800 × 10<sup>−7</sup> m³/s per m of water offered against 3.2000 ×
-10<sup>−7</sup>. The extra water shows in the answer — **4.916 × 10<sup>−7</sup>
-against 4.737 × 10<sup>−7</sup>, +3.8%** — with the section, the soil, the rates
-and the drain identical between the two.
-[The verification case](../verification/rocscience_groundwater.md#gw6) transcribes
-those extents exactly, because they are part of the model it checks against.
-
-An extent picked off mesh nodes has two problems, and the 2 m gaps are the smaller
-of them. Those gaps at least stay put: they are in the extent rather than in the
-discretization, so refining the mesh never fills them in — the surface simply goes
-on receiving no rain, at any element size. The larger problem is that the extent is
-only correct on the mesh it was picked on. Put the source problem's extents on this
-page's mesh — which has no node at (22, 11) or at (50, 1) — and the boundary
-assembles **96% of the rain it was given**, because the part-edge at each end has
-only one corner on the polyline and is dropped whole. Drawn corner to corner on the
-section instead, the same boundary delivers its stated rain at any element size, so
-the mesh can be refined without changing how much water the model takes in.
-
-Nothing warns about the missing 4%. XSLOPE does compare each flux block's matched
-length against the length it was given, but it only speaks up when the shortfall
-exceeds one of that block's own elements, and the part-edge dropped at each end
-here is shorter than that. All three blocks pass the check, the model solves on 96%
-of its rain, and the run reports nothing out of the ordinary. That is the reason to
-draw a flux boundary on the geometry: the loss it saves you from is one that would
-not be reported.
 
 ---
 

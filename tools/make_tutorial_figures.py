@@ -3117,9 +3117,25 @@ def _seep03_problem_section(model):
     ax = plt.gcf().axes[0]
     shell, core = model["materials"][0], model["materials"][1]
     fields = "%s\nk₁ = %g, k₂ = %g ft/day\n$S_s$ = %g /ft, $S_y$ = %g"
-    # The shell label sits inside the upstream shell, where that zone is thickest.
-    ax.text(22.0, 4.6, fields % (shell["name"], shell["k1"], shell["k2"],
-                                 shell["Ss"], shell["Sy"]),
+
+    def _x_crossings(pts, level):
+        out = []
+        for (x0, y0), (x1, y1) in zip(pts[:-1], pts[1:]):
+            if min(y0, y1) <= level <= max(y0, y1) and y1 != y0:
+                out.append(x0 + (level - y0) / (y1 - y0) * (x1 - x0))
+        return out
+
+    # The shell label sits inside the upstream shell, centered in the open wedge
+    # between the upstream face and the core at the label's own height — both
+    # edges computed from the geometry, so the block re-centers if either moves.
+    y_lab = 4.6
+    gs_pts = list(model["ground_surface"].coords)
+    core_pts = list(model["profile_lines"][1]["coords"])
+    x_face = min(_x_crossings(gs_pts, y_lab))
+    x_core = min(_x_crossings(core_pts, y_lab))
+    ax.text(0.5 * (x_face + x_core), y_lab,
+            fields % (shell["name"], shell["k1"], shell["k2"],
+                      shell["Ss"], shell["Sy"]),
             ha="center", va="center", fontsize=9)
     # The core is nine feet wide at its crest and the label is not, so it is called
     # out from the sky above the downstream slope with a leader into the zone. The
@@ -3169,9 +3185,12 @@ def _seep03_problem_section(model):
                 xytext=(99.0, -3.2), fontsize=9, color="#2b7bb0",
                 ha="center", va="center",
                 arrowprops=dict(arrowstyle="-|>", color="#2b7bb0", lw=0.9))
+    # The crest label hangs just below crest level in the sky over the upstream
+    # face — above the pool line, below the frame — rather than crammed against
+    # the top of the axes.
     ax.annotate("crest el %g" % crest, xy=(52.0, crest),
-                xytext=(34.0, crest + 2.0), fontsize=9, color="0.3",
-                ha="center", va="bottom",
+                xytext=(34.0, crest - 0.6), fontsize=9, color="0.3",
+                ha="center", va="top",
                 arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
 
 

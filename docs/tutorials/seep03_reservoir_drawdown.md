@@ -573,7 +573,10 @@ and barely at all by the end.
 ## Reading the frames
 
 A transient run does not land as one picture. It lands in a **Seep · Transient**
-tab carrying all twelve frames, with a play bar under the plot:
+tab carrying all twelve frames, with a play bar under the plot. The tab has a
+Display panel of its own, so the **Filled contours** you ticked on the steady
+view does not follow you here — the frames open on the transient defaults shown
+below:
 
 ![The play bar at day 30, mid drawdown](images/seep03_studio_playbar.png)
 

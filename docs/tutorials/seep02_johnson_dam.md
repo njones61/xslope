@@ -385,7 +385,7 @@ Save the model with **File → Save** under any name; the completed file calls i
 
 However the model was arrived at, it has no mesh yet. Build the one this page
 runs on — the linear element type and the element size the
-[sample page](../seep/samples.md#johnson-reservoir) catalogues its discharge at.
+[sample page](../seep/samples.md#johnson-reservoir) catalogs its discharge at.
 Click **Build Mesh…**:
 
 ![The Build Mesh dialog](images/seep02_studio_build_mesh.png)
@@ -961,10 +961,13 @@ This tutorial covered:
   check `converged` before quoting a flowrate, and raise **Max iterations**
   rather than loosening the tolerance when a steep curve needs more sweeps.
 
-**Where to go next:** the [tutorials index](index.md) lists the series.
+**Where to go next:** [Tutorial SEEP-3](seep03_reservoir_drawdown.md) is the
+next seepage tutorial — a reservoir drawn down through a cored dam, where the
+boundaries move and the answer depends on when you look. The
+[tutorials index](index.md) lists the series.
 [Seepage Analysis](../seep/overview.md) carries the governing equations, all three
 unsaturated models with their parameter tables, and the convergence conditions in
-full; [Sample Problem 5](../seep/samples.md#johnson-reservoir) catalogues this model
+full; [Sample Problem 5](../seep/samples.md#johnson-reservoir) catalogs this model
 and reports its cross-check against the USACE SEEP2D program on a mesh identical to
 the one it exported to SEEP2D;
 [Seepage and Slope Stability](../seep/seep_slope.md) takes this head field into a

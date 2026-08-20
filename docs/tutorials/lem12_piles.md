@@ -504,7 +504,7 @@ This tutorial covered:
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Piles and Concrete Piers](../lem/piles.md) derives the Ito & Matsui equations,
 the capacity checks and the per-unit-width convention;
-[Sample Problem 10](../lem/samples.md#10-slope-stabilized-with-piles) catalogues
+[Sample Problem 10](../lem/samples.md#10-slope-stabilized-with-piles) catalogs
 this model with its factor of safety by every method;
 [LEM-9](lem09_tieback_wall.md) enters a pile with its force stated, beside the
 tieback anchors it carries; and [VP106](../verification/rocscience.md#vp106) and

@@ -418,7 +418,7 @@ This tutorial covered:
 stands because of what is buried in it. The [tutorials index](index.md) lists the
 series, and the sample problems carry each page further.
 [Sample Problem 11](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)
-catalogues this model, [DXF Import/Export](../usage/dxf.md) is the route from a
+catalogs this model, [DXF Import/Export](../usage/dxf.md) is the route from a
 CAD drawing to the `polygon` sheet this page filled by hand, and
 [Composite Failure Surfaces](../lem/overview.md#composite-failure-surfaces)
 derives what the truncated surface does to the moment methods that assumed a

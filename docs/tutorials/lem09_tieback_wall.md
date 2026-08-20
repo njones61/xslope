@@ -535,7 +535,7 @@ This tutorial covered:
 **Where to go next:** [LEM-10](lem10_global_minimum.md) searches a section that
 holds two competing mechanisms, where the surface a search returns depends on the
 circle it started from. The [tutorials index](index.md) lists the series.
-[VP49](../verification/rocscience.md#vp49) catalogues this model against the
+[VP49](../verification/rocscience.md#vp49) catalogs this model against the
 published solutions it comes from, [Soil Reinforcement in LEM](../lem/reinforcement.md)
 derives the capacity envelope and the per-method equations the anchor force enters,
 and [Piles and Concrete Piers](../lem/piles.md) covers the support family the

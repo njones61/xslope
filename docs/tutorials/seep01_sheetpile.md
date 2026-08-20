@@ -988,7 +988,9 @@ This tutorial covered:
 - A discharge exactly proportional to an isotropic conductivity, and not
   proportional when one principal value moves alone.
 
-**Where to go next:** the [tutorials index](index.md) lists the series.
+**Where to go next:** [Tutorial SEEP-2](seep02_johnson_dam.md) is the next
+seepage tutorial — an unconfined problem on a zoned dam, where the water table
+is part of the answer. The [tutorials index](index.md) lists the series.
 [Seepage Analysis](../seep/overview.md) carries the governing equations, the
 boundary-condition types in full, and the flow-net rule the channel count follows;
 [Sample Problem 1](../seep/samples.md#1-sheetpile-with-clay-blanket) catalogs

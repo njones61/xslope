@@ -221,6 +221,6 @@ This tutorial covered:
   seed converged 23% high.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
-[Sample Problem 13](../lem/samples.md#13-multiple-local-minima) catalogues this
+[Sample Problem 13](../lem/samples.md#13-multiple-local-minima) catalogs this
 model, [LEM-3](lem03_layered_slope.md) is where the per-layer starting-circle rule
 is built, and [Automated Search](../lem/search.md) documents the search itself.

@@ -541,7 +541,7 @@ problem — a tieback wall, where the support is discrete and stiff rather than
 continuous and flexible, and the Type preset that describes it changes both **Dir**
 and **Appl**. The [tutorials index](index.md) lists the series, and the sample
 problems carry each page further.
-[Sample Problem 9](../lem/samples.md#9-reinforced-slope) catalogues this model
+[Sample Problem 9](../lem/samples.md#9-reinforced-slope) catalogs this model
 alongside the published solution it comes from,
 [Soil Reinforcement in LEM](../lem/reinforcement.md) derives the capacity
 envelope and the per-method equations the force enters, and

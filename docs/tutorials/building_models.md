@@ -60,7 +60,7 @@ with `c = 0` are different models, and only the second one is claiming anything.
 The same goes for the run options on `main` — a blank **LEM method** means *use the
 default*, chosen when you run.
 
-Every cell of every sheet is catalogued in the
+Every cell of every sheet is cataloged in the
 [Input Template reference](../usage/input_template.md).
 
 ---

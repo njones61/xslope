@@ -457,7 +457,7 @@ in factor of safety. The verge depth is the most defensible model of the soil; t
 theoretical depth is the conservative habit. What is not defensible is the
 uncracked model: both cracked answers sit far below its 1.276.
 
-The [sample page](../lem/samples.md#1-simple-embankment) catalogues the uncracked
+The [sample page](../lem/samples.md#1-simple-embankment) catalogs the uncracked
 variant of this model; the cracked model is yours — keep it with **Save As**.
 
 ---

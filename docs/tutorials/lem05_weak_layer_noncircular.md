@@ -612,7 +612,7 @@ section itself is entered — closed material-zone polygons instead of profile
 lines, on bedrock that dips across the model and refuses the circles that would
 cut below it. The sample problems carry each page further:
 [Sample Problem 7](../lem/samples.md#7-non-circular-failure-surface)
-catalogues this same model and its per-method searches, and
+catalogs this same model and its per-method searches, and
 [Sample Problem 13](../lem/samples.md#13-multiple-local-minima) is the circular
 counterpart of the same hazard — a section where the surface a search settles on
 depends entirely on where it was started.

@@ -293,7 +293,12 @@ on. Click **Run → Build Mesh…**
 
 Set **Element type** to **Linear triangles (tri3)**. Head is a scalar field, so
 there is nothing for a linear element to lock up on, and unlike a stability
-analysis a transient seepage run puts no restriction on element order.
+analysis a transient seepage run puts no restriction on element order. The one
+plan that would restrict it: a finite-element stability analysis reading its
+pore pressures from this solution runs on this same mesh, and the FEM side
+requires quadratic elements — for that workflow, build the mesh as
+**Quadratic triangles (tri6)** from the start. This page stays with seepage, so
+tri3 serves.
 
 Leave **Auto-size from geometry** ticked, and set **Size divisions** to `64`. The
 grayed **Target element size** box does not follow the divisions — it keeps

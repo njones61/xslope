@@ -213,7 +213,7 @@ and large ones through quiescent periods:
 ### Lumped mass
 
 The storage matrix is **lumped** (diagonalized) rather than kept in consistent form. A
-consistent mass matrix couples neighbouring nodes and can produce non-physical overshoot ahead
+consistent mass matrix couples neighboring nodes and can produce non-physical overshoot ahead
 of a steep wetting front; lumping suppresses this. XSLOPE uses HRZ (special lumping) diagonal
 scaling, which coincides with row-summing on linear elements and stays strictly positive on
 quadratic ones. Lumped mass is the default and only option.
@@ -284,7 +284,7 @@ the same way, so draw the face only up to the level unless that migration is int
 line switch from held reservoir head to exit face, and the still-saturated soil drains back out
 through the newly exposed surface.*
 
-### Exit-face behaviour {#exit-face-behavior}
+### Exit-face behavior {#exit-face-behavior}
 
 The exit face — present statically as a downstream seepage face, or appearing dynamically as a
 reservoir level falls below a node — is resolved each step with the same SEEP2D-style

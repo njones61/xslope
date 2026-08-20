@@ -3091,119 +3091,13 @@ def _seep03_pick_nodes(mesh, seep_data):
     return picked
 
 
-def _seep03_problem_section(model):
-    """The section panel of the problem graphic: the two zones with the properties
-    that make them behave differently, and the two water levels.
+def _seep03_schedule(model):
+    """The pool series the reservoir boundary follows, as the reader enters it —
+    three breakpoints and a duration.
 
-    The conductivities and the storage are read off the model rather than written
-    here, so the graphic cannot state a property the file does not carry.
-
-    The boundary set is deliberately NOT drawn. This panel states the problem, and
-    at the point the reader meets it nothing has been built: a reservoir-boundary
-    overlay, exit-face markers and the t = 0 / t = end waterline pair are the
-    completed model's symbology, and drawn here they would answer the question the
-    page is about to ask. So the panel runs on a copy of the model with the
-    boundary set removed, and draws the full pool and the tailwater itself as
-    single water levels with the package's own water-surface symbol.
-    """
-    xs = [x for x, _ in model["ground_surface"].coords]
-    ys = [y for _, y in model["ground_surface"].coords]
-    aspect = (max(ys) - min(ys)) / (max(xs) - min(xs))
-    stated = dict(model)
-    stated["seepage_bc"] = {}
-    with _hold_show():
-        plot_inputs(stated, mode="seep", show_title=False, frame="content",
-                    show_mesh=False, show_legend=True,
-                    figsize=(8.6, max(3.2, 8.6 * aspect + 2.0)))
-    ax = plt.gcf().axes[0]
-    shell, core = model["materials"][0], model["materials"][1]
-    _u = declared_unit_labels(model)
-    fields = ("%s\nk₁ = %g, k₂ = %g " + _u["k"]
-              + "\n$S_s$ = %g " + _u["inv_length"] + ", $S_y$ = %g")
-
-    def _x_crossings(pts, level):
-        out = []
-        for (x0, y0), (x1, y1) in zip(pts[:-1], pts[1:]):
-            if min(y0, y1) <= level <= max(y0, y1) and y1 != y0:
-                out.append(x0 + (level - y0) / (y1 - y0) * (x1 - x0))
-        return out
-
-    # The shell label sits inside the upstream shell, centered in the open wedge
-    # between the upstream face and the core at the label's own height — both
-    # edges computed from the geometry, so the block re-centers if either moves.
-    y_lab = 4.6
-    gs_pts = list(model["ground_surface"].coords)
-    core_pts = list(model["profile_lines"][1]["coords"])
-    x_face = min(_x_crossings(gs_pts, y_lab))
-    x_core = min(_x_crossings(core_pts, y_lab))
-    ax.text(0.5 * (x_face + x_core), y_lab,
-            fields % (shell["name"], shell["k1"], shell["k2"],
-                      shell["Ss"], shell["Sy"]),
-            ha="center", va="center", fontsize=9)
-    # The core is nine metres wide at its crest and the label is not, so it is called
-    # out from the sky above the downstream slope with a leader into the zone. The
-    # block is anchored ON that slope and grows up and to the RIGHT, where the ground
-    # only falls further away — so it clears the section by construction rather than
-    # by a tuned coordinate.
-    ax.annotate(fields % (core["name"], core["k1"], core["k2"], core["Ss"],
-                          core["Sy"]),
-                xy=(56.0, 12.0), xytext=(74.0, _seep03_top(model, 74.0) + 1.4),
-                fontsize=9, ha="left", va="bottom",
-                arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
-    pool = _seep03_pool(model, 0.0)
-    tail = float(model["seepage_bc"]["specified_heads"][1]["head"])
-    crest = max(y for _, y in model["ground_surface"].coords)
-    # The two water levels, drawn here because the boundary set is not: each is one
-    # horizontal surface running from the end of the section to where the ground
-    # first rises above it, carrying the package's own apex-down water symbol.
-    from xslope.plot import draw_water_level_symbol
-    from xslope.style import feature_style, resolve_style
-
-    wl = feature_style(resolve_style(None), "seep_water_level")
-    wl_color, wl_lw = wl.get("color", "lightskyblue"), wl.get("linewidth", 2.0)
-
-    def _water_line(level, from_left):
-        pts = list(model["ground_surface"].coords)
-        if not from_left:
-            pts = pts[::-1]
-        x_face = pts[-1][0]
-        for (x0, y0), (x1, y1) in zip(pts[:-1], pts[1:]):
-            if min(y0, y1) <= level <= max(y0, y1) and y1 != y0:
-                x_face = x0 + (level - y0) / (y1 - y0) * (x1 - x0)
-                break
-        x_lo, x_hi = sorted((pts[0][0], x_face))
-        ax.plot([x_lo, x_hi], [level, level], color=wl_color, lw=wl_lw,
-                solid_capstyle="butt", zorder=2)
-        draw_water_level_symbol(ax, 0.5 * (x_lo + x_hi), level, color=wl_color,
-                                markersize=8, extra_gap_points=2.0)
-
-    _water_line(pool, True)
-    _water_line(tail, False)
-    ax.text(2.0, pool + 0.9, "full pool  el %g" % pool, fontsize=9,
-            color="#2b7bb0", ha="left", va="bottom")
-    # The tailwater sits in the corner where the downstream slope, the exit face and
-    # the specified-head line all meet, so its label goes in the clear margin under
-    # the section with a leader up to the water line.
-    ax.annotate("tailwater  el %g" % tail, xy=(107.5, tail),
-                xytext=(99.0, -3.2), fontsize=9, color="#2b7bb0",
-                ha="center", va="center",
-                arrowprops=dict(arrowstyle="-|>", color="#2b7bb0", lw=0.9))
-    # The crest label hangs just below crest level in the sky over the upstream
-    # face — above the pool line, below the frame — rather than crammed against
-    # the top of the axes.
-    ax.annotate("crest el %g" % crest, xy=(52.0, crest),
-                xytext=(34.0, crest - 0.6), fontsize=9, color="0.3",
-                ha="center", va="top",
-                arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
-
-
-def _seep03_problem_schedule(model):
-    """The schedule panel of the problem graphic: the pool series the reservoir
-    boundary follows, as the reader enters it — three breakpoints and a duration.
-
-    Drawn beneath the section rather than as an inset on it: at equal aspect this
-    dam's section is five times as wide as it is tall, and an inset small enough to
-    sit in its sky is too small to read a schedule off.
+    A figure of its own rather than a panel under the section: the section is a
+    sketch of the dam a reader meets before anything is built, while the schedule
+    belongs with the transient dialog that carries these same three rows.
     """
     times = list(model["tseep"]["times"])
     pool = list(model["tseep"]["series"]["pool"])
@@ -3214,7 +3108,7 @@ def _seep03_problem_schedule(model):
     ax.plot(times + [duration], pool + [pool[-1]], color="#2b7bb0", lw=2.2,
             zorder=3)
     ax.plot(times, pool, "o", ms=6, mfc="white", mec="#2b7bb0", mew=1.8,
-            zorder=4, label="breakpoints entered on the tseep sheet")
+            zorder=4, label="schedule breakpoints")
     ax.annotate("held at full pool", xy=(times[1], pool[1]),
                 xytext=(times[1] + 26.0, pool[1] + 1.6), fontsize=9,
                 color="0.3", ha="left",
@@ -3336,11 +3230,7 @@ def seep03_plots():
           % (tseep.get("stage_1"), tseep.get("stage_2"),
              tseep.get("stability_time")))
 
-    capture("seep03_problem_section.png", _seep03_problem_section, sd)
-    capture("seep03_problem_schedule.png", _seep03_problem_schedule, sd)
-    _stack_panels("seep03_problem.png",
-                  [os.path.join(OUT_DIR, "seep03_problem_section.png"),
-                   os.path.join(OUT_DIR, "seep03_problem_schedule.png")])
+    capture("seep03_schedule.png", _seep03_schedule, sd)
     capture("seep03_inputs.png", plot_inputs, sd, mode="seep",
             title="Seepage Model Inputs", frame="content", show_mesh=False)
 

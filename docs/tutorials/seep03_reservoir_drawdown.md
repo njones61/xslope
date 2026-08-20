@@ -17,7 +17,7 @@ frames on a play bar, as a head history at a point, and as a ledger of water
 crossing the boundary against water leaving storage.
 
 The example is a small earth dam with a granular shell and a clay core, holding a
-reservoir at elevation 18 ft, which is then lowered to equal the tailwater
+reservoir at elevation 18 m, which is then lowered to equal the tailwater
 elevation over 45 days. It
 is a good vehicle for these questions because the two zones drain at very
 different rates: the shell follows the pool down, the core does not, and the
@@ -60,9 +60,9 @@ the construction and start at [Building the mesh](#building-the-mesh)
 
 ## The problem
 
-![The dam, and the schedule the reservoir follows](images/seep03_problem.png){width=1000}
+![The dam, its two zones, and the properties that make them behave differently](images/seep03_problem_sketch.png){width=1000}
 
-The section is 110 ft long and 22 ft tall at the crest, sitting on rock at
+The section is 110 m long and 22 m tall at the crest, sitting on rock at
 elevation 0. The upstream face rises at about 2.3:1 from the heel at (0, 0) to
 elevation 18, continues to the crest at elevation 22, and the downstream face
 falls at about 2.3:1 from (59, 22) to the toe at (105, 2).
@@ -70,19 +70,21 @@ falls at about 2.3:1 from (59, 22) to the toe at (105, 2).
 Inside the embankment is a clay **core**, a low-conductivity zone whose job is to
 carry the head drop so the shell does not have to. It runs the full height of the
 foundation contact, from (46, 0) up to elevation 18 and back down to (63, 0) —
-about 17 ft wide at the base and 8 ft wide at its crest, 4 ft below the dam crest.
+about 17 m wide at the base and 8 m wide at its crest, 4 m below the dam crest.
 The rest of the section is the granular **shell**.
 
-The reservoir stands at elevation 18, which is 18 ft of water against the
-upstream face and 4 ft of freeboard below the crest. The tailwater stands at
+The reservoir stands at elevation 18, which is 18 m of water against the
+upstream face and 4 m of freeboard below the crest. The tailwater stands at
 elevation 2 at the downstream toe.
 
-The lower panel is the whole of what makes this problem transient. The pool is
-held at elevation 18 for 2 days, drawn down 16 ft to the tailwater datum at
-elevation 2 over the next 45 days, and then held there for the remaining 313 days
-of a 360-day run while the dam relaxes toward its new steady state. Three
-breakpoints state that schedule — (0, 18), (2, 18) and (47, 2) — and building them
-is the featured step of this page.
+The history the reservoir follows is the whole of what makes this problem
+transient. The pool is held at elevation 18 for 2 days, drawn down 16 m to the
+tailwater datum at elevation 2 over the next 45 days, and then held there for the
+remaining 313 days of a 360-day run while the dam relaxes toward its new steady
+state. Three breakpoints state that schedule — (0, 18), (2, 18) and (47, 2) — and
+building them is the featured step of this page.
+
+![The pool schedule the reservoir boundary follows](images/seep03_schedule.png){width=1000}
 
 ---
 
@@ -90,7 +92,7 @@ is the featured step of this page.
 
 A steady seepage analysis solves for the total head *h* at every point of the
 ground — the elevation a column of water would stand to in a standpipe at that
-point, in feet here — and everything else follows from that one field.
+point, in meters here — and everything else follows from that one field.
 [SEEP-1](seep01_sheetpile.md) works through what total head is, and
 [SEEP-2](seep02_johnson_dam.md) through what an unconfined problem adds to it. A
 transient analysis solves for the same field, but for *h*(*x*, *y*, *t*) rather
@@ -101,11 +103,11 @@ than for one answer, and it needs two things a steady analysis does not.
 A steady solution has water in equal to water out everywhere: nothing accumulates
 and nothing is released. The moment the boundary moves, that stops being true.
 Water leaves the dam faster than it enters because the soil itself is giving water
-up, and how much it gives up per foot of head lost is a soil property. XSLOPE
+up, and how much it gives up per meter of head lost is a soil property. XSLOPE
 takes it from two columns on the material table.
 
 **Specific storage, *S<sub>s</sub>*** — the volume of water a unit volume of
-*saturated* soil releases per unit decline in head, in units of 1/ft here. It is
+*saturated* soil releases per unit decline in head, in units of 1/m here. It is
 compressibility: the skeleton closes slightly and the water expands slightly as
 the pressure in the pores comes off, and the small amount of water that displaces
 has to go somewhere. It acts only below the phreatic surface.
@@ -116,7 +118,7 @@ down through it. This is a far larger quantity than the elastic storage, and it
 acts only in the band of soil the falling water table is crossing.
 
 The two therefore work in different places at the same instant, and both are
-needed on this problem: the water table falls tens of feet through the shell, so
+needed on this problem: the water table falls through many meters of shell, so
 *S<sub>y</sub>* is doing most of the work there, while deep saturated soil that
 the water table never reaches still gives up its elastic storage.
 [Storage properties](../seep/transient.md#storage) carries both with typical
@@ -151,10 +153,10 @@ The file carries the section — two profile lines, one per zone, with the maxim
 depth at elevation 0 — and the material properties. It carries no boundary
 conditions and no schedule, which is what the rest of this page builds.
 
-Its global parameters are already set: **Units** `imperial`, so the unit weight of
-water is 62.4 pcf and heads read in feet, and **Time** `day`, which puts
-`k1 (ft/day)` on the material form and makes every discharge on this page cubic
-feet per day per foot of dam. Those two fields are explained on
+Its global parameters are already set: **Units** `SI`, so the unit weight of
+water is 9.81 kN/m³ and heads read in meters, and **Time** `day`, which puts
+`k1 (m/day)` on the material form and makes every discharge on this page cubic
+meters per day per meter of dam. Those two fields are explained on
 [SEEP-1](seep01_sheetpile.md#1-global-parameters). On a transient model the time
 unit does one more thing: it is the unit of every time on the schedule, so
 `Duration (day)` and the breakpoint times below are all in days because of it.
@@ -163,10 +165,10 @@ Click **Materials**, set the **Show parameters for:** toggles to **Seepage**
 alone, and the table shows the seepage band of the `mat` worksheet — ten columns,
 the last two of which need a scroll to the right to reach:
 
-| mat | name | k1 (ft/day) | k2 (ft/day) | alpha | unsat | kr0 | h0 (ft) | vg_a | vg_n | Ss (1/ft) | Sy |
+| mat | name | k1 (m/day) | k2 (m/day) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n | Ss (1/m) | Sy |
 |:---:|---|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1 | `shell` | 0.75 | 0.25 | 0 | `lf` | 0.01 | −1 | 0 | 0 | 10<sup>−4</sup> | 0.22 |
-| 2 | `core` | 0.012 | 0.005 | 0 | `lf` | 0.01 | −1 | 0 | 0 | 10<sup>−3</sup> | 0.03 |
+| 1 | `shell` | 1.5 | 0.5 | 0 | `lf` | 0.01 | −0.3 | 0 | 0 | 3 × 10<sup>−4</sup> | 0.22 |
+| 2 | `core` | 0.012 | 0.005 | 0 | `lf` | 0.01 | −0.3 | 0 | 0 | 3 × 10<sup>−3</sup> | 0.03 |
 
 Both zones are **anisotropic** — `k1` is three times `k2` on the shell and about
 2.4 times on the core, which is what compacted horizontal lifts produce. `alpha`
@@ -182,13 +184,15 @@ relative-conductivity model, which
 sit at zero here because this model uses neither.
 
 The last two columns — the ones the scroll was for — are what this page is about.
-The shell's *S<sub>s</sub>* = 10<sup>−4</sup> /ft and *S<sub>y</sub>* = 0.22 are sand values,
-and the core's 10<sup>−3</sup> /ft and 0.03 are clay values, in both cases from
-the [tables on the transient page](../seep/transient.md#storage). Those tables are
-quoted in 1/m, and a model in feet takes them times 0.3048, so the shell's
-10<sup>−4</sup> /ft is 3.3 × 10<sup>−4</sup> /m — inside the table's sand band —
-and the core's 10<sup>−3</sup> /ft is 3.3 × 10<sup>−3</sup> /m, inside its plastic
-clay band. Note that the two properties move in opposite directions with soil
+The shell's *S<sub>s</sub>* = 3 × 10<sup>−4</sup> /m and *S<sub>y</sub>* = 0.22 are
+sand values, and the core's 3 × 10<sup>−3</sup> /m and 0.03 are clay values, in
+both cases read straight off the
+[tables on the transient page](../seep/transient.md#storage): the shell's pair
+sits in the sand row and the clean-sand-and-gravel row, and the core's in the
+plastic-clay row and the clay row. Those tables are quoted in 1/m and
+*S<sub>s</sub>* is entered in the model's own length unit, so on a model in meters
+the values go in as they stand.
+Note that the two properties move in opposite directions with soil
 type: the clay is the *more* compressible of the two and so has the larger
 *S<sub>s</sub>*, but it holds nearly all of its pore water against gravity and so
 has by far the smaller *S<sub>y</sub>*.
@@ -197,13 +201,13 @@ That opposition is the source of everything this page measures. A falling water
 table drains **downward**, so the rate it can fall through a zone goes as that
 zone's *vertical* conductivity over its *S<sub>y</sub>* — the conductivity that
 moves the water divided by the volume that has to be moved. For the shell that is
-0.25 / 0.22 = 1.1 ft/day. For the core it is 0.005 / 0.03 = 0.17 ft/day, about
-seven times slower, because the core's conductivity is fifty times smaller while
-its drainable porosity is only seven times smaller. The pool falls 16 ft in
-45 days, which is 0.36 ft/day: the shell can keep up with that and the core
-cannot. The solution further down bears the estimate out — inside the core the
-water table falls from 16.9 ft to 10.1 ft between day 2 and day 47, which is
-0.15 ft/day.
+0.5 / 0.22 = 2.3 m/day. For the core it is 0.005 / 0.03 = 0.17 m/day, about
+fourteen times slower, because the core's conductivity is a hundred times smaller
+while its drainable porosity is only seven times smaller. The pool falls 16 m in
+45 days, which is 0.36 m/day: the shell can keep up with that at six times over,
+and the core, at half the pool's rate, cannot. The solution further down bears the
+estimate out — inside the core the water table falls from 16.4 m to 10.6 m
+between day 2 and day 47, 5.9 m in 45 days, which is 0.13 m/day.
 
 Click **OK**.
 
@@ -224,7 +228,7 @@ waiting in the list and give it its points. Each table below pastes straight int
 the points grid.
 
 **Head 1 — the reservoir.** Leave **Type:** at `head` and set
-**Head value (ft):** to `18`. Its polyline runs along the foundation contact at
+**Head value (m):** to `18`. Its polyline runs along the foundation contact at
 the heel and up the submerged part of the upstream face:
 
 | x | y |
@@ -233,11 +237,11 @@ the heel and up the submerged part of the upstream face:
 | 42 | 18 |
 
 The upper end is the point where the reservoir surface meets the slope. Every
-node on that polyline is under 18 ft of water or at its surface, so holding the
+node on that polyline is under 18 m of water or at its surface, so holding the
 total head at 18 along it is exact.
 
 **Head 2 — the tailwater.** Press **Add head** again, set
-**Head value (ft):** to `2`, and enter the two points that carry the downstream
+**Head value (m):** to `2`, and enter the two points that carry the downstream
 water:
 
 | x | y |
@@ -285,7 +289,7 @@ Leave **Auto-size from geometry** ticked, and set **Size divisions** to `64`. Th
 grayed **Target element size** box does not follow the divisions — it keeps
 whatever value it held — so the size actually used is the one the Log states when
 the mesh is built, `Auto element size: 1.719 (slope width / 64 divisions)`. The
-section is 110 ft wide, and 110/64 is 1.72 ft. Leave the rest of the dialog alone.
+section is 110 m long, and 110/64 is 1.72 m. Leave the rest of the dialog alone.
 
 Click **Build**. The mesh comes out at **614 nodes and 1,089 triangles**:
 
@@ -301,7 +305,7 @@ reach the rock would show here rather than in the answer.
 
 ## The steady solution at full pool
 
-Before the pool moves, the dam is in steady state under 18 ft of water, and that
+Before the pool moves, the dam is in steady state under 18 m of water, and that
 state is the field the march will start from. Solving it now is worth doing on its
 own terms as well: it is the reference every transient number on this page is read
 against.
@@ -316,9 +320,9 @@ or at replacing the series name with a number. A preflight check catches it befo
 the solve, so in steady mode the **Run** button on that file is unavailable. Take
 this section as the account of where the march begins, and rejoin the page at
 [Running the transient march](#running-the-transient-march), whose first frame is
-this same solution at the same 0.156 ft³/day per ft.
+this same solution at the same 0.165 m³/day per m.
 
-Built as above, the model's reservoir boundary is still the plain 18 ft head, and
+Built as above, the model's reservoir boundary is still the plain 18 m head, and
 the steady run goes ahead. Click **Run → Run Seep…**. The dialog offers
 **Convergence tol** and **Max iterations** and nothing else — there is no
 run-type selector yet, because
@@ -333,20 +337,19 @@ Number of fixed-head nodes: 33
 Number of exit face nodes: 30
 Starting unsaturated flow iteration...
 Convergence tolerance: 2.200000e-03
-Iteration 1: residual = 6.156100e-01, closure = 1.648e+02, relax = 1.000, 13/30 exit face active
-Iteration 2: residual = 3.879001e-01, closure = 3.817e+00, relax = 1.000, 8/30 exit face active
-Iteration 3: residual = 2.353058e-01, closure = 9.591e+00, relax = 1.000, 4/30 exit face active
-Iteration 4: residual = 2.168638e-01, closure = 7.374e+00, relax = 1.000, 2/30 exit face active
-Iteration 5: residual = 2.465698e-01, closure = 2.568e+01, relax = 1.000, 1/30 exit face active
-Iteration 6: residual = 1.626138e-01, closure = 3.234e+01, relax = 1.000, 0/30 exit face active
+Iteration 1: residual = 6.156139e-01, closure = 2.308e+02, relax = 1.000, 12/30 exit face active
+Iteration 2: residual = 3.454960e-01, closure = 6.006e+00, relax = 1.000, 7/30 exit face active
+Iteration 3: residual = 2.356367e-01, closure = 1.432e+01, relax = 1.000, 3/30 exit face active
+Iteration 4: residual = 2.298170e-01, closure = 9.756e+00, relax = 1.000, 1/30 exit face active
+Iteration 5: residual = 1.791190e-01, closure = 5.469e+00, relax = 1.000, 0/30 exit face active
 ...
-Iteration 170: residual = 3.121460e-06, closure = 9.750e-04, relax = 0.010, 0/30 exit face active
-Converged in 170 iterations (residual = 3.121e-06, closure = 9.750e-04, exit face stable)
+Iteration 55: residual = 1.045643e-04, closure = 2.452e-03, relax = 0.200, 0/30 exit face active
+Converged in 59 iterations (residual = 4.791e-05, closure = 9.100e-04, exit face stable)
 ```
 
 The last column is the exit face reporting its own answer, and on this dam that
-answer is **none of it**. The iteration starts by holding 13 of the 30 nodes wet,
-sheds them over five sweeps, and from sweep 6 to the end holds **0 of 30**. The
+answer is **none of it**. The iteration starts by holding 12 of the 30 nodes wet,
+sheds them over four sweeps, and from sweep 5 to the end holds **0 of 30**. The
 downstream slope never develops a seepage face on this model: the core drops the
 head far enough that the phreatic surface passes *under* the slope and meets the
 downstream boundary at the tailwater. The exit face was still the right boundary
@@ -363,16 +366,16 @@ reaches the tailwater goes through it.
 
 ![The full-pool steady solution](images/seep03_steady.png){width=1000}
 
-**The total discharge is 0.156 ft³/day per ft** — per foot of dam measured along
-its axis. The head ranges from **2.000 ft to 18.000 ft**, the two boundary values
-and nothing outside them. The pore pressure runs from **−445.4 psf to 1,123.2
-psf**; the negative end is the unsaturated soil above the phreatic surface, where
-the pressure head ψ = *h* − *z* is negative.
+**The total discharge is 0.165 m³/day per m** — per meter of dam measured along
+its axis. The head ranges from **2.000 m to 18.000 m**, the two boundary values
+and nothing outside them. The pore pressure runs from **−78.6 kPa to 176.6 kPa**;
+the negative end is the unsaturated soil above the phreatic surface, where
+the pressure head ψ = *h* − *z* (*z* the elevation) is negative.
 
 The heavy black line is the phreatic surface, and the flow lines crowding into the
 core say the same thing it does. Read across the section, the surface stands at
-**17.84 ft at x = 50**, inside the core's upstream half, and at **4.41 ft at
-x = 63**, at the core's downstream toe. That is 13.4 ft of the total 16 ft head
+**17.90 m at x = 50**, inside the core's upstream half, and at **3.52 m at
+x = 63**, at the core's downstream toe. That is 14.4 m of the total 16 m head
 drop taken across the core — the zone doing exactly the job it was built for.
 Downstream of it the surface runs low and nearly flat to the tailwater, which is
 why the slope above it stays dry.
@@ -408,9 +411,9 @@ elevation each:
 | 47 | 2 |
 
 A series runs **linearly between its entries** and is **held constant** before the
-first and after the last, so those three rows are the entire schedule shown in the
-lower panel of the problem figure: flat at 18 from the start of the run through day
-2, straight down to 2 by day 47, and flat at 2 from there to the end. The first row
+first and after the last, so those three rows are the entire schedule drawn at the top
+of this page: flat at 18 from the start of the run through day 2, straight down to
+2 by day 47, and flat at 2 from there to the end. The first row
 matters twice over, because the initial condition is a steady solve at the t = 0
 value, so `0, 18` is what makes the march start from the full-pool solution
 computed above. The second row buys a check: with the pool still at 18 on day 2,
@@ -422,12 +425,12 @@ breakpoint rules.
 **Duration (day).** Set it to `360`. This is how long the march runs, and the
 right value is one that carries the answer past the question being asked. Here the
 drawdown itself is over on day 47, but the dam goes on draining for months
-afterward, and 360 days is long enough for the outflow to fall to a hundredth of
-its peak — measured further down this page. A run that stops at day 47 answers
+afterward, and 360 days is long enough for the outflow to fall to two thousandths
+of its peak — measured further down this page. A run that stops at day 47 answers
 what the dam looks like at the worst instant; this one also answers what it
 settles to.
 
-**Save interval (day).** Set it to `60`. The solver takes hundreds of steps but
+**Save interval (day).** Set it to `60`. The solver takes thousands of steps but
 stores only the frames you ask for, and this field lays down a regular grid of
 them: 60, 120, 180, 240, 300 and 360. Left blank, it defaults to roughly fifty
 frames spread over the duration. A coarse grid like this one is the right choice
@@ -441,7 +444,8 @@ because a time that is not a saved frame is served by running again with that ti
 added — never by interpolating between two frames, since a field blended from two
 solutions solves nothing.
 
-**Stage 1 time, Stage 2 time and Stability time.** Leave all three blank. They
+**Stage 1 time (day), Stage 2 time (day) and Stability time (day).** Leave all
+three blank. They
 belong to [rapid-drawdown staging](../seep/transient.md#rapid-drawdown-staging),
 used when a stability analysis consumes a transient solution and needs particular
 instants marked in it — the subject of a later tutorial. Nothing on this page reads
@@ -467,7 +471,7 @@ polyline is drawn no higher than the level, as it is here: every node on it is
 submerged either way. Drawn above its own level, a constant-value reservoir face
 releases the nodes standing above it to seep even in a steady run.
 
-Then clear the **Head value (ft):** field and type `pool` in place of the number
+Then clear the **Head value (m):** field and type `pool` in place of the number
 18. That is the whole of what makes a boundary condition time-varying: a value
 cell holding the name of a series is driven by that series instead of by a
 constant. Click **OK**.
@@ -514,24 +518,24 @@ the material table stated back: both materials have `k1` ≠ `k2` with `alpha`
 blank, so the major conductivity is taken along +x on each. That is what this
 model intends, so the notes are confirmation rather than a problem.
 
-Click **Run**. The march first solves its initial condition — the same 170-sweep
-unconfined iteration as the steady run above, at the tighter tolerance it sets for
-itself — and then prints a line per saved frame:
+Click **Run**. The march first solves its initial condition — the same unconfined
+iteration as the steady run above, at the tighter tolerance it sets for itself —
+and then prints a line per saved frame:
 
 ```text
 Building seepage data (transient, BC set 1)…
 Running transient seepage analysis…
-  t=2: frame saved (steps so far=6, mass-balance closure=2.41e-04)
-  t=15: frame saved (steps so far=63, mass-balance closure=3.75e-02)
-  t=30: frame saved (steps so far=182, mass-balance closure=7.88e-03)
-  t=47: frame saved (steps so far=406, mass-balance closure=7.77e-03)
-  t=60: frame saved (steps so far=514, mass-balance closure=7.48e-03)
-  t=80: frame saved (steps so far=649, mass-balance closure=6.84e-03)
-  t=120: frame saved (steps so far=764, mass-balance closure=6.66e-03)
-  t=180: frame saved (steps so far=824, mass-balance closure=4.84e-04)
-  t=240: frame saved (steps so far=838, mass-balance closure=1.74e-02)
-  t=300: frame saved (steps so far=848, mass-balance closure=2.47e-02)
-  t=360: frame saved (steps so far=851, mass-balance closure=2.61e-02)
+  t=2: frame saved (steps so far=6, mass-balance closure=7.60e-04)
+  t=15: frame saved (steps so far=283, mass-balance closure=4.66e-03)
+  t=30: frame saved (steps so far=716, mass-balance closure=1.82e-02)
+  t=47: frame saved (steps so far=1207, mass-balance closure=2.89e-02)
+  t=60: frame saved (steps so far=1579, mass-balance closure=2.67e-02)
+  t=80: frame saved (steps so far=1802, mass-balance closure=3.99e-02)
+  t=120: frame saved (steps so far=1940, mass-balance closure=4.92e-02)
+  t=180: frame saved (steps so far=2050, mass-balance closure=3.25e-02)
+  t=240: frame saved (steps so far=2076, mass-balance closure=1.59e-02)
+  t=300: frame saved (steps so far=2084, mass-balance closure=9.54e-03)
+  t=360: frame saved (steps so far=2098, mass-balance closure=6.84e-03)
 Transient seepage complete — 12 saved frame(s).
 ```
 
@@ -543,10 +547,10 @@ dropped, so 0, 2, 15, 30, 47, 60, 80, 120, 180, 240, 300 and 360 is what survive
 in full. Nothing on this file contributes stage times, since those fields were
 left blank.
 
-**851 steps behind those 12 frames**, and the running count in the log says where
-the solver spent them. It reaches day 47 on step 406, so **almost half the run's
-steps fall inside the first 47 days**, and it covers the last 180 days in **27
-steps**. The step size is chosen from how fast the field is moving, so the step
+**2,098 steps behind those 12 frames**, and the running count in the log says where
+the solver spent them. It reaches day 47 on step 1,207 — **the first 47 days are
+13% of the run's duration but take 58% of its steps** — and it covers the last 180 days in
+**48 steps**. The step size is chosen from how fast the field is moving, so the step
 count is itself a reading: the dam is changing quickly while the pool is falling
 and barely at all by the end.
 
@@ -562,13 +566,13 @@ tab carrying all twelve frames, with a play bar under the plot:
 `|<` and `>|` jump to the first and last frame, `<` and `>` step one at a time,
 **Play** animates through them at the **Speed** multiplier, and the **t =** box
 takes a typed time and jumps to the nearest saved frame. The title carries the
-frame's time, and the subtitle carries **Inflow 0 / Outflow 1.237 ft³/day per ft**
+frame's time, and the subtitle carries **Inflow 0 / Outflow 1.658 m³/day per m**
 — two numbers where a steady solution reports one, because under storage exchange
 the water entering and the water leaving are no longer the same.
 
 The frame shown is day 30, in the middle of the drawdown, and it is the whole
 problem in one picture. The pool has fallen to elevation 8. The phreatic surface
-inside the dam still stands above elevation 12 over the core, more than 4 ft above
+inside the dam still stands at elevation 13.2 over the core, more than 5 m above
 the water that used to hold it up.
 
 The arrows are **velocity vectors**, which is how direction is read on a transient
@@ -591,26 +595,27 @@ the previous section solved on its own.
 
 **t = 15, mid drawdown.** The pool has dropped to elevation 13.4. The phreatic
 surface in the upstream shell has followed it down and largely flattened, but it
-still climbs about 2 ft on its way in — 13.4 ft where it leaves the face against
-15.5 ft over the core's upstream edge at x = 50 — and the head field inside the
+still climbs about 2 m on its way in — 13.4 m where it leaves the face against
+15.5 m over the middle of the core at x = 54.5 — and the head field inside the
 core has hardly moved.
 
 **t = 47, the end of drawdown, and the largest lag.** The pool is at elevation 2
 and the drawdown is complete, but the water table inside the core stands at
-**elevation 10.1** — a lag of **8.1 ft, half the entire 16 ft drawdown**, still in
-place at the instant the pool reaches its final level. The warm pocket over the core is the
+**elevation 10.6** — a lag of **8.6 m, more than half the entire 16 m drawdown**,
+still in place at the instant the pool reaches its final level. The warm pocket over the core is the
 head field's residue in damp soil the drawdown has not drained yet: every node in
 it sits above the water table, at negative pressure. The pore pressure a
 rapid-drawdown stability check exists to account for is below that pocket, in the
-paler region — a water table at elevation 10.1 inside the dam against a pool at
+paler region — a water table at elevation 10.6 inside the dam against a pool at
 elevation 2 outside it. The upstream shell has lost the water pressure that was
 holding it up from outside while the core has kept the water pressure pushing
 outward from within.
 
-**t = 120, recovery.** The pocket has drained away and the surface is settling
-toward the new pool level. Measured over the core at the same station, the lag is
-down from 8.1 ft on day 47 to 4.7 ft on day 80 and 1.1 ft on day 180, and by day
-360 the whole surface is within **0.17 ft** of the pool it stands over.
+**t = 120, recovery.** The pocket is nearly gone — a faint rise over the core is
+all that remains — and the surface is settling toward the new pool level. Measured
+over the core at the same station, the lag is down from 8.6 m on day 47 to 4.5 m
+on day 80, 1.9 m on this frame, and 0.6 m on day 180, and by day 360 the whole
+surface is within **0.05 m** of the pool it stands over.
 
 ---
 
@@ -629,31 +634,32 @@ reservoir never supplied.
 The gray dashed line is the pool, the shaded band is the drawdown window, and the
 three solid traces are the nodes. Four instants tell the story:
 
-| t (day) | pool (ft) | core *h* (ft) | shell *h* (ft) | core ψ (ft) | shell ψ (ft) |
+| t (day) | pool (m) | core *h* (m) | shell *h* (m) | core ψ (m) | shell ψ (m) |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| 0 | 18.00 | 13.43 | 17.96 | +4.52 | +9.04 |
-| 30 | 8.04 | 10.45 | 10.54 | +1.54 | +1.62 |
-| 47 | 2.00 | 9.34 | 8.15 | +0.44 | −0.76 |
-| 120 | 2.00 | 4.01 | 3.85 | −4.90 | −5.07 |
+| 0 | 18.00 | 13.56 | 17.98 | +4.65 | +9.06 |
+| 30 | 8.04 | 10.50 | 9.84 | +1.59 | +0.92 |
+| 47 | 2.00 | 9.35 | 6.54 | +0.44 | −2.37 |
+| 120 | 2.00 | 2.92 | 2.71 | −5.99 | −6.21 |
 
-At full pool the shell node stands at **17.96 ft** and the core node at
-**13.43 ft** — the shell is **4.53 ft higher**, which is just the steady picture
+At full pool the shell node stands at **17.98 m** and the core node at
+**13.56 m** — the shell is **4.42 m higher**, which is just the steady picture
 again: the core is what the head drops across, so a point inside it is already
 partway down.
 
 Over the 45 days of drawdown the two exchange places. The shell node loses
-**9.81 ft** of head, following the pool down at very nearly its rate. The core node
-loses **4.09 ft**. The traces cross at **t ≈ 31 day**, marked on the figure, and by
-the end of the drawdown the core stands **1.19 ft above** the shell it began 4.53 ft
+**11.44 m** of head, nearly three quarters of the 16 m the pool itself dropped.
+The core node loses **4.21 m**, little more than a quarter of it. The traces cross
+at **t ≈ 25 day**, marked on the figure, and by
+the end of the drawdown the core stands **2.81 m above** the shell it began 4.42 m
 below. They do not come back together until about day 120.
 
 The pressure head ψ in the last two columns says what that means for the soil.
-At day 47 the shell node has gone **unsaturated**, at ψ = −0.76 ft, while
-the core node 24 ft away at the same elevation is **still saturated** at
-ψ = +0.44 ft. The water table has passed below one and not the other.
+At day 47 the shell node has gone **unsaturated**, at ψ = −2.37 m, while
+the core node 24 m away at the same elevation is **still saturated** at
+ψ = +0.44 m. The water table has passed below one and not the other.
 
-The downstream shell node barely notices any of it, dropping from 4.45 ft to
-3.82 ft over the whole drawdown. It was never supplied by the reservoir in the
+The downstream shell node barely notices any of it, its head easing just over a
+meter — from 4.21 m to 3.18 m — over the whole drawdown. It was never supplied by the reservoir in the
 first place — the core saw to that — so removing the reservoir asks little of it.
 
 ---
@@ -664,23 +670,23 @@ The frames and the histories both describe the field. The last reading is the
 water budget, and it is the one that says where the water in those frames came
 from. Each saved frame reports the flow across the boundary in each direction:
 
-| t (day) | pool (ft) | inflow (ft³/day per ft) | outflow (ft³/day per ft) |
+| t (day) | pool (m) | inflow (m³/day per m) | outflow (m³/day per m) |
 |:---:|:---:|:---:|:---:|
-| 0 | 18.00 | 0.15647 | 0.15647 |
-| 2 | 18.00 | 0.15647 | 0.15647 |
-| 15 | 13.38 | 0.00000 | 0.88416 |
-| 30 | 8.04 | 0.00000 | 1.23660 |
-| 47 | 2.00 | 0.00000 | 1.12053 |
-| 60 | 2.00 | 0.00000 | 0.80751 |
-| 80 | 2.00 | 0.00000 | 0.53525 |
-| 120 | 2.00 | 0.00000 | 0.27070 |
-| 180 | 2.00 | 0.00000 | 0.11466 |
-| 240 | 2.00 | 0.00000 | 0.05534 |
-| 300 | 2.00 | 0.00000 | 0.02818 |
-| 360 | 2.00 | 0.00000 | 0.01573 |
+| 0 | 18.00 | 0.16488 | 0.16488 |
+| 2 | 18.00 | 0.16488 | 0.16488 |
+| 15 | 13.38 | 0.00000 | 1.25079 |
+| 30 | 8.04 | 0.00000 | 1.65767 |
+| 47 | 2.00 | 0.00000 | 1.43680 |
+| 60 | 2.00 | 0.00000 | 0.81468 |
+| 80 | 2.00 | 0.00000 | 0.42130 |
+| 120 | 2.00 | 0.00000 | 0.15870 |
+| 180 | 2.00 | 0.00000 | 0.04799 |
+| 240 | 2.00 | 0.00000 | 0.01830 |
+| 300 | 2.00 | 0.00000 | 0.00769 |
+| 360 | 2.00 | 0.00000 | 0.00326 |
 
 The first two rows are the check the two-day hold was entered for: inflow equals
-outflow at **0.15647**, which is the steady discharge computed at full pool, and it
+outflow at **0.16488**, which is the steady discharge computed at full pool, and it
 is unchanged on day 2. The march starts from a genuine steady state and sits in it
 until the pool is asked to move.
 
@@ -688,30 +694,32 @@ until the pool is asked to move.
 the upstream face stops being a source. The first frame to record that is t = 15,
 and from there to the end of the run — 345 days — nothing enters the dam at all.
 
-**The outflow peaks at 1.2366 on day 30**, which is **7.9 times** the steady
+**The outflow peaks at 1.6577 on day 30**, which is **ten times** the steady
 discharge the same dam passed under a full reservoir. Every bit of that is water
 the soil is giving up: it cannot be water arriving from the reservoir, because
 there is none. This is what the storage properties bought, and it is why a
 drawdown cannot be modeled by rerunning the steady problem at the lower pool — a
 steady solve at elevation 2 would report a small discharge and no lag at all.
 
-**Late in the run the outflow decays toward the new steady state.** It roughly
-halves between each of the last four frames — 0.11466, 0.05534, 0.02818, 0.01573 —
-which is what a diffusive relaxation looks like, and finishes at **1.3% of the
-peak**. That decay and the 0.17 ft of remaining lag from the frames are the same
-statement made two ways: by day 360 there is almost nothing left to drain.
+**Late in the run the outflow decays toward the new steady state.** It drops by
+roughly a factor of two and a half between successive frames at the end of the
+run — 0.04799, 0.01830, 0.00769, 0.00326 — which is what a diffusive relaxation
+looks like, and
+finishes at **0.20% of the peak**. That decay and the 0.05 m of remaining lag from
+the frames are the same statement made two ways: by day 360 there is almost
+nothing left to drain.
 
 The solver also keeps a running ledger of the whole run, which is the transient
 counterpart of the steady solver's flow-closure check. Over the 360 days,
-**104.294 ft³ per ft of dam crossed the boundary outward**, and the soil released
-**107.016 ft³ per ft** from storage. Those two are the same volume counted two
+**105.109 m³ per m of dam crossed the boundary outward**, and the soil released
+**105.828 m³ per m** from storage. Those two are the same volume counted two
 ways, so their difference is a measure of how well the march conserved water: over
-the whole run it comes to **2.6% of the volume transferred**, and no single frame
-is worse than **3.8%** — the t = 15 frame, where the field is moving fastest.
-Most frames are far better than that: from day 30 through day 180 the figure
-runs under **1%**. The per-frame value is the `mass-balance closure` printed on
-each frame line of the log, and
-[the ledger](../seep/transient.md#mass-balance-ledger) is where it is defined.
+the whole run it comes to **0.7% of the volume transferred**. That difference is
+the `mass-balance closure` printed on each frame line of the log — a running
+figure, the imbalance accumulated up to that instant rather than the frame's own.
+It accumulates through the drawdown and the two months of drainage that follow,
+peaking at **4.9%** on day 120, and then closes back to 0.7% as the field settles.
+[The ledger](../seep/transient.md#mass-balance-ledger) is where it is defined.
 
 ---
 

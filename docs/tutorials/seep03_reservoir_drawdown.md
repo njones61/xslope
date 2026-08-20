@@ -365,8 +365,8 @@ The last column is the exit face reporting its own answer, and on this dam that
 answer is **none of it**. The iteration starts by holding 12 of the 30 nodes wet,
 sheds them over four sweeps, and from sweep 5 to the end holds **0 of 30**. The
 downstream slope never develops a seepage face on this model: the core drops the
-head far enough that the phreatic surface passes *under* the slope and meets the
-downstream boundary at the tailwater. The exit face was still the right boundary
+head far enough that the phreatic surface stays inside the dam, below the dry
+face, and comes out at the tailwater. The exit face was still the right boundary
 to draw, because whether it is wet is not something you can know before solving —
 here the solution says it is dry, and on the same dam with a more conductive core
 it would not be.

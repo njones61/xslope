@@ -21,7 +21,7 @@ reservoir at elevation 18 ft, which is then lowered to equal the tailwater
 elevation over 45 days. It
 is a good vehicle for these questions because the two zones drain at very
 different rates: the shell follows the pool down, the core does not, and the
-head left inside the core after the water is gone is what a rapid-drawdown
+head left inside the core after the drawdown ends is what a rapid-drawdown
 stability check has to account for.
 
 [Tutorial SEEP-2](seep02_johnson_dam.md) built a zoned dam from nothing and
@@ -601,9 +601,9 @@ still climbs about 2 ft on its way in — 13.4 ft where it leaves the face again
 core has hardly moved.
 
 **t = 47, the end of drawdown, and the largest lag.** The pool is at elevation 2
-and the reservoir is gone, but the water table inside the core stands at
+and the drawdown is complete, but the water table inside the core stands at
 **elevation 10.1** — a lag of **8.1 ft, half the entire 16 ft drawdown**, still in
-place at the instant the reservoir empties. The warm pocket over the core is the
+place at the instant the pool reaches its final level. The warm pocket over the core is the
 head field's residue in damp soil the drawdown has not drained yet: every node in
 it sits above the water table, at negative pressure. The pore pressure a
 rapid-drawdown stability check exists to account for is below that pocket, in the

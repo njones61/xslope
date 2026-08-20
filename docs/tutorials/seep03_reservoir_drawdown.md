@@ -753,25 +753,18 @@ peaking at **4.9%** on day 120, and then closes back to 0.7% as the field settle
 
 This tutorial covered:
 
-- The two storage properties a transient run reads from the material table —
-  specific storage below the water table, specific yield in the band it is passing
-  through — and why the clay core has more of the first and far less of the
-  second.
-- Building a boundary set for a dam with water on both sides, including an exit
-  face whose wet extent the solution decides, and which on this dam turns out to
-  be dry.
-- The initial condition: a steady solve at the schedule's t = 0 value, which is
-  why a drawdown model starts by stating the full-pool level.
-- Building a schedule — a named time series of pool level against time, a run
-  duration long enough to carry the answer past the question, and a save schedule
-  chosen so the instants worth looking at are among the frames kept.
-- Making a boundary time-varying by typing the series name into its value cell,
-  and choosing the reservoir type so that face nodes the water leaves are free to
-  seep rather than pinned or sealed.
-- Reading the result three ways: the frames, where the phreatic surface visibly
-  lags the pool; the head history, where the core's head passes above the shell's
-  partway through the drawdown; and the water budget, where an outflow many times
-  the steady discharge is drawn entirely from storage.
+- The two storage properties a transient run reads — specific storage below the
+  water table, specific yield in the band it crosses — and why clay has more of
+  the first and far less of the second.
+- A boundary set for a dam with water on both sides, including an exit face
+  whose wet extent the solution decides.
+- The initial condition: a steady solve at the schedule's t = 0 values.
+- A schedule — a pool-level time series, a run duration, and the save times
+  worth keeping.
+- Making a boundary time-varying by naming its series in the value cell, with
+  the reservoir type freeing the nodes the water leaves.
+- Three readings of the result: the frames, the head history, and the water
+  budget.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Transient Seepage](../seep/transient.md) carries the formulation, the storage

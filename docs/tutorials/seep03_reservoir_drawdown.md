@@ -327,20 +327,17 @@ state is the field the march will start from. Solving it now is worth doing on i
 own terms as well: it is the reference every transient number on this page is read
 against.
 
-If you opened the completed download rather than the starter file, read this
-section rather than run it. That file's reservoir boundary is already bound to
-the time series built two sections below, and a steady run on it is refused:
-XSLOPE reports that a boundary value is bound to a series and that a steady solve
-has no time axis to read one at, then points you either at a transient run — whose
-first saved frame, at t = 0, is the steady solution at the initial series values —
-or at replacing the series name with a number. A preflight check catches it before
-the solve, so in steady mode the **Run** button on that file is unavailable. Take
-this section as the account of where the march begins, and rejoin the page at
-[Running the transient march](#running-the-transient-march), whose first frame is
-this same solution at the same 0.165 m³/day per m.
+If you opened the completed download rather than the starter file, this section
+works for you too, with two small differences. That file carries the schedule, so
+its Run Seepage dialog has a **Run type** selector — choose **Steady** for this
+section. And its reservoir boundary is already bound to the time series built two
+sections below, so the Log opens with
+`Series 'pool' read at t = 0 for the steady solve: reservoir value 18` — a
+series-bound boundary is read at its starting value for a steady run, which at
+t = 0 is the full pool. The solution below comes out identical either way.
 
-Built as above, the model's reservoir boundary is still the plain 18 m head, and
-the steady run goes ahead. Click **Run → Run Seep…**. The dialog offers
+Built as above, the model's reservoir boundary is the plain 18 m head. Click
+**Run → Run Seep…**. The dialog offers
 **Convergence tol** and **Max iterations** and nothing else — there is no
 run-type selector yet, because
 the model has no schedule for a transient run to follow. Leave both fields at

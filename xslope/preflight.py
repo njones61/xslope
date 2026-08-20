@@ -3467,12 +3467,12 @@ def _tseep_initial_condition(ctx):
     return out
 
 
-@rule("seep.steady_with_series_bc", ERROR, ("seep",),
-      "A boundary value bound to a time series cannot be solved steady.")
-def _steady_with_series_bc(ctx):
+@rule("seep.steady_reads_series_at_t0", INFO, ("seep",),
+      "A steady run reads each series-bound boundary at its t = 0 value.")
+def _steady_reads_series_at_t0(ctx):
     # Fires on the STEADY run only. A transient run inherits every seep rule
-    # (analyses expansion), but a series-bound value is exactly what a transient
-    # run is for -- guard on the exact analysis, not the expanded set.
+    # (analyses expansion), but there the series drive the march itself -- guard
+    # on the exact analysis, not the expanded set.
     if ctx.analysis_name != "seep":
         return None
     bc = ctx.seep_bc
@@ -3481,12 +3481,15 @@ def _steady_with_series_bc(ctx):
     bound = list(dict.fromkeys(v for v in names if isinstance(v, str) and v.strip()))
     if not bound:
         return None
-    listed = ", ".join(f"'{s}'" for s in bound)
-    return (f"One or more boundary values are bound to a time series ({listed}), "
-            f"and a steady solve has no time axis to read a series at. Run a "
-            f"TRANSIENT analysis instead -- its first saved frame (t = 0) is the "
-            f"steady solution at the initial series values -- or replace the "
-            f"series name with a number for a steady run {_AT_SEEPBC}.")
+    parts = []
+    for s in bound:
+        v = ctx.series_at_start(s)
+        parts.append(f"'{s}'" if v is None else f"'{s}' = {v:g}")
+    listed = ", ".join(parts)
+    return (f"Boundary values bound to a time series are read at their t = 0 "
+            f"values for a steady run ({listed}) -- the initial-condition "
+            f"snapshot, the same field a transient march starts from. The Log "
+            f"states each reading {_AT_SEEPBC}.")
 
 
 @rule("tseep.reservoir_face_above_level", INFO, ("seep",),

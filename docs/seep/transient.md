@@ -235,10 +235,11 @@ tseep sheet holds a single shared time column and up to **five named series** (d
 own **type** — `head`, `reservoir` or `flux` — decides whether its numbers are read as a plain
 Dirichlet head, a submerged-only reservoir level, or a specified flux.
 
-A series-bound value also commits the model to a transient solve: a **steady** run has no time
-axis to read a series at, so it refuses to run and says so (the steady solution at the initial
-series values is the transient run's own first frame, at t = 0). For a steady run, replace the
-series name with a number.
+A series-bound value does not rule out a **steady** run: the series is read at its **t = 0
+value**, and the Log states each reading (`Series 'pool' read at t = 0 for the steady solve`).
+That steady solution is the initial-condition snapshot — the same field a transient march
+starts from, and its first saved frame — so a quick steady run is the natural check on a model
+before committing to a long march.
 
 Each series is a curve of value versus time with these **breakpoint semantics**:
 

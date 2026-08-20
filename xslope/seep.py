@@ -331,6 +331,22 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     head_series_bindings = []   # [{"mask": bool(n_nodes), "series": name, "kind": str}]
     flux_series_bindings = []   # [{"unit_flux_nodal": (n_nodes,), "series": name}]
 
+    # Each binding also carries the series' value AT t = 0 ("value_t0"), computed
+    # here where the tseep sheet is in reach. A STEADY solve on a series-bound
+    # model reads every series at t = 0 — the same values the transient march's
+    # own initial condition uses — so the steady run is the initial-condition
+    # snapshot, cheap, without the march behind it.
+    _series_t0 = {}
+    _ts = (slope_data or {}).get("tseep") or {}
+    for _name, _vals in (_ts.get("series") or {}).items():
+        _pairs = [(float(t), float(v)) for t, v in zip(_ts.get("times") or [], _vals)
+                  if v is not None]
+        if _pairs:
+            _ta, _va = zip(*_pairs)
+            # np.interp clamps to the first value before the first breakpoint,
+            # matching the march's held-before-first rule.
+            _series_t0[_name] = float(np.interp(0.0, _ta, _va))
+
     # Process specified head boundary conditions
     # Vectorized: compute distance from all nodes to each BC line at once
     specified_heads = seepage_bc.get("specified_heads", [])
@@ -358,7 +374,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
             # applies the submerged-only reservoir rule or the plain head rule by
             # the binding's kind. It stays OUT of the baked scalar arrays here.
             head_series_bindings.append({"mask": mask, "series": head_value,
-                                         "kind": kind})
+                                         "kind": kind,
+                                         "value_t0": _series_t0.get(head_value)})
             continue
         if kind == "reservoir":
             # Submerged-only against the constant level: hold submerged nodes,
@@ -406,7 +423,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
                 nodes, elements, element_types,
                 [{"coords": _b["coords"], "flux": 1.0}], tolerance)
             flux_series_bindings.append({"unit_flux_nodal": unit_fn,
-                                         "series": _b["flux"]})
+                                         "series": _b["flux"],
+                                         "value_t0": _series_t0.get(_b["flux"])})
     flux_nodal = assemble_flux_nodal(nodes, elements, element_types,
                                      _numeric_fluxes, tolerance)
     # A series-bound head resolves to a Dirichlet (or exit-face) node at runtime, so
@@ -3839,17 +3857,56 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     # those nodes free would solve a different problem than the file describes.
     # Refuse loudly instead. The steady solution at the initial pool level is the
     # transient run's own first frame (t = 0), so nothing is lost by refusing.
-    _bound = ([b["series"] for b in seep_data.get("head_series_bindings") or []] +
-              [b["series"] for b in seep_data.get("flux_series_bindings") or []])
-    if _bound:
-        _names = ", ".join(f"'{s}'" for s in dict.fromkeys(_bound))
-        raise SeepInputError(
-            f"Cannot run a STEADY seepage analysis: one or more boundary values "
-            f"are bound to time series ({_names}), and a steady solve has no time "
-            f"axis to read them at. Run a TRANSIENT analysis instead — its first "
-            f"saved frame (t = 0) is the steady solution at the initial series "
-            f"values — or replace the series name with a number in the seep bc "
-            f"sheet for a steady run.")
+    # A boundary value bound to a tseep series is read AT ITS t = 0 VALUE for a
+    # steady solve — the same values the transient march's own initial condition
+    # uses, so the steady run is the initial-condition snapshot without the march
+    # behind it. Never silent: each reading is announced on the log. The overlay
+    # works on copies, so the caller's seep_data stays untouched (its arrays keep
+    # the binding nodes free, as the transient path expects).
+    _hb = seep_data.get("head_series_bindings") or []
+    _fb = seep_data.get("flux_series_bindings") or []
+    _bc_overlay = None
+    if _hb or _fb:
+        _unresolved = [b["series"] for b in (_hb + _fb)
+                       if b.get("value_t0") is None]
+        if _unresolved:
+            _names = ", ".join(f"'{s}'" for s in dict.fromkeys(_unresolved))
+            raise SeepInputError(
+                f"Cannot run a STEADY seepage analysis: boundary values are bound "
+                f"to time series ({_names}) whose t = 0 values are not carried on "
+                f"this seep_data. Rebuild it with build_seep_data from the loaded "
+                f"model (so the tseep sheet is in reach), or replace the series "
+                f"name with a number in the seep bc sheet.")
+        _nodes_y = np.asarray(seep_data["nodes"], dtype=float)[:, 1]
+        _bt = np.asarray(seep_data["bc_type"]).copy()
+        _bv = np.asarray(seep_data["bc_values"], dtype=float).copy()
+        _fn = seep_data.get("flux_nodal")
+        _fn = (np.zeros(len(_bt)) if _fn is None
+               else np.asarray(_fn, dtype=float).copy())
+        for _b in _hb:
+            _v = float(_b["value_t0"])
+            _mask = _b["mask"]
+            print(f"Series '{_b['series']}' read at t = 0 for the steady solve: "
+                  f"{_b.get('kind', 'head')} value {_v:g}")
+            if str(_b.get("kind", "head")).strip().lower() == "reservoir":
+                # Submerged-only at the t = 0 level, exactly as a constant
+                # reservoir bakes: hold submerged nodes, let above-level nodes
+                # seep (Dirichlet from another boundary still wins there).
+                _sub = _mask & (_nodes_y <= _v)
+                _bt[_sub] = 1
+                _bv[_sub] = _v
+                _above = _mask & (_nodes_y > _v) & (_bt != 1)
+                _bt[_above] = 2
+                _bv[_above] = _nodes_y[_above]
+            else:
+                _bt[_mask] = 1
+                _bv[_mask] = _v
+        for _b in _fb:
+            _v = float(_b["value_t0"])
+            print(f"Series '{_b['series']}' read at t = 0 for the steady solve: "
+                  f"flux value {_v:g}")
+            _fn = _fn + np.asarray(_b["unit_flux_nodal"], dtype=float) * _v
+        _bc_overlay = (_bt, _bv, _fn)
 
     start_time = time.time()
 
@@ -3872,15 +3929,19 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     # Extract data from seep_data
     nodes = seep_data["nodes"]
     elements = seep_data["elements"]
-    bc_type = seep_data["bc_type"]
-    bc_values = seep_data["bc_values"]
-    # Consistent nodal loads from specified-flux BCs (absent on seep_data built by
-    # import_seep2d or older callers -> no flux).
-    flux_nodal = seep_data.get("flux_nodal")
-    if flux_nodal is None:
-        flux_nodal = np.zeros(len(bc_type))
+    if _bc_overlay is not None:
+        # Series-bound model: the t = 0 overlay computed above.
+        bc_type, bc_values, flux_nodal = _bc_overlay
     else:
-        flux_nodal = np.asarray(flux_nodal, dtype=float)
+        bc_type = seep_data["bc_type"]
+        bc_values = seep_data["bc_values"]
+        # Consistent nodal loads from specified-flux BCs (absent on seep_data
+        # built by import_seep2d or older callers -> no flux).
+        flux_nodal = seep_data.get("flux_nodal")
+        if flux_nodal is None:
+            flux_nodal = np.zeros(len(bc_type))
+        else:
+            flux_nodal = np.asarray(flux_nodal, dtype=float)
     has_flux = bool(np.any(flux_nodal != 0.0))
     if has_flux and not np.any(bc_type > 0):
         raise SeepInputError(

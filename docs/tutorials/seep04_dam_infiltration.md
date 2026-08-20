@@ -13,8 +13,8 @@ the water table it feeds finds its own position. That is what the third boundary
 condition type, the **specified flux**, is for, and building one is the subject of
 this page.
 
-The example is a 12 m earth dam with a horizontal drain at its downstream toe,
-holding 10 m of water. It is solved twice. The first run is the dam in dry
+The example is a 12 m earth dam holding 10 m of water, with a horizontal drain
+at its downstream toe. It is solved twice. The first run is the dam in dry
 weather, and it is the reference. The second is the same model with steady rain
 falling on it at 1 × 10<sup>−8</sup> m/s, and nothing else changed — one input
 added, the run repeated, the two answers compared. Most of what the page measures

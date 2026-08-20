@@ -377,8 +377,10 @@ In the **Display** panel, tick **Filled contours** and set **Base material** to
 `2: core`. A flow net has to be scaled to the zone the through-flow actually
 crosses, which
 [SEEP-2 works through](seep02_johnson_dam.md#scaling-the-flow-net-on-a-zoned-section);
-on this dam the core spans the full height of the section, so every drop that
-reaches the tailwater goes through it.
+on this dam that zone is the core, because there is no path around it: it is
+keyed to the rock below, and its top at elevation 18 stands at pool level —
+above the phreatic surface inside the dam — so no saturated flow passes over
+it. Every drop that reaches the tailwater crosses the core.
 
 ![The full-pool steady solution](images/seep03_steady.png){width=1000}
 

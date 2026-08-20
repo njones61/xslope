@@ -64,8 +64,8 @@ the construction and start at [Building the mesh](#building-the-mesh)
 
 The section is 110 m long and 22 m tall at the crest, sitting on rock at
 elevation 0. The upstream face rises at about 2.3:1 from the heel at (0, 0) to
-elevation 18, continues to the crest at elevation 22, and the downstream face
-falls at about 2.3:1 from (59, 22) to the toe at (105, 2).
+the crest at elevation 22, and the downstream face falls at about 2.3:1 from
+(59, 22) to the toe at (105, 2).
 
 Inside the embankment is a clay **core**, a low-conductivity zone whose job is to
 carry the head drop so the shell does not have to. It runs the full height of the

@@ -17,7 +17,8 @@ frames on a play bar, as a head history at a point, and as a ledger of water
 crossing the boundary against water leaving storage.
 
 The example is a small earth dam with a granular shell and a clay core, holding a
-reservoir at elevation 18 ft, which is emptied to the tailwater over 45 days. It
+reservoir at elevation 18 ft, which is then lowered to equal the tailwater
+elevation over 45 days. It
 is a good vehicle for these questions because the two zones drain at very
 different rates: the shell follows the pool down, the core does not, and the
 head left inside the core after the water is gone is what a rapid-drawdown

@@ -292,7 +292,7 @@ def test_contract():
     if panel.blocked:
         fails.append(f"the panel still blocks the run after the repair was applied "
                      f"({panel.block_reason()[:80]!r})")
-    if any(f.rule_id == RULE for f in (panel.report.errors if panel.report else [])):
+    if any(f.rule_id == RULE for f in (panel.report.errors if panel.report is not None else [])):
         fails.append("the finding that offered the remedy survived it — the panel "
                      "did not re-check the model it changed")
     return fails
@@ -537,7 +537,7 @@ def test_notes_collapsed():
 
     panel = _panel(_load(TWO_NOTES), "seep")
     toggle = panel.findChild(QToolButton, "preflight_infos")
-    infos = [f for f in (panel.report.infos if panel.report else [])]
+    infos = [f for f in (panel.report.infos if panel.report is not None else [])]
     if not infos:
         fails.append("the fixture reports no notes, so the disclosure is not tested")
         return fails

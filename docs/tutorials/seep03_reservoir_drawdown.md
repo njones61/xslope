@@ -214,6 +214,13 @@ Click **OK**.
 
 ## Building the boundary conditions
 
+The model gets built in two passes. This section and the two after it build and
+solve an ordinary **steady** model of the dam at full pool — the same kind of
+model SEEP-2 built — and only then is it converted to transient, by adding the
+schedule and pointing the reservoir boundary at it. Building the steady model
+first is not a detour: its solution becomes the transient run's starting state,
+as the steady-solution section explains.
+
 The dam has water on both sides of it and a face that water may leave through, so
 it takes three boundary condition entries. Their mechanics — what each type does, why an
 exit face is drawn over the whole slope, and what the no-flow default covers — are

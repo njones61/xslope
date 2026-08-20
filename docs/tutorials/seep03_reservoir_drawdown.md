@@ -649,6 +649,13 @@ shell at the same elevation, (30.7, 8.9), so the comparison is like for like. A
 third at (75.3, 6.8) in the downstream shell gives a control — a point the
 reservoir never supplied.
 
+The figure below is drawn by this page, not by a Studio display option — the
+solution views show one frame at a time. But the saved frames sit on disk beside
+the model, and the **assistant** can plot them: ask it
+*"Plot total head versus time at (54.5, 8.9) and (30.7, 8.9) from the saved
+transient frames, with the pool schedule overlaid"* and it will build the same
+kind of figure from the same data.
+
 ![Total head against time at three nodes](images/seep03_history.png){width=1000}
 
 The gray dashed line is the pool, the shaded band is the drawdown window, and the

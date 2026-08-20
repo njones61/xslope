@@ -1671,6 +1671,21 @@ export_transient_solution(seep_data, solution, "earth_dam", input_file=input_fil
 Use `vectors=True, flowlines=False` on a transient frame: a storage-release state has no flow
 net, so no stream function is stored.
 
+**Time-history plots at a point** (a common ask — Studio has no display option for this, so
+users are sent to you): each frame carries nodal arrays, so pick the nearest node and stack a
+quantity over `frames`. Overlay the driving series from `slope_data["tseep"]` so the response
+reads against its cause. For the standard station overview (reservoir level, water table at an
+x-station, boundary in/outflow), `plot_transient_history(seep_data, solution, station=x)` is
+already built.
+
+```python
+nodes = np.asarray(seep_data["nodes"], float)
+i = int(np.argmin((nodes[:, 0] - 54.5)**2 + (nodes[:, 1] - 8.9)**2))   # nearest node
+t = [f["time"] for f in solution["frames"]]
+h = [f["head"][i] for f in solution["frames"]]                          # or f["u"][i]
+ax.plot(t, h); ax.plot(ts["times"], ts["series"]["pool"], "k--")        # ts = slope_data["tseep"]
+```
+
 ### Stability at one instant of a transient march
 
 A stability run reads **one frame**, never a blend — the march is never interpolated. Stage it

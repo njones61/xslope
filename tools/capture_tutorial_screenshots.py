@@ -1938,6 +1938,68 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# SEEP-4 — Infiltration & Flux Boundaries
+#
+# The page's whole subject is one editor: the boundary set, with three flux
+# entries in it beside the reservoir head and the toe drain. So the first shot is
+# the Seep BC dialog with a flux entry open — the one on the upstream face, whose
+# first point is the same (20, 10) the head boundary ends on, which is the shared
+# node the page's collision rule is about. The second is the Run Seepage dialog in
+# steady mode, the state the reader solves from.
+#
+# There is no results-view shot: the two solved fields are drawn by
+# ``tools/make_tutorial_figures.py`` (seep04_dry.png / seep04_wet.png) on one
+# pinned color scale so the pair compares, and a Studio grab of the same plot in
+# its panel chrome adds nothing the earlier seepage tutorials have not already
+# shown of that view.
+# --------------------------------------------------------------------------- #
+SEEP04 = os.path.join(REPO_ROOT,
+                      "docs/tutorials/files/xslope_dam_infiltration.xlsx")
+#: The boundary-list row the BC shot opens: 0 is the reservoir head, 1-3 the three
+#: infiltration blocks, 4 the toe drain. Row 1 is the upstream-face block, which
+#: starts at the waterline the head boundary ends on.
+SEEP04_BC_ROW = 1
+
+
+def seep04_seep_bc():
+    """The boundary set complete: the reservoir head, the three infiltration
+    blocks and the toe drain, with the upstream-face block open.
+
+    Its points table reads (20, 10) → (24, 12): the block starts exactly where the
+    reservoir head boundary stops, so the two share a node, and its value is the
+    projected 8.94427191e-09 rather than the vertical rain rate.
+    """
+    from studio.editors import SeepBcEditor
+
+    data = _load(SEEP04)
+    dlg = SeepBcEditor().build(data, None, select=(0, SEEP04_BC_ROW))
+    dlg.resize(1080, 560)
+    return _grab(dlg, "seep04_studio_seep_bc.png")
+
+
+def seep04_run_seep():
+    """Run Seepage in **Steady** mode — the model checks a steady unconfined run is
+    held to, on a model whose boundary set is a head, three fluxes and an exit face.
+    """
+    from studio.dialogs import RunSeepDialog
+
+    data = _load(SEEP04)
+    dlg = RunSeepDialog(defaults={"mode": "steady", "tol": 1e-4},
+                        slope_data=data,
+                        has_bc2=bool((data.get("seepage_bc2") or {})
+                                     .get("specified_heads")),
+                        has_tseep=bool(data.get("tseep")))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "seep04_studio_run_seep.png")
+
+
+SHOTS.update({
+    "seep04_seep_bc": seep04_seep_bc,
+    "seep04_run_seep": seep04_run_seep,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

@@ -3351,6 +3351,475 @@ def seep03_plots():
             picked)
 
 
+# --------------------------------------------------------------------------- #
+# SEEP-4 — infiltration and flux boundaries
+# --------------------------------------------------------------------------- #
+# The Fredlund & Rahardjo (1993) earth dam under steady rainfall: 12 m high, 4 m
+# crest, symmetric 2:1 faces, 52 m base, reservoir at 10 m, a 12 m horizontal
+# drain at the downstream toe.  It is verification case 4 of GW6, and the
+# tutorial's file pair is built from that corpus file by
+# ``tools/build_dam_infiltration.py``.
+#
+# The lesson is a CONTRAST, so every figure and every number here is measured
+# twice on one mesh: once with the rain and once without it.  The dry run is the
+# completed model with its flux boundaries removed, which is bit-for-bit the same
+# model as GW6 case 1 (gw006a) — identical geometry, identical soil — so the
+# comparison is the manual's own pair of cases rather than a variation invented
+# for the page.  Both runs are meshed and solved at the corpus discretization the
+# verification page locks (tri3, 1.0 m, max_iter 2000), so a number printed here
+# is a number that page can be checked against.
+#
+# Head figures are drawn on ONE pinned color scale, computed over both solutions,
+# so the dry and wet panels are readable side by side: a contour that moves has
+# moved, not been rescaled.
+# --------------------------------------------------------------------------- #
+SEEP04 = os.path.join(REPO_ROOT,
+                      "docs/tutorials/files/xslope_dam_infiltration.xlsx")
+#: The mesh, in the Build mesh dialog's own controls, and the solver's iteration
+#: cap — the corpus discretization the GW6 verification tags run at.
+SEEP04_SIZE = 1.0
+SEEP04_ELEMENT = "tri3"
+SEEP04_MAX_ITER = 2000
+#: The manual's line 1-1: the crest centerline, where every GW6 case publishes its
+#: pressure-head profile.  The dam is 24–28 m across the crest, so 26 is its axis.
+SEEP04_LINE_X = 26.0
+#: Elevations the line 1-1 profile is tabulated at — Fig 6.18's own marker spacing,
+#: base to crest.  0.05 rather than 0 because the base node itself sits on the
+#: no-flow boundary; it is the station the verification tag locks.
+SEEP04_LINE_Y = (0.05, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0,
+                 12.0)
+#: Vertical stations the phreatic surface is read at, upstream toe to downstream
+#: toe.  20 is the waterline, 24 and 28 are the crest shoulders, and 40 is the
+#: upstream end of the toe drain, so the set brackets every feature that moves.
+SEEP04_STATIONS = (4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 26.0, 28.0, 32.0, 36.0,
+                   40.0, 44.0, 48.0)
+#: Contour count for the head figures.
+SEEP04_LEVELS = 12
+#: The vendor's rain rate — a VERTICAL Darcy velocity, in m/s — and the 2:1 face
+#: slope it falls on, both restated here so the projection the page teaches is
+#: arithmetic the producer prints rather than a number copied into prose.
+SEEP04_RAIN = 1e-8
+SEEP04_FACE_RUN, SEEP04_FACE_RISE = 2.0, 1.0
+#: The VENDOR's infiltration extents, for the comparison the page closes on. They
+#: stop one vendor mesh edge short of the waterline and one short of the toe, so
+#: they are properties of the vendor's mesh rather than of the dam; the tutorial
+#: file draws the same rain on the geometry instead, waterline (20, 10) to toe
+#: (52, 0). The corpus file gw006d keeps these, exactly as the vendor wrote them.
+SEEP04_VENDOR_VERTICES = ((22.0, 11.0), (24.0, 12.0), (28.0, 12.0), (50.0, 1.0))
+#: A flux block laid entirely inside the reservoir head boundary, used to prove the
+#: collision rule: every node it loads is a specified-head node, so the answer must
+#: not move. Wholly below the waterline at (20, 10), on the submerged upstream face.
+SEEP04_SUBMERGED_BLOCK = ((12.0, 6.0), (20.0, 10.0))
+
+
+def _seep04_mesh(model, size=SEEP04_SIZE, element_type=SEEP04_ELEMENT):
+    """One mesh of the model's material polygons, quiet — the corpus mesh."""
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model), size, element_type,
+            size_regions=extract_size_regions(model))
+
+
+def _seep04_solve(model, mesh, max_iter=SEEP04_MAX_ITER):
+    """One steady seepage solve on a built mesh, with the solver's log captured.
+
+    ``tol=1e-5`` is the tolerance the page's own verification tags solve at
+    (``run_seep_head_test``), so the heads printed here are the heads those tags
+    compare against.
+    """
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        seep_data = build_seep_data(mesh, model)
+        solution = run_seepage_analysis(seep_data, tol=1e-5, max_iter=max_iter)
+    return seep_data, solution, log.getvalue()
+
+
+def _seep04_dry(model):
+    """The completed model with the rain switched off, in memory.
+
+    Everything else — the reservoir head, the toe-drain exit face, the soil, the
+    section — is untouched, so the difference between this run and the completed
+    file's is the infiltration and nothing else.
+    """
+    bc = dict(model["seepage_bc"])
+    bc["specified_fluxes"] = []
+    return dict(model, seepage_bc=bc)
+
+
+def _seep04_line(mesh, solution, x=SEEP04_LINE_X, elevations=SEEP04_LINE_Y):
+    """Pressure head up the vertical line at ``x``, at the given elevations.
+
+    Read off a linear interpolator over the mesh rather than off the nearest node,
+    because the two runs are compared station by station and the difference at the
+    base is smaller than the 1 m element.
+    """
+    import numpy as np
+
+    ihead = _seep02_interp(mesh, np.asarray(solution["head"], dtype=float))
+    xs = np.full(len(elevations), float(x))
+    heads = np.ma.filled(ihead(xs, np.asarray(elevations, dtype=float)), np.nan)
+    return np.asarray(heads), np.asarray(heads) - np.asarray(elevations)
+
+
+def _seep04_top(x):
+    """The dam's surface elevation at ``x`` — 2:1 faces up to a 4 m crest at 12 m."""
+    if x <= 24.0:
+        return x / 2.0
+    if x <= 28.0:
+        return 12.0
+    return (52.0 - x) / 2.0
+
+
+def _seep04_phreatic(mesh, solution, stations=SEEP04_STATIONS):
+    """The phreatic-surface elevation at each station — the pressure-head zero
+    crossing, walked up a vertical line and interpolated between the samples that
+    straddle it, the same reading SEEP-2's producer takes.
+
+    A column saturated all the way to the dam surface has no crossing inside the
+    domain and returns NaN; on this dam that is the submerged upstream face.
+    """
+    import numpy as np
+
+    ihead = _seep02_interp(mesh, np.asarray(solution["head"], dtype=float))
+    out = []
+    for x in stations:
+        top = _seep04_top(x)
+        ys = np.linspace(0.01, top - 0.01, 4000)
+        psi = np.ma.filled(ihead(np.full(len(ys), float(x)), ys), np.nan) - ys
+        ok = ~np.isnan(psi)
+        ys, psi = ys[ok], psi[ok]
+        wet = np.where(psi >= 0.0)[0]
+        if not len(wet) or wet[-1] + 1 >= len(psi):
+            out.append(float("nan"))
+            continue
+        i = wet[-1]
+        out.append(float(ys[i] + (ys[i + 1] - ys[i]) * psi[i]
+                         / (psi[i] - psi[i + 1])))
+    return out
+
+
+def _seep04_log_line(log, needle):
+    """The last line of a solver log containing ``needle``, stripped."""
+    hits = [ln.strip() for ln in log.splitlines() if needle in ln]
+    return hits[-1] if hits else ""
+
+
+def _seep04_exit_active(log):
+    """The solver's own final report of how much of the exit face is draining.
+
+    The unconfined iteration prints ``n/m exit face active`` on every logged
+    sweep; the last one is the state the converged solution is in.
+    """
+    line = _seep04_log_line(log, "exit face active")
+    if not line:
+        return ""
+    return line.split("relax")[-1].split(",")[-1].strip()
+
+
+def _seep04_vendor_extent(model, vertices=SEEP04_VENDOR_VERTICES):
+    """The completed model with the rain redrawn on the VENDOR's extents.
+
+    The verification file stops one vendor mesh edge short of the waterline and
+    one short of the toe — extents that are properties of the vendor's mesh, not
+    of the dam.  Rebuilt here at the tutorial file's own rates so the only
+    difference between the two runs is where the boundary starts and stops.
+    """
+    rates = {}
+    for f in model["seepage_bc"]["specified_fluxes"]:
+        rates["level" if f["coords"][0][1] == f["coords"][-1][1]
+              else "sloping"] = f["flux"]
+    blocks = [{"flux": rates["level"] if a[1] == b[1] else rates["sloping"],
+               "coords": [a, b]}
+              for a, b in zip(vertices, vertices[1:])]
+    bc = dict(model["seepage_bc"], specified_fluxes=blocks)
+    return dict(model, seepage_bc=bc)
+
+
+def _seep04_submerged_block(model, coords=SEEP04_SUBMERGED_BLOCK):
+    """The completed model with one extra flux block laid ENTIRELY inside the
+    reservoir head boundary.
+
+    Every node it loads is a specified-head node, so if the Dirichlet rows really
+    do discard the flux they carry, this model must solve to exactly the same
+    answer as the one without it.  That is the falsifiable form of the collision
+    rule the page teaches, and the producer prints the comparison.
+    """
+    rate = max(f["flux"] for f in model["seepage_bc"]["specified_fluxes"])
+    bc = dict(model["seepage_bc"])
+    bc["specified_fluxes"] = list(bc["specified_fluxes"]) + [
+        {"flux": rate, "coords": list(coords)}]
+    return dict(model, seepage_bc=bc)
+
+
+def _seep04_profile_figure(dry, wet, x=SEEP04_LINE_X):
+    """The line 1-1 pressure-head profile, dry against infiltration, on one axes —
+    the comparison Fig 6.18 itself draws, with the dry case added beside it.
+
+    Elevation is the vertical axis, as the manual plots it, and the ψ = 0 line is
+    marked because where each curve crosses it is that run's phreatic surface on
+    the crest centerline.
+    """
+    import numpy as np
+
+    fig, ax = plt.subplots(figsize=(6.0, 6.4))
+    ys = np.asarray(SEEP04_LINE_Y, dtype=float)
+    for (label, psi), color, marker in ((dry, "#1f6fb4", "o"),
+                                        (wet, "#b5460f", "s")):
+        ax.plot(psi, ys, color=color, marker=marker, markersize=4.5, lw=1.8,
+                label=label)
+    ax.axvline(0.0, color="#8a939c", lw=1.0, ls="--")
+    ax.annotate("ψ = 0\n(phreatic surface)", xy=(0.0, 11.4),
+                xytext=(0.35, 11.4), color="#5a636c", fontsize=8, va="center")
+    ax.set_xlabel("pressure head ψ (m)")
+    ax.set_ylabel("elevation (m)")
+    ax.set_title("Pressure head on the crest centerline, x = %g m" % x)
+    ax.set_ylim(0.0, 12.6)
+    ax.grid(True, color="#e4e7ea", lw=0.7)
+    ax.set_axisbelow(True)
+    ax.legend(loc="upper right", frameon=False)
+    fig.tight_layout()
+    plt.show()
+
+
+def seep04_plots():
+    """The infiltrated dam: the model, the mesh, the two solutions and the profile
+    that compares them.
+
+    Printed rather than drawn: the projection arithmetic behind the two flux rates,
+    the mesh, each run's discharge and mass balance, the solver's iteration count
+    and exit-face activity, the line 1-1 profile station by station with the rise
+    the rain causes, and the phreatic surface at thirteen stations for each run.
+    Every number the page quotes is on one of these lines.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import plot_seep_data, plot_seep_solution
+
+    sd = load_slope_data(SEEP04)
+    _u = declared_unit_labels(sd)
+    mat = sd["materials"][0]
+    print("   soil        %s · k %g/%g %s/s · %s α=%g n=%g · units %s"
+          % (mat["name"], mat["k1"], mat["k2"], _u["length"], mat["unsat"],
+             mat["vg_a"], mat["vg_n"], sd["unit_system"]))
+
+    # ---- the boundary set, and the projection behind the two rates ---------- #
+    bc = sd["seepage_bc"]
+    for h in bc["specified_heads"]:
+        print("   head        %g %s over %s" % (h["head"], _u["length"],
+                                                h["coords"]))
+    slope = math.degrees(math.atan2(SEEP04_FACE_RISE, SEEP04_FACE_RUN))
+    projected = SEEP04_RAIN * SEEP04_FACE_RUN / math.hypot(SEEP04_FACE_RUN,
+                                                           SEEP04_FACE_RISE)
+    print("   projection  vertical rain %g %s/s on a %g:%g face (%.4f° from "
+          "horizontal) has normal component %g × %g/√%g = %.8e"
+          % (SEEP04_RAIN, _u["length"], SEEP04_FACE_RUN, SEEP04_FACE_RISE, slope,
+             SEEP04_RAIN, SEEP04_FACE_RUN,
+             SEEP04_FACE_RUN ** 2 + SEEP04_FACE_RISE ** 2, projected))
+    footprint = 0.0
+    for f in bc["specified_fluxes"]:
+        (x0, y0), (x1, y1) = f["coords"][0], f["coords"][-1]
+        length = math.hypot(x1 - x0, y1 - y0)
+        footprint += abs(x1 - x0)
+        print("   flux        %.8e over (%g, %g)→(%g, %g) · length %.4f %s · "
+              "q·L %.6e · horizontal footprint %g %s"
+              % (f["flux"], x0, y0, x1, y1, length, _u["length"],
+                 f["flux"] * length, abs(x1 - x0), _u["length"]))
+    total_in = sum(f["flux"] * math.hypot(f["coords"][-1][0] - f["coords"][0][0],
+                                          f["coords"][-1][1] - f["coords"][0][1])
+                   for f in bc["specified_fluxes"])
+    print("   rain total  Σ q·L %.6e %s³/s per %s over a %g %s horizontal "
+          "footprint = %.6e (rain × footprint %.6e)"
+          % (total_in, _u["length"], _u["length"], footprint, _u["length"],
+             total_in, SEEP04_RAIN * footprint))
+    print("   exit face   %s" % (bc["exit_face"],))
+
+    # ---- one mesh, two runs ------------------------------------------------- #
+    mesh = _seep04_mesh(sd)
+    nodes = np.asarray(mesh["nodes"])
+    print("   mesh        %d nodes · %d elements · %s at %g %s"
+          % (len(nodes), len(mesh["elements"]), SEEP04_ELEMENT, SEEP04_SIZE,
+             _u["length"]))
+
+    # The mesher pins a node at every seepage-BC vertex
+    # (xslope/mesh.py::add_seep_bc_points_to_polygons), so a model whose boundary
+    # polylines end anywhere but a corner of the section gets a mesh of its own.
+    # The dry run's vertices are a subset of the completed model's, so it shares
+    # this mesh; the vendor-extent variant ends at (22, 11) and (50, 1) and does
+    # not, so it is meshed on its own terms — which is what the corpus file
+    # gw006d does, and the comparison has to be model against model, not model
+    # against a mesh built for something else. The collision test deliberately
+    # STAYS on this mesh: it adds one load and nothing else, so the answer moving
+    # would have only one possible cause.
+    runs = {}
+    ven_model = _seep04_vendor_extent(sd)
+    for name, model, on in (("dry", _seep04_dry(sd), mesh),
+                            ("wet", sd, mesh),
+                            ("vendor", ven_model, _seep04_mesh(ven_model)),
+                            ("collide", _seep04_submerged_block(sd), mesh)):
+        seep_data, solution, log = _seep04_solve(model, on)
+        runs[name] = (seep_data, solution, log, on)
+        head = np.asarray(solution["head"], dtype=float)
+        fn = np.asarray(seep_data["flux_nodal"], dtype=float)
+        applied = float(np.sum(fn))
+        # What the Dirichlet rows throw away: the load on specified-head nodes,
+        # and on the exit-face nodes that finished the solve draining.
+        held = np.asarray(seep_data["bc_type"]) == 1
+        drained = ((np.asarray(seep_data["bc_type"]) == 2)
+                   & (head <= np.asarray(seep_data["nodes"])[:, 1] + 1e-9))
+        discarded = float(np.sum(fn[held | drained]))
+        print("   %-7s run %d nodes · q %.6e %s³/s per %s · head %.4f–%.4f %s · "
+              "converged %s · Σ assembled flux load %.6e (of which %.6e lands "
+              "on head / draining nodes and is discarded)"
+              % (name, len(np.asarray(seep_data["nodes"])), solution["flowrate"],
+                 _u["length"], _u["length"], head.min(), head.max(),
+                 _u["length"], solution.get("converged"), applied, discarded))
+        print("        %s" % _seep04_log_line(log, "Converged in"))
+        print("        %s" % _seep04_log_line(log, "Flow closure check"))
+        print("        exit face at closure: %s" % _seep04_exit_active(log))
+        # Where the water crosses the boundary, from the nodal reactions: the
+        # reservoir head boundary and the toe drain, each as a signed total
+        # (+ into the domain).  This is what the rain moves.
+        q_react = np.asarray(solution["q"], dtype=float)
+        print("        boundary flow: reservoir head %+.6e · toe drain %+.6e "
+              "%s³/s per %s"
+              % (float(np.sum(q_react[held])), float(np.sum(q_react[drained])),
+                 _u["length"], _u["length"]))
+
+    dry_data, dry_sol, _dry_log, _ = runs["dry"]
+    wet_data, wet_sol, _wet_log, _ = runs["wet"]
+
+    # The dry run is GW6 case 1 (gw006a) — same section, same soil, no rain. Solved
+    # here rather than asserted, so the page's "this is the manual's case 1" holds.
+    gw006a = os.path.join(REPO_ROOT,
+                          "docs/verification/files/rocscience_gw/gw006a.xlsx")
+    if os.path.exists(gw006a):
+        ref = load_slope_data(gw006a)
+        _rd, ref_sol, _rl = _seep04_solve(ref, _seep04_mesh(ref))
+        print("   dry == gw006a (GW6 case 1): q %.6e vs %.6e, Δ %.3e"
+              % (dry_sol["flowrate"], ref_sol["flowrate"],
+                 dry_sol["flowrate"] - ref_sol["flowrate"]))
+
+    # ---- the collision rule, measured -------------------------------------- #
+    # A flux block laid wholly inside the reservoir head boundary loads only
+    # specified-head nodes.  Those rows are overwritten with the prescribed head
+    # (xslope/seep.py::_dirichlet_system: b is seeded with the flux vector, then
+    # b[dirichlet] = head), so the load is discarded and the answer must not move.
+    col_data, col_sol, _col_log, _ = runs["collide"]
+    col_head = np.asarray(col_sol["head"], dtype=float)
+    wet_head = np.asarray(wet_sol["head"], dtype=float)
+    extra = (float(np.sum(np.asarray(col_data["flux_nodal"], dtype=float)))
+             - float(np.sum(np.asarray(wet_data["flux_nodal"], dtype=float))))
+    print("   collision   an extra flux block over %s (wholly inside the head "
+          "boundary) assembles %.6e of load"
+          % (list(SEEP04_SUBMERGED_BLOCK), extra))
+    print("               q %.6e vs %.6e (Δ %.3e) · max |Δhead| %.3e %s "
+          "→ the load on a specified-head node is discarded"
+          % (col_sol["flowrate"], wet_sol["flowrate"],
+             col_sol["flowrate"] - wet_sol["flowrate"],
+             float(np.max(np.abs(col_head - wet_head))), _u["length"]))
+    shared = int(np.argmin((nodes[:, 0] - 20.0) ** 2 + (nodes[:, 1] - 10.0) ** 2))
+    print("               shared waterline node %d at (%.3f, %.3f): bc_type %d "
+          "(1 = specified head) · assembled load %.6e · solved head %.6f %s "
+          "(prescribed 10)"
+          % (shared, nodes[shared, 0], nodes[shared, 1],
+             int(np.asarray(wet_data["bc_type"])[shared]),
+             float(np.asarray(wet_data["flux_nodal"], dtype=float)[shared]),
+             wet_head[shared], _u["length"]))
+
+    # ---- the extent comparison the page closes on --------------------------- #
+    ven_data, ven_sol, _ven_log, ven_mesh = runs["vendor"]
+    print("   extents     tutorial (geometry: waterline→toe) q %.6e vs vendor "
+          "(mesh-edge-tied) q %.6e · Δ %+.3e (%+.2f%%)"
+          % (wet_sol["flowrate"], ven_sol["flowrate"],
+             wet_sol["flowrate"] - ven_sol["flowrate"],
+             100.0 * (wet_sol["flowrate"] - ven_sol["flowrate"])
+             / ven_sol["flowrate"]))
+    _wl = sum(f["flux"] * math.hypot(f["coords"][-1][0] - f["coords"][0][0],
+                                     f["coords"][-1][1] - f["coords"][0][1])
+              for f in sd["seepage_bc"]["specified_fluxes"])
+    _vl = sum(f["flux"] * math.hypot(f["coords"][-1][0] - f["coords"][0][0],
+                                     f["coords"][-1][1] - f["coords"][0][1])
+              for f in _seep04_vendor_extent(sd)["seepage_bc"]["specified_fluxes"])
+    _wa = float(np.sum(np.asarray(wet_data["flux_nodal"], dtype=float)))
+    _va = float(np.sum(np.asarray(ven_data["flux_nodal"], dtype=float)))
+    print("               rain offered Σq·L %.6e over a 32 m footprint vs %.6e "
+          "over 28 m · Δ %+.3e" % (_wl, _vl, _wl - _vl))
+    print("               rain ASSEMBLED %.6e (%.2f%% of offered) vs %.6e "
+          "(%.2f%%) — each on its own mesh, which pins a node at every BC "
+          "vertex, so neither loses length at its ends"
+          % (_wa, 100.0 * _wa / _wl, _va, 100.0 * _va / _vl))
+    # What the vendor extents cost when they are NOT the extents the mesh was
+    # built around: an edge carries load only when both its corners lie on the
+    # polyline, so endpoints landing part-way along an edge drop it whole.
+    _off_data, _off_sol, _off_log = _seep04_solve(ven_model, mesh)
+    _off_a = float(np.sum(np.asarray(_off_data["flux_nodal"], dtype=float)))
+    print("               the same vendor extents on the tutorial file's mesh "
+          "(no node at (22, 11) or (50, 1)) assemble only %.6e (%.2f%% of "
+          "offered) and give q %.6e — the loss is why a flux boundary is drawn "
+          "on the geometry"
+          % (_off_a, 100.0 * _off_a / _vl, _off_sol["flowrate"]))
+
+    # ---- figures ------------------------------------------------------------ #
+    # frame="content": the section is four times as long as it is deep, and the
+    # default fill frame pads it out to the figure aspect and buries the dam.
+    capture("seep04_inputs.png", plot_inputs, sd, mode="seep",
+            title="Seepage Model Inputs", frame="content", show_mesh=False)
+    figsize = _seep02_figsize(mesh)
+    capture("seep04_mesh.png", plot_seep_data, wet_data, figsize=figsize,
+            show_bc=True)
+
+    # One color scale over BOTH solutions, so the two panels compare directly.
+    both = np.concatenate([np.asarray(dry_sol["head"], dtype=float),
+                           np.asarray(wet_sol["head"], dtype=float)])
+    vmin, vmax = float(both.min()), float(both.max())
+    print("   color scale pinned across both runs to head %.4f–%.4f %s"
+          % (vmin, vmax, _u["length"]))
+    for name, (data, sol, _log, _m) in (("dry", runs["dry"]), ("wet", runs["wet"])):
+        capture("seep04_%s.png" % name, plot_seep_solution, data, sol,
+                figsize=figsize, levels=SEEP04_LEVELS, base_mat=1,
+                fill_contours=True, phreatic=True, flowlines=True, mesh=False,
+                vmin=vmin, vmax=vmax)
+
+    # ---- line 1-1, the manual's own comparison ------------------------------ #
+    dry_h, dry_psi = _seep04_line(mesh, dry_sol)
+    wet_h, wet_psi = _seep04_line(mesh, wet_sol)
+    ven_h, ven_psi = _seep04_line(ven_mesh, ven_sol)
+    print("   line 1-1 (x = %g %s): pressure head ψ = h − y"
+          % (SEEP04_LINE_X, _u["length"]))
+    print("   %-8s %10s %10s %10s %10s %10s %10s %10s"
+          % ("y", "h dry", "h wet", "ψ dry", "ψ wet", "Δψ rain",
+             "ψ vendor", "Δψ extent"))
+    for y, hd, hw, pd_, pw, pv in zip(SEEP04_LINE_Y, dry_h, wet_h, dry_psi,
+                                      wet_psi, ven_psi):
+        print("   %-8g %10.4f %10.4f %10.4f %10.4f %+10.4f %10.4f %+10.4f"
+              % (y, hd, hw, pd_, pw, pw - pd_, pv, pw - pv))
+    capture("seep04_profiles.png", _seep04_profile_figure,
+            ("no infiltration", dry_psi), ("with infiltration", wet_psi))
+
+    # ---- what the rain does to the interior and to the free surface --------- #
+    rise = (np.asarray(wet_sol["head"], dtype=float)
+            - np.asarray(dry_sol["head"], dtype=float))
+    i_max = int(np.argmax(rise))
+    print("   head rise   mean %+.4f %s · max %+.4f at node %d (%.2f, %.2f)"
+          % (rise.mean(), _u["length"], rise[i_max], i_max,
+             nodes[i_max, 0], nodes[i_max, 1]))
+    dry_ph = _seep04_phreatic(mesh, dry_sol)
+    wet_ph = _seep04_phreatic(mesh, wet_sol)
+    ven_ph = _seep04_phreatic(ven_mesh, ven_sol)
+    print("   phreatic surface elevation (%s) by station" % _u["length"])
+    print("   %-10s %s" % ("station", " ".join("%6g" % x
+                                               for x in SEEP04_STATIONS)))
+    for label, ys in (("dry", dry_ph), ("wet", wet_ph), ("vendor", ven_ph)):
+        print("   %-10s %s" % (label, " ".join("%6.2f" % y for y in ys)))
+    print("   %-10s %s" % ("Δ", " ".join("%+6.2f" % (w - d)
+                                         for d, w in zip(dry_ph, wet_ph))))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -3379,6 +3848,7 @@ GROUPS = {
     "seep01_plots": seep01_plots,
     "seep02_plots": seep02_plots,
     "seep03_plots": seep03_plots,
+    "seep04_plots": seep04_plots,
 }
 
 

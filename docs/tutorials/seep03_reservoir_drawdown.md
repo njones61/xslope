@@ -62,18 +62,16 @@ the construction and start at [Building the mesh](#building-the-mesh)
 
 ![The dam, its two zones, and the properties that make them behave differently](images/seep03_problem_sketch.png){width=1000}
 
-The section is 110 m long and 22 m tall at the crest, sitting on rock at
-elevation 0. The upstream face rises at about 2.3:1 from the heel at (0, 0) to
-the crest at elevation 22, and the downstream face falls at about 2.3:1 from
-(59, 22) to the toe at (105, 2).
+The dam is 110 m long and 22 m tall at the crest, sitting on rock at
+elevation 0, with both faces sloping at about 2.3:1.
 
 Inside the embankment is a clay **core**, a low-conductivity zone whose job is to
 carry the head drop so the shell does not have to. It runs the full height of the
-foundation contact, from (46, 0) up to elevation 18 and back down to (63, 0) —
-about 17 m wide at the base and 8 m wide at its crest, 4 m below the dam crest.
-The rest of the section is the granular **shell**. The coordinates those
-paragraphs quote are the vertices the section is built from, all of them shown
-here:
+section, from the rock up to 4 m below the crest, about 17 m wide at its base and
+8 m wide at its top. The rest of the section is the granular **shell**.
+
+The specific coordinates that define the geometric inputs to this problem are
+shown here:
 
 ![The vertex coordinates of the section](../seep/images/earth_dam1_pts.png){width=650}
 

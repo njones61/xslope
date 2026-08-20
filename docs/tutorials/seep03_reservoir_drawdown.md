@@ -371,12 +371,12 @@ to draw, because whether it is wet is not something you can know before solving 
 here the solution says it is dry, and on the same dam with a more conductive core
 it would not be.
 
-In the **Display** panel, tick **Filled contours** and set **Base material** to
-`2: core`. Base material supplies the conductivity the flow-net scaling runs on,
-and the zone whose k draws the net as squares is the one to pick —
+In the **Display** panel, tick **Filled contours**. **Base material** already
+reads `2: core`: the selector supplies the conductivity the flow-net scaling
+runs on, and it opens on the zone whose k draws the net as squares —
 [SEEP-2 works through the rule](seep02_johnson_dam.md#scaling-the-flow-net-on-a-zoned-section)
-on a three-zone dam. Here it is the core: nearly the entire head drop happens
-inside it, so the net reads there and nowhere else.
+on a three-zone dam. Here that is the core: nearly the entire head drop happens
+inside it, so the net reads there and nowhere else. Leave it.
 
 ![The full-pool steady solution](images/seep03_steady.png){width=1000}
 

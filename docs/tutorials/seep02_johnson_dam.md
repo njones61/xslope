@@ -457,8 +457,8 @@ what lets one default work on a 10 m sheetpile section and on a 180 ft dam.
 
 The run finishes in **23 iterations**. In the **Display** panel, tick
 **Filled contours** — worth having on a zoned section, where the wash shows the
-core carrying the drop — and set **Base material** to `3: foundation`, which is
-what makes the flow lines legible;
+core carrying the drop. **Base material** already reads `3: foundation`: the
+selector opens on the zone whose conductivity makes the flow lines legible;
 [Scaling the flow net](#scaling-the-flow-net-on-a-zoned-section) below is what
 that control does and why the other two choices fail here:
 
@@ -588,7 +588,8 @@ That leaves one thing to supply — the *k*. On SEEP-1's single-soil problem the
 was only one candidate and the choice was inert. On a zoned section there are
 three, they differ by three orders of magnitude, and the answer changes by three
 orders of magnitude with them. The choice is the Display panel's **Base
-material** selector — one entry per material, opening on the first — and this
+material** selector — one entry per material, opening on the zone XSLOPE picks
+for the solution and following that pick until you choose by hand — and this
 dam is where it matters. Try all three. With 20 contour levels, so 19 head
 drops of 3.158 ft each, and a 60 ft head drop:
 

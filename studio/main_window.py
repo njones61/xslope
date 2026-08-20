@@ -2260,6 +2260,11 @@ class MainWindow(QMainWindow):
         panel = self._display_panels.get(canvas)
         if bundle and panel and canvas is not None:
             try:
+                # Default the flow-net base material to the solver-side pick
+                # (nearest-to-squares) until the user chooses one by hand.
+                from xslope.plot_seep import flownet_base_material
+                panel.suggest_base_mat(flownet_base_material(
+                    bundle["seep_data"], bundle["solution"]))
                 canvas.render_seep_solution(
                     bundle["seep_data"], bundle["solution"], panel.options(),
                     style=self.doc.style or None)

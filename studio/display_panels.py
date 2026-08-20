@@ -411,7 +411,16 @@ class SeepDisplayPanel(QWidget):
         if self.base_mat.count() == 0:
             self.base_mat.addItem("1", 1)
         self.base_mat.setToolTip("Reference material for the flow-net "
-                                 "(base permeability / number of flow channels).")
+                                 "(base permeability / number of flow channels). "
+                                 "Follows the zone whose conductivity draws the "
+                                 "net nearest to squares until you pick one "
+                                 "yourself.")
+        # The combo FOLLOWS flownet_base_material's pick (suggest_base_mat, called
+        # with each rendered solution) until the user chooses a material by hand —
+        # ``activated`` fires only on human interaction, so a programmatic suggest
+        # never claims the choice for the user.
+        self._base_mat_user_set = False
+        self.base_mat.activated.connect(self._base_mat_touched)
 
         self.levels = _ispin(2, 100, 20, step=5)
         self.alpha = _dspin(0.0, 1.0, 0.85, 0.05)   # contour-fill wash opacity
@@ -472,6 +481,22 @@ class SeepDisplayPanel(QWidget):
         self.vectors.toggled.connect(self._sync_enabled)
         self.fill.toggled.connect(self._sync_enabled)
         self._sync_enabled()
+
+    def _base_mat_touched(self, *_):
+        self._base_mat_user_set = True
+
+    def suggest_base_mat(self, mat_id):
+        """Adopt ``flownet_base_material``'s pick unless the user chose by hand.
+
+        Silent (signals blocked): the caller renders with ``options()`` right
+        after, so an extra changed-emit would only double the render."""
+        if self._base_mat_user_set:
+            return
+        j = self.base_mat.findData(int(mat_id))
+        if j >= 0 and j != self.base_mat.currentIndex():
+            self.base_mat.blockSignals(True)
+            self.base_mat.setCurrentIndex(j)
+            self.base_mat.blockSignals(False)
 
     def _on_variable(self, *_):
         self._sync_enabled()

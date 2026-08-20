@@ -159,7 +159,8 @@ meters per day per meter of dam. Those two fields are explained on
 unit does one more thing: it is the unit of every time on the schedule, so
 `Duration (day)` and the breakpoint times below are all in days because of it.
 
-Click **Materials**, set the **Show parameters for:** toggles to **Seepage**
+Click **Materials**. On **Table view** — the view the editor opens on — set the
+**Show parameters for:** toggles to **Seepage**
 alone, and the table shows the seepage band of the `mat` worksheet — ten columns,
 the last two of which need a scroll to the right to reach:
 

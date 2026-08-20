@@ -71,7 +71,11 @@ Inside the embankment is a clay **core**, a low-conductivity zone whose job is t
 carry the head drop so the shell does not have to. It runs the full height of the
 foundation contact, from (46, 0) up to elevation 18 and back down to (63, 0) —
 about 17 m wide at the base and 8 m wide at its crest, 4 m below the dam crest.
-The rest of the section is the granular **shell**.
+The rest of the section is the granular **shell**. The coordinates those
+paragraphs quote are the vertices the section is built from, all of them shown
+here:
+
+![The vertex coordinates of the section](../seep/images/earth_dam1_pts.png){width=650}
 
 The reservoir stands at elevation 18, which is 18 m of water against the
 upstream face and 4 m of freeboard below the crest. The tailwater stands at

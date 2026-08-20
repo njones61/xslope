@@ -327,8 +327,8 @@ state is the field the march will start from. Solving it now is worth doing on i
 own terms as well: it is the reference every transient number on this page is read
 against.
 
-Anyone who opened the completed download rather than building the model reads this
-section rather than runs it. That file's reservoir boundary is already bound to
+If you opened the completed download rather than the starter file, read this
+section rather than run it. That file's reservoir boundary is already bound to
 the time series built two sections below, and a steady run on it is refused:
 XSLOPE reports that a boundary value is bound to a series and that a steady solve
 has no time axis to read one at, then points you either at a transient run — whose

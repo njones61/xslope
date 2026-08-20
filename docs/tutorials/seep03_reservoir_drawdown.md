@@ -215,7 +215,7 @@ Click **OK**.
 ## Building the boundary conditions
 
 The dam has water on both sides of it and a face that water may leave through, so
-it takes three boundary entries. Their mechanics — what each type does, why an
+it takes three boundary condition entries. Their mechanics — what each type does, why an
 exit face is drawn over the whole slope, and what the no-flow default covers — are
 [SEEP-2's subject](seep02_johnson_dam.md#4-boundary-conditions), and this section
 does not repeat them. What follows is the set this dam needs and the points that

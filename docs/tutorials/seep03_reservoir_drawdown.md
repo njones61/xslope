@@ -366,9 +366,7 @@ answer is **none of it**. The iteration starts by holding 12 of the 30 nodes wet
 sheds them over four sweeps, and from sweep 5 to the end holds **0 of 30**. The
 downstream slope never develops a seepage face on this model: the core drops the
 head far enough that the phreatic surface passes *under* the slope and meets the
-downstream boundary at the tailwater. That is the physics, not the mesh — refined
-to a 0.4 m mesh, which puts 126 nodes on the exit face instead of 30, the count
-held wet is still zero. The exit face was still the right boundary
+downstream boundary at the tailwater. The exit face was still the right boundary
 to draw, because whether it is wet is not something you can know before solving —
 here the solution says it is dry, and on the same dam with a more conductive core
 it would not be.

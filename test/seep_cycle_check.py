@@ -101,8 +101,8 @@ RESCUED = [
 INERT = [
     ("docs/verification/files/rocscience/vp046b", 1, VENDOR, 1.278746e-03, 207),
     ("docs/verification/files/rocscience/vp077a", 1, DOCS, 8.221076e-06, 500),
-    ("docs/seep/files/xslope_earth_dam1_vg", 1, DOCS, 40.120963, 180),
-    ("docs/seep/files/xslope_earth_dam1", 1, DOCS, 42.439945, 98),
+    ("docs/seep/files/xslope_earth_dam1_vg", 1, DOCS, 37.711830, 346),
+    ("docs/seep/files/xslope_earth_dam1", 1, DOCS, 38.781841, 115),
     ("docs/inputs/seep/xslope_earth_dam_bc2", 1, DOCS, 42.437178, 111),
     ("docs/inputs/seep/xslope_earth_dam_bc2", 2, DOCS, 11.587548, 13),
     ("docs/seep/files/xslope_johnson_res", 1, DOCS, 1.939071, 26),

@@ -1795,7 +1795,7 @@ SHOTS.update({
 SEEP03 = os.path.join(REPO_ROOT,
                       "docs/tutorials/files/xslope_earth_dam_drawdown.xlsx")
 #: The mesh the page builds, in the Build Mesh dialog's own controls: tri3,
-#: auto-sized at 64 divisions across the 110 ft section — the 1.71875 ft target
+#: auto-sized at 64 divisions across the 110 m section — the 1.71875 m target
 #: every SEEP-3 figure is computed at.
 SEEP03_DIVISIONS = 64
 #: The instant the play bar is parked on for its shot: the pool is a third of the

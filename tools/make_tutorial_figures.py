@@ -53,7 +53,8 @@ import matplotlib.pyplot as plt                                      # noqa: E40
 from xslope.fileio import load_slope_data                            # noqa: E402
 from xslope.generators import generate_starting_circles              # noqa: E402
 from xslope.search import circular_search, file_search_window        # noqa: E402
-from xslope.plot import (plot_inputs, plot_solution,                 # noqa: E402
+from xslope.plot import (declared_unit_labels,                       # noqa: E402
+                         plot_inputs, plot_solution,
                          plot_circular_search_results)
 
 OUT_DIR = os.path.join(REPO_ROOT, "docs", "tutorials", "images")
@@ -2909,7 +2910,7 @@ def seep02_plots():
 SEEP03 = os.path.join(REPO_ROOT,
                       "docs/tutorials/files/xslope_earth_dam_drawdown.xlsx")
 #: The mesh, in the Build mesh dialog's own controls: tri3 (the seepage default),
-#: auto-sized at 64 divisions across the 110 ft section — the 1.71875 ft target the
+#: auto-sized at 64 divisions across the 110 m section — the 1.71875 m target the
 #: sample page's own transient figures are computed at.
 SEEP03_DIVISIONS = 64
 SEEP03_ELEMENT = "tri3"
@@ -2924,7 +2925,7 @@ SEEP03_BASE_MAT = 2
 #: the same panel size the sample's own series figure uses.
 SEEP03_PANEL_SIZE = (8.6, 2.55)
 #: The instants the frame series is drawn at, and what each one is. Full pool is the
-#: initial condition; 15 is mid-drawdown, with the pool already 4.6 ft below the
+#: initial condition; 15 is mid-drawdown, with the pool already a few metres below the
 #: interior surface; 47 is the end of the drawdown, where the lag is largest; 120 is
 #: the recovery, where the interior mound is draining toward the new steady state.
 SEEP03_FRAMES = ((0.0, "full pool — the initial condition"),
@@ -3116,7 +3117,9 @@ def _seep03_problem_section(model):
                     figsize=(8.6, max(3.2, 8.6 * aspect + 2.0)))
     ax = plt.gcf().axes[0]
     shell, core = model["materials"][0], model["materials"][1]
-    fields = "%s\nk₁ = %g, k₂ = %g ft/day\n$S_s$ = %g /ft, $S_y$ = %g"
+    _u = declared_unit_labels(model)
+    fields = ("%s\nk₁ = %g, k₂ = %g " + _u["k"]
+              + "\n$S_s$ = %g " + _u["inv_length"] + ", $S_y$ = %g")
 
     def _x_crossings(pts, level):
         out = []
@@ -3137,7 +3140,7 @@ def _seep03_problem_section(model):
             fields % (shell["name"], shell["k1"], shell["k2"],
                       shell["Ss"], shell["Sy"]),
             ha="center", va="center", fontsize=9)
-    # The core is nine feet wide at its crest and the label is not, so it is called
+    # The core is nine metres wide at its crest and the label is not, so it is called
     # out from the sky above the downstream slope with a leader into the zone. The
     # block is anchored ON that slope and grows up and to the RIGHT, where the ground
     # only falls further away — so it clears the section by construction rather than
@@ -3229,7 +3232,7 @@ def _seep03_problem_schedule(model):
     ax.set_xlim(-8.0, duration + 8.0)
     ax.set_ylim(0.0, pool[0] + 5.0)
     ax.set_xlabel("time (day)")
-    ax.set_ylabel("pool elevation (ft)")
+    ax.set_ylabel("pool elevation (%s)" % declared_unit_labels(model)["length"])
     ax.grid(alpha=0.22)
     ax.legend(loc="upper right", frameon=False, fontsize=8.5)
     fig.tight_layout()
@@ -3254,9 +3257,10 @@ def _seep03_frame_panel(seep_data, frame, label, vmin, vmax, pool):
                            cmap="Spectral_r", vmin=vmin, vmax=vmax,
                            show_title=False, show_legend=False,
                            show_bc_levels=True)
-    plt.gcf().axes[0].set_title("t = %g day   ·   pool el %.1f ft   —   %s"
-                                % (frame["time"], pool, label), fontsize=11,
-                                pad=5)
+    _u = declared_unit_labels(seep_data)
+    plt.gcf().axes[0].set_title("t = %g %s   ·   pool el %.1f %s   —   %s"
+                                % (frame["time"], _u["time"], pool, _u["length"],
+                                   label), fontsize=11, pad=5)
 
 
 def _seep03_history_figure(model, times, series, picked):
@@ -3300,7 +3304,7 @@ def _seep03_history_figure(model, times, series, picked):
                 fontsize=8.5, color="#2b7bb0", ha="center", va="top")
     ax.set_xlim(-8.0, duration + 8.0)
     ax.set_xlabel("time (day)")
-    ax.set_ylabel("total head (ft)")
+    ax.set_ylabel("total head (%s)" % declared_unit_labels(model)["length"])
     ax.grid(alpha=0.22)
     ax.legend(loc="upper right", frameon=False, fontsize=9)
     ax.set_title("The core holds its head after the shell has let go", fontsize=11.5)
@@ -3321,6 +3325,7 @@ def seep03_plots():
     from xslope.plot_seep import plot_seep_data, plot_seep_solution
 
     sd = load_slope_data(SEEP03)
+    _u = declared_unit_labels(sd)
     tseep = sd["tseep"]
     print("   schedule    pool %s at t %s · duration %g · save_interval %g · "
           "save_times %s"
@@ -3342,9 +3347,10 @@ def seep03_plots():
     mesh = _seep03_mesh(sd)
     figsize = _seep02_figsize(mesh)
     nodes = np.asarray(mesh["nodes"])
-    print("   mesh        %d nodes · %d elements · %s at width/%d = %.5g ft"
+    _width = max(nodes[:, 0]) - min(nodes[:, 0])
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.5g %s"
           % (len(nodes), len(mesh["elements"]), SEEP03_ELEMENT, SEEP03_DIVISIONS,
-             110.0 / SEEP03_DIVISIONS))
+             _width / SEEP03_DIVISIONS, _u["length"]))
 
     # ---- the initial condition, as an ordinary steady run ------------------ #
     steady_model = _seep03_steady_model(sd)
@@ -3356,11 +3362,11 @@ def seep03_plots():
             figsize=figsize, levels=SEEP03_LEVELS, base_mat=SEEP03_BASE_MAT,
             fill_contours=True, mesh=False)
     head = np.asarray(steady["head"])
-    psi = np.asarray(steady["u"]) / 62.4
-    print("   steady      q %.6f ft³/day per ft · head %.3f to %.3f ft · "
-          "u %.1f to %.1f psf"
-          % (steady["flowrate"], head.min(), head.max(),
-             np.min(steady["u"]), np.max(steady["u"])))
+    psi = np.asarray(steady["u"]) / sd["gamma_water"]
+    print("   steady      q %.6f %s · head %.3f to %.3f %s · u %.1f to %.1f %s"
+          % (steady["flowrate"], _u["flowrate"], head.min(), head.max(),
+             _u["length"], np.min(steady["u"]), np.max(steady["u"]),
+             _u["stress"]))
     print("   iteration   %s" % stats)
     face = np.where(np.asarray(seep_data["bc_type"]) == 2)[0]
     wet = face[psi[face] > -1e-6]
@@ -3398,7 +3404,8 @@ def seep03_plots():
     outflow = [float(f.get("outflow") or 0.0) for f in frames]
     inflow = [float(f.get("inflow") or 0.0) for f in frames]
     peak = max(outflow)
-    print("   %-8s %10s %10s %10s" % ("t (day)", "pool", "inflow", "outflow"))
+    print("   %-8s %10s %10s %10s"
+          % ("t (%s)" % _u["time"], "pool", "inflow", "outflow"))
     for t, qi, qo in zip(times, inflow, outflow):
         print("   %-8g %10.2f %10.5f %10.5f" % (t, _seep03_pool(sd, t), qi, qo))
     print("   outflow     peaks at %.5f on t = %g, and is %.5f at t = %g "
@@ -3409,8 +3416,8 @@ def seep03_plots():
     # ---- the frame series --------------------------------------------------- #
     all_head = np.concatenate([np.asarray(f["head"], float) for f in frames])
     vmin, vmax = float(all_head.min()), float(all_head.max())
-    print("   color scale pinned across the series to head %.3f – %.3f ft"
-          % (vmin, vmax))
+    print("   color scale pinned across the series to head %.3f – %.3f %s"
+          % (vmin, vmax, _u["length"]))
     panels = []
     for t, label in SEEP03_FRAMES:
         i = int(np.argmin(np.abs(np.asarray(times) - t)))
@@ -3420,8 +3427,9 @@ def seep03_plots():
     _stack_panels("seep03_frames.png", panels)
 
     # ---- the phreatic surface, frame by frame -------------------------------- #
-    print("   phreatic surface elevation (ft) by station and saved instant")
-    print("   %-8s %-6s %s" % ("t (day)", "pool",
+    print("   phreatic surface elevation (%s) by station and saved instant"
+          % _u["length"])
+    print("   %-8s %-6s %s" % ("t (%s)" % _u["time"], "pool",
                                " ".join("%6g" % x for x in SEEP03_STATIONS)))
     for f in frames:
         ys = _seep03_phreatic(sd, mesh, f)
@@ -3436,15 +3444,15 @@ def seep03_plots():
               % (label, i, coords[0], coords[1], mats))
     series = [[float(np.asarray(f["head"])[i]) for f in frames]
               for _l, i, _c, _col, _m in picked]
-    pressures = [[float(np.asarray(f["u"])[i]) / 62.4 for f in frames]
+    pressures = [[float(np.asarray(f["u"])[i]) / sd["gamma_water"] for f in frames]
                  for _l, i, _c, _col, _m in picked]
-    print("   %-8s %-8s %s" % ("t (day)", "pool",
+    print("   %-8s %-8s %s" % ("t (%s)" % _u["time"], "pool",
                                " ".join("%18s" % l for l, *_ in picked)))
     for j, t in enumerate(times):
         print("   %-8g %-8.2f %s"
               % (t, _seep03_pool(sd, t),
                  " ".join("%18.4f" % s[j] for s in series)))
-    print("   pressure head ψ = u/γw (ft) at the same nodes")
+    print("   pressure head ψ = u/γw (%s) at the same nodes" % _u["length"])
     for j, t in enumerate(times):
         print("   %-8g %-8.2f %s"
               % (t, _seep03_pool(sd, t),

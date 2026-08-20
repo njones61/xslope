@@ -74,7 +74,7 @@ from xslope.seep import (build_seep_data, build_tseep_data,             # noqa: 
                          transient_frame_index, kr_relative_vec,
                          KR_LF, KR_VG, KR_GARD)
 from xslope.plot_seep import plot_seep_data, plot_seep_solution         # noqa: E402
-from xslope.plot import get_material_color                              # noqa: E402
+from xslope.plot import declared_unit_labels, get_material_color        # noqa: E402
 from xslope.slice import generate_slices                                # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -310,6 +310,10 @@ def fig_transient(run):
     nodes, elements, et = mesh["nodes"], mesh["elements"], mesh["element_types"]
     times = np.asarray(sol["times"])
     series_t, series_v = tseep["series"]["pool"]
+    # Axis units come from the model's own declaration, so a file that changes unit
+    # system relabels its figures rather than contradicting them.
+    _len = declared_unit_labels(data)["length"] or ""
+    _lu = f" ({_len})" if _len else ""
 
     # --- phreatic lag -------------------------------------------------------
     xs = np.linspace(nodes[:, 0].min() + 0.5, nodes[:, 0].max() - 0.5, 120)
@@ -326,8 +330,8 @@ def fig_transient(run):
         ax.plot([nodes[:, 0].min(), 42.0 * (pool / 18.0)], [pool, pool],
                 color=c, lw=1.0, ls=":")
     ax.set_aspect("equal")
-    ax.set_xlabel("x (ft)")
-    ax.set_ylabel("elevation (ft)")
+    ax.set_xlabel(f"x{_lu}")
+    ax.set_ylabel(f"elevation{_lu}")
     ax.legend(fontsize=8, frameon=False, ncol=3, loc="upper right")
     ax.set_title("Phreatic surface through a reservoir drawdown "
                  "(dotted: pool level at that time)", fontsize=10)
@@ -354,8 +358,8 @@ def fig_transient(run):
     ax.plot(xs, ph, color="black", lw=2.0, label="phreatic surface")
     _dam_outline(ax, data, mesh)
     ax.set_aspect("equal")
-    ax.set_xlabel("x (ft)")
-    ax.set_ylabel("elevation (ft)")
+    ax.set_xlabel(f"x{_lu}")
+    ax.set_ylabel(f"elevation{_lu}")
     handles = [Patch(facecolor=c, label=l) for c, l in zip(colors, labels)]
     handles.append(Line2D([0], [0], color="black", lw=2.0, label="phreatic surface"))
     ax.legend(handles=handles, fontsize=8, frameon=False, ncol=4,

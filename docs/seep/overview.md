@@ -57,7 +57,8 @@ reduces to
     Conductivity, specified flux and the computed flowrate all carry a length/time (or
     volume/time) dimension. When the model declares both a unit system and a **Time** unit on
     the main sheet, XSLOPE labels these quantities with that time unit — on the input forms,
-    on the flow-net title (e.g. *Total Flowrate: 42.44 ft³/day per ft*) and colorbar, and in a
+    on the flow-net title (e.g. *Total Flowrate: 38.776 m³/yr per m* on the earth dam below)
+    and colorbar, and in a
     `# units:` header on the exported `_seep.csv`. The one declared time unit governs them all
     together, because XSLOPE never converts. Leave it blank and these quantities stay
     unlabeled.

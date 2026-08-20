@@ -10,10 +10,10 @@ sheet, declare units + a day time base, and round-trip through the packaged v18
 template with ``save_slope_data_to_xlsx``.
 
   ``earth_dam``  -> docs/seep/files/xslope_earth_dam_tseep.xlsx
-      Transient variant of the homogeneous cored earth dam of
+      Transient variant of the cored earth dam of
       [Problem 3](../seep/samples.md) (``xslope_earth_dam1.xlsx``): the SAME
       cross-section, zones and downstream boundaries, driven by a falling
-      upstream reservoir.
+      upstream reservoir. Metric, like its base.
 
   ``johnson``    -> docs/seep/files/xslope_johnson_res_tseep.xlsx
       Transient variant of the zoned Johnson Reservoir dam of
@@ -24,18 +24,25 @@ template with ``save_slope_data_to_xlsx``.
 
 Physics choices (all stated in the docs entries):
 
+  * Each sample keeps its base file's UNIT SYSTEM — the earth dam is metric, the
+    Johnson dam is imperial — so a conversion of one never reaches the other.
   * Time base = DAY, so the conductivities must be expressed in units that share
     the schedule's time unit (the transient march balances storage against
     ``div(k grad h)``). The Johnson base file is already in **ft/day** — its steady
     discharge is the 1.958 ft^3/day/ft SEEP2D benchmark — so its k is reused
-    verbatim. The homogeneous earth-dam base is in ft/yr, so representative
-    granular-shell / clay-core conductivities are set in ft/day instead.
+    verbatim. The earth-dam base is in m/yr, so representative granular-shell /
+    clay-core conductivities are set in **m/day** instead. They are deliberately
+    not the steady sketch's 46/18 m/yr: at that rate the shell drains at
+    ``k2/Sy`` = 0.22 m/yr and could not follow a 45-day drawdown at all, so the
+    model would have no transient story to tell.
   * Storage (mat ``Ss``/``Sy``), from the transient.md storage tables, assigned by
-    material type: granular shell (sand) ``Ss = 1e-4`` /ft, ``Sy = 0.22``; clay core
-    ``Ss = 1e-3`` /ft, ``Sy = 0.03``; the Johnson silty-sand foundation
-    ``Ss = 2e-4`` /ft, ``Sy = 0.15``. With the linear-front law and ``|h0| = 1`` ft the
-    drainable-band storage is ~``Sy``, so the phreatic surface drains at the
-    unconfined rate ``k/Sy``.
+    material type in the model's OWN length unit — ``Ss`` is a 1/length, so the
+    metric values are the imperial ones times ~3.28: granular shell (sand)
+    ``Ss = 3e-4`` /m or ``1e-4`` /ft, ``Sy = 0.22``; clay core ``Ss = 3e-3`` /m or
+    ``1e-3`` /ft, ``Sy = 0.03``; the Johnson silty-sand foundation
+    ``Ss = 2e-4`` /ft, ``Sy = 0.15``. With the linear-front law and a small
+    ``|h0|`` the drainable-band storage is ~``Sy``, so the phreatic surface drains
+    at the unconfined rate ``k/Sy``.
   * Schedule: the pool is held at full pool briefly, drawn down to the tailwater
     datum over ~45 days, then held while the field relaxes toward a new steady
     state (the boundary outflow decays to ~1% of its drawdown peak). ``stage_1``
@@ -75,16 +82,22 @@ import sys
 
 from xslope.fileio import (load_slope_data, save_slope_data_to_xlsx,
                            default_template_path)
+from xslope.units import GAMMA_W
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILES = os.path.join(REPO_ROOT, "docs", "seep", "files")
 TUTORIAL_FILES = os.path.join(REPO_ROOT, "docs", "tutorials", "files")
 
-# --- representative storage by material type (1/ft, dimensionless) ----------- #
-# From the transient.md storage tables; |h0| = 1 so the drainable band storage ~ Sy.
-SAND_STORAGE = dict(Ss=1.0e-4, Sy=0.22)   # granular shell (fine sand)
-CLAY_STORAGE = dict(Ss=1.0e-3, Sy=0.03)   # compacted clay core
-SILT_STORAGE = dict(Ss=2.0e-4, Sy=0.15)   # silty-sand foundation
+# --- representative storage by material type --------------------------------- #
+# From the transient.md storage tables. Ss is a 1/length, so it is quoted in the
+# model's own length unit and the metric values are the imperial ones times ~3.28;
+# Sy is a drainable water content and is dimensionless, so it is shared. With the
+# linear-front law the drainable band storage is ~Sy.
+SAND_STORAGE_SI = dict(Ss=3.0e-4, Sy=0.22)   # granular shell (fine sand), 1/m
+CLAY_STORAGE_SI = dict(Ss=3.0e-3, Sy=0.03)   # compacted clay core, 1/m
+SAND_STORAGE = dict(Ss=1.0e-4, Sy=0.22)      # granular shell (fine sand), 1/ft
+CLAY_STORAGE = dict(Ss=1.0e-3, Sy=0.03)      # compacted clay core, 1/ft
+SILT_STORAGE = dict(Ss=2.0e-4, Sy=0.15)      # silty-sand foundation, 1/ft
 
 
 # --------------------------------------------------------------------------- #
@@ -94,14 +107,15 @@ SILT_STORAGE = dict(Ss=2.0e-4, Sy=0.15)   # silty-sand foundation
 # base file's material order), the index of the upstream head boundary to retype as
 # a reservoir, and the tseep control block (times/series/run controls/stage pair).
 SAMPLES = {
-    # Homogeneous cored earth dam (Problem 3).  Base k is in ft/yr, so k is reset to
-    # representative ft/day values (shell ~ fine sand, core ~ silty clay).
+    # Cored earth dam (Problem 3).  Metric; base k is in m/yr, so k is reset to
+    # representative m/day values (shell ~ fine sand, core ~ compacted clay).
     "earth_dam": dict(
         base="xslope_earth_dam1.xlsx",
         out="xslope_earth_dam_tseep.xlsx",
+        unit_system="si",
         mat_updates=[
-            dict(k1=0.75, k2=0.25, **SAND_STORAGE),   # 0: shell
-            dict(k1=0.012, k2=0.005, **CLAY_STORAGE),  # 1: core
+            dict(k1=1.5, k2=0.5, **SAND_STORAGE_SI),     # 0: shell
+            dict(k1=0.012, k2=0.005, **CLAY_STORAGE_SI),  # 1: core
         ],
         reservoir_idx=0,
         tseep=dict(
@@ -122,6 +136,7 @@ SAMPLES = {
     "johnson": dict(
         base="xslope_johnson_res.xlsx",
         out="xslope_johnson_res_tseep.xlsx",
+        unit_system="imperial",
         mat_updates=[
             dict(**SAND_STORAGE),   # 0: shell   (k = 1.0 ft/day, base)
             dict(**CLAY_STORAGE),   # 1: core    (k = 0.001 ft/day, base)
@@ -143,8 +158,12 @@ SAMPLES = {
 
 def _soil(spec):
     """The base model with this sample's soil made transient: per-zone storage,
-    ft/day conductivities where the base file is not in /day, declared units and a
-    day time base (required for a transient run).
+    per-day conductivities where the base file is not in /day, the base file's own
+    declared unit system and a day time base (required for a transient run).
+
+    The unit system is named per sample rather than assumed, so the metric earth dam
+    and the imperial Johnson dam can share this one call without either inheriting
+    the other's declaration.
 
     Everything downstream of this — the sample, the tutorial starter and the
     tutorial's completed file — is the same soil, because it is the same call.
@@ -152,7 +171,8 @@ def _soil(spec):
     sd = load_slope_data(os.path.join(FILES, spec["base"]))
     for i, upd in enumerate(spec["mat_updates"]):
         sd["materials"][i].update(upd)
-    sd["unit_system"] = "imperial"
+    sd["unit_system"] = spec["unit_system"]
+    sd["gamma_water"] = GAMMA_W[spec["unit_system"]]
     sd["time_unit"] = "day"
     return sd
 

@@ -59,8 +59,9 @@ The following diagram illustrates a simple earth dam with a clay core and a gran
 
 ![earth_dam1.png](images/earth_dam1.png)
 
+The dam is 22 m high and 110 m long at the base, with an 18 m pool upstream and 2 m of tailwater downstream.
 This problem requires an upstream head BC, a small downstream head BC, and a downstream exit face BC from the crest 
-of the dam down to the tailwater. The conductivities used in the input file are: shell k1 = 56, k2 = 18; core k1 = 4.5, k2 = 1.8 (ft/yr — the sketch's "46 m/yr" shell label is superseded by these values). To build the input file, the following list of coordinates can be used:
+of the dam down to the tailwater. The conductivities used in the input file are the sketch's: shell k1 = 46, k2 = 18; core k1 = 4.5, k2 = 1.8, all in m/yr. To build the input file, the following list of coordinates can be used:
 
 ![earth_dam1_pts.png](images/earth_dam1_pts.png)
 
@@ -73,13 +74,16 @@ The solution should look something like this:
 
 ![earth_dam1_solution.png](images/earth_dam1_solution.png){width=1200px}
 
-<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=42.422, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=38.761, tolerance=0.05 -->
 <!-- Element-type coverage (unsaturated/unconfined, linear-front): tri3, tri6, quad4, quad8, quad9. -->
-<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep_elements, expected_flowrate=42.422, tolerance=0.05, target_size=2.0 -->
+<!-- The linear front spans |h0| = 0.3 m, so the element size has to resolve it: at a 2 m -->
+<!-- target the quad8 solve stalls on the unresolved front. 0.6 m is two elements across it -->
+<!-- and all five types converge to within 0.3% of each other. -->
+<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep_elements, expected_flowrate=38.754, tolerance=0.05, target_size=0.6 -->
 
 ### 4. Earth Dam with Core — van Genuchten Unsaturated Model
 
-This is the same earth dam as [Problem 3](#3-earth-dam-with-core) — identical geometry, conductivities, and boundary conditions — but the unsaturated zone is modeled with the **van Genuchten** relative-conductivity function (`unsat = "vg"`) rather than the linear front. Only the per-material unsaturated parameters change: the `a` column (van Genuchten α) and the `n` column, set to representative values for the shell (sandy loam) and core (loam), converted to the model's length unit (1/ft). See the [van Genuchten Model](overview.md#van-genuchten-model) section for the typical-value table and the unit convention for α.
+This is the same earth dam as [Problem 3](#3-earth-dam-with-core) — identical geometry, conductivities, and boundary conditions — but the unsaturated zone is modeled with the **van Genuchten** relative-conductivity function (`unsat = "vg"`) rather than the linear front. Only the per-material unsaturated parameters change: the `a` column (van Genuchten α) and the `n` column, set to representative values for the shell (sandy loam, α = 0.075 /cm) and core (loam, α = 0.036 /cm), converted to the model's length unit — α = 7.5 /m and 3.6 /m. See the [van Genuchten Model](overview.md#van-genuchten-model) section for the typical-value table and the unit convention for α.
 
 [xslope_earth_dam1_vg.xlsx](files/xslope_earth_dam1_vg.xlsx)
 
@@ -87,9 +91,9 @@ The solution should look something like this:
 
 ![earth_dam1_vg_solution.png](images/earth_dam1_vg_solution.png){width=1200px}
 
-The computed flow rate (≈40.4) is close to the linear-front result of Problem 3 (≈42.4): with both models calibrated to the same soils, the unsaturated conductivity curve has little influence on the through-flow — consistent with the modeling guidance in the [seepage overview](overview.md#unsaturated-flow-formulation).
+The computed flow rate (≈37.8 m³/yr per m) is within 3% of the linear-front result of Problem 3 (≈38.8): with both models calibrated to the same soils, the unsaturated conductivity curve has little influence on the through-flow — consistent with the modeling guidance in the [seepage overview](overview.md#unsaturated-flow-formulation).
 
-<!-- test: file=files/xslope_earth_dam1_vg.xlsx, type=seep, expected_flowrate=40.365, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam1_vg.xlsx, type=seep, expected_flowrate=37.848, tolerance=0.05 -->
 
 ### 5. Johnson Reservoir {#johnson-reservoir}
 
@@ -207,22 +211,27 @@ described on the [Transient Seepage](transient.md) page; this entry is a worked 
 
 - **Storage properties** on the `mat` sheet. Each material carries a specific storage `Ss` and a
   specific yield `Sy` (see the [storage tables](transient.md#storage)): shell (sand)
-  `Ss = 1e-4` /ft, `Sy = 0.22`; core (clay) `Ss = 1e-3` /ft, `Sy = 0.03`. With the linear-front
+  `Ss = 3e-4` /m, `Sy = 0.22`; core (clay) `Ss = 3e-3` /m, `Sy = 0.03`. With the linear-front
   law the drainable-band storage is about `Sy`, so the water table drains at the unconfined rate
   `k/Sy`.
 - A **tseep sheet** carrying the reservoir schedule and run controls. The upstream boundary is
   retyped from a fixed head to a submerged-only **`reservoir`** boundary (see
   [head types](transient.md#head-types-head-and-reservoir)) bound to a `pool` series: the pool is
-  held at the crest level (el 18) briefly, drawn down to the tailwater datum (el 2) over **45 days**,
-  then held. The run lasts **360 days** — long enough that the field reaches quasi-equilibrium (by
-  the end the boundary outflow has decayed to about 1.4% of its drawdown peak). Twelve frames are
-  saved, and the `stage_1` (full pool, t = 0) / `stage_2` (end of drawdown, t = 47) pair marks the
-  critical states a rapid-drawdown analysis would draw on.
+  held at the core crest level (el 18 m) briefly, drawn down to the tailwater datum (el 2 m) over
+  **45 days**, then held. The run lasts **360 days** — long enough that the field reaches
+  quasi-equilibrium (by the end the boundary outflow has decayed to 0.2% of its drawdown peak).
+  Twelve frames are saved, and the `stage_1` (full pool, t = 0) / `stage_2` (end of drawdown,
+  t = 47) pair marks the critical states a rapid-drawdown analysis would draw on.
 
-Because a **day** time base is declared, the conductivities are given in **ft/day** (the storage
+Because a **day** time base is declared, the conductivities are given in **m/day** (the storage
 march balances against `div(k grad h)`, so `k` must share the schedule's time unit): shell
-`k1 = 0.75`, `k2 = 0.25`; core `k1 = 0.012`, `k2 = 0.005` — a fine-sand shell over a much less
-permeable compacted-clay core.
+`k1 = 1.5`, `k2 = 0.5`; core `k1 = 0.012`, `k2 = 0.005` — a fine-sand shell over a much less
+permeable compacted-clay core. These are not the steady sample's 46 and 4.5 m/yr: at 18 m/yr the
+shell would drain at `k2/Sy` = 82 m/yr, which is 0.22 m/day — slower than the pool falls, so
+nothing in the section would keep up and the drawdown would have no contrast to show. With the
+values above the pool falls at 16 m over 45 days = 0.36 m/day, the shell drains at 0.5/0.22 =
+2.3 m/day and keeps up, and the core drains at 0.005/0.03 = 0.17 m/day and cannot — which is the
+whole point of the problem.
 
 [xslope_earth_dam_tseep.xlsx](files/xslope_earth_dam_tseep.xlsx)
 
@@ -246,8 +255,9 @@ instead. The time-stamped series looks like this:
 **What to observe:**
 
 - **The phreatic surface lags the reservoir.** At the end of the 45-day drawdown (t = 47) the pool
-  is already at el 2, but the interior water table is still perched high — the shell cannot drain as
-  fast as the pool falls. This lag is the pore pressure a rapid-drawdown check must account for.
+  is already at el 2 m, but the interior water table is still perched high — el 10.6 m over the core
+  crest, a lag of 8.6 m, more than half the entire 16 m drawdown. This lag is the pore pressure a
+  rapid-drawdown check must account for.
 - **The exit point migrates down the upstream face.** As the level falls, face nodes the water
   leaves behind convert from held reservoir head to a free-draining exit face, and the point where
   the phreatic surface meets the face walks down the slope, trailing the pool.
@@ -273,9 +283,9 @@ difference *is* the storage change — a single steady "total flowrate" no longe
 ![earth_dam_tseep_history.png](images/earth_dam_tseep_history.png){width=720px}
 
 <!-- Transient regression: total head sampled at interior stations at three saved times (early drawdown / end of drawdown / quasi-equilibrium), re-solved through the run_tests tseep_head path (tri3, target_size=2.0). -->
-<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=15, points=30:6:13.735;40:8:14.178;55:5:10.356, tolerance=0.05 -->
-<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:7.776;40:8:8.584;55:5:7.524, tolerance=0.05 -->
-<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.124;40:8:2.136;55:5:2.193, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=15, points=30:6:13.647;40:8:13.970;55:5:10.776, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:6.355;40:8:7.014;55:5:7.272, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.011;40:8:2.012;55:5:2.027, tolerance=0.05 -->
 
 ### 9. Johnson Reservoir — Zoned Drawdown (Transient)
 

@@ -534,7 +534,7 @@ slope_data = stage_transient_for_drawdown(slope_data, solution)
 
 **Worked examples** — complete input files you can download and open:
 
-- [Earth Dam — Reservoir Drawdown](samples.md#8-earth-dam-reservoir-drawdown-transient): a homogeneous dam followed through a drawdown driven by a falling `reservoir` series.
+- [Earth Dam — Reservoir Drawdown](samples.md#8-earth-dam-reservoir-drawdown-transient): a shell-and-core dam followed through a drawdown driven by a falling `reservoir` series.
 - [Johnson Reservoir — Zoned Drawdown](samples.md#9-johnson-reservoir-zoned-drawdown-transient): the zoned Johnson Reservoir dam drawn down over 45 days, with `stage_1` / `stage_2` set.
 - [Rapid drawdown from a transient solution](../lem/rapid.md#worked-example): that drawdown carried into a three-stage rapid-drawdown stability analysis.
 

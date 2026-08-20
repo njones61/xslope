@@ -602,11 +602,11 @@ the upstream shell pointing back *toward* the reservoir: with the pool down to
 elevation 8 and still falling, the shell drains out through the face it was filled
 through.
 
-The play bar shows one frame at a time, and it draws each frame on that frame's
-own contour scale. To compare instants side by side, the figure below draws four
-of the saved frames as one picture instead, with a single color scale pinned
-across the panels — which the play bar does not do — so the dam's emptying reads
-as one map fading:
+The play bar shows one frame at a time, drawn on the transient view's defaults —
+line contours with velocity vectors, each frame scaled to itself. The figure
+below draws four of the saved frames differently, as one picture: filled
+contours, no vectors, and a single color scale pinned across the panels — which
+the play bar does not do — so the dam's emptying reads as one map fading:
 
 ![Four frames: the initial condition, mid drawdown, the end of drawdown, and recovery](images/seep03_frames.png){width=1000}
 

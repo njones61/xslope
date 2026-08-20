@@ -39,11 +39,10 @@ rather than to repeat — running it on the completed file returns the wet answe
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to model rainfall infiltration: how a vertical rain
-rate becomes the normal flux a boundary takes, how to draw a flux boundary on the
-geometry rather than on mesh nodes, what happens where a flux boundary runs into a
-specified head, how to read one run against another when a single input is all
-that changed, and how far a rain rate can be scaled before the soil can no longer
-take what the boundary prescribes.
+rate becomes the normal flux a boundary takes, what happens where a flux boundary
+runs into a specified head, how to read one run against another when a single
+input is all that changed, and how far a rain rate can be scaled before the soil
+can no longer take what the boundary prescribes.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">steady seepage</span><span class="tg-pill">specified flux</span><span class="tg-pill">infiltration</span><span class="tg-pill">normal flux</span><span class="tg-pill">specified head</span><span class="tg-pill">exit face</span><span class="tg-pill">toe drain</span><span class="tg-pill">van Genuchten</span><span class="tg-pill">phreatic surface</span><span class="tg-pill">water budget</span></p>
 <div class="tgm-model" markdown>

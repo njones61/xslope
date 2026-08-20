@@ -39,15 +39,10 @@ completed file below and pick the page back up at
 <div class="tgt-tile"><span class="tg-label">Build &amp; explore</span><p>~30 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Read the storage properties a transient run adds to the material
-table and say what each one does, build the boundary set for a dam with a
-reservoir on one side and a tailwater on the other, solve the full-pool steady
-state and recognize it as the initial condition the march begins from, enter a
-falling-pool time series with a run duration and a save schedule, bind the
-reservoir boundary to that series so it becomes time-varying, and read the
-solution three ways — the frames on the play bar, the head history at a node
-inside the core against one in the shell, and the mass balance that says where
-the water came from.
+**Objectives** — Give a two-zone dam the storage properties and boundary set a
+drawdown problem needs, solve the full-pool steady state the march starts from,
+drive the reservoir boundary from a falling-pool time series, and read the
+transient solution — frames, a head history, and the mass balance.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">transient seepage</span><span class="tg-pill">specific storage</span><span class="tg-pill">specific yield</span><span class="tg-pill">time series</span><span class="tg-pill">reservoir boundary</span><span class="tg-pill">initial condition</span><span class="tg-pill">saved frames</span><span class="tg-pill">head history</span><span class="tg-pill">mass balance</span></p>
 <div class="tgm-model" markdown>

@@ -312,9 +312,11 @@ Click **Build**. The mesh comes out at **614 nodes and 1,089 triangles**:
 
 The blue squares are the **33 specified-head nodes**: the long run up the upstream
 face is Head 1, and the short group at the downstream toe is Head 2. The red
-circles are the **30 exit-face nodes** down the downstream slope. The core is
-drawn in its own color, so a core that failed to reach elevation 18 or failed to
-reach the rock would show here rather than in the answer.
+circles are the **30 exit-face nodes** down the downstream slope. The core's elements are
+drawn in their own color, so this plot is also a check on the geometry: confirm
+the core zone runs the full height, from the rock up to elevation 18. A
+mis-entered core boundary is easy to spot here and hard to spot later, in a
+solution that is quietly wrong.
 
 ---
 

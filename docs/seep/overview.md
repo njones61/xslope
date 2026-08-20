@@ -256,7 +256,7 @@ $qL/6,\ qL/6,\ 2qL/3$ at the corners and midside of a quadratic edge. Each set s
 so the water entering through an edge is exactly $qL$ at any element order. Flux nodes remain
 unknowns in the solve, since a flux is a natural boundary condition.
 
-Three consequences are worth knowing:
+Four consequences are worth knowing:
 
 **A model with only flux boundaries is singular.** A flux constrains the gradient of the head,
 not the head, so the solution is determined only up to an additive constant. At least one
@@ -278,6 +278,21 @@ water table rises, nodes cross from the first regime to the second. The one posi
 cannot resolve is an inflow onto a seepage face larger than the face can drain — such a node
 has no steady answer under either condition, so the iteration oscillates and the run reports
 `converged = False` rather than a plausible-looking number.
+
+**A flux boundary may also overlap a specified head**, which is what happens wherever rain
+falling on a slope meets the reservoir: the same node is on both polylines. The specified head
+wins. The load is assembled onto that node like any other and then discarded when the head is
+enforced, so none of the water that load stood for enters the domain — the reservoir already
+fixes the head at that node, and a flux cannot move a prescribed head.
+
+Draw a flux boundary on the **geometry** — corner to corner of the surface the water falls on —
+rather than on the extent some mesh happens to have nodes at. The mesher pins a node at every
+vertex of every boundary polyline, so a boundary drawn on the section is honored to its stated
+length whatever element size is used. A boundary drawn to fit one mesh is not: an edge carries
+load only when *both* its corner nodes lie on the polyline, so an endpoint that lands part-way
+along an element edge drops that edge whole, and the model quietly takes less water than it
+was given. XSLOPE warns when the matched length misses the specified length by more than one
+element.
 
 Zero flux is the natural (do-nothing) condition that an unspecified boundary already carries,
 so a flux boundary is needed only where the flux is non-zero.

@@ -625,8 +625,12 @@ def gw006c():
     identical unsaturated relative shape (both custom functions are parallel).
     Same 12 m dam, 2:1 faces, 12 m toe drain, reservoir at 10 m.
 
-    The domain is tiled by four non-overlapping polygons (three shell pieces +
-    the core) so the core is a true internal zone. The low-k core forces almost
+    The domain is tiled by two non-overlapping polygons — one notched shell that
+    wraps the core on three sides plus over its top, and the core rectangle
+    itself — so the core is a true internal zone with no seam through the shell.
+    (An earlier version cut the shell into three pieces around the core; the two
+    extra seams were internal boundaries the mesher had to honour, dividing the
+    shell for no physical reason.) The low-k core forces almost
     the entire hydraulic-head drop across its 4 m width (the crowded contours of
     Fig 6.13). Target: pressure head along line 1-1 (x=26, now inside the core,
     Fig 6.14). xslope reproduces the profile shape and sits at the high end of
@@ -646,11 +650,14 @@ def gw006c():
     core.update(name='Core', k1=1e-9, k2=1e-9)
     sd['materials'] = [shell, core]
     sd['profile_lines'] = []
+    # The shell is the dam outline with the core's footprint notched out of its
+    # base: along the base to the core's upstream face, up and over the core,
+    # back down to the base, on to the downstream toe, then up the downstream
+    # face, across the crest and down the upstream face.
     sd['polygons'] = [
-        {'mat_id': 0, 'polygon': Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 12.0)])},
-        {'mat_id': 0, 'polygon': Polygon([(24.0, 10.0), (28.0, 10.0),
+        {'mat_id': 0, 'polygon': Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 10.0),
+                                          (28.0, 10.0), (28.0, 0.0), (52.0, 0.0),
                                           (28.0, 12.0), (24.0, 12.0)])},
-        {'mat_id': 0, 'polygon': Polygon([(28.0, 0.0), (52.0, 0.0), (28.0, 12.0)])},
         {'mat_id': 1, 'polygon': Polygon([(24.0, 0.0), (28.0, 0.0),
                                           (28.0, 10.0), (24.0, 10.0)])},
     ]

@@ -26,8 +26,8 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.2516;26:2:7.2571;26:4:7.3727;26:6:7.5047, tolerance=0.05, benchmark=GW6a-h -->
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.692e-06, tolerance=0.05, benchmark=GW6b-q -->
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:6.5688;26:2:6.7452;26:4:7.2663;26:6:7.8577, tolerance=0.05, benchmark=GW6b-h -->
-<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.873e-08, tolerance=0.05, benchmark=GW6c-q -->
-<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.7859;26:2:5.7854;26:4:6.3608;26:6:7.0789, tolerance=0.05, benchmark=GW6c-h -->
+<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.879e-08, tolerance=0.05, benchmark=GW6c-q -->
+<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.7966;26:2:5.7860;26:4:6.3611;26:6:7.0788, tolerance=0.05, benchmark=GW6c-h -->
 <!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=4.737e-07, tolerance=0.05, benchmark=GW6d-q -->
 <!-- test: file=files/rocscience_gw/gw006d.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.8970;26:2:7.9161;26:4:8.0363;26:6:8.1847;26:8:8.4101;26:10:8.6738;26:12:9.1446, tolerance=0.05, benchmark=GW6d-h -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.777e-07, tolerance=0.05, benchmark=GW6e-q -->
@@ -115,7 +115,7 @@ used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide chart everywhere | |
 | [4](#gw4) | 🔴 | Steady unconfined flow through earth dam | Phreatic surface within 0.02–0.06 m of the Kozeny basic parabola over the dam body · y₁ above the drain toe 0.401 vs RS2's own solve of this model 0.395 (+1.5%) · vs Slide 0.442 (−9.3%) · vs Eq 4.1 0.486 (−17.5%) · drain-face entry offset x₁ 0.272 vs 0.226 (**+20.4%**, and it sets the dot) | RS2's Table 4.1 for the file this model is built from is the governing pairing and publishes both quantities; y₁ is green on it, x₁ is not, and x₁ turns on an unsaturated curve the vendor file does not store |
 | [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.165×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%; +1.8% on the finest mesh) · solved pressure head inside Fig 5-4's own 1 m colour bands at 46 of 49 grid points (worst miss 0.025 m) | **built**; chart-keyed target, locked on XSLOPE's own field |
-| [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1, against Slide: case 2 within 0.07 m and case 5 within 0.10 m · case 1 within 0.24 m · case 4 within 0.37 m over all thirteen of Fig 6.18's markers (0.19 m rms) · case 3 the outlier, within 0.16 m at elevations 0 and 2 but climbing through +0.26 and +0.68 to +0.98 m at elevation 8, where Slide and Ref[1] themselves differ by 0.9 m | **built** (5 of 5 cases); chart-only target, locked on XSLOPE's own field; one conductivity curve, taken from the vendor tables and fit to 0.030 decades rms, serves all five |
+| [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1, against Slide: case 2 within 0.07 m and case 5 within 0.10 m · case 1 within 0.24 m · case 4 within 0.37 m over all thirteen of Fig 6.18's markers (0.19 m rms) · case 3 the outlier, within 0.15 m at elevations 0 and 2 but climbing through +0.26 and +0.68 to +0.98 m at elevation 8, where Slide and Ref[1] themselves differ by 0.9 m | **built** (5 of 5 cases); chart-only target, locked on XSLOPE's own field; one conductivity curve, taken from the vendor tables and fit to 0.030 decades rms, serves all five |
 | [7](#gw7) | 🟢 | Seepage within layered slope | Total head along the manual's own query line within 0.005 m rms / 0.013 m worst of the Fig 22.7 steady markers over 21 stations (≈1% of the profile's head range) · water table at the toe el 0.30 vs the stated Slide / Rulon & Freeze 0.3 m (0.00 m) · perched zone and slope-face spring reproduced · Q = q·L = 1.68×10⁻⁴ locked | **built**; problem 7's own figures are chart-only, so the numeric target comes from problem 22's Fig 22.7 steady frame |
 | [8](#gw8) | 🟢 | Flow through ditch-drained soils | Flux boundary exact — total inflow = *q*·*L*, the confined response matching the closed form to six figures · water table within 0.004–0.006 m of the Fig 8.3/8.4 line over the whole span (worst 2.4% of the 0.25 m divide mound) · Fig 8.3's labeled pressure-head contours within 0.010 m rms over 14 stations | **built**; flux rate and Soil B's Gardner *a* taken from the vendor model where it disagrees with the printed tables |
 | [9](#gw9) | 🟢 | Seepage through dam | Dam 1: Q = 1.384×10⁻³ vs Slide 1.378×10⁻³ m³/(min·m) (+0.4%) · dam 2: Q = 4.28×10⁻⁶ vs Slide 4.23×10⁻⁶ m³/(s·m) (+1.2%) | **built** (both dams); body k read from Bowles (1984) Fig E9-2b, not the Chapuis caption |
@@ -423,14 +423,15 @@ Flowrate 1.692×10⁻⁶ m³/s per m (locked with the total-head field).
 **Case 3 — isotropic dam with a low-permeability core and the horizontal drain.** A
 rectangular central core (x ∈ [24, 28], y ∈ [0, 10], read from the vendor mesh's material-2
 footprint) with saturated k = 10⁻⁹ m/s — 100× lower than the 10⁻⁷ shell — is tiled into the
-dam as four non-overlapping polygons (three shell pieces + the core). The core forces almost
+dam as two non-overlapping polygons: the core, and a shell whose outline is the dam with the
+core's footprint notched out of it. The core forces almost
 the whole head drop across its 4 m width (Fig 6.13's crowded contours), throttling the
-flowrate to 4.873×10⁻⁸ m³/s per m. Along line 1-1 (now inside the core) XSLOPE reproduces the
+flowrate to 4.879×10⁻⁸ m³/s per m. Along line 1-1 (now inside the core) XSLOPE reproduces the
 profile shape and sits at the high end of the published scatter:
 
 | Elevation on line 1-1 | XSLOPE pressure head | Slide (Fig 6.14) | Ref[1] |
 |---|---|---|---|
-| 0 | 5.74 | ≈5.9 (≈−0.16 m) | ≈5.8 (≈−0.06 m) |
+| 0 | 5.75 | ≈5.9 (≈−0.15 m) | ≈5.8 (≈−0.05 m) |
 | 2 | 3.79 | ≈3.9 (≈−0.11 m) | ≈3.9 (≈−0.11 m) |
 | 4 | 2.36 | ≈2.1 (≈+0.26 m) | ≈2.1 (≈+0.26 m) |
 | 6 | 1.08 | ≈0.4 (≈+0.68 m) | ≈0.7 (≈+0.38 m) |
@@ -487,6 +488,27 @@ Flowrate 4.737×10⁻⁷ m³/s per m (locked with the total-head field). The rai
 2.800×10⁻⁷ of it, leaving 1.937×10⁻⁷ from the reservoir against the 2.808×10⁻⁷ the reservoir
 drives in case 1: the infiltration lifts heads inside the dam and flattens the gradient the
 reservoir works against.
+
+**Where the vendor's rain starts and stops.** The infiltration is applied by selecting element
+edges on the vendor's mesh, so the loaded extent is a property of that mesh, not of the dam:
+the loaded surface begins one edge — 2.24 m of slope — above the waterline at (22, 11) and ends
+one edge above the toe at (50, 1), so 2 m of horizontal footprint carries no rain at each end.
+Those extents are transcribed here exactly, because they are part of the model this case
+verifies against. A model built to the geometry instead would run the rain from the waterline
+(20, 10) to the toe (52, 0) and offer 3.200×10⁻⁷ m³/s per m over a 32 m footprint against the
+vendor's 2.800×10⁻⁷ over 28 m. The extra water shows in the answer: the discharge becomes
+4.916×10⁻⁷ against 4.737×10⁻⁷, **+3.8%**, and the crest-line profile rises a further 0.03 to
+0.05 m. Extent is the only input that differs between the two models — the rates, the section,
+the soil and the drain are identical.
+
+Rebuilding the vendor's own 195-node, 336-element mesh and its fourteen traction cards node for
+node — the boundary statement in `gw006d.xlsx` reproduces them exactly, 11 fixed-head and 7
+drain nodes and an assembled rain of 2.800000×10⁻⁷ — and solving on that mesh gives 4.796×10⁻⁷
+against the 4.737×10⁻⁷ locked here, **+1.2%**, with the crest-line pressure heads agreeing
+within 0.023 m. Changing the mesh therefore moves the crest line by at most 0.023 m, while
+XSLOPE's offsets from Fig 6.18's markers run 0.12 to 0.37 m against Slide — ten times as far —
+and the vendor's own mesh reproduces those offsets unchanged. The discretization is not what
+separates the two solutions.
 
 ![gw006d: mesh and solved heads (steady-state infiltration)](images/gw006d.png)
 

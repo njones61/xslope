@@ -776,4 +776,6 @@ is SEEP-2's larger Johnson Reservoir dam taken through a drawdown of its own.
 [Rapid Drawdown Analysis](../lem/rapid.md) is where the stage times left blank
 here are used, taking a transient solution like this one into a stability
 analysis. [SEEP-2](seep02_johnson_dam.md) is where the unconfined steady problem
-and its seepage face are built from nothing.
+and its seepage face are built from nothing, and
+[SEEP-4](seep04_dam_infiltration.md) adds rain to a dam through the third boundary
+type, a specified flux.

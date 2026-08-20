@@ -3410,6 +3410,26 @@ SEEP04_VENDOR_VERTICES = ((22.0, 11.0), (24.0, 12.0), (28.0, 12.0), (50.0, 1.0))
 #: collision rule: every node it loads is a specified-head node, so the answer must
 #: not move. Wholly below the waterline at (20, 10), on the submerged upstream face.
 SEEP04_SUBMERGED_BLOCK = ((12.0, 6.0), (20.0, 10.0))
+#: Multiples of the file's rain rate the sweep solves at.  They span an order of
+#: magnitude and a half around the vendor's rate, which is the middle of the set,
+#: so the sweep brackets it rather than extending from it.
+SEEP04_SWEEP_FACTORS = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0)
+#: Stations the swept free surfaces are drawn at: half-metre spacing from just
+#: downstream of the waterline to the drain's upstream lip at x = 40, then tenth-
+#: metre spacing out over the drain.  Denser than the thirteen the tables use,
+#: because these are curves rather than readings, and denser again past the lip
+#: because that is where the surfaces separate — the dry one turns down at the lip
+#: itself while the wet ones stay up over the first metre or two of drain.
+SEEP04_SWEEP_STATIONS = (tuple(20.5 + 0.5 * i for i in range(40))
+                         + tuple(round(40.1 + 0.1 * i, 1) for i in range(25)))
+#: The dam in profile — the ground surface the file carries, closed along the
+#: impermeable base.  Drawn by hand because the sweep figure is a section with
+#: curves on it, not a solution plot.
+SEEP04_SECTION = ((0.0, 0.0), (24.0, 12.0), (28.0, 12.0), (52.0, 0.0))
+#: One color per rain rate, cool to warm as the rate rises, so the six curves read
+#: in order without the legend.  Same family the other seepage figures draw from.
+SEEP04_SWEEP_COLORS = ("#2166ac", "#4393c3", "#3f8f5a", "#c9a227", "#c1663a",
+                       "#96201f")
 
 
 def _seep04_mesh(model, size=SEEP04_SIZE, element_type=SEEP04_ELEMENT):
@@ -3556,32 +3576,152 @@ def _seep04_submerged_block(model, coords=SEEP04_SUBMERGED_BLOCK):
     return dict(model, seepage_bc=bc)
 
 
-def _seep04_profile_figure(dry, wet, x=SEEP04_LINE_X):
-    """The line 1-1 pressure-head profile, dry against infiltration, on one axes —
-    the comparison Fig 6.18 itself draws, with the dry case added beside it.
+def _seep04_scaled_rain(model, factor):
+    """The completed model with every flux block multiplied by ``factor``.
 
-    Elevation is the vertical axis, as the manual plots it, and the ψ = 0 line is
-    marked because where each curve crosses it is that run's phreatic surface on
-    the crest centerline.
+    All three blocks are scaled together, so the projection the file carries — the
+    slope segments at cos(atan 1/2) of the crest rate — survives the scaling and
+    the boundary still represents one vertical rain rate.  The workbook is never
+    touched; ``factor = 0`` is the dry model.
+    """
+    bc = dict(model["seepage_bc"])
+    bc["specified_fluxes"] = [dict(f, flux=f["flux"] * factor)
+                              for f in model["seepage_bc"]["specified_fluxes"]]
+    return dict(model, seepage_bc=bc)
+
+
+def _seep04_free_surface(mesh, solution, stations=SEEP04_SWEEP_STATIONS):
+    """The free surface at each station, and whether the column reached it.
+
+    Returns ``(elevations, saturated)``.  Where the pressure head crosses zero
+    inside the dam the elevation is that crossing — the phreatic surface.  Where
+    the whole column is at or above zero the water has reached the dam surface and
+    there is no crossing to find; the elevation returned is the dam surface itself
+    and the flag is True, because the free surface has emerged rather than
+    vanished.  A column that is dry throughout returns NaN.
+
+    ``_seep04_phreatic`` returns NaN for both of those cases, which is the right
+    answer for a table of phreatic elevations and the wrong one for a curve.
     """
     import numpy as np
 
-    fig, ax = plt.subplots(figsize=(6.0, 6.4))
-    ys = np.asarray(SEEP04_LINE_Y, dtype=float)
-    for (label, psi), color, marker in ((dry, "#1f6fb4", "o"),
-                                        (wet, "#b5460f", "s")):
-        ax.plot(psi, ys, color=color, marker=marker, markersize=4.5, lw=1.8,
-                label=label)
-    ax.axvline(0.0, color="#8a939c", lw=1.0, ls="--")
-    ax.annotate("ψ = 0\n(phreatic surface)", xy=(0.0, 11.4),
-                xytext=(0.35, 11.4), color="#5a636c", fontsize=8, va="center")
-    ax.set_xlabel("pressure head ψ (m)")
+    ihead = _seep02_interp(mesh, np.asarray(solution["head"], dtype=float))
+    ys_out, sat_out = [], []
+    for x in stations:
+        top = _seep04_top(x)
+        ys = np.linspace(0.01, top - 0.01, 4000)
+        psi = np.ma.filled(ihead(np.full(len(ys), float(x)), ys), np.nan) - ys
+        ok = ~np.isnan(psi)
+        ys, psi = ys[ok], psi[ok]
+        wet = np.where(psi >= 0.0)[0]
+        if not len(wet):
+            ys_out.append(float("nan"))
+            sat_out.append(False)
+        elif wet[-1] + 1 >= len(psi):
+            ys_out.append(top)
+            sat_out.append(True)
+        else:
+            i = wet[-1]
+            ys_out.append(float(ys[i] + (ys[i + 1] - ys[i]) * psi[i]
+                                / (psi[i] - psi[i + 1])))
+            sat_out.append(False)
+    return ys_out, sat_out
+
+
+def _seep04_base_landing(mesh, solution, start=40.0, stop=46.0, step=0.002,
+                         offset=0.01):
+    """The x at which the free surface reaches the base, out along the drain.
+
+    Read as the furthest x whose pressure head is still non-negative a hair above
+    the base.  The hair is needed: the active drain nodes are held at head = y, so
+    ψ is identically zero along the base itself and there is no sign change to find
+    there.  ``offset`` is 1% of the 1 m element, and the answer moves by at most
+    0.05 m as it is varied over 0.005–0.1 m — a tenth of one element, invisible at
+    section scale.
+    """
+    import numpy as np
+
+    ihead = _seep02_interp(mesh, np.asarray(solution["head"], dtype=float))
+    xs = np.arange(start, stop, step)
+    psi = np.ma.filled(ihead(xs, np.full(len(xs), offset)), np.nan) - offset
+    ok = np.where(np.isfinite(psi) & (psi >= 0.0))[0]
+    return float(xs[ok[-1]]) if len(ok) else float(start)
+
+
+def _seep04_section_axes(ax):
+    """One frame for the hand-drawn section: the dam, its impermeable base, the
+    reservoir, and the toe drain, at equal aspect."""
+    xs = [p[0] for p in SEEP04_SECTION]
+    ys = [p[1] for p in SEEP04_SECTION]
+    ax.plot(xs, ys, color="#4a5560", lw=1.6)
+    ax.plot([SEEP04_SECTION[0][0], SEEP04_SECTION[-1][0]], [0.0, 0.0],
+            color="#8a939c", lw=1.0)
+    # The reservoir standing on the upstream face, with the water-table symbol at
+    # its surface, and the toe drain that every free surface below drains into.
+    head = 10.0
+    ax.plot([0.0, 20.0], [head, head], color="#6ba8d6", lw=1.1)
+    ax.plot([10.0], [head], marker="v", ms=7, color="#6ba8d6",
+            markeredgecolor="#6ba8d6")
+    ax.plot([40.0, 52.0], [0.0, 0.0], color="#3f8f5a", lw=3.0,
+            solid_capstyle="butt")
+    ax.annotate("toe drain", xy=(46.0, 0.0), xytext=(46.0, 1.2),
+                color="#3f8f5a", fontsize=8, ha="center")
+    ax.set_xlim(-1.0, 53.0)
+    ax.set_ylim(-0.6, 13.9)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel("x (m)")
     ax.set_ylabel("elevation (m)")
-    ax.set_title("Pressure head on the crest centerline, x = %g m" % x)
-    ax.set_ylim(0.0, 12.6)
-    ax.grid(True, color="#e4e7ea", lw=0.7)
-    ax.set_axisbelow(True)
-    ax.legend(loc="upper right", frameon=False)
+
+
+def _seep04_sweep_figure(series, entry=(20.0, 10.0)):
+    """The free surface on the dam section at each rain rate, all six on one axes.
+
+    Each curve is anchored at both ends.  Upstream it starts at the reservoir
+    waterline, which pins it whatever the rain does.  Downstream it ends ON the
+    base, at the point where that run's own saturation runs out: the dry dam turns
+    down at the drain's upstream lip, and the wetter the dam the further out over
+    the drain the surface stays up before coming down.  The last stretch is steep
+    because a free surface meeting a horizontal drain meets it at a right angle —
+    the entry condition the Kozeny parabola is built on — and how steep is not
+    resolved by a 1 m mesh, so it is drawn as what the stations report rather than
+    smoothed into something the solution does not say.
+
+    A rate whose curve lies on the dam surface has saturated the dam to its
+    boundary; it is drawn dashed, because there the specified-flux boundary is
+    offering more water than the soil can take and the run has stopped being a
+    model of rain falling on a slope.
+    """
+    import numpy as np
+
+    fig, ax = plt.subplots(figsize=(11.0, 4.4))
+    _seep04_section_axes(ax)
+    emerged = None
+    for (label, ys, sat, land), color in zip(series, SEEP04_SWEEP_COLORS):
+        pts = [entry] + [(x, y) for x, y in zip(SEEP04_SWEEP_STATIONS, ys)
+                         if np.isfinite(y)]
+        # The terminus is on the base, at whichever of the two readings of "the
+        # surface is down" lies further out.  They can differ by up to an element:
+        # over an active drain the base is held at atmospheric pressure and can
+        # finish unsaturated while a saturated body is still draining onto it from
+        # above, so the base scan stops before the column walk does.  Taking the
+        # further of the two ends the curve where the saturation actually runs out
+        # and keeps it from doubling back on itself.
+        pts.append((max(pts[-1][0], land), 0.0))
+        on_surface = any(sat)
+        style = dict(lw=2.4, dashes=(4.5, 2.0)) if on_surface else dict(lw=1.8)
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], "-", color=color,
+                label=label, **style)
+        if on_surface:
+            emerged = color
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.01), ncol=6,
+              frameon=False, fontsize=9, columnspacing=1.6, handlelength=2.2)
+    if emerged is not None:
+        ax.annotate("dashed: the dam is saturated to its surface, so the\n"
+                    "specified-flux boundary would pond in reality",
+                    xy=(22.6, 11.3), xytext=(2.0, 12.7), color=emerged,
+                    fontsize=8, ha="left", va="center",
+                    arrowprops=dict(arrowstyle="->", color=emerged, lw=0.9,
+                                    shrinkA=6, shrinkB=4))
     fig.tight_layout()
     plt.show()
 
@@ -3798,8 +3938,6 @@ def seep04_plots():
                                       wet_psi, ven_psi):
         print("   %-8g %10.4f %10.4f %10.4f %10.4f %+10.4f %10.4f %+10.4f"
               % (y, hd, hw, pd_, pw, pw - pd_, pv, pw - pv))
-    capture("seep04_profiles.png", _seep04_profile_figure,
-            ("no infiltration", dry_psi), ("with infiltration", wet_psi))
 
     # ---- what the rain does to the interior and to the free surface --------- #
     rise = (np.asarray(wet_sol["head"], dtype=float)
@@ -3818,6 +3956,78 @@ def seep04_plots():
         print("   %-10s %s" % (label, " ".join("%6.2f" % y for y in ys)))
     print("   %-10s %s" % ("Δ", " ".join("%+6.2f" % (w - d)
                                          for d, w in zip(dry_ph, wet_ph))))
+
+    # ---- the rain sweep ----------------------------------------------------- #
+    # The file's rates, scaled in memory, on the one mesh: what more rain does to
+    # the discharge, to the water table under the crest, and to how much of the
+    # dam stays unsaturated.  Every rate is reported as q/k, because that ratio —
+    # not the rate itself — is what decides whether the soil can carry the rain
+    # away, and the sweep runs up to the rate at which it cannot.
+    k = float(sd["materials"][0]["k1"])
+    print("   rain sweep at q/k = q ÷ k = q ÷ %g %s/s (all three flux blocks "
+          "scaled together, in memory)" % (k, _u["length"]))
+    print("   %-8s %-12s %-7s %-14s %-14s %-9s %-9s %-8s %s"
+          % ("factor", "q (m/s)", "q/k", "Q", "reservoir", "WT x=26",
+             "Δ from dry", "lands x", "exit face"))
+    sweep, sweep_q, sweep_wt, sweep_res = [], [], [], []
+    i26 = SEEP04_STATIONS.index(SEEP04_LINE_X)
+    for factor in SEEP04_SWEEP_FACTORS:
+        model = _seep04_scaled_rain(sd, factor)
+        s_data, s_sol, s_log = _seep04_solve(model, mesh)
+        ys, sat = _seep04_free_surface(mesh, s_sol)
+        table_ph = _seep04_phreatic(mesh, s_sol)
+        wt = table_ph[i26]
+        q = float(s_sol["flowrate"])
+        rain = SEEP04_RAIN * factor
+        # How much of the drain's outflow the reservoir is supplying: the nodal
+        # reactions on the specified-head boundary.  The rest is rain.
+        res = float(np.sum(np.asarray(s_sol["q"], dtype=float)[
+            np.asarray(s_data["bc_type"]) == 1]))
+        # Where this run's free surface comes down onto the base, out along the
+        # drain.  The drain's lip is at x = 40, so a landing further out is
+        # saturated drain length: the dam is discharging over that much of it.
+        land = _seep04_base_landing(mesh, s_sol)
+        sweep.append(("q/k = %g" % round(rain / k, 6), ys, sat, land))
+        sweep_q.append(q)
+        sweep_wt.append(wt)
+        sweep_res.append(res)
+        print("   %-8g %-12.4e %-7g %-14.6e %-14.6e %-9s %-9s %-8.3f %s"
+              % (factor, rain, round(rain / k, 6), q, res,
+                 "surface" if np.isnan(wt) else "%.4f" % wt,
+                 "—" if np.isnan(wt) or np.isnan(sweep_wt[0])
+                 else "%+.4f" % (wt - sweep_wt[0]),
+                 land, _seep04_exit_active(s_log)))
+        n_sat = sum(1 for f in sat if f)
+        if n_sat:
+            xs_sat = [x for x, f in zip(SEEP04_SWEEP_STATIONS, sat) if f]
+            print("        saturated to the dam surface over x = %g–%g %s "
+                  "(%d of %d stations) — the flux boundary is offering more "
+                  "than the soil can accept"
+                  % (min(xs_sat), max(xs_sat), _u["length"], n_sat, len(sat)))
+    # Linear in q or not, from the sweep's own numbers: a linear response has the
+    # same rise per unit of rain everywhere, so the per-factor increments are the
+    # test rather than the totals.
+    print("   response per unit factor (a linear response repeats a constant):")
+    for i in range(1, len(SEEP04_SWEEP_FACTORS)):
+        f0, f1 = SEEP04_SWEEP_FACTORS[i - 1], SEEP04_SWEEP_FACTORS[i]
+        dq = (sweep_q[i] - sweep_q[i - 1]) / (f1 - f0)
+        dres = (sweep_res[i] - sweep_res[i - 1]) / (f1 - f0)
+        dwt = (sweep_wt[i] - sweep_wt[i - 1]) / (f1 - f0)
+        print("        factor %-5g → %-5g   ΔQ/Δfactor %.6e   "
+              "Δreservoir/Δfactor %+.6e   ΔWT/Δfactor %s"
+              % (f0, f1, dq, dres, "n/a" if np.isnan(dwt) else "%+.4f" % dwt))
+    # The rain each run offers, against what the drain actually gains: the two
+    # differ because the rising mound throttles the reservoir, so the drain never
+    # gains a full unit of rain per unit of rain applied.
+    offered = sum(f["flux"] * math.hypot(f["coords"][-1][0] - f["coords"][0][0],
+                                         f["coords"][-1][1] - f["coords"][0][1])
+                  for f in sd["seepage_bc"]["specified_fluxes"])
+    i0 = SEEP04_SWEEP_FACTORS.index(0.0)
+    i1 = SEEP04_SWEEP_FACTORS.index(1.0)
+    print("        rain offered at factor 1 is %.6e; the drain gains %.6e of it "
+          "because the reservoir gives up %.6e"
+          % (offered, sweep_q[i1] - sweep_q[i0], sweep_res[i0] - sweep_res[i1]))
+    capture("seep04_rain_sweep.png", _seep04_sweep_figure, sweep)
 
 
 GROUPS = {

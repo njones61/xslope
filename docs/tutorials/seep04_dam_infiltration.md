@@ -20,14 +20,17 @@ falling on it at 1 × 10<sup>−8</sup> m/s, and nothing else changed — one in
 added, the run repeated, the two answers compared. Most of what the page measures
 comes out of that comparison: where the water enters, where it leaves, how far the
 phreatic surface climbs, and the result that the drain passes 75% more water while
-the reservoir supplies a third less.
+the reservoir supplies a third less. A closing sweep of six rain rates then asks
+what the dam does when the weather changes.
 
 [SEEP-2](seep02_johnson_dam.md) built an unconfined dam from nothing and
 [SEEP-1](seep01_sheetpile.md) covers what a seepage analysis computes; this page
 does not repeat either. It starts from a **starter file** that already carries the
 section and the soil, so the build here is only the boundary set — the reservoir,
 the drain, and the rain. (To skip the construction, download the completed file
-below and pick the page back up at [Building the mesh](#building-the-mesh).)
+below and pick the page back up at [Building the mesh](#building-the-mesh). That
+file already carries the rain, so the dry-weather run in between is one to read
+rather than to repeat — running it on the completed file returns the wet answer.)
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -38,8 +41,9 @@ below and pick the page back up at [Building the mesh](#building-the-mesh).)
 **Objectives** — Learn how to model rainfall infiltration: how a vertical rain
 rate becomes the normal flux a boundary takes, how to draw a flux boundary on the
 geometry rather than on mesh nodes, what happens where a flux boundary runs into a
-specified head, and how to read one run against another when a single input is all
-that changed.
+specified head, how to read one run against another when a single input is all
+that changed, and how far a rain rate can be scaled before the soil can no longer
+take what the boundary prescribes.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">steady seepage</span><span class="tg-pill">specified flux</span><span class="tg-pill">infiltration</span><span class="tg-pill">normal flux</span><span class="tg-pill">specified head</span><span class="tg-pill">exit face</span><span class="tg-pill">toe drain</span><span class="tg-pill">van Genuchten</span><span class="tg-pill">phreatic surface</span><span class="tg-pill">water budget</span></p>
 <div class="tgm-model" markdown>
@@ -49,7 +53,10 @@ is the file the build below starts from
 
 **Completed model** — [xslope_dam_infiltration.xlsx](files/xslope_dam_infiltration.xlsx),
 the same model with the reservoir, the drain and the three rain blocks filled in;
-open it to skip the construction and start at [Building the mesh](#building-the-mesh)
+open it to skip the construction and start at [Building the mesh](#building-the-mesh),
+then run it at [Running it again](#running-it-again) — the rain is already in it, so
+the dry-weather run is an account of where the comparison starts, not a step to
+carry out on this file
 </div>
 </div>
 
@@ -108,7 +115,7 @@ Click **Materials**, and on **Table view** set the **Show parameters for:** togg
 to **Seepage** alone. One row, with the seepage band of the `mat` worksheet
 across it:
 
-| mat | name | k1 (m/s) | k2 (m/s) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n |
+| mat | name | k1 | k2 | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n |
 |:---:|---|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
 | 1 | `Dam fill` | 1 × 10<sup>−7</sup> | 1 × 10<sup>−7</sup> | 0 | `vg` | 0 | 0 | 0.2452 | 2.5739 |
 
@@ -174,15 +181,15 @@ node at atmospheric pressure only while water is actually leaving through it, an
 releases any node where the soil has gone unsaturated. That release is what gives
 the solution a free surface to find. Written instead as a specified head of 0, this
 model would have no exit face anywhere, and XSLOPE would solve it as a confined
-problem — saturated everywhere, with the unsaturated behavior this dam is posed to
-show dropped — leaving neither run below a phreatic surface to read. The cost of
+problem: saturated everywhere, with no phreatic surface in either run and none of
+the unsaturated behavior this dam is posed to show. The cost of
 the exit face is that how much of the drain actually runs becomes an output rather
 than something entered, and [the first run](#the-dry-weather-solution) reports it.
 
 Everything not named in the list is **no-flow**: the rock under the dam at
 elevation 0, the base upstream of the drain, and — for now — the whole exposed
 surface above the waterline. Click **OK**, and save the model with
-**File → Save As** under a name of your own.
+**File → Save As…** under a name of your own.
 
 ---
 
@@ -192,14 +199,15 @@ Click **Run → Build Mesh…**
 
 Set **Element type** to **Linear triangles (tri3)**. Head is a scalar field, so
 there is nothing for a linear element to lock up on, and unlike a stability
-analysis a seepage run puts no restriction on element order. The one plan that
-would restrict it: a finite element stability analysis reading its pore pressures
-from this solution runs on this same mesh, and the FEM side requires quadratic
-elements — for that workflow, build the mesh as **Quadratic triangles (tri6)**
+analysis a seepage run puts no restriction on element order. One plan does
+restrict it. A finite element stability analysis reading its pore pressures from
+this solution runs on this same mesh, and the FEM side requires quadratic
+elements, so for that workflow build the mesh as **Quadratic triangles (tri6)**
 from the start. This page stays with seepage, so tri3 serves.
 
 Untick **Auto-size from geometry**, which enables the **Target element size** box
-below it, and type `1.0`. Leave the rest of the dialog alone and click **Build**.
+below it, and confirm that box reads `1.0`. Leave the rest of the dialog alone and
+click **Build**.
 The mesh comes out at **473 nodes and 833 triangles**:
 
 ![The mesh, with the boundary nodes marked on it](images/seep04_mesh.png){width=1000}
@@ -223,11 +231,17 @@ begins is to see where the markers stop.
 
 ## The dry-weather solution
 
+The rain is not in the model yet, so this first run is the dam in dry weather —
+the reference everything after it is read against. (If you downloaded the
+completed file rather than building the boundaries, the rain is already in it:
+read this run's numbers rather than reproducing them, and pick the keyboard back
+up at [Running it again](#running-it-again).)
+
 Click **Run → Run Seep…**
 
 ![The Run Seepage dialog](images/seep04_studio_run_seep.png)
 
-The dialog offers **Convergence tol** and **Max iterations** and nothing else.
+The dialog offers two settings, **Convergence tol** and **Max iterations**.
 Leave both at their defaults, `0.00010000` and `400` — this model closes in well
 under ten sweeps — and click **Run**. There is no run-type selector, because the
 file carries no schedule for a transient run to follow;
@@ -243,7 +257,7 @@ In the **Display** panel, tick **Filled contours**.
 comes from the reservoir: the head boundary is the only place water can enter this
 model. The head ranges from **0 to 10 m**, the two boundary values and nothing
 outside them, and the Log's flow-closure check reports inflow and outflow agreeing
-to the digits it prints. The exit face finishes with
+to six figures. The exit face finishes with
 **all 13 of its nodes draining**, so the drain runs over its whole 12 m rather
 than over part of it.
 
@@ -257,7 +271,7 @@ negative, which on the crest centerline reaches −4.2 m at the crest itself.
 This run is the source problem's own dry-weather case, solved on the same section
 with the same soil, and its discharge of 2.808 × 10<sup>−7</sup> m³/s per m is the
 value
-[the verification page locks for that case](../verification/rocscience_groundwater.md#gw6).
+[the verification page checks that case against](../verification/rocscience_groundwater.md#gw6).
 Nothing about the model changes from here except the rain.
 
 ---
@@ -307,8 +321,8 @@ that fell. A block of length *L* at a uniform *q* puts *qL* into the model, so:
 
 The three blocks together offer 3.2000 × 10<sup>−7</sup> m³/s per m, and the rain
 rate times the 32 m of horizontal ground the dam's surface covers is
-1 × 10<sup>−8</sup> × 32 = 3.2 × 10<sup>−7</sup>. The two agree to seven figures,
-and they agree because of the projection: enter the vertical rate on the sloping
+1 × 10<sup>−8</sup> × 32 = 3.2 × 10<sup>−7</sup>. The two agree exactly, and they
+agree because of the projection: enter the vertical rate on the sloping
 faces instead, and the model takes in 1 × 10<sup>−8</sup> × 35.305 m of boundary
 length = 3.5305 × 10<sup>−7</sup>, 10% more water than fell on it.
 
@@ -329,7 +343,9 @@ selected.
 
 The list now reads `Head 1 (h = 10.0)`, the three flux blocks with their rates,
 and `Exit face`. Flux 1 is selected in the shot, so the **Flux value:** box shows
-its rate and the points table below shows (20, 10) and (24, 12); the preview draws
+its rate — as `8.94427e-09`, the box's own shortened display of the
+`8.94427191e-09` that was entered — and the points table below shows (20, 10) and
+(24, 12); the preview draws
 the selected boundary bold, in orange, over that stretch of the upstream face, and
 dims the others.
 
@@ -432,67 +448,111 @@ The three inflow rows close on the outflow: 1.800 + 3.2000 − 0.0844 =
 partly replaces the reservoir rather than adding to it. The mechanism is the
 gradient: water moves from the reservoir toward the drain because the head falls
 between them, and the rate it moves at is set by how steeply. Rain landing on the
-dam's surface raises the head inside the dam, which is the downstream end of that
-drop. Raising it flattens the gradient the reservoir is working against, and less
+dam's surface raises the head in the soil between them while the reservoir stays
+at 10 m, so what the reservoir has to push against is higher than it was. That
+flattens the gradient across the upstream face, and less
 water crosses the upstream face per second as a result. The drain receives all of
 it either way, which is why the total goes up while one of its two sources goes
 down.
 
 ---
 
-## Reading the change inside the dam
+## Scaling the rain
 
-The source problem's own comparison line is the **crest centerline**, the vertical
-line at x = 26 m, read as pressure head ψ = *h* − *y* against elevation: positive
-below the phreatic surface, zero on it, negative in the unsaturated soil above.
+The rain on this page is one weather event: 1 × 10<sup>−8</sup> m/s, falling
+steadily. Design questions arrive as a range instead — a wetter season, a heavier
+storm, the same dam in a different climate — and what settles the dam's answer is
+not the rain rate on its own but the rain rate against the soil's ability to carry
+it away. That ratio is **q/k**, the rain rate over the saturated conductivity.
+Here q = 1 × 10<sup>−8</sup> m/s and k = 1 × 10<sup>−7</sup> m/s, so
+**q/k = 0.1**: the soil can pass ten times the water landing on it.
 
-![Pressure head on the crest centerline, dry against wet](images/seep04_profiles.png){width=600}
+### Run it at twice the rain
 
-| elevation (m) | ψ dry (m) | ψ with rain (m) | change (m) |
-|---:|---:|---:|---:|
-| 0.05 (base) | 7.20 | 7.88 | +0.68 |
-| 2 | 5.28 | 5.97 | +0.69 |
-| 4 | 3.35 | 4.07 | +0.71 |
-| 6 | 1.47 | 2.23 | +0.76 |
-| 8 | −0.39 | +0.44 | +0.82 |
-| 10 | −2.25 | −1.30 | +0.95 |
-| 12 (crest) | −4.18 | −2.81 | +1.37 |
+Click **Seep BC** in the Inputs dock and double all three flux values:
 
-Both profiles are close to straight lines, which is what a nearly vertical
-hydraulic gradient through a uniform soil gives. The rain moves the whole line to
-the right — the soil is wetter at every elevation — but not by a constant amount:
-**+0.68 m at the base, widening to +1.37 m at the crest**, twice as much. The
-widening is the unsaturated zone taking the rain. Below the water table the soil is
-already full and can only pass water along; above it there is capacity, and the
-deeper the suction the more the rain relieves it.
+| block | at q/k = 0.1 | at q/k = 0.2 |
+|---|---|---|
+| Flux 1 — upstream face | `8.94427191e-09` | `1.788854382e-08` |
+| Flux 2 — crest | `1e-08` | `2e-08` |
+| Flux 3 — downstream face | `8.94427191e-09` | `1.788854382e-08` |
 
-The ψ = 0 crossing marked on the figure is the phreatic surface on this line, and
-it moves from **elevation 7.6 dry to elevation 8.5 under rain**. At elevation 8 the
-sign flips with it: that point is 0.39 m into suction in dry weather and 0.44 m
-into positive pressure under rain. The crest node itself is still 2.81 m into
-suction under rain, so the dam does not saturate to its surface — the soil takes
-the rain at the rate it falls.
+The three scale together because they are one vertical rain rate resolved onto
+three slopes: the faces stay at 2/√5 of the crest at every rate, which is what
+keeps the set standing for rain falling straight down. Click **OK**, then
+**Run → Run Seep…** and **Run**. (Work on a copy, or set the three values back
+afterwards.)
 
-Across the whole section the same story, station by station along the phreatic
-surface:
+The discharge comes out at **6.949 × 10<sup>−7</sup> m³/s per m**, against
+4.916 × 10<sup>−7</sup> at the rain the file carries, and the phreatic surface on
+the crest centerline stands at **9.55 m**, up from 8.49 m. Doubling the rain
+bought the dam another meter of saturated height.
 
-| station x (m) | 24 | 26 | 28 | 32 | 36 | 40 |
-|---|---:|---:|---:|---:|---:|---:|
-| dry weather | 8.20 | 7.58 | 6.95 | 5.56 | 3.81 | 0.94 |
-| with infiltration | 8.94 | 8.50 | 8.00 | 6.76 | 4.99 | 1.81 |
-| **rise (m)** | **+0.74** | **+0.91** | **+1.04** | **+1.20** | **+1.18** | **+0.87** |
+### Six rates on one section
 
-The largest rise is not under the crest but **downstream of it, +1.20 m at
-x = 32**, out on the downstream face. That is where the rain has the furthest to
-travel before it reaches the drain and the least head driving it there, so the
-water it adds banks up more than it does anywhere else on the
-section. Averaged over every node, the interior head rise is **+0.54 m**, and its
-maximum anywhere is **+1.63 m at (28, 12)** — the downstream crest shoulder, where
-the crest block and the long downstream block meet.
+Sweeping that experiment from dry weather to four times the file's rain draws the
+whole family on one section:
 
-Both phreatic surfaces still land on the base at x = 40, the head of the drain.
-Under this rain the drain is still what stops the free surface daylighting on the
-downstream face.
+![The phreatic surface at six rain rates, dry to four times the file's rain](images/seep04_rain_sweep.png){width=1000}
+
+| q/k | q (m/s) | discharge Q (m³/s per m) | water table at x = 26 (m) |
+|---:|---|---|---|
+| 0 | 0 | 2.808 × 10<sup>−7</sup> | 7.58 |
+| 0.025 | 2.5 × 10<sup>−9</sup> | 3.340 × 10<sup>−7</sup> | 7.80 |
+| 0.05 | 5 × 10<sup>−9</sup> | 3.869 × 10<sup>−7</sup> | 8.03 |
+| 0.1 | 1 × 10<sup>−8</sup> | 4.916 × 10<sup>−7</sup> | 8.49 |
+| 0.2 | 2 × 10<sup>−8</sup> | 6.949 × 10<sup>−7</sup> | 9.55 |
+| 0.4 | 4 × 10<sup>−8</sup> | 1.246 × 10<sup>−6</sup> | none — saturated to the surface |
+
+All six runs are on the mesh this page has been using, all six converge in the
+same eight sweeps, and all thirteen drain nodes drain in every one of them, so
+nothing below is the drain switching on or off.
+
+**The water table rises faster than the rain does.** Each 0.1 of q/k added lifts
+the centerline water table 0.88 m at the bottom of the range and 1.05 m at the
+top, 19% more per unit of rain. Going from dry weather to the rain the file
+carries lifts the surface 0.91 m; doubling that rain lifts it another 1.05 m. The
+rise per unit of rain climbs steadily across all four intervals of the sweep. Why
+it accelerates is not something these six runs settle.
+
+**The discharge does not.** Q is close to linear in the rain: each 0.1 of q/k adds
+about 2.1 × 10<sup>−7</sup> to it. What drift there is runs the other way, from
+2.129 × 10<sup>−7</sup> over the first step of the sweep to 2.034 × 10<sup>−7</sup>
+over the last, 4.5% less per unit of rain. That fall is the reservoir backing off,
+the same effect the water budget above measures at one rate. The mound the rain
+builds inside the dam stands higher at every rate, so the reservoir supplies
+2.808 × 10<sup>−7</sup> in dry weather, 1.800 × 10<sup>−7</sup> at q/k = 0.1 and
+only 7.18 × 10<sup>−8</sup> at q/k = 0.2. By q/k = 0.4 its reaction has changed
+sign: the dam is pushing water back out into the reservoir.
+
+**Above q/k ≈ 0.26 the model stops being an answer.** A specified flux prescribes
+the rate water crosses the boundary whatever the head does, and soil that cannot
+conduct that much water away has no way to refuse it. The pressure at the boundary
+simply rises until it is positive — which in the field means the surface ponds and
+the boundary becomes a specified head, a switch this model does not make. Bisected on
+this mesh, q/k = 0.26 still comes out clean; at 0.27 one boundary node finishes
+with positive pore pressure, at 0.30 eight of them, and at 0.40 twenty-three, the
+worst at 14.11 kPa — about 1.4 m of pressure head on a surface that should carry
+none. That top rate has no phreatic surface anywhere in the dam: from x = 20.5 to
+x = 40 the section is saturated to its own surface, which is why the figure draws
+that case dashed and lying on the dam's own profile rather than inside it. The downstream
+face floods before the crest does — at q/k = 0.3 the soil just under the surface
+at x = 36 is already at positive pressure while the crest centerline is still
+about 0.75 m into suction.
+
+XSLOPE does not let that pass quietly. The run comes back with a warning:
+
+> 23 specified-flux node(s) finished with positive pore pressure (max u = 14.11):
+> the specified inflow exceeds what the soil can accept there, so in reality the
+> surface would pond and the boundary would become a specified head. **This
+> solution is suspect.**
+
+A specified flux is a promise about water that the soil may not be able to keep.
+Below this dam's ceiling it is the right boundary for rain, and the five rates up
+to q/k = 0.2 all return real solutions. Above it, the boundary insists on putting
+in more water than the section can carry away, and what comes back is a number
+rather than a solution. Check q/k before trusting a rain boundary, and read what the solver
+says about the run.
 
 ---
 
@@ -500,7 +560,7 @@ downstream face.
 
 The rain on this model runs from the waterline (20, 10) to the toe (52, 0), the
 full extent of the exposed surface, because that is the extent of the surface the
-rain falls on. The vendor model this problem is verified against arrives at a
+rain falls on. The model this case is verified against arrives at a
 different extent, by applying its rain to **selected element edges on its own
 mesh**: the selection starts one edge above the waterline at
 (22, 11) and stops one edge above the toe at (50, 1). Two meters of horizontal
@@ -510,22 +570,26 @@ footprint at each end therefore carry no rain: 28 m against this page's 32 m, an
 against 4.737 × 10<sup>−7</sup>, +3.8%** — with the section, the soil, the rates
 and the drain identical between the two.
 [The verification case](../verification/rocscience_groundwater.md#gw6) transcribes
-the vendor's extents exactly, because they are part of the model it checks against.
+those extents exactly, because they are part of the model it checks against.
 
 An extent picked off mesh nodes has two problems, and the 2 m gaps are the smaller
 of them. Those gaps at least stay put: they are in the extent rather than in the
 discretization, so refining the mesh never fills them in — the surface simply goes
 on receiving no rain, at any element size. The larger problem is that the extent is
-only correct on the mesh it was picked on. Put the vendor's extents on this page's
-mesh — which has no node at (22, 11) or at (50, 1) — and the boundary assembles
-**96% of the rain it was given**, because the part-edge at each end has only one
-corner on the polyline and is dropped whole. Drawn corner to corner on the section
-instead, the same boundary delivers its stated rain at any element size, so the
-mesh can be refined without changing how much water the model takes in. XSLOPE
-does warn when a flux
-boundary's matched length falls more than one element short of the length it was
-given, so a boundary that has quietly lost an edge is reported rather than silently
-solved.
+only correct on the mesh it was picked on. Put the source problem's extents on this
+page's mesh — which has no node at (22, 11) or at (50, 1) — and the boundary
+assembles **96% of the rain it was given**, because the part-edge at each end has
+only one corner on the polyline and is dropped whole. Drawn corner to corner on the
+section instead, the same boundary delivers its stated rain at any element size, so
+the mesh can be refined without changing how much water the model takes in.
+
+Nothing warns about the missing 4%. XSLOPE does compare each flux block's matched
+length against the length it was given, but it only speaks up when the shortfall
+exceeds one of that block's own elements, and the part-edge dropped at each end
+here is shorter than that. All three blocks pass the check, the model solves on 96%
+of its rain, and the run reports nothing out of the ordinary. That is the reason to
+draw a flux boundary on the geometry: the loss it saves you from is one that would
+not be reported.
 
 ---
 
@@ -544,7 +608,10 @@ This tutorial covered:
 - A drain written as an exit face rather than as a head of zero, so the solution
   keeps a free surface to find.
 - Reading one run against another: the discharge up 75%, the reservoir's share
-  down 36%, and the phreatic surface up 0.7 to 1.2 m.
+  down 36%, and the water table under the crest up from 7.58 to 8.49 m.
+- Scaling the rain by q/k: a water table that rises faster than the rain, a
+  discharge that does not, and the rate above which the soil cannot take what the
+  boundary prescribes and the run stops being an answer.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Seepage Analysis](../seep/overview.md#specified-flux-boundary-conditions-neumann)

@@ -237,7 +237,11 @@ the heel and up the submerged part of the upstream face:
 
 The upper end is the point where the reservoir surface meets the slope. Every
 node on that polyline is under 18 m of water or at its surface, so holding the
-total head at 18 along it is exact.
+total head at 18 along it is exact. The **Type:** list also offers `reservoir` —
+the submerged-only kind built for a moving pool, which this boundary will be
+switched to when the drawdown is added. On a standing pool with the polyline
+fully submerged the two behave identically, so the steady build keeps the plain
+`head`.
 
 **Head 2 — the tailwater.** Press **Add head** again, set
 **Head value (m):** to `2`, and enter the two points that carry the downstream

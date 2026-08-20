@@ -36,15 +36,10 @@ download the completed file below and pick the page back up at
 <div class="tgt-tile"><span class="tg-label">Build &amp; explore</span><p>~40 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build a zoned earth dam from three stacked profile lines and
-give it the boundary set an unconfined problem needs, solve the flow through it
-and read the phreatic surface it produces, see what the seepage face on the downstream slope
-does and make it do more, measure how much of the discharge travels above the
-phreatic surface and how much passes under the core, scale the flow net to each
-of the three zones in turn and find the one that reads, run all three unsaturated
-conductivity models against each other and explain the difference between them,
-and watch the iteration fail and then succeed on a curve steep enough to make it
-struggle.
+**Objectives** — Learn how to model unconfined seepage: how to give a zoned dam
+the boundary set the problem needs, how the phreatic surface and the seepage
+face are found, what the three unsaturated conductivity models are each worth,
+and how to scale a flow net on a zoned section.
 </div>
 <p><span class="tg-pill">three materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">unconfined flow</span><span class="tg-pill">seepage face</span><span class="tg-pill">phreatic surface</span><span class="tg-pill">unsaturated models</span><span class="tg-pill">relative conductivity</span><span class="tg-pill">flow net base material</span><span class="tg-pill">convergence</span><span class="tg-pill">underseepage</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx), the same model as [Seepage Sample Problem 5](../seep/samples.md#johnson-reservoir); open it to skip the construction and start at [Building the mesh](#building-the-mesh)</div>

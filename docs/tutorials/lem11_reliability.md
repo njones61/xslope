@@ -41,11 +41,10 @@ it.**
 <div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~15 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Read the standard-deviation columns a reliability analysis runs
-on, estimate the reliability index and probability of failure two ways — the
-Taylor series over 1 + 2N searches and a 10,000-realization Monte Carlo campaign
-— on one model and one surface, measure which of the two uncertainties actually
-drives the answer, and halve it.
+**Objectives** — Learn how to run a reliability analysis: what the
+standard-deviation columns mean, how to estimate the reliability index and
+probability of failure by the Taylor series and by Monte Carlo, and how to find
+which uncertainty drives the answer.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">undrained strength</span><span class="tg-pill">distributed load</span><span class="tg-pill">standard deviations</span><span class="tg-pill">Taylor series (TSPM)</span><span class="tg-pill">Monte Carlo</span><span class="tg-pill">variance Pareto</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_reliability.xlsx](../lem/files/xslope_reliability.xlsx) — essentially the same problem as [LEM Sample Problem 15](../lem/samples.md#15-reliability-analysis-submerged-slope), with the standing water entered as a piezometric line instead of hand-typed surface loads</div>

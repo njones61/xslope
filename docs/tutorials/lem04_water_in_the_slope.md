@@ -21,11 +21,10 @@ off and 1.301 with them on.**
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build a layered section whose materials read their pore
-pressure from a piezometric line, search it for the critical circle, and hold
-that circle while the water assumptions change around it: the line and the u it
-produces on every slice base, the two unit-weight columns and the weight they
-split, and the r<sub>u</sub> alternative.
+**Objectives** — Learn how to put water in a slope model: how to define a
+piezometric line and the pore pressure it produces on every slice base, what the
+two unit-weight columns do, and when the r<sub>u</sub> alternative is worth
+using.
 </div>
 <p><span class="tg-pill">three materials</span><span class="tg-pill">piezometric line</span><span class="tg-pill">effective stress</span><span class="tg-pill">saturated unit weight</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_method_slices_problem.xlsx](../lem/files/xslope_method_slices_problem.xlsx) — the same file used by [LEM Sample Problem 5](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)</div>

@@ -19,11 +19,10 @@ input, and it is the one that decides the answer.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Load an existing model four ways — spread over an area, gathered
-onto a point, pushed perpendicular to the ground or straight down, and shaken —
-read what each does to the factor of safety and to the critical surface, then run
-the sweep that says what strength would carry the load at a target factor of
-safety.
+**Objectives** — Learn how to apply loads to a slope model: how to enter
+distributed and line loads and set their direction, what a seismic coefficient
+does, how each load moves the factor of safety and the critical surface, and how
+to sweep strength against a target factor of safety.
 </div>
 <p><span class="tg-pill">distributed loads</span><span class="tg-pill">line loads</span><span class="tg-pill">load direction</span><span class="tg-pill">seismic coefficient</span><span class="tg-pill">design mode</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_crest_surcharge.xlsx](../lem/files/xslope_crest_surcharge.xlsx) — LEM-1's embankment with the surcharge added</div>

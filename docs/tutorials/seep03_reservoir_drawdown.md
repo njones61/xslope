@@ -39,10 +39,10 @@ completed file below and pick the page back up at
 <div class="tgt-tile"><span class="tg-label">Build &amp; explore</span><p>~30 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Give a two-zone dam the storage properties and boundary set a
-drawdown problem needs, solve the full-pool steady state the march starts from,
-drive the reservoir boundary from a falling-pool time series, and read the
-transient solution — frames, a head history, and the mass balance.
+**Objectives** — Learn how to model transient seepage: what storage properties
+the materials need, how to define time-varying boundary conditions with a time
+series, how to run a transient simulation, and how to read the results — frames,
+head histories, and the mass balance.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">transient seepage</span><span class="tg-pill">specific storage</span><span class="tg-pill">specific yield</span><span class="tg-pill">time series</span><span class="tg-pill">reservoir boundary</span><span class="tg-pill">initial condition</span><span class="tg-pill">saved frames</span><span class="tg-pill">head history</span><span class="tg-pill">mass balance</span></p>
 <div class="tgm-model" markdown>

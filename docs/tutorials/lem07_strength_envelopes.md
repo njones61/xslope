@@ -21,12 +21,10 @@ firmly as the geometry does.**
 <div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~15 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Open a completed model carrying a non-linear strength
-envelope, run it, and then swap the strength option for the linear fit of the
-same data and watch the factor of safety and the critical surface both change
-(Part A); and read a strength that varies with elevation, replace it with a
-constant, and measure what the search does when depth no longer buys strength
-(Part B).
+**Objectives** — Learn how to use strength options beyond Mohr-Coulomb: how to
+enter a non-linear envelope and a strength that varies with elevation, and how
+to measure what each choice does to the factor of safety and the critical
+surface against its linear or constant stand-in.
 </div>
 <p><span class="tg-pill">power-curve envelope</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">strength with depth</span><span class="tg-pill">undrained strength</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed models** — [xslope_baker_clay.xlsx](../lem/files/xslope_baker_clay.xlsx), the compacted-clay slope of [verification problem VP44](../verification/rocscience.md#vp44) carrying its power-curve envelope, and [xslope_low_clay.xlsx](../lem/files/xslope_low_clay.xlsx), the layered undrained slope of [verification problem VP23](../verification/rocscience.md#vp23) carrying its depth-varying strength</div>

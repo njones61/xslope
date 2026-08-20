@@ -23,12 +23,10 @@ S. G. Wright's educational version of UTEXAS.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Enter soil reinforcement as lines carrying a tensile capacity,
-with the pullout length that develops it and the support type that sets how its
-force acts; search the reinforced section for its critical circle; and read the
-result against the same slope with the lines taken out, against the force each
-crossing actually mobilizes, and against the one layer the critical surface
-never touches.
+**Objectives** — Learn how to model soil reinforcement: how to enter geogrid
+layers with their tensile capacity and pullout lengths, how a support type sets
+the way each force acts, and how to read what the layers are worth against the
+unreinforced slope and the force each crossing actually mobilizes.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">distributed load</span><span class="tg-pill">reinforcement lines</span><span class="tg-pill">capacity envelope</span><span class="tg-pill">pullout length</span><span class="tg-pill">support types</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_reinforce.xlsx](../lem/files/xslope_reinforce.xlsx) — the same file used by [LEM Sample Problem 9](../lem/samples.md#9-reinforced-slope)</div>

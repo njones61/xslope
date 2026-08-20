@@ -20,11 +20,9 @@ model has to be built so the search can ask about both sides of it.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build a section with two material zones, put a profile line on
-the boundary between them and a starting circle at the base of each, and read the
-search result at depth: which layer the critical surface runs in, why it stops
-where it does, and what would have to change for the deeper circle to be the
-answer.
+**Objectives** — Learn how to model a layered slope: how to carve a section into
+zones with stacked profile lines, where starting circles belong when each layer
+could fail, and how to read which layer the critical surface runs in and why.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">per-layer starting circles</span><span class="tg-pill">generated circles</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_simple_mult_layers.xlsx](../lem/files/xslope_simple_mult_layers.xlsx) — the same file used by [LEM Sample Problem 3](../lem/samples.md#3-simple-slope-with-multiple-layers)</div>

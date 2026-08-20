@@ -23,12 +23,10 @@ reproduces that row's locked values.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Enter discrete grouted anchors as reinforcement lines with the
-**Anchor** support-type preset, a bond length only at the embedded end and a
-capacity reduced to a per-foot-of-wall force; search the wall for its critical
-wedge; solve the wedge a reference manual specifies; and read the result against
-the same wall with the anchors taken out and against the two ways an anchor force
-can be applied.
+**Objectives** — Learn how to model a tieback wall: how to enter grouted anchors
+with the Anchor preset and per-foot-of-wall capacities, how to search for the
+critical wedge and solve a specified one, and how to read what the anchors are
+worth and the two ways their force can be applied.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">reinforcement lines</span><span class="tg-pill">support types</span><span class="tg-pill">anchors</span><span class="tg-pill">piles</span><span class="tg-pill">non-circular search</span><span class="tg-pill">active vs passive</span></p>
 <div class="tgm-model" markdown>**Completed model** — [vp049.xlsx](../verification/files/rocscience/vp049.xlsx) — the same file used by [verification problem VP49](../verification/rocscience.md#vp49)</div>

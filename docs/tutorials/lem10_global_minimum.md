@@ -20,11 +20,9 @@ answer.**
 <div class="tgt-tile"><span class="tg-label">Open & run</span><p>~10 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Open a completed model and search it from the circle the
-file carries, then move the seed and get a different answer; use a minimum
-slip depth to reject surficial slivers (Part A); and on the James Bay dyke,
-watch a single plausible seed miss the global minimum that grid seeding finds
-with no seeds at all (Part B).
+**Objectives** — Learn how to find the global minimum rather than a local one:
+how the seed circle steers what a search finds, how a minimum slip depth rejects
+surficial slivers, and when grid seeding beats any hand-placed seed.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">grid seeding</span><span class="tg-pill">minimum slip depth</span></p>
 <div class="tgm-model" markdown>**Completed models** — [xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) (the same file used by [LEM Sample Problem 13](../lem/samples.md#13-multiple-local-minima)) and, for Part B, [xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the James Bay dyke of [verification problem VP75](../verification/rocscience.md#vp75), with a single mid-depth starting circle</div>

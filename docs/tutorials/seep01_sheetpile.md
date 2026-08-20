@@ -30,11 +30,10 @@ by counting lines.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>25–30 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build a seepage model from scratch and assign its boundary
-conditions, mesh it and choose an element type, solve it for the discharge under
-the wall, set the flow net up so it can be read and read it, measure how much of
-the answer is mesh rather than physics, refine the mesh at the sheetpile toe where
-the flow turns, and sweep the hydraulic conductivity to see what it is worth.
+**Objectives** — Learn how to build and run a seepage model: how to assign
+boundary conditions, how to mesh a section and choose an element type, how to
+read a flow net and the discharge it carries, and how to measure whether the
+mesh or the physics is setting the answer.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">confined flow</span><span class="tg-pill">specified head</span><span class="tg-pill">no-flow boundaries</span><span class="tg-pill">mesh generation</span><span class="tg-pill">element types</span><span class="tg-pill">flow net</span><span class="tg-pill">feature refinement</span><span class="tg-pill">parametric study</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_clay_blanket.xlsx](../seep/files/xslope_clay_blanket.xlsx), the same file used by [Seepage Sample Problem 1](../seep/samples.md#1-sheetpile-with-clay-blanket)</div>

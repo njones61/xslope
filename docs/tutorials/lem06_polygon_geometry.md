@@ -20,11 +20,9 @@ one per material zone, and the base of the model is whatever the polygons draw.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Enter a section as material-zone polygons rather than profile
-lines, on a base that dips too much for a maximum depth to describe; search it
-for the critical circle; and read what the base does to that search — the
-circles it refuses, the option that lets a circle be truncated against it
-instead, and the change in soil that puts the critical surface on it.
+**Objectives** — Learn how to enter geometry as material-zone polygons: when
+polygons beat profile lines, how a dipping base constrains the circular search,
+and how to let circles truncate against the base instead of being refused by it.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">polygons</span><span class="tg-pill">dipping base</span><span class="tg-pill">composite surfaces</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_sloping_bottom.xlsx](../lem/files/xslope_sloping_bottom.xlsx) — the same file used by [LEM Sample Problem 11](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)</div>

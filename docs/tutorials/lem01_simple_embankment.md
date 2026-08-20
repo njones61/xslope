@@ -18,9 +18,10 @@ friction angle — a **total-stress undrained** strength.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>25–30 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build the embankment from scratch — the smallest complete XSLOPE
-model — find its critical circular failure surface with Spencer's method, and read
-the results carefully enough to catch what the first model gets wrong.
+**Objectives** — Learn how to build and run a slope stability model: how to
+enter a section as profile lines with a material, how to search for the critical
+circular surface, and how to read the result closely enough to catch what a
+first model gets wrong.
 </div>
 <p><span class="tg-pill">profile lines</span><span class="tg-pill">one material</span><span class="tg-pill">Mohr-Coulomb</span><span class="tg-pill">starting circles</span><span class="tg-pill">circular search</span><span class="tg-pill">tension crack</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx) — the same file used by [LEM Sample Problem 1](../lem/samples.md#1-simple-embankment)</div>

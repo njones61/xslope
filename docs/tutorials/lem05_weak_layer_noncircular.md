@@ -20,11 +20,10 @@ flat along a seam — so the failure surface is entered as a list of points.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build a four-layer section with a weak seam and a water table,
-enter its failure surface as a table of vertices rather than a circle, and search
-it: read where the search moved each vertex and why, which methods support a
-non-circular surface at all, how steep an end ramp a search will start from, and
-how deep in the seam the track belongs.
+**Objectives** — Learn how to model failure along a weak layer: how to enter a
+non-circular surface as a table of vertices, which methods support one, and how
+to read what the search did to each vertex and where the track belongs in the
+seam.
 </div>
 <p><span class="tg-pill">four materials</span><span class="tg-pill">piezometric line</span><span class="tg-pill">non-circular surface</span><span class="tg-pill">non-circular search</span><span class="tg-pill">Movement options</span><span class="tg-pill">weak-zone generator</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_noncircular.xlsx](../lem/files/xslope_noncircular.xlsx) — the same file used by [LEM Sample Problem 7](../lem/samples.md#7-non-circular-failure-surface)</div>

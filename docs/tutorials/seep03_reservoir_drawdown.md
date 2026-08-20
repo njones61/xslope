@@ -63,21 +63,17 @@ the construction and start at [Building the mesh](#building-the-mesh)
 ![The dam, its two zones, and the properties that make them behave differently](images/seep03_problem_sketch.png){width=1000}
 
 The dam is 110 m long and 22 m tall at the crest, sitting on rock at
-elevation 0, with both faces sloping at about 2.3:1.
-
-Inside the embankment is a clay **core**, a low-conductivity zone whose job is to
-carry the head drop so the shell does not have to. It runs the full height of the
-section, from the rock up to 4 m below the crest, about 17 m wide at its base and
-8 m wide at its top. The rest of the section is the granular **shell**.
-
-The specific coordinates that define the geometric inputs to this problem are
-shown here:
+elevation 0, with both faces sloping at about 2.3:1. Inside the embankment is a
+clay **core**, a low-conductivity zone whose job is to carry the head drop so
+the shell does not have to: it runs the full height of the section, from the
+rock up to 4 m below the crest, about 17 m wide at its base and 8 m wide at its
+top, and the rest of the section is the granular **shell**. The reservoir
+stands at elevation 18 — 18 m of water against the upstream face and 4 m of
+freeboard below the crest — and the tailwater stands at elevation 2 at the
+downstream toe. The specific coordinates that define the geometric inputs to
+this problem are shown here:
 
 ![The vertex coordinates of the section](../seep/images/earth_dam1_pts.png){width=650}
-
-The reservoir stands at elevation 18, which is 18 m of water against the
-upstream face and 4 m of freeboard below the crest. The tailwater stands at
-elevation 2 at the downstream toe.
 
 The history the reservoir follows is the whole of what makes this problem
 transient. The pool is held at elevation 18 for 2 days, drawn down 16 m to the

@@ -863,6 +863,11 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     y = nodes[:, 1]
     f_ext = (np.zeros(n_nodes) if flux_nodal is None
              else np.asarray(flux_nodal, dtype=float))
+    # Water OFFERED at each node by its boundary condition: the threshold the
+    # exit-face switch measures an apparent inflow against (see the switch below).
+    # Zero wherever no inflow is prescribed, which is every node of a model with no
+    # flux BC, so the switch is then the strict-sign rule bit-for-bit.
+    q_offered = np.maximum(f_ext, 0.0)
 
     # Initialize heads
     fixed_heads = bc_values[bc_type == 1]
@@ -1008,10 +1013,36 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # compare the applied load against ITSELF, read "inflow" for any q > 0, and
         # pin the node out of the seepage face forever, however high its pressure
         # climbed. Subtracting f_eff restores the residual the term is meant to test.
+        #
+        # THE THRESHOLD IS THE WATER OFFERED AT THE NODE, NOT ZERO. Subtracting f_eff
+        # is necessary but not sufficient: on a converged free row the residual it
+        # leaves is identically zero, so at a flux-loaded exit candidate the SIGN of q
+        # is round-off. Measured on the dam-infiltration model at the rate where its
+        # surface first ponds: q = +2.4e-22 against a nodal rain load of +2.2e-08 (a
+        # ratio of 1e-14) at a node standing at psi = +0.055 m, which therefore never
+        # joined the seepage face; a rate higher still and that noise changes sign from
+        # sweep to sweep and the active set cycles instead of converging.
+        #
+        # So the tests compare q against `q_offered` = max(f_ext, 0), which states one
+        # physical thing in both directions of the switch: THE BOUNDARY MAY NOT SUPPLY
+        # MORE WATER THAN IS PRESCRIBED THERE. A node held at psi = 0 that takes in no
+        # more than the rain falling on it is infiltrating that rain and shedding the
+        # rest as runoff — precisely what an active exit node over a flux boundary
+        # means. Only a reaction ABOVE the offered flux is water the boundary invented,
+        # and only that may veto activation or shed an active node. The threshold is
+        # thus scaled by the node's own assembled load, in the model's own flow units,
+        # as `hyst` is scaled by the domain height and `eps` by height x tol; nothing
+        # here is a fixed number.
+        #
+        # Both sides use the SAME threshold, and that symmetry is what keeps the set
+        # from chattering: a node that activates on a near-zero residual cannot then be
+        # shed by a reaction the rain it already carries accounts for. And it is f_ext,
+        # not f_eff: the offered water is a property of the boundary condition, so the
+        # threshold must not move when the node's own row turns Dirichlet.
         corner_candidate = np.zeros(n_nodes, dtype=bool)
         is_corner = (bc_type == 2) & _exit_is_corner
-        stay = is_corner & exit_face_active & ~((h_new < y - hyst) | (q > 0))
-        turn_on = is_corner & ~exit_face_active & (h_new >= y + hyst) & (q <= 0)
+        stay = is_corner & exit_face_active & ~((h_new < y - hyst) | (q > q_offered))
+        turn_on = is_corner & ~exit_face_active & (h_new >= y + hyst) & (q <= q_offered)
         corner_candidate[stay | turn_on] = True
 
         new_exit_face_active = np.zeros(n_nodes, dtype=bool)
@@ -1019,9 +1050,11 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
         for c1, mid, c2 in _exit_quadratic_edges:
             if exit_face_active[mid]:
-                mid_candidate = not (h_new[mid] < y[mid] - hyst or q[mid] > 0)
+                mid_candidate = not (h_new[mid] < y[mid] - hyst
+                                     or q[mid] > q_offered[mid])
             else:
-                mid_candidate = (h_new[mid] >= y[mid] + hyst and q[mid] <= 0)
+                mid_candidate = (h_new[mid] >= y[mid] + hyst
+                                 and q[mid] <= q_offered[mid])
 
             if (c1, mid, c2) in _free_edges:
                 # This edge, and only this edge, is updated per node: it was carrying
@@ -4661,9 +4694,17 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 f_eff = np.where(dir_mask, 0.0, flux)
                 q = _coo_matvec(asm, kd, h_new) - f_eff
                 hyst = 1e-3 * char_h
+                # An apparent inflow is measured against the water OFFERED at the
+                # node, max(flux, 0), not against zero: on a settled free row the
+                # residual left after f_eff is round-off, so a strict sign test hands
+                # a flux-loaded exit candidate to noise. Same threshold on both tests,
+                # same reasoning as the steady switch (see solve_unsaturated); exactly
+                # zero, hence bit-for-bit the strict rule, wherever no inflow is
+                # prescribed.
+                q_offered = np.maximum(flux, 0.0)
                 is_c = (bt == 2) & exit_is_corner
-                stay = is_c & act & ~((h_new < y - hyst) | (q > 0))
-                turn_on = is_c & ~act & (h_new >= y + hyst) & (q <= 0)
+                stay = is_c & act & ~((h_new < y - hyst) | (q > q_offered))
+                turn_on = is_c & ~act & (h_new >= y + hyst) & (q <= q_offered)
                 corner_candidate = np.zeros(n_nodes, dtype=bool)
                 corner_candidate[stay | turn_on] = True
 
@@ -4675,10 +4716,10 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 for _c1, _mid, _c2 in exit_quadratic_edges:
                     if act[_mid]:
                         mid_candidate = not (h_new[_mid] < y[_mid] - hyst
-                                             or q[_mid] > 0)
+                                             or q[_mid] > q_offered[_mid])
                     else:
                         mid_candidate = (h_new[_mid] >= y[_mid] + hyst
-                                         and q[_mid] <= 0)
+                                         and q[_mid] <= q_offered[_mid])
                     mid_cands.append(bool(mid_candidate))
                     if corner_candidate[_c1] and mid_candidate and corner_candidate[_c2]:
                         new_act[_c1] = True

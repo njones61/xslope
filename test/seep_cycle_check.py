@@ -1,5 +1,5 @@
-"""The two limit-cycle escapes in the unconfined seepage solver: what they rescue,
-and what they must leave alone.
+"""The unconfined seepage solver's exit-face active set: the two limit-cycle escapes,
+and the threshold the switch measures an apparent inflow against.
 
 Four corpus models used to run to their iteration ceiling and stop, reporting a flow
 rate off a field that was still moving. Neither was diverging: each had settled into
@@ -21,6 +21,19 @@ a set it has already visited, after sweep 100. The veto is then lifted from the 
 carrying the nodes that moved during the orbit -- 2 edges of 97 exit nodes on
 earth_dam2 -- and from nothing else.
 
+AN EXIT FACE OVER A FLUX BOUNDARY -- the switch's threshold. An exit-face node's
+turn-on test asks whether the boundary would have to push water into the domain, and
+reads that off the reaction ``A.h - f_eff``. On an INACTIVE node the row is free, so
+that reaction is the previous sweep's residual and settles to identically zero -- at a
+node carrying a rain load the sign gating activation is then round-off. Measured on the
+dam-infiltration model at 2.8x its own rain: +2.4e-22 against a nodal load of +2.2e-08,
+at a node standing at psi = +0.055 m which therefore never joined the seepage face.
+The switch instead compares the reaction against ``q_offered = max(f_ext, 0)``, the
+water the boundary offers at that node, on BOTH the turn-on and the turn-off test: a
+node held at psi = 0 taking in no more than the rain falling on it is infiltrating that
+rain and shedding the rest, and only a reaction above the offered flux is water the
+boundary invented.
+
 WHAT THIS CHECK LOCKS
 
 1. The four models converge, to the flow rates below.
@@ -28,6 +41,11 @@ WHAT THIS CHECK LOCKS
    field, flow rate AND SWEEP COUNT are exactly what they were before the escapes
    existed. The sweep counts are in the table below for that reason: a trajectory
    that has been nudged shows up there before it shows up in a flow rate.
+3. The dam under rain sheds it once its surface saturates, and no active exit node
+   draws in more water than its boundary offers. Under a strict ``q <= 0`` the same
+   three rows read: nothing activates at 2.8x (the solve returns the flux-only field
+   and its ponding warning), and at 3x the active set cycles between 13 and 14 of its
+   48 exit nodes to the 2000-sweep ceiling without converging.
 
 MEASURED DURING THE ROUND, NOT LOCKED HERE
 
@@ -110,6 +128,37 @@ INERT = [
 
 #: earth_dam2's exit face settles on 8 of its 97 exit-face nodes.
 EDAM2_ACTIVE = 8
+
+#: The dam-infiltration tutorial model: a rain flux over the whole exposed surface,
+#: draining to a 12 m toe drain that is the file's only exit face.
+INFIL_MODEL = "docs/tutorials/files/xslope_dam_infiltration.xlsx"
+#: The overlay EXTENDS that drain across the exposed surface. ``exit_face`` is a single
+#: polyline, so the drain's own segment has to stay inside it -- replacing it rather
+#: than extending it deletes the drain and halves the discharge, while still converging
+#: and still reporting a full-looking active set.
+INFIL_OVERLAY = [[40.0, 0.0], [52.0, 0.0], [28.0, 12.0], [24.0, 12.0], [20.0, 10.0]]
+#: The page's own discretization and solver settings (tools/make_tutorial_figures.py,
+#: SEEP04_SIZE / SEEP04_ELEMENT / SEEP04_MAX_ITER and ``_seep04_solve``'s tolerance),
+#: so these flow rates are read off the same field its figures are.
+INFIL_SIZE, INFIL_ELEMENT = 1.0, "tri3"
+INFIL_SETTINGS = dict(tol=1e-5, max_iter=2000)
+#: The mesh that discretization gives, and the exposed-surface share of the overlay's
+#: 48 exit nodes (the other 13 are the drain). Pinned because the overlay adds no mesh
+#: vertex the flux blocks had not already pinned: it must not move the mesh.
+INFIL_NODES, INFIL_FACE_NODES = 473, 35
+#: Rain, as a multiple of the file's own rate, against: exposed-face nodes the overlay
+#: activates, the overlay's flow rate, the flux-only flow rate, and whether the
+#: flux-only run raises the ponding warning. 1x is below the rate at which the surface
+#: saturates, so the overlay is a no-op there and has to stay one; 2.8x is the onset,
+#: where one node ponds under the flux BC alone; 3x is past it.
+INFIL_ROWS = [
+    (1.0, 0, 4.915513796099751e-07, 4.915514596217149e-07, False),
+    (2.8, 1, 8.660298496520072e-07, 8.874008969783335e-07, True),
+    (3.0, 3, 8.675023464553751e-07, 9.411714513832222e-07, True),
+]
+#: How closely the 1x overlay has to reproduce the flux-only solve to count as the
+#: no-op it is: the two differ only in the iterate each solve arrives along.
+INFIL_NOOP_RTOL = 1e-5
 #: Relative tolerance on a flow rate. The solve is deterministic — these are the
 #: numbers it gives, not numbers it is near — so this is a rounding allowance.
 Q_RTOL = 1e-6
@@ -238,10 +287,110 @@ def leg_inert():
     return fails
 
 
+def _solve_infiltration(rain_factor, overlay):
+    """The dam-infiltration model at a multiple of its rain, with or without the exit
+    face laid over its exposed surface. Returns (seep_data, solution, warnings)."""
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        model = load_slope_data(os.path.join(_REPO, INFIL_MODEL))
+        bc = dict(model["seepage_bc"])
+        bc["specified_fluxes"] = [dict(f, flux=f["flux"] * rain_factor)
+                                  for f in bc["specified_fluxes"]]
+        if overlay:
+            bc["exit_face"] = [list(p) for p in INFIL_OVERLAY]
+        model = dict(model, seepage_bc=bc)
+        mesh = build_mesh_from_polygons(get_material_polygons(model), INFIL_SIZE,
+                                        INFIL_ELEMENT,
+                                        size_regions=extract_size_regions(model))
+        seep_data = build_seep_data(mesh, model)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            solution = run_seepage_analysis(seep_data, **INFIL_SETTINGS)
+    return seep_data, solution, [str(w.message) for w in caught]
+
+
+def _ponding_warning(messages):
+    return [m for m in messages if "positive pore pressure" in m]
+
+
+def leg_exit_face_over_flux():
+    """Rain the soil can no longer take runs off an exit face laid over it, instead of
+    ponding on a flux boundary that has no way to shed it."""
+    fails = []
+    for factor, face_want, q_overlay, q_flux, warn_flux in INFIL_ROWS:
+        runs = {}
+        for overlay in (False, True):
+            seep_data, sol, msgs = _solve_infiltration(factor, overlay)
+            nodes = seep_data["nodes"]
+            on_exit = seep_data["bc_type"] == 2
+            # An active exit node is held at p = 0; the drain is the exit face the
+            # file itself carries, along the base downstream of x = 40.
+            p = sol["head"] - nodes[:, 1]
+            active = on_exit & (np.abs(p) < 1e-6)
+            drain = on_exit & (nodes[:, 1] <= 1e-9) & (nodes[:, 0] >= 39.9)
+            runs[overlay] = dict(sol=sol, msgs=msgs, nodes=nodes,
+                                 n_face=int(np.sum(on_exit & ~drain)),
+                                 n_face_active=int(np.sum(active & ~drain)),
+                                 # what the boundary supplies at each active node,
+                                 # against the flux it offers there
+                                 excess=float(np.max(
+                                     (sol["q"] - np.maximum(sol["flux_nodal"], 0.0))[active]))
+                                 if np.any(active) else 0.0)
+            if len(nodes) != INFIL_NODES:
+                fails.append(f"rain x{factor:g} {'overlay' if overlay else 'flux only'} "
+                             f"meshed to {len(nodes)} nodes, not {INFIL_NODES}")
+            if not sol["converged"]:
+                fails.append(f"rain x{factor:g} "
+                             f"{'with the overlay' if overlay else 'flux only'} does "
+                             f"not converge")
+
+        ov, fx = runs[True], runs[False]
+        if ov["n_face"] != INFIL_FACE_NODES:
+            fails.append(f"the overlay claims {ov['n_face']} exposed-face exit nodes, "
+                         f"not {INFIL_FACE_NODES}")
+        if ov["n_face_active"] != face_want:
+            fails.append(f"rain x{factor:g}: the overlay activates "
+                         f"{ov['n_face_active']} exposed-face node(s) of "
+                         f"{ov['n_face']}, not {face_want}")
+        for label, run, want in (("overlay", ov, q_overlay), ("flux only", fx, q_flux)):
+            if not _close(float(run["sol"]["flowrate"]), want):
+                fails.append(f"rain x{factor:g} {label} flow rate "
+                             f"{run['sol']['flowrate']:.7g} for {want:.7g}")
+        # A seepage face cannot invent water: at an active node the boundary may
+        # supply at most the flux prescribed there, and the rest of that flux runs off.
+        if ov["excess"] > 0.0:
+            fails.append(f"rain x{factor:g}: an active exit node draws "
+                         f"{ov['excess']:.3e} more than the flux offered there")
+        # The overlay is the model's answer to ponding, so it must not leave the
+        # warning standing; the flux BC alone has no way to shed the water and does.
+        if _ponding_warning(ov["msgs"]):
+            fails.append(f"rain x{factor:g}: the overlay still reports ponding — "
+                         f"{_ponding_warning(ov['msgs'])[0]}")
+        if bool(_ponding_warning(fx["msgs"])) != warn_flux:
+            fails.append(f"rain x{factor:g} flux only: ponding warning "
+                         f"{'absent' if warn_flux else 'raised'}, unexpectedly")
+        if face_want == 0 and abs(ov["sol"]["flowrate"] - fx["sol"]["flowrate"]) > \
+                INFIL_NOOP_RTOL * abs(fx["sol"]["flowrate"]):
+            fails.append(f"rain x{factor:g}: the overlay activates nothing yet moves "
+                         f"the flow rate, {ov['sol']['flowrate']:.7g} against "
+                         f"{fx['sol']['flowrate']:.7g}")
+        print(f"  rain x{factor:<4g} overlay {ov['n_face_active']:>2}/{ov['n_face']} "
+              f"face nodes active  q={ov['sol']['flowrate']:.7g}  "
+              f"(flux only {fx['sol']['flowrate']:.7g}, ponding "
+              f"{'reported' if _ponding_warning(fx['msgs']) else 'none'})")
+    return fails
+
+
 LEGS = [
     ("models rescued from a limit cycle", leg_rescued),
     ("earth_dam2's exit-face set", leg_earth_dam2_set),
     ("models that converge without either escape", leg_inert),
+    ("an exit face over a flux boundary", leg_exit_face_over_flux),
 ]
 
 
@@ -260,8 +409,9 @@ def main():
         for f in failures:
             print(f"  {f}")
         raise SystemExit(1)
-    print("\nPASS: the four cycling models converge to their own answers, and every "
-          "model that converged without the escapes is unchanged sweep for sweep.")
+    print("\nPASS: the four cycling models converge to their own answers, every model "
+          "that converged without the escapes is unchanged sweep for sweep, and the "
+          "dam under rain sheds what it cannot take.")
 
 
 if __name__ == "__main__":

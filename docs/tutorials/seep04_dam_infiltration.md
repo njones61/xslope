@@ -163,7 +163,8 @@ Every node on that line is under water or at its surface, so holding the total
 head at 10 along it is exact.
 
 **Exit face — the toe drain.** Select the **Exit face** entry already waiting in
-the list, and draw it along the base over the 12 m the drain occupies:
+the list, and enter the two points that run it along the base, over the 12 m the
+drain occupies:
 
 | x | y |
 |---:|---:|

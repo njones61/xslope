@@ -12,10 +12,15 @@ This hook does both halves of that at build time:
   package is committed to the repository.
 
 * **The paired link** (``on_page_content``): a link to a sample workbook is
-  rewritten to the pair **Download** · **Open in Studio**. Both come from one
-  string — the package's URL — so they cannot point at different things, and the
-  packaging step above is asked afterwards to prove that every package a page
-  linked was actually built.
+  rewritten to the pair **Download** · **Open in Studio**. Open in Studio always
+  names the package — the deep link unpacks one, and a package holding a lone
+  workbook is a perfectly good package. Download names the package too, *except*
+  when there is nothing beside the workbook to package: a sample whose project is
+  the ``.xlsx`` and nothing else is downloaded as that ``.xlsx``, because a page
+  that tells the reader to open the file in Excel has to hand them a file Excel
+  opens. Either way the package is built and registered, and the packaging step
+  above is asked afterwards to prove that every package a page linked was actually
+  built.
 
 ``Open in Studio`` is ``xslope://open?url=<package URL>``: the OS hands it to
 whatever registered the ``xslope`` scheme (Studio, when installed by an installer),
@@ -66,13 +71,14 @@ RAW_CLASS = "raw-file"
 
 #: Said once per page, next to the first pair.
 NOTE_HTML = (
-    '<p class="xslz-note"><em>Each input file below is linked as a project '
-    'package (<code>.xslz</code>) — the Excel workbook together with the mesh and '
-    'results stored beside it. <strong>Download</strong> saves the package; '
-    '<strong>Open in Studio</strong> opens it in an installed copy of XSLOPE '
-    'Studio, which unpacks it first. Open in Studio needs a Studio installed from '
-    'an installer; a pip install registers no <code>xslope://</code> handler, so '
-    'use Download.</em></p>\n'
+    '<p class="xslz-note"><em>Each input file below is linked twice. '
+    '<strong>Download</strong> saves the sample\'s project package '
+    '(<code>.xslz</code>) — the Excel workbook together with the mesh and results '
+    'stored beside it — or the workbook itself, for a sample that has nothing '
+    'stored beside it. <strong>Open in Studio</strong> opens the package in an '
+    'installed copy of XSLOPE Studio, which unpacks it first. Open in Studio needs '
+    'a Studio installed from an installer; a pip install registers no '
+    '<code>xslope://</code> handler, so use Download.</em></p>\n'
 )
 
 _TAG = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)\b[^>]*?(/?)>")
@@ -143,7 +149,7 @@ def _workbook_href(href):
     return href[: -len(PACKAGE_EXT)] + ".xlsx"
 
 
-def _pair_html(inner, pkg_href, pkg_url):
+def _pair_html(inner, dl_href, pkg_href, pkg_url):
     """The rendered pair: the page's own words, then Download · Open in Studio.
 
     The anchor's text is kept verbatim and stops being a link. It is often the file
@@ -152,16 +158,24 @@ def _pair_html(inner, pkg_href, pkg_url):
     ("$c_u2/c_u1 = 0.8$"). Replacing that text with the word "Download" would make
     those sentences unreadable, so the pair follows the text instead of replacing
     it.
+
+    ``dl_href`` is what Download hands over — the package for a sample that has
+    sidecars, the workbook itself for one that does not — and ``pkg_href`` is always
+    the package, which is what Open in Studio carries. The two are the same string
+    for every sample with something stored beside its workbook; they differ only
+    where a package would have held the workbook alone, and the title says which
+    of the two the reader is about to get.
     """
-    name = posixpath.basename(pkg_href)
+    name = posixpath.basename(dl_href)
+    what = ("the workbook" if dl_href.lower().endswith(".xlsx")
+            else "the workbook and its results in one file")
     scheme_url = build_url(pkg_url)
     return (
-        f'{inner} (<a class="xslz-download" href="{html.escape(pkg_href, quote=True)}" '
-        f'title="Download {html.escape(name, quote=True)} — the workbook and its '
-        f'results in one file">Download</a> · '
+        f'{inner} (<a class="xslz-download" href="{html.escape(dl_href, quote=True)}" '
+        f'title="Download {html.escape(name, quote=True)} — {what}">Download</a> · '
         f'<a class="xslz-studio" href="{html.escape(scheme_url, quote=True)}" '
-        f'title="Open {html.escape(name, quote=True)} in XSLOPE Studio">'
-        f'Open in Studio</a>)'
+        f'title="Open {html.escape(posixpath.basename(pkg_href), quote=True)} in '
+        f'XSLOPE Studio">Open in Studio</a>)'
     )
 
 
@@ -238,6 +252,10 @@ def rewrite_links(page_html, page_url, docs_dir, site_url):
     the hrefs in ``page_html`` are relative to — MkDocs has already rewritten them by
     the time a hook sees the rendered content.
 
+    Every sample paired here is registered as a linked package, whatever its Download
+    link names: Open in Studio carries the package for all of them, and a package the
+    build did not write is a broken link either way.
+
     A link that LOOKS like a sample link and is not rewritten is reported rather than
     passed over. Silence there is the expensive failure: the page keeps a bare ``.xlsx``
     link that nobody notices has stopped being a pair, and the reason is always
@@ -287,7 +305,8 @@ def rewrite_links(page_html, page_url, docs_dir, site_url):
                 f"a query or percent-encoding is not turned into a pair (rename the "
                 f"file, or mark the link {{: .{RAW_CLASS} }})")
             continue
-        if not os.path.isfile(os.path.join(docs_dir, *docs_rel.split("/"))):
+        src = os.path.join(docs_dir, *docs_rel.split("/"))
+        if not os.path.isfile(src):
             warnings.append(
                 f"{href} was left as a bare workbook link: there is no "
                 f"{docs_rel} in the docs tree to package")
@@ -295,10 +314,16 @@ def rewrite_links(page_html, page_url, docs_dir, site_url):
         inner = m.group(0)[len(tag):-len("</a>")]
         pkg_href = _package_href(href)
         pkg_url = urljoin(urljoin(site_url, page_url), pkg_href)
+        # What Download hands over. A package holding the workbook and nothing else
+        # is a package the reader has to unpack to get at the file the page just
+        # told them to open in Excel, so that sample is downloaded as its workbook.
+        # The classification is the packer's own, so a sample that gains a sidecar
+        # goes back to a package Download with nothing to edit here.
+        dl_href = href if len(project_files(src)) == 1 else pkg_href
         out.append(page_html[last:m.start()])
         if first_pair_at is None:
             first_pair_at = sum(len(s) for s in out)
-        out.append(_pair_html(inner, pkg_href, pkg_url))
+        out.append(_pair_html(inner, dl_href, pkg_href, pkg_url))
         last = m.end()
         linked.add(_package_href(docs_rel))
     if first_pair_at is None:

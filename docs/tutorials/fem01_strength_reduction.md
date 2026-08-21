@@ -536,7 +536,11 @@ which already passes it, so Auto lands on **1.0×**, the lowest multiplier it
 will use: this collapse has developed far enough to draw at true scale. That is
 the number the panel prints in its own title. Type a number into **Displ. ×**
 and it overrides that, which is worth doing when two figures have to be compared
-at one exaggeration; leave it on Auto otherwise. The reason Auto exists is on
+at one exaggeration; leave it on Auto otherwise. The box's spin arrows redraw
+the view at every step, and that turns the control into something better than a
+setting: start at Auto and hold the up arrow, and the mesh deforms a step at a
+time — the crest dropping and the toe bulging in what amounts to an animation
+of the slope failing. The reason Auto exists is on
 display in the next section — the same 15% asks for 131× on the converged state,
 because the two states differ by more than a hundredfold in how far the slope
 moved.

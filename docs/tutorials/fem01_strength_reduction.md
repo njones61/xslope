@@ -415,7 +415,7 @@ resolution on the answer and costs one more trial per halving:
 | Tolerance | FS | Final bracket | Trials | Wall time |
 |:---:|:---:|:---:|:---:|:---:|
 | 0.05 | 1.3594 | [1.3438, 1.3750] | 7 | 17 s |
-| 0.0100 (default) | 1.3477 | [1.3438, 1.3516] | 9 | 25 s |
+| 0.01 (default) | 1.3477 | [1.3438, 1.3516] | 9 | 25 s |
 | 0.005 | 1.3457 | [1.3438, 1.3477] | 10 | 28 s |
 
 All three brackets share the same lower edge, **1.3438** — the highest trial

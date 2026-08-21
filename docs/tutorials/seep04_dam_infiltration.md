@@ -231,11 +231,8 @@ Click **Run → Run Seep…**
 
 The dialog offers two settings, **Convergence tol** and **Max iterations**.
 Leave both at their defaults, `0.00010000` and `400` — this model closes in well
-under ten sweeps — and click **Run**. There is no run-type selector, because the
-file carries no schedule for a transient run to follow;
-[SEEP-3](seep03_reservoir_drawdown.md#running-the-transient-march) is where that
-control appears. The **Model checks** panel reads **No problems found for this
-run.**
+under ten sweeps — and click **Run**. The **Model checks** panel reads
+**No problems found for this run.**
 
 In the **Display** panel, tick **Filled contours**.
 

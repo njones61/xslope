@@ -249,10 +249,13 @@ than over part of it.
 The heavy black line is the phreatic surface. It leaves the upstream face at the
 waterline, elevation 10, crosses under the crest at about elevation 7.6, and comes
 down to the base at x = 40, the upstream end of the drain — which is the drain
-doing its job. That is also where the water crosses: the drain's first meter
-passes over half the discharge, the shares fall away tenfold by mid-drain, and
-what little arrives farther along has percolated down through the unsaturated
-soil above. Below and left of that line the soil is saturated and the pressure
+doing its job. From there the zero-pressure line is the drain itself: an active
+exit-face node is held at atmospheric pressure, ψ = 0, and all thirteen stay
+active, so the drain runs at zero pressure head end to end. Water arrives all
+along it, but not evenly — the first meter passes over half the discharge, the
+shares fall away tenfold by mid-drain, and what little lands farther along has
+percolated down through the unsaturated soil that sits above the drain
+downstream of x = 40. Below and left of that line the soil is saturated and the pressure
 head is positive; above it the soil is unsaturated and the pressure head is
 negative, which on the crest centerline reaches −4.2 m at the crest itself.
 

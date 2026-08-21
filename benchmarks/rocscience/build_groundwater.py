@@ -245,8 +245,12 @@ def gw003():
     block 40 x 10 m; head 5 on the ground x 0-8, head 0 on x 20-40, dam base
     x 8-20 impervious (no BC). Targets: head profiles along line 1-1 (y=-4)
     and line 2-2 (x=20) from Fig 3.5/3.6 - xslope within 0.08 m of the
-    chart (Slide's markers coincide with Rushton & Redshaw's)."""
-    sd = _base_sd(time_unit='sec')
+    chart (Slide's markers coincide with Rushton & Redshaw's).
+
+    k = 1e-7 m/s, the vendor model's own SK (#003.slw). The problem is confined
+    and homogeneous, so the published head-profile targets are k-independent;
+    only the self-locked flowrate scales with it."""
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     from shapely.geometry import Polygon
     sd['profile_lines'] = []
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(

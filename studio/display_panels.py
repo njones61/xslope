@@ -562,8 +562,10 @@ class FemResultsDisplayPanel(QWidget):
             self.plot_type.addItem(label, key)
 
         self.deform_percent = _ispin(0, 100, 15, suffix=" %")
-        self.deform_percent.setToolTip("Deformed-shape exaggeration as a percent "
-                                       "of slope height (used when Displ. x is Auto).")
+        self.deform_percent.setToolTip("The size Auto aims for: the largest "
+                                       "displacement draws at this percent of the "
+                                       "mesh height. Ignored while Scale x holds "
+                                       "an explicit value.")
 
         # Deformation-plot-only controls (the Variant E look): the original-mesh
         # reference as a tri-state (dashed outline / full grid / off, default outline),
@@ -583,8 +585,9 @@ class FemResultsDisplayPanel(QWidget):
         self.deform_scale = _dspin(0.0, 100000.0, 0.0, 1.0, decimals=1)
         self.deform_scale.setSpecialValueText("Auto")   # shown at the minimum (0)
         self.deform_scale.setToolTip(
-            "Displacement multiplier. Auto sizes it so the field reaches the Deform "
-            "percent of mesh height; a value overrides it with an explicit factor.")
+            "Displacement exaggeration — the multiplier the plot title prints. "
+            "Auto picks whatever draws the largest displacement at the Auto size "
+            "percent of mesh height; a value pins it explicitly.")
 
         self.cmap = _make_cmap_combo("coolwarm")
         self.cmap.setToolTip("Color ramp for the shear-strain contours.")
@@ -647,8 +650,8 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("Plot type", self.plot_type)
         form.addRow("Color ramp", self.cmap)
         form.addRow("Field state", self.field_state)
-        form.addRow("Deform", self.deform_percent)
-        form.addRow("Displ. ×", self.deform_scale)
+        form.addRow("Auto size", self.deform_percent)
+        form.addRow("Scale ×", self.deform_scale)
         form.addRow("Original mesh", self.show_original)
         form.addRow("Deformed color", self.deformed_color)
         form.addRow("", self.element_edges)
@@ -670,7 +673,7 @@ class FemResultsDisplayPanel(QWidget):
         self.cmap.currentIndexChanged.connect(self._emit)
         self.field_state.currentIndexChanged.connect(self._emit)
         self.deform_percent.valueChanged.connect(self._emit)
-        self.deform_scale.valueChanged.connect(self._emit)
+        self.deform_scale.valueChanged.connect(self._on_scale)
         self.show_original.currentIndexChanged.connect(self._emit)
         self.deformed_color.currentIndexChanged.connect(self._emit)
         self.displacement_tolerance.valueChanged.connect(self._emit)
@@ -703,6 +706,11 @@ class FemResultsDisplayPanel(QWidget):
     def _emit(self, *_):
         self.changed.emit()
 
+    def _on_scale(self, *_):
+        # An explicit Scale x dims Auto size; back on Auto (0) it wakes.
+        self._sync_enabled()
+        self.changed.emit()
+
     def _sync_enabled(self):
         pt = self.plot_type.currentData()
         # Vector-only controls.
@@ -719,6 +727,9 @@ class FemResultsDisplayPanel(QWidget):
         for w in (self.deform_percent, self.deform_scale,
                   self.show_original, self.deformed_color):
             w.setEnabled(pt == "deformation")
+        # Auto size is Auto's target: dead while Scale x pins the multiplier.
+        if pt == "deformation":
+            self.deform_percent.setEnabled(self.deform_scale.value() == 0.0)
 
     def options(self):
         # One universal "Element edges" toggle drives the mesh overlay in every

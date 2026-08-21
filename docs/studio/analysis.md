@@ -631,9 +631,11 @@ default: the developed collapse mechanism) or **Last converged** (the sub-critic
 converged solution) — and it applies to the deformation, shear-strain, and
 displacement-vector plots alike, so they always tell the same story. The
 deformation plot adds its own controls: the **Original mesh** reference (dashed
-outline, full grid, or off), the **Deformed color** of the displaced grid, a
-**Deform** exaggeration percent, and an explicit **Displ. ×** multiplier that
-overrides it. The displacement-vector plot can **color arrows by magnitude** (with
+outline, full grid, or off), the **Deformed color** of the displaced grid, and
+the exaggeration pair — **Scale ×**, the displacement multiplier the plot title
+prints, whose **Auto** default picks whatever draws the largest displacement at
+the **Auto size** percent of the mesh height; entering an explicit Scale ×
+dims Auto size until the box returns to Auto. The displacement-vector plot can **color arrows by magnitude** (with
 a colorbar) instead of solid black.
 
 The FEM · Results toolbar also carries **1D Details…**, which opens a non-modal panel

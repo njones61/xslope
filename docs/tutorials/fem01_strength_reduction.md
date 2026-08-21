@@ -526,24 +526,21 @@ outline of where it started: the crest settled, the face bulged out, and the toe
 pushed forward, which together are the rotation the vectors below make explicit.
 
 Two boxes on the Display panel control the exaggeration, which most fields need
-because at true scale their movement would be invisible. **Deform** is a
-percentage of the mesh height, default 15, and **Displ. ×** is an explicit
-multiplier whose default reads **Auto**.
-On Auto, the multiplier is whatever makes the largest displacement in
-the field come out at the Deform percentage of the mesh height — here 15% of
-50 ft is 7.5 ft, and the field's largest viscoplastic displacement is 7.64 ft,
-which already passes it, so Auto lands on **1.0×**, the lowest multiplier it
-will use: this collapse has developed far enough to draw at true scale. That is
-the number the panel prints in its own title. Type a number into **Displ. ×**
-and it overrides that, which is worth doing when two figures have to be compared
-at one exaggeration; leave it on Auto otherwise. The box's spin arrows redraw
-the view at every step, and that turns the control into something better than a
-setting: start at Auto and hold the up arrow, and the mesh deforms a step at a
-time — the crest dropping and the toe bulging in what amounts to an animation
-of the slope failing. The reason Auto exists is on
-display in the next section — the same 15% asks for 131× on the converged state,
-because the two states differ by more than a hundredfold in how far the slope
-moved.
+because at true scale their movement would be invisible. **Scale ×** is the
+multiplier itself — the number the plot prints in its own title — and its
+default reads **Auto**. On Auto, the multiplier is whatever draws the field's
+largest displacement at the **Auto size** percentage of the mesh height,
+default 15: here 15% of 50 ft is 7.5 ft, the largest viscoplastic displacement
+is 7.64 ft, and Auto lands on **1.0×** — this collapse has developed far enough
+to draw at true scale. Type a number into **Scale ×** to pin the exaggeration
+instead, which is worth doing when two figures have to be compared at one
+setting; Auto size dims while an explicit value holds. The box's spin arrows
+redraw the view at every step, and that turns the control into something better
+than a setting: start at Auto and hold the up arrow, and the mesh deforms a
+step at a time — the crest dropping and the toe bulging in what amounts to an
+animation of the slope failing. The reason Auto exists is on display in the
+next section — the same 15% asks for 131× on the converged state, because the
+two states differ by more than a hundredfold in how far the slope moved.
 
 ### Displacement vectors
 

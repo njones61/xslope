@@ -272,7 +272,8 @@ the water table decides how much of the exit face runs; under the base, the
 drain runs end to end and the water table instead decides how the discharge is
 shared along it.
 
-Strictly, then, the heavy line over the drain is no longer a water table.
+Strictly, then, the heavy line over the drain is no longer a water table in the
+sense we often think of one.
 Upstream of x = 40 it caps a saturated zone — the water table as usually meant.
 Over the drain there is no saturated zone beneath it to cap: the same ψ = 0
 rule is now tracing the atmospheric boundary itself. The figure shows the

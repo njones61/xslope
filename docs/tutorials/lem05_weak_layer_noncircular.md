@@ -13,6 +13,10 @@ flat along a seam — so the failure surface is entered as a list of points.
 
 ![Slope with a weak clay layer](../lem/sample_images/noncircular.png){width=700}
 
+The problem and the figure are from the user manual for UTEXASED, the slope
+stability program developed by Stephen G. Wright at the University of Texas
+at Austin.
+
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium</p></div>

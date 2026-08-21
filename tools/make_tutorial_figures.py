@@ -4103,9 +4103,9 @@ def fem01_plots():
     and the captured collapse.  Every number the page quotes is on one of these
     lines.
 
-    The two-state pair is drawn on ONE color range, exaggeration and arrow scale
-    (``shared_panel_scales``), so the difference between the two pictures is the
-    difference between the states and not the difference between two autoscales.
+    Every results panel is drawn autoscaled, exactly as Studio draws it — the
+    converged state's figure matches the reader's screen, and the comparison
+    between the states is carried by the color bar ranges, not a shared scale.
     """
     import time
 
@@ -4199,21 +4199,17 @@ def fem01_plots():
                 fs=result["FS"], failure_solution=fail, field_state="failure")
 
     # The comparison the page's failure definition rests on: the same section at
-    # the last trial that reached equilibrium, beside the collapse. Only the
-    # converged panel is drawn here — ``fem01_shear_strain.png`` above IS the
-    # failed half, at the same color range, so drawing it twice would commit two
-    # identical files. The range, the exaggeration and the arrow length come from
-    # BOTH fields (shared_panel_scales), so a strain color means the same strain
-    # in the pair and the difference between the pictures is the difference
-    # between the states.
-    scales = shared_panel_scales(fem_data, [last, fail])
-    print("   shared      shear-strain range %s–%s · exaggeration %s · longest "
-          "arrow %s" % (scales["vmin"], scales["vmax"], scales["deform_scale"],
-                        scales["vector_max"]))
+    # the last trial that reached equilibrium. Autoscaled to its own range, the
+    # way Studio draws every field state — the reader's screen and this figure
+    # agree, and the eightyfold gap between the two states' color bar maxima is
+    # the comparison the page teaches.
+    own = shared_panel_scales(fem_data, [last])
+    both = shared_panel_scales(fem_data, [last, fail])
+    print("   ranges      converged shear strain %s–%s · at failure %s–%s"
+          % (own["vmin"], own["vmax"], both["vmin"], both["vmax"]))
     capture("fem01_shear_strain_converged.png", plot_fem_results, fem_data, last,
             plot_type="shear_strain", fs=result["FS"], failure_solution=fail,
-            field_state="converged", vmin=scales["vmin"], vmax=scales["vmax"],
-            vector_max=scales["vector_max"])
+            field_state="converged")
 
 
 GROUPS = {

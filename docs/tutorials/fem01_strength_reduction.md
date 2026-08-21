@@ -593,17 +593,16 @@ re-solves once at FS × 1.15 — the **Capture margin** on the dialog, 1.3633 ×
 develop the mechanism the figures show. The factor of safety, the bracket and
 the converged field are unaffected either way.
 
-The two states compare directly on **one scale**. The figure below is the
-converged state at *F* = 1.3594, drawn not on its own range but on the failure
-state's — 0 to 0.646, the same scale as the shear strain figure above — so the
-two panels can be read against each other:
+The figure below is the converged state at *F* = 1.3594, drawn the way Studio
+draws it, on its own range:
 
-![The converged state, drawn on the same color scale as the failed state above](images/fem01_shear_strain_converged.png){width=1000}
+![The converged state at F = 1.3594, scaled to its own strain range](images/fem01_shear_strain_converged.png){width=1000}
 
-On that scale the whole embankment sits uniformly in the bottom band, which is
-what an eightyfold difference in range looks like when it is drawn rather than
-tabulated. Below the critical factor the embankment barely strains; past it, the
-same soil develops a continuous band from crest to toe. The transition the
+The band is already there. The strain concentrates along the same crest-to-toe
+path the failed state develops, hot spot at the base near the toe and all — but
+the color bar tops out near 0.008 where the failed state's reached 0.646.
+Below the critical factor the embankment strains along the eventual surface and
+stops; past it, the same band runs away eightyfold. The transition the
 bisection spent nine solves locating is the transition between these two
 pictures.
 

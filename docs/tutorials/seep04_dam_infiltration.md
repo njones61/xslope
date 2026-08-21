@@ -11,7 +11,9 @@ schedule. This one puts water in where the head is not known and the **rate** is
 rain landing on the surface of a dam, soaking in at a rate the weather sets while
 the water table it feeds finds its own position. That is what the third boundary
 condition type, the **specified flux**, is for, and building one is the subject of
-this page.
+this page. Rain is this page's instance of the general case, **infiltration** —
+water arriving at the ground surface at a known rate, which can just as well be
+snowmelt or irrigation — and everything here applies to any of them.
 
 The example is a 12 m earth dam holding 10 m of water, with a horizontal drain
 at its downstream toe. It is solved twice. The first run is the dam in dry

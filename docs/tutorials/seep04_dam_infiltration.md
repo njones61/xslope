@@ -595,4 +595,6 @@ the same dam again with its drain replaced by a seepage face.
 [SEEP-2](seep02_johnson_dam.md) is where the unconfined steady problem and its
 seepage face are built from nothing, and
 [SEEP-3](seep03_reservoir_drawdown.md) takes a dam's boundary and makes it move
-with time.
+with time. [FEM-1](fem01_strength_reduction.md) meshes a slope for stability
+instead of seepage and finds its factor of safety by reducing the soil's
+strength until it fails.

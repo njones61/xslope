@@ -64,3 +64,13 @@ writes, and how to send a whole project to somebody else.
 | 4 | [Infiltration and Flux Boundaries](seep04_dam_infiltration.md) | A 12 m earth dam with a reservoir, a toe drain and steady rain falling on its exposed surface, solved twice with the rain as the only difference — the specified flux that carries rainfall, the projection that turns a vertical rain rate into the normal flux a boundary takes, why a flux boundary is drawn on the section's corners rather than on a mesh's nodes, what happens at the nodes where it runs into the reservoir and the drain, and a water budget where the discharge rises 75% while the reservoir's share falls 36% — then a sweep of six rain rates that finds the ceiling past which the soil can no longer take what the boundary prescribes | Seepage | one material, steady seepage, specified flux, infiltration, normal flux, specified head, exit face, toe drain, van Genuchten, phreatic surface, water budget | ~25 min |
 
 </div>
+
+## Finite element
+
+<div class="tut-summary" markdown>
+
+| # | Tutorial | What it covers | Analysis | Features | Time |
+|---|---|---|---|---|---|
+| 1 | [Strength Reduction Basics](fem01_strength_reduction.md) | A 50 ft embankment on a rigid base solved twice — once with Spencer's method for the reference answer, once by meshing the slope and weakening its soil until it can no longer stand — the two elastic properties the run refuses to start without and the measurement showing E scales every displacement while changing the factor of safety not at all, why a stability mesh has to be quadratic, the bracket the search validates and bisects with the iteration count climbing toward failure, the per-trial budget that decides which near-critical trials are allowed to finish, and the mechanism read out of shear strain, a deformed mesh and displacement vectors against the converged state on one color scale | Finite element | one material, Mohr-Coulomb, strength reduction, Young's modulus, Poisson's ratio, quadratic triangles, side boundary conditions, tensile cutoff, bisection bracket, iteration budget, shear strain, deformed mesh, displacement vectors | ~25 min |
+
+</div>

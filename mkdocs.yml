@@ -76,6 +76,8 @@ nav:
       - Unconfined Seepage Through a Zoned Dam: tutorials/seep02_johnson_dam.md
       - "Transient Seepage: Reservoir Drawdown": tutorials/seep03_reservoir_drawdown.md
       - Infiltration and Flux Boundaries: tutorials/seep04_dam_infiltration.md
+    - Finite Element:
+      - Strength Reduction Basics: tutorials/fem01_strength_reduction.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

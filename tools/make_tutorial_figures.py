@@ -4052,8 +4052,8 @@ FEM01_DONE = os.path.join(REPO_ROOT,
 #: limit-equilibrium statement of the same problem the finite element run solves.
 FEM01_METHOD = "spencer"
 FEM01_SLICES = 40
-#: The strength-reduction run, all of it at ``solve_ssrm``'s own defaults except
-#: the criterion: bracket [1.0, 2.0], tolerance 0.01, 3000 iterations a trial.
+#: The strength-reduction run, at the settings the page's final run is made at:
+#: bracket [1.0, 2.0], tolerance 0.01, and 12,000 iterations a trial.
 #: ``non_convergence`` rather than the API default ``hybrid`` because that is what
 #: Studio's Run FEM dialog runs — its Failure criterion list offers no hybrid
 #: entry, and its runner falls back to non-convergence.  On this model the two
@@ -4061,6 +4061,13 @@ FEM01_SLICES = 40
 FEM01_CRITERION = "non_convergence"
 FEM01_F_MIN, FEM01_F_MAX = 1.0, 2.0
 FEM01_TOLERANCE = 0.01
+#: 12,000 rather than ``solve_ssrm``'s default 3,000, because that is the budget
+#: the page instructs the reader to type into **Max iterations per trial** before
+#: the run these figures illustrate.  The figures have to show the state the
+#: page's own instructions produce: at 3,000 the near-critical trials are cut off
+#: mid-work and the answer reads 1.3477, at 12,000 they finish and it plateaus at
+#: 1.3633, and the panel titles carry whichever one they were drawn at.
+FEM01_MAX_ITERATIONS = 12000
 
 
 def _fem01_mesh(model):
@@ -4153,7 +4160,8 @@ def fem01_plots():
     with contextlib.redirect_stdout(log):
         result = solve_ssrm(fem_data, F_min=FEM01_F_MIN, F_max=FEM01_F_MAX,
                             tolerance=FEM01_TOLERANCE, debug_level=1,
-                            failure_criterion=FEM01_CRITERION)
+                            failure_criterion=FEM01_CRITERION,
+                            max_iterations=FEM01_MAX_ITERATIONS)
     wall = time.time() - t0
     print("   SSRM        FS %.4f from the bracket [%.4f, %.4f] (width %.4f) "
           "after %d bisection steps · %.1f s wall"

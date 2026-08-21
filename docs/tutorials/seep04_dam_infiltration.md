@@ -107,8 +107,13 @@ which is what the next two sections build.
 Its global parameters are already set: **Units** `SI`, so the unit weight of water
 is 9.81 kN/m³ and heads read in meters. Conductivity is entered in m/s on this
 model, so every rate on this page is per second, and every discharge is cubic
-meters per second per meter of dam measured along its axis.
-[SEEP-1](seep01_sheetpile.md#1-global-parameters) covers those fields.
+meters per second per meter of dam measured along its axis. The **Time** field
+stays blank: a steady analysis never reads it — the "per second" rides inside
+the conductivity values themselves — which is also why Studio's column headers
+show a bare `k1` with no unit suffix. A transient run is where the time unit has
+to be declared, as [SEEP-3](seep03_reservoir_drawdown.md) did with its day base.
+[SEEP-1](seep01_sheetpile.md#1-global-parameters) covers the rest of those
+fields.
 
 Click **Materials**, and on **Table view** set the **Show parameters for:** toggles
 to **Seepage** alone. One row, with the seepage band of the `mat` worksheet
@@ -148,13 +153,10 @@ exit face is drawn where the discharge point is unknown is
 [SEEP-2's subject](seep02_johnson_dam.md#4-boundary-conditions), and this section
 does not repeat it.
 
-Click **Seep BC** in the Inputs dock. The editor opens on **Set 1**. Press **Add
-head** once and fill it in, then select the **Exit face** entry already waiting in
-the list and give it its points. **Add row** under the points table adds a row to
-whichever boundary is selected.
+Click **Seep BC** in the Inputs dock. The editor opens on **Set 1**.
 
-**Head 1 — the reservoir.** Leave **Type:** at `head` and set
-**Head value (m):** to `10`. Its polyline runs up the submerged part of the
+**Head 1 — the reservoir.** Press **Add head**, leave **Type:** at `head`, and
+set **Head value (m):** to `10`. Its polyline runs up the submerged part of the
 upstream face, from the heel to the waterline:
 
 | x | y |
@@ -165,8 +167,8 @@ upstream face, from the heel to the waterline:
 Every node on that line is under water or at its surface, so holding the total
 head at 10 along it is exact.
 
-**Exit face — the toe drain.** Draw it along the base over the 12 m the drain
-occupies:
+**Exit face — the toe drain.** Select the **Exit face** entry already waiting in
+the list, and draw it along the base over the 12 m the drain occupies:
 
 | x | y |
 |---:|---:|

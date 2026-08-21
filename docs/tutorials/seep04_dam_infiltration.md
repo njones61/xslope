@@ -1,6 +1,6 @@
 ---
 title: "Tutorial SEEP-4 — Infiltration and Flux Boundaries"
-description: "Rain falling on a 12 m earth dam in XSLOPE — the specified-flux boundary that carries it, the projection that turns a vertical rain rate into the normal flux a boundary takes, the extent it is drawn over and what happens where it meets a specified head, and a run without rain read against a run with it on one pinned color scale."
+description: "Rain falling on a 12 m earth dam in XSLOPE — the specified-flux boundary that carries it, the projection that turns a vertical rain rate into the normal flux a boundary takes, the extent it covers and what happens where it meets a specified head, and a run without rain read against a run with it on one pinned color scale."
 ---
 
 # Tutorial SEEP-4 — Infiltration and Flux Boundaries
@@ -144,7 +144,7 @@ before it reaches the water table. Click **OK**.
 
 The dam takes two boundary conditions before the rain: the reservoir on the
 upstream face, and the drain at the downstream toe. What each type does and why an
-exit face is drawn where the discharge point is unknown is
+exit face goes where the discharge point is unknown is
 [SEEP-2's subject](seep02_johnson_dam.md#4-boundary-conditions), and this section
 does not repeat it.
 
@@ -347,7 +347,7 @@ so in practice the rate applied to an inclined boundary is often reduced
 further, to a net infiltration rate the modeler judges. This page keeps the full
 geometric values, which is what the source problem applies.
 
-### A flux is drawn on the geometry
+### Entering the flux boundary conditions
 
 Enter the three blocks. Click **Seep BC**, press **Add flux** three times, and
 give each block its rate and its two points. The **Add row** and **Remove
@@ -372,21 +372,21 @@ dims the others.
 
 Those endpoints are the corners of the dam's own surface, not points chosen off a
 mesh, and that is deliberate. The mesher pins a node at every boundary vertex, so
-a polyline drawn on the section is honored at its stated length whatever element
-size is used. A polyline drawn to land on the nodes of one particular mesh is not:
+a polyline defined on the section is honored at its stated length whatever element
+size is used. A polyline placed to land on the nodes of one particular mesh is not:
 an element edge carries load only when **both** of its corners lie on the polyline,
 so an endpoint falling part way along an edge drops that edge's water entirely, and
 the model quietly takes in less rain than it was given. That is not hypothetical
 on this dam: the source problem's own model picks its rain extent off mesh edges
 and stops one edge short of the waterline and one short of the toe, so the
-geometry-drawn boundary built here takes in about 4% more water than the
+geometry-based boundary built here takes in about 4% more water than the
 published case —
 [the GW6 verification case](../verification/rocscience_groundwater.md#gw6)
 carries the two extents and the comparison.
 
 ### Where the rain meets the reservoir, the head wins
 
-The rain is drawn from the waterline at (20, 10) all the way to the toe at
+The rain covers the surface from the waterline at (20, 10) all the way to the toe at
 (52, 0), so it touches the reservoir boundary at one end and the exit face at the
 other. Both shared nodes are visible on the mesh figure above — a green flux
 triangle sitting inside a blue specified-head square at (20, 10), and another at

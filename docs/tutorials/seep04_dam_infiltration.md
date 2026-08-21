@@ -528,37 +528,25 @@ All six runs are on the mesh this page has been using, all six converge in the
 same eight sweeps, and all thirteen drain nodes drain in every one of them, so
 nothing below is the drain switching on or off.
 
-**The water table rises faster than the rain does.** Each 0.1 of q/k added lifts
-the centerline water table 0.88 m at the bottom of the range and 1.05 m at the
-top, 19% more per unit of rain. Going from dry weather to the rain the file
-carries lifts the surface 0.91 m; doubling that rain lifts it another 1.05 m. The
-rise per unit of rain climbs steadily across all four intervals of the sweep. Why
-it accelerates is not something these six runs settle.
+**The water table rises faster than the rain does.** Each step of the sweep
+lifts the centerline surface more than the step before — the table above shows
+the climb. Why the rise accelerates is not something these six runs settle.
 
-**The discharge does not.** Q is close to linear in the rain: each 0.1 of q/k adds
-about 2.1 × 10<sup>−7</sup> to it. What drift there is runs the other way, from
-2.129 × 10<sup>−7</sup> over the first step of the sweep to 2.034 × 10<sup>−7</sup>
-over the last, 4.5% less per unit of rain. That fall is the reservoir backing off,
-the same effect the water budget above measures at one rate. The mound the rain
-builds inside the dam stands higher at every rate, so the reservoir supplies
-2.808 × 10<sup>−7</sup> in dry weather, 1.800 × 10<sup>−7</sup> at q/k = 0.1 and
-only 7.18 × 10<sup>−8</sup> at q/k = 0.2. By q/k = 0.4 its reaction has changed
-sign: the dam is pushing water back out into the reservoir.
+**The discharge does not.** Q grows nearly linearly with the rain, and what
+drift there is runs the other way: the mound the rain builds stands higher at
+every rate, so the reservoir supplies less and less — the same effect the water
+budget above measures at one rate — until by q/k = 0.4 the dam is pushing water
+back out into the reservoir.
 
-**Above q/k ≈ 0.26 the model stops being an answer.** A specified flux prescribes
-the rate water crosses the boundary whatever the head does, and soil that cannot
-conduct that much water away has no way to refuse it. The pressure at the boundary
-simply rises until it is positive — which in the field means the surface ponds and
-the boundary becomes a specified head, a switch this model does not make. Bisected on
-this mesh, q/k = 0.26 still comes out clean; at 0.27 one boundary node finishes
-with positive pore pressure, at 0.30 eight of them, and at 0.40 twenty-three, the
-worst at 14.11 kPa — about 1.4 m of pressure head on a surface that should carry
-none. That top rate has no phreatic surface anywhere in the dam: from x = 20.5 to
-x = 40 the section is saturated to its own surface, which is why the figure draws
-that case dashed and lying on the dam's own profile rather than inside it. The downstream
-face floods before the crest does — at q/k = 0.3 the soil just under the surface
-at x = 36 is already at positive pressure while the crest centerline is still
-about 0.75 m into suction.
+**Above q/k ≈ 0.26 the model stops being an answer.** A specified flux
+prescribes the rate water crosses the boundary whatever the head does, and soil
+that cannot conduct that much water away has no way to refuse it: the boundary
+pressure simply rises until it is positive — which in the field means the
+surface ponds and the boundary becomes a specified head, a switch this model
+does not make. At the top rate there is no phreatic surface anywhere in the
+dam — the section is saturated to its own surface from the upstream shoulder to
+the drain, which is why the figure draws that case dashed and lying on the
+dam's own profile rather than inside it.
 
 XSLOPE does not let that pass quietly. The run comes back with a warning:
 

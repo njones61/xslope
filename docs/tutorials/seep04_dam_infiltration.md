@@ -349,16 +349,30 @@ geometric values, which is what the source problem applies.
 
 ### Entering the flux boundary conditions
 
-Enter the three blocks. Click **Seep BC**, press **Add flux** three times, and
-give each block its rate and its two points. The **Add row** and **Remove
-selected** pair beside those buttons manages the points of whichever block is
-selected.
+Enter the three blocks in **Seep BC**, each the same way: press **Add flux**,
+set **Flux value (m/sec):**, and enter or copy-paste the block's two points.
 
-| block | Flux value | points |
-|---|---|---|
-| Flux 1 | `8.94427191e-09` | (20, 10), (24, 12) |
-| Flux 2 | `1e-08` | (24, 12), (28, 12) |
-| Flux 3 | `8.94427191e-09` | (28, 12), (52, 0) |
+**Flux 1 — the upstream face above the waterline.** Flux value
+`8.94427191e-09`:
+
+| x | y |
+|---:|---:|
+| 20 | 10 |
+| 24 | 12 |
+
+**Flux 2 — the crest.** Flux value `1e-08`:
+
+| x | y |
+|---:|---:|
+| 24 | 12 |
+| 28 | 12 |
+
+**Flux 3 — the downstream face.** Flux value `8.94427191e-09`:
+
+| x | y |
+|---:|---:|
+| 28 | 12 |
+| 52 | 0 |
 
 ![The boundary list with Flux 1 selected](images/seep04_studio_seep_bc.png)
 

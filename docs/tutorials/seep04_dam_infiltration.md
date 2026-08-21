@@ -391,30 +391,16 @@ surface.
 
 ### Where the rain meets the reservoir, the head wins
 
-The rain covers the surface from the waterline at (20, 10) all the way to the toe at
-(52, 0), so it touches the reservoir boundary at one end and the exit face at the
-other. Both shared nodes are visible on the mesh figure above — a green flux
-triangle sitting inside a blue specified-head square at (20, 10), and another at
-the drain's far end at (52, 0).
-
-A node cannot be both. Where a flux boundary meets a **specified head**, the head
-wins: the flux load is assembled onto that node like any other and then discarded
-when the head is enforced, because a prescribed head cannot be moved by adding
-water to it. Where a flux meets an **exit face**, the exit face wins while it is
-draining — a draining node is held at atmospheric pressure, so rain landing on it
-runs off — and an inactive exit-face node is a free unknown that does take the
-rain.
-
-The discarding is complete rather than partial, which is worth knowing because it
-means overlap is not an error to be avoided. Laying a flux block wholly inside the
-reservoir boundary of this model — enough load to add 27% to its rain — changes the
-discharge and every nodal head by **exactly zero**.
-
-Draw the rain over the surface it falls on, in other words, and let the collisions
-fall where they will. On this model 8.444 × 10<sup>−9</sup> of the assembled
-3.2000 × 10<sup>−7</sup> is discarded that way, 2.6% of it: 4.000 × 10<sup>−9</sup>
-at the waterline node, and the remaining 4.444 × 10<sup>−9</sup> at the toe node,
-where the flux polyline ends on the draining exit face.
+The rain covers the surface from the waterline at (20, 10) all the way to the
+toe at (52, 0), so it shares a node with the reservoir boundary at one end and
+with the exit face at the other. A node cannot serve both conditions, and the
+head wins: where a flux meets a **specified head**, the flux load on the shared
+node is discarded when the head is enforced, and where it meets a **draining
+exit face**, the same happens — a draining node is held at atmospheric pressure,
+so rain landing on it simply runs off. The discarding is complete, so overlap is
+not an error to be avoided: cover the surface the rain falls on and let the
+shared nodes sort themselves out. On this model about 2.6% of the offered rain
+lands on those two nodes and is discarded there.
 
 ### The finished inputs
 

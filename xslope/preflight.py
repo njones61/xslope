@@ -2918,14 +2918,14 @@ def _mat_tensile_cap_missing(ctx):
         phi = _num(m.get("phi")) or 0.0
         c = _num(m.get("c")) or 0.0
         if phi <= 0:
-            what = ("nowhere at all -- with f = 0 the Mohr-Coulomb cone has no apex, "
+            what = ("without limit -- with f = 0 the Mohr-Coulomb cone has no apex, "
                     "so nothing bounds the tensile stress the material can carry")
         else:
             apex = c / math.tan(math.radians(phi)) if phi < 90 else 0.0
-            what = (f"at the Mohr-Coulomb cone apex, c/tan(f) = {apex:.4g}, which "
+            what = (f"up to the Mohr-Coulomb cone apex, c/tan(f) = {apex:.4g}, which "
                     f"may be far above the material's real tensile strength")
-        yield (f"{ctx.mat_label(i)} has no tensile strength: a blank t_cut leaves "
-               f"tension capped {what}. Enter t_cut, or 0 for a no-tension soil. A "
+        yield (f"{ctx.mat_label(i)} has no tensile cutoff: a blank t_cut allows "
+               f"tension {what}. Enter t_cut, or 0 for a no-tension soil. A "
                f"dropped cap is not visible in any result: it raises the "
                f"strength-reduction factor of safety silently {_AT_MAT}.")
 

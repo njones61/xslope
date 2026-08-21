@@ -3760,6 +3760,14 @@ PREFLIGHT_RULE_SPECS = [
              specified_heads=[dict(b, coords=b['coords'][:1])
                               for b in sd['seepage_bc']['specified_heads']])),
          expect='fewer than two points'),
+    dict(rule='seep.steady_reads_series_at_t0', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc=dict(
+             sd['seepage_bc'],
+             specified_heads=[dict(sd['seepage_bc']['specified_heads'][0],
+                                   head='t1')]
+             + sd['seepage_bc']['specified_heads'][1:])),
+         expect='read at their t = 0 values'),
 
     # --- finite element elastic properties and the tensile cap -------------
     dict(rule='mat.nu_unusable', base=PREFLIGHT_BASE_FEM, mode='excel',
@@ -3770,7 +3778,7 @@ PREFLIGHT_RULE_SPECS = [
          analysis='ssrm',
          mutation=lambda sd: _pf_mats(sd, t_cut=None),
          control=lambda sd: _pf_mats(sd, t_cut=50.0),
-         expect='has no tensile strength'),
+         expect='has no tensile cutoff'),
     dict(rule='main.tension_srf_unset', base=PREFLIGHT_BASE_FEM, mode='excel',
          analysis='ssrm',
          mutation=lambda sd: _pf_mats(_pf_set(sd, tension_srf=None), t_cut=50.0),

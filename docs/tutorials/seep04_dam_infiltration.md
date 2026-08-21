@@ -569,8 +569,9 @@ A specified flux is a promise about water that the soil may not be able to keep.
 Below this dam's ceiling it is the right boundary for rain, and the five rates up
 to q/k = 0.2 all return real solutions. Above it, the boundary insists on putting
 in more water than the section can carry away, and what comes back is a number
-rather than a solution. Check q/k before trusting a rain boundary, and read what the solver
-says about the run.
+rather than a solution. In reality the excess would run off the surface, but a
+specified flux has no way to say so — it insists the water enters. Check q/k
+before trusting a rain boundary, and read what the solver says about the run.
 
 ---
 

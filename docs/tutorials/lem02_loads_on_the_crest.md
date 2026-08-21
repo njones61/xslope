@@ -10,7 +10,7 @@ embankment: 750 psf over a 10 ft strip, set back 5 ft from the top of the face.
 The slope, the soil and the rigid base are unchanged — the load is the only new
 input, and it is the one that decides the answer.
 
-![The embankment carrying the crest surcharge](images/lem02_problem.png){width=1000}
+![The embankment carrying the crest surcharge](images/lem02_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

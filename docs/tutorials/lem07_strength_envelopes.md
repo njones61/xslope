@@ -14,6 +14,7 @@ flattening that profile to a single strength moves the failure to the bottom of
 the model. **The strength model is an input, and it decides the answer as
 firmly as the geometry does.**
 
+![A 6 m slope in compacted clay with a nonlinear strength envelope](images/lem07_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

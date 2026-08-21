@@ -14,7 +14,7 @@ reference manual, by way of the Rocscience Slide2 verification corpus — it is
 [verification problem VP49](../verification/rocscience.md#vp49), and this page
 reproduces that row's locked values.
 
-![A soldier-pile tieback wall: two anchor rows in two soil layers](images/lem09_problem.png){width=1000}
+![A soldier-pile tieback wall: two anchor rows in two soil layers](images/lem09_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

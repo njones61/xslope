@@ -17,6 +17,7 @@ the two ways XSLOPE models a pile: the tieback wall tutorial
 ([LEM-9](lem09_tieback_wall.md)) entered its soldier pile the other way,
 with the force stated directly, and this page compares the two routes.
 
+![A 20 ft slope stabilized by two rows of piles](images/lem12_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

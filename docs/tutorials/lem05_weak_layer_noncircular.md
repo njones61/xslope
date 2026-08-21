@@ -11,9 +11,9 @@ S<sub>u</sub> = 200 psf, against friction angles φ′ of 33° and 37° in the s
 above and below it. **The mechanism follows the seam**, and a circle cannot run
 flat along a seam — so the failure surface is entered as a list of points.
 
-![Slope with a weak clay layer](../lem/sample_images/noncircular.png){width=700}
+![Slope with a weak clay layer](images/lem05_problem_sketch.png){width=1000}
 
-The problem and the figure are from the user manual for UTEXASED, the slope
+The problem is from the user manual for UTEXASED, the slope
 stability program developed by Stephen G. Wright at the University of Texas
 at Austin.
 

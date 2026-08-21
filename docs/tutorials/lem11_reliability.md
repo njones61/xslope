@@ -34,6 +34,7 @@ stochastic answer is that the slope has roughly one chance in six of failing.
 **The factor of safety does not change; what changes is what is known about
 it.**
 
+![A submerged 30 ft slope with uncertain unit weight and cohesion](images/lem11_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

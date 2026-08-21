@@ -13,6 +13,7 @@ full scale on a real section, the James Bay dyke, where a single credible seed
 reads 23% high. **The lower of the two numbers is not necessarily the
 answer.**
 
+![A 15 ft embankment on a clay foundation](images/lem10_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

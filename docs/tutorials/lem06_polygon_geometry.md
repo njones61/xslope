@@ -11,7 +11,7 @@ profile-line model cannot say that. Its bottom boundary is one number, a single
 horizontal elevation — so **the geometry is entered as closed polygons instead**,
 one per material zone, and the base of the model is whatever the polygons draw.
 
-![A slope on a dipping base, entered as two material zones](images/lem06_problem.png){width=700}
+![A slope on a dipping base, entered as two material zones](images/lem06_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

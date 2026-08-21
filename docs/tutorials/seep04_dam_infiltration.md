@@ -476,9 +476,10 @@ down.
 
 ## Scaling the rain
 
-The rain on this page is one weather event: 1 × 10<sup>−8</sup> m/s, falling
-steadily. Design questions arrive as a range instead — a wetter season, a heavier
-storm, the same dam in a different climate — and what settles the dam's answer is
+The rain on this page is one steady-state assumption: infiltration held at
+1 × 10<sup>−8</sup> m/s for long enough that the flow field has stopped changing.
+Design questions arrive as a range instead — a wetter season, the same dam in a
+different climate — and what settles the dam's answer is
 not the rain rate on its own but the rain rate against the soil's ability to carry
 it away. That ratio is **q/k**, the rain rate over the saturated conductivity.
 Here q = 1 × 10<sup>−8</sup> m/s and k = 1 × 10<sup>−7</sup> m/s, so

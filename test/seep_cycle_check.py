@@ -43,9 +43,16 @@ WHAT THIS CHECK LOCKS
    that has been nudged shows up there before it shows up in a flow rate.
 3. The dam under rain sheds it once its surface saturates, and no active exit node
    draws in more water than its boundary offers. Under a strict ``q <= 0`` the same
-   three rows read: nothing activates at 2.8x (the solve returns the flux-only field
-   and its ponding warning), and at 3x the active set cycles between 13 and 14 of its
-   48 exit nodes to the 2000-sweep ceiling without converging.
+   rows read: nothing activates at 2.8x (the solve returns the flux-only field and its
+   ponding warning), and at 3x and 4x the active set cycles — 13 to 14 of the 48 exit
+   nodes — to the 2000-sweep ceiling without converging.
+4. Every reported flow rate equals the outflow summed against it. The reported number
+   is the inflow half of a balance the operator closes exactly, so the two agree at any
+   solved field; they stop agreeing the moment an entry point is left out of the sum.
+   Water absorbed at an ACTIVE exit-face node is one such entry point, reachable only
+   over a flux boundary: held at p = 0 with its own load discarded, the node draws the
+   share of that load the soil can still take. It is 1.9% of the throughput here at
+   2.8x rain and 21% at 4x.
 
 MEASURED DURING THE ROUND, NOT LOCKED HERE
 
@@ -150,15 +157,22 @@ INFIL_NODES, INFIL_FACE_NODES = 473, 35
 #: activates, the overlay's flow rate, the flux-only flow rate, and whether the
 #: flux-only run raises the ponding warning. 1x is below the rate at which the surface
 #: saturates, so the overlay is a no-op there and has to stay one; 2.8x is the onset,
-#: where one node ponds under the flux BC alone; 3x is past it.
+#: where one node ponds under the flux BC alone; 3x and 4x are past it, and are the two
+#: rates whose active set used to cycle to the sweep ceiling instead of converging.
 INFIL_ROWS = [
     (1.0, 0, 4.915513796099751e-07, 4.915514596217149e-07, False),
-    (2.8, 1, 8.660298496520072e-07, 8.874008969783335e-07, True),
-    (3.0, 3, 8.675023464553751e-07, 9.411714513832222e-07, True),
+    (2.8, 1, 8.823960999866383e-07, 8.874008969783335e-07, True),
+    (3.0, 3, 9.202226475422334e-07, 9.411714513832222e-07, True),
+    (4.0, 12, 1.0583269792370564e-06, 1.246222222222292e-06, True),
 ]
 #: How closely the 1x overlay has to reproduce the flux-only solve to count as the
 #: no-op it is: the two differ only in the iterate each solve arrives along.
 INFIL_NOOP_RTOL = 1e-5
+#: How closely a reported flow rate has to equal the OUTflow measured against it. The
+#: two are the same water — the operator has zero row sums, so what enters leaves —
+#: and the reported number is the inflow half. They agree to ~1e-14 of themselves; the
+#: allowance is for summation order, not for a discrepancy.
+INFIL_BALANCE_RTOL = 1e-9
 #: Relative tolerance on a flow rate. The solve is deterministic — these are the
 #: numbers it gives, not numbers it is near — so this is a rounding allowance.
 Q_RTOL = 1e-6
@@ -318,6 +332,22 @@ def _ponding_warning(messages):
     return [m for m in messages if "positive pore pressure" in m]
 
 
+def _outflow(seep_data, solution, active):
+    """The water leaving the domain across its boundary, summed independently of the
+    reported flow rate: the negative reactions at the Dirichlet-held rows (specified
+    heads and active exit-face nodes) plus any prescribed outflow delivered on a free
+    row. The reported flow rate is the INflow half of the same balance, so the two are
+    equal at any solved field — which is what makes an incomplete enumeration of
+    either half visible."""
+    bc_type = seep_data["bc_type"]
+    f_ext = np.asarray(solution["flux_nodal"], dtype=float)
+    held = (bc_type == 1) | ((bc_type == 2) & active)
+    reaction = np.asarray(solution["q"], dtype=float) - np.where(held, 0.0, f_ext)
+    out = -float(np.sum(reaction[held & (reaction < 0)]))
+    out -= float(np.sum(f_ext[~held & (f_ext < 0)]))
+    return out
+
+
 def leg_exit_face_over_flux():
     """Rain the soil can no longer take runs off an exit face laid over it, instead of
     ponding on a flux boundary that has no way to shed it."""
@@ -334,6 +364,7 @@ def leg_exit_face_over_flux():
             active = on_exit & (np.abs(p) < 1e-6)
             drain = on_exit & (nodes[:, 1] <= 1e-9) & (nodes[:, 0] >= 39.9)
             runs[overlay] = dict(sol=sol, msgs=msgs, nodes=nodes,
+                                 outflow=_outflow(seep_data, sol, active),
                                  n_face=int(np.sum(on_exit & ~drain)),
                                  n_face_active=int(np.sum(active & ~drain)),
                                  # what the boundary supplies at each active node,
@@ -358,9 +389,18 @@ def leg_exit_face_over_flux():
                          f"{ov['n_face_active']} exposed-face node(s) of "
                          f"{ov['n_face']}, not {face_want}")
         for label, run, want in (("overlay", ov, q_overlay), ("flux only", fx, q_flux)):
-            if not _close(float(run["sol"]["flowrate"]), want):
-                fails.append(f"rain x{factor:g} {label} flow rate "
-                             f"{run['sol']['flowrate']:.7g} for {want:.7g}")
+            got = float(run["sol"]["flowrate"])
+            if not _close(got, want):
+                fails.append(f"rain x{factor:g} {label} flow rate {got:.7g} for "
+                             f"{want:.7g}")
+            # The reported flow rate is the throughput, so it equals the outflow
+            # measured against it. It stops doing so the moment an entry point is left
+            # out of the sum: at 2.8x the water absorbed at the one active face node is
+            # 1.9% of the throughput, and at 4x it is 21%.
+            if abs(got - run["outflow"]) > INFIL_BALANCE_RTOL * abs(run["outflow"]):
+                fails.append(f"rain x{factor:g} {label} reports {got:.8g} against an "
+                             f"outflow of {run['outflow']:.8g} — the reported inflow "
+                             f"is not the throughput")
         # A seepage face cannot invent water: at an active node the boundary may
         # supply at most the flux prescribed there, and the rest of that flux runs off.
         if ov["excess"] > 0.0:
@@ -380,9 +420,9 @@ def leg_exit_face_over_flux():
                          f"the flow rate, {ov['sol']['flowrate']:.7g} against "
                          f"{fx['sol']['flowrate']:.7g}")
         print(f"  rain x{factor:<4g} overlay {ov['n_face_active']:>2}/{ov['n_face']} "
-              f"face nodes active  q={ov['sol']['flowrate']:.7g}  "
-              f"(flux only {fx['sol']['flowrate']:.7g}, ponding "
-              f"{'reported' if _ponding_warning(fx['msgs']) else 'none'})")
+              f"face nodes active  q={ov['sol']['flowrate']:.7g} "
+              f"(out {ov['outflow']:.7g})  flux only {fx['sol']['flowrate']:.7g}, "
+              f"ponding {'reported' if _ponding_warning(fx['msgs']) else 'none'}")
     return fails
 
 

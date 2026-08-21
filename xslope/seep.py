@@ -1253,17 +1253,34 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     h_new = spsolve(A_final, b_final)
     q_final = _coo_matvec(asm, data, h_new)
 
-    # Flowrate: the reaction at the specified-head boundaries, plus the flux
-    # delivered on the free rows. "Free" is the runtime Dirichlet complement, so it
-    # includes the INACTIVE exit-face nodes — their rows stay free, so their loads
-    # do enter the solve and are real inflow (rain landing on the unsaturated part
-    # of a seepage face infiltrates). Loads on ACTIVE exit nodes were dropped by the
-    # solve, so f_eff zeroes them and they are counted nowhere: rain falling on a
-    # saturated, free-draining face simply runs off.
+    # Flowrate: the water crossing INTO the domain, which conservation makes equal to
+    # the water crossing out of it (the conduction operator has zero row sums, so the
+    # reactions and the delivered loads sum to zero). Two entries, and the enumeration
+    # has to be complete or the number is not the throughput.
+    #
+    #   1. THE REACTION AT EVERY DIRICHLET-HELD ROW THAT IS POSITIVE — the specified
+    #      heads AND the active exit-face nodes, not the specified heads alone. An
+    #      active exit node over a flux boundary is held at p = 0 with its own load
+    #      discarded, and what it then draws is the share of that load the soil can
+    #      still accept; the rest runs off. That is water entering the domain at the
+    #      boundary and it is counted nowhere else. Without a flux load on the exit
+    #      face the term is empty: an exit node is active because the switch measured
+    #      it draining. (This is the enumeration `_frame_flows` already uses per frame
+    #      on the transient side.)
+    #   2. THE FLUX DELIVERED ON THE FREE ROWS. "Free" is the runtime Dirichlet
+    #      complement, so it includes the INACTIVE exit-face nodes — their rows stay
+    #      free, so their loads do enter the solve and are real inflow (rain landing on
+    #      the unsaturated part of a seepage face infiltrates).
+    #
+    # Nothing is counted twice. `_dirichlet_system` seeds the RHS with the loads and
+    # then OVERWRITES the held rows, so a load sitting on a held node never entered the
+    # solve: `f_eff` zeroes it here and `_flux_inflow` masks it out there. The only
+    # water crossing the boundary at a held node is its reaction, and the only water
+    # crossing at a free node is its delivered load.
     free_final = ~dir_mask
     f_eff = np.where(dir_mask, 0.0, f_ext)
     react_final = q_final - f_eff
-    total_inflow = float(np.sum(react_final[(bc_type == 1) & (react_final > 0)]))
+    total_inflow = float(np.sum(react_final[dir_mask & (react_final > 0)]))
     total_inflow += _flux_inflow(f_ext, free_final)
 
     # Closure report: kr-consistent imbalance at the converged state

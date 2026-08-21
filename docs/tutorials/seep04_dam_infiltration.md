@@ -152,7 +152,8 @@ Click **Seep BC** in the Inputs dock. The editor opens on **Set 1**.
 
 **Head 1 — the reservoir.** Press **Add head**, leave **Type:** at `head`, and
 set **Head value (m):** to `10`. Its polyline runs up the submerged part of the
-upstream face, from the heel to the waterline:
+upstream face, from the heel to the waterline. Enter or copy-paste the following
+points:
 
 | x | y |
 |---:|---:|
@@ -163,8 +164,8 @@ Every node on that line is under water or at its surface, so holding the total
 head at 10 along it is exact.
 
 **Exit face — the toe drain.** Select the **Exit face** entry already waiting in
-the list, and enter the two points that run it along the base, over the 12 m the
-drain occupies:
+the list. Its line runs along the base, over the 12 m the drain occupies. Enter
+or copy-paste the following points:
 
 | x | y |
 |---:|---:|

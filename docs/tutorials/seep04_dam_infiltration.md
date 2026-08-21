@@ -341,6 +341,12 @@ agree because of the projection: enter the vertical rate on the sloping
 faces instead, and the model takes in 1 × 10<sup>−8</sup> × 35.305 m of boundary
 length = 3.5305 × 10<sup>−7</sup>, 10% more water than fell on it.
 
+The projection is geometry alone, and it assumes every drop that lands soaks in.
+On a real slope some of the rain runs off instead — more as the face steepens —
+so in practice the rate applied to an inclined boundary is often reduced
+further, to a net infiltration rate the modeler judges. This page keeps the full
+geometric values, which is what the source problem applies.
+
 ### A flux is drawn on the geometry
 
 Enter the three blocks. Click **Seep BC**, press **Add flux** three times, and

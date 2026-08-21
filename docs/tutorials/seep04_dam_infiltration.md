@@ -201,7 +201,7 @@ analysis a seepage run puts no restriction on element order. One plan does
 restrict it. A finite element stability analysis reading its pore pressures from
 this solution runs on this same mesh, and the FEM side requires quadratic
 elements, so for that workflow build the mesh as **Quadratic triangles (tri6)**
-from the start. This page stays with seepage, so tri3 serves.
+from the start. This page stays with seepage, so tri3 is sufficient.
 
 Untick **Auto-size from geometry**, which enables the **Target element size** box
 below it, and confirm that box reads `1.0`. Leave the rest of the dialog alone and

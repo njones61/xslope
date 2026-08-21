@@ -438,8 +438,8 @@ does not push any of them above the reservoir that is the model's high point.
 The two solution figures are drawn on the **same color scale**, 0 to 10 m of total
 head, so they can be read against each other directly. Everything downstream of the
 crest is warmer under rain — heads there are higher — and the phreatic surface is
-visibly higher along its whole length, meeting the base at the drain in both cases
-but arriving there from further up. The extra flow lines entering through the
+visibly higher along its whole length, meeting the drain in both cases but
+arriving from further up and landing about a meter further along it. The extra flow lines entering through the
 downstream face are the rain, water that never touched the reservoir.
 
 ---

@@ -104,22 +104,17 @@ The file carries the section as one profile line with its maximum depth at
 elevation 0, and it carries the material. It carries no boundary conditions,
 which is what the next two sections build.
 
-Its global parameters are already set: **Units** `SI`, so the unit weight of water
-is 9.81 kN/m³ and heads read in meters. Conductivity is entered in m/s on this
-model, so every rate on this page is per second, and every discharge is cubic
-meters per second per meter of dam measured along its axis. The **Time** field
-stays blank: a steady analysis never reads it — the "per second" rides inside
-the conductivity values themselves — which is also why Studio's column headers
-show a bare `k1` with no unit suffix. A transient run is where the time unit has
-to be declared, as [SEEP-3](seep03_reservoir_drawdown.md) did with its day base.
-[SEEP-1](seep01_sheetpile.md#1-global-parameters) covers the rest of those
-fields.
+Its global parameters are already set: **Units** `SI` and **Time** `s`, so the
+unit weight of water is 9.81 kN/m³, heads read in meters, conductivities and
+fluxes in m/s, and every discharge in cubic meters per second per meter of dam
+measured along its axis.
+[SEEP-1](seep01_sheetpile.md#1-global-parameters) covers those fields.
 
 Click **Materials**, and on **Table view** set the **Show parameters for:** toggles
 to **Seepage** alone. One row, with the seepage band of the `mat` worksheet
 across it:
 
-| mat | name | k1 | k2 | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n |
+| mat | name | k1 (m/s) | k2 (m/s) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n |
 |:---:|---|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
 | 1 | `Dam fill` | 1 × 10<sup>−7</sup> | 1 × 10<sup>−7</sup> | 0 | `vg` | 0 | 0 | 0.2452 | 2.5739 |
 
@@ -343,7 +338,7 @@ selected.
 ![The boundary list with Flux 1 selected](images/seep04_studio_seep_bc.png)
 
 The list now reads `Head 1 (h = 10.0)`, the three flux blocks with their rates,
-and `Exit face`. Flux 1 is selected in the shot, so the **Flux value:** box shows
+and `Exit face`. Flux 1 is selected in the shot, so the **Flux value (m/s):** box shows
 its rate — as `8.94427e-09`, the box's own shortened display of the
 `8.94427191e-09` that was entered — and the points table below shows (20, 10) and
 (24, 12); the preview draws

@@ -92,9 +92,15 @@ def _model():
 
     Both tutorial files come through here, so the soil and the section are the
     same object in both, and both are the corpus file's.
+
+    The corpus file declares no Time unit (its rates carry the per-second
+    inside the numbers); the tutorial declares **s** explicitly, so every label
+    a reader sees — k1 (m/s), flux (m/s), the discharge title — states its
+    unit (owner's ruling: if the time base is seconds, say so).
     """
     sd = load_slope_data(BASE)
     sd.update(_EMPTY_SURFACES)
+    sd["time_unit"] = "s"
     return sd
 
 

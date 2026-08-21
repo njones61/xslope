@@ -464,7 +464,7 @@ The three inflow rows close on the outflow: 1.800 + 3.2000 − 0.0844 =
 1.800 × 10<sup>−7</sup> — while the drain's discharge rises by 75%. The rain
 partly replaces the reservoir rather than adding to it. The mechanism is the
 gradient: water moves from the reservoir toward the drain because the head falls
-between them, and the rate it moves at is set by how steeply. Rain landing on the
+between them, and the rate it moves at is set by how steeply the head falls. Rain landing on the
 dam's surface raises the head in the soil between them while the reservoir stays
 at 10 m, so what the reservoir has to push against is higher than it was. That
 flattens the gradient across the upstream face, and less

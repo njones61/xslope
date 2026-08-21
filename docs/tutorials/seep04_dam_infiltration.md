@@ -214,9 +214,6 @@ The blue squares up the submerged face are the specified-head nodes and the red
 circles along the base from x = 40 are the exit-face nodes — thirteen of them, the
 number the solver reports back when it runs.
 
-That figure is the check on the boundary conditions as much as on the mesh. A
-no-flow boundary is invisible in the input, so the only way to see where one
-begins is to see where the markers stop.
 
 ---
 

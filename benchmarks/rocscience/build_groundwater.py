@@ -71,15 +71,52 @@ ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 
 
-def _base_sd(k1=1e-5, kr0=1e-3, h0=-0.4):
+# ---------------------------------------------------------------------------
+# THE TIME BASE OF EACH STEADY CASE
+#
+# Every model here carries a conductivity, and a conductivity is a length over a
+# TIME, so each file declares the base its k is written in (the 'main' sheet's Time
+# selector).  The base is read off the vendor model, per case, never inherited from
+# a sibling: RS2 stores k in whatever base the model's own ``TimeUnit`` names, and
+# the set is not uniform -- ``#019``/``#020`` are hours and ``#021`` is minutes, and
+# their k values are the m/hr and m/min numbers to match (see the transient tiers
+# below, which already declare theirs).
+#
+# For the STEADY tier the vendor is unanimous.  Every one of ``groundwater #001``
+# through ``#013`` declares ``TimeUnit: second`` and ``metric permeability:
+# "meters/second"`` in its own ``.fea``, and each builder's k is that model's own
+# ``SK`` / conductivity-table value at face value in that base -- #002's 1e-05,
+# #009_01's 6.67e-06, #010's 1.1574e-05, #011's 1e-07, #012's 1e-05, #013's 0.001,
+# and the m/s fluxes the manual prints for #001 (2.5e-6), #007 (2.1e-4) and #008
+# (4.4444e-5).  So all thirteen declare ``sec``.
+#
+# GW9 dam 1 is the case worth naming, because the page reports its discharge in
+# m3/(min*m): that is a CONVERSION for comparison with Bowles, who works the dam in
+# m/min.  The file's own conductivity is the vendor's 6.67e-6 m/s, and the locked
+# flowrate 2.3069e-05 is the per-second number the page's 1.384e-3 is sixty times.
+# Its declared base is therefore ``sec``, like every other steady case; labelling it
+# per minute would put a unit on the figure that its own printed Q contradicts.
+# ---------------------------------------------------------------------------
+
+
+def _base_sd(k1=1e-5, kr0=1e-3, h0=-0.4, time_unit=None):
     """Seepage-only base model: one material with u='seep'; the LEM circle is
-    a placeholder (these problems are never solved for a factor of safety)."""
+    a placeholder (these problems are never solved for a factor of safety).
+
+    ``time_unit`` is the TIME BASE the case's conductivities are expressed against,
+    and every caller states it rather than inheriting a default: a conductivity is
+    length/time, so an undeclared base leaves the k column and the solved flowrate
+    as bare numbers in the figures, the Studio material table and the results CSV.
+    It is passed per case and never guessed -- the block comment above carries the
+    evidence each case's base rests on.
+    """
     sd = load_slope_data(ACADS_1A)
     m = dict(sd['materials'][0])
     m.update(name='Soil', c=1.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
              option='mc', u='seep', k1=k1, k2=k1, alpha=0.0, kr0=kr0, h0=h0)
     sd['materials'] = [m]
     sd['gamma_water'] = 9.81
+    sd['time_unit'] = time_unit
     sd['dloads'] = []
     sd['piezo_line'] = []
     sd['circular'] = True
@@ -106,7 +143,7 @@ def gw001():
     the SEEP2D cross-check documents); Q=P*L=2.5e-5 m3/s per m is exact by
     construction. The free surface is k- and unsat-model independent (mass balance
     sets it); the flowrate lock plus a mound-guarding head regression are taken."""
-    sd = _base_sd(k1=1e-5)
+    sd = _base_sd(k1=1e-5, time_unit='sec')
     from shapely.geometry import Polygon
     sd['profile_lines'] = []
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
@@ -147,7 +184,7 @@ def gw007():
     GW6/GW7 - only the flowrate is locked (Q=q*L=1.68e-4, exact by construction),
     with a head regression guarding the field. xslope reproduces the stated water
     table (daylights at el 0.30 at the toe) and the perched zone above the lens."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     med = dict(sd['materials'][0])
     med.update(name='Medium sand', k1=0.0014, k2=0.0014, alpha=0.0,
                kr0=1e-3, h0=-0.4, unsat='vg', vg_a=1.7745, vg_n=2.3276)
@@ -183,7 +220,7 @@ def gw002():
     heads at the 5 printed points - xslope matches Slide within 0.0013 m
     everywhere and the closed form within its own idealization error.
     Homogeneous confined flow: the head field is k-independent."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     from shapely.geometry import Polygon
     arc = [(4.0 - math.cos(t), math.sin(t))
            for t in [math.pi * i / 24 for i in range(25)]]
@@ -209,7 +246,7 @@ def gw003():
     x 8-20 impervious (no BC). Targets: head profiles along line 1-1 (y=-4)
     and line 2-2 (x=20) from Fig 3.5/3.6 - xslope within 0.08 m of the
     chart (Slide's markers coincide with Rushton & Redshaw's)."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     from shapely.geometry import Polygon
     sd['profile_lines'] = []
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
@@ -265,7 +302,7 @@ def gw004():
     0.377 / 0.394 / 0.401 / 0.404 / 0.407 at target_size 0.25 / 0.147 /
     0.09 / 0.06 / 0.045 / 0.03, and the tags run at 0.06."""
     from shapely.geometry import Polygon
-    sd = _base_sd(k1=1e-7, h0=-0.25)
+    sd = _base_sd(k1=1e-7, h0=-0.25, time_unit='sec')
     sd['profile_lines'] = []
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
         [(0.0, 0.0), (10.0, 5.0), (12.5, 5.0),
@@ -326,7 +363,7 @@ def gw005():
     water loads typed in. No result is affected — the file's only locks are the
     seepage flowrate and head field, and seepage never reads a surface load."""
     from shapely.geometry import Polygon
-    sd = _base_sd(k1=1e-10)
+    sd = _base_sd(k1=1e-10, time_unit='sec')
     host = sd['materials'][0]
     host.update(name='Material 1', k1=1e-10, k2=1e-10, alpha=0.0,
                 kr0=1.0, h0=-0.4)          # kr0=1 -> the vendor's constant k(psi)
@@ -366,7 +403,7 @@ def gw009a():
     Example 9-2 / Fig E9-2a: direct 11.01e-4, flow-net 12.8e-4, k = 4e-4 m/min
     = 6.67e-6 m/s). Dam 2 (the toe-drain variant, Bowles Fig E9-2b) is
     gw009b()."""
-    sd = _base_sd(k1=6.67e-6)
+    sd = _base_sd(k1=6.67e-6, time_unit='sec')
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, kr0=0.0, h0=0.0,
              unsat='vg', vg_a=0.2835, vg_n=2.765)
@@ -404,7 +441,7 @@ def gw009b():
     m3/(s*m) in Bowles' own units line. The k=2e-6 caption over-reads Q by ~10x
     (linear in k); see the GW9 section."""
     from shapely.geometry import Polygon
-    sd = _base_sd(k1=2e-7)
+    sd = _base_sd(k1=2e-7, time_unit='sec')
     body = sd['materials'][0]
     body.update(name='Dam fill', c=10.0, phi=30.0, k1=2e-7, k2=2e-7, alpha=0.0,
                 kr0=0.0, h0=0.0, unsat='vg', vg_a=0.2835, vg_n=2.765)
@@ -440,7 +477,7 @@ def gw010():
     4.87 vs Clement 4.8 / Slide 5.0 (the manual's "seepage face" column is
     the exit ELEVATION, not a face length). Only the tailwater-2 case has
     published numbers."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     sd['materials'][0].update(u='none', k1=1.1574e-5, k2=1.1574e-5, alpha=0.0,
                               unsat='vg', vg_a=0.64, vg_n=4.65,
                               kr0=0.001, h0=-1.0)
@@ -465,7 +502,7 @@ def gw012():
     (+1.1%) / Vedernikov k(B+AH)/2 = 4.0e-4 (+3.4%); flow-bulb half-width
     ~42 vs Slide 41 / theory 40. The detached bulb converges at
     max_iter=1500 (tag key), not the default 400."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     sd['materials'][0].update(u='none', k1=1e-5, k2=1e-5, alpha=0.0,
                               unsat='lf', kr0=0.001, h0=-1.0)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 40.0), (15.0, 40.0),
@@ -486,7 +523,7 @@ def gw013():
     """GW#13: Vedernikov's triangular ditch into a deep drainage layer,
     half-model: apex (0,40) to (10,50), k=1e-3. Q_half = 2.087e-2 vs Slide
     2.050e-2 (+1.8%) / Vedernikov 2.0e-2 (+4.3%). max_iter=1500 as GW#12."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     sd['materials'][0].update(u='none', k1=1e-3, k2=1e-3, alpha=0.0,
                               unsat='lf', kr0=0.001, h0=-1.0)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 40.0), (10.0, 50.0),
@@ -519,7 +556,7 @@ def gw011():
     from Table 11.1 (p.46) for the companion non-homogeneous case.
     Target: release point on the downstream face - Slide 19.397 m,
     ABAQUS/Zhang 19.64 m (p.46)."""
-    sd = _base_sd(k1=1e-7)
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     sd['materials'][0].update(name='Dam fill', kr0=0.0, h0=0.0,
                               unsat='gard', vg_a=0.15, vg_n=6.0)
     sd['profile_lines'] = [
@@ -572,7 +609,7 @@ def gw006a():
     Slide's curve there, mesh- and fit-insensitive; locked at xslope's own
     values. Cases 2 (9:1 anisotropy), 3 (core), 4 (infiltration) and 5
     (seepage face) are gw006b/c/d/e."""
-    sd = _base_sd(k1=1e-7)
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, kr0=0.0, h0=0.0, **_GW6_VG)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 0.0), (24.0, 12.0),
@@ -601,7 +638,7 @@ def gw006b():
     head 6.52 / 4.74 / 3.28 / 1.85 / 0.38 m at elevations 0 / 2 / 4 / 6 / 8 vs
     the chart's 6.5 / 4.7 / 3.2 / 1.85 / 0.4. Chart-only target (no tabulated
     value), so xslope's own flowrate and total-head field are locked."""
-    sd = _base_sd(k1=9e-7)
+    sd = _base_sd(k1=9e-7, time_unit='sec')
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, k1=9e-7, k2=1e-7, alpha=0.0,
              kr0=0.0, h0=0.0, **_GW6_VG)
@@ -642,7 +679,7 @@ def gw006c():
     every metre, and its core's is that function 100x lower, so both zones take
     the shared fit."""
     from shapely.geometry import Polygon
-    sd = _base_sd(k1=1e-7)
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     shell = sd['materials'][0]
     shell.update(name='Shell', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
                  kr0=0.0, h0=0.0, **_GW6_VG)
@@ -684,7 +721,7 @@ def gw006e():
     6.35 / 4.41 / 2.45 / 0.50 m at elevations 0 / 2 / 4 / 6 / 8 vs the chart's
     8.4 / 6.4 / 4.5 / 2.5 / 0.55. Chart-only target, so xslope's own flowrate
     and total-head field are locked."""
-    sd = _base_sd(k1=1e-7)
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
              kr0=0.0, h0=0.0, **_GW6_VG)
@@ -728,7 +765,7 @@ def gw006d():
     tracks the Slide markers to 0.19 m rms over the 13 stations, running above
     them by 0.18 m on average.
     Chart-only target, so xslope's own flowrate and total-head field are locked."""
-    sd = _base_sd(k1=1e-7)
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
              kr0=0.0, h0=0.0, **_GW6_VG)
@@ -791,7 +828,7 @@ def gw008():
     Targets are chart-only (the manual prints no point value and no
     discharge): the Fig 8.3 pressure-head contours above the water table
     and the Fig 8.4 total-head contours plus its drawn water table."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     soil_b = dict(sd['materials'][0])
     soil_b.update(name='Soil B', k1=1.111111e-4, k2=1.111111e-4, alpha=0.0,
                   kr0=0.0, h0=0.0, unsat='gard', vg_a=277.777, vg_n=4.2)

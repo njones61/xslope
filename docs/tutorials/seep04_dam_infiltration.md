@@ -104,7 +104,7 @@ The file carries the section as one profile line with its maximum depth at
 elevation 0, and it carries the material. It carries no boundary conditions,
 which is what the next two sections build.
 
-Its global parameters are already set: **Units** `SI` and **Time** `s`, so the
+Its global parameters are already set: **Units** `SI` and **Time** `sec`, so the
 unit weight of water is 9.81 kN/m³, heads read in meters, conductivities and
 fluxes in m/s, and every discharge in cubic meters per second per meter of dam
 measured along its axis.
@@ -114,7 +114,7 @@ Click **Materials**, and on **Table view** set the **Show parameters for:** togg
 to **Seepage** alone. One row, with the seepage band of the `mat` worksheet
 across it:
 
-| mat | name | k1 (m/s) | k2 (m/s) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n |
+| mat | name | k1 (m/sec) | k2 (m/sec) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n |
 |:---:|---|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
 | 1 | `Dam fill` | 1 × 10<sup>−7</sup> | 1 × 10<sup>−7</sup> | 0 | `vg` | 0 | 0 | 0.2452 | 2.5739 |
 
@@ -249,7 +249,10 @@ than over part of it.
 The heavy black line is the phreatic surface. It leaves the upstream face at the
 waterline, elevation 10, crosses under the crest at about elevation 7.6, and comes
 down to the base at x = 40, the upstream end of the drain — which is the drain
-doing its job. Below and left of that line the soil is saturated and the pressure
+doing its job. That is also where the water crosses: the drain's first meter
+passes over half the discharge, the shares fall away tenfold by mid-drain, and
+what little arrives farther along has percolated down through the unsaturated
+soil above. Below and left of that line the soil is saturated and the pressure
 head is positive; above it the soil is unsaturated and the pressure head is
 negative, which on the crest centerline reaches −4.2 m at the crest itself.
 
@@ -327,7 +330,7 @@ selected.
 ![The boundary list with Flux 1 selected](images/seep04_studio_seep_bc.png)
 
 The list now reads `Head 1 (h = 10.0)`, the three flux blocks with their rates,
-and `Exit face`. Flux 1 is selected in the shot, so the **Flux value (m/s):** box shows
+and `Exit face`. Flux 1 is selected in the shot, so the **Flux value (m/sec):** box shows
 its rate — as `8.94427e-09`, the box's own shortened display of the
 `8.94427191e-09` that was entered — and the points table below shows (20, 10) and
 (24, 12); the preview draws

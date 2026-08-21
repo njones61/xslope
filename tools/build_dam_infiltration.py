@@ -94,13 +94,13 @@ def _model():
     same object in both, and both are the corpus file's.
 
     The corpus file declares no Time unit (its rates carry the per-second
-    inside the numbers); the tutorial declares **s** explicitly, so every label
-    a reader sees — k1 (m/s), flux (m/s), the discharge title — states its
-    unit (owner's ruling: if the time base is seconds, say so).
+    inside the numbers); the tutorial declares **sec** explicitly (the template dropdown's token), so every label
+    a reader sees — k1 (m/sec), the flux value box, the discharge title —
+    states its unit (owner's ruling: if the time base is seconds, say so).
     """
     sd = load_slope_data(BASE)
     sd.update(_EMPTY_SURFACES)
-    sd["time_unit"] = "s"
+    sd["time_unit"] = "sec"
     return sd
 
 

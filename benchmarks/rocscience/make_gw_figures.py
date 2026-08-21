@@ -32,7 +32,7 @@ from PIL import Image
 from xslope.fileio import load_slope_data
 from xslope.mesh import get_material_polygons, build_mesh_from_polygons
 from xslope.seep import build_seep_data, run_seepage_analysis
-from xslope.plot import plot_inputs
+from xslope.plot import plot_inputs, declared_unit_labels
 from xslope.plot_seep import plot_seep_solution
 
 SRC = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience_gw')
@@ -225,7 +225,14 @@ def make_figure(stem, target_size, max_iter, panel_size=(8.0, 5.0), dpi=150):
                                mesh=False, pad_frac=CUSHION)
             head_title = f'{stem} — total head'
             if q is not None:
-                head_title += f'  (Q = {q:.3e})'
+                # The discharge carries its unit, from the file's own declarations
+                # (Units + Time), by the same rule plot_seep_solution's built-in
+                # title uses: labelled only when the model declares both, so a
+                # model with no time base prints a bare number rather than a
+                # guessed one. A flowrate is length³/time per length, and these
+                # problems do not all run on the same time base.
+                q_unit = (declared_unit_labels(seep_data) or {}).get('flowrate', '')
+                head_title += f'  (Q = {q:.3e}{" " + q_unit if q_unit else ""})'
             fig.axes[0].set_title(head_title)
         drawn_width = frame_panel(fig, fig.axes[0], xlim, ylim, drawn_width)
         p = os.path.join(OUT, f'_{stem}_{which}.png')

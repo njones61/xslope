@@ -381,19 +381,13 @@ and `Exit face`. Flux 1 is selected in the shot — its rate in the value box
 (displayed shortened), its two points below — and the preview draws the selected
 boundary bold over its stretch of the upstream face, dimming the others.
 
-Those endpoints are the corners of the dam's own surface, not points chosen off a
-mesh, and that is deliberate. The mesher pins a node at every boundary vertex, so
-a polyline defined on the section is honored at its stated length whatever element
-size is used. A polyline placed to land on the nodes of one particular mesh is not:
-an element edge carries load only when **both** of its corners lie on the polyline,
-so an endpoint falling part way along an edge drops that edge's water entirely, and
-the model quietly takes in less rain than it was given. That is not hypothetical
-on this dam: the source problem's own model picks its rain extent off mesh edges
-and stops one edge short of the waterline and one short of the toe, so the
-geometry-based boundary built here takes in about 4% more water than the
-published case —
-[the GW6 verification case](../verification/rocscience_groundwater.md#gw6)
-carries the two extents and the comparison.
+Those endpoints are the corners of the dam's own surface, and that is the habit
+to build: a boundary defined on the geometry is honored at its stated length on
+any mesh. The
+[GW6 verification case](../verification/rocscience_groundwater.md#gw6) shows
+what the alternative costs — the source problem's model picks its rain extent
+off mesh edges and ends up applying about 4% less water than falls on the
+surface.
 
 ### Where the rain meets the reservoir, the head wins
 

@@ -426,8 +426,7 @@ Click **Run → Run Seep…** and **Run**, with the same two settings as before 
 there is no need to rebuild the mesh, because every vertex of the three rain
 blocks already sits on a pinned node of the one built earlier. The solver
 reaches the answer in the same handful of sweeps it took in dry weather, with
-the same 13 of 13 exit-face nodes draining at the end: the rain costs the
-solution nothing in effort.
+the same 13 of 13 exit-face nodes draining at the end.
 
 ![The dam under steady rain](images/seep04_wet.png){width=1000}
 

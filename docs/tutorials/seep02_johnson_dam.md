@@ -49,7 +49,7 @@ and how to scale a flow net on a zoned section.
 
 ## The problem
 
-![The Johnson Reservoir dam](images/seep02_problem.png){width=1000}
+![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
 
 The section is 750 ft long and 180 ft tall at the crest. A 100 ft foundation runs
 the whole length of it, on rock at elevation 0. The embankment sits on that

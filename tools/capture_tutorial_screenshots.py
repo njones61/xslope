@@ -2000,6 +2000,153 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# FEM-1 — Strength Reduction Basics
+# --------------------------------------------------------------------------- #
+FEM01_START = os.path.join(REPO_ROOT,
+                           "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx")
+FEM01_DONE = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_ssrm_embankment.xlsx")
+
+
+def _fem_only(dlg):
+    """Untick every usage toggle but FEM, the mirror of ``_lem_only``.
+
+    The FEM band is not a band of its own: unit weight, the strength option and
+    c/φ are shared with the limit-equilibrium set, so ticking FEM alone still
+    shows the whole material — with E and ν, which is what the page's step adds,
+    at the right of the row instead of forty columns away.
+    """
+    toggles = getattr(dlg, "_toggles", None) or {}
+    for tag, cb in toggles.items():
+        cb.setChecked(tag == "fem")
+    return dlg
+
+
+def _fem01_meshed(path=FEM01_DONE):
+    """The completed model with the tutorial's own mesh attached.
+
+    The mesh is BUILT here rather than read from a sidecar: neither tutorial file
+    ships one, because building it is a step the page teaches. Studio's Run FEM
+    action is unreachable without a mesh, so the dialog is photographed in the
+    state the Build Mesh step leaves behind.
+
+    The element type and size are the COMPLETED file's, whichever model is being
+    meshed: the starter declares neither (the reader types them into Build Mesh),
+    and photographing its Run FEM dialog on a different discretization would put
+    two meshes in one tutorial.
+    """
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    done = _load(FEM01_DONE)
+    data = done if path == FEM01_DONE else _load(path)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data), done["target_size"], done["element_type"],
+            size_regions=extract_size_regions(data))
+    return data
+
+
+def fem01_materials():
+    """The materials editor, table view, FEM columns: the row the page's second
+    step completes.
+
+    Photographed on the COMPLETED file, so the figure is the state the reader is
+    working toward — E = 2,088,500 psf and ν = 0.3 filled in beside the strength
+    the limit-equilibrium run already used. The window reaches through ``nu``,
+    the last column this problem fills.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _fem_only(MaterialsEditor().build(_load(FEM01_DONE), None))
+    return _grab(_mat_table(dlg, through="nu"), "fem01_studio_materials.png")
+
+
+def fem01_run_lem():
+    """Run LEM on the STARTER — the model with no elastic constants at all.
+
+    The page opens on a factor of safety by slices, and this is the figure that
+    says why it can: the checks column beside the controls is clean and **Run** is
+    enabled on a material whose E and ν cells are empty, because neither is a
+    limit-equilibrium input. The same file will not run the finite element engine
+    until they are filled, which is the next shot's subject.
+    """
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(FEM01_START))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem01_studio_run_lem.png")
+
+
+def fem01_build_mesh():
+    """Build Mesh set to the tutorial's mesh: tri6, auto-sizing off, 3.5 ft.
+
+    Auto-size is unticked so the target size box is live — the completed file
+    declares 3.5, and a declared size is what turns auto-sizing off (see
+    ``MainWindow._file_defaults``), so this is the dialog the reader's own file
+    opens. tri6 is the element type the dialog already defaults to; the page's
+    point is that the default is quadratic and must stay that way.
+    """
+    from studio.dialogs import BuildMeshDialog
+
+    data = _load(FEM01_DONE)
+    dlg = BuildMeshDialog(defaults={"element_type": data["element_type"],
+                                    "target_size": float(data["target_size"]),
+                                    "auto_size": False})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem01_studio_build_mesh.png")
+
+
+def fem01_run_fem():
+    """The Run FEM dialog on the meshed model, as the reader presses **Run**.
+
+    SSRM with the bracket the page walks — F min 1.0, F max 2.0 — the 0.01
+    bisection tolerance, and the rest at the dialog's own defaults: rollers on the
+    sides, no K0 initialization, non-convergence as the failure criterion, and the
+    at-failure capture on with its 0.15 margin, which is what produces the
+    mechanism the results figures draw.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _fem01_meshed()
+    dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
+                                 "tolerance": 0.01},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem01_studio_run_fem.png")
+
+
+def fem01_run_fem_no_elastic():
+    """The same dialog on the STARTER, meshed but with E and ν still blank.
+
+    **Run** is disabled and the checks column names both missing constants. This
+    is the page's transition figure: the limit-equilibrium run above needed
+    neither, and the finite element run refuses without them.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _fem01_meshed(FEM01_START)
+    dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
+                                 "tolerance": 0.01},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem01_studio_run_fem_no_elastic.png")
+
+
+SHOTS.update({
+    "fem01_materials": fem01_materials,
+    "fem01_run_lem": fem01_run_lem,
+    "fem01_build_mesh": fem01_build_mesh,
+    "fem01_run_fem": fem01_run_fem,
+    "fem01_run_fem_no_elastic": fem01_run_fem_no_elastic,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

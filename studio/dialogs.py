@@ -90,6 +90,7 @@ FEM_SIDE_BC = [("rollers", "Rollers (vertical movement free)"),
                ("fixed", "Fixed (both components clamped)")]
 FEM_FAILURE_CRITERIA = [
     ("non_convergence", "Non-convergence"),
+    ("hybrid", "Hybrid (non-convergence + displacement)"),
     ("displacement_limit", "Displacement limit"),
     ("displacement_increase", "Displacement increase"),
 ]
@@ -551,7 +552,29 @@ class RunFemDialog(QDialog):
         self.tolerance.setDecimals(4)
         self.tolerance.setRange(0.0001, 1.0)
         self.tolerance.setValue(float(defaults.get("tolerance", 0.01)))
+        self.tolerance.setToolTip(
+            "How narrow the F bracket must get before the search stops — the "
+            "width of [F min, F max] after bisection, not a solver convergence "
+            "tolerance.")
         form.addRow("Tolerance (SSRM)", self.tolerance)
+
+        # Per-trial viscoplastic iteration budget. Trials just below the true FS
+        # need far more iterations to reach equilibrium than trials far from it;
+        # too small a budget makes near-failure trials read as failed and biases
+        # the reported FS low. Previously only the API exposed this
+        # (solve_fem/solve_ssrm max_iterations); a Studio run was pinned at the
+        # 3000 default with no way to reach the converged plateau.
+        self.max_iterations = QSpinBox()
+        self.max_iterations.setRange(500, 100000)
+        self.max_iterations.setSingleStep(500)
+        self.max_iterations.setValue(int(defaults.get("max_iterations") or 3000))
+        self.max_iterations.setToolTip(
+            "Viscoplastic iteration ceiling for EACH trial F (and single-F runs). "
+            "A trial that cannot reach equilibrium within this budget counts as "
+            "failed, so too small a value biases the SSRM factor of safety low. "
+            "Raise it if the reported FS keeps climbing when you do; it has "
+            "plateaued when raising it further changes nothing.")
+        form.addRow("Max iterations per trial", self.max_iterations)
 
         # Side boundary condition (v21 main!D22). Applies to both a single trial and
         # the SSRM — it is part of how the model is restrained, not part of the
@@ -821,6 +844,7 @@ class RunFemDialog(QDialog):
             "F_min": self.F_min.value(),
             "F_max": self.F_max.value(),
             "tolerance": self.tolerance.value(),
+            "max_iterations": self.max_iterations.value(),
             "failure_criterion": self.failure_criterion.currentData(),
             "min_slip_depth": (self.min_slip_depth.value()
                                if self.min_slip_on.isChecked()

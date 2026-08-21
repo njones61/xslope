@@ -4035,6 +4035,179 @@ def seep04_plots():
     capture("seep04_rain_sweep.png", _seep04_sweep_figure, sweep)
 
 
+# --------------------------------------------------------------------------- #
+# FEM-1 — Strength Reduction Basics
+# --------------------------------------------------------------------------- #
+#: FEM-1's file pair, written by ``tools/build_ssrm_embankment.py`` from the
+#: Griffiths & Lane Example 1 corpus model.  The starter carries no elastic
+#: constants, which is why the limit-equilibrium figures are drawn on IT — the
+#: page's opening claim is that a factor of safety by slices needs neither E nor
+#: nu, and drawing that state from the file that lacks them is the claim itself.
+FEM01_START = os.path.join(REPO_ROOT,
+                           "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx")
+FEM01_DONE = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_ssrm_embankment.xlsx")
+#: The method the page's limit-equilibrium number is quoted from.  Spencer
+#: because it satisfies both equilibrium conditions, which is the closest
+#: limit-equilibrium statement of the same problem the finite element run solves.
+FEM01_METHOD = "spencer"
+FEM01_SLICES = 40
+#: The strength-reduction run, all of it at ``solve_ssrm``'s own defaults except
+#: the criterion: bracket [1.0, 2.0], tolerance 0.01, 3000 iterations a trial.
+#: ``non_convergence`` rather than the API default ``hybrid`` because that is what
+#: Studio's Run FEM dialog runs — its Failure criterion list offers no hybrid
+#: entry, and its runner falls back to non-convergence.  On this model the two
+#: criteria return the same factor of safety trial for trial.
+FEM01_CRITERION = "non_convergence"
+FEM01_F_MIN, FEM01_F_MAX = 1.0, 2.0
+FEM01_TOLERANCE = 0.01
+
+
+def _fem01_mesh(model):
+    """The tutorial's mesh, built at the element type and size the COMPLETED FILE
+    declares rather than at numbers restated here — so the picture and the
+    workbook's main sheet cannot disagree."""
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(get_material_polygons(model),
+                                        model["target_size"],
+                                        model["element_type"],
+                                        size_regions=extract_size_regions(model))
+
+
+def _fem01_search(model, method=FEM01_METHOD):
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path, circles = circular_search(
+            model, method, num_slices=FEM01_SLICES, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache, path, circles
+
+
+def fem01_plots():
+    """The strength-reduction arc: the section, the limit-equilibrium answer, the
+    mesh, and the finite element run's three result panels at failure.
+
+    Printed rather than drawn: the limit-equilibrium search's critical circle, the
+    mesh counts, the whole bisection walk trial by trial with its iteration
+    counts, the factor of safety and the bracket it came from, and the two states
+    the last pair of figures compares — the last trial that reached equilibrium
+    and the captured collapse.  Every number the page quotes is on one of these
+    lines.
+
+    The two-state pair is drawn on ONE color range, exaggeration and arrow scale
+    (``shared_panel_scales``), so the difference between the two pictures is the
+    difference between the states and not the difference between two autoscales.
+    """
+    import time
+
+    import numpy as np
+
+    from xslope.fem import build_fem_data, solve_ssrm
+    from xslope.plot_fem import (plot_fem_data, plot_fem_results,
+                                 shared_panel_scales)
+
+    # ---- the section, and the answer that needs no elastic constants -------- #
+    start = load_slope_data(FEM01_START)
+    _u = declared_unit_labels(start)
+    mat = start["materials"][0]
+    print("   starter     %s · γ %g %s · c %g %s · φ %g° · option %s · E %r · ν %r"
+          % (mat["name"], mat["gamma"], _u["unit_weight"], mat["c"], _u["stress"],
+             mat["phi"], mat["option"], mat["E"], mat["nu"]))
+    print("   geometry    %s · one starting circle %s"
+          % (start["ground_surface"], start["circles"]))
+
+    capture("fem01_inputs.png", plot_inputs, start,
+            title="Slope Geometry and Inputs")
+
+    fs_cache, _path, _circles = _fem01_search(start)
+    crit = fs_cache[0]
+    capture("fem01_lem_solution.png", plot_solution, start, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    print("   LEM         %s FS %.4f on Xo %.4f Yo %.4f R %.4f (tangent depth "
+          "%.4f) · entry (%.3f, %.3f) exit (%.3f, %.3f) · %d candidates"
+          % (FEM01_METHOD, crit["FS"], crit["Xo"], crit["Yo"],
+             crit["Yo"] - crit["Depth"], crit["Depth"], xs[0], ys[0], xs[-1],
+             ys[-1], len(fs_cache)))
+
+    # ---- the mesh the strength reduction runs on ---------------------------- #
+    done = load_slope_data(FEM01_DONE)
+    dmat = done["materials"][0]
+    print("   completed   same soil with E %g %s · ν %g · declares %s at target "
+          "size %g %s" % (dmat["E"], _u["stress"], dmat["nu"],
+                          done["element_type"], done["target_size"], _u["length"]))
+    mesh = _fem01_mesh(done)
+    nodes = np.asarray(mesh["nodes"])
+    fem_data = build_fem_data(done, mesh)
+    print("   mesh        %d nodes · %d elements · every element %s · side BC %s"
+          % (len(nodes), len(mesh["elements"]), done["element_type"],
+             done.get("side_bc") or "rollers (the shipped default; the file "
+             "declares none)"))
+    capture("fem01_mesh.png", plot_fem_data, fem_data)
+
+    # ---- the strength reduction --------------------------------------------- #
+    log = io.StringIO()
+    t0 = time.time()
+    with contextlib.redirect_stdout(log):
+        result = solve_ssrm(fem_data, F_min=FEM01_F_MIN, F_max=FEM01_F_MAX,
+                            tolerance=FEM01_TOLERANCE, debug_level=1,
+                            failure_criterion=FEM01_CRITERION)
+    wall = time.time() - t0
+    print("   SSRM        FS %.4f from the bracket [%.4f, %.4f] (width %.4f) "
+          "after %d bisection steps · %.1f s wall"
+          % (result["FS"], result["final_interval"][0], result["final_interval"][1],
+             result["interval_width"], result["iterations_ssrm"], wall))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s iterations"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+
+    last, fail = result["last_solution"], result.get("failure_solution")
+    for label, field in (("last converged", last), ("at failure", fail)):
+        if field is None:
+            print("   %-12s none" % label)
+            continue
+        u = np.asarray(field["displacements"]).reshape(-1, 2)
+        umag = np.hypot(u[:, 0], u[:, 1])
+        i = int(np.argmax(umag))
+        ue = np.asarray(field["displacements_elastic"]).reshape(-1, 2)
+        print("   %-11s F %.4f · %s in %d iterations (%s) · max|u| %.6f %s at "
+              "(%.2f, %.2f), %.2f× the elastic %.6f"
+              % (label, field.get("F", float("nan")),
+                 "equilibrium" if field.get("converged") else "no equilibrium",
+                 field.get("iterations"), field.get("exit_reason"), umag.max(),
+                 _u["length"], nodes[i, 0], nodes[i, 1],
+                 umag.max() / np.hypot(ue[:, 0], ue[:, 1]).max(),
+                 np.hypot(ue[:, 0], ue[:, 1]).max()))
+
+    # The three panels the FEM Results view offers, each drawn on its own so the
+    # page can place them where its prose reaches them. Every one is at the
+    # captured at-failure field, which is the state the mechanism is visible in.
+    for name, kind in (("fem01_shear_strain.png", "shear_strain"),
+                       ("fem01_deformed.png", "deformation"),
+                       ("fem01_displacement_vectors.png", "displace_vector")):
+        capture(name, plot_fem_results, fem_data, last, plot_type=kind,
+                fs=result["FS"], failure_solution=fail, field_state="failure")
+
+    # The comparison the page's failure definition rests on: the same section at
+    # the last trial that reached equilibrium, beside the collapse. Only the
+    # converged panel is drawn here — ``fem01_shear_strain.png`` above IS the
+    # failed half, at the same color range, so drawing it twice would commit two
+    # identical files. The range, the exaggeration and the arrow length come from
+    # BOTH fields (shared_panel_scales), so a strain color means the same strain
+    # in the pair and the difference between the pictures is the difference
+    # between the states.
+    scales = shared_panel_scales(fem_data, [last, fail])
+    print("   shared      shear-strain range %s–%s · exaggeration %s · longest "
+          "arrow %s" % (scales["vmin"], scales["vmax"], scales["deform_scale"],
+                        scales["vector_max"]))
+    capture("fem01_shear_strain_converged.png", plot_fem_results, fem_data, last,
+            plot_type="shear_strain", fs=result["FS"], failure_solution=fail,
+            field_state="converged", vmin=scales["vmin"], vmax=scales["vmax"],
+            vector_max=scales["vector_max"])
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -4064,6 +4237,7 @@ GROUPS = {
     "seep02_plots": seep02_plots,
     "seep03_plots": seep03_plots,
     "seep04_plots": seep04_plots,
+    "fem01_plots": fem01_plots,
 }
 
 

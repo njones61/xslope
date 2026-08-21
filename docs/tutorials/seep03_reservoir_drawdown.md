@@ -298,7 +298,7 @@ plan that would restrict it: a finite-element stability analysis reading its
 pore pressures from this solution runs on this same mesh, and the FEM side
 requires quadratic elements — for that workflow, build the mesh as
 **Quadratic triangles (tri6)** from the start. This page stays with seepage, so
-tri3 serves.
+tri3 is sufficient.
 
 Leave **Auto-size from geometry** ticked, and set **Size divisions** to `64`. The
 grayed **Target element size** box does not follow the divisions — it keeps

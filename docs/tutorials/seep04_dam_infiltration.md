@@ -222,8 +222,8 @@ number the solver reports back when it runs.
 The rain is not in the model yet, so this first run is the dam in dry weather —
 the reference everything after it is read against. (If you downloaded the
 completed file rather than building the boundaries, the rain is already in it:
-read this run's numbers rather than reproducing them, and pick the keyboard back
-up at [Running it again](#running-it-again).)
+read this run's numbers rather than reproducing them, and resume at
+[Running it again](#running-it-again).)
 
 Click **Run → Run Seep…**
 

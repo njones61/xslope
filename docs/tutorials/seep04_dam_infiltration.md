@@ -377,12 +377,9 @@ set **Flux value (m/sec):**, and enter or copy-paste the block's two points.
 ![The boundary list with Flux 1 selected](images/seep04_studio_seep_bc.png)
 
 The list now reads `Head 1 (h = 10.0)`, the three flux blocks with their rates,
-and `Exit face`. Flux 1 is selected in the shot, so the **Flux value (m/sec):** box shows
-its rate — as `8.94427e-09`, the box's own shortened display of the
-`8.94427191e-09` that was entered — and the points table below shows (20, 10) and
-(24, 12); the preview draws
-the selected boundary bold, in orange, over that stretch of the upstream face, and
-dims the others.
+and `Exit face`. Flux 1 is selected in the shot — its rate in the value box
+(displayed shortened), its two points below — and the preview draws the selected
+boundary bold over its stretch of the upstream face, dimming the others.
 
 Those endpoints are the corners of the dam's own surface, not points chosen off a
 mesh, and that is deliberate. The mesher pins a node at every boundary vertex, so

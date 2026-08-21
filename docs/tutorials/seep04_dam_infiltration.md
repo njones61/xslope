@@ -272,6 +272,16 @@ the water table decides how much of the exit face runs; under the base, the
 drain runs end to end and the water table instead decides how the discharge is
 shared along it.
 
+Strictly, then, the heavy line over the drain is no longer a water table.
+Upstream of x = 40 it caps a saturated zone — the water table as usually meant.
+Over the drain there is no saturated zone beneath it to cap: the same ψ = 0
+rule is now tracing the atmospheric boundary itself. The figure shows the
+consequence. In a textbook flow net the uppermost flow line *is* the phreatic
+surface, but here a flow line rides **above** the heavy line on its way to the
+drain — the unsaturated soil over the drain still conducts, and the water
+percolating through it is still bound for the drain, so the flow lines pass
+through that zone rather than ending at the line.
+
 This run is the source problem's own dry-weather case, solved on the same section
 with the same soil, and its discharge of 2.808 × 10<sup>−7</sup> m³/s per m is the
 value

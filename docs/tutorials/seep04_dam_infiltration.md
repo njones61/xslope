@@ -259,6 +259,19 @@ downstream of x = 40. Below and left of that line the soil is saturated and the 
 head is positive; above it the soil is unsaturated and the pressure head is
 negative, which on the crest centerline reaches −4.2 m at the crest itself.
 
+This is materially different from an exit face on a slope, like the downstream
+face of [SEEP-2's dam](seep02_johnson_dam.md#the-seepage-face). There the
+phreatic surface meets the face partway up, and the face **above** that point
+deactivates: the soil behind it is unsaturated, gravity carries what water it
+holds down and away from the face rather than out through it, and the iteration
+releases those nodes — the seepage face's wet extent is the answer the solve
+finds. A drain along the **base** sits on the other side of gravity: everything
+above it drains *toward* it, so even where the soil over it is unsaturated the
+water still arrives, and every node stays an active outlet at ψ = 0. On a slope,
+the water table decides how much of the exit face runs; under the base, the
+drain runs end to end and the water table instead decides how the discharge is
+shared along it.
+
 This run is the source problem's own dry-weather case, solved on the same section
 with the same soil, and its discharge of 2.808 × 10<sup>−7</sup> m³/s per m is the
 value

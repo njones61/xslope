@@ -212,14 +212,7 @@ The mesh comes out at **473 nodes and 833 triangles**:
 
 The blue squares up the submerged face are the specified-head nodes and the red
 circles along the base from x = 40 are the exit-face nodes — thirteen of them, the
-number the solver reports back when it runs. The green triangles over the whole
-exposed surface are the rain, which the next section adds; they are drawn here
-because this is the mesh both runs use. Adding the rain does not change it: the
-mesher pins a node at every vertex of every boundary polyline, and all four
-vertices of the three rain blocks — (20, 10), (24, 12), (28, 12) and (52, 0) —
-are already nodes, the first because the reservoir polyline ends there, the last
-because the exit face does, and the two crest corners because the section itself
-turns there.
+number the solver reports back when it runs.
 
 That figure is the check on the boundary conditions as much as on the mesh. A
 no-flow boundary is invisible in the input, so the only way to see where one
@@ -408,9 +401,11 @@ Save the model. The completed file calls it `xslope_dam_infiltration.xlsx`.
 
 ## Running it again
 
-Click **Run → Run Seep…** and **Run**, with the same two settings as before. The
-solver reaches the answer in the same handful of sweeps it took in dry weather,
-with the same 13 of 13 exit-face nodes draining at the end: the rain costs the
+Click **Run → Run Seep…** and **Run**, with the same two settings as before —
+there is no need to rebuild the mesh, because every vertex of the three rain
+blocks already sits on a pinned node of the one built earlier. The solver
+reaches the answer in the same handful of sweeps it took in dry weather, with
+the same 13 of 13 exit-face nodes draining at the end: the rain costs the
 solution nothing in effort.
 
 ![The dam under steady rain](images/seep04_wet.png){width=1000}

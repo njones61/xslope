@@ -3910,7 +3910,12 @@ def seep04_plots():
     capture("seep04_inputs.png", plot_inputs, sd, mode="seep",
             title="Seepage Model Inputs", frame="content", show_mesh=False)
     figsize = _seep02_figsize(mesh)
-    capture("seep04_mesh.png", plot_seep_data, wet_data, figsize=figsize,
+    # The mesh figure shows the reader's OWN state at that point in the build:
+    # head and exit face entered, no rain yet — so it is drawn from the dry
+    # model's seep_data (same mesh; the completed model's flux vertices are all
+    # already-pinned points), and no flux markers appear before the reader has
+    # built a flux boundary.
+    capture("seep04_mesh.png", plot_seep_data, dry_data, figsize=figsize,
             show_bc=True)
 
     # One color scale over BOTH solutions, so the two panels compare directly.

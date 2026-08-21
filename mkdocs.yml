@@ -59,25 +59,25 @@ nav:
     - Overview: tutorials/index.md
     - Building Models Three Ways: tutorials/building_models.md
     - Limit Equilibrium:
-      - Simple Embankment: tutorials/lem01_simple_embankment.md
-      - Loads on the Crest: tutorials/lem02_loads_on_the_crest.md
-      - A Layered Slope: tutorials/lem03_layered_slope.md
-      - Water in the Slope: tutorials/lem04_water_in_the_slope.md
-      - A Weak Layer, Non-Circular: tutorials/lem05_weak_layer_noncircular.md
-      - Polygon Geometry: tutorials/lem06_polygon_geometry.md
-      - Strength Options Beyond Mohr-Coulomb: tutorials/lem07_strength_envelopes.md
-      - A Reinforced Slope (Geogrids): tutorials/lem08_reinforced_slope.md
-      - A Tieback Wall: tutorials/lem09_tieback_wall.md
-      - Finding the Global Minimum: tutorials/lem10_global_minimum.md
-      - Reliability: tutorials/lem11_reliability.md
-      - Piles: tutorials/lem12_piles.md
+      - 1. Simple Embankment: tutorials/lem01_simple_embankment.md
+      - 2. Loads on the Crest: tutorials/lem02_loads_on_the_crest.md
+      - 3. A Layered Slope: tutorials/lem03_layered_slope.md
+      - 4. Water in the Slope: tutorials/lem04_water_in_the_slope.md
+      - 5. A Weak Layer, Non-Circular: tutorials/lem05_weak_layer_noncircular.md
+      - 6. Polygon Geometry: tutorials/lem06_polygon_geometry.md
+      - 7. Strength Options Beyond Mohr-Coulomb: tutorials/lem07_strength_envelopes.md
+      - 8. A Reinforced Slope (Geogrids): tutorials/lem08_reinforced_slope.md
+      - 9. A Tieback Wall: tutorials/lem09_tieback_wall.md
+      - 10. Finding the Global Minimum: tutorials/lem10_global_minimum.md
+      - 11. Reliability: tutorials/lem11_reliability.md
+      - 12. Piles: tutorials/lem12_piles.md
     - Seepage:
-      - Confined Seepage Under a Sheetpile: tutorials/seep01_sheetpile.md
-      - Unconfined Seepage Through a Zoned Dam: tutorials/seep02_johnson_dam.md
-      - "Transient Seepage: Reservoir Drawdown": tutorials/seep03_reservoir_drawdown.md
-      - Infiltration and Flux Boundaries: tutorials/seep04_dam_infiltration.md
+      - 1. Confined Seepage Under a Sheetpile: tutorials/seep01_sheetpile.md
+      - 2. Unconfined Seepage Through a Zoned Dam: tutorials/seep02_johnson_dam.md
+      - "3. Transient Seepage: Reservoir Drawdown": tutorials/seep03_reservoir_drawdown.md
+      - 4. Infiltration and Flux Boundaries: tutorials/seep04_dam_infiltration.md
     - Finite Element:
-      - Strength Reduction Basics: tutorials/fem01_strength_reduction.md
+      - 1. Strength Reduction Basics: tutorials/fem01_strength_reduction.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

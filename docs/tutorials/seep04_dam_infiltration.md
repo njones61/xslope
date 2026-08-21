@@ -454,7 +454,7 @@ reports the water crossing it, and the ledger says something else:
 |---|---:|---:|
 | in at the reservoir | +2.808 × 10<sup>−7</sup> | +1.800 × 10<sup>−7</sup> |
 | in as rain, assembled | 0 | +3.2000 × 10<sup>−7</sup> |
-| of that, lost where the rain meets the reservoir and the drain | 0 | −0.0844 × 10<sup>−7</sup> |
+| of that, discarded on head and draining nodes | 0 | −0.0844 × 10<sup>−7</sup> |
 | out at the drain | −2.808 × 10<sup>−7</sup> | −4.916 × 10<sup>−7</sup> |
 
 The three inflow rows close on the outflow: 1.800 + 3.2000 − 0.0844 =

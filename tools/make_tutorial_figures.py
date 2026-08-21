@@ -328,36 +328,6 @@ def _hold_show():
         plt.show = orig
 
 
-def _lem02_problem_sketch(model):
-    """The page's opening sketch: the section, the surcharge, and the numbers.
-
-    ``frame="content"`` crops the panel to the model rather than padding the
-    section out to the figure's aspect. The strength and the load are read off
-    the model rather than written here, so the sketch cannot print a property
-    the file does not carry.
-    """
-    with _hold_show():
-        plot_inputs(model, title="Slope Geometry and Inputs", frame="content")
-    ax = plt.gcf().axes[0]
-    mat = model["materials"][0]
-    ax.text(30.0, 9.0,
-            "γ = %g pcf\nc = %g psf\nφ = %g" % (mat["gamma"], mat["c"],
-                                                          mat["phi"]),
-            ha="center", va="center", fontsize=11)
-    band = model["dloads"][0]
-    x0, x1 = band[0]["X"], band[-1]["X"]
-    q = max(pt["Normal"] for pt in band)
-    crest = max(pt["Y"] for pt in band)
-    top = crest + q / model["gamma_water"]        # how tall plot_dloads draws it
-    # The strip's width is dimensioned BELOW the loaded surface, where nothing
-    # else is drawn: above it the arrows run to the top of the frame.
-    ax.annotate("", xy=(x0, crest - 1.6), xytext=(x1, crest - 1.6),
-                arrowprops=dict(arrowstyle="<->", color="0.25", linewidth=1.0))
-    ax.text(0.5 * (x0 + x1), crest - 2.2, "%g ft" % (x1 - x0),
-            ha="center", va="top", fontsize=10, color="0.25")
-    ax.text(x1 + 1.5, 0.5 * (crest + top), "%g psf" % q,
-            ha="left", va="center", fontsize=11)
-
 
 def _lem02_search(model, method="spencer"):
     with contextlib.redirect_stdout(io.StringIO()):
@@ -404,9 +374,7 @@ def lem02_plots():
     # starting circle dropped. A trial circle is a step toward the answer rather
     # than part of the question, and the figure a reader decides the page by should
     # carry only what they are being asked about.
-    problem = copy.deepcopy(sd)
-    problem["circles"], problem["circular"] = [], False
-    capture("lem02_problem.png", _lem02_problem_sketch, problem)
+    # The problem figure is the hand drawing crest_surcharge.fodg (private repo).
 
     # Where the three paths rejoin: the same model with the circle back.
     capture("lem02_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
@@ -846,35 +814,6 @@ def lem06_sheets():
     render("lem06_sheet_circles.png", LEM06, "circles", rows=(1, 6), cols="A:H")
 
 
-def _lem06_problem_sketch(model):
-    """The page's opening sketch: the two zones, their strengths, and the base.
-
-    The starting circles are dropped from the model the sketch is drawn on — the
-    sketch states the problem, and the circles are an input the reader has not
-    entered yet. The strengths are read off the file rather than written here, so
-    the sketch cannot print a property the model does not carry.
-    """
-    bare = copy.deepcopy(model)
-    bare["circles"], bare["circular"] = [], False
-    with _hold_show():
-        plot_inputs(bare, title="Slope Geometry and Inputs", frame="content")
-    ax = plt.gcf().axes[0]
-    embankment, foundation = model["materials"][0], model["materials"][1]
-    # Each label sits inside the zone it names, where that zone is thickest: the
-    # embankment under its level crest, the foundation at the left edge where the
-    # base has dipped away from it and nothing else is drawn.
-    ax.text(80.0, 10.0, "%s\nγ = %g pcf\nc = %g psf\nφ = %g"
-            % (embankment["name"], embankment["gamma"], embankment["c"],
-               embankment["phi"]),
-            ha="center", va="center", fontsize=10)
-    ax.text(-25.0, -7.5, "%s\nγ = %g pcf\nc = %g psf\nφ = %g"
-            % (foundation["name"], foundation["gamma"], foundation["c"],
-               foundation["phi"]),
-            ha="center", va="center", fontsize=10)
-    # The two ends of the dipping base, called out below the hatching that draws it.
-    ax.text(-49.0, -17.5, "El. −15", ha="left", va="top", fontsize=10, color="0.25")
-    ax.text(119.0, -8.0, "El. −5", ha="right", va="top", fontsize=10, color="0.25")
-
 
 def lem06_plots():
     """The states LEM-6 reads, in the order the page walks them.
@@ -887,7 +826,7 @@ def lem06_plots():
     """
     sd = load_slope_data(LEM06)
 
-    capture("lem06_problem.png", _lem06_problem_sketch, sd)
+    # The problem figure is the hand drawing sloping_bottom.fodg (private repo).
     capture("lem06_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
 
     fs_cache, path, circles = _lem06_search(sd)
@@ -1118,30 +1057,6 @@ def _lem09_wedge(model, method=LEM09_METHOD):
     return slice_df, surface, result
 
 
-def _lem09_problem_sketch(model):
-    """The page's opening sketch: the wall, the two layers, the two tiebacks.
-
-    The strengths are read off the model, so the sketch cannot print a property
-    the file does not carry, and the wall height is measured from the profile
-    line's own vertical run rather than written here.
-    """
-    with _hold_show():
-        plot_inputs(model, title="Slope Geometry and Inputs", frame="content")
-    ax = plt.gcf().axes[0]
-    for mat, (x, y) in zip(model["materials"], ((135.0, 62.0), (95.0, 20.0))):
-        ax.text(x, y, "%s\nγ = %g pcf\nc = %g psf\nφ = %g" % (
-            mat["name"], mat["gamma"], mat["c"], mat["phi"]),
-            ha="center", va="center", fontsize=10)
-    face = [pt for pt in model["profile_lines"][1]["coords"] if pt[0] == 0.0]
-    top = max(y for _, y in face)
-    ax.annotate("", xy=(-6.0, 0.0), xytext=(-6.0, top),
-                arrowprops=dict(arrowstyle="<->", color="0.25", linewidth=1.0))
-    ax.text(-7.5, 0.5 * top, "%g ft wall" % top, ha="right", va="center",
-            rotation=90, fontsize=10, color="0.25")
-    for line in model["reinforcement_lines"]:
-        ax.text(line["x2"] + 2.0, line["y2"], "%s lb/ft" % f"{line['t_max']:,.0f}",
-                ha="left", va="center", fontsize=10)
-
 
 def lem09_sheets():
     """The five worksheets LEM-9's Excel path fills.
@@ -1178,9 +1093,7 @@ def lem09_plots():
     # The sketch a reader decides the page by carries the question, not a step
     # toward the answer: the entered wedge is dropped from it, as LEM-2 drops its
     # starting circle.
-    problem = copy.deepcopy(sd)
-    problem["non_circ"] = []
-    capture("lem09_problem.png", _lem09_problem_sketch, problem)
+    # The problem figure is the hand drawing tieback_wall.fodg (private repo).
 
     capture("lem09_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
 

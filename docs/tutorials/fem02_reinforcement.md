@@ -221,8 +221,8 @@ exists, so build one first. Click **Run → Build Mesh…**
 
 ![Build Mesh, set for this reinforced run](images/fem02_studio_build_mesh.png)
 
-Set **Element type** to **Quadratic triangles (tri6)**. A factor of safety needs
-quadratic elements — linear ones lock and report a factor of safety that is too
+Set **Element type** to **Quadratic triangles (tri6)**. A finite element slope
+stability analysis needs quadratic elements — linear ones lock and report a factor of safety that is too
 high — and [FEM-1](fem01_strength_reduction.md#building-the-mesh) measures what
 that costs on a slope of this kind.
 

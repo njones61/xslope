@@ -19,9 +19,10 @@ The example is the geogrid-reinforced sand fill from
 [LEM-8](lem08_reinforced_slope.md) — six layers of geogrid in a 24 ft fill under
 a crest surcharge — and it is solved three times. Spencer's method gives the
 reference answer. Then the same model is meshed and run by **strength
-reduction** twice: once with the bars elastic-perfectly-plastic, which is what
-every mainstream finite element code assumes unless told otherwise, and once
-with a residual capacity that takes effect after the bar ruptures.
+reduction** twice: once with the bars holding their full strength after they
+yield, which is what every mainstream finite element code assumes unless told
+otherwise, and once with a residual capacity that takes effect after the bar
+ruptures.
 
 [LEM-8](lem08_reinforced_slope.md) built this model and covers reinforcement
 lines, the capacity envelope and pullout lengths, and

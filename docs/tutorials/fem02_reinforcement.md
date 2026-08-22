@@ -132,9 +132,10 @@ A reinforcement element carries **two separate limits**, and that two-limit
 structure is the standard idealization the mainstream finite element codes
 share: PLAXIS, RS2 and FLAC all model reinforcement as a bond limit, perfectly
 plastic once it slips, plus a rupture limit for the reinforcement itself with an
-optional residual after it. XSLOPE's rupture limit is the same one — a blank
-`Tres` gives exactly what a PLAXIS geogrid does, elastoplastic with a maximum
-axial force. The bond limit is where the default differs. Those codes derive
+optional residual after it. XSLOPE handles rupture the same way: `Tmax` is the
+rupture limit, and with `Tres` left blank a bar that reaches it simply holds
+there — the elastic-perfectly-plastic geogrid those codes use by default. The
+bond limit is where the default differs. Those codes derive
 bond from a stress-dependent interface, so the length a bar needs to develop its
 full capacity changes along the line; XSLOPE's default instead reads a
 development length declared on the input, and its optional

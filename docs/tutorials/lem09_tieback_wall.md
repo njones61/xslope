@@ -128,10 +128,10 @@ afterwards to override it. That is why the capacity values below are their own
 table rather than running on from the endpoints: Type and its two settings sit
 between.
 
-| Tmax | Lp1 | Lp2 | Tend1 | Tend2 | Spacing |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| 15043.1 | 0 | 8.86735 | 0 | 0 | 1 |
-| 20527.2 | 0 | 12.1 | 0 | 0 | 1 |
+| Tmax | Lp1 | Lp2 | Adhesion | Delta | Tend1 | Tend2 | Spacing |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 15043.1 | 0 | 8.86735 |  |  | 0 | 0 | 1 |
+| 20527.2 | 0 | 12.1 |  |  | 0 | 0 | 1 |
 
 **Tmax is per foot of wall** — the anchor's bar capacity divided by the 8 ft
 horizontal spacing between anchors — which is why **Spacing** stays at 1: the
@@ -142,7 +142,10 @@ whole capacity is available right at that end, which is what a bearing plate on
 the wall face provides. **Lp2** is the far end's bond length — the length of grout
 it takes to develop Tmax — so the tension available tapers from full capacity down
 to zero over the last 8.87 ft of the upper anchor and the last 12.1 ft of the
-lower one. **Tend1** and **Tend2**, the end anchorage capacities, are 0 because
+lower one. **Adhesion** and **Delta** stay blank, which is what keeps the bond lengths in
+force; they are the alternative law, where the grout's resistance would follow the
+effective overburden instead. **Tend1** and **Tend2**, the end anchorage
+capacities, are 0 because
 the plate is already expressed as Lp1 = 0.
 
 **Soldier pile** — a separate input, on its own sheet and its own editor, because

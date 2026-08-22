@@ -89,9 +89,12 @@ SHEETS = [
     {"out": "sheet_dloads.png", "src": RAPID, "sheet": "dloads", "cols": "A:P"},
     {"out": "sheet_dloads2.png", "src": RAPID, "sheet": "dloads (2)", "cols": "A:P"},
     # reinforce/piles: stop at the real table edge — the columns beyond hold hidden
-    # dropdown-list source data (Z:AB). piles keeps its LEM/FEM colour key (to T).
+    # dropdown-list source data (AB:AD). piles keeps its LEM/FEM colour key (to T).
+    # A:T is the v24 reinforce sheet's own table edge: Adhesion and Delta sit
+    # between Lp2 and Tend1, so the table that used to end at Area in column R
+    # ends at Area in column T.
     {"out": "sheet_reinforce.png", "src": "docs/lem/files/xslope_reinforce.xlsx",
-     "sheet": "reinforce", "cols": "A:R"},
+     "sheet": "reinforce", "cols": "A:T"},
     {"out": "sheet_piles.png", "src": "docs/lem/files/xslope_piles.xlsx",
      "sheet": "piles", "cols": "A:T"},
     {"out": "sheet_lloads.png", "src": "docs/inputs/slope/xslope_nail_axial.xlsx",

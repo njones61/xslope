@@ -21,6 +21,7 @@ import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
 
 from .mesh import find_element_containing_point, interpolate_at_point
+from .water import seep_water_table_profile
 from .hoekbrown import hb_tangent
 
 _ito_matsui_warned = False  # module-level flag: warn once about large H
@@ -1071,6 +1072,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # In manual mode with_water_loads returns the caller's model by identity and
     # both derived lists are empty, so every list below is the one this function
     # has always built and the analysis is bit-identical.
+    # Resolve any overburden-dependent pullout law BEFORE with_water_loads, which
+    # in auto mode hands back a shallow copy: the refreshed point list has to land
+    # on the caller's model, not on a copy this function then drops.
+    if slope_data.get("reinforcement_lines"):
+        from .fileio import ensure_reinforce_pullout
+        ensure_reinforce_pullout(slope_data)
     from .water import with_water_loads, DERIVED_KEYS
     slope_data = with_water_loads(slope_data)
     dloads = list(slope_data["dloads"]) + list(slope_data.get(DERIVED_KEYS[1]) or [])
@@ -1156,6 +1163,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 "geom": LineString([(r["x1"], r["y1"]), (r["x2"], r["y2"])]),
                 "envelope": (r["t_max"], r["lp1"], r["lp2"],
                              r.get("tend1", 0.0), r.get("tend2", 0.0)),
+                "pullout": r.get("_pullout_profile"),
                 "length": length,
                 "dir": r.get("dir", "tangent"),
                 "appl": r.get("appl", "active"),
@@ -1578,49 +1586,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     water_table_y_all = np.full(len(slice_centers), np.nan)
     if any_gamma_sat:
         if has_seep_data:
-            cache = slope_data.get('_water_table_profile')
-            if cache is None:
-                mesh = slope_data['mesh']
-                seep_u = np.asarray(slope_data['seep_u'], dtype=float)
-                nodes = np.asarray(mesh['nodes'], dtype=float)
-                xs_grid = np.linspace(nodes[:, 0].min(), nodes[:, 0].max(), 201)
-                y_lo_all, y_hi_all = nodes[:, 1].min(), nodes[:, 1].max()
-                wt = np.full(xs_grid.shape, np.nan)
-                for k, xg in enumerate(xs_grid):
-                    def _u(yy):
-                        val, found = interpolate_at_point(
-                            mesh['nodes'], mesh['elements'], mesh['element_types'],
-                            seep_u, (xg, yy), return_found=True)
-                        return (val, found)
-                    u_lo, f_lo = _u(y_lo_all + 1e-6)
-                    u_hi, f_hi = _u(y_hi_all - 1e-6)
-                    if not (f_lo or f_hi):
-                        continue
-                    if f_hi and u_hi >= 0:
-                        wt[k] = y_hi_all          # fully saturated column
-                        continue
-                    if f_lo and u_lo <= 0:
-                        wt[k] = y_lo_all          # fully unsaturated column
-                        continue
-                    lo, hi = y_lo_all, y_hi_all
-                    for _ in range(30):           # bisect u(y) = 0
-                        mid = 0.5 * (lo + hi)
-                        um, fm = _u(mid)
-                        if not fm:
-                            hi = mid
-                            continue
-                        if um > 0:
-                            lo = mid
-                        else:
-                            hi = mid
-                    wt[k] = 0.5 * (lo + hi)
-                cache = (xs_grid, wt)
-                slope_data['_water_table_profile'] = cache
-                if piezo_line:
-                    print("gamma_sat weight split: using the seepage solution's u = 0 "
-                          "contour as the water table; the piezometric line is NOT "
-                          "used for unit weight (it may still supply pore pressure "
-                          "and plotting).")
+            had_cache = slope_data.get('_water_table_profile') is not None
+            cache = seep_water_table_profile(slope_data)
+            if not had_cache and piezo_line:
+                print("gamma_sat weight split: using the seepage solution's u = 0 "
+                      "contour as the water table; the piezometric line is NOT "
+                      "used for unit weight (it may still supply pore pressure "
+                      "and plotting).")
             xs_grid, wt = cache
             water_table_y_all = np.interp(slice_centers, xs_grid, wt)
         elif piezo_line:
@@ -1914,7 +1886,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 s_along = rl["geom"].project(intersec)
                 t_mx, lp1, lp2, te1, te2 = rl["envelope"]
                 t_i = rl["avail"](s_along, rl["length"] - s_along,
-                                  t_mx, lp1, lp2, te1, te2)
+                                  t_mx, lp1, lp2, te1, te2,
+                                  pullout=rl.get("pullout"))
             else:
                 # legacy point-list path (hand-built slope_data): interp on X
                 t_i = np.interp(intersec.x, rl["xs"], rl["ts"], left=0.0, right=0.0)

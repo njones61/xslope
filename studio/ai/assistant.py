@@ -200,7 +200,9 @@ the canvas re-renders automatically.
 - non_circ[i]: {'X':-10.0,'Y':0.0,'Movement':'Free'}
 - piezo_line / piezo_line2: list of (x, y) tuples.
 - dloads / dloads2: list of blocks; each block is a list of {'X','Y','Normal'} pts.
-- reinforcement_lines[i]: {'x1','y1','x2','y2','t_max','t_res','lp1','lp2','area','E'}
+- reinforcement_lines[i]: {'x1','y1','x2','y2','t_max','t_res','lp1','lp2','area','E',
+  'tend1','tend2','spacing','type','dir','appl','adhesion','delta'}
+  ('adhesion'+'delta' both set = overburden pullout law; 'lp1'/'lp2' then unused)
   # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
 - pile_lines[i]: {'x1','y1','x2','y2','D_pile','S','E','I','area','M_cap','V_cap',
   'theta_p','fixity','label','H'}

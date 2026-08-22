@@ -458,7 +458,7 @@ class _EditableTable(QWidget):
 
     def __init__(self, fields, rows, new_row, parent=None, swatch_state=None,
                  on_change=None, on_select=None, dim_rule=None, unit_labels=None,
-                 preset_spec=None):
+                 preset_spec=None, dim_on_edit=False):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
@@ -478,6 +478,11 @@ class _EditableTable(QWidget):
         # (kept read-only, value retained). The Materials editor uses it to mirror
         # the mat-sheet conditional formatting for an option=elastic row.
         self._dim_rule = dim_rule
+        # Whether a TYPED cell can change which cells apply. The materials rule is
+        # driven by combos, which re-derive on their own; the reinforcement rule is
+        # driven by whether Adhesion and Delta carry values, so it has to re-derive
+        # when one is typed or cleared.
+        self._dim_on_edit = bool(dim_on_edit)
         self._suppress_notify = True
         self._bases = [dict(r) for r in rows]  # keep originals to preserve extra keys
         # Optional leading display-color swatch column (Materials editor). It is a
@@ -530,7 +535,7 @@ class _EditableTable(QWidget):
         self._apply_dim_all()      # gray inapplicable cells (e.g. an elastic row)
         # Notifications are wired only AFTER the initial population, and item edits
         # go through a suppress flag, so building the table fires nothing.
-        self.table.itemChanged.connect(lambda *_: self._emit_change())
+        self.table.itemChanged.connect(self._on_item_changed)
         self.table.itemSelectionChanged.connect(self._emit_select)
         self._suppress_notify = False
 
@@ -905,6 +910,21 @@ class _EditableTable(QWidget):
                 it = self.table.item(i, j)
                 vals[f.key] = it.text() if it is not None else ""
         return vals
+
+    def _on_item_changed(self, item):
+        """A typed cell may change which cells apply — the reinforcement pullout
+        law is chosen by whether Adhesion and Delta carry values, not by a combo
+        — so the row's graying is re-derived from the edit before the change is
+        announced. (The materials rule is combo-driven and re-derives there.)"""
+        if (self._dim_rule is not None and self._dim_on_edit
+                and not self._suppress_notify):
+            prev = self._suppress_notify
+            self._suppress_notify = True
+            try:
+                self._apply_dim_row(item.row())
+            finally:
+                self._suppress_notify = prev
+        self._emit_change()
 
     def _apply_dim_all(self):
         if self._dim_rule is None:
@@ -4200,9 +4220,17 @@ class _LineListView(QWidget):
 
     def __init__(self, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, preview_caption=None, parent=None,
-                 unit_labels=None, dynamic_spec=None, preset_spec=None):
+                 unit_labels=None, dynamic_spec=None, preset_spec=None,
+                 switch_spec=None):
         super().__init__(parent)
         self._field_by_key = {f.key: f for f in fields}
+        # Optional per-line either/or switch inside one group (reinforcement's
+        # Pullout: development length OR overburden). It is a VIEW of the row —
+        # which pair carries values decides where it opens — not a stored field,
+        # so nothing new reaches the file. See _build_switch.
+        self._switch = switch_spec or None
+        self._switch_combo = None
+        self._switch_stash = {}   # row index -> {key: text} parked by a switch
         # Same preset rule the table view carries (reinforcement's Type -> Dir/Appl),
         # so the two views fill identically — see _apply_preset.
         self._preset = preset_spec or None
@@ -4355,6 +4383,8 @@ class _LineListView(QWidget):
         for title, group_rows in self._groups:
             g = QGroupBox(title)
             gv = QVBoxLayout(g)
+            if self._switch is not None and title == self._switch.get("group"):
+                gv.addWidget(self._build_switch())
             for keys in group_rows:
                 # A spacing-scaled field carries a long "per element / per unit width"
                 # label, so a pair containing one is broken onto full-width single rows
@@ -4375,6 +4405,86 @@ class _LineListView(QWidget):
         if driver is not None and hasattr(driver, "textChanged"):
             driver.textChanged.connect(lambda *_: self._relabel_dynamic())
         return scroll
+
+    # --- either/or switch -------------------------------------------------
+    def _build_switch(self):
+        """The group's law selector: one combo naming each option and the pair of
+        fields it governs.
+
+        Nothing about it is stored. The row itself says which law is in force —
+        for reinforcement, a filled Adhesion/Delta pair IS the overburden law —
+        so the combo opens where ``resolve`` puts it and the fields it does not
+        govern are grayed, values intact.
+        """
+        spec = self._switch
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 2, 0, 2)
+        h.setSpacing(4)
+        lab = QLabel(spec.get("label", "Mode"))
+        lab.setMinimumWidth(58)
+        combo = QComboBox()
+        for opt in spec["options"]:
+            combo.addItem(opt[1])
+        tip = spec.get("tooltip")
+        if tip:
+            lab.setToolTip(tip)
+            combo.setToolTip(tip)
+        combo.currentIndexChanged.connect(self._on_switch_changed)
+        h.addWidget(lab)
+        h.addWidget(combo, 1)
+        self._switch_combo = combo
+        return w
+
+    def _switch_index(self, row):
+        want = self._switch["resolve"](row)
+        for j, opt in enumerate(self._switch["options"]):
+            if opt[0] == want:
+                return j
+        return 0
+
+    def _apply_switch_state(self):
+        """Enable the governing pair, gray the rest — labels and edits alike, so a
+        dimmed field reads as inactive rather than merely unfocused."""
+        if self._switch_combo is None:
+            return
+        active = self._switch_combo.currentIndex()
+        for j, opt in enumerate(self._switch["options"]):
+            for key in opt[2]:
+                cell = self._cells.get(key)
+                if cell is not None:
+                    cell.setEnabled(j == active)
+
+    def _on_switch_changed(self, *_):
+        """Move the row onto the law the combo now names.
+
+        Only a SELF-ASSERTING pair is cleared, and it is parked rather than
+        dropped: values left in Adhesion and Delta would keep the overburden law
+        in force whatever the combo said, so leaving that option stashes them and
+        entering it again brings them back. The development lengths assert
+        nothing while the other law runs, so they merely dim — their values stay
+        in the cells, which is what the switch promises.
+        """
+        if self._switch_combo is None or self._cur < 0:
+            return
+        active = self._switch_combo.currentIndex()
+        stash = self._switch_stash.setdefault(self._cur, {})
+        for j, opt in enumerate(self._switch["options"]):
+            keys, asserting = opt[2], opt[3]
+            for key in keys:
+                w = self._edits.get(key)
+                if w is None or isinstance(w, QComboBox):
+                    continue
+                if j == active:
+                    if not w.text().strip() and stash.get(key):
+                        w.setText(stash.pop(key))
+                elif asserting:
+                    if w.text().strip():
+                        stash[key] = w.text()
+                    w.clear()
+        self._apply_switch_state()
+        self._commit()
+        self._preview.schedule()
 
     def apply_usage_filter(self, enabled):
         """Hide the form cells of fields whose usage tag is not enabled — the
@@ -4436,6 +4546,14 @@ class _LineListView(QWidget):
         # Loading blocks the driver's textChanged, so re-word the scaled labels from
         # the freshly-loaded Spacing/S here.
         self._relabel_dynamic()
+        # The either/or switch reads the freshly-loaded row, silently: seeding it
+        # is not the user choosing a law, so it must not move any value.
+        if self._switch_combo is not None:
+            self._switch_combo.blockSignals(True)
+            self._switch_combo.setCurrentIndex(
+                self._switch_index(self._rows[idx]) if ok else 0)
+            self._switch_combo.blockSignals(False)
+            self._apply_switch_state()
         self._form_scroll.setEnabled(ok)
         if ok:
             self._cur = idx
@@ -4546,7 +4664,7 @@ class _LineEditorDialog(QDialog):
                  preview_draw, pick_resolve, view_state, parent=None,
                  help_text=None, usage_toggles=None, preview_caption=None,
                  field_help=None, unit_labels=None, dynamic_spec=None,
-                 preset_spec=None):
+                 preset_spec=None, dim_rule=None, switch_spec=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -4558,6 +4676,12 @@ class _LineEditorDialog(QDialog):
         # Preset rule handed to BOTH views, so a Type picked in either fills the same
         # two columns from the same table (reinforcement; None elsewhere).
         self._preset_spec = preset_spec
+        # Per-row graying rule (row dict -> keys to gray) and the list view's
+        # either/or switch. Both express the SAME fact — which of two mutually
+        # exclusive parameter sets a row is using — so the table's grayed pair and
+        # the list's dimmed pair always agree.
+        self._dim_rule = dim_rule
+        self._switch_spec = switch_spec
         self._new_row = new_row
         self._groups = groups
         self._item_label = item_label
@@ -4704,7 +4828,9 @@ class _LineEditorDialog(QDialog):
                                      on_change=self._schedule_table_preview,
                                      on_select=self._schedule_table_preview,
                                      unit_labels=self._unit_labels,
-                                     preset_spec=self._preset_spec)
+                                     preset_spec=self._preset_spec,
+                                     dim_rule=self._dim_rule,
+                                     dim_on_edit=self._dim_rule is not None)
         self._table_preview = PreviewPane(
             lambda ax: self._preview_draw(ax, self._table.result_rows(),
                                           self._table.selected_row()),
@@ -4740,7 +4866,8 @@ class _LineEditorDialog(QDialog):
                 self._fields, self._rows, self._new_row, self._groups,
                 self._item_label, self._preview_draw, self._pick_resolve,
                 preview_caption=self._preview_caption, unit_labels=self._unit_labels,
-                dynamic_spec=self._dynamic_spec, preset_spec=self._preset_spec)
+                dynamic_spec=self._dynamic_spec, preset_spec=self._preset_spec,
+                switch_spec=self._switch_spec)
             self._list_lay.addWidget(self._list_view)
             # A lazily built list view starts under whatever the toggle bar
             # already says — the same filter the table is showing.
@@ -6446,7 +6573,11 @@ def _new_reinf():
             "t_max": 0.0, "t_res": 0.0,
             "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0,
             "type": "", "dir": "tangent", "appl": "active",
-            "tend1": 0.0, "tend2": 0.0, "spacing": 1.0}
+            "tend1": 0.0, "tend2": 0.0, "spacing": 1.0,
+            # Blank, not zero: a new line uses the development-length law, and a
+            # zero Adhesion with a zero Delta would be a real (and useless)
+            # overburden law rather than the absence of one.
+            "adhesion": float("nan"), "delta": float("nan")}
 
 
 # List-view form layout for a reinforcement line: every ReinforcementEditor.FIELDS
@@ -6457,7 +6588,8 @@ _REINF_FORM_GROUPS = [
     ("Identity", [["label"]]),
     ("Geometry", [["x1", "y1"], ["x2", "y2"]]),
     ("Capacity", [["t_max", "t_res"], ["E", "area"]]),
-    ("Anchorage", [["lp1", "lp2"], ["tend1", "tend2"], ["spacing"]]),
+    ("Anchorage", [["lp1", "lp2"], ["adhesion", "delta"],
+                   ["tend1", "tend2"], ["spacing"]]),
     ("Type", [["type"], ["dir", "appl"]]),
 ]
 
@@ -6472,9 +6604,12 @@ def _reinf_item_label(i, row):
 
 
 # Wording mirrors the 'reinforce' worksheet section of input_template.md. Tmax,
-# Lp1/Lp2, Tend1/Tend2 and Spacing form the capacity envelope used by BOTH LEM and
-# FEM (fem.py caps the truss yield force at the same envelope) even though their
-# header color is "LEM only" red — so they aren't tagged that way here. Type/Dir/
+# Lp1/Lp2, Adhesion/Delta, Tend1/Tend2 and Spacing form the capacity envelope used
+# by BOTH LEM and FEM (fem.py caps the truss yield force at the same envelope) even
+# though their header color is "LEM only" red — so they aren't tagged that way here.
+# Lp1/Lp2 and Adhesion/Delta are two ways to state ONE thing, the pullout law: a
+# filled Adhesion/Delta pair takes over and Lp1/Lp2 stop being read, which is what
+# the list view's Pullout switch and the grayed pair in either view say. Type/Dir/
 # Appl are truly LEM only (FEM ignores them); Tres/E/Area are truly FEM only.
 REINFORCE_HELP = {
     "label": "Name used in error messages, summaries, and plots (optional).",
@@ -6504,6 +6639,8 @@ REINFORCE_HELP = {
             "friction only; ÷ Spacing for discrete supports).",
     "lp1": "Pullout bond length at end 1 — tapers the mobilized force toward that end.",
     "lp2": "Pullout bond length at end 2 — tapers the mobilized force toward that end.",
+    "adhesion": "Adhesion = soil-reinforcement interface adhesion (blank = use Lp).",
+    "delta": "Delta = soil-reinforcement interface friction angle (blank = use Lp).",
     "spacing": "Out-of-plane spacing for discrete supports (nails, tiebacks); leave "
               "blank or 1 for geosynthetics (already per unit width). All capacity "
               "terms and Area are divided by it, once, for both engines.",
@@ -6545,6 +6682,17 @@ class ReinforcementEditor(CategoryEditor):
         Field("t_max", "Tmax", usage="lem", tooltip=REINFORCE_HELP["t_max"]),
         Field("lp1", "Lp1", usage="lem", tooltip=REINFORCE_HELP["lp1"]),
         Field("lp2", "Lp2", usage="lem", tooltip=REINFORCE_HELP["lp2"]),
+        # The overburden pullout law. applies=LF, like Spacing: both engines read
+        # it, so neither usage toggle may hide it. The sheet colors the whole
+        # envelope block one red; the editor leaves the both-engines members of
+        # that block uncolored, as it already does for Spacing.
+        # kind="optfloat", not "float": a cleared cell must come back BLANK, and a
+        # blank pair is what selects the development-length law. A plain float
+        # would read a cleared cell as 0.0 — a real, and refused, overburden law.
+        Field("adhesion", "Adhesion", "optfloat", applies=LF, unit="stress",
+              tooltip=REINFORCE_HELP["adhesion"]),
+        Field("delta", "Delta", "optfloat", applies=LF,
+              tooltip=REINFORCE_HELP["delta"]),
         Field("tend1", "Tend1", usage="lem", tooltip=REINFORCE_HELP["tend1"]),
         Field("tend2", "Tend2", usage="lem", tooltip=REINFORCE_HELP["tend2"]),
         Field("spacing", "Spacing", applies=LF, tooltip=REINFORCE_HELP["spacing"]),
@@ -6557,6 +6705,56 @@ class ReinforcementEditor(CategoryEditor):
         Field("E", "E", usage="fem", unit="stress", tooltip=REINFORCE_HELP["E"]),
         Field("area", "Area", usage="fem", tooltip=REINFORCE_HELP["area"]),
     ]
+    # Which pullout law a line uses is not a stored field — the row says it. A
+    # filled Adhesion/Delta pair IS the overburden law, and the development lengths
+    # stop being read; anything else is the development-length law, with Adhesion
+    # and Delta blank and free to be typed. One function answers that question for
+    # the table's graying, the list view's switch, and the preflight note, so the
+    # three cannot disagree.
+    @staticmethod
+    def pullout_mode(row):
+        """'overburden' when this row carries both Adhesion and Delta, else 'lp'."""
+        def _filled(v):
+            if v is None or (isinstance(v, str) and not v.strip()):
+                return False
+            try:
+                return float(v) == float(v)          # NaN is blank
+            except (TypeError, ValueError):
+                return False
+        return ("overburden" if _filled(row.get("adhesion")) and _filled(row.get("delta"))
+                else "lp")
+
+    @classmethod
+    def dim_keys(cls, row):
+        """Field keys to gray for a reinforcement row.
+
+        Only the pair the row is NOT using is grayed, and only when the other pair
+        is actually in force: a line on the development-length law leaves Adhesion
+        and Delta live, because graying an empty cell is graying out the only way
+        to fill it.
+        """
+        if cls.pullout_mode(row) == "overburden":
+            return frozenset(("lp1", "lp2"))
+        return frozenset()
+
+    SWITCH_SPEC = {
+        "group": "Anchorage",
+        "label": "Pullout",
+        # (id, label, fields, self-asserting). Adhesion/Delta are self-asserting:
+        # values left in them WOULD keep the overburden law in force, so leaving
+        # that option parks them. Lp1/Lp2 are inert while the other law runs, so
+        # they simply dim -- their values stay on screen and in the file.
+        "options": [("lp", "Development length (Lp1, Lp2)", ("lp1", "lp2"), False),
+                    ("overburden", "Overburden (Adhesion, Delta)",
+                     ("adhesion", "delta"), True)],
+        "resolve": lambda row: ReinforcementEditor.pullout_mode(row),
+        "tooltip": "Which pullout law this line uses. Development length develops "
+                   "the full capacity over Lp1/Lp2. Overburden develops it at "
+                   "2·(Adhesion + σ′v·tan Delta) per unit "
+                   "length, from the effective overburden at each point of the "
+                   "line.",
+    }
+
     # The sheet's Dir/Appl formulas, in the editor: picking a Type fills both from
     # the loader's own table; typing over either keeps it until a Type is picked
     # again. Handed to BOTH views (and used by a pasted Type), so the three ways a
@@ -6580,12 +6778,18 @@ class ReinforcementEditor(CategoryEditor):
                                      "tend1": "force", "tend2": "force",
                                      "area": "area"}},
             preset_spec=self.PRESET_SPEC,
+            dim_rule=self.dim_keys,
+            switch_spec=self.SWITCH_SPEC,
             help_text="List view edits one line at a time as a grouped form beside a "
                       "live section preview; the table view is available for bulk entry "
                       "of the many lines of a tiered wall. Both views edit the same rows, "
-                      "so switching is lossless. Lp1/Lp2 are the pullout lengths at each "
-                      "end (0 = fully anchored); the LEM tension distribution on the "
-                      "preview is derived from these. Picking a Type fills Dir and Appl "
+                      "so switching is lossless. A line develops its pullout capacity one "
+                      "of two ways, chosen per line by the Pullout switch: over the "
+                      "development lengths Lp1/Lp2 (0 = fully anchored), or from the "
+                      "effective overburden through Adhesion and Delta. The pair not in "
+                      "use is grayed, values intact. The LEM tension distribution on the "
+                      "preview is derived from whichever is in force. Picking a Type "
+                      "fills Dir and Appl "
                       "— change either afterwards to override it — and a blank Type is a "
                       "generic tensile line. Tend1/Tend2 are the "
                       "end-anchorage capacities; capacities and E/Area are per-unit-width "
@@ -6597,11 +6801,15 @@ class ReinforcementEditor(CategoryEditor):
             field_help=REINFORCE_HELP)
 
     def apply(self, slope_data, dlg):
-        from xslope.fileio import build_reinforce_lines
+        from xslope.fileio import build_reinforce_lines, attach_reinforce_pullout
         rows = dlg.result_rows()
         slope_data["reinforcement_lines"] = rows
         # Rebuild the LEM display/analysis format so the canvas reflects the edit.
         slope_data["reinforce_lines"] = build_reinforce_lines(rows)
+        # An edited Adhesion/Delta changes the envelope's shape, not just its
+        # numbers, so the pullout profiles are rebuilt here rather than waiting
+        # for a solve — the canvas draws the curve the analysis will use.
+        attach_reinforce_pullout(slope_data)
 
 
 # --- line loads ------------------------------------------------------------- #

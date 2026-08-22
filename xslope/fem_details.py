@@ -495,6 +495,7 @@ def _reinforcement_line_inputs(fem_data, slope_data, line_id):
         "lp2": float(ln.get("lp2", 0.0) or 0.0),
         "tend1": float(ln.get("tend1", 0.0) or 0.0),
         "tend2": float(ln.get("tend2", 0.0) or 0.0),
+        "pullout": ln.get("_pullout_profile"),
     }
 
 
@@ -508,24 +509,31 @@ def capacity_envelope(inputs, n=241):
     ``Tmax`` in the middle, and the step to the connection capacity ``Tend`` at
     an anchored end. The sample grid always includes the envelope's own kinks,
     so the polyline drawn through it is exact rather than merely dense.
+
+    Under the overburden-dependent pullout law the ramps are curves rather than
+    straight lines — the resistance follows the depth of burial along the line —
+    and the curve has no kinks to solve for, so the even grid carries it.
     """
     L = inputs["length"]
     t_max, lp1, lp2 = inputs["t_max"], inputs["lp1"], inputs["lp2"]
     tend1, tend2 = inputs["tend1"], inputs["tend2"]
+    pullout = inputs.get("pullout")
 
     kinks = {0.0, L}
-    if lp1 > 0 and tend1 < t_max and t_max > 0:
-        kinks.add(min(L, (t_max - tend1) * lp1 / t_max))
-    if lp2 > 0 and tend2 < t_max and t_max > 0:
-        kinks.add(max(0.0, L - (t_max - tend2) * lp2 / t_max))
-    if lp1 > 0 and lp2 > 0 and t_max > 0:
-        m1, m2 = t_max / lp1, t_max / lp2
-        s_x = (tend2 + m2 * L - tend1) / (m1 + m2)
-        if 0.0 < s_x < L and (tend1 + m1 * s_x) < t_max:
-            kinks.add(s_x)
+    if pullout is None:
+        if lp1 > 0 and tend1 < t_max and t_max > 0:
+            kinks.add(min(L, (t_max - tend1) * lp1 / t_max))
+        if lp2 > 0 and tend2 < t_max and t_max > 0:
+            kinks.add(max(0.0, L - (t_max - tend2) * lp2 / t_max))
+        if lp1 > 0 and lp2 > 0 and t_max > 0:
+            m1, m2 = t_max / lp1, t_max / lp2
+            s_x = (tend2 + m2 * L - tend1) / (m1 + m2)
+            if 0.0 < s_x < L and (tend1 + m1 * s_x) < t_max:
+                kinks.add(s_x)
     s = np.unique(np.concatenate([np.linspace(0.0, L, n), np.array(sorted(kinks))]))
     T = np.array([reinforce_available_tension(float(v), L - float(v), t_max,
-                                              lp1, lp2, tend1, tend2) for v in s])
+                                              lp1, lp2, tend1, tend2,
+                                              pullout=pullout) for v in s])
     return s, T
 
 
@@ -547,13 +555,11 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     ``x``, ``y`` : centroid coordinates
     ``T`` : mobilized axial force at each centroid
     ``t_allow`` : the solver's capacity at each centroid (``t_allow_by_1d_elem``)
-    ``t_cap`` : the capacity the solve actually enforced — identical to
-        ``t_allow`` unless the optional bond-slip model re-capped the line
     ``t_res`` : residual (post-peak) capacity, NaN where the line never softens
     ``failed``, ``softened`` : per-element state flags
     ``field_state`` : the state the series above were read at
     ``env_s``, ``env_T`` : the analytic capacity envelope (None without model
-        inputs, in which case the per-element ``t_cap`` is the capacity to draw)
+        inputs, in which case the per-element ``t_allow`` is the capacity to draw)
     ``bond_s``, ``bond_q`` : mobilized bond force per unit length, dT/ds, at the
         boundaries between consecutive elements
     ``slip_modelled`` : False — see note below
@@ -599,9 +605,6 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     forces = _sol_array(field, "forces_1d", n_1d)
     failed = _sol_array(field, "failed_1d_elements", n_1d, dtype=bool)
     softened = _sol_array(field, "softened_1d_elements", n_1d, dtype=bool)
-    t_cap_all = _sol_array(field, "t_cap_1d", n_1d, fill=np.nan)
-    if not np.any(np.isfinite(t_cap_all)):
-        t_cap_all = t_allow
 
     idx = idx[elen[idx] > 0] if len(idx) else idx
     order = np.argsort(d1[idx], kind="stable") if len(idx) else np.array([], int)
@@ -625,7 +628,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         env_s = env_T = None
 
     T = forces[idx]
-    cap = t_cap_all[idx]
+    cap = t_allow[idx]
     with np.errstate(divide="ignore", invalid="ignore"):
         util = np.where(cap > 1e-12, T / cap, np.nan)
 
@@ -678,7 +681,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     # The LINE's verdict, from the one function that decides it.
     status_key, status = reinforcement_status(
         T, t_allow[idx], t_res=tr, failed=failed[idx], softened=soft,
-        t_cap=cap, utilization=util)
+        utilization=util)
     badge = reinforcement_badge(status_key, peak_util)
 
     return {
@@ -692,7 +695,6 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "y": pts[:, 1] if len(pts) else np.zeros(0),
         "T": T,
         "t_allow": t_allow[idx],
-        "t_cap": cap,
         "t_res": t_res[idx],
         "utilization": util,
         "failed": failed[idx],
@@ -815,7 +817,7 @@ def _line_array(value, n, fill=0.0, dtype=float):
 
 
 def reinforcement_status(force, t_allow, t_res=None, failed=None, softened=None,
-                         t_cap=None, utilization=None):
+                         utilization=None):
     """The verdict for ONE reinforcement line, from its per-element arrays.
 
     Returns ``(key, phrase)`` — a key from :data:`REINFORCEMENT_STATES` and the
@@ -831,9 +833,7 @@ def reinforcement_status(force, t_allow, t_res=None, failed=None, softened=None,
     t_res : residual capacity at each element, NaN where the line never softens
     failed, softened : the solver's two latches — reached the capacity it was
         given, and dropped off it onto the residual
-    t_cap : the capacity the solve actually enforced, where it differs from
-        ``t_allow`` (the optional bond-slip model); ``t_allow`` is used without it
-    utilization : force over enforced capacity, computed here when not supplied
+    utilization : force over capacity, computed here when not supplied
 
     Precedence, in :data:`REINFORCEMENT_STATE_ORDER`: an element that softened
     with nothing left to hold and no force in it makes the line **ruptured**;
@@ -852,12 +852,9 @@ def reinforcement_status(force, t_allow, t_res=None, failed=None, softened=None,
     t_res = _line_array(t_res, n, np.nan)
     failed = _line_array(failed, n, False, bool)
     softened = _line_array(softened, n, False, bool)
-    cap = _line_array(t_cap, n, np.nan)
-    if not np.any(np.isfinite(cap)):
-        cap = t_allow
     if utilization is None:
         with np.errstate(divide="ignore", invalid="ignore"):
-            util = np.where(cap > 1e-12, force / cap, np.nan)
+            util = np.where(t_allow > 1e-12, force / t_allow, np.nan)
     else:
         util = _line_array(utilization, n, np.nan)
 
@@ -873,8 +870,8 @@ def reinforcement_status(force, t_allow, t_res=None, failed=None, softened=None,
         return _verdict("softened")
 
     # At capacity, by either reading of it: the solver latched the element when
-    # it reached the capacity it was given, and the force stands at the capacity
-    # the solve enforced. WHERE those elements sit is the whole distinction.
+    # it reached the capacity it was given, and the force stands at that
+    # capacity. WHERE those elements sit is the whole distinction.
     # An element inside a pullout ramp carries less than the line's Tmax because
     # there is less embedment to develop it; the zero-capacity elements at the
     # very ends belong to the ramps too.
@@ -1305,7 +1302,7 @@ def profile_table(profile):
         series = [
             (f"position{ln}", profile["s"]),
             (f"axial_force{fo}", profile["T"]),
-            (f"capacity{fo}", profile["t_cap"]),
+            (f"capacity{fo}", profile["t_allow"]),
             (f"residual_capacity{fo}", profile["t_res"]),
             ("utilization", profile["utilization"]),
             ("failed", profile["failed"].astype(int)),

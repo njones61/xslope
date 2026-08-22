@@ -824,6 +824,8 @@ resisting side and divided by FS, i.e. it mobilizes with the soil. Filled by Typ
 tiebacks) enter the per-element capacity and provide **Spacing**, and xslope divides for you.<br>
 >>Lp1 **[L]**: Pullout bond length at end 1<br>
 >>Lp2 **[L]**: Pullout bond length at end 2<br>
+>>Adhesion **[F/L²]**: Soil-reinforcement interface adhesion. Leave blank to use Lp1/Lp2.<br>
+>>Delta **[degrees]**: Soil-reinforcement interface friction angle. Leave blank to use Lp1/Lp2.<br>
 >>Tend1 — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Anchorage/plate/connection capacity at end 1 (0 = friction only)<br>
 >>Tend2 — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Anchorage/plate/connection capacity at end 2 (0 = friction only)<br>
 >>Spacing **[L]**: Out-of-plane spacing for discrete supports. Leave blank (or 1) for geosynthetics, whose properties are
@@ -844,6 +846,13 @@ envelope is what `Tmax`, `Lp1`, `Lp2`, `Tend1` and `Tend2` describe between them
 FEM. The envelope, the end-condition cases, and how to convert a bond strength into an `Lp`, are all set out in
 **[Soil Reinforcement in LEM](../lem/reinforcement.md#capacity-envelope)** — the figures there are the quickest way
 to see what a given combination of columns actually produces.
+
+`Adhesion` and `Delta` are the alternative to `Lp1`/`Lp2`: instead of a fixed development length they state the
+interface strength, and the pullout resistance then follows the effective overburden along the line —
+$2(a + \sigma'_v\tan\delta)$ per unit length, with $\sigma'_v$ the weight of the soil column above each point less
+the pore pressure the model declares there. Fill **both** to use it, in which case `Lp1` and `Lp2` are not read;
+leave **both** blank for the development-length law. One filled and one blank is refused. See
+[Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden).
 
 How the force is then *used* differs by analysis:
 

@@ -55,6 +55,34 @@ The envelope for each of the four end conditions. The force available where a tr
 the envelope value at the crossing point, so a surface that clips a line near a free end mobilizes only a
 fraction of $T_{max}$.
 
+### Pullout from the effective overburden
+
+$L_p$ states the bond as a development length: the capacity grows at a constant rate $T_{max}/L_p$ no matter how
+deep the reinforcement is buried. Interface friction does not work that way — it grows with the normal stress
+pressing the soil onto the reinforcement — so the **Adhesion** and **Delta** columns state the interface strength
+instead and let the resistance follow the depth of burial. Per unit length of a planar reinforcement, with soil
+bearing on both faces:
+
+>$r(s) = 2\left(a + \sigma'_v(s)\tan\delta\right)$
+
+where $a$ is the soil–reinforcement adhesion (stress units), $\delta$ the interface friction angle (degrees), and
+$\sigma'_v(s)$ the **effective** vertical stress at the point $s$ along the line: the weight of the soil column
+standing above that point — every material zone it crosses at that material's unit weight, saturated below the
+water table where the material declares a $\gamma_{sat}$ — less the pore pressure the model declares there
+(piezometric line, $r_u$, or seepage field, exactly as a slice base reads it).
+
+The envelope is then the same three-way minimum, with the ramps integrated rather than assumed linear:
+
+>$T(s) = \min\left(T_{max},\;\; T_{end1} + \displaystyle\int_0^s r,\;\; T_{end2} + \int_s^L r\right)$
+
+A constant $r$ recovers the straight ramps above, so the two laws are one formula. Both columns filled selects
+this law and $L_{p1}$/$L_{p2}$ are then not read; both blank is the default and leaves the development-length law
+exactly as it was. One filled and one blank is refused — half a law is not a law. LEM and FEM read the same
+envelope under either law.
+
+**FHWA pullout capacity.** The FHWA form $F^{*}\alpha\sigma'_v$ per unit area is this law with $a = 0$ and
+$\delta = \arctan(F^{*}\alpha)$.
+
 **Grouted tiebacks with a bonded length.** A tieback develops pullout resistance only over its grouted (bonded)
 length $L_{bond}$ at the far end, at a bond strength $b$ (force per unit length); the free length carries whatever
 force the bond zone can supply. This is expressed in the envelope by entering an effective

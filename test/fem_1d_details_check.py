@@ -381,8 +381,8 @@ def test_envelope_mutation():
 
     real = fileio.reinforce_available_tension
 
-    def mutated(d1, d2, t_max, lp1, lp2, tend1=0.0, tend2=0.0):
-        return 0.5 * real(d1, d2, t_max, lp1, lp2, tend1, tend2)
+    def mutated(d1, d2, t_max, lp1, lp2, tend1=0.0, tend2=0.0, pullout=None):
+        return 0.5 * real(d1, d2, t_max, lp1, lp2, tend1, tend2, pullout=pullout)
 
     fileio.reinforce_available_tension = mutated
     try:
@@ -470,30 +470,32 @@ def test_reload():
                     b = fd.pile_profile(fem_data, back, pidx, slope_data)
                     _same_profile(a, b, f"pile {pidx}", fails)
 
-            # The reinforcement sidecar now carries the cap the solve enforced,
-            # and an older file without that column still reads.
+            # The capacity is the model's — build_fem_data rebuilds
+            # t_allow_by_1d_elem on reload — so the sidecar carries no cap
+            # column of its own, and a file that still has one reads anyway.
             if kind == "reinforcement":
                 import pandas as pd
                 csv = stem.parent / f"{stem.name}_fem_reinf.csv"
                 df = pd.read_csv(csv, comment="#")
-                if "t_cap" not in df.columns:
-                    fails.append("the reinforcement sidecar has no t_cap column")
-                old = stem.parent / "old"
-                df.drop(columns=["t_cap"]).to_csv(
-                    stem.parent / "old_fem_reinf.csv", index=False)
+                if "t_cap" in df.columns:
+                    fails.append("the reinforcement sidecar still writes a "
+                                 "t_cap column")
+                stale = stem.parent / "stale"
+                df.assign(t_cap=df["t_allow"]).to_csv(
+                    stem.parent / "stale_fem_reinf.csv", index=False)
                 for suffix in ("nodes", "elements"):
-                    (stem.parent / f"old_fem_{suffix}.csv").write_bytes(
+                    (stem.parent / f"stale_fem_{suffix}.csv").write_bytes(
                         (stem.parent / f"{stem.name}_fem_{suffix}.csv").read_bytes())
                 try:
-                    legacy = import_fem_solution(fem_data, old)
+                    legacy = import_fem_solution(fem_data, stale)
                 except Exception as exc:
-                    fails.append(f"a sidecar without t_cap fails to load: {exc!r}")
+                    fails.append(f"a sidecar carrying t_cap fails to load: {exc!r}")
                 else:
-                    got = np.asarray(legacy.get("t_cap_1d"), dtype=float)
-                    want = np.asarray(fem_data["t_allow_by_1d_elem"], dtype=float)
+                    got = np.asarray(legacy.get("forces_1d"), dtype=float)
+                    want = np.asarray(solution["forces_1d"], dtype=float)
                     if got.shape != want.shape or not np.allclose(got, want):
-                        fails.append("a sidecar without t_cap does not fall back "
-                                     "to t_allow")
+                        fails.append("a sidecar carrying t_cap does not reload "
+                                     "its bar forces")
     return fails
 
 
@@ -685,7 +687,7 @@ def test_field_state_profiles():
         if np.allclose(conv["T"], fail["T"]):
             fails.append(f"line {line_id}: the at-failure axial force equals the "
                          f"converged one — the switch reads the same field twice")
-        if not np.allclose(conv["t_cap"], fail["t_cap"], equal_nan=True):
+        if not np.allclose(conv["t_allow"], fail["t_allow"], equal_nan=True):
             fails.append(f"line {line_id}: the capacity moved with the field state")
         if not np.allclose(conv["env_T"], fail["env_T"]):
             fails.append(f"line {line_id}: the capacity envelope moved with the "

@@ -354,6 +354,12 @@ def _roundtrip_diff(a, b, path=''):
         if not isinstance(b, dict):
             return [f"{path}: dict vs {type(b).__name__}"]
         for k in a:
+            # Underscore keys are DERIVED caches, not file state — a reinforcement
+            # line's resolved pullout profile, a model's water-table sampling. They
+            # are rebuilt from the values beside them on every load, so comparing
+            # them compares two objects, not two files.
+            if isinstance(k, str) and k.startswith('_'):
+                continue
             if k not in b:
                 out.append(f"{path}.{k}: missing")
             else:
@@ -838,25 +844,6 @@ def build_fem_ssrm_case(test):
         kwargs['elastic_materials'] = [s.strip() for s in
                                        str(test['elastic_materials']).split(';')
                                        if s.strip()]
-    # Bond-slip load transfer for 1D reinforcement (opt-in). Tags split on commas,
-    # so line entries are SEMICOLON-separated and their fields COLON-separated:
-    # bond_slip=<line>:<bond_c>:<bond_phi_deg>:<perimeter>[;<line>:...]. <line> is a
-    # reinforcement line label, a 1-based id, or '*' (all lines). Off by default.
-    if 'bond_slip' in test:
-        bs = {}
-        for entry in str(test['bond_slip']).split(';'):
-            entry = entry.strip()
-            if not entry:
-                continue
-            key, c, phi, perim = entry.split(':')
-            key = key.strip()
-            # numeric key => 1-based line id; otherwise a label (or '*')
-            try:
-                key = int(key)
-            except ValueError:
-                pass
-            bs[key] = (float(c), float(phi), float(perim))
-        kwargs['bond_slip'] = bs
     # Matric-suction strength (Fredlund extended MC), opt-in. suction_phi_b is a
     # per-material angle list "Name:deg;Name2:deg" (semicolon-separated, since tags
     # split on commas); suction_cap is one number (stress units) bounding the credited
@@ -3049,6 +3036,224 @@ def run_template_sync_test(test):
     return 0.0, None
 
 
+def run_pullout_law_test(test):
+    """The overburden-dependent pullout law against arithmetic done by hand.
+
+    Three checks, and each would fail if the law were computed any other way:
+
+    1. **Uniform soil, no water.** A horizontal line 5 deep in one 20-unit-weight
+       material, adhesion 0, delta 45 degrees. sigma'v = 20*5 = 100 everywhere, so
+       r = 2*(0 + 100*tan45) = 200 per unit length and T(s) = min(200 s, 200(L-s)).
+    2. **Two materials and a water table.** The column above the line crosses a
+       lower zone (gamma_sat 22) and an upper zone (gamma_sat 20 below the water
+       table, moist 18 above it), and the point's material takes its pore pressure
+       from the piezometric line. Every one of those five numbers moves the answer,
+       so a gamma/gamma_sat mix-up, a dropped zone, or a forgotten u cannot pass.
+    3. **The constant-rate law is untouched.** With no Adhesion/Delta the envelope
+       must reproduce the linear ramps exactly, bit for bit, at every sample.
+
+    Then the mutations: perturbing the law's own terms one at a time must break
+    check 1 or 2. A test that passes against a broken implementation is not a test.
+    """
+    import math
+    import numpy as np
+    from shapely.geometry import Polygon, LineString
+    from xslope.fileio import (attach_reinforce_pullout,
+                               reinforce_available_tension)
+
+    def _line(**kw):
+        base = dict(x1=0.0, y1=5.0, x2=10.0, y2=5.0, t_max=1.0e9,
+                    t_res=float('nan'), lp1=0.0, lp2=0.0, E=float('nan'),
+                    area=float('nan'), tend1=0.0, tend2=0.0, spacing=1.0,
+                    label='L', type='', dir='tangent', appl='active',
+                    adhesion=float('nan'), delta=float('nan'))
+        base.update(kw)
+        return base
+
+    def _uniform(adhesion, delta, gamma=20.0):
+        return {
+            'materials': [{'name': 'sand', 'gamma': gamma, 'gamma_sat': None,
+                           'u': 'none'}],
+            'polygons': [{'polygon': Polygon([(0, 0), (20, 0), (20, 10), (0, 10)]),
+                          'mat_id': 0}],
+            'ground_surface': LineString([(0, 10), (20, 10)]),
+            'gamma_water': 9.81,
+            'reinforcement_lines': [_line(adhesion=adhesion, delta=delta)],
+        }
+
+    def _layered(adhesion, delta):
+        return {
+            'materials': [{'name': 'upper', 'gamma': 18.0, 'gamma_sat': 20.0,
+                           'u': 'piezo'},
+                          {'name': 'lower', 'gamma': 21.0, 'gamma_sat': 22.0,
+                           'u': 'piezo'}],
+            'polygons': [{'polygon': Polygon([(0, 6), (20, 6), (20, 10), (0, 10)]),
+                          'mat_id': 0},
+                         {'polygon': Polygon([(0, 0), (20, 0), (20, 6), (0, 6)]),
+                          'mat_id': 1}],
+            'ground_surface': LineString([(0, 10), (20, 10)]),
+            'piezo_line': [(0, 8), (20, 8)],
+            'gamma_water': 9.81,
+            'reinforcement_lines': [_line(y1=4.0, y2=4.0, adhesion=adhesion,
+                                          delta=delta)],
+        }
+
+    def _envelope(sd, t_max=1.0e9, tend=0.0, lp=0.0):
+        attach_reinforce_pullout(sd)
+        p = sd['reinforcement_lines'][0]['_pullout_profile']
+        if p is None:
+            return None
+        return [reinforce_available_tension(s, 10.0 - s, t_max, lp, lp, tend, tend,
+                                            pullout=p)
+                for s in (0.0, 1.0, 2.5, 5.0, 7.5, 9.0, 10.0)]
+
+    def _hand(rate):
+        return [min(1.0e9, rate * s, rate * (10.0 - s))
+                for s in (0.0, 1.0, 2.5, 5.0, 7.5, 9.0, 10.0)]
+
+    problems = []
+
+    # 1 — uniform soil, no water
+    rate1 = 2.0 * (0.0 + 20.0 * 5.0 * math.tan(math.radians(45.0)))
+    got = _envelope(_uniform(0.0, 45.0))
+    for g, w in zip(got, _hand(rate1)):
+        if abs(g - w) > 1e-6 * max(1.0, abs(w)):
+            problems.append(f"uniform: {g:.6f} != {w:.6f}")
+            break
+
+    # 2 — two materials, a water table, and pore pressure at the line
+    sigma_v = 2 * 22.0 + 2 * 20.0 + 2 * 18.0        # 4->6 sat, 6->8 sat, 8->10 moist
+    u = (8.0 - 4.0) * 9.81
+    rate2 = 2.0 * (5.0 + (sigma_v - u) * math.tan(math.radians(30.0)))
+    got = _envelope(_layered(5.0, 30.0))
+    for g, w in zip(got, _hand(rate2)):
+        if abs(g - w) > 1e-6 * max(1.0, abs(w)):
+            problems.append(f"layered: {g:.6f} != {w:.6f}")
+            break
+
+    # 3 — the constant-rate law must be bit-for-bit what it always was
+    for lp1, lp2, te1, te2, tmx in ((4.0, 4.0, 0.0, 0.0, 800.0),
+                                    (0.0, 3.0, 0.0, 200.0, 500.0),
+                                    (2.5, 2.5, 35.0, 0.0, 400.0)):
+        for s in np.linspace(0.0, 10.0, 21):
+            new = reinforce_available_tension(s, 10.0 - s, tmx, lp1, lp2, te1, te2)
+            cap1 = tmx if lp1 <= 0 else min(tmx, te1 + tmx * s / lp1)
+            cap2 = tmx if lp2 <= 0 else min(tmx, te2 + tmx * (10.0 - s) / lp2)
+            old = max(0.0, min(cap1, cap2))
+            if new != old:
+                problems.append(f"constant-rate drift at s={s:g}: {new!r} != {old!r}")
+                break
+
+    # 4 — mutations: each perturbation of the law must be caught by check 1 or 2
+    mutations = [
+        ("adhesion dropped", _uniform(7.0, 45.0),
+         2.0 * (0.0 + 20.0 * 5.0)),
+        ("one face instead of two", _uniform(0.0, 45.0), rate1 / 2.0),
+        ("total stress instead of effective", _layered(5.0, 30.0),
+         2.0 * (5.0 + sigma_v * math.tan(math.radians(30.0)))),
+        ("moist gamma below the water table", _layered(5.0, 30.0),
+         2.0 * (5.0 + (2 * 21.0 + 2 * 18.0 + 2 * 18.0 - u)
+                * math.tan(math.radians(30.0)))),
+        ("delta read as a tangent", _uniform(0.0, 45.0),
+         2.0 * (0.0 + 20.0 * 5.0 * 45.0)),
+    ]
+    for name, sd, wrong_rate in mutations:
+        got = _envelope(sd)
+        wrong = _hand(wrong_rate)
+        if all(abs(g - w) <= 1e-6 * max(1.0, abs(w)) for g, w in zip(got, wrong)):
+            problems.append(f"mutation not caught: {name}")
+
+    if problems:
+        return None, "; ".join(problems[:6])
+    return 0.0, None
+
+
+def run_pullout_switch_test(test):
+    """The reinforcement editor's Pullout switch, driven offscreen on a real model.
+
+    The switch is a reading of the line, not a stored field, so the checks are
+    about what it reads and what it leaves behind: a file with no Adhesion/Delta
+    opens on the development lengths; switching to Overburden dims Lp1/Lp2 without
+    touching their values; switching back parks Adhesion/Delta rather than losing
+    them; and the table view grays the same pair the list view dims.
+    """
+    import os as _os
+    _os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    from PySide6.QtWidgets import QApplication
+    from xslope.fileio import load_slope_data
+    from studio.editors import ReinforcementEditor
+
+    app = QApplication.instance() or QApplication([])
+    path = _repo('docs/tutorials/files/xslope_reinforced_slope_start.xlsx')
+    if not _os.path.exists(path):
+        return None, f"the FEM-2 starter is missing: {path}"
+    sd = load_slope_data(path)
+    if not (sd.get('reinforcement_lines') or []):
+        return None, "the FEM-2 starter carries no reinforcement lines"
+
+    editor = ReinforcementEditor()
+    dlg = editor.build(sd, None)
+    dlg.set_view_mode("list")
+    lv = dlg._list_view
+    lv.list.setCurrentRow(0)
+    problems = []
+
+    combo = lv._switch_combo
+    if combo is None:
+        return None, "the reinforcement list view has no Pullout switch"
+    if combo.currentText() != "Development length (Lp1, Lp2)":
+        problems.append(f"a file with no Adhesion/Delta opened on "
+                        f"{combo.currentText()!r}")
+    if not lv._cells['lp1'].isEnabled():
+        problems.append("Lp1 is dimmed on a line that uses the development lengths")
+    if lv._cells['adhesion'].isEnabled():
+        problems.append("Adhesion is live on a line that uses the development lengths")
+
+    lp1_text = lv._edits['lp1'].text()
+    combo.setCurrentIndex(1)                      # -> Overburden
+    if lv._cells['lp1'].isEnabled():
+        problems.append("Lp1 stayed live after the switch to Overburden")
+    if not lv._cells['adhesion'].isEnabled():
+        problems.append("Adhesion stayed dimmed after the switch to Overburden")
+    if lv._edits['lp1'].text() != lp1_text:
+        problems.append(f"the switch changed Lp1 from {lp1_text!r} to "
+                        f"{lv._edits['lp1'].text()!r} — values must survive it")
+
+    lv._edits['adhesion'].setText("5")
+    lv._edits['delta'].setText("30")
+    lv._commit()
+    row = lv._rows[0]
+    if ReinforcementEditor.pullout_mode(row) != "overburden":
+        problems.append("a filled Adhesion/Delta pair did not read as the "
+                        "overburden law")
+    if ReinforcementEditor.dim_keys(row) != frozenset(("lp1", "lp2")):
+        problems.append(f"the table view grays {sorted(ReinforcementEditor.dim_keys(row))} "
+                        f"on an overburden line, not Lp1/Lp2")
+
+    combo.setCurrentIndex(0)                      # -> back to the lengths
+    row = lv._rows[0]
+    if ReinforcementEditor.pullout_mode(row) != "lp":
+        problems.append("switching back to the development lengths left the "
+                        "overburden law in force")
+    if lv._edits['lp1'].text() != lp1_text:
+        problems.append("Lp1 did not survive the round trip through Overburden")
+    combo.setCurrentIndex(1)                      # -> Overburden again
+    if (lv._edits['adhesion'].text(), lv._edits['delta'].text()) != ("5", "30"):
+        problems.append(f"the parked Adhesion/Delta came back as "
+                        f"{lv._edits['adhesion'].text()!r}/"
+                        f"{lv._edits['delta'].text()!r}, not '5'/'30'")
+
+    if ReinforcementEditor.dim_keys({'adhesion': float('nan'),
+                                     'delta': float('nan')}):
+        problems.append("the table view grays a pair on a development-length line, "
+                        "which would leave Adhesion untypable there")
+
+    dlg.deleteLater()
+    if problems:
+        return None, "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_diagram_sync_test(test):
     """Verify every slice force diagram the Analysis Report prints is
     byte-identical to the drawing the LEM documentation displays.
@@ -4035,6 +4240,39 @@ PREFLIGHT_RULE_SPECS = [
          mode='dict',
          mutation=lambda sd: _pf_move(sd, 'reinforcement_lines', dx=1.0e5),
          expect='crosses any failure surface'),
+    # The overburden pullout law. Mode 'dict': the base file predates the columns,
+    # so a save would drop them — which is itself the right behavior, and not what
+    # these rows are testing.
+    dict(rule='reinforce.pullout_law_incomplete', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', adhesion=5.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                     adhesion=5.0, delta=30.0),
+         expect='half of it is not a law'),
+    dict(rule='reinforce.pullout_law_incomplete', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', delta=30.0),
+         expect='fills Delta but leaves Adhesion blank'),
+    dict(rule='reinforce.pullout_delta_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                      adhesion=0.0, delta=95.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                     adhesion=0.0, delta=30.0),
+         expect='strictly between 0 and 90'),
+    dict(rule='reinforce.pullout_delta_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                      adhesion=0.0, delta=0.0),
+         expect='strictly between 0 and 90'),
+    dict(rule='reinforce.pullout_lp_ignored', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                      adhesion=5.0, delta=30.0, lp1=4.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                     adhesion=5.0, delta=30.0,
+                                     lp1=0.0, lp2=0.0),
+         expect='Lp1/Lp2 are not read'),
 
     # --- magnitude plausibility (the sniff tests) --------------------------
     dict(rule='mat.E_off_soil_type_band', base=PREFLIGHT_BASE_FEM, mode='excel',
@@ -11253,6 +11491,10 @@ def _dispatch_test(test):
         return run_auto_water_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
+    if test_type == 'pullout_law':
+        return run_pullout_law_test(test)
+    if test_type == 'pullout_switch':
+        return run_pullout_switch_test(test)
     if test_type == 'diagram_sync':
         return run_diagram_sync_test(test)
     if test_type == 'deps_declared':
@@ -11402,7 +11644,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -11855,6 +12097,14 @@ def main():
         # from their editable docs masters.
         tests.append({'type': 'template_sync', 'file': BUNDLED_TEMPLATE,
                       'method': '-', 'source': 'template'})
+        # The overburden-dependent pullout law against hand arithmetic, with the
+        # constant-rate law checked bit-for-bit beside it.
+        tests.append({'type': 'pullout_law', 'file': 'reinforcement pullout law',
+                      'method': '-', 'source': 'reinforce'})
+        # The editor's Pullout switch, driven offscreen: which law a line reads as,
+        # and that neither pair's values are lost switching between them.
+        tests.append({'type': 'pullout_switch', 'file': 'reinforcement pullout switch',
+                      'method': '-', 'source': 'reinforce'})
         # Same guard for the slice force diagrams the Analysis Report prints:
         # the documentation's drawings are the masters, and the report embeds
         # the copies in the wheel.

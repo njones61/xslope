@@ -1,6 +1,6 @@
 """Render the reinforcement illustration figures for the two reinforcement pages.
 
-Two figures land in docs/lem/images/, two in docs/fem/images/:
+Two figures land in docs/lem/images/, one in docs/fem/images/:
 
   reinf_envelope.png    The LEM capacity envelope T(s) along a reinforcement
                         line, for the four end conditions the page describes:
@@ -16,11 +16,8 @@ Two figures land in docs/lem/images/, two in docs/fem/images/:
   reinf_bar_law.png     The truss-bar constitutive law: tension only, the
                         elastic slope EA/L, and the three post-peak models
                         (Tres blank, Tres entered, Tres = 0).
-  reinf_bond_slip.png   The optional bond-slip envelope against the fixed
-                        pullout ramp, on a line whose overburden grows from one
-                        end to the other.
 
-All four are closed-form schematics; nothing is solved.
+All three are closed-form schematics; nothing is solved.
 
 Run from the repo root:
 
@@ -51,7 +48,7 @@ C_SOIL = "#f6e3d0"
 C_SOIL_EDGE = "#1f2933"
 C_ACCENT = "#1f6fb2"        # the primary curve / the fixed ramp
 C_FORCE = "#c0392b"         # the reinforcement force P
-C_GREEN = "#2f7d5b"         # anchorage / bond envelope
+C_GREEN = "#2f7d5b"         # anchorage
 C_ORANGE = "#c05621"        # the contrasting curve
 C_GRID = "#d7dde3"
 
@@ -336,76 +333,7 @@ def fig_bar_law():
     _finish(fig, FEM_OUT, "reinf_bar_law.png")
 
 
-# ===========================================================================
-# Figure 4 — the bond-slip envelope against the fixed pullout ramp
-# ===========================================================================
-
-def fig_bond_slip():
-    L = 8.0                        # line length, m
-    Tmax = 100.0                   # kN/m
-    Lp = 2.0                       # fixed pullout length at both ends, m
-    gamma = 20.0                   # kN/m3
-    perim = 2.0                    # geotextile: friction on both faces
-    c_bond = 0.0                   # kPa
-    phi_bond = np.radians(28.35)
-
-    s = np.linspace(0.0, L, 1601)
-    depth = 0.5 + (6.0 - 0.5) * s / L          # overburden grows into the fill
-    sig_n = gamma * depth
-    q = perim * (c_bond + sig_n * np.tan(phi_bond))
-
-    from_1 = np.concatenate([[0.0], np.cumsum(np.diff(s) * 0.5 * (q[1:] + q[:-1]))])
-    from_2 = from_1[-1] - from_1
-    T_bond = np.minimum(Tmax, np.minimum(from_1, from_2))
-
-    T_fixed = np.array([reinforce_available_tension(si, L - si, Tmax, Lp, Lp)
-                        for si in s])
-
-    fig, (ax_q, ax_t) = plt.subplots(2, 1, figsize=(8.6, 6.4), sharex=True,
-                                     gridspec_kw=dict(height_ratios=[1.0, 1.55]))
-
-    ax_q.fill_between(s, 0, q, color=C_GREEN, alpha=0.13)
-    ax_q.plot(s, q, color=C_GREEN, linewidth=2.2)
-    ax_q.text(0.25, q.max() * 1.34,
-              r"$q(s)=P\,(c_{bond}+\sigma_n(s)\tan\phi_{bond})$",
-              fontsize=10, color=C_GREEN, ha="left", va="top")
-    ax_q.set_ylabel("bond rate   $q$", fontsize=9.5)
-    ax_q.set_ylim(0, q.max() * 1.42)
-    _tidy(ax_q)
-
-    ax_t.plot(s, T_fixed, color=C_ACCENT, linewidth=2.2,
-              linestyle=(0, (6, 3)), label="fixed ramp, $L_p$ at each end")
-    ax_t.plot(s, T_bond, color=C_GREEN, linewidth=2.4,
-              label="bond envelope, $\\int q\\,ds$ from each end")
-    ax_t.axhline(Tmax, color=C_MUTED, linewidth=1.0, linestyle=(0, (5, 4)))
-    ax_t.text(L, Tmax + 3, "$T_{max}$", fontsize=9.5, color=C_MUTED,
-              ha="right", va="bottom")
-
-    ax_t.annotate("shallow end: force develops\nmore slowly than the ramp allows",
-                  xy=(1.15, np.interp(1.15, s, T_bond)),
-                  xytext=(3.35, Tmax * 0.72), fontsize=9, color=C_INK,
-                  ha="left", va="center",
-                  arrowprops=dict(arrowstyle="->", color=C_INK, linewidth=1.0))
-    ax_t.annotate("deep end: the thick overburden\ndevelops it in a fraction of $L_p$",
-                  xy=(7.35, np.interp(7.35, s, T_bond)),
-                  xytext=(6.55, Tmax * 0.40), fontsize=9, color=C_INK,
-                  ha="right", va="center",
-                  arrowprops=dict(arrowstyle="->", color=C_INK, linewidth=1.0))
-
-    ax_t.set_xlim(0, L)
-    ax_t.set_ylim(0, Tmax * 1.30)
-    ax_t.set_xlabel("distance along the line   $s$   (end 1 at the face,"
-                    " end 2 under the fill)", fontsize=9.5)
-    ax_t.set_ylabel("available tension   $T_{allow}$", fontsize=9.5)
-    _tidy(ax_t)
-    ax_t.legend(loc="lower center", fontsize=9, frameon=False, ncol=2)
-
-    fig.tight_layout(h_pad=1.2)
-    _finish(fig, FEM_OUT, "reinf_bond_slip.png")
-
-
 if __name__ == "__main__":
     fig_capacity_envelope()
     fig_force_direction()
     fig_bar_law()
-    fig_bond_slip()

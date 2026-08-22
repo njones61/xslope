@@ -241,6 +241,7 @@ SWEEPABLE_FIELDS = (
     "pow_a", "pow_b", "pow_c", "pow_d", "hb_sci", "hb_gsi", "hb_mi", "hb_d",
     "k1", "k2", "alpha", "kr0", "h0", "head",
     "t_max", "t_res", "lp1", "lp2", "tend1", "tend2", "spacing",
+    "adhesion", "delta",
     "H", "theta", "D", "S", "V_cap", "M_cap",
     "k_seismic", "tcrack_depth", "tcrack_water", "piezo",
 )
@@ -4222,6 +4223,63 @@ def _reinf_pullout_negative(ctx):
                        f"turns the weakest pullout case into the strongest and "
                        f"raises the factor of safety. Enter the anchorage length, "
                        f"or 0 for a fully anchored end {_AT_REINF}.")
+
+
+@rule("reinforce.pullout_law_incomplete", ERROR, ("lem", "fem"),
+      "Adhesion and Delta describe one pullout law: both, or neither.",
+      fields=("adhesion", "delta"))
+def _reinf_pullout_law_incomplete(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        a, d = _num(r.get("adhesion")), _num(r.get("delta"))
+        if (a is None) == (d is None):
+            continue
+        have, missing = ("Adhesion", "Delta") if a is not None else ("Delta", "Adhesion")
+        yield (f"{ctx.reinf_label(i)} fills {have} but leaves {missing} blank. The "
+               f"two are one law -- pullout resistance 2*(Adhesion + sigma'v*tan "
+               f"Delta) per unit length -- and half of it is not a law: the missing "
+               f"half would have to be read as zero, which is either no interface "
+               f"friction at all or no adhesion at all, neither of them what a "
+               f"half-filled row means. Fill both to use the overburden-dependent "
+               f"law, or clear both to use the development lengths Lp1/Lp2 "
+               f"{_AT_REINF}.")
+
+
+@rule("reinforce.pullout_delta_range", ERROR, ("lem", "fem"),
+      "The interface friction angle is an angle between 0 and 90 degrees.",
+      fields=("delta",))
+def _reinf_pullout_delta_range(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        d = _num(r.get("delta"))
+        if d is None or 0.0 < d < 90.0:
+            continue
+        yield (f"{ctx.reinf_label(i)} has Delta = {d:g} degrees. The interface "
+               f"friction angle must lie strictly between 0 and 90: at 0 the "
+               f"overburden contributes nothing and the law reduces to adhesion "
+               f"alone (leave Delta blank and use Lp instead if that is the "
+               f"intent), and at 90 tan Delta is infinite. A value entered as a "
+               f"tangent or a percentage rather than degrees lands here "
+               f"{_AT_REINF}.")
+
+
+@rule("reinforce.pullout_lp_ignored", INFO, ("lem", "fem"),
+      "Lp1/Lp2 play no part on a line that uses the overburden-dependent law.",
+      fields=("adhesion", "delta", "lp1", "lp2"))
+def _reinf_pullout_lp_ignored(ctx):
+    rows = []
+    for i, r in enumerate(ctx.reinforcement):
+        a, d = _num(r.get("adhesion")), _num(r.get("delta"))
+        if a is None or d is None:
+            continue
+        if _num(r.get("lp1")) or _num(r.get("lp2")):
+            rows.append(i)
+    if not rows:
+        return []
+    return [f"{len(rows)} reinforcement line(s) carry both a development length "
+            f"and the overburden-dependent pullout law, starting at "
+            f"{ctx.reinf_label(rows[0])}. Adhesion and Delta govern there: the "
+            f"capacity is the interface resistance integrated from each end, and "
+            f"Lp1/Lp2 are not read. Clear Adhesion and Delta to go back to the "
+            f"development lengths {_AT_REINF}."]
 
 
 @rule("reinforce.envelope_inconsistent", WARNING, ("lem", "fem"),

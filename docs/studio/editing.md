@@ -218,7 +218,7 @@ use in the table.
 
 **Reinforcement** lines are grouped as **Identity** (the line's label),
 **Geometry** (endpoints), **Capacity** (Tmax, Tres, E, Area), **Anchorage**
-(Lp1/Lp2 pullout lengths, Tend1/Tend2 end capacities, Spacing), and **Type** —
+(the pullout law, Tend1/Tend2 end capacities, Spacing), and **Type** —
 picking a Type (geosynthetic, nail, tieback, anchor) fills **Dir** and **Appl**
 with that support's pair, exactly as the `reinforce` worksheet's formulas do.
 Change either afterwards and the change stands; picking a Type again puts the
@@ -227,6 +227,16 @@ preview draws the lines on the section with the selected one emphasized and its
 pullout breakpoints marked:
 
 ![Reinforcement editor (list view)](images/editing_reinforcement_editor.png)
+
+A line develops its pullout capacity one of two ways, and the **Pullout** selector
+at the top of the Anchorage group chooses per line: **Development length (Lp1,
+Lp2)**, or **Overburden (Adhesion, Delta)**, where the resistance follows the
+effective overburden along the line. The pair not in use is grayed rather than
+cleared, in both views — the values stay in their cells, and switching back brings
+them into force again. The selector is a reading of the line itself: a line arrives
+on **Overburden** when it carries both Adhesion and Delta, and on **Development
+length** otherwise, so a file edited outside Studio opens showing the law it
+actually uses.
 
 Table view lays every column out at once — the bulk-entry path for the fifteen-plus
 lines of a tiered wall:

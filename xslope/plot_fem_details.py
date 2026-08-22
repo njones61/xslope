@@ -294,7 +294,7 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
                 color=C_ENVELOPE, label="Capacity envelope", zorder=3,
                 gid="DETAIL_CAPACITY")
     else:
-        ax.step(s, profile["t_cap"], where="mid", linestyle="--", linewidth=1.4,
+        ax.step(s, profile["t_allow"], where="mid", linestyle="--", linewidth=1.4,
                 color=C_ENVELOPE, label="Element capacity", zorder=3,
                 gid="DETAIL_CAPACITY")
 

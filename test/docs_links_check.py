@@ -1131,11 +1131,12 @@ LEM08_REINF_GROUPS = ("Identity", "Geometry", "Capacity", "Anchorage", "Type")
 #: The capacity fields the page names, as label *prefixes*: the list view appends
 #: the units the model implies ("Tmax (per unit width, lb/ft)"), which the page
 #: quotes for Tmax and which must therefore stay attached to it.
-LEM08_REINF_FIELDS = ("Tmax", "Lp1", "Lp2", "Tend1", "Tend2", "Spacing")
+LEM08_REINF_FIELDS = ("Tmax", "Lp1", "Lp2", "Adhesion", "Delta",
+                      "Tend1", "Tend2", "Spacing")
 LEM08_REINF_TMAX_LABEL = "Tmax (per unit width, lb/ft)"
 
 #: The support-type preset table the page reproduces, as the template's own
-#: lookup block (reinforce!Z8:AB11) — the values the Type drop-down offers and
+#: lookup block (reinforce!AB8:AD11) — the values the Type drop-down offers and
 #: the Dir/Appl its formula fills for each. The page's table is this table.
 LEM08_TYPE_PRESETS = (("Geosynthetic", "Tangent", "Active"),
                       ("Nail", "Axial", "Passive"),
@@ -2400,7 +2401,7 @@ def _lem08_editor_labels(mw):
     # The Type preset table, read from the template's own lookup block.
     sheet = openpyxl.load_workbook(TEMPLATE_FILE)["reinforce"]
     presets = tuple(tuple(str(sheet.cell(row=r, column=c).value)
-                          for c in (26, 27, 28))          # Z, AA, AB
+                          for c in (28, 29, 30))          # AB, AC, AD
                     for r in range(8, 12))
     if presets != LEM08_TYPE_PRESETS:
         fails.append(f"the template's support-type presets read {presets}, not "

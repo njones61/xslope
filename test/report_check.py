@@ -16185,21 +16185,68 @@ def test_fem_members_are_reported():
     return fails
 
 
+def _broken_tie_profiles(slope_data, bundle):
+    """``(profiles, broken)`` for a run whose tie set has a HOLE in it.
+
+    Takes the first reinforcement line that stands at its greatest utilization
+    over a stretch, copies the field the report reads its members from, and
+    drops the force in one bar element inside that stretch to half of what it
+    was holding. Every profile is then re-read through
+    :func:`xslope.report._detail_profiles`, so the tie set, the span and the gap
+    positions are all computed by the shipping code — only the force it reads is
+    arranged.
+
+    ``broken`` maps the label of each line whose stretch came back with a hole
+    to the positions of the samples it stands below capacity at.
+
+    Whether the shipped run develops a hole of its own depends on the mechanism
+    the model reaches, and that is not what the exception is about.
+    """
+    import numpy as np
+    from xslope import fem_details
+    from xslope.report import DETAIL_FIELD_STATE, _detail_profiles
+
+    profiles = _detail_profiles(slope_data, bundle, "reinforcement")
+    holed = next((p for p in profiles
+                  if len(np.asarray(p["peak_indices"], dtype=int)) > 1), None)
+    if holed is None:
+        return profiles, {}
+    tied = np.asarray(holed["peak_indices"], dtype=int)
+    element_ids = np.asarray(holed["element_ids"], dtype=int)
+    hole = int(tied[len(tied) // 2])          # an interior sample of the stretch
+    field = fem_details.field_solution(
+        bundle.get("solution") or {}, field_state=DETAIL_FIELD_STATE,
+        failure_solution=bundle.get("failure_solution"))
+    knocked = dict(field)
+    forces = np.array(field["forces_1d"], dtype=float)
+    forces[element_ids[hole]] = 0.5 * forces[element_ids[hole]]
+    knocked["forces_1d"] = forces
+    if field is bundle.get("solution"):
+        bundle = dict(bundle, solution=knocked)
+    else:
+        bundle = dict(bundle, failure_solution=knocked)
+    profiles = _detail_profiles(slope_data, bundle, "reinforcement")
+    broken = {p["label"]: [float(v) for v in p.get("peak_gap_s", [])]
+              for p in profiles if len(p.get("peak_gap_s", []))}
+    return profiles, broken
+
+
 def test_a_broken_tie_stretch_is_excepted():
     """A line at capacity everywhere along a stretch BUT one point is drawn that
     way: the highlight breaks at the hole.
 
-    The greatest utilization is held over a stretch on most reinforcement lines.
-    On the reinforcement sample's own mechanism, line 4 stands at capacity at
-    every sample from 1.00 to 19.00 except the one at 5.00, and line 6 from 7.00
-    to 19.00 except 15.00 — and the two ends alone read as an unbroken run, which
-    is a different bar. The figure is now the only place that stretch is
-    reported (the summary table went with the owner's fem_reinforce ruling), so
-    what is measured here is the drawn highlight: one thickened run per unbroken
-    stretch, and no run that spans a sample the line drops below capacity at.
+    The greatest utilization is held over a stretch on every reinforcement line
+    of the sample, and the two ends alone read as an unbroken run — which is a
+    different bar from one that dips below capacity in the middle. The figure is
+    the only place that stretch is reported (the summary table went with the
+    owner's fem_reinforce ruling), so what is measured here is the drawn
+    highlight: one thickened run per unbroken stretch, and no run that spans a
+    sample the line drops below capacity at.
 
-    Read off the shipped at-failure snapshot, which is the field the deliverable
-    reports and the one the holes are in.
+    Whether the shipped mechanism leaves an interior sample below the rest is a
+    property of the model rather than of the reporting, so the hole is arranged
+    on the field the report reads (:func:`_broken_tie_profiles`) and everything
+    from the tie set outward is the shipping code.
     """
     fails = []
     import matplotlib
@@ -16207,19 +16254,17 @@ def test_a_broken_tie_stretch_is_excepted():
     import numpy as np
     from matplotlib.figure import Figure as MplFigure
     from xslope.plot_fem_details import plot_detail
-    from xslope.report import _detail_profiles
 
     slope_data, solutions = _restored(FEM_REINF_XLSX)
     bundle = solutions.get("fem")
     if not bundle:
         return ["the reinforcement sample ships no solved run"]
-    profiles = _detail_profiles(slope_data, bundle, "reinforcement")
-    broken = {p["label"]: [float(v) for v in p.get("peak_gap_s", [])]
-              for p in profiles if len(p.get("peak_gap_s", []))}
+    profiles, broken = _broken_tie_profiles(slope_data, bundle)
     if not broken:
-        return fails + ["no line on the shipped mechanism holds its greatest "
-                        "utilization over a BROKEN stretch, so the exception "
-                        "this check is about could not arise"]
+        return fails + ["a bar element inside a stretch was dropped to half the "
+                        "force it was holding and no line came back with a hole "
+                        "in its tie set, so the exception this check is about "
+                        "could not arise"]
 
     def highlight_runs(profile):
         """The x-ranges the figure thickens on one line."""
@@ -16235,29 +16280,47 @@ def test_a_broken_tie_stretch_is_excepted():
                         runs.append((min(xs), max(xs)))
         return sorted(runs)
 
-    for profile in profiles:
-        label = profile["label"]
-        runs = highlight_runs(profile)
-        gaps = broken.get(label)
-        if gaps is None:
-            # An unbroken stretch is one run, or none where the peak is a point.
-            if len(runs) > 1:
-                fails.append(f"{label}: the stretch is unbroken and the figure "
-                             f"draws {len(runs)} separate runs: {runs}")
-            continue
-        if not runs:
-            fails.append(f"{label}: the line holds its greatest utilization "
-                         f"over a stretch and the figure highlights none of it")
-            continue
-        # No run may span a position the line drops below capacity at.
-        for gap in gaps:
-            spanning = [r for r in runs if r[0] < gap < r[1]]
-            if spanning:
-                fails.append(f"{label}: a highlighted run {spanning} spans "
-                             f"{gap:.2f}, where the line stands below capacity")
-        if len(runs) < len(gaps) + 1:
-            fails.append(f"{label}: {len(runs)} highlighted run(s) for a stretch "
-                         f"broken at {len(gaps)} position(s)")
+    def drawn_faults(profiles, broken):
+        """What the highlighted runs owe the lines they were drawn for."""
+        faults = []
+        for profile in profiles:
+            label = profile["label"]
+            runs = highlight_runs(profile)
+            gaps = broken.get(label)
+            if gaps is None:
+                # An unbroken stretch is one run, or none where the peak is a
+                # point.
+                if len(runs) > 1:
+                    faults.append(f"{label}: the stretch is unbroken and the "
+                                  f"figure draws {len(runs)} separate runs: "
+                                  f"{runs}")
+                continue
+            if not runs:
+                faults.append(f"{label}: the line holds its greatest "
+                              f"utilization over a stretch and the figure "
+                              f"highlights none of it")
+                continue
+            # No run may span a position the line drops below capacity at.
+            for gap in gaps:
+                spanning = [r for r in runs if r[0] < gap < r[1]]
+                if spanning:
+                    faults.append(f"{label}: a highlighted run {spanning} spans "
+                                  f"{gap:.2f}, where the line stands below "
+                                  f"capacity")
+            if len(runs) < len(gaps) + 1:
+                faults.append(f"{label}: {len(runs)} highlighted run(s) for a "
+                              f"stretch broken at {len(gaps)} position(s)")
+        return faults
+
+    fails += drawn_faults(profiles, broken)
+
+    # Mutation: the hole disowned — the same figures read against a run in which
+    # no line is said to break. The line the gap was arranged on draws two runs,
+    # and a stretch nothing is missing from does not come in two pieces.
+    if not drawn_faults(profiles, {}):
+        fails.append("the gap positions were dropped and the drawn runs still "
+                     "agreed with their lines; a stretch in two pieces with "
+                     "nothing missing from it cannot be caught")
 
     # Mutation: the contiguous claim restored — the highlight drawn from the two
     # ends alone, exactly as a chord across the dip. Every broken line has to be
@@ -17603,7 +17666,7 @@ def test_member_companions_that_are_not_this_models_are_refused():
         mixed["n_pile_elements"] = len(pile_ids)
         mixed["pile_elem_indices"] = pile_ids
         columns = ["element_id", "line_id", "x_start", "y_start", "x_end",
-                   "y_end", "axial_force", "t_allow", "t_cap", "t_res",
+                   "y_end", "axial_force", "t_allow", "t_res",
                    "mobilization", "failed", "softened"]
 
         def written(tmp, ids):

@@ -883,9 +883,10 @@ def lem08_sheets():
     """The five worksheets LEM-8's Excel path fills.
 
     ``reinforce`` is the one this page is about. Its window runs from the
-    column-name row (row 2) to column R, the last input column — the six lines
-    plus two blank rows under them, so the block reads as unfilled below the
-    last line. Columns beyond R hold the Type preset's lookup table, which is
+    column-name row (row 2) to column Q, the last column a limit equilibrium run
+    reads — the six lines plus two blank rows under them, so the block reads as
+    unfilled below the last line. Columns R:T (Tres, E, Area) are read only by
+    the finite element engine, and the Type preset's lookup table beyond them is
     the sheet's own machinery rather than an input.
 
     ``mat`` and ``profile`` take LEM-3's frames — the same two-material shape,
@@ -897,7 +898,7 @@ def lem08_sheets():
     render("lem08_sheet_profile.png", LEM08, "profile", rows=(1, 13), cols="A:H")
     render("lem08_sheet_dloads.png", LEM08, "dloads", rows=(4, 10), cols="A:H")
     # LEM problem: the render stops before the FEM-only columns (Tres, E, Area).
-    render("lem08_sheet_reinforce.png", LEM08, "reinforce", rows=(2, 10), cols="A:O")
+    render("lem08_sheet_reinforce.png", LEM08, "reinforce", rows=(2, 10), cols="A:Q")
     render("lem08_sheet_circles.png", LEM08, "circles", rows=(1, 5), cols="A:H")
 
 

@@ -137,22 +137,25 @@ between.
 **How much force is available depends on where the surface crosses.** A geogrid
 does not carry its full capacity at its free end — the tension is developed by
 friction against the soil, over some length of embedment. That is what the second
-block says, the same six values on every line:
+block says, the same eight values on every line:
 
-| Tmax | Lp1 | Lp2 | Tend1 | Tend2 | Spacing |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| 800 | 4 | 4 | 0 | 0 | 1 |
-| 800 | 4 | 4 | 0 | 0 | 1 |
-| 800 | 4 | 4 | 0 | 0 | 1 |
-| 800 | 4 | 4 | 0 | 0 | 1 |
-| 800 | 4 | 4 | 0 | 0 | 1 |
-| 800 | 4 | 4 | 0 | 0 | 1 |
+| Tmax | Lp1 | Lp2 | Adhesion | Delta | Tend1 | Tend2 | Spacing |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
 
 **Tmax** is the rupture capacity, 800 lb/ft. **Lp1** and **Lp2** are the pullout
 lengths at each end: the tension available rises from zero at an end to the full
 Tmax 4 ft in, so a crossing within 4 ft of either end mobilizes only its share.
-**Tend1** and **Tend2** are end anchorage — a bearing plate, a facing
-connection — and 0 is the friction-only case these geogrids are. **Spacing** is
+**Adhesion** and **Delta** are blank, which is what selects the development-length
+law above: fill them instead and the pullout resistance follows the effective
+overburden along the line rather than a fixed length. **Tend1** and **Tend2** are
+end anchorage — a bearing plate, a facing connection — and 0 is the friction-only
+case these geogrids are. **Spacing** is
 for discrete supports installed at a spacing out of the page; geogrid properties
 are already per foot of slope, so it stays at 1. Together the five make the
 line's *capacity envelope*, whose breakpoints are drawn on every plot as tension

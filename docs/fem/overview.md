@@ -785,7 +785,7 @@ Its principal arguments:
 >  mesh height. The SSRM's default path disables it.<br>
 >- **`early_exit`** (default `True`): the no-progress budget exit described above.<br>
 >- **`k0`**, **`staged`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
->  **`bond_slip`**, **`suction_phi_b`** / **`suction_cap`**: the options described in their own
+>  **`suction_phi_b`** / **`suction_cap`**: the options described in their own
 >  sections; all default to off or to what the input file declares.<br>
 >- **`debug_level`** (default 0): 0 silent, 1 summary, 2 per-iteration.
 
@@ -967,7 +967,7 @@ Its principal arguments:
 >  a failing state under an absolute `force_tol`.<br>
 >- **`pp_formulation`** (`"effective"`), **`k0`**, **`staged`**, **`min_slip_depth`**,
 >  **`ssr_exclude`** / **`ssr_zone`**, **`tension_cutoff_by_material`** / **`tension_srf`**,
->  **`elastic_materials`**, **`bond_slip`**, **`suction_phi_b`** / **`suction_cap`**: as described in
+>  **`elastic_materials`**, **`suction_phi_b`** / **`suction_cap`**: as described in
 >  their own sections.<br>
 >- **`n_sweep`** (10): coarse sweep points for the `"displacement_increase"` criterion.<br>
 >- **`capture_failure_state`** (`True`) and **`capture_margin`** (0.15): after the bracket resolves,
@@ -1240,11 +1240,7 @@ body-force corrections.
 
 - **[Soil Reinforcement](reinforcement.md)**: geotextiles, soil nails and ground anchors as
   tension-only truss elements with axial stiffness $EA/L$ — including the failure modes (perfectly
-  plastic pullout, peak-residual softening, brittle rupture) and typical material properties. The optional
-  **`bond_slip`** run argument replaces a line's fixed pullout ramp with a stress-dependent Coulomb
-  bond that caps the force gradient along the embedded length,
-  $dT/ds \le P(c_{bond} + \sigma_n \tan\phi_{bond})$; it is off by default. See
-  [Bond-Slip Load Transfer](reinforcement.md#bond-slip-load-transfer-optional).
+  plastic pullout, peak-residual softening, brittle rupture) and typical material properties.
 
 - **[Piles and Concrete Piers](piles.md)**: beam elements carrying both axial stiffness ($EA/L$) and
   lateral bending stiffness ($12EI/L^3$), and — unlike reinforcement — both tension and compression.
@@ -1396,7 +1392,6 @@ a captured mechanism simply omits those rows.
 | `x_start`, `y_start`, `x_end`, `y_end` | Element endpoint coordinates. |
 | `axial_force` | Axial (tensile) force carried by the element. |
 | `t_allow` | Allowable tensile capacity (reduced toward the ends by the pullout ramp). |
-| `t_cap` | The tensile cap the solve actually enforced. Equal to `t_allow` except where the optional [bond-slip model](reinforcement.md#bond-slip-load-transfer-optional) replaced the pullout ramp with its Coulomb bond envelope, which is a run option and so cannot be recovered from the model alone. Absent in files written before this column existed, which read back as `t_allow`. |
 | `t_res` | Residual tensile capacity after softening: the smaller of the $T_{res}$ entered for the line and the capacity the embedment develops at that element. Zero only where the line's $T_{res}$ is zero — brittle rupture. Blank where the line declares no $T_{res}$ and so never softens. |
 | `mobilization` | Ratio of axial force to allowable capacity. |
 | `failed`, `softened` | Whether the element reached its capacity, and whether it dropped to residual. |

@@ -854,3 +854,104 @@ def match_water_blocks(blocks, derived, tol=WATER_MATCH_TOL):
             "unmatched": [i for i in range(len(blocks)) if i not in used_b],
             "missing": [j for j in range(len(derived)) if j not in used_d],
             "worst": max([p[2]["worst"] for p in pairs], default=0.0)}
+
+
+# ---------------------------------------------------------------------------
+# The global water table
+#
+# One phreatic surface per problem, independent of any material's pore-pressure
+# option (the "sidecar" model). It governs unit weight — gamma_sat below it,
+# moist gamma above — and the effective overburden an overburden-dependent
+# pullout law reads. Base pore pressure stays with the per-material u option.
+#
+# Source precedence: a seepage solution's u = 0 contour beats a hand-drawn
+# piezometric line. Rapid drawdown deliberately keys weight to the PRE-drawdown
+# (stage-1) surfaces, never the staged ones — the premise of rapid drawdown is
+# that the soil stays saturated while the pore pressures fall — so only
+# 'seep_u' and 'piezo_line' are read here, never their stage-2 twins.
+# ---------------------------------------------------------------------------
+
+def seep_water_table_profile(slope_data):
+    """(xs, ys) sample of the u = 0 contour of the model's seepage solution, or
+    None when the model carries no seepage field.
+
+    The contour is root-found on the UNCLAMPED signed field by bisection, on a
+    201-point grid spanning the mesh. A column that is wet at its top reads the
+    mesh top; one that is dry at its bottom reads the mesh bottom, so a fully
+    saturated or fully unsaturated column falls out of the same code.
+
+    Cached on ``slope_data['_water_table_profile']`` — the slice generator and
+    the reinforcement pullout law ask for the same surface, and bisecting a
+    finite element field 201 times is not something to repeat per trial surface.
+    """
+    import numpy as np
+    from .mesh import interpolate_at_point
+
+    cache = slope_data.get('_water_table_profile')
+    if cache is not None:
+        return cache
+    mesh = slope_data.get('mesh')
+    seep_u = slope_data.get('seep_u')
+    if mesh is None or seep_u is None:
+        return None
+
+    seep_u = np.asarray(seep_u, dtype=float)
+    nodes = np.asarray(mesh['nodes'], dtype=float)
+    xs_grid = np.linspace(nodes[:, 0].min(), nodes[:, 0].max(), 201)
+    y_lo_all, y_hi_all = nodes[:, 1].min(), nodes[:, 1].max()
+    wt = np.full(xs_grid.shape, np.nan)
+    for k, xg in enumerate(xs_grid):
+        def _u(yy):
+            val, found = interpolate_at_point(
+                mesh['nodes'], mesh['elements'], mesh['element_types'],
+                seep_u, (xg, yy), return_found=True)
+            return (val, found)
+        u_lo, f_lo = _u(y_lo_all + 1e-6)
+        u_hi, f_hi = _u(y_hi_all - 1e-6)
+        if not (f_lo or f_hi):
+            continue
+        if f_hi and u_hi >= 0:
+            wt[k] = y_hi_all          # fully saturated column
+            continue
+        if f_lo and u_lo <= 0:
+            wt[k] = y_lo_all          # fully unsaturated column
+            continue
+        lo, hi = y_lo_all, y_hi_all
+        for _ in range(30):           # bisect u(y) = 0
+            mid = 0.5 * (lo + hi)
+            um, fm = _u(mid)
+            if not fm:
+                hi = mid
+                continue
+            if um > 0:
+                lo = mid
+            else:
+                hi = mid
+        wt[k] = 0.5 * (lo + hi)
+    cache = (xs_grid, wt)
+    slope_data['_water_table_profile'] = cache
+    return cache
+
+
+def water_table_y(slope_data, x):
+    """Water-table elevation at x (scalar or array), NaN where the model does
+    not define one there.
+
+    Follows the precedence above: the seepage solution's u = 0 contour first,
+    the piezometric line second. Off the ends of a piezometric line the answer
+    is NaN rather than the nearest endpoint, so a column outside the line's own
+    extent is treated as undefined instead of silently flooded or drained.
+    """
+    import numpy as np
+    x = np.asarray(x, dtype=float)
+    prof = seep_water_table_profile(slope_data)
+    if prof is not None:
+        xs_grid, wt = prof
+        return np.interp(x, xs_grid, wt)
+    piezo = slope_data.get('piezo_line') or []
+    if len(piezo) >= 2:
+        pts = np.asarray(piezo, dtype=float)
+        order = np.argsort(pts[:, 0])
+        return np.interp(x, pts[order, 0], pts[order, 1],
+                         left=np.nan, right=np.nan)
+    return np.full(x.shape, np.nan)

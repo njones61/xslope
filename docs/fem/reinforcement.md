@@ -199,6 +199,8 @@ In the Excel input template used by XSLOPE, the user can define up to 20 reinfor
 | Tres | Residual tensile force the reinforcement retains after it ruptures, capped by the capacity its embedment can develop. **Leave blank for no post-peak drop** (elastic-perfectly-plastic — the usual choice, and the default). An explicit `0` means brittle rupture. Used by the FEM only. |
 | Lp1  | The pullout length on the left side |
 | Lp2  | The pullout length on the right side |
+| Adhesion | Soil-reinforcement interface adhesion. Filled together with Delta, it replaces Lp1/Lp2 with the overburden-dependent pullout law. Blank (with Delta blank) uses the pullout lengths. |
+| Delta | Soil-reinforcement interface friction angle, degrees. |
 | E    | The modulus of elasticity of reinforcement material  |
 | Area | The cross-sectional area of the reinforcement material  |
 
@@ -208,7 +210,7 @@ should be in $ft^2$. Alternately, E could be in $psi$ as long as Area is in $in^
 
 ### Element Discretization and Capacity Assignment
 
-A separate pullout length (Lp) is used for each end since each end may be embedded in a separate soil with different shear resistance values.
+A separate pullout length (Lp) is used for each end since each end may be embedded in a separate soil with different shear resistance values. A line may instead state its interface strength through Adhesion and Delta, in which case the resistance follows the effective overburden along the line and the pullout lengths are not used.
 
 During mesh generation, each reinforcement line is discretized into multiple truss elements based on the specified mesh density. The discretization process follows these steps:
 
@@ -218,14 +220,13 @@ During mesh generation, each reinforcement line is discretized into multiple tru
 Elastic modulus: $E$<br>
 Element stiffness: $K_e = AE/L$ (where L varies based on element length)<br>
 
-2. **Tensile Capacity Assignment**: Each truss element is assigned an allowable $T_{allow}$ and residual $T_{res}$ tensile capacity based on the following logic:
+2. **Tensile Capacity Assignment**: Each truss element is assigned an allowable $T_{allow}$ and residual $T_{res}$ tensile capacity. $T_{allow}$ is the capacity envelope at the element centroid — the **same** envelope the limit-equilibrium engine applies at a slip-surface crossing, evaluated by the same function, so the two engines cannot drift:
 
->>For an element whose center is at distance $d$ from the nearest reinforcement end, where $L_p$ is the pullout length corresponding to that end ($L_{p1}$ if nearest to end 1, $L_{p2}$ if nearest to end 2):
+>>For an element whose centroid is at distances $d_1$ and $d_2$ from the two ends of a line of length $L$:
 >>
->>$T_{allow} = \begin{cases}
-T_{max} \cdot \dfrac{d}{L_p} & \text{if } d < L_p \\
-T_{max} & \text{if } d \geq L_p
-\end{cases}$
+>>$T_{allow} = \min\left(T_{max},\;\; T_{end1} + \displaystyle\int_0^{d_1} r,\;\; T_{end2} + \int_{L-d_2}^{L} r\right)$
+>>
+>>where $r$ is the pullout resistance per unit length. Under the development-length law $r = T_{max}/L_p$ at each end, and the integrals are the linear ramps $T_{max}d_1/L_{p1}$ and $T_{max}d_2/L_{p2}$. Under the overburden-dependent law (Adhesion and Delta both filled) $r = 2(a + \sigma'_v\tan\delta)$ varies along the line with the effective overburden, and $L_{p1}$/$L_{p2}$ are not read. Both laws, and the end anchorage capacities $T_{end}$, are set out in **[Soil Reinforcement in LEM](../lem/reinforcement.md#capacity-envelope)**.
 
 >>
 >>$T_{res} = \begin{cases}
@@ -233,7 +234,7 @@ T_{max} & \text{if } d \geq L_p
 \min\left(T_{residual},\ T_{allow}\right) & \text{otherwise}
 \end{cases}$
 
-This approach ensures that elements near the reinforcement ends have reduced capacity (starting from zero at the ends), while elements beyond the pullout length carry the full design strength. The linear variation within the pullout length reflects the gradual development of pullout resistance through interface friction. Since each end of a reinforcement line may be embedded in a different soil with different shear resistance, the appropriate pullout length ($L_{p1}$ or $L_{p2}$) is selected based on which end is nearest to the element centroid.
+Elements near a free end therefore have reduced capacity — zero at the end itself, unless an anchorage capacity $T_{end}$ is entered there — while elements far enough from both ends carry the full design strength. The taper is the gradual development of pullout resistance through interface friction, and the minimum is taken over BOTH ends rather than the nearer one, which is the same answer wherever the two zones do not overlap and the correct one where they do. Each end has its own $L_{p1}$/$L_{p2}$ because each may be embedded in a different soil; under the overburden law the same variation comes from $\sigma'_v$ instead, without the soils having to be named.
 
 The residual capacity is only assigned at all when the user has entered a $T_{res}$ for the line. Where post-peak behavior *is* switched on, two independent mechanisms can limit what an element retains, and the smaller of the two governs. Bond slip is perfectly plastic, so the embedment goes on developing $T_{allow}$ — the ramped envelope, end anchorage included — however far the bar is pulled. $T_{residual}$ is the rupture residual, a property of the reinforcement itself and not of its embedment. Beyond the ramps $T_{allow} = T_{max}$ and the element takes the user's residual strength; inside a ramp it takes whichever of the two is less.
 
@@ -274,58 +275,6 @@ These equations are a general guide that can be used to come up with reasonable 
 | **Soil Nails** | 1.5 - 3.0 | Depends on soil conditions and nail diameter |
 | **Geotextiles** | 0.5 - 1.5 | Depends on normal stress and surface texture |
 | **Geogrid** | 1.0 - 2.0 | Depends on aperture size and bearing resistance |
-
-### Bond-Slip Load Transfer (optional)
-
-The pullout ramp above uses a **fixed** development length $L_p$ at each end: the available
-tension rises linearly from zero at the end to $T_{max}$ at a distance $L_p$, regardless of
-where the element sits in the slope. This is a good first approximation, but the pullout
-resistance actually depends on the **local normal stress** — a bar segment under deep
-overburden can develop force faster than one near the surface, so the development length is
-not really constant along the line.
-
-The optional **bond-slip** model makes this explicit. Instead of a fixed $L_p$, it caps the
-rate at which tension can develop along the bar by a stress-dependent Coulomb bond per unit
-length:
-
->>$\dfrac{dT}{ds} \leq q(s) = P\,\big(c_{bond} + \sigma_n(s)\,\tan\phi_{bond}\big)$
-
-where $P$ is the bonded perimeter per unit width (2 for a geotextile sheet — friction on both
-faces; $\pi D / S$ for a nail of diameter $D$ at horizontal spacing $S$), $c_{bond}$ and
-$\phi_{bond}$ are the interface cohesion and friction angle, and $\sigma_n(s)$ is the local
-vertical overburden at the segment (integrated soil column above it — the same quantity used
-for $r_u$ pore pressures). The available tension at a point is the smaller of the two one-sided
-integrals of $q$ from each free end, still capped by the material axial capacity:
-
->>$T_{allow}(s) = \min\!\Big(T_{max},\; \int_{\text{end 1}}^{s} q\,ds',\; \int_{s}^{\text{end 2}} q\,ds'\Big)$
-
-![reinf_bond_slip.png](images/reinf_bond_slip.png)
-
-The two envelopes on a line whose overburden grows from the face into the fill. The bond envelope develops
-tension more slowly than the fixed ramp where the line is shallow, and far faster where it is deeply buried.
-
-In the constant-$\sigma_n$, single-soil limit this reduces exactly to the fixed double-ended
-ramp with slope $q$ in place of $T_{max}/L_p$ — the two models agree where the overburden is
-uniform, and diverge where it is not (a face-parallel geotextile whose upslope end lies under
-a thick fill develops force faster there than the fixed ramp allows). The bond parameters map
-directly onto a grouted-joint interface property in continuum codes (RS2's stress-dependent
-joint, for example).
-
-Bond-slip is a **run option**, off by default:
-
-```python
-solve_ssrm(fem_data, bond_slip={"geotextile 1": (0.0, 28.35, 2.0)})
-#                                 line label     c_bond  φ_bond  P
-```
-
-The dictionary is keyed by reinforcement line **label** (a string), **1-based id** (an
-integer), or `"*"` (every reinforcement line); each value is the tuple
-`(bond_c, bond_phi_deg, perimeter)`. Only the named lines switch from the fixed $L_p$ ramp to
-the bond envelope — unnamed lines keep their ramp. With `bond_slip=None` (the default) the
-solve is bit-identical to the fixed-ramp path. The same option is available on `solve_fem`,
-and from a verification tag as `bond_slip=<line>:<c>:<phi_deg>:<perimeter>` (semicolon-separated
-for several lines). The invariant (off ≡ fixed ramp), the closed-form envelope, the axial cap,
-and unknown-name rejection are asserted by `benchmarks/bondslip_guard.py`.
 
 ### Wished-in-Place Analysis and EA Selection
 
@@ -446,9 +395,7 @@ it is labelled a shear strain band, which is what it is. A line the concentratio
 Beneath the force profile is the bond transfer rate $dT/ds$: the force the ground hands the bar per unit of its
 length, which is the gradient of the profile above it. There is no companion slip series because the formulation
 has no slip degree of freedom — a reinforcement element is a truss bar on the continuum's own nodes, so bar and
-soil displacement are the same number at every node. Load transfer is expressed through the capacity envelope
-(or, with [bond-slip](#bond-slip-load-transfer-optional) enabled, through the Coulomb bond envelope that replaces
-it), not through a slip law.
+soil displacement are the same number at every node. Load transfer is expressed through the capacity envelope, not through a slip law.
 
 A **Field state** control at the foot of the panel selects which field the profiles are read from — the at-failure
 mechanism an SSRM run captured, or the last converged solution — and is the same switch, with the same default, as

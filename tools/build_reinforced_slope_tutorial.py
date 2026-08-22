@@ -79,11 +79,14 @@ FEM_REINFORCE_KEYS = ("t_res", "E", "area")
 #: The geometry and capacity terms that must agree between the two base models
 #: before either can be called "the same slope".  Checked, not assumed.
 SHARED_REINFORCE_KEYS = ("x1", "y1", "x2", "y2", "t_max", "lp1", "lp2",
+                         "adhesion", "delta",
                          "tend1", "tend2", "spacing")
 
 
 def _same(a, b, tol=1e-9):
     if isinstance(a, float) and isinstance(b, float):
+        if a != a and b != b:          # both unset (NaN): the same blank
+            return True
         return math.isclose(a, b, rel_tol=tol, abs_tol=tol)
     return a == b
 

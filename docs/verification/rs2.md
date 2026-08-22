@@ -2015,11 +2015,9 @@ reinforcement), vp090 (dual geotextile type) and vp093 (crest surcharge) drop to
 auto-bracket floor, a mesh/reinforcement-geometry convergence gap. With feature-aware mesh refinement near the reinforcement lines
 (`refine_factor`), all three do reach equilibrium, but at refinement-sensitive rather than
 mesh-converged factors — vp089 0.923 (factor 3) / 0.863 (factor 4), vp090 0.908 / 0.277,
-vp093 0.824 / (no equilibrium at factor 4) — so none is lockable. The bond-slip load-transfer
-model ([Bond-Slip Load Transfer](../fem/reinforcement.md#bond-slip-load-transfer-optional))
-does not change this: on these wished-in-place walls the geotextile bars are not mobilized to
-their pull-out capacity at the incipient failure state, so re-capping the pull-out envelope
-leaves every one of those factors byte-identical.
+vp093 0.824 / (no equilibrium at factor 4) — so none is lockable. On these wished-in-place
+walls the geotextile bars are not mobilized to their pull-out capacity at the incipient
+failure state, so the pull-out envelope is not what holds those factors back.
 
 The vendor `.fez` files for those three (`#050`/`#051`/`#054`) settle three questions about the
 modelling; the fourth difference, the split mesh at the sheets, is the family's own and is
@@ -3483,8 +3481,7 @@ the nail nodes are shared with the 2D mesh by construction, rather than embedded
 — which leaves such wall-rooted lines non-conforming. With the nails conforming, XSLOPE's SSRM
 lands at **0.991** — squarely inside the published 0.91–1.02 spread, just under XSLOPE's own LEM
 Spencer 1.010. For undrained φ = 0 clay the nail bond is adhesion-governed
-(stress-independent), so the standard fixed-ramp pull-out is faithful and no bond-slip envelope is
-needed. Mesh-stable (0.991 at both 2.0 and 1.5 ft); the conforming mesh equilibrates at a uniform
+(stress-independent), so the fixed-ramp pull-out is faithful. Mesh-stable (0.991 at both 2.0 and 1.5 ft); the conforming mesh equilibrates at a uniform
 size without feature refinement. ψ = 0.
 
 **The vendor model holds a third of the domain elastic, and this run does not.** `#060-slope7` states a strength-reduction constraint the way the Methodology table records for

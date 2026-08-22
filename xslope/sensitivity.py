@@ -42,7 +42,8 @@ _MAT_GENERAL_FIELDS = ('gamma', 'gamma_sat', 'ru', 'd', 'psi')
 # seep fields live on the material rows too; settable here so a later coupled
 # seep+lem analysis reuses the same refs
 _SEEP_FIELDS = ('k1', 'k2', 'alpha', 'kr0', 'h0')
-_REINFORCE_FIELDS = ('t_max', 't_res', 'lp1', 'lp2', 'tend1', 'tend2', 'spacing')
+_REINFORCE_FIELDS = ('t_max', 't_res', 'lp1', 'lp2', 'tend1', 'tend2', 'spacing',
+                     'adhesion', 'delta')
 # plan-name -> slope_data key for pile fields
 _PILE_FIELDS = {'H': 'H', 'theta': 'theta_p', 'D': 'D_pile', 'S': 'S',
                 'V_cap': 'V_cap', 'M_cap': 'M_cap'}

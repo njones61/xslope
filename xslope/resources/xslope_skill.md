@@ -949,9 +949,22 @@ slope_data['reinforcement_lines'] = [
      'dir': 'tangent',      # 'tangent' (flexible, force along slip surface) | 'axial' (rigid, along the line)
      'appl': 'active',      # 'active' (allowable force, not /FS) | 'passive' (ultimate, /FS)
      'tend1': 0.0, 'tend2': 0.0,  # end anchorage/plate/connection capacity (per unit width)
-     'spacing': 1.0},       # out-of-plane spacing already divided out at load time
+     'spacing': 1.0,        # out-of-plane spacing already divided out at load time
+     # v24 overburden-dependent pullout, the alternative to lp1/lp2. NaN = blank =
+     # use the pullout lengths. Fill BOTH or neither (preflight refuses one of two).
+     'adhesion': float('nan'),   # interface adhesion, stress units
+     'delta': float('nan')},     # interface friction angle, degrees, in (0, 90)
 ]
 ```
+
+Two pullout laws, one envelope. With `lp1`/`lp2` the capacity develops at a constant rate
+`t_max/lp` from each end. With `adhesion` and `delta` both set it develops at
+`2*(adhesion + sigma'_v*tan(delta))` per unit length, integrated along the line — `sigma'_v`
+being the weight of the soil column above each point (gamma_sat below the water table where a
+material declares one) less the pore pressure that point's material declares. `lp1`/`lp2` are
+then not read. The FHWA form is `adhesion = 0`, `delta = atan(F* * alpha)`. Both engines apply
+the same envelope, `xslope.fileio.reinforce_available_tension`. A `slope_data` you assemble in
+memory resolves the law on the way into either engine, so nothing extra has to be called.
 
 Support-type recipes: geosynthetics -> `type='geosynthetic'` (tangent, active); soil nails ->
 `type='nail'` (axial, passive, `tend1` = plate capacity at the face end); tiebacks ->

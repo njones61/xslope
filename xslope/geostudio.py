@@ -381,11 +381,22 @@ def read_gsz(path):
             "pullout": _num(rf, "PulloutResistance", 0.0),
             "spacing": _num(rf, "Spacing", None),          # out-of-plane, None = per metre
             "distribution": _text(rf, "ForceDistribution", ""),
-            # An ALTERNATIVE pullout law: bond from soil adhesion + friction on the
-            # interface, which grows with the normal stress on the bar. xslope's bond is a
-            # constant rate, so this one cannot be reproduced -- it is reported instead.
+            # The ALTERNATIVE pullout law, and xslope's Adhesion/Delta columns:
+            # bond from soil adhesion + friction on the interface, growing with the
+            # effective overburden. GeoStudio states the interface strength per unit
+            # AREA, tau = a + sigma'v*tan(delta) (Slope Stability Modeling, Eq. 67),
+            # and multiplies it by a length measure xi to get force per unit length
+            # (Eq. 65): for a geosynthetic xi = SurfaceAreaFactor (default 2, both
+            # faces), for an anchor or nail xi = pi*BondDiameter (Eq. 69). Which law
+            # is in force is CalculatedPulloutResistance -- a product may carry both
+            # a constant PulloutResistance and the interface pair.
             "adhesion": _num(rf, "InterfaceAdhesion", None),
             "shear_angle": _num(rf, "InterfaceShearAngle", None),
+            "calculated_pullout": (_text(rf, "CalculatedPulloutResistance", "")
+                                   or "").strip().lower() == "true",
+            "surface_area_factor": _num(rf, "SurfaceAreaFactor", None),
+            "bond_diameter": _num(rf, "BondDiameter", None),
+            "bond_length": _num(rf, "BondLength", None),
         }
 
     stability = {}
@@ -686,6 +697,7 @@ def _reinforcement(product, line, ground_surface):
 
     xtype, xdir, xappl = _REINF_TYPE.get(product.get("type") or "",
                                          ("", "tangent", "active"))
+    adhesion, delta = _interface_pullout(product, spacing)
     return {
         "x1": p1[0], "y1": p1[1], "x2": p2[0], "y2": p2[1],
         "t_max": t_max,
@@ -697,7 +709,58 @@ def _reinforcement(product, line, ground_surface):
         "spacing": 1.0,                 # already per unit width — never divide twice
         "label": product.get("name") or "reinforcement",
         "type": xtype, "dir": xdir, "appl": xappl,
+        "adhesion": adhesion, "delta": delta,
     }
+
+
+def _interface_pullout(product, spacing):
+    """GeoStudio's calculated pullout law -> xslope's (Adhesion, Delta), or (NaN, NaN).
+
+    GeoStudio states the interface strength per unit AREA and multiplies it by a
+    length measure xi to reach force per unit length of bar::
+
+        r = xi * (a + sigma'v * tan(delta_gs))
+
+    with xi = SurfaceAreaFactor for a geosynthetic (default 2.0 — soil bearing on
+    both faces) and xi = pi * BondDiameter for an anchor or nail. xslope writes the
+    two-faced planar case into the law itself::
+
+        r = 2 * (Adhesion + sigma'v * tan(Delta))
+
+    so the two agree exactly when the entered pair carries the factor xi/2::
+
+        Adhesion  = a * xi / 2
+        Delta     = atan( tan(delta_gs) * xi / 2 )
+
+    For the SLOPE/W default (a geosynthetic at SAF = 2) that factor is 1 and the
+    numbers transfer unchanged; a product that sets SAF = 1, or an anchor whose
+    xi = pi*D is anything but 2, is scaled here rather than silently mismatched.
+    The out-of-plane Spacing divides it for the same reason it divides every other
+    capacity term: xslope stores reinforcement per unit width of slope.
+    """
+    if not product.get("calculated_pullout"):
+        return float("nan"), float("nan")
+    a = product.get("adhesion")
+    d = product.get("shear_angle")
+    if a is None and d is None:
+        return float("nan"), float("nan")
+    a = float(a or 0.0)
+    d = float(d or 0.0)
+    if not (0.0 < d < 90.0):
+        # An interface with no friction angle is pure adhesion, which xslope's law
+        # cannot state on its own: Delta has to be an angle strictly inside (0, 90).
+        # Left unmapped, and reported.
+        return float("nan"), float("nan")
+    gtype = (product.get("type") or "").strip()
+    if gtype == "Geosynthetic":
+        xi = product.get("surface_area_factor")
+        xi = 2.0 if xi is None else float(xi)
+    else:                                    # anchor / nail: the bonded perimeter
+        dia = product.get("bond_diameter")
+        xi = math.pi * float(dia) if dia else 2.0
+    factor = xi / (2.0 * (spacing or 1.0))
+    delta = math.degrees(math.atan(math.tan(math.radians(d)) * factor))
+    return a * factor, delta
 
 
 _REINF_TYPE_OUT = {x: g for g, (x, _, _) in _REINF_TYPE.items()}   # xslope type -> GeoStudio
@@ -756,8 +819,29 @@ def _reinforcement_out(r, gamma_water):
             f"but GeoStudio has no field for either — it infers {want_dir}/{want_appl} "
             f"from the type '{gtype}'. THE FORCE WILL DIFFER; re-check it in GeoStudio")
 
+    # The overburden pullout law. GeoStudio states the same law per unit AREA and
+    # multiplies it by a length measure -- SurfaceAreaFactor for a geosynthetic,
+    # pi*BondDiameter for an anchor or nail -- and its manual restricts the
+    # calculated law to anchors and geosynthetics. Writing SAF = 2 makes GeoStudio's
+    # rate 2*(a + sigma'v*tan delta), which is xslope's, so the pair transfers
+    # unchanged. A line on the law whose type is not a geosynthetic keeps its
+    # constant rate and says so.
+    adhesion, delta = r.get("adhesion"), r.get("delta")
+    interface = None
+    if (adhesion is not None and delta is not None
+            and float(adhesion) == float(adhesion) and float(delta) == float(delta)):
+        if gtype == "Geosynthetic":
+            interface = (float(adhesion), float(delta))
+        else:
+            notes.append(
+                f"reinforcement {r.get('label') or ''!r} develops its pullout from the "
+                f"effective overburden (Adhesion/Delta), which GeoStudio offers for "
+                f"geosynthetics and anchors but not for a '{gtype}'; the constant "
+                f"pullout rate was written instead and the developed force will differ")
+
     return {"type": gtype, "name": str(r.get("label") or gtype), "spacing": 1.0,
-            "tensile": t_max, "plate": plate, "pullout": rate}, notes
+            "tensile": t_max, "plate": plate, "pullout": rate,
+            "interface": interface}, notes
 
 
 def _line_load_out(ll):
@@ -1423,8 +1507,13 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             continue
         rlines.append(_reinforcement(product, rl, ground_surface))
     if rlines:
+        from .fileio import attach_reinforce_pullout
         slope_data["reinforcement_lines"] = rlines
         slope_data["reinforce_lines"] = build_reinforce_lines(rlines)
+        # A line imported onto the overburden law needs its profile before the
+        # envelope means anything — the geometry, materials and water are all in
+        # slope_data by now.
+        attach_reinforce_pullout(slope_data)
         kinds = sorted({r["type"] or "generic" for r in rlines})
         caveats.append(
             f"{len(rlines)} reinforcement line(s) imported ({', '.join(kinds)}), acting "
@@ -1433,19 +1522,33 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
             f"length (Lp = Tmax / pullout rate), and its plate capacity the end capacity "
             f"at the face")
 
-        # A pullout law xslope cannot reproduce: bond that grows with the normal stress on
-        # the bar. Silence here would hand back a plausible force computed the wrong way.
+        # The interface pullout law. xslope has the same law, so a product using it
+        # arrives as Adhesion/Delta rather than as an approximation -- but the length
+        # measure GeoStudio multiplies it by is type-dependent, and a product whose
+        # interface pair could not be expressed still has to say so.
         used = [gsz["reinforcements"][rl["reinforcement"]] for rl in stab["reinf_lines"]
                 if rl["reinforcement"] in gsz["reinforcements"]]
-        interface = sorted({p["name"] for p in used
-                            if p.get("adhesion") or p.get("shear_angle")})
-        if interface:
+        mapped = sorted({r["label"] for r in rlines
+                         if r.get("delta") == r.get("delta")})
+        if mapped:
             caveats.append(
-                f"reinforcement {', '.join(repr(n) for n in interface)} takes its pullout "
-                f"from the soil INTERFACE (adhesion + friction), which grows with the "
-                f"normal stress on the bar. xslope's bond is a constant rate, so the "
-                f"imported bond length is an approximation — check the developed forces "
-                f"against GeoStudio if the bars are not fully anchored")
+                f"reinforcement {', '.join(repr(n) for n in mapped)} takes its pullout "
+                f"from the soil interface (adhesion + friction on the effective "
+                f"overburden); xslope reads the same law, so it was imported as the "
+                f"Adhesion and Delta columns and the bond length is not used there")
+        unmapped = sorted({p["name"] for p in used
+                           if p.get("calculated_pullout")
+                           and (p.get("adhesion") or p.get("shear_angle"))
+                           and not any(r["label"] == p["name"]
+                                       and r.get("delta") == r.get("delta")
+                                       for r in rlines)})
+        if unmapped:
+            caveats.append(
+                f"reinforcement {', '.join(repr(n) for n in unmapped)} states its "
+                f"interface pullout with no friction angle (pure adhesion), which "
+                f"xslope's law cannot express -- it needs an interface friction angle "
+                f"strictly between 0 and 90. The constant bond rate was imported "
+                f"instead; check the developed forces against GeoStudio")
         spread = sorted({p["name"] for p in used
                          if (p.get("distribution") or "Concentrated") != "Concentrated"})
         if spread:
@@ -2371,7 +2474,15 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
                      f'<Tensile>{p["tensile"]:.10g}</Tensile>'
                      f'<PlateCapacity>{p["plate"]:.10g}</PlateCapacity>'
                      f'<PulloutResistance>{p["pullout"]:.10g}</PulloutResistance>'
-                     f'</Reinforcement>')
+                     + (f'<InterfaceAdhesion>{p["interface"][0]:.10g}'
+                        f'</InterfaceAdhesion>'
+                        f'<InterfaceShearAngle>{p["interface"][1]:.10g}'
+                        f'</InterfaceShearAngle>'
+                        f'<SurfaceAreaFactor>2</SurfaceAreaFactor>'
+                        f'<CalculatedPulloutResistance>true'
+                        f'</CalculatedPulloutResistance>'
+                        if p.get("interface") else '')
+                     + f'</Reinforcement>')
         L.append('  </Reinforcements>')
 
     # Region -> material, per analysis (GeoStudio keeps it here, not on the region).

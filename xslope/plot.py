@@ -3018,8 +3018,16 @@ def plot_reinforcement_lines(ax, slope_data, style=None):
                 linewidth=rfs.get('linewidth', 3), linestyle=rfs.get('linestyle', '-'),
                 alpha=rfs.get('alpha', 0.8), label='Reinforcement Line' if i == 0 else "")
         
-        # Add markers at each point to show tension values
+        # Add markers to show tension values. Under the constant-rate pullout
+        # law a line has a handful of points — the envelope's own breakpoints —
+        # and every one is worth a marker. The overburden-dependent law makes
+        # the envelope a curve, stored as a dense sampling, so the markers are
+        # thinned to about eight: enough to read the taper, not so many that
+        # they paint over the line they annotate.
+        step = max(1, (len(line) - 1) // 6)
         for j, point in enumerate(line):
+            if j % step and j != len(line) - 1:
+                continue
             tension = point.get('T', 0.0)
             if tension > 0:
                 # Use smaller marker size proportional to tension (normalized)

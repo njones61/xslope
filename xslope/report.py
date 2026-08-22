@@ -2447,9 +2447,9 @@ def _point(m, x, y):
 #: solver reads it afterwards.
 REINFORCEMENT_PROPERTIES = {
     "lem": ("label", "start", "end", "t_max", "tend1", "tend2", "lp1", "lp2",
-            "spacing", "dir", "appl"),
+            "adhesion", "delta", "spacing", "dir", "appl"),
     "fem": ("label", "start", "end", "t_max", "t_res", "tend1", "tend2",
-            "lp1", "lp2", "spacing", "E", "area"),
+            "lp1", "lp2", "adhesion", "delta", "spacing", "E", "area"),
 }
 
 #: The same, for the piles. The limit equilibrium analysis takes the lateral
@@ -2487,6 +2487,13 @@ def _reinforcement_fields(slope_data):
                   lambda m: _fmt(m.get("tend2"), "{:g}"), False),
         "lp1": ("lp1", f"L_p1{lu}", lambda m: _fmt(m.get("lp1"), "{:g}"), True),
         "lp2": ("lp2", f"L_p2{lu}", lambda m: _fmt(m.get("lp2"), "{:g}"), True),
+        # The overburden pullout law. Printed only on the lines that carry it —
+        # a blank pair means the development lengths above are the law, and a
+        # column of blanks would say nothing.
+        "adhesion": ("adhesion", f"Adhesion{su}",
+                     lambda m: _fmt(m.get("adhesion"), "{:g}"), False),
+        "delta": ("delta", "Delta (deg)",
+                  lambda m: _fmt(m.get("delta"), "{:g}"), False),
         "spacing": ("spacing", f"Spacing{lu}",
                     lambda m: _fmt(m.get("spacing"), "{:g}"), True),
         "dir": ("dir", "Direction",
@@ -7979,7 +7986,10 @@ DETAIL_FIGURE_READING = {
     "reinforcement": (
         "The upper panel plots the axial force the line has mobilized along its "
         "length, over the dashed capacity envelope. The envelope ramps up from "
-        "each free end over the pullout length declared for that end and levels "
+        "each free end at the rate the pullout law declared for that line "
+        "develops — a constant rate over the pullout length, or the interface "
+        "resistance the effective overburden supports at each point where the "
+        "line states an adhesion and an interface friction angle — and levels "
         "off at the tensile capacity T_max between them, so the force a line "
         "can hold near an end is the pullout resistance and not the capacity of "
         "the bar. Where the two meet, the line is holding everything available "

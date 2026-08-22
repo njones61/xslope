@@ -211,11 +211,10 @@ type.
 
 ## Building the mesh
 
-The finite element engine cannot do any of that until the model is meshed, and
-on a reinforced slope the mesh decides more than the usual accuracy question: it
-fixes where each bar element sits along its line, and therefore what capacity
-the envelope hands that element. Two of the Build Mesh dialog's defaults are
-changed here for that reason.
+The model has to be meshed before the finite element engine can run. On a
+reinforced slope the mesh also sets where each bar element falls along its
+line, and with it the capacity that element gets from the envelope. Two of the
+Build Mesh defaults are changed here because of that.
 
 Switch the mode strip to **FEM**. **Run → Run FEM…** stays disabled until a mesh
 exists, so build one first. Click **Run → Build Mesh…**

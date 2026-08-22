@@ -198,10 +198,9 @@ strain — the axial stiffness times how much it stretched per unit length —
 capped by the envelope value at that element's own position along the line. The
 bar therefore develops a force *profile*, low at the ends, high where the
 mechanism crosses it, and the load that one element cannot carry is shed into
-its neighbors through the soil. Two inputs
-that a limit equilibrium run never asks for decide that profile: the elastic
-modulus `E` and the cross-sectional area `Area` of the reinforcement, whose
-product *EA* is its axial stiffness.
+its neighbors through the soil. That profile depends on two inputs the limit equilibrium run does not use:
+the reinforcement's elastic modulus `E` and its cross-sectional area `Area`.
+Their product *EA* is the axial stiffness.
 
 [Soil reinforcement in LEM](../lem/reinforcement.md) and
 [soil reinforcement in FEM](../fem/reinforcement.md) carry the formulations,

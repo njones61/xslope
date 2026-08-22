@@ -240,17 +240,21 @@ the mesher guarantees about four element rows across every thin material zone,
 because a band too thin to resolve cannot develop a shear band and quietly
 returns a factor of safety that is too high. The thin zone here is the `shell`,
 the cohesive band down the face, 1.25 ft across (the check reports about
-1.2 ft, measured off the mesh). Refining it is not free on this
-model: the mesh grows from 2,101 elements to 5,096, the run takes 533 seconds
-instead of 103, and the answer of the second run below moves from 1.512 to
-1.402 — 0.110 of factor of safety. The first run's answer moves 0.031 under the
-same refinement, 1.535 to 1.504, less than a third as far, which says what is
-moving. The refinement also puts more elements along the bars, and that changes
-where each bar element sits inside the 4 ft pullout ramp and therefore what
-residual it drops to — which only the run with post-peak behavior in it has. A
-model with post-peak strength loss is mesh-sensitive by nature, as the
+1.2 ft, measured off the mesh). Refining it is left off here, for a reason worth
+knowing. The refined mesh has 5,096 elements instead of 2,101 and the run takes
+533 seconds instead of 103, which is only cost. What matters is what it does to
+the two answers below. The first run, with no post-peak drop, moves from 1.535
+to 1.504 — and across every mesh size tried it stays between 1.50 and 1.54 with
+no trend, which is ordinary discretization noise: that answer is
+mesh-independent to about 2%. The second run, with a residual capacity, drops
+from 1.512 to 1.402. That is not the mesh converging on a better number; it is
+the mesh dependence every strain-softening model has. Once one bar element sheds
+load, its neighbors pick it up and shed in turn, and how far that chain runs
+depends on how finely the bar is divided — a finer mesh gives a lower number,
+and a finer one still would give a lower one again. Neither value is the "right"
+one; the spread is the uncertainty of the post-peak model itself, as the
 [FEM reinforcement page](../fem/reinforcement.md#force-behavior-and-failure-modes)
-warns, so this page solves the same discretization the published sample uses.
+warns. This page keeps the mesh the rest of its numbers were measured on.
 Leave the rest of the dialog alone and click **Build**.
 
 The mesh comes out at **4,364 nodes and 2,101 triangles**, with the six lines

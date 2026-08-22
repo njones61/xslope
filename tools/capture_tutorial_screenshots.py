@@ -2147,6 +2147,227 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# FEM-2 — Reinforcement: LEM against FEM
+# --------------------------------------------------------------------------- #
+FEM02_START = os.path.join(REPO_ROOT,
+                           "docs/tutorials/files/xslope_reinforced_slope_start.xlsx")
+FEM02_DONE = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_reinforced_slope.xlsx")
+#: The line whose detail panel is photographed: the most heavily loaded of the six.
+FEM02_DETAIL_LINE = "Line 5"
+
+
+def _line_table(dlg, through):
+    """Put a two-view line editor in its TABLE view, sized to reach ``through``.
+
+    The line editors' own default is the LIST view and the last view used is a
+    session setting, so the mode is set explicitly — the same reason ``_mat_table``
+    gives. Width and height are measured off the built table for the same reason
+    too: a reinforcement table cut off before its last column photographs a row
+    whose columns the page is telling the reader to fill.
+    """
+    dlg._set_mode("table")
+    dlg.show()
+    _settle()
+    tbl = dlg._table.table
+    hh = tbl.horizontalHeader()
+    keys = [f.key for f in dlg._fields]
+    col = keys.index(through)
+    rows = sum(tbl.rowHeight(r) for r in range(tbl.rowCount()))
+    want = rows + tbl.horizontalHeader().height()
+    # Height is grown by the measured deficit rather than computed once: the table
+    # shares a splitter with the section preview, so a taller dialog does not hand
+    # the table all of the extra — and a table one row short photographs a file
+    # whose last line the reader cannot see.
+    from PySide6.QtWidgets import QSplitter
+
+    for _ in range(4):
+        w = (hh.sectionPosition(col) + hh.sectionSize(col)
+             + (dlg.width() - tbl.viewport().width()))
+        deficit = max(0, want - tbl.viewport().height())
+        dlg.resize(w, dlg.height() + deficit)
+        # The splitter keeps its own proportions through a resize, so the extra
+        # height lands on the preview unless the table's pane is asked for it.
+        for sp in dlg.findChildren(QSplitter):
+            sizes = sp.sizes()
+            if len(sizes) == 2 and sp.isAncestorOf(tbl) and deficit:
+                sp.setSizes([sizes[0] + deficit, max(1, sizes[1])])
+        _settle()
+    return dlg
+
+
+def _fem02_meshed(path=FEM02_DONE):
+    """The model with the tutorial's own mesh attached — the state the Build Mesh
+    step leaves behind, and the only state Studio's Run FEM action is reachable in.
+
+    The element type and target size are the COMPLETED file's whichever model is
+    meshed, and the reinforcement lines go in as constraint lines so the bars land
+    on mesh edges, exactly as ``studio.runners.MeshWorker`` does it. **Refine thin
+    zones is off**, which is what the page instructs: the dialog's own default is
+    on, and on this section it moves the mesh from 2,101 elements to 5,096 and the
+    peak-residual factor of safety from 1.51 to 1.40.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_size_regions, get_material_polygons)
+
+    done = _load(FEM02_DONE)
+    data = done if path == FEM02_DONE else _load(path)
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(data)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data, reinf_lines=lines), done["target_size"],
+            done["element_type"], lines=lines or None,
+            size_regions=extract_size_regions(data))
+    return data
+
+
+def fem02_materials():
+    """The materials editor, table view, FEM columns: both soils already carry the
+    elastic pair this tutorial's starter is delivered with.
+
+    The page's featured input is the reinforcement table, not this one — the
+    elastic constants arrive filled — so this shot exists to show the reader what
+    a complete FEM material row looks like before the run refuses on something
+    else.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _fem_only(MaterialsEditor().build(_load(FEM02_DONE), None))
+    return _grab(_mat_table(dlg, through="nu"), "fem02_studio_materials.png")
+
+
+def fem02_reinforce_blank():
+    """The reinforcement table as the STARTER delivers it: six lines with their
+    geometry, tensile capacity and pullout lengths, and Tres, E and Area empty.
+
+    Both usage toggles are ticked, so the limit-equilibrium columns the file
+    already carries sit beside the three the reader is about to fill.
+    """
+    from studio.editors import ReinforcementEditor
+
+    dlg = ReinforcementEditor().build(_load(FEM02_START), None)
+    for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(True)
+    return _grab(_line_table(dlg, through="area"),
+                 "fem02_studio_reinforce_blank.png")
+
+
+def fem02_reinforce_filled():
+    """The same table on the COMPLETED file — Tres, E and Area entered on all six
+    lines. The state the reader is working toward, beside the blank one."""
+    from studio.editors import ReinforcementEditor
+
+    dlg = ReinforcementEditor().build(_load(FEM02_DONE), None)
+    for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(True)
+    return _grab(_line_table(dlg, through="area"),
+                 "fem02_studio_reinforce_filled.png")
+
+
+def fem02_build_mesh():
+    """Build Mesh set to the tutorial's mesh: tri6, auto-sizing off, 2 ft, and
+    **Refine thin zones unticked**.
+
+    The last of those is the only box on this dialog the page asks the reader to
+    change from its default. The shell is a 1.19 ft facing band, thinner than one
+    element at 2 ft, so the refinement fires on it — and the mesh it produces is a
+    different answer, not a better-resolved version of this one.
+    """
+    from studio.dialogs import BuildMeshDialog
+
+    data = _load(FEM02_DONE)
+    dlg = BuildMeshDialog(defaults={"element_type": data["element_type"],
+                                    "target_size": float(data["target_size"]),
+                                    "auto_size": False,
+                                    "refine_thin_zones": False})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem02_studio_build_mesh.png")
+
+
+def fem02_run_fem():
+    """Run FEM on the meshed completed model, with the checks column beside it.
+
+    SSRM over the dialog's own bracket, and the per-trial iteration budget raised
+    to 12,000 — the one control the page tells the reader to change, because at
+    the 3,000 default this model's two reinforcement runs return the same factor
+    of safety.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _fem02_meshed()
+    dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
+                                 "tolerance": 0.01, "max_iterations": 12000},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem02_studio_run_fem.png")
+
+
+def fem02_run_fem_no_reinf():
+    """The same dialog on the STARTER, meshed but with the reinforcement's E and
+    Area still blank.
+
+    **Run** is disabled and the checks column names all six lines. This is the
+    page's transition figure: the limit-equilibrium search ran on this file
+    unchanged, and the finite element engine refuses it until the bars have a
+    stiffness — the capacity envelope alone is not a bar.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _fem02_meshed(FEM02_START)
+    dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
+                                 "tolerance": 0.01, "max_iterations": 12000},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem02_studio_run_fem_no_reinf.png")
+
+
+def fem02_details():
+    """The 1D Details panel on the most heavily loaded line of the peak-residual
+    run — the axial force along the bar over its capacity envelope, and the bond
+    transfer rate under it.
+
+    The run is made HERE rather than read from a sidecar: neither tutorial file
+    ships companions, so the panel is photographed on a solve at the page's own
+    settings (tri6 at 2 ft with the thin-zone refinement off, the dialog's
+    bracket, 12,000 iterations a trial). That costs about two minutes.
+    """
+    from studio.fem_details_dialog import FemDetailsDialog
+    from PySide6.QtCore import Qt
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    data = _fem02_meshed()
+    fem_data = build_fem_data(data, data["mesh"])
+    with contextlib.redirect_stdout(io.StringIO()):
+        result = solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01,
+                            debug_level=0, failure_criterion="non_convergence",
+                            max_iterations=12000)
+    dlg = FemDetailsDialog(fem_data, result["last_solution"], data,
+                           model_path=FEM02_DONE,
+                           failure_solution=result.get("failure_solution"))
+    dlg.resize(1140, 660)
+    for row in range(dlg.list.count()):
+        entry = dlg.list.item(row).data(Qt.UserRole)
+        if entry and entry["label"] == FEM02_DETAIL_LINE:
+            dlg.list.setCurrentRow(row)
+            break
+    return _grab(dlg, "fem02_studio_1d_details.png")
+
+
+SHOTS.update({
+    "fem02_materials": fem02_materials,
+    "fem02_reinforce_blank": fem02_reinforce_blank,
+    "fem02_reinforce_filled": fem02_reinforce_filled,
+    "fem02_build_mesh": fem02_build_mesh,
+    "fem02_run_fem": fem02_run_fem,
+    "fem02_run_fem_no_reinf": fem02_run_fem_no_reinf,
+    "fem02_details": fem02_details,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

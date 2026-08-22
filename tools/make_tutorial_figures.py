@@ -4125,6 +4125,338 @@ def fem01_plots():
             field_state="converged")
 
 
+# --------------------------------------------------------------------------- #
+# FEM-2 — Reinforcement: LEM against FEM
+# --------------------------------------------------------------------------- #
+#: FEM-2's file pair, written by ``tools/build_reinforced_slope_tutorial.py`` from
+#: the LEM reinforced-slope model (docs/lem/samples.md problem 9, the model
+#: Tutorial LEM-8 builds) and its finite element counterpart
+#: (docs/fem/samples.md problem 1).  The starter carries the elastic constants and
+#: the six geogrid lines but no mesh and no FEM reinforcement data; the completed
+#: file adds Tres, the bar modulus and the bar area, and declares the mesh.
+FEM02_START = os.path.join(REPO_ROOT,
+                           "docs/tutorials/files/xslope_reinforced_slope_start.xlsx")
+FEM02_DONE = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_reinforced_slope.xlsx")
+#: The method the page's limit-equilibrium number is quoted from, and the slice
+#: count the sample page's own locked search uses.
+FEM02_METHOD = "spencer"
+FEM02_SLICES = 40
+#: The strength-reduction run, at the settings the page's final runs are made at.
+#: ``non_convergence`` rather than the API default ``hybrid`` because that is what
+#: Studio's Run FEM dialog runs.
+FEM02_CRITERION = "non_convergence"
+FEM02_F_MIN, FEM02_F_MAX = 1.0, 2.0
+FEM02_TOLERANCE = 0.01
+#: 12,000 rather than ``solve_ssrm``'s default 3,000, because on THIS model the
+#: default budget does not merely shade the answer — it erases the comparison the
+#: page is about.  At 3,000 iterations a trial, the elastic-perfectly-plastic and
+#: the peak-residual runs return the same factor of safety (1.3555) from the same
+#: bracket, trial for trial, because no trial ever converges far enough for the
+#: post-peak fixed point to be evaluated (``fem.py``: softening is decided only on
+#: a converged state).  At 12,000 they separate — 1.5352 against 1.5117 — and the
+#: answer then plateaus: 16,000 returns the same two numbers and the same
+#: brackets.  So 12,000 is both the budget the page instructs and the cheapest
+#: one that reaches the plateau.
+FEM02_MAX_ITERATIONS = 12000
+#: The line the bar-force profiles are drawn for: the most heavily loaded of the
+#: six in both runs (peak 800 lb/ft elastic-perfectly-plastic, 798 lb/ft
+#: peak-residual, both at the last converged trial).
+FEM02_PROFILE_LINE = 5
+#: The residual capacities the sweep asks for, highest first.  ``None`` is the
+#: blank cell — no post-peak drop at all.  The sweep runs down to zero because
+#: that is where the answer moves: Tres = Tmax is the same run as a blank cell,
+#: every entry between 700 and 200 gives one lower factor of safety, and only
+#: Tres = 0 — the bar tearing and carrying nothing — gives a third.
+FEM02_TRES_SWEEP = (None, 800.0, 700.0, 600.0, 500.0, 400.0, 200.0, 0.0)
+
+
+def _fem02_mesh(model):
+    """The tutorial's mesh, at the element type and target size the COMPLETED FILE
+    declares, built the way Studio's Build Mesh dialog builds it — the
+    reinforcement lines carried in as constraint lines so the bars land on mesh
+    edges — with **Refine thin zones unticked**.
+
+    The dialog's own default for that box is ticked, and on this section it is not
+    inert: the shell is a 1.19 ft facing band, thinner than one element at the
+    target size, so the refinement drives the local size there to 0.33 ft and the
+    mesh from 2,101 elements to 5,096.  That mesh is a different model's worth of
+    answer (peak-residual 1.40 against 1.51), so the page has to tell the reader
+    which box to clear, and this producer draws the mesh the page's own numbers
+    come from.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_size_regions, get_material_polygons)
+
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(model)
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model, reinf_lines=lines),
+            model["target_size"], model["element_type"], lines=lines or None,
+            size_regions=extract_size_regions(model))
+
+
+def _fem02_solve(model, mesh, t_res, max_iterations=FEM02_MAX_ITERATIONS):
+    """One strength-reduction run on this model with the six lines' residual
+    capacity set to ``t_res`` (``None`` leaves the cells blank, which the loader
+    reads as "no post-peak drop").  Returns ``(fem_data, result, log)``."""
+    import copy as _copy
+
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    sd = _copy.deepcopy(model)
+    for line in sd["reinforcement_lines"]:
+        line["t_res"] = float("nan") if t_res is None else float(t_res)
+    fem_data = build_fem_data(sd, mesh)
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        result = solve_ssrm(fem_data, F_min=FEM02_F_MIN, F_max=FEM02_F_MAX,
+                            tolerance=FEM02_TOLERANCE, debug_level=1,
+                            failure_criterion=FEM02_CRITERION,
+                            max_iterations=max_iterations)
+    return fem_data, result, log.getvalue()
+
+
+def _fem02_report(label, fem_data, result):
+    """Print everything the page can quote from one run: the bracket walk, the two
+    states, and what each of the six lines is doing at the last converged one."""
+    import numpy as np
+
+    from xslope import fem_details
+
+    print("   %-14s FS %.4f from [%.6f, %.6f] (width %.6f) after %d bisection "
+          "steps" % (label, result["FS"], result["final_interval"][0],
+                     result["final_interval"][1], result["interval_width"],
+                     result["iterations_ssrm"]))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s iterations"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+    nodes = np.asarray(fem_data["nodes"])
+    last, fail = result["last_solution"], result.get("failure_solution")
+    for state, field in (("last converged", last), ("at failure", fail)):
+        if field is None:
+            print("        %-14s none" % state)
+            continue
+        u = np.asarray(field["displacements"]).reshape(-1, 2)
+        umag = np.hypot(u[:, 0], u[:, 1])
+        ue = np.asarray(field["displacements_elastic"]).reshape(-1, 2)
+        i = int(np.argmax(umag))
+        print("        %-14s F %.4f · %s in %s iterations (%s) · max|u| %.6f at "
+              "(%.2f, %.2f), %.2f× elastic"
+              % (state, field.get("F", float("nan")),
+                 "equilibrium" if field.get("converged") else "no equilibrium",
+                 field.get("iterations"), field.get("exit_reason"), umag.max(),
+                 nodes[i, 0], nodes[i, 1],
+                 umag.max() / np.hypot(ue[:, 0], ue[:, 1]).max()))
+    mats_1d = np.asarray(fem_data.get("element_materials_1d", []), dtype=int)
+    piles = np.asarray(fem_data.get("pile_elem_mask", np.zeros(len(mats_1d))),
+                       dtype=bool)
+    for line_id in sorted(set(mats_1d[~piles].tolist())):
+        prof = fem_details.reinforcement_profile(
+            fem_data, last, int(line_id), field_state="converged",
+            failure_solution=fail)
+        if not len(prof["s"]):
+            continue
+        # Two different "peaks", and the page needs both: the greatest force
+        # anywhere on the bar, and the force at the point working hardest against
+        # its own capacity — which on a bar with pullout ramps is usually an end
+        # element carrying a fraction of Tmax against a fraction of the capacity.
+        print("        line %d  max force %.1f · hardest-worked %.1f at s %.2f "
+              "(utilization %.3f) · %s · %d element(s) at capacity, %d softened"
+              % (line_id, float(prof["T"].max()), prof["peak_T"], prof["peak_s"],
+                 prof["peak_utilization"], prof["status"],
+                 int(prof["failed"].sum()), int(prof["softened"].sum())))
+
+
+def fem02_plots():
+    """The reinforcement arc: the section, the limit-equilibrium answer on the
+    same six lines, the mesh the bars are meshed into, and the two strength
+    reduction runs the page compares — elastic-perfectly-plastic (Tres blank) and
+    peak-residual (Tres = 600 lb/ft).
+
+    Printed rather than drawn: the critical circle, the mesh counts, both bracket
+    walks trial by trial, the two states of each run, and every line's peak force
+    and state at the last converged trial.
+    """
+    import time
+
+    import numpy as np
+
+    from xslope.plot_fem import plot_fem_data, plot_fem_results
+
+    # ---- the section, and the answer the slices already gave ---------------- #
+    start = load_slope_data(FEM02_START)
+    _u = declared_unit_labels(start)
+    for mat in start["materials"]:
+        print("   starter     %-6s γ %g %s · c %g %s · φ %g° · E %r · ν %r"
+              % (mat["name"], mat["gamma"], _u["unit_weight"], mat["c"],
+                 _u["stress"], mat["phi"], mat["E"], mat["nu"]))
+    r0 = start["reinforcement_lines"][0]
+    print("   starter     %d reinforcement lines · Tmax %g · Lp %g/%g · "
+          "Tres %r · E %r · Area %r"
+          % (len(start["reinforcement_lines"]), r0["t_max"], r0["lp1"], r0["lp2"],
+             r0["t_res"], r0["E"], r0["area"]))
+
+    capture("fem02_inputs.png", plot_inputs, start,
+            title="Slope Geometry and Inputs")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _path, _circles = circular_search(
+            start, FEM02_METHOD, num_slices=FEM02_SLICES, diagnostic=False,
+            **file_search_window(start))
+    crit = fs_cache[0]
+    capture("fem02_lem_solution.png", plot_solution, start, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    print("   LEM         %s FS %.4f on Xo %.4f Yo %.4f R %.4f · entry "
+          "(%.3f, %.3f) exit (%.3f, %.3f) · %d candidates"
+          % (FEM02_METHOD, crit["FS"], crit["Xo"], crit["Yo"],
+             crit["Yo"] - crit["Depth"], xs[0], ys[0], xs[-1], ys[-1],
+             len(fs_cache)))
+
+    # ---- the mesh the bars are meshed into ---------------------------------- #
+    done = load_slope_data(FEM02_DONE)
+    d0 = done["reinforcement_lines"][0]
+    print("   completed   Tres %g · bar E %g %s · Area %g %s²/%s · declares %s at "
+          "target size %g %s"
+          % (d0["t_res"], d0["E"], _u["stress"], d0["area"], _u["length"],
+             _u["length"], done["element_type"], done["target_size"],
+             _u["length"]))
+    mesh = _fem02_mesh(done)
+    print("   mesh        %d nodes · %d elements · %d bar elements · every "
+          "element %s"
+          % (len(mesh["nodes"]), len(mesh["elements"]),
+             len(mesh.get("elements_1d", [])), done["element_type"]))
+    from xslope.fem import build_fem_data
+    capture("fem02_mesh.png", plot_fem_data, build_fem_data(done, mesh))
+
+    # ---- the two runs -------------------------------------------------------- #
+    runs = {}
+    for tag, t_res in (("epp", None), ("pr", d0["t_res"])):
+        t0 = time.time()
+        fem_data, result, _log = _fem02_solve(done, mesh, t_res)
+        print("   %s run · Tres %s · %.1f s wall (capture included)"
+              % ("elastic-perfectly-plastic" if t_res is None else "peak-residual",
+                 "blank" if t_res is None else "%g" % t_res, time.time() - t0))
+        _fem02_report(tag, fem_data, result)
+        runs[tag] = (fem_data, result)
+
+    for tag, name in (("epp", "fem02_shear_strain_epp.png"),
+                      ("pr", "fem02_shear_strain_pr.png")):
+        fem_data, result = runs[tag]
+        capture(name, plot_fem_results, fem_data, result["last_solution"],
+                plot_type="shear_strain", fs=result["FS"],
+                failure_solution=result.get("failure_solution"),
+                field_state="failure")
+    fem_data, result = runs["pr"]
+    for name, kind in (("fem02_deformed_pr.png", "deformation"),
+                       ("fem02_displacement_vectors_pr.png", "displace_vector")):
+        capture(name, plot_fem_results, fem_data, result["last_solution"],
+                plot_type=kind, fs=result["FS"],
+                failure_solution=result.get("failure_solution"),
+                field_state="failure")
+
+    # ---- the bar the page reads along --------------------------------------- #
+    # Studio's own 1D Details drawing, one figure per run: the two cannot share a
+    # figure because ``plot_reinforcement_detail`` lays its panels out with
+    # ``tight_layout``, which a matplotlib SubFigure does not carry.
+    from xslope import fem_details
+    from xslope.plot_fem_details import plot_reinforcement_detail
+
+    for tag, name in (("epp", "fem02_bar_profile_epp.png"),
+                      ("pr", "fem02_bar_profile_pr.png")):
+        fem_data, result = runs[tag]
+        prof = fem_details.reinforcement_profile(
+            fem_data, result["last_solution"], FEM02_PROFILE_LINE,
+            slope_data=done, field_state="converged",
+            failure_solution=result.get("failure_solution"))
+        print("   %-4s line %d · max force %.1f %s · hardest-worked %.1f at "
+              "s %.2f %s (utilization %.3f) · %s · %d at capacity, %d softened"
+              % (tag, FEM02_PROFILE_LINE, float(prof["T"].max()),
+                 _u["force_per_len"], prof["peak_T"], prof["peak_s"],
+                 _u["length"], prof["peak_utilization"], prof["status"],
+                 int(prof["failed"].sum()), int(prof["softened"].sum())))
+        capture(name, plot_reinforcement_detail, prof)
+
+    # Where each engine puts the mechanism, measured rather than described: the
+    # limit-equilibrium circle's entry and exit against the centroid of the
+    # elements carrying the most viscoplastic shear strain.
+    fem_data, result = runs["pr"]
+    fail = result.get("failure_solution") or result["last_solution"]
+    strain = np.asarray(fem_details._mechanism_field(
+        fem_data, result["last_solution"], fail))
+    cent = np.asarray(fem_details._element_centroids(fem_data))
+    hot = strain >= 0.5 * np.nanmax(strain)
+    w = strain[hot]
+    top = int(np.argmax(cent[hot, 1]))              # where the band reaches the crest
+    print("   mechanism   %d of %d elements above half the peak shear strain "
+          "(%.4f); strain-weighted centroid (%.2f, %.2f); x %.2f–%.2f, "
+          "y %.2f–%.2f; highest band element at (%.2f, %.2f)"
+          % (int(hot.sum()), len(strain), float(np.nanmax(strain)),
+             float((cent[hot, 0] * w).sum() / w.sum()),
+             float((cent[hot, 1] * w).sum() / w.sum()),
+             float(cent[hot, 0].min()), float(cent[hot, 0].max()),
+             float(cent[hot, 1].min()), float(cent[hot, 1].max()),
+             float(cent[hot][top, 0]), float(cent[hot][top, 1])))
+    print("   LEM circle  entry (%.3f, %.3f) exit (%.3f, %.3f) · center "
+          "(%.3f, %.3f) R %.3f — the surface the slices found, for comparison"
+          % (xs[0], ys[0], xs[-1], ys[-1], crit["Xo"], crit["Yo"],
+             crit["Yo"] - crit["Depth"]))
+
+
+def fem02_tres_sweep():
+    """FS against the residual capacity typed into Tres, with the
+    limit-equilibrium answer drawn across it.
+
+    Its own group because it is eight strength-reduction runs — about twenty
+    minutes — and nothing else on the page needs them.
+    """
+    import numpy as np
+
+    done = load_slope_data(FEM02_DONE)
+    mesh = _fem02_mesh(done)
+    start = load_slope_data(FEM02_START)
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _p, _c = circular_search(
+            start, FEM02_METHOD, num_slices=FEM02_SLICES, diagnostic=False,
+            **file_search_window(start))
+    lem_fs = fs_cache[0]["FS"]
+
+    values, factors = [], []
+    for t_res in FEM02_TRES_SWEEP:
+        fem_data, result, _log = _fem02_solve(done, mesh, t_res)
+        values.append(t_res)
+        factors.append(result["FS"])
+        print("   Tres %-6s FS %.4f  interval [%.6f, %.6f]"
+              % ("blank" if t_res is None else "%g" % t_res, result["FS"],
+                 result["final_interval"][0], result["final_interval"][1]))
+
+    def _draw():
+        _u = declared_unit_labels(done)
+        numeric = [(v, f) for v, f in zip(values, factors) if v is not None]
+        blank = [f for v, f in zip(values, factors) if v is None]
+        fig, ax = plt.subplots(figsize=(7.2, 4.4))
+        ax.plot([v for v, _ in numeric], [f for _, f in numeric],
+                marker="o", color="#1f4e79", linewidth=1.8,
+                label="Tres entered")
+        if blank:
+            ax.axhline(blank[0], color="#7a5195", linestyle="--", linewidth=1.5,
+                       label="Tres blank (elastic-perfectly-plastic)")
+        ax.axhline(lem_fs, color="#c0392b", linestyle=":", linewidth=1.5,
+                   label="Spencer (limit equilibrium)")
+        ax.set_xlabel("Residual capacity Tres (%s)" % _u["force_per_len"])
+        ax.set_ylabel("Factor of safety")
+        ax.grid(True, alpha=0.3)
+        # The measured curve steps twice and leaves a clear corner, so the legend
+        # goes inside where matplotlib finds room for it rather than eating a
+        # third of the figure width in a reserved column beside the axes.
+        ax.legend(loc="best", fontsize=9, framealpha=0.9)
+        fig.tight_layout()
+
+    capture("fem02_tres_sweep.png", _draw)
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -4155,6 +4487,8 @@ GROUPS = {
     "seep03_plots": seep03_plots,
     "seep04_plots": seep04_plots,
     "fem01_plots": fem01_plots,
+    "fem02_plots": fem02_plots,
+    "fem02_tres_sweep": fem02_tres_sweep,
 }
 
 

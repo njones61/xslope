@@ -69,8 +69,8 @@ below the toe, with a **240 psf** surcharge over the 70 ft of crest behind it.
 Two Mohr-Coulomb soils at the same unit weight: the fill itself is clean sand
 with no cohesion at all, and the face is wrapped in a band of cohesive fill —
 the `shell` — 2 ft measured horizontally, which on a 1.25:1 face is 1.25 ft
-perpendicular to it; its 300 psf of cohesion keeps the search off the face. Six geogrid layers, each **20 ft** long and 4 ft apart vertically, are
-stepped 5 ft back as they climb. Each develops **800 lb/ft** of tension over a pullout length
+perpendicular to it; its 300 psf of cohesion keeps the search off the face. Six geogrid layers, each **20 ft** long and 4 ft apart vertically, start at
+the face. Each develops **800 lb/ft** of tension over a pullout length
 of **4 ft** at either end.
 
 The soils' elastic properties, E = 1.0 × 10<sup>6</sup> psf and ν = 0.3, are

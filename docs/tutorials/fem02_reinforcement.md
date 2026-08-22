@@ -146,22 +146,23 @@ way. XSLOPE handles rupture the same way: `Tmax` is the rupture limit. With
 `Tres` left blank, a bar that reaches it holds there — the elastic-perfectly-
 plastic geogrid those codes use by default. With a `Tres` entered, a bar that
 reaches `Tmax` drops to that residual and carries no more than it from then on.
-The bond limit is where XSLOPE's default differs from those codes. They compute
-bond from the stress on the bar-soil interface, so the length a bar needs to
-develop its full capacity depends on how deep it is buried; XSLOPE's default
-reads that length directly from the input — the pullout lengths `Lp1` and
-`Lp2` — and its optional
-[bond-slip model](../fem/reinforcement.md#bond-slip-load-transfer-optional)
-is the stress-dependent form. Keeping the two limits apart is what makes the
-finite element results below readable.
+The bond limit can be stated either way. Those codes compute bond from the
+stress on the bar-soil interface, so the length a bar needs to develop its full
+capacity depends on how deep it is buried; XSLOPE offers that form through the
+`Adhesion` and `Delta` columns, and reads the length directly from the input —
+the pullout lengths `Lp1` and `Lp2` — when they are left blank, which is what
+this page does. Keeping the two limits apart is what makes the finite element
+results below readable.
 
 **Bond** is the first limit. A geogrid is held by friction against the soil it
 is buried in, and near a free end there is not much soil to be held by, so the
 force the line can carry there is limited by its embedment rather than by its
 own strength. That is what the pullout length `Lp` describes: over the first
 4 ft from each end the available force ramps from zero up to the full 800 lb/ft,
-and past 4 ft the embedment can develop the whole capacity. The ramp and the
-plateau together are the **capacity envelope**. Bond is **perfectly plastic**:
+and past 4 ft the embedment can develop the whole capacity. (Stating `Adhesion`
+and `Delta` instead makes that ramp follow the effective overburden along the
+line rather than rise at a fixed rate; this model uses the lengths.) The ramp
+and the plateau together are the **capacity envelope**. Bond is **perfectly plastic**:
 when the force reaches what the embedment can develop, the line slips there and
 goes on carrying that force. Interface friction does not disappear once it has
 been overcome, so nothing drops to zero.
@@ -184,8 +185,9 @@ Both engines apply the same envelope. What differs is where they apply it.
 
 The limit equilibrium engine evaluates the envelope at **one point** — where the
 trial surface crosses the line — and applies that force to the sliding mass,
-tangent to the surface for a flexible support like a geogrid. The force is
-prescribed, not computed: nothing about the soil's stiffness, the bar's
+tangent to the surface for a flexible support like a geogrid, or along the
+line's own axis for a rigid member like a soil nail (the **Dir** column). The
+force is prescribed, not computed: nothing about the soil's stiffness, the bar's
 stiffness or how far anything moved enters it. That is also why `Tres` has no
 meaning in a limit equilibrium run: a post-peak drop depends on how far the
 reinforcement has strained, and the method never computes a strain.
@@ -710,8 +712,7 @@ This tutorial covered:
   residual capacity that lands on three values rather than a curve.
 
 **Where to go next:** [Soil reinforcement in FEM](../fem/reinforcement.md) and
-[soil reinforcement in LEM](../lem/reinforcement.md) carry both formulations,
-including bond-slip load transfer and staged construction;
+[soil reinforcement in LEM](../lem/reinforcement.md) carry both formulations;
 [LEM-8](lem08_reinforced_slope.md) builds this model from nothing and measures
 what the geogrid is worth against the bare section;
 [FEM-1](fem01_strength_reduction.md) is strength reduction on an unreinforced

@@ -403,19 +403,27 @@ is carrying everything it has and the slope still cannot find equilibrium.
 ### Reading what each layer is doing
 
 The state worth reading a bar in is the last one that reached equilibrium, not
-the captured failure. Click **1D Details…** on the results toolbar and switch
+the captured failure. Click **1D Details…** on the results toolbar and set
 **Field state** to **Last converged**, which here is the trial at *F* = 1.5312.
+The panel opens on **At failure**, where all six lines stand at 100% and read
+alike; on the converged field they separate, and the comparison below is only
+readable there.
 
-At that state the six lines are not all doing the same thing. Line 1, the bottom
-layer at the toe, reads **OK** — it never reaches its capacity anywhere. Lines 3,
-4 and 5 read **YIELDED**: at least one element away from the ends is at the full
-800 lb/ft and holding it. Lines 2 and 6 read **PULLOUT**: elements near their
-ends have reached their embedment-limited capacity and are slipping at that
-force, while the interior is still below capacity. Pullout in this vocabulary is
-not a failure — it is a geogrid end doing exactly what a geogrid end does.
+Each row of the list names a line, gives its utilization, and says what state
+the line is in. At that state the six lines are not all doing the same thing.
+Line 1, the bottom layer at the toe, reads **near capacity** at 91%: its
+hardest-worked element sits 1 ft in from the face carrying 182 of the 200 lb/ft
+its embedment develops there, and nothing along the line has reached capacity.
+Lines 3, 4 and 5 read **yielded** — an element away from the ends is at the full
+800 lb/ft and holding it, which is the whole tensile strength of the geogrid
+mobilized. Lines 2 and 6 read **pullout**: an element near an end has reached
+the capacity its embedment can develop and is slipping at that force, while the
+interior of the line is still below capacity. Pullout here is not a failure: the
+end of a geogrid is slipping at the force its embedment can develop, which is
+what the envelope says it should do.
 
-Line 5 is one of the three that reach capacity, and the most heavily loaded in
-the second run, so it is the one to open:
+Line 5 is one of the three that yield, and the most heavily loaded in the
+second run, so it is the one to open:
 
 ![Line 5 at the last converged trial, elastic-perfectly-plastic](images/fem02_bar_profile_epp.png){width=1000}
 
@@ -426,9 +434,11 @@ over the last 4 ft. The blue line is the force actually mobilized. It climbs
 from almost nothing at the face, holds the envelope at s = 11 and 13, drops
 below it at 15 and 17, and meets it again at the last element at s = 19 ft,
 where the envelope itself is down to 200 lb/ft. The panel titles the line
-**at capacity** because at its most utilized point the force is everything that
-is available there. The vertical orange line marks where the failure band
-crosses.
+**yielded** for the elements at s = 11 and 13: they stand out on the plateau,
+away from either ramp, at the full 800 lb/ft. The element at s = 19 is at
+capacity too, but at the 200 lb/ft its embedment develops — on its own that
+element would have read **pullout**, and yielded is the more serious of the two.
+The vertical orange line marks where the failure band crosses.
 
 The lower strip is the bond transfer, dT/ds, the rate at which force passes
 between the bar and the soil per foot of bar. It is positive from the face out to
@@ -511,19 +521,22 @@ rupturing when its embedment could only ever develop 200. The mobilized force
 itself has barely moved from the elastic-perfectly-plastic profile, and there is
 no rupture mark anywhere on the line.
 
-At the last converged trial the verdicts have shifted one notch: line 1 still
-reads OK, and lines 2 through 6 now all read PULLOUT, with the ends slipping at
-what their embedment allows while the interiors sit just under capacity. The
-same panel, left on its default **At failure** state, reads every line at 100%:
+At the last converged trial the verdicts have shifted. Line 1 still reads
+**near capacity**, at 84% rather than 91%. Lines 3 and 4 have dropped out of
+**yielded** and joined lines 2 and 6 at **pullout**, their end elements slipping
+at the 200 lb/ft their embedment allows while their interiors sit under
+capacity. Line 5 alone still reads **yielded**, its hardest-worked element
+holding 798 of the 800 lb/ft available to it. The same panel, left on its
+default **At failure** state, reads every line at 100%:
 
 ![The 1D Details panel, line 5 selected](images/fem02_studio_1d_details.png)
 
-The list on the left carries all six lines with their utilization and a status
-badge, the map below it shows which line is selected, and the profile is drawn
-on the right for the state the **Field state** selector at the bottom names. It
-opens on **At failure**, which is why every line reads 100% here and why the
-title says *at failure* — the state where the comparison between layers lives is
-**Last converged**.
+The list on the left carries all six lines with their utilization, a badge
+colored by it, and the state each line is in; the map below it shows which line
+is selected; and the profile is drawn on the right for the state the **Field
+state** selector at the bottom names. It opens on **At failure**, which is why
+every line here reads 100% and **yielded**, and why the title says *at failure*
+— the state where the comparison between layers lives is **Last converged**.
 
 ### The failed state
 

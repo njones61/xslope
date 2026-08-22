@@ -416,10 +416,10 @@ version of XSLOPE.
 
 The FEM results view colors each reinforcement element by the force it carries, which shows at a glance which
 lines are working hardest. To read one line along its length, use the **1D Details…** button on that view's
-toolbar. It opens a panel listing every reinforcement line and pile in the model, each with a utilization badge,
-and draws the selected member's profiles beside the list. Under the list is a map of the section with the selected
-member picked out, so a name in a list is a place on the slope. The button is dimmed for a model with no
-reinforcement lines and no piles.
+toolbar. It opens a panel listing every reinforcement line and pile in the model with its utilization and a badge
+colored by it — a reinforcement row also names the state the line is in — and draws the selected member's profiles
+beside the list. Under the list is a map of the section with the selected member picked out, so a name in a list is
+a place on the slope. The button is dimmed for a model with no reinforcement lines and no piles.
 
 ![Reinforcement detail for Line 4 of the reinforcement sample](images/reinforce_fem_details.png){width=1000}
 
@@ -462,8 +462,32 @@ together. The panel is non-modal and reads the solution it was opened
 with, so it can stay open beside the results view; it works the same on a solution reloaded from its saved
 sidecar files as on a fresh solve.
 
-The screenshot above is the reinforcement sample's own strength reduction run, $FS = 1.49$, read at the mechanism
+The screenshot above is the reinforcement sample's own strength reduction run, $FS = 1.51$, read at the mechanism
 it developed (see [FEM sample problems](samples.md)).
+
+### The state of a line
+
+One line is in one state, named the same way everywhere XSLOPE reports it: on the panel's list rows and under its
+plot, in the title of a detail figure, in the table `print_reinforcement_summary()` prints, and in a generated
+report.
+
+| State | The line |
+|-------|----------|
+| within capacity | is below the capacity available to it everywhere along its length |
+| near capacity | is below capacity everywhere, but close to it where it is most utilized |
+| pullout | is slipping near an end at the capacity its embedment can develop there |
+| yielded | is at its full tensile capacity away from the ends and holding it |
+| softened | has dropped off its peak capacity onto its residual |
+| ruptured | has softened with no residual capacity left and now carries nothing |
+| inactive | carries no tension anywhere and is not engaged |
+
+The two middle states are the ones worth separating, and they read alike on a badge: both are a line standing at
+100% of what is available to it. **Pullout** is an end element at the reduced capacity its embedment can develop —
+the friction ramp doing what a friction ramp does, with the interior of the line still below capacity. **Yielded**
+is an element out on the $T_{max}$ plateau, where the whole tensile strength of the geosynthetic is mobilized. A
+line in both states at once is reported yielded, the more serious of the two. **Softened** and **ruptured** need a
+$T_{res}$: a line that declares none cannot reach them.
+
 
 ## References
 

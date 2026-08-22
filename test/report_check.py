@@ -16897,9 +16897,12 @@ def test_the_member_terms_are_defined_where_they_are_used():
 
     Each definition is written once per report — the term is one term, however
     many runs and however many kinds of member the report describes — and the
-    state language matches the classes the solver actually records: at capacity
-    is a member holding its full capacity, softened is one that has dropped onto
-    its residual, ruptured is one with no residual left carrying nothing.
+    state language matches the classes the solver actually records, in the one
+    vocabulary every surface uses (xslope.fem_details.REINFORCEMENT_STATES):
+    yielded is a line at its full capacity away from the ends, pullout one
+    slipping at what its embedment can develop near an end, softened one that
+    has dropped onto its residual, ruptured one with no residual left carrying
+    nothing.
 
     The band is the one term that is really two. On a strength reduction run it
     marks the mechanism; on a run that converged under gravity there is no
@@ -17052,14 +17055,19 @@ def test_the_member_terms_are_defined_where_they_are_used():
     # reachable — and the definition that they are the softening latch's, not
     # the yield latch's.
     said = " ".join(_prose(_engine_report("fem", xlsx=FEM_REINF_XLSX)))
-    for phrase in ("A line reported at capacity is holding the full capacity "
-                   "declared for it",
-                   "dropped onto its residual capacity is reported as softened",
-                   "whose residual is nothing and which now carries nothing as "
-                   "ruptured"):
-        if phrase not in said:
+    from xslope.fem_details import REINFORCEMENT_STATES
+    for key in ("near capacity", "pullout", "yielded", "softened", "ruptured"):
+        phrase, meaning = REINFORCEMENT_STATES[key]
+        sentence = f"A line reported {phrase} {meaning}."
+        if sentence not in said:
             fails.append(f"the reinforcement subsection does not say what a "
-                         f"state means: {phrase!r} is not on the page")
+                         f"state means: {sentence!r} is not on the page")
+    # And the definitions say the thing that separates the two at-capacity
+    # states, which is the distinction the panel and the summary are read for.
+    for word in ("embedment", "away from the ends"):
+        if word not in " ".join(m for _p, m in REINFORCEMENT_STATES.values()):
+            fails.append(f"the state vocabulary does not distinguish pullout "
+                         f"from yielded: nothing says {word!r}")
 
     # Two runs of the same model: two member subsections, and each definition
     # still written once. The term is one term whatever the report describes.

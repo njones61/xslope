@@ -72,24 +72,17 @@ shows the displacement vectors. The reinforcement summary table is shown below.
 
 The `print_reinforcement_summary()` function reports the state of each line — how many
 elements are carrying tension, how many sit inside a pullout ramp, how many have yielded,
-and how many have dropped to the residual capacity — together with a status for the line:
-
-| Status | Meaning |
-|--------|---------|
-| OK | All elements below capacity |
-| NEAR CAPACITY | Peak force within 5% of $T_{max}$ |
-| PULLOUT | Elements near the ends have reached their embedment-limited capacity |
-| YIELDED | Elements away from the ends are at $T_{max}$ and holding it (perfectly plastic) |
-| SOFTENED | Elements yielded and then dropped to their residual capacity — $T_{res}$, or the capacity their embedment develops if that is smaller |
-| INACTIVE | No elements carrying tension |
+and how many have dropped to the residual capacity — together with the line's state, in the
+vocabulary [The state of a line](reinforcement.md#the-state-of-a-line) sets out and the
+Studio panel and the report use.
 
 <!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.509, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=16000 -->
 
 At the last trial that reaches equilibrium the reinforcement is heavily mobilized but has
 not yet lost anything. The five upper lines each have one element inside a pullout ramp
 ($L_p$ = 4 ft from each end) sitting at the 200 lb/ft its embedment can develop and slipping
-there — the PULLOUT status in the table above. The greatest force anywhere is 795 lb/ft, just
-short of $T_{max}$, and nothing has softened. Only line 1, at the toe, is clear of capacity
+there, which is what makes those five lines read **pullout**. The greatest force anywhere is
+795 lb/ft, just short of $T_{max}$, and nothing has softened. Only line 1, at the toe, is clear of capacity
 altogether.
 
 One trial higher, at $F$ = 1.525, four interior elements do reach $T_{max}$ = 800 lb/ft and

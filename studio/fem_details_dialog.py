@@ -69,10 +69,26 @@ def _badge_icon(band, px=12):
 
 
 def _row_text(entry):
+    """``label   utilization   verdict`` — the row a member is read off.
+
+    The verdict is on the row because the list is where the members are
+    COMPARED, and the distinction that matters between two lines both standing
+    at 100% is which of them is yielding at its full tensile capacity and which
+    is slipping at what its embedment can develop. A colored dot and a
+    percentage cannot carry that; the word can, and it is the same word
+    :func:`xslope.fem.print_reinforcement_summary` prints.
+    """
     util = entry.get("utilization")
-    if util is None or util != util:                 # None / NaN
-        return f"{entry['label']}"
-    return f"{entry['label']}   {util:.0%}"
+    bits = [entry["label"]]
+    if util is not None and util == util:            # not None / NaN
+        bits.append(f"{util:.0%}")
+    # Reinforcement only. A pile's state names the capacity it was measured
+    # against ("at capacity (moment vs Mcap)"), which is longer than the list is
+    # wide and would be read truncated; it stays on the row's tooltip, where the
+    # reinforcement meanings are too.
+    if entry.get("kind") == "reinforcement" and entry.get("status"):
+        bits.append(entry["status"])
+    return "   ".join(bits)
 
 
 class FemDetailsDialog(QDialog):
@@ -314,7 +330,14 @@ class FemDetailsDialog(QDialog):
                 plot_detail(prof, fig=fig)
 
         self.canvas.render_figure(_draw)
+        # The verdict, with what it means one hover away: the panel is where a
+        # reader meets these words, and a word with no gloss beside it is a
+        # word they have to go and look up.
+        from xslope.fem_details import reinforcement_state_meaning
         self.status.setText(prof.get("status", ""))
+        meaning = reinforcement_state_meaning(prof.get("status_key"))
+        self.status.setToolTip(f"This {prof['kind']} line {meaning}."
+                               if meaning else "")
 
     # --- export ----------------------------------------------------------
     def default_export_stem(self):

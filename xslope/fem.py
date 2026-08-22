@@ -5092,8 +5092,14 @@ def print_reinforcement_summary(fem_data, solution):
     Print a summary table of reinforcement line results.
 
     Groups 1D elements by reinforcement line and reports per-line statistics
-    including element counts, force ranges, and failure modes.
+    including element counts, force ranges, and failure modes. Each line's
+    verdict is :func:`xslope.fem_details.reinforcement_status`, which is where
+    the Studio 1D Details panel and the report read it from as well: the word
+    printed here is the word on the screen.
     """
+    from .fem_details import (REINFORCEMENT_STATE_ORDER, REINFORCEMENT_STATES,
+                              reinforcement_status)
+
     elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
     n_1d = len(elements_1d)
     if n_1d == 0:
@@ -5108,6 +5114,11 @@ def print_reinforcement_summary(fem_data, solution):
     softened = solution.get("softened_1d_elements", np.zeros(n_1d, dtype=bool))
     if len(softened) != n_1d:
         softened = np.zeros(n_1d, dtype=bool)
+    # The cap the solve actually enforced, which is t_allow except where the
+    # optional bond-slip model re-capped the line.
+    t_cap_by_elem = np.asarray(solution.get("t_cap_1d", []), dtype=float)
+    if len(t_cap_by_elem) != n_1d or not np.any(np.isfinite(t_cap_by_elem)):
+        t_cap_by_elem = t_allow_by_elem
 
     # Filter out pile elements — reinforcement reported separately
     reinf_mask = ~pile_elem_mask
@@ -5160,23 +5171,15 @@ def print_reinforcement_summary(fem_data, solution):
         active_forces = line_forces[line_forces > 0]
         avg_t = active_forces.mean() if len(active_forces) > 0 else 0.0
 
-        # Status. A line that has actually shed capacity (dropped to Tres) is the
-        # most serious state and outranks a merely-yielded one.
-        n_softened = int(line_softened.sum())
-        if n_softened > 0:
-            status = "SOFTENED"
-        elif n_yield_outside_lp > 0:
-            status = "YIELDED"
-        elif n_yield_in_lp > 0:
-            status = "PULLOUT"
-        elif max_t > 0.95 * t_max_line and t_max_line > 0:
-            status = "NEAR CAPACITY"
-        elif n_active > 0:
-            status = "OK"
-        else:
-            status = "INACTIVE"
+        # The line's verdict, from the one function that decides it — the same
+        # call, and so the same word, the Studio 1D Details panel puts on the
+        # line and the report writes into its prose.
+        status_key, phrase = reinforcement_status(
+            line_forces, line_t_allow, t_res=line_t_res, failed=line_failed,
+            softened=line_softened, t_cap=t_cap_by_elem[mask])
+        status = phrase.upper()
 
-        statuses_seen.add(status)
+        statuses_seen.add(status_key)
 
         print(f"{line_id:>4}  {n_elem:>5}  {max_t:>8.1f}  {avg_t:>8.1f}  "
               f"{n_active:>7}  {n_pullout:>5}  {n_yield_outside_lp:>7}  "
@@ -5184,17 +5187,11 @@ def print_reinforcement_summary(fem_data, solution):
 
     print("-" * 80)
 
-    # Print notes for statuses that appeared
-    status_notes = {
-        "OK": "OK: All elements within allowable capacity, none yielding.",
-        "NEAR CAPACITY": "NEAR CAPACITY: Maximum force exceeds 95% of Tmax. Close to yielding.",
-        "PULLOUT": "PULLOUT: Elements near the reinforcement ends have reached their embedment-limited (pullout) capacity and are slipping at that force. Interior elements are below capacity.",
-        "YIELDED": "YIELDED: One or more elements away from the ends are at the full tensile capacity Tmax and holding it (perfectly plastic). The line is fully mobilized.",
-        "SOFTENED": "SOFTENED: One or more elements yielded and then dropped to their residual capacity, the smaller of the Tres entered for this line and the capacity the embedment can develop there (Tres = 0 means brittle rupture). Post-peak behavior is OFF unless Tres is filled in.",
-        "INACTIVE": "INACTIVE: No elements are carrying tension. The reinforcement is not engaged.",
-    }
-    notes = [status_notes[s] for s in ["OK", "NEAR CAPACITY", "PULLOUT", "YIELDED",
-                                       "SOFTENED", "INACTIVE"] if s in statuses_seen]
+    # What each state that appeared means, in the words every other surface
+    # defines it in (:data:`xslope.fem_details.REINFORCEMENT_STATES`).
+    notes = [f"{REINFORCEMENT_STATES[key][0].upper()}: the line "
+             f"{REINFORCEMENT_STATES[key][1]}."
+             for key in REINFORCEMENT_STATE_ORDER if key in statuses_seen]
     if notes:
         print()
         for note in notes:

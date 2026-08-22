@@ -8316,17 +8316,20 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         gives = ("its length, the largest shear and bending moment along it, "
                  "the depth of each of them, the lateral displacement of its "
                  "head, and the utilization it reaches")
-    # What the states an overlay and a figure report mean, where the model
-    # declares a residual capacity and softening is a state its members can
-    # reach. A line holding its full capacity has not softened: it is at
-    # capacity, which is the state the word describes and the one the overlay
-    # colors it by.
+    # What each state a figure reports means, defined in the words the solver's
+    # own summary and the Studio panel use (there is one vocabulary, held in
+    # xslope.fem_details.REINFORCEMENT_STATES). Only the states this model can
+    # reach are defined: without a residual capacity a line cannot soften or
+    # rupture, and defining those two would describe behavior the run has none of.
     states = ""
-    if kind == "reinforcement" and _declares_residual(slope_data, profiles):
-        states = (" A line reported at capacity is holding the full capacity "
-                  "declared for it. One that has dropped onto its residual "
-                  "capacity is reported as softened, and one whose residual is "
-                  "nothing and which now carries nothing as ruptured.")
+    if kind == "reinforcement":
+        from .fem_details import REINFORCEMENT_STATES
+        reachable = ["near capacity", "pullout", "yielded"]
+        if _declares_residual(slope_data, profiles):
+            reachable += ["softened", "ruptured"]
+        states = "".join(f" A line reported {REINFORCEMENT_STATES[key][0]} "
+                         f"{REINFORCEMENT_STATES[key][1]}."
+                         for key in reachable)
 
     # What a member is NAMED by, for the locator to send a reader to. With a
     # summary table that is the table; without one it is the properties table

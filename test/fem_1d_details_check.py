@@ -21,7 +21,9 @@ What is being defended:
      stays visible and dims, and its tooltip says why.
 
   B. THE LIST — every reinforcement line and pile appears, under its own header,
-     with a utilization badge whose colour follows the reported ratio.
+     with a utilization badge whose colour follows the member's verdict, and a
+     reinforcement row spells that verdict out in the one vocabulary
+     ``xslope.fem_details.REINFORCEMENT_STATES`` holds.
 
   C. THE ENVELOPE IS THE SOLVER'S — the capacity envelope drawn over a
      reinforcement line's force profile is the same curve the solver used to fill
@@ -190,13 +192,14 @@ def test_gate_mutation():
 
 def test_list():
     """Both samples populate the list: a header per kind, one row per member,
-    each row carrying a badge that matches its reported utilization."""
+    each row carrying the member's verdict in words and a badge that matches
+    it."""
     fails = []
     import matplotlib
     matplotlib.use("Agg")
     _app()
     from PySide6.QtCore import Qt
-    from studio.fem_details_dialog import FemDetailsDialog
+    from studio.fem_details_dialog import FemDetailsDialog, _row_text
     from xslope import fem_details as fd
 
     for path, kind, want_n in ((REINF_XLSX, "reinforcement", 6), (PILES_XLSX, "pile", 2)):
@@ -222,19 +225,95 @@ def test_list():
             if dlg.list.count() != len(entries) + len(headers):
                 fails.append(f"{os.path.basename(path)}: list has {dlg.list.count()} rows "
                              f"for {len(entries)} members and {len(headers)} headers")
-            # Badge colour follows the reported ratio.
+            # Badge colour follows the member's verdict, and the row carries
+            # that verdict in words: two lines both standing at 100% are told
+            # apart by the word, not by the dot or the percentage.
             for e in entries:
-                want = ("none" if e["utilization"] is None else
-                        "red" if e["utilization"] >= fd.UTIL_AT_CAPACITY else
-                        "amber" if e["utilization"] >= fd.UTIL_WATCH else "green")
-                if e["badge"] not in (want, "red"):   # pullout forces red
+                want = fd.reinforcement_badge(e.get("status_key"),
+                                              e["utilization"])
+                if e["badge"] != want:
                     fails.append(f"{e['label']}: badge {e['badge']!r} for "
-                                 f"utilization {e['utilization']}")
+                                 f"{e.get('status_key')!r} at utilization "
+                                 f"{e['utilization']}, expected {want!r}")
+                if e["kind"] == "reinforcement":
+                    if e["status_key"] not in fd.REINFORCEMENT_STATES:
+                        fails.append(f"{e['label']}: unknown verdict "
+                                     f"{e.get('status_key')!r}")
+                    if e["status"] != fd.reinforcement_state_phrase(
+                            e["status_key"]):
+                        fails.append(f"{e['label']}: the row's status "
+                                     f"{e['status']!r} is not the phrase for "
+                                     f"{e['status_key']!r}")
+                    row = _row_text(e)
+                    if e["status"] not in row:
+                        fails.append(f"{e['label']}: the list row {row!r} does "
+                                     f"not carry the verdict {e['status']!r}")
             # A member is selected and its detail is drawn.
             if dlg.current_profile() is None:
                 fails.append(f"{os.path.basename(path)}: no member selected on open")
         finally:
             dlg.close()
+    return fails
+
+
+def test_the_verdict_is_the_summary_s():
+    """The word on a list row is the word the printed summary prints.
+
+    The two used to be different vocabularies over the same arrays: the summary
+    told a line slipping at its embedment-limited capacity near an end
+    (PULLOUT) from one standing at its full tensile capacity in the middle
+    (YIELDED), and the panel called both of them "at capacity" — so the panel
+    could not answer the question a reader opens it to ask. One function
+    decides it now, and this check compares what each surface says, line by
+    line, rather than trusting that they call the same one.
+    """
+    fails = []
+    from xslope import fem_details as fd
+    from xslope.fem import print_reinforcement_summary
+
+    slope_data, fem_data, solution = _solved(REINF_XLSX)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        print_reinforcement_summary(fem_data, solution)
+    printed = {}
+    for raw in buf.getvalue().splitlines():
+        bits = raw.split()
+        if len(bits) >= 9 and bits[0].isdigit():
+            printed[int(bits[0])] = " ".join(bits[8:])
+    if not printed:
+        return ["the summary printed no line rows to compare against"]
+
+    rows = {e["index"]: e for e in fd.list_lines(fem_data, solution, slope_data)
+            if e["kind"] == "reinforcement"}
+    for line_id, word in printed.items():
+        row = rows.get(line_id)
+        if row is None:
+            fails.append(f"the summary prints line {line_id} and the list "
+                         f"carries no such row")
+            continue
+        if word != row["status"].upper():
+            fails.append(f"line {line_id}: the summary says {word!r} and the "
+                         f"panel says {row['status']!r}")
+    # The distinction itself is reachable: classify a made-up line whose only
+    # at-capacity element sits inside a pullout ramp, and one whose only
+    # at-capacity element sits at the full Tmax, and the two must differ.
+    ramp = fd.reinforcement_status([100.0, 400.0, 200.0],
+                                   [200.0, 800.0, 200.0],
+                                   failed=[False, False, True])
+    full = fd.reinforcement_status([100.0, 800.0, 100.0],
+                                   [200.0, 800.0, 200.0],
+                                   failed=[False, True, False])
+    if ramp[0] != "pullout" or full[0] != "yielded":
+        fails.append(f"the at-capacity split does not discriminate: a ramp end "
+                     f"reads {ramp[0]!r} and a full-Tmax element {full[0]!r}")
+    # And a line at capacity in BOTH places is reported yielded, which is the
+    # precedence the summary has always used.
+    both = fd.reinforcement_status([100.0, 800.0, 200.0],
+                                   [200.0, 800.0, 200.0],
+                                   failed=[False, True, True])
+    if both[0] != "yielded":
+        fails.append(f"a line at capacity in a ramp AND at full Tmax reads "
+                     f"{both[0]!r}, not yielded")
     return fails
 
 
@@ -1350,6 +1429,8 @@ CHECKS = [
     ("the toolbar button and its gate", test_gate),
     ("the gate check would catch a mutation", test_gate_mutation),
     ("the member list and its badges", test_list),
+    ("the panel's verdict is the summary's",
+     test_the_verdict_is_the_summary_s),
     ("the envelope is the solver's capacity", test_envelope),
     ("the envelope is the shared function", test_envelope_mutation),
     ("profiles survive save + reload", test_reload),

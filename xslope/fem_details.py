@@ -312,6 +312,7 @@ def list_lines(fem_data, solution, slope_data=None, field_state="converged",
     ``index`` (the 1-based reinforcement line id, or the 0-based pile line
     index), ``label``, ``n_elements``, ``utilization`` (peak, or None when the
     model supplies no capacity to measure against), ``badge`` and ``status``.
+    A reinforcement row carries its ``status_key`` as well.
 
     ``field_state`` selects the field the utilizations are measured on, exactly
     as it does for the profiles themselves, so the badges and the plotted
@@ -335,6 +336,7 @@ def list_lines(fem_data, solution, slope_data=None, field_state="converged",
             "utilization": prof["peak_utilization"],
             "badge": prof["badge"],
             "status": prof["status"],
+            "status_key": prof["status_key"],
         })
     for pidx in _pile_line_indices(fem_data):
         prof = pile_profile(fem_data, solution, pidx, slope_data,
@@ -557,7 +559,9 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     ``slip_modelled`` : False — see note below
     ``band_lo``, ``band_hi``, ``band_peak`` : band extents in ``s``
     ``band_state`` : the field that band was read from (:func:`band_state`)
-    ``peak_s``, ``peak_T``, ``peak_utilization``, ``badge``, ``status``
+    ``peak_s``, ``peak_T``, ``peak_utilization``, ``badge``, ``status``,
+    ``status_key`` : the line's verdict (:func:`reinforcement_status`) as the
+        phrase it is displayed as and as its key
     ``peak_indices`` : every sample standing at the greatest utilization
     ``peak_span``, ``peak_T_span`` : the stretch of ``s``, and the range of
         force over it, when more than one sample stands there — None when the
@@ -565,9 +569,9 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         :func:`_peak_utilization`)
     ``peak_gap_s`` : the ``s`` of any sample INSIDE that stretch which does not
         stand with the rest — empty where the stretch is unbroken
-    ``pullout_s``, ``softened_s`` : the ``s`` of elements in each state — an
-        element that softened with no residual left and no force in it is a
-        pullout and appears in the first alone
+    ``ruptured_s``, ``softened_s`` : the ``s`` of elements in each state — an
+        element that softened with no residual left and no force in it is
+        ruptured and appears in the first alone
     ``units`` : the model's display unit strings
 
     Relative slip has no entry because the model has no slip degree of freedom:
@@ -654,12 +658,13 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     peak_gap_s = (s[np.setdiff1d(np.arange(tied[0], tied[-1] + 1), tied)]
                   if len(tied) > 1 else np.zeros(0))
 
-    # Ruptured: the element SOFTENED — dropped off the capacity it was
-    # holding — its residual capacity is (finitely) zero, and it now carries no
-    # force. That happens where the line's Tres is zero, or where the envelope
-    # develops nothing; bond slip alone never leaves an element here, being
-    # perfectly plastic (see build_fem_data's t_res assignment). A NaN residual
-    # means the line never softens at all, which is neither state.
+    # Ruptured elements, marked one by one on the figure: the element SOFTENED —
+    # dropped off the capacity it was holding — its residual capacity is
+    # (finitely) zero, and it now carries no force. That happens where the
+    # line's Tres is zero, or where the envelope develops nothing; bond slip
+    # alone never leaves an element here, being perfectly plastic (see
+    # build_fem_data's t_res assignment). A NaN residual means the line never
+    # softens at all, which is neither state.
     # Softening is the latch, not the yield flag: an element that has
     # merely reached its capacity is holding it, and the overlay
     # (:func:`xslope.plot_fem.plot_reinforcement_forces`) reads the same three
@@ -667,12 +672,14 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     # ruptured here.
     tr = t_res[idx]
     soft = softened[idx] if len(idx) else np.zeros(0, dtype=bool)
-    pulled = (soft & np.isfinite(tr) & (tr < 1e-6) & (T < 1e-6)) if len(idx) \
+    burst = (soft & np.isfinite(tr) & (tr < 1e-6) & (T < 1e-6)) if len(idx) \
         else np.zeros(0, dtype=bool)
-    pulled_out = bool(np.any(pulled))
 
-    status = _reinforcement_status(peak_util, pulled_out, bool(np.any(soft)))
-    badge = "red" if pulled_out else _badge(peak_util)
+    # The LINE's verdict, from the one function that decides it.
+    status_key, status = reinforcement_status(
+        T, t_allow[idx], t_res=tr, failed=failed[idx], softened=soft,
+        t_cap=cap, utilization=util)
+    badge = reinforcement_badge(status_key, peak_util)
 
     return {
         "kind": "reinforcement",
@@ -703,13 +710,14 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "peak_span": peak_span,
         "peak_T_span": peak_T_span,
         "peak_gap_s": peak_gap_s,
-        "pullout_s": s[pulled] if len(idx) else np.zeros(0),
+        "ruptured_s": s[burst] if len(idx) else np.zeros(0),
         # Softened but not ruptured — the two are drawn with different marks
-        # and an element is in one state, so a pullout is not also a plain
-        # softened element with a second mark on top of it.
-        "softened_s": s[soft & ~pulled] if len(idx) else np.zeros(0),
+        # and an element is in one state, so a ruptured element is not also a
+        # plain softened one with a second mark on top of it.
+        "softened_s": s[soft & ~burst] if len(idx) else np.zeros(0),
         "badge": badge,
         "status": status,
+        "status_key": status_key,
         "units": unit_labels(fem_data),
     }
 
@@ -739,18 +747,167 @@ def _peak_utilization(util):
     return int(tied[0]), tied
 
 
-def _reinforcement_status(util, pulled_out, softened):
-    if pulled_out:
-        return "ruptured"
-    if softened:
-        return "softened to residual"
-    if util is None or not np.isfinite(util):
-        return "no capacity declared"
-    if util >= UTIL_AT_CAPACITY:
-        return "at capacity"
-    if util >= UTIL_WATCH:
-        return "near capacity"
-    return "within capacity"
+#: The states a reinforcement line is reported in, most serious first, each with
+#: the display phrase it is written as and the one sentence that says what it
+#: means. Everything that reports a line's state reads this table — the Studio
+#: list and its detail panel, :func:`xslope.fem.print_reinforcement_summary`,
+#: the figure titles, and the report — so a reader who learns the word in one
+#: place has learned it in all of them.
+#: Each meaning is written to follow the line it describes — "a line reported
+#: yielded IS at its full tensile capacity ..." — so one sentence serves the
+#: printed summary's notes and the report's prose without either rewording it.
+REINFORCEMENT_STATES = {
+    "ruptured": (
+        "ruptured",
+        "has softened with no residual capacity left and now carries nothing"),
+    "softened": (
+        "softened",
+        "has dropped off its peak capacity onto its residual"),
+    "yielded": (
+        "yielded",
+        "is at its full tensile capacity away from the ends and holding it"),
+    "pullout": (
+        "pullout",
+        "is slipping near an end at the capacity its embedment can develop "
+        "there"),
+    "near capacity": (
+        "near capacity",
+        "is below capacity everywhere, but close to it where it is most "
+        "utilized"),
+    "within capacity": (
+        "within capacity",
+        "is below the capacity available to it everywhere along its length"),
+    "inactive": (
+        "inactive",
+        "carries no tension anywhere and is not engaged"),
+    "no capacity declared": (
+        "no capacity declared",
+        "declares no capacity for its force to be measured against"),
+}
+
+#: The order :func:`reinforcement_status` resolves the states in. A line in two
+#: of them at once is reported in the first: having shed capacity outranks
+#: standing at it, and standing at full capacity away from the ends outranks
+#: slipping at an embedment-limited one near them, which is the precedence the
+#: printed summary has always used.
+REINFORCEMENT_STATE_ORDER = ("ruptured", "softened", "yielded", "pullout",
+                             "near capacity", "within capacity", "inactive",
+                             "no capacity declared")
+
+
+def reinforcement_state_phrase(key):
+    """The display phrase for a state key (the key itself if it is unknown)."""
+    return REINFORCEMENT_STATES.get(key, (str(key), ""))[0]
+
+
+def reinforcement_state_meaning(key):
+    """The one-sentence meaning of a state key, for a page that defines it."""
+    return REINFORCEMENT_STATES.get(key, ("", ""))[1]
+
+
+def _line_array(value, n, fill=0.0, dtype=float):
+    """``value`` as a length-``n`` array of ``dtype``, or ``fill`` throughout."""
+    if value is None:
+        return np.full(n, fill, dtype=dtype)
+    arr = np.asarray(value, dtype=dtype).ravel()
+    return arr if len(arr) == n else np.full(n, fill, dtype=dtype)
+
+
+def reinforcement_status(force, t_allow, t_res=None, failed=None, softened=None,
+                         t_cap=None, utilization=None):
+    """The verdict for ONE reinforcement line, from its per-element arrays.
+
+    Returns ``(key, phrase)`` — a key from :data:`REINFORCEMENT_STATES` and the
+    lowercase phrase it is displayed as. This is the only place a line's state
+    is decided.
+
+    Parameters
+    ----------
+    force : mobilized axial force in each of the line's elements
+    t_allow : the capacity envelope at each element (``t_allow_by_1d_elem``),
+        which is what says where the line's pullout ramps are: an element
+        carrying less than the line's own maximum is inside one
+    t_res : residual capacity at each element, NaN where the line never softens
+    failed, softened : the solver's two latches — reached the capacity it was
+        given, and dropped off it onto the residual
+    t_cap : the capacity the solve actually enforced, where it differs from
+        ``t_allow`` (the optional bond-slip model); ``t_allow`` is used without it
+    utilization : force over enforced capacity, computed here when not supplied
+
+    Precedence, in :data:`REINFORCEMENT_STATE_ORDER`: an element that softened
+    with nothing left to hold and no force in it makes the line **ruptured**;
+    any softened element makes it **softened**; an element AT capacity at the
+    line's full Tmax makes it **yielded**; one at capacity inside a pullout ramp
+    makes it **pullout**. A line in none of those is read off its greatest
+    utilization — **near capacity** at or above :data:`UTIL_WATCH`, **within
+    capacity** below it — and one carrying no tension at all is **inactive**.
+    """
+    force = np.asarray(force, dtype=float).ravel()
+    n = len(force)
+    if n == 0:
+        return "no capacity declared", REINFORCEMENT_STATES["no capacity declared"][0]
+
+    t_allow = _line_array(t_allow, n, 0.0)
+    t_res = _line_array(t_res, n, np.nan)
+    failed = _line_array(failed, n, False, bool)
+    softened = _line_array(softened, n, False, bool)
+    cap = _line_array(t_cap, n, np.nan)
+    if not np.any(np.isfinite(cap)):
+        cap = t_allow
+    if utilization is None:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            util = np.where(cap > 1e-12, force / cap, np.nan)
+    else:
+        util = _line_array(utilization, n, np.nan)
+
+    def _verdict(key):
+        return key, REINFORCEMENT_STATES[key][0]
+
+    # Ruptured: the element SOFTENED — dropped off the capacity it was holding —
+    # its residual capacity is (finitely) zero, and it now carries no force. A
+    # NaN residual means the line never softens at all, which is neither state.
+    if np.any(softened & np.isfinite(t_res) & (t_res < 1e-6) & (force < 1e-6)):
+        return _verdict("ruptured")
+    if np.any(softened):
+        return _verdict("softened")
+
+    # At capacity, by either reading of it: the solver latched the element when
+    # it reached the capacity it was given, and the force stands at the capacity
+    # the solve enforced. WHERE those elements sit is the whole distinction.
+    # An element inside a pullout ramp carries less than the line's Tmax because
+    # there is less embedment to develop it; the zero-capacity elements at the
+    # very ends belong to the ramps too.
+    t_max = float(np.max(t_allow))
+    at_cap = failed | (np.isfinite(util) & (util >= UTIL_AT_CAPACITY))
+    if t_max > 1e-6:
+        in_ramp = t_allow < t_max - 1e-6
+        if np.any(at_cap & ~in_ramp):
+            return _verdict("yielded")
+        if np.any(at_cap & in_ramp):
+            return _verdict("pullout")
+
+    if not np.any(np.isfinite(util)):
+        return _verdict("no capacity declared")
+    if not np.any(force > 0):
+        return _verdict("inactive")
+    if float(np.nanmax(util)) >= UTIL_WATCH:
+        return _verdict("near capacity")
+    return _verdict("within capacity")
+
+
+def reinforcement_badge(key, utilization=None):
+    """The list badge color for a state key.
+
+    Both of the at-capacity states carry the at-capacity color, and so does a
+    ruptured line. A softened one is amber: it has shed capacity, and what it
+    is holding now is a capacity it can hold. Anything below capacity is
+    colored by how far it has been worked.
+    """
+    if key in ("ruptured", "yielded", "pullout"):
+        return "red"
+    if key == "softened":
+        return "amber"
+    return _badge(utilization)
 
 
 # --------------------------------------------------------------------------

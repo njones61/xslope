@@ -654,6 +654,15 @@ dimmed, with a tooltip saying why, for a model that carries neither reinforcemen
 nor piles. See [FEM Reinforcement](../fem/reinforcement.md#inspecting-the-results) and
 [FEM Piles](../fem/piles.md#inspecting-the-results) for what the profiles show.
 
+Each reinforcement row also carries the state the line is in — *within capacity*, *near
+capacity*, *pullout*, *yielded*, *softened*, *ruptured* or *inactive* — and so does the
+line under the plot, with its meaning in the tooltip. Two lines both standing at 100% are
+told apart by that word and not by the badge: *pullout* is an end slipping at what its
+embedment can develop, *yielded* is the middle of the line at its full tensile capacity.
+The states are defined in [The state of a
+line](../fem/reinforcement.md#the-state-of-a-line), and they are the words
+`print_reinforcement_summary()` prints and a generated report writes.
+
 ---
 
 ## Display options per view

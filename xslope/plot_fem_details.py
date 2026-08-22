@@ -38,7 +38,7 @@ C_ENVELOPE = "#333333"     # declared capacity
 C_BAND = "#d95f0e"         # failure / shear strain band (see band_label)
 C_PEAK = "#c0392b"         # peak / maximum marker
 C_SOFT = "#8e44ad"         # softened to residual
-C_PULL = "#000000"         # ruptured
+C_RUPT = "#000000"        # ruptured
 C_LIMIT = "#7f8c8d"        # limiting resistance envelope
 GRID = dict(alpha=0.25, linewidth=0.6)
 
@@ -312,9 +312,9 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     if len(soft_s):
         ax.plot(soft_s, np.interp(soft_s, s, T), "s", color=C_SOFT, markersize=6,
                 label="Softened", zorder=6)
-    pull_s = profile.get("pullout_s", [])
-    if len(pull_s):
-        ax.plot(pull_s, np.zeros(len(pull_s)), "x", color=C_PULL, markersize=8,
+    burst_s = profile.get("ruptured_s", [])
+    if len(burst_s):
+        ax.plot(burst_s, np.zeros(len(burst_s)), "x", color=C_RUPT, markersize=8,
                 markeredgewidth=2, label="Ruptured", zorder=6)
 
     ax.set_ylabel(_axis_label("Axial force", u.get("force")), fontsize=9)

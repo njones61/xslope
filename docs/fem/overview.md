@@ -1401,6 +1401,11 @@ a captured mechanism simply omits those rows.
 | `mobilization` | Ratio of axial force to allowable capacity. |
 | `failed`, `softened` | Whether the element reached its capacity, and whether it dropped to residual. |
 
+These two flags, together with whether the elements at capacity sit inside a pullout ramp or out on the
+$T_{max}$ plateau, are what the line's reported state is built from — *within capacity*, *near capacity*,
+*pullout*, *yielded*, *softened*, *ruptured* or *inactive*, defined in
+[The state of a line](reinforcement.md#the-state-of-a-line).
+
 ### Pile results columns
 
 | Column | Description |

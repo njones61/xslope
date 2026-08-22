@@ -1936,6 +1936,8 @@ _PREVIEW_MIN_LINES = 16
 #: as wide as the same table opened full, and typing the first row does not need a
 #: resize.
 _NUMBER_SAMPLE = "-" + "0" * _DISPLAY_SIG_DIGITS + "."
+#: A free-text column's floor — room for a name a little longer than "Line 10".
+_TEXT_SAMPLE = "0" * 12
 
 
 def _column_widths(table, numeric):
@@ -1943,16 +1945,30 @@ def _column_widths(table, numeric):
 
     ``numeric`` is the set of column indexes holding numbers; those are the ones
     floored at :data:`_NUMBER_SAMPLE`."""
+    from PySide6.QtWidgets import QComboBox, QStyle
+
     header = table.horizontalHeader()
     fm = table.fontMetrics()
     cushion = fm.horizontalAdvance("00")                    # one em-ish, both sides
     number = fm.horizontalAdvance(_NUMBER_SAMPLE) + cushion
+    # A free-text column (a label, a name) floors on a sample wider than its
+    # header so a short entry does not leave it cramped.
+    text_floor = fm.horizontalAdvance(_TEXT_SAMPLE) + cushion
     widths = []
     for c in range(table.columnCount()):
         w = max(table.sizeHintForColumn(c), header.sectionSizeHint(c))
+        free_text = combo = False
         for r in range(table.rowCount()):
             cell = table.cellWidget(r, c)
-            if cell is not None:
+            if isinstance(cell, QComboBox):
+                # Just wide enough for the longest choice it offers plus the
+                # arrow: a combo's own sizeHint pads well beyond that.
+                longest = max((fm.horizontalAdvance(cell.itemText(i))
+                               for i in range(cell.count())), default=0)
+                arrow = cell.style().pixelMetric(QStyle.PM_ScrollBarExtent)
+                w = max(w, longest + arrow + cushion)
+                combo = True
+            elif cell is not None:
                 w = max(w, cell.sizeHint().width())
             else:
                 # Measured row by row rather than left to sizeHintForColumn, which
@@ -1962,9 +1978,14 @@ def _column_widths(table, numeric):
                 item = table.item(r, c)
                 if item is not None and item.text():
                     w = max(w, fm.horizontalAdvance(item.text()))
-        w += cushion
+                    if c not in numeric:
+                        free_text = True
+        if not combo:                # a combo column's cushion is already in
+            w += cushion
         if c in numeric:
             w = max(w, number)
+        elif free_text:
+            w = max(w, text_floor)
         widths.append(max(w, header.minimumSectionSize()))
     return widths
 

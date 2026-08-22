@@ -710,6 +710,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "peak_span": peak_span,
         "peak_T_span": peak_T_span,
         "peak_gap_s": peak_gap_s,
+        "peak_tied_s": s[tied] if len(tied) else np.zeros(0),
         "ruptured_s": s[burst] if len(idx) else np.zeros(0),
         # Softened but not ruptured — the two are drawn with different marks
         # and an element is in one state, so a ruptured element is not also a

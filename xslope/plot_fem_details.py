@@ -374,11 +374,18 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
         # it is drawn as two runs with a break between them, and the two ends of
         # the span alone would describe the unbroken line instead.
         gaps = np.asarray(profile.get("peak_gap_s", []), dtype=float)
-        said = (f"{profile['peak_utilization']:.0%} of capacity\n"
-                f"from {span[0]:,.2f} to {span[1]:,.2f}"
-                f"{(' ' + u['length']) if u.get('length') else ''}")
-        if len(gaps):
-            said += "\nexcept " + ", ".join(f"{g:,.2f}" for g in gaps)
+        tied_s = np.asarray(profile.get("peak_tied_s", []), dtype=float)
+        unit = (' ' + u['length']) if u.get('length') else ''
+        if len(gaps) and len(gaps) >= len(tied_s):
+            # More holes than members: "from 11 to 19 except 13, 15, 17" is two
+            # points wearing a range. Name the points.
+            said = (f"{profile['peak_utilization']:.0%} of capacity\n"
+                    f"at {', '.join(f'{t:,.2f}' for t in tied_s)}{unit}")
+        else:
+            said = (f"{profile['peak_utilization']:.0%} of capacity\n"
+                    f"from {span[0]:,.2f} to {span[1]:,.2f}{unit}")
+            if len(gaps):
+                said += "\nexcept " + ", ".join(f"{g:,.2f}" for g in gaps)
         _annotate_inside(ax, (mid, float(np.interp(mid, s, T))), said, C_PEAK)
     elif profile.get("peak_s") is not None:
         _annotate_inside(

@@ -151,8 +151,10 @@ stress on the bar-soil interface, so the length a bar needs to develop its full
 capacity depends on how deep it is buried; XSLOPE offers that form through the
 `Adhesion` and `Delta` columns, and reads the length directly from the input —
 the pullout lengths `Lp1` and `Lp2` — when they are left blank, which is what
-this page does. Keeping the two limits apart is what makes the finite element
-results below readable.
+this page does. The distinction between the two limits matters when the
+results are read: the 1D Details panel reports whether a line reached its bond
+limit (**pullout**) or its rupture limit (**yielded**), and the two mean
+different things for the design.
 
 **Bond** is the first limit. A geogrid is held by friction against the soil it
 is buried in, and near a free end there is not much soil to be held by, so the

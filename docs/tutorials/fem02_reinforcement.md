@@ -175,9 +175,7 @@ geogrid itself. What happens after it is reached is the `Tres` column: leave it
 blank and the line holds its capacity indefinitely while the soil around it goes
 on straining, which is the **elastic-perfectly-plastic** model and the industry
 default; enter a number and a ruptured element drops to that residual; enter
-zero and it ruptures brittly and carries nothing afterwards. The editor's own
-tooltip on the column says the same thing — *"blank = elastic-perfectly-plastic
-(holds capacity), 0 = brittle rupture (carries nothing)"*. This page runs the
+zero and it ruptures brittly and carries nothing afterwards. This page runs the
 blank case first, because it is what a published reinforced-slope analysis
 assumes unless it says otherwise.
 

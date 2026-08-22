@@ -1373,19 +1373,31 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     if t_res != t_res:
                         # Unset: this line never softens, anywhere along its length.
                         t_res_by_1d_elem[elem_idx] = float('nan')
-                    elif t_allow >= t_max - 1e-12:
-                        # Beyond the pullout zones - full capacity, material residual
-                        t_res_by_1d_elem[elem_idx] = t_res
                     else:
-                        # Inside a friction ramp. Historically residual = 0 (sudden,
-                        # complete pullout). With end anchorage, the hardware
-                        # survives soil/grout failure up to its own capacity,
-                        # capped by the material residual: min(Tres, Tend of the
-                        # governing end).
-                        cap1 = t_max if lp1 <= 0 else tend1 + t_max * dist_to_left / lp1
-                        cap2 = t_max if lp2 <= 0 else tend2 + t_max * dist_to_right / lp2
-                        tend_g = tend1 if cap1 <= cap2 else tend2
-                        t_res_by_1d_elem[elem_idx] = min(t_res, tend_g)
+                        # Two independent post-peak mechanisms, and the element is
+                        # governed by whichever leaves it the less capacity.
+                        #
+                        # Bond slip is PERFECTLY PLASTIC: an element inside a
+                        # pullout ramp that reaches the capacity its embedment can
+                        # develop keeps slipping AT that capacity. The soil-bar
+                        # interface is frictional, and friction does not vanish
+                        # once it is overcome. t_allow — the ramped envelope,
+                        # including end anchorage — is therefore both the yield
+                        # force and the post-slip force.
+                        #
+                        # Tres is the RUPTURE residual: what the bar itself retains
+                        # once the material tears. It is a property of the
+                        # reinforcement, not of the embedment.
+                        #
+                        # So the element can never carry more than the smaller of
+                        # the two. This is the same envelope the limit-equilibrium
+                        # engine applies (fileio.reinforce_available_tension) and
+                        # the standard cable/geogrid treatment.
+                        #
+                        # (Elements inside a ramp were dropped all the way to zero
+                        # in earlier versions — "sudden complete pullout" — so
+                        # results predating this rule read lower.)
+                        t_res_by_1d_elem[elem_idx] = min(t_res, t_allow)
 
                     # Compute axial stiffness. E and Area are OPTIONAL in the
                     # input (the LEM needs neither — it applies the capacity
@@ -3748,6 +3760,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         # replacing their fixed lp1/lp2 pull-out ramp; other lines keep t_allow.
         if bond_slip:
             t_cap_1d = _bond_slip_caps(fem_data, bond_slip)
+            # The residual follows the cap that is actually in force. Bond slip is
+            # perfectly plastic in this model too, so an element's post-peak
+            # capacity is the smaller of the rupture residual Tres and the bond
+            # envelope — the same min() build_fem_data takes against the end-ramp
+            # envelope, re-taken against the envelope that replaced it.
+            t_res_by_1d_elem = np.minimum(t_res_by_1d_elem, t_cap_1d)
         else:
             t_cap_1d = t_allow_by_1d_elem
 
@@ -5172,7 +5190,7 @@ def print_reinforcement_summary(fem_data, solution):
         "NEAR CAPACITY": "NEAR CAPACITY: Maximum force exceeds 95% of Tmax. Close to yielding.",
         "PULLOUT": "PULLOUT: Elements near the reinforcement ends have reached their embedment-limited (pullout) capacity and are slipping at that force. Interior elements are below capacity.",
         "YIELDED": "YIELDED: One or more elements away from the ends are at the full tensile capacity Tmax and holding it (perfectly plastic). The line is fully mobilized.",
-        "SOFTENED": "SOFTENED: One or more elements yielded and then dropped to the residual capacity Tres entered for this line (Tres = 0 means brittle rupture). Post-peak behavior is OFF unless Tres is filled in.",
+        "SOFTENED": "SOFTENED: One or more elements yielded and then dropped to their residual capacity, the smaller of the Tres entered for this line and the capacity the embedment can develop there (Tres = 0 means brittle rupture). Post-peak behavior is OFF unless Tres is filled in.",
         "INACTIVE": "INACTIVE: No elements are carrying tension. The reinforcement is not engaged.",
     }
     notes = [status_notes[s] for s in ["OK", "NEAR CAPACITY", "PULLOUT", "YIELDED",

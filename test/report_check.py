@@ -16615,7 +16615,7 @@ def test_the_member_overlay_marks_the_state_the_solver_recorded():
 
     Pinned in both fields of the sample, because they differ: the converged
     field has five back-end elements that softened with nothing left to hold and
-    are marked pulled out, and the at-failure field has none.
+    are marked ruptured, and the at-failure field has none.
     """
     fails = []
     import numpy as np
@@ -16655,7 +16655,7 @@ def test_the_member_overlay_marks_the_state_the_solver_recorded():
         if ("At residual (Tres)" in legend) != (residual > 0):
             fails.append(f"at the {state} field the legend {'names' if residual else 'does not name'} "
                          f"a residual state that {residual} element(s) are in: {legend}")
-        if ("Pulled out" in legend) != (pulled > 0):
+        if ("Ruptured" in legend) != (pulled > 0):
             fails.append(f"at the {state} field the legend disagrees with the "
                          f"{pulled} pulled-out element(s): {legend}")
 
@@ -16899,7 +16899,7 @@ def test_the_member_terms_are_defined_where_they_are_used():
     many runs and however many kinds of member the report describes — and the
     state language matches the classes the solver actually records: at capacity
     is a member holding its full capacity, softened is one that has dropped onto
-    its residual, pulled out is one with no residual left carrying nothing.
+    its residual, ruptured is one with no residual left carrying nothing.
 
     The band is the one term that is really two. On a strength reduction run it
     marks the mechanism; on a run that converged under gravity there is no
@@ -17056,7 +17056,7 @@ def test_the_member_terms_are_defined_where_they_are_used():
                    "declared for it",
                    "dropped onto its residual capacity is reported as softened",
                    "whose residual is nothing and which now carries nothing as "
-                   "pulled out"):
+                   "ruptured"):
         if phrase not in said:
             fails.append(f"the reinforcement subsection does not say what a "
                          f"state means: {phrase!r} is not on the page")

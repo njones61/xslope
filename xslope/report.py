@@ -8326,7 +8326,7 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         states = (" A line reported at capacity is holding the full capacity "
                   "declared for it. One that has dropped onto its residual "
                   "capacity is reported as softened, and one whose residual is "
-                  "nothing and which now carries nothing as pulled out.")
+                  "nothing and which now carries nothing as ruptured.")
 
     # What a member is NAMED by, for the locator to send a reader to. With a
     # summary table that is the table; without one it is the properties table

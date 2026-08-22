@@ -654,14 +654,17 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     peak_gap_s = (s[np.setdiff1d(np.arange(tied[0], tied[-1] + 1), tied)]
                   if len(tied) > 1 else np.zeros(0))
 
-    # Pulled out: the element SOFTENED — dropped off the capacity it was
+    # Ruptured: the element SOFTENED — dropped off the capacity it was
     # holding — its residual capacity is (finitely) zero, and it now carries no
-    # force. A NaN residual means the line never softens at all, which is not
-    # pullout. Softening is the latch, not the yield flag: an element that has
+    # force. That happens where the line's Tres is zero, or where the envelope
+    # develops nothing; bond slip alone never leaves an element here, being
+    # perfectly plastic (see build_fem_data's t_res assignment). A NaN residual
+    # means the line never softens at all, which is neither state.
+    # Softening is the latch, not the yield flag: an element that has
     # merely reached its capacity is holding it, and the overlay
     # (:func:`xslope.plot_fem.plot_reinforcement_forces`) reads the same three
-    # parts, so a bar marked pulled out on the section figure is the bar marked
-    # pulled out here.
+    # parts, so a bar marked ruptured on the section figure is the bar marked
+    # ruptured here.
     tr = t_res[idx]
     soft = softened[idx] if len(idx) else np.zeros(0, dtype=bool)
     pulled = (soft & np.isfinite(tr) & (tr < 1e-6) & (T < 1e-6)) if len(idx) \
@@ -701,7 +704,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "peak_T_span": peak_T_span,
         "peak_gap_s": peak_gap_s,
         "pullout_s": s[pulled] if len(idx) else np.zeros(0),
-        # Softened but not pulled out — the two are drawn with different marks
+        # Softened but not ruptured — the two are drawn with different marks
         # and an element is in one state, so a pullout is not also a plain
         # softened element with a second mark on top of it.
         "softened_s": s[soft & ~pulled] if len(idx) else np.zeros(0),
@@ -738,7 +741,7 @@ def _peak_utilization(util):
 
 def _reinforcement_status(util, pulled_out, softened):
     if pulled_out:
-        return "pulled out"
+        return "ruptured"
     if softened:
         return "softened to residual"
     if util is None or not np.isfinite(util):

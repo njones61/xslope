@@ -1239,8 +1239,8 @@ share nodes with the surrounding soil elements and participate in the viscoplast
 body-force corrections.
 
 - **[Soil Reinforcement](reinforcement.md)**: geotextiles, soil nails and ground anchors as
-  tension-only truss elements with axial stiffness $EA/L$ — including the failure modes (pullout,
-  peak-residual softening, complete failure) and typical material properties. The optional
+  tension-only truss elements with axial stiffness $EA/L$ — including the failure modes (perfectly
+  plastic pullout, peak-residual softening, brittle rupture) and typical material properties. The optional
   **`bond_slip`** run argument replaces a line's fixed pullout ramp with a stress-dependent Coulomb
   bond that caps the force gradient along the embedded length,
   $dT/ds \le P(c_{bond} + \sigma_n \tan\phi_{bond})$; it is off by default. See
@@ -1397,7 +1397,7 @@ a captured mechanism simply omits those rows.
 | `axial_force` | Axial (tensile) force carried by the element. |
 | `t_allow` | Allowable tensile capacity (reduced toward the ends by the pullout ramp). |
 | `t_cap` | The tensile cap the solve actually enforced. Equal to `t_allow` except where the optional [bond-slip model](reinforcement.md#bond-slip-load-transfer-optional) replaced the pullout ramp with its Coulomb bond envelope, which is a run option and so cannot be recovered from the model alone. Absent in files written before this column existed, which read back as `t_allow`. |
-| `t_res` | Residual tensile capacity after softening (0 for brittle rupture). |
+| `t_res` | Residual tensile capacity after softening: the smaller of the $T_{res}$ entered for the line and the capacity the embedment develops at that element. Zero only where the line's $T_{res}$ is zero — brittle rupture. Blank where the line declares no $T_{res}$ and so never softens. |
 | `mobilization` | Ratio of axial force to allowable capacity. |
 | `failed`, `softened` | Whether the element reached its capacity, and whether it dropped to residual. |
 

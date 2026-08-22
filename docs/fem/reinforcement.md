@@ -94,9 +94,10 @@ A blank $T_{res}$ means *no post-peak drop* — it does **not** mean zero.
 
 **Peak-Residual Model:**
 
-Entering a value for $T_{res}$ turns on post-peak behavior: an element that yields drops from $T_{allow}$ to
-$T_{res}$. Appropriate for ductile materials where the published capacity is a peak rather than a plateau; typical
-residual ratios for geosynthetics are $T_{res}/T_{allow} = 0.3-0.7$.
+Entering a value for $T_{res}$ turns on post-peak behavior: an element that yields drops from $T_{allow}$ to its
+residual capacity, which is $T_{res}$ or the capacity its embedment can develop, whichever is smaller. Appropriate
+for ductile materials where the published capacity is a peak rather than a plateau; typical residual ratios for
+geosynthetics are $T_{res}/T_{allow} = 0.3-0.7$.
 
 The drop is decided **only on a converged equilibrium state**, never inside the viscoplastic iteration. This
 matters: the first iterate of a viscoplastic solve is the elastic predictor, whose bar forces overshoot badly
@@ -126,8 +127,11 @@ For each reinforcement line, it is assumed that the tension force in the reinfor
 - The available strength is limited by pullout resistance rather than material strength<br>
 - For elements at distance $d$ from the reinforcement end where $d < L_p$:<br>
   >>$T_{available} = T_{allow} \times \frac{d}{L_p}$<br>
-- Pullout failure is typically sudden and complete (no residual capacity)<br>
-- Progressive pullout can occur as elements near the ends fail sequentially
+- Pullout is **perfectly plastic**. An element that reaches its embedment-limited capacity slips at that force and
+  goes on carrying it: interface friction does not vanish once it has been overcome, so there is no drop to zero.
+  This is the standard cable and geogrid treatment, and it is the same assumption the LEM envelope makes.<br>
+- Pullout spreads along a line as elements near the ends reach their capacity one after another and shed the
+  balance of the demand into the interior
 
 **Tension-Only Behavior:**
 
@@ -169,7 +173,7 @@ This matrix is factored once (via sparse LU decomposition) and reused for all vi
 
 These corrections are added to the same load vector that receives the soil viscoplastic strain corrections ($[B]^T [D] \{\varepsilon_{vp}\}$). The factored stiffness matrix then solves the corrected system, and the process repeats until convergence.
 
-**Failure irreversibility:** Once an element is marked as failed (having exceeded $T_{allow}$), it remains failed for all subsequent iterations within that analysis. Its effective capacity permanently drops from $T_{allow}$ to $T_{res}$. This models the irreversible nature of material yielding or pullout failure.
+**Failure irreversibility:** Once an element is marked as failed (having exceeded $T_{allow}$), it remains failed for all subsequent iterations within that analysis. Its effective capacity permanently drops from $T_{allow}$ to the residual assigned to it. This models the irreversible nature of material yielding.
 
 ## Strength Reduction and Reinforcement
 
@@ -192,7 +196,7 @@ In the Excel input template used by XSLOPE, the user can define up to 20 reinfor
 | x1, y1 | The x and y coordinates of the left end of the line |
 | x2, y2 | The x and y coordinates of the right end of the line |
 | Tmax | Maximum allowable tensile force |
-| Tres | Residual tensile force after yield. **Leave blank for no post-peak drop** (elastic-perfectly-plastic — the usual choice, and the default). An explicit `0` means brittle rupture. Used by the FEM only. |
+| Tres | Residual tensile force the reinforcement retains after it ruptures, capped by the capacity its embedment can develop. **Leave blank for no post-peak drop** (elastic-perfectly-plastic — the usual choice, and the default). An explicit `0` means brittle rupture. Used by the FEM only. |
 | Lp1  | The pullout length on the left side |
 | Lp2  | The pullout length on the right side |
 | E    | The modulus of elasticity of reinforcement material  |
@@ -226,13 +230,12 @@ T_{max} & \text{if } d \geq L_p
 >>
 >>$T_{res} = \begin{cases}
 \text{unset (no post-peak drop)} & \text{if } T_{res}\ \text{is blank in the input} \\
-0 & \text{if } d < L_p \\
-T_{residual} & \text{if } d \geq L_p
+\min\left(T_{residual},\ T_{allow}\right) & \text{otherwise}
 \end{cases}$
 
 This approach ensures that elements near the reinforcement ends have reduced capacity (starting from zero at the ends), while elements beyond the pullout length carry the full design strength. The linear variation within the pullout length reflects the gradual development of pullout resistance through interface friction. Since each end of a reinforcement line may be embedded in a different soil with different shear resistance, the appropriate pullout length ($L_{p1}$ or $L_{p2}$) is selected based on which end is nearest to the element centroid.
 
-The residual capacity is only assigned at all when the user has entered a $T_{res}$ for the line. Where post-peak behavior *is* switched on, an element inside a pullout ramp ($d < L_p$) takes a residual of zero, because pullout failure is assumed to be sudden and complete; beyond the ramp ($d \geq L_p$) the element takes the user's residual strength. If the line has end anchorage, the hardware survives soil/grout failure up to its own capacity, so the residual there is $\min(T_{res}, T_{end})$ for the governing end.
+The residual capacity is only assigned at all when the user has entered a $T_{res}$ for the line. Where post-peak behavior *is* switched on, two independent mechanisms can limit what an element retains, and the smaller of the two governs. Bond slip is perfectly plastic, so the embedment goes on developing $T_{allow}$ — the ramped envelope, end anchorage included — however far the bar is pulled. $T_{residual}$ is the rupture residual, a property of the reinforcement itself and not of its embedment. Beyond the ramps $T_{allow} = T_{max}$ and the element takes the user's residual strength; inside a ramp it takes whichever of the two is less.
 
 ### Axial Stiffness (EA)
 
@@ -425,8 +428,10 @@ envelope of the [pullout section above](#determining-reinforcement-line-pullout-
 developing from each free end over its pullout length $L_p$, the tensile plateau at $T_{max}$ in the middle, and
 the step to the end anchorage capacity $T_{end}$ where one is declared. That envelope is the same expression the
 solver evaluates at each element centroid to set $T_{allow}$, so the curve and the element capacities cannot
-disagree. Where $T_{res}$ is filled in, the residual capacity is drawn as a dotted step, and elements that have
-softened to it are marked; elements that have pulled out are marked at zero force.
+disagree. Where $T_{res}$ is filled in, the residual capacity is drawn as a dotted step beneath it — flat at
+$T_{res}$ along the middle of the line, and following the friction ramp wherever the embedment develops less than
+that — and elements that have softened onto it are marked. An element left with no residual at all, and therefore
+carrying no force, is marked at zero.
 
 The greatest utilization along a line is usually held over a stretch rather than at a point, the force being capped
 by a flat envelope. Where it is a point, that point is ringed and annotated with its force and its fraction of

@@ -829,10 +829,12 @@ tiebacks) enter the per-element capacity and provide **Spacing**, and xslope div
 >>Spacing **[L]**: Out-of-plane spacing for discrete supports. Leave blank (or 1) for geosynthetics, whose properties are
 already per unit width.<br>
 - **Stiffness / Residual** (FEM only):<br>
->>Tres — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Residual tensile force *after* the element yields — its post-peak strength. **Leave it blank** for the
+>>Tres — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Residual tensile force the reinforcement retains *after* it ruptures — its post-peak strength. **Leave it blank** for the
 usual elastic-perfectly-plastic bar, which simply holds its capacity once it yields; a blank is not the same as a
 zero. Entering **0** means brittle rupture: the element drops to carrying nothing at all. Anything in between models
-a bar that sheds part of its load and retains the rest.<br>
+a bar that sheds part of its load and retains the rest. Near the ends the capacity envelope may develop less than
+`Tres`, and the element then retains only what the envelope gives it — bond slip is perfectly plastic and does not
+take a bar below the force its embedment can hold.<br>
 >>E **[F/L²]**: Elastic modulus of reinforcement<br>
 >>Area — **[L²] per element (÷ Spacing)** (or [L²/L] per unit width when Spacing is blank): Cross-sectional area<br>
 
@@ -851,7 +853,8 @@ How the force is then *used* differs by analysis:
   [Force Application](../lem/reinforcement.md#force-application-appl).
 - **FEM** models the line as a 1D truss element with stiffness `E`·`Area`, so the force is an *output* of the
   analysis rather than an input — the bar carries whatever the deforming soil pushes into it, capped by the
-  envelope, and dropping to `Tres` once it yields. **Dir** and **Appl** have no effect. See
+  envelope, and dropping to `Tres` once it yields, or to the envelope value where that is the lower of the two.
+  **Dir** and **Appl** have no effect. See
   [Soil Reinforcement in FEM](../fem/reinforcement.md#force-behavior-and-failure-modes).
 
 ---

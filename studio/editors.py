@@ -6324,8 +6324,10 @@ REINFORCE_HELP = {
     "t_max": "Maximum tensile force the line can mobilize, per unit width (discrete "
             "supports: enter the per-element capacity with Spacing). Caps both the "
             "LEM force and the FEM yield force.",
-    "t_res": "Residual tensile force after yield (post-peak), per unit width (÷ "
-            "Spacing for discrete supports). FEM only; blank = elastic-perfectly-"
+    "t_res": "Residual tensile force the line retains after it ruptures (post-peak), "
+            "per unit width (÷ Spacing for discrete supports). Capped by the pullout "
+            "envelope: bond slip is perfectly plastic, so an element keeps carrying "
+            "whatever its embedment develops. FEM only; blank = elastic-perfectly-"
             "plastic (holds capacity), 0 = brittle rupture (carries nothing).",
     "tend1": "End anchorage/connection capacity at end 1, per unit width (0 = "
             "friction only; ÷ Spacing for discrete supports).",

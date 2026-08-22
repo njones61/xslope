@@ -1059,6 +1059,43 @@ def test_the_band_is_named_for_the_field_it_was_read_from():
     return fails
 
 
+def _broken_tie_set(fd, fem_data, bundle, slope_data, tied_lines, fails):
+    """One ``(state, line_id, profile, gaps)`` whose tie set has a hole in it.
+
+    Takes the first line that stands at its greatest utilization over a stretch,
+    copies the field it was read from, and drops the force in one bar element
+    inside that stretch to half the capacity it was holding. The profile is then
+    re-read through :func:`xslope.fem_details.reinforcement_profile`, so the tie
+    set, the span, the gap positions and the figure's label are all computed by
+    the shipping code — only the force it reads is arranged.
+
+    Whether the shipped run produces such a hole of its own depends on the
+    mechanism the model develops, which is not what this is testing.
+    """
+    state, line_id, prof = tied_lines[0]
+    tied = np.asarray(prof["peak_indices"], dtype=int)
+    element_ids = np.asarray(prof["element_ids"], dtype=int)
+    hole = int(tied[len(tied) // 2])          # an interior sample of the stretch
+    field = (bundle.get("failure_solution") if state == "failure"
+             else bundle["solution"])
+    knocked = dict(field)
+    forces = np.array(field["forces_1d"], dtype=float)
+    forces[element_ids[hole]] = 0.5 * forces[element_ids[hole]]
+    knocked["forces_1d"] = forces
+    solution = bundle["solution"]
+    failure = knocked if state == "failure" else bundle.get("failure_solution")
+    if state != "failure":
+        solution = knocked
+    out = fd.reinforcement_profile(fem_data, solution, line_id, slope_data,
+                                   field_state=state, failure_solution=failure)
+    gaps = [round(float(v), 6) for v in out.get("peak_gap_s", [])]
+    if not gaps:
+        fails.append(f"{state} line {line_id}: a bar element inside the stretch "
+                     f"was dropped to half its force and the profile still "
+                     f"reports an unbroken span")
+    return [(state, line_id, out, gaps)]
+
+
 def test_the_peak_utilization_is_tie_aware():
     """A member at its greatest utilization over a stretch reports the stretch.
 
@@ -1073,11 +1110,13 @@ def test_the_peak_utilization_is_tie_aware():
     :data:`UTIL_TIE_TOL` of the greatest is in the span, the span's ends are the
     first and last of them, and the figure rings all of them rather than one.
 
-    A tie set can have a HOLE in it — on this sample's mechanism, line 4 stands
-    at capacity from 1.00 to 19.00 except at 5.00 — and the two ends alone
-    describe an unbroken run instead. The samples inside the span that do not
-    stand with the rest are reported as ``peak_gap_s``, and the figure's label
-    names them.
+    A tie set can have a HOLE in it — a sample between two at-capacity ones that
+    stands below them — and the two ends alone describe an unbroken run instead.
+    The samples inside the span that do not stand with the rest are reported as
+    ``peak_gap_s``, and the figure's label names them. That case is put to the
+    same code path on a field with one interior bar force knocked down
+    (:func:`_broken_tie_set`), since whether the shipped run develops a hole of
+    its own is a property of the mechanism rather than of the reporting.
     """
     fails = []
     from xslope import fem_details as fd
@@ -1147,9 +1186,18 @@ def test_the_peak_utilization_is_tie_aware():
     if not single_lines:
         fails.append("every line reports a span, so the single-point case is "
                      "untested")
+    if fails:
+        return fails
+
+    # A tie set with a HOLE in it. Whether the shipped run leaves an interior
+    # sample below the rest is a property of the mechanism and not of the
+    # reporting, so the broken case is put through the same code path on a field
+    # with one interior bar force knocked off capacity: everything from
+    # _peak_utilization outward is the shipping code, and only the force it
+    # reads is arranged.
     if not broken_lines:
-        fails.append("no line's tie set has a hole in it, so the broken stretch "
-                     "is untested")
+        broken_lines = _broken_tie_set(fd, fem_data, bundle, slope_data,
+                                       tied_lines, fails)
     if fails:
         return fails
 

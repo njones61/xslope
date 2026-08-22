@@ -2,8 +2,8 @@
   "failure_criterion": "hybrid",
   "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
   "final_interval": [
-    1.4875,
-    1.49375
+    1.50625,
+    1.5125
   ],
   "interval_width": 0.006249999999999867,
   "iterations_ssrm": 7,
@@ -35,18 +35,6 @@
     {
       "F": 1.5,
       "role": "bisect",
-      "converged": false,
-      "stable": false,
-      "verdict": "FAILED",
-      "u_ratio": 3.8361968693730835,
-      "growth": 0.4203719408902255,
-      "exit_reason": "no_progress",
-      "ee_suppressed": false,
-      "iterations": 4610
-    },
-    {
-      "F": 1.3,
-      "role": "bisect",
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
@@ -54,82 +42,94 @@
       "growth": null,
       "exit_reason": "converged",
       "ee_suppressed": false,
-      "iterations": 1544
+      "iterations": 3108
     },
     {
-      "F": 1.4,
-      "role": "bisect",
-      "converged": true,
-      "stable": true,
-      "verdict": "CONVERGED",
-      "u_ratio": null,
-      "growth": null,
-      "exit_reason": "converged",
-      "ee_suppressed": false,
-      "iterations": 5168
-    },
-    {
-      "F": 1.45,
-      "role": "bisect",
-      "converged": true,
-      "stable": true,
-      "verdict": "CONVERGED",
-      "u_ratio": null,
-      "growth": null,
-      "exit_reason": "converged",
-      "ee_suppressed": false,
-      "iterations": 6298
-    },
-    {
-      "F": 1.475,
-      "role": "bisect",
-      "converged": true,
-      "stable": true,
-      "verdict": "CONVERGED",
-      "u_ratio": null,
-      "growth": null,
-      "exit_reason": "converged",
-      "ee_suppressed": false,
-      "iterations": 5034
-    },
-    {
-      "F": 1.4875,
-      "role": "bisect",
-      "converged": true,
-      "stable": true,
-      "verdict": "CONVERGED",
-      "u_ratio": null,
-      "growth": null,
-      "exit_reason": "converged",
-      "ee_suppressed": false,
-      "iterations": 4968
-    },
-    {
-      "F": 1.49375,
+      "F": 1.7,
       "role": "bisect",
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 4.4261959918926115,
-      "growth": 0.8743079774259086,
+      "u_ratio": 13.836888884555957,
+      "growth": 2.6396473497170394,
       "exit_reason": "no_progress",
       "ee_suppressed": false,
-      "iterations": 7274
+      "iterations": 2459
+    },
+    {
+      "F": 1.6,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 8.97213292370129,
+      "growth": 1.0108065417432364,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 6303
+    },
+    {
+      "F": 1.55,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 4.673708162959486,
+      "growth": 0.16613475121086949,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 4097
+    },
+    {
+      "F": 1.525,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 4.491616522597623,
+      "growth": 0.7504276358310802,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 5580
+    },
+    {
+      "F": 1.5125,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 3.418967730339291,
+      "growth": 0.045805186192478996,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 4008
+    },
+    {
+      "F": 1.50625,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 3039
     }
   ],
   "tolerance": 0.01,
   "F_min": 1.1,
   "F_max": 1.9,
   "analysis_type": "ssrm",
-  "FS": 1.490625,
+  "FS": 1.509375,
   "element_type": "tri6",
   "target_size": 2.0,
   "max_iter": 16000,
-  "expected_fs": 1.491,
-  "F": 1.4875,
+  "expected_fs": 1.509,
+  "F": 1.50625,
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 4968,
-  "residual": 2.1025660012499806e-05,
-  "max_displacement": 0.21542499358129902
+  "iterations": 3039,
+  "residual": 2.554165281414148e-05,
+  "max_displacement": 0.20816758712805083
 }

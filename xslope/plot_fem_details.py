@@ -38,7 +38,7 @@ C_ENVELOPE = "#333333"     # declared capacity
 C_BAND = "#d95f0e"         # failure / shear strain band (see band_label)
 C_PEAK = "#c0392b"         # peak / maximum marker
 C_SOFT = "#8e44ad"         # softened to residual
-C_PULL = "#000000"         # pulled out
+C_PULL = "#000000"         # ruptured
 C_LIMIT = "#7f8c8d"        # limiting resistance envelope
 GRID = dict(alpha=0.25, linewidth=0.6)
 
@@ -243,7 +243,7 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     development length, the tensile plateau at Tmax in the middle, and the step
     to the connection capacity at an anchored end. The band the mechanism field
     puts on this bar is shaded and named by :func:`band_label`, and elements that
-    softened or pulled out are marked where they occur.
+    softened or ruptured are marked where they occur.
 
     The point of greatest utilization is ringed where it is a point, and where
     the line holds that utilization over a stretch — which is the usual case,
@@ -315,7 +315,7 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     pull_s = profile.get("pullout_s", [])
     if len(pull_s):
         ax.plot(pull_s, np.zeros(len(pull_s)), "x", color=C_PULL, markersize=8,
-                markeredgewidth=2, label="Pulled out", zorder=6)
+                markeredgewidth=2, label="Ruptured", zorder=6)
 
     ax.set_ylabel(_axis_label("Axial force", u.get("force")), fontsize=9)
     ax.set_title(_title(profile), fontsize=11)

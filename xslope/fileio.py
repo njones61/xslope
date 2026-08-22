@@ -518,12 +518,14 @@ def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area,
         if 0.0 < s_x < line_length and (Tend1 + m1 * s_x) < Tmax:
             cands.add(s_x)
 
-    # Emit ordered, deduplicated breakpoints. The stored Tres mirrors the old
-    # semantics: the material residual where the full capacity is available,
-    # zero inside a friction ramp (sudden pullout) unless the governing end is
-    # anchored, in which case the anchor hardware survives up to min(Tres, Tend).
-    # An UNSET Tres (NaN) stays unset everywhere along the line — no post-peak
-    # drop anywhere — rather than collapsing to a number through min().
+    # Emit ordered, deduplicated breakpoints. The stored Tres is the residual
+    # capacity at the breakpoint: the smaller of the material residual and the
+    # capacity the envelope develops there. Bond slip is perfectly plastic — an
+    # element that slips keeps carrying the ramped capacity — so the only thing
+    # that can cut a point's post-peak capacity below the envelope is the
+    # material residual itself. An UNSET Tres (NaN) stays unset everywhere along
+    # the line — no post-peak drop anywhere — rather than collapsing to a number
+    # through min().
     tol = max(1e-9, 1e-9 * line_length)
     line_points = []
     for s in sorted(cands):
@@ -532,14 +534,8 @@ def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area,
         T = T_at(s)
         if Tres != Tres:                      # NaN: unset, no post-peak drop
             tres_pt = float('nan')
-        elif T >= Tmax - 1e-12:
-            tres_pt = Tres
         else:
-            governing_tend = tend_g = 0.0
-            cap1 = Tmax if Lp1 <= 0 else Tend1 + Tmax * s / Lp1
-            cap2 = Tmax if Lp2 <= 0 else Tend2 + Tmax * (line_length - s) / Lp2
-            tend_g = Tend1 if cap1 <= cap2 else Tend2
-            tres_pt = min(Tres, tend_g)
+            tres_pt = min(Tres, T)
         line_points.append({"X": x1 + s * dx, "Y": y1 + s * dy, "T": T,
                             "Tres": tres_pt, "E": E, "Area": Area, "_s": s})
     for p in line_points:

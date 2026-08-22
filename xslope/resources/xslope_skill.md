@@ -937,7 +937,10 @@ A list of line dicts with explicit endpoints and capacities.
 slope_data['reinforcement_lines'] = [
     {'x1': 0, 'y1': 0, 'x2': 20, 'y2': 0,      # start -> end
      't_max': 5000,    # max tension  (LEM & FEM), per unit width
-     't_res': 0,       # residual tension (FEM)
+     't_res': float('nan'),  # residual tension after rupture (FEM). NaN = blank = no
+                             # post-peak drop; an explicit 0 is brittle rupture. Capped
+                             # by the pullout envelope: bond slip holds the ramped
+                             # capacity, so an element never drops below it.
      'lp1': 0, 'lp2': 0,   # pullout lengths at start / end
      'E': 0, 'area': 0,    # Young's modulus / cross-section area (FEM)
      # v12 support-type fields (defaults shown = the classic generic line):

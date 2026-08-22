@@ -128,14 +128,23 @@ through that crossing-by-crossing.
 
 ## What a reinforcement line is to each engine
 
-A reinforcement element carries **two separate limits**, and that two-limit
-structure is the standard idealization the mainstream finite element codes
-share: PLAXIS, RS2 and FLAC all model reinforcement as a bond limit, perfectly
-plastic once it slips, plus a rupture limit for the reinforcement itself with an
-optional residual after it. XSLOPE handles rupture the same way: `Tmax` is the
-rupture limit, and with `Tres` left blank a bar that reaches it simply holds
-there — the elastic-perfectly-plastic geogrid those codes use by default. The
-bond limit is where the default differs. Those codes derive
+A reinforcement element is an elastic bar with **two separate limits** on the
+force it can carry. The **bond limit** is the force the soil can transfer into
+the bar through friction along its embedded length; when the bar force reaches
+it, the bar slips. The **rupture limit** is the strength of the reinforcement
+itself; when the force reaches it, the material yields. Both limits are
+**perfectly plastic**: once the force reaches the limit it stays there while
+the bar keeps stretching, neither rising nor falling. Below either limit the bar
+is **elastic** — its force grows in proportion to how far it is stretched — so
+the whole behavior is called **elastic-perfectly-plastic**: force proportional
+to stretch up to the limit, then constant at it. A material can also be given a
+**residual**: a lower force it drops to after rupture, instead of holding at the
+limit. That two-limit structure is the standard idealization the mainstream
+finite element codes share; PLAXIS, RS2 and FLAC all model reinforcement this
+way. XSLOPE handles rupture the same way: `Tmax` is the rupture limit, and with
+`Tres` left blank a bar that reaches it holds there — the elastic-perfectly-
+plastic geogrid those codes use by default. The bond limit is where the default
+differs. Those codes derive
 bond from a stress-dependent interface, so the length a bar needs to develop its
 full capacity changes along the line; XSLOPE's default instead reads a
 development length declared on the input, and its optional

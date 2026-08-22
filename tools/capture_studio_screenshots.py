@@ -587,15 +587,23 @@ def _line_editor(editor_cls, path, mode, size):
         # section beside them is already on the list-view shot. The dialog is then
         # widened to whatever the columns need, measured — every column has to be on
         # the shot, and which columns there are is the point of it.
-        from PySide6.QtWidgets import QHeaderView
-
+        #
+        # The column widths are the editor's own (studio.editors fits every table to
+        # its content when it builds it), not a width imposed for the photograph:
+        # what the reader is shown is what the dialog does.
         dlg._table_split.setSizes([size[0], 0])
         table = dlg._table.table
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        _settle()
-        chrome = dlg.width() - table.viewport().width()   # everything but the columns
-        dlg.resize(table.horizontalHeader().length() + chrome, size[1])
-        dlg._table_split.setSizes([dlg.width(), 0])
+        # Shown before measuring, and measured twice: an unshown dialog's viewport
+        # has not been laid out yet, and the difference it reports between the dialog
+        # and the viewport is a couple of hundred pixels of chrome that do not exist
+        # — which is a blank band to the right of the last column on the shot. The
+        # second pass measures the dialog the first one produced.
+        dlg.show()
+        for _ in range(2):
+            _settle()
+            chrome = dlg.width() - table.viewport().width()  # all but the columns
+            dlg.resize(table.horizontalHeader().length() + chrome, size[1])
+            dlg._table_split.setSizes([dlg.height(), 0])
     else:
         dlg._list_view.list.setCurrentRow(0)
         # Tall enough for the whole form: the groups are the shot's subject, and the

@@ -125,6 +125,45 @@ def _mat_table(dlg, through="u"):
     return dlg
 
 
+def _line_table(dlg, through):
+    """Put a two-view line editor in its TABLE view, sized to reach ``through``.
+
+    The line editors' own default is the LIST view and the last view used is a
+    session setting, so the mode is set explicitly — the same reason ``_mat_table``
+    gives. Width and height are measured off the built table for the same reason
+    too: a reinforcement table cut off before its last column photographs a row
+    whose columns the page is telling the reader to fill.
+    """
+    dlg._set_mode("table")
+    dlg.show()
+    _settle()
+    tbl = dlg._table.table
+    hh = tbl.horizontalHeader()
+    keys = [f.key for f in dlg._fields]
+    col = keys.index(through)
+    rows = sum(tbl.rowHeight(r) for r in range(tbl.rowCount()))
+    want = rows + tbl.horizontalHeader().height()
+    # Height is grown by the measured deficit rather than computed once: the table
+    # shares a splitter with the section preview, so a taller dialog does not hand
+    # the table all of the extra — and a table one row short photographs a file
+    # whose last line the reader cannot see.
+    from PySide6.QtWidgets import QSplitter
+
+    for _ in range(4):
+        w = (hh.sectionPosition(col) + hh.sectionSize(col)
+             + (dlg.width() - tbl.viewport().width()))
+        deficit = max(0, want - tbl.viewport().height())
+        dlg.resize(w, dlg.height() + deficit)
+        # The splitter keeps its own proportions through a resize, so the extra
+        # height lands on the preview unless the table's pane is asked for it.
+        for sp in dlg.findChildren(QSplitter):
+            sizes = sp.sizes()
+            if len(sizes) == 2 and sp.isAncestorOf(tbl) and deficit:
+                sp.setSizes([sizes[0] + deficit, max(1, sizes[1])])
+        _settle()
+    return dlg
+
+
 @contextlib.contextmanager
 def _app_defaults():
     """Run a capture against the app's OWN defaults, not this machine's stored ones.
@@ -711,11 +750,10 @@ def lem08_reinforcement_table():
 
     dlg = ReinforcementEditor().build(_load(LEM08), None)
     _lem_only(dlg)
-    dlg._set_mode("table")
     # The preview stacks below the table, so the width is just the columns:
-    # wide enough that every LEM column (Label through Spacing) shows.
-    dlg.resize(1460, 760)
-    return _grab(dlg, "lem08_studio_reinforcement_table.png")
+    # measured out to Spacing, the last LEM column.
+    return _grab(_line_table(dlg, through="spacing"),
+                 "lem08_studio_reinforcement_table.png")
 
 
 SHOTS["lem08_reinforcement_table"] = lem08_reinforcement_table
@@ -737,9 +775,8 @@ def lem09_reinforcement_table():
 
     dlg = ReinforcementEditor().build(_load(LEM09), None)
     _lem_only(dlg)
-    dlg._set_mode("table")
-    dlg.resize(1460, 760)
-    return _grab(dlg, "lem09_studio_reinforcement_table.png")
+    return _grab(_line_table(dlg, through="spacing"),
+                 "lem09_studio_reinforcement_table.png")
 
 
 SHOTS["lem09_reinforcement_table"] = lem09_reinforcement_table
@@ -770,9 +807,8 @@ def lem09_piles_table():
 
     dlg = PilesEditor().build(_load(LEM09), None)
     _lem_only(dlg)
-    dlg._set_mode("table")
-    dlg.resize(1460, 700)
-    return _grab(dlg, "lem09_studio_piles_table.png")
+    return _grab(_line_table(dlg, through="M_cap"),
+                 "lem09_studio_piles_table.png")
 
 
 SHOTS["lem09_piles_table"] = lem09_piles_table
@@ -1424,9 +1460,7 @@ def _lem12_piles_table(name, **edit):
 
     dlg = PilesEditor().build(_lem12_model(**edit), None)
     _lem_only(dlg)
-    dlg._set_mode("table")
-    dlg.resize(1180, 620)
-    return _grab(dlg, name)
+    return _grab(_line_table(dlg, through="M_cap"), name)
 
 
 def lem12_piles_table():
@@ -2156,45 +2190,6 @@ FEM02_DONE = os.path.join(REPO_ROOT,
                           "docs/tutorials/files/xslope_reinforced_slope.xlsx")
 #: The line whose detail panel is photographed: the most heavily loaded of the six.
 FEM02_DETAIL_LINE = "Line 5"
-
-
-def _line_table(dlg, through):
-    """Put a two-view line editor in its TABLE view, sized to reach ``through``.
-
-    The line editors' own default is the LIST view and the last view used is a
-    session setting, so the mode is set explicitly — the same reason ``_mat_table``
-    gives. Width and height are measured off the built table for the same reason
-    too: a reinforcement table cut off before its last column photographs a row
-    whose columns the page is telling the reader to fill.
-    """
-    dlg._set_mode("table")
-    dlg.show()
-    _settle()
-    tbl = dlg._table.table
-    hh = tbl.horizontalHeader()
-    keys = [f.key for f in dlg._fields]
-    col = keys.index(through)
-    rows = sum(tbl.rowHeight(r) for r in range(tbl.rowCount()))
-    want = rows + tbl.horizontalHeader().height()
-    # Height is grown by the measured deficit rather than computed once: the table
-    # shares a splitter with the section preview, so a taller dialog does not hand
-    # the table all of the extra — and a table one row short photographs a file
-    # whose last line the reader cannot see.
-    from PySide6.QtWidgets import QSplitter
-
-    for _ in range(4):
-        w = (hh.sectionPosition(col) + hh.sectionSize(col)
-             + (dlg.width() - tbl.viewport().width()))
-        deficit = max(0, want - tbl.viewport().height())
-        dlg.resize(w, dlg.height() + deficit)
-        # The splitter keeps its own proportions through a resize, so the extra
-        # height lands on the preview unless the table's pane is asked for it.
-        for sp in dlg.findChildren(QSplitter):
-            sizes = sp.sizes()
-            if len(sizes) == 2 and sp.isAncestorOf(tbl) and deficit:
-                sp.setSizes([sizes[0] + deficit, max(1, sizes[1])])
-        _settle()
-    return dlg
 
 
 def _fem02_meshed(path=FEM02_DONE):

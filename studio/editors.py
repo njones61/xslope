@@ -554,6 +554,45 @@ class _EditableTable(QWidget):
         self.paste_summary.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.paste_summary.setVisible(False)
         layout.addWidget(self.paste_summary)
+        # Every table is fitted to its own content the moment it is populated, so no
+        # editor opens on Qt's default section width — which is the same number for
+        # an x-coordinate and a support-type combo, and therefore both too wide for
+        # one and too narrow for the other.
+        self.fit_columns()
+
+    # ---------------------------------------------------------------- #
+    # Column fit
+    # ---------------------------------------------------------------- #
+    def fit_columns(self):
+        """Size every column to its own widest content; returns the width the
+        VISIBLE columns need in the table's viewport.
+
+        The field kinds are what tell a numeric column (floored at the widest
+        ordinary number, so an empty table is as wide as a full one) from a text or
+        choice column (floored at its header). A display column that is not a field
+        — the Materials swatch — is not numeric either, and floors on its own
+        header glyph."""
+        numeric = {j for j, f in enumerate(self._fields)
+                   if f.kind in Field.NUMERIC_KINDS}
+        return _fit_columns(self.table, numeric)
+
+    def columns_width(self):
+        """The width this pane needs to show every visible column: the fitted
+        columns plus everything they sit inside — the row-number gutter, the frame,
+        and the scroll bar the table reserves.
+
+        Measured from the widgets' metrics rather than read off the current
+        geometry, so it is the same answer before the pane is ever shown as after.
+        sizeHint(), not width(), for the gutter: it is only as wide as the row count
+        needs, and before layout its width() has not caught up with the rows in it —
+        a 40-row table's gutter is wider than a 1-row table's, and measuring the
+        stale one puts a column back over the edge."""
+        from PySide6.QtWidgets import QStyle
+
+        return (self.fit_columns()
+                + self.table.verticalHeader().sizeHint().width()
+                + 2 * self.table.frameWidth()
+                + self.style().pixelMetric(QStyle.PM_ScrollBarExtent))
 
     # ---------------------------------------------------------------- #
     # Clipboard
@@ -1870,11 +1909,17 @@ def _pick_dloads(set_blocks, x, y, tol):
 # Fitting a table to its own content
 #
 # A table dialog that opens with a column past its right edge is a table dialog with
-# a hidden input. Rather than guess a width per column, the two helpers below measure
-# one: the widest thing any column has to show (header text, cell text, and the cell
-# WIDGETS a combo column is made of, whose width no item hint knows about), squared
-# off so every column is that wide. Uniform columns read as a sheet, and a dialog
-# opened at their total can not be hiding one.
+# a hidden input, and one that gives every column the width of its widest is a dialog
+# most of whose width is blank: an x-coordinate does not need the room a
+# "geosynthetic" combo does, and seventeen columns sized for that combo is a
+# seventeen-hundred pixel dialog. So each column is measured on ITS OWN widest thing
+# — header text, cell text, and the cell WIDGETS a combo column is made of, whose
+# width no item hint knows about — and given that, plus a cushion.
+#
+# A numeric column is floored at the widest ordinary number instead of at its header,
+# so a table opened EMPTY is as wide as the same table opened full and typing the
+# first row never moves a column; a text column floors on its header, which is the
+# widest thing it is guaranteed to hold.
 #
 # Everything is measured in the widget's own font, so the fit follows the font, the
 # display and the platform instead of a pixel guess made on one of them.
@@ -1887,44 +1932,106 @@ _TABLE_SPARE_ROWS = 3
 #: cross-section in; it scales with the font rather than fixing a pixel height.
 _PREVIEW_MIN_LINES = 16
 #: A negative number written to the display precision — the widest ordinary thing a
-#: numeric cell holds. It floors a column's width, so a table opened EMPTY is as wide
-#: as the same table opened full, and typing the first row does not need a resize.
+#: numeric cell holds. It floors a NUMERIC column's width, so a table opened EMPTY is
+#: as wide as the same table opened full, and typing the first row does not need a
+#: resize.
 _NUMBER_SAMPLE = "-" + "0" * _DISPLAY_SIG_DIGITS + "."
 
 
-def _uniform_column_width(table):
-    """The width every column needs to show its widest content, header included."""
+def _column_widths(table, numeric):
+    """The width each column needs to show its own widest content, header included.
+
+    ``numeric`` is the set of column indexes holding numbers; those are the ones
+    floored at :data:`_NUMBER_SAMPLE`."""
     header = table.horizontalHeader()
     fm = table.fontMetrics()
     cushion = fm.horizontalAdvance("00")                    # one em-ish, both sides
-    widest = max(header.minimumSectionSize(),
-                 fm.horizontalAdvance(_NUMBER_SAMPLE) + cushion)
+    number = fm.horizontalAdvance(_NUMBER_SAMPLE) + cushion
+    widths = []
     for c in range(table.columnCount()):
         w = max(table.sizeHintForColumn(c), header.sectionSizeHint(c))
         for r in range(table.rowCount()):
             cell = table.cellWidget(r, c)
             if cell is not None:
                 w = max(w, cell.sizeHint().width())
-        widest = max(widest, w + cushion)
-    return widest
+            else:
+                # Measured row by row rather than left to sizeHintForColumn, which
+                # only looks at the rows currently in the viewport: the longest
+                # label in a forty-row table is usually not one of the first
+                # twenty, and a fit that had not seen it would cut it off.
+                item = table.item(r, c)
+                if item is not None and item.text():
+                    w = max(w, fm.horizontalAdvance(item.text()))
+        w += cushion
+        if c in numeric:
+            w = max(w, number)
+        widths.append(max(w, header.minimumSectionSize()))
+    return widths
 
 
-def _fit_columns(table):
-    """Size every column to :func:`_uniform_column_width` and let them share any
-    extra width the dialog is given. Returns the viewport width they need.
+def _fit_columns(table, numeric):
+    """Size each column to its own content (:func:`_column_widths`). Returns the
+    viewport width the VISIBLE columns need.
 
-    Stretch (rather than a one-off resize) is what keeps the fit true after the user
-    drags the dialog wider or narrower; the minimum section size is what stops the
-    stretch from squeezing a column back out of legibility."""
+    The sections stay Interactive at the fitted width rather than stretching to fill
+    the viewport: a fitted column is already as wide as the widest thing in it, so
+    sharing out spare width only pads it, and a dialog dragged narrower would take
+    that width back out of every column at once. Left alone, the fit survives a
+    resize in both directions — the spare width is blank space on the right, and a
+    dialog dragged narrower than its columns scrolls, which is the one direction a
+    table has a scroll bar for. The user keeps the column drag Interactive means."""
     header = table.horizontalHeader()
     # Forget the previous fit before measuring: a minimum section size left standing
     # is reported back as the sections' own hint, so re-fitting would ratchet the
     # columns wider every time it ran.
     header.setMinimumSectionSize(-1)
-    width = _uniform_column_width(table)
-    header.setMinimumSectionSize(width)
-    header.setSectionResizeMode(QHeaderView.Stretch)
-    return width * max(table.columnCount(), 1)
+    header.setSectionResizeMode(QHeaderView.Interactive)
+    header.setStretchLastSection(False)
+    widths = _column_widths(table, numeric)
+    for c, w in enumerate(widths):
+        header.resizeSection(c, w)
+    return sum(w for c, w in enumerate(widths) if not table.isColumnHidden(c))
+
+
+def _dialog_width_for(dialog, editable):
+    """The width ``dialog`` needs to show every visible column of the table pane
+    ``editable``: the pane's fitted width plus the dialog's own margins, and never
+    narrower than the rest of the dialog already needs — the view toggle and usage
+    checkboxes above the table, the buttons below it. A four-column table does not
+    get to fold the toggle bar."""
+    margins = dialog.layout().contentsMargins()
+    return max(editable.columns_width() + margins.left() + margins.right(),
+               dialog.layout().minimumSize().width())
+
+
+def _set_dialog_width(dialog, want, cap=None, grow_only=False):
+    """Take ``dialog`` to ``want`` pixels wide, never past ``cap`` or the screen.
+
+    ``grow_only`` for a dialog already on screen: showing a hidden column (a usage
+    toggle ticked back on) or switching to a wider view must not leave a column past
+    the right edge, but neither may it take back width the user gave the dialog
+    themselves. It is applied after the caps, so a dialog someone has already made
+    wider than the screen (a headless capture does exactly that) is left alone."""
+    if cap is not None:
+        want = min(want, cap)
+    screen = dialog.screen() or QApplication.primaryScreen()
+    if screen is not None:
+        want = min(want, screen.availableGeometry().width())
+    if grow_only:
+        want = max(want, dialog.width())
+    if want != dialog.width():
+        dialog.resize(want, dialog.height())
+
+
+def _fit_dialog_to_columns(dialog, editable, cap=None, grow_only=False):
+    """Set ``dialog``'s width to what the fitted columns of ``editable`` need."""
+    _set_dialog_width(dialog, _dialog_width_for(dialog, editable),
+                      cap=cap, grow_only=grow_only)
+
+
+def _grow_dialog_to(dialog, want):
+    """Widen ``dialog`` to ``want`` if it is narrower than that; never shrink it."""
+    _set_dialog_width(dialog, want, grow_only=True)
 
 
 class TableEditorDialog(QDialog):
@@ -2022,6 +2129,10 @@ class TableEditorDialog(QDialog):
             attach_help(self, self._field_help,
                        _table_help_resolver(lambda: self._editable, lambda: self._fields))
             _wire_cell_help(self._help_strip, self._editable, self._fields, self._field_help)
+        # Sized from its own table where the table IS the dialog's width — the
+        # preview stacked below it. A preview BESIDE the table splits the width with
+        # it, so there the table's fit is not the dialog's width and the opening
+        # size stays the split one.
         self._content_sized = bool(preview_below)
         if preview_below:
             # Last, so the measurement sees every strip the dialog ended up with.
@@ -2043,23 +2154,11 @@ class TableEditorDialog(QDialog):
         return table.horizontalHeader().height() + rows + spare + chrome + bar
 
     def _content_width(self):
-        """Dialog width that fits every column: the fitted columns themselves plus
-        everything they sit inside — row-number gutter, frame, the scroll bar the
-        table reserves, and the dialog's own margins. Computed from the widgets'
-        metrics rather than read off the current geometry, so it is the same answer
-        before the dialog is ever shown as after."""
-        from PySide6.QtWidgets import QStyle
-
-        table = self._editable.table
-        margins = self.layout().contentsMargins()
-        # sizeHint(), not width(): the row-number gutter is only as wide as the row
-        # count needs, and before the table has been laid out its width() has not
-        # caught up with the rows in it -- a 40-row table's gutter is wider than a
-        # 1-row table's, and measuring the stale one puts a column back over the edge.
-        return (_fit_columns(table)
-                + table.verticalHeader().sizeHint().width() + 2 * table.frameWidth()
-                + self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
-                + margins.left() + margins.right())
+        """Dialog width that fits every column: the table pane's own fitted width
+        (:meth:`_EditableTable.columns_width`) plus the dialog's margins, and never
+        narrower than the rows above and below the table — the toggle bar, the
+        buttons — already need."""
+        return _dialog_width_for(self, self._editable)
 
     def _size_to_content(self):
         """Open at the size the content asks for, capped by the screen.
@@ -2107,10 +2206,10 @@ class TableEditorDialog(QDialog):
         would be taking room away from them to save room they did not ask to save.
 
         Only for a dialog that was sized from its content in the first place. The
-        fit takes the columns off Interactive and onto Stretch, which costs the user
-        the ability to drag a column width; that is a fair trade in a dialog whose
-        whole width was measured to fit its columns, and no trade at all in one that
-        was not -- there it would take the drag away and give nothing back."""
+        fit resets the columns to the new content's widths, which discards any width
+        the user dragged a column to; in a dialog whose whole width was measured to
+        fit its columns that is the fit doing its job, while in one sized some other
+        way it would only be overwriting the user's own arrangement."""
         if not getattr(self, "_content_sized", False):
             return
         needed = self._content_width()
@@ -3684,7 +3783,11 @@ class MaterialsDialog(QDialog):
         self._doc = doc
         self._orig_style = copy.deepcopy(style or {})
         self._color = _MaterialColorState(self._orig_style)
-        self.resize(1180, 640)
+        # The width the LIST view was laid out for, and the height both views open
+        # at. The table view sizes itself from its own fitted columns instead (see
+        # _fit_table_width), which on a filtered material sheet is narrower.
+        self._designed_width = 1180
+        self.resize(self._designed_width, 640)
 
         layout = QVBoxLayout(self)
         if help_text:
@@ -3808,6 +3911,9 @@ class MaterialsDialog(QDialog):
         self._sync_rel_enabled()
         if self._mode == "table" and self._table is not None:
             self._table.apply_usage_filter(self._enabled_usage())
+            # Columns that were just shown belong on the dialog, not past its right
+            # edge — so the width follows the filter (wider only).
+            self._fit_table_width()
         if self._mode == "list" and self._list_view is not None:
             self._list_view.apply_usage_filter(self._enabled_usage())
 
@@ -3860,13 +3966,27 @@ class MaterialsDialog(QDialog):
         if mode == "table":
             self._build_table()
             self._stack.setCurrentIndex(0)
+            self._fit_table_width()
         else:
             self._ensure_list()
             self._stack.setCurrentIndex(1)
+            if self.isVisible():
+                _grow_dialog_to(self, self._designed_width)
         self._mode = mode
         self._seg[mode].setChecked(True)
         global _LAST_MATERIALS_VIEW
         _LAST_MATERIALS_VIEW = mode
+
+    def _fit_table_width(self):
+        """Take the dialog to the width the table view's fitted columns need, up to
+        the width the list view was laid out for — the two views share one dialog,
+        and the material sheet has more columns than any screen has room for, so the
+        table view's fit is a floor to open at rather than a width to insist on.
+        Only ever wider once the dialog is on screen (see _fit_dialog_to_columns)."""
+        if self._table is None:
+            return
+        _fit_dialog_to_columns(self, self._table, cap=self._designed_width,
+                               grow_only=self.isVisible())
 
     def set_view_mode(self, mode):
         """Programmatic view switch (used by the round-trip guard)."""
@@ -4433,7 +4553,12 @@ class _LineEditorDialog(QDialog):
         self._table_split = None
         self._table_preview = None
         self._list_view = None
-        self.resize(1200, 620)
+        # The width the LIST view was laid out for, and the height both views open
+        # at. The table view sizes itself from its own fitted columns instead (see
+        # _set_mode) — narrower here, since a line's fields are a dozen numbers —
+        # but never wider than the view it shares the dialog with.
+        self._designed_width = 1200
+        self.resize(self._designed_width, 620)
 
         layout = QVBoxLayout(self)
         if help_text:
@@ -4526,6 +4651,10 @@ class _LineEditorDialog(QDialog):
             s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
         if self._table is not None:
             self._table.apply_usage_filter(self._enabled_usage())
+            if self._mode == "table":
+                # Columns that were just shown belong on the dialog, not past its
+                # right edge — so the width follows the filter (wider only).
+                self._fit_table_width()
         if self._list_view is not None:
             self._list_view.apply_usage_filter(self._enabled_usage())
 
@@ -4612,12 +4741,31 @@ class _LineEditorDialog(QDialog):
         if mode == "table":
             self._build_table()
             self._stack.setCurrentIndex(0)
+            self._fit_table_width()
         else:
             self._ensure_list()
             self._stack.setCurrentIndex(1)
+            if self.isVisible():
+                _grow_dialog_to(self, self._designed_width)
         self._mode = mode
         self._seg[mode].setChecked(True)
         _set_last_line_view(self._view_state, mode)
+
+    def _fit_table_width(self):
+        """Take the dialog to the width the table view's fitted columns need.
+
+        Bounded above by the width the list view was laid out for: the two views
+        share one dialog, and a table that wanted more than that would be sizing the
+        other view's form off the screen. Bounded below by nothing but the dialog's
+        own controls — a table of a dozen number columns is a narrow dialog, and it
+        should open as one.
+
+        Only ever wider once the dialog is on screen: a switch back to the table is
+        not a reason to take back width the user gave it."""
+        if self._table is None:
+            return
+        _fit_dialog_to_columns(self, self._table, cap=self._designed_width,
+                               grow_only=self.isVisible())
 
     def set_view_mode(self, mode):
         """Programmatic view switch (used by the round-trip guard)."""

@@ -183,7 +183,7 @@ assumes unless it says otherwise.
 
 Both engines apply the same envelope. What differs is where they apply it.
 
-The limit equilibrium engine evaluates the envelope at **one point** — where the
+The **limit equilibrium** engine evaluates the envelope at **one point** — where the
 trial surface crosses the line — and applies that force to the sliding mass,
 tangent to the surface for a flexible support like a geogrid, or along the
 line's own axis for a rigid member like a soil nail (the **Dir** column). The
@@ -192,7 +192,7 @@ stiffness or how far anything moved enters it. That is also why `Tres` has no
 meaning in a limit equilibrium run: a post-peak drop depends on how far the
 reinforcement has strained, and the method never computes a strain.
 
-The finite element engine ties each line into the mesh as a row of tension-only
+The **finite element** engine ties each line into the mesh as a row of tension-only
 bar elements sharing nodes with the soil. The force in an element is *EA* times the
 strain — the axial stiffness times how much it stretched per unit length —
 capped by the envelope value at that element's own position along the line. The

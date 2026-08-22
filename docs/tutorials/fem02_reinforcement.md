@@ -74,10 +74,10 @@ the face. Each develops **800 lb/ft** of tension over a pullout length
 of **4 ft** at either end.
 
 The soils' elastic properties, E = 1.0 × 10<sup>6</sup> psf and ν = 0.3, are
-already in the starter file. The geogrid's axial stiffness, *EA* = 80,000 lb/ft,
-and its residual capacity of 600 lb/ft are on the sketch because the finished
-model carries them; they are the inputs this page adds, each at the point where
-a run needs it. The geometry, the soils and the reinforcement are Example 5 from
+already in the starter file. The sketch also shows the geogrid's axial
+stiffness, *EA* = 80,000 lb/ft, and its residual capacity, 600 lb/ft. Neither is
+in the starter file; both are entered on this page when the finite element run
+calls for them. The geometry, the soils and the reinforcement are Example 5 from
 the UTEXASED user manual, and [LEM-8](lem08_reinforced_slope.md) builds all of
 it from nothing.
 

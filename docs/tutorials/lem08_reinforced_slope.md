@@ -539,7 +539,10 @@ This tutorial covered:
 **Where to go next:** [LEM-9](lem09_tieback_wall.md) is the other reinforced
 problem — a tieback wall, where the support is discrete and stiff rather than
 continuous and flexible, and the Type preset that describes it changes both **Dir**
-and **Appl**. The [tutorials index](index.md) lists the series, and the sample
+and **Appl**. [FEM-2](fem02_reinforcement.md) runs this same model through the
+finite element engine, where each line is meshed into bar elements that carry an
+axial stiffness and develop their force from the movement of the soil around
+them. The [tutorials index](index.md) lists the series, and the sample
 problems carry each page further.
 [Sample Problem 9](../lem/samples.md#9-reinforced-slope) catalogs this model
 alongside the published solution it comes from,

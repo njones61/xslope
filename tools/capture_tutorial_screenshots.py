@@ -2317,8 +2317,10 @@ def fem02_run_fem_no_reinf():
     from studio.dialogs import RunFemDialog
 
     data = _fem02_meshed(FEM02_START)
+    # The refusal is shot at the dialog's own default budget: the page raises
+    # Max iterations per trial a section later, so this screen must not show it.
     dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
-                                 "tolerance": 0.01, "max_iterations": 12000},
+                                 "tolerance": 0.01},
                        material_names=[m.get("name") for m in data["materials"]],
                        slope_data=data)
     dlg.resize(dlg.sizeHint())

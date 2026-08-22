@@ -642,4 +642,6 @@ answers. [LEM-1](lem01_simple_embankment.md) is the same kind of slope solved by
 limit equilibrium from nothing, and
 [SEEP-1](seep01_sheetpile.md#building-the-mesh) works through mesh generation and
 element order on a problem where that choice is a trade rather than a
-requirement.
+requirement. [FEM-2](fem02_reinforcement.md) takes the method to a reinforced
+slope, where the bars carry a stiffness of their own and the two engines'
+answers begin to diverge, for reasons FEM-2 measures.

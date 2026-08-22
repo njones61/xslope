@@ -78,6 +78,7 @@ nav:
       - 4. Infiltration and Flux Boundaries: tutorials/seep04_dam_infiltration.md
     - Finite Element:
       - 1. Strength Reduction Basics: tutorials/fem01_strength_reduction.md
+      - "2. Reinforcement: LEM vs FEM": tutorials/fem02_reinforcement.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

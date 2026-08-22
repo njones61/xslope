@@ -146,12 +146,13 @@ way. XSLOPE handles rupture the same way: `Tmax` is the rupture limit. With
 `Tres` left blank, a bar that reaches it holds there — the elastic-perfectly-
 plastic geogrid those codes use by default. With a `Tres` entered, a bar that
 reaches `Tmax` drops to that residual and carries no more than it from then on.
-The bond limit is where the default differs. Those codes derive
-bond from a stress-dependent interface, so the length a bar needs to develop its
-full capacity changes along the line; XSLOPE's default instead reads a
-development length declared on the input, and its optional
-[bond-slip model](../fem/reinforcement.md#bond-slip-load-transfer-optional) is
-that stress-dependent form. Keeping the two limits apart is what makes the
+The bond limit is where XSLOPE's default differs from those codes. They compute
+bond from the stress on the bar-soil interface, so the length a bar needs to
+develop its full capacity depends on how deep it is buried; XSLOPE's default
+reads that length directly from the input — the pullout lengths `Lp1` and
+`Lp2` — and its optional
+[bond-slip model](../fem/reinforcement.md#bond-slip-load-transfer-optional)
+is the stress-dependent form. Keeping the two limits apart is what makes the
 finite element results below readable.
 
 **Bond** is the first limit. A geogrid is held by friction against the soil it

@@ -222,9 +222,10 @@ exists, so build one first. Click **Run → Build Mesh…**
 ![Build Mesh, set for this reinforced run](images/fem02_studio_build_mesh.png)
 
 Set **Element type** to **Quadratic triangles (tri6)**. A finite element slope
-stability analysis needs quadratic elements — linear ones lock and report a factor of safety that is too
-high — and [FEM-1](fem01_strength_reduction.md#building-the-mesh) measures what
-that costs on a slope of this kind.
+stability analysis needs quadratic elements — linear ones lock and report a
+factor of safety that is too high; the
+[element type table](../fem/overview.md#element-type-selection-and-volumetric-locking)
+in the FEM overview puts the error at 21% for tri3 and 11% for quad4.
 
 Untick **Auto-size from geometry** and set **Target element size** to `2`. That
 is the size the [FEM sample problem](../fem/samples.md) for this model uses, and

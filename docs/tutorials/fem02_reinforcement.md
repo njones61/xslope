@@ -109,9 +109,7 @@ complete for it.
 
 Click **Run → Run LEM…**, choose **Method** = `Spencer` and **Analysis** =
 `Auto search`, and leave the slice count at 40. **Model checks** reads
-*No problems found for this run*. The three finite element entries on the
-reinforcement table — Tres, E and Area — are still blank, and that is not a
-finding here because limit equilibrium never reads them.
+*No problems found for this run*.
 Spencer is the method to compare against because it satisfies both force and
 moment equilibrium, which makes it the closest limit equilibrium statement of
 what a finite element run solves. Click **Run**.

@@ -68,9 +68,8 @@ The fill stands **24 ft** high at **1.25:1** on a foundation that runs 10 ft
 below the toe, with a **240 psf** surcharge over the 70 ft of crest behind it.
 Two Mohr-Coulomb soils at the same unit weight: the fill itself is clean sand
 with no cohesion at all, and the face is wrapped in a band of cohesive fill —
-the `shell` — 2 ft measured horizontally, which is about 1.19 ft across the
-face, the width the checks measure; its 300 psf of cohesion keeps the search off
-the face. Six geogrid layers, each **20 ft** long and 4 ft apart vertically, are
+the `shell` — 2 ft measured horizontally, which on a 1.25:1 face is 1.25 ft
+perpendicular to it; its 300 psf of cohesion keeps the search off the face. Six geogrid layers, each **20 ft** long and 4 ft apart vertically, are
 stepped 5 ft back as they climb. Each develops **800 lb/ft** of tension over a pullout length
 of **4 ft** at either end.
 
@@ -227,7 +226,8 @@ Untick **Refine thin zones** as well. Checked — and it is checked by default �
 the mesher guarantees about four element rows across every thin material zone,
 because a band too thin to resolve cannot develop a shear band and quietly
 returns a factor of safety that is too high. The thin zone here is the `shell`,
-the cohesive band down the face, 1.19 ft across. Refining it is not free on this
+the cohesive band down the face, 1.25 ft across (the check reports about
+1.2 ft, measured off the mesh). Refining it is not free on this
 model: the mesh grows from 2,101 elements to 5,096, the run takes 533 seconds
 instead of 103, and the answer of the second run below moves from 1.512 to
 1.402 — 0.110 of factor of safety. The first run's answer moves 0.031 under the

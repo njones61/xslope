@@ -77,6 +77,20 @@ lengths because they are not alike: the buried end sits under 4 to 16 ft of fill
 and grips within about two feet, while the face end has almost no soil above it
 and needs about four.
 
+The 2 ft is this page's own. LEM-8 and the UTEXASED example behind it develop
+the full tension over 4 ft at both ends, and the two sample problems that lock
+this slope's answers keep that. Shortening the buried ramp does not move the
+limit equilibrium answer — Spencer returns 1.587 either way, on the same circle,
+because every crossing lands more than 8 ft from the nearer tip — and it changes
+what the finite element run has to say about the tips themselves. Over a 4 ft
+buried ramp the outermost element of each line is allowed only 200 lb/ft, and in
+the peak-residual run five of the six lines end up slipping there rather than
+where the failure surface crosses them — that run is
+[FEM sample problem 1](../fem/samples.md).
+Over 2 ft the same element is allowed 400 lb/ft, no tip reaches it, and what the
+run reports instead is the loss of tensile capacity in the middle of the lines,
+which is what this page compares against the limit equilibrium answer.
+
 The soils' elastic properties, E = 1.0 × 10<sup>6</sup> psf and ν = 0.3, are
 already in the starter file. The sketch also shows the geogrid's axial
 stiffness, *EA* = 80,000 lb/ft, and its residual capacity, 600 lb/ft. Neither is

@@ -33,8 +33,7 @@ Six reinforcement lines are defined with the following properties:
 |----------|-------|
 | $T_{max}$ | 800 lb/ft |
 | $T_{res}$ | 600 lb/ft |
-| $L_{p1}$ (face end) | 4 ft |
-| $L_{p2}$ (buried end) | 2 ft |
+| $L_{p1}$, $L_{p2}$ | 4 ft |
 | $E$ | 800,000 psf |
 | $Area$ | 0.1 ft$^2$/ft |
 | $EA$ | 80,000 lb/ft |
@@ -49,7 +48,7 @@ FEM mesh with boundary conditions and reinforcement elements (red lines):
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.48**. The companion LEM analysis
+SSRM results. The computed factor of safety is **FS = 1.51**. The companion LEM analysis
 gives **FS = 1.59** by Spencer's method (see [LEM sample problem 9](../lem/samples.md)),
 and the FEM reads below it. This is a *peak-residual* run: $T_{res}$ = 600 lb/ft is filled
 in, so a reinforcement element that reaches its full tensile capacity sheds to that
@@ -57,8 +56,8 @@ residual, while the LEM has no strain compatibility and simply applies the full 
 value at each crossing (it ignores $T_{res}$ entirely — see
 [LEM Reinforcement](../lem/reinforcement.md)).
 
-Blank out $T_{res}$ and the same model runs elastic-perfectly-plastic at **FS = 1.547**, so
-post-peak behavior accounts for 0.069 of the 0.109 that separates the two engines here. The
+Blank out $T_{res}$ and the same model runs elastic-perfectly-plastic at **FS = 1.559**, so
+post-peak behavior accounts for 0.050 of the 0.077 that separates the two engines here. The
 rest is the difference between prescribing the reinforcement force at one crossing point and
 letting it emerge from displacement compatibility along the whole line.
 
@@ -66,8 +65,7 @@ The plots below show the solution at the computed factor of safety. The
 top plot shows the deformed mesh with original and deformed reinforcement positions. The
 middle plot shows the viscoplastic shear strain concentration with reinforcement elements
 colored by axial force (blue = low, red = high): the middle of each line carries $T_{max}$
-and the end segments carry the reduced force their embedment can develop, over a longer run
-at the face end than at the buried one. The bottom plot
+and the end segments carry the reduced force their embedment can develop. The bottom plot
 shows the displacement vectors. The reinforcement summary table is shown below.
 
 ![reinforce_fem_results.png](images/reinforce_fem_results.png){width=1000}
@@ -78,19 +76,19 @@ and how many have dropped to the residual capacity — together with the line's 
 vocabulary [The state of a line](reinforcement.md#the-state-of-a-line) sets out and the
 Studio panel and the report use.
 
-<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.478, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=16000 -->
+<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.509, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=16000 -->
 
-At the last trial that reaches equilibrium, $F$ = 1.475, the reinforcement is heavily
-mobilized and two lines have already lost something. Lines 4 and 5 each carry one interior
-element that reached $T_{max}$ = 800 lb/ft and shed to $T_{res}$ = 600 lb/ft, which is what
-makes those two read **softened**; the other four read **near capacity**, between 88% and 96%
-of what is available to them, with nothing at its limit anywhere. The greatest force on any
-line is 767 lb/ft. No line is in **pullout**: with 2 ft of development at the buried end its
-outermost element is allowed 400 lb/ft rather than 200, and none of the tips reaches that.
+At the last trial that reaches equilibrium, $F$ = 1.506, the reinforcement is heavily
+mobilized but has not yet lost anything. The five upper lines each have one element inside a
+pullout ramp ($L_p$ = 4 ft from each end) sitting at the 200 lb/ft its embedment can develop
+and slipping there, which is what makes those five lines read **pullout**. The greatest force
+anywhere is 795 lb/ft, just short of $T_{max}$, and nothing has softened. Only line 1, at the
+toe, is clear of capacity altogether.
 
-One trial higher, at $F$ = 1.481, the slope never finds equilibrium again: the elements that
-shed hand their load to their neighbors, more of them yield, and the run ends in
-non-convergence. That is the mechanism the factor of safety brackets — not the pullout
+One trial higher, at $F$ = 1.513, the slope never finds equilibrium again: elements reach
+$T_{max}$ = 800 lb/ft and shed to $T_{res}$ = 600 lb/ft, hand their load to their neighbors,
+more of them yield, and the run ends in non-convergence. That is the mechanism the factor of
+safety brackets — not the pullout
 zones, which go on carrying what they were carrying, but the loss of tensile capacity in the
 middle of the lines where the failure surface crosses them.
 

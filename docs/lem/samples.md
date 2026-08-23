@@ -449,7 +449,7 @@ at Austin.
 
 ![reinforce.png](sample_images/reinforce.png){width=900}
 
-A 240 psf surcharge is applied along the slope crest from x = 30 to x = 100. For each line of reinforcement, the full tensile force develops over a length of 4 ft at the face end and 2 ft at the buried end, where 4 to 16 ft of fill presses on the geogrid. The toe of the slope corresponds
+A 240 psf surcharge is applied along the slope crest from x = 30 to x = 100. For each line of reinforcement, the full tensile force develops over a length of 4 ft. The toe of the slope corresponds
 to (0, 0) and the top of the slope corresponds to (30, 24). The six reinforcement lines are horizontal at elevations y = 0, 4, 8, 12, 16, and 20 ft (the lowest at the toe elevation); each starts on the slope face and is 20 ft long. 
 
 The following Excel input file illustrates the problem. The soil reinforcement is entered in the "reinforce" sheet.
@@ -469,20 +469,17 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.487 | 1.594 | 1.524 | 1.381 | 1.598 | 1.587 | 1.587 |
+| 1.480 | 1.593 | 1.524 | 1.377 | 1.597 | 1.587 | 1.587 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.487, fs_bishop=1.594, fs_janbu=1.524, fs_corps=1.381, fs_lowe=1.598, fs_spencer=1.587, fs_mprice=1.587 -->
+<!-- test: file=files/xslope_reinforce.xlsx, type=circular_search, num_slices=40, fs_oms=1.480, fs_bishop=1.593, fs_janbu=1.524, fs_corps=1.377, fs_lowe=1.597, fs_spencer=1.587, fs_mprice=1.587 -->
 
 !!! note
     This problem is UTEXASED's Example 5 (Wright), whose reported solution is FS = 1.646 (Spencer) on a critical
-    circle centered at (3.2, 42.0) with R = 43.4. UTEXASED's example develops the full tension over 4 ft at both
-    ends of every line; set $L_{p2}$ to that instead of the 2 ft this model carries and XSLOPE's Spencer solution
-    **on that same circle is FS = 1.646** — the two programs' reinforcement mechanics agree (with either the
-    Tangent or Axial direction setting; the geogrid crossings on this deep circle occur where the slip surface is
-    nearly parallel to the horizontal reinforcement, so the two directions differ by less than 0.1% here). On that
-    circle the 2 ft buried development length gives 1.681 instead, because two of its five crossings land within
-    2 ft of a buried tip and the shorter ramp hands them more tension. The lower value in the table above arises
+    circle centered at (3.2, 42.0) with R = 43.4. XSLOPE's Spencer solution **on that same circle is FS = 1.646**
+    — the two programs' reinforcement mechanics agree (with either the Tangent or Axial direction setting; the
+    geogrid crossings on this deep circle occur where the slip surface is nearly parallel to the horizontal
+    reinforcement, so the two directions differ by less than 0.1% here). The lower value in the table above arises
     because XSLOPE's automated search finds a **shallower critical surface** (center near (−5, 47), FS = 1.587)
     in a region UTEXASED's tangent-line grid search modes did not explore. UTEXASED's own example documentation
     notes that this model's thin cohesive face layer was added specifically to discourage shallow face surfaces —

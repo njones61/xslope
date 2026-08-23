@@ -17,7 +17,9 @@ from either:
       -> docs/tutorials/files/xslope_reinforced_slope.xlsx
 
 so the model a reader opens can never drift from the one the two sample pages
-measure.  Nothing here hand-edits an xlsx.
+measure.  Nothing here hand-edits an xlsx.  The one input the tutorial sets for
+itself is ``TUTORIAL_LP2``, the pullout length at the buried end; everything else
+comes from the two base models.
 
 The starter is the LEM-8 model plus the elastic constants
 --------------------------------------------------------
@@ -78,9 +80,22 @@ FEM_REINFORCE_KEYS = ("t_res", "E", "area")
 
 #: The geometry and capacity terms that must agree between the two base models
 #: before either can be called "the same slope".  Checked, not assumed.
-SHARED_REINFORCE_KEYS = ("x1", "y1", "x2", "y2", "t_max", "lp1", "lp2",
+#: ``lp2`` is not among them: the tutorial sets its own, below.
+SHARED_REINFORCE_KEYS = ("x1", "y1", "x2", "y2", "t_max", "lp1",
                          "adhesion", "delta",
                          "tend1", "tend2", "spacing")
+
+#: The pullout length at the buried end, on both tutorial files.
+#:
+#: The two base workbooks transcribe a published example that develops the full
+#: tension over 4 ft at each end of every line, and they keep that.  The
+#: tutorial shortens the buried end, which is the end that carries 4 to 16 ft of
+#: fill and grips within about two feet: it leaves Spencer's answer where it is
+#: (the critical circle crosses every line more than 8 ft from either tip) and
+#: changes what the finite element run reports about the tips themselves, which
+#: is what FEM-2 is about.  Applied here rather than in either base model, so
+#: the sample pages and the tutorial can differ in this one input on purpose.
+TUTORIAL_LP2 = 2.0
 
 
 def _same(a, b, tol=1e-9):
@@ -129,6 +144,7 @@ def _model():
     for m, fm in zip(lem["materials"], fem["materials"]):
         m["E"], m["nu"] = fm["E"], fm["nu"]
     for r in lem["reinforcement_lines"]:
+        r["lp2"] = TUTORIAL_LP2
         r["t_res"] = float("nan")
         r["E"] = float("nan")
         r["area"] = float("nan")

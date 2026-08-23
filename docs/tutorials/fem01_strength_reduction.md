@@ -432,8 +432,8 @@ default is a sensible place to leave it: the last halving is worth 0.002.
 **Max iterations per trial** is the viscoplastic iteration budget for each trial
 *F*, and it opens at **12,000**. It is a budget rather than a ceiling. A trial
 that spends it and is still making progress — its out-of-balance force still
-trending down, or its displacement field standing still while the classifier
-cannot rule on it — is given another budget's worth, and another, up to the
+trending down, or its displacement field standing still — is given another
+budget's worth, and another, up to the
 **Iteration ceiling** on the same dialog, which opens at 50,000. Only a trial
 whose displacements are growing stops at its budget and is recorded as failed.
 
@@ -442,18 +442,18 @@ That is what the last two rows of the walk above are showing. The trial at
 still working — and the one at 1.3672 was extended twice, to 36,000, before the
 search accepted that it was running away.
 
-Because of that, this box no longer decides the answer. Run the same model with
-it set to 3,000 and the search returns **the same 1.3633** from the same
-bracket: the trial at 1.3594 is extended three times instead of running inside
-one budget, and it converges at the same 11,904 iterations either way. What the
-budget sets is where the extension starts and how coarsely the work is granted,
-not whether a slow trial is allowed to finish.
+Because the budget extends itself, it does not decide the answer. Run the same
+model with it set to 3,000 and the search returns **the same 1.3633** from the
+same bracket: the trial at 1.3594 is extended three times instead of running
+inside one budget, and it converges at the same 11,904 iterations either way.
+The budget sets how coarsely the work is granted, not whether a slow trial is
+allowed to finish.
 
 The one verdict the ceiling can leave open is **inconclusive**: a trial that
 reaches 50,000 with its out-of-balance still falling has neither settled nor run
-away. The search does not count it as a failure. It reports the highest *F* that
-did reach equilibrium, carries the inconclusive trial as the bracket's upper
-edge, and says so in the log along with the advice to raise the ceiling if that
+away. The search does not count it as a failure: the inconclusive trial becomes the
+bracket's undecided upper edge, the factor of safety is the bracket's midpoint
+as usual, and the log says so, with the advice to raise the ceiling if that
 trial has to be decided. No trial on this model reaches it.
 
 ---

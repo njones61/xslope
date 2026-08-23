@@ -414,8 +414,10 @@ def sweep_griffiths1():
     dmax = []
     for f in SWEEP1_F:
         with contextlib.redirect_stdout(io.StringIO()):
+            # early_failure off: the sweep plots the displacement each trial
+            # REACHES, so a failing trial has to run its budget to reach it.
             sol = solve_fem(fem_data, F=f, max_iterations=int(tag['max_iter']),
-                            debug_level=0, fast_kernel=False)
+                            debug_level=0, fast_kernel=False, early_failure=False)
         disp = np.asarray(sol['displacements']).reshape(-1, 2)
         d = float(np.max(np.hypot(disp[:, 0], disp[:, 1])))
         dmax.append(d)

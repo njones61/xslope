@@ -1814,7 +1814,11 @@ still improving is reported `inconclusive` and is NOT counted as a failure: `sol
 on below it and reports `result['FS']` as the midpoint of `final_interval`, exactly as on any
 other run. The difference is that the bracket's upper edge is an undecided trial rather than a
 measured failure, which `result['inconclusive']` lists and `result['note']` states in a sentence.
-Raise the ceiling or loosen `tolerance` if you see one.
+Raise the ceiling or loosen `tolerance` if you see one. At the other end, a trial whose movement is
+clearly running away — past 8 times its own elastic displacement and still growing, or a flat
+residual over 2000 iterations while the field gains a whole elastic displacement — is declared
+failed at that point rather than spending the rest of its budget (`exit_reason = 'diverging'`;
+`early_failure=False` turns it off).
 
 **FEM-only models still need one starting circle.** `load_slope_data()` requires a failure
 surface definition unless the file has seepage BCs or a pre-built mesh; a pure FEM input with

@@ -298,8 +298,10 @@ def fig_ssrm_sweep():
         F_values = np.round(np.arange(1.00, 1.81, 0.05), 3)
         disp, stable = [], []
         for F in F_values:
+            # early_failure off: this curve is the displacement each trial
+            # REACHES, so a failing trial has to run its budget to reach it.
             sol = solve_fem(fem_data, F=float(F), max_iterations=4000,
-                            max_disp_factor=None)
+                            max_disp_factor=None, early_failure=False)
             u = sol["displacements"] - sol["displacements_elastic"]
             disp.append(float(np.max(np.abs(u))))
             stable.append(bool(sol["stable"]))

@@ -697,8 +697,17 @@ refinement** while a fixed window does not, so on that model a 1500-iteration wi
 required work at 2.5 ft element size and 9% at 1 ft. Stopping on the plateau reported those trials
 as failed and the bisection closed on the false failure, biasing the factor of safety low by 18% on
 the finest mesh. The price of letting them run is paid by trials that genuinely fail: they spend
-the whole budget, which is why `max_iterations` should be set to what the model needs rather than
-left to absorb hopeless trials.
+the whole budget unless the rule below closes them sooner, which is why `max_iterations` should be
+set to what the model needs rather than left to absorb hopeless trials.
+
+**A trial whose movement is clearly running away is declared failed early** — max|u| past 8 times
+that trial's own elastic displacement and still growing, or the out-of-balance flat over the last
+2000 iterations while the field gains a whole elastic displacement — and stops there with
+`exit_reason = 'diverging'` instead of spending the rest of its budget (`early_failure=False` turns
+it off; the at-failure capture solve always runs to its own budget). Both thresholds are measured in
+the trial's own elastic response, and both sit far outside the range occupied by trials that go on
+to reach equilibrium — which near the critical factor grow past five times elastic with a flat
+residual — so the rule catches only gross runaways and no verdict moves.
 
 The **displacement limit** (`max_disp_factor`) is disabled on the default criterion, and
 deliberately so: its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a

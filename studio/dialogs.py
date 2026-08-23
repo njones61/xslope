@@ -573,7 +573,9 @@ class RunFemDialog(QDialog):
             "It is a budget, not a hard stop: a trial that reaches it with the "
             "out-of-balance force still falling is given another budget's worth, "
             "again and again, up to the iteration ceiling below. A residual that "
-            "stops improving is reported but never ends a trial on its own. "
+            "stops improving is reported but never ends a trial on its own; a "
+            "trial whose movement is clearly running away is declared failed "
+            "early and does not spend the rest of its budget. "
             "Raise it if the reported FS keeps climbing when you do; it has "
             "plateaued when raising it further changes nothing.")
         form.addRow("Max iterations per trial", self.max_iterations)

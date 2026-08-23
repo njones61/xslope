@@ -257,7 +257,7 @@ same: at 2.5, 2.0, 1.5 and 1.0 ft with no thin-zone refinement at all, the run
 with a residual reads 1.512 / 1.512 / 1.481 / 1.434, a 5% spread that falls as
 the elements get smaller rather than settling on a value.
 
-The reason is what refinement does to the ends of the bars. The six lines are
+Refinement changes the answer through the ends of the bars. The six lines are
 divided into 156 bar elements instead of 60, and the extra ones land at the face,
 where the refinement is. The outermost element of the bottom line ends up a third
 of a foot long instead of two feet, and the capacity envelope allows it 33 lb/ft

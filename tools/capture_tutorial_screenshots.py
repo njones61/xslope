@@ -2237,14 +2237,14 @@ def fem02_reinforce_blank():
     """The reinforcement table as the STARTER delivers it: six lines with their
     geometry, tensile capacity and pullout lengths, and Tres, E and Area empty.
 
-    Both usage toggles are ticked, so the limit-equilibrium columns the file
-    already carries sit beside the three the reader is about to fill.
+    Only the FEM toggle is ticked: the LEM inputs are complete, so the table
+    shows just the geometry and the three columns the reader is about to fill.
     """
     from studio.editors import ReinforcementEditor
 
     dlg = ReinforcementEditor().build(_load(FEM02_START), None)
     for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
-        cb.setChecked(True)
+        cb.setChecked(tag == "fem")
     return _grab(_line_table(dlg, through="area"),
                  "fem02_studio_reinforce_blank.png")
 
@@ -2256,7 +2256,7 @@ def fem02_reinforce_filled():
 
     dlg = ReinforcementEditor().build(_load(FEM02_DONE), None)
     for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
-        cb.setChecked(True)
+        cb.setChecked(tag == "fem")
     return _grab(_line_table(dlg, through="area"),
                  "fem02_studio_reinforce_filled.png")
 

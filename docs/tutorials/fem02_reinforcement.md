@@ -313,9 +313,10 @@ is measured further down, because on a reinforced model the answer is different
 from the one FEM-1 reports. Click **OK**.
 
 The reinforcement's two columns are next. Open **Reinforcement** in the Inputs
-dock, and set the **Show parameters for:** toggles so both **LEM** and **FEM**
-are ticked — the three columns at the right end, in blue, are the ones only the
-finite element engine reads.
+dock, and set the **Show parameters for:** toggles to **FEM** alone, as on the
+materials table — the limit equilibrium inputs are complete and can stay out of
+view. The three columns at the right end, in blue, are the ones only the finite
+element engine reads.
 
 ![The reinforcement table on the starter: Tres, E and Area empty](images/fem02_studio_reinforce_blank.png)
 

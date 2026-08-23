@@ -242,31 +242,24 @@ and, as the next two paragraphs show, is not a neutral choice on a reinforced
 model.
 
 Untick **Refine thin zones** as well. Checked — and it is checked by default —
-the mesher guarantees about four element rows across every thin material zone,
-because a band too thin to resolve cannot develop a shear band and quietly
-returns a factor of safety that is too high. The thin zone here is the `shell`,
-the cohesive band down the face, 1.25 ft across (the check reports 1.19 ft,
-measured off the mesh); refining it drives the local element size there to
-0.33 ft and takes the mesh from 2,101 elements to 5,096. Refining would make
-the second run five times slower, and it would lower both answers by about
-0.05 — the run with a residual from **1.512 to 1.441**. Shrinking the whole
-mesh does the same thing more gradually: from 2.5 ft to 1 ft elements the
-residual run drifts from 1.51 down to 1.43 without settling on a value at
-these sizes.
-
-Here is why. Near a bar's end its capacity ramps up from zero over the 4 ft
-pullout length, and each bar element is given the capacity at its own midpoint.
-On this page's mesh the end element of each bar is 2 ft long, so its midpoint
-sits 1 ft in and it is allowed 200 lb/ft. The refined mesh cuts the same ends
-into elements a third of a foot long; the outermost one sits 2 inches in and is
-allowed only 33 lb/ft — so little that it reaches its limit and slips, and the
-refined mesh reports the bottom layer in **pullout** where this mesh reports it
-below capacity. A finer mesh resolves slip at the tips that a coarse one
-cannot, which is why the answer moves with the mesh, and in the usual way:
-refine until the answer stops moving, and treat that as the model's answer.
-This page stays on the published sample's mesh so that each run takes minutes
-rather than tens of them, and its numbers carry that few-percent mesh
-sensitivity. Leave the rest of the dialog alone and click **Build**.
+the mesher guarantees about four element rows across every thin material zone;
+the thin zone here is the `shell`, the cohesive band down the face. On this
+model the box is left off, for a reason particular to this slope. The fill is a
+37° sand on a 1.25:1 face — a face slightly steeper than its friction angle —
+and only the cohesive band holds the face up. Resolve that band finely enough,
+by ticking the box or by shrinking the whole mesh, and the model begins to find
+a second, real mechanism: shallow sloughing of the sand face, the same one a
+tiny starting circle on the face would find in the limit equilibrium search.
+The reported factor of safety then drifts down toward the sloughing answer
+(from 1.51 at this page's mesh to 1.43 at 1 ft elements, on the run with a
+residual) — a different failure, not a better estimate of this one. This page
+is about the general mechanism through the reinforced block, the one Spencer's
+circle finds, so it stays on the published sample's mesh, where that mechanism
+governs. To study a fine mesh and still hold the search on the general
+mechanism, the Run FEM dialog has the tools: **Ignore surficial (skin)
+failures** with a **Min slip depth**, or an **SSR exclusion** over the face
+band, which holds that zone at full strength while the rest of the model is
+reduced. Leave the rest of the dialog alone and click **Build**.
 
 The mesh comes out at **4,364 nodes and 2,101 triangles**, with the six lines
 discretized into **60 bar elements**, ten per line:

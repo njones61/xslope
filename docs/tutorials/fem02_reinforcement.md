@@ -235,7 +235,7 @@ in the FEM overview shows how much.
 
 Untick **Auto-size from geometry** and set **Target element size** to `2`. That
 is the size the [FEM sample problem](../fem/samples.md) for this model uses, and
-it puts ten elements on each 20 ft geogrid, which is enough to draw the force
+it puts 10 elements on each 20 ft geogrid, which is enough to draw the force
 profile along a bar. Auto-sizing would divide the 130 ft section width by 100
 divisions for a 1.3 ft element instead, which is finer than this mechanism needs
 and, as the next two paragraphs show, is not a neutral choice on a reinforced

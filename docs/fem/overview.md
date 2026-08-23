@@ -662,21 +662,40 @@ Four dependencies are worth knowing, because the tolerance is absolute:
 >  converged. Leave `dt_scale` at 1.0, and never lower it to force a reluctant model to "converge".
 
 **Defaults and budgets.** $\text{tol} = 10^{-3}$ (displacement) and
-$\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value), with a ceiling of
-3000 iterations — 1500–4000 iterations is normal just below failure, consistent with Griffiths &
-Lane's reported 792 iterations just below their Example 1 failure point. A genuinely stable trial
-that exhausts the ceiling is called failed, which biases the factor of safety **low**, the
-conservative direction; under the default hybrid criterion such a trial is checked against its
-displacement field before the verdict is taken.
+$\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value), with a budget of
+`max_iterations` = 12000 iterations per trial. 1500–4000 iterations is normal well below failure —
+consistent with Griffiths & Lane's reported 792 just below their Example 1 failure point — but the
+count climbs steeply as a trial approaches the critical factor and as the mesh is refined: the same
+reinforced slope reaches equilibrium at $F = 1.25$ in 5,054 iterations at 2.5 ft element size and
+16,242 at 1 ft.
 
-A **no-progress early exit** stops a solve that goes 1500 iterations without improving on the lowest
-out-of-balance value it has seen by more than 1%, and reports it as failed exactly as an exhausted
-ceiling would. This is a **budget** decision, not an independent test of the slope: because the
-residual can stall long before the outcome is decided, the exit can truncate a solve that would
-still have converged, biasing the factor of safety low. That is the trade for the iterations it
-saves. Turn it off with `early_exit=False` on `solve_fem()` when a marginal trial matters more than
-runtime; inside the bisection the hybrid criterion handles the same problem by suppressing the exit
-where it would fire on a stable-looking state.
+**Running out of budget is not a verdict.** A trial that reaches `max_iterations` with its
+out-of-balance still **trending down** — the mean over the last 500 iterations at least 1% below the
+mean over the 500 before it — is given another `max_iterations` worth, and again, for as long as the
+trend holds, up to `max_iterations_ceiling` (default 50000). So the budget sets where the extension
+starts, not where the trial dies, and the answer stops depending on it: the FEM-1 embankment returns
+FS = 1.3633 from a 3000-iteration budget and from a 12000-iteration one. A trial whose residual is
+**not** falling at the budget stops there and is failed exactly as before.
+
+**Inconclusive trials.** A trial that reaches `max_iterations_ceiling` while still improving is
+neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. The bisection does
+not count it as a failure — that is what biases a factor of safety low. It stops there, reports the
+last $F$ that actually reached equilibrium, widens `final_interval` to the inconclusive trial, and
+returns a `note` naming it. Raise the ceiling or loosen the bisection tolerance to resolve it.
+
+A **no-progress plateau** — 1500 iterations without improving on the lowest out-of-balance value
+seen by more than 1% — is recorded (`plateau_iteration`, `plateau_ratio`) and **does not stop the
+solve**: a trial runs to convergence, to its iteration ceiling, or to the displacement cap, and
+nothing else ends it. A plateau is an observation about the residual, not a verdict on the slope.
+It cannot be one, for two measured reasons: the residual is **not monotone** — a reinforced slope
+whose out-of-balance sits at twice `force_tol` around iteration 9,500 climbs back an order of
+magnitude and then converges at 16,242 — and the iterations a trial needs **grow with mesh
+refinement** while a fixed window does not, so on that model a 1500-iteration window was 30% of the
+required work at 2.5 ft element size and 9% at 1 ft. Stopping on the plateau reported those trials
+as failed and the bisection closed on the false failure, biasing the factor of safety low by 18% on
+the finest mesh. The price of letting them run is paid by trials that genuinely fail: they spend
+the whole budget, which is why `max_iterations` should be set to what the model needs rather than
+left to absorb hopeless trials.
 
 The **displacement limit** (`max_disp_factor`) is disabled on the default criterion, and
 deliberately so: its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a
@@ -775,15 +794,18 @@ Its principal arguments:
 
 >- **`F`** (default 1.0): strength reduction factor, applied as $c_r = c/F$ and
 >  $\tan\phi_r = \tan\phi/F$.<br>
->- **`max_iterations`** (default 3000) and **`tolerance`** (default $10^{-3}$): the iteration budget
+>- **`max_iterations`** (default 12000) and **`tolerance`** (default $10^{-3}$): the iteration budget
 >  and the CHECON displacement tolerance.<br>
+>- **`max_iterations_ceiling`** (default 50000): hard stop on the automatic extension of that
+>  budget. Reaching it while still improving gives `exit_reason = 'inconclusive'`.<br>
 >- **`force_tol`** (default $10^{-3}$): the per-node force-equilibrium tolerance; with `oob_window`
 >  (default 10) the averaging width that cancels the yield-surface limit cycle.<br>
 >- **`failure_criterion`** (default `"hybrid"`): how a non-converged trial is judged — see
 >  [SSRM failure criteria](#ssrm-failure-criteria).<br>
 >- **`max_disp_factor`** (default 0.1, `None` to disable): displacement backstop as a fraction of
 >  mesh height. The SSRM's default path disables it.<br>
->- **`early_exit`** (default `True`): the no-progress budget exit described above.<br>
+>- **`early_exit`** (default `True`): watch the residual for the no-progress plateau described
+>  above and report it. The plateau does not end the solve.<br>
 >- **`k0`**, **`staged`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
 >  **`suction_phi_b`** / **`suction_cap`**: the options described in their own
 >  sections; all default to off or to what the input file declares.<br>
@@ -873,10 +895,9 @@ where the evidence is unambiguous, and every trial's verdict, $u_{ratio}$ and gr
 
 **The history must be a full-budget history.** Both signals are calibrated on solves that ran to
 their iteration ceiling. A slow runaway takes far longer to become visible in the displacement field
-than the no-progress early exit takes to fire, so a truncated history can look frozen while the
-slope is accelerating. Under the hybrid criterion the early exit is therefore **suppressed** whenever
-it trips on a state that currently looks stuck; every other case exits as before, keeping the time
-saving where the FAILED verdict is already corroborated.
+than a residual plateau takes to appear, so a truncated history can look frozen while the slope is
+accelerating. Every trial now spends its whole budget — a plateau is reported, never acted on — so
+the classifier always reads a full-budget history.
 
 **Calibration.** The thresholds are $u_{ratio} \le 1.25$ for "at elastic scale", $u_{ratio} \ge 1.5$
 for "beyond it", and a growth of 0.02 elastic displacements over the trailing window for "still
@@ -958,7 +979,8 @@ Its principal arguments:
 >  the reported FS is independent of the bracket, at the same $\log_2$ cost. Used by the
 >  [reliability analysis](../reliability/fem.md) for reproducible results.<br>
 >- **`failure_criterion`** (`"hybrid"`), **`convergence_tol`** ($10^{-3}$), **`force_tol`**
->  ($10^{-3}$), **`max_iterations`** (3000): passed to each trial.<br>
+>  ($10^{-3}$), **`max_iterations`** (12000), **`max_iterations_ceiling`** (50000): passed to each
+>  trial.<br>
 >- **`max_disp_factor`** (0.1): the displacement-limit fraction. It is what the
 >  `"displacement_limit"` criterion bisects on; the equilibrium-based criteria disable it in their
 >  trials.<br>

@@ -95,11 +95,11 @@ def check_classifier():
     check("too little history -> AMBIGUOUS, no growth reported",
           v == 'AMBIGUOUS' and g is None)
 
-    # The early exit is NOT itself a verdict: a no-progress exit on a frozen state
-    # is still STABLE_STUCK (this is the premise correction the hybrid exists for).
+    # A residual plateau is NOT itself a verdict: on a frozen state the classifier
+    # still reads STABLE_STUCK. ('no_progress' is the legacy exit_reason string,
+    # still accepted; solve_fem no longer ends a solve on a plateau.)
     v, _, _ = classify_nonconvergence([1.04] * 40, 1.0, 'no_progress')
-    check("no-progress early exit on a frozen state -> STABLE_STUCK",
-          v == 'STABLE_STUCK')
+    check("a plateau on a frozen state -> STABLE_STUCK", v == 'STABLE_STUCK')
 
     # Thresholds are where the calibration says they are.
     check("calibration constants unchanged",
@@ -124,6 +124,12 @@ def _stub_solution(F, kind):
         return {"converged": False, "stable": False, "verdict": "AMBIGUOUS",
                 "u_ratio": 6.0, "u_growth": 0.0, "exit_reason": "no_progress",
                 "iterations": 1600}
+    if kind == 'inconclusive':
+        # Reached the iteration ceiling with the residual still coming down:
+        # neither settled nor failed.
+        return {"converged": False, "stable": False, "verdict": "AMBIGUOUS",
+                "u_ratio": 1.4, "u_growth": 0.0, "exit_reason": "inconclusive",
+                "iterations": 50000}
     return {"converged": False, "stable": False, "verdict": "FAILED",
             "u_ratio": 12.0, "u_growth": 3.0, "exit_reason": "iteration_cap",
             "iterations": 1600}
@@ -210,6 +216,24 @@ def check_wiring():
                    'growth', 'exit_reason', 'iterations'} <= set(t) for t in trials),
               f"{len(trials or [])} trials")
 
+    # An INCONCLUSIVE trial — the iteration ceiling reached with the residual still
+    # falling — is not a failure. The bisection stops on it, reports the last F that
+    # reached equilibrium, widens the bracket to the inconclusive trial, and says so.
+    def kinds_inc(F):
+        return 'converged' if F < 1.4 else ('inconclusive' if F < 1.8 else 'failed')
+
+    res_inc, _ = _bisect(kinds_inc, hybrid=False)
+    check("an inconclusive trial does not decide the bracket",
+          res_inc['FS'] == res_inc['final_interval'][0]
+          and res_inc['final_interval'][1] >= 1.4,
+          f"FS={res_inc['FS']:.3f} interval={res_inc['final_interval']}")
+    check("the run reports the inconclusive trial in words",
+          bool(res_inc.get('note')) and 'inconclusive' in res_inc['note'].lower()
+          and len(res_inc.get('inconclusive') or []) >= 1,
+          f"note={res_inc.get('note')}")
+    check("the factor of safety comes from a trial that reached equilibrium",
+          res_inc['last_solution']['converged'] is True)
+
     # The criterion is threaded down to every trial, not just to the driver.
     _, stub = _bisect(kinds, hybrid=True)
     check("every trial is solved with failure_criterion='hybrid'",
@@ -221,23 +245,31 @@ def check_wiring():
 
 # ===================== 3. default invariance on a real solve =====================
 
-def check_real_solve():
-    print("\n3. real solve — metadata is recorded, default behavior is unchanged")
-
+def _real_model():
+    """The Griffiths & Lane Example 1 slope on a coarse mesh, or None if absent."""
     from xslope.fileio import load_slope_data
-    from xslope.fem import build_fem_data, solve_fem
+    from xslope.fem import build_fem_data
     from xslope.mesh import get_material_polygons, build_mesh_from_polygons
 
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     xlsx = os.path.join(here, 'docs', 'fem', 'files', 'xslope_griffiths1.xlsx')
     if not os.path.exists(xlsx):
-        check("griffiths1 input present", False, xlsx)
-        return
-
+        return None
     slope_data = load_slope_data(xlsx)
     mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
                                     target_size=8.0, element_type='tri6')
-    fem_data = build_fem_data(slope_data, mesh)
+    return build_fem_data(slope_data, mesh)
+
+
+def check_real_solve():
+    print("\n3. real solve — metadata is recorded, default behavior is unchanged")
+
+    from xslope.fem import solve_fem
+
+    fem_data = _real_model()
+    if fem_data is None:
+        check("griffiths1 input present", False)
+        return
 
     # F = 1.0 on this slope (FS ~ 1.4) settles quickly: a converged trial.
     sol = solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=4000,
@@ -270,26 +302,64 @@ def check_real_solve():
     check("hybrid does not rescue a genuinely failing trial",
           sol_h['stable'] is False and sol_h['verdict'] == 'FAILED')
 
-    # The no-progress early exit must not be able to hand the classifier a
-    # truncated history: under 'hybrid' the exit is suppressed for a state that
-    # currently looks stuck, so the verdict rests on the full budget. On the
-    # default criterion the exit is untouched.
-    check("early_exit_suppressed is reported", 'early_exit_suppressed' in sol_h)
-    sol_d = solve_fem(fem_data, F=2.5, debug_level=0, max_iterations=1200,
+    # The no-progress watch cannot hand the classifier a truncated history,
+    # because it no longer stops anything: a plateau in the out-of-balance residual
+    # is recorded and the solve runs on. A trial ends on convergence, on its
+    # iteration cap, or on the displacement cap, and on nothing else.
+    check("the no-progress watch is reported",
+          'plateau_iteration' in sol_h and 'early_exit_suppressed' in sol_h)
+    sol_d = solve_fem(fem_data, F=2.5, debug_level=0, max_iterations=2000,
                       max_disp_factor=None, early_exit=True)
-    check("default criterion never suppresses the early exit",
-          sol_d['early_exit_suppressed'] is False)
+    check("a residual plateau never ends a solve",
+          sol_d['exit_reason'] in ('converged', 'iteration_cap', 'disp_limit'),
+          f"exit_reason={sol_d['exit_reason']}")
+    check("a non-converged trial spends its whole budget",
+          sol_d['converged'] is False and sol_d['iterations'] == 2000,
+          f"iterations={sol_d['iterations']}")
+
+
+def check_budget_extension():
+    """The budget is extended while the residual is still falling, and the hard
+    ceiling produces 'inconclusive' rather than a failure."""
+    print("\n5. budget extension — reaching the budget is not a verdict either")
+    from xslope.fem import solve_fem
+
+    fem_data = _real_model()
+    if fem_data is None:
+        check("griffiths1 input present", False)
+        return
+
+    # Just below this slope's factor of safety (~1.37), where equilibrium takes
+    # thousands of iterations. A budget far below what the trial needs: the residual
+    # is still falling when it runs out, so the solve is extended rather than failed.
+    sol = solve_fem(fem_data, F=1.35, debug_level=0, max_iterations=300,
+                    max_iterations_ceiling=8000, max_disp_factor=None)
+    check("a too-small budget is extended, not failed",
+          sol['budget_extensions'] > 0 and sol['iterations'] > 300,
+          f"extensions={sol['budget_extensions']} iterations={sol['iterations']}")
+    check("and the extended trial reaches equilibrium", sol['converged'] is True,
+          f"exit_reason={sol['exit_reason']}")
+
+    # The same trial with the ceiling at the budget: nothing may be extended, and
+    # stopping while still improving is INCONCLUSIVE, not failure.
+    sol = solve_fem(fem_data, F=1.35, debug_level=0, max_iterations=300,
+                    max_iterations_ceiling=300, max_disp_factor=None)
+    check("the ceiling stops the extension", sol['budget_extensions'] == 0,
+          f"iterations={sol['iterations']}")
+    check("a solve still improving at the ceiling is inconclusive",
+          sol['exit_reason'] == 'inconclusive' and sol['converged'] is False,
+          f"exit_reason={sol['exit_reason']}")
 
 
 def check_exit_suppression():
     """The suppression rule, on a synthetic solve whose history is controlled.
 
-    RS2-62c at F = 0.800 is the measured case: the no-progress exit fires at
-    iteration 5,118 with max|u| at 1.03x elastic and no trailing growth — which the
-    classifier alone reads as STABLE_STUCK — while the same trial run to 40,000
-    iterations reaches 1.72x and is growing. The rule under test is that a
-    stuck-LOOKING state does not get its verdict taken at the exit."""
-    print("\n4. no-progress exit — a truncated history cannot produce STABLE_STUCK")
+    RS2-62c at F = 0.800 is the measured case: the residual plateaus at iteration
+    5,118 with max|u| at 1.03x elastic and no trailing growth — which the classifier
+    alone reads as STABLE_STUCK — while the same trial run to 40,000 iterations
+    reaches 1.72x and is growing. The rule under test is that a stuck-LOOKING state
+    does not get its verdict taken on a short history."""
+    print("\n4. a truncated history cannot produce STABLE_STUCK")
 
     # Truncated (what the exit would have seen) vs full budget (the truth).
     truncated = [1.03] * 40
@@ -300,8 +370,8 @@ def check_exit_suppression():
           v_trunc == 'STABLE_STUCK')
     check("the full-budget history reads FAILED", v_full == 'FAILED',
           f"u_ratio={ur:.2f} growth={g:.2f}")
-    check("so the two disagree — which is why the exit must be suppressed, "
-          "not merely reclassified", v_trunc != v_full)
+    check("so the two disagree — which is why a plateau may not stop the solve",
+          v_trunc != v_full)
 
 
 def main():
@@ -312,6 +382,7 @@ def main():
     check_wiring()
     check_real_solve()
     check_exit_suppression()
+    check_budget_extension()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))

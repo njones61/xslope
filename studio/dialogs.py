@@ -563,18 +563,37 @@ class RunFemDialog(QDialog):
         # too small a budget makes near-failure trials read as failed and biases
         # the reported FS low. Previously only the API exposed this
         # (solve_fem/solve_ssrm max_iterations); a Studio run was pinned at the
-        # 3000 default with no way to reach the converged plateau.
+        # engine default with no way to reach the converged plateau.
         self.max_iterations = QSpinBox()
         self.max_iterations.setRange(500, 100000)
         self.max_iterations.setSingleStep(500)
-        self.max_iterations.setValue(int(defaults.get("max_iterations") or 3000))
+        self.max_iterations.setValue(int(defaults.get("max_iterations") or 12000))
         self.max_iterations.setToolTip(
-            "Viscoplastic iteration ceiling for EACH trial F (and single-F runs). "
-            "A trial that cannot reach equilibrium within this budget counts as "
-            "failed, so too small a value biases the SSRM factor of safety low. "
+            "Viscoplastic iteration budget for EACH trial F (and single-F runs). "
+            "It is a budget, not a hard stop: a trial that reaches it with the "
+            "out-of-balance force still falling is given another budget's worth, "
+            "again and again, up to the iteration ceiling below. A residual that "
+            "stops improving is reported but never ends a trial on its own. "
             "Raise it if the reported FS keeps climbing when you do; it has "
             "plateaued when raising it further changes nothing.")
         form.addRow("Max iterations per trial", self.max_iterations)
+
+        # Hard stop on the automatic budget extension. A trial that reaches THIS
+        # while still improving is inconclusive - it did not fail, and it did not
+        # settle - so the bisection refuses to rule on it and says so.
+        self.max_iterations_ceiling = QSpinBox()
+        self.max_iterations_ceiling.setRange(500, 500000)
+        self.max_iterations_ceiling.setSingleStep(1000)
+        self.max_iterations_ceiling.setValue(
+            int(defaults.get("max_iterations_ceiling") or 50000))
+        self.max_iterations_ceiling.setToolTip(
+            "Hard stop on the automatic budget extension above. A trial that "
+            "reaches this ceiling with its out-of-balance force still falling is "
+            "reported INCONCLUSIVE - neither settled nor failed - and is not "
+            "counted as a failure: the factor of safety comes from the last trial "
+            "that reached equilibrium and the bracket is widened to the "
+            "inconclusive one, with a note on the run.")
+        form.addRow("Iteration ceiling", self.max_iterations_ceiling)
 
         # Side boundary condition (v21 main!D22). Applies to both a single trial and
         # the SSRM — it is part of how the model is restrained, not part of the
@@ -845,6 +864,7 @@ class RunFemDialog(QDialog):
             "F_max": self.F_max.value(),
             "tolerance": self.tolerance.value(),
             "max_iterations": self.max_iterations.value(),
+            "max_iterations_ceiling": self.max_iterations_ceiling.value(),
             "failure_criterion": self.failure_criterion.currentData(),
             "min_slip_depth": (self.min_slip_depth.value()
                                if self.min_slip_on.isChecked()

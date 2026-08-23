@@ -2982,6 +2982,90 @@ _HYBRID_GROWTH_MIN = 0.02      # elastic displacements gained over the trailing 
 # noise; under it the classifier declines to rule.
 _HYBRID_U_SCALE_FLOOR_FRAC = 1e-6
 
+# Iterations without a >1% improvement on the best out-of-balance value seen after
+# which the residual is called PLATEAUED. This is a reporting threshold only: a
+# plateau is recorded in the result and the solve keeps running (see the no-progress
+# watch inside solve_fem for why it may not decide a verdict).
+_NO_PROGRESS_WINDOW = 1500
+
+# === Budget extension =========================================================
+# Reaching `max_iterations` is not a verdict either. A trial whose out-of-balance
+# is still TRENDING DOWN when the budget runs out has not failed; it has run out of
+# budget, and the number of iterations a viscoplastic solve needs grows with mesh
+# refinement and with proximity to the critical F. So the budget is EXTENDED, one
+# chunk at a time, for as long as the residual keeps falling, up to a hard ceiling
+# (`max_iterations_ceiling`).
+#
+# The trend is read from the mean of the last window against the mean of the window
+# before it, rather than from a single iterate: the residual oscillates on the yield
+# surface (see oob_window) and creeps non-monotonically, so consecutive values say
+# nothing. Requiring the same 1% the no-progress watch uses keeps one definition of
+# "meaningful improvement" in the file.
+_OOB_TREND_WINDOW = 500        # iterations averaged in each of the two windows
+_OOB_TREND_MIN = 0.01          # the later window must be this much lower (1%)
+# A steady decay is not the only way a solve is worth more iterations. Measured on
+# the reinforced slope at F = 1.25 (tri6, 1 ft): the residual falls to 2e-3 by
+# iteration 9,000, sits there, then RISES eighty-fold through a burst of plastic
+# redistribution around iteration 14,000 before coming back down and reaching
+# equilibrium at 16,242 — while max|u| moves from 0.1101 to 0.1139 ft. The slope is
+# standing still the whole time; only the residual is thrashing. At iteration 12,000
+# that solve is mid-excursion, so a trend test alone reads RISING and stops it 4,000
+# iterations short of its answer.
+#
+# The second signal is therefore the DISPLACEMENT field, read through the same
+# classifier the failure criterion uses: a trial whose displacement is not growing
+# and whose evidence the classifier cannot rule on (AMBIGUOUS) has not shown itself
+# to be failing, and gets more budget. A trial that IS growing is failing and gets
+# none — which is also where the iterations are saved. A STABLE_STUCK trial is
+# excluded deliberately: the classifier can already rule on it, and under the hybrid
+# criterion it counts as standing, so spending the ceiling on it would buy nothing.
+
+
+def _still_progressing(oob_hist, disp_hist, u_elastic_scale, mesh_height,
+                       window=_OOB_TREND_WINDOW):
+    """Is this solve worth more iterations than its budget allowed?
+
+    Two signals, either of which counts:
+
+      * the residual is TRENDING DOWN — the mean over the last ``window`` iterations
+        is at least ``_OOB_TREND_MIN`` below the mean over the ``window`` before it.
+        This is the ordinary case: a solve part-way down its decay.
+      * the displacement field is STANDING STILL on evidence the failure classifier
+        cannot rule on — verdict AMBIGUOUS with no trailing growth. This is the
+        excursion case: the residual is off on a rise while the slope does not move.
+
+    Neither signal is present in a trial whose displacement is GROWING while its
+    residual sits flat: that is a slope failing, and it stops at its budget exactly as
+    it always has. A STABLE_STUCK trial is left alone too — the classifier can
+    already rule on it, and under the hybrid criterion it counts as standing, so
+    spending the ceiling on it would buy nothing.
+    """
+    if _oob_still_falling(oob_hist, window=window):
+        return True
+    verdict, _, growth = classify_nonconvergence(
+        disp_hist, u_elastic_scale, 'iteration_cap', model_height=mesh_height)
+    return (verdict == 'AMBIGUOUS' and growth is not None
+            and growth <= _HYBRID_GROWTH_MIN)
+
+
+def _oob_still_falling(oob_hist, sample_every=_HYBRID_SAMPLE_EVERY,
+                       window=_OOB_TREND_WINDOW, min_fall=_OOB_TREND_MIN):
+    """Is the out-of-balance residual still trending down?
+
+    Compares the mean of the last ``window`` iterations against the mean of the
+    ``window`` before it, both read from ``oob_hist`` (sampled every
+    ``sample_every`` iterations). Returns False when there is not yet enough
+    history to judge, which is the conservative answer: no history, no extension.
+    """
+    k = max(2, int(window // max(1, sample_every)))
+    if len(oob_hist) < 2 * k:
+        return False
+    last = sum(oob_hist[-k:]) / k
+    prev = sum(oob_hist[-2 * k:-k]) / k
+    if not (prev > 0.0):
+        return False
+    return last < (1.0 - min_fall) * prev
+
 
 def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
                             sample_every=_HYBRID_SAMPLE_EVERY, model_height=None):
@@ -3015,7 +3099,9 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
     Parameters:
         disp_hist (list of float): max|u| sampled every ``sample_every`` iterations.
         u_elastic_scale (float): max|u| of the purely elastic solution for this trial.
-        exit_reason (str): 'iteration_cap', 'no_progress' or 'disp_limit'.
+        exit_reason (str): 'iteration_cap', 'inconclusive' or 'disp_limit'
+            ('no_progress' is still accepted and read as 'iteration_cap'; solve_fem
+            no longer ends a solve on a no-progress plateau).
         sample_every (int): sampling stride (documentation only; the window is a
             fraction of the sample count, so the stride does not enter the maths).
         model_height (float or None): mesh height, used only to floor the elastic
@@ -3059,7 +3145,7 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
     return 'AMBIGUOUS', u_ratio, growth
 
 
-def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
+def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None, min_slip_depth=None,
@@ -3067,7 +3153,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
               elastic_mask=None,
               suction_phi_b=None, suction_cap=None, _prepared=None,
               fast_kernel='auto', failure_criterion="hybrid", k0=None,
-              _init_state=None):
+              max_iterations_ceiling=50000, _init_state=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -3105,7 +3191,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         fem_data (dict): FEM data dictionary from build_fem_data
         F (float): Shear strength reduction factor (c/F, tan(phi)/F)
         debug_level (int): 0=silent, 1=summary, 2=per-iteration
-        max_iterations (int): Maximum viscoplastic iterations (default 3000)
+        max_iterations (int): Viscoplastic iteration budget per trial (default
+            12000). It is a budget, not a ceiling: a trial that reaches it with the
+            out-of-balance residual still trending down is EXTENDED by another
+            budget's worth, repeatedly, while the trend holds.
+        max_iterations_ceiling (int): Hard stop on that extension (default 50000).
+            A trial that reaches the ceiling while still improving stops with
+            exit_reason 'inconclusive' - neither converged nor failed - and
+            solve_ssrm reports it as the bracket's upper uncertainty rather than
+            counting it as a failure.
         tolerance (float): Convergence tolerance ||du|| / ||u|| (default 1e-3).
             Normalized by the current displacement (Smith & Griffiths CHECON-style),
             so steady benign viscoplastic creep is accepted as converged; false
@@ -3337,6 +3431,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             Studio included. The standing guard is benchmarks/kernel_xcheck.py,
             which solves cases both ways and fails on any divergence; it MUST NOT
             be removed while 'auto' is the default.
+        early_exit (bool): Watch the out-of-balance residual for a no-progress
+            plateau and report it (`plateau_iteration`, `plateau_ratio`). The plateau
+            is an observation only - it does not end the solve, and a trial always
+            runs to convergence, its iteration cap, or the displacement cap. It used
+            to end the solve and report the trial as failed, which cut off trials that
+            were still converging and biased the factor of safety low; the residual is
+            not monotone and the iterations a trial needs grow with mesh refinement,
+            so a fixed window cannot decide the outcome (see the watch in the
+            iteration loop).
         failure_criterion (str): 'hybrid' (DEFAULT since 2026-07-26) or
             'non_convergence' (the legacy verdict, still fully supported). Under
             'hybrid', a trial that does not reach equilibrium is put through
@@ -3365,7 +3468,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             - u_ratio (float or None): max|u| / max|u|_elastic at the end of the solve
             - u_growth (float or None): elastic displacements gained over the trailing
               window of the iteration history (the growth signal)
-            - exit_reason (str): 'converged' | 'iteration_cap' | 'no_progress' | 'disp_limit'
+            - exit_reason (str): 'converged' | 'iteration_cap' | 'disp_limit' - why
+              this solve stopped
+            - plateau_iteration (int or None): iteration at which the out-of-balance
+              stopped improving by >1% for `_NO_PROGRESS_WINDOW` iterations, or None
+              if it never stalled. A plateau does NOT stop the solve; it is reported
+              so a trial that ran to its cap can say the residual had gone flat.
+            - plateau_ratio (float or None): the out-of-balance ratio it stalled at
             - iterations (int): Number of iterations used
             - displacements (ndarray): Nodal displacement vector
             - stresses (ndarray): Element stress array (n_elements, 4) [sig_x, sig_y, tau_xy, sig_vm] compression-positive
@@ -3820,7 +3929,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     disp_hist = []
     u_elastic_scale = 0.0
     exit_reason = 'iteration_cap'
-    ee_suppressed = False
+    plateau_iter = None            # iteration at which the residual plateaued
+    plateau_ratio = None           # the out-of-balance ratio it plateaued at
+    n_extensions = 0               # budget extensions granted (all stages)
+    budget = int(max_iterations)
     sq3 = np.sqrt(3.0)   # loop-invariant constant (hoisted out of the VP iteration)
 
     for stage_idx, (base_loads, u_gp_active, u_gp_signed_active, stage_label) in enumerate(stage_list):
@@ -3942,9 +4054,56 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         disp_hist = []                 # max|u| samples (hybrid criterion)
         u_elastic_scale = float(np.max(np.abs(u_e_grav))) if u_e_grav.size else 0.0
         exit_reason = 'iteration_cap'
-        ee_suppressed = False          # hybrid: full budget granted to a stuck-looking state
+        plateau_iter = None            # no-progress watch, reset per stage
+        plateau_ratio = None
+        oob_hist = []                  # out-of-balance samples (budget-extension trend)
+        budget = int(max_iterations)   # this stage's CURRENT budget; may be extended
+        ceiling = max(int(max_iterations_ceiling or 0), budget)
+        chunk = int(max_iterations)    # one extension is worth one original budget
+        # Two trend windows have to FIT inside the budget, or the trend can never be
+        # read and a small budget would never be extended. They are the nominal
+        # width, capped at a quarter of the budget.
+        trend_window = min(_OOB_TREND_WINDOW,
+                           max(2 * _HYBRID_SAMPLE_EVERY, budget // 4))
 
-        for iteration in range(max_iterations):
+        iteration = -1
+        while True:
+            iteration += 1
+            if iteration >= budget:
+                # Budget reached. Extend it while the solve is still progressing.
+                if budget < ceiling and _still_progressing(
+                        oob_hist, disp_hist, u_elastic_scale, mesh_height,
+                        trend_window):
+                    budget = min(ceiling, budget + chunk)
+                    n_extensions += 1
+                    if debug_level >= 1:
+                        print(f"  Budget extended at iteration {iteration}: "
+                              f"the solve is still making progress "
+                              f"({unbalanced_force_ratio:.2e} against tolerance "
+                              f"{force_tol:.1e}); budget now {budget} "
+                              f"(ceiling {ceiling})")
+                else:
+                    if (budget >= ceiling
+                            and _still_progressing(oob_hist, disp_hist,
+                                                   u_elastic_scale, mesh_height,
+                                                   trend_window)
+                            and _oob_still_falling(oob_hist, window=trend_window)):
+                        # Out of ceiling, not out of progress: this trial has not
+                        # failed and has not converged, and nothing here can say
+                        # which. The residual must be measurably STILL FALLING for
+                        # that claim — an undecidable displacement field on its own
+                        # keeps the legacy verdict, so the bisection is only ever
+                        # halted on positive evidence of an unfinished convergence.
+                        exit_reason = 'inconclusive'
+                        if debug_level >= 1:
+                            print(f"  Iteration ceiling {ceiling} reached with the "
+                                  f"solve still making progress "
+                                  f"({unbalanced_force_ratio:.2e} against tolerance "
+                                  f"{force_tol:.1e}) - INCONCLUSIVE, neither "
+                                  f"converged nor failed")
+                    converged = False
+                    iteration -= 1          # the last iteration actually performed
+                    break
             # Build body load correction from accumulated viscoplastic strains
             loads = base_loads.copy()
 
@@ -4427,6 +4586,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # criterion, only the VERDICT's effect on the caller differs.
             if iteration % _HYBRID_SAMPLE_EVERY == 0:
                 disp_hist.append(float(norm_u_new))
+                oob_hist.append(float(unbalanced_force_ratio))
 
             # Force-equilibrium condition. The threshold is ABSOLUTE, which is what
             # makes the test immune to the size of the domain and to the size of the
@@ -4444,70 +4604,52 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # non-conservatively HIGH factor of safety.
             plastic_settled = unbalanced_force_ratio < force_tol
 
-            # No-progress early exit: if a long window passes with no meaningful
-            # improvement (>1%) on the best out-of-balance value seen, this trial is
-            # not going to reach `force_tol` in the remaining budget, so stop rather
-            # than burn the iteration ceiling.
+            # No-progress WATCH. When `_NO_PROGRESS_WINDOW` iterations pass with no
+            # meaningful improvement (>1%) on the best out-of-balance value seen, the
+            # residual is called PLATEAUED: the fact is recorded and reported, and the
+            # solve carries on to its iteration cap. A plateau is an observation about
+            # the residual, never a verdict on the slope.
             #
-            # NOTE ON ITS PREMISE. This exit was originally justified by "a settling
-            # state's out-of-balance keeps decaying; a failing state's plateaus", and
-            # that premise is FALSE IN BOTH DIRECTIONS: stable states plateau too
-            # (the residual can stall above an absolute tolerance while the slope is
-            # standing perfectly still), and failing states can keep inching the
-            # residual down while the displacement field runs away. The exit is
-            # therefore a BUDGET decision — "this solve is not converging" — and not
-            # by itself a verdict on the slope. Under failure_criterion='hybrid' the
-            # verdict is taken afterwards by classify_nonconvergence() from the
-            # displacement history, on the same footing as an iteration-cap exit.
+            # It used to END the solve and report the trial as failed, and that was
+            # wrong in the direction that matters. Two measurements say so:
+            #
+            #   * THE RESIDUAL IS NOT MONOTONE. On the reinforced slope at F = 1.25
+            #     (tri6, 1 ft elements) it sits near 2e-3 around iteration 9,500 —
+            #     twice the tolerance it is chasing — climbs back above 1e-2, and only
+            #     then falls through 1e-3 at iteration 16,242. "No improvement lately"
+            #     is not evidence that the solve is finished.
+            #   * THE WORK A TRIAL NEEDS GROWS WITH MESH REFINEMENT, A FIXED WINDOW
+            #     DOES NOT. Iterations to equilibrium at that same F are 5,054 /
+            #     10,555 / 16,242 at 2.5 / 1.5 / 1.0 ft element size, so a fixed
+            #     1,500-iteration window is 30% of the required work on the coarse
+            #     mesh and 9% on the fine one: refining the mesh tightened the
+            #     guillotine without anyone asking it to. The bisection closed on the
+            #     false failure and reported FS = 1.238 for a slope that reaches
+            #     equilibrium at F = 1.25, and again at F = 1.424, on that same mesh.
+            #     With the plateau demoted to an observation it reports 1.434, and the
+            #     spread over a 6x range in element count falls from 18% to 5%.
+            #
+            # A near-tolerance guard ("do not stop while the residual is within 10 x
+            # force_tol") was measured and does NOT repair it — the stop simply fires
+            # later, on the rebound, at iteration 12,920. The window had to stop
+            # deciding, not move.
+            #
+            # The cost falls on trials that genuinely fail: they now spend the whole
+            # budget instead of leaving early. Converged trials are untouched, because
+            # a converging solve leaves on convergence, which comes before the cap.
             if unbalanced_force_ratio < 0.99 * ufr_best:
                 ufr_best = unbalanced_force_ratio
                 last_progress_iter = iteration
-            # Window calibration: genuinely settling states can stall for >500
-            # iterations mid-decay (the reinforced slope at F=1.6 settles at ~2900
-            # iterations with a ~1000-iteration plateau on the way), so the window must
-            # be generous; post-vectorization the extra iterations cost seconds.
-            _trip = (early_exit and not ee_suppressed and not plastic_settled
-                     and iteration - last_progress_iter > 1500)
-            # HYBRID: the classifier's calibration was measured on FULL-BUDGET solves,
-            # and it must only be applied to full-budget solves. The early exit's
-            # window is far shorter than the time a slow runaway takes to become
-            # visible in the displacement field, so a truncated history can look
-            # frozen while the slope is in fact accelerating. Measured on RS2-62c at
-            # F = 0.800: the exit fires at iteration 5,118 with max|u| at 1.03x
-            # elastic and zero trailing growth — indistinguishable from a genuinely
-            # stuck state — while the SAME trial run to 40,000 iterations reaches
-            # 1.72x elastic and is growing by 0.23 per window, i.e. plainly failing
-            # (and matching the 1.7x this benchmark's verification section reports).
-            # So when the exit trips on a state the classifier would call
-            # STABLE_STUCK, do not exit: suppress the exit for the rest of this solve
-            # and let the trial spend its budget, so the verdict rests on a
-            # full-budget observation. The time saving is kept for every other case —
-            # a state already beyond elastic scale exits immediately, because its
-            # FAILED verdict is corroborated the moment the exit trips.
-            if _trip and failure_criterion == 'hybrid':
-                _v, _, _ = classify_nonconvergence(disp_hist, u_elastic_scale,
-                                                   'no_progress',
-                                                   model_height=mesh_height)
-                if _v == 'STABLE_STUCK':
-                    _trip = False
-                    ee_suppressed = True
-                    if debug_level >= 1:
-                        print(f"  Early exit suppressed at iteration {iteration+1}: "
-                              f"out-of-balance plateaued but max|u| is still at "
-                              f"elastic scale — running the full budget so the "
-                              f"verdict is not taken on a truncated history")
-            if _trip:
-                converged = False
-                exit_reason = 'no_progress'
-                u = u_new
+            if (early_exit and plateau_iter is None and not plastic_settled
+                    and iteration - last_progress_iter > _NO_PROGRESS_WINDOW):
+                plateau_iter = iteration + 1
+                plateau_ratio = float(unbalanced_force_ratio)
                 if debug_level >= 1:
-                    _tail = ("- verdict deferred to the displacement classifier"
-                             if failure_criterion == 'hybrid' else "- declared FAILED")
-                    print(f"  Early exit at iteration {iteration+1}: no progress in "
-                          f"out-of-balance force for 1500 iterations (plateau "
-                          f"{unbalanced_force_ratio:.2e} vs tolerance {force_tol:.1e})"
-                          f" {_tail}")
-                break
+                    print(f"  Out-of-balance plateaued at iteration {iteration+1} "
+                          f"({unbalanced_force_ratio:.2e} against tolerance "
+                          f"{force_tol:.1e}; no >1% improvement for "
+                          f"{_NO_PROGRESS_WINDOW} iterations) - recorded; the solve "
+                          f"continues to its iteration cap")
 
             if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
                 print(f"  Iter {iteration+1:4d}: max|du|/max|u| = {relative_change:.3e}, "
@@ -4518,8 +4660,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # progress bar within this viscoplastic solve, not just between solves.
             if progress_callback is not None and iteration % 10 == 0:
                 try:
-                    progress_callback((iteration + 1) / max_iterations,
-                                      f"vp iter {iteration + 1}/{max_iterations}, "
+                    progress_callback((iteration + 1) / budget,
+                                      f"vp iter {iteration + 1}/{budget}, "
                                       f"oob={unbalanced_force_ratio:.1e}")
                 except Exception:
                     pass
@@ -4579,6 +4721,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                         # new equilibrium is judged on its own decay history
                         ufr_best = np.inf
                         last_progress_iter = iteration
+                        plateau_iter = None
+                        plateau_ratio = None
                         u = u_new
                         continue
                 # -------------------------------------------------------------
@@ -4599,7 +4743,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             break   # stage failed -> overall failure
 
     if not converged and debug_level >= 1:
-        print(f"  Did NOT converge after {max_iterations} iterations (max|du|/max|u| = {relative_change:.3e})")
+        print(f"  Did NOT converge after {total_iterations} iterations "
+              f"(max|du|/max|u| = {relative_change:.3e}, exit {exit_reason})")
 
     # === Hybrid failure criterion: classify a non-converged trial ===
     # Computed on EVERY criterion so the metadata is always available for reporting
@@ -4886,9 +5031,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         # Equilibrated initial-stress state (K0 runs only; None otherwise). Internal:
         # solve_ssrm's equilibration solve hands this to every trial as _init_state.
         "_k0_state": k0_state,
-        # True when the hybrid criterion held the no-progress exit back so a
-        # stuck-looking state could spend its full iteration budget.
-        "early_exit_suppressed": ee_suppressed,
+        # The no-progress watch: the iteration at which the out-of-balance stopped
+        # improving, and the value it stalled at, or None if it never stalled. A
+        # plateau does not end the solve — a trial that plateaus and then runs out of
+        # budget reports exit_reason 'iteration_cap' with these fields set, which is
+        # what tells a reader the residual had stopped moving before the cap.
+        "plateau_iteration": plateau_iter,
+        "plateau_ratio": plateau_ratio,
+        # Retained name: True when a plateau was seen and the solve carried on anyway.
+        "early_exit_suppressed": plateau_iter is not None,
+        # Budget extension: how many extra chunks this solve was granted because the
+        # solve was still progressing at the budget, and the budget it ended on.
+        "budget_extensions": n_extensions,
+        "iteration_budget": budget,
         "failure_criterion": failure_criterion,
         "iterations": total_iterations,
         "displacements": u_reported,
@@ -5499,6 +5654,8 @@ def _verdict_note(sol):
     has ("Converged" / "Did NOT converge") with the displacement evidence appended."""
     if sol.get("converged"):
         return "Converged"
+    if sol.get("exit_reason") == 'inconclusive':
+        return "INCONCLUSIVE at the iteration ceiling (still improving)"
     v = sol.get("verdict") or "FAILED"
     ur = sol.get("u_ratio")
     ur_txt = "" if ur is None else f", max|u| = {ur:.2f}x elastic"
@@ -5626,7 +5783,8 @@ def _compose_ssr_zone_masks(fem_data, zones):
 
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, force_tol=1e-3,
                oob_window=10,
-               max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
+               max_iterations=12000, max_iterations_ceiling=50000,
+               convergence_tol=1e-3, max_disp_factor=0.1,
                failure_criterion="hybrid", n_sweep=10,
                staged=False, tension_cutoff=False, char_point=None,
                pp_formulation='effective', dt_scale=1.0, cancel_check=None,
@@ -5680,7 +5838,16 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             shallow zone still yields, it just cannot decide the bisection alone. Set the
             same value on the LEM search (search.py) to compare like-for-like surfaces.
         debug_level (int): Verbosity (0=silent, 1=summary, 2=detailed)
-        max_iterations (int): Max viscoplastic iterations passed to solve_fem
+        max_iterations (int): Viscoplastic iteration BUDGET per trial, passed to
+            solve_fem (default 12000). A trial that reaches it with the
+            out-of-balance residual still trending down is extended by another
+            budget's worth, repeatedly, up to max_iterations_ceiling.
+        max_iterations_ceiling (int): Hard stop on that extension (default 50000).
+            A trial that reaches the ceiling while still improving is INCONCLUSIVE:
+            it is not counted as a failure. The bisection stops there, the factor of
+            safety is reported from the last converged trial, the bracket is widened
+            to the inconclusive F, and the result carries a 'note' saying so.
+
         convergence_tol (float): Convergence tolerance passed to solve_fem
         max_disp_factor (float): Displacement limit (fraction of mesh height) used as a
             backstop/early-termination cap inside solve_fem trials (default 0.1).
@@ -6103,6 +6270,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             fem_data_trials, F=1.0, debug_level=max(0, debug_level - 1),
             force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
             pp_formulation=pp_formulation, max_iterations=max_iterations,
+            max_iterations_ceiling=max_iterations_ceiling,
             tolerance=convergence_tol, max_disp_factor=None, staged=staged,
             tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
             early_exit=True, ssr_exclude_mask=ssr_exclude_mask,
@@ -6141,12 +6309,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 "FS < 1. The bisection runs without a carried in-situ state.")
 
     if failure_criterion in ("non_convergence", "hybrid"):
-        # Same driver, same trials, same early exit — 'hybrid' only changes how a
-        # NON-CONVERGED trial's verdict is read (see classify_nonconvergence).
+        # Same driver, same trials — 'hybrid' only changes how a NON-CONVERGED
+        # trial's verdict is read (see classify_nonconvergence).
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
             oob_window=oob_window, hybrid=(failure_criterion == "hybrid"),
             debug_level=debug_level, max_iterations=max_iterations,
+            max_iterations_ceiling=max_iterations_ceiling,
             convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
             tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
@@ -6162,6 +6331,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
             oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
+            max_iterations_ceiling=max_iterations_ceiling,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
             staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
@@ -6228,7 +6398,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 fem_data_trials, F=F_fail, debug_level=max(0, debug_level - 1),
                 force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
                 pp_formulation=pp_formulation, max_iterations=cap_iters,
-                tolerance=convergence_tol, max_disp_factor=None, staged=staged,
+                max_iterations_ceiling=cap_iters, tolerance=convergence_tol,
+                max_disp_factor=None, staged=staged,
                 tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
                 early_exit=False, ssr_exclude_mask=ssr_exclude_mask,
                 tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
@@ -6265,6 +6436,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
 def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, force_tol=1e-3,
                               oob_window=10, k0=None,
                               debug_level=0, max_iterations=500,
+                              max_iterations_ceiling=50000,
                               convergence_tol=1e-3, max_disp_factor=0.1,
                               staged=False, tension_cutoff=False,
                  pp_formulation='effective',
@@ -6290,10 +6462,34 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     settings, so an A/B comparison needs no extra solves."""
 
     trials = []                        # per-trial verdict metadata (both settings)
+    inconclusive = []                  # trials that hit the iteration ceiling, still improving
 
     def _stable(sol):
         """Does the bisection treat this trial as standing at its F?"""
         return bool(sol.get("stable", sol["converged"])) if hybrid else bool(sol["converged"])
+
+    def _inconclusive(sol):
+        """Did this trial run out of CEILING rather than out of progress?
+
+        Such a trial is neither converged nor failed: the residual was still coming
+        down when the hard ceiling stopped it. Counting it as a failure is what the
+        no-progress exit used to do, and it biases the factor of safety low, so the
+        bisection refuses to rule on it. A criterion that CAN rule on it — the
+        hybrid's STABLE_STUCK verdict — is left to do so, so this asks only about
+        trials the bisection would otherwise have counted as failures."""
+        return sol.get("exit_reason") == 'inconclusive' and not _stable(sol)
+
+    def _note_inconclusive(F, sol):
+        msg = (f"SSRM: trial F = {F:.4f} is inconclusive at the iteration ceiling "
+               f"({sol.get('iterations', 0)} iterations, out-of-balance still "
+               f"falling) - raise max_iterations_ceiling to decide it. It is NOT "
+               f"counted as a failure: the factor of safety reported is the highest "
+               f"F that reached equilibrium, and the bracket's upper edge carries "
+               f"this trial as an uncertainty rather than a measured failure.")
+        inconclusive.append({"F": float(F), "iterations": int(sol.get("iterations", 0)),
+                             "message": msg})
+        print(f"\n{msg}")
+        return msg
 
     def _record(F, sol, role):
         trials.append({
@@ -6305,6 +6501,10 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "u_ratio": sol.get("u_ratio"),
             "growth": sol.get("u_growth"),
             "exit_reason": sol.get("exit_reason"),
+            # The residual went flat before this trial stopped (None if it never did).
+            "plateau_iteration": sol.get("plateau_iteration"),
+            # How many extra budgets this trial was granted for still improving.
+            "budget_extensions": int(sol.get("budget_extensions", 0) or 0),
             "ee_suppressed": bool(sol.get("early_exit_suppressed", False)),
             "iterations": int(sol.get("iterations", 0)),
         })
@@ -6348,6 +6548,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          oob_window=oob_window,
                          dt_scale=dt_scale, pp_formulation=pp_formulation,
                          max_iterations=max_iterations, tolerance=convergence_tol,
+                         max_iterations_ceiling=max_iterations_ceiling,
                          max_disp_factor=max_disp_factor, staged=staged,
                          tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
                          early_exit=(max_disp_factor is None),
@@ -6380,6 +6581,11 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         print(f"  Verifying lower bound F={F_left:.2f} converges...")
     solution_min = _record(F_left, _solve_at(F_left, bracket_step,
                                              f"Lower bound F={F_left:.3f}"), "lower")
+    if _inconclusive(solution_min):
+        # An inconclusive lower bound has not been shown to stand, so the bracket
+        # walks down exactly as it would for a failure — but the trial is recorded
+        # as the uncertainty it is rather than silently counted as a failure.
+        _note_inconclusive(F_left, solution_min)
     n_expand = 0
     while not _stable(solution_min):
         if F_left <= f_min_floor + 1e-9 or n_expand >= max_expand:
@@ -6396,6 +6602,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         _bump_bracket()
         solution_min = _record(F_left, _solve_at(F_left, bracket_step,
                                                 f"Lower bound F={F_left:.3f}"), "lower")
+        if _inconclusive(solution_min):
+            _note_inconclusive(F_left, solution_min)
     F_min = F_left
     if debug_level >= 1:
         print(f"    -> Converged in {solution_min['iterations']} iters (F_min={F_min:.2f})")
@@ -6408,6 +6616,11 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         print(f"  Verifying upper bound F={F_right:.2f} does not converge...")
     solution_max = _record(F_right, _solve_at(F_right, bracket_step,
                                               f"Upper bound F={F_right:.3f}"), "upper")
+    if _inconclusive(solution_max):
+        # The upper bound only has to NOT stand, and an inconclusive trial does not:
+        # it is accepted as the bracket's upper edge, carrying its uncertainty, and
+        # the bisection proceeds below it.
+        _note_inconclusive(F_right, solution_max)
     n_expand = 0
     while _stable(solution_max):
         if F_right >= f_max_ceiling - 1e-9 or n_expand >= max_expand:
@@ -6426,6 +6639,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         _bump_bracket()
         solution_max = _record(F_right, _solve_at(F_right, bracket_step,
                                                  f"Upper bound F={F_right:.3f}"), "upper")
+        if _inconclusive(solution_max):
+            _note_inconclusive(F_right, solution_max)
     F_max = F_right
     if debug_level >= 1:
         print(f"    -> Did NOT converge ({solution_max['iterations']} iters, F_max={F_max:.2f})")
@@ -6466,6 +6681,16 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             solution = _record(
                 F_mid, _solve_at(F_mid, step, f"F={F_mid:.3f} [{lo_f:.3f}, {hi_f:.3f}]"),
                 "bisect")
+            if _inconclusive(solution):
+                # A trial nothing can rule on becomes the bracket's UPPER
+                # UNCERTAINTY: the search carries on below it, so the run still
+                # reports the highest F that actually reached equilibrium, but that
+                # edge is never counted as a measured failure and never sets the
+                # answer by being averaged into it.
+                _note_inconclusive(F_mid, solution)
+                i_hi = i_mid
+                iteration += 1
+                continue
             if _stable(solution):
                 i_lo = i_mid
                 last_converged_solution = solution
@@ -6493,6 +6718,17 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                 _solve_at(F_mid, step, f"F={F_mid:.3f} [{F_left:.3f}, {F_right:.3f}]"),
                 "bisect")
 
+            if _inconclusive(solution):
+                # A trial nothing can rule on becomes the bracket's UPPER
+                # UNCERTAINTY: the search carries on below it, so the run still
+                # reports the highest F that actually reached equilibrium, but that
+                # edge is never counted as a measured failure and never sets the
+                # answer by being averaged into it.
+                _note_inconclusive(F_mid, solution)
+                F_right = F_mid
+                iteration += 1
+                continue
+
             if _stable(solution):
                 F_left = F_mid
                 last_converged_solution = solution
@@ -6508,7 +6744,12 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     # Report the midpoint of the final bracket (unbiased, +/- tolerance/2, or exactly
     # the grid-cell center when grid bisection is used);
     # the full bracket is returned in 'final_interval'.
-    critical_FS = 0.5 * (F_left + F_right)
+    #
+    # UNLESS an INCONCLUSIVE trial was met. Then the bracket's upper edge is not a
+    # measured failure but an unknown, so its midpoint would be a number nothing
+    # measured. The factor of safety is the highest F that actually reached
+    # equilibrium, and the bracket carries the uncertainty.
+    critical_FS = F_left if inconclusive else 0.5 * (F_left + F_right)
 
     _ssrm_progress(progress_callback, _total() * SUBDIV, _total() * SUBDIV, f"FS = {critical_FS:.3f}")
     if debug_level >= 1:
@@ -6526,6 +6767,11 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         # growth, exit_reason, iterations. Populated on every criterion so an A/B
         # between criteria costs no extra solves.
         "trials": trials,
+        # Trials the iteration ceiling could not decide (empty on a clean run). When
+        # this is non-empty the bracket's upper edge is an UNCERTAINTY, not a
+        # measured failure, and `note` says so in words.
+        "inconclusive": inconclusive,
+        "note": (inconclusive[-1]["message"] if inconclusive else None),
         "failure_criterion": ("hybrid" if hybrid else
                               "non_convergence" if max_disp_factor is None
                               else "displacement_limit"),

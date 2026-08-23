@@ -2284,10 +2284,10 @@ def fem02_build_mesh():
 def fem02_run_fem():
     """Run FEM on the meshed completed model, with the checks column beside it.
 
-    SSRM over the dialog's own bracket, and the per-trial iteration budget raised
-    to 12,000 — the one control the page tells the reader to change, because at
-    the 3,000 default this model's two reinforcement runs return the same factor
-    of safety.
+    SSRM over the dialog's own bracket at the per-trial iteration budget of 12,000,
+    which is now also the dialog's own default. The budget is where the automatic
+    extension starts rather than where a trial dies, so the reader no longer has to
+    raise it to separate this model's two reinforcement runs.
     """
     from studio.dialogs import RunFemDialog
 

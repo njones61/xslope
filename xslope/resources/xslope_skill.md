@@ -1796,6 +1796,8 @@ result = solve_ssrm(fem_data, F_min=F_min, F_max=F_max, tolerance=0.05,
 
 if result.get("converged", False):
     print(f"\nFactor of Safety: {result['FS']:.2f}")
+    if result.get("note"):          # a trial the iteration ceiling could not decide
+        print(result["note"])
     print_reinforcement_summary(fem_data, result['last_solution'])
     print_pile_summary(fem_data, result['last_solution'])
     plot_fem_results(fem_data, result['last_solution'],
@@ -1803,6 +1805,15 @@ if result.get("converged", False):
 else:
     print(f"SSRM failed: {result.get('error', 'Unknown error')}")
 ```
+
+**The iteration budget extends itself.** `max_iterations` (default 12000) is the budget each
+trial *starts* with. A trial that uses it up with the out-of-balance force still falling is
+granted another budget's worth, repeatedly, up to `max_iterations_ceiling` (default 50000), so
+the factor of safety does not depend on the budget you pass. A trial that reaches the ceiling
+still improving is reported `inconclusive` and is NOT counted as a failure: `solve_ssrm` stops
+there, reports the last F that reached equilibrium, widens `final_interval` to the inconclusive
+trial, and puts a sentence in `result['note']`. Raise the ceiling or loosen `tolerance` if you
+see one.
 
 **FEM-only models still need one starting circle.** `load_slope_data()` requires a failure
 surface definition unless the file has seepage BCs or a pre-built mesh; a pure FEM input with

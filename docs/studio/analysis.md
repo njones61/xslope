@@ -552,6 +552,18 @@ the failure criterion.
 
 ![Run FEM dialog](images/analysis_run_fem_dialog.png)
 
+**Max iterations per trial** (12000) is the viscoplastic budget each trial *starts*
+with, not a hard stop. A trial that uses it up with its out-of-balance force still
+falling is given another budget's worth, repeatedly, until either it settles or it
+reaches the **Iteration ceiling** (50000). That is what keeps the answer from
+depending on the budget: a model needing 16,000 iterations returns the same factor
+of safety whether the budget was typed as 3000 or 12000. A trial that reaches the
+ceiling while still improving is *inconclusive* — neither settled nor failed — and
+the run says so in the Log rather than counting it as a failure: the factor of
+safety comes from the last trial that reached equilibrium and the bracket is widened
+to the inconclusive one. Raise the ceiling, or loosen the SSRM tolerance, when that
+happens.
+
 The [model checks](#model-checks-before-a-run) in the dialog's second column are the
 finite-element ones: a blank Poisson's ratio (which reads as 0.0 and moved the
 strength-reduction factor of safety by a third on the reference model), a modulus of

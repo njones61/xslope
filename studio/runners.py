@@ -550,7 +550,9 @@ class FemRunner(RunnerThread):
                     self.progress.emit(int(frac * 100), 100, str(label))
 
                 solution = solve_fem(fem_data, F=F, debug_level=1,
-                                     max_iterations=opts.get("max_iterations") or 3000,
+                                     max_iterations=opts.get("max_iterations") or 12000,
+                                     max_iterations_ceiling=(
+                                         opts.get("max_iterations_ceiling") or 50000),
                                      k0=opts.get("k0"),
                                      progress_callback=fem_cb)
                 print(f"FEM solve: converged={solution.get('converged')}, "
@@ -566,7 +568,8 @@ class FemRunner(RunnerThread):
                 result = solve_ssrm(
                     fem_data, F_min=opts.get("F_min", 1.0), F_max=opts.get("F_max", 2.0),
                     tolerance=opts.get("tolerance", 0.01), debug_level=1,
-                    max_iterations=opts.get("max_iterations") or 3000,
+                    max_iterations=opts.get("max_iterations") or 12000,
+                    max_iterations_ceiling=(opts.get("max_iterations_ceiling") or 50000),
                     failure_criterion=opts.get("failure_criterion", "non_convergence"),
                     min_slip_depth=opts.get("min_slip_depth"),
                     ssr_exclude=opts.get("ssr_exclude"),

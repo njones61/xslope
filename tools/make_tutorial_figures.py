@@ -3975,12 +3975,13 @@ FEM01_SLICES = 40
 FEM01_CRITERION = "non_convergence"
 FEM01_F_MIN, FEM01_F_MAX = 1.0, 2.0
 FEM01_TOLERANCE = 0.01
-#: 12,000 rather than ``solve_ssrm``'s default 3,000, because that is the budget
-#: the page instructs the reader to type into **Max iterations per trial** before
-#: the run these figures illustrate.  The figures have to show the state the
-#: page's own instructions produce: at 3,000 the near-critical trials are cut off
-#: mid-work and the answer reads 1.3477, at 12,000 they finish and it plateaus at
-#: 1.3633, and the panel titles carry whichever one they were drawn at.
+#: 12,000 — now ``solve_ssrm``'s own default, and the budget the page shows in
+#: **Max iterations per trial**.  The figures have to show the state the page's own
+#: instructions produce.  At the former 3,000 default the near-critical trials were
+#: cut off mid-work and the answer read 1.3477; at 12,000 they finish and it
+#: plateaus at 1.3633.  A budget below what the model needs is no longer a verdict
+#: either — the engine extends it while the residual is still falling — so this
+#: number now sets where the extension starts, not where the trial dies.
 FEM01_MAX_ITERATIONS = 12000
 
 
@@ -4157,8 +4158,8 @@ FEM02_TOLERANCE = 0.01
 #: post-peak fixed point to be evaluated (``fem.py``: softening is decided only on
 #: a converged state).  At 12,000 they separate — 1.5352 against 1.5117 — and the
 #: answer then plateaus: 16,000 returns the same two numbers and the same
-#: brackets.  So 12,000 is both the budget the page instructs and the cheapest
-#: one that reaches the plateau.
+#: brackets.  12,000 is now also the engine's default budget, and a trial that
+#: needs more is extended rather than failed.
 FEM02_MAX_ITERATIONS = 12000
 #: The line the bar-force profiles are drawn for: the most heavily loaded of the
 #: six in both runs (peak 800 lb/ft elastic-perfectly-plastic, 798 lb/ft

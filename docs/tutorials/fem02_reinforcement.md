@@ -357,36 +357,37 @@ under a name of your own.
 
 ## The iteration budget
 
-One control on the Run FEM dialog is worth understanding before either run, even
-though neither run needs it changed.
+Two controls on the Run FEM dialog decide how long each trial is allowed to
+iterate. Neither needs changing for this page, but what they do is worth
+knowing before the first run.
 
-**Max iterations per trial** is the viscoplastic iteration budget each trial
-reduction factor starts with, and it opens at **12,000**. It is a budget rather
-than a ceiling: a trial that spends it and is still making progress — its
-out-of-balance force still trending down, or its displacement field standing
-still — is given another budget's worth, and another, up to the **Iteration
-ceiling** below it, which opens at 50,000. Only a trial whose displacements are
-growing stops at its budget and is recorded as failed. A trial that reaches the
-ceiling with its out-of-balance still falling is reported **inconclusive**: it is
-not counted as a failure, the factor of safety reported is the highest *F* that
-actually reached equilibrium, and the run says so in the log.
+**Max iterations per trial**, which opens at **12,000**, is the budget each
+trial reduction factor starts with. It is a budget rather than a limit: a
+trial that spends it while still converging — its out-of-balance force still
+falling, or its displacements standing still — is given another budget's
+worth, and another, up to the **Iteration ceiling**, which opens at 50,000. A
+trial whose displacements are growing stops at its budget and is recorded as
+failed; that is the non-convergence the method reads as failure. A trial that
+reaches the ceiling still converging is reported **inconclusive**: the search
+treats it as the undecided edge of the bracket rather than a failure, the
+factor of safety is the bracket's midpoint as usual, and the log says so.
 
-That is why the budget no longer decides the answer on this model. Run either of
-the two runs below at the old 3,000 default and it returns the same factor of
-safety it returns at 12,000 — 1.543 elastic-perfectly-plastic and 1.481 with the
-residual — from the same bracket, in the same seven bisection steps, with the
-same converged field to six decimals. The trials that would once have died at
-3,000 now extend past it: the trial at *F* = 1.5000 takes 3,288 iterations and
-the one at 1.5469 takes 6,000.
+Because the budget extends itself, the factor of safety on this model does not
+depend on it. Both runs below return the same answer from a budget of 3,000 as
+from 12,000 — 1.543 elastic-perfectly-plastic and 1.481 with the residual —
+from the same bracket, in the same seven bisection steps, with the same
+converged field to six decimals; the trials near the critical factor simply
+run past the smaller budget until they settle (3,288 iterations at *F* = 1.5,
+6,000 at *F* = 1.547).
 
-What a small budget still changes is the **captured failure state**, because the
-capture is one more solve and it is budget-limited too. At 3,000 the
-elastic-perfectly-plastic run's failure field has moved 1.54 ft, 24 times its
-elastic response; at 12,000 the same field has moved 5.43 ft, 86 times. The
-factor of safety is the same either way, but the mechanism figure drawn from
-that field is a collapse that has barely started.
+What a small budget does change is the **captured failure state**, because the
+capture is one more solve and it stops at its budget. From a budget of 3,000
+the elastic-perfectly-plastic run's failure field has moved 1.54 ft, 24 times
+its elastic response; from 12,000 the same field has moved 5.43 ft, 86 times.
+The factor of safety is the same either way, but the mechanism figure drawn
+from the smaller budget shows a collapse that has barely started.
 
-**Leave both boxes as they open.** Each run takes a few minutes.
+Leave both boxes as they open. Each run takes a few minutes.
 
 ---
 

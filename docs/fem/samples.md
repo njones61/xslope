@@ -139,7 +139,7 @@ SSRM results without piles (**FS = 1.155**). The shear strain concentration show
 
 <!-- test: file=files/xslope_piles_fem_nopile.xlsx, type=fem_ssrm, expected_fs=1.155, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
 
-SSRM results with two rows of piles (**FS = 1.36**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
+SSRM results with two rows of piles (**FS = 1.370**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
 
 ![piles_fem_results.png](images/piles_fem_results.png){width=1000}
 
@@ -154,7 +154,7 @@ Pile  Elems   Max |T|   Max |V|   Max |M|     V_cap     M_cap  Yielded  Status
 --------------------------------------------------------------------------------
 ```
 
-The two rows of piles increase the factor of safety from 1.155 to 1.36 — an 18% improvement. In the last converged
+The two rows of piles increase the factor of safety from 1.155 to 1.370 — a 19% improvement. In the last converged
 trial the largest bending moment is 6,319 per unit width (Pile 2), about 63% of the moment capacity
 ($M_{\text{cap}}/S$ = 10,000), and the largest shear 1,951 (Pile 1), about 25% of $V_{\text{cap}}/S$ = 7,667. In
 the developed mechanism at failure — the state the results figure above draws — both are smaller: 4,429 (44%) and
@@ -163,7 +163,7 @@ transfer lateral load to the piles is the limiting factor, not the pile strength
 
 This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
 
-<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.36, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
+<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.370, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
 
 ### 3. Non-Circular Failure Surface with Thin Weak Layer
 
@@ -210,7 +210,7 @@ lateral sliding of the slope mass along the clay layer.
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
-The FEM result of FS = 1.53 is about 12% below the LEM result of FS = 1.74 obtained using
+The FEM result of FS = 1.62 is about 7% below the LEM result of FS = 1.74 obtained using
 Spencer's method — both analyses use the same piezometric surface in the foundation sand.
 Differences of this order between SSRM and LEM are typical: the FEM develops the failure
 mechanism freely through the global stress field, while the LEM evaluates rigid-block
@@ -222,7 +222,7 @@ more sharply the band through the 2-ft layer is resolved.
 <!-- mesh resolution: the 2-ft soft clay layer needs >=2 elements through its thickness;
      target_size=1.0 or finer (ts=2.0 gives 1.634, ts=1.0 gives 1.534, ts=0.75 gives
      1.516 — mild thin-band localization sensitivity) -->
-<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.534, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000 -->
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.616, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000 -->
 
 ### 4. Reliability Analysis: Two-Layer c–φ Slope
 
@@ -299,7 +299,7 @@ contribution directly.
      on a deliberately coarse 253-element mesh (target_size=5): at 2.4 this one test WAS the suite's
      wall clock (~510s; 5.0 runs in ~110s). beta is mesh-dependent but bit-reproducible for a fixed
      mesh, and the test guards the TSPM-over-SSRM pipeline, not mesh convergence. -->
-<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.240, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
+<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.356, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
 
 
 ---

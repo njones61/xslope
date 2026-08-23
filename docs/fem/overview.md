@@ -679,9 +679,12 @@ FS = 1.3633 from a 3000-iteration budget and from a 12000-iteration one. A trial
 
 **Inconclusive trials.** A trial that reaches `max_iterations_ceiling` while still improving is
 neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. The bisection does
-not count it as a failure — that is what biases a factor of safety low. It stops there, reports the
-last $F$ that actually reached equilibrium, widens `final_interval` to the inconclusive trial, and
-returns a `note` naming it. Raise the ceiling or loosen the bisection tolerance to resolve it.
+not count it as a failure — that is what biases a factor of safety low. It carries on below the
+inconclusive $F$, and the factor of safety is the final bracket's midpoint, exactly as on any other
+run. What the inconclusive trial changes is the meaning of the bracket's upper edge: an undecided
+trial rather than a measured failure. The result says so — `inconclusive` lists the trials and
+`note` names the last of them in a sentence, which is also printed to the log. Raise the ceiling or
+loosen the bisection tolerance to resolve it.
 
 A **no-progress plateau** — 1500 iterations without improving on the lowest out-of-balance value
 seen by more than 1% — is recorded (`plateau_iteration`, `plateau_ratio`) and **does not stop the

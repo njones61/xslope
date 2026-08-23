@@ -1810,10 +1810,11 @@ else:
 trial *starts* with. A trial that uses it up with the out-of-balance force still falling is
 granted another budget's worth, repeatedly, up to `max_iterations_ceiling` (default 50000), so
 the factor of safety does not depend on the budget you pass. A trial that reaches the ceiling
-still improving is reported `inconclusive` and is NOT counted as a failure: `solve_ssrm` stops
-there, reports the last F that reached equilibrium, widens `final_interval` to the inconclusive
-trial, and puts a sentence in `result['note']`. Raise the ceiling or loosen `tolerance` if you
-see one.
+still improving is reported `inconclusive` and is NOT counted as a failure: `solve_ssrm` carries
+on below it and reports `result['FS']` as the midpoint of `final_interval`, exactly as on any
+other run. The difference is that the bracket's upper edge is an undecided trial rather than a
+measured failure, which `result['inconclusive']` lists and `result['note']` states in a sentence.
+Raise the ceiling or loosen `tolerance` if you see one.
 
 **FEM-only models still need one starting circle.** `load_slope_data()` requires a failure
 surface definition unless the file has seepage BCs or a pre-built mesh; a pure FEM input with

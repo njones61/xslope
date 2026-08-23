@@ -559,10 +559,11 @@ reaches the **Iteration ceiling** (50000). That is what keeps the answer from
 depending on the budget: a model needing 16,000 iterations returns the same factor
 of safety whether the budget was typed as 3000 or 12000. A trial that reaches the
 ceiling while still improving is *inconclusive* — neither settled nor failed — and
-the run says so in the Log rather than counting it as a failure: the factor of
-safety comes from the last trial that reached equilibrium and the bracket is widened
-to the inconclusive one. Raise the ceiling, or loosen the SSRM tolerance, when that
-happens.
+the run says so in the Log rather than counting it as a failure. The factor of safety
+is still the final bracket's midpoint, as on any other run; what changes is that the
+bracket's upper edge is an undecided trial rather than a measured failure, which the
+Log states beside the answer. Raise the ceiling, or loosen the SSRM tolerance, when
+that happens.
 
 The [model checks](#model-checks-before-a-run) in the dialog's second column are the
 finite-element ones: a blank Poisson's ratio (which reads as 0.0 and moved the

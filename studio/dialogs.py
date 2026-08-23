@@ -580,7 +580,7 @@ class RunFemDialog(QDialog):
 
         # Hard stop on the automatic budget extension. A trial that reaches THIS
         # while still improving is inconclusive - it did not fail, and it did not
-        # settle - so the bisection refuses to rule on it and says so.
+        # settle - so the bisection does not count it as a failure and says so.
         self.max_iterations_ceiling = QSpinBox()
         self.max_iterations_ceiling.setRange(500, 500000)
         self.max_iterations_ceiling.setSingleStep(1000)
@@ -590,9 +590,10 @@ class RunFemDialog(QDialog):
             "Hard stop on the automatic budget extension above. A trial that "
             "reaches this ceiling with its out-of-balance force still falling is "
             "reported INCONCLUSIVE - neither settled nor failed - and is not "
-            "counted as a failure: the factor of safety comes from the last trial "
-            "that reached equilibrium and the bracket is widened to the "
-            "inconclusive one, with a note on the run.")
+            "counted as a failure. The factor of safety is still the final "
+            "bracket's midpoint, as on any other run; what changes is that the "
+            "bracket's upper edge is an undecided trial rather than a measured "
+            "failure, and the Log says so.")
         form.addRow("Iteration ceiling", self.max_iterations_ceiling)
 
         # Side boundary condition (v21 main!D22). Applies to both a single trial and

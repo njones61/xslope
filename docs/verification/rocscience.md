@@ -2808,20 +2808,20 @@ model, and the differences below are the measurement of what separates them rath
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
 |---|---|---|
 | No pile | 1.136 | 1.14 (−0.4%) |
-| Pile, free head | 1.497 | 1.36 (+10.1%) |
-| Pile, head rotation restrained | 1.552 | 1.45 (+7.0%) |
+| Pile, free head | 1.538 | 1.36 (+13.1%) |
+| Pile, head rotation restrained | 1.570 | 1.45 (+8.3%) |
 
 Without a pile the two agree to −0.4%: the same section, the same soil, the same strength-reduction
 procedure, and nothing three-dimensional in either model. That row is what makes the other two readable —
 what they carry is the pile, not the slope.
 
-With the pile in place the two-dimensional model reads high, by +10.1% with a free head and +7.0% with the
+With the pile in place the two-dimensional model reads high, by +13.1% with a free head and +8.3% with the
 head rotation restrained. Read as the credit each model gives the pile row, XSLOPE multiplies its own
-unreinforced factor of safety by 1.318 and Cai & Ugai's model multiplies theirs by 1.193. The direction is
+unreinforced factor of safety by 1.354 and Cai & Ugai's model multiplies theirs by 1.193. The direction is
 the one the idealization predicts. In three dimensions the soil at three diameters' spacing arches onto the
 piles, some of it moves between them, and it can slip along each pile's surface; in a plane-strain smear the
 row is a continuous sheet at one-third the stiffness, and everything above it has to push through it.
-Restraining the head rotation is worth less in XSLOPE for the same reason — a factor of 1.037 against their
+Restraining the head rotation is worth less in XSLOPE for the same reason — a factor of 1.021 against their
 1.066 — because a smeared row is already stiffer than the row it stands for, so stiffening its head adds
 less.
 
@@ -2839,8 +2839,8 @@ limit equilibrium with the Ito & Matsui limit pressure — [VP106](#vp106) acros
 **Sources:** Cai & Ugai (2000), the three-dimensional shear-strength-reduction results.
 
 <!-- test: file=files/rocscience/vp106a_fem.xlsx, type=fem_ssrm, expected_fs=1.136, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.85, f_max=1.45, max_iter=16000, benchmark=VP106-FEM-nopile -->
-<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.497, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
-<!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.552, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed -->
+<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.538, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
+<!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.570, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed -->
 
 ## VP107: Retaining walls, gabion walls, supports {#vp107}
 

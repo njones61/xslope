@@ -36,7 +36,6 @@ CONFIG = PageConfig(
         ('+2.5', 'the three answers agree within', '1.25', '1.219'),
         ('+1.9', 'that rounding is worth', '0.997', '0.978'),
         ('+15.6', "above Slide2's own Spencer on an identical slope", '1.11', '0.960'),
-        ('−4.7', 'at the tagged 12.4 ft mesh', '1.384', '1.452'),
         ('+3.0', 'one count in the last place', '0.34', '0.33'),
         ('+23.2', 'GEO FEM reads 23.2% above', '1.17', '0.95'),
         ('+11.3', 'above PLAXIS on #58 case 3', '0.59', '0.53'),

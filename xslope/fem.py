@@ -5844,9 +5844,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             budget's worth, repeatedly, up to max_iterations_ceiling.
         max_iterations_ceiling (int): Hard stop on that extension (default 50000).
             A trial that reaches the ceiling while still improving is INCONCLUSIVE:
-            it is not counted as a failure. The bisection stops there, the factor of
-            safety is reported from the last converged trial, the bracket is widened
-            to the inconclusive F, and the result carries a 'note' saying so.
+            it is not counted as a failure. The bisection carries on below it, the
+            factor of safety is reported as the final bracket's midpoint exactly as
+            on any other run, and the result carries 'inconclusive' and a 'note'
+            recording that the bracket's upper edge is undecided rather than a
+            measured failure.
 
         convergence_tol (float): Convergence tolerance passed to solve_fem
         max_disp_factor (float): Displacement limit (fraction of mesh height) used as a
@@ -6483,9 +6485,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         msg = (f"SSRM: trial F = {F:.4f} is inconclusive at the iteration ceiling "
                f"({sol.get('iterations', 0)} iterations, out-of-balance still "
                f"falling) - raise max_iterations_ceiling to decide it. It is NOT "
-               f"counted as a failure: the factor of safety reported is the highest "
-               f"F that reached equilibrium, and the bracket's upper edge carries "
-               f"this trial as an uncertainty rather than a measured failure.")
+               f"counted as a failure: the bracket's upper edge carries this trial "
+               f"as an uncertainty rather than a measured failure, and the factor of "
+               f"safety is reported as the bracket midpoint, as on any other run.")
         inconclusive.append({"F": float(F), "iterations": int(sol.get("iterations", 0)),
                              "message": msg})
         print(f"\n{msg}")
@@ -6745,11 +6747,11 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     # the grid-cell center when grid bisection is used);
     # the full bracket is returned in 'final_interval'.
     #
-    # UNLESS an INCONCLUSIVE trial was met. Then the bracket's upper edge is not a
-    # measured failure but an unknown, so its midpoint would be a number nothing
-    # measured. The factor of safety is the highest F that actually reached
-    # equilibrium, and the bracket carries the uncertainty.
-    critical_FS = F_left if inconclusive else 0.5 * (F_left + F_right)
+    # An INCONCLUSIVE trial does not change how the number is reported: the midpoint
+    # is still the estimate, +/- half the bracket. What changes is what the bracket's
+    # upper edge means - an undecided trial rather than a measured failure - and that
+    # is disclosed in 'inconclusive', in 'note', and on the log.
+    critical_FS = 0.5 * (F_left + F_right)
 
     _ssrm_progress(progress_callback, _total() * SUBDIV, _total() * SUBDIV, f"FS = {critical_FS:.3f}")
     if debug_level >= 1:
@@ -6768,8 +6770,9 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         # between criteria costs no extra solves.
         "trials": trials,
         # Trials the iteration ceiling could not decide (empty on a clean run). When
-        # this is non-empty the bracket's upper edge is an UNCERTAINTY, not a
-        # measured failure, and `note` says so in words.
+        # this is non-empty the reported FS is still the bracket midpoint, but the
+        # bracket's upper edge is an UNCERTAINTY rather than a measured failure, and
+        # `note` says so in words.
         "inconclusive": inconclusive,
         "note": (inconclusive[-1]["message"] if inconclusive else None),
         "failure_criterion": ("hybrid" if hybrid else

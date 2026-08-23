@@ -217,15 +217,16 @@ def check_wiring():
               f"{len(trials or [])} trials")
 
     # An INCONCLUSIVE trial — the iteration ceiling reached with the residual still
-    # falling — is not a failure. The bisection stops on it, reports the last F that
-    # reached equilibrium, widens the bracket to the inconclusive trial, and says so.
+    # falling — is not a failure. The bisection carries on below it and reports the
+    # final bracket's MIDPOINT, exactly as on any other run; what the trial changes is
+    # what the bracket's upper edge means, which the result states in words.
     def kinds_inc(F):
         return 'converged' if F < 1.4 else ('inconclusive' if F < 1.8 else 'failed')
 
     res_inc, _ = _bisect(kinds_inc, hybrid=False)
-    check("an inconclusive trial does not decide the bracket",
-          res_inc['FS'] == res_inc['final_interval'][0]
-          and res_inc['final_interval'][1] >= 1.4,
+    _lo, _hi = res_inc['final_interval']
+    check("an inconclusive trial is still reported as the bracket midpoint",
+          abs(res_inc['FS'] - 0.5 * (_lo + _hi)) < 1e-12 and _hi >= 1.4,
           f"FS={res_inc['FS']:.3f} interval={res_inc['final_interval']}")
     check("the run reports the inconclusive trial in words",
           bool(res_inc.get('note')) and 'inconclusive' in res_inc['note'].lower()

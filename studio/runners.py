@@ -588,6 +588,14 @@ class FemRunner(RunnerThread):
                     return
                 fs = result.get("FS")
                 print(f"SSRM factor of safety = {fs:.3f}")
+                # The factor of safety is the bracket midpoint however the bracket
+                # was closed, so an INCONCLUSIVE upper edge is invisible in the
+                # number itself. Restate the note beside the answer, where a reader
+                # looking only at the last lines of the Log will see it.
+                if result.get("note"):
+                    lo, hi = result.get("final_interval", (float("nan"),) * 2)
+                    print(f"  Bracket [{lo:.4f}, {hi:.4f}] — upper edge UNDECIDED")
+                    print(f"  {result['note']}")
                 # What the run chose and what its trials found. solve_ssrm returns
                 # these on the RESULT, and the bundle carried only
                 # result["last_solution"] — the field — so the criterion that

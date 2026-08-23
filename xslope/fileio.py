@@ -712,6 +712,15 @@ def _column_total_stress(slope_data, x, y, y_ground, y_water):
         if hi - lo <= 0:
             continue
         column = LineString([(x, lo), (x, hi)])
+        # A zone owns the part of the column no zone before it already claimed.
+        # A shapely polygon includes its own boundary, so a column standing
+        # exactly on the vertical edge two zones share — which is where a
+        # reinforcement line ends in every zoned retaining structure, the back
+        # of the reinforced fill — intersects BOTH of them over its whole
+        # length and would be weighed twice. Claiming each length once makes the
+        # zone listed first own an interface, the same convention
+        # :func:`_material_at_point` already applies to a point on a boundary.
+        claimed = None
         for poly in polygons:
             shape = poly.get('polygon') if isinstance(poly, dict) else poly
             mat_id = poly.get('mat_id') if isinstance(poly, dict) else None
@@ -719,6 +728,8 @@ def _column_total_stress(slope_data, x, y, y_ground, y_water):
                 continue
             try:
                 piece = column.intersection(shape)
+                if claimed is not None:
+                    piece = piece.difference(claimed)
             except Exception:                            # pragma: no cover
                 continue
             if piece.is_empty:
@@ -727,6 +738,7 @@ def _column_total_stress(slope_data, x, y, y_ground, y_water):
                 mat = materials[int(mat_id)]
             except (IndexError, TypeError, ValueError):
                 continue
+            claimed = piece if claimed is None else claimed.union(piece)
             g_sat = mat.get('gamma_sat')
             gamma = (g_sat if (saturated and g_sat is not None) else mat['gamma'])
             total += piece.length * float(gamma)

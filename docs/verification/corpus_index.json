@@ -5985,6 +5985,80 @@
       "features": {
         "circular": true,
         "cutoff_walls": 0,
+        "dloads": 1,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 11,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": true,
+          "pullout": false,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 24,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/verification/files/published/fhwa_e1.xlsx",
+      "references": [
+        {
+          "anchor": "fhwa-e1",
+          "checks": [
+            "FHWA-E1",
+            "FHWA-E1-global"
+          ],
+          "level": 2,
+          "page": "verification/published/",
+          "resolution": "input-link",
+          "source_md": "docs/verification/published.md",
+          "title": "FHWA Example E1 — MSE wall with a broken backslope",
+          "url": "https://xslope.readthedocs.io/en/latest/verification/published/#fhwa-e1"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
         "dloads": 0,
         "element_type": null,
         "hoek_brown": true,
@@ -22491,7 +22565,7 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 317,
+    "models": 318,
     "pages": [
       "fem/samples/",
       "lem/samples/",
@@ -22499,13 +22573,14 @@
       "seep/samples/",
       "seep/seep_slope/",
       "verification/geostudio/",
+      "verification/published/",
       "verification/rocscience/",
       "verification/rocscience_groundwater/",
       "verification/rs2/",
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 540,
+    "tags": 542,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
@@ -22514,7 +22589,7 @@
       "piles": 15,
       "probabilistic": 15,
       "rapid-drawdown": 6,
-      "reinforcement": 21,
+      "reinforcement": 22,
       "seepage-coupled": 67,
       "seismic": 10,
       "soil-nails": 5,
@@ -22788,6 +22863,7 @@
       "docs/fem/files/xslope_reinforce_fem.xlsx",
       "docs/lem/files/xslope_reinforce.xlsx",
       "docs/verification/files/geostudio/gs2_18.xlsx",
+      "docs/verification/files/published/fhwa_e1.xlsx",
       "docs/verification/files/rocscience/vp030a.xlsx",
       "docs/verification/files/rocscience/vp030b.xlsx",
       "docs/verification/files/rocscience/vp032a.xlsx",

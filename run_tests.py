@@ -14,6 +14,12 @@ tags of the form:
     <!-- test: file=files/foo.xlsx, type=seep_elements, expected_flowrate=40.062, target_size=1.5, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=fem_elements, expected_fs=1.36, target_size=3.5, tolerance=0.04, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
     <!-- test: file=files/foo.xlsx, type=mesh_elements, element_type=tri6, target_size=6.5, expected_elements=3166, expected_nodes=6555, benchmark=RS2-4-mesh -->
+    <!-- test: file=files/foo.xlsx, type=pullout_envelope, expected_pullout=10.28:5378;9.22:7488, tolerance=0.002, benchmark=FHWA-E1 -->
+
+The pullout_envelope type locks a published PULLOUT TABLE -- the resistance a
+reinforcement layer develops beyond an assumed failure surface, layer by layer.
+It evaluates the capacity envelope the engines share and solves nothing, so it
+costs milliseconds; see run_pullout_envelope_test for the tag's two list keys.
 
 The mesh_elements type locks a published MESH SIZE — the element and node count
 one model meshes to at one target size. It builds the mesh and counts it, and
@@ -594,6 +600,123 @@ def run_lem_test(test):
 
     else:
         return None, f"Unknown LEM test type: {test_type}"
+
+
+def run_pullout_envelope_test(test):
+    """Check the reinforcement capacity envelope at named stations along the lines.
+
+    This is the regression form for a published PULLOUT table — a design manual
+    that tabulates, layer by layer, the resistance a reinforcement develops in
+    the zone beyond an assumed failure surface. Nothing is solved: the check
+    reads the same ``PulloutProfile`` the LEM and FEM engines read and evaluates
+    the same envelope function they call, so it costs milliseconds and still
+    exercises the whole overburden-dependent law — the soil column above each
+    point, the material zones it crosses, the pore pressure, and the integral.
+
+    Tag keys, both semicolon lists with ONE ELEMENT PER REINFORCEMENT LINE in the
+    order the file's reinforce sheet carries them:
+
+    ``expected_pullout=<x>:<value>``
+        the resistance developed between the station ``x`` and the FAR end of the
+        line (``Tend2`` plus the integral of r from the station to end 2), which
+        is the quantity a pullout table publishes: what the resisting zone alone
+        can hold back. ``x`` is a horizontal station, projected onto the line.
+    ``expected_envelope=<x>:<value>``
+        optional, and the full three-way envelope at the same station —
+        ``min(Tmax, Tend1 + int, Tend2 + int)``. It is what a trial surface
+        crossing there would actually mobilize, so a table where rupture governs
+        can say so and have it checked.
+
+    ``tolerance`` is RELATIVE (default 0.002), because these values run from
+    hundreds to tens of thousands in the same table and one absolute band would
+    be meaningless at one end of it.
+
+    Returns (0.0, None) on success, else (None, message).
+    """
+    import math
+
+    from xslope.fileio import (ensure_reinforce_pullout, load_slope_data,
+                               reinforce_available_tension)
+
+    tol = float(test.get('tolerance', 0.002))
+
+    def _stations(key):
+        raw = test.get(key)
+        if raw is None or str(raw).strip() == '':
+            return None
+        out = []
+        for tok in str(raw).split(';'):
+            tok = tok.strip()
+            if not tok:
+                continue
+            x, sep, val = tok.rpartition(':')
+            if not sep:
+                raise ValueError(f"{key} entry {tok!r} must be 'station:value'")
+            out.append((float(x), float(val)))
+        return out
+
+    want_pull = _stations('expected_pullout')
+    want_env = _stations('expected_envelope')
+    if not want_pull and not want_env:
+        return None, ("a pullout_envelope tag needs expected_pullout and/or "
+                      "expected_envelope")
+
+    slope_data = ensure_reinforce_pullout(load_slope_data(test['file']))
+    lines = slope_data.get('reinforcement_lines') or []
+    if not lines:
+        return None, "the model carries no reinforcement lines"
+    for key, want in (('expected_pullout', want_pull),
+                      ('expected_envelope', want_env)):
+        if want is not None and len(want) != len(lines):
+            return None, (f"{key} lists {len(want)} element(s) but the model has "
+                          f"{len(lines)} reinforcement line(s)")
+
+    problems = []
+    for i, line in enumerate(lines):
+        prof = line.get('_pullout_profile')
+        if prof is None:
+            problems.append(f"line {i + 1} is not on the overburden-dependent "
+                            f"law (Adhesion/Delta blank)")
+            continue
+        x1, y1 = float(line['x1']), float(line['y1'])
+        x2, y2 = float(line['x2']), float(line['y2'])
+        length = math.hypot(x2 - x1, y2 - y1)
+        for key, want in (('expected_pullout', want_pull),
+                          ('expected_envelope', want_env)):
+            if want is None:
+                continue
+            station, expected = want[i]
+            if x2 == x1:
+                return None, (f"line {i + 1} is vertical; a horizontal station "
+                              f"cannot be projected onto it")
+            frac = (station - x1) / (x2 - x1)
+            if not 0.0 <= frac <= 1.0:
+                problems.append(f"line {i + 1}: station {station:g} is off the "
+                                f"line (x from {x1:g} to {x2:g})")
+                continue
+            d1 = frac * length
+            d2 = length - d1
+            if key == 'expected_pullout':
+                got = float(line.get('tend2', 0.0)) + prof.from_end2(d2)
+            else:
+                got = reinforce_available_tension(
+                    d1, d2, line['t_max'], line['lp1'], line['lp2'],
+                    line.get('tend1', 0.0), line.get('tend2', 0.0), pullout=prof)
+            if expected == 0:
+                ok = abs(got) <= tol
+                rel = abs(got)
+            else:
+                rel = abs(got - expected) / abs(expected)
+                ok = rel <= tol
+            if not ok:
+                problems.append(f"line {i + 1} {key[9:]} at x={station:g}: "
+                                f"{got:.1f} vs {expected:g} ({rel * 100:.2f}% off, "
+                                f"tolerance {tol * 100:.2f}%)")
+
+    if problems:
+        return None, (f"{len(problems)} station(s) off: "
+                      + "; ".join(problems[:6]))
+    return 0.0, None
 
 
 def run_critical_kc_test(test):
@@ -3051,6 +3174,12 @@ def run_pullout_law_test(test):
        so a gamma/gamma_sat mix-up, a dropped zone, or a forgotten u cannot pass.
     3. **The constant-rate law is untouched.** With no Adhesion/Delta the envelope
        must reproduce the linear ramps exactly, bit for bit, at every sample.
+    4. **A line ending on a zone boundary.** The far end sits exactly on the
+       vertical edge two side-by-side zones share, which is where a reinforcement
+       layer ends in every zoned retaining structure. A shapely polygon owns its
+       own boundary, so the column standing there intersects BOTH zones over its
+       whole length; weighed once per zone it would carry twice the soil it has,
+       and the resistance developed from that end would read high.
 
     Then the mutations: perturbing the law's own terms one at a time must break
     check 1 or 2. A test that passes against a broken implementation is not a test.
@@ -3076,6 +3205,22 @@ def run_pullout_law_test(test):
                            'u': 'none'}],
             'polygons': [{'polygon': Polygon([(0, 0), (20, 0), (20, 10), (0, 10)]),
                           'mat_id': 0}],
+            'ground_surface': LineString([(0, 10), (20, 10)]),
+            'gamma_water': 9.81,
+            'reinforcement_lines': [_line(adhesion=adhesion, delta=delta)],
+        }
+
+    def _boundary(adhesion, delta, gamma=20.0):
+        """Two zones of the same soil meeting at x = 10, where the line ends."""
+        return {
+            'materials': [{'name': 'left', 'gamma': gamma, 'gamma_sat': None,
+                           'u': 'none'},
+                          {'name': 'right', 'gamma': gamma, 'gamma_sat': None,
+                           'u': 'none'}],
+            'polygons': [{'polygon': Polygon([(0, 0), (10, 0), (10, 10), (0, 10)]),
+                          'mat_id': 0},
+                         {'polygon': Polygon([(10, 0), (20, 0), (20, 10), (10, 10)]),
+                          'mat_id': 1}],
             'ground_surface': LineString([(0, 10), (20, 10)]),
             'gamma_water': 9.81,
             'reinforcement_lines': [_line(adhesion=adhesion, delta=delta)],
@@ -3129,6 +3274,19 @@ def run_pullout_law_test(test):
     for g, w in zip(got, _hand(rate2)):
         if abs(g - w) > 1e-6 * max(1.0, abs(w)):
             problems.append(f"layered: {g:.6f} != {w:.6f}")
+            break
+
+    # 4 — the far end sits on the boundary two zones share: the soil above it is
+    # the same 5 units of one 20-unit-weight column, counted once. Under a
+    # per-zone sum it is counted twice, which inflates what the far end develops
+    # (visible at s = 9, where that branch governs) while leaving the near-end
+    # branch and the two endpoints looking right.
+    got = _envelope(_boundary(0.0, 45.0))
+    for s_at, g, w in zip((0.0, 1.0, 2.5, 5.0, 7.5, 9.0, 10.0), got,
+                          _hand(rate1)):
+        if abs(g - w) > 1e-6 * max(1.0, abs(w)):
+            problems.append(f"zone boundary at the far end: {g:.6f} != {w:.6f} "
+                            f"at s={s_at:g}")
             break
 
     # 3 — the constant-rate law must be bit-for-bit what it always was
@@ -4512,6 +4670,9 @@ PREFLIGHT_TAG_ANALYSIS = {
     # A mesh-size lock names no analysis of its own: the file's OTHER tags say
     # what the model is for, and this row only counts what the mesher produced.
     'mesh_elements': ('fem', {}),
+    # A pullout table names no surface family either: it reads the reinforcement
+    # capacity envelope, which every LEM run on the file shares.
+    'pullout_envelope': ('lem', {}),
 }
 
 
@@ -5979,7 +6140,7 @@ def run_dload_direction_test(test):
 
 
 def run_verification_pages_test(test):
-    """Standing checks on the six verification pages under docs/verification.
+    """Standing checks on the verification pages under docs/verification.
 
     Three checks run per page (tools/verification_checks): every printed
     percentage and absolute FS difference is re-derived from two numbers the
@@ -11567,6 +11728,8 @@ def _dispatch_test(test):
         return run_water_hoist_test(test)
     if test_type == 'mesh_elements':
         return run_mesh_elements_test(test)
+    if test_type == 'pullout_envelope':
+        return run_pullout_envelope_test(test)
     if test_type == 'cwd_invariant':
         return run_cwd_invariant_test(test)
     if test_type == 'docs_heading_trap':

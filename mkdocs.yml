@@ -121,6 +121,7 @@ nav:
     - Rocscience Groundwater Corpus: verification/rocscience_groundwater.md
     - Rocscience RS2 (SSRM) Corpus: verification/rs2.md
     - GeoStudio (SLOPE/W) Corpus: verification/geostudio.md
+    - Published Problems: verification/published.md
     - References: verification/references.md
   - API:
     - Advanced: api/advanced.md

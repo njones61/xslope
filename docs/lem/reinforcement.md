@@ -81,7 +81,17 @@ exactly as it was. One filled and one blank is refused — half a law is not a l
 envelope under either law.
 
 **FHWA pullout capacity.** The FHWA form $F^{*}\alpha\sigma'_v$ per unit area is this law with $a = 0$ and
-$\delta = \arctan(F^{*}\alpha)$.
+$\delta = \arctan(F^{*}\alpha)$. Written out, FHWA's nominal pullout resistance of a layer is
+$P_r = F^{*}\alpha\,\sigma'_v L_e C R_c$, where $C = 2$ counts the two bearing faces of a sheet and $R_c$ is the
+fraction of the wall the reinforcement covers. For a continuous geosynthetic ($R_c = 1$) that is the integral
+above, term for term: the factor of two is already in $r(s)$, and the per-unit-width convention is what $R_c = 1$
+means. In FHWA's Example E1 — a 20 ft geogrid-reinforced wall — the geogrids take $F^{*} = 0.45$ and
+$\alpha = 0.8$ from the manual's Table 3-6 ($\alpha$ is 0.8 for geogrids, 0.6 for geotextiles, 1.0 for metallic
+reinforcement), so the two columns read Adhesion = 0 and
+Delta = $\arctan(0.45 \times 0.8) = 19.80°$, and nothing else about the bond is entered. Reading the envelope
+where the design failure surface crosses each of that wall's eleven layers reproduces the manual's whole pullout
+table; the entry is under
+[published problems](../verification/published.md#fhwa-e1).
 
 **Grouted tiebacks with a bonded length.** A tieback develops pullout resistance only over its grouted (bonded)
 length $L_{bond}$ at the far end, at a bond strength $b$ (force per unit length); the free length carries whatever

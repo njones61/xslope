@@ -4,7 +4,8 @@ Full bibliographic details for the author-year citations used throughout the
 verification corpus pages ([Slide2](rocscience.md), [Slide2
 groundwater](rocscience_groundwater.md), [RS2](rs2.md),
 [SLOPE/W](geostudio.md), [FE
-seepage](seep.md) and [SSRM](ssrm.md)). The corpus pages cite works in
+seepage](seep.md), [SSRM](ssrm.md) and [published
+problems](published.md)). The corpus pages cite works in
 author-year form in their prose and **Sources:** lines; this page collects the
 matching references, alphabetical by first author.
 
@@ -46,6 +47,11 @@ Engineers).
   Crossref.)*
 - Bear, J. (1972). *Dynamics of Fluids in Porous Media*. American Elsevier, New
   York.
+- Berg, R.R., Christopher, B.R. & Samtani, N.C. (2009). *Design and
+  Construction of Mechanically Stabilized Earth Walls and Reinforced Soil
+  Slopes*. FHWA-NHI-10-024 (Volume I) and FHWA-NHI-10-025 (Volume II), FHWA GEC
+  011. National Highway Institute, Federal Highway Administration, Washington,
+  D.C. [Volume II](https://www.fhwa.dot.gov/engineering/geotech/pubs/nhi10025/nhi10025.pdf)
 - Biedenharn, D.S. & Tracy, F.T. (1987). *Finite Element Method Package for
   Solving Steady-State Seepage Problems* (SEEP2D). U.S. Army Engineer Waterways
   Experiment Station, Vicksburg, MS.

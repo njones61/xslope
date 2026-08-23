@@ -281,45 +281,17 @@ are the 240 psf surcharge.
 
 ## The stiffnesses the run needs
 
-The mesh exists, but the run will not start on it yet. The starter carries the
+The mesh exists, but the run cannot start on it yet. The starter carries the
 limit equilibrium model and nothing beyond it, so every input the continuum
 needs is still blank: the two elastic properties on each soil, and two of the
-three finite element columns on each reinforcement line. This section fills
-them in, soils first, because what a bar's stiffness does depends on the
-stiffness of the soil it is buried in.
+three finite element columns on each reinforcement line. Opening **Run → Run
+FEM…** now would show the same refusal
+[FEM-1](fem01_strength_reduction.md#youngs-modulus-and-poissons-ratio) walked
+through — errors naming each blank input, with **Run** disabled — so this
+section goes straight to entering them, soils first, because what a bar's
+stiffness does depends on the stiffness of the soil it is buried in.
 
-With a mesh in place, **Run → Run FEM…** is available. Click it.
-
-![The run refused: neither soil has a stiffness, the six lines have no axial stiffness, and Run is disabled](images/fem02_studio_run_fem_no_reinf.png)
-
-**Model checks — 3 errors · 2 warnings**, and the **Run** button is disabled.
-The same file ran in the limit equilibrium engine with nothing to report. Three
-checks failed, one line each, and each line ends with the rows its own check
-fired on — trimmed to the width the list has, and given in full in the detail
-underneath it:
-
-> A blank or non-positive Young's modulus reaches the solver as a singular
-> matrix — 2 materials: 1 ('shell'), 2 ('base')
->
-> Poisson's ratio nu must be in (0, 0.5); a blank one reads as 0.0 — 2
-> materials: 1 ('shell'), 2 ('base')
->
-> The FEM models reinforcement as a bar element and needs E and Area — 6 lines:
-> 1 ('Line 1'), 2 ('Line 2'), 3 ('Line 3'), 4 ('Line 4'), 5 ('Line 5'), and 1
-> more
-
-The panel opens on the first of the three, and the detail beneath the list
-carries the rest of that message: the finite element engine needs a positive
-modulus for every material it meshes, and a zero one reaches the solver as
-*Factor is exactly singular*. Select the third line and it explains itself the
-same way:
-
-> The finite element engine models reinforcement as a bar element, so it needs
-> both. The limit-equilibrium engine does not -- it applies the tensile capacity
-> envelope (Tmax/Lp) directly -- so this file runs in the LEM but not in the FEM
-> until E and Area are filled in.
-
-Click **Cancel**, then **Materials** in the Inputs dock. On **Table view**, set
+Click **Materials** in the Inputs dock. On **Table view**, set
 the **Show parameters for:** toggles to **FEM** alone, and give both soils an
 elastic modulus of 1.0 × 10<sup>6</sup> psf and a Poisson's ratio of 0.3, in the
 columns headed `E (psf)` and `n` (the Poisson's ratio column is labeled with a

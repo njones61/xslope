@@ -53,16 +53,19 @@ pile-stabilized slope with a three-dimensional strength reduction finite element
 individual piles with slip interfaces, and XSLOPE's SSRM is run on the same slope at a spacing of three
 diameters in [the VP106 diagnostic](../verification/rocscience.md#vp106-fem). With no pile the two agree to
 0.4%, which is what makes the rest of the comparison readable. With the pile row in place the
-two-dimensional model reads 10.1% high with a free head and 7.0% high with the head rotation restrained: it
-credits the row with multiplying the unreinforced factor of safety by 1.318 where the three-dimensional
-model credits 1.193.
+two-dimensional model reads 13.1% high with a free head and 8.3% high with the head rotation restrained: it
+credits the row with multiplying the unreinforced factor of safety by 1.354 where the three-dimensional
+model credits 1.193. Limit equilibrium with the Ito & Matsui force credits the same row 1.269, nearer the
+three-dimensional value than the plane-strain beam gets.
 
 **Which path to use.** For a discrete pile row, the validated route is limit equilibrium with the Ito &
 Matsui (1975) limit pressure, which is a theory *of* the three-dimensional mechanism rather than a
 two-dimensional substitute for it: XSLOPE computes it automatically from the pile diameter and spacing,
 and it is verified across four spacings against both Slide2 and the originating paper in
 [VP106](../verification/rocscience.md#vp106) and again in
-[VP54](../verification/rocscience.md#vp54). See [LEM Piles](../lem/piles.md). The finite element path
+[VP54](../verification/rocscience.md#vp54). See
+[LEM vs. FEM Pile Modeling](../lem/piles.md#lem-vs-fem-pile-modeling), which states the same rule from the
+limit equilibrium side and carries the measured pair on XSLOPE's own pile sample. The finite element path
 remains the right one for a continuous wall, and for a pile row it is best read as a stiffness-and-force
 study whose factor of safety carries the idealization above.
 

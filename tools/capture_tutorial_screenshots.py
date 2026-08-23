@@ -2300,28 +2300,6 @@ def fem02_run_fem():
     return _grab(dlg, "fem02_studio_run_fem.png")
 
 
-def fem02_run_fem_no_reinf():
-    """The same dialog on the STARTER, meshed but carrying no finite element
-    input at all: the soils' E and nu blank, and the reinforcement's E and Area
-    blank with them.
-
-    **Run** is disabled and the checks column carries three errors — a modulus
-    check and a Poisson's-ratio check over both materials, and the axial
-    stiffness check over all six lines. This is the page's transition figure: the
-    limit-equilibrium search ran on this file unchanged, and the finite element
-    engine refuses it until the soils and the bars both have a stiffness — the
-    capacity envelope alone is not a bar.
-    """
-    from studio.dialogs import RunFemDialog
-
-    data = _fem02_meshed(FEM02_START)
-    dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
-                                 "tolerance": 0.01},
-                       material_names=[m.get("name") for m in data["materials"]],
-                       slope_data=data)
-    dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "fem02_studio_run_fem_no_reinf.png")
-
 
 def fem02_details():
     """The 1D Details panel on the most heavily loaded line of the peak-residual
@@ -2361,7 +2339,6 @@ SHOTS.update({
     "fem02_reinforce_filled": fem02_reinforce_filled,
     "fem02_build_mesh": fem02_build_mesh,
     "fem02_run_fem": fem02_run_fem,
-    "fem02_run_fem_no_reinf": fem02_run_fem_no_reinf,
     "fem02_details": fem02_details,
 })
 

@@ -573,11 +573,15 @@ unconservatively high factor of safety.
 
 #### LEM vs. FEM Comparison
 
-The corresponding FEM analysis of this problem (see [FEM Samples](../fem/samples.md), Problem 3) gives
-FS = 1.32 with piles — significantly lower than the LEM result of 1.85. This difference arises because
-the LEM applies the Ito & Matsui force (even after capping) as a concentrated load at the failure surface,
-while the FEM beam elements only develop as much resistance as the global deformation pattern naturally
-produces. The FEM result is generally considered more realistic for pile-stabilized slopes.
+The same model solved with the finite element engine (see
+[FEM Samples](../fem/samples.md#2-slope-stabilized-with-drilled-shaft-piles)) reads FS = 1.370 with the
+piles and 1.155 without them, where Spencer reads 1.842 with them and 1.149 without. The two engines
+credit the same row by factors of 1.19 and 1.60. That gap is an idealization, not a numerical difference:
+a plane-strain finite element model has no space between the piles, so it represents the row as a
+continuous wall carrying one pile's stiffness smeared over the spacing, while the Ito & Matsui force is
+a theory of the soil flowing between them. For a discrete row at spacing the limit equilibrium result is the applicable one,
+and the finite element run is read for the pile's internal forces rather than for its factor of safety —
+see [LEM vs. FEM Pile Modeling](piles.md#lem-vs-fem-pile-modeling).
 
 One more caution this problem teaches: the tabulated values are the deep-surface results the Ito & Matsui
 walkthrough analyzes, found by the search seeded from the circles sheet. A grid-seeded global search

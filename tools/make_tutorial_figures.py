@@ -4151,16 +4151,13 @@ FEM02_SLICES = 40
 FEM02_CRITERION = "non_convergence"
 FEM02_F_MIN, FEM02_F_MAX = 1.0, 2.0
 FEM02_TOLERANCE = 0.01
-#: 12,000 rather than ``solve_ssrm``'s default 3,000, because on THIS model the
-#: default budget does not merely shade the answer — it erases the comparison the
-#: page is about.  At 3,000 iterations a trial, the elastic-perfectly-plastic and
-#: the peak-residual runs return the same factor of safety (1.3555) from the same
-#: bracket, trial for trial, because no trial ever converges far enough for the
-#: post-peak fixed point to be evaluated (``fem.py``: softening is decided only on
-#: a converged state).  At 12,000 they separate — 1.5352 against 1.5117 — and the
-#: answer then plateaus: 16,000 returns the same two numbers and the same
-#: brackets.  12,000 is now also the engine's default budget, and a trial that
-#: needs more is extended rather than failed.
+#: 12,000, which is also ``solve_ssrm``'s default budget.  On this model the
+#: number no longer decides the answer: a trial that spends its budget while still
+#: making progress is extended rather than failed, so both runs return the same
+#: factors of safety (1.5586 elastic-perfectly-plastic, 1.5117 peak-residual) from
+#: a 3,000 budget and from 12,000, with the same brackets and the same converged
+#: field.  What the budget still decides is how far the captured failure state has
+#: developed, which is why the producers ask for the larger one.
 FEM02_MAX_ITERATIONS = 12000
 #: The line the bar-force profiles are drawn for: the most heavily loaded of the
 #: six in both runs (peak 800 lb/ft elastic-perfectly-plastic, 798 lb/ft
@@ -4169,8 +4166,8 @@ FEM02_PROFILE_LINE = 5
 #: The residual capacities the sweep asks for, highest first.  ``None`` is the
 #: blank cell — no post-peak drop at all.  The sweep runs down to zero because
 #: that is where the answer moves: Tres = Tmax is the same run as a blank cell,
-#: every entry between 700 and 200 gives one lower factor of safety, and only
-#: Tres = 0 — the bar tearing and carrying nothing — gives a third.
+#: 600 and 400 give one lower factor of safety, and only Tres = 0 — the bar
+#: tearing and carrying nothing — gives a third.
 FEM02_TRES_SWEEP = (None, 800.0, 600.0, 400.0, 0.0)
 
 
@@ -4184,9 +4181,9 @@ def _fem02_mesh(model):
     inert: the shell is a 1.19 ft facing band, thinner than one element at the
     target size, so the refinement drives the local size there to 0.33 ft and the
     mesh from 2,101 elements to 5,096.  That mesh is a different model's worth of
-    answer (peak-residual 1.40 against 1.51), so the page has to tell the reader
-    which box to clear, and this producer draws the mesh the page's own numbers
-    come from.
+    answer (peak-residual 1.4414 against 1.5117, elastic-perfectly-plastic 1.5117
+    against 1.5586), so the page has to tell the reader which box to clear, and
+    this producer draws the mesh the page's own numbers come from.
     """
     from xslope.mesh import (build_mesh_from_polygons,
                              extract_constraint_line_geometry,

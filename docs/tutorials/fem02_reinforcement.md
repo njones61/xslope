@@ -63,7 +63,7 @@ step below is done on either one
 
 ## The problem
 
-![A 24 ft reinforced sand fill: six geogrid layers with 4 ft of development at the face and 2 ft buried, a cohesive face band, and a crest surcharge](images/fem02_problem_sketch.png){width=1000}
+![A 24 ft reinforced sand fill: six geogrid layers developing their tension over 4 ft at each end, a cohesive face band, and a crest surcharge](images/fem02_problem_sketch.png){width=1000}
 
 The fill stands **24 ft** high at **1.25:1** on a foundation that runs 10 ft
 below the toe, with a **240 psf** surcharge over the 70 ft of crest behind it.
@@ -72,24 +72,11 @@ with no cohesion at all, and the face is wrapped in a band of cohesive fill —
 the `shell` — 2 ft measured horizontally, which on a 1.25:1 face is 1.25 ft
 perpendicular to it; its 300 psf of cohesion keeps the search off the face. Six geogrid layers, each **20 ft** long and 4 ft apart vertically, start at
 the face. Each develops **800 lb/ft** of tension over a pullout length of
-**4 ft at the face end and 2 ft at the buried end**. The two ends get different
-lengths because they are not alike: the buried end sits under 4 to 16 ft of fill
-and grips within about two feet, while the face end has almost no soil above it
-and needs about four.
-
-The 2 ft is this page's own. LEM-8 and the UTEXASED example behind it develop
-the full tension over 4 ft at both ends, and the two sample problems that lock
-this slope's answers keep that. Shortening the buried ramp does not move the
-limit equilibrium answer — Spencer returns 1.587 either way, on the same circle,
-because every crossing lands more than 8 ft from the nearer tip — and it changes
-what the finite element run has to say about the tips themselves. Over a 4 ft
-buried ramp the outermost element of each line is allowed only 200 lb/ft, and in
-the peak-residual run five of the six lines end up slipping there rather than
-where the failure surface crosses them — that run is
-[FEM sample problem 1](../fem/samples.md).
-Over 2 ft the same element is allowed 400 lb/ft, no tip reaches it, and what the
-run reports instead is the loss of tensile capacity in the middle of the lines,
-which is what this page compares against the limit equilibrium answer.
+**4 ft at both ends**, which is the published example's own value. It treats the
+two ends as alike, and they are not — the buried end carries 4 to 16 ft of fill
+and the face end almost none — so
+[pullout from the overburden](#pullout-from-the-overburden) below runs the same
+model with the bond read from the depth of burial instead.
 
 The soils' elastic properties, E = 1.0 × 10<sup>6</sup> psf and ν = 0.3, are
 already in the starter file. The sketch also shows the geogrid's axial
@@ -113,9 +100,8 @@ feet, unit weights in pcf, and stresses, strengths and stiffnesses in psf.
 The Inputs plot shows the face band and the fill as two profile lines, the
 hatched maximum-depth line at elevation −10, the crest surcharge as purple
 arrows, and the six reinforcement lines as gray bars stepping up the face. Each
-bar carries two red **tension points**, 4 ft in from the face end and 2 ft in
-from the buried end — the points where its capacity envelope first reaches the
-full 800 lb/ft. The two dashed red
+bar carries two red **tension points**, 4 ft in from each end — the points where
+its capacity envelope first reaches the full 800 lb/ft. The two dashed red
 arcs are the starting circles the search begins from.
 
 ---
@@ -179,11 +165,11 @@ is buried in, and near a free end there is not much soil to be held by, so the
 force the line can carry there is limited by its embedment rather than by its
 own strength. That is what the pullout lengths `Lp1` and `Lp2` describe: the available force
 ramps from zero at an end up to the full 800 lb/ft over that length, and past it
-the embedment can develop the whole capacity. Here the ramp is 4 ft at the face
-and 2 ft at the buried end, because the buried end has 4 to 16 ft of fill
-pressing on it and the face end has almost none. (Stating `Adhesion`
-and `Delta` instead makes that ramp follow the effective overburden along the
-line rather than rise at a fixed rate; this model uses the lengths.) The ramp
+the embedment can develop the whole capacity. Here the ramp is 4 ft at each end.
+(Stating `Adhesion` and `Delta` instead makes that ramp follow the effective
+overburden along the line rather than rise at a fixed rate; this model uses the
+lengths, and [the section below](#pullout-from-the-overburden) runs it the other
+way.) The ramp
 and the plateau together are the **capacity envelope**. Bond is **perfectly plastic**:
 when the force reaches what the embedment can develop, the line slips there and
 goes on carrying that force. Interface friction does not disappear once it has
@@ -251,8 +237,9 @@ Untick **Auto-size from geometry** and set **Target element size** to `2`. That
 is the size the [FEM sample problem](../fem/samples.md) for this model uses, and
 it puts ten elements on each 20 ft geogrid, which is enough to draw the force
 profile along a bar. Auto-sizing would divide the 130 ft section width by 100
-divisions for a 1.3 ft element instead, which is finer than this mechanism
-needs: already at 1.5 ft the same run takes about three times as long.
+divisions for a 1.3 ft element instead, which is finer than this mechanism needs
+and, as the next two paragraphs show, is not a neutral choice on a reinforced
+model.
 
 Untick **Refine thin zones** as well. Checked — and it is checked by default —
 the mesher guarantees about four element rows across every thin material zone,
@@ -260,28 +247,28 @@ because a band too thin to resolve cannot develop a shear band and quietly
 returns a factor of safety that is too high. The thin zone here is the `shell`,
 the cohesive band down the face, 1.25 ft across (the check reports 1.19 ft,
 measured off the mesh); refining it drives the local element size there to
-0.33 ft and takes the mesh from 2,101 elements to 5,150.
+0.33 ft and takes the mesh from 2,101 elements to 5,096.
 
 It is left off here, and what that costs is worth knowing. Time is the smaller
-part — the second run below takes about twenty minutes on the refined mesh
-against three on this one. The answer is the larger part. Both runs move on it:
-the one with no post-peak drop from **1.543 to 1.512**, and the one with a
-residual capacity from **1.481 to 1.441**. Across the three target sizes tried
-without refinement — 2.5, 2.0 and 1.5 ft, 1,349 to 3,691 elements — they read
-1.559 / 1.543 / 1.543 and 1.481 / 1.481 / 1.457. Neither is settling on a better
-number as the elements get smaller; a finer mesh gives a lower one, and a finer
-one still would give a lower one again.
+part — the second run below takes about ten minutes on the refined mesh against
+two on this one. The answer is the larger part. Both runs move on it: the one
+with no post-peak drop from **1.559 to 1.512**, and the one with a residual
+capacity from **1.512 to 1.441**. A smaller target size everywhere does the
+same: at 2.5, 2.0, 1.5 and 1.0 ft with no thin-zone refinement at all, the run
+with a residual reads 1.512 / 1.512 / 1.481 / 1.434, a 5% spread that falls as
+the elements get smaller rather than settling on a value.
 
-Refinement also changes what the ends of the bars can carry, which is where the
-sensitivity comes from. The six lines are divided into 156 bar elements instead
-of 60, and the extra ones land at the face, where the refinement is. The
-outermost element of the bottom line ends up a third of a foot long instead of
-two feet, and the capacity envelope allows it 33 lb/ft instead of 200 — little
-enough that it reaches that limit and slips, so the refined mesh reports the
-bottom layer in **pullout** where this page's mesh has no line in pullout at
-all. The spread
-across meshes is the discretization uncertainty a reinforced model carries rather
-than an error to be refined away, and the
+The reason is what refinement does to the ends of the bars. The six lines are
+divided into 156 bar elements instead of 60, and the extra ones land at the face,
+where the refinement is. The outermost element of the bottom line ends up a third
+of a foot long instead of two feet, and the capacity envelope allows it 33 lb/ft
+instead of 200 — little enough that it reaches that limit and slips, so the
+refined mesh reports the bottom layer in **pullout** in both runs where this
+page's mesh reports it below capacity in both. A bar's capacity near its tip is a
+property of where the element boundaries fall, so a mesh change is also a change
+to the model's bond capacity. The spread across meshes is the discretization
+uncertainty a reinforced model carries rather than an error to be refined away,
+and the
 [FEM reinforcement page](../fem/reinforcement.md#force-behavior-and-failure-modes)
 makes the same point about the post-peak model in particular. This page keeps the
 mesh the rest of its numbers were measured on. Leave the rest of the dialog alone
@@ -344,9 +331,8 @@ end, in blue, are the ones only the finite element engine reads.
 ![The reinforcement table on the starter: Tres, E and Area empty](images/fem02_studio_reinforce_blank.png)
 
 The six lines are complete on everything both engines share: 800 lb/ft of
-capacity, a 4 ft pullout length at the face end and 2 ft at the buried one, no
-end anchorage, and a `Spacing` of 1 because geogrid properties are already per
-unit width. The three blue
+capacity, a 4 ft pullout length at each end, no end anchorage, and a `Spacing` of
+1 because geogrid properties are already per unit width. The three blue
 columns are empty.
 
 Fill `E (psf)` and `Area` on all six rows, and leave `Tres` empty:
@@ -388,20 +374,20 @@ factor of safety is the bracket's midpoint as usual, and the log says so.
 
 Because the budget extends itself, the factor of safety on this model does not
 depend on it. Both runs below return the same answer from a budget of 3,000 as
-from 12,000 — 1.543 elastic-perfectly-plastic and 1.481 with the residual —
+from 12,000 — 1.559 elastic-perfectly-plastic and 1.512 with the residual —
 from the same bracket, in the same seven bisection steps, with the same
 converged field to six decimals; the trials near the critical factor simply
-run past the smaller budget until they settle (3,288 iterations at *F* = 1.5,
-6,000 at *F* = 1.547).
+run past the smaller budget until they settle (3,108 iterations at *F* = 1.5,
+12,726 at *F* = 1.547).
 
 What a small budget does change is the **captured failure state**, because the
 capture is one more solve and it stops at its budget. From a budget of 3,000
-the elastic-perfectly-plastic run's failure field has moved 1.54 ft, 24 times
-its elastic response; from 12,000 the same field has moved 5.43 ft, 86 times.
+the elastic-perfectly-plastic run's failure field has moved 1.85 ft, 29 times
+its elastic response; from 12,000 the same field has moved 6.73 ft, 107 times.
 The factor of safety is the same either way, but the mechanism figure drawn
 from the smaller budget shows a collapse that has barely started.
 
-Leave both boxes as they open. Each run takes a few minutes.
+Leave both boxes as they open. Each run takes about two minutes.
 
 ---
 
@@ -427,9 +413,9 @@ a bracket of 1.00 to 2.00, a tolerance of 0.0100, **Rollers** on the sides, and
 which cannot reach equilibrium has failed. FEM-1 compares it against the three
 other criteria the list offers. Click **Run**.
 
-**FS = 1.543**, from a final bracket of [1.5391, 1.5469], in seven bisection
-steps. Against Spencer's 1.587 that is **2.8% lower** — two engines that share
-nothing but the input file, within a few percent of each other.
+**FS = 1.559**, from a final bracket of [1.5547, 1.5625], in seven bisection
+steps. Against Spencer's 1.587 that is **1.8% lower** — two engines that share
+nothing but the input file, within a couple of percent of each other.
 
 ### Viscoplastic shear strain
 
@@ -440,62 +426,52 @@ captures by re-solving once at 1.15 times the factor of safety so the collapse
 develops far enough to draw. The contours are viscoplastic shear strain — the
 shearing left after the elastic response is subtracted — and the band they draw
 runs from the toe, up behind the reinforced block, and out onto the crest near
-**x = 48**. Spencer's circle came out at x = 36.2. The two mechanisms start in
-the same place and end about 12 ft apart: the finite element band passes
+**x = 49**. Spencer's circle came out at x = 36.2. The two mechanisms start in
+the same place and end about 13 ft apart: the finite element band passes
 *behind* the reinforced block rather than cutting through the back of it,
 because it was free to go wherever the soil was weakest and a circular search
 was not.
 
 The bars are drawn on the same figure, colored by their axial force against the
 second color bar. Every one of them reads deep red — 800 lb/ft, the full
-capacity — through its middle, with pale ends where the pullout ramp allows
-less. The pale stretch is visibly longer at the face than at the buried end,
-which is the 4 ft ramp against the 2 ft one. At the captured failure state every
-line is fully mobilized: the geogrid is carrying everything it has and the slope
-still cannot find equilibrium.
+capacity — through its middle, with pale ends of matching length where the two
+4 ft pullout ramps allow less. At the captured failure state every line is fully
+mobilized: the geogrid is carrying everything it has and the slope still cannot
+find equilibrium.
 
 ### Reading what each layer is doing
 
 The state worth reading a bar in is the last one that reached equilibrium, not
 the captured failure. Click **1D Details…** on the results toolbar and set
-**Field state** to **Last converged**, which here is the trial at *F* = 1.5391.
+**Field state** to **Last converged**, which here is the trial at *F* = 1.5547.
 The panel opens on **At failure**, where all six lines stand at 100% and read
 alike; on the converged field they separate, and the comparison below is only
 readable there.
 
 Each row of the list names a line, gives its utilization, and says what state
-the line is in. At that state the six lines are not all doing the same thing.
-Lines 3, 4 and 5 read **yielded** — an element away from the ends is at the full
-800 lb/ft and holding it, which is the whole tensile strength of the geogrid
-mobilized. The other three read **near capacity**: below capacity everywhere,
-but close to it where they are most utilized. Line 1, the bottom layer at the
-toe, is at 87%, its hardest-worked element sitting 1 ft in from the face
-carrying 174 of the 200 lb/ft its embedment develops there. Line 2 is at 91%,
-and the point deciding that is at the other end of the bar — 1 ft in from the
-buried tip, carrying 364 of the 400 lb/ft the 2 ft ramp develops. Line 6 is at
-98%, on an interior element just short of the full 800.
+the line is in. At that state five of the six read **yielded** — somewhere away
+from the ends an element is at the full 800 lb/ft and holding it, which is the
+whole tensile strength of the geogrid mobilized. Only line 1, the bottom layer
+at the toe, reads **near capacity**: below capacity everywhere, but close to it
+where it is most utilized. It is at 97%, its hardest-worked element sitting 1 ft
+in from the face carrying 193 of the 200 lb/ft its embedment develops there.
+That point is working against its bond limit, not its rupture limit.
 
-**No line reads pullout.** A line reads pullout when an element inside a ramp
-reaches the capacity its embedment allows and starts slipping there, and on this
-model none does. The buried ramp is short enough — 2 ft, so its outermost
-element is allowed 400 lb/ft rather than 200 — that the tips stay ahead of the
-force arriving at them, and what governs instead is the tensile strength in the
-middle of the bar.
-
-Line 5 is one of the three that yield, and the one the second run changes most,
-so it is the one to open:
+Line 5 is one of the five that yield, and it carries both limits at once, so it
+is the one to open:
 
 ![Line 5 at the last converged trial, elastic-perfectly-plastic](images/fem02_bar_profile_epp.png){width=1000}
 
 Position along the line runs from the face at s = 0 to the buried end at
-s = 20 ft. The dashed line is the capacity envelope, and it is not symmetric: it
-ramps from zero over the first 4 ft at the face, sits at 800 lb/ft along the
-middle of the line, and drops back to zero over the last 2 ft. The blue line is
-the force actually mobilized. It climbs from almost nothing at the face, meets
-the envelope at s = 11 and 13 — the two elements the panel titles **yielded**,
-out on the plateau away from either ramp at the full 800 lb/ft — then falls away
-and runs down the buried ramp, ending at 397 of the 400 lb/ft available at
-s = 19.
+s = 20 ft. The dashed line is the capacity envelope: it ramps from zero over the
+first 4 ft, sits at 800 lb/ft along the middle of the line, and ramps back to
+zero over the last 4 ft. The blue line is the force actually mobilized. It
+climbs from almost nothing at the face, reaches the envelope at s = 9 and holds
+it at 11 and 13 — those three elements are what the panel titles **yielded**, at
+the full 800 lb/ft — then falls away down the buried ramp and touches the
+envelope again at s = 19, where 1 ft of embedment develops only 200 lb/ft and
+the bar carries 197 of it. One line, both limits: rupture in the middle, bond at
+the tip.
 
 The lower strip is the bond transfer, dT/ds, the rate at which force passes
 between the bar and the soil per foot of bar. It is positive from the face out to
@@ -518,31 +494,37 @@ A residual of 600 lb/ft against a peak of 800 is a ratio of 0.75, a little above
 the 0.3 to 0.7 usually quoted for geosynthetics. Click **OK**, then
 **Run → Run FEM…** and **Run**, with nothing else on the dialog touched.
 
-**FS = 1.481**, from a bracket of [1.4766, 1.4844]. Post-peak behavior cost
-**0.063** of factor of safety, 4.1% — more than the 0.044 between Spencer's
-1.587 and the elastic-perfectly-plastic 1.543.
+**FS = 1.512**, from a bracket of [1.5078, 1.5156]. Post-peak behavior cost
+**0.047** of factor of safety, 3.0% — more than the 0.028 between Spencer's
+1.587 and the elastic-perfectly-plastic 1.559.
 
-Where it cost it is worth seeing, because the two runs diverge at the very first
-bisection trial:
+Where it cost it is worth seeing, because the two searches walk together for six
+trials and then part:
 
 | Trial | *F* | Elastic-perfectly-plastic | *F* | With a 600 lb/ft residual |
 |:---:|:---:|:---:|:---:|:---:|
 | lower bound | 1.0000 | converged | 1.0000 | converged |
 | upper bound | 2.0000 | failed | 2.0000 | failed |
-| 1 | 1.5000 | **converged** | 1.5000 | **failed** |
-| 2 | 1.7500 | failed | 1.2500 | converged |
-| 3 | 1.6250 | failed | 1.3750 | converged |
-| 4 | 1.5625 | failed | 1.4375 | converged |
-| 5 | 1.5312 | converged | 1.4688 | converged |
-| 6 | 1.5469 | failed | 1.4844 | failed |
-| 7 | 1.5391 | converged | 1.4766 | converged |
+| 1 | 1.5000 | converged | 1.5000 | converged |
+| 2 | 1.7500 | failed | 1.7500 | failed |
+| 3 | 1.6250 | failed | 1.6250 | failed |
+| 4 | 1.5625 | failed | 1.5625 | failed |
+| 5 | 1.5312 | **converged** | 1.5312 | **failed** |
+| 6 | 1.5469 | converged | 1.5156 | failed |
+| 7 | 1.5547 | converged | 1.5078 | converged |
 
-The two searches share only the two bounds. At *F* = 1.5000 the
-elastic-perfectly-plastic slope reaches equilibrium after 3,288 viscoplastic
-iterations and the peak-residual one never does, and from that trial on the two
-are bisecting different halves of the bracket. Everything below 1.4688 the
-peak-residual run converges comfortably; the transition it is looking for is
-0.06 lower than the other run's.
+They separate at *F* = 1.5312: the elastic-perfectly-plastic slope reaches
+equilibrium there after 4,374 viscoplastic iterations, and the peak-residual one
+gives up after 5,611. From that trial on the two are bisecting different halves
+of the bracket, and the transition the second run is looking for is a little
+under 0.05 lower than the first run's.
+
+That trial is also where the residual first does anything. Solved on its own at
+*F* = 1.5312, the blank-`Tres` model reaches equilibrium with 11 bar elements
+standing at their capacity and none of them dropping; the `Tres` = 600 model
+puts five elements over `Tmax` — interior elements on lines 3, 4 and 5, away
+from either ramp — and each sheds to its 600 lb/ft residual. Their load goes to
+their neighbors, more elements reach 800, and the slope never settles.
 
 ### What changed in the results, and what did not
 
@@ -554,26 +536,28 @@ converged field is where to look for it.
 
 ![Line 5 with a residual capacity entered](images/fem02_bar_profile_pr.png){width=1000}
 
-Two things are new on this profile. The dotted purple line is the **residual
-capacity**, which the panel draws because there is one. It is not flat at 600: it
-steps — 200 lb/ft over the outer 2 ft at the face, 600 lb/ft along the middle,
-400 lb/ft over the last 2 ft — because a residual is capped by the bond the
-embedment can develop at that point. An element near the end of a bar cannot hold
-600 lb/ft after rupturing when its embedment could only ever develop 200.
+What is new on this profile is the dotted purple line, the **residual capacity**,
+which the panel draws because there is one. It is not flat at 600: it steps —
+200 lb/ft over the outer 2 ft at each end, 600 lb/ft along the middle — because
+a residual is capped by the bond the embedment can develop at that point. An
+element near the end of a bar cannot hold 600 lb/ft after rupturing when its
+embedment could only ever develop 200.
 
-The second is the purple square at s = 13 ft. That element reached the full
-800 lb/ft, dropped to its 600 lb/ft residual, and is carrying that; the mobilized
-force dips into the notch it left, and its neighbors at 11 and 15 ft have picked
-up what it shed. The panel titles the line **softened** and its peak reads 93%
-rather than 100% — the greatest force anywhere on it is now 741 lb/ft, at
-s = 11 ft, against 800 in the run before.
+Nothing on this line has actually dropped to it. There is no purple *Softened*
+square, which is how the panel marks an element that has shed, and the line still
+reads **yielded**: its interior peak is 798 of the 800 lb/ft available there, two
+pounds short of the run before. The tip at s = 19 sits on its 200 lb/ft bond
+limit as it did before. The residual has not changed this state — it has changed
+which states are reachable above it.
 
-At the last converged trial the verdicts have shifted with it. Line 4 has
-softened too, one element at s = 13 ft. Lines 3 and 6 have dropped out of
-**yielded** into **near capacity**, at 98% and 99% — high, but with nothing
-actually at its limit. Lines 1 and 2 are still **near capacity**, at 89% and
-83%. The same panel, left on its default **At failure** state, reads every line
-at 100%:
+That shows in the other five lines. Lines 2, 3, 4 and 6 now read **pullout**:
+each has one element at the buried tip, s = 19, holding the 200 lb/ft its last
+foot of embedment develops and slipping there rather than carrying more. Line 1
+is **near capacity** at 84%, down from 97%. Four lines at their bond limit and
+one at its rupture limit, in the same field: **pullout** and **yielded** are both
+"the line has reached a limit", and only the word says which limit, which is why
+the panel prints it. The same panel, left on its default **At failure** state,
+reads every line at 100%:
 
 ![The 1D Details panel, line 5 selected](images/fem02_studio_1d_details.png)
 
@@ -592,7 +576,7 @@ The deformed panel draws the mesh at its displaced position over a dashed
 outline of where it started. The reinforced block has slid out over the toe and
 settled at the crest, and the six bars — red where they started gray — are
 stretched and rotated with it, hinging where the failure band crosses them. The
-title's **Scale = 1.7x** is the exaggeration, which the panel picks so the
+title's **Scale = 1.1x** is the exaggeration, which the panel picks so the
 collapse reads at this figure size. **Scale ×** and **Auto size** on
 the Display panel control that multiplier.
 
@@ -607,10 +591,12 @@ soil beyond that is not part of the mechanism at this reduction factor.
 
 ## Pullout from the overburden
 
-Everything above states the bond as a **development length**: 4 ft at the face,
-2 ft buried, and the capacity climbs at a constant rate over each. Those two
-numbers are a judgement about how deep each end is buried. The `Adhesion` and
-`Delta` columns, left blank until now, let the model make that judgement itself.
+Everything above states the bond as a **development length**: 4 ft at each end,
+with the capacity climbing at a constant rate over it. That number is a
+judgement about how deep the reinforcement is buried, and it is the same
+judgement for a tail under 16 ft of fill and for a tip at the face. The
+`Adhesion` and `Delta` columns, left blank until now, let the model make that
+judgement itself.
 Filled, they state the soil–reinforcement interface strength and the resistance
 follows the effective overburden along the line — per foot of a sheet with soil
 bearing on both faces, *r*(s) = 2(*a* + σ′<sub>v</sub>(s) tan δ), integrated from
@@ -630,23 +616,29 @@ grows with it and the integral of a growing rate is a curve: on line 2 the law
 allows **42, 168 and 378 lb/ft** at 1, 2 and 3 ft in from the face, where the
 stated 4 ft ramp allowed 200, 400 and 600. At the buried end it goes the other
 way — under 16 ft of fill the law reaches the full 800 lb/ft within half a foot
-of the tip, where the 2 ft ramp still allows only 400. The run puts the failure band at
-**3 to 5 ft**, at the face; under the stated lengths line 2's hardest-worked
-point was its buried tip. That is the whole engineering content of the
+of the tip, and holds it at 17, 18 and 19 ft where the stated ramp is ramping
+back down through 600, 400 and 200. One foot in from a tip, the two ends of the
+same line are allowed 42 lb/ft and 800 lb/ft — a factor of nearly twenty, where
+the stated length allows 200 at both.
+
+The run puts line 2 at capacity almost the whole way from 1 to 15 ft, and that
+now includes the two elements out on the curve at 1 and 3 ft in, riding 42 and
+378 lb/ft. Its failure band sits at **3 to 5 ft**, at the face. Under the stated
+lengths the same line's hardest-worked point was an interior element at the full
+800 lb/ft, 7 ft in. That is the engineering content of the
 comparison: a stated development length is depth-blind, so it under-rates a
 deeply buried tail and over-rates a shallow one, and reinforced slopes are
 critical at the face.
 
-**The strength-reduction answer does not move.** Run elastic-perfectly-plastic
-under the law and it returns **1.543** from the same bracket, in the same seven
-bisection steps, with the same verdict on every one of the nine trials; only the
-iteration counts differ. Spencer moves, from 1.587 to **1.559** — 1.8% — and the
-move is not a loss of capacity. On the circle Spencer already drew, every one of
-the five crossings sits 8.4 ft or more from the nearer end, out where both laws
-allow the full 800 lb/ft, so that surface cannot tell them apart. What happens is
-that a *different* circle becomes critical: one that daylights 8.4 ft beyond the
-toe, passes under line 1 and clips it 2 ft from the face, where the law offers
-168 lb/ft against the stated ramp's 400. One sentence of caution on
+Both answers move, and the smaller move is the finite element one. Run
+elastic-perfectly-plastic under the law and it returns **1.543** against 1.559 —
+1%, two bisection cells. Spencer moves from 1.587 to **1.559**, 1.8%,
+and that move is not a loss of capacity. On the circle Spencer already drew,
+every one of the five crossings sits 8.4 ft or more from the nearer end, out
+where both laws allow the full 800 lb/ft, so that surface cannot tell them apart.
+What happens is that a *different* circle becomes critical: one that daylights
+8.4 ft beyond the toe, passes under line 1 and clips it 2 ft from the face, where
+the law offers 168 lb/ft against the stated ramp's 400. One sentence of caution on
 σ′<sub>v</sub>: it is the weight of the soil column standing above the point and
 nothing else, so the 240 psf crest surcharge does not count toward pullout
 resistance — which is what FHWA directs for a live load.
@@ -665,12 +657,12 @@ Three readings of the same slope, from the same file:
 | Reading | FS |
 |---|:---:|
 | Spencer's method, searched on this page | 1.587 |
-| Strength reduction, bars elastic-perfectly-plastic | 1.543 |
-| Strength reduction, bars with a 600 lb/ft residual | 1.481 |
+| Strength reduction, bars elastic-perfectly-plastic | 1.559 |
+| Strength reduction, bars with a 600 lb/ft residual | 1.512 |
 
-The gap between Spencer and the peak-residual run is 0.106, and the section
-above measured what post-peak behavior is worth: **0.063 of it**. The other
-0.044 separates Spencer from the elastic-perfectly-plastic run, which is the
+The gap between Spencer and the peak-residual run is 0.075, and the section
+above measured what post-peak behavior is worth: **0.047 of it**. The other
+0.028 separates Spencer from the elastic-perfectly-plastic run, which is the
 same physical assumption about the bars — hold capacity once yielded — applied
 two different ways.
 
@@ -678,17 +670,18 @@ The difference is where the force is decided. Spencer takes the envelope value
 at one crossing point and hands the sliding mass 800 lb/ft, five times over, as
 a known force on a surface it chose. The finite element run lets the force
 emerge along the whole of each bar from displacement compatibility, so a layer
-contributes what the soil around it actually mobilized: three of the six lines
-never reach capacity at all, line 1 gets no further than 87% of what its
-embedment allows at the face, and the force in every bar tapers away from the
-failure band instead of standing at its envelope value everywhere. Prescribing
-the maximum available force at one point is the more generous of the two, and
-3% is what that generosity is worth on this slope.
+contributes what the soil around it actually mobilized: line 1 gets no further
+than 97% of what its embedment allows at the face, four of the six lines are held
+at their buried tips by 200 lb/ft of bond once the residual is in play, and the
+force in every bar tapers away from the failure band instead of standing at its
+envelope value everywhere. Prescribing the maximum available force at one point
+is the more generous of the two, and 1.8% is what that generosity is worth on
+this slope.
 
 The mechanisms differ in the same direction. Spencer's circle had to be a
 circle, and the most critical circle available cuts out through the crest at
 x = 36.2. The finite element band, free to take any shape, goes around the back
-of the reinforced block and reaches the crest near x = 48 — a path no circular
+of the reinforced block and reaches the crest near x = 49 — a path no circular
 search had on offer.
 
 ---
@@ -706,26 +699,27 @@ bars' modulus scaled separately:
 
 | Soil E | Bar E | FS |
 |:---:|:---:|:---:|
-| ×0.1 | ×1 | 1.5508 |
-| ×1 (the file) | ×1 | 1.5430 |
-| ×10 | ×1 | 1.5195 |
-| ×10 | ×10 | 1.5508 |
+| ×0.1 | ×1 | 1.5586 |
+| ×1 (the file) | ×1 | 1.5586 |
+| ×10 | ×1 | 1.2383 |
+| ×10 | ×10 | 1.5586 |
 
-A hundredfold sweep in the soil's modulus alone moves the answer by **0.031**,
-2%. It moves it in the direction the mechanism says it should: a stiffer soil
-strains less under the same load, the bars are stretched less, and the
-reinforcement is asked for less of the tension it is capable of. But four
-bisection cells is all it is worth, and the middle two rows are one cell apart.
+The result does not carry over. Ten times the soil's modulus, with the geogrid
+left as it is, costs **0.32 of factor of safety — 21%**. It moves in the
+direction the mechanism says it should: a stiffer soil strains less under the
+same load, the bars are stretched less, and the reinforcement is never asked for
+the tension it is capable of. One tenth of the modulus costs nothing at all,
+because at that stiffness the bars are already carrying everything the envelope
+allows and there is nothing further to mobilize.
 
-Scale the bars by the same ten as the soil and the answer comes back to 1.5508 —
-within one bisection cell of the unscaled 1.5430, which is as close as a
-bisection stopped at a 0.0078-wide bracket can report "the same". What a
-reinforced finite element model responds to is the **ratio** of soil stiffness to
-bar stiffness rather than the absolute value of either, and on this slope even
-that ratio is worth a couple of percent. FEM-1's invariance carries over here,
-loosened rather than overturned: a round soil modulus against a catalog number
-for the geogrid is a modeling decision with a small consequence for the factor of
-safety and a large one for the displacements the run reports.
+Scale the bars by the same ten as the soil and the answer returns to 1.5586, to
+the printed digit and from the same bracket. What a reinforced finite element
+model responds to is the **ratio** of soil stiffness to bar stiffness, not the
+absolute value of either. FEM-1's invariance holds only where there is one
+stiffness to sweep; put a second one in the model and the pair matters. A round
+soil modulus against a catalog number for the geogrid is a modeling decision with
+a real consequence for the factor of safety, and the two values should be chosen
+against each other rather than one at a time.
 
 ---
 
@@ -737,34 +731,32 @@ which is brittle rupture — measures how much the answer depends on that choice
 
 | `Tres` | FS |
 |:---:|:---:|
-| blank | 1.5430 |
-| 800 | 1.5430 |
-| 600 | 1.4805 |
-| 400 | 1.4648 |
-| 0 | 1.4648 |
+| blank | 1.5586 |
+| 800 | 1.5586 |
+| 600 | 1.5117 |
+| 400 | 1.5117 |
+| 0 | 1.4883 |
 
 ![Factor of safety against the residual capacity entered](images/fem02_tres_sweep.png){width=800}
 
-The answer lands on **steps**, not on a curve. `Tres` = 800 reproduces the blank
-run exactly — the same factor of safety, the same bracket, the same trials —
-which is the model saying what it should: a residual equal to the peak means
-nothing ever drops below what it was already carrying, so the post-peak branch
-is never entered. Below that, each step down in the residual is worth less than
-the one before it: 800 to 600 costs 0.063, 600 to 400 costs 0.016, and 400 to 0
-costs nothing measurable at this bisection tolerance.
+The answer lands on **three steps**, not on a curve. `Tres` = 800 reproduces the
+blank run exactly — the same factor of safety, the same bracket, the same trials
+— which is the model saying what it should: a residual equal to the peak means
+nothing ever drops below what it was already carrying, so the post-peak branch is
+never entered. 600 and 400 give the same answer as each other, 0.047 below that.
+Only a brittle zero goes lower, by a further 0.023.
 
-Two things follow for a real design. The first is that the top of the range is
-where the entry matters. The difference between claiming a geogrid holds its
-capacity after rupture and claiming it drops to three quarters of it is 4% of
-factor of safety; the difference between a residual of 400 lb/ft and a brittle
-zero is nothing this model can see. The second is that the whole range, from a
-blank cell to a brittle zero, is worth 0.078, about 5%. Leaving `Tres` blank
-claims the geogrid holds its capacity once it yields, which is what the
-mainstream codes assume and what most published capacities describe; entering
-zero claims it snaps. Neither claim is one a catalog value settles, and the
-meshing step showed that the answer under either moves with the discretization,
-so a residual is better treated as a back-analysis parameter than as a design
-default.
+Two things follow for a real design. The first is that what the entry decides is
+mostly *whether* there is a residual, not how large it is: the step from holding
+capacity to shedding to three quarters of it is 3% of factor of safety, and a
+third of the residual range below that — 600 down to 400 — is invisible at this
+bisection tolerance. The second is that the whole range, from a blank cell to a
+brittle zero, is worth 0.070, about 4.5%. Leaving `Tres` blank claims the geogrid
+holds its capacity once it yields, which is what the mainstream codes assume and
+what most published capacities describe; entering zero claims it snaps. Neither
+claim is one a catalog value settles, and the meshing step showed that the answer
+under either moves with the discretization, so a residual is better treated as a
+back-analysis parameter than as a design default.
 
 ---
 

@@ -2201,7 +2201,7 @@ def _fem02_meshed(path=FEM02_DONE):
     on mesh edges, exactly as ``studio.runners.MeshWorker`` does it. **Refine thin
     zones is off**, which is what the page instructs: the dialog's own default is
     on, and on this section it moves the mesh from 2,101 elements to 5,096 and the
-    peak-residual factor of safety from 1.51 to 1.40.
+    peak-residual factor of safety from 1.5117 to 1.4414.
     """
     from xslope.mesh import (build_mesh_from_polygons,
                              extract_constraint_line_geometry,

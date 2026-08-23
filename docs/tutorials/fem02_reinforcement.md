@@ -24,8 +24,9 @@ yield, which is what every mainstream finite element code assumes unless told
 otherwise, and once with a residual capacity that takes effect after the bar
 ruptures.
 
-[LEM-8](lem08_reinforced_slope.md) built this model and covers reinforcement
-lines, the capacity envelope and pullout lengths, and
+Work through [LEM-8](lem08_reinforced_slope.md) before this page if you have
+not: it built this model and covers reinforcement lines, the capacity envelope
+and pullout lengths, all of which this page leans on.
 [FEM-1](fem01_strength_reduction.md) covers strength reduction, meshing for a
 stability run and the controls that decide whether a trial is allowed to finish.
 This page does not repeat either. It starts from a **starter file** that carries

@@ -257,21 +257,16 @@ answer here; the spread is the uncertainty of the post-peak model itself, for
 the reason the next paragraph gives, and this page keeps the mesh its other
 numbers were measured on.
 
-Refinement changes the answer through the ends of the bars. The six lines are
-divided into 156 bar elements instead of 60, and the extra ones land at the face,
-where the refinement is. The outermost element of the bottom line ends up a third
-of a foot long instead of two feet, and the capacity envelope allows it 33 lb/ft
-instead of 200 — little enough that it reaches that limit and slips, so the
-refined mesh reports the bottom layer in **pullout** in both runs where this
-page's mesh reports it below capacity in both. A bar's capacity near its tip is a
-property of where the element boundaries fall, so a mesh change is also a change
-to the model's bond capacity. The spread across meshes is the discretization
-uncertainty a reinforced model carries rather than an error to be refined away,
-and the
-[FEM reinforcement page](../fem/reinforcement.md#force-behavior-and-failure-modes)
-makes the same point about the post-peak model in particular. This page keeps the
-mesh the rest of its numbers were measured on. Leave the rest of the dialog alone
-and click **Build**.
+Here is why. Near a bar's end its capacity ramps up from zero over the 4 ft
+pullout length, and each bar element is given the capacity at its own midpoint.
+On this page's mesh the end element of each bar is 2 ft long, so its midpoint
+sits 1 ft in and it is allowed 200 lb/ft. The refined mesh cuts the same ends
+into elements a third of a foot long; the outermost one sits 2 inches in and is
+allowed only 33 lb/ft — so little that it reaches its limit and slips, and the
+refined mesh reports the bottom layer in **pullout** where this mesh reports it
+below capacity. Dividing a bar more finely weakens its ends. That is why the
+answer moves with the mesh, and why the smaller numbers are not closer to the
+truth. Leave the rest of the dialog alone and click **Build**.
 
 The mesh comes out at **4,364 nodes and 2,101 triangles**, with the six lines
 discretized into **60 bar elements**, ten per line:

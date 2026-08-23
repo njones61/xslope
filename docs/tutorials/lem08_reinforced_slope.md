@@ -9,12 +9,10 @@ A 24 ft embankment of clean sand — c = 0, φ = 37° — standing at 1.25:1 und
 240 psf surcharge. Sand alone cannot stand that steep at those numbers; six
 layers of geogrid do, each 20 ft long, 4 ft apart vertically, developing 800
 lb/ft of tension. The face is wrapped in a 2 ft band of cohesive fill, and the
-base of the problem is 10 ft below the bottom of the slope — not pictured in
-the drawing. The
-problem and the drawing below are Example 5 from the UTEXASED user manual,
-S. G. Wright's educational version of UTEXAS.
+bottom of the problem is 10 ft below the toe. The problem is Example 5 from the
+UTEXASED user manual, S. G. Wright's educational version of UTEXAS.
 
-![A reinforced sand fill: six geogrid layers, a cohesive face wrap, and a crest surcharge](../lem/sample_images/reinforce.png){width=700}
+![A 24 ft sand embankment at 1.25:1 with a 2 ft cohesive band along the face, six geogrid layers 4 ft apart and 20 ft long developing their tension over 4 ft at each end, and a 240 psf surcharge across the crest](images/lem08_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

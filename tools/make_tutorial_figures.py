@@ -999,10 +999,11 @@ def lem08_lengths():
                                                         r.get("tend1", 0.0),
                                                         r.get("tend2", 0.0))))
         print("   %2d ft  FS %.4f  ΣT %5.0f  crossings %d  (Xo %.2f Yo %.2f "
-              "depth %.3f)  nearest end %s"
+              "depth %.3f)  each crossing (x, ft to nearer end, T) %s"
               % (length, crit["FS"], crit["slices"]["p"].sum(), crossed,
                  crit["Xo"], crit["Yo"], crit["Depth"],
-                 " ".join("%.1f" % d for _x, d, _t in tension)))
+                 " ".join("(%.2f, %.1f, %.0f)" % (x, d, t)
+                          for x, d, t in tension)))
         if length == LEM08_LENGTHS[0]:
             capture("lem08_solution_short.png", plot_solution, model,
                     crit["slices"], crit["failure_surface"],
@@ -4170,7 +4171,7 @@ FEM02_PROFILE_LINE = 5
 #: that is where the answer moves: Tres = Tmax is the same run as a blank cell,
 #: every entry between 700 and 200 gives one lower factor of safety, and only
 #: Tres = 0 — the bar tearing and carrying nothing — gives a third.
-FEM02_TRES_SWEEP = (None, 800.0, 700.0, 600.0, 500.0, 400.0, 200.0, 0.0)
+FEM02_TRES_SWEEP = (None, 800.0, 600.0, 400.0, 0.0)
 
 
 def _fem02_mesh(model):
@@ -4407,11 +4408,118 @@ def fem02_plots():
              crit["Yo"] - crit["Depth"]))
 
 
+#: The overburden-dependent pullout law entered on FEM-2's alternative run:
+#: adhesion zero, and the interface angle FHWA-NHI-10-024's default pullout
+#: friction factor gives for a geogrid in sand — δ = arctan(F*·α) with
+#: F* = (2/3)·tan φ′ and the geogrid scale-effect correction α = 0.8.  At
+#: φ′ = 37° that is arctan(0.404) = 22.0°.
+FEM02_LAW_ADHESION = 0.0
+FEM02_LAW_DELTA = 22.0
+#: The line the law's envelope is drawn along.  Line 2 rather than line 5: it is
+#: the line whose hardest-worked point moves from the buried end to the face when
+#: the law replaces the constant ramps, so its profile shows both the curve and
+#: what the curve costs.
+FEM02_LAW_PROFILE_LINE = 2
+
+
+def fem02_pullout_law():
+    """The same model with pullout resistance read from the overburden instead of
+    from a stated development length: Adhesion 0, Delta 22°.
+
+    One elastic-perfectly-plastic strength-reduction run and one Spencer search
+    under the law, against the constant-law search on the same file, plus the
+    bar-force profile that shows the curved capacity envelope.
+    """
+    import copy as _copy
+    import time
+
+    from xslope.fem import build_fem_data
+    from xslope.fileio import ensure_reinforce_pullout
+    from xslope import fem_details
+    from xslope.plot_fem_details import plot_reinforcement_detail
+
+    done = load_slope_data(FEM02_DONE)
+    start = load_slope_data(FEM02_START)
+    _u = declared_unit_labels(done)
+
+    # ---- the limit-equilibrium half: the same search under each law ---------- #
+    def _search(model):
+        with contextlib.redirect_stdout(io.StringIO()):
+            fs_cache, _, _p, _c = circular_search(
+                model, FEM02_METHOD, num_slices=FEM02_SLICES, diagnostic=False,
+                **file_search_window(model))
+        return fs_cache[0]
+
+    law_start = _copy.deepcopy(start)
+    for line in law_start["reinforcement_lines"]:
+        line["adhesion"] = FEM02_LAW_ADHESION
+        line["delta"] = FEM02_LAW_DELTA
+    ensure_reinforce_pullout(law_start)
+
+    for tag, model in (("constant", start), ("law", law_start)):
+        crit = _search(model)
+        xs, ys = zip(*list(crit["failure_surface"].coords))
+        print("   LEM %-9s %s FS %.4f on Xo %.4f Yo %.4f R %.4f · entry "
+              "(%.3f, %.3f) exit (%.3f, %.3f) · ΣP %.0f %s"
+              % (tag, FEM02_METHOD, crit["FS"], crit["Xo"], crit["Yo"],
+                 crit["Yo"] - crit["Depth"], xs[0], ys[0], xs[-1], ys[-1],
+                 crit["slices"]["p"].sum(), _u["force_per_len"]))
+
+    # ---- the finite element half: one run, blank Tres ------------------------ #
+    # The mesh is built from the model as the page meshes it, and the law is
+    # applied to the copy that goes into ``build_fem_data``. Meshing the law's
+    # own model instead would put a node at every one of its 41 stored tension
+    # points per line — 240 bar elements against 60 — and the comparison would
+    # be between two meshes rather than between two capacity laws.
+    mesh = _fem02_mesh(done)
+    law_done = _copy.deepcopy(done)
+    for line in law_done["reinforcement_lines"]:
+        line["adhesion"] = FEM02_LAW_ADHESION
+        line["delta"] = FEM02_LAW_DELTA
+    ensure_reinforce_pullout(law_done)
+    print("   mesh        %d nodes · %d elements · %d bar elements"
+          % (len(mesh["nodes"]), len(mesh["elements"]),
+             len(mesh.get("elements_1d", []))))
+    t0 = time.time()
+    fem_data, result, _log = _fem02_solve(law_done, mesh, None)
+    print("   law run · Tres blank · %.1f s wall" % (time.time() - t0))
+    _fem02_report("law-epp", fem_data, result)
+
+    prof = fem_details.reinforcement_profile(
+        fem_data, result["last_solution"], FEM02_LAW_PROFILE_LINE,
+        slope_data=law_done, field_state="converged",
+        failure_solution=result.get("failure_solution"))
+    print("   law  line %d · max force %.1f %s · hardest-worked %.1f at s %.2f "
+          "%s (utilization %.3f) · %s"
+          % (FEM02_LAW_PROFILE_LINE, float(prof["T"].max()), _u["force_per_len"],
+             prof["peak_T"], prof["peak_s"], _u["length"],
+             prof["peak_utilization"], prof["status"]))
+    capture("fem02_bar_profile_law.png", plot_reinforcement_detail, prof)
+
+    # What the two laws allow along that line, so the page's claim about WHERE the
+    # bond is critical is a measurement rather than a reading of the figure.
+    from xslope.fileio import reinforce_available_tension
+    r_law = law_done["reinforcement_lines"][FEM02_LAW_PROFILE_LINE - 1]
+    r_con = done["reinforcement_lines"][FEM02_LAW_PROFILE_LINE - 1]
+    L = math.hypot(r_con["x2"] - r_con["x1"], r_con["y2"] - r_con["y1"])
+    print("   envelope along line %d (s from the face end, %s):"
+          % (FEM02_LAW_PROFILE_LINE, _u["length"]))
+    for s in (1.0, 2.0, 3.0, 4.0, 5.0, 10.0, L - 3.0, L - 2.0, L - 1.0):
+        con = reinforce_available_tension(s, L - s, r_con["t_max"], r_con["lp1"],
+                                          r_con["lp2"], r_con.get("tend1", 0.0),
+                                          r_con.get("tend2", 0.0))
+        law = reinforce_available_tension(s, L - s, r_law["t_max"], r_law["lp1"],
+                                          r_law["lp2"], r_law.get("tend1", 0.0),
+                                          r_law.get("tend2", 0.0),
+                                          pullout=r_law.get("_pullout_profile"))
+        print("        s %5.1f   constant %6.1f   law %6.1f" % (s, con, law))
+
+
 def fem02_tres_sweep():
     """FS against the residual capacity typed into Tres, with the
     limit-equilibrium answer drawn across it.
 
-    Its own group because it is eight strength-reduction runs — about twenty
+    Its own group because it is five strength-reduction runs — about ten
     minutes — and nothing else on the page needs them.
     """
     import numpy as np
@@ -4494,6 +4602,7 @@ GROUPS = {
     "seep04_plots": seep04_plots,
     "fem01_plots": fem01_plots,
     "fem02_plots": fem02_plots,
+    "fem02_pullout_law": fem02_pullout_law,
     "fem02_tres_sweep": fem02_tres_sweep,
 }
 

@@ -141,16 +141,20 @@ block says, the same eight values on every line:
 
 | Tmax | Lp1 | Lp2 | Adhesion | Delta | Tend1 | Tend2 | Spacing |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
-| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
-| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
-| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
-| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
-| 800 | 4 | 4 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 2 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 2 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 2 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 2 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 2 |  |  | 0 | 0 | 1 |
+| 800 | 4 | 2 |  |  | 0 | 0 | 1 |
 
 **Tmax** is the rupture capacity, 800 lb/ft. **Lp1** and **Lp2** are the pullout
 lengths at each end: the tension available rises from zero at an end to the full
-Tmax 4 ft in, so a crossing within 4 ft of either end mobilizes only its share.
+Tmax over that length, so a crossing inside it mobilizes only its share. The two
+columns carry different numbers because the two ends are not alike. The buried
+end sits under 4 to 16 ft of fill and grips within about two feet, so 2 ft is
+about right for it; the face end has almost no soil above it and needs about
+four.
 **Adhesion** and **Delta** are blank, which is what selects the development-length
 law above: fill them instead and the pullout resistance follows the effective
 overburden along the line rather than a fixed length. **Tend1** and **Tend2** are
@@ -204,7 +208,7 @@ surcharge and the reinforcement layout. Paste it into the chat box and type
 
 <div class="prompt-block" markdown>
 ```text
-Build a model for a 24 ft embankment with a 1.25:1 face, toe at (0, 0) and crest break at (30, 24). The fill is 130 pcf sand with c = 0, phi = 37; a 2 ft wide band along the face is the same 130 pcf with c = 300 psf, phi = 37. The crest runs back to x = 100 and the ground continues 30 ft in front of the toe; the bottom of the model is elevation -10. Put a 240 psf surcharge on the crest from x = 30 to x = 100. Add six horizontal geogrid layers of support type Geosynthetic at elevations 0, 4, 8, 12, 16 and 20, each starting on the slope face and 20 ft long, with a tensile capacity of 800 lb/ft and a pullout length of 4 ft at each end. Add starting circles for a critical-surface search.
+Build a model for a 24 ft embankment with a 1.25:1 face, toe at (0, 0) and crest break at (30, 24). The fill is 130 pcf sand with c = 0, phi = 37; a 2 ft wide band along the face is the same 130 pcf with c = 300 psf, phi = 37. The crest runs back to x = 100 and the ground continues 30 ft in front of the toe; the bottom of the model is elevation -10. Put a 240 psf surcharge on the crest from x = 30 to x = 100. Add six horizontal geogrid layers of support type Geosynthetic at elevations 0, 4, 8, 12, 16 and 20, each starting on the slope face and 20 ft long, with a tensile capacity of 800 lb/ft and a pullout length of 4 ft at the face end and 2 ft at the buried end. Add starting circles for a critical-surface search.
 ```
 </div>
 
@@ -218,11 +222,13 @@ Build a model for a 24 ft embankment with a 1.25:1 face, toe at (0, 0) and crest
   the reinforcement *is*, and it fills `Dir` with tangent and `Appl` with
   active. If it came back empty, say: *"Set the support type to Geosynthetic on
   every reinforcement line."*
-- **Both ends have a pullout length.** `Lp1` and `Lp2` = 4 on every line. A
-  blank or 0 means *fully anchored* — the whole 800 lb/ft available right at the
-  free end on the face, which is the opposite of what a geogrid does. If they
-  came back empty, say: *"Set the pullout length to 4 ft at both ends of every
-  reinforcement line."*
+- **Both ends have a pullout length.** `Lp1` = 4 and `Lp2` = 2 on every line —
+  4 ft at the face, where there is almost no soil above the geogrid, and 2 ft at
+  the buried end, where there is 4 to 16 ft of it. A blank or 0 means *fully
+  anchored* — the whole 800 lb/ft available right at the free end on the face,
+  which is the opposite of what a geogrid does. If they came back empty, say:
+  *"Set the pullout length to 4 ft at the face end and 2 ft at the buried end of
+  every reinforcement line."*
 - **Tmax is per foot of slope**, 800 lb/ft, with the spacing left at 1. Geogrid
   capacities are quoted that way already.
 - **c = 0 in the fill.** The reinforcement exists because the sand has no
@@ -369,7 +375,8 @@ However you built it, you now hold the same model:
 ![The finished model](images/lem08_inputs.png){width=1000}
 
 The six gray lines step up the face, each with a red tension point 4 ft in from
-either end — the points where its envelope reaches the full 800 lb/ft. The
+the face end and 2 ft in from the buried end — the points where its envelope
+reaches the full 800 lb/ft. The
 purple arrows are the crest surcharge, and the two dashed red arcs are the
 starting circles.
 
@@ -414,9 +421,10 @@ decides what each one gives:
 | 5 | 30.56 | 9.44 | 800 |
 | 6 | 33.67 | 8.67 | 800 |
 
-Every crossing lands more than 8 ft from the nearer end of its line, twice the
-4 ft it takes to develop the full capacity, so pullout limits nothing here and
-all five deliver 800 lb/ft.
+Every crossing lands more than 8 ft from the nearer end of its line — twice the
+4 ft the face end takes to develop the full capacity and four times the 2 ft the
+buried end takes — so pullout limits nothing here and all five deliver
+800 lb/ft.
 
 To see the pullout lengths at work, solve this same circle as a **Single
 surface** run — no search, so changing `Lp1` and `Lp2` is the only thing that
@@ -438,11 +446,11 @@ Each method gets its own search and its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1.480 | 1.594 | 1.524 | 1.381 | 1.598 | 1.587 | 1.587 |
+| 1.487 | 1.594 | 1.524 | 1.381 | 1.598 | 1.587 | 1.587 |
 
 Spencer and Morgenstern-Price agree to four figures on the same circle and are
 the ones to report. The spread below them is the usual one for a frictional
-slope: OMS neglects the interslice forces and comes out 7% low, and the Corps of
+slope: OMS neglects the interslice forces and comes out 6% low, and the Corps of
 Engineers procedure settles on a far deeper circle of its own, bottoming out at
 elevation −9.7, just above the base of the model.
 
@@ -473,8 +481,8 @@ length gets its own search and its own critical circle:
 
 | Line length (ft) | FS | Tension mobilized (lb/ft) | Lines crossed |
 |:---:|:---:|:---:|:---:|
-| 10 | 1.270 | 532 | 2 of 6 |
-| 15 | 1.426 | 1,466 | 4 of 6 |
+| 10 | 1.277 | 153 | 2 of 6 |
+| 15 | 1.457 | 550 | 3 of 6 |
 | 20 | 1.587 | 4,000 | 5 of 6 |
 | 25 | 1.587 | 4,000 | 5 of 6 |
 | 30 | 1.587 | 4,000 | 5 of 6 |
@@ -489,7 +497,7 @@ of length buying nothing.
 Beyond 20 ft the answer stops moving, and the four searches that produced it say
 why: each settles on the same circle — center (−5.13, 46.98), the same five
 crossings at the same x — and every one of those crossings already lies at least
-8.4 ft from the nearer end of its line, twice the 4 ft it takes to develop Tmax.
+8.4 ft from the nearer end of its line, well past both development lengths.
 All five deliver the full 800 lb/ft before anything is lengthened. Adding length
 moves the back end further from crossings the back end never governed. What caps
 the reinforcement on this section is rupture capacity, and length cannot buy more
@@ -501,12 +509,12 @@ back ends of most of the layers:
 ![Spencer on the same section with 10 ft geogrids](images/lem08_solution_short.png){width=1000}
 
 The gray bars stop well short of the surface in the middle of the face: only two
-of the six lines are crossed at all, and both crossings are caught within 1.7 ft
-of a tip, inside the pullout ramp, where they mobilize 193 and 340 lb/ft instead
-of 800. At 1.270 that section is barely better than the 1.167 of no reinforcement at
-all. Between the two regimes — 15 ft, four crossings, 1,466 lb/ft — length is
-buying reach and anchorage together, and it is the only part of the range where
-lengthening a geogrid changes the answer.
+of the six lines are crossed at all, and both crossings are caught within half a
+foot of a tip, inside the pullout ramp, where they mobilize 2 and 156 lb/ft
+instead of 800. At 1.277 that section is barely better than the 1.167 of no
+reinforcement at all. Between the two regimes — 15 ft, three crossings,
+550 lb/ft — length is buying reach and anchorage together, and it is the only
+part of the range where lengthening a geogrid changes the answer.
 
 ### What Dir and Appl change
 

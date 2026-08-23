@@ -2284,16 +2284,16 @@ def fem02_build_mesh():
 def fem02_run_fem():
     """Run FEM on the meshed completed model, with the checks column beside it.
 
-    SSRM over the dialog's own bracket at the per-trial iteration budget of 12,000,
-    which is now also the dialog's own default. The budget is where the automatic
-    extension starts rather than where a trial dies, so the reader no longer has to
-    raise it to separate this model's two reinforcement runs.
+    SSRM over the dialog's own bracket, and everything else at the dialog's own
+    defaults — including **Max iterations per trial**, which opens at 12,000. The
+    budget is where the automatic extension starts rather than where a trial dies,
+    so the reader changes nothing here.
     """
     from studio.dialogs import RunFemDialog
 
     data = _fem02_meshed()
     dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
-                                 "tolerance": 0.01, "max_iterations": 12000},
+                                 "tolerance": 0.01},
                        material_names=[m.get("name") for m in data["materials"]],
                        slope_data=data)
     dlg.resize(dlg.sizeHint())
@@ -2312,8 +2312,6 @@ def fem02_run_fem_no_reinf():
     from studio.dialogs import RunFemDialog
 
     data = _fem02_meshed(FEM02_START)
-    # The refusal is shot at the dialog's own default budget: the page raises
-    # Max iterations per trial a section later, so this screen must not show it.
     dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
                                  "tolerance": 0.01},
                        material_names=[m.get("name") for m in data["materials"]],

@@ -1,6 +1,6 @@
 ---
 title: "Tutorial FEM-1 — Strength Reduction Basics"
-description: "A 50 ft embankment solved twice in XSLOPE — once with Spencer's method and once by finite element strength reduction — the elastic properties a mesh needs and what they do not change, the bracket the search bisects, the iteration budget that decides whether a near-critical trial is allowed to finish, and the mechanism read out of shear strain, a deformed mesh and displacement vectors."
+description: "A 50 ft embankment solved twice in XSLOPE — once with Spencer's method and once by finite element strength reduction — the elastic properties a mesh needs and what they do not change, the bracket the search bisects, the two convergence controls on the run dialog, and the mechanism read out of shear strain, a deformed mesh and displacement vectors."
 ---
 
 # Tutorial FEM-1 — Strength Reduction Basics
@@ -290,9 +290,9 @@ it:
 
 | E (psf) | vs. the file | SSRM FS | Largest displacement at *F* = 1 (ft) |
 |:---:|:---:|:---:|:---:|
-| 208,850 | ×0.1 | 1.3477 | 0.5699 |
-| 2,088,500 | ×1 | 1.3477 | 0.05699 |
-| 20,885,000 | ×10 | 1.3477 | 0.005699 |
+| 208,850 | ×0.1 | 1.3633 | 0.5699 |
+| 2,088,500 | ×1 | 1.3633 | 0.05699 |
+| 20,885,000 | ×10 | 1.3633 | 0.005699 |
 
 **The factor of safety is identical to every printed digit across a hundredfold
 sweep**, and so is the bracket it came from — and the first trial took the same
@@ -341,8 +341,9 @@ entered.
 
 The rest of the dialog opens on the defaults this run wants. **Analysis** is
 **SSRM (find FS)**. **F min** and **F max** are 1.00 and 2.00, the ends of the
-bracket to search. **Tolerance** is 0.0100 and **Max iterations per trial** is
-3000, both of which the next section is about. **Failure criterion** is
+bracket to search. **Tolerance** is 0.0100, **Max iterations per trial** is
+12000 and **Iteration ceiling** is 50000, all three of which the next section is
+about. **Failure criterion** is
 **Non-convergence** — the plain reading, that a trial which cannot reach
 equilibrium has failed. The list offers three others, among them **Hybrid**,
 which weighs displacement evidence alongside the convergence verdict; on this
@@ -371,30 +372,31 @@ That is what the Log reports, trial by trial:
 | Trial | *F* | Verdict | Iterations | Bracket after it |
 |---|:---:|:---:|:---:|:---:|
 | lower bound | 1.0000 | converged | 56 | — |
-| upper bound | 2.0000 | failed | 1,503 | [1.0000, 2.0000] |
-| 1 | 1.5000 | failed | 1,504 | [1.0000, 1.5000] |
+| upper bound | 2.0000 | failed | 12,000 | [1.0000, 2.0000] |
+| 1 | 1.5000 | failed | 12,000 | [1.0000, 1.5000] |
 | 2 | 1.2500 | converged | 124 | [1.2500, 1.5000] |
-| 3 | 1.3750 | failed | 3,000 | [1.2500, 1.3750] |
+| 3 | 1.3750 | failed | 12,000 | [1.2500, 1.3750] |
 | 4 | 1.3125 | converged | 490 | [1.3125, 1.3750] |
 | 5 | 1.3438 | converged | 2,790 | [1.3438, 1.3750] |
-| 6 | 1.3594 | failed | 3,000 | [1.3438, 1.3594] |
-| 7 | 1.3516 | failed | 3,000 | [1.3438, 1.3516] |
+| 6 | 1.3594 | converged | 11,904 | [1.3594, 1.3750] |
+| 7 | 1.3672 | failed | 36,000 | [1.3594, 1.3672] |
 
-**FS = 1.3477**, the midpoint of the final bracket [1.3438, 1.3516], reached in
-nine solves and about 25 seconds. Seven bisection steps is not luck: each one
-halves the bracket, so from a starting width of 1.0 it takes seven halvings to
-get under the 0.01 tolerance, and seven is what it took.
+**FS = 1.3633**, the midpoint of the final bracket [1.3594, 1.3672], reached in
+nine solves. Seven bisection steps is not luck: each one halves the bracket, so
+from a starting width of 1.0 it takes seven halvings to get under the 0.01
+tolerance, and seven is what it took.
 
 **The iteration column is where the physics is.** Trials well below the critical
 factor settle almost immediately — 56 iterations at *F* = 1.00, 124 at 1.25.
 Nearer the transition the slope has to redistribute stress through more and more
 yielded soil before it can balance, and the count climbs steeply: 490 at 1.3125,
-and **2,790** at 1.3438, the highest trial that made it. Past the transition the
-count stops meaning anything, because there is nothing to converge to — those
-trials run until the iteration ceiling stops them. Read down that column and the
-method's definition of failure stops being an abstraction: the slope does not
-snap at some *F*, it takes longer and longer to find equilibrium until there is
-no equilibrium to find.
+2,790 at 1.3438, and **11,904** at 1.3594, the highest trial that made it. Past
+the transition the count stops meaning anything, because there is nothing to
+converge to — the last trial, at 1.3672, was still moving after 36,000
+iterations when the search gave up on it. Read down that column and the method's
+definition of failure stops being an abstraction: the slope does not snap at
+some *F*, it takes longer and longer to find equilibrium until there is no
+equilibrium to find.
 
 ---
 
@@ -412,50 +414,47 @@ It is not a solver convergence tolerance — the per-trial displacement and forc
 tests live in the engine and are not on this dialog. Tightening it buys
 resolution on the answer and costs one more trial per halving:
 
-| Tolerance | FS | Final bracket | Trials | Wall time |
-|:---:|:---:|:---:|:---:|:---:|
-| 0.05 | 1.3594 | [1.3438, 1.3750] | 7 | 17 s |
-| 0.01 (default) | 1.3477 | [1.3438, 1.3516] | 9 | 25 s |
-| 0.005 | 1.3457 | [1.3438, 1.3477] | 10 | 28 s |
-
-All three brackets share the same lower edge, **1.3438** — the highest trial
-that reached equilibrium in any of them. Tightening the tolerance only walks the
-upper edge down toward it, which is why the answer moves less at each halving
-than it did at the one before. The default is a sensible place to leave it.
-
-### Max iterations per trial decides which trials are allowed to finish
-
-**Max iterations per trial** is the viscoplastic iteration ceiling for each
-trial *F*. A trial that has not reached equilibrium by then is recorded as
-failed — and on a model whose near-critical trials creep for thousands of
-iterations, that is a decision about the answer, not just about the run time.
-The walk above shows the symptom already: three of its nine trials ended at
-exactly 3,000.
-
-Raise the field and re-run to see what those three were doing:
-
-| Max iterations per trial | FS | Final bracket | Wall time |
+| Tolerance | FS | Final bracket | Trials |
 |:---:|:---:|:---:|:---:|
-| 3000 (default) | 1.3477 | [1.3438, 1.3516] | 25 s |
-| 6000 | 1.3555 | [1.3516, 1.3594] | 38 s |
-| 12000 | 1.3633 | [1.3594, 1.3672] | 70 s |
-| 24000 | 1.3633 | [1.3594, 1.3672] | 117 s |
+| 0.05 | 1.3594 | [1.3438, 1.3750] | 7 |
+| 0.01 (default) | 1.3633 | [1.3594, 1.3672] | 9 |
+| 0.005 | 1.3652 | [1.3633, 1.3672] | 10 |
 
-At 6,000 the trial at *F* = 1.3516 turns out to reach equilibrium after
-**4,637** iterations — it was never failing, it was still working. At 12,000 the
-trial at 1.3594 does the same at **11,904**. And then it stops: 24,000 returns
-the identical bracket, so there is no further trial waiting to be rescued. The
-answer has **plateaued at 1.363**, and the default budget was reading about
-0.015 low, entirely because near-critical trials were cut off rather than
-because of anything physical.
+What moves as the tolerance tightens is the bracket's **lower** edge — the
+highest *F* that actually reached equilibrium. It climbs from 1.3438 to 1.3594
+to 1.3633 as the search is allowed to look between trials it previously skipped
+over, and the reported midpoint follows it up. The upper edge barely moves,
+because the failed trials above the transition fail wherever they are tried. The
+default is a sensible place to leave it: the last halving is worth 0.002.
 
-That gives a rule worth carrying to every model, not just this one: **raise the
-budget until the answer stops moving.** A factor of safety that climbs when you
-give the trials more room is a factor of safety that has not converged yet; one
-that stays put through a doubling has.
+### Max iterations per trial decides how long a near-critical trial may work
 
-**Set Max iterations per trial to `12000` and run again.** That run — 70
-seconds, the same seven bisection steps — returns **FS = 1.363**.
+**Max iterations per trial** is the viscoplastic iteration budget for each trial
+*F*, and it opens at **12,000**. It is a budget rather than a ceiling. A trial
+that spends it and is still making progress — its out-of-balance force still
+trending down, or its displacement field standing still while the classifier
+cannot rule on it — is given another budget's worth, and another, up to the
+**Iteration ceiling** on the same dialog, which opens at 50,000. Only a trial
+whose displacements are growing stops at its budget and is recorded as failed.
+
+That is what the last two rows of the walk above are showing. The trial at
+*F* = 1.3594 took **11,904** iterations to settle — it was never failing, it was
+still working — and the one at 1.3672 was extended twice, to 36,000, before the
+search accepted that it was running away.
+
+Because of that, this box no longer decides the answer. Run the same model with
+it set to 3,000 and the search returns **the same 1.3633** from the same
+bracket: the trial at 1.3594 is extended three times instead of running inside
+one budget, and it converges at the same 11,904 iterations either way. What the
+budget sets is where the extension starts and how coarsely the work is granted,
+not whether a slow trial is allowed to finish.
+
+The one verdict the ceiling can leave open is **inconclusive**: a trial that
+reaches 50,000 with its out-of-balance still falling has neither settled nor run
+away. The search does not count it as a failure. It reports the highest *F* that
+did reach equilibrium, carries the inconclusive trial as the bracket's upper
+edge, and says so in the log along with the advice to raise the ceiling if that
+trial has to be decided. No trial on this model reaches it.
 
 ---
 
@@ -464,7 +463,7 @@ seconds, the same seven bisection steps — returns **FS = 1.363**.
 | Reading | FS |
 |---|:---:|
 | Spencer's method, searched on this page | 1.376 |
-| Strength reduction, this page's run at a 12,000-iteration budget | 1.363 |
+| Strength reduction, this page's run | 1.363 |
 | Strength reduction, as [the FEM overview reports it](../fem/overview.md#what-to-expect) for this model | 1.366 |
 | Griffiths & Lane's own finite element result | 1.4 |
 
@@ -483,7 +482,7 @@ surface, divides the mass above it into slices and needs an assumption about the
 forces between them to close the equations. Strength reduction imposes nothing —
 no surface, no slices, no interslice assumption — but in exchange it needs a
 mesh, a stiffness and an iteration budget, each of which is a modeling decision
-of its own, as the element type and the budget sweep above both measured. On a
+of its own, as the element type and the tolerance sweep above both measured. On a
 slope like this one the limit equilibrium assumptions cost almost nothing, which
 is why the numbers agree. On a slope with a weak seam, a wall, or a mechanism
 that is not a circle, they cost more, and that is where a run like this one
@@ -570,7 +569,7 @@ the converged state has barely moved.
 |---|:---:|:---:|
 | *F* | 1.3594 | 1.5678 |
 | Equilibrium reached | yes | no |
-| Viscoplastic iterations | 11,904 | 12,000 — the ceiling |
+| Viscoplastic iterations | 11,904 | 12,000 — the budget |
 | Elements that have yielded, of 1,087 | 210 | 609 |
 | Largest displacement (ft) | 0.106 | 7.646 |
 | Relative to the elastic response | 1.9× | 134.8× |
@@ -623,11 +622,10 @@ This tutorial covered:
   size chosen against what the mechanism needs, and the base and side conditions
   the mesh is held by.
 - The bracket the search validates and bisects, and the iteration count climbing
-  from 56 to 2,790 as the trials approach the critical factor.
+  from 56 to 11,904 as the trials approach the critical factor.
 - Two controls that look alike and are not: the tolerance that sets the
-  bracket's stopping width, and the per-trial iteration budget that decides
-  which trials are allowed to finish — raised until the answer plateaued at
-  1.363.
+  bracket's stopping width, and the per-trial iteration budget, which is where
+  the automatic extension starts rather than where a slow trial dies.
 - Reading the mechanism out of shear strain, a deformed mesh and displacement
   vectors, and the converged state against the failed one on a single color
   scale.

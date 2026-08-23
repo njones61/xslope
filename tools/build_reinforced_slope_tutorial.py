@@ -20,14 +20,17 @@ so the model a reader opens can never drift from the one the two sample pages
 measure.  Nothing here hand-edits an xlsx, and no input is the tutorial's own:
 every value comes from one of the two base models.
 
-The starter is the LEM-8 model plus the elastic constants
---------------------------------------------------------
+The starter is the LEM-8 model, and nothing the finite element engine needs
+-------------------------------------------------------------------------
 The page's arc is: recall the limit-equilibrium answer, then give the same
 section to the finite element engine and watch what the reinforcement does that
 the slices could not express.  So the starter carries **everything limit
-equilibrium needs and everything the continuum needs**, and is missing exactly
-the two things the page teaches a reader to supply:
+equilibrium needs and nothing the continuum needs**, and every finite-element
+input is one the page teaches a reader to supply:
 
+* **no elastic constants** — E and nu are cleared to blank cells on both
+  materials, the way ``tools/build_ssrm_embankment.py`` clears them for FEM-1.
+  Blank, not zero: a zero is a stiffness of zero rather than an unfilled one.
 * **no mesh** — neither file has a mesh sidecar, and the starter declares no
   element type or target size, so the reader builds the mesh from the Build Mesh
   dialog.  (The completed file declares tri6 at the tutorial's target size, which
@@ -40,8 +43,8 @@ the two things the page teaches a reader to supply:
   elastic-perfectly-plastic model, which is the page's first run; the reader
   types the residual capacity in afterwards for the second.
 
-Everything else on the starter is the completed file's, so the only inputs the
-reader adds are the mesh and the three reinforcement columns.
+Everything else on the starter is the completed file's, so the inputs the reader
+adds are the elastic pair, the mesh and the three reinforcement columns.
 
 Run:  PYTHONPATH=. python3 tools/build_reinforced_slope_tutorial.py         # both
       PYTHONPATH=. python3 tools/build_reinforced_slope_tutorial.py start   # one
@@ -144,16 +147,26 @@ def _write(sd, filename):
 
 
 def build_start():
-    """The starter: the reinforced slope with elastic constants and no mesh, and
-    with Tres / E / Area left blank on every reinforcement row.
+    """The starter: the reinforced slope carrying the limit-equilibrium model
+    only — no elastic constants, no mesh, and Tres / E / Area blank on every
+    reinforcement row.
 
-    Blank rather than zero on all three.  ``save_slope_data_to_xlsx`` writes an
-    unset Tres as an empty cell, and E and Area go out as the NaN they came in
-    as, which the writer's number formatter also puts out empty — so the reader
-    opens three genuinely empty columns and the loader reads them back as "not
-    given" rather than as "zero", which for Tres would mean brittle rupture.
+    The materials' ``E`` and ``nu`` are set to ``None`` rather than to a number,
+    which the material writer puts out as an empty cell; that is how
+    ``tools/build_ssrm_embankment.py`` clears the same pair for FEM-1, and it
+    loads back as an unfilled property rather than a zero one.
+
+    Blank rather than zero on the three reinforcement columns too.
+    ``save_slope_data_to_xlsx`` writes an unset Tres as an empty cell, and E and
+    Area go out as the NaN they came in as, which the writer's number formatter
+    also puts out empty — so the reader opens three genuinely empty columns and
+    the loader reads them back as "not given" rather than as "zero", which for
+    Tres would mean brittle rupture.
     """
     sd, _fem = _model()
+    for m in sd["materials"]:
+        m["E"] = None
+        m["nu"] = None
     return _write(sd, START_OUT)
 
 

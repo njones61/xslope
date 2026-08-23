@@ -2219,13 +2219,13 @@ def _fem02_meshed(path=FEM02_DONE):
 
 
 def fem02_materials():
-    """The materials editor, table view, FEM columns: both soils already carry the
-    elastic pair this tutorial's starter is delivered with.
+    """The materials editor, table view, FEM columns, AFTER the elastic pair is
+    entered — the state the page's Materials step leaves behind.
 
-    The page's featured input is the reinforcement table, not this one — the
-    elastic constants arrive filled — so this shot exists to show the reader what
-    a complete FEM material row looks like before the run refuses on something
-    else.
+    The starter delivers both soils with E and nu blank, so this is the filled
+    state the reader is working toward, photographed on the COMPLETED file the
+    way FEM-1's ``fem01_studio_materials`` is. The blank state is not shot: the
+    Run FEM refusal above it is what shows the reader the cells are empty.
     """
     from studio.editors import MaterialsEditor
 
@@ -2301,13 +2301,16 @@ def fem02_run_fem():
 
 
 def fem02_run_fem_no_reinf():
-    """The same dialog on the STARTER, meshed but with the reinforcement's E and
-    Area still blank.
+    """The same dialog on the STARTER, meshed but carrying no finite element
+    input at all: the soils' E and nu blank, and the reinforcement's E and Area
+    blank with them.
 
-    **Run** is disabled and the checks column names all six lines. This is the
-    page's transition figure: the limit-equilibrium search ran on this file
-    unchanged, and the finite element engine refuses it until the bars have a
-    stiffness — the capacity envelope alone is not a bar.
+    **Run** is disabled and the checks column carries three errors — a modulus
+    check and a Poisson's-ratio check over both materials, and the axial
+    stiffness check over all six lines. This is the page's transition figure: the
+    limit-equilibrium search ran on this file unchanged, and the finite element
+    engine refuses it until the soils and the bars both have a stiffness — the
+    capacity envelope alone is not a bar.
     """
     from studio.dialogs import RunFemDialog
 

@@ -29,9 +29,9 @@ lines, the capacity envelope and pullout lengths, and
 [FEM-1](fem01_strength_reduction.md) covers strength reduction, meshing for a
 stability run and the controls that decide whether a trial is allowed to finish.
 This page does not repeat either. It starts from a **starter file** that carries
-the whole LEM-8 model plus the soils' elastic properties, so the only inputs
-added here are the three columns the finite element engine needs on a
-reinforcement line.
+the whole LEM-8 model and nothing else, so the inputs added here are the ones the
+finite element engine needs and the limit equilibrium engine does not: the soils'
+two elastic properties, and three columns on every reinforcement line.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -47,13 +47,13 @@ much the post-peak assumption is worth.
 <p><span class="tg-pill">two materials</span><span class="tg-pill">reinforcement lines</span><span class="tg-pill">capacity envelope</span><span class="tg-pill">pullout length</span><span class="tg-pill">bar elements</span><span class="tg-pill">axial stiffness</span><span class="tg-pill">elastic-perfectly-plastic</span><span class="tg-pill">residual capacity</span><span class="tg-pill">strength reduction</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">thin zones</span><span class="tg-pill">iteration budget</span><span class="tg-pill">overburden pullout</span><span class="tg-pill">1D details</span><span class="tg-pill">shear strain</span></p>
 <div class="tgm-model" markdown>
 **Starter file** — [xslope_reinforced_slope_start.xlsx](files/xslope_reinforced_slope_start.xlsx),
-the LEM-8 model with Young's modulus and Poisson's ratio already on both soils,
-and with `Tres`, `E (psf)` and `Area` blank on all six reinforcement lines; this
-is the file the page starts from
+the LEM-8 model with every finite element input blank: Young's modulus and
+Poisson's ratio on both soils, and `Tres`, `E (psf)` and `Area` on all six
+reinforcement lines; this is the file the page starts from
 
 **Completed model** — [xslope_reinforced_slope.xlsx](files/xslope_reinforced_slope.xlsx),
-the same model with the three reinforcement columns filled in and the element
-type and target size declared; open it to skip to
+the same model with the soils' elastic pair and the three reinforcement columns
+filled in and the element type and target size declared; open it to skip to
 [the runs](#the-iteration-budget). Neither file carries a mesh, so the meshing
 step below is done on either one
 </div>
@@ -78,10 +78,10 @@ and the face end almost none — so
 [pullout from the overburden](#pullout-from-the-overburden) below runs the same
 model with the bond read from the depth of burial instead.
 
-The soils' elastic properties, E = 1.0 × 10<sup>6</sup> psf and ν = 0.3, are
-already in the starter file. The sketch also shows the geogrid's axial
-stiffness, *EA* = 80,000 lb/ft, and its residual capacity, 600 lb/ft. Neither is
-in the starter file; both are entered on this page when the finite element run
+The sketch shows the soils' elastic properties, E = 1.0 × 10<sup>6</sup> psf and
+ν = 0.3, the geogrid's axial stiffness, *EA* = 80,000 lb/ft, and its residual
+capacity, 600 lb/ft, because the finished model carries them; none of the four is
+in the starter file, and all are entered on this page when the finite element run
 calls for them. The geometry, the soils and the reinforcement are Example 5 from
 the UTEXASED user manual, and [LEM-8](lem08_reinforced_slope.md) builds all of
 it from nothing.
@@ -231,7 +231,7 @@ Set **Element type** to **Quadratic triangles (tri6)**. A finite element slope
 stability analysis needs quadratic elements — linear ones lock and report a
 factor of safety that is too high; the
 [element type table](../fem/overview.md#element-type-selection-and-volumetric-locking)
-in the FEM overview puts the error at 21% for tri3 and 11% for quad4.
+in the FEM overview shows how much.
 
 Untick **Auto-size from geometry** and set **Target element size** to `2`. That
 is the size the [FEM sample problem](../fem/samples.md) for this model uses, and
@@ -292,41 +292,71 @@ are the 240 psf surcharge.
 
 ---
 
-## The stiffness the bars need
+## The stiffnesses the run needs
 
-The mesh exists, but the run will not start on it yet. Two of the three finite
-element reinforcement columns are still blank, and this section fills them in.
-It starts from the soils' elastic properties, because what a bar's stiffness
-does depends on the stiffness of the soil it is buried in.
-
-![The materials table on the FEM toggle: both soils already carry E and n](images/fem02_studio_materials.png)
-
-Both soils already carry an elastic modulus of 1,000,000 psf and a Poisson's
-ratio of 0.3, entered as `E (psf)` and `n` on the materials table with the
-**Show parameters for:** toggles set to **FEM**. A single round modulus was used
-for both layers rather than values from a soil-type table, and
-[what a stiffness does and does not change](#what-the-two-stiffnesses-change)
-is measured further down, because on a reinforced model the answer is different
-from the one FEM-1 reports.
+The mesh exists, but the run will not start on it yet. The starter carries the
+limit equilibrium model and nothing beyond it, so every input the continuum
+needs is still blank: the two elastic properties on each soil, and two of the
+three finite element columns on each reinforcement line. This section fills
+them in, soils first, because what a bar's stiffness does depends on the
+stiffness of the soil it is buried in.
 
 With a mesh in place, **Run → Run FEM…** is available. Click it.
 
-![The run refused: the six lines have no axial stiffness, and Run is disabled](images/fem02_studio_run_fem_no_reinf.png)
+![The run refused: neither soil has a stiffness, the six lines have no axial stiffness, and Run is disabled](images/fem02_studio_run_fem_no_reinf.png)
 
-**Model checks — 1 error · 2 warnings**, and the **Run** button is disabled. The
-error names all six lines and then explains itself:
+**Model checks — 3 errors · 2 warnings**, and the **Run** button is disabled.
+The same file ran in the limit equilibrium engine with nothing to report. Three
+checks failed, one line each, and each line ends with the rows its own check
+fired on — trimmed to the width the list has, and given in full in the detail
+underneath it:
+
+> A blank or non-positive Young's modulus reaches the solver as a singular
+> matrix — 2 materials: 1 ('shell'), 2 ('base')
+>
+> Poisson's ratio nu must be in (0, 0.5); a blank one reads as 0.0 — 2
+> materials: 1 ('shell'), 2 ('base')
+>
+> The FEM models reinforcement as a bar element and needs E and Area — 6 lines:
+> 1 ('Line 1'), 2 ('Line 2'), 3 ('Line 3'), 4 ('Line 4'), 5 ('Line 5'), and 1
+> more
+
+The panel opens on the first of the three, and the detail beneath the list
+carries the rest of that message: the finite element engine needs a positive
+modulus for every material it meshes, and a zero one reaches the solver as
+*Factor is exactly singular*. Select the third line and it explains itself the
+same way:
 
 > The finite element engine models reinforcement as a bar element, so it needs
 > both. The limit-equilibrium engine does not -- it applies the tensile capacity
 > envelope (Tmax/Lp) directly -- so this file runs in the LEM but not in the FEM
 > until E and Area are filled in.
 
-The same file ran in the limit equilibrium engine with nothing to report. The
-three columns at the end of the reinforcement table are what the finite element
-engine needs and the limit equilibrium engine does not. Click **Cancel**, then
-**Reinforcement** in the Inputs dock, and set the **Show parameters for:**
-toggles so both **LEM** and **FEM** are ticked — the three columns at the right
-end, in blue, are the ones only the finite element engine reads.
+Click **Cancel**, then **Materials** in the Inputs dock. On **Table view**, set
+the **Show parameters for:** toggles to **FEM** alone, and give both soils an
+elastic modulus of 1.0 × 10<sup>6</sup> psf and a Poisson's ratio of 0.3, in the
+columns headed `E (psf)` and `n` (the Poisson's ratio column is labeled with a
+plain `n`);
+[FEM-1](fem01_strength_reduction.md#where-e-comes-from-and-what-it-changes)
+covers what each of the two is and where a nominal modulus comes from when the
+problem gives you nothing better.
+
+| E (psf) | n |
+|---:|---:|
+| 1000000 | 0.3 |
+
+![The materials table with both soils' elastic properties entered](images/fem02_studio_materials.png)
+
+A single round modulus is used for both layers here rather than values from a
+soil-type table, and
+[what a stiffness does and does not change](#what-the-two-stiffnesses-change)
+is measured further down, because on a reinforced model the answer is different
+from the one FEM-1 reports. Click **OK**.
+
+The reinforcement's two columns are next. Open **Reinforcement** in the Inputs
+dock, and set the **Show parameters for:** toggles so both **LEM** and **FEM**
+are ticked — the three columns at the right end, in blue, are the ones only the
+finite element engine reads.
 
 ![The reinforcement table on the starter: Tres, E and Area empty](images/fem02_studio_reinforce_blank.png)
 

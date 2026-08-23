@@ -4134,9 +4134,11 @@ def fem01_plots():
 #: FEM-2's file pair, written by ``tools/build_reinforced_slope_tutorial.py`` from
 #: the LEM reinforced-slope model (docs/lem/samples.md problem 9, the model
 #: Tutorial LEM-8 builds) and its finite element counterpart
-#: (docs/fem/samples.md problem 1).  The starter carries the elastic constants and
-#: the six geogrid lines but no mesh and no FEM reinforcement data; the completed
-#: file adds Tres, the bar modulus and the bar area, and declares the mesh.
+#: (docs/fem/samples.md problem 1).  The starter carries the limit-equilibrium
+#: model only — the six geogrid lines, but no elastic constants, no mesh and no
+#: FEM reinforcement data; the completed file adds the soils' E and nu, Tres, the
+#: bar modulus and the bar area, and declares the mesh.  Nothing here runs the FEM
+#: on the starter: its three uses below are the inputs plot and the Spencer search.
 FEM02_START = os.path.join(REPO_ROOT,
                            "docs/tutorials/files/xslope_reinforced_slope_start.xlsx")
 FEM02_DONE = os.path.join(REPO_ROOT,

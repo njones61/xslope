@@ -251,11 +251,8 @@ measured off the mesh); refining it drives the local element size there to
 the second run five times slower, and it would lower both answers by about
 0.05 — the run with a residual from **1.512 to 1.441**. Shrinking the whole
 mesh does the same thing more gradually: from 2.5 ft to 1 ft elements the
-residual run drifts from 1.51 down to 1.43 without settling on a value. The
-lower numbers are not more correct. A finer mesh is not converging on a better
-answer here; the spread is the uncertainty of the post-peak model itself, for
-the reason the next paragraph gives, and this page keeps the mesh its other
-numbers were measured on.
+residual run drifts from 1.51 down to 1.43 without settling on a value at
+these sizes.
 
 Here is why. Near a bar's end its capacity ramps up from zero over the 4 ft
 pullout length, and each bar element is given the capacity at its own midpoint.
@@ -264,9 +261,12 @@ sits 1 ft in and it is allowed 200 lb/ft. The refined mesh cuts the same ends
 into elements a third of a foot long; the outermost one sits 2 inches in and is
 allowed only 33 lb/ft — so little that it reaches its limit and slips, and the
 refined mesh reports the bottom layer in **pullout** where this mesh reports it
-below capacity. Dividing a bar more finely weakens its ends. That is why the
-answer moves with the mesh, and why the smaller numbers are not closer to the
-truth. Leave the rest of the dialog alone and click **Build**.
+below capacity. A finer mesh resolves slip at the tips that a coarse one
+cannot, which is why the answer moves with the mesh, and in the usual way:
+refine until the answer stops moving, and treat that as the model's answer.
+This page stays on the published sample's mesh so that each run takes minutes
+rather than tens of them, and its numbers carry that few-percent mesh
+sensitivity. Leave the rest of the dialog alone and click **Build**.
 
 The mesh comes out at **4,364 nodes and 2,101 triangles**, with the six lines
 discretized into **60 bar elements**, ten per line:

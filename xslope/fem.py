@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import time
 import warnings
 from math import degrees, sin, cos, sqrt, asin, tan
 
 
 import numpy as np
-from scipy.sparse import lil_matrix, csr_matrix
+from scipy.sparse import csr_matrix, issparse
 from scipy.sparse.linalg import splu
 import shapely
 from shapely.geometry import LineString, Point, Polygon
@@ -2407,6 +2408,74 @@ def _gauss_point_overburden(fem_data, elem_gp_data):
     return sv0
 
 
+class _CholmodFactorSolver:
+    """``.solve(b)`` over a CHOLMOD Cholesky factor, matching SuperLU's interface."""
+
+    kind = "CHOLMOD Cholesky"
+
+    def __init__(self, factor):
+        self._factor = factor
+
+    def solve(self, b):
+        return self._factor(b)
+
+
+def _factorize_free_stiffness(K_free):
+    """Factorize the free-free stiffness once, for reuse by every iteration.
+
+    After the constrained DOFs are removed, K is symmetric positive definite, so
+    the general unsymmetric LU that ``splu`` performs by default stores and
+    applies two triangular factors where one would do -- and the back-
+    substitution is roughly 60 % of every viscoplastic pass. Two symmetric paths
+    are used instead, in order of preference:
+
+    * CHOLMOD (``scikit-sparse``), a true supernodal Cholesky, if it is
+      importable. It is an optional accelerator, never a requirement.
+    * ``splu``'s documented symmetric mode -- ``permc_spec='MMD_AT_PLUS_A'``
+      with the diagonal pivot threshold at zero and ``SymmetricMode`` on -- which
+      orders for the symmetric pattern and pivots down the diagonal.
+
+    Either way the matrix itself is unchanged, and a factorization that fails
+    (an indefinite or singular K, which means a badly posed model rather than a
+    bad solver choice) falls back to the general LU so the failure is reported
+    where it always was. ``XSLOPE_FEM_FACTOR`` (``auto``, ``cholmod``,
+    ``symmetric``, ``unsymmetric``) pins the path for measurement.
+
+    Returns (factor, kind) where factor exposes ``.solve(b)``.
+    """
+    # Default is the general LU the corpus was locked on: the symmetric modes
+    # change round-off enough to move a knife-edge trial by one bisection step
+    # (measured on the FEM-2 model), so they stay opt-in until a full FEM
+    # suite has run on them.
+    mode = os.environ.get("XSLOPE_FEM_FACTOR", "unsymmetric").strip().lower()
+
+    if mode in ("auto", "cholmod"):
+        try:
+            from sksparse.cholmod import cholesky as _cholmod_cholesky
+        except Exception:
+            if mode == "cholmod":
+                raise
+        else:
+            try:
+                return (_CholmodFactorSolver(_cholmod_cholesky(K_free.tocsc())),
+                        _CholmodFactorSolver.kind)
+            except Exception:
+                if mode == "cholmod":
+                    raise
+
+    if mode in ("auto", "symmetric"):
+        try:
+            return (splu(K_free.tocsc(), permc_spec="MMD_AT_PLUS_A",
+                         diag_pivot_thresh=0.0,
+                         options=dict(SymmetricMode=True)),
+                    "SuperLU symmetric mode")
+        except Exception:
+            if mode == "symmetric":
+                raise
+
+    return splu(K_free.tocsc()), "SuperLU general LU"
+
+
 def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                        suction_cap=None, elastic_mask=None,
                        tension_cap_by_elem=None, tension_cutoff=False,
@@ -2557,16 +2626,18 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     n_free = len(free_dofs)
 
     # ---- Extract K_free and PRE-FACTORIZE ----
-    if hasattr(K_global, 'toarray'):
-        K_dense = K_global.toarray()
-    else:
-        K_dense = K_global
-    K_free = csr_matrix(K_dense[np.ix_(free_dofs, free_dofs)])
-    K_factor = splu(K_free.tocsc())
+    # Constrained DOFs are eliminated by taking the free-free submatrix, exactly
+    # as before -- the selection is done sparsely, so K never exists as a dense
+    # n_dof x n_dof array (1.4 GB at the 2 ft mesh, 21.8 GB at 1 ft).
+    K_csr = K_global if issparse(K_global) else csr_matrix(K_global)
+    K_csr = K_csr.tocsr()
+    K_free = K_csr[free_dofs][:, free_dofs]
+    K_free.eliminate_zeros()
+    K_factor, K_factor_kind = _factorize_free_stiffness(K_free)
 
     if debug_level >= 1:
         print(f"  DOFs: {n_dof} total, {n_free} free, {len(constraint_dofs)} constrained")
-        print(f"  K factorized (reused for all iterations)")
+        print(f"  K factorized ({K_factor_kind}, reused for all iterations)")
 
     # ---- dt from material properties (Smith & Griffiths) + Rankine dt_r ----
     # NOTE: this is the phi-INDEPENDENT part only. It is a safe bound while the
@@ -7020,11 +7091,80 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
     }
 
 
+def _coo_to_csr_ordered(rows, cols, vals, shape):
+    """Sum stacked COO triplets into a CSR matrix, in the order they were staged.
+
+    ``scipy``'s own duplicate summation is free to add the entries of a repeated
+    (row, col) in any order, and a floating-point sum is not associative: the
+    last bits of the assembled stiffness would depend on how the library chose
+    to sort. The stiffness feeds a factorization that feeds a viscoplastic
+    fixed-point iteration with a convergence test, and near-critical strength
+    reduction trials are decided in exactly those last bits, so the summation
+    order is held fixed here instead.
+
+    Entries are grouped by (row, col) with a stable sort -- so within a group
+    they keep the element order they were staged in -- and then added one rank
+    at a time, which is the same left-to-right accumulation the entry-by-entry
+    ``K[i, j] += ...`` fill performed. Exact zeros are dropped, as the dense
+    round-trip this replaced also dropped them.
+    """
+    n_dof = shape[0]
+    if not rows:
+        return csr_matrix(shape)
+
+    rows = np.concatenate(rows).astype(np.int64, copy=False)
+    cols = np.concatenate(cols).astype(np.int64, copy=False)
+    vals = np.concatenate(vals)
+    if len(rows) == 0:
+        return csr_matrix(shape)
+
+    # Stable sort on the flattened (row, col) key: duplicates stay in staging order.
+    key = rows * np.int64(shape[1]) + cols
+    order = np.argsort(key, kind='stable')
+    key = key[order]
+    vals = vals[order]
+
+    starts = np.flatnonzero(np.r_[True, key[1:] != key[:-1]])
+    group_of = np.zeros(len(key), dtype=np.int64)
+    group_of[starts[1:]] = 1
+    np.cumsum(group_of, out=group_of)
+    rank = np.arange(len(key), dtype=np.int64) - starts[group_of]
+
+    data = vals[starts].copy()                     # rank 0 of every group
+    for r in range(1, int(rank.max()) + 1 if len(rank) else 1):
+        sel = rank == r
+        if not sel.any():
+            break
+        data[group_of[sel]] += vals[sel]           # one entry per group per rank
+
+    g_rows = key[starts] // shape[1]
+    g_cols = key[starts] - g_rows * shape[1]
+
+    keep = data != 0.0
+    if not keep.all():
+        data = data[keep]
+        g_rows = g_rows[keep]
+        g_cols = g_cols[keep]
+
+    indptr = np.zeros(n_dof + 1, dtype=np.int64)
+    np.cumsum(np.bincount(g_rows, minlength=n_dof), out=indptr[1:])
+    K = csr_matrix((data, g_cols, indptr), shape=shape)
+    K.has_sorted_indices = True
+    return K
+
+
 def build_global_stiffness(nodes, elements, element_types, element_materials, E_by_mat, nu_by_mat, fem_data=None):
     """
     Build global stiffness matrix from 2D soil elements and (optionally) 1D truss + pile beam elements.
 
     Uses dof_offset from fem_data to support mixed DOF systems (pile nodes have 3 DOFs).
+
+    Assembly is COO: each element's stiffness block and its global row/column
+    indices are stacked, and the whole matrix is built in one pass with
+    ``_coo_to_csr_ordered``. That helper sums each repeated (row, col) entry in
+    ELEMENT ORDER, which is the order the earlier entry-by-entry ``lil_matrix``
+    fill used, so the assembled matrix is bit-for-bit what it was -- the change
+    is the cost of building it, never its value.
     """
     n_nodes = len(nodes)
 
@@ -7035,7 +7175,16 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
     else:
         n_dof = 2 * n_nodes
 
-    K_global = lil_matrix((n_dof, n_dof))
+    coo_rows = []
+    coo_cols = []
+    coo_vals = []
+
+    def _stage(K_block, dof_idx):
+        """Queue one element block (n x n) against its n global DOF indices."""
+        n = len(dof_idx)
+        coo_rows.append(np.repeat(dof_idx, n))
+        coo_cols.append(np.tile(dof_idx, n))
+        coo_vals.append(np.asarray(K_block, dtype=float).ravel())
 
     for elem_idx, element in enumerate(elements):
         elem_type = element_types[elem_idx]
@@ -7067,28 +7216,12 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
             print(f"Error building stiffness for element {elem_idx}, type {elem_type}: {e}")
             continue
 
-        # Assemble into global matrix using dof_offset for global DOF indices
-        for i in range(elem_type):
-            for j in range(elem_type):
-                node_i = elem_nodes[i]
-                node_j = elem_nodes[j]
-
-                if dof_offset is not None:
-                    base_i = dof_offset[node_i]
-                    base_j = dof_offset[node_j]
-                else:
-                    base_i = 2 * node_i
-                    base_j = 2 * node_j
-
-                for di in range(2):
-                    for dj in range(2):
-                        global_i = base_i + di
-                        global_j = base_j + dj
-                        local_i = 2 * i + di
-                        local_j = 2 * j + dj
-
-                        if local_i < K_elem.shape[0] and local_j < K_elem.shape[1]:
-                            K_global[global_i, global_j] += K_elem[local_i, local_j]
+        # Assemble into global matrix using dof_offset for global DOF indices.
+        # An element matrix smaller than its 2 x n_node DOF count contributes
+        # only its leading block (the guard the entry-by-entry fill applied).
+        dof_idx = _elem_dof_indices(elem_nodes, dof_offset=dof_offset)
+        n_use = min(len(dof_idx), K_elem.shape[0], K_elem.shape[1])
+        _stage(K_elem[:n_use, :n_use], dof_idx[:n_use])
 
     # Assemble 1D truss element stiffness matrices (reinforcement only — skip pile elements)
     if fem_data is not None:
@@ -7099,26 +7232,18 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
         for elem_idx_1d in range(len(K_global_1d_elems)):
             if pile_elem_mask[elem_idx_1d]:
                 continue  # pile elements use beam stiffness, assembled below
-            K_elem_1d = K_global_1d_elems[elem_idx_1d]
-            dof_idx = dof_indices_1d[elem_idx_1d]
-
-            for i in range(4):
-                for j in range(4):
-                    K_global[dof_idx[i], dof_idx[j]] += K_elem_1d[i, j]
+            _stage(K_global_1d_elems[elem_idx_1d],
+                   np.asarray(dof_indices_1d[elem_idx_1d]))
 
         # Assemble pile beam element stiffness matrices (6x6 Euler-Bernoulli)
         K_global_pile_elems = fem_data.get("K_global_pile_elems", [])
         dof_indices_pile = fem_data.get("dof_indices_pile", np.zeros((0, 6), dtype=int))
 
         for p_idx in range(len(K_global_pile_elems)):
-            K_beam = K_global_pile_elems[p_idx]
-            dof_idx = dof_indices_pile[p_idx]
+            _stage(K_global_pile_elems[p_idx],
+                   np.asarray(dof_indices_pile[p_idx]))
 
-            for i in range(6):
-                for j in range(6):
-                    K_global[dof_idx[i], dof_idx[j]] += K_beam[i, j]
-
-    return K_global.tocsr()
+    return _coo_to_csr_ordered(coo_rows, coo_cols, coo_vals, (n_dof, n_dof))
 
 
 

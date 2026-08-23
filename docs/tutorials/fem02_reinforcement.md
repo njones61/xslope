@@ -251,7 +251,11 @@ measured off the mesh); refining it drives the local element size there to
 the second run five times slower, and it would lower both answers by about
 0.05 — the run with a residual from **1.512 to 1.441**. Shrinking the whole
 mesh does the same thing more gradually: from 2.5 ft to 1 ft elements the
-residual run drifts from 1.51 down to 1.43 without settling on a value.
+residual run drifts from 1.51 down to 1.43 without settling on a value. The
+lower numbers are not more correct. A finer mesh is not converging on a better
+answer here; the spread is the uncertainty of the post-peak model itself, for
+the reason the next paragraph gives, and this page keeps the mesh its other
+numbers were measured on.
 
 Refinement changes the answer through the ends of the bars. The six lines are
 divided into 156 bar elements instead of 60, and the extra ones land at the face,

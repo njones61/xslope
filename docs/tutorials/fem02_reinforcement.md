@@ -249,10 +249,9 @@ the cohesive band down the face, 1.25 ft across (the check reports 1.19 ft,
 measured off the mesh); refining it drives the local element size there to
 0.33 ft and takes the mesh from 2,101 elements to 5,096.
 
-It is left off here, and what that costs is worth knowing. Time is the smaller
-part — the second run below takes about ten minutes on the refined mesh against
-two on this one. The answer is the larger part. Both runs move on it: the one
-with no post-peak drop from **1.559 to 1.512**, and the one with a residual
+It is left off here. Refining would cost time — the second run below takes
+about ten minutes on the refined mesh against two on this one — and it would
+change the answers: the run with no post-peak drop moves from **1.559 to 1.512**, and the run with a residual
 capacity from **1.512 to 1.441**. A smaller target size everywhere does the
 same: at 2.5, 2.0, 1.5 and 1.0 ft with no thin-zone refinement at all, the run
 with a residual reads 1.512 / 1.512 / 1.481 / 1.434, a 5% spread that falls as

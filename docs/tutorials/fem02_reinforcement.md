@@ -247,9 +247,7 @@ because a band too thin to resolve cannot develop a shear band and quietly
 returns a factor of safety that is too high. The thin zone here is the `shell`,
 the cohesive band down the face, 1.25 ft across (the check reports 1.19 ft,
 measured off the mesh); refining it drives the local element size there to
-0.33 ft and takes the mesh from 2,101 elements to 5,096.
-
-It is left off here. Refining would cost time — the second run below takes
+0.33 ft and takes the mesh from 2,101 elements to 5,096. Refining would cost time — the second run below takes
 about ten minutes on the refined mesh against two on this one — and it would
 change the answers: the run with no post-peak drop moves from **1.559 to 1.512**, and the run with a residual
 capacity from **1.512 to 1.441**. A smaller target size everywhere does the

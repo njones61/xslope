@@ -535,9 +535,13 @@ lb/ft with no excess demand stays there. In this converged state, at
 *F* = 1.508, no element on line 5 was asked for more than it could carry: the
 interior peak is 798 lb/ft, the tip at s = 19 is on its 200 lb/ft bond limit, and
 there is no purple *Softened* square, which is how the panel marks an element that
-has shed. The drops happened at the higher trial values the run failed at, which
-is why the factor of safety is lower even though this state looks like the run
-before.
+has shed. The drops happened at the higher trial values the run failed at.
+Nothing carries between trials: each trial *F* is a separate solve from the
+same starting model, with every element back at its full 800 lb/ft, so the
+elements that dropped to 600 at *F* = 1.53 and the ones holding 798 here are two
+independent solves at two different strengths, not one element going down and
+coming back. That is why the factor of safety is lower even though this state
+looks like the run before.
 
 That shows in the other five lines. Lines 2, 3, 4 and 6 now read **pullout**:
 each has one element at the buried tip, s = 19, holding the 200 lb/ft its last

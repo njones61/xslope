@@ -2026,7 +2026,7 @@ def _mat_no_shear_strength(ctx):
         c, phi = _num(m.get("c")) or 0.0, _num(m.get("phi")) or 0.0
         if c == 0.0 and phi == 0.0:
             yield (f"{ctx.mat_label(i)} has no shear strength at all: option = mc "
-                   f"with c = 0 and f = 0. If it is cohesionless, enter its friction "
+                   f"with c = 0 and φ = 0. If it is cohesionless, enter its friction "
                    f"angle -- nothing can tell 'cohesionless' from 'no data' "
                    f"{_AT_MAT}.")
 
@@ -2919,11 +2919,11 @@ def _mat_tensile_cap_missing(ctx):
         phi = _num(m.get("phi")) or 0.0
         c = _num(m.get("c")) or 0.0
         if phi <= 0:
-            what = ("without limit -- with f = 0 the Mohr-Coulomb cone has no apex, "
+            what = ("without limit -- with φ = 0 the Mohr-Coulomb cone has no apex, "
                     "so nothing bounds the tensile stress the material can carry")
         else:
             apex = c / math.tan(math.radians(phi)) if phi < 90 else 0.0
-            what = (f"up to the Mohr-Coulomb cone apex, c/tan(f) = {apex:.4g}, which "
+            what = (f"up to the Mohr-Coulomb cone apex, c/tan(φ) = {apex:.4g}, which "
                     f"may be far above the material's real tensile strength")
         yield (f"{ctx.mat_label(i)} has no tensile cutoff: a blank t_cut allows "
                f"tension {what}. Enter t_cut, or 0 for a no-tension soil. A "
@@ -2943,7 +2943,7 @@ def _tension_srf_unset(ctx):
         return None
     return (f"Tension SRF (FEM) is blank, so the engine default applies: the "
             f"tensile cap is divided by the trial strength-reduction factor "
-            f"alongside c and tan(f). {len(capped)} material(s) carry a t_cut. Set "
+            f"alongside c and tan(φ). {len(capped)} material(s) carry a t_cut. Set "
             f"it to NO to hold the cap at its entered value instead "
             f"{_at_global('D17')}.")
 
@@ -4533,7 +4533,7 @@ def _mat_phi_range(ctx):
         if v is None or v < 90.0:
             continue
         yield (f"{ctx.mat_label(i)} has f (friction angle) = {v:g} degrees. The "
-               f"Mohr-Coulomb strength is c + s'*tan(f), which has no finite value "
+               f"Mohr-Coulomb strength is c + σ′·tan(φ), which has no finite value "
                f"at 90 degrees and changes sign above it. Enter an angle below 90 "
                f"{_AT_MAT}.")
 

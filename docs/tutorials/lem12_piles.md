@@ -82,8 +82,8 @@ endpoints control how the pile force is computed, limited, and applied:
 
 | Label | x1 | y1 | x2 | y2 | H | Appl | D | S | Vcap | Mcap |
 |---|:---:|:---:|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
-| `lower row` | 5 | 5 | 5 | -10 | | Active | 2 | 6 | 46000 | 60000 |
-| `upper row` | 10 | 10 | 10 | -10 | | Active | 2 | 6 | 46000 | 60000 |
+| `lower row` | 5 | 5 | 5 | -10 | | active | 2 | 6 | 46000 | 60000 |
+| `upper row` | 10 | 10 | 10 | -10 | | active | 2 | 6 | 46000 | 60000 |
 
 **H is empty on both rows.** `H` is the pile force per foot of slope — the
 lateral resistance a row contributes to the equilibrium equations. Leaving
@@ -92,8 +92,8 @@ compute that force by the Ito & Matsui method; entering a number in `H`
 uses that number instead.
 The direction of the pile force is not entered: XSLOPE takes it
 perpendicular to the pile's own axis, which for these vertical shafts means
-horizontal — the usual case for a stabilizing pile. `Appl` is `Active`: the force enters the equilibrium equations as it
-stands. The alternative, `Passive`, treats the force as a resistance and
+horizontal — the usual case for a stabilizing pile. `Appl` is `active`: the force enters the equilibrium equations as it
+stands. The alternative, `passive`, treats the force as a resistance and
 divides it by the factor of safety, so the support carries the same margin
 as the soil strength. (A file that leaves the cell blank is read as
 active; files XSLOPE saves write the choice out.)

@@ -24,9 +24,9 @@ A PZ-27 steel sheet pile section, driven from the crest of the face at (10, 10)
 down to the rigid base at (10, -10), stated per foot of wall:
 
     E     4.176e9 psf     29,000 ksi
-    I     0.00888 ft^4/ft   184.2 in^4/ft
-    Area  0.0556 ft^2/ft      8.0 in^2/ft
-    Mcap  90,600 lb*ft/ft   Fy 36 ksi x Z 30.2 in^3/ft
+    I     0.00888 ft^4/ft   184.20 in^4/ft
+    Area  0.0551 ft^2/ft      7.94 in^2/ft
+    Mcap  90,600 lb*ft/ft   Fy 36 ksi x S 30.2 in^3/ft, the moment at first yield
     S     1
 
 ``S`` = 1 passes those constants into the beam elements unchanged: a wall has no
@@ -78,7 +78,7 @@ SSRM_F_MIN, SSRM_F_MAX = 1.0, 2.0
 WALL_ROW = {
     "x1": 10.0, "y1": 10.0, "x2": 10.0, "y2": -10.0,
     "H": None, "theta_p": 0.0, "D_pile": None, "S": 1.0,
-    "E": 4.176e9, "I": 0.00888, "area": 0.0556,
+    "E": 4.176e9, "I": 0.00888, "area": 0.0551,
     "V_cap": None, "M_cap": 90600.0,
     "head_fixity": "free", "tip_fixity": "free",
     "appl": "active", "label": "sheet pile wall",

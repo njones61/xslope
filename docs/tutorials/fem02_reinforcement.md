@@ -465,9 +465,10 @@ zero over the last 4 ft. The blue line is the force actually mobilized. It
 climbs from almost nothing at the face, reaches the envelope at s = 9 and holds
 it at 11 and 13 — those three elements are what the panel titles **yielded**, at
 the full 800 lb/ft — then falls away down the buried ramp and touches the
-envelope again at s = 19, where 1 ft of embedment develops only 200 lb/ft and
-the layer carries 197 of it. One line, both limits: rupture in the middle, bond at
-the tip.
+envelope again at s = 19, where 1 ft of embedment allows only 200 lb/ft and
+the element sits at that limit (197 lb/ft, the ring marking it at capacity; the
+force can never exceed the envelope). One line, both limits: rupture in the
+middle, bond at the tip.
 
 The lower strip is the bond transfer, dT/ds, the rate at which force passes
 between the layer and the soil per foot of layer. It is positive from the face out to

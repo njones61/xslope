@@ -501,33 +501,12 @@ the 0.3 to 0.7 usually quoted for geosynthetics. Click **OK**, then
 **0.047** of factor of safety, 3.0% — more than the 0.028 between Spencer's
 1.587 and the elastic-perfectly-plastic 1.559.
 
-Where it cost it is worth seeing, because the two searches walk together for six
-trials and then part:
-
-| Trial | *F* | Elastic-perfectly-plastic | *F* | With a 600 lb/ft residual |
-|:---:|:---:|:---:|:---:|:---:|
-| lower bound | 1.0000 | converged | 1.0000 | converged |
-| upper bound | 2.0000 | failed | 2.0000 | failed |
-| 1 | 1.5000 | converged | 1.5000 | converged |
-| 2 | 1.7500 | failed | 1.7500 | failed |
-| 3 | 1.6250 | failed | 1.6250 | failed |
-| 4 | 1.5625 | failed | 1.5625 | failed |
-| 5 | 1.5312 | **converged** | 1.5312 | **failed** |
-| 6 | 1.5469 | converged | 1.5156 | failed |
-| 7 | 1.5547 | converged | 1.5078 | converged |
-
-They separate at *F* = 1.5312: the elastic-perfectly-plastic slope reaches
-equilibrium there after 4,374 viscoplastic iterations, and the peak-residual one
-gives up after 5,611. From that trial on the two are bisecting different halves
-of the bracket, and the transition the second run is looking for is a little
-under 0.05 lower than the first run's.
-
-That trial is also where the residual first does anything. Solved on its own at
-*F* = 1.5312, the blank-`Tres` model reaches equilibrium with 11 bar elements
-standing at their capacity and none of them dropping; the `Tres` = 600 model
-puts five elements over `Tmax` — interior elements on lines 3, 4 and 5, away
-from either ramp — and each sheds to its 600 lb/ft residual. Their load goes to
-their neighbors, more elements reach 800, and the slope never settles.
+Where the cost comes from is simple. At *F* = 1.53 the elastic-perfectly-plastic
+slope reaches equilibrium with 11 bar elements standing at capacity and none of
+them dropping. With the residual entered, five interior elements on lines 3, 4
+and 5 pass their peak and shed to 600 lb/ft; their load moves to their neighbors,
+more elements reach 800, and the slope never settles — so the transition the
+search is looking for sits a little under 0.05 lower.
 
 ### What changed in the results, and what did not
 

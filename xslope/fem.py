@@ -3322,7 +3322,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               elastic_mask=None,
               suction_phi_b=None, suction_cap=None, _prepared=None,
               fast_kernel='auto', failure_criterion="hybrid", k0=None,
-              max_iterations_ceiling=50000, early_failure=True, _init_state=None):
+              max_iterations_ceiling=50000, early_failure=True, _init_state=None,
+              _softened_seed=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -3909,6 +3910,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # is FINITE — an unset (NaN) t_res means the bar is
         # elastic-perfectly-plastic and holds t_allow forever.
         softened_1d = np.zeros(n_1d_elements, dtype=bool)
+        # A carried-in post-peak set (INTERNAL; solve_ssrm's at-failure capture).
+        # The capture solve runs beyond critical, where the slope never passes
+        # through equilibrium, so the fixed point below can never fire and every
+        # softening bar would sit at its peak capacity in the at-failure field.
+        # Seeding it with the set the bracket's failed-edge trial actually shed
+        # to shows those bars at their residual, which is the state that failed.
+        if _softened_seed is not None and len(_softened_seed) == n_1d_elements:
+            softened_1d |= np.asarray(_softened_seed, dtype=bool)
         can_soften_1d = (np.isfinite(t_res_by_1d_elem)
                          & (t_res_by_1d_elem < t_allow_by_1d_elem - 1e-12))
         n_soften_rounds = 0
@@ -5876,6 +5885,14 @@ def _verdict_note(sol):
     return f"Did NOT converge ({v}{ur_txt})"
 
 
+def _failed_edge_softened(solution):
+    """The softened 1D-element set of a failed trial, or None when it has none."""
+    if not solution:
+        return None
+    soft = np.asarray(solution.get("softened_1d_elements", []), dtype=bool)
+    return soft if soft.size and soft.any() else None
+
+
 def _ssrm_bisect_steps(width, tolerance):
     """Number of halvings needed to narrow ``width`` below ``tolerance``."""
     if width <= tolerance:
@@ -6626,7 +6643,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
                 elastic_mask=elastic_mask,
                 suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-                _prepared=prep, _init_state=init_state)
+                _prepared=prep, _init_state=init_state,
+                _softened_seed=result.get("failed_edge_softened"))
             result["failure_solution"] = failure_solution
             if debug_level >= 1:
                 print(f"    at-failure field: converged={failure_solution['converged']} "
@@ -6873,6 +6891,10 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     prog["n_steps"] = _ssrm_bisect_steps(F_right - F_left, tolerance)
 
     last_converged_solution = solution_min
+    # The bracket's failed edge, kept for the at-failure capture: the post-peak
+    # set the trial at F_right shed to before it gave way (empty when nothing
+    # can soften). Updated whenever a trial moves F_right down.
+    failed_edge_solution = solution_max
     iteration = 0
     from .search import _check_cancel
 
@@ -6922,6 +6944,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                     print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
             else:
                 i_hi = i_mid
+                failed_edge_solution = solution
                 if debug_level >= 1:
                     print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
             iteration += 1
@@ -6960,6 +6983,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                     print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
             else:
                 F_right = F_mid
+                failed_edge_solution = solution
                 if debug_level >= 1:
                     print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
 
@@ -6987,6 +7011,10 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         "iterations_ssrm": iteration,
         "final_interval": (F_left, F_right),
         "interval_width": F_right - F_left,
+        # The post-peak set the failed-edge trial shed to (None when nothing can
+        # soften): what the at-failure capture starts from, so a softening bar
+        # is shown at its residual in the field that failed.
+        "failed_edge_softened": _failed_edge_softened(failed_edge_solution),
         # Per-trial record: F, role, converged/stable, hybrid verdict, u_ratio,
         # growth, exit_reason, iterations. Populated on every criterion so an A/B
         # between criteria costs no extra solves.

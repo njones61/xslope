@@ -408,7 +408,10 @@ A **Field state** control at the foot of the panel selects which field the profi
 mechanism an SSRM run captured, or the last converged solution — and is the same switch, with the same default, as
 the one on the results view, so the two views can be set to the same instant of the analysis. It is dimmed for a
 run that captured no mechanism, where there is only one field to read, and neither the capacity envelope nor the
-shaded band moves with it.
+shaded band moves with it. On a softening line the two fields can differ in kind: an element drops to its residual
+only when an equilibrium state demands more than its capacity, so the last converged field may show no softened
+element at all while the at-failure field — which starts from the set the failed-edge trial shed to — shows the
+elements that gave way sitting on the residual line, marked *Softened*.
 
 **Export** writes the current view as a PNG and its plotted series as a CSV named from the model, the line and the
 field state, with that state also recorded in the CSV's header, so the picture and the numbers behind it stay

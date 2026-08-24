@@ -550,16 +550,27 @@ is **near capacity** at 84%, down from 97%. Four lines at their bond limit and
 one at its rupture limit, in the same field: **pullout** and **yielded** are both
 "the line has reached a limit", and only the word says which limit, which is why
 the panel prints it. The same panel, left on its default **At failure** state,
-reads every line at 100%:
+shows what the converged state cannot:
 
 ![The 1D Details panel, line 5 selected](images/fem02_studio_1d_details.png)
 
 The list on the left carries all six lines with their utilization, a badge
 colored by it, and the state each line is in; the map below it shows which line
 is selected; and the profile is drawn on the right for the state the **Field
-state** selector at the bottom names. It opens on **At failure**, which is why
-every line here reads 100% and **yielded**, and why the title says *at failure*
-— the state where the comparison between layers lives is **Last converged**.
+state** selector at the bottom names. It opens on **At failure**, the field of
+the capture solve the run makes beyond critical, and here that field carries the
+drops. Lines 4 and 5 read **softened**: on line 5 the two interior elements at
+s = 11 and 13 sit on the 600 lb/ft residual line, marked by purple *Softened*
+squares, while their neighbors at 5 to 9 and 15 hold 800. A slope beyond
+critical never passes through equilibrium, so the capture solve cannot decide
+softening on its own; it starts from the set the bracket's failed-edge trial
+shed to at *F* = 1.516, which is these four elements — two on line 4, two on
+line 5. The bond transfer strip shows the consequence: it drops to −100 lb/ft per
+ft at 10 ft, where the force falls from 800 to 600, and climbs back to +100 at
+14 ft, where it recovers — the 200 lb/ft the two softened elements shed goes to
+the elements on either side. The state where the comparison between
+layers lives is still **Last converged**; the at-failure field is where the
+residual is seen doing its work.
 
 ### The failed state
 
@@ -569,7 +580,7 @@ The deformed panel draws the mesh at its displaced position over a dashed
 outline of where it started. The reinforced block has slid out over the toe and
 settled at the crest, and the six layers — red where they started gray — are
 stretched and rotated with it, hinging where the shear band crosses them. The
-title's **Scale = 1.1x** is the exaggeration, which the panel picks so the
+title's **Scale = 1.0x** is the exaggeration, which the panel picks so the
 collapse reads at this figure size. **Scale ×** and **Auto size** on
 the Display panel control that multiplier.
 

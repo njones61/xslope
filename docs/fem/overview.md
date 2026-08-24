@@ -1009,7 +1009,11 @@ Its principal arguments:
 >  backstop and early exit off and a generous ceiling — so the unconverged field develops the
 >  **at-failure mechanism** (the rotational collapse: crest settlement, toe heave). Right at the
 >  critical factor the collapse develops too slowly to become visible in a finite number of
->  iterations, hence the margin. The result is returned as `failure_solution` and changes nothing
+>  iterations, hence the margin. A slope beyond critical never passes through equilibrium, and a
+>  reinforcement element drops to its residual only on an equilibrium state, so the capture solve
+>  starts from the post-peak set the bracket's failed-edge trial shed to: a layer that gave way at
+>  its residual is shown at that residual in the at-failure field (`failed_edge_softened` in the
+>  result). The field is returned as `failure_solution` and changes nothing
 >  else, so turning it off leaves the factor of safety, the bracket and `last_solution` untouched —
 >  which is what the reliability and sensitivity analyses do, since they never draw the field.
 

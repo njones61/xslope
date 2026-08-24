@@ -5005,9 +5005,19 @@ def fem03_wall():
     capture("fem03_inputs_wall.png", plot_inputs, start,
             title="Slope Geometry and Inputs")
 
+    # The bare slope, both ways — the baseline both halves of the page measure
+    # against, drawn so the reader sees the two mechanisms before any member.
+    crit = _fem03_search(start)
+    capture("fem03_lem_solution_bare.png", plot_solution, start, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    print("   LEM (bare)  %s" % _fem03_reading(crit))
     mesh = _fem03_mesh(start)
     fem_data, result, solution, seconds = _fem03_solve(start, mesh)
     _fem03_report("no wall", start, mesh, fem_data, result, solution, seconds)
+    capture("fem03_fem_shear_bare.png", plot_fem_results, fem_data, solution,
+            plot_type="shear_strain", fs=result["FS"],
+            failure_solution=result.get("failure_solution"),
+            field_state="failure")
 
     #: (label, tip, 1D element size, keep Mcap, mesh figure, shear-strain figure,
     #: profile figure)

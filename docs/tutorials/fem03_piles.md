@@ -103,6 +103,12 @@ The mode strip opens on **LEM**. **Run → Run LEM…**, `Spencer`, `Auto search
 40 slices, **Run**: **FS = 1.149**, the search
 [LEM-12](lem12_piles.md#what-the-two-rows-are-worth) runs on the same bare slope.
 
+![Spencer's critical circle on the bare slope](images/fem03_lem_solution_bare.png){width=1000}
+
+The critical circle enters at the toe and exits on the crest about 6 ft behind
+its edge, dipping only 3 ft below the toe — the shallow surface a 1:1 clay slope
+with c = 200 psf and φ = 20° fails on.
+
 Switch the mode strip to **FEM**, click **Run → Build Mesh…** and **Build**: the
 file declares **Quadratic triangles (tri6)** with **Auto-size from geometry** off
 at `2`, and the mesh comes out at **3,154 nodes and 1,509 triangles** with no
@@ -111,6 +117,13 @@ beam elements. Then **Run → Run FEM…** — the file declares the bracket too
 This run takes about **100 seconds**, longer than the piled runs that follow,
 because a slope closer to failing takes more iterations at each trial to decide.
 **FS = 1.160**, from [1.1563, 1.1641].
+
+![The strength-reduction mechanism at failure on the bare slope](images/fem03_fem_shear_bare.png){width=1000}
+
+The shear band starts at the toe, where the strain is highest, runs up through
+the body of the slope and comes out on the crest 10 to 15 ft behind its edge —
+the same surface Spencer found, drawn as a band of strain rather than a line,
+and reaching a few feet farther back.
 
 The two engines are 0.011 apart on the bare slope, so every difference between
 them on the rest of this page belongs to the member rather than to the engine.

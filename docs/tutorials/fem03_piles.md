@@ -14,8 +14,7 @@ A **limit equilibrium** method adds one force where a trial surface crosses a
 pile. With the **Ito & Matsui (1975)** method that force is not entered: it is
 computed from the pile diameter `D` and the center-to-center spacing `S`, from a
 plasticity solution for soil squeezing *between* adjacent piles, and recomputed
-for every trial surface. Spacing enters that calculation as the mechanism it
-governs.
+for every trial surface.
 
 A **finite element** method meshes the pile into a chain of beam elements
 sharing nodes with the soil around it, and divides the beam's axial stiffness
@@ -111,13 +110,17 @@ both bands matter at once:
 
 ![The two pile rows with both usage bands shown](images/fem03_studio_piles_table.png)
 
-The columns are colored by which engine reads them: the red ones are read only by
-the limit equilibrium engine, the blue ones only by the finite element engine.
-`D` and `S` are black because both engines read them, and on this file that
-matters. Every stiffness the finite element model uses comes from those two
-cells: `I` and `Area` are blank, so the engine derives the solid circular section
-from the diameter, I = πD⁴/64 and Area = πD²/4, and then divides *EA* and *EI* by
-the spacing. Hovering `S` says what each engine does with it:
+The columns are colored by which engine reads them. Red is limit equilibrium
+only: `H`, the stated pile force, and `Appl`, how that force enters the
+equations. Blue is finite element only: `E`, `I`, `Area` and `Fixity`. The black
+columns are read by both — `D` and `S`, and also `Vcap` and `Mcap`, which cap the
+per-pile force in the limit equilibrium engine and, in the finite element engine,
+clip the beam shear at Vcap ÷ S and release a plastic hinge where the beam moment
+reaches Mcap ÷ S. On this file `D` and `S` carry the most. Every stiffness the
+finite element model uses comes from those two cells: `I` and `Area` are blank,
+so the engine derives the solid circular section from the diameter,
+I = πD⁴/64 and Area = πD²/4, and then divides *EA* and *EI* by the spacing.
+Hovering `S` says what each engine does with it:
 
 > Center-to-center pile spacing. In the LEM, spacing is physics: it sets the
 > arching between piles (Ito & Matsui) and makes Vcap/Mcap per-pile. In the FEM,
@@ -144,8 +147,8 @@ Click **Run**.
 
 ![Spencer's critical circle, with the two pile crossings marked](images/fem03_lem_solution_piles.png){width=1000}
 
-**FS = 1.842**, on a deep circle that leaves the ground 14 ft beyond the toe and
-exits on the crest at x = 35. The two red dots are where it crosses the pile
+**FS = 1.842**, on a deep circle that leaves the ground 13.5 ft beyond the toe
+and exits on the crest at x = 35. The two red dots are where it crosses the pile
 rows. The rows deliver **4,367.6 lb/ft** to the slices there, both of them
 limited by the shafts' moment capacity rather than by what the soil could
 supply; [LEM-12](lem12_piles.md#how-the-force-is-computed) works through that
@@ -186,19 +189,19 @@ this model's answer, and leave everything else as it opens: tolerance 0.0100,
 on the sides, and **Non-convergence** as the failure criterion. Click **Run**.
 The run takes about 40 seconds.
 
-**FS = 1.361**, from a final bracket of [1.3563, 1.3656] in eight bisection
-steps. Spencer's method gave 1.842 on the same file.
+**FS = 1.361**, from a final bracket of [1.3563, 1.3656] in eight trials — two
+bracket checks and six bisections. Spencer's method gave 1.842 on the same file.
 
 ![The mechanism at failure, with the pile rows colored by shear force](images/fem03_fem_shear_piles.png){width=1000}
 
 The contours are viscoplastic shear strain — the shearing left after the elastic
 response is subtracted. The band runs up from the flat ground beyond the toe,
-past the lower row, and concentrates on the uphill side of the upper row before
-breaking out of the face just above it at about x = 12, y = 8. Nowhere does it
-pass *through* a row, because in plane strain there is nothing to pass through:
-each row is a continuous obstruction over the full length of the slope, and the
-mechanism has to climb over it. That is the statement at the top of this page,
-seen in a field rather than argued.
+past the lower row, and concentrates on the uphill side of the upper row, where
+the strain peaks at about (12, 7). From there the band reaches the face at the
+upper row's head, near (10, 10). Nowhere does it pass *through* a row, because in
+plane strain there is nothing to pass through: each row is a continuous
+obstruction over the full length of the slope, and the mechanism has to climb
+over it.
 
 ### What the row is worth in each engine
 
@@ -228,9 +231,8 @@ the same 1.00 to 1.60 bracket, **Run**:
 
 Read the first column first. On the bare slope the two engines land 1.3% apart,
 so nothing structural separates them on this section, and whatever the second
-column adds is the pile row and only the pile row. There they credit it by a
-factor of 1.60 and 1.17 — a disagreement on the quantity being designed, not a
-rounding.
+column adds is the pile row and only the pile row. There they credit it ×1.60 and
+×1.17 — a disagreement on the quantity being designed, not a rounding.
 
 Reopen [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx) with **File → Open…**
 to put the rows back before the next section.
@@ -257,32 +259,44 @@ skims the toe. Set the column back to `Active` before continuing.
 
 A designer adjusts the spacing once the diameter is set, and the two engines part
 company over it more sharply than over anything else. The sweep below runs both
-of them across the applicable band — 3, 6 and 12 ft, S/D from 1.5 to 6 — with
-nothing changing but the `S` cell on the two rows. Each limit equilibrium point
-is its own Spencer search, because spacing changes which surface governs.
+of them across a 4× range in spacing — 3, 6 and 12 ft, S/D 1.5 to 6 — with
+nothing changing but the `S` cell on the two rows. Ito & Matsui is applicable for
+S/D between about 2 and 8, so the 3 ft point sits below the band and raises the
+**Model checks** warning [LEM-12](lem12_piles.md#what-the-spacing-is-worth)
+discusses. Each limit equilibrium point is its own Spencer search, because
+spacing changes which surface governs.
 
 ![Factor of safety against pile spacing, both engines on one axis](images/fem03_spacing_sweep.png){width=800}
 
 The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%. The
-strength reduction answer is 1.361 at all three spacings, to six decimals, from
-the same bisection interval and with the same verdict at every trial.
+three strength reduction runs return the same bracket, [1.356, 1.366], and so the
+same answer, 1.361, with the same verdict at every trial. Repeating them at a
+tolerance of 0.0025 separates the three by 0.002.
 
 Run one point of it to see both. Open **Piles**, set `S` to `12` on both rows
 with `H` still blank, and **OK**. Search with Spencer again: **FS = 1.409**, and
-not on the deep circle the 6 ft spacing found — the deepest point of the
-critical surface rises from elevation −5.1 to −0.8. Widening the gap did not
-only lower the answer, it changed which surface governs, which
-[LEM-12](lem12_piles.md#what-the-spacing-is-worth) covers in full. The pile
-lines have not moved, so the mesh still fits: switch to **FEM** and
-**Run → Run FEM…** with the same bracket. **FS = 1.361**, the same answer as at
-6 ft.
+not on the deep circle the 6 ft spacing found. The 12 ft surface leaves the toe,
+reaches 10.1 ft below the ground at its deepest and exits 8.5 ft behind the
+crest; the 6 ft circle started 13.5 ft out in front of the toe, ran down to
+elevation −5.1, more than 5 ft below the toe, and exited 14.9 ft behind the
+crest. Widening the gap did not only lower the answer, it changed which surface
+governs, which [LEM-12](lem12_piles.md#what-the-spacing-is-worth) covers in full.
+
+Editing a pile row makes the mesh stale — the pile lines are mesh constraints —
+so **Run FEM…** is greyed until one is built again. Switch to **FEM**,
+**Run → Build Mesh…** and **Build**; the dialog opens on the tri6 at 2 ft the
+session already used. Because the pile lines themselves have not moved, the mesh
+comes back identical — **3,180 nodes and 1,521 triangles** with the same **18
+beam elements** — which is what makes the two runs comparable. **Run → Run
+FEM…** with the same bracket: **FS = 1.361**, the same answer as at 6 ft.
 
 That flat line is worth explaining carefully, because the obvious reading of it
 is wrong. Dividing *EA* and *EI* by `S` is not bookkeeping the finite element
 engine does to dispose of the spacing column — it is the correct plane-strain
 stiffness of a row smeared into a wall, and it responds to `S` exactly as it
 should. Over this sweep the smeared stiffness falls by a factor of four, and the
-run's internals move with it:
+run's internals move with it. Each row below is read from that spacing's last
+trial to reach equilibrium, F = 1.356:
 
 | S (ft) | *EI*/S (lb·ft²) | Peak moment per unit width (lb·ft/ft) | Peak moment per pile (lb·ft) | Fraction of M<sub>cap</sub> | Elements yielded in bending |
 |:---:|:---:|:---:|:---:|:---:|:---:|
@@ -308,7 +322,7 @@ begin to bend it, and the factor of safety would fall back toward the unpiled
 1.164. What the two-dimensional model cannot represent at any spacing is the
 mechanism that spacing actually governs — soil arching onto the shafts and
 squeezing through the gaps between them, which is exactly what Ito & Matsui
-computes. Plane strain has no gaps.
+computes, and which a plane-strain section has no gaps to hold.
 
 Set `S` back to `6` on both rows before the next section, or reopen the file.
 
@@ -330,13 +344,12 @@ in [VP106](../verification/rocscience.md#vp106) and
 | Pile, head rotation restrained | 1.570 | 1.45 (+8.3%) |
 
 The unpiled row agrees to 0.4%, which is what makes the other two readable. With
-the row in place the plane-strain model credits it with multiplying the
-unreinforced factor of safety by 1.279, where the three-dimensional model
-credits 1.193. On the same slope a Bishop search with the Ito & Matsui force
-reads 1.451, a credit of 1.269. Both two-dimensional routes sit above the
-three-dimensional answer by a comparable amount, and neither recovers it. What
-this benchmark settles is the direction of the plane-strain error, not a ranking
-of the two routes against each other.
+the row in place the plane-strain model credits it ×1.279, where the
+three-dimensional model credits ×1.193. On the same slope a Bishop search with
+the Ito & Matsui force reads 1.451, a credit of ×1.269. Both two-dimensional
+routes sit above the three-dimensional answer by a comparable amount, and
+neither recovers it. What this benchmark settles is the direction of the
+plane-strain error, not a ranking of the two routes against each other.
 
 So the reason to take a discrete row's factor of safety from the limit
 equilibrium engine is not that its number is larger or smaller. It is that Ito &
@@ -420,9 +433,9 @@ This run takes about **20 minutes**. It is a 6,484-element mesh and the trials
 near the critical factor iterate tens of thousands of times each before they
 settle, so it can be left going.
 
-**FS = 1.020**, from a final bracket of [1.0156, 1.0250] in seven trials. The
-slope stands, barely. SIGMA/W reads about 1.025 on the same model, and two other
-analyses in the same project put it at 1.033 and 1.035 —
+**FS = 1.020**, from a final bracket of [1.0156, 1.0250] in seven trials.
+SIGMA/W reads about 1.025 on the same model, and two other analyses in the same
+project put it at 1.033 and 1.035 —
 [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) states
 how each of those published figures is read.
 
@@ -430,7 +443,8 @@ how each of those published figures is read.
 
 The wall goes in as one row of the piles table, and which cells it fills is the
 content of this step. Open **Piles** in the **Inputs** dock, press **List
-view**, and click **Add**.
+view**, and click **Add**. The new row opens with its **Label** reading `Pile`;
+type `sheet pile wall` over it, which is the name the results panels use.
 
 ![The wall row: S = 1, no diameter, no capacities, section constants entered directly](images/fem03_studio_wall_row.png)
 
@@ -447,22 +461,24 @@ and *EI* = 1.0 × 10<sup>5</sup> kN·m²/m.
 
 Set **S** to `1`, and leave `H`, `D`, `Vcap` and `Mcap` empty.
 
-`S` = 1 is what makes this member continuous. A sheet pile wall has no
-out-of-plane gap, so its section constants already are per meter of wall, and a
-spacing of 1 passes them into the beam elements unchanged instead of smearing
-one member's stiffness over a spacing. The blank cells follow from the same
-fact. `D` is blank because there is no circular shaft to derive a section from —
-`I` and `Area` are given directly, which is the other way the engine accepts a
-section. `Vcap` and `Mcap` are blank because this run is asked to report what the
+A sheet pile wall has no out-of-plane gap, so its section constants already are
+per meter of wall, and a spacing of 1 passes them into the beam elements
+unchanged instead of smearing one member's stiffness over a spacing. The blank
+cells follow from the same fact. `D` is blank because there is no circular shaft
+to derive a section from — `I` and `Area` are given directly, which is the other
+way the engine accepts a section. `Vcap` and `Mcap` are blank because this run is asked to report what the
 wall carries rather than to check it against a declared capacity, and, as the
 last section shows, the detail panel draws a capacity line only where one is
 entered. `H` is blank because a finite element run never uses a stated pile
 force.
 
-**Appl** reads `passive` on this row, and **Fixity** `free`. `Appl` is a limit
-equilibrium input and does nothing in a strength reduction run. `Fixity` `free`
-leaves both ends of the wall able to rotate, which is what a driven sheet pile
-with no capping beam does, and the moment profile below is read against it.
+A new row opens with **Appl** on `active` and **Fixity** on `free`. The figure
+above is from the completed model, which carries `passive` — inherited from the
+SIGMA/W transcription it was built from — and either setting is inert in this
+run: `Appl` is a limit equilibrium input, and a strength reduction run never
+reads it. `Fixity` `free` leaves both ends of the wall able to rotate, which is
+what a driven sheet pile with no capping beam does, and the moment profile below
+is read against it.
 
 Click **OK**.
 
@@ -488,21 +504,28 @@ Set **F min (SSRM)** to `1.15` and **F max (SSRM)** to `1.65` and click **Run**.
 This run takes about **30 minutes**.
 
 **FS = 1.420**, from a final bracket of [1.4156, 1.4234] in eight trials. The
-wall takes the slope from 1.020 to 1.420, a credit of ×1.39, against SIGMA/W's
-own reading of about 1.4 for the same model.
+wall takes the slope from 1.020 to 1.420, a credit of ×1.39. SIGMA/W's own factor
+of safety for the same model is about 1.4, a credit of ×1.37.
 
 One note on that number before the figures. The
 [verification page](../verification/geostudio.md#sigmaw-wall) records 1.451 for
-this model rather than 1.420. The two runs differ in the **Failure criterion**
-setting: the Run FEM dialog opens on **Non-convergence**, the plain reading that
-a trial which cannot reach equilibrium has failed, and the verification run uses
-the engine's hybrid criterion, which also weighs how the displacements are
-behaving when a trial spends its iteration ceiling. On this model five of the
-eight trials reach that ceiling without settling, so the two criteria adjudicate
-them differently and the two searches close on different intervals. Both answers
-sit inside the published "about 1.4". [FEM-1](fem01_strength_reduction.md)
-compares the criteria the list offers. The two figures below are drawn from the
-verification run, so their titles read 1.45.
+this model rather than 1.420. Two settings differ. The Run FEM dialog opens on
+**Non-convergence** — the plain reading, that a trial which cannot reach
+equilibrium has failed — where the verification run uses the engine's **Hybrid**
+criterion, which weighs how the displacements are behaving alongside the
+convergence verdict; and the dialog's **Max iterations per trial** is 12,000
+against the verification run's 16,000. The budget is inert here, because it is
+extended rather than enforced: five of the eight trials are still undecided when
+they spend it and run on to the 50,000 **Iteration ceiling** either way. It is
+the criterion that then adjudicates those five, so the two searches close on
+different intervals. Both answers sit inside the published "about 1.4".
+[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) names the
+criteria the list offers and
+[SSRM failure criteria](../fem/overview.md#ssrm-failure-criteria) compares them.
+The shear strain field below and the four profiles in the next section both come
+from the verification run at 1.451 rather than from the 1.420 run above — the
+first carries that factor in its title — and so do the moment, shear, soil
+reaction and displacement values quoted with them.
 
 ![The mechanism with the wall in place, running along the weak clay band](images/fem03_wall_shear.png){width=1000}
 
@@ -555,14 +578,17 @@ same turning point at the base of the band, with peaks about half again as
 large; the benchmark page
 [states how far each sits from the published value and why](../verification/geostudio.md#sigmaw-wall).
 
-Two things the panel does *not* draw are worth noticing.
-There is no Ito & Matsui limiting-resistance envelope on the moment axis and no
-capacity lines on the shear or moment panels. Both are correct here. The
-envelope is a limit pressure for soil flowing between piles, and this member has
-no gaps for soil to flow through; the capacity lines would need a `Vcap` and
-`Mcap` the row does not declare, and drawing a capacity that was not entered
-would be inventing one. The status beside the field selector reads *no capacity
-declared* for that reason.
+Two things the panel draws for other members are absent here. The shear and
+moment panels carry a dashed capacity line wherever a `Vcap` or an `Mcap` is
+entered, and this row declares neither — which is what the figure's title and the
+status beside the field selector say when they read *no capacity declared*. The
+soil reaction panel plots the Ito & Matsui limiting resistance beside the
+mobilized reaction, and here it plots the mobilized reaction alone: that envelope
+is the limit pressure for soil flowing between piles, computed from `D` and `S`,
+and a member with `S` = 1 and no diameter has no gaps for soil to flow through.
+Both absences are correct. A capacity that was not entered would be an invented
+one, and an arching envelope on a continuous wall would be a mechanism the member
+does not have.
 
 ---
 
@@ -621,6 +647,4 @@ the beam formulation, the assembly and the applicability rule in full, and
 the same rule from the other side;
 [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) is the
 second half of this page checked against its published source;
-[LEM-12](lem12_piles.md) is the pile row on its own. COMBO-1, Seepage →
-Stability, is the next tutorial on the roster and takes up as its subject the
-seepage-then-stability sequence that appeared here as a step.
+[LEM-12](lem12_piles.md) is the pile row on its own.

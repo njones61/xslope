@@ -4570,6 +4570,379 @@ def fem02_tres_sweep():
     capture("fem02_tres_sweep.png", _draw)
 
 
+# --------------------------------------------------------------------------- #
+# FEM-3 — Piles: LEM against FEM
+# --------------------------------------------------------------------------- #
+#: FEM-3's two models.  The discrete row is the pile sample problem — one model,
+#: two sample pages: docs/lem/samples.md problem 10 locks Spencer's search on it
+#: and docs/fem/samples.md problem 2 locks the strength-reduction runs, and the
+#: two workbooks are the same section, soil and pile rows (verified: identical
+#: ground surface, max_depth, material and pile rows; they differ only in
+#: template version and row labels).  The finite element copy is the one used
+#: here wherever a mesh or a solved field is needed, because it is the copy the
+#: mesh and the field are committed beside.
+FEM03_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
+FEM03_PILES_FEM = os.path.join(REPO_ROOT, "docs/fem/files/xslope_piles_fem.xlsx")
+FEM03_PILES_FEM_STEM = os.path.join(REPO_ROOT, "docs/fem/files/xslope_piles_fem")
+#: The continuous wall: the tutorial pair written by
+#: ``tools/build_pile_wall_tutorial.py`` from the SIGMA/W transcription in the
+#: verification corpus, and the corpus stem the solved fields are committed at.
+#: The tutorial files are sidecar-free by the campaign's Download rule, so the
+#: mesh and the two solved fields are read from the corpus copies they are
+#: derived from — the same model, meshed at the same settings, measured this
+#: round to reproduce the same factor of safety from the tutorial file.
+FEM03_WALL_START = os.path.join(REPO_ROOT,
+                                "docs/tutorials/files/xslope_pile_wall_start.xlsx")
+FEM03_WALL_DONE = os.path.join(REPO_ROOT,
+                               "docs/tutorials/files/xslope_pile_wall.xlsx")
+FEM03_WALL_CORPUS = os.path.join(REPO_ROOT,
+                                 "docs/verification/files/geostudio/gs2_wall")
+#: The limit-equilibrium method and slice count the piles model's own locked
+#: search runs at (docs/lem/samples.md's circular_search tag).
+FEM03_METHOD = "spencer"
+FEM03_SLICES = 40
+#: The strength-reduction settings the piles model's own locked runs are made at
+#: (docs/fem/samples.md's fem_ssrm tags): tri6 on the committed mesh, bracketed
+#: 1.0–1.6, bisected to 0.01, 16,000 iterations a trial.
+FEM03_F_MIN, FEM03_F_MAX = 1.0, 1.6
+FEM03_TOLERANCE = 0.01
+FEM03_MAX_ITERATIONS = 16000
+#: The spacings the sweep runs, spanning S/D = 1.5 to 6 on the model's 2 ft
+#: shafts.  6 ft is the file's own value and the locked case; 3 and 12 ft halve
+#: and double it, which quarters and quadruples what the finite element model
+#: sees, since spacing reaches it only as the divisor on EA and EI.
+FEM03_SPACINGS = (3.0, 6.0, 12.0)
+
+
+def _fem03_search(model):
+    """One Spencer search on the piles model at the sample's own slice count."""
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _conv, _path, _cache = circular_search(
+            model, FEM03_METHOD, num_slices=FEM03_SLICES, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache[0]
+
+
+def _fem03_reading(crit):
+    """The one-line reading of a search: factor of safety, circle, and the pile
+    force that reached the slices."""
+    piles = (crit["slices"].attrs.get("pile_report") or []
+             if crit.get("slices") is not None else [])
+    total = sum(r["H_width"] for r in piles)
+    return ("FS %.4f on Xo %.3f Yo %.3f R %.3f (deepest y %.3f) · ΣH %.1f "
+            "per unit width from %d row(s)"
+            % (crit["FS"], crit["Xo"], crit["Yo"], crit["Yo"] - crit["Depth"],
+               crit["Depth"], total, len(piles)))
+
+
+def _fem03_ssrm(spacing):
+    """One strength-reduction run on the piles model with the two rows' spacing
+    set to ``spacing``, on the mesh committed beside the model.
+
+    Spacing changes no geometry, so every run in the sweep sits on that one mesh
+    and the only thing the finite element model sees change is EA/S and EI/S.
+    """
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    sd = load_slope_data(FEM03_PILES_FEM)
+    for pile in sd["pile_lines"]:
+        pile["S"] = float(spacing)
+    fem_data = build_fem_data(sd, sd["mesh"])
+    with contextlib.redirect_stdout(io.StringIO()):
+        result = solve_ssrm(fem_data, F_min=FEM03_F_MIN, F_max=FEM03_F_MAX,
+                            tolerance=FEM03_TOLERANCE, debug_level=0,
+                            max_iterations=FEM03_MAX_ITERATIONS)
+    return sd, fem_data, result
+
+
+def fem03_piles():
+    """The discrete row: the section both engines are given, the limit
+    equilibrium answer with the two rows crossing the critical circle, and the
+    strength-reduction mechanism the finite element model builds instead.
+
+    The finite element figure is drawn from the field committed beside
+    docs/fem/files/xslope_piles_fem.xlsx rather than re-solved, so it is the same
+    run the sample page's number is locked to.
+    """
+    import json
+
+    import numpy as np
+
+    from xslope.fem import build_fem_data, import_fem_solution
+    from xslope.plot_fem import plot_fem_results
+
+    sd = load_slope_data(FEM03_PILES)
+    _u = declared_unit_labels(sd)
+    mat = sd["materials"][0]
+    print("   model       %s: γ %g %s · c %g %s · φ %g° · E %g %s · ν %g · u %s"
+          % (mat["name"], mat["gamma"], _u["unit_weight"], mat["c"], _u["stress"],
+             mat["phi"], mat["E"], _u["stress"], mat["nu"], mat["u"]))
+    for pile in sd["pile_lines"]:
+        print("   pile row    %-9s (%g, %g) to (%g, %g) · D %g %s · S %g %s · "
+              "E %g %s · Vcap %g · Mcap %g · %s · %s"
+              % (pile["label"], pile["x1"], pile["y1"], pile["x2"], pile["y2"],
+                 pile["D_pile"], _u["length"], pile["S"], _u["length"],
+                 pile["E"], _u["stress"], pile["V_cap"], pile["M_cap"],
+                 pile["fixity"], pile["appl"]))
+
+    capture("fem03_inputs_piles.png", plot_inputs, sd,
+            title="Slope Geometry and Inputs")
+
+    crit = _fem03_search(sd)
+    capture("fem03_lem_solution_piles.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    print("   LEM         %s" % _fem03_reading(crit))
+    for rec in (crit["slices"].attrs.get("pile_report") or []):
+        print("      row %-9s crosses at y %.3f · Ito & Matsui %.0f per pile · "
+              "%s → %.0f per pile = %.1f %s applied"
+              % (rec["label"], rec["y"], rec["F_soil"], rec["governed"],
+                 rec["F_used"], rec["H_width"], _u["force_per_len"]))
+
+    fem_sd = load_slope_data(FEM03_PILES_FEM)
+    mesh = fem_sd["mesh"]
+    fem_data = build_fem_data(fem_sd, mesh)
+    with contextlib.redirect_stdout(io.StringIO()):
+        solution = import_fem_solution(fem_data, FEM03_PILES_FEM_STEM)
+    with open("%s_fem_meta.json" % FEM03_PILES_FEM_STEM) as fh:
+        meta = json.load(fh)
+    print("   mesh        %d nodes · %d elements · %d beam elements · %s at "
+          "target size %g %s"
+          % (len(mesh["nodes"]), len(mesh["elements"]),
+             len(mesh.get("elements_1d", [])), meta.get("element_type"),
+             meta.get("target_size"), _u["length"]))
+    print("   FEM         FS %.4f from [%.6f, %.6f] · last equilibrium at "
+          "F %.5f · max|u| %.4f %s"
+          % (meta["FS"], meta["final_interval"][0], meta["final_interval"][1],
+             meta["F"], meta["max_displacement"], _u["length"]))
+    capture("fem03_fem_shear_piles.png", plot_fem_results, fem_data, solution,
+            plot_type="shear_strain", fs=meta["FS"],
+            failure_solution=solution.get("failure_solution"),
+            field_state="failure")
+
+    # Where each engine puts the mechanism, measured rather than described.
+    from xslope import fem_details
+    fail = solution.get("failure_solution") or solution
+    strain = np.asarray(fem_details._mechanism_field(fem_data, solution, fail))
+    cent = np.asarray(fem_details._element_centroids(fem_data))
+    hot = strain >= 0.5 * np.nanmax(strain)
+    w = strain[hot]
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    print("   mechanism   %d of %d elements above half the peak shear strain "
+          "(%.4f) · strain-weighted centroid (%.2f, %.2f) · x %.2f–%.2f, "
+          "y %.2f–%.2f"
+          % (int(hot.sum()), len(strain), float(np.nanmax(strain)),
+             float((cent[hot, 0] * w).sum() / w.sum()),
+             float((cent[hot, 1] * w).sum() / w.sum()),
+             float(cent[hot, 0].min()), float(cent[hot, 0].max()),
+             float(cent[hot, 1].min()), float(cent[hot, 1].max())))
+    print("   LEM circle  entry (%.3f, %.3f) exit (%.3f, %.3f) — the surface the "
+          "slices found, for comparison" % (xs[0], ys[0], xs[-1], ys[-1]))
+
+
+def fem03_spacing():
+    """The page's falsifiable test: the same two pile rows at 3, 6 and 12 ft
+    spacing, put through both engines.
+
+    The limit equilibrium runs are full searches — spacing changes which surface
+    governs, so a held circle would hide half the effect.  The strength-reduction
+    runs are the same bracket, tolerance and iteration budget on the same mesh,
+    with nothing changing but the S cell; 6 ft is the model's own value and is
+    run as a control against the field committed beside it.
+
+    Printed beside each pair: EA/S and EI/S, which is the whole of what the
+    finite element model sees spacing do, and the per-pile beam actions, which is
+    where the response that does not reach the factor of safety goes.
+    """
+    import json
+
+    import numpy as np
+
+    sd = load_slope_data(FEM03_PILES)
+    _u = declared_unit_labels(sd)
+    D = sd["pile_lines"][0]["D_pile"]
+    E = sd["pile_lines"][0]["E"]
+    area, inertia = math.pi * D ** 2 / 4.0, math.pi * D ** 4 / 64.0
+    print("   section     D %g %s → A %.4f %s² · I %.4f %s⁴ · E %g %s"
+          % (D, _u["length"], area, _u["length"], inertia, _u["length"], E,
+             _u["stress"]))
+
+    lem, fem = {}, {}
+    for spacing in FEM03_SPACINGS:
+        model = copy.deepcopy(sd)
+        for pile in model["pile_lines"]:
+            pile["S"] = float(spacing)
+        crit = _fem03_search(model)
+        lem[spacing] = crit["FS"]
+        print("   LEM  S %-5g %s" % (spacing, _fem03_reading(crit)))
+
+    for spacing in FEM03_SPACINGS:
+        run_sd, fem_data, result = _fem03_ssrm(spacing)
+        fem[spacing] = result["FS"]
+        field = result["last_solution"]
+        u = np.asarray(field["displacements"]).reshape(-1, 2)
+        moments = np.asarray(field.get("forces_pile_moment", []), dtype=float)
+        shear = np.asarray(field.get("forces_pile_lateral", []), dtype=float)
+        m_peak = float(np.abs(moments).max()) if moments.size else 0.0
+        print("   FEM  S %-5g FS %.4f from [%.6f, %.6f] · EA/S %.4g · EI/S %.4g "
+              "· max|u| %.4f %s at F %.5f · peak beam moment %.0f %s·%s/%s "
+              "(%.0f per pile, %.0f%% of Mcap) · peak beam shear %.0f"
+              % (spacing, result["FS"], result["final_interval"][0],
+                 result["final_interval"][1], E * area / spacing,
+                 E * inertia / spacing,
+                 float(np.hypot(u[:, 0], u[:, 1]).max()), _u["length"],
+                 field.get("F"), m_peak, _u["stress"].split("/")[0],
+                 _u["length"], _u["length"], m_peak * spacing,
+                 100.0 * m_peak * spacing / run_sd["pile_lines"][0]["M_cap"],
+                 float(np.abs(shear).max()) if shear.size else float("nan")))
+
+    with open("%s_fem_meta.json" % FEM03_PILES_FEM_STEM) as fh:
+        meta = json.load(fh)
+    print("   control     S = 6 run %.6f against the field committed beside the "
+          "model, %.6f" % (fem[6.0], meta["FS"]))
+
+    def _draw():
+        fig, ax = plt.subplots(figsize=(7.0, 4.6))
+        xs = list(FEM03_SPACINGS)
+        ax.plot(xs, [lem[s] for s in xs], "o-", color="#1f77b4", linewidth=2.0,
+                markersize=7, label="LEM (Spencer, Ito & Matsui)")
+        ax.plot(xs, [fem[s] for s in xs], "s-", color="#d62728", linewidth=2.0,
+                markersize=7, label="FEM (SSRM, beam smeared over S)")
+        for s in xs:
+            ax.annotate("%.3f" % lem[s], (s, lem[s]), textcoords="offset points",
+                        xytext=(0, 9), ha="center", fontsize=9, color="#1f77b4")
+            ax.annotate("%.3f" % fem[s], (s, fem[s]), textcoords="offset points",
+                        xytext=(0, -16), ha="center", fontsize=9, color="#d62728")
+        ax.set_xlabel("Pile spacing S (%s)" % _u["length"])
+        ax.set_ylabel("Factor of safety")
+        ax.set_title("Two rows of 2 ft shafts: what each engine does with spacing")
+        ax.set_xticks(xs)
+        ax.set_xlim(min(xs) - 1.0, max(xs) + 1.0)
+        # Room for the two annotation rows, measured off the data rather than
+        # padded by a guess: the lower labels sit under the flat line and would
+        # otherwise print on the axis.
+        lo = min(min(lem.values()), min(fem.values()))
+        hi = max(max(lem.values()), max(fem.values()))
+        ax.set_ylim(lo - 0.10 * (hi - lo), hi + 0.08 * (hi - lo))
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="upper right", frameon=False)
+        fig.tight_layout()
+
+    capture("fem03_spacing_sweep.png", _draw)
+
+
+def fem03_wall():
+    """The continuous wall: the section the reader starts from, the mechanism the
+    wall changes, and the internal actions only the finite element engine can
+    give.
+
+    Nothing is solved here.  The tutorial pair is derived from the verification
+    corpus's SIGMA/W transcription by ``tools/build_pile_wall_tutorial.py``, and
+    the fields committed beside the corpus models are the fields these figures
+    are drawn from — the same mesh, the same seepage solve, the same locked
+    factors of safety.
+    """
+    import json
+
+    from xslope import fem_details
+    from xslope.fem import build_fem_data, import_fem_solution
+    from xslope.plot_fem import plot_fem_results
+    from xslope.plot_fem_details import plot_pile_detail
+
+    start = load_slope_data(FEM03_WALL_START)
+    done = load_slope_data(FEM03_WALL_DONE)
+    _u = declared_unit_labels(done)
+    for mat in done["materials"]:
+        print("   %-11s γ %g %s · %s · c %r · φ %r · E %g %s · ν %g · t_cut %r "
+              "· u %s · k %g"
+              % (mat["name"], mat["gamma"], _u["unit_weight"], mat["option"],
+                 mat["c"], mat["phi"], mat["E"], _u["stress"], mat["nu"],
+                 mat["t_cut"], mat["u"], mat["k1"]))
+    wall = done["pile_lines"][0]
+    print("   wall row    %s: (%g, %g) to (%g, %g) · E %g %s · Area %g %s²/%s · "
+          "I %g %s⁴/%s · S %g · D %r · Vcap %r · Mcap %r · %s"
+          % (wall["label"], wall["x1"], wall["y1"], wall["x2"], wall["y2"],
+             wall["E"], _u["stress"], wall["area"], _u["length"], _u["length"],
+             wall["I"], _u["length"], _u["length"], wall["S"], wall["D_pile"],
+             wall["V_cap"], wall["M_cap"], wall["fixity"]))
+    print("   starter     %d pile row(s) · %d materials · %s at target size "
+          "%g %s · weak-clay local size %r"
+          % (len(start["pile_lines"]), len(start["materials"]),
+             start["element_type"], start["target_size"], _u["length"],
+             start["profile_lines"][1]["size"]))
+
+    capture("fem03_inputs_wall.png", plot_inputs, start,
+            title="Slope Geometry and Inputs")
+
+    sd = load_slope_data("%s.xlsx" % FEM03_WALL_CORPUS)
+    fem_data = build_fem_data(sd, sd["mesh"])
+    with contextlib.redirect_stdout(io.StringIO()):
+        solution = import_fem_solution(fem_data, FEM03_WALL_CORPUS)
+    with open("%s_fem_meta.json" % FEM03_WALL_CORPUS) as fh:
+        meta = json.load(fh)
+    print("   wall mesh   %d nodes · %d elements · %d beam elements"
+          % (len(sd["mesh"]["nodes"]), len(sd["mesh"]["elements"]),
+             len(sd["mesh"].get("elements_1d", []))))
+    print("   FEM         FS %.4f from [%.6f, %.6f] · last equilibrium at "
+          "F %.5f" % (meta["FS"], meta["final_interval"][0],
+                      meta["final_interval"][1], meta["F"]))
+    capture("fem03_wall_shear.png", plot_fem_results, fem_data, solution,
+            plot_type="shear_strain", fs=meta["FS"],
+            failure_solution=solution.get("failure_solution"),
+            field_state="failure")
+
+    prof = fem_details.pile_profile(fem_data, solution, 0, slope_data=sd,
+                                    field_state="converged",
+                                    failure_solution=solution.get("failure_solution"))
+    head_y = wall["y1"]
+    print("   wall actions  length %.2f %s over %d beam elements · peak moment "
+          "%.1f %s·%s/%s at depth %.2f (el. %.2f) · peak shear %.1f at depth "
+          "%.2f (el. %.2f) · max lateral displacement %.4f %s"
+          % (prof["length"], _u["length"], prof["n_elements"],
+             prof["max_moment"], _u["stress"].split("/")[0], _u["length"],
+             _u["length"], prof["max_moment_depth"],
+             head_y - prof["max_moment_depth"], prof["max_shear"],
+             prof["max_shear_depth"], head_y - prof["max_shear_depth"],
+             float(abs(prof["u_lateral"]).max()), _u["length"]))
+    print("   wall ends     moment %.3f at the head and %.3f at the toe — both "
+          "free · Ito & Matsui envelope %r · Vcap %r · Mcap %r · badge %r"
+          % (float(prof["moment"][0]), float(prof["moment"][-1]),
+             prof["limit_p"], prof["V_cap"], prof["M_cap"], prof["badge"]))
+    shear, depth = prof["shear"], prof["elem_depth"]
+    above = shear[depth <= (head_y - 5.0)]
+    below = shear[depth > (head_y - 5.0)]
+    print("   shear branches  above el. 5: peak %.1f · below el. 5: peak %.1f "
+          "(opposite signs: the wall is driven by the band and reacts against "
+          "the material under it)"
+          % (float(above[abs(above).argmax()]) if len(above) else float("nan"),
+             float(below[abs(below).argmax()]) if len(below) else float("nan")))
+    # The same profile read at the captured mechanism rather than at the last
+    # equilibrium state. That is the state Studio's detail panel opens on when a
+    # mechanism was captured, and the state the verification page's own peaks and
+    # its forces figure are read at — so it is the state this figure draws, and
+    # the converged numbers above are stated beside it rather than plotted.
+    fail_prof = fem_details.pile_profile(
+        fem_data, solution, 0, slope_data=sd, field_state="failure",
+        failure_solution=solution.get("failure_solution"))
+    fshear, fdepth = fail_prof["shear"], fail_prof["elem_depth"]
+    fabove = fshear[fdepth <= (head_y - 5.0)]
+    fbelow = fshear[fdepth > (head_y - 5.0)]
+    print("   at failure    peak moment %.1f at depth %.2f (el. %.2f) · shear "
+          "above el. 5 %.1f · below %.1f · max lateral displacement %.4f %s "
+          "(growth from the converged state: moment ×%.2f, shears ×%.2f and "
+          "×%.2f)"
+          % (fail_prof["max_moment"], fail_prof["max_moment_depth"],
+             head_y - fail_prof["max_moment_depth"],
+             float(fabove[abs(fabove).argmax()]) if len(fabove) else float("nan"),
+             float(fbelow[abs(fbelow).argmax()]) if len(fbelow) else float("nan"),
+             float(abs(fail_prof["u_lateral"]).max()), _u["length"],
+             abs(fail_prof["max_moment"] / prof["max_moment"]),
+             abs(float(fabove[abs(fabove).argmax()]) / float(above[abs(above).argmax()]))
+             if len(fabove) and len(above) else float("nan"),
+             abs(float(fbelow[abs(fbelow).argmax()]) / float(below[abs(below).argmax()]))
+             if len(fbelow) and len(below) else float("nan")))
+    capture("fem03_wall_profiles.png", plot_pile_detail, fail_prof)
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -4603,6 +4976,9 @@ GROUPS = {
     "fem02_plots": fem02_plots,
     "fem02_pullout_law": fem02_pullout_law,
     "fem02_tres_sweep": fem02_tres_sweep,
+    "fem03_piles": fem03_piles,
+    "fem03_spacing": fem03_spacing,
+    "fem03_wall": fem03_wall,
 }
 
 

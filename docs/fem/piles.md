@@ -36,7 +36,7 @@ finite element path is verified on, at both levels:
 - The whole path — wall, soil, pore pressures and strength reduction together — is measured against
   GeoStudio's SIGMA/W *slope stabilization with piles* example, where a sheet pile wall driven from a bench
   through a weak clay band takes the slope from marginal stability to comfortably stable. XSLOPE reads
-  1.011 without the wall and 1.451 with it, against SIGMA/W's own readings of about 1.025 and about 1.4,
+  1.020 without the wall and 1.451 with it, against SIGMA/W's own readings of about 1.025 and about 1.4,
   and recovers the wall's bending moment and shear down its length with the published shape and turning
   point. See [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall), which states how the
   published factors are read and how far XSLOPE sits from each.
@@ -331,7 +331,7 @@ field state, with that state also recorded in the CSV's header.
 The panel is non-modal and reads the solution it was opened with, and works the same on a solution reloaded from
 its saved sidecar files as on a fresh solve.
 
-The screenshot above is the piles sample's own strength reduction run, $FS = 1.370$, read at the mechanism it
+The screenshot above is the piles sample's own strength reduction run, $FS = 1.361$, read at the mechanism it
 developed (see [FEM sample problems](samples.md)).
 
 ## References

@@ -17,6 +17,9 @@
       "u_ratio": null,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
       "iterations": 275
     },
@@ -26,11 +29,14 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 73.49487237767428,
-      "growth": 17.802723317650248,
-      "exit_reason": "no_progress",
+      "u_ratio": 8.231619839352573,
+      "growth": 1.5124705231554674,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 220,
       "ee_suppressed": false,
-      "iterations": 2452
+      "iterations": 221
     },
     {
       "F": 1.3,
@@ -41,6 +47,9 @@
       "u_ratio": null,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
       "iterations": 1649
     },
@@ -50,11 +59,14 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 49.380137444735446,
-      "growth": 11.421204268307417,
-      "exit_reason": "no_progress",
+      "u_ratio": 8.09069104618088,
+      "growth": 1.2994504553270934,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 510,
       "ee_suppressed": false,
-      "iterations": 4665
+      "iterations": 511
     },
     {
       "F": 1.375,
@@ -62,11 +74,14 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 18.70560783279485,
-      "growth": 2.5585186907029476,
-      "exit_reason": "iteration_cap",
+      "u_ratio": 8.012005131126992,
+      "growth": 0.763731011608894,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 2200,
       "ee_suppressed": false,
-      "iterations": 16000
+      "iterations": 2201
     },
     {
       "F": 1.3375,
@@ -77,6 +92,9 @@
       "u_ratio": null,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
       "iterations": 3844
     },
@@ -89,6 +107,9 @@
       "u_ratio": null,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
       "iterations": 7571
     },
@@ -98,11 +119,14 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 8.829907919392772,
-      "growth": 0.1467226541113704,
-      "exit_reason": "iteration_cap",
+      "u_ratio": 8.001895215660339,
+      "growth": 0.3526522323186543,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 5780,
       "ee_suppressed": false,
-      "iterations": 16000
+      "iterations": 5781
     }
   ],
   "tolerance": 0.01,
@@ -113,11 +137,11 @@
   "element_type": "tri6",
   "target_size": 2.0,
   "max_iter": 16000,
-  "expected_fs": 1.36,
+  "expected_fs": 1.361,
   "F": 1.35625,
   "unit_system": "imperial",
   "converged": true,
   "iterations": 7571,
-  "residual": 1.4294889193709326e-06,
-  "max_displacement": 0.1238178907620024
+  "residual": 1.429488928348283e-06,
+  "max_displacement": 0.12381789076106953
 }

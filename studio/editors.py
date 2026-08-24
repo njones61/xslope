@@ -5812,8 +5812,9 @@ def _pile_item_label(i, row):
 
 # Wording mirrors the 'piles' worksheet section of input_template.md. Where a field
 # is genuinely single-analysis (matching its column's usage tag / header color) the
-# text says so explicitly; D and S feed both (LEM force auto-computation AND FEM
-# I/Area defaults), so neither is tagged "LEM only" despite the red header.
+# text says so explicitly; D and S feed both engines — the LEM force auto-computation
+# AND the FEM section and its per-unit-width smear — so neither is tagged "LEM only"
+# and each tooltip names both readers.
 PILES_HELP = {
     "label": "Name used in error messages, summaries, and plots (optional).",
     "x1": "Pile top X-coordinate.",
@@ -5822,10 +5823,14 @@ PILES_HELP = {
     "y2": "Pile tip (bottom) Y-coordinate.",
     "H": "Pile force per unit width of slope (force/length). Blank = auto-computed "
         "via Ito & Matsui from D and S (vertical piles only).",
-    "D_pile": "Pile diameter. Required for the Ito & Matsui auto-computation of H; "
-             "also derives I and Area for FEM when those are left blank.",
-    "S": "Center-to-center pile spacing. Required for Ito & Matsui and for "
-        "Vcap/Mcap (both per-pile); lets xslope report per-pile forces.",
+    "D_pile": "Pile diameter. Read by both engines: LEM needs it for the Ito & "
+             "Matsui auto-computation of H, and FEM derives the section from it "
+             "when I and Area are blank — I = pi·D^4/64 and Area = pi·D^2/4 for a "
+             "solid circular pile.",
+    "S": "Center-to-center pile spacing. Read by both engines: LEM needs it for "
+        "Ito & Matsui and for Vcap/Mcap (both per-pile), and FEM divides EA and EI "
+        "by it to smear the row into a per-unit-width beam. Also what lets xslope "
+        "report per-pile forces.",
     "E": "Young's modulus of the pile material; with I and Area gives the flexural "
         "(EI) and axial (EA) stiffness, each divided by S for the per-unit-width "
         "2D beam. FEM only.",
@@ -5856,6 +5861,7 @@ class PilesEditor(CategoryEditor):
     # between H and Appl and has no column here: θ is derived from the pile axis on
     # save, so a block spanning it goes in as two — the endpoints through H, then D
     # onward, which is how the tutorials print it.
+    LF = {"lem", "fem"}
     FIELDS = [
         Field("label", "Label", "str", tooltip=PILES_HELP["label"]),
         Field("x1", "x1", tooltip=PILES_HELP["x1"]), Field("y1", "y1", tooltip=PILES_HELP["y1"]),
@@ -5865,8 +5871,12 @@ class PilesEditor(CategoryEditor):
         # passive = ultimate capacity divided by FS (loader default 'active').
         Field("appl", "Appl", "choice", choices=["active", "passive"], usage="lem",
               tooltip=PILES_HELP["appl"]),
-        Field("D_pile", "D", "optfloat", usage="lem", tooltip=PILES_HELP["D_pile"]),
-        Field("S", "S", "optfloat", usage="lem", tooltip=PILES_HELP["S"]),
+        # D and S are applies=LF, like the reinforcement editor's Spacing: the FEM
+        # beam assembly derives I and Area from D when they are blank and divides
+        # EA and EI by S, so neither usage toggle may hide them and neither header
+        # is colored for a single engine.
+        Field("D_pile", "D", "optfloat", applies=LF, tooltip=PILES_HELP["D_pile"]),
+        Field("S", "S", "optfloat", applies=LF, tooltip=PILES_HELP["S"]),
         Field("V_cap", "Vcap", "optfloat", usage="lem", tooltip=PILES_HELP["V_cap"]),
         Field("M_cap", "Mcap", "optfloat", usage="lem", tooltip=PILES_HELP["M_cap"]),
         Field("E", "E", "optfloat", usage="fem", tooltip=PILES_HELP["E"]),

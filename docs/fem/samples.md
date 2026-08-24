@@ -133,13 +133,13 @@ The unstabilized slope is the same model with its two pile rows cleared and noth
 differs only by the piles: [xslope_piles_fem_nopile.xlsx](files/xslope_piles_fem_nopile.xlsx). It is solved on the
 same element type and mesh size as the stabilized run.
 
-SSRM results without piles (**FS = 1.155**). The shear strain concentration shows a failure mechanism passing through the toe:
+SSRM results without piles (**FS = 1.164**). The shear strain concentration shows a failure mechanism passing through the toe:
 
 ![piles_fem_no_pile_results.png](images/piles_fem_no_pile_results.png){width=1000}
 
-<!-- test: file=files/xslope_piles_fem_nopile.xlsx, type=fem_ssrm, expected_fs=1.155, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
+<!-- test: file=files/xslope_piles_fem_nopile.xlsx, type=fem_ssrm, expected_fs=1.164, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
 
-SSRM results with two rows of piles (**FS = 1.370**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
+SSRM results with two rows of piles (**FS = 1.361**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
 
 ![piles_fem_results.png](images/piles_fem_results.png){width=1000}
 
@@ -154,7 +154,7 @@ Pile  Elems   Max |T|   Max |V|   Max |M|     V_cap     M_cap  Yielded  Status
 --------------------------------------------------------------------------------
 ```
 
-The two rows of piles increase the factor of safety from 1.155 to 1.370 — a 19% improvement. In the last converged
+The two rows of piles increase the factor of safety from 1.164 to 1.361 — a 17% improvement. In the last converged
 trial the largest bending moment is 6,319 per unit width (Pile 2), about 63% of the moment capacity
 ($M_{\text{cap}}/S$ = 10,000), and the largest shear 1,951 (Pile 1), about 25% of $V_{\text{cap}}/S$ = 7,667. In
 the developed mechanism at failure — the state the results figure above draws — both are smaller: 4,429 (44%) and
@@ -165,7 +165,7 @@ This is typical behavior for piles in relatively weak soil — the pile is much 
 applicability rather than conservatism — see
 [LEM vs. FEM Pile Modeling](../lem/piles.md#lem-vs-fem-pile-modeling).
 
-<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.370, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
+<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.361, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
 
 ### 3. Non-Circular Failure Surface with Thin Weak Layer
 

@@ -461,8 +461,9 @@ is the one to open:
 Position along the line runs from the face at s = 0 to the buried end at
 s = 20 ft. The dashed line is the capacity envelope: it ramps from zero over the
 first 4 ft, sits at 800 lb/ft along the middle of the line, and ramps back to
-zero over the last 4 ft. The blue line is the force actually mobilized. It
-climbs from almost nothing at the face, reaches the envelope at s = 9 and holds
+zero over the last 4 ft. The blue line is the force actually mobilized, with a
+point at the center of each of the ten 2 ft bar elements the mesh laid along the
+layer — that is where the solver reports each element's force. It climbs from almost nothing at the face, reaches the envelope at s = 9 and holds
 it at 11 and 13 — those three elements are what the panel titles **yielded**, at
 the full 800 lb/ft — then falls away down the buried ramp and touches the
 envelope again at s = 19, where 1 ft of embedment allows only 200 lb/ft. The

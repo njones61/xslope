@@ -212,44 +212,11 @@ plane strain there is nothing to pass through: each row is a continuous
 obstruction over the full length of the slope, and the mechanism has to climb
 over it.
 
-### What the row is worth in each engine
-
-Neither number above says what the piles contributed, and the two engines have
-to be compared on that rather than on the piled answer alone. Measuring it takes
-the same slope without them, run both ways.
-
-Open **Piles**, and on **Table view** select both rows and click **Remove
-selected**, then **OK**. Run Spencer again exactly as before — **Run → Run LEM…**, `Spencer`,
-`Auto search`, 40 slices:
-
-**FS = 1.149**, on a shallower circle from the toe.
-[LEM-12](lem12_piles.md#what-the-two-rows-are-worth) shows that surface.
-
-Now the same model in the finite element engine. The pile rows were mesh
-constraints, so the mesh has to be rebuilt without them: switch to **FEM**,
-**Run → Build Mesh…**, the same tri6 at 2 ft, **Build**. It comes back at
-**3,154 nodes and 1,509 triangles** and no beam elements. **Run → Run FEM…**,
-the same 1.00 to 1.60 bracket, **Run**:
-
-**FS = 1.164**.
-
-| | Without the rows | With them | Credit for the rows |
-|---|:---:|:---:|:---:|
-| **LEM** — Spencer, Ito & Matsui | 1.149 | 1.842 | ×1.60 |
-| **FEM** — strength reduction | 1.164 | 1.361 | ×1.17 |
-
-Read the first column first. On the bare slope the two engines land 1.3% apart,
-so nothing structural separates them on this section, and whatever the second
-column adds is the pile row and only the pile row. There they credit it ×1.60 and
-×1.17 — a disagreement on the quantity being designed, not a rounding.
-
-Reopen [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx) with **File → Open…**
-to put the rows back before the next section.
-
 ### How the pile force is applied
 
-Part of that gap is a convention rather than an idealization, and it is worth
-separating out before the rest is attributed to plane strain. The `Appl` column
+Part of the 0.48 between 1.842 and 1.361 is a convention rather than an
+idealization, and it has to be separated out before the rest is attributed to
+plane strain. The `Appl` column
 on a pile row has two settings. `Active` hands the computed force to the
 equilibrium equations as it stands, which is what this file does. `Passive`
 treats it as a resistance and divides it by the factor of safety, so the support

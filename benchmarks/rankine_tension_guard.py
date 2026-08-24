@@ -83,7 +83,8 @@ def _fixture():
     cl, _, _ = extract_constraint_line_geometry(sd)
     polys = get_material_polygons(sd, reinf_lines=cl)
     mesh = build_mesh_from_polygons(polys, target_size=1.0, element_type='tri3',
-                                    lines=cl, point_constraints=extract_point_constraints(sd))
+                                    lines=cl, element_size_1d=sd.get('element_size_1d'),
+                                    point_constraints=extract_point_constraints(sd))
     return build_fem_data(sd, mesh)
 
 

@@ -416,11 +416,22 @@ message naming the line, rather than producing a mesh the line is silently missi
 
 Node spacing along a line comes from the size field like everything else — the global
 target away from any refinement, and the local size where the line itself is a refined
-feature. `target_size_1d` asks for a finer size along the lines specifically; left at
-`None`, the default and what Studio passes, the lines simply follow the field. A value at
-or above `target_size` is ignored, since the field composes by taking the minimum and a
-coarser request could never bind. `element_materials_1d` numbers the lines 1, 2, 3, … in
-the order they were passed, so each line's elements can be given their own properties.
+feature. `element_size_1d` asks for a finer size along the lines specifically. It is a
+model input, **1D element size** on the main sheet, which Studio's *Build mesh* dialog
+edits and every model-driven caller passes through; left at `None` the lines simply
+follow the field. The stated size is applied as a graded band around the lines, so the
+1D elements and the soil elements sharing their nodes both come back at it and grow back
+to the global target away from them. A value at or above `target_size` is ignored, since
+the field composes by taking the minimum and a coarser request could never bind — for
+the same reason, a zone that already declares a finer local `Size` keeps it, and the
+stated 1D size only refines the stretches of a line that are coarser than it.
+`element_materials_1d` numbers the lines 1, 2, 3, … in the order they were passed, so
+each line's elements can be given their own properties.
+
+On the pile sample (`docs/fem/files/xslope_piles_fem.xlsx`, tri6 at a target size of 2,
+two pile lines totaling 35 ft) the two lines carry 18 elements at their default spacing;
+`element_size_1d=0.5` brings them to 70, and the mesh grows from 3,180 nodes / 1,521
+elements to 6,029 / 2,928.
 
 ## gmsh options
 

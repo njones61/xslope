@@ -175,7 +175,7 @@ def _slope_data(with_wall):
     }
 
     sd['pile_lines'] = [dict(WALL, H=None, theta_p=None, D_pile=None,
-                             V_cap=None, M_cap=None, fixity='free',
+                             V_cap=None, M_cap=None, head_fixity='free',
                              appl='passive', label='sheet pile wall')
                         ] if with_wall else []
     return sd
@@ -192,6 +192,7 @@ def _build_one(name, with_wall):
     polygons = get_material_polygons(sd, reinf_lines=lines)
     mesh = build_mesh_from_polygons(polygons, target_size=TARGET,
                                     element_type='tri6', lines=lines,
+                                    element_size_1d=sd.get('element_size_1d'),
                                     size_regions=extract_size_regions(sd))
     export_mesh_to_json(mesh, os.path.join(OUT, f'{name}_mesh.json'))
     seep = build_seep_data(mesh, sd)

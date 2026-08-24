@@ -205,7 +205,7 @@ the canvas re-renders automatically.
   ('adhesion'+'delta' both set = overburden pullout law; 'lp1'/'lp2' then unused)
   # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
 - pile_lines[i]: {'x1','y1','x2','y2','D_pile','S','E','I','area','M_cap','V_cap',
-  'theta_p','fixity','label','H'}
+  'theta_p','head_fixity','tip_fixity','label','H'}
 - scalars: gamma_water, max_depth (elevation of the hard base — the lowest
   elevation the PROBLEM describes, never one you chose; see iron rule 1),
   k_seismic, tcrack_depth, tcrack_water, circular (bool).

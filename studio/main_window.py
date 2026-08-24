@@ -1944,6 +1944,10 @@ class MainWindow(QMainWindow):
             seed("num_slices", sd.get("num_slices"))
         elif which == "mesh":
             seed("element_type", sd.get("element_type"), bool)
+            # The 1D element size is a model input the dialog writes back, so the
+            # model wins over the last run's value: the box always shows what the
+            # file states, including a value cleared since the last build.
+            d["element_size_1d"] = sd.get("element_size_1d")
             if "target_size" not in d and sd.get("target_size") is not None:
                 d["target_size"] = float(sd["target_size"])
                 # An explicit size in the file means the file MEANT that size, so
@@ -1967,6 +1971,14 @@ class MainWindow(QMainWindow):
             return
         opts = dlg.options()
         self._last_mesh_opts = opts
+        # The 1D element size is a model input (main!D20), not a per-run choice, so
+        # an entry goes back into the model — saved with the file and undoable like
+        # any other edit. Nothing is recorded when the value is unchanged, so opening
+        # the dialog and building does not by itself dirty the document.
+        if opts.get("element_size_1d") != self.doc.slope_data.get("element_size_1d"):
+            self.doc.begin_edit("1D element size")
+            self.doc.slope_data["element_size_1d"] = opts["element_size_1d"]
+            self.doc.commit_edit()
         self._mesh_busy = True
         self._update_run_actions()    # disable Run/Build while meshing
         self.statusBar().showMessage("Building mesh …")

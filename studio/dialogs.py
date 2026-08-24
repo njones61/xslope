@@ -82,6 +82,12 @@ REFINE_THIN_ZONES_TIP = (
     "is too high — so this is on by default. A section with no thin zone meshes "
     "exactly as it would with this off.")
 
+# "1D element size" — the model's main!D20 cell, edited where the mesh is built.
+ELEMENT_SIZE_1D_TIP = (
+    "Target element size along reinforcement and pile lines. Blank = the mesh "
+    "element size. Refines the beam/bar elements and the soil they share nodes "
+    "with.")
+
 
 FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)")]
 # v21 main!D22. 'rollers' first — it is the template's shipped value, what every
@@ -1037,6 +1043,12 @@ class BuildMeshDialog(QDialog):
     ``(x_max - x_min) / size_divisions`` over the ground surface (see the
     main_seep / main_fem drivers).
 
+    The 1D element size is the size along the reinforcement and pile lines. It IS a
+    model input — ``main!D20``, ``slope_data['element_size_1d']`` — so the box opens
+    on whatever the file states and an entry is written back to the model, where it
+    is saved and undone like any other edit. Blank means the file states nothing and
+    the lines follow the mesh element size.
+
     The quadrilateral style (free / structured-where-possible) is a per-run
     choice: it rides on the returned options dict to ``build_mesh_from_polygons``
     and is deliberately NOT written to the model, because the .xlsx carries no
@@ -1076,6 +1088,19 @@ class BuildMeshDialog(QDialog):
         self.target_size.setDecimals(3)
         self.target_size.setValue(float(defaults.get("target_size", 1.0)))
         form.addRow("Target element size", self.target_size)
+
+        # Element size along the constraint lines — the model's own cell, so a
+        # blank box means the model states nothing and the lines follow the target
+        # size. A line edit rather than a spin box for exactly that reason: a spin
+        # box has no empty state, and "no value" is the default here. Same idiom as
+        # the local Size field on a material zone or profile line.
+        self.element_size_1d = QLineEdit()
+        _e1d = defaults.get("element_size_1d")
+        if _e1d is not None:
+            self.element_size_1d.setText(f"{float(_e1d):g}")
+        self.element_size_1d.setPlaceholderText("follows the mesh element size")
+        self.element_size_1d.setToolTip(ELEMENT_SIZE_1D_TIP)
+        form.addRow("1D element size", self.element_size_1d)
 
         # Quadrilateral style — two mutually exclusive choices, so radios rather
         # than a combo: both options and the difference between them are readable
@@ -1162,12 +1187,42 @@ class BuildMeshDialog(QDialog):
         for key, label, own_tip in QUAD_STYLES:
             self._quad_style_radios[key].setToolTip(own_tip if quads else tip)
 
+    def size_1d(self):
+        """The entered 1D element size as a float, or None when the box is blank
+        (the lines follow the mesh element size). Raises ``ValueError`` on text
+        that is not a positive number — ``accept`` reports that to the user rather
+        than building a mesh at a size nobody asked for."""
+        text = self.element_size_1d.text().strip()
+        if not text:
+            return None
+        value = float(text)
+        if value <= 0:
+            raise ValueError(text)
+        return value
+
+    def accept(self):
+        # A typo in the 1D size must not fall through to "blank": that would build a
+        # mesh at the target size and look like the entry had been accepted.
+        try:
+            self.size_1d()
+        except ValueError:
+            QMessageBox.warning(
+                self, "Build mesh",
+                f"'{self.element_size_1d.text().strip()}' is not a valid 1D element "
+                "size. Enter a positive number, or leave the box blank to mesh the "
+                "reinforcement and pile lines at the mesh element size.")
+            self.element_size_1d.setFocus()
+            self.element_size_1d.selectAll()
+            return
+        super().accept()
+
     def options(self):
         return {
             "element_type": self.element_type.currentData(),
             "auto_size": self.auto_size.isChecked(),
             "size_divisions": self.size_divisions.value(),
             "target_size": self.target_size.value(),
+            "element_size_1d": self.size_1d(),
             "quad_style": self.quad_style(),
             "refine_near_features": self.refine_near_features.isChecked(),
             "refine_factor": self.refine_factor.value(),

@@ -1073,7 +1073,7 @@ def lem09_sheets():
     render("lem09_sheet_profile.png", LEM09, "profile", rows=(1, 14), cols="A:H")
     render("lem09_sheet_noncirc.png", LEM09, "non-circ", rows=(1, 6), cols="A:F")
     render("lem09_sheet_reinforce.png", LEM09, "reinforce", rows=(2, 6), cols="A:O")
-    # LEM problem: stop before the FEM-only pile columns (E, I, Area, Fixity).
+    # LEM problem: stop before the FEM-only pile columns (E, I, Area, Head, Tip).
     render("lem09_sheet_piles.png", LEM09, "piles", rows=(2, 6), cols="A:M")
 
 
@@ -4196,6 +4196,7 @@ def _fem02_mesh(model):
         return build_mesh_from_polygons(
             get_material_polygons(model, reinf_lines=lines),
             model["target_size"], model["element_type"], lines=lines or None,
+            element_size_1d=model.get("element_size_1d"),
             size_regions=extract_size_regions(model))
 
 
@@ -4683,7 +4684,7 @@ def fem03_piles():
               % (pile["label"], pile["x1"], pile["y1"], pile["x2"], pile["y2"],
                  pile["D_pile"], _u["length"], pile["S"], _u["length"],
                  pile["E"], _u["stress"], pile["V_cap"], pile["M_cap"],
-                 pile["fixity"], pile["appl"]))
+                 pile.get("head_fixity", pile.get("fixity", "free")), pile["appl"]))
 
     capture("fem03_inputs_piles.png", plot_inputs, sd,
             title="Slope Geometry and Inputs")
@@ -4864,7 +4865,7 @@ def fem03_wall():
           % (wall["label"], wall["x1"], wall["y1"], wall["x2"], wall["y2"],
              wall["E"], _u["stress"], wall["area"], _u["length"], _u["length"],
              wall["I"], _u["length"], _u["length"], wall["S"], wall["D_pile"],
-             wall["V_cap"], wall["M_cap"], wall["fixity"]))
+             wall["V_cap"], wall["M_cap"], wall.get("head_fixity", wall.get("fixity", "free"))))
     print("   starter     %d pile row(s) · %d materials · %s at target size "
           "%g %s · weak-clay local size %r"
           % (len(start["pile_lines"]), len(start["materials"]),

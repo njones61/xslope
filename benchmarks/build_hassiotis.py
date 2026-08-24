@@ -64,7 +64,7 @@ def _pile_at(distance_from_toe):
         'H': None, 'theta_p': 0.0,
         'D_pile': D_PILE, 'S': S_PILE,
         'E': None, 'I': None, 'area': None,
-        'V_cap': None, 'M_cap': None, 'fixity': 'free', 'appl': 'active',
+        'V_cap': None, 'M_cap': None, 'head_fixity': 'free', 'appl': 'active',
         'label': 'pile row %.1f m from toe' % distance_from_toe,
     }
 

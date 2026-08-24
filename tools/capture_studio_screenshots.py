@@ -414,7 +414,8 @@ SEEP_TWO_BC = os.path.join(REPO_ROOT, "docs/lem/files/xslope_earth_dam_rapid.xls
 
 
 def capture_build_mesh_dialog():
-    """Build mesh, as it opens: auto-size on, feature refinement off."""
+    """Build mesh, as it opens: auto-size on, feature refinement off, and a blank
+    1D element size — the state a model that says nothing opens in."""
     from studio.dialogs import BuildMeshDialog
 
     dlg = BuildMeshDialog(defaults={})
@@ -423,11 +424,13 @@ def capture_build_mesh_dialog():
 
 
 def capture_build_mesh_dialog_refine():
-    """Build mesh with an explicit target size and feature refinement on, so the
-    Refinement factor is live and Size divisions is greyed."""
+    """Build mesh with an explicit target size, a stated 1D element size and
+    feature refinement on, so the Refinement factor is live, Size divisions is
+    greyed, and the pair of shots covers both states of the 1D size box."""
     from studio.dialogs import BuildMeshDialog
 
     dlg = BuildMeshDialog(defaults={"auto_size": False, "target_size": 1.0,
+                                    "element_size_1d": 0.5,
                                     "refine_near_features": True})
     dlg.resize(dlg.sizeHint())
     return _grab(dlg, "analysis_build_mesh_dialog_refine.png")

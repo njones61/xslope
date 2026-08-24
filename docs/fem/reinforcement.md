@@ -19,7 +19,9 @@ reflects the behavior of flexible reinforcement materials like geotextiles and e
 
 Truss elements are incorporated into the XSLOPE finite element mesh by passing the geometry of the reinforcement
 lines from the input template to the mesh generation process. The reinforcement lines are discretized into multiple
-truss elements based on the specified mesh density (target_size). The 1D elements are fully integrated with the 2D
+truss elements based on the specified mesh density (target_size), or on the **1D element size** on the main sheet
+where a model states one — the element size along the reinforcement and pile lines, which refines the truss elements
+and the soil sharing their nodes together. The 1D elements are fully integrated with the 2D
 elements - each 1D element corresponds to the edge of two adjacent 2D elements and both the 1D and 2D elements share
 the same nodes. The 1D elements have their own set of material properties corresponding to the properties of the
 corresponding reinforcement lines input by the user and include $T_{max}$, $T_{res}$, $E$, and cross-sectional area

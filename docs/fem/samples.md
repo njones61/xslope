@@ -124,7 +124,8 @@ Two rows of vertical drilled shafts are placed at $x = 5$ ft and $x = 10$ ft alo
 | Cross-sectional area, $A$ | $\pi D^2 / 4$ = 3.14 ft$^2$ (auto-computed from $D$) |
 | Shear capacity, $V_{\text{cap}}$ | 46,000 lb |
 | Moment capacity, $M_{\text{cap}}$ | 60,000 ft·lb |
-| Fixity | free |
+| Head fixity | free |
+| Tip fixity | free |
 
 Each pile is modeled as a chain of 6-DOF Euler-Bernoulli beam elements with rotational DOFs at each node (see [FEM Piles](piles.md) for the formulation). The pile stiffness ($EI$ and $EA$) is scaled by $1/S$ to convert from per-pile to per-unit-width quantities. Unlike the LEM approach where the user provides a single force $H$, the FEM beam elements naturally develop resistance as the soil deforms around the pile. Bending moments are computed directly at each node, and structural capacity limits ($V_{\text{cap}}$, $M_{\text{cap}}$) are enforced through the viscoplastic correction loop.
 

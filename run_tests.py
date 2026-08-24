@@ -202,6 +202,11 @@ ROUNDTRIP_KEYS = [
     # the v19 template must NOT let the template's own pre-filled D17='YES' leak in.
     'lem_method', 'num_slices', 'k0', 'tension_srf', 'element_type',
     'target_size', 'ssrm_f_min', 'ssrm_f_max', 'search_window',
+    # v25 1D element size (main D20). None on every corpus file — they predate the
+    # cell — so the check that matters here is the same one as the options above:
+    # saving them into the v25 template must not invent a 1D size, and the SSRM
+    # bracket beside it must come back from its new row rather than the old one.
+    'element_size_1d',
     # v22 water-load mode. Unlike the options above it is never None: these
     # pre-v22 fixtures resolve to 'manual' on load, and the check that matters
     # here is that saving them into the v22 template — which ships D23 pre-filled
@@ -298,6 +303,10 @@ V19_ROUNDTRIP_VALUES = {
     'target_size': 2.75,
     'ssrm_f_min': 0.8,
     'ssrm_f_max': 2.4,
+    # v25: the cell that shifted the two rows above down one. Set here for the same
+    # reason they are — a distinct non-default value, so a writer left on the old
+    # row would come back wrong rather than merely blank.
+    'element_size_1d': 1.25,
 }
 # --- v20 SSR-zone overlay round-trip ---
 # A polygon-geometry model, so the zone rows are written AFTER real material-zone
@@ -906,6 +915,7 @@ def build_fem_ssrm_case(test):
         mesh = build_mesh_from_polygons(
             polygons, target_size=target_size, element_type=element_type,
             lines=constraint_lines,
+            element_size_1d=slope_data.get('element_size_1d'),
             point_constraints=extract_point_constraints(slope_data),
             size_regions=extract_size_regions(slope_data),
             **_refine_kwargs(test)
@@ -1512,6 +1522,7 @@ def run_fem_elements_test(test):
                 mesh = build_mesh_from_polygons(
                     polygons, target_size=target_size, element_type=et,
                     lines=constraint_lines,
+                    element_size_1d=slope_data.get('element_size_1d'),
                     size_regions=extract_size_regions(slope_data))
                 fem_data = build_fem_data(slope_data, mesh)
                 result = solve_ssrm(fem_data, F_min=test.get('f_min', 0.5),
@@ -1783,6 +1794,7 @@ def run_fem_reliability_test(test):
     polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
     mesh = build_mesh_from_polygons(polygons, target_size=target_size,
                                     element_type=element_type, lines=constraint_lines,
+                                    element_size_1d=slope_data.get('element_size_1d'),
                                     size_regions=extract_size_regions(slope_data))
     with contextlib.redirect_stdout(io.StringIO()):
         success, result = reliability_fem(
@@ -1921,7 +1933,7 @@ def run_v19_roundtrip_test(test):
 
 
 def run_surface_family_roundtrip_test(test):
-    """Verify the v22 surface-family cell (main D24) survives save -> load.
+    """Verify the v22 surface-family cell (main D24, D25 from v25) survives save -> load.
 
     The rare deck defines BOTH a circular and a non-circular surface, and nothing in
     its geometry says which one it means — the circles simply win. The cell is where
@@ -1946,6 +1958,14 @@ def run_surface_family_roundtrip_test(test):
     template = test.get('template', ROUNDTRIP_TEMPLATE)
     problems = []
 
+    # The cell moved down one row at v25, which inserted '1D element size' above it.
+    # Located from the DESTINATION template's own version rather than hardcoded, so
+    # this reads the cell the writer was actually aiming at.
+    _twb = openpyxl.load_workbook(template, read_only=True)
+    _tv = int(float(_twb['main']['D5'].value))
+    _twb.close()
+    SF_CELL = f"D{25 if _tv >= 25 else 24}"
+
     def _cycle(mutate):
         d1 = load_slope_data(test['file'])
         mutate(d1)
@@ -1953,7 +1973,7 @@ def run_surface_family_roundtrip_test(test):
         try:
             save_slope_data_to_xlsx(d1, tmp, template=template)
             wb = openpyxl.load_workbook(tmp)
-            cell = wb['main']['D24'].value
+            cell = wb['main'][SF_CELL].value
             wb.close()
             return load_slope_data(tmp), cell
         finally:
@@ -1968,7 +1988,8 @@ def run_surface_family_roundtrip_test(test):
     # (1) A model that states nothing writes a blank cell and reads back None.
     d2, cell = _cycle(lambda d: _both(d, None))
     if cell is not None:
-        problems.append(f"blank: the writer put {cell!r} in D24 instead of a blank cell")
+        problems.append(f"blank: the writer put {cell!r} in {SF_CELL} instead of "
+                        f"a blank cell")
     if d2.get('surface_family') is not None:
         problems.append(f"blank: came back as {d2.get('surface_family')!r}, not None")
     if not d2.get('circular'):
@@ -1981,7 +2002,8 @@ def run_surface_family_roundtrip_test(test):
                                          ('noncircular', 'non-circular', False)):
         d2, cell = _cycle(lambda d, f=family: _both(d, f))
         if cell != want_cell:
-            problems.append(f"{family}: D24 holds {cell!r}, expected {want_cell!r}")
+            problems.append(f"{family}: {SF_CELL} holds {cell!r}, expected "
+                            f"{want_cell!r}")
         if d2.get('surface_family') != family:
             problems.append(f"{family}: came back as {d2.get('surface_family')!r}")
         if bool(d2.get('circular')) != want_flag:
@@ -1996,7 +2018,7 @@ def run_surface_family_roundtrip_test(test):
     #     blank, and a value that somehow got in cannot claim the absent surface.
     d2, cell = _cycle(lambda d: None)
     if cell is not None or d2.get('surface_family') is not None:
-        problems.append(f"single-family: D24 = {cell!r}, model = "
+        problems.append(f"single-family: {SF_CELL} = {cell!r}, model = "
                         f"{d2.get('surface_family')!r} — both should be blank/None")
     d2, cell = _cycle(lambda d: d.update(surface_family='noncircular'))
     if not d2.get('circular'):
@@ -2008,7 +2030,7 @@ def run_surface_family_roundtrip_test(test):
     try:
         _cycle(lambda d: d.update(surface_family='spiral'))
     except ValueError as exc:
-        if 'D24' not in str(exc):
+        if SF_CELL not in str(exc):
             problems.append(f"an unknown family raised without naming the cell: {exc}")
     else:
         problems.append("an unknown surface family was written without an error")
@@ -2343,7 +2365,10 @@ def _editor_fixture():
         p = {"label": "P", "x1": x1, "y1": y1, "x2": x2, "y2": y2, "H": 10.0,
              "theta_p": math.degrees(math.atan2(x2 - x1, -(y2 - y1))),
              "D_pile": 2.0, "S": 6.0, "E": 3000.0, "I": 1.5, "area": 4.0,
-             "V_cap": 50.0, "M_cap": 200.0, "fixity": "fixed", "appl": appl}
+             "V_cap": 50.0, "M_cap": 200.0, "head_fixity": "fixed",
+             # v25: the tip restraint, stated 'fixed' because 'free' is the default
+             # a dropped field would come back as anyway.
+             "tip_fixity": "fixed", "appl": appl}
         return p
 
     return {
@@ -5493,6 +5518,7 @@ def _auto_water_mesh(sd):
     return build_mesh_from_polygons(get_material_polygons(sd, reinf_lines=lines),
                                     target_size=(max(xs) - min(xs)) / 40,
                                     element_type='tri3', lines=lines,
+                                    element_size_1d=sd.get('element_size_1d'),
                                     point_constraints=extract_point_constraints(sd),
                                     size_regions=extract_size_regions(sd))
 
@@ -5658,7 +5684,13 @@ def run_auto_water_test(test):
             _remedy_excel(AUTO_WATER_CASES[0][0],
                           lambda sd: dict(sd, water_loads='sometimes'), template)
         except Exception as exc:
-            if 'D23' not in str(exc):
+            # The mode cell moved from D23 to D24 at v25, which inserted a row above
+            # it; the refusal names the cell in the destination template's own layout.
+            import openpyxl as _opx
+            _wbv = _opx.load_workbook(template, read_only=True)
+            _wl_cell = ('D24' if int(float(_wbv['main']['D5'].value)) >= 25 else 'D23')
+            _wbv.close()
+            if _wl_cell not in str(exc):
                 problems.append(f"an unknown water-load mode was refused without "
                                 f"naming the cell: {str(exc)[:80]}")
         else:
@@ -6268,6 +6300,7 @@ def run_mesh_elements_test(test):
         polygons, target_size=target_size,
         element_type=test.get('element_type', 'tri6'),
         lines=constraint_lines,
+        element_size_1d=slope_data.get('element_size_1d'),
         point_constraints=extract_point_constraints(slope_data),
         size_regions=extract_size_regions(slope_data),
         **_refine_kwargs(test)

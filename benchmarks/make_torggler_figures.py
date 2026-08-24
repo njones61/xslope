@@ -121,6 +121,7 @@ def render(tag):
         mesh = build_mesh_from_polygons(
             polys, target_size=tag.get('target_size'),
             element_type=tag['element_type'], lines=lines,
+            element_size_1d=sd.get('element_size_1d'),
             point_constraints=extract_point_constraints(sd),
             size_regions=extract_size_regions(sd), **RT._refine_kwargs(tag))
         fem_data = build_fem_data(sd, mesh)

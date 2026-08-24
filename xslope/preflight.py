@@ -209,7 +209,7 @@ REMEDIES = {
                         "(Global parameters; main D13).",
     "reverse_polyline": "Reverse a right-to-left load or piezometric line.",
     "add_ponded_water_load": "Add the standing water as a distributed load.",
-    "switch_to_auto_water": "Set Water loads to auto (main D23) so the engine "
+    "switch_to_auto_water": "Set Water loads to auto (the main sheet's Water loads row) so the engine "
                             "derives them, removing the transcribed blocks they "
                             "replace.",
     "extend_piezo_line": "Extend the piezometric line across the section.",
@@ -795,7 +795,7 @@ class _Ctx:
         """``"circular"``, ``"noncircular"``, or ``None`` when nothing states one.
 
         A deck may carry both families, and two things can state which one is meant:
-        the model itself (``main!D24``) and this run. The file's statement is the
+        the model itself (the main sheet's Surface family row) and this run. The file's statement is the
         standing answer -- it is what a run dialog opens on, what a scripted run that
         selects nothing gets, and what every consumer outside a dialog reads -- and a
         run that states a family of its own is a change to it, taken live here and
@@ -1823,7 +1823,7 @@ def _ponded_no_dload(ctx):
 
 
 # ---------------------------------------------------------------------------
-# Family: automatic water loads (main!D23 = auto)
+# Family: automatic water loads (main sheet, Water loads = auto)
 #
 # The mirror image of the manual-mode rules above. There, the risk is a water
 # load nobody entered; here it is a water load entered twice, or a derivation
@@ -1860,7 +1860,7 @@ def _auto_double_count(ctx):
                    f"{100 * measures['worst']:.2g}%. It will be counted twice. "
                    f"Delete the block {_at_dloads(stage)}, or set Water loads to "
                    f"manual if this file is meant to carry its water loads "
-                   f"explicitly (main D23).")
+                   f"explicitly (the main sheet's Water loads row).")
 
 
 @rule("water.auto_derivation_empty", WARNING, ("lem", "rapid"),
@@ -1890,7 +1890,7 @@ def _auto_derivation_empty(ctx):
     return (f"Water loads is set to auto and Piezometric Line 1 stands up to "
             f"{depth:.3g} above the ground surface, but the engine derived no water "
             f"load at all: {why}. The reservoir's weight is missing from the "
-            f"analysis (main D23).")
+            f"analysis (the main sheet's Water loads row).")
 
 
 @rule("water.sources_disagree", WARNING, ("lem", "rapid"),
@@ -2195,7 +2195,7 @@ def _family_ambiguous(ctx):
             "the run did not state which to analyse. The circular surface will be "
             "used; the non-circular surface will be ignored -- set Surface family "
             "to say which (Circles, circles sheet; Non-circular surface, non-circ "
-            "sheet; main D24).")
+            "sheet; the main sheet's Surface family row).")
 
 
 # ---------------------------------------------------------------------------

@@ -68,7 +68,7 @@ D_PILE = 0.8        # m
 SD_RATIO = 3        # D1/D -- the spacing the diagnostic is stated at
 
 
-def _slope_data(with_pile, fixity='free'):
+def _slope_data(with_pile, head_fixity='free'):
     sd = load_slope_data(DONOR)
     m = sd['materials'][0]
     m.update(name='Soil', c=10.0, phi=20.0, gamma=20.0, gamma_sat=20.0,
@@ -92,8 +92,8 @@ def _slope_data(with_pile, fixity='free'):
             # area blank: derived from D as pi D^4/64 and pi D^2/4.
             'H': None, 'theta_p': 0.0, 'D_pile': D_PILE, 'S': SD_RATIO * D_PILE,
             'E': E_PILE, 'I': None, 'area': None,
-            'V_cap': None, 'M_cap': None, 'fixity': fixity,
-            'appl': 'passive', 'label': f'pile row D1={SD_RATIO}D ({fixity} head)',
+            'V_cap': None, 'M_cap': None, 'head_fixity': head_fixity,
+            'appl': 'passive', 'label': f'pile row D1={SD_RATIO}D ({head_fixity} head)',
         }]
     return sd
 

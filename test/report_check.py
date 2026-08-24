@@ -15780,16 +15780,20 @@ def test_member_detail_figures_are_readable():
 
             # The peak labels are the bold ones; they are the only annotations
             # these panels place against the data rather than against the axes.
-            # A reinforcement line has one — where it is most utilized. A pile
-            # has two, one per panel: the largest shear at its depth and the
+            # A reinforcement line has NONE: its hardest-worked element is the
+            # ringed one and the legend names the ring (the owner's ruling — the
+            # in-plot range text was redundant with the ring and the title). A
+            # pile has two, one per panel: the largest shear at its depth and the
             # largest moment at its own (the owner's fem_piles ruling — a peak
             # reported without its depth cannot be found on the pile).
             peaks = [(ax, t) for ax in fig.axes for t in ax.texts
                      if t.get_fontweight() == "bold"]
-            want = 2 if profile["kind"] == "pile" else 1
+            want = 2 if profile["kind"] == "pile" else 0
             if len(peaks) != want:
                 fails.append(f"{where}: {len(peaks)} peak labels on the figure, "
                              f"not {want}")
+                continue
+            if want == 0:
                 continue
             if want == 2:
                 heads = sorted(t.get_text().split()[0] for _a, t in peaks)
@@ -16307,9 +16311,16 @@ def test_a_broken_tie_stretch_is_excepted():
                     faults.append(f"{label}: a highlighted run {spanning} spans "
                                   f"{gap:.2f}, where the line stands below "
                                   f"capacity")
-            if len(runs) < len(gaps) + 1:
+            # One thickened run per piece of the stretch that has two or more
+            # samples; a piece of one sample is a point, marked by its ring
+            # alone, and draws no run.
+            tied = np.asarray(profile.get("peak_indices", []), dtype=int)
+            pieces = [r for r in np.split(tied, np.where(np.diff(tied) > 1)[0] + 1)
+                      if len(r) > 1] if len(tied) else []
+            if len(runs) != len(pieces):
                 faults.append(f"{label}: {len(runs)} highlighted run(s) for a "
-                              f"stretch broken at {len(gaps)} position(s)")
+                              f"stretch broken at {len(gaps)} position(s) into "
+                              f"{len(pieces)} piece(s) of two or more samples")
         return faults
 
     fails += drawn_faults(profiles, broken)
@@ -17951,8 +17962,8 @@ _MEMBER_COLUMNS = {
     ("reinforcement", "fem"): (("T_max", "T_res", "L_p1", "L_p2",
                                 "E", "Area"), ("Direction", "Applied")),
     ("piles", "lem"): (("H", "θ (deg)", "V_cap", "M_cap", "Applied"),
-                       ("E", "I", "Head fixity")),
-    ("piles", "fem"): (("V_cap", "M_cap", "E", "Head fixity"),
+                       ("E", "I", "Head fixity", "Tip fixity")),
+    ("piles", "fem"): (("V_cap", "M_cap", "E", "Head fixity", "Tip fixity"),
                        ("H", "θ (deg)", "Applied")),
 }
 

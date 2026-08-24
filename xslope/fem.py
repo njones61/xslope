@@ -906,7 +906,11 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             - EI_by_pile_elem: np.ndarray (n_pile_elements,) of flexural rigidity per unit width
             - EA_by_pile_elem: np.ndarray (n_pile_elements,) of axial rigidity per unit width
             - pile_head_nodes: np.ndarray of node indices for each pile line's top node
-            - pile_head_fixed: np.ndarray of booleans for fixity of each pile head
+            - pile_head_fixed: np.ndarray of booleans, True where the pile head's
+              rotation is restrained ('Head' = fixed in the piles sheet)
+            - pile_tip_nodes: np.ndarray of node indices for each pile line's bottom node
+            - pile_tip_fixed: np.ndarray of booleans, True where the pile tip's
+              rotation is restrained ('Tip' = fixed in the piles sheet)
             - unit_weight: float, unit weight of water
             - k_seismic: float, seismic coefficient (horizontal acceleration / gravity)
     """
@@ -1606,13 +1610,21 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         dof_indices_1d[elem_idx] = [dof_offset[node_0], dof_offset[node_0] + 1,
                                      dof_offset[node_1], dof_offset[node_1] + 1]
 
-    # Identify pile head nodes and their fixity for boundary conditions
-    # The pile head is the top node (highest y) of each pile line.
+    # Identify the pile end nodes and their rotation restraints for boundary
+    # conditions. The head is the top node (highest y) of each pile line and the
+    # tip is the bottom node (lowest y). Each end carries its own restraint --
+    # 'Head' and 'Tip' in the piles sheet -- and 'fixed' constrains that node's
+    # ROTATION degree of freedom only; the translations stay with the boundary
+    # conditions and the surrounding soil. ``fixity`` is read as the head for a
+    # slope_data dict built before the two ends were separated.
     pile_head_nodes = []
     pile_head_fixed = []
+    pile_tip_nodes = []
+    pile_tip_fixed = []
     for pl_idx in range(n_pile_lines):
         pile_data = pile_lines[pl_idx]
-        fixity = pile_data.get("fixity", "free")
+        head_fixity = pile_data.get("head_fixity", pile_data.get("fixity", "free"))
+        tip_fixity = pile_data.get("tip_fixity", "free")
 
         # Collect all nodes belonging to this pile line
         pile_nodes_for_line = set()
@@ -1623,13 +1635,18 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                 pile_nodes_for_line.add(n1)
 
         if pile_nodes_for_line:
-            # Top node = highest y coordinate
+            # Top node = highest y coordinate; bottom node = lowest y
             top_node = max(pile_nodes_for_line, key=lambda nd: nodes[nd, 1])
+            bottom_node = min(pile_nodes_for_line, key=lambda nd: nodes[nd, 1])
             pile_head_nodes.append(top_node)
-            pile_head_fixed.append(fixity == "fixed")
+            pile_head_fixed.append(head_fixity == "fixed")
+            pile_tip_nodes.append(bottom_node)
+            pile_tip_fixed.append(tip_fixity == "fixed")
 
     pile_head_nodes = np.array(pile_head_nodes, dtype=int)
     pile_head_fixed = np.array(pile_head_fixed, dtype=bool)
+    pile_tip_nodes = np.array(pile_tip_nodes, dtype=int)
+    pile_tip_fixed = np.array(pile_tip_fixed, dtype=bool)
 
     # Set up boundary conditions
     
@@ -2237,6 +2254,8 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "pile_line_idx_by_pile_elem": pile_line_idx_by_pile_elem,
         "pile_head_nodes": pile_head_nodes,
         "pile_head_fixed": pile_head_fixed,
+        "pile_tip_nodes": pile_tip_nodes,
+        "pile_tip_fixed": pile_tip_fixed,
     }
 
 
@@ -2603,6 +2622,8 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     has_pile_elements = n_pile_elements > 0
     pile_head_nodes = fem_data.get("pile_head_nodes", np.array([], dtype=int))
     pile_head_fixed = fem_data.get("pile_head_fixed", np.array([], dtype=bool))
+    pile_tip_nodes = fem_data.get("pile_tip_nodes", np.array([], dtype=int))
+    pile_tip_fixed = fem_data.get("pile_tip_fixed", np.array([], dtype=bool))
 
     constraint_dofs = []
     for i in range(n_nodes):
@@ -2615,12 +2636,18 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         elif bc_type[i] == 3 or i in roller_y_nodes:  # Y-roller
             constraint_dofs.append(dof_y)
     if has_pile_elements:
-        for ph_idx in range(len(pile_head_nodes)):
-            if pile_head_fixed[ph_idx]:
-                ph_node = pile_head_nodes[ph_idx]
-                rot_dof = dof_offset[ph_node] + 2 if dof_offset is not None else None
-                if rot_dof is not None:
-                    constraint_dofs.append(rot_dof)
+        # A fixed end constrains that node's ROTATION degree of freedom (the
+        # third DOF a pile node carries); its translations are left to the
+        # boundary conditions and the surrounding soil. The head and the tip
+        # are restrained by the same mechanism, one end at a time.
+        for _end_nodes, _end_fixed in ((pile_head_nodes, pile_head_fixed),
+                                       (pile_tip_nodes, pile_tip_fixed)):
+            for pe_idx in range(len(_end_nodes)):
+                if _end_fixed[pe_idx]:
+                    pe_node = _end_nodes[pe_idx]
+                    rot_dof = dof_offset[pe_node] + 2 if dof_offset is not None else None
+                    if rot_dof is not None:
+                        constraint_dofs.append(rot_dof)
 
     constraint_set = set(constraint_dofs)
     free_dofs = np.array(sorted(set(range(n_dof)) - constraint_set))

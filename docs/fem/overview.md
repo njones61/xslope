@@ -219,6 +219,16 @@ quads lock volumetrically and read high (see
 [Element type and volumetric locking](#element-type-selection-and-volumetric-locking)). Mesh
 construction is covered in [Mesh Generation](mesh.md).
 
+Reinforcement and pile lines are embedded in the same mesh, so their 1D elements are edges of the
+soil elements around them and every 1D node is a soil node. That coupling makes their discretization
+a mesh question rather than a per-member one: refining a member means refining the soil it hands its
+load to. The **1D element size** on the main sheet is where a model states it — the element size
+along those lines, blank to mesh them at the global target size like everything else. A stated size
+is applied as a graded band around the lines, so the structural elements and the soil sharing their
+nodes both come back at that size and grow back to the target away from them, and a member can be
+discretized finely without a finer mesh across the whole section. It only ever refines: a value at
+or above the target size cannot coarsen the lines and is ignored.
+
 ### Stiffness and assembly
 
 Each element's stiffness follows from virtual work,

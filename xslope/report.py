@@ -2457,14 +2457,14 @@ REINFORCEMENT_PROPERTIES = {
 #: Ito and Matsui method from the diameter and spacing — at the inclination given
 #: for it, capped by the shear and moment capacities, and active or passive
 #: (``slice.py``). The finite element analysis assembles the pile as a beam in
-#: the mesh and needs its section stiffness and the fixity of its head
+#: the mesh and needs its section stiffness and the rotation restraint at each end
 #: (``fem.py``); it takes no stated force, because the force is an outcome of the
 #: solution rather than an input to it.
 PILE_PROPERTIES = {
     "lem": ("label", "top", "bottom", "H", "theta_p", "D_pile", "S",
             "V_cap", "M_cap", "appl"),
     "fem": ("label", "top", "bottom", "D_pile", "S", "V_cap", "M_cap",
-            "E", "I", "area", "fixity"),
+            "E", "I", "area", "head_fixity", "tip_fixity"),
 }
 
 
@@ -2547,8 +2547,11 @@ def _pile_fields(slope_data):
         "E": ("E", f"E{su}", lambda m: _fmt(m.get("E"), "{:,.0f}"), False),
         "I": ("I", f"I{iu}", lambda m: _fmt(m.get("I"), "{:g}"), False),
         "area": ("area", f"Area{au}", lambda m: _fmt(m.get("area"), "{:g}"), False),
-        "fixity": ("fixity", "Head fixity",
-                   lambda m: str(m.get("fixity") or ""), False),
+        "head_fixity": ("head_fixity", "Head fixity",
+                        lambda m: str(m.get("head_fixity")
+                                      or m.get("fixity") or ""), False),
+        "tip_fixity": ("tip_fixity", "Tip fixity",
+                       lambda m: str(m.get("tip_fixity") or ""), False),
     }
 
 
@@ -2622,9 +2625,9 @@ _PILE_PROSE = {
     "fem": "its diameter and out-of-plane spacing, the shear and moment "
            "capacities that cap what it carries, the modulus, area and second "
            "moment of area that set the stiffness of the beam that represents "
-           "it, "
-           "and the fixity of its head. The force a pile carries is an outcome "
-           "of the solution here rather than an input to it",
+           "it, and the rotation restraint at its head and at its tip. The "
+           "force a pile carries is an outcome of the solution here rather "
+           "than an input to it",
 }
 
 

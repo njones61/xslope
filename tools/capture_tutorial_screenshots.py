@@ -1431,7 +1431,7 @@ SHOTS.update({
 #
 # The subject is a column that is EMPTY in the shipped file: H is blank on both
 # pile rows, which is what puts the run on the Ito & Matsui path. Every piles shot
-# here pins LEM only, so the FEM tail (E, I, Area, Fixity) is out of the way and
+# here pins LEM only, so the FEM tail (E, I, Area, Head, Tip) is out of the way and
 # the blank H sits among the columns that feed it — D, S, Vcap and Mcap.
 # --------------------------------------------------------------------------- #
 LEM12 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
@@ -2214,6 +2214,7 @@ def _fem02_meshed(path=FEM02_DONE):
         data["mesh"] = build_mesh_from_polygons(
             get_material_polygons(data, reinf_lines=lines), done["target_size"],
             done["element_type"], lines=lines or None,
+            element_size_1d=done.get("element_size_1d"),
             size_regions=extract_size_regions(data))
     return data
 
@@ -2389,6 +2390,7 @@ def _fem03_meshed(path, mesh_from=None):
         data["mesh"] = build_mesh_from_polygons(
             get_material_polygons(data, reinf_lines=lines),
             data["target_size"], data["element_type"], lines=lines or None,
+            element_size_1d=data.get("element_size_1d"),
             size_regions=extract_size_regions(data))
     return data
 
@@ -2411,7 +2413,7 @@ def fem03_piles_table():
     dlg = PilesEditor().build(_load(FEM03_PILES), None)
     for _tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
         cb.setChecked(True)
-    return _grab(_line_table(dlg, through="fixity"),
+    return _grab(_line_table(dlg, through="tip_fixity"),
                  "fem03_studio_piles_table.png")
 
 

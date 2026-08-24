@@ -301,7 +301,9 @@ def feature_signature(slope_data):
                                     for m in reinf),
         },
         'piles': len(piles),
-        'pile_fixities': sorted({str(p.get('fixity')) for p in piles if p.get('fixity')}),
+        'pile_fixities': sorted({str(p.get('head_fixity', p.get('fixity')))
+                                 for p in piles
+                                 if p.get('head_fixity', p.get('fixity'))}),
         'line_loads': len(slope_data.get('line_loads') or []),
         'dloads': len(slope_data.get('dloads') or []),
         'cutoff_walls': find_cutoff_notches(slope_data),

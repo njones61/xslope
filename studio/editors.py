@@ -5786,8 +5786,8 @@ class SeepBcEditor(CategoryEditor):
 def _new_pile():
     return {"label": "Pile", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0, "H": None,
             "theta_p": 0.0, "D_pile": None, "S": None, "E": None, "I": None,
-            "area": None, "V_cap": None, "M_cap": None, "fixity": "free",
-            "appl": "active"}
+            "area": None, "V_cap": None, "M_cap": None, "head_fixity": "free",
+            "tip_fixity": "free", "appl": "active"}
 
 
 # List-view form layout for a pile: every PilesEditor.FIELDS key grouped (Identity /
@@ -5798,7 +5798,7 @@ _PILE_FORM_GROUPS = [
     ("Geometry", [["x1", "y1"], ["x2", "y2"]]),
     ("Capacity / design", [["H"], ["D_pile", "S"], ["V_cap", "M_cap"],
                            ["E", "I"], ["area"]]),
-    ("Behavior", [["appl", "fixity"]]),
+    ("Behavior", [["appl"], ["head_fixity", "tip_fixity"]]),
 ]
 
 
@@ -5849,8 +5849,12 @@ PILES_HELP = {
             "unit width.",
     "appl": "Force application — Active: H is an allowable force, not divided by "
            "FS (default). Passive: H is an ultimate capacity divided by FS. LEM only.",
-    "fixity": "Pile head rotation boundary condition — free (default, can rotate) "
-             "or fixed (zero rotation). FEM only.",
+    "head_fixity": "Rotation restraint at the top of the pile: free (default; a "
+                   "stabilizing pile with no structural connection) or fixed (a cap "
+                   "or wall that prevents rotation). FEM only.",
+    "tip_fixity": "Rotation restraint at the bottom of the pile: free (default; a "
+                  "tip resting on a stratum, or restrained only by the soil around "
+                  "it) or fixed (a shaft socketed into rock). FEM only.",
 }
 
 
@@ -5859,7 +5863,7 @@ class PilesEditor(CategoryEditor):
     # tooltip=PILES_HELP[key] gives the table-header hover and the list-view
     # label/edit hover; the same dict feeds the context-sensitive help strip.
     # Field order mirrors the piles sheet's columns (Label, the endpoints, H, Appl,
-    # D, S, Vcap, Mcap, then the FEM tail E, I, Area, Fixity) so a block copied from
+    # D, S, Vcap, Mcap, then the FEM tail E, I, Area, Head, Tip) so a block copied from
     # the sheet or the docs' tables pastes straight in. The sheet's qp (θ) sits
     # between H and Appl and has no column here: θ is derived from the pile axis on
     # save, so a block spanning it goes in as two — the endpoints through H, then D
@@ -5885,8 +5889,10 @@ class PilesEditor(CategoryEditor):
         Field("E", "E", "optfloat", usage="fem", tooltip=PILES_HELP["E"]),
         Field("I", "I", "optfloat", usage="fem", tooltip=PILES_HELP["I"]),
         Field("area", "Area", "optfloat", usage="fem", tooltip=PILES_HELP["area"]),
-        Field("fixity", "Fixity", "choice", choices=["free", "fixed"], usage="fem",
-              tooltip=PILES_HELP["fixity"]),
+        Field("head_fixity", "Head", "choice", choices=["free", "fixed"], usage="fem",
+              tooltip=PILES_HELP["head_fixity"]),
+        Field("tip_fixity", "Tip", "choice", choices=["free", "fixed"], usage="fem",
+              tooltip=PILES_HELP["tip_fixity"]),
     ]
 
     def build(self, slope_data, parent):

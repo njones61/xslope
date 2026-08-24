@@ -730,6 +730,7 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
         polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
         mesh = build_mesh_from_polygons(polygons, target_size=target_size,
                                         element_type=element_type, lines=constraint_lines,
+                                        element_size_1d=slope_data.get('element_size_1d'),
                                         point_constraints=extract_point_constraints(slope_data))
 
     # grid=tolerance: bisect each SSRM on a fixed global grid so every factor of

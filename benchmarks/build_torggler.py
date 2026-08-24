@@ -42,7 +42,7 @@ stiffnesses exactly and with no derived quantity in between:
 S = 1.0 m is a continuous wall, which is what a 2D plate element is, so no
 out-of-plane arching question arises.  D is left blank: it is only used to
 derive A and I when those are absent, and here they are given.  The plate has
-no rotational restraint at its head, so Fixity = free.
+no rotational restraint at its head, so Head = free.
 
 The plate station is dimensioned in Fig. 17 as 8.66 m from the crest and 8.66 m
 from the toe — mid-slope, x = 20 + 8.66 = 28.66, where the slope surface is at
@@ -137,7 +137,7 @@ def _plate(y_tip, label):
         'H': None, 'theta_p': 0.0,
         'D_pile': None, 'S': S_PLATE,
         'E': E_PLATE, 'I': I_PLATE, 'area': A_PLATE,
-        'V_cap': None, 'M_cap': None, 'fixity': 'free', 'appl': 'active',
+        'V_cap': None, 'M_cap': None, 'head_fixity': 'free', 'appl': 'active',
         'label': label,
     }
 

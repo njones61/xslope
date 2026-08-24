@@ -434,7 +434,7 @@ It states what it will remove before it removes anything —
 ```
 Set Water loads to auto and remove 1 block from Distributed loads (#1), which the
 derivation from Piezometric Line 1 reproduces to within 0% (resultant 11886.4)
-(main D23).
+(the main sheet's Water loads row).
 ```
 
 — it keeps every block that is *not* water verbatim, and it declines rather than removing

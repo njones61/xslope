@@ -1112,7 +1112,7 @@ def _yamagami_pile_slope(with_pile):
             'x1': 9.0, 'y1': 4.0, 'x2': 9.0, 'y2': -2.0,
             'H': None, 'theta_p': 0.0, 'D_pile': 0.3, 'S': 1.0,
             'E': None, 'I': None, 'area': None,
-            'V_cap': 10.7, 'M_cap': 1.0e6, 'fixity': 'free',   # shear governs; Mcap>0 required
+            'V_cap': 10.7, 'M_cap': 1.0e6, 'head_fixity': 'free',   # shear governs; Mcap>0 required
             # Slide applies the micro-pile shear in the ACTIVE sense (added
             # to the resisting sum un-factored): active reproduces its 1.193
             # on the printed circle (1.185); passive-(/F) gives 1.172.
@@ -2532,7 +2532,7 @@ def vp049():
         'x1': 0.5, 'y1': 30.0, 'x2': 0.5, 'y2': -7.0,
         'H': 5900.0, 'theta_p': 0.0, 'D_pile': 0.5, 'S': 1.0,
         'E': None, 'I': None, 'area': None,
-        'V_cap': None, 'M_cap': None, 'fixity': 'free',
+        'V_cap': None, 'M_cap': None, 'head_fixity': 'free',
         'appl': 'active', 'label': 'soldier pile'}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp049.xlsx'))
     return 'vp049.xlsx'
@@ -2994,7 +2994,7 @@ def _vp106_slope_data(sd_ratio, appl='passive'):
             'x1': 17.5, 'y1': 5.0, 'x2': 17.5, 'y2': -10.0,
             'H': None, 'theta_p': 0.0, 'D_pile': 0.8, 'S': sd_ratio * 0.8,
             'E': None, 'I': None, 'area': None,
-            'V_cap': None, 'M_cap': None, 'fixity': 'free',
+            'V_cap': None, 'M_cap': None, 'head_fixity': 'free',
             'appl': appl, 'label': f'pile row D1={sd_ratio}D',
         }]
     return sd

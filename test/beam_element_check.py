@@ -117,7 +117,7 @@ def build_beam(length, n_elem, angle_deg=0.0, spacing=1.0, E=E_BEAM, I=I_BEAM,
         'pile_lines': [{'x1': float(beam_nodes[0, 0]), 'y1': float(beam_nodes[0, 1]),
                         'x2': float(beam_nodes[-1, 0]), 'y2': float(beam_nodes[-1, 1]),
                         'E': E, 'I': I, 'area': area, 'S': spacing,
-                        'fixity': 'free'}],
+                        'head_fixity': 'free'}],
     }
     fem_data = build_fem_data(slope_data, mesh)
     return fem_data, list(range(n0, n0 + n_elem + 1))
@@ -470,7 +470,7 @@ def leg_circular_section():
                        'option': 'mc', 'c': 25.0, 'phi': 30.0, 'u': 'none'}],
         'gamma_water': 9.81,
         'pile_lines': [{'x1': 0.0, 'y1': 0.0, 'x2': 8.0, 'y2': 0.0,
-                        'E': E_BEAM, 'D_pile': D, 'S': 1.0, 'fixity': 'free'}],
+                        'E': E_BEAM, 'D_pile': D, 'S': 1.0, 'head_fixity': 'free'}],
     }
     fd = build_fem_data(slope_data, mesh)
     cmp(fails, "I from D            pi D^4/64", fd['EI_by_pile_elem'][0] / E_BEAM,

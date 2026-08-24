@@ -293,6 +293,14 @@ class MeshWorker(QObject):
                 target = options.get("target_size", 1.0)
             extra = (f", {n_reinf} reinforcement + {n_pile} pile line(s)"
                      if (n_reinf + n_pile) else "")
+            # Element size along the constraint lines (main!D20). The dialog carries
+            # the model's value, so fall back to the model for a caller that builds a
+            # mesh without one. Announced only where it can act — a section with no
+            # reinforcement or pile line has no line to size.
+            size_1d = options.get("element_size_1d", sd.get("element_size_1d"))
+            size_1d_msg = ""
+            if size_1d is not None and constraint_lines:
+                size_1d_msg = f", 1D element size {float(size_1d):g}"
             size_regions = extract_size_regions(sd)
             factor = float(options.get("refine_factor", 3.0))
             features = set(_REFINE_FEATURES) if options.get(
@@ -328,7 +336,7 @@ class MeshWorker(QObject):
             style_msg = (f", {quad_style} quads"
                          if element_type.startswith("quad") else "")
             print(f"Building {element_type} mesh, target size {target:.3g}"
-                  f"{style_msg}{extra}{refine_msg}{thin_msg}…")
+                  f"{style_msg}{extra}{size_1d_msg}{refine_msg}{thin_msg}…")
             # Name every zone the toggle refined, the size it got, and the resolution
             # that size buys. Nothing is printed when nothing was refined, so a
             # section with no thin zone reads exactly as it did before the option
@@ -342,6 +350,7 @@ class MeshWorker(QObject):
             mesh = build_mesh_from_polygons(polygons, target_size=target,
                                             element_type=element_type,
                                             lines=constraint_lines or None,
+                                            element_size_1d=size_1d,
                                             refine_factor=refine,
                                             refine_features=refine_features,
                                             size_regions=size_regions,

@@ -357,6 +357,16 @@ Seepage and FEM run on a finite-element mesh, which you build explicitly. In
 - **Element type** — `tri3`, `tri6`, `quad4`, `quad8`, or `quad9`.
 - **Target size** — entered directly, or auto-sized as the slope width divided by a
   number of divisions.
+- **1D element size** — the element size along the reinforcement and pile lines,
+  blank by default, which meshes them at the target size like everything else. A
+  value refines the beam and bar elements *and* the soil elements that share their
+  nodes, growing back to the target size away from the lines, so a member can be
+  discretized finely without paying for a finer mesh across the whole section. It is
+  a model input — **1D element size** on the main sheet — so the box opens on
+  whatever the file states and an entry is written back to the model, saved with the
+  file and undone like any other edit. A value at or above the target size is
+  ignored, since sizes compose by taking the smaller and a coarser request could
+  never bind.
 - **Quadrilateral style** — **Free (recommended)**, or **Structured where possible**,
   which sweeps rows and columns of quads through the grid-like zones and free-meshes
   the rest. Available for the quad element types only, and dimmed for the triangular

@@ -419,12 +419,12 @@ slope_data = {
 
     # --- Run options: how this model is meant to be analyzed, carried in the file instead of
     #     living in a dialog. All optional; None = unspecified and the solver default stands.
-    'water_loads':    'auto',    # v22, main!D23. 'auto' = the engine derives the ponded-water
+    'water_loads':    'auto',    # v22, main!D24 (D23 before v25). 'auto' = the engine derives the ponded-water
                                  #   load from the model's own water definition at EVERY solve,
                                  #   so the dloads sheets carry NON-water loads only; 'manual' =
                                  #   you enter it there yourself. A new file is 'auto'; every
                                  #   pre-v22 file is 'manual'. See guideline 8 (ponded water).
-    'surface_family': None,      # v22, main!D24. 'circular' | 'non-circular'. Only bites on a
+    'surface_family': None,      # v22, main!D25 (D24 before v25). 'circular' | 'non-circular'. Only bites on a
                                  #   file defining BOTH families — it picks which one runs (and
                                  #   sets slope_data['circular'] at load). Leave None otherwise.
     'lem_method':     None,      # v19, main!D14. one of the seven method names, or 'all'
@@ -437,9 +437,12 @@ slope_data = {
     'tension_srf':    None,      # v19, main!D17. reduce t_cut along with c and tan(phi)?
     'element_type':   None,      # v19, main!D18. mesh element type (see Meshing below)
     'target_size':    None,      # v19, main!D19. global target element size
-    'ssrm_f_min':     None,      # v19, main!D20/D21. the SSRM bracket
+    'element_size_1d': None,     # v25, main!D20. target element size ALONG the 1D members (piles
+                                 #   and reinforcement lines). Blank = the mesher subdivides them
+                                 #   on its own, which is what every pre-v25 file does.
+    'ssrm_f_min':     None,      # v19, main!D21/D22 (D20/D21 before v25). the SSRM bracket
     'ssrm_f_max':     None,
-    'side_bc':        None,      # v21, main!D22. 'rollers' (the default — a truncation boundary
+    'side_bc':        None,      # v21, main!D23 (D22 before v25). 'rollers' (the default — a truncation boundary
                                  #   is a cut through ground that continues) | 'fixed'. Use
                                  #   'fixed' only to reproduce a program that clamps its sides.
 }
@@ -820,7 +823,7 @@ and you should decide consciously, not miss it by accident.
 Even a **FEM-only** run needs at least one nominal circle here so `load_slope_data` validates;
 the FEM solver does not use it, but the loader requires a failure surface to exist.
 
-**A file that defines both families.** `slope_data['surface_family']` (main!D24) — `'circular'`
+**A file that defines both families.** `slope_data['surface_family']` (main!D25) — `'circular'`
 or `'non-circular'` — decides which one runs, and the loader uses it to set
 `slope_data['circular']`, so the run, the plots and the next session all read the same surface.
 Blank is normal and means "whichever family the model defines"; on a file carrying both, the
@@ -994,7 +997,8 @@ slope_data['pile_lines'] = [
      'E': None, 'I': None, 'area': None,        # FEM section props (None -> auto from D)
      'V_cap': None, 'M_cap': None,              # shear / moment capacity per pile
      'appl': 'active',                          # 'active' (H not /FS) | 'passive' (H /FS; LEM only)
-     'fixity': 'free'},                         # 'free' or 'fixed' (FEM head condition)
+     'head_fixity': 'free',                     # 'free' or 'fixed' (FEM rotation at the top)
+     'tip_fixity': 'free'},                     # 'free' or 'fixed' (FEM rotation at the bottom)
 ]
 ```
 
@@ -1166,7 +1170,7 @@ generate_slices(report.model, circle=report.model['circles'][0])   # the copy, n
 ```
 
 The five: `reverse_polyline` (a piezo line or load block entered right to left),
-`add_ponded_water_load`, `switch_to_auto_water` (set **Water loads** to `auto`, main D23, and
+`add_ponded_water_load`, `switch_to_auto_water` (set **Water loads** to `auto`, the main sheet's Water loads row, and
 drop the transcribed water blocks — the better of the two water fixes, since a mode is recomputed at every solve
 while a written block goes stale), `generate_starting_circles`, `generate_noncircular_surface`.
 
@@ -1179,8 +1183,10 @@ a reason instead of half-applying.
 
 ## Meshing
 
-`build_mesh_from_polygons(polygons, target_size, element_type=..., ...)` — `element_type`
-defaults to **`tri6`**.
+`build_mesh_from_polygons(polygons, target_size, element_type=..., element_size_1d=None, ...)` — `element_type`
+defaults to **`tri6`**. `element_size_1d` is the main sheet's **1D element size** cell (`slope_data['element_size_1d']`):
+the target element size along every reinforcement and pile line, refining the bar/beam elements and the soil they share
+nodes with; pass `slope_data.get('element_size_1d')` through so a stated cell is honored, blank = the target size.
 
 **Never use linear elements for a FEM or SSRM run.** `tri3` and `quad4` lock volumetrically:
 Mohr-Coulomb plastic flow is nearly incompressible, a linear element cannot shear at constant
@@ -1945,7 +1951,7 @@ results = solve_selected("spencer", slice_df, rapid=True)
      envelope usually drawn). If elevations or lengths are genuinely unclear, state your
      reading and ask — a 2-ft shift in grid elevations changes FS by ~2-3%.
    - **Water table identification**: A water table is indicated by an **inverted triangle symbol** (▽) on the diagram. Do NOT assume a dashed line is a water table unless it is accompanied by this symbol or is explicitly labeled. Dashed lines may represent other features (e.g., material boundaries, construction lines).
-   - **Ponded / standing / reservoir water**: If the water table (▽) is shown ABOVE the ground surface, there is external water whose weight MUST be carried by the analysis. **In a v22 file — the template's default, `Water loads: auto` in main!D23 — do NOT enter it on the dloads sheets.** The engine derives it at solve time from the water definition you have already entered (the piezometric line, or the seepage head boundaries where a seepage analysis is defined), and a block entered on top of that counts the reservoir twice — preflight warns about exactly this. Your job is to make sure the water definition is right and reaches across the whole submerged stretch; the load follows from it. Set `Water loads: manual` only when the point is to reproduce another program's input exactly, and then enter the load yourself: normal stress = γ_w × (water_elevation - ground_elevation) at each point. **Apply it over the ENTIRE submerged ground surface** — every ground segment below the water level, including flat foundation/bench areas AND sloping faces — as a continuous load that follows the ground profile from where the water meets the ground on one side to where it meets it on the other. Do NOT apply it to the slope face only. This applies even for phi=0 total stress: the water definition drives the surface load for every material unconditionally, and `mat!u` decides only who samples that water as pore pressure — a submerged total-stress slope carries the reservoir's weight with zero pore pressure. The load and the pore pressure are two separate consequences of the same water: a reservoir impounded against a dam presses on the flooded foundation AND the submerged upstream face, and also raises the phreatic surface inside the embankment. The water load is part of the problem definition, not an optional refinement. Never skip it — and in auto mode, never enter it twice. Leave a water load's direction `'normal'` — water pressure IS perpendicular to the surface; `'vertical'` is for dead weight.
+   - **Ponded / standing / reservoir water**: If the water table (▽) is shown ABOVE the ground surface, there is external water whose weight MUST be carried by the analysis. **In a v22 file — the template's default, `Water loads: auto` in main!D24 — do NOT enter it on the dloads sheets.** The engine derives it at solve time from the water definition you have already entered (the piezometric line, or the seepage head boundaries where a seepage analysis is defined), and a block entered on top of that counts the reservoir twice — preflight warns about exactly this. Your job is to make sure the water definition is right and reaches across the whole submerged stretch; the load follows from it. Set `Water loads: manual` only when the point is to reproduce another program's input exactly, and then enter the load yourself: normal stress = γ_w × (water_elevation - ground_elevation) at each point. **Apply it over the ENTIRE submerged ground surface** — every ground segment below the water level, including flat foundation/bench areas AND sloping faces — as a continuous load that follows the ground profile from where the water meets the ground on one side to where it meets it on the other. Do NOT apply it to the slope face only. This applies even for phi=0 total stress: the water definition drives the surface load for every material unconditionally, and `mat!u` decides only who samples that water as pore pressure — a submerged total-stress slope carries the reservoir's weight with zero pore pressure. The load and the pore pressure are two separate consequences of the same water: a reservoir impounded against a dam presses on the flooded foundation AND the submerged upstream face, and also raises the phreatic surface inside the embankment. The water load is part of the problem definition, not an optional refinement. Never skip it — and in auto mode, never enter it twice. Leave a water load's direction `'normal'` — water pressure IS perpendicular to the surface; `'vertical'` is for dead weight.
    - Piezometric surfaces: typically shown as dashed/blue lines with explicit labels
    - Material boundaries shown as solid lines between differently hatched/colored zones
    - Property tables typically shown in the diagram legend

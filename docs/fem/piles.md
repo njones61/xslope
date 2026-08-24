@@ -129,6 +129,10 @@ Pile elements are integrated into the finite element mesh using the same approac
 
 When a pile endpoint is within a small tolerance of a polygon boundary (e.g., the ground surface), it is automatically snapped to the nearest boundary point. This prevents near-zero-length elements that would otherwise arise from minor coordinate mismatches between the pile definition and the ground surface interpolation.
 
+Beam elements are spaced along the pile line at the global target element size unless the model states a **1D element
+size** on the main sheet, which sets the element size along the pile and reinforcement lines and refines the soil
+sharing their nodes with them.
+
 For details on the mesh generation process and 1D element extraction, see [Mesh Generation](mesh.md).
 
 
@@ -170,16 +174,18 @@ The plastic hinge approach is the standard method used in commercial geotechnica
 Both checks are applied independently at each iteration. An element can yield in shear, moment, or both. The summary output reports which elements have yielded and by which mechanism.
 
 
-## Pile Head Fixity
+## Head and Tip Fixity
 
-The **Fixity** column in the `piles` sheet controls the rotational boundary condition at the pile head (top node):
+Each end of a pile carries its own rotational boundary condition. The **Head** column in the `piles` sheet sets the condition at the top node (highest $y$) and the **Tip** column sets it at the bottom node (lowest $y$):
 
-- **free** (default): The pile head can rotate freely. This is the standard assumption for passive stabilizing piles with no structural connection at the top.
-- **fixed**: Zero rotation at the pile head. This models a pile connected to a pile cap, retaining wall, or other structure that prevents rotation.
+- **free** (default): the end rotates freely. At the head this is the standard assumption for a stabilizing pile with no structural connection at the top; at the tip it is the usual condition for a shaft the surrounding soil restrains.
+- **fixed**: zero rotation at that end. At the head this models a pile connected to a pile cap, a retaining wall, or another structure that prevents rotation; at the tip it models a shaft socketed into rock.
 
-The pile tip (bottom node) rotation is always free — the embedment in stable soil naturally provides restraint through the soil elements.
+A fixed end constrains the rotation degree of freedom at that node and nothing else — the translations remain with the boundary conditions and the soil elements around the pile.
 
-Fixity has no effect on LEM analysis.
+Whether a free tip needs restraining depends on where the pile ends. A shaft that continues well below the slip surface is restrained by the soil it passes through, and leaving the tip free is correct: the surrounding elements supply the rotational restraint the embedment provides. A shaft whose bottom node lands on a fixed boundary is a different case. Its translations are held there, but its rotation is not, so the tip behaves as a pin and the pile swings about it. Set **Tip** to fixed to model a shaft socketed into that base.
+
+Neither column has any effect on LEM analysis.
 
 
 ## SSRM Treatment
@@ -274,7 +280,8 @@ Pile properties for FEM analysis are specified in the `piles` sheet of the input
 | M | $Area$ | Cross-sectional area of pile cross-section |
 | N | $V_{\text{cap}}$ | Shear capacity per pile (force units). Blank = no limit. |
 | O | $M_{\text{cap}}$ | Moment capacity per pile (force × length units). Blank = no limit. |
-| P | Fixity | Pile head rotation: **free** (default) or **fixed** |
+| P | Head | Pile head (top node) rotation: **free** (default) or **fixed** |
+| Q | Tip | Pile tip (bottom node) rotation: **free** (default) or **fixed** |
 
 If $D$ is provided and $I$/$Area$ are omitted, a solid circular section is assumed:
 

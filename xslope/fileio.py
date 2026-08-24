@@ -886,7 +886,13 @@ def ensure_reinforce_pullout(slope_data):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 24
+SUPPORTED_TEMPLATE_VERSION = 25
+
+# The template version that inserted the 1D element size cell at main!D20, pushing
+# every main-sheet run option below it down one row. Files at or above it are read
+# (and written) with that one-row shift; older ones keep their original layout and
+# carry no 1D size at all.
+_ELEMENT_SIZE_1D_TEMPLATE_VERSION = 25
 
 # The template version that introduced the water-load mode cell (main!D23). Below it
 # a file cannot say who supplies the weight of standing water, so it always means
@@ -1280,6 +1286,12 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
             f"xslope supports versions up to {SUPPORTED_TEMPLATE_VERSION}. "
             "Update xslope to read this file.")
 
+    # v25 inserted '1D element size' at main!D20, so every run option below it moved
+    # down one row. One offset carries that through the whole main-sheet block --
+    # including the cell names the error messages quote, which must name the row the
+    # user is actually looking at.
+    _shift = 1 if _tv >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION else 0
+
     # === MAIN-SHEET GLOBALS (version-gated positional map) ===
     # v18 inserted two declaration cells at the top of the block and shifted the three
     # existing globals down two rows:
@@ -1338,12 +1350,15 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     #   D14 LEM method       D15 number of slices   D16 K0 initial stress (FEM)
     #   D17 Tension SRF      D18 mesh element type  D19 mesh target size
     #   D20 SSRM F min       D21 SSRM F max
+    # From v25 the block gains D20 '1D element size' and the SSRM bracket moves to
+    # D21/D22; the rows below shift with it (see _shift).
     lem_method = None
     num_slices_opt = None
     k0 = None
     tension_srf_opt = None
     element_type = None
     target_size = None
+    element_size_1d = None
     ssrm_f_min = None
     ssrm_f_max = None
 
@@ -1424,14 +1439,27 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 "in cell D19. It must be positive (leave it blank for the "
                 "automatic size).")
 
-        # -- D20/D21 SSRM bracket.
-        ssrm_f_min = _opt_num(19, 'SSRM F min')                          # D20
-        ssrm_f_max = _opt_num(20, 'SSRM F max')                          # D21
+        # -- D20 1D element size (v25). The target edge length along the 1D
+        # members -- piles and reinforcement lines. Blank means unspecified, and
+        # the mesher's own subdivision applies, so a v24 file (which has no such
+        # cell at all) and a v25 file with the cell empty are the same model.
+        if _tv >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
+            element_size_1d = _opt_num(19, '1D element size')            # D20
+            if element_size_1d is not None and element_size_1d <= 0:
+                raise ValueError(
+                    f"The 'main' sheet declares a 1D element size of "
+                    f"{element_size_1d} in cell D20. It must be positive (leave it "
+                    "blank to subdivide the 1D members automatically).")
+
+        # -- SSRM bracket (D20/D21 through v24, D21/D22 from v25).
+        ssrm_f_min = _opt_num(19 + _shift, 'SSRM F min')
+        ssrm_f_max = _opt_num(20 + _shift, 'SSRM F max')
         if (ssrm_f_min is not None and ssrm_f_max is not None
                 and ssrm_f_min >= ssrm_f_max):
             raise ValueError(
-                f"The 'main' sheet declares SSRM F min = {ssrm_f_min} (D20) >= "
-                f"F max = {ssrm_f_max} (D21). The bracket must be increasing.")
+                f"The 'main' sheet declares SSRM F min = {ssrm_f_min} "
+                f"(D{20 + _shift}) >= F max = {ssrm_f_max} (D{21 + _shift}). "
+                f"The bracket must be increasing.")
 
     # === SIDE BOUNDARY CONDITION (v21, main D22) ===
     # How the FEM restrains the left and right truncation boundaries:
@@ -1443,14 +1471,16 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     # untouched cell is the same model as its v20 original.
     side_bc = None
     if _tv >= 21:
-        _sbc_raw = _cell_str(main_df.iloc[21, 3]) if main_df.shape[0] > 21 else ''
+        _sbc_row = 21 + _shift
+        _sbc_raw = (_cell_str(main_df.iloc[_sbc_row, 3])
+                    if main_df.shape[0] > _sbc_row else '')
         if _sbc_raw:
             side_bc = _sbc_raw.lower()
             if side_bc not in SIDE_BC_OPTIONS:
                 raise ValueError(
                     f"The 'main' sheet declares a Side BC of {_sbc_raw!r} in cell "
-                    f"D22. Expected one of: {', '.join(SIDE_BC_OPTIONS)} (or leave it "
-                    "blank for the default, rollers).")
+                    f"D{_sbc_row + 1}. Expected one of: {', '.join(SIDE_BC_OPTIONS)} "
+                    "(or leave it blank for the default, rollers).")
 
     # === WATER LOADS (v22, main D23) ===
     # Who supplies the weight of standing water:
@@ -1467,14 +1497,17 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     # under them would count the reservoir twice.
     water_loads = 'manual'
     if _tv >= 22:
-        _wl_raw = _cell_str(main_df.iloc[22, 3]) if main_df.shape[0] > 22 else ''
+        _wl_row = 22 + _shift
+        _wl_raw = (_cell_str(main_df.iloc[_wl_row, 3])
+                   if main_df.shape[0] > _wl_row else '')
         if _wl_raw:
             water_loads = _wl_raw.lower()
             if water_loads not in WATER_LOAD_OPTIONS:
                 raise ValueError(
                     f"The 'main' sheet declares a Water loads mode of {_wl_raw!r} in "
-                    f"cell D23. Expected one of: {', '.join(WATER_LOAD_OPTIONS)} (or "
-                    "leave it blank for the default, auto).")
+                    f"cell D{_wl_row + 1}. Expected one of: "
+                    f"{', '.join(WATER_LOAD_OPTIONS)} (or leave it blank for the "
+                    "default, auto).")
         else:
             water_loads = 'auto'
 
@@ -1492,14 +1525,17 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     # spells the second one with a hyphen.
     surface_family = None
     if _tv >= 22:
-        _sf_raw = _cell_str(main_df.iloc[23, 3]) if main_df.shape[0] > 23 else ''
+        _sf_row = 23 + _shift
+        _sf_raw = (_cell_str(main_df.iloc[_sf_row, 3])
+                   if main_df.shape[0] > _sf_row else '')
         if _sf_raw:
             _sf = _sf_raw.strip().lower().replace('_', '-').replace(' ', '')
             if _sf not in SURFACE_FAMILY_OPTIONS + ('noncircular',):
                 raise ValueError(
                     f"The 'main' sheet declares a surface family of {_sf_raw!r} in "
-                    f"cell D24. Expected one of: {', '.join(SURFACE_FAMILY_OPTIONS)} "
-                    "(or leave it blank to use whichever family the model defines).")
+                    f"cell D{_sf_row + 1}. Expected one of: "
+                    f"{', '.join(SURFACE_FAMILY_OPTIONS)} (or leave it blank to use "
+                    "whichever family the model defines).")
             surface_family = 'noncircular' if _sf.startswith('non') else 'circular'
 
     # === PROFILE LINES ===
@@ -2418,6 +2454,13 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
         piles_df = xls.parse('piles', header=1)
         piles_df.columns = [str(c).strip().lower() for c in piles_df.columns]
         _theta_col = 'qp' if 'qp' in piles_df.columns else 'theta'
+        # v25 split the single rotation restraint into one per end: the old
+        # 'Fixity' column became 'Head' (top node) and a new 'Tip' column
+        # (bottom node) was inserted after it. A v24 or older file carries
+        # only 'Fixity', which is read as the head, and no Tip at all, which
+        # reads as 'free' -- exactly the behavior it had before the column
+        # existed.
+        _head_col = 'head' if 'head' in piles_df.columns else 'fixity'
         for i, row in piles_df.iterrows():
             # Stop reading when column x1 is empty
             if pd.isna(row.get('x1')):
@@ -2443,10 +2486,15 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 area = float(row['area']) if pd.notna(row.get('area')) else None
                 V_cap = float(row['vcap']) if pd.notna(row.get('vcap')) else None
                 M_cap = float(row['mcap']) if pd.notna(row.get('mcap')) else None
-                fixity_raw = str(row['fixity']).strip().lower() if pd.notna(row.get('fixity')) else 'free'
-                if fixity_raw not in ('free', 'fixed'):
-                    raise ValueError(f"Fixity must be 'free' or 'fixed', got '{fixity_raw}'")
-                fixity = fixity_raw
+                head_fixity = (str(row[_head_col]).strip().lower()
+                               if pd.notna(row.get(_head_col)) else 'free')
+                if head_fixity not in ('free', 'fixed'):
+                    raise ValueError(f"{_head_col.capitalize()} must be 'free' or "
+                                     f"'fixed', got '{head_fixity}'")
+                tip_fixity = (str(row['tip']).strip().lower()
+                              if pd.notna(row.get('tip')) else 'free')
+                if tip_fixity not in ('free', 'fixed'):
+                    raise ValueError(f"Tip must be 'free' or 'fixed', got '{tip_fixity}'")
                 # Force application (v12, LEM only): Active = allowable force, not
                 # divided by FS (default, pre-v12 behavior); Passive = ultimate
                 # capacity divided by FS.
@@ -2480,7 +2528,8 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                     "area": area,
                     "V_cap": V_cap,
                     "M_cap": M_cap,
-                    "fixity": fixity,
+                    "head_fixity": head_fixity,
+                    "tip_fixity": tip_fixity,
                     "appl": appl_raw,
                     "label": label,
                 })
@@ -2751,6 +2800,7 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
     globals_data["tension_srf"] = tension_srf_opt
     globals_data["element_type"] = element_type
     globals_data["target_size"] = target_size
+    globals_data["element_size_1d"] = element_size_1d
     globals_data["ssrm_f_min"] = ssrm_f_min
     globals_data["ssrm_f_max"] = ssrm_f_max
     # v21 side boundary condition (None = unspecified -> the engine default, rollers).
@@ -3095,6 +3145,10 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     # the writer copied `template`, so the main-sheet globals go at the positions that
     # template uses, and tseep is written only if the template actually has the sheet.
     _dest_version, _dest_sheets = _read_template_info(filepath)
+    # v25 inserted '1D element size' at main!D20 and pushed the run options below it
+    # down one row; the same offset the loader uses, applied to the DESTINATION's
+    # layout so an archived template is still written at its own positions.
+    _dshift = 1 if _dest_version >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION else 0
 
     # === main === (version-gated positional map; see load_slope_data)
     if _dest_version >= 18:
@@ -3129,16 +3183,25 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             main_u['D18'] = str(slope_data['element_type']) if slope_data.get('element_type') else None
             main_u['D19'] = (_f(slope_data['target_size'])
                              if slope_data.get('target_size') is not None else None)
-            main_u['D20'] = (_f(slope_data['ssrm_f_min'])
-                             if slope_data.get('ssrm_f_min') is not None else None)
-            main_u['D21'] = (_f(slope_data['ssrm_f_max'])
-                             if slope_data.get('ssrm_f_max') is not None else None)
+            if _dest_version >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
+                # v25 1D element size (D20). Written unconditionally like the rest
+                # of the block: the template ships the cell blank, and a model that
+                # declares no 1D size must save as blank rather than inherit one.
+                main_u['D20'] = (_f(slope_data['element_size_1d'])
+                                 if slope_data.get('element_size_1d') is not None
+                                 else None)
+            main_u[f'D{20 + _dshift}'] = (
+                _f(slope_data['ssrm_f_min'])
+                if slope_data.get('ssrm_f_min') is not None else None)
+            main_u[f'D{21 + _dshift}'] = (
+                _f(slope_data['ssrm_f_max'])
+                if slope_data.get('ssrm_f_max') is not None else None)
         if _dest_version >= 21:
             # v21 side BC (D22). Written unconditionally for the same leak reason as
             # the run options above: the blank template ships D22 pre-filled
             # 'rollers', and a model that declares nothing must not inherit it.
             _sbc = slope_data.get('side_bc')
-            main_u['D22'] = str(_sbc).lower() if _sbc else None
+            main_u[f'D{22 + _dshift}'] = str(_sbc).lower() if _sbc else None
         if _dest_version >= 22:
             # v22 water loads (D23). Written EXPLICITLY, never blank, and this one
             # matters more than the leak cases above: the template ships D23
@@ -3154,9 +3217,9 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 # and the answer decides whether the reservoir is counted once.
                 raise ValueError(
                     f"Cannot save this model: its water-load mode is {_wl!r}, which "
-                    f"is not a value cell D23 of the 'main' sheet can hold. Expected "
-                    f"one of: {', '.join(WATER_LOAD_OPTIONS)}.")
-            main_u['D23'] = _wl
+                    f"is not a value cell D{23 + _dshift} of the 'main' sheet can "
+                    f"hold. Expected one of: {', '.join(WATER_LOAD_OPTIONS)}.")
+            main_u[f'D{23 + _dshift}'] = _wl
             # v22 amendment: the surface family (D24). Written unconditionally, so a
             # model that states nothing writes a blank cell -- the normal state, and
             # the template ships blank, so there is nothing here to leak. A model that
@@ -3170,11 +3233,12 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 if _sf_key not in SURFACE_FAMILY_CELL:
                     raise ValueError(
                         f"Cannot save this model: its surface family is {_sf!r}, which "
-                        f"is not a value cell D24 of the 'main' sheet can hold. Expected "
-                        f"one of: {', '.join(SURFACE_FAMILY_OPTIONS)}.")
-                main_u['D24'] = SURFACE_FAMILY_CELL[_sf_key]
+                        f"is not a value cell D{24 + _dshift} of the 'main' sheet "
+                        f"can hold. Expected one of: "
+                        f"{', '.join(SURFACE_FAMILY_OPTIONS)}.")
+                main_u[f'D{24 + _dshift}'] = SURFACE_FAMILY_CELL[_sf_key]
             else:
-                main_u['D24'] = None
+                main_u[f'D{24 + _dshift}'] = None
         updates['main'] = main_u
     else:
         updates['main'] = {
@@ -3509,7 +3573,8 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
 
     # === piles ===  (header row 2, data rows 3+. The piles layout changed at
     # v23 — the qp force-angle column was dropped, shifting everything after H
-    # one column left — and this writer also fills ARCHIVED older templates
+    # one column left — and again at v25, where Fixity became Head and a Tip
+    # column was inserted after it; this writer also fills ARCHIVED older templates
     # (the legacy round-trip fixtures), so each field's column is read from the
     # target template's own header row rather than hardcoded. A header the
     # target does not carry is skipped.)
@@ -3534,16 +3599,23 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 val = p.get(key)
                 if col is not None and val is not None:
                     piles_u[cell_ref(row, col)] = _f(val)
-            # Appl is written explicitly both ways (like Fixity below): a
+            # Appl is written explicitly both ways (like Head/Tip below): a
             # blank cell still LOADS as active, but a default a reader cannot
             # see in the sheet is a trap, so saved files spell the choice out.
             if 'appl' in _pcol:
                 piles_u[cell_ref(row, _pcol['appl'])] = \
                     'Passive' if str(p.get('appl', 'active')) == 'passive' \
                     else 'Active'
-            if 'fixity' in _pcol:
-                piles_u[cell_ref(row, _pcol['fixity'])] = \
-                    str(p.get('fixity', 'free'))
+            # Head fixity is 'Head' from v25 on and 'Fixity' before it; Tip is
+            # v25-only. Each is written only where the target sheet carries the
+            # column, so a v24 file round-trips through its own layout.
+            _head = str(p.get('head_fixity', p.get('fixity', 'free')) or 'free')
+            for hdr in ('head', 'fixity'):
+                if hdr in _pcol:
+                    piles_u[cell_ref(row, _pcol[hdr])] = _head
+            if 'tip' in _pcol:
+                piles_u[cell_ref(row, _pcol['tip'])] = \
+                    str(p.get('tip_fixity', 'free') or 'free')
     if piles_u:
         updates['piles'] = piles_u
 

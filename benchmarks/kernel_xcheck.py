@@ -99,6 +99,7 @@ def _build(file_rel, element_type, target_size):
     polys = get_material_polygons(sd, reinf_lines=lines)
     mesh = build_mesh_from_polygons(polys, target_size=target_size,
                                     element_type=element_type, lines=lines,
+                                    element_size_1d=sd.get('element_size_1d'),
                                     point_constraints=extract_point_constraints(sd))
     return fem.build_fem_data(sd, mesh)
 

@@ -47,7 +47,7 @@ was seen in practice:
         were pinned at the global target and a surface cannot be finer than the
         boundary nodes it must honour.
       * A REINFORCEMENT LINE likewise: 1.4-2.5x its request, from a transfinite node
-        count derived from target_size_1d on every segment, on both families.
+        count derived from element_size_1d on every segment, on both families.
       * A CRACK TIP is a slit, not a sharp corner. The detector fired on the bottom
         corners of ordinary rectangular domains and refined them at target/6.
 
@@ -590,7 +590,7 @@ def check_feature_delivery(build, failures):
                     f"feature/line {et}: the line at "
                     f"{tuple(round(c, 2) for c in mid)} is meshed at {got:.2f}x the "
                     f"size the refinement asked for ({want:.4g}), outside [{lo}, {hi}]. "
-                    f"target_size_1d pinning every segment with setTransfiniteCurve is "
+                    f"element_size_1d pinning every segment with setTransfiniteCurve is "
                     f"how this reached 2.47x")
 
 

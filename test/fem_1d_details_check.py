@@ -850,16 +850,71 @@ def test_field_state_export():
 
 
 # --------------------------------------------------------------------------
-# G. the failure band, and the labels around it
+# G. the shear band's mark, and what names it
 # --------------------------------------------------------------------------
 
-def _label_boxes(ax, text):
-    """The drawn box of every annotation on ``ax`` whose text starts with
-    ``text``, in display pixels, with the panel's own frame."""
-    renderer = ax.figure.canvas.get_renderer()
-    boxes = [t.get_window_extent(renderer) for t in ax.texts
-             if str(t.get_text()).strip().startswith(text)]
-    return boxes, ax.get_window_extent(renderer)
+def _legend_labels(fig):
+    """Every entry in every legend the drawn figure carries."""
+    return [t.get_text() for ax in fig.axes if ax.get_legend() is not None
+            for t in ax.get_legend().get_texts()]
+
+
+def _figure_text(fig):
+    """Every annotation standing over a panel of the drawn figure — what the
+    legend entries are NOT."""
+    return " ".join(t.get_text() for ax in fig.axes for t in ax.texts)
+
+
+def _peak_runs(fig):
+    """The x-ranges of the thickened runs the figure draws along the stretch a
+    line stands at its greatest utilization over, read off the artists."""
+    runs = []
+    for ax in fig.axes:
+        for line in ax.lines:
+            if line.get_gid() == "DETAIL_PEAK_SPAN":
+                xs = [float(v) for v in line.get_xdata()]
+                if xs:
+                    runs.append((min(xs), max(xs)))
+    return sorted(runs)
+
+
+def _band_marks(ax):
+    """``(spans, rules)`` — the shaded stretches drawn in the band's colour on
+    one panel, and any line drawn in it, read off the artists rather than off
+    the profile that produced them.
+
+    The mark is a shaded stretch and only that. ``rules`` is kept so a figure
+    that goes back to ruling a crossing — which is what a span measured center
+    to center collapsed to on a single element — is caught rather than passed
+    over."""
+    from matplotlib.colors import to_rgb
+    from xslope.plot_fem_details import C_BAND
+
+    spans = [p for p in ax.patches
+             if p.get_alpha() is not None and 0.0 < p.get_alpha() < 0.5
+             and to_rgb(p.get_facecolor()[:3]) == to_rgb(C_BAND)]
+    # The band's colour is its own: nothing else on a panel is drawn in it.
+    rules = [l for l in ax.lines if to_rgb(l.get_color()) == to_rgb(C_BAND)]
+    return spans, rules
+
+
+def _span_extent(ax, axis="x"):
+    """The data range the shaded band covers on one panel, or None.
+
+    ``axvspan`` and ``axhspan`` each draw a rectangle whose span is in data
+    coordinates along one axis and in axes coordinates along the other, so only
+    the axis asked for is read.
+    """
+    spans = _band_marks(ax)[0]
+    if not spans:
+        return None
+    edges = []
+    for span in spans:
+        if axis == "x":
+            edges += [span.get_x(), span.get_x() + span.get_width()]
+        else:
+            edges += [span.get_y(), span.get_y() + span.get_height()]
+    return float(min(edges)), float(max(edges))
 
 
 def _drawn(profile, figsize=(9.5, 6.0)):
@@ -876,20 +931,27 @@ def _drawn(profile, figsize=(9.5, 6.0)):
 
 
 def test_the_band_needs_the_mechanism():
-    """A member gets a failure band only where the mechanism reaches it.
+    """A member is marked for the shear band only where the mechanism reaches it.
 
     The band's edges are the positions along a member where the mechanism field
     falls to BAND_FRACTION of its peak ALONG THAT MEMBER. Normalized to the
     member alone, every member has a peak and so every member has a band: on the
-    reinforcement sample the lines the mechanism misses were given one-sample
-    bands on their last element, drawn as a dashed rule hard against the end of
-    the frame with a label running off the panel.
+    reinforcement sample the lines the mechanism misses were given one-element
+    bands hard against the end of the frame.
 
     The member's own peak is now measured against the mechanism's peak over the
     whole section, on the same fraction. Pinned on all six lines of the
     reinforcement sample, which has both cases, and on the drawn figures: a band
-    that is one sample wide still draws inside the frame, and the label that
-    names it is inside the panel in both cases.
+    on the last element still draws inside the frame, the figure that draws a
+    mark names it in the legend, and the figure that draws none names none.
+
+    Where the band SITS is pinned here too, because it is a reading and not a
+    decoration. It is measured on a dense walk of the line (:func:`_band_walk`),
+    so its ends are where the field crosses BAND_FRACTION of the line's peak and
+    not the nearest bar element's center — which is what put a crossing inside a
+    two-foot element at that element's center with no width at all. Norm, on the
+    regenerated Line 5: "the shear band crossing is a single thin line? shouldn't
+    it be a band?" Then: "why don't we just show the band exactly where it is?"
     """
     fails = []
     from xslope import fem_details as fd
@@ -915,7 +977,7 @@ def test_the_band_needs_the_mechanism():
         if has_band != crossed:
             fails.append(
                 f"line {line_id} reaches {own / peak:.0%} of the mechanism's "
-                f"peak and {'has' if has_band else 'has no'} failure band")
+                f"peak and {'is' if has_band else 'is not'} marked for the band")
         (banded if has_band else bare).append((line_id, prof))
 
     if not banded:
@@ -926,8 +988,10 @@ def test_the_band_needs_the_mechanism():
     if fails:
         return fails
 
-    # The drawn figures: a band inside the frame, and its label inside the
-    # panel — including the narrowest band the sample has.
+    # The drawn figures: a shaded stretch inside the frame, the legend naming
+    # it, and no rule anywhere — including the narrowest band the sample has.
+    from xslope.plot_fem_details import BAND_LABEL
+
     narrowest = min(banded, key=lambda b: b[1]["band_hi"] - b[1]["band_lo"])
     for line_id, prof in (banded[0], narrowest):
         fig = _drawn(prof)
@@ -937,54 +1001,148 @@ def test_the_band_needs_the_mechanism():
             fails.append(f"line {line_id}: the band ({prof['band_lo']}, "
                          f"{prof['band_hi']}) falls outside the drawn frame "
                          f"({lo}, {hi})")
-        boxes, frame = _label_boxes(ax, "failure band")
-        if not boxes:
-            fails.append(f"line {line_id}: the band is drawn and not named")
-        for box in boxes:
-            if not (frame.x0 <= box.x0 and box.x1 <= frame.x1
-                    and frame.y0 <= box.y0 and box.y1 <= frame.y1):
-                fails.append(f"line {line_id}: the band's label is cut by the "
-                             f"panel edge (label {box.x0:.0f}..{box.x1:.0f}, "
-                             f"panel {frame.x0:.0f}..{frame.x1:.0f})")
+        spans, rules = _band_marks(ax)
+        if not spans:
+            fails.append(f"line {line_id}: the band was measured and the panel "
+                         f"shades nothing")
+        if rules:
+            fails.append(f"line {line_id}: the band is shaded and the panel "
+                         f"also draws {len(rules)} rule(s) in its colour")
+        drawn_span = _span_extent(ax)
+        if drawn_span is not None and not (
+                abs(drawn_span[0] - prof["band_lo"]) < 1e-6
+                and abs(drawn_span[1] - prof["band_hi"]) < 1e-6):
+            fails.append(f"line {line_id}: the panel shades {drawn_span} for a "
+                         f"band measured at ({prof['band_lo']}, "
+                         f"{prof['band_hi']})")
+        # The ends are the field's own: the walk's last sample over the
+        # threshold at each end, and the first one under it just outside.
+        walk = np.asarray(prof["mechanism_s"], dtype=float)
+        trace = np.asarray(prof["mechanism"], dtype=float)
+        thresh = fd.BAND_FRACTION * float(np.nanmax(trace))
+        over = trace >= thresh
+        inside = (walk >= prof["band_lo"] - 1e-9) & (walk <= prof["band_hi"] + 1e-9)
+        if not np.all(over[inside]):
+            fails.append(f"line {line_id}: the band covers "
+                         f"{int((~over[inside]).sum())} sample(s) below "
+                         f"{thresh:.4g}")
+        step = float(walk[1] - walk[0])
+        outside = np.where(over & ~inside)[0]
+        near = [i for i in outside
+                if abs(walk[i] - prof["band_lo"]) <= step + 1e-9
+                or abs(walk[i] - prof["band_hi"]) <= step + 1e-9]
+        if near:
+            fails.append(f"line {line_id}: the band stops at "
+                         f"({prof['band_lo']:.4f}, {prof['band_hi']:.4f}) with "
+                         f"the field still over the threshold at "
+                         f"{[round(float(walk[i]), 3) for i in near]}")
+        if prof["band_hi"] - prof["band_lo"] < step - 1e-9:
+            fails.append(f"line {line_id}: the band is "
+                         f"{prof['band_hi'] - prof['band_lo']:.4f} wide, "
+                         f"narrower than the {step:.4f} step it was read on")
+        if BAND_LABEL not in _legend_labels(fig):
+            fails.append(f"line {line_id}: the band is drawn and the legend "
+                         f"does not name it: {_legend_labels(fig)}")
 
-    # And the narrowest band there can be, at the place it was worst: one
-    # sample wide, on the last element of the line. That is the band the sample
-    # used to fabricate, and the label naming it ran off the right of the panel.
+    # And the narrowest band there can be, at the place it was worst: one step
+    # of the walk, at the far end of the line. That is the band the sample used
+    # to fabricate, and it is a stretch against the frame's edge and not a rule
+    # on it.
     line_id, prof = banded[0]
-    end = float(np.asarray(prof["s"], dtype=float)[-1])
-    ax = _drawn(dict(prof, band_lo=end, band_hi=end, band_peak=end)).axes[0]
-    boxes, frame = _label_boxes(ax, "failure band")
-    if not boxes:
-        fails.append(f"line {line_id}: a band on the last element is not named")
-    for box in boxes:
-        if not (frame.x0 <= box.x0 and box.x1 <= frame.x1
-                and frame.y0 <= box.y0 and box.y1 <= frame.y1):
-            fails.append(f"line {line_id}: a band on the last element puts its "
-                         f"label outside the panel ({box.x0:.0f}..{box.x1:.0f} "
-                         f"against {frame.x0:.0f}..{frame.x1:.0f})")
+    walk = np.asarray(prof["mechanism_s"], dtype=float)
+    step = float(walk[1] - walk[0])
+    fig = _drawn(dict(prof, band_lo=walk[-1] - step, band_hi=walk[-1],
+                      band_peak=walk[-1]))
+    ax = fig.axes[0]
+    lo, hi = ax.get_xlim()
+    drawn_span = _span_extent(ax)
+    if drawn_span is None:
+        fails.append(f"line {line_id}: a band at the end of the line shades "
+                     f"nothing")
+    else:
+        if not (drawn_span[1] - drawn_span[0]) > 0:
+            fails.append(f"line {line_id}: a band at the end of the line is "
+                         f"drawn with no width: {drawn_span}")
+        if not (lo <= drawn_span[0] and drawn_span[1] <= hi + 1e-9):
+            fails.append(f"line {line_id}: a band at the end of the line shades "
+                         f"{drawn_span} outside the frame ({lo}, {hi})")
+    if _band_marks(ax)[1]:
+        fails.append(f"line {line_id}: a band at the end of the line is ruled")
+    if BAND_LABEL not in _legend_labels(fig):
+        fails.append(f"line {line_id}: a band at the end of the line is not "
+                     f"named")
 
-    # A line the mechanism misses draws no band and names none.
+    # A line the mechanism misses draws no mark and names none.
     line_id, prof = bare[0]
-    ax = _drawn(prof).axes[0]
-    if _label_boxes(ax, "failure band")[0]:
+    fig = _drawn(prof)
+    spans, rules = _band_marks(fig.axes[0])
+    if spans or rules:
+        fails.append(f"line {line_id}: no band was measured and the panel draws "
+                     f"{len(spans)} span(s) and {len(rules)} rule(s)")
+    if BAND_LABEL in _legend_labels(fig):
         fails.append(f"line {line_id}: no band was measured and one is named")
+
+    # A crossing sharp enough to light one step of the walk and nothing either
+    # side of it: the field was read there and nowhere else, which is a crossing
+    # one step wide and not a crossing of no width. The sample's own mesh is far
+    # coarser than the walk, so this case is put to the measurement directly.
+    walk = np.linspace(0.0, 10.0, 201)
+    spike = np.zeros(len(walk))
+    spike[100] = 1.0
+    lo, hi, at = fd._band_span(walk, spike, None, step=float(walk[1] - walk[0]))
+    if abs((hi - lo) - float(walk[1] - walk[0])) > 1e-9:
+        fails.append(f"a crossing lighting one step of the walk is reported "
+                     f"{hi - lo:.4f} wide, not {walk[1] - walk[0]:.4f}")
+    if not lo <= at <= hi:
+        fails.append(f"the peak {at} of a one-step crossing is outside its own "
+                     f"span ({lo}, {hi})")
+    # Mutation: the step withheld — which is the zero-width crossing itself.
+    if fd._band_span(walk, spike, None)[1] != fd._band_span(walk, spike, None)[0]:
+        fails.append("without the step a one-sample crossing is already wide; "
+                     "the widening is not what gives it its width")
+
+    def _reread():
+        """Every line's band, read again through the shipping code."""
+        return {line_id: fd.reinforcement_profile(
+            fem_data, solution, line_id, slope_data, field_state="failure",
+            failure_solution=failure) for line_id in range(1, 7)}
 
     # Mutation: the gate removed — the member's own peak judged against itself,
     # which is what fabricated the bands this check exists to refuse.
     real = fd._band_span
-    fd._band_span = lambda positions, mech, global_peak=None: real(positions, mech)
+    fd._band_span = (lambda positions, mech, global_peak=None, step=None:
+                     real(positions, mech, step=step))
     try:
-        still = 0
-        for line_id, _prof in bare:
-            prof = fd.reinforcement_profile(fem_data, solution, line_id,
-                                            slope_data, field_state="failure",
-                                            failure_solution=failure)
-            still += prof["band_lo"] is not None
+        again = _reread()
+        still = sum(again[line_id]["band_lo"] is not None
+                    for line_id, _prof in bare)
         if still != len(bare):
             fails.append(f"without the gate only {still} of {len(bare)} unbanded "
                          f"lines gain a band; the gate is not what removed them")
     finally:
         fd._band_span = real
+
+    # Mutation: the walk coarsened to the bar elements — the band read at
+    # element centers, which is what reported a crossing inside one element as
+    # that element's center with no width at all. Every banded line has to move.
+    real_walk = fd._band_walk
+    fd._band_walk = lambda p1, p2, length: (np.zeros(0), np.zeros((0, 2)))
+    try:
+        again = _reread()
+        moved = 0
+        for line_id, prof in banded:
+            coarse = again[line_id]
+            if coarse["band_lo"] is None:
+                moved += 1
+                continue
+            moved += (abs(coarse["band_lo"] - prof["band_lo"]) > 1e-6
+                      or abs(coarse["band_hi"] - prof["band_hi"]) > 1e-6)
+        if moved != len(banded):
+            fails.append(f"read at the bar elements instead of along the line, "
+                         f"only {moved} of {len(banded)} banded lines report a "
+                         f"different band; the walk is not what places it")
+    finally:
+        fd._band_walk = real_walk
     return fails
 
 
@@ -1059,21 +1217,26 @@ def test_the_reaction_panel_says_where_its_limit_is():
     return fails
 
 
-def test_the_band_is_named_for_the_field_it_was_read_from():
-    """The band across a member is called what it is on the run that drew it.
+def test_the_band_marker_is_named_in_the_legend():
+    """The mark a member carries for the shear band is named in the legend.
 
-    The band is read from the at-failure snapshot whenever there is one, so on a
-    strength reduction run it marks the mechanism and "failure band" is what it
-    is. A run that converged under gravity captured no snapshot and reached no
-    failure; its band is where the computed shear strain concentrates in a
-    section that is standing, and calling that a failure band states a collapse
-    the analysis never found.
+    The band is a feature of the two-dimensional field; what a profile along one
+    member can show is where that band crosses the member, and that is what the
+    mark is called — "Shear band crossing" — whichever field it was read from.
+    A strength reduction run's band is the mechanism and a converged run's is
+    where the computed shear strain concentrates, and neither reading is stated
+    by calling the mark on a standing section a failure.
+
+    It is named in the legend and nowhere else. The name used to be written over
+    the top of the panel, where on a reinforcement figure it stood in the drawing
+    area the profile runs through and on a pile figure it sat in one of four
+    panels it belongs to no more than to the other three.
 
     Both members, both runs, off the drawn figures.
     """
     fails = []
     from xslope import fem_details as fd
-    from xslope.plot_fem_details import band_label
+    from xslope.plot_fem_details import BAND_LABEL, band_label
 
     for path, kind, read in ((REINF_XLSX, "reinforcement",
                               fd.reinforcement_profile),
@@ -1082,9 +1245,7 @@ def test_the_band_is_named_for_the_field_it_was_read_from():
         failure = _failure_field(path)
         ids = [m["index"] for m in fd.list_lines(fem_data, solution, slope_data)
                if m["kind"] == kind]
-        drawn = {}
-        for state, snapshot, want in (("failure", failure, "failure band"),
-                                      ("converged", None, "shear strain band")):
+        for state, snapshot in (("failure", failure), ("converged", None)):
             banded = None
             for index in ids:
                 prof = read(fem_data, solution, index, slope_data,
@@ -1094,49 +1255,54 @@ def test_the_band_is_named_for_the_field_it_was_read_from():
                                  f" a snapshot reads its band from "
                                  f"{fd.band_state(solution, snapshot)!r}")
                     break
-                if band_label(prof) != want:
+                if band_label(prof) != BAND_LABEL:
                     fails.append(f"{kind} {prof['label']}: the {state} run's "
-                                 f"band is called {band_label(prof)!r}")
+                                 f"mark is called {band_label(prof)!r}")
                 has_band = (prof.get("band_depth") is not None
                             if kind == "pile" else prof.get("band_lo") is not None)
                 if has_band and banded is None:
                     banded = prof
-            drawn[state] = banded
             if banded is None:
-                fails.append(f"{kind}: the {state} run bands no member, so the "
+                fails.append(f"{kind}: the {state} run marks no member, so the "
                              f"name on the figure is untested")
                 continue
-            said = " ".join(t.get_text()
-                            for ax in _drawn(banded).axes for t in ax.texts)
-            if want not in said:
+            fig = _drawn(banded, figsize=((11.0, 6.0) if kind == "pile"
+                                          else (9.5, 6.0)))
+            if BAND_LABEL not in _legend_labels(fig):
                 fails.append(f"{kind} {banded['label']}: the {state} run's "
-                             f"figure does not say {want!r}: {said!r}")
-            other = ("shear strain band" if want == "failure band"
-                     else "failure band")
-            if other in said:
+                             f"figure does not name the mark: "
+                             f"{_legend_labels(fig)}")
+            said = _figure_text(fig)
+            if BAND_LABEL in said or "band" in said:
                 fails.append(f"{kind} {banded['label']}: the {state} run's "
-                             f"figure says {other!r}")
+                             f"figure names the mark over a panel: {said!r}")
+            for gone in ("failure band", "shear strain band"):
+                if gone in said or gone in _legend_labels(fig):
+                    fails.append(f"{kind} {banded['label']}: the figure still "
+                                 f"says {gone!r}")
 
-    # Mutation: the name fixed at "failure band" whatever the run, which is what
-    # the figures said before. The converged run has to catch it.
+    # The measurement is of the drawn legend and not of the constant. Two
+    # mutations: the name pinned back to what the figures used to say, and the
+    # mark drawn with no name at all.
     import xslope.plot_fem_details as ppd
+    slope_data, fem_data, solution = _solved(REINF_XLSX)
+    prof = next((p for p in (fd.reinforcement_profile(
+        fem_data, solution, i, slope_data) for i in range(1, 7))
+        if p.get("band_lo") is not None), None)
+    if prof is None:
+        fails.append("the gravity run marks no line, so the mutations have "
+                     "nothing to act on")
+        return fails
     real = ppd.band_label
-    ppd.band_label = lambda profile: "failure band"
-    try:
-        slope_data, fem_data, solution = _solved(REINF_XLSX)
-        prof = next((p for p in (fd.reinforcement_profile(
-            fem_data, solution, i, slope_data) for i in range(1, 7))
-            if p.get("band_lo") is not None), None)
-        if prof is None:
-            fails.append("the gravity run bands no line, so the mutation has "
-                         "nothing to act on")
-        else:
-            said = " ".join(t.get_text() for t in _drawn(prof).axes[0].texts)
-            if "shear strain band" in said:
-                fails.append("the name was pinned to 'failure band' and the "
-                             "figure still said 'shear strain band'")
-    finally:
-        ppd.band_label = real
+    for mutation, name in ((lambda profile: "failure band", "the old name"),
+                           (lambda profile: "", "no name")):
+        ppd.band_label = mutation
+        try:
+            if BAND_LABEL in _legend_labels(_drawn(prof)):
+                fails.append(f"the mark was drawn with {name} and the legend "
+                             f"still read {BAND_LABEL!r}")
+        finally:
+            ppd.band_label = real
     return fails
 
 
@@ -1147,8 +1313,8 @@ def _broken_tie_set(fd, fem_data, bundle, slope_data, tied_lines, fails):
     copies the field it was read from, and drops the force in one bar element
     inside that stretch to half the capacity it was holding. The profile is then
     re-read through :func:`xslope.fem_details.reinforcement_profile`, so the tie
-    set, the span, the gap positions and the figure's label are all computed by
-    the shipping code — only the force it reads is arranged.
+    set, the span, the gap positions and the runs the figure thickens are all
+    computed by the shipping code — only the force it reads is arranged.
 
     Whether the shipped run produces such a hole of its own depends on the
     mechanism the model develops, which is not what this is testing.
@@ -1194,8 +1360,9 @@ def test_the_peak_utilization_is_tie_aware():
     A tie set can have a HOLE in it — a sample between two at-capacity ones that
     stands below them — and the two ends alone describe an unbroken run instead.
     The samples inside the span that do not stand with the rest are reported as
-    ``peak_gap_s``, and the figure's label names them. That case is put to the
-    same code path on a field with one interior bar force knocked down
+    ``peak_gap_s``, and the figure draws the runs it really is, so the break in
+    the thickened curve is where the line comes off capacity. That case is put
+    to the same code path on a field with one interior bar force knocked down
     (:func:`_broken_tie_set`), since whether the shipped run develops a hole of
     its own is a property of the mechanism rather than of the reporting.
     """
@@ -1282,25 +1449,44 @@ def test_the_peak_utilization_is_tie_aware():
     if fails:
         return fails
 
-    # The figure's label says what its thickened runs draw: a span with a hole
-    # in it excepts the hole by position, and an unbroken one excepts nothing.
+    # The hole is READ OFF THE DRAWING: the thickened curve breaks where the
+    # line comes off capacity, so a span with a hole in it is drawn as the runs
+    # it really is and an unbroken one as one run. Nothing says so in words —
+    # the figure carries no label over its panels at all.
     for state, line_id, prof, gaps in (broken_lines[0],):
-        said = " ".join(t.get_text() for t in _drawn(prof).axes[0].texts)
-        if "except" not in said:
-            fails.append(f"{state} line {line_id}: the label reads {said!r} and "
-                         f"the line stands below capacity at {gaps} inside its "
-                         f"span")
+        fig = _drawn(prof)
+        runs = _peak_runs(fig)
         for gap in gaps:
-            if f"{gap:,.2f}" not in said:
-                fails.append(f"{state} line {line_id}: {gap:,.2f} is excepted "
-                             f"from the span and the label reads {said!r}")
+            spanning = [r for r in runs if r[0] < gap < r[1]]
+            if spanning:
+                fails.append(f"{state} line {line_id}: a thickened run "
+                             f"{spanning} spans {gap:,.2f}, where the line "
+                             f"stands below capacity")
+        if len(runs) < len(gaps) + 1:
+            fails.append(f"{state} line {line_id}: {len(runs)} thickened run(s) "
+                         f"for a stretch broken at {len(gaps)} position(s)")
+        if _figure_text(fig):
+            fails.append(f"{state} line {line_id}: the panel carries a label "
+                         f"over it: {_figure_text(fig)!r}")
     unbroken = next((t for t in tied_lines
                      if not len(t[2].get("peak_gap_s", []))), None)
     if unbroken is not None:
-        said = " ".join(t.get_text() for t in _drawn(unbroken[2]).axes[0].texts)
-        if "except" in said:
-            fails.append(f"{unbroken[0]} line {unbroken[1]}: the span is "
-                         f"unbroken and the label reads {said!r}")
+        runs = _peak_runs(_drawn(unbroken[2]))
+        if len(runs) > 1:
+            fails.append(f"{unbroken[0]} line {unbroken[1]}: the stretch is "
+                         f"unbroken and the figure draws {len(runs)} separate "
+                         f"runs: {runs}")
+
+    # Mutation: the contiguous claim restored — the highlight drawn from the two
+    # ends of the span alone, which is a chord across the dip. The break has to
+    # be what the measurement is reading.
+    state, line_id, prof, gaps = broken_lines[0]
+    tied = np.asarray(prof.get("peak_indices", []), dtype=int)
+    chord = dict(prof, peak_indices=np.arange(int(tied.min()), int(tied.max()) + 1))
+    runs = _peak_runs(_drawn(chord))
+    if not any(r[0] < gaps[0] < r[1] for r in runs):
+        fails.append(f"a highlight drawn from the two ends alone still broke at "
+                     f"{gaps[0]:,.2f}: {runs} — the measurement cannot fail")
 
     # The figure: as many rings as there are samples at the maximum.
     for state, line_id, prof in (tied_lines[0], single_lines[0]):
@@ -1420,11 +1606,11 @@ def test_the_inset_follows_the_selection():
 
 
 CHECKS = [
-    ("the failure band needs the mechanism", test_the_band_needs_the_mechanism),
+    ("the band's mark needs the mechanism", test_the_band_needs_the_mechanism),
     ("the reaction panel says where its limit is",
      test_the_reaction_panel_says_where_its_limit_is),
-    ("the band is named for the field it was read from",
-     test_the_band_is_named_for_the_field_it_was_read_from),
+    ("the band's mark is named in the legend",
+     test_the_band_marker_is_named_in_the_legend),
     ("the inset follows the selection", test_the_inset_follows_the_selection),
     ("the peak utilization is tie-aware",
      test_the_peak_utilization_is_tie_aware),

@@ -20,14 +20,18 @@ along the pile, so neither takes the equal-aspect framing the geometry figures
 use. Every series comes from :mod:`xslope.fem_details`, which is also what the
 dialog's CSV export writes — the picture and the numbers are the same data.
 
-Legends appear only where a panel genuinely carries more than one series whose
-identity is not already in the axis label: the reinforcement force panel (the
-mobilized force against its capacity envelope) and the pile soil-reaction panel
-(mobilized against the Ito & Matsui limit). The others are single-series and are
-labelled by their axis — and so is the soil-reaction panel of a pile well inside
-its working range, where the limiting resistance sits off the panel's scale
-entirely and only the mobilized profile is drawn. There the note that states the
-peak mobilization says where the envelope it is measured against has gone.
+Legends appear only where a panel carries a mark whose identity is not already
+in the axis label, and where they appear they name every such mark: the
+reinforcement force panel names the profile, the capacity it is drawn against,
+the states its elements have reached and the stretch it stands at capacity
+along, so nothing on that panel has to be named by a label standing over the
+curves. The pile panels are single-series and labeled by their axis, except the
+soil-reaction panel where the Ito & Matsui limit is drawn beside the mobilized
+reaction — and where a pile well inside its working range puts that limit off
+the panel's scale entirely, only the mobilized profile is drawn and the note
+that states the peak mobilization says where the envelope it is measured
+against has gone. The mark for the shear band the mechanism puts across a member
+is named in a legend on both figures.
 """
 
 import numpy as np
@@ -35,7 +39,7 @@ import numpy as np
 # Colours, kept in one place so the two figures read as one family.
 C_FORCE = "#1f5fa9"        # mobilized quantity
 C_ENVELOPE = "#333333"     # declared capacity
-C_BAND = "#d95f0e"         # failure / shear strain band (see band_label)
+C_BAND = "#d95f0e"         # where the shear band crosses a member
 C_PEAK = "#c0392b"         # peak / maximum marker
 C_SOFT = "#8e44ad"         # softened to residual
 C_RUPT = "#000000"        # ruptured
@@ -125,10 +129,11 @@ def _annotate_inside(ax, xy, text, color, fontsize=8.5, fontweight="bold",
     coordinate labels (:func:`xslope.plot.plot_coordinate_labels`), and the same
     box/segment test underneath it.
 
-    Which is why the failure band's own label is placed through here too. Set
-    against the band's left edge, it ran off the right of the panel whenever the
-    band sat on the last element of the line — the label a reader needs is the
-    one that is fully on the page, and where that is depends on the panel.
+    Which is why every label a member figure still carries is placed through
+    here: a peak sitting anywhere in a panel, and a member name anywhere on the
+    map. A label set against its point by a fixed offset ran off the panel
+    whenever the point sat near an edge — the label a reader needs is the one
+    that is fully on the page, and where that is depends on the panel.
     """
     import math
     from matplotlib.font_manager import FontProperties
@@ -203,18 +208,67 @@ def _annotate_inside(ax, xy, text, color, fontsize=8.5, fontweight="bold",
                 arrowprops=arrow, zorder=8)
 
 
-def band_label(profile):
-    """What the band drawn across a member is called on the figure.
+#: What the mark a member carries where the shear band crosses it is called, in
+#: the legend of both detail figures. The band itself is a feature of the
+#: two-dimensional field; what a profile along one member can show is where that
+#: band crosses the member, which is what the mark is and what it is named. One
+#: name serves both fields the band can be read from
+#: (:func:`xslope.fem_details.band_state`): a strength reduction run's band is
+#: the mechanism and a converged run's is where the computed shear strain
+#: concentrates, and neither reading is stated by calling the mark a failure.
+#: Which field the figure was drawn from is in its title.
+BAND_LABEL = "Shear band crossing"
 
-    A strength reduction run captured a mechanism and the band marks it. A run
-    that converged under gravity and reached no failure has no mechanism to
-    mark, and its band is where the computed shear strain concentrates — which
-    is worth drawing and is not a failure. The name follows the field the band
-    was read from (:func:`xslope.fem_details.band_state`), so the mark on the
-    page and the sentence that defines it in the report say one thing.
+
+def band_label(profile):
+    """What the mark drawn across a member is called on the figure.
+
+    :data:`BAND_LABEL`, whichever field the band was read from — see there. The
+    argument is kept so a caller naming the mark for one member asks the figure
+    what it says rather than assuming.
     """
-    return ("failure band" if (profile or {}).get("band_state") == "failure"
-            else "shear strain band")
+    return BAND_LABEL
+
+
+#: The alpha a shaded band is given IN THE LEGEND KEY. The band is drawn as a
+#: wash over a wide stretch of the panel, which is a different reading problem
+#: from a key twenty pixels across: the wash that is right behind a profile
+#: disappears at key size, so the key is drawn at the alpha that shows the
+#: colour and the panel keeps its own.
+BAND_KEY_ALPHA = 0.35
+
+
+def _band_handle():
+    """The legend key for the mark a member carries where the band crosses it:
+    the shaded stretch it is drawn as.
+
+    One key, because there is one mark. A crossing was ruled instead of shaded
+    wherever it fell on a single bar element, which is what a span sampled at
+    element centers collapses to — a crossing drawn as a point, on an element
+    two feet long. The span is read off a dense walk of the member now
+    (:func:`xslope.fem_details._band_walk`), so it is where the band crosses
+    rather than which element it crosses, and every crossing is shaded.
+    """
+    from matplotlib.patches import Patch
+
+    return Patch(facecolor=C_BAND, edgecolor="none", alpha=BAND_KEY_ALPHA)
+
+
+def _peak_label(profile):
+    """What the ringed samples and the run between them are called.
+
+    They mark where the member stands at its greatest utilization. Where that
+    utilization is capacity — the usual case, the force being capped by a flat
+    envelope — the mark says so; a member that never reaches capacity is marked
+    at the hardest-worked point it does reach, and calling that "at capacity"
+    would state a limit the member is nowhere near. The test is the utilization
+    as the title states it, so a title reading peak 100% and a key reading "At
+    capacity" are one reading and not two.
+    """
+    util = profile.get("peak_utilization")
+    at_capacity = (util is not None and np.isfinite(util)
+                   and round(float(util), 2) >= 1.0)
+    return "At capacity" if at_capacity else "Peak utilization"
 
 
 def _title(profile):
@@ -241,16 +295,25 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     Upper panel: mobilized axial force along the bar, over the dashed capacity
     envelope — the pullout ramp developing from each free end over its
     development length, the tensile plateau at Tmax in the middle, and the step
-    to the connection capacity at an anchored end. The band the mechanism field
-    puts on this bar is shaded and named by :func:`band_label`, and elements that
-    softened or ruptured are marked where they occur.
+    to the connection capacity at an anchored end. Every sample is one bar
+    element: the force is constant over an element, so each marker sits at that
+    element's midpoint and the profile between two markers is the reading
+    crossing from one element to the next. The stretch the shear band crosses is
+    shaded where the soil field puts it, which is measured along the line itself
+    and not at the bar elements' centers, and elements that softened or ruptured
+    are marked where they occur.
 
     The point of greatest utilization is ringed where it is a point, and where
     the line holds that utilization over a stretch — which is the usual case,
     the force being capped by a flat envelope — the whole stretch is drawn
-    instead, every sample on it ringed and the extent stated. A stretch with a
-    sample inside it that stands below the rest is drawn as the runs it really
-    is, and the extent excepts that sample by name.
+    instead, every sample on it ringed and the run of curve between them
+    thickened. A stretch with a sample inside it that stands below the rest is
+    drawn as the runs it really is, so the break in the thickened curve is where
+    the line comes off capacity.
+
+    Every mark is named in the legend and nothing is labeled over the curves:
+    the panel is wide and shallow, and a label placed on it stands over the
+    profile it is describing.
 
     Lower panel (``show_bond``): the bond transfer rate implied by the force
     gradient, dT/ds — the force the ground hands the bar per unit of its length.
@@ -275,54 +338,54 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
 
     s, T = profile["s"], profile["T"]
 
-    # Failure band first, so everything else draws over it.
+    # The band's mark first, so everything else draws over it. It is where the
+    # band crosses the line, read off a dense walk of it, so it is always a
+    # stretch — one step of that walk at the narrowest.
     lo, hi = profile.get("band_lo"), profile.get("band_hi")
-    if lo is not None and hi is not None:
-        if hi - lo < 1e-9:                 # a single element: a rule, not a band
-            for a in (ax, ax_b):
-                if a is not None:
-                    a.axvline(lo, color=C_BAND, linewidth=1.2, linestyle=(0, (4, 3)),
-                              zorder=1)
-        else:
-            for a in (ax, ax_b):
-                if a is not None:
-                    a.axvspan(lo, hi, color=C_BAND, alpha=0.13, zorder=0, linewidth=0)
+    banded = lo is not None and hi is not None
+    if banded:
+        for a in (ax, ax_b):
+            if a is not None:
+                a.axvspan(lo, hi, color=C_BAND, alpha=0.13, zorder=0, linewidth=0)
 
     # Capacity envelope.
     if profile.get("env_s") is not None:
-        ax.plot(profile["env_s"], profile["env_T"], linestyle="--", linewidth=1.4,
-                color=C_ENVELOPE, label="Capacity envelope", zorder=3,
-                gid="DETAIL_CAPACITY")
+        envelope, = ax.plot(profile["env_s"], profile["env_T"], linestyle="--",
+                            linewidth=1.4, color=C_ENVELOPE, zorder=3,
+                            gid="DETAIL_CAPACITY")
+        env_label = "Capacity envelope"
     else:
-        ax.step(s, profile["t_allow"], where="mid", linestyle="--", linewidth=1.4,
-                color=C_ENVELOPE, label="Element capacity", zorder=3,
-                gid="DETAIL_CAPACITY")
+        envelope, = ax.step(s, profile["t_allow"], where="mid", linestyle="--",
+                            linewidth=1.4, color=C_ENVELOPE, zorder=3,
+                            gid="DETAIL_CAPACITY")
+        env_label = "Element capacity"
 
     # Residual capacity, only where the line actually softens somewhere.
+    residual = None
     t_res = np.asarray(profile.get("t_res", []), dtype=float)
     if len(t_res) and np.any(np.isfinite(t_res) & (t_res > 0)):
-        ax.step(s, t_res, where="mid", linestyle=":", linewidth=1.1,
-                color=C_SOFT, label="Residual capacity", zorder=3)
+        residual, = ax.step(s, t_res, where="mid", linestyle=":", linewidth=1.1,
+                            color=C_SOFT, zorder=3)
 
     # Mobilized force.
-    ax.plot(s, T, "-o", color=C_FORCE, linewidth=1.8, markersize=3.5,
-            label="Mobilized force", zorder=5, gid="DETAIL_PROFILE")
+    mobilized, = ax.plot(s, T, "-o", color=C_FORCE, linewidth=1.8, markersize=3.5,
+                         zorder=5, gid="DETAIL_PROFILE")
 
+    softened = ruptured = None
     soft_s = profile.get("softened_s", [])
     if len(soft_s):
-        ax.plot(soft_s, np.interp(soft_s, s, T), "s", color=C_SOFT, markersize=6,
-                label="Softened", zorder=6)
+        softened, = ax.plot(soft_s, np.interp(soft_s, s, T), "s", color=C_SOFT,
+                            markersize=6, zorder=6)
     burst_s = profile.get("ruptured_s", [])
     if len(burst_s):
-        ax.plot(burst_s, np.zeros(len(burst_s)), "x", color=C_RUPT, markersize=8,
-                markeredgewidth=2, label="Ruptured", zorder=6)
+        ruptured, = ax.plot(burst_s, np.zeros(len(burst_s)), "x", color=C_RUPT,
+                            markersize=8, markeredgewidth=2, zorder=6)
 
     ax.set_ylabel(_axis_label("Axial force", u.get("force")), fontsize=9)
     ax.set_title(_title(profile), fontsize=11)
     ax.grid(True, **GRID)
     ax.set_xlim(0.0, profile.get("length") or (s[-1] if len(s) else 1.0))
     ax.set_ylim(bottom=0.0)
-    ax.legend(loc="best", fontsize=8, framealpha=0.85)
 
     # Where the line stands at its greatest utilization: one point, or the
     # stretch it holds that utilization over. A stretch is drawn as a stretch —
@@ -331,21 +394,49 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     # and marked it as the one place the reader should look at.
     span = profile.get("peak_span")
     tied = np.asarray(profile.get("peak_indices", []), dtype=int)
+    rings = thick = None
     if span is not None and len(tied):
         # Run by run: a sample between two tied ones that is NOT itself at the
         # maximum breaks the highlight, so what is thickened is the curve the
-        # line is actually at capacity along and never a chord across a dip.
+        # line is actually at capacity along and never a chord across a dip. The
+        # break IS the reading — a hole in the run is where the line comes off
+        # capacity — so it is drawn and not written out.
         for run in np.split(tied, np.where(np.diff(tied) > 1)[0] + 1):
             if len(run) > 1:
-                ax.plot(s[run], T[run], "-", color=C_PEAK, linewidth=4.5,
-                        alpha=0.30, solid_capstyle="butt", zorder=6,
-                        gid="DETAIL_PEAK_SPAN")
-        ax.plot(s[tied], T[tied], "o", color=C_PEAK, markersize=6,
-                markerfacecolor="none", markeredgewidth=1.5, zorder=7)
+                thick, = ax.plot(s[run], T[run], "-", color=C_PEAK, linewidth=4.5,
+                                 alpha=0.30, solid_capstyle="butt", zorder=6,
+                                 gid="DETAIL_PEAK_SPAN")
+        rings, = ax.plot(s[tied], T[tied], "o", color=C_PEAK, markersize=6,
+                         markerfacecolor="none", markeredgewidth=1.5, zorder=7)
     elif profile.get("peak_s") is not None:
         ps, pt = profile["peak_s"], profile["peak_T"]
-        ax.plot([ps], [pt], "o", color=C_PEAK, markersize=7,
-                markerfacecolor="none", markeredgewidth=1.8, zorder=7)
+        rings, = ax.plot([ps], [pt], "o", color=C_PEAK, markersize=7,
+                         markerfacecolor="none", markeredgewidth=1.8, zorder=7)
+
+    # Every mark the panel carries, named. The key for the greatest utilization
+    # is the ring over the thickened run where the figure draws both, so what
+    # stands in the legend is what stands on the curve.
+    from matplotlib.legend_handler import HandlerTuple
+    entries = [(mobilized, "Mobilized force")]
+    if rings is not None:
+        entries.append(((thick, rings) if thick is not None else rings,
+                        _peak_label(profile)))
+    if softened is not None:
+        entries.append((softened, "Softened"))
+    if ruptured is not None:
+        entries.append((ruptured, "Ruptured"))
+    entries.append((envelope, env_label))
+    if residual is not None:
+        entries.append((residual, "Residual capacity"))
+    if banded:
+        entries.append((_band_handle(), band_label(profile)))
+    # Two columns past four entries: the panel is wide and shallow, and a legend
+    # standing seven rows tall in it is a block the profile has to run around.
+    ax.legend([h for h, _t in entries], [t for _h, t in entries],
+              loc="best", fontsize=8, framealpha=0.85,
+              ncol=2 if len(entries) > 4 else 1,
+              handler_map={tuple: HandlerTuple(ndivide=None, pad=0.0)})
+
     if ax_b is not None:
         ax_b.axhline(0.0, color="0.6", linewidth=0.8)
         ax_b.plot(profile["bond_s"], profile["bond_q"], "-", color=C_FORCE,
@@ -358,41 +449,6 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
         ax.set_xlabel(_axis_label("Position along line", u.get("length")))
 
     _fit_stacked_panels(fig, DETAIL_BANDS if has_bond else DETAIL_BANDS[:1])
-
-    # The labels go on last, on the final layout: each is placed against the
-    # curves, the legend and the labels already standing, and all of those move
-    # when the panels are sized to their bands. The band's label goes first, so
-    # the one naming the utilization is placed knowing where it ended up.
-    if lo is not None:
-        band_x = 0.5 * (lo + hi) if hi is not None else lo
-        _annotate_inside(ax, (band_x, ax.get_ylim()[1]), band_label(profile),
-                         C_BAND, fontsize=8, fontweight="normal")
-
-    if span is not None and len(tied):
-        mid = 0.5 * (span[0] + span[1])
-        # The label says what the thickened runs draw. A tie set with a hole in
-        # it is drawn as two runs with a break between them, and the two ends of
-        # the span alone would describe the unbroken line instead.
-        gaps = np.asarray(profile.get("peak_gap_s", []), dtype=float)
-        tied_s = np.asarray(profile.get("peak_tied_s", []), dtype=float)
-        unit = (' ' + u['length']) if u.get('length') else ''
-        if len(gaps) and len(gaps) >= len(tied_s):
-            # More holes than members: "from 11 to 19 except 13, 15, 17" is two
-            # points wearing a range. Name the points.
-            said = (f"{profile['peak_utilization']:.0%} of capacity\n"
-                    f"at {', '.join(f'{t:,.2f}' for t in tied_s)}{unit}")
-        else:
-            said = (f"{profile['peak_utilization']:.0%} of capacity\n"
-                    f"from {span[0]:,.2f} to {span[1]:,.2f}{unit}")
-            if len(gaps):
-                said += "\nexcept " + ", ".join(f"{g:,.2f}" for g in gaps)
-        _annotate_inside(ax, (mid, float(np.interp(mid, s, T))), said, C_PEAK)
-    elif profile.get("peak_s") is not None:
-        _annotate_inside(
-            ax, (profile["peak_s"], profile["peak_T"]),
-            f"{profile['peak_T']:,.0f}"
-            f"{(' ' + u['force']) if u.get('force') else ''}"
-            f"  ({profile['peak_utilization']:.0%})", C_PEAK)
     return fig
 
 
@@ -406,11 +462,18 @@ def plot_pile_detail(profile, fig=None):
     Four panels sharing one depth axis, pile head at the top: lateral
     displacement, shear, bending moment, and the lateral soil reaction with the
     Ito & Matsui limiting resistance dashed beside it. The maximum-moment depth
-    is marked, and the stretch of the pile the mechanism crosses (named by
-    :func:`band_label`) is shaded across all four so the profiles can be read
-    against it — the same mark the reinforcement figures carry, drawn from the
-    same measurement (:func:`xslope.fem_details._band_span`). A crossing that
-    falls on a single element has no stretch to shade and is ruled instead.
+    is marked, and the stretch of the pile the shear band crosses is shaded
+    across all four so the profiles can be read against it — the same mark the
+    reinforcement figures carry, drawn from the same measurement
+    (:func:`xslope.fem_details._band_span`) and named the same way
+    (:data:`BAND_LABEL`), in a legend on the displacement panel. The stretch is
+    the depths the band crosses the pile between, measured along the pile itself
+    rather than at its beam elements, so it is where the crossing is and not
+    which element holds it.
+
+    The shear, moment and soil-reaction samples are element quantities: each
+    marker sits at the midpoint of the beam element it was read from, and the
+    displacement is nodal.
 
     Capacity lines are drawn only for the capacities the model declares. Shear
     and moment capacities come from the ``Vcap`` and ``Mcap`` inputs; there is no
@@ -515,19 +578,14 @@ def plot_pile_detail(profile, fig=None):
     ax_u.set_ylim(depth_max, 0.0)
 
     # Depth marks that belong to every panel. The mechanism crosses the pile
-    # over a stretch of it, so the stretch is shaded, as it is on a reinforcement
-    # line; a crossing confined to one element has no stretch and is ruled.
-    band = profile.get("band_depth")
+    # over a stretch of it — the depths a dense walk of the pile finds it
+    # between — so the stretch is shaded, as it is on a reinforcement line.
     band_lo, band_hi = profile.get("band_lo"), profile.get("band_hi")
-    banded = (band_lo is not None and band_hi is not None
-              and band_hi - band_lo >= 1e-9)
+    banded = band_lo is not None and band_hi is not None
     for ax in axes:
         if banded:
             ax.axhspan(band_lo, band_hi, color=C_BAND, alpha=0.13, zorder=0,
                        linewidth=0)
-        elif band is not None:
-            ax.axhline(band, color=C_BAND, linestyle=(0, (4, 3)), linewidth=1.2,
-                       zorder=2)
         if profile.get("max_moment_depth") is not None:
             ax.axhline(profile["max_moment_depth"], color=C_PEAK, linewidth=0.8,
                        alpha=0.35, zorder=2)
@@ -543,16 +601,19 @@ def plot_pile_detail(profile, fig=None):
         ax_v.plot([vm], [vd], "o", color=C_PEAK, markersize=6,
                   markerfacecolor="none", markeredgewidth=1.6, zorder=7)
 
+    # The mark is drawn across all four panels and named once, on the panel a
+    # depth axis is read down from. A name set beside the mark itself stood in
+    # the middle of a panel it belongs to no more than to the other three.
+    if banded:
+        ax_u.legend([_band_handle()], [band_label(profile)],
+                    loc="best", fontsize=7.5, framealpha=0.85)
+
     fig.suptitle(_title(profile), fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
 
     # The labels go on last, on the final layout: the moment panel is one of
     # four sharing a depth axis and is narrow, so where a label fits is a
-    # question about the drawn panel and not about the moment. The band's label
-    # is placed by the same solver, on the same terms.
-    if band is not None:
-        _annotate_inside(ax_u, (ax_u.get_xlim()[0], band), band_label(profile),
-                         C_BAND, fontsize=8, fontweight="normal")
+    # question about the drawn panel and not about the moment.
     if profile.get("max_shear") is not None:
         _annotate_inside(ax_v, (profile["max_shear"],
                                 profile["max_shear_depth"]),

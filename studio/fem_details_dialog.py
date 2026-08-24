@@ -156,9 +156,9 @@ class FemDetailsDialog(QDialog):
         # The results view's Field state switch, on the panel that reads the same
         # solution: same two states, same names, same default. It selects the
         # field the member forces and displacements are read from; the capacity
-        # envelopes are the model's and the failure-band marks are the captured
-        # mechanism's, so neither moves with it. Dimmed — and held on the field
-        # there is — when no at-failure snapshot was captured.
+        # envelopes are the model's and the shear band's crossing marks are the
+        # captured mechanism's, so neither moves with it. Dimmed — and held on
+        # the field there is — when no at-failure snapshot was captured.
         self.field_state = QComboBox()
         for key, label in (("failure", "At failure"), ("converged", "Last converged")):
             self.field_state.addItem(label, key)
@@ -168,8 +168,8 @@ class FemDetailsDialog(QDialog):
             "At failure — the member forces in the developed collapse mechanism "
             "(default).\n"
             "Last converged — the sub-critical converged solution instead.\n"
-            "The capacity envelopes and the failure-band marks are the same in "
-            "both.")
+            "The capacity envelopes and the shear band crossing marks are the "
+            "same in both.")
         if self._failure_solution is None:
             self.field_state.setCurrentIndex(self.field_state.findData("converged"))
         self.field_state.setEnabled(self._failure_solution is not None)

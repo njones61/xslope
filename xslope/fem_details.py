@@ -151,7 +151,10 @@ def band_state(solution, failure_solution=None):
     :func:`_mechanism_field`), so on a strength reduction run it always marks the
     mechanism. On a run that reached no failure there is no mechanism to mark,
     and what the band shows is where the CONVERGED shear strain concentrates —
-    a real reading, and not the one the words "failure band" describe.
+    a real reading, and not a collapse. The figures name the mark the same way
+    either way (:data:`xslope.plot_fem_details.BAND_LABEL`), because the mark is
+    where the band crosses the member and not the verdict on the run; what this
+    state selects is the sentence the report writes about it.
     """
     return ("failure" if has_failure_state(solution, failure_solution)
             else "converged")
@@ -420,10 +423,49 @@ def _mechanism_peak(fem_data, solution, failure_solution=None):
     return peak if np.isfinite(peak) and peak > 0 else None
 
 
-def _band_span(positions, mech, global_peak=None):
+#: How finely a member is walked when the band crossing it is measured, as a
+#: fraction of the member's length and as a floor in the model's length unit.
+#: The walk is what makes the band a reading of the SOIL field rather than of
+#: the member's own meshing: sampled at the 1D elements instead, the crossing
+#: was reported at the nearest element center, and one confined to a single
+#: element came back with no width at all — Norm, on a bar element two feet
+#: long: "the shear band crossing is a single thin line? shouldn't it be a
+#: band?" The step is the coarser of the two so a long member is not walked in
+#: thousands of steps and a short one is not walked in a handful.
+BAND_SAMPLE_FRACTION = 1.0 / 400.0
+BAND_SAMPLE_MIN = 0.05
+
+
+def _band_walk(p1, p2, length):
+    """``(positions, points)`` — a dense walk from one end of a straight member
+    to the other: the along-member coordinate of each step, and its ``(x, y)``.
+
+    The step is :data:`BAND_SAMPLE_FRACTION` of the length or
+    :data:`BAND_SAMPLE_MIN`, whichever is coarser, and never so coarse that the
+    walk is fewer than three steps.
+    """
+    p1 = np.asarray(p1, dtype=float)
+    p2 = np.asarray(p2, dtype=float)
+    if not np.isfinite(length) or length <= 0:
+        return np.zeros(0), np.zeros((0, 2))
+    step = min(max(length * BAND_SAMPLE_FRACTION, BAND_SAMPLE_MIN), length / 3.0)
+    n = max(int(np.ceil(length / step)) + 1, 4)
+    t = np.linspace(0.0, length, n)
+    return t, p1 + (p2 - p1) * (t / length)[:, None]
+
+
+def _band_span(positions, mech, global_peak=None, step=None):
     """Contiguous run of ``positions`` around the mechanism peak whose field
     reaches ``BAND_FRACTION`` of that peak — the failure band as this member
     sees it. Returns ``(lo, hi, peak_position)`` or ``(None, None, None)``.
+
+    ``positions`` are the along-member coordinates the mechanism field was
+    sampled at, and the band is returned as the ends of the run in those
+    coordinates — so a walk fine enough resolves where the band crosses the
+    member rather than which of the member's elements it crosses. ``step`` is
+    the walk's spacing, and is what a run that comes down to a single sample is
+    widened to: the field was read there and nowhere either side of it, which is
+    a crossing one step wide and not a crossing of no width.
 
     ``global_peak`` is the mechanism's peak over the whole section
     (:func:`_mechanism_peak`), and it is what decides whether this member is in
@@ -462,12 +504,39 @@ def _band_span(positions, mech, global_peak=None):
     hi = k
     while hi + 1 < len(mech) and mech[hi + 1] >= thresh:
         hi += 1
-    return float(positions[lo]), float(positions[hi]), float(positions[k])
+    p_lo, p_hi = float(positions[lo]), float(positions[hi])
+    if step and p_hi - p_lo < step:
+        pad = 0.5 * (step - (p_hi - p_lo))
+        p_lo = max(p_lo - pad, float(positions[0]))
+        p_hi = min(p_hi + pad, float(positions[-1]))
+    return p_lo, p_hi, float(positions[k])
 
 
 # --------------------------------------------------------------------------
 # reinforcement
 # --------------------------------------------------------------------------
+
+def _line_ends(inputs, pts, s, length):
+    """The two ends of one reinforcement line in ``(x, y)``, end 1 first.
+
+    From the model's own endpoints where the line is in ``slope_data``, and
+    otherwise from the element centers the profile was built on: they lie on
+    the line, so the direction they run in and the arc length of the first of
+    them place both ends without inventing any geometry. ``(None, None)`` where
+    there are too few centers for that.
+    """
+    if inputs is not None:
+        return ((float(inputs["x1"]), float(inputs["y1"])),
+                (float(inputs["x2"]), float(inputs["y2"])))
+    if len(pts) < 2 or not np.isfinite(length) or length <= 0:
+        return None, None
+    ds = float(s[-1] - s[0])
+    if ds <= 0:
+        return None, None
+    unit = (np.asarray(pts[-1], float) - np.asarray(pts[0], float)) / ds
+    end1 = np.asarray(pts[0], float) - unit * float(s[0])
+    return tuple(end1), tuple(end1 + unit * length)
+
 
 def _reinforcement_line_inputs(fem_data, slope_data, line_id):
     """The capacity-envelope inputs for one reinforcement line, or None.
@@ -563,7 +632,11 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     ``bond_s``, ``bond_q`` : mobilized bond force per unit length, dT/ds, at the
         boundaries between consecutive elements
     ``slip_modelled`` : False — see note below
-    ``band_lo``, ``band_hi``, ``band_peak`` : band extents in ``s``
+    ``mechanism``, ``mechanism_s`` : the mechanism field sampled along the line,
+        on the dense walk the band below was measured from (:func:`_band_walk`)
+    ``band_lo``, ``band_hi`` : the ``s`` the band crosses the line between,
+        read off that walk and so independent of where the bar elements fall
+    ``band_peak`` : the ``s`` the mechanism peaks at on the line
     ``band_state`` : the field that band was read from (:func:`band_state`)
     ``peak_s``, ``peak_T``, ``peak_utilization``, ``badge``, ``status``,
     ``status_key`` : the line's verdict (:func:`reinforcement_status`) as the
@@ -642,10 +715,21 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         bond_s = np.zeros(0)
         bond_q = np.zeros(0)
 
-    mech = _sample_mechanism(fem_data, solution, pts, failure_solution)
+    # Where the shear band crosses this line, measured on a dense walk of the
+    # line itself rather than on its bar elements: the band is a feature of the
+    # soil field, and sampling it at element centers reported the crossing at
+    # the nearest center and gave one confined to a single element no width.
+    end1, end2 = _line_ends(inputs, pts, s, length)
+    mech_s, mech_pts = (_band_walk(end1, end2, length)
+                        if end1 is not None else (np.zeros(0), np.zeros((0, 2))))
+    if not len(mech_s):                       # nothing to walk: the centers
+        mech_s, mech_pts = s, pts
+    mech = _sample_mechanism(fem_data, solution, mech_pts, failure_solution)
     band_lo, band_hi, band_peak = (
-        _band_span(s, mech, _mechanism_peak(fem_data, solution, failure_solution))
-        if len(idx) else (None, None, None))
+        _band_span(mech_s, mech,
+                   _mechanism_peak(fem_data, solution, failure_solution),
+                   step=float(mech_s[1] - mech_s[0]) if len(mech_s) > 1 else None)
+        if len(mech_s) else (None, None, None))
 
     peak_i, tied = _peak_utilization(util)
     peak_util = float(util[peak_i]) if peak_i is not None else None
@@ -702,7 +786,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "env_s": env_s, "env_T": env_T,
         "bond_s": bond_s, "bond_q": bond_q,
         "slip_modelled": False,
-        "mechanism": mech,
+        "mechanism": mech, "mechanism_s": mech_s,
         "band_lo": band_lo, "band_hi": band_hi, "band_peak": band_peak,
         "band_state": band_state(solution, failure_solution),
         "peak_s": float(s[peak_i]) if peak_i is not None else None,
@@ -984,7 +1068,9 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         envelope (None when the model does not supply pile diameter and spacing)
     ``max_moment``, ``max_moment_depth``
     ``max_shear``, ``max_shear_depth`` : the largest shear and the depth of it
-    ``band_lo``, ``band_hi`` : the depths the mechanism crosses the pile between
+    ``band_lo``, ``band_hi`` : the depths the mechanism crosses the pile
+        between, read off a dense walk from head to toe (:func:`_band_walk`)
+        and so independent of where the beam elements fall
     ``band_depth`` : the depth of the mechanism's peak on the pile
     ``band_state`` : the field that band was read from (:func:`band_state`)
     ``peak_utilization``, ``badge``, ``status``, ``utilization_basis``
@@ -1122,19 +1208,19 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
     max_shear = float(shear[k_shear]) if k_shear is not None else None
     max_shear_depth = float(elem_depth[k_shear]) if k_shear is not None else None
 
-    mech_pts = np.column_stack([np.full(len(elem_depth), xy[0][0]),
-                                y_head - elem_depth]) if len(elem_depth) else np.zeros((0, 2))
-    if len(elem_depth):
-        mech_pts[:, 0] = 0.5 * (xy[:-1, 0] + xy[1:, 0])
+    # The depths the mechanism crosses this pile between, and the depth of its
+    # peak. Measured on a dense walk from head to toe rather than on the pile's
+    # own beam elements: the span is where the shear band meets the pile, which
+    # is a feature of the soil field and not of how finely the pile is meshed.
+    # The walk's positions are depths below the head, the axis the profiles are
+    # read down, so the mark and the profiles are on one scale.
+    mech_s, mech_pts = _band_walk(xy[0], xy[-1], length)
     mech = _sample_mechanism(fem_data, solution, mech_pts, failure_solution)
-    # The span the mechanism crosses this pile over, and the depth of its peak.
-    # The span is kept, not thrown away for its midpoint: where the mechanism
-    # meets a pile it meets a length of it, and the figure that drew one dashed
-    # line described a crossing at a point that the measurement never claimed.
     band_lo, band_hi, band_depth = (
-        _band_span(elem_depth, mech,
-                   _mechanism_peak(fem_data, solution, failure_solution))
-        if len(elem_depth) else (None, None, None))
+        _band_span(mech_s, mech,
+                   _mechanism_peak(fem_data, solution, failure_solution),
+                   step=float(mech_s[1] - mech_s[0]) if len(mech_s) > 1 else None)
+        if len(mech_s) else (None, None, None))
 
     reaction_ratio = _reaction_ratio(reaction, reaction_depth, limit_depth, limit_p)
     util, basis = _pile_utilization(shear, moment, V_cap, M_cap, reaction_ratio)
@@ -1166,7 +1252,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         "max_moment_depth": max_moment_depth,
         "max_shear": max_shear,
         "max_shear_depth": max_shear_depth,
-        "mechanism": mech,
+        "mechanism": mech, "mechanism_s": mech_s,
         "band_lo": band_lo,
         "band_hi": band_hi,
         "band_depth": band_depth,

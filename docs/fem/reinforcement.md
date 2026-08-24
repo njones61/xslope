@@ -383,14 +383,21 @@ that — and elements that have softened onto it are marked. An element left wit
 carrying no force, is marked at zero.
 
 The greatest utilization along a line is usually held over a stretch rather than at a point, the force being capped
-by a flat envelope. Where it is a point, that point is ringed and annotated with its force and its fraction of
-capacity. Where it is a stretch, every sample on the stretch is ringed, the run of curve between them is thickened,
-and the annotation gives the extent instead — and a stretch with a sample inside it that stands below the rest is
-drawn as the runs it really is, with the annotation excepting that sample by position.
+by a flat envelope. Where it is a point, that point is ringed. Where it is a stretch, every sample on the stretch is
+ringed and the run of curve between them is thickened — and a stretch with a sample inside it that stands below the
+rest is drawn as the runs it really is, so a break in the thickened curve is where the line comes off capacity. The
+legend calls the mark **At capacity**, or **Peak utilization** on a line that never reaches its envelope, and the
+title states the fraction of capacity the peak reaches.
 
-A band is shaded behind the profile where the viscoplastic shear strain concentrates along the line. On a run that
-captured a mechanism it is the failure band and is labelled as one; on a run that converged and reached no failure
-it is labelled a shear strain band, which is what it is. A line the concentration does not reach carries no band.
+A band is shaded behind the profile where the viscoplastic shear strain concentrates along the line, called
+**Shear band crossing** in the legend: what a profile along one line can show is where the band crosses it. The
+extent is measured by walking the line itself and sampling the soil's shear strain field at every step, so the
+shading is where the band crosses and not which bar elements hold the crossing. A line the concentration does not
+reach carries no mark. Which field the band was read from, the mechanism an SSRM run captured or the shear strain
+in a section that is standing, is what the title says.
+
+Every mark on the panel is named in the legend, and nothing is labeled over the curves: the panel is wide and
+shallow, and a label placed in it stands over the profile it describes.
 
 Beneath the force profile is the bond transfer rate $dT/ds$: the force the ground hands the bar per unit of its
 length, which is the gradient of the profile above it. There is no companion slip series because the formulation

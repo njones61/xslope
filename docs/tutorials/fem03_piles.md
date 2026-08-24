@@ -525,12 +525,13 @@ list on the left.
 
 Four profiles, all plotted against depth below the pile head, which is at
 elevation 10 — so a depth of 5.00 m on these axes is elevation 5.00, the base of
-the weak clay band. The dashed orange line at 4.13 m is where the mechanism
-crosses the wall, elevation 5.87, inside the band. The panel opens on
-**Field state = At failure**, the state the
-run re-solves once past the factor of safety so the collapse develops far enough
-to read; the selector at the bottom switches it to the last converged state,
-where every quantity below is about a quarter smaller.
+the weak clay band. The orange stretch shaded from 4.00 to 4.25 m — **Shear
+band crossing** in the legend — is where the mechanism crosses the wall,
+elevation 6.00 down to 5.75, inside the clay. The panel opens on
+**Field state = At failure**, the state the run re-solves once past the factor
+of safety so the collapse develops far enough to read; the selector at the
+bottom switches it to the last converged state, where every quantity below is
+about a quarter smaller.
 
 The **bending moment** is zero at the head and zero at the toe, which is the
 check that the profile is being read the right way round — both ends are free,

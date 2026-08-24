@@ -5822,7 +5822,8 @@ PILES_HELP = {
     "x2": "Pile tip (bottom) X-coordinate.",
     "y2": "Pile tip (bottom) Y-coordinate.",
     "H": "Pile force per unit width of slope (force/length). Blank = auto-computed "
-        "via Ito & Matsui from D and S (vertical piles only).",
+        "via Ito & Matsui from D and S (vertical piles only). LEM only; the FEM "
+        "never reads a stated pile force.",
     "D_pile": "Pile diameter. Read by both engines: LEM needs it for the Ito & "
              "Matsui auto-computation of H, and FEM derives the section from it "
              "when I and Area are blank — I = pi·D^4/64 and Area = pi·D^2/4 for a "
@@ -5839,12 +5840,13 @@ PILES_HELP = {
         "auto-computed from D for a solid circular section when left blank.",
     "area": "Cross-sectional area of a single pile (÷ S for per unit width). FEM "
            "only; auto-computed from D for a solid circular section when left blank.",
-    "V_cap": "Shear capacity of a single pile — per element (force units); requires "
-            "S. xslope reports forces per unit width (= per pile ÷ S) and checks the "
-            "per-pile force against this. LEM only.",
-    "M_cap": "Moment capacity of a single pile — per element (force×length); "
-            "requires S. Checked against the per-pile force (per unit width × S). "
-            "LEM only.",
+    "V_cap": "Shear capacity of a single pile (force units); requires S. Read by "
+            "both engines: the LEM checks the per-pile shear against it; the FEM "
+            "clips the beam shear at Vcap ÷ S per unit width.",
+    "M_cap": "Moment capacity of a single pile (force×length); requires S. Read by "
+            "both engines: the LEM checks the per-pile moment against it; the FEM "
+            "releases a plastic hinge where the beam moment reaches Mcap ÷ S per "
+            "unit width.",
     "appl": "Force application — Active: H is an allowable force, not divided by "
            "FS (default). Passive: H is an ultimate capacity divided by FS. LEM only.",
     "fixity": "Pile head rotation boundary condition — free (default, can rotate) "
@@ -5867,7 +5869,7 @@ class PilesEditor(CategoryEditor):
         Field("label", "Label", "str", tooltip=PILES_HELP["label"]),
         Field("x1", "x1", tooltip=PILES_HELP["x1"]), Field("y1", "y1", tooltip=PILES_HELP["y1"]),
         Field("x2", "x2", tooltip=PILES_HELP["x2"]), Field("y2", "y2", tooltip=PILES_HELP["y2"]),
-        Field("H", "H", "optfloat", tooltip=PILES_HELP["H"]),
+        Field("H", "H", "optfloat", usage="lem", tooltip=PILES_HELP["H"]),
         # Force application (v12, LEM only): active = allowable force applied as-is;
         # passive = ultimate capacity divided by FS (loader default 'active').
         Field("appl", "Appl", "choice", choices=["active", "passive"], usage="lem",
@@ -5878,8 +5880,8 @@ class PilesEditor(CategoryEditor):
         # is colored for a single engine.
         Field("D_pile", "D", "optfloat", applies=LF, tooltip=PILES_HELP["D_pile"]),
         Field("S", "S", "optfloat", applies=LF, tooltip=PILES_HELP["S"]),
-        Field("V_cap", "Vcap", "optfloat", usage="lem", tooltip=PILES_HELP["V_cap"]),
-        Field("M_cap", "Mcap", "optfloat", usage="lem", tooltip=PILES_HELP["M_cap"]),
+        Field("V_cap", "Vcap", "optfloat", applies=LF, tooltip=PILES_HELP["V_cap"]),
+        Field("M_cap", "Mcap", "optfloat", applies=LF, tooltip=PILES_HELP["M_cap"]),
         Field("E", "E", "optfloat", usage="fem", tooltip=PILES_HELP["E"]),
         Field("I", "I", "optfloat", usage="fem", tooltip=PILES_HELP["I"]),
         Field("area", "Area", "optfloat", usage="fem", tooltip=PILES_HELP["area"]),

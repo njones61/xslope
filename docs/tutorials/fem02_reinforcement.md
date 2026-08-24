@@ -571,7 +571,7 @@ every line here reads 100% and **yielded**, and why the title says *at failure*
 The deformed panel draws the mesh at its displaced position over a dashed
 outline of where it started. The reinforced block has slid out over the toe and
 settled at the crest, and the six layers — red where they started gray — are
-stretched and rotated with it, hinging where the failure band crosses them. The
+stretched and rotated with it, hinging where the shear band crosses them. The
 title's **Scale = 1.1x** is the exaggeration, which the panel picks so the
 collapse reads at this figure size. **Scale ×** and **Auto size** on
 the Display panel control that multiplier.
@@ -617,18 +617,18 @@ back down through 600, 400 and 200. One foot in from a tip, the two ends of the
 same line are allowed 42 lb/ft and 800 lb/ft — a factor of nearly twenty, where
 the stated length allows 200 at both.
 
-The run puts line 2 at capacity almost the whole way from 1 to 15 ft, and that
-now includes the two elements out on the curve at 1 and 3 ft in, riding 42 and
-378 lb/ft. Its failure band sits at **3 to 5 ft**, at the face. Under the stated
-lengths the same line's hardest-worked point was an interior element at the full
-800 lb/ft, 7 ft in. That is the engineering content of the
+The run puts line 2 at capacity at 3, 9 and 11 ft: two interior elements at
+the full 800 lb/ft and the element out on the curve at 3 ft in, riding the law's
+378 lb/ft. The shear band crosses it between **1.05 and 3.10 ft**, at the face,
+through that element. Under the stated lengths the same line's hardest-worked
+point was an interior element at the full 800 lb/ft, 7 ft in. That is the engineering content of the
 comparison: a stated development length is depth-blind, so it under-rates a
 deeply buried tail and over-rates a shallow one, and reinforced slopes are
 critical at the face.
 
 Both answers move, and the smaller move is the finite element one. Run
-elastic-perfectly-plastic under the law and it returns **1.543** against 1.559 —
-1%, two bisection cells. Spencer moves from 1.587 to **1.559**, 1.8%,
+elastic-perfectly-plastic under the law and it returns **1.535** against 1.559 —
+1.5%, three bisection cells. Spencer moves from 1.587 to **1.559**, 1.8%,
 and that move is not a loss of capacity. On the circle Spencer already drew,
 every one of the five crossings sits 8.4 ft or more from the nearer end, out
 where both laws allow the full 800 lb/ft, so that surface cannot tell them apart.
@@ -669,7 +669,7 @@ emerge along the whole of each layer from displacement compatibility, so a layer
 contributes what the soil around it actually mobilized: line 1 gets no further
 than 97% of what its embedment allows at the face, four of the six lines are held
 at their buried tips by 200 lb/ft of bond once the residual is in play, and the
-force in every layer tapers away from the failure band instead of standing at its
+force in every layer tapers away from the shear band instead of standing at its
 envelope value everywhere. Prescribing the maximum available force at one point
 is the more generous of the two, and 1.8% is what that generosity is worth on
 this slope.

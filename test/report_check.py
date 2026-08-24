@@ -16991,53 +16991,55 @@ def test_the_member_terms_are_defined_where_they_are_used():
     # The band means one thing on a run that developed a mechanism and another
     # on one that converged under gravity, and the two definitions are held
     # apart: the converged one cannot claim a failure the analysis never found.
-    # And each is written for the ARTIST the figures carry — a shaded stretch, or
-    # the dashed line a crossing confined to one element is drawn as. The owner,
-    # reading fem_piles: "I don't see a band on the figures. Just a dashed line.
-    # Confusing." A sentence describing a mark the figure does not draw is the
-    # defect, whichever way it is cured.
+    # There is one sentence per state and not two, because there is one mark:
+    # the shaded stretch of the member the band crosses, measured by walking the
+    # member and sampling the shear strain field along it. The owner, reading fem_piles: "I don't
+    # see a band on the figures. Just a dashed line. Confusing." That rule is
+    # gone from the drawing, and the sentence that described it with it.
     for word in ("failure mechanism passes through", "shear strain field"):
-        if word not in BAND_DEFINED[("failure", "band")]:
+        if word not in BAND_DEFINED["failure"]:
             fails.append(f"the at-failure band definition does not say {word!r}: "
-                         f"{BAND_DEFINED[('failure', 'band')]!r}")
-    if "computed shear strain concentrates" not in \
-            BAND_DEFINED[("converged", "band")]:
+                         f"{BAND_DEFINED['failure']!r}")
+    if "computed shear strain concentrates" not in BAND_DEFINED["converged"]:
         fails.append(f"the converged band definition does not say where the "
-                     f"strain concentrates: "
-                     f"{BAND_DEFINED[('converged', 'band')]!r}")
-    if "failure" in BAND_DEFINED[("converged", "band")]:
+                     f"strain concentrates: {BAND_DEFINED['converged']!r}")
+    if "failure" in BAND_DEFINED["converged"]:
         fails.append(f"a run that reached no failure is told about one: "
-                     f"{BAND_DEFINED[('converged', 'band')]!r}")
+                     f"{BAND_DEFINED['converged']!r}")
     for state in ("failure", "converged"):
-        if "shaded" not in BAND_DEFINED[(state, "band")]:
+        if "shaded" not in BAND_DEFINED[state]:
             fails.append(f"the {state} band definition does not say the mark is "
-                         f"shaded: {BAND_DEFINED[(state, 'band')]!r}")
-        if "dashed line" not in BAND_DEFINED[(state, "line")]:
-            fails.append(f"the {state} single-element definition does not say "
-                         f"the mark is a dashed line: "
-                         f"{BAND_DEFINED[(state, 'line')]!r}")
-        if "band" in BAND_DEFINED[(state, "line")]:
-            fails.append(f"a mark drawn as a dashed line is still called a band: "
-                         f"{BAND_DEFINED[(state, 'line')]!r}")
+                         f"shaded: {BAND_DEFINED[state]!r}")
+        if "dashed" in BAND_DEFINED[state]:
+            fails.append(f"the {state} band definition still describes a rule "
+                         f"no figure draws: {BAND_DEFINED[state]!r}")
 
-    # And the sentence a page carries is the one for the mark that page's figures
-    # DRAW, measured on the artists: a shaded span is an axvspan or an axhspan, a
-    # single-element crossing a dashed rule.
+    # And each sentence names the mark the way the figure's legend names it: a
+    # reader told to look for something has to be told the name that is printed
+    # on the page.
+    from xslope.plot_fem_details import BAND_LABEL
+    for key, said in BAND_DEFINED.items():
+        if BAND_LABEL not in said:
+            fails.append(f"the {key} definition does not name the mark as the "
+                         f"legend does ({BAND_LABEL!r}): {said!r}")
+
+    # And a page that carries the sentence carries figures that DRAW the mark it
+    # describes, measured on the artists: a shaded span is an axvspan or an
+    # axhspan in the band's colour, and nothing on these figures is a rule in it.
     import matplotlib
     matplotlib.use("Agg")
     from matplotlib.figure import Figure as MplFigure
     from matplotlib.colors import to_rgb
     from xslope.plot_fem_details import C_BAND, plot_detail
-    from xslope.report import _band_artist, _detail_profiles
+    from xslope.report import _band_marked, _detail_profiles
 
     for label, xlsx, kind in (("reinforcement", FEM_REINF_XLSX, "reinforcement"),
                               ("piles", FEM_PILES_XLSX, "pile")):
         sd, bundle = _fem_1d_bundle(xlsx)
         profiles = _detail_profiles(sd, bundle, kind)
-        artist = _band_artist(profiles)
-        if not artist:
+        if not _band_marked(profiles):
             continue
-        shaded = 0
+        shaded = ruled = 0
         for profile in profiles:
             fig = MplFigure(figsize=(6.5, 4.5))
             with contextlib.redirect_stdout(io.StringIO()):
@@ -17047,21 +17049,18 @@ def test_the_member_terms_are_defined_where_they_are_used():
                 if patch.get_alpha() is not None
                 and 0.0 < patch.get_alpha() < 0.5
                 and to_rgb(patch.get_facecolor()[:3]) == to_rgb(C_BAND))
-        if artist == "band" and not shaded:
-            fails.append(f"{label}: the prose calls the mark a shaded band and "
-                         f"the figures shade nothing")
-        if artist == "line" and shaded:
-            fails.append(f"{label}: the prose calls the mark a dashed line and "
-                         f"the figures shade {shaded} span(s)")
+            ruled += sum(1 for ax in fig.axes for line in ax.lines
+                         if to_rgb(line.get_color()) == to_rgb(C_BAND))
+        if not shaded:
+            fails.append(f"{label}: the prose calls the mark a shaded stretch "
+                         f"and the figures shade nothing")
+        if ruled:
+            fails.append(f"{label}: the mark is a shaded stretch and the figures "
+                         f"draw {ruled} rule(s) in the band's colour")
         said = " ".join(_prose(_engine_report("fem", xlsx=xlsx)))
-        state = "converged"
-        if BAND_DEFINED[(state, artist)] not in said:
+        if BAND_DEFINED["converged"] not in said:
             fails.append(f"{label}: the page does not carry the sentence for the "
-                         f"{artist!r} its figures draw")
-        wrong = "line" if artist == "band" else "band"
-        if BAND_DEFINED[(state, wrong)] in said:
-            fails.append(f"{label}: the page describes a {wrong!r} its figures "
-                         f"do not draw")
+                         f"mark its figures draw")
 
     # The two sample models are documented from a gravity trial each — no
     # snapshot, no mechanism — so their pages take the converged definition and
@@ -17069,15 +17068,13 @@ def test_the_member_terms_are_defined_where_they_are_used():
     for label, xlsx, kind in (("reinforcement", FEM_REINF_XLSX, "reinforcement"),
                               ("piles", FEM_PILES_XLSX, "pile")):
         said = " ".join(_prose(_engine_report("fem", xlsx=xlsx)))
-        artist = _band_artist(_detail_profiles(
-            *_fem_1d_bundle(xlsx), kind)) or "band"
         for what, phrase in (("utilization", UTILIZATION_DEFINED[kind]),
-                             ("the band", BAND_DEFINED[("converged", artist)])):
+                             ("the band", BAND_DEFINED["converged"])):
             n = said.count(phrase)
             if n != 1:
                 fails.append(f"{label}: {what} is defined {n} times on the page "
                              f"({phrase[:48]!r}…)")
-        if BAND_DEFINED[("failure", artist)] in said:
+        if BAND_DEFINED["failure"] in said:
             fails.append(f"{label}: a converged gravity run's band is called the "
                          f"failure mechanism's")
 
@@ -17090,14 +17087,11 @@ def test_the_member_terms_are_defined_where_they_are_used():
     else:
         at_failure = " ".join(_prose(_engine_report(
             "fem", bundle=ssrm["fem"], xlsx=FEM_REINF_XLSX)))
-        ssrm_artist = _band_artist(_detail_profiles(
-            _sd, ssrm["fem"], "reinforcement", "failure")) or "band"
-        if at_failure.count(BAND_DEFINED[("failure", ssrm_artist)]) != 1:
+        if at_failure.count(BAND_DEFINED["failure"]) != 1:
             fails.append(
                 f"a run carrying a mechanism defines the failure band "
-                f"{at_failure.count(BAND_DEFINED[('failure', ssrm_artist)])} "
-                f"times")
-        if BAND_DEFINED[("converged", ssrm_artist)] in at_failure:
+                f"{at_failure.count(BAND_DEFINED['failure'])} times")
+        if BAND_DEFINED["converged"] in at_failure:
             fails.append("a run carrying a mechanism calls its band the "
                          "converged field's")
         # A report of both kinds of run defines each band once: the term is two
@@ -17106,10 +17100,8 @@ def test_the_member_terms_are_defined_where_they_are_used():
         mixed = " ".join(_prose(_built_report(
             _sd, {"fem": [ssrm["fem"], gravity]},
             {"input_path": FEM_REINF_XLSX, "lem": False, "pd_figure": False})))
-        for state, art in (("failure", ssrm_artist),
-                           ("converged", _band_artist(_detail_profiles(
-                               _sd, gravity, "reinforcement")) or "band")):
-            n = mixed.count(BAND_DEFINED[(state, art)])
+        for state in ("failure", "converged"):
+            n = mixed.count(BAND_DEFINED[state])
             if n != 1:
                 fails.append(f"a report of a mechanism run and a gravity run "
                              f"defines the {state} band {n} times")
@@ -17144,10 +17136,8 @@ def test_the_member_terms_are_defined_where_they_are_used():
         fails.append(f"a report of two runs carries {len(subsections)} member "
                      f"subsection(s), so a repeated definition could not arise")
     twice = " ".join(_prose(two_runs))
-    drawn = _band_artist(_detail_profiles(slope_data, bundle,
-                                          "reinforcement")) or "band"
     for what, phrase in (("utilization", UTILIZATION_DEFINED["reinforcement"]),
-                         ("the band", BAND_DEFINED[("converged", drawn)])):
+                         ("the band", BAND_DEFINED["converged"])):
         n = twice.count(phrase)
         if n != 1:
             fails.append(f"a report of two runs defines {what} {n} times")

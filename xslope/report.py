@@ -7979,9 +7979,9 @@ DETAIL_FIGURE_SHOWS = {
 #: and the owner asked for it on these two (fem_piles review, 2026-08-09).
 #:
 #: Only what every such figure carries is stated. The marks a figure carries
-#: conditionally — the failure band, the softened and pulled-out elements, the
-#: peak-utilization ring — are named where the run that produced them is
-#: described, so a figure with none of them is not credited with them.
+#: conditionally — the shear band's crossing, the softened and pulled-out
+#: elements, the peak-utilization ring — are named where the run that produced
+#: them is described, so a figure with none of them is not credited with them.
 DETAIL_FIGURE_READING = {
     "reinforcement": (
         "The upper panel plots the axial force the line has mobilized along its "
@@ -7993,8 +7993,10 @@ DETAIL_FIGURE_READING = {
         "off at the tensile capacity T_max between them, so the force a line "
         "can hold near an end is the pullout resistance and not the capacity of "
         "the bar. Where the two meet, the line is holding everything available "
-        "to it there. The point of greatest utilization is ringed and labeled "
-        "with the fraction of capacity the line reaches at it. The lower panel "
+        "to it there. The point of greatest utilization is ringed, and where the "
+        "line holds that utilization over a stretch every sample on the stretch "
+        "is ringed and the run of curve between them thickened, so a break in "
+        "the thickened curve is where the line comes off capacity. The lower panel "
         "plots the bond transfer rate dT/ds — the force the ground hands the "
         "line per unit of its length — which is how fast the force in the panel "
         "above is building: a steep stretch of force is a stretch the ground is "
@@ -8007,7 +8009,8 @@ DETAIL_FIGURE_READING = {
         "panels carry a dashed line at each declared capacity, Vcap and Mcap, "
         "drawn on both sides of the axis because either sign reaches it; a "
         "profile inside them is inside capacity. The depth of the largest "
-        "moment is ringed and ruled across all four panels. On the soil "
+        "moment is ringed and ruled across all four panels, and the largest "
+        "shear is ringed at its own depth on its own panel. On the soil "
         "reaction panel the dashed Ito and Matsui limiting resistance is the "
         "most the ground can offer at that depth, and the panel states the peak "
         "of the mobilized reaction as a fraction of it."),
@@ -8031,51 +8034,45 @@ UTILIZATION_DEFINED = {
         "limiting resistance where it does not."),
 }
 
-#: What the band drawn across a member is, per the field it was read from
-#: (:func:`xslope.fem_details.band_state`). A strength reduction run captured a
-#: mechanism and the band marks where it crosses the member. A run that converged
-#: under gravity found no failure at all, and the band it carries is where the
-#: computed shear strain concentrates — the same reading, of a section that is
-#: standing. The figure names the mark the same way
-#: (:func:`xslope.plot_fem_details.band_label`).
+#: What the mark a figure's legend calls the shear band crossing is, per the
+#: field it was read from (:func:`xslope.fem_details.band_state`). A strength
+#: reduction run captured a mechanism and the mark is where it crosses the
+#: member. A run that converged under gravity found no failure at all, and the
+#: band it carries is where the computed shear strain concentrates — the same
+#: reading, of a section that is standing. One name serves both on the figure
+#: (:data:`xslope.plot_fem_details.BAND_LABEL`), because the mark is the
+#: crossing and not the verdict; the sentence is what says which field the
+#: crossing was read from.
+#:
+#: One sentence per state, because there is one mark: the shaded stretch of the
+#: member the band crosses. It is measured by walking the member and sampling
+#: the shear strain field along it (:func:`xslope.fem_details._band_walk`), so
+#: it is where the band crosses rather than which of the member's elements the
+#: crossing falls on — and the dashed rule a crossing inside one element used to
+#: be drawn as, with the sentence that described it, is gone.
 BAND_DEFINED = {
-    ("failure", "band"): (
-        "The failure band shaded on a figure is the stretch of the member the "
-        "failure mechanism passes through, read from the shear strain field; a "
-        "member the mechanism does not reach carries none."),
-    ("failure", "line"): (
-        "The dashed line marked across a figure is where the failure mechanism "
-        "crosses the member, read from the shear strain field; the crossing "
-        "falls on a single element of the member, so it is drawn as a line "
-        "rather than as a stretch, and a member the mechanism does not reach "
-        "carries neither."),
-    ("converged", "band"): (
-        "The shear strain band shaded on a figure is the stretch of the member "
-        "where the computed shear strain concentrates; a member the "
+    "failure": (
+        "The stretch shaded on a figure and labeled Shear band crossing is where "
+        "the failure mechanism passes through the member, read from the shear "
+        "strain field; a member the mechanism does not reach carries none."),
+    "converged": (
+        "The stretch shaded on a figure and labeled Shear band crossing is where "
+        "the computed shear strain concentrates along the member; a member the "
         "concentration does not reach carries none."),
-    ("converged", "line"): (
-        "The dashed line marked across a figure is where the computed shear "
-        "strain concentrates on the member; the concentration falls on a single "
-        "element, so it is drawn as a line rather than as a stretch, and a "
-        "member the concentration does not reach carries neither."),
 }
 
 
-def _band_artist(profiles):
-    """``"band"``, ``"line"`` or ``""`` — the mark the detail figures of these
-    members actually carry.
+def _band_marked(profiles):
+    """Whether the detail figures of these members carry the band's mark at all.
 
-    The plotters shade the stretch the mechanism crosses a member over, and rule
-    a single line where that stretch collapses onto one element
-    (:mod:`xslope.plot_fem_details`). The sentence that explains the mark is
-    chosen from what was drawn, so a reader is never told to look for a band on
-    a figure that carries a line.
+    The plotters shade the stretch the band crosses a member over
+    (:mod:`xslope.plot_fem_details`), and a run whose mechanism reaches none of
+    these members draws nothing. The sentence that explains the mark follows
+    what was drawn, so a reader is never told to look for a mark no figure
+    carries.
     """
-    spans = [(p.get("band_lo"), p.get("band_hi")) for p in profiles]
-    spans = [(lo, hi) for lo, hi in spans if lo is not None and hi is not None]
-    if not spans:
-        return ""
-    return "band" if any(hi - lo >= 1e-9 for lo, hi in spans) else "line"
+    return any(p.get("band_lo") is not None and p.get("band_hi") is not None
+               for p in profiles)
 
 #: What one detail figure's caption calls it, before the member's own name.
 DETAIL_FIGURE_CAPTIONS = {
@@ -8424,13 +8421,15 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
             if any(p.get("peak_span") for p in (chosen or profiles)):
                 stretch = (
                     " A line that reaches its greatest utilization at more than "
-                    "one point has the whole stretch those points span marked, "
-                    "and its label gives the two ends of it.")
+                    "one point has every one of those points ringed and the run "
+                    "of curve between them thickened, so what the mark shows is "
+                    "the whole stretch the line holds that utilization over.")
                 if any(len(_series(p, "peak_gap_s"))
                        for p in (chosen or profiles)):
                     stretch += (
                         " A point inside that stretch which stands below them "
-                        "is excepted from it, and the mark breaks there.")
+                        "breaks the thickened run, so the mark comes in pieces "
+                        "where the line comes off capacity.")
             trailing = " ".join(
                 part.strip() for part in
                 [stretch, " ".join(definitions), states, read_at]
@@ -8445,12 +8444,11 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         # found. Keyed by which sentence it is, so a report carrying both kinds
         # of run writes each once rather than letting the first silence the
         # second.
-        # Named for the mark the figures below actually carry — shaded stretch
-        # or dashed line — and only where they carry one at all.
-        artist = _band_artist(chosen or profiles)
+        # Written only where the figures below carry the mark at all.
         band = BAND_DEFINED.get(
-            (band_state(bundle.get("solution") or {},
-                        bundle.get("failure_solution")), artist)) if artist else None
+            band_state(bundle.get("solution") or {},
+                       bundle.get("failure_solution"))
+        ) if _band_marked(chosen or profiles) else None
         if band and band not in defined:
             defined.add(band)
             text += f" {band}"

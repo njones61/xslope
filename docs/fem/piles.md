@@ -297,7 +297,8 @@ Four panels share one depth axis, pile head at the top:
 
 - **Lateral displacement** — the component of nodal displacement normal to the pile axis.
 - **Shear** — the element shear $V$, after the $V_{\text{cap}}$ limit of the
-  [structural capacity checks](#structural-capacity-checks) is applied.
+  [structural capacity checks](#structural-capacity-checks) is applied, with the largest marked and its depth
+  annotated. The two peaks a pile is checked at are read the same way or one of them is read off the eye.
 - **Moment** — the bending moment, assembled from the beam elements' end moments into a continuous profile, with
   the maximum marked and its depth annotated. A free head and a free toe both read zero, which is a useful check
   that the profile is being read correctly.
@@ -307,8 +308,8 @@ Four panels share one depth axis, pile head at the top:
   passive-pile force (see [LEM Piles](../lem/piles.md)), and the peak fraction of that limit is stated in the
   panel. The limiting resistance grows with depth and is often far above anything mobilized, in which case the
   panel is scaled to the mobilized profile and the limit runs off the sides. For a pile far enough inside its
-  working range that the envelope does not reach the panel at all, it is not drawn, there is no legend, and the
-  note that states the peak fraction says how far off the envelope is.
+  working range that the envelope does not reach the panel at all, it is not drawn, that panel carries no legend,
+  and the note that states the peak fraction says how far off the envelope is.
 
 Capacity lines appear only where the model declares a capacity: $V_{\text{cap}}$ and $M_{\text{cap}}$ are inputs,
 and no substitute is computed from an assumed section — the pile inputs carry force capacities, not section
@@ -316,15 +317,17 @@ moduli. Where the model does supply $D$ and $S$ but no structural capacities, th
 the mobilized soil reaction against the Ito & Matsui limit; with neither, the badge stays neutral rather than
 reporting a ratio the model does not support.
 
-The depth at which the viscoplastic shear strain concentrates across the pile is ruled across all four panels. On
-a run that captured a mechanism it is the failure band and is labelled as one; on a run that converged and reached
-no failure it is labelled a shear strain band, which is what it is. A pile the concentration does not reach carries
-no rule.
+The depths at which the viscoplastic shear strain concentrates across the pile are shaded across all four panels
+and named **Shear band crossing** in the legend on the displacement panel. The extent is measured by walking the
+pile from head to toe and sampling the soil's shear strain field at every step, so the shading is where the band
+crosses and not which beam elements hold the crossing. Which field it was read from, the mechanism an SSRM run
+captured or the shear strain in a section that is standing, is what the title says. A pile the concentration does
+not reach carries no mark.
 
 A **Field state** control at the foot of the panel selects which field the displacement, shear and moment profiles
 are read from — the at-failure mechanism an SSRM run captured, or the last converged solution — and is the same
 switch, with the same default, as the one on the results view. It is dimmed for a run that captured no mechanism,
-and the limiting-resistance envelope and the band rule are the same in both states.
+and the limiting-resistance envelope and the band's shading are the same in both states.
 
 **Export** writes the current view as a PNG and its plotted series as a CSV named from the model, the pile and the
 field state, with that state also recorded in the CSV's header.

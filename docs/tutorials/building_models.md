@@ -74,7 +74,7 @@ opens its editor.
 
 ![Studio on a model, with the Inputs tree, the section and the Assistant dock](images/t0_studio_window.png)
 
-Three behaviors are worth knowing before your first build:
+Three behaviors to know before your first build:
 
 - **The canvas is always current.** An edit is validated, applied to the model and
   redrawn immediately, so a mistyped vertex shows up as a wrong-looking section

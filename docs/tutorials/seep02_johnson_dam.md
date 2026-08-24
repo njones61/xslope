@@ -769,8 +769,8 @@ front and Gardner by at most **0.35 ft**, and van Genuchten and Gardner by at mo
 6.25 ft.
 
 These are differences between three runs on one mesh, so the discretization error
-common to all three cancels out of them. That is what makes a shift smaller than
-one element worth reading at all.
+common to all three cancels out of them. That is why a shift smaller than
+one element can be read at all.
 
 Which model to choose follows from those two comparisons, and it is why the
 [overview](../seep/overview.md#unsaturated-flow-formulation) recommends the linear

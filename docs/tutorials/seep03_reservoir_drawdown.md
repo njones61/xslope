@@ -323,8 +323,7 @@ markers.
 ## The steady solution at full pool
 
 Before the pool moves, the dam is in steady state under 18 m of water, and that
-state is the field the march will start from. Solving it now is worth doing on its
-own terms as well: it is the reference every transient number on this page is read
+state is the field the march will start from. Solving it now also serves a second purpose: it is the reference every transient number on this page is read
 against.
 
 If you opened the completed download rather than the starter file, this section

@@ -558,7 +558,7 @@ it at `0.0001`, and leave **Max iterations** at `400`; both belong to the
 unconfined iteration SEEP-2 works through.
 
 The **Model checks** column beside the controls reads *No problems found for this
-run*. It is worth reading rather than clicking past: a conductivity of zero, a
+run*. Read it rather than clicking past: a conductivity of zero, a
 boundary set that drives no flow, or a mesh built against a different material
 table each produce a finished-looking number, and this column says so before the
 solve rather than after.

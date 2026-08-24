@@ -412,8 +412,7 @@ of the formula:
 ![The response-surface FS histogram](images/lem11_rs.png){width=1000}
 
 **P<sub>f</sub> = 16.6%** and **β<sub>LN</sub> = 0.997**, beside Monte
-Carlo's 16.42% and 0.988. The checks are reported with the answer, and they
-are worth reading: across the 500 checking solves the formula reproduced the
+Carlo's 16.42% and 0.988. The checks are reported with the answer: across the 500 checking solves the formula reproduced the
 real factor of safety with a typical error of 0.018 (R² = 0.998), and only
 1 of the 500 landed on the other side of FS = 1 from where the formula put
 it. In a fuller test run for this page, thirty thousand of the draws were

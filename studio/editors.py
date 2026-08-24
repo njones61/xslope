@@ -5827,10 +5827,11 @@ PILES_HELP = {
              "Matsui auto-computation of H, and FEM derives the section from it "
              "when I and Area are blank — I = pi·D^4/64 and Area = pi·D^2/4 for a "
              "solid circular pile.",
-    "S": "Center-to-center pile spacing. Read by both engines: LEM needs it for "
-        "Ito & Matsui and for Vcap/Mcap (both per-pile), and FEM divides EA and EI "
-        "by it to smear the row into a per-unit-width beam. Also what lets xslope "
-        "report per-pile forces.",
+    "S": "Center-to-center pile spacing. In the LEM, spacing is physics: it sets "
+        "the arching between piles (Ito & Matsui) and makes Vcap/Mcap per-pile. "
+        "In the FEM, S converts per-pile properties to per-unit-width (EA/S, "
+        "EI/S) — the correct plane-strain stiffness of the smeared row; what it "
+        "cannot model is the soil arching between piles.",
     "E": "Young's modulus of the pile material; with I and Area gives the flexural "
         "(EI) and axial (EA) stiffness, each divided by S for the per-unit-width "
         "2D beam. FEM only.",

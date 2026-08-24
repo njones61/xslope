@@ -72,7 +72,7 @@ Everything XSLOPE needs to know about the two pile rows sits in two rows of
 the piles sheet. Read them closely before running anything. Open
 **Piles** in the **Inputs** tree and press **Table view**. Its columns match
 the piles worksheet; with **Show parameters for:** set to **LEM**, the
-columns only the finite element engine reads (`E`, `I`, `Area`, `Fixity`)
+columns only the finite element engine reads (`E`, `I`, `Area`, `Head`, `Tip`)
 are hidden:
 
 ![The two pile rows as the file carries them](images/lem12_studio_piles_table.png)

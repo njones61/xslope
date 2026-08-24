@@ -2347,50 +2347,49 @@ SHOTS.update({
 # --------------------------------------------------------------------------- #
 # FEM-3 — Piles: LEM against FEM
 # --------------------------------------------------------------------------- #
-#: The discrete row: one model, two sample pages.  The limit-equilibrium copy is
-#: the one the page links; the finite element copy is the same model and is used
-#: wherever a mesh or a solved field is wanted, because those are committed
-#: beside it.
+#: The discrete row: one model, two sample pages.  The page links the
+#: limit-equilibrium copy and enters the mesh and the bracket by hand, so every
+#: dialog below is photographed on a mesh built here at the page's own settings
+#: rather than on a committed companion.
 FEM03_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
-FEM03_PILES_FEM = os.path.join(REPO_ROOT, "docs/fem/files/xslope_piles_fem.xlsx")
-#: The continuous wall: the tutorial pair, and the corpus stem whose committed
-#: fields the details panel is photographed on.  The tutorial files are
-#: sidecar-free, and a strength-reduction run on this model takes the better part
-#: of an hour, so the panel is drawn from the field the corpus model — the model
-#: the tutorial pair is derived from — carries beside it.
-FEM03_WALL_START = os.path.join(REPO_ROOT,
-                                "docs/tutorials/files/xslope_pile_wall_start.xlsx")
+#: The continuous wall: the completed file of the page's second half, written by
+#: ``tools/build_pile_wall_tutorial.py`` on the same slope.
 FEM03_WALL_DONE = os.path.join(REPO_ROOT,
                                "docs/tutorials/files/xslope_pile_wall.xlsx")
-FEM03_WALL_CORPUS = os.path.join(REPO_ROOT,
-                                 "docs/verification/files/geostudio/gs2_wall")
-#: The strength-reduction settings each model's own locked run is made at.
-FEM03_PILES_BRACKET = (1.0, 1.6)
-FEM03_WALL_BRACKET = (1.15, 1.65)
+#: The mesh the page builds for both models, and the finer 1D element size its
+#: optional refinement step enters.
+FEM03_ELEMENT_TYPE = "tri6"
+FEM03_TARGET_SIZE = 2.0
+FEM03_REFINED_1D = 0.5
+#: The strength-reduction settings the page runs every trial at.  The bracket
+#: reaches 2.0 because the socketed runs stand at 1.6 and above; everything else
+#: is the dialog as it opens.
+FEM03_BRACKET = (1.0, 2.0)
+FEM03_TOLERANCE = 0.01
+FEM03_MAX_ITERATIONS = 12000
+FEM03_CRITERION = "non_convergence"
 
 
-def _fem03_meshed(path, mesh_from=None):
+def _fem03_meshed(path, element_size_1d=None):
     """The model with a mesh attached — the state Build Mesh leaves behind, and
     the only state Studio's Run FEM action is reachable in.
 
-    ``mesh_from`` takes the mesh off another workbook's committed companion
-    instead of building one; the pile model's mesh is committed beside its finite
-    element copy and is the mesh its locked runs are made on.
+    The mesh is built at the page's own settings, tri6 at 2 ft, with the pile or
+    wall lines carried in as constraint lines.
     """
     from xslope.mesh import (build_mesh_from_polygons,
                              extract_constraint_line_geometry,
+                             extract_point_constraints,
                              extract_size_regions, get_material_polygons)
 
     data = _load(path)
-    if mesh_from is not None:
-        data["mesh"] = _load(mesh_from)["mesh"]
-        return data
     lines, _n_reinf, _n_pile = extract_constraint_line_geometry(data)
     with contextlib.redirect_stdout(io.StringIO()):
         data["mesh"] = build_mesh_from_polygons(
             get_material_polygons(data, reinf_lines=lines),
-            data["target_size"], data["element_type"], lines=lines or None,
-            element_size_1d=data.get("element_size_1d"),
+            FEM03_TARGET_SIZE, FEM03_ELEMENT_TYPE, lines=lines or None,
+            element_size_1d=element_size_1d,
+            point_constraints=extract_point_constraints(data),
             size_regions=extract_size_regions(data))
     return data
 
@@ -2407,6 +2406,9 @@ def fem03_piles_table():
     editor's Spacing.  Both bands are photographed rather than FEM alone because
     the subject is one row read two ways: the same D and S feed the Ito & Matsui
     force on the left and the smeared beam section on the right.
+
+    The table is taken out to Tip, the last column, because the page's spacing
+    section turns on what Head and Tip are set to.
     """
     from studio.editors import PilesEditor
 
@@ -2418,15 +2420,15 @@ def fem03_piles_table():
 
 
 def fem03_run_fem_piles():
-    """Run FEM on the meshed pile model: strength reduction over the sample's own
+    """Run FEM on the meshed pile model: strength reduction over the page's
     bracket, with the checks column beside it."""
     from studio.dialogs import RunFemDialog
 
-    data = _fem03_meshed(FEM03_PILES, mesh_from=FEM03_PILES_FEM)
+    data = _fem03_meshed(FEM03_PILES)
     dlg = RunFemDialog(defaults={"analysis": "ssrm",
-                                 "F_min": FEM03_PILES_BRACKET[0],
-                                 "F_max": FEM03_PILES_BRACKET[1],
-                                 "tolerance": 0.01},
+                                 "F_min": FEM03_BRACKET[0],
+                                 "F_max": FEM03_BRACKET[1],
+                                 "tolerance": FEM03_TOLERANCE},
                        material_names=[m.get("name") for m in data["materials"]],
                        slope_data=data)
     dlg.resize(dlg.sizeHint())
@@ -2434,13 +2436,14 @@ def fem03_run_fem_piles():
 
 
 def fem03_wall_row():
-    """The one row the reader adds, in the editor's list view: the wall's two
+    """The one row the reader adds, in the editor's table view: the wall's two
     endpoints, its axial and bending section constants entered directly, spacing
-    1, and D, Vcap and Mcap left empty.
+    1, a moment capacity, and D and Vcap left empty.
 
     Both usage bands are shown rather than the FEM band alone, because the row's
     subject is which cells a continuous member fills and which it leaves blank,
-    and those cells sit in both bands.
+    and those cells sit in both bands.  The table reaches Tip, which is the cell
+    the page's second run changes.
     """
     from studio.editors import PilesEditor
 
@@ -2449,19 +2452,40 @@ def fem03_wall_row():
     # a shot that does not set it photographs whatever the last dialog left.
     for _tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
         cb.setChecked(True)
-    return _grab(_list_view(dlg, 1400), "fem03_studio_wall_row.png")
+    return _grab(_line_table(dlg, through="tip_fixity"),
+                 "fem03_studio_wall_row.png")
+
+
+def fem03_build_mesh_1d():
+    """Build Mesh with the page's optional refinement entered: tri6 at 2 ft, and
+    a 1D element size of 0.5 ft.
+
+    The 1D size box is the only one the refinement step changes.  Left blank it
+    follows the mesh element size, which is what every other run on the page
+    uses.  Every other control is left at the dialog's own default, Refine thin
+    zones included: this section carries one material, so the thin-zone plan is
+    empty and the box changes nothing.
+    """
+    from studio.dialogs import BuildMeshDialog
+
+    dlg = BuildMeshDialog(defaults={"element_type": FEM03_ELEMENT_TYPE,
+                                    "target_size": FEM03_TARGET_SIZE,
+                                    "auto_size": False,
+                                    "element_size_1d": FEM03_REFINED_1D})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem03_studio_build_mesh_1d.png")
 
 
 def fem03_run_fem_wall():
-    """Run FEM on the meshed wall model, at the bracket the page's number is
+    """Run FEM on the meshed wall model, at the bracket the page's numbers are
     measured over."""
     from studio.dialogs import RunFemDialog
 
     data = _fem03_meshed(FEM03_WALL_DONE)
     dlg = RunFemDialog(defaults={"analysis": "ssrm",
-                                 "F_min": FEM03_WALL_BRACKET[0],
-                                 "F_max": FEM03_WALL_BRACKET[1],
-                                 "tolerance": 0.01},
+                                 "F_min": FEM03_BRACKET[0],
+                                 "F_max": FEM03_BRACKET[1],
+                                 "tolerance": FEM03_TOLERANCE},
                        material_names=[m.get("name") for m in data["materials"]],
                        slope_data=data)
     dlg.resize(dlg.sizeHint())
@@ -2469,28 +2493,32 @@ def fem03_run_fem_wall():
 
 
 def fem03_wall_details():
-    """The 1D Details panel on the wall: lateral displacement, shear, bending
-    moment and soil reaction down its length.
+    """The 1D Details panel on the wall with its tip fixed: lateral displacement,
+    shear, bending moment and soil reaction down its length.
 
-    No Ito & Matsui envelope and no capacity lines are drawn, because the row
-    declares no diameter and no capacities — which is correct for a member with no
-    gaps for soil to arch across, and is the point the page reads off this shot.
+    The moment capacity the row declares draws a dashed line on the moment panel;
+    no Ito & Matsui envelope is drawn, because the row declares no diameter — which
+    is correct for a member with no gaps for soil to arch across, and is the point
+    the page reads off this shot.
 
-    The field is the one committed beside the corpus model this tutorial pair is
-    derived from, rather than a solve: a strength-reduction run on this mesh takes
-    the better part of an hour, and the committed field is the run the page's
-    factor of safety is locked to.
+    The run is made HERE rather than read from a sidecar: the tutorial files ship
+    no companions, so the panel is photographed on a solve at the page's own
+    settings, which takes about a minute.
     """
     from studio.fem_details_dialog import FemDetailsDialog
-    from xslope.fem import build_fem_data, import_fem_solution
+    from xslope.fem import build_fem_data, solve_ssrm
 
-    data = _load("%s.xlsx" % FEM03_WALL_CORPUS)
+    data = _fem03_meshed(FEM03_WALL_DONE)
+    data["pile_lines"][0]["tip_fixity"] = "fixed"
     with contextlib.redirect_stdout(io.StringIO()):
         fem_data = build_fem_data(data, data["mesh"])
-        solution = import_fem_solution(fem_data, FEM03_WALL_CORPUS)
-    dlg = FemDetailsDialog(fem_data, solution, data,
+        result = solve_ssrm(fem_data, F_min=FEM03_BRACKET[0],
+                            F_max=FEM03_BRACKET[1], tolerance=FEM03_TOLERANCE,
+                            debug_level=0, failure_criterion=FEM03_CRITERION,
+                            max_iterations=FEM03_MAX_ITERATIONS)
+    dlg = FemDetailsDialog(fem_data, result["last_solution"], data,
                            model_path=FEM03_WALL_DONE,
-                           failure_solution=solution.get("failure_solution"))
+                           failure_solution=result.get("failure_solution"))
     dlg.resize(1140, 660)
     dlg.list.setCurrentRow(dlg.list.count() - 1)
     return _grab(dlg, "fem03_studio_wall_1d_details.png")
@@ -2500,6 +2528,7 @@ SHOTS.update({
     "fem03_piles_table": fem03_piles_table,
     "fem03_run_fem_piles": fem03_run_fem_piles,
     "fem03_wall_row": fem03_wall_row,
+    "fem03_build_mesh_1d": fem03_build_mesh_1d,
     "fem03_run_fem_wall": fem03_run_fem_wall,
     "fem03_wall_details": fem03_wall_details,
 })

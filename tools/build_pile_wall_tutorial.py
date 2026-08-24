@@ -1,56 +1,41 @@
-"""Build Tutorial FEM-3's wall PAIR (the continuous sheet pile wall, in the FEM).
+"""Build Tutorial FEM-3's wall PAIR: a continuous sheet pile wall on the pile
+tutorial's own slope.
 
-FEM-3 compares what the two engines do with a row of piles.  Its second half is
-the case the finite element engine is right for: a member that really is
-continuous out of plane, where a plane-strain beam's EA and EI are already per
-metre and nothing has to be smeared.  The model is the SIGMA/W example
-transcribed for the verification corpus:
+FEM-3's first half puts two rows of drilled shafts through both engines.  Its
+second half is the case the finite element engine is right for — a member that
+really is continuous out of plane, whose section constants are already per foot
+of wall and whose stiffness is therefore not smeared over a spacing.  Keeping
+that member on the SAME slope as the pile rows is what makes the two halves
+readable against each other: identical geometry, identical clay, identical mesh
+settings, one structural line instead of two.
 
-    docs/verification/files/geostudio/gs2_wall.xlsx   the slope + the wall
-    docs/verification/files/geostudio/gs2_wall_none.xlsx   the slope alone
-      -> docs/tutorials/files/xslope_pile_wall_start.xlsx   (no wall row)
-      -> docs/tutorials/files/xslope_pile_wall.xlsx         (with the wall row)
+    docs/lem/files/xslope_piles.xlsx            the pile tutorial's model
+      -> docs/tutorials/files/xslope_pile_wall_start.xlsx   both rows removed
+      -> docs/tutorials/files/xslope_pile_wall.xlsx         the wall row added
 
-and this builder DERIVES the tutorial pair from the corpus pair rather than
-restating the model.  ``benchmarks/geostudio/build_gs2_wall.py`` stays the
-authority on what the model is; this file only re-expresses it in the form the
-campaign's Download rule requires.  Every value a reader sees came out of the
-committed corpus workbook.
+The starter is the bare slope; the completed file is the same slope with the one
+row the page's reader enters.  Both are written at the current template version
+and are sidecar-free — no ``_mesh.json`` and no ``_seep.csv`` — because the page
+builds the mesh in Studio and the model carries no seepage.
 
-Why a tutorial copy at all
---------------------------
-Two reasons, both structural:
+The wall
+--------
+A PZ-27 steel sheet pile section, driven from the crest of the face at (10, 10)
+down to the rigid base at (10, -10), stated per foot of wall:
 
-* **The corpus has no starter.**  ``gs2_wall_none.xlsx`` is a benchmark in its
-  own right, locked at its own factor of safety; the tutorial needs a file that
-  is the *completed* model minus exactly the one thing the page teaches (the
-  wall row), so that "add one row and re-run" is literally what the reader does.
-  The starter is therefore cut from ``gs2_wall.xlsx``, and this builder asserts
-  that what remains is the same model ``gs2_wall_none.xlsx`` carries.
-* **The corpus files carry sidecars.**  Both ship a committed mesh and a
-  committed seepage field, because a ``u = 'seep'`` model has to run its
-  stability solve on the mesh its nodal field was written on.  Tutorial
-  downloads are sidecar-free (the reader builds the mesh, runs the seepage and
-  runs the SSRM), so the tutorial copies must not sit beside a ``_mesh.json`` or
-  a ``_seep.csv``.
+    E     4.176e9 psf     29,000 ksi
+    I     0.00888 ft^4/ft   184.2 in^4/ft
+    Area  0.0556 ft^2/ft      8.0 in^2/ft
+    Mcap  90,600 lb*ft/ft   Fy 36 ksi x Z 30.2 in^3/ft
+    S     1
 
-The tutorial copies are written at the current template version; the corpus pair
-is older, and rebuilding the corpus is the corpus builder's business, not this
-one's.
-
-What the starter leaves out, and what it keeps
-----------------------------------------------
-Out: the single ``piles`` sheet row.  That is the page's whole teaching content
-for this half — *which* cells a continuous member fills (x1 y1 x2 y2, E, Area,
-I, S = 1) and which it correctly leaves blank (D, Vcap, Mcap), and the
-re-mesh / re-seep / re-run loop that adding a constraint line forces.
-
-Kept: everything else, including the mesh declaration (tri6 at 1.5 m with the
-0.3 m local override across the weak clay band).  The mesh is not what this page
-teaches and the reader builds it on *both* models, so both files open their
-Build Mesh dialog on the settings the page's numbers were measured at.  This is
-the one place the pair differs from FEM-2's, whose starter withholds the mesh
-because meshing is part of what FEM-2 teaches.
+``S`` = 1 passes those constants into the beam elements unchanged: a wall has no
+out-of-plane gap, so there is nothing to smear.  ``D`` is blank because there is
+no circular shaft to derive a section from and no gap for an arching theory to
+act in, ``Vcap`` is blank because the section's shear rating is not part of what
+the page checks, and ``H`` is blank because a strength reduction run never reads
+a stated pile force.  The row ships with its tip free; the page has the reader
+set it to fixed and re-run.
 
 Run:  PYTHONPATH=. python3 tools/build_pile_wall_tutorial.py         # both
       PYTHONPATH=. python3 tools/build_pile_wall_tutorial.py start   # one
@@ -58,7 +43,6 @@ Run:  PYTHONPATH=. python3 tools/build_pile_wall_tutorial.py         # both
 
 from __future__ import annotations
 
-import math
 import os
 import sys
 import warnings
@@ -71,86 +55,51 @@ sys.path.insert(0, REPO_ROOT)
 from xslope.fileio import (default_template_path, load_slope_data,  # noqa: E402
                            save_slope_data_to_xlsx)
 
-CORPUS = os.path.join(REPO_ROOT, "docs", "verification", "files", "geostudio")
-WALL_BASE = os.path.join(CORPUS, "gs2_wall.xlsx")
-NONE_BASE = os.path.join(CORPUS, "gs2_wall_none.xlsx")
+PILES_BASE = os.path.join(REPO_ROOT, "docs", "lem", "files", "xslope_piles.xlsx")
 TUTORIAL_FILES = os.path.join(REPO_ROOT, "docs", "tutorials", "files")
 
 START_OUT = "xslope_pile_wall_start.xlsx"
 DONE_OUT = "xslope_pile_wall.xlsx"
 
-#: The mesh both models are solved on, and the one the corpus builder emits:
-#: tri6 (quadratic elements are the only ones the SSRM path is verified on) at
-#: 1.5 m globally, with the weak clay band's own 0.3 m size override riding
-#: through on its profile line.
+#: The mesh the page's numbers are measured on, declared in the files so both
+#: models open their Build Mesh dialog on it: quadratic triangles (the only
+#: element the strength reduction path runs on) at 2 ft, the pile model's own
+#: target size.
 ELEMENT_TYPE = "tri6"
-TARGET_SIZE = 1.5
+TARGET_SIZE = 2.0
 
-#: The model fields the starter must share with the corpus's own no-wall model.
-#: Checked rather than assumed: if cutting the wall row out of gs2_wall does not
-#: land on gs2_wall_none, the two halves of the page are not the same slope.
-SHARED_KEYS = ("unit_system", "gamma_water", "max_depth", "k_seismic",
-               "tcrack_depth")
-MATERIAL_KEYS = ("name", "option", "gamma", "gamma_sat", "c", "phi", "E", "nu",
-                 "u", "t_cut", "k1", "k2", "alpha", "kr0", "h0")
+#: The strength reduction bracket the page runs every trial over.  1.6 would sit
+#: below the socketed wall's answer, so the files declare 2.0 and the dialog
+#: opens there.
+SSRM_F_MIN, SSRM_F_MAX = 1.0, 2.0
 
-
-def _same(a, b, tol=1e-9):
-    if isinstance(a, float) and isinstance(b, float):
-        if a != a and b != b:          # both unset (NaN): the same blank
-            return True
-        return math.isclose(a, b, rel_tol=tol, abs_tol=tol)
-    return a == b
+#: The PZ-27 sheet pile row, per foot of wall.  See the module docstring for
+#: where each number comes from.
+WALL_ROW = {
+    "x1": 10.0, "y1": 10.0, "x2": 10.0, "y2": -10.0,
+    "H": None, "theta_p": 0.0, "D_pile": None, "S": 1.0,
+    "E": 4.176e9, "I": 0.00888, "area": 0.0556,
+    "V_cap": None, "M_cap": 90600.0,
+    "head_fixity": "free", "tip_fixity": "free",
+    "appl": "active", "label": "sheet pile wall",
+}
 
 
 def _base():
-    """The corpus wall model, with its committed mesh dropped.
-
-    ``load_slope_data`` picks up ``gs2_wall_mesh.json`` and ``gs2_wall_seep.csv``
-    from beside the corpus workbook.  Neither tutorial file has a sidecar, so the
-    in-memory mesh and the nodal pore pressure field go too, and nothing written
-    here can inherit either.
-    """
-    sd = load_slope_data(WALL_BASE)
+    """The pile tutorial's slope with both pile rows removed and the mesh and
+    strength reduction settings the page runs at declared on the main sheet."""
+    sd = load_slope_data(PILES_BASE)
+    if len(sd["pile_lines"]) != 2:
+        raise SystemExit(f"{os.path.basename(PILES_BASE)} carries "
+                         f"{len(sd['pile_lines'])} pile rows, expected 2")
     sd.pop("mesh", None)
     sd.pop("seep_u", None)
-    if len(sd["pile_lines"]) != 1:
-        raise SystemExit(f"{os.path.basename(WALL_BASE)} carries "
-                         f"{len(sd['pile_lines'])} pile rows, expected 1")
+    sd["pile_lines"] = []
     sd["element_type"] = ELEMENT_TYPE
     sd["target_size"] = TARGET_SIZE
+    sd["ssrm_f_min"] = SSRM_F_MIN
+    sd["ssrm_f_max"] = SSRM_F_MAX
     return sd
-
-
-def _check_starter_is_the_corpus_no_wall_model(sd):
-    """The starter, cut from the wall model, must be the corpus's no-wall model."""
-    none = load_slope_data(NONE_BASE)
-    none.pop("mesh", None)
-    none.pop("seep_u", None)
-    if none["pile_lines"]:
-        raise SystemExit(f"{os.path.basename(NONE_BASE)} carries a pile row")
-    if str(sd["ground_surface"]) != str(none["ground_surface"]):
-        raise SystemExit("the corpus pair does not share a ground surface")
-    for k in SHARED_KEYS:
-        if not _same(sd[k], none[k]):
-            raise SystemExit(f"{k} differs across the corpus pair "
-                             f"({sd[k]!r} vs {none[k]!r})")
-    if len(sd["materials"]) != len(none["materials"]):
-        raise SystemExit("the corpus pair carries different material counts")
-    for a, b in zip(sd["materials"], none["materials"]):
-        for k in MATERIAL_KEYS:
-            if not _same(a.get(k), b.get(k)):
-                raise SystemExit(f"material {a['name']}: {k} differs across the "
-                                 f"corpus pair ({a.get(k)!r} vs {b.get(k)!r})")
-    if len(sd["profile_lines"]) != len(none["profile_lines"]):
-        raise SystemExit("the corpus pair carries different profile line counts")
-    for a, b in zip(sd["profile_lines"], none["profile_lines"]):
-        if a["mat_id"] != b["mat_id"] or list(a["coords"]) != list(b["coords"]) \
-                or not _same(a["size"], b["size"]):
-            raise SystemExit("a profile line differs across the corpus pair")
-    if sd["seepage_bc"] != none["seepage_bc"]:
-        raise SystemExit("the seepage boundary conditions differ across the "
-                         "corpus pair")
 
 
 def _write(sd, filename):
@@ -166,32 +115,19 @@ def _write(sd, filename):
 
 
 def build_start():
-    """The starter: the whole slope — geometry, the three zones including the
-    elastic OC soil, the tensile cut-off on both Mohr-Coulomb zones, the seepage
-    boundary conditions, the weak-clay size override — and no wall.
+    """The starter: the slope on its own, with no structural line in it.
 
-    This is also the page's first run: mesh it, solve the seepage on that mesh,
-    run the SSRM, and read the slope's own factor of safety.
+    This is the page's first run of the second half — mesh it, run the strength
+    reduction, and read what the slope holds without the wall.
     """
-    sd = _base()
-    sd["pile_lines"] = []
-    _check_starter_is_the_corpus_no_wall_model(sd)
-    return _write(sd, START_OUT)
+    return _write(_base(), START_OUT)
 
 
 def build_done():
-    """The completed file: the same model with the one wall row the reader adds.
-
-    The row is the corpus model's, unchanged — a vertical member from (38, 10) to
-    (38, 1) with E = 2x10^8 kPa, Area = 0.02 m2/m and I = 0.0005 m4/m at S = 1,
-    and D, Vcap and Mcap left blank.  S = 1 because the wall is continuous out of
-    plane, so the section constants are already per metre and XSLOPE's spacing
-    divisor must not reduce them; D is blank because there is no gap between
-    members for an arching theory to act in, so no Ito & Matsui limit pressure
-    applies; the capacities are blank because the corpus transcription carries no
-    structural rating for the section.
-    """
+    """The completed file: the same slope with the one wall row the reader
+    enters, tip free."""
     sd = _base()
+    sd["pile_lines"] = [dict(WALL_ROW)]
     return _write(sd, DONE_OUT)
 
 

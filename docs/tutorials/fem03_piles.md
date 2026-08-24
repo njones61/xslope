@@ -1,6 +1,6 @@
 ---
 title: "Tutorial FEM-3 — Piles: LEM vs FEM"
-description: "Two rows of drilled shafts and a sheet pile wall, each put through both of XSLOPE's engines — why a plane-strain finite element model turns a discrete pile row into a continuous wall, what pile spacing does to each engine's answer and what it cannot do to the finite element one, and the moment, shear and deflection a continuous wall carries, which no limit equilibrium analysis can report."
+description: "Two rows of drilled shafts and a sheet pile wall on the same slope, each put through both of XSLOPE's engines — why a plane-strain finite element model turns a discrete pile row into a continuous wall, why the pile tip decides what the two engines say about the same shafts, and the moment, shear and deflection a wall carries, which no limit equilibrium analysis can report."
 ---
 
 # Tutorial FEM-3 — Piles: LEM vs FEM
@@ -23,15 +23,12 @@ width of section. Nothing is prescribed. The beam carries whatever the deforming
 soil pushes onto it, over its whole length rather than at one point, and the run
 reports the moment, shear, deflection and soil reaction down the member.
 
-What separates the two is that a two-dimensional analysis is **plane strain**:
-every member in it is continuous out of plane. There is no gap between piles for
-soil to move through, so a discrete row put into the finite element engine is a
-wall. The rule that follows is measured on two models below. A discrete row at
-spacing belongs in the limit equilibrium engine with Ito & Matsui, which models
-the flow between piles directly. A member that is genuinely continuous — a sheet
-pile, diaphragm or secant wall — or a row close enough to act as one belongs in
-the finite element engine, which is also the only route that reports what the
-member carries.
+Two things follow from that difference, and both are measured below. A
+two-dimensional analysis is **plane strain**: every member in it is continuous
+out of plane, so a discrete row put into the finite element engine is a wall
+with no gaps for soil to squeeze through. And a beam model computes what the
+limit equilibrium force assumes — whether the shaft can develop the moment its
+capacity allows — which turns out to depend on what holds the pile at its ends.
 
 Work through [LEM-12](lem12_piles.md) before this page: it builds the pile model
 used in the first half and covers the Ito & Matsui force, the structural
@@ -45,15 +42,15 @@ directly per foot of wall.
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Finite element (strength reduction)</p></div>
-<div class="tgt-tile"><span class="tg-label">Build &amp; explore</span><p>~75 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Build &amp; explore</span><p>~60 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn which engine models which kind of pile: why a plane-strain
-model turns a discrete row into a wall, what spacing is worth to each engine,
-and how to model a continuous wall and read the moment, shear and deflection it
-carries.
+model turns a discrete row into a wall, what the pile tip is worth to each
+engine, what spacing does to both, and how to model a continuous wall and read
+the moment, shear and deflection it carries.
 </div>
-<p><span class="tg-pill">piles</span><span class="tg-pill">Ito &amp; Matsui</span><span class="tg-pill">pile spacing</span><span class="tg-pill">beam elements</span><span class="tg-pill">smeared stiffness</span><span class="tg-pill">plane strain</span><span class="tg-pill">sheet pile wall</span><span class="tg-pill">continuous member</span><span class="tg-pill">strength reduction</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">steady seepage</span><span class="tg-pill">shear strain</span><span class="tg-pill">1D details</span><span class="tg-pill">moment and shear profiles</span></p>
+<p><span class="tg-pill">piles</span><span class="tg-pill">Ito &amp; Matsui</span><span class="tg-pill">pile spacing</span><span class="tg-pill">head and tip fixity</span><span class="tg-pill">beam elements</span><span class="tg-pill">smeared stiffness</span><span class="tg-pill">plane strain</span><span class="tg-pill">sheet pile wall</span><span class="tg-pill">continuous member</span><span class="tg-pill">strength reduction</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">1D element size</span><span class="tg-pill">shear strain</span><span class="tg-pill">moment and shear profiles</span></p>
 <div class="tgm-model" markdown>
 **Pile row model** — [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx), the
 completed model from [LEM-12](lem12_piles.md), which is also
@@ -61,13 +58,16 @@ completed model from [LEM-12](lem12_piles.md), which is also
 inputs, so nothing is entered on the first half of this page
 
 **Wall starter file** — [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx),
-the sheet pile wall model with the wall itself left out; this is the file the
-second half starts from
+the same slope with both pile rows taken out; this is the file the second half
+starts from
 
 **Wall completed model** — [xslope_pile_wall.xlsx](files/xslope_pile_wall.xlsx),
-the same model with the wall row entered; open it to skip to
-[the wall's run](#re-meshing-and-running-again). Neither wall file carries a mesh
-or a seepage solution, so both are built on the page
+the same file with the wall row entered; open it to skip to
+[the wall's run](#re-meshing-and-running-again). Neither wall file carries a
+mesh, so both are meshed on the page
+
+Every strength reduction run below takes between 30 seconds and about
+two minutes.
 </div>
 </div>
 
@@ -115,8 +115,9 @@ only: `H`, the stated pile force, and `Appl`, how that force enters the
 equations. `H` is blank on both rows, and that blank is what brings Ito & Matsui
 in: with no force stated, the limit equilibrium engine computes one from `D`,
 `S` and the soil around the pile; enter a number and that number is used
-instead. Blue is finite element only: `E`, `I`, `Area` and `Fixity`. The black
-columns are read by both — `D` and `S`, and also `Vcap` and `Mcap`, which cap the
+instead. Blue is finite element only: `E`, `I`, `Area`, and `Head` and `Tip`,
+which say whether each end of the member is free to rotate. The black columns
+are read by both — `D` and `S`, and also `Vcap` and `Mcap`, which cap the
 per-pile force in the limit equilibrium engine and, in the finite element engine,
 clip the beam shear at Vcap ÷ S and release a plastic hinge where the beam moment
 reaches Mcap ÷ S. On this file `D` and `S` carry the most. Every stiffness the
@@ -131,11 +132,11 @@ Hovering `S` says what each engine does with it:
 > plane-strain stiffness of the smeared row; what it cannot model is the soil
 > arching between piles.
 
-`H` is blank on both rows, which is what tells the limit equilibrium engine to
-compute the force by Ito & Matsui rather than use a stated one, and `Appl` is
-`Active`, meaning that force enters the equilibrium equations as it stands.
-[LEM-12](lem12_piles.md#the-pile-rows) reads the whole row column by column.
-Click **Cancel**.
+`Appl` is `Active`, meaning the computed force enters the equilibrium equations
+as it stands; the alternative, `Passive`, divides it by the factor of safety,
+and [LEM-12](lem12_piles.md#the-pile-rows) reads the whole row column by column.
+Both rows open with `Head` and `Tip` on `free`, which the spacing section below
+returns to. Click **Cancel**.
 
 ### The limit equilibrium answer
 
@@ -152,7 +153,8 @@ Click **Run**.
 
 **FS = 1.842**, on a deep circle that leaves the ground 13.5 ft beyond the toe
 and exits on the crest at x = 35. The two red dots are where it crosses the pile
-rows. The rows deliver **4,367.6 lb/ft** to the slices there, both of them
+rows. The rows deliver **4,367.6 lb/ft** to the slices there — 15,244 lb from
+each shaft of the lower row and 10,962 lb from each of the upper, both of them
 limited by the shafts' moment capacity rather than by what the soil could
 supply; [LEM-12](lem12_piles.md#how-the-force-is-computed) works through that
 calculation.
@@ -168,7 +170,9 @@ be quadratic, and [FEM-1](fem01_strength_reduction.md#building-the-mesh)
 measures what linear elements cost. Untick **Auto-size from geometry** and set
 **Target element size** to `2`, which is what the
 [FEM sample problem](../fem/samples.md) for this model uses. Leave the rest of
-the dialog alone and click **Build**.
+the dialog alone. **Refine thin zones** stays ticked as it opens: it drives the
+local element size down through any material band thinner than one element, and
+this section is a single clay, so it finds nothing to act on. Click **Build**.
 
 The mesh comes out at **3,180 nodes and 1,521 triangles**, with the two pile
 rows carried in as constraints and discretized into **18 beam elements** — 8 on
@@ -192,64 +196,52 @@ that means and when to enter a cap. The note below it says that the two pile
 rows carry a diameter with no `Area` or `I`, so the engine is deriving the solid
 circular section — the derivation described above, reported rather than assumed.
 
-Set **F min (SSRM)** to `1.00` and **F max (SSRM)** to `1.60`, which brackets
-this model's answer, and leave everything else as it opens: tolerance 0.0100,
-**Max iterations per trial** 12,000, **Iteration ceiling** 50,000, **Rollers**
-on the sides, and **Non-convergence** as the failure criterion. Click **Run**.
-The run takes about 40 seconds.
+Set **F min (SSRM)** to `1.00` and **F max (SSRM)** to `2.00`. A bracket has to
+contain the answer, and two of the runs below stand above 1.6, so every run on
+this page uses the same 1.0 to 2.0 and the answers stay comparable.
+Leave everything else as it opens: tolerance 0.0100, **Max iterations per trial**
+12,000, **Iteration ceiling** 50,000, **Rollers** on the sides, and
+**Non-convergence** as the failure criterion. Click **Run**. The run takes about
+45 seconds.
 
-**FS = 1.361**, from a final bracket of [1.3563, 1.3656] in eight trials — two
-bracket checks and six bisections. Spencer's method gave 1.842 on the same file.
+**FS = 1.363**, from a final bracket of [1.3594, 1.3672] in nine trials — two
+bracket checks and seven bisections. Spencer's method gave 1.842 on the same
+file.
+
+The [FEM sample problem](../fem/samples.md) for this model reports 1.361. A
+bisection stops once its bracket is narrower than the tolerance and returns the
+middle of it, so an answer carries the width of that last bracket — 0.008 here —
+and a search started from 1.0 to 1.6 closes on a different point inside it than
+one started from 1.0 to 2.0.
 
 ![The mechanism at failure, with the pile rows colored by shear force](images/fem03_fem_shear_piles.png){width=1000}
 
 The contours are viscoplastic shear strain — the shearing left after the elastic
 response is subtracted. The band runs up from the flat ground beyond the toe,
 past the lower row, and concentrates on the uphill side of the upper row, where
-the strain peaks at about (12, 7). From there the band reaches the face at the
-upper row's head, near (10, 10). Nowhere does it pass *through* a row, because in
-plane strain there is nothing to pass through: each row is a continuous
-obstruction over the full length of the slope, and the mechanism has to climb
-over it.
-
-### How the pile force is applied
-
-Part of the 0.48 between 1.842 and 1.361 is a convention rather than an
-idealization, and it has to be separated out before the rest is attributed to
-plane strain. The `Appl` column
-on a pile row has two settings. `Active` hands the computed force to the
-equilibrium equations as it stands. It is the default, and what this file uses,
-because it is the standard practice: the pile force is a load the moving soil
-applies to the pile, and it enters the analysis the way any other applied load
-does, at its full value. `Passive` treats it as a resistance and divides it by
-the factor of safety, so the support carries the same margin as the soil
-strength does. Slide2 applies a pile force the passive way, and XSLOPE's own
-[VP106](../verification/rocscience.md#vp106) files are built that way to match
-it.
-
-Set `Appl` to `Passive` on both rows and search again. Spencer returns
-**1.574** instead of 1.842. The choice is worth 0.268 of factor of safety on
-this model, against 0.481 between the limit equilibrium and finite element
-answers — over half of the difference between the engines. It also moves the
-critical surface: under `Passive` the deep circle loses to a shallow one that
-skims the toe. Set the column back to `Active` before continuing.
+the strain peaks at 0.75 in the element centered on (10.5, 9.0). From there it
+reaches the face at the upper row's head, near (10, 10). Nowhere does it pass
+*through* a row, because in plane strain there is nothing to pass through: each
+row is a continuous obstruction over the full length of the slope, and the
+mechanism has to climb over it.
 
 ### What spacing does to each engine
 
-A designer adjusts the spacing once the diameter is set, and the two engines part
-company over it more sharply than over anything else. The sweep below runs both
-of them across a 4× range in spacing — 3, 6 and 12 ft, S/D 1.5 to 6 — with
-nothing changing but the `S` cell on the two rows. Ito & Matsui is applicable for
-S/D between about 2 and 8, so the 3 ft point sits below the band and raises the
+A designer adjusts the spacing once the diameter is set, and it is the input
+that separates the two engines most sharply. The sweep below runs both of them
+across a 4× range in spacing — 3, 6 and 12 ft, S/D 1.5 to 6 — with nothing
+changing but the `S` cell on the two rows. Ito & Matsui is applicable for S/D
+between about 2 and 8, so the 3 ft point sits below the band and raises the
 **Model checks** warning [LEM-12](lem12_piles.md#what-the-spacing-is-worth)
 discusses. Each limit equilibrium point is its own Spencer search, because
 spacing changes which surface governs.
 
 ![Factor of safety against pile spacing, both engines on one axis](images/fem03_spacing_sweep.png){width=800}
 
-The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%. The
-three strength reduction runs return the same bracket, [1.356, 1.366], and so the
-same answer, 1.361, with the same verdict at every trial.
+The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%. The three strength reduction runs return the same bracket,
+[1.3594, 1.3672], and so the same answer, 1.363, with the same verdict at every
+trial. The purple line is a second set of strength reduction runs on the same
+rows, which the next section comes to.
 
 Run one point of it to see both. Open **Piles**, set `S` to `12` on both rows
 with `H` still blank, and **OK**. Search with Spencer again: **FS = 1.409**, and
@@ -260,56 +252,133 @@ elevation −5.1, more than 5 ft below the toe, and exited 14.9 ft behind the
 crest. Widening the gap did not only lower the answer, it changed which surface
 governs, which [LEM-12](lem12_piles.md#what-the-spacing-is-worth) covers in full.
 
-The mesh is still good: a pile row enters the mesh only as a constraint line,
-so Studio throws the mesh away when a row's endpoints move or a row is added or
+The mesh is still good: a pile row enters the mesh only as a constraint line, so
+Studio throws the mesh away when a row's endpoints move or a row is added or
 removed, not when `S` or any other property on it changes. Switch to **FEM** and
-**Run → Run FEM…** with the same bracket: **FS = 1.361**, the same answer as at
+**Run → Run FEM…** with the same bracket: **FS = 1.363**, the same answer as at
 6 ft, on the same 3,180 nodes and 1,521 triangles.
 
-The obvious reading of that flat line is wrong. Dividing *EA* and *EI* by `S` is not bookkeeping the finite element
-engine does to dispose of the spacing column — it is the correct plane-strain
-stiffness of a row smeared into a wall, and it responds to `S` exactly as it
-should. Over this sweep the smeared stiffness falls by a factor of four, and the
-run's internals move with it. Each row below is read from that spacing's last
-trial to reach equilibrium, F = 1.356:
+The flat line is not the model ignoring the spacing column. Over this sweep the
+smeared bending stiffness *EI*/S falls fourfold, and what the shafts carry moves
+with it. Each row below is read at that spacing's captured mechanism:
 
-| S (ft) | *EI*/S (lb·ft²) | Peak moment per unit width (lb·ft/ft) | Peak moment per pile (lb·ft) | Fraction of M<sub>cap</sub> | Elements yielded in bending |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| 3 | 1.357 × 10<sup>8</sup> | 6,518 | 19,553 | 33% | 0 |
-| 6 | 6.786 × 10<sup>7</sup> | 6,319 | 37,912 | 63% | 0 |
-| 12 | 3.393 × 10<sup>7</sup> | 5,000 | 60,000 | 100% | 8 |
+| S (ft) | *EI*/S (lb·ft²) | Peak moment per unit width (lb·ft/ft) | Peak moment per shaft (lb·ft) | Fraction of M<sub>cap</sub> |
+|:---:|:---:|:---:|:---:|:---:|
+| 3 | 1.357 × 10<sup>8</sup> | 4,412 | 13,235 | 22% |
+| 6 | 6.786 × 10<sup>7</sup> | 4,412 | 26,470 | 44% |
+| 12 | 3.393 × 10<sup>7</sup> | 4,412 | 52,941 | 88% |
 
-Read across the two moment columns. The moment *per unit width of slope* barely
-moves, which is the quantity the smear holds nearly constant. The moment *per
-shaft* is that number times the spacing, and it triples: at 12 ft each shaft
-reaches its full 60,000 lb·ft of capacity and eight beam elements yield in
-bending. The model is responding to spacing in every quantity a designer would
-check. What does not move is the factor of safety.
+The moment *per unit width of slope* does not move at all, which is the quantity
+the smear holds constant. The moment *per shaft* is that number times the
+spacing, so it quadruples, and at 12 ft each shaft is at 88% of its capacity.
+Every quantity a designer would check responds to spacing. The factor of safety
+does not.
 
-Two things explain that. A strength reduction analysis finds the factor by which
-the soil's strength has to be divided before equilibrium becomes impossible, so
-the answer is decided by strength, and stiffness reaches it only through the
-ratio of the member's stiffness to the soil's. Across this sweep that ratio
-stays high — a steel-stiff shaft against a soft clay — so the wall stays
-effectively rigid and the mechanism has to climb over it at every spacing. Spread
-the row far enough and the smeared wall would go flexible, the mechanism would
-begin to bend it, and the factor of safety would fall back toward the unpiled
-1.164. What the two-dimensional model cannot represent at any spacing is the
-mechanism that spacing actually governs — soil arching onto the shafts and
-squeezing through the gaps between them, which is exactly what Ito & Matsui
-computes, and which a plane-strain section has no gaps to hold.
+### What the flat line is measuring
 
-Set `S` back to `6` on both rows before the next section, or reopen the file.
+Four runs locate what is holding that answer at 1.363. Each changes one thing on
+both rows, and each is the same bracket on the same mesh, so the numbers are
+comparable to the 1.363 above.
+
+| Change | FS |
+|---|:---:|
+| the file as it stands | 1.363 |
+| shaft modulus `E` × 100 | 1.363 |
+| shaft modulus `E` ÷ 100 | 1.277 |
+| `Vcap` and `Mcap` cleared | 1.363 |
+| `Head` set to `fixed`, tips still free | 1.793 |
+
+Stiffness is not what holds it: a hundredfold stiffer shaft returns the same
+answer to four figures, and only a hundredfold *softer* one — a shaft the clay
+can bend — moves it, and then only to 1.277. The structural capacities are not
+what holds it either: clearing both leaves the answer unchanged, because with
+the rows as shipped nothing reaches capacity anyway. What moves the answer is
+restraining rotation at an end.
+
+That is a physical question about the shafts rather than a modeling knob. Both
+rows run from the face down to the rigid base, and both open with `Head` and
+`Tip` on `free`. With neither end held, nothing but the clay itself resists the
+member turning, so the rows tilt with the sliding mass instead of bending
+against a restraint: the moment falls to zero at both ends, and at the captured
+mechanism the shafts stand at 44% of their moment capacity. A drilled shaft
+bearing on rock behaves that way. One socketed into the rock does not, and `Tip`
+is the cell that says which it is.
+
+Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
+survives a fixity change, as it survived the spacing change. Run the same
+bracket again. This run takes about two minutes.
+
+**FS = 1.793**, from [1.7891, 1.7969]. Both rows now reach their full
+60,000 lb·ft over most of their length: 12 beam elements are at capacity in
+bending at the last converged trial and 14 at the captured mechanism, one of them
+also at its shear capacity. And the failure the run finds is a different one:
+
+![The mechanism with both pile tips fixed: a shallow patch of the face above the upper row](images/fem03_fem_shear_piles_fixed.png){width=1000}
+
+The deep band through the toe is gone. What is left is four elements at the face
+just above the upper row's head, between x = 10.9 and 14.1 at elevation 9.9 to
+10.9, with a peak strain of 0.29 where the free-tip run's captured collapse
+reached 0.75 — a surficial failure of the slope face above the reinforcement
+rather than a slide through it.
+
+Run the spacing sweep again with the tips fixed and it is flat too, at 1.793,
+1.793 and 1.785 for 3, 6 and 12 ft — the purple line on the figure above. This
+time the shafts are at their moment capacity at every spacing, the peak moment
+per unit width tracking M<sub>cap</sub> ÷ S exactly: 20,000, 10,000 and
+5,000 lb·ft/ft. Whichever end condition the rows are given, the factor of safety
+is decided by the mechanism the smeared wall forces the soil into, not by how
+much moment each shaft carries.
+
+Set `Tip` back to `free` on both rows, or reopen the file, before the next
+section.
+
+### Which answer is right
+
+With the tips free the two engines are 0.48 apart. With the tips fixed they are
+0.049 apart — 1.842 against 1.793, under 3%. The tip condition, not the engine,
+is most of the disagreement, and each engine treats it differently.
+
+The limit equilibrium force cannot state a tip condition. It is the smaller of
+the Ito & Matsui soil force and what the shaft's structure can carry, and on this
+model at 6 ft the structural cap governs: 60,000 lb·ft of moment capacity
+divided by the arm from the pressure centroid to the failure surface, and then
+by the 6 ft spacing, which
+[LEM-12](lem12_piles.md#what-the-structural-capacity-does) works through. Behind
+that limit is an assumption that the shaft develops its full moment capacity,
+and developing it takes an end able to hold the moment.
+
+The finite element run does not assume it. It computes the moment the soil can
+actually push into the member and reports it: 44% of capacity with the tips
+free, 100% with them fixed. So the two engines agree once the model is told what
+the limit equilibrium method had already assumed, and the real question is what
+holds the shaft — bearing on the stratum, or socketed into it. That is a
+question about the design, and it is one cell in the file.
+
+The 3% that is left at 6 ft is a difference in mechanism rather than in force.
+Spencer's search returns a deep circle through the toe; the tip-fixed strength
+reduction run fails in the patch of face above the upper row, which is a
+shallower and slightly weaker mechanism, and not one the circular search
+reports.
+
+Spacing separates the engines for a related reason, and the pile report says
+which limit is binding at each point of the sweep. At 3 and 6 ft the moment
+capacity governs both rows, and the Ito & Matsui soil force is far above it —
+26 and 55 times the force used at 3 ft, 3 and 7 times at 6 ft. Only at 12 ft
+does the soil force itself govern, at 6,007 and 15,193 lb per shaft. So over
+most of this sweep the falling blue curve is a structural capacity divided by a
+widening spacing on a moving critical circle, and arching becomes the binding
+mechanism only at the wide end — where the finite element model, having no gaps,
+has nothing to represent it with.
 
 ### The one problem with a three-dimensional answer
 
-Neither number in the comparison table is a three-dimensional answer, and the
-direction of the plane-strain error is only known where a three-dimensional
-reference exists. One benchmark in XSLOPE's corpus has one. Cai & Ugai (2000)
-analyzed a pile-stabilized slope with a strength reduction finite element model
-that meshes the individual piles, the soil between them, and the slip interface
-on each pile's surface. XSLOPE runs the same slope through both of its engines
-in [VP106](../verification/rocscience.md#vp106) and
+Neither engine gives a three-dimensional answer, and the direction of the
+plane-strain error is only known where a three-dimensional reference exists. One
+benchmark in XSLOPE's corpus has one. Cai & Ugai (2000) analyzed a
+pile-stabilized slope with a strength reduction finite element model that meshes
+the individual piles, the soil between them, and the slip interface on each
+pile's surface. XSLOPE runs the same slope through both of its engines in
+[VP106](../verification/rocscience.md#vp106) and
 [the VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem):
 
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
@@ -330,129 +399,88 @@ So the reason to take a discrete row's factor of safety from the limit
 equilibrium engine is not that its number is larger or smaller. It is that Ito &
 Matsui is a theory *of* the three-dimensional mechanism, while the beam model is
 a two-dimensional substitute for it. The finite element run on a discrete row
-still tells you what the shafts are carrying — the moment table above stands;
-it is the factor of safety that carries the idealization.
+still tells you what the shafts are carrying, and — as the tip runs show — under
+what end condition they could carry it.
 
 ---
 
 ## The continuous wall
 
-![A 20 m slope over a weak clay band, held by a sheet pile wall driven from the bench](images/fem03_wall_problem_sketch.png){width=1000}
+The second half is the case the finite element engine is right for: a member
+that really is continuous out of plane. It is the same slope as above — the same
+clay, the same 20 ft face, the same rigid base at elevation −10 — with both pile
+rows taken out and one **sheet pile wall** put in on the upper row's line, from
+the crest of the face at (10, 10) down to the base at (10, −10).
 
-The second half is the case the finite element engine is right for, and it is a
-different model with a different unit system. Everything below is **SI** —
-meters, kN/m³ and kPa — because this model is a transcription of GeoStudio's
-SIGMA/W *slope stabilization with piles* example and converting it would cut it
-loose from the published answer it is checked against.
+The section is a PZ-27 steel sheet pile, and its properties are per foot of
+wall rather than per member:
 
-The section is 64 m wide and 24 m tall, from a rigid base at elevation −4 to a
-crest at elevation 20. The face runs from the crest at 1.6:1 down to a bench at
-elevation 10, then at 2:1 down to level ground at elevation 8. Sandy clay fills
-everything above elevation 6. Under it a **1 m band of weak clay** runs the full
-width between elevations 5 and 6, with no cohesion and φ′ = 10°, and under that
-a stiff overconsolidated soil, modeled as linear elastic, reaches the base. The
-weak band is what makes the slope marginal. A **sheet pile wall** is driven from
-the middle of the bench at x = 38, from elevation 10 down to elevation 1 — 9 m,
-through the band and 4 m into the stiff soil under it.
+| Property | Value | From |
+|---|---:|---|
+| E | 4.176 × 10<sup>9</sup> psf | 29,000 ksi |
+| I | 0.00888 ft⁴/ft | 184.2 in⁴/ft |
+| Area | 0.0556 ft²/ft | 8.0 in²/ft |
+| M<sub>cap</sub> | 90,600 lb·ft/ft | F<sub>y</sub> 36 ksi × Z 30.2 in³/ft |
 
-Pore pressures come from a **steady-state seepage solution** rather than from a
-water table drawn on the section: total head is held at 14 m on the upstream
-face and 8 m downstream, and the seepage run computes the field between them.
-[SEEP-2](seep02_johnson_dam.md) covers how a steady seepage solve is set up and
-read; this page runs it and uses the field.
-
-### Opening the starter file
-
-Download [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx) and
-open it with **File → Open…**. It is the whole model except the wall: the
-geometry, the three materials with their elastic properties, the seepage
-boundary conditions, and the element type and target size the mesh needs.
-
-![The wall starter: three profile lines and no wall](images/fem03_inputs_wall.png){width=1000}
-
-The Inputs plot draws the three material zones as profile lines — the sandy clay
-down to elevation 6, the weak clay band between 6 and 5, and the overconsolidated
-soil below it — over the hatched maximum-depth line at elevation −4. The band is
-thin enough on this scale that its two lines nearly touch, which is why the file
-carries a local element size override of 0.3 m on it: a controlling band needs
-several element rows across it whatever the rest of the mesh is doing.
-
-### Meshing and solving the seepage
-
-Switch the mode strip to **Seepage** and click **Run → Build Mesh…** The file
-already declares **Quadratic triangles (tri6)** with **Auto-size from geometry**
-off at `1.5`, so both are set when the dialog opens. Click **Build**.
-
-The mesh comes out at **13,127 nodes and 6,484 triangles**, refined through the
-weak band by the size override the file carries.
-
-Click **Run → Run Seep…** and **Run**, with nothing on the dialog changed. It
-converges in about half a second, at a flow rate of
-1.9432 × 10<sup>−5</sup> m³/s per meter of section. The solved pore pressures go
-into the model, where the strength reduction run reads them: all three materials
-have their `u` set to `seep`.
-
-The order of those two steps matters for the rest of the page. Building a mesh
-discards any seepage solution computed on the old one, so a re-mesh is always
-followed by a re-solve.
+Nothing else about the model changes, so every number in this half is
+comparable to the first half's.
 
 ### The slope without the wall
 
-Switch the mode strip to **FEM** and click **Run → Run FEM…** The **Model
-checks** panel reads *No problems found for this run*. Set **F min (SSRM)** to
-`0.95` and **F max (SSRM)** to `1.25`, leave everything else as it opens, and
-click **Run**.
+Download [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx) and
+open it with **File → Open…** It is the slope with no structural line in it at
+all.
 
-This run takes about **20 minutes**. It is a 6,484-element mesh and the trials
-near the critical factor iterate tens of thousands of times each before they
-settle, so it can be left going.
+![The wall starter: the same slope with nothing in it](images/fem03_inputs_wall.png){width=1000}
 
-**FS = 1.020**, from a final bracket of [1.0156, 1.0250] in seven trials.
-SIGMA/W reads about 1.025 on the same model, and two other analyses in the same
-project put it at 1.033 and 1.035 —
-[the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) states
-how each of those published figures is read.
+The Inputs plot draws the section over the hatched maximum-depth line at
+elevation −10, with the same starting circle the pile model carries; this half
+runs no search, so nothing is done with it.
+
+Switch the mode strip to **FEM** and click **Run → Build Mesh…** The file
+declares **Quadratic triangles (tri6)** with **Auto-size from geometry** off at
+`2`, so both are already set when the dialog opens. Click **Build**: **3,154
+nodes and 1,509 triangles**, and no beam elements, because there is nothing to
+put on.
+
+Click **Run → Run FEM…** The file also declares the bracket, so **F min (SSRM)**
+and **F max (SSRM)** open on `1.00` and `2.00`. Leave the rest as it opens and
+click **Run**. This run takes about **100 seconds** — longer than the piled runs
+of the first half, because a slope closer to failing takes more iterations at
+each trial to decide.
+
+**FS = 1.160**, from a final bracket of [1.1563, 1.1641]. That is the number the
+wall is worth measuring against.
 
 ### Adding the wall
 
 The wall goes in as one row of the piles table, and which cells it fills is the
-content of this step. Open **Piles** in the **Inputs** dock, press **List
-view**, and click **Add**. The new row opens with its **Label** reading `Pile`;
-type `sheet pile wall` over it, which is the name the results panels use.
+content of this step. Open **Piles** in the **Inputs** dock, press **Table
+view**, and click **Add row**. The new row opens with its **Label** reading
+`Pile`; type `sheet pile wall` over it, which is the name the results panels
+use.
 
-![The wall row: S = 1, no diameter, no capacities, section constants entered directly](images/fem03_studio_wall_row.png)
+![The wall row: S = 1, no diameter, section constants entered directly](images/fem03_studio_wall_row.png)
 
-Enter the geometry — `x1` 38, `y1` 10, `x2` 38, `y2` 1 — and then the three
-section values, all of them per meter of wall:
+Enter the geometry — `x1` 10, `y1` 10, `x2` 10, `y2` −10 — then `E`
+`4176000000`, `I` `0.00888` and `Area` `0.0556` from the table above, `Mcap`
+`90600`, and `S` `1`. Leave `H`, `D` and `Vcap` empty.
 
-| E | I | Area |
-|---:|---:|---:|
-| 200000000 | 0.0005 | 0.02 |
+Each of those follows from the member being continuous. A sheet pile wall has no
+out-of-plane gap, so its section constants already are per foot of wall, and a
+spacing of 1 passes them into the beam elements unchanged instead of smearing one
+member's stiffness over a spacing. `D` is blank because there is no circular
+shaft to derive a section from — `I` and `Area` are given directly, which is the
+other way the engine accepts a section — and because there is no gap for soil to
+squeeze through, so no arching theory applies. `Vcap` is blank because this run
+checks the wall in bending only. `H` is blank because a strength reduction run
+never uses a stated pile force.
 
-That is 2.0 × 10<sup>8</sup> kPa of modulus, 5.0 × 10<sup>−4</sup> m⁴/m of
-moment of inertia and 0.02 m²/m of area, giving *EA* = 4.0 × 10<sup>6</sup> kN/m
-and *EI* = 1.0 × 10<sup>5</sup> kN·m²/m.
-
-Set **S** to `1`, and leave `H`, `D`, `Vcap` and `Mcap` empty.
-
-A sheet pile wall has no out-of-plane gap, so its section constants already are
-per meter of wall, and a spacing of 1 passes them into the beam elements
-unchanged instead of smearing one member's stiffness over a spacing. The blank
-cells follow from the same fact. `D` is blank because there is no circular shaft
-to derive a section from — `I` and `Area` are given directly, which is the other
-way the engine accepts a section. `Vcap` and `Mcap` are blank because this run is asked to report what the
-wall carries rather than to check it against a declared capacity, and, as the
-last section shows, the detail panel draws a capacity line only where one is
-entered. `H` is blank because a finite element run never uses a stated pile
-force.
-
-A new row opens with **Appl** on `active` and **Fixity** on `free`. The figure
-above is from the completed model, which carries `passive` — inherited from the
-SIGMA/W transcription it was built from — and either setting is inert in this
-run: `Appl` is a limit equilibrium input, and a strength reduction run never
-reads it. `Fixity` `free` leaves both ends of the wall able to rotate, which is
-what a driven sheet pile with no capping beam does, and the moment profile below
-is read against it.
+A new row also opens with **Appl** on `active` and both **Head** and **Tip** on
+`free`. `Appl` is inert here: it is a limit equilibrium input, and a strength
+reduction run never reads it. `Head` `free` is a driven sheet pile with no
+capping beam. `Tip` `free` is the wall's toe standing on the base rather than
+driven into it, which is the first of the two runs below.
 
 Click **OK**.
 
@@ -460,113 +488,121 @@ Click **OK**.
 
 The wall line is a mesh constraint — the beam elements have to lie on element
 edges and share their nodes with the soil — so the mesh has to be built again
-with it in place, and the seepage solution has to be recomputed on the new mesh.
+with it in place. **Run → Build Mesh…** and **Build**. The mesh comes out at
+**3,157 nodes and 1,510 triangles**, one triangle more than the bare slope, with
+the wall discretized into **10 beam elements** over its 20 ft:
 
-Switch to **Seepage**, **Run → Build Mesh…** and **Build**. The mesh comes out
-at **13,223 nodes and 6,532 triangles**, 48 more than before, with the wall
-discretized into **18 beam elements** over its 9 m:
+![The wall mesh: tri6 at 2 ft, the wall as a chain of 10 beam elements](images/fem03_mesh_wall.png){width=1000}
 
-![The wall mesh: tri6 at 1.5 m, refined through the weak band, the wall as 18 beam elements](images/fem03_mesh_wall.png){width=1000}
-
-Then **Run → Run Seep…** and
-**Run**: it converges at 1.9429 × 10<sup>−5</sup> m³/s per meter, within 0.02%
-of the flow rate without the wall. A pile row is a structural member in XSLOPE
-and not a flow barrier, so the seepage solve sees only the slightly different
-mesh; the wall changes the stability run, not the water.
-
-Switch to **FEM** and click **Run → Run FEM…**
+Click **Run → Run FEM…**
 
 ![Run FEM on the meshed wall model](images/fem03_studio_run_fem_wall.png)
 
-Set **F min (SSRM)** to `1.15` and **F max (SSRM)** to `1.65` and click **Run**.
-This run takes about **30 minutes**.
+**Model checks — 1 warning**, the same blank `t_cut` on the clay, and no note
+this time: the wall states its own `I` and `Area`, so nothing is derived. The
+bracket is already `1.00` to `2.00`. Click **Run**. The run takes about
+45 seconds.
 
-**FS = 1.420**, from a final bracket of [1.4156, 1.4234] in eight trials. The
-wall takes the slope from 1.020 to 1.420, a credit of ×1.39. SIGMA/W's own factor
-of safety for the same model is about 1.4, a credit of ×1.37.
+**FS = 1.340**, from [1.3359, 1.3438]. The wall takes the slope from 1.160 to
+1.340, a credit of ×1.16.
 
-One note on that number before the figures. The
-[verification page](../verification/geostudio.md#sigmaw-wall) records 1.451 for
-this model rather than 1.420. Two settings differ. The Run FEM dialog opens on
-**Non-convergence** — the plain reading, that a trial which cannot reach
-equilibrium has failed — where the verification run uses the engine's **Hybrid**
-criterion, which weighs how the displacements are behaving alongside the
-convergence verdict; and the dialog's **Max iterations per trial** is 12,000
-against the verification run's 16,000. The budget is inert here, because it is
-extended rather than enforced: five of the eight trials are still undecided when
-they spend it and run on to the 50,000 **Iteration ceiling** either way. It is
-the criterion that then adjudicates those five, so the two searches close on
-different intervals. Both answers sit inside the published "about 1.4".
-[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) names the
-criteria the list offers and
-[SSRM failure criteria](../fem/overview.md#ssrm-failure-criteria) compares them.
-The shear strain field below and the four profiles in the next section both come
-from the verification run at 1.451 rather than from the 1.420 run above — the
-first carries that factor in its title — and so do the moment, shear, soil
-reaction and displacement values quoted with them.
+![The mechanism with the wall in place](images/fem03_wall_shear.png){width=1000}
 
-![The mechanism with the wall in place, running along the weak clay band](images/fem03_wall_shear.png){width=1000}
-
-The shear strain band is nothing like the pile model's. It runs almost flat
-along the weak clay band between elevations 5 and 6, from under the crest out to
-beyond the toe, because that is the only weak material in the section. The wall
-crosses it at x = 38, colored by shear force against the second color bar, with
-its darkest segment just below the band, where the shear peaks.
+The band is the pile model's: up from the flat ground beyond the toe, over the
+wall, and out at the face just above the wall's head, peaking at 0.68 in the
+same element at (10.5, 9.0). One continuous member at x = 10 does to the
+mechanism what a smeared row at x = 10 did.
 
 ### What the wall carries
 
 This run produces two things. The factor of safety is the first, and the second
 is what the wall itself is carrying, which no limit equilibrium analysis can
 report. Click **1D Details…** on the results toolbar and select the wall in the
-list on the left.
-
-![The 1D details panel on the wall](images/fem03_studio_wall_1d_details.png)
+list on the left. Set **Field state** to **Last converged**, which is the state
+the numbers below are read at.
 
 ![Lateral displacement, shear, moment and soil reaction down the wall](images/fem03_wall_profiles.png){width=1000}
 
 Four profiles, all plotted against depth below the pile head, which is at
-elevation 10 — so a depth of 5.00 m on these axes is elevation 5.00, the base of
-the weak clay band. The orange stretch shaded from 4.00 to 4.25 m — **Shear
-band crossing** in the legend — is where the mechanism crosses the wall,
-elevation 6.00 down to 5.75, inside the clay. The panel opens on
-**Field state = At failure**, the state the run re-solves once past the factor
-of safety so the collapse develops far enough to read; the selector at the
-bottom switches it to the last converged state, where every quantity below is
-about a quarter smaller.
+elevation 10 — so a depth of 14.00 ft on these axes is elevation −4.00.
 
 The **bending moment** is zero at the head and zero at the toe, which is the
 check that the profile is being read the right way round — both ends are free,
-so neither can carry a moment — and it peaks at **1,118 kN·m/m at a depth of
-5.00 m**, the base of the band.
+so neither can carry a moment — and it peaks at **12,175 lb·ft/ft at a depth of
+14 ft**, well down the buried length. That is the shape of a wall whose toe can
+turn: the moment builds through the embedded length and comes back to zero at an
+end that cannot hold it. The **shear** reverses sign
+between 13 and 15 ft, running to 3,447 lb/ft at 19 ft, and the **soil reaction**
+changes sign higher up, between 8 and 10 ft: the clay drives the wall downslope
+over the upper half of its length and pushes back over the lower. The **lateral
+displacement** is 0.137 ft at the head and decays smoothly to zero at the toe.
 
-The **shear** holds one sign above that elevation, peaking at 505 kN/m, and
-reverses below it to a peak of −852 kN/m at 5.49 m. The **soil reaction** panel
-shows the same reversal as a spike, 3,216 kN/m per meter of wall at the same
-5.00 m: the soil pushes hard on the wall from upslope through the band, and the
-stiff overconsolidated material below pushes back. Between them the wall is
-being driven by the weak band and reacting against what it is embedded in, which
-is what a sheet pile driven through a sliding layer is for. The **lateral
-displacement** panel is the shape that produces: 0.118 m at the head, decaying
-smoothly with depth and down to 1 mm at the toe, without ever changing
-direction — the wall is bending like a cantilever fixed in the stiff soil, not
-sliding with the block.
+The peak moment is **13% of the 90,600 lb·ft/ft** the section can carry, which
+is what the panel's title reports and why the moment panel draws no capacity
+line: the dashed M<sub>cap</sub> line appears only when the capacity is within
+about three times the peak, and here it would be off the axis. The cap is not
+merely unreached but inert — clearing `Mcap` and running again returns
+1.340 and the same moment profile.
 
-The published example's own moment and shear diagrams have the same form and the
-same turning point at the base of the band, with peaks about half again as
-large; the benchmark page
-[states how far each sits from the published value and why](../verification/geostudio.md#sigmaw-wall).
+### Fixing the toe
 
-Two things the panel draws for other members are absent here. The shear and
-moment panels carry a dashed capacity line wherever a `Vcap` or an `Mcap` is
-entered, and this row declares neither — which is what the figure's title and the
-status beside the field selector say when they read *no capacity declared*. The
-soil reaction panel plots the Ito & Matsui limiting resistance beside the
-mobilized reaction, and here it plots the mobilized reaction alone: that envelope
-is the limit pressure for soil flowing between piles, computed from `D` and `S`,
-and a member with `S` = 1 and no diameter has no gaps for soil to flow through.
-Both absences are correct. A capacity that was not entered would be an invented
-one, and an arching envelope on a continuous wall would be a mechanism the member
-does not have.
+The wall's toe stands on the rigid base, and the first half's runs showed what
+the tip condition is worth to a member that ends there. Open **Piles**, set
+`Tip` to `fixed` — a wall driven or socketed into the base rather than standing
+on it — and **OK**. The mesh survives the change. Run the same bracket again;
+this run takes about **30 seconds**.
+
+**FS = 1.543**, from [1.5391, 1.5469]: the credit over the bare slope goes from
+×1.16 to ×1.33.
+
+![The mechanism with the wall's toe fixed](images/fem03_wall_shear_fixed.png){width=1000}
+
+The band has the same shape as the free-toe run's, and the color bar reads a
+different scale: 0.034 at the peak against 0.677, so the collapse the run
+captured is twenty times less developed than the free-toe one.
+
+![The wall's profiles with its toe fixed: a cantilever fixed at the base](images/fem03_wall_profiles_fixed.png){width=1000}
+
+The moment profile has changed shape, not just scale. It is zero at the head and
+largest at the toe — **50,762 lb·ft/ft**, 56% of capacity — which is a member
+cantilevered from its base rather than one free to rotate there. The shear no
+longer reverses: it holds one sign the whole length, peaking at 4,004 lb/ft at
+11 ft. The head moves 0.163 ft.
+
+Switch **Field state** to **At failure**, which is the state the panel opens on:
+
+![The 1D details panel on the wall, at failure](images/fem03_studio_wall_1d_details.png)
+
+The moment at the toe reaches the full 90,600 lb·ft/ft, one beam element yields
+in bending, and the dashed M<sub>cap</sub> lines the moment panel now draws are
+what the curve is standing on. The list on the left reports the same thing as a
+utilization — **100%** beside the wall's name — and the status beside the field
+selector reads *at capacity (moment vs Mcap)*. Two runs of the same model, one
+cell apart, and the second is the one that needs a section check.
+
+### A finer beam
+
+The wall is ten beam elements over 20 ft, which is the mesh's own element size.
+**1D element size** on the Build Mesh dialog sets it independently.
+
+![Build Mesh with a 1D element size of 0.5 ft](images/fem03_studio_build_mesh_1d.png)
+
+**Run → Build Mesh…**, enter `0.5` in **1D element size**, and **Build**. The
+wall is now **40 beam elements**, and the soil mesh refines with it, from 1,510
+to **2,418 triangles**, because the constraint line's nodes are the soil mesh's
+nodes. Run the same bracket: about **60 seconds**, twice the run above.
+
+**FS = 1.551** against 1.543, and the peak moment 49,967 lb·ft/ft against
+50,762 — half a percent and one and a half percent. The profiles say where the
+run time went:
+
+![The same profiles on 40 beam elements](images/fem03_wall_profiles_refined.png){width=1000}
+
+The moment curve is the one above. The shear and soil reaction curves are not:
+at ten elements they are kinked polylines, and at forty they are smooth curves
+with the reversal near the toe resolved. Refine the 1D size when the profile
+shapes are the deliverable — a section check down the member, a soil reaction
+distribution — and leave it alone when the factor of safety is.
 
 ---
 
@@ -587,12 +623,18 @@ edges.
 Two things follow for a discrete row, and both are stated in
 [LEM vs. FEM pile modeling](../lem/piles.md#lem-vs-fem-pile-modeling). Take its
 factor of safety from the limit equilibrium analysis, and read the finite
-element counterpart as a stiffness-and-force study — what the shafts carry and
-where they yield — rather than as a competing factor of safety. And do not try
-to repair the plane-strain smear by adjusting the pile stiffness or by imposing
-the Ito & Matsui limit pressure on the beam: that limit pressure is a theory of
-the very mechanism the two-dimensional model does not contain, so applying it
-there counts the same resistance twice.
+element counterpart as a stiffness-and-force study — what the shafts carry, where
+they yield, and what their end conditions are worth — rather than as a competing
+factor of safety. And do not try to repair the plane-strain smear by adjusting
+the pile stiffness or by imposing the Ito & Matsui limit pressure on the beam:
+that limit pressure is a theory of the very mechanism the two-dimensional model
+does not contain, so applying it there counts the same resistance twice.
+
+Whichever engine gives the factor of safety, the pile tip is an input to state
+rather than a default to accept. On the pile rows it moved the strength
+reduction answer further than the spacing, the shaft stiffness and the
+structural capacities together, and on the wall it was worth 0.20 of factor of
+safety.
 
 ---
 
@@ -606,23 +648,25 @@ This tutorial covered:
 - Why a two-dimensional model turns a discrete row into a continuous wall, seen
   in a shear strain field where the mechanism climbs over the rows rather than
   passing through them.
+- Why the two engines disagreed on the pile rows: the limit equilibrium force
+  assumes each shaft develops its moment capacity, and with both ends free to
+  rotate the beam model computes that it does not. Socket the tips and the two
+  answers close to within 3%.
 - What spacing does to each engine: a 36% swing in the limit equilibrium answer
   and a change in which surface governs, against a strength reduction answer
-  that does not move, even though the smeared stiffness falls fourfold and each
-  shaft reaches its moment capacity.
-- What the one benchmark with a published three-dimensional answer establishes,
-  and what it does not.
-- How a continuous wall is entered — spacing 1, section constants per meter, no
-  diameter and no capacities — and the re-mesh and re-solve a new structural
-  line forces on a model whose pore pressures come from seepage.
-- The moment, shear, deflection and soil reaction down a wall, which a limit
-  equilibrium analysis cannot produce, and why the detail panel draws no arching
-  envelope for a member with no gaps.
+  that does not move at either tip condition, even though the moment per shaft
+  quadruples.
+- How a continuous wall is entered — spacing 1, section constants per foot of
+  wall, no diameter — and what its toe condition is worth: 1.340 standing on the
+  base against 1.543 fixed into it, with the moment peaking inside the embedded
+  length in the first case and at the toe in the second.
+- What the finite element engine reports that no limit equilibrium analysis can:
+  moment, shear, deflection and soil reaction down the member, at whatever
+  resolution the 1D element size is set to.
 
 **Where to go next:** [Piles and concrete piers in FEM](../fem/piles.md) carries
 the beam formulation, the assembly and the applicability rule in full, and
 [stabilizing piles in LEM](../lem/piles.md) carries the Ito & Matsui theory and
-the same rule from the other side;
-[the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall) is the
-second half of this page checked against its published source;
-[LEM-12](lem12_piles.md) is the pile row on its own.
+the same rule from the other side; [LEM-12](lem12_piles.md) is the pile row on
+its own. For a sheet pile wall checked against a published analysis, see
+[the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall).

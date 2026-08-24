@@ -19,9 +19,9 @@ The example is the geogrid-reinforced sand fill from
 [LEM-8](lem08_reinforced_slope.md) — six layers of geogrid in a 24 ft fill under
 a crest surcharge — and it is solved three times. Spencer's method gives the
 reference answer. Then the same model is meshed and run by **strength
-reduction** twice: once with the bars holding their full strength after they
+reduction** twice: once with the layers holding their full strength after they
 yield, which is what every mainstream finite element code assumes unless told
-otherwise, and once with a residual capacity that takes effect after the bar
+otherwise, and once with a residual capacity that takes effect after the layer
 ruptures.
 
 Work through [LEM-8](lem08_reinforced_slope.md) before this page if you have
@@ -100,8 +100,8 @@ feet, unit weights in pcf, and stresses, strengths and stiffnesses in psf.
 
 The Inputs plot shows the face band and the fill as two profile lines, the
 hatched maximum-depth line at elevation −10, the crest surcharge as purple
-arrows, and the six reinforcement lines as gray bars stepping up the face. Each
-bar carries two red **tension points**, 4 ft in from each end — the points where
+arrows, and the six reinforcement lines as gray layers stepping up the face. Each
+layer carries two red **tension points**, 4 ft in from each end — the points where
 its capacity envelope first reaches the full 800 lb/ft. The two dashed red
 arcs are the starting circles the search begins from.
 
@@ -134,13 +134,13 @@ through that crossing-by-crossing.
 
 ## What a reinforcement line is to each engine
 
-A reinforcement element is an elastic bar with **two separate limits** on the
+A reinforcement element is an elastic layer with **two separate limits** on the
 force it can carry. The **bond limit** is the force the soil can transfer into
-the bar through friction along its embedded length; when the bar force reaches
-it, the bar slips. The **rupture limit** is the strength of the reinforcement
+the layer through friction along its embedded length; when the layer force reaches
+it, the layer slips. The **rupture limit** is the strength of the reinforcement
 itself; when the force reaches it, the material yields. Both limits are
 **perfectly plastic**: once the force reaches the limit it stays there while
-the bar keeps stretching, neither rising nor falling. Below either limit the bar
+the layer keeps stretching, neither rising nor falling. Below either limit the layer
 is **elastic** — its force grows in proportion to how far it is stretched — so
 the whole behavior is called **elastic-perfectly-plastic**: force proportional
 to stretch up to the limit, then constant at it. A material can also be given a
@@ -148,11 +148,11 @@ to stretch up to the limit, then constant at it. A material can also be given a
 limit. That two-limit structure is the standard idealization the mainstream
 finite element codes share; PLAXIS, RS2 and FLAC all model reinforcement this
 way. XSLOPE handles rupture the same way: `Tmax` is the rupture limit. With
-`Tres` left blank, a bar that reaches it holds there — the elastic-perfectly-
-plastic geogrid those codes use by default. With a `Tres` entered, a bar that
+`Tres` left blank, a layer that reaches it holds there — the elastic-perfectly-
+plastic geogrid those codes use by default. With a `Tres` entered, a layer that
 reaches `Tmax` drops to that residual and carries no more than it from then on.
 The bond limit can be stated either way. Those codes compute bond from the
-stress on the bar-soil interface, so the length a bar needs to develop its full
+stress on the layer-soil interface, so the length a layer needs to develop its full
 capacity depends on how deep it is buried; XSLOPE offers that form through the
 `Adhesion` and `Delta` columns, and reads the length directly from the input —
 the pullout lengths `Lp1` and `Lp2` — when they are left blank, which is what
@@ -186,7 +186,7 @@ zero and it ruptures brittly and carries nothing afterwards. This page runs the
 blank case first, because it is what a published reinforced-slope analysis
 assumes unless it says otherwise.
 
-![The same bar, seen by each engine](images/fem02_bar_two_engines.png){width=1000}
+![The same layer, seen by each engine](images/fem02_bar_two_engines.png){width=1000}
 
 Both engines apply the same envelope. What differs is where they apply it.
 
@@ -194,7 +194,7 @@ The **limit equilibrium** engine evaluates the envelope at **one point** — whe
 trial surface crosses the line — and applies that force to the sliding mass,
 tangent to the surface for a flexible support like a geogrid, or along the
 line's own axis for a rigid member like a soil nail (the **Dir** column). The
-force is prescribed, not computed: nothing about the soil's stiffness, the bar's
+force is prescribed, not computed: nothing about the soil's stiffness, the layer's
 stiffness or how far anything moved enters it. That is also why `Tres` has no
 meaning in a limit equilibrium run: a post-peak drop depends on how far the
 reinforcement has strained, and the method never computes a strain.
@@ -203,7 +203,7 @@ The **finite element** engine ties each line into the mesh as a row of tension-o
 bar elements sharing nodes with the soil. The force in an element is *EA* times the
 strain — the axial stiffness times how much it stretched per unit length —
 capped by the envelope value at that element's own position along the line. The
-bar therefore develops a force *profile*, low at the ends, high where the
+layer therefore develops a force *profile*, low at the ends, high where the
 mechanism crosses it, and the load that one element cannot carry is shed into
 its neighbors through the soil. That profile depends on two inputs the limit equilibrium run does not use:
 the reinforcement's elastic modulus `E` and its cross-sectional area `Area`.
@@ -237,7 +237,7 @@ in the FEM overview shows how much.
 Untick **Auto-size from geometry** and set **Target element size** to `2`. That
 is the size the [FEM sample problem](../fem/samples.md) for this model uses, and
 it puts 10 elements on each 20 ft geogrid, which is enough to draw the force
-profile along a bar. Auto-sizing would divide the 130 ft section width by 100
+profile along a layer. Auto-sizing would divide the 130 ft section width by 100
 divisions for a 1.3 ft element instead, which is finer than this mechanism needs
 and, as the next two paragraphs show, is not a neutral choice on a reinforced
 model.
@@ -263,7 +263,7 @@ band, which holds that zone at full strength while the rest of the model is
 reduced. Leave the rest of the dialog alone and click **Build**.
 
 The mesh comes out at **4,364 nodes and 2,101 triangles**, with the six lines
-discretized into **60 bar elements**, ten per line:
+discretized into **60 bar elements**, 10 per line:
 
 ![The mesh, with the reinforcement lines carried onto element edges](images/fem02_mesh.png){width=1000}
 
@@ -271,7 +271,7 @@ The reinforcement lines are drawn in red because they are part of the mesh, not
 an overlay on it: each line was carried into the mesh generator as a constraint,
 so every bar element lies on an edge shared with the triangles on either side of
 it and its end nodes are soil nodes. The shared node is what couples the two: soil
-movement stretches the bar, and the bar's tension pulls back on the soil.
+movement stretches the layer, and the layer's tension pulls back on the soil.
 
 The `shell` shows as a one-element-wide blue veneer down the face, which is the
 thin zone the dialog offered to refine. Red triangles along the base are fixed
@@ -289,7 +289,7 @@ three finite element columns on each reinforcement line. Opening **Run → Run
 FEM…** now would show the same refusal
 [FEM-1](fem01_strength_reduction.md#youngs-modulus-and-poissons-ratio) walked
 through — errors naming each blank input, with **Run** disabled — so this
-section goes straight to entering them, soils first, because what a bar's
+section goes straight to entering them, soils first, because what a layer's
 stiffness does depends on the stiffness of the soil it is buried in.
 
 Click **Materials** in the Inputs dock. On **Table view**, set
@@ -385,7 +385,7 @@ Leave both boxes as they open. Each run takes about two minutes.
 ## The elastic-perfectly-plastic run
 
 The first of the two runs is the one that leaves `Tres` blank, which makes every
-bar elastic-perfectly-plastic. It gives the finite element answer to compare
+layer elastic-perfectly-plastic. It gives the finite element answer to compare
 against Spencer's before any post-peak assumption is added on top of it. Click
 **Run → Run FEM…** again.
 
@@ -421,13 +421,13 @@ runs from the toe, up behind the reinforced block, and out onto the crest near
 **x = 49**. Spencer's circle came out at x = 36.2. The two mechanisms start in
 the same place and end about 13 ft apart: the finite element band passes
 *behind* the reinforced block, while Spencer's circle cuts through the back of
-it. The two engines treat the bars differently — the limit equilibrium run
-applies each bar's full capacity at the crossing, the finite element run lets
+it. The two engines treat the layers differently — the limit equilibrium run
+applies each layer's full capacity at the crossing, the finite element run lets
 the force develop from strain — and the critical mechanism each finds follows
 from that.
 
-The bars are drawn on the same figure, colored by their axial force against the
-second color bar. Every one of them reads deep red — 800 lb/ft, the full
+The layers are drawn on the same figure, colored by their axial force against the
+second color layer. Every one of them reads deep red — 800 lb/ft, the full
 capacity — through its middle, with pale ends of matching length where the two
 4 ft pullout ramps allow less. At the captured failure state every line is fully
 mobilized: the geogrid is carrying everything it has and the slope still cannot
@@ -435,12 +435,14 @@ find equilibrium.
 
 ### Reading what each layer is doing
 
-Read the bars in the last state that reached equilibrium, not in the captured
-failure. Click **1D Details…** on the results toolbar and set
-**Field state** to **Last converged**, which here is the trial at *F* = 1.5547.
-The panel opens on **At failure**, where all six lines stand at 100% and read
-alike; on the converged field they separate, and the comparison below is only
-readable there.
+The color layers on the shear strain plot give a first reading of each
+geogrid layer's state. The **1D Details** panel gives a much more detailed
+one: for every layer, its utilization, the force it carries along its whole
+length against its capacity envelope, and a verdict naming how it is working.
+Click **1D Details…** on the results toolbar. It opens on the **At failure**
+field, where all six layers stand at 100% and read alike; set **Field state**
+to **Last converged** — here the trial at *F* = 1.5547 — because that is the
+last state that reached equilibrium, and it is where the layers separate.
 
 Each row of the list names a line, gives its utilization, and says what state
 the line is in. At that state five of the six read **yielded** — somewhere away
@@ -464,13 +466,13 @@ climbs from almost nothing at the face, reaches the envelope at s = 9 and holds
 it at 11 and 13 — those three elements are what the panel titles **yielded**, at
 the full 800 lb/ft — then falls away down the buried ramp and touches the
 envelope again at s = 19, where 1 ft of embedment develops only 200 lb/ft and
-the bar carries 197 of it. One line, both limits: rupture in the middle, bond at
+the layer carries 197 of it. One line, both limits: rupture in the middle, bond at
 the tip.
 
 The lower strip is the bond transfer, dT/ds, the rate at which force passes
-between the bar and the soil per foot of bar. It is positive from the face out to
-the peak, where the soil is loading the bar, and negative beyond it, where the
-bar is holding the soil back, crossing zero where the force is greatest. A limit
+between the layer and the soil per foot of layer. It is positive from the face out to
+the peak, where the soil is loading the layer, and negative beyond it, where the
+layer is holding the soil back, crossing zero where the force is greatest. A limit
 equilibrium run of the same model would have taken one number off the dashed
 envelope at one crossing and stopped.
 
@@ -478,7 +480,7 @@ envelope at one crossing and stopped.
 
 ## The peak-residual run
 
-The second run changes exactly one thing: what a bar does after it ruptures.
+The second run changes exactly one thing: what a layer does after it ruptures.
 Open **Reinforcement** again and enter `600` in the `Tres` column on all six
 rows, leaving everything else as it stands.
 
@@ -524,8 +526,8 @@ their neighbors, more elements reach 800, and the slope never settles.
 
 ![The mechanism with the residual in place](images/fem02_shear_strain_pr.png){width=1000}
 
-The band is in the same place, at a lower factor of safety, and the bars are
-still red through the middle. What has changed is inside the bars, and the
+The band is in the same place, at a lower factor of safety, and the layers are
+still red through the middle. What has changed is inside the layers, and the
 converged field is where to look for it.
 
 ![Line 5 with a residual capacity entered](images/fem02_bar_profile_pr.png){width=1000}
@@ -534,7 +536,7 @@ What is new on this profile is the dotted purple line, the **residual capacity**
 which the panel draws because there is one. It is not flat at 600: it steps —
 200 lb/ft over the outer 2 ft at each end, 600 lb/ft along the middle — because
 a residual is capped by the bond the embedment can develop at that point. An
-element near the end of a bar cannot hold 600 lb/ft after rupturing when its
+element near the end of a layer cannot hold 600 lb/ft after rupturing when its
 embedment could only ever develop 200.
 
 Nothing on this line has actually dropped to it. There is no purple *Softened*
@@ -568,7 +570,7 @@ every line here reads 100% and **yielded**, and why the title says *at failure*
 
 The deformed panel draws the mesh at its displaced position over a dashed
 outline of where it started. The reinforced block has slid out over the toe and
-settled at the crest, and the six bars — red where they started gray — are
+settled at the crest, and the six layers — red where they started gray — are
 stretched and rotated with it, hinging where the failure band crosses them. The
 title's **Scale = 1.1x** is the exaggeration, which the panel picks so the
 collapse reads at this figure size. **Scale ×** and **Auto size** on
@@ -651,23 +653,23 @@ Three readings of the same slope, from the same file:
 | Reading | FS |
 |---|:---:|
 | Spencer's method, searched on this page | 1.587 |
-| Strength reduction, bars elastic-perfectly-plastic | 1.559 |
-| Strength reduction, bars with a 600 lb/ft residual | 1.512 |
+| Strength reduction, layers elastic-perfectly-plastic | 1.559 |
+| Strength reduction, layers with a 600 lb/ft residual | 1.512 |
 
 The gap between Spencer and the peak-residual run is 0.075, and the section
 above measured what post-peak behavior is worth: **0.047 of it**. The other
 0.028 separates Spencer from the elastic-perfectly-plastic run, which is the
-same physical assumption about the bars — hold capacity once yielded — applied
+same physical assumption about the layers — hold capacity once yielded — applied
 two different ways.
 
 The difference is where the force is decided. Spencer takes the envelope value
 at one crossing point and hands the sliding mass 800 lb/ft, five times over, as
 a known force on a surface it chose. The finite element run lets the force
-emerge along the whole of each bar from displacement compatibility, so a layer
+emerge along the whole of each layer from displacement compatibility, so a layer
 contributes what the soil around it actually mobilized: line 1 gets no further
 than 97% of what its embedment allows at the face, four of the six lines are held
 at their buried tips by 200 lb/ft of bond once the residual is in play, and the
-force in every bar tapers away from the failure band instead of standing at its
+force in every layer tapers away from the failure band instead of standing at its
 envelope value everywhere. Prescribing the maximum available force at one point
 is the more generous of the two, and 1.8% is what that generosity is worth on
 this slope.
@@ -685,13 +687,13 @@ search had on offer.
 [FEM-1](fem01_strength_reduction.md#where-e-comes-from-and-what-it-changes)
 measured that a hundredfold sweep in Young's modulus left the factor of safety
 identical to every printed digit. A reinforced slope has a second stiffness in
-it — the bars' — and the two do not have to move together, so that result needs
+it — the layers' — and the two do not have to move together, so that result needs
 checking here rather than assuming.
 
 The same run, at the same mesh and bracket, with the soils' modulus and the
-bars' modulus scaled separately:
+layers' modulus scaled separately:
 
-| Soil E | Bar E | FS |
+| Soil E | Layer E | FS |
 |:---:|:---:|:---:|
 | ×0.1 | ×1 | 1.5586 |
 | ×1 (the file) | ×1 | 1.5586 |
@@ -701,14 +703,14 @@ bars' modulus scaled separately:
 The result does not carry over. Ten times the soil's modulus, with the geogrid
 left as it is, costs **0.32 of factor of safety — 21%**. It moves in the
 direction the mechanism says it should: a stiffer soil strains less under the
-same load, the bars are stretched less, and the reinforcement is never asked for
+same load, the layers are stretched less, and the reinforcement is never asked for
 the tension it is capable of. One tenth of the modulus costs nothing at all,
-because at that stiffness the bars are already carrying everything the envelope
+because at that stiffness the layers are already carrying everything the envelope
 allows and there is nothing further to mobilize.
 
-Scale the bars by the same ten as the soil and the answer returns to 1.5586, to
+Scale the layers by the same ten as the soil and the answer returns to 1.5586, to
 the printed digit and from the same bracket. What a reinforced finite element
-model responds to is the **ratio** of soil stiffness to bar stiffness, not the
+model responds to is the **ratio** of soil stiffness to layer stiffness, not the
 absolute value of either. FEM-1's invariance holds only where there is one
 stiffness to sweep; put a second one in the model and the pair matters. A round
 soil modulus against a catalog number for the geogrid is a modeling decision with

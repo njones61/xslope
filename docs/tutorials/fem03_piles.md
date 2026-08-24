@@ -57,9 +57,9 @@ completed model from [LEM-12](lem12_piles.md), which is also
 [FEM sample problem 2](../fem/samples.md). It already carries both engines'
 inputs, so nothing is entered on the first half of this page
 
-**Wall starter file** — [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx),
-the same slope with both pile rows taken out; this is the file the second half
-starts from
+**Bare slope** — [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx),
+the slope with no structural member in it; it is run first, as the baseline both
+halves measure against, and the wall half builds on it
 
 **Wall completed model** — [xslope_pile_wall.xlsx](files/xslope_pile_wall.xlsx),
 the same file with the wall row entered; open it to skip to
@@ -93,14 +93,28 @@ engines run on it as it stands.
 
 ### The slope on its own
 
-Before either member goes in, the slope with nothing in it stands at
-**FS = 1.149** by Spencer's method — the search
-[LEM-12](lem12_piles.md#what-the-two-rows-are-worth) runs — and at
-**FS = 1.160** by strength reduction, from a bracket of [1.1563, 1.1641]; that
-run is made in [the wall half below](#the-slope-without-the-wall), on the same
-clay and the same section. The two engines are 0.011 apart on the bare slope, so
-every difference between them on the rest of this page belongs to the member
-rather than to the engine.
+Before either member goes in, run the slope with nothing in it, both ways. Download
+[xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx) and open it with
+**File → Open…** — the same slope with no structural line in it at all:
+
+![The bare slope: the same section with nothing in it](images/fem03_inputs_wall.png){width=1000}
+
+The mode strip opens on **LEM**. **Run → Run LEM…**, `Spencer`, `Auto search`,
+40 slices, **Run**: **FS = 1.149**, the search
+[LEM-12](lem12_piles.md#what-the-two-rows-are-worth) runs on the same bare slope.
+
+Switch the mode strip to **FEM**, click **Run → Build Mesh…** and **Build**: the
+file declares **Quadratic triangles (tri6)** with **Auto-size from geometry** off
+at `2`, and the mesh comes out at **3,154 nodes and 1,509 triangles** with no
+beam elements. Then **Run → Run FEM…** — the file declares the bracket too, so
+**F min (SSRM)** and **F max (SSRM)** open on `1.00` and `2.00` — and **Run**.
+This run takes about **100 seconds**, longer than the piled runs that follow,
+because a slope closer to failing takes more iterations at each trial to decide.
+**FS = 1.160**, from [1.1563, 1.1641].
+
+The two engines are 0.011 apart on the bare slope, so every difference between
+them on the rest of this page belongs to the member rather than to the engine.
+Both halves of the page measure against these two numbers.
 
 ## The discrete pile row
 
@@ -468,25 +482,11 @@ credit a reserve the member never develops.
 Nothing else about the model changes, so every number in this half is
 comparable to the first half's.
 
-### The slope without the wall
-
-This is the run behind the baseline
-[at the top of the page](#the-slope-on-its-own). Download [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx) and
-open it with **File → Open…** — the same slope with no structural line in it at
-all:
-
-![The wall starter: the same slope with nothing in it](images/fem03_inputs_wall.png){width=1000}
-
-Switch the mode strip to **FEM**, click **Run → Build Mesh…** and **Build**: the
-file declares **Quadratic triangles (tri6)** with **Auto-size from geometry** off
-at `2`, and the mesh comes out at **3,154 nodes and 1,509 triangles** with no
-beam elements. Then **Run → Run FEM…** — the file declares the bracket too, so
-**F min (SSRM)** and **F max (SSRM)** open on `1.00` and `2.00` — and **Run**.
-This run takes about **100 seconds**, longer than the piled runs of the first
-half, because a slope closer to failing takes more iterations at each trial to
-decide. **FS = 1.160**, from [1.1563, 1.1641].
-
 ### Adding the wall
+
+The wall goes into the bare slope run [at the top of the page](#the-slope-on-its-own):
+reopen [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx) with
+**File → Open…** if another file is open.
 
 The wall goes in as one row of the piles table, and which cells it fills is the
 content of this step. Open **Piles** in the **Inputs** dock, press **Table

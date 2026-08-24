@@ -64,8 +64,9 @@ letting it emerge from displacement compatibility along the whole line.
 The plots below show the solution at the computed factor of safety. The
 top plot shows the deformed mesh with original and deformed reinforcement positions. The
 middle plot shows the viscoplastic shear strain concentration with reinforcement elements
-colored by axial force (blue = low, red = high): the middle of each line carries $T_{max}$
-and the end segments carry the reduced force their embedment can develop. The bottom plot
+colored by axial force (blue = low, red = high): the middle of each line carries $T_{max}$,
+the end segments carry the reduced force their embedment can develop, and the magenta
+segments are elements standing at $T_{res}$. The bottom plot
 shows the displacement vectors. The reinforcement summary table is shown below.
 
 ![reinforce_fem_results.png](images/reinforce_fem_results.png){width=1000}
@@ -87,10 +88,12 @@ toe, is clear of capacity altogether.
 
 One trial higher, at $F$ = 1.513, the slope never finds equilibrium again: elements reach
 $T_{max}$ = 800 lb/ft and shed to $T_{res}$ = 600 lb/ft, hand their load to their neighbors,
-more of them yield, and the run ends in non-convergence. That is the mechanism the factor of
+more of them yield, and the run ends in non-convergence. Three elements make that drop — one
+on line 4, 13 ft along it, and two on line 5, at 11 and 13 ft — and the at-failure field
+above carries them, drawn magenta on the residual. That is the mechanism the factor of
 safety brackets — not the pullout
 zones, which go on carrying what they were carrying, but the loss of tensile capacity in the
-middle of the lines where the failure surface crosses them.
+middle of lines 4 and 5 where the failure surface crosses them.
 
 ### 2. Slope Stabilized with Drilled Shaft Piles
 

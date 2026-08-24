@@ -617,8 +617,8 @@ nearer end, capped at `Tmax`. Deep under the fill the rate is high and the
 capacity develops within a foot or two; near the face, under little cover, it
 develops slowly.
 
-Where do *a* and δ come from? Without site pullout tests, FHWA-NHI-10-024 gives
-a default for geosynthetics: the pullout friction factor *F*\* = (2/3) tan φ′,
+Where do *a* and δ come from? Without site pullout tests, [FHWA-NHI-10-024](https://www.fhwa.dot.gov/engineering/geotech/pubs/nhi10024/nhi10024.pdf)
+gives a default for geosynthetics: the pullout friction factor *F*\* = (2/3) tan φ′,
 reduced by a scale-effect correction α = 0.8 for geogrids, with no adhesion.
 Its resistance rate, 2 *F*\* α σ′<sub>v</sub>, is the law above with
 **Adhesion = 0** and **Delta = arctan(*F*\*α)**. For this sand, φ′ = 37° gives

@@ -249,8 +249,7 @@ spacing changes which surface governs.
 
 The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%. The
 three strength reduction runs return the same bracket, [1.356, 1.366], and so the
-same answer, 1.361, with the same verdict at every trial. Repeating them at a
-tolerance of 0.0025 separates the three by 0.002.
+same answer, 1.361, with the same verdict at every trial.
 
 Run one point of it to see both. Open **Piles**, set `S` to `12` on both rows
 with `H` still blank, and **OK**. Search with Spencer again: **FS = 1.409**, and

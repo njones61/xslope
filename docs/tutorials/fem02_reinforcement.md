@@ -405,9 +405,9 @@ which cannot reach equilibrium has failed. FEM-1 compares it against the three
 other criteria the list offers. Click **Run**.
 
 **FS = 1.559**, from a final bracket of [1.5547, 1.5625], in seven bisection
-steps. The strength reduction answer is **1.8% below** Spencer's 1.587 — two
-engines that share nothing but the input file, within a couple of percent of
-each other.
+steps. This is **1.8% below** Spencer's 1.587. The two engines solve the
+problem in completely different ways, so agreement within a couple of percent
+is a good check on both.
 
 ### Viscoplastic shear strain
 

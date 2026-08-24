@@ -218,11 +218,14 @@ Part of the 0.48 between 1.842 and 1.361 is a convention rather than an
 idealization, and it has to be separated out before the rest is attributed to
 plane strain. The `Appl` column
 on a pile row has two settings. `Active` hands the computed force to the
-equilibrium equations as it stands, which is what this file does. `Passive`
-treats it as a resistance and divides it by the factor of safety, so the support
-carries the same margin as the soil strength does. Slide2 applies a pile force
-the passive way, and XSLOPE's own [VP106](../verification/rocscience.md#vp106)
-files are built that way to match it.
+equilibrium equations as it stands. It is the default, and what this file uses,
+because it is the standard practice: the pile force is a load the moving soil
+applies to the pile, and it enters the analysis the way any other applied load
+does, at its full value. `Passive` treats it as a resistance and divides it by
+the factor of safety, so the support carries the same margin as the soil
+strength does. Slide2 applies a pile force the passive way, and XSLOPE's own
+[VP106](../verification/rocscience.md#vp106) files are built that way to match
+it.
 
 Set `Appl` to `Passive` on both rows and search again. Spencer returns
 **1.574** instead of 1.842. The choice is worth 0.268 of factor of safety on

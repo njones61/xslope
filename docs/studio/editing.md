@@ -357,8 +357,12 @@ Results are derived from the inputs, so editing an input that a result depended 
 makes that result stale. Studio handles this automatically:
 
 - Editing any input clears a stale **LEM solution** (its tab is removed).
-- Editing the **geometry** (profile/polygon lines, max depth, reinforcement, piles)
-  also clears the **mesh**, so Seepage and FEM re-gate on a fresh **Build Mesh**.
+- Editing the **geometry** (profile/polygon lines, max depth, the endpoints of a
+  reinforcement or pile row, or adding or removing a row) also clears the
+  **mesh**, so Seepage and FEM re-gate on a fresh **Build Mesh**. Changing a
+  row's other properties — spacing, capacities, stiffness, how its force is
+  applied — leaves the mesh in place, because a row enters the mesh only as a
+  constraint line.
 - Undo/redo apply the same rule — stale solution tabs are dropped, and the mesh
   follows the restored geometry.
 

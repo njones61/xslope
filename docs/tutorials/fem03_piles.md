@@ -261,13 +261,11 @@ elevation −5.1, more than 5 ft below the toe, and exited 14.9 ft behind the
 crest. Widening the gap did not only lower the answer, it changed which surface
 governs, which [LEM-12](lem12_piles.md#what-the-spacing-is-worth) covers in full.
 
-Editing a pile row makes the mesh stale — the pile lines are mesh constraints —
-so **Run FEM…** is greyed until one is built again. Switch to **FEM**,
-**Run → Build Mesh…** and **Build**; the dialog opens on the tri6 at 2 ft the
-session already used. Because the pile lines themselves have not moved, the mesh
-comes back identical — **3,180 nodes and 1,521 triangles** with the same **18
-beam elements** — which is what makes the two runs comparable. **Run → Run
-FEM…** with the same bracket: **FS = 1.361**, the same answer as at 6 ft.
+The mesh is still good: a pile row enters the mesh only as a constraint line,
+so Studio throws the mesh away when a row's endpoints move or a row is added or
+removed, not when `S` or any other property on it changes. Switch to **FEM** and
+**Run → Run FEM…** with the same bracket: **FS = 1.361**, the same answer as at
+6 ft, on the same 3,180 nodes and 1,521 triangles.
 
 The obvious reading of that flat line is wrong. Dividing *EA* and *EI* by `S` is not bookkeeping the finite element
 engine does to dispose of the spacing column — it is the correct plane-strain

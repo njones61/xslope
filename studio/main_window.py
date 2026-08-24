@@ -1849,8 +1849,20 @@ class MainWindow(QMainWindow):
             if isinstance(o, (list, tuple)):
                 return [clean(x) for x in o]
             return o
+        def geometry_only(key, rows):
+            # A reinforcement or pile row enters the mesh as a constraint line
+            # and nothing more: only its endpoints (and how many rows there are)
+            # can change the mesh. Editing S, D, Tmax, Appl or any other property
+            # on a row must not throw the mesh away.
+            if key not in ("reinforcement_lines", "pile_lines") or not rows:
+                return clean(rows)
+            try:
+                return [[clean(r.get("x1")), clean(r.get("y1")),
+                         clean(r.get("x2")), clean(r.get("y2"))] for r in rows]
+            except Exception:
+                return clean(rows)
         try:
-            return json.dumps({k: clean(sd.get(k)) for k in MainWindow.MESH_KEYS},
+            return json.dumps({k: geometry_only(k, sd.get(k)) for k in MainWindow.MESH_KEYS},
                               sort_keys=True, default=str)
         except Exception:
             return None

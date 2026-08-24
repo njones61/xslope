@@ -525,7 +525,7 @@ because a residual is capped by the bond the embedment can develop at that
 point. An element near the end of a layer cannot hold 600 lb/ft after rupturing
 when its embedment could only ever develop 200.
 
-Nothing on this line has dropped to it, and that is worth understanding.
+Nothing on this line has dropped to it.
 Reaching capacity is not what triggers the drop. Once a trial has settled into
 equilibrium, the solver asks each element whether the stretch the soil imposes
 on it demands *more* than its capacity; only an element asked for more than 800

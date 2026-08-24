@@ -364,8 +364,20 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     residual = None
     t_res = np.asarray(profile.get("t_res", []), dtype=float)
     if len(t_res) and np.any(np.isfinite(t_res) & (t_res > 0)):
-        residual, = ax.step(s, t_res, where="mid", linestyle=":", linewidth=1.1,
-                            color=C_SOFT, zorder=3)
+        # Each element's residual is min(Tres, its capacity), so along the line
+        # the residual follows the capacity envelope up its ramps and flattens at
+        # the stated Tres through the middle. Draw it that way — continuously
+        # over the analytic envelope — rather than as one step per element.
+        # The line's Tres is the largest element residual: on the flat of the
+        # envelope min(Tres, capacity) is Tres itself.
+        t_res_line = float(np.nanmax(np.where(np.isfinite(t_res), t_res, np.nan)))
+        if profile.get("env_s") is not None and np.isfinite(t_res_line):
+            residual, = ax.plot(profile["env_s"],
+                                np.minimum(t_res_line, np.asarray(profile["env_T"], dtype=float)),
+                                linestyle=":", linewidth=1.1, color=C_SOFT, zorder=3)
+        else:
+            residual, = ax.step(s, t_res, where="mid", linestyle=":", linewidth=1.1,
+                                color=C_SOFT, zorder=3)
 
     # Mobilized force.
     mobilized, = ax.plot(s, T, "-o", color=C_FORCE, linewidth=1.8, markersize=3.5,

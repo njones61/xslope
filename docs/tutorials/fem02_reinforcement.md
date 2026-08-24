@@ -519,18 +519,25 @@ converged field is where to look for it.
 ![Line 5 with a residual capacity entered](images/fem02_bar_profile_pr.png){width=1000}
 
 What is new on this profile is the dotted purple line, the **residual capacity**,
-which the panel draws because there is one. It is not flat at 600: it steps —
-200 lb/ft over the outer 2 ft at each end, 600 lb/ft along the middle — because
-a residual is capped by the bond the embedment can develop at that point. An
-element near the end of a layer cannot hold 600 lb/ft after rupturing when its
-embedment could only ever develop 200.
+which the panel draws because there is one. It is not flat at 600: it runs
+along the middle at 600 lb/ft and follows the capacity envelope down each ramp,
+because a residual is capped by the bond the embedment can develop at that
+point. An element near the end of a layer cannot hold 600 lb/ft after rupturing
+when its embedment could only ever develop 200.
 
-Nothing on this line has actually dropped to it. There is no purple *Softened*
-square, which is how the panel marks an element that has shed, and the line still
-reads **yielded**: its interior peak is 798 of the 800 lb/ft available there, two
-pounds short of the run before. The tip at s = 19 sits on its 200 lb/ft bond
-limit as it did before. The residual has not changed this state — it has changed
-which states are reachable above it.
+Nothing on this line has dropped to it, and that is worth understanding.
+Reaching capacity is not what triggers the drop. Once a trial has settled into
+equilibrium, the solver asks each element whether the stretch the soil imposes
+on it demands *more* than its capacity; only an element asked for more than 800
+lb/ft drops to its residual, and the trial is then re-solved, because the load
+it sheds can push its neighbors over the same limit. An element sitting at 800
+lb/ft with no excess demand stays there. In this converged state, at
+*F* = 1.508, no element on line 5 was asked for more than it could carry: the
+interior peak is 798 lb/ft, the tip at s = 19 is on its 200 lb/ft bond limit, and
+there is no purple *Softened* square, which is how the panel marks an element that
+has shed. The drops happened at the higher trial values the run failed at, which
+is why the factor of safety is lower even though this state looks like the run
+before.
 
 That shows in the other five lines. Lines 2, 3, 4 and 6 now read **pullout**:
 each has one element at the buried tip, s = 19, holding the 200 lb/ft its last

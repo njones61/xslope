@@ -4669,7 +4669,7 @@ def fem03_piles():
     import numpy as np
 
     from xslope.fem import build_fem_data, import_fem_solution
-    from xslope.plot_fem import plot_fem_results
+    from xslope.plot_fem import plot_fem_data, plot_fem_results
 
     sd = load_slope_data(FEM03_PILES)
     _u = declared_unit_labels(sd)
@@ -4714,6 +4714,7 @@ def fem03_piles():
           "F %.5f · max|u| %.4f %s"
           % (meta["FS"], meta["final_interval"][0], meta["final_interval"][1],
              meta["F"], meta["max_displacement"], _u["length"]))
+    capture("fem03_mesh_piles.png", plot_fem_data, fem_data)
     capture("fem03_fem_shear_piles.png", plot_fem_results, fem_data, solution,
             plot_type="shear_strain", fs=meta["FS"],
             failure_solution=solution.get("failure_solution"),
@@ -4845,7 +4846,7 @@ def fem03_wall():
 
     from xslope import fem_details
     from xslope.fem import build_fem_data, import_fem_solution
-    from xslope.plot_fem import plot_fem_results
+    from xslope.plot_fem import plot_fem_data, plot_fem_results
     from xslope.plot_fem_details import plot_pile_detail
 
     start = load_slope_data(FEM03_WALL_START)
@@ -4882,6 +4883,7 @@ def fem03_wall():
     print("   wall mesh   %d nodes · %d elements · %d beam elements"
           % (len(sd["mesh"]["nodes"]), len(sd["mesh"]["elements"]),
              len(sd["mesh"].get("elements_1d", []))))
+    capture("fem03_mesh_wall.png", plot_fem_data, fem_data)
     print("   FEM         FS %.4f from [%.6f, %.6f] · last equilibrium at "
           "F %.5f" % (meta["FS"], meta["final_interval"][0],
                       meta["final_interval"][1], meta["F"]))

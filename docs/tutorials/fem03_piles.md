@@ -172,7 +172,13 @@ the dialog alone and click **Build**.
 
 The mesh comes out at **3,180 nodes and 1,521 triangles**, with the two pile
 rows carried in as constraints and discretized into **18 beam elements** — 8 on
-the lower row and 10 on the upper one.
+the lower row and 10 on the upper one:
+
+![The pile-row mesh: tri6 at 2 ft, the two rows as chains of beam elements on element edges](images/fem03_mesh_piles.png){width=1000}
+
+The two rows are drawn in green, each a chain of beam elements lying on
+triangle edges and sharing nodes with the clay on both sides; the base is fixed
+and the two vertical boundaries are rollers.
 
 Click **Run → Run FEM…**
 
@@ -493,7 +499,11 @@ with it in place, and the seepage solution has to be recomputed on the new mesh.
 
 Switch to **Seepage**, **Run → Build Mesh…** and **Build**. The mesh comes out
 at **13,223 nodes and 6,532 triangles**, 48 more than before, with the wall
-discretized into **18 beam elements** over its 9 m. Then **Run → Run Seep…** and
+discretized into **18 beam elements** over its 9 m:
+
+![The wall mesh: tri6 at 1.5 m, refined through the weak band, the wall as 18 beam elements](images/fem03_mesh_wall.png){width=1000}
+
+Then **Run → Run Seep…** and
 **Run**: it converges at 1.9429 × 10<sup>−5</sup> m³/s per meter, within 0.02%
 of the flow rate without the wall. A pile row is a structural member in XSLOPE
 and not a flow barrier, so the seepage solve sees only the slightly different

@@ -420,9 +420,11 @@ shearing left after the elastic response is subtracted — and the band they dra
 runs from the toe, up behind the reinforced block, and out onto the crest near
 **x = 49**. Spencer's circle came out at x = 36.2. The two mechanisms start in
 the same place and end about 13 ft apart: the finite element band passes
-*behind* the reinforced block rather than cutting through the back of it,
-because it was free to go wherever the soil was weakest and a circular search
-was not.
+*behind* the reinforced block, while Spencer's circle cuts through the back of
+it. The two engines treat the bars differently — the limit equilibrium run
+applies each bar's full capacity at the crossing, the finite element run lets
+the force develop from strain — and the critical mechanism each finds follows
+from that.
 
 The bars are drawn on the same figure, colored by their axial force against the
 second color bar. Every one of them reads deep red — 800 lb/ft, the full
@@ -433,8 +435,8 @@ find equilibrium.
 
 ### Reading what each layer is doing
 
-The state worth reading a bar in is the last one that reached equilibrium, not
-the captured failure. Click **1D Details…** on the results toolbar and set
+Read the bars in the last state that reached equilibrium, not in the captured
+failure. Click **1D Details…** on the results toolbar and set
 **Field state** to **Last converged**, which here is the trial at *F* = 1.5547.
 The panel opens on **At failure**, where all six lines stand at 100% and read
 alike; on the converged field they separate, and the comparison below is only

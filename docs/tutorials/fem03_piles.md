@@ -406,11 +406,15 @@ what end condition they could carry it.
 
 ## The continuous wall
 
+![A 20 ft clay slope with a PZ-27 sheet pile wall at x = 10 from the face to the rigid base](images/fem03_wall_problem_sketch.png){width=1000}
+
 The second half is the case the finite element engine is right for: a member
 that really is continuous out of plane. It is the same slope as above — the same
 clay, the same 20 ft face, the same rigid base at elevation −10 — with both pile
 rows taken out and one **sheet pile wall** put in on the upper row's line, from
-the crest of the face at (10, 10) down to the base at (10, −10).
+the crest of the face at (10, 10) down to the base at (10, −10). The section
+drawn above is the first half's, with that one member standing where the two
+rows were.
 
 The section is a PZ-27 steel sheet pile, and its properties are per foot of
 wall rather than per member:

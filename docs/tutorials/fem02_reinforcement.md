@@ -473,12 +473,15 @@ the final state stands at 197 lb/ft, a hair under the cap once the surrounding
 soil has finished redistributing. One line, both limits: rupture in the middle,
 bond at the tip.
 
-The lower strip is the bond transfer, dT/ds, the rate at which force passes
-between the layer and the soil per foot of layer. It is positive from the face out to
-the peak, where the soil is loading the layer, and negative beyond it, where the
-layer is holding the soil back, crossing zero where the force is greatest. A limit
-equilibrium run of the same model would have taken one number off the dashed
-envelope at one crossing and stopped.
+The lower strip is the bond transfer, dT/ds: how much the layer's force
+changes per foot of length. The only way force gets into or out of a layer is
+through the shear between its surface and the soil, so this strip is that shear,
+per foot, and its sign is the direction the soil pulls. From the face out to the
+force peak the strip is positive: the soil is moving toward the face and drags
+the layer with it, so force builds up with every foot. Beyond the peak it is
+negative: the stable soil around the buried part holds the layer, and the force
+drains back into the ground foot by foot until the tip. The crossing at zero is
+where the pull changes direction, which is why the force is greatest there.
 
 ---
 

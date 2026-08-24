@@ -438,8 +438,8 @@ the factor of safety drops to **1.539**.
 Line 1 gives nothing at all. It runs from the toe at elevation 0, and the
 surface daylights at the toe and climbs away from it, so the whole line lies in
 the soil below the sliding mass. A layer the critical surface never crosses is
-not in the analysis — which is what the plotted lines show
-against the plotted surface rather than counting the rows in the sheet.
+not in the analysis — which is why the plotted lines are read against the
+plotted surface rather than by counting the rows in the sheet.
 
 ### What the other methods say
 

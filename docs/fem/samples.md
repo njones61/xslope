@@ -161,7 +161,9 @@ the developed mechanism at failure — the state the results figure above draws 
 1,580 (21%). The structural capacity does not govern for this problem in either state. The soil's ability to
 transfer lateral load to the piles is the limiting factor, not the pile strength.
 
-This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
+This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result. Which engine belongs to which pile configuration is a question of
+applicability rather than conservatism — see
+[LEM vs. FEM Pile Modeling](../lem/piles.md#lem-vs-fem-pile-modeling).
 
 <!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.370, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
 

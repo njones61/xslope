@@ -1623,20 +1623,20 @@ failure.
 **What the wall carries.** The moment and shear XSLOPE recovers down the wall reproduce the published
 distributions in shape. The bending moment is zero at the head and at the toe — both are free, which is the
 check that the profile is being read correctly — and peaks at el. 5.00, the base of the weak clay band, at
-1,135 kN·m/m. The shear holds one sign above that elevation (peak 510 kN/m) and reverses to the other below
-it (peak 866 kN/m), so the wall is being driven by the band and is reacting against the stiff material under
+1,118 kN·m/m. The shear holds one sign above that elevation (peak 505 kN/m) and reverses to the other below
+it (peak 852 kN/m), so the wall is being driven by the band and is reacting against the stiff material under
 it. The example's own diagrams have the same form and the same turning point, with peaks of roughly
 1,650 kN·m/m and roughly 750 and 1,300 kN/m. XSLOPE's peaks are near two-thirds of those, and all three
-scale by nearly the same factor — 0.69 for the moment, 0.68 and 0.67 for the two shear branches — so this is
+scale by nearly the same factor — 0.68 for the moment, 0.67 and 0.66 for the two shear branches — so this is
 a difference in how much load the wall has taken up at the state each is read at, not a difference in how
 the wall distributes it. The published curves grow with every increment of the sweep and are printed at its
 last step, past the reduction factor the example interprets as the factor of safety; XSLOPE's are read at
 the mechanism its bisection captured.
 
 How steeply the actions rise once the section fails is measurable here rather than assumed. Both committed
-fields bracket the failure: the last equilibrium state at F = 1.46 and the post-failure state the bisection
-captured at F = 1.69. Between them XSLOPE's own peak moment rises from 869 to 1,135 kN·m/m, a factor of
-1.31, and its two shear peaks by factors of 1.19 and 1.31 — so where along the failure sweep the published
+fields bracket the failure: the last equilibrium state at F = 1.45 and the post-failure state the bisection
+captured at F = 1.67. Between them XSLOPE's own peak moment rises from 878 to 1,118 kN·m/m, a factor of
+1.27, and its two shear peaks by factors of 1.18 and 1.28 — so where along the failure sweep the published
 values were read materially affects the comparison of peaks.
 
 ![gs2_wall_none: inputs and the strength-reduction mechanism without the wall](images/gs2_wall_none.png)

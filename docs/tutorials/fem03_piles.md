@@ -112,7 +112,10 @@ both bands matter at once:
 
 The columns are colored by which engine reads them. Red is limit equilibrium
 only: `H`, the stated pile force, and `Appl`, how that force enters the
-equations. Blue is finite element only: `E`, `I`, `Area` and `Fixity`. The black
+equations. `H` is blank on both rows, and that blank is what brings Ito & Matsui
+in: with no force stated, the limit equilibrium engine computes one from `D`,
+`S` and the soil around the pile; enter a number and that number is used
+instead. Blue is finite element only: `E`, `I`, `Area` and `Fixity`. The black
 columns are read by both — `D` and `S`, and also `Vcap` and `Mcap`, which cap the
 per-pile force in the limit equilibrium engine and, in the finite element engine,
 clip the beam shear at Vcap ÷ S and release a plastic hinge where the beam moment

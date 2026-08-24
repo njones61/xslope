@@ -601,16 +601,38 @@ judgement about how deep the reinforcement is buried, and it is the same
 judgement for a tail under 16 ft of fill and for a tip at the face. The
 `Adhesion` and `Delta` columns, left blank until now, let the model make that
 judgement itself.
-Filled, they state the soil–reinforcement interface strength and the resistance
-follows the effective overburden along the line — per foot of a sheet with soil
-bearing on both faces, *r*(s) = 2(*a* + σ′<sub>v</sub>(s) tan δ), integrated from
-each end. FHWA-NHI-10-024's default pullout friction factor for a geosynthetic
-with no site test data is *F*\* = (2/3) tan φ′, with a scale-effect correction
-α = 0.8 for geogrids, and the FHWA form *F*\*ασ′<sub>v</sub> is this law with
-**Adhesion = 0** and **Delta = arctan(*F*\*α)** — at φ′ = 37°, **22°**. Enter
-those two on all six lines and `Lp1` and `Lp2` are no longer read;
-[Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden)
-carries the formulation.
+
+With them filled, the model no longer needs to be told how far the bond takes
+to develop. It reads the resistance at every point along the line from the
+soil standing above that point. The interface between soil and reinforcement
+is given a strength the same way a soil is: an adhesion *a* and a friction
+angle δ, so the shear it can carry per unit area is *a* + σ′<sub>v</sub> tan δ,
+where σ′<sub>v</sub> is the effective vertical stress at that depth. A sheet
+has soil bearing on both faces, so per foot of length the resistance rate is
+
+*r*(s) = 2 (*a* + σ′<sub>v</sub>(s) tan δ)
+
+and the capacity available at any point is that rate integrated in from the
+nearer end, capped at `Tmax`. Deep under the fill the rate is high and the
+capacity develops within a foot or two; near the face, under little cover, it
+develops slowly.
+
+Where do *a* and δ come from? Without site pullout tests, FHWA-NHI-10-024 gives
+a default for geosynthetics: the pullout friction factor *F*\* = (2/3) tan φ′,
+reduced by a scale-effect correction α = 0.8 for geogrids, with no adhesion.
+Its resistance rate, 2 *F*\* α σ′<sub>v</sub>, is the law above with
+**Adhesion = 0** and **Delta = arctan(*F*\*α)**. For this sand, φ′ = 37° gives
+*F*\* = 0.502, *F*\*α = 0.402, and δ = **22°**.
+
+Open **Reinforcement** once more. Clear the `Tres` column, so the layers are
+elastic-perfectly-plastic again and the only change from the first run is the
+pullout law, and enter `0` under `Adhesion` and `22` under `Delta` on all six
+rows. Once those two are filled, `Lp1` and `Lp2` are no longer read. Click
+**OK**, then **Run → Run FEM…** and **Run**.
+
+**FS = 1.535**, against 1.559 with the stated 4 ft lengths — 1.5% lower, three
+bisection cells. To see why, open **Results → 1D Details** and select line 2,
+the second from the bottom, which is the line the new law changes most:
 
 ![Line 2 under the overburden law: a curved capacity envelope](images/fem02_bar_profile_law.png){width=1000}
 
@@ -634,9 +656,8 @@ comparison: a stated development length is depth-blind, so it under-rates a
 deeply buried tail and over-rates a shallow one, and reinforced slopes are
 critical at the face.
 
-Both answers move, and the smaller move is the finite element one. Run
-elastic-perfectly-plastic under the law and it returns **1.535** against 1.559 —
-1.5%, three bisection cells. Spencer moves from 1.587 to **1.559**, 1.8%,
+Both answers move, and the smaller move is the finite element one, 1.5%.
+Spencer, searched again on the same file, moves from 1.587 to **1.559**, 1.8%,
 and that move is not a loss of capacity. On the circle Spencer already drew,
 every one of the five crossings sits 8.4 ft or more from the nearer end, out
 where both laws allow the full 800 lb/ft, so that surface cannot tell them apart.

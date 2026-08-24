@@ -53,10 +53,12 @@ pile-stabilized slope with a three-dimensional strength reduction finite element
 individual piles with slip interfaces, and XSLOPE's SSRM is run on the same slope at a spacing of three
 diameters in [the VP106 diagnostic](../verification/rocscience.md#vp106-fem). With no pile the two agree to
 0.4%, which is what makes the rest of the comparison readable. With the pile row in place the
-two-dimensional model reads 13.1% high with a free head and 8.3% high with the head rotation restrained: it
-credits the row with multiplying the unreinforced factor of safety by 1.354 where the three-dimensional
-model credits 1.193. Limit equilibrium with the Ito & Matsui force credits the same row 1.269, nearer the
-three-dimensional value than the plane-strain beam gets.
+two-dimensional model reads 6.8% high with a free head and 8.3% high with the head rotation restrained: it
+credits the row with multiplying the unreinforced factor of safety by 1.279 where the three-dimensional
+model credits 1.193. Limit equilibrium with the Ito & Matsui force credits the same row 1.269 — a
+comparable distance above the three-dimensional value rather than a materially smaller one. Neither
+two-dimensional route recovers the three-dimensional credit; what the benchmark establishes about the
+plane-strain beam is that it over-credits the row against the only three-dimensional answer available.
 
 **Which path to use.** For a discrete pile row, the validated route is limit equilibrium with the Ito &
 Matsui (1975) limit pressure, which is a theory *of* the three-dimensional mechanism rather than a

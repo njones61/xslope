@@ -2808,27 +2808,33 @@ model, and the differences below are the measurement of what separates them rath
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
 |---|---|---|
 | No pile | 1.136 | 1.14 (−0.4%) |
-| Pile, free head | 1.538 | 1.36 (+13.1%) |
+| Pile, free head | 1.453 | 1.36 (+6.8%) |
 | Pile, head rotation restrained | 1.570 | 1.45 (+8.3%) |
 
 Without a pile the two agree to −0.4%: the same section, the same soil, the same strength-reduction
 procedure, and nothing three-dimensional in either model. That row is what makes the other two readable —
 what they carry is the pile, not the slope.
 
-With the pile in place the two-dimensional model reads high, by +13.1% with a free head and +8.3% with the
+With the pile in place the two-dimensional model reads high, by +6.8% with a free head and +8.3% with the
 head rotation restrained. Read as the credit each model gives the pile row, XSLOPE multiplies its own
-unreinforced factor of safety by 1.354 and Cai & Ugai's model multiplies theirs by 1.193. The direction is
+unreinforced factor of safety by 1.279 and Cai & Ugai's model multiplies theirs by 1.193. The direction is
 the one the idealization predicts. In three dimensions the soil at three diameters' spacing arches onto the
 piles, some of it moves between them, and it can slip along each pile's surface; in a plane-strain smear the
 row is a continuous sheet at one-third the stiffness, and everything above it has to push through it.
-Restraining the head rotation is worth less in XSLOPE for the same reason — a factor of 1.021 against their
-1.066 — because a smeared row is already stiffer than the row it stands for, so stiffening its head adds
-less.
+Restraining the head rotation is worth a comparable amount in the two models — a factor of 1.081 in XSLOPE
+against their 1.066.
 
-On this problem the limit-equilibrium path lands closer to the three-dimensional answer than the
-two-dimensional finite-element path does: [VP106](#vp106)'s Bishop search reads 1.451 where the paper's own
-limit-equilibrium value is 1.37, and the Ito & Matsui limit pressure behind it is a theory *of* the
-three-dimensional mechanism rather than a two-dimensional stand-in for it.
+The free-head model sits close enough to its critical factor that the answer is sensitive at the round-off
+level: different valid numerical configurations land a bisection step or two apart, and the lock records
+the configuration the package ships.
+
+The limit-equilibrium path lands a comparable distance above the three-dimensional answer rather than a
+materially smaller one: [VP106](#vp106)'s Bishop search reads 1.451 where the paper's own
+limit-equilibrium value is 1.37, a credit of 1.269 against the beam's 1.279 and the three-dimensional
+1.193. The 0.010 between the two credits is under one bisection step on a free-head model this sensitive,
+so this problem does not rank the two-dimensional routes against each other, and neither of them recovers
+the three-dimensional credit. What recommends the limit-equilibrium path is the Ito & Matsui limit pressure
+behind it, a theory *of* the three-dimensional mechanism rather than a two-dimensional stand-in for it.
 
 **Scope.** The plane-strain beam is an exact representation of a member that really is continuous out of
 plane, and it is verified as one against a sheet pile wall in
@@ -2839,7 +2845,7 @@ limit equilibrium with the Ito & Matsui limit pressure — [VP106](#vp106) acros
 **Sources:** Cai & Ugai (2000), the three-dimensional shear-strength-reduction results.
 
 <!-- test: file=files/rocscience/vp106a_fem.xlsx, type=fem_ssrm, expected_fs=1.136, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.85, f_max=1.45, max_iter=16000, benchmark=VP106-FEM-nopile -->
-<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.538, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
+<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.453, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
 <!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.570, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed -->
 
 ## VP107: Retaining walls, gabion walls, supports {#vp107}

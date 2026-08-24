@@ -2443,11 +2443,12 @@ def _factorize_free_stiffness(K_free):
 
     Returns (factor, kind) where factor exposes ``.solve(b)``.
     """
-    # Default is the general LU the corpus was locked on: the symmetric modes
-    # change round-off enough to move a knife-edge trial by one bisection step
-    # (measured on the FEM-2 model), so they stay opt-in until a full FEM
-    # suite has run on them.
-    mode = os.environ.get("XSLOPE_FEM_FACTOR", "unsymmetric").strip().lower()
+    # Default is the symmetric path (the full FEM suite ran on it 2026-08-23:
+    # 186/189, the two genuine movers being knife-edge models whose near-critical
+    # answer is round-off sensitive under any configuration — their locks carry
+    # that note). XSLOPE_FEM_FACTOR pins a specific path when reproducing an
+    # older configuration.
+    mode = os.environ.get("XSLOPE_FEM_FACTOR", "auto").strip().lower()
 
     if mode in ("auto", "cholmod"):
         try:

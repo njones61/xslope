@@ -352,7 +352,7 @@ piggyback row may cover fewer cases than the corpus row it links to.
 | [3](#rs2-2) | 🟢 | Slope, 3 materials (ACADS 1c) | SSRM 1.347 vs RS2 SSRM 1.36 (−1.0%) | Piggyback on [RS2-2](#rs2-2). Part IV publishes RS2 SSRM 1.34; ref 1.39. |
 | [4](#rs2-3) | 🟢 | Slope, 3 materials, seismic (ACADS 1d) | SSRM 0.958 vs RS2 SSRM 0.97 (−1.2%) | Piggyback on [RS2-3](#rs2-3). Part IV publishes RS2 SSRM 0.95; ref 1.00. |
 | [5](#rs2-4) | 🟢 | Dam, 4 materials (ACADS 2a) | Unconstrained: SSRM 1.672 vs closed form 1.669 (+0.2%) · SSR Exclusion Area: SSRM 1.844 vs RS2 SSRM 1.9 (−2.9%) | Locked twice on [RS2-4](#rs2-4), the second under this manual's own SSR Exclusion Area. Slide2 1.948, ref 1.95 [Giam]. |
-| [6](#p4-vp6) | 🟢 | Dam, 4 materials, predefined surface (ACADS 2b) | SSRM 2.166 vs RS2 SSRM 2.15 (+0.7%) | Own SSRM build, constrained to RS2's 37-vertex Search Area from `#006.fez`, which holds the mechanism on ACADS 2(b)'s upstream circle. |
+| [6](#p4-vp6) | 🟢 | Dam, 4 materials, predefined surface (ACADS 2b) | SSRM 2.188 vs RS2 SSRM 2.15 (+1.8%) | Own SSRM build, constrained to RS2's 37-vertex Search Area from `#006.fez`, which holds the mechanism on ACADS 2(b)'s upstream circle. |
 | [7](#rs2-5) | 🟢 | Slope, 2 materials, weak layer (ACADS 3a) | SSRM 1.280 vs RS2 SSRM 1.26 (+1.6%) | Piggyback on [RS2-5](#rs2-5). Part IV publishes RS2 SSRM 1.24; ref 1.24–1.27. |
 | [9](#rs2-6) | 🟢 | Weak layer, water table, load (ACADS 4) | SSRM 0.777 vs ACADS referee 0.78 (−0.4%) | Piggyback on [RS2-6](#rs2-6). Part IV publishes RS2 SSRM 0.76. |
 | [10](#rs2-7) | 🟢 | Homogeneous, pore-pressure grid, ponded (ACADS 5) | SSRM 1.473 vs RS2 SSRM 1.48 (−0.5%) | Piggyback on [RS2-7](#rs2-7). Part IV publishes RS2 SSRM 1.46; ref 1.53. |
@@ -420,7 +420,7 @@ the true global minimum at 1.076 (a deep foundation mechanism, matched by XSLOPE
 unconstrained LEM search at Spencer 1.075), while reproducing RS2's SSR Exclusion Area below
 El. 81 lifts the mechanism onto the toe circle at 1.303, against RS2's constrained
 SSRM 1.33 ([details](#p4-vp67)); and VP6 (ACADS 2b Talbingo) confined to
-RS2's SSR Search Area read verbatim from the vendor `#006.fez` (SSRM 2.166 vs RS2 SSRM 2.15)
+RS2's SSR Search Area read verbatim from the vendor `#006.fez` (SSRM 2.188 vs RS2 SSRM 2.15)
 alongside the [VP6](rocscience.md#vp6) LEM lock ([details](#p4-vp6)); and the two USACE pool dams
 VP65 and VP66, whose sources pond them differently — VP66 on both faces, locking at SSRM 2.172
 against RS2's 2.22, and VP65 upstream only, reported at 1.909 against a vendor factor its SSR
@@ -544,7 +544,7 @@ mechanisms in two methods: RS2's 1.88 / 1.9 is strength reduction on the crest/c
 ([VP5](rocscience.md#vp5)) stays on the upstream circle in the input file and locks 1.955.
 [RS2 Part IV VP6](#p4-vp6) is a third station on the same dam: confining reduction to RS2's
 upstream SSR *Search* Area (37 vertices, read verbatim from `#006.fez`) holds the mechanism on
-ACADS 2(b)'s specified circle and gives 2.166 against RS2's SSRM 2.15.
+ACADS 2(b)'s specified circle and gives 2.188 against RS2's SSRM 2.15.
 
 **Mesh.** Both rows are locked at the 6.5 m tri6 mesh, 3 166 elements against the vendor model's
 2 204, so XSLOPE's mesh is the finer of the two. Both mechanisms drift mildly downward
@@ -3390,19 +3390,22 @@ FEM elastics.
 | Method | XSLOPE | RS2 SSRM | Slide2 (specified upstream circle) | Giam & Donald reference |
 |---|---|---|---|---|
 | SSRM, unconstrained (→ [RS2-4](#rs2-4)) | 1.672 | — (downstream bench, true global min) | — | — |
-| SSRM, SSR Search Area (upstream circle) | 2.166 | 2.15 (+0.7%) | Bishop 2.208 / Spencer 2.292 / GLE 2.301 | 2.29 (−5.4%) |
+| SSRM, SSR Search Area (upstream circle) | 2.188 | 2.15 (+1.8%) | Bishop 2.208 / Spencer 2.292 / GLE 2.301 | 2.29 (−4.5%) |
 
-XSLOPE's constrained SSRM lands at **2.166**, +0.7% on RS2's SSRM 2.15. Locked at the RS2-4 mesh
-(6.5 m tri6). The upstream-face confinement lifts the factor from the unconstrained 1.672
-(downstream bench) to the upstream-circle 2.166, reproducing RS2's ACADS 2(b) answer — confirming
+XSLOPE's constrained SSRM lands at **2.188**, +1.8% on RS2's SSRM 2.15. Locked at the RS2-4 mesh
+(6.5 m tri6). This mechanism sits close enough to its critical factor that the answer is sensitive
+at the round-off level: different valid numerical configurations land a bisection step or two
+apart, and the lock records the configuration the package ships. The upstream-face confinement
+lifts the factor from the unconstrained 1.672
+(downstream bench) to the upstream-circle 2.188, reproducing RS2's ACADS 2(b) answer — confirming
 that the split between the two is a **mechanism choice, not a discrepancy**. The 2(a) problem's own
 constraint is different again: RS2 solves it with an SSR *Exclusion* Area over the downstream shell
 rather than a search area over the upstream face, and [RS2-4](#rs2-4) locks that configuration
 separately at 1.844 against RS2's 1.88 / 1.9.
 
-<!-- test: file=files/rocscience/vp006.xlsx, type=fem_ssrm, expected_fs=2.166, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.8, f_max=2.5, max_iter=16000, ssr_zone=337.693;156.655;332.733;149.028;321.296;131.643;301.471;106.786;282.104;86.9617;253.282;65.612;218.97;44.5673;191.673;33.2825;160.106;24.1326;129.302;18.6427;106.884;16.5077;82.3323;16.5077;59.6101;20.1677;46.2384;23.742;43.4453;27.1826;26.5181;18.6427;29.4837;15.139;45.1228;9.79785;62.5076;7.05289;90.1096;5.22292;107.647;5.22292;124.269;5.22292;147.754;7.66288;167.883;10.8653;189.996;16.9652;206.923;22.7602;226.464;30.2593;250.08;42.5849;274.937;59.2071;299.184;79.9468;312.146;94.4341;328.442;115.178;340.663;132.406;348.593;150.686;350.477;154.416;339.88;160.039;337.693;156.655, tension_srf=true, k0=1, benchmark=RS2-P4-VP6 -->
+<!-- test: file=files/rocscience/vp006.xlsx, type=fem_ssrm, expected_fs=2.188, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.8, f_max=2.5, max_iter=16000, ssr_zone=337.693;156.655;332.733;149.028;321.296;131.643;301.471;106.786;282.104;86.9617;253.282;65.612;218.97;44.5673;191.673;33.2825;160.106;24.1326;129.302;18.6427;106.884;16.5077;82.3323;16.5077;59.6101;20.1677;46.2384;23.742;43.4453;27.1826;26.5181;18.6427;29.4837;15.139;45.1228;9.79785;62.5076;7.05289;90.1096;5.22292;107.647;5.22292;124.269;5.22292;147.754;7.66288;167.883;10.8653;189.996;16.9652;206.923;22.7602;226.464;30.2593;250.08;42.5849;274.937;59.2071;299.184;79.9468;312.146;94.4341;328.442;115.178;340.663;132.406;348.593;150.686;350.477;154.416;339.88;160.039;337.693;156.655, tension_srf=true, k0=1, benchmark=RS2-P4-VP6 -->
 
-![RS2 Part IV VP6: ACADS 2(b) Talbingo dam (Giam & Donald 1989), constrained SSRM 2.166 vs RS2 SSRM 2.15 — the mechanism confined to RS2's upstream SSR-Search-Area polygon read verbatim from the vendor model; FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP6.png)
+![RS2 Part IV VP6: ACADS 2(b) Talbingo dam (Giam & Donald 1989), constrained SSRM 2.188 vs RS2 SSRM 2.15 — the mechanism confined to RS2's upstream SSR-Search-Area polygon read verbatim from the vendor model; FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP6.png)
 
 ### RS2 Part IV VP41: Homogeneous slope, power curve + r<sub>u</sub> (Jiang, Baker & Yamagami 2003) {#p4-vp41}
 

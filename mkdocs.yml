@@ -79,6 +79,7 @@ nav:
     - Finite Element:
       - 1. Strength Reduction Basics: tutorials/fem01_strength_reduction.md
       - "2. Reinforcement: LEM vs FEM": tutorials/fem02_reinforcement.md
+      - "3. Piles: LEM vs FEM": tutorials/fem03_piles.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

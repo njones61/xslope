@@ -784,4 +784,7 @@ This tutorial covered:
 [LEM-8](lem08_reinforced_slope.md) builds this model from nothing and measures
 what the geogrid is worth against the bare section;
 [FEM-1](fem01_strength_reduction.md) is strength reduction on an unreinforced
-embankment. FEM-3 puts stabilizing piles through the same two-engine comparison.
+embankment.
+[FEM-3](fem03_piles.md) puts stabilizing piles through the same two-engine
+comparison, and measures which engine a discrete row belongs in and which a
+continuous wall does.

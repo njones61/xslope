@@ -269,8 +269,7 @@ comes back identical — **3,180 nodes and 1,521 triangles** with the same **18
 beam elements** — which is what makes the two runs comparable. **Run → Run
 FEM…** with the same bracket: **FS = 1.361**, the same answer as at 6 ft.
 
-That flat line is worth explaining carefully, because the obvious reading of it
-is wrong. Dividing *EA* and *EI* by `S` is not bookkeeping the finite element
+The obvious reading of that flat line is wrong. Dividing *EA* and *EI* by `S` is not bookkeeping the finite element
 engine does to dispose of the spacing column — it is the correct plane-strain
 stiffness of a row smeared into a wall, and it responds to `S` exactly as it
 should. Over this sweep the smeared stiffness falls by a factor of four, and the
@@ -334,9 +333,8 @@ So the reason to take a discrete row's factor of safety from the limit
 equilibrium engine is not that its number is larger or smaller. It is that Ito &
 Matsui is a theory *of* the three-dimensional mechanism, while the beam model is
 a two-dimensional substitute for it. The finite element run on a discrete row
-still tells you what the shafts are carrying, which is why the moment table
-above is worth reading; it is the factor of safety that carries the
-idealization.
+still tells you what the shafts are carrying — the moment table above stands;
+it is the factor of safety that carries the idealization.
 
 ---
 

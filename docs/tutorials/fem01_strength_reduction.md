@@ -89,7 +89,7 @@ displacements simply keep growing. **The factor of safety is the largest *F* the
 slope still stands at**, and finding it is a search over *F* rather than a
 search over surfaces.
 
-Two consequences are worth holding on to before the first run. Failure here is
+Two consequences follow, and both matter on the first run. Failure here is
 **the solver failing to find equilibrium**, not a surface reaching a limit
 state, so how long each trial is allowed to iterate is part of the answer. And
 because nothing about a surface was assumed, the mechanism comes out of the
@@ -310,7 +310,7 @@ ground movement.
 ν is not in the same category. Setting it to 0 — the value a blank cell loads
 as — moved the reference model's factor of safety by a third, which is why the
 run gate raises it as an error rather than a warning. 0.3 is the paper's nominal
-value too, but unlike E it is not inert, so a real problem is worth a real one.
+value too, but unlike E it is not inert, so a real problem needs a real one.
 
 ---
 
@@ -532,8 +532,7 @@ largest displacement at the **Auto size** percentage of the mesh height,
 default 15: here 15% of 50 ft is 7.5 ft, the largest viscoplastic displacement
 is 7.64 ft, and Auto lands on **1.0×** — this collapse has developed far enough
 to draw at true scale. Type a number into **Scale ×** to pin the exaggeration
-instead, which is worth doing when two figures have to be compared at one
-setting; Auto size dims while an explicit value holds. The box's spin arrows
+instead, which is how two figures are compared at one setting; Auto size dims while an explicit value holds. The box's spin arrows
 redraw the view at every step, and that turns the control into something better
 than a setting: start at Auto and hold the up arrow, and the mesh deforms a
 step at a time — the crest dropping and the toe bulging in what amounts to an

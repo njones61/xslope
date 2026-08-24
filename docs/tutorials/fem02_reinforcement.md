@@ -349,8 +349,7 @@ under a name of your own.
 ## The iteration budget
 
 Two controls on the Run FEM dialog decide how long each trial is allowed to
-iterate. Neither needs changing for this page, but what they do is worth
-knowing before the first run.
+iterate. Neither needs changing for this page; what they do matters on the first run.
 
 **Max iterations per trial**, which opens at **12,000**, is the budget each
 trial reduction factor starts with. It is a budget rather than a limit: a

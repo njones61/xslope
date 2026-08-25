@@ -294,14 +294,18 @@ comparable to the 1.363 above.
 | shaft modulus `E` × 100 | 1.363 |
 | shaft modulus `E` ÷ 100 | 1.277 |
 | `Vcap` and `Mcap` cleared | 1.363 |
-| `Head` set to `fixed`, tips still free | 1.793 |
+| `Head` set to `fixed`, tips still pinned | 1.793 |
 
 Stiffness is not what holds it: a hundredfold stiffer shaft returns the same
 answer to four figures, and only a hundredfold *softer* one — a shaft the clay
 can bend — moves it, and then only to 1.277. The structural capacities are not
-what holds it either: clearing both leaves the answer unchanged, because with
-the rows as shipped nothing reaches capacity anyway. What moves the answer is
-restraining rotation at an end.
+what holds it either. With a value in `Mcap` the engine releases a plastic
+hinge in any beam element whose moment reaches it, and with a value in `Vcap`
+it caps the beam shear there; blank, the shaft stays elastic at any moment or
+shear, with no limit at all. Clearing both leaves the answer unchanged, because
+with the rows as shipped nothing reaches capacity anyway — the shafts peak at
+44% of M<sub>cap</sub>, so a limit they never meet cannot be what is holding
+them. What moves the answer is restraining rotation at an end.
 
 That is a physical question about the shafts rather than a modeling knob. Both
 rows run from the face down to the rigid base with `Tip` on `pinned`, as

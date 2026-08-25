@@ -146,8 +146,7 @@ are held at their toes.
 
 Download [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx) and open it with
 **File → Open…**. The mode strip opens on **LEM**, which is where the first run
-happens. Units are `imperial`, so lengths read in feet and stresses and
-stiffnesses in psf.
+happens.
 
 ![The pile model as it opens: two rows through the face and the starting circle](images/fem03_inputs_piles.png){width=1000}
 

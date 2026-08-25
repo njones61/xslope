@@ -376,17 +376,6 @@ M<sub>cap</sub> ÷ S exactly: 20,000, 10,000 and 5,000 lb·ft/ft. Whichever end 
 is decided by the mechanism the smeared wall forces the soil into, not by how
 much moment each shaft carries.
 
-Run one point of it to see both. Open **Piles**, set `S` to `12` on both rows
-with `H` still blank, and **OK**. Search with Spencer again: **FS = 1.409**, on
-a different, shallower circle than the 6 ft spacing found —
-[LEM-12](lem12_piles.md#what-the-spacing-is-worth) covers why.
-
-The mesh is still good: a pile row enters the mesh only as a constraint line, so
-Studio throws the mesh away when a row's endpoints move or a row is added or
-removed, not when `S` or any other property on it changes. Switch to **FEM** and
-**Run → Run FEM…** with the same bracket: **FS = 1.363**, the same answer as at
-6 ft, on the same 3,180 nodes and 1,521 triangles.
-
 The pinned-tip line is not the model ignoring the spacing column. Over this sweep the
 smeared bending stiffness *EI*/S falls fourfold, and what the shafts carry moves
 with it. Each row below is read at that spacing's captured mechanism:

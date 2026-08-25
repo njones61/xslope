@@ -272,7 +272,9 @@ continuous obstruction over the full length of the slope. The soil between the
 toe and the upper row shears down to the base and carries both rows with it,
 each rotating about its toe, and the mass behind the upper row shears past its
 head. The shading on the piles says the same thing: the largest shear on each
-shaft is at its tip, where the rotation is resisted.
+shaft is at its tip, which the rigid base holds in place while the soil above
+drags the shaft — the shear there is the reaction at that pinned toe, and the
+shaft is free to rotate about it.
 
 ### What spacing does to each engine
 

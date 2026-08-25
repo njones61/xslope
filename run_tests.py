@@ -6454,6 +6454,38 @@ def run_beam_element_test(test):
     return 0.0, None
 
 
+def run_one_d_compatibility_test(test):
+    """Embedded 1D elements against the soil edge they lie on.
+
+    A bar or beam element couples to the soil only where they share a node, so on
+    a quadratic mesh it must stand on the midside node of its soil edge as well as
+    on the two corners. Checked at the mesh (every 1D element records three nodes,
+    the third being the edge's own midside node, both from the mesher and from a
+    stored mesh read back), at the element (a bar under a uniform axial strain
+    carries exactly EA*eps, the midside node takes no share of a constant axial
+    force, and the midside degrees of freedom are really in the member stiffness),
+    and against the linear mesh, whose stiffness and member forces must be
+    bit-for-bit what the two-node escape hatch gives.
+
+    The check itself lives in test/one_d_compatibility_check.py (file-less: it
+    meshes a small block with a constraint line across it, at tri6 and tri3).
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'one_d_compatibility_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('one_d_compatibility_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_flow_recovery_test(test):
     """Gradient and velocity recovery against a field with an exact answer.
 
@@ -11705,6 +11737,8 @@ def _dispatch_test(test):
         return run_k0_level_ground_test(test)
     if test_type == 'beam_element':
         return run_beam_element_test(test)
+    if test_type == 'one_d_compatibility':
+        return run_one_d_compatibility_test(test)
     if test_type == 'flow_recovery':
         return run_flow_recovery_test(test)
     if test_type == 'spencer_disclosure':
@@ -11840,7 +11874,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -12339,6 +12373,14 @@ def main():
         # assembles only the beam matrices build_fem_data returns).
         tests.append({'type': 'beam_element', 'file': 'pile beam element vs beam theory',
                       'method': '-', 'source': 'beam_element'})
+        # Guard the coupling between an embedded 1D element and the soil edge it
+        # lies on: on a quadratic mesh the element stands on the edge's midside
+        # node as well as its corners, a bar under uniform axial strain carries
+        # EA*eps with nothing at the midside node, and a linear mesh is
+        # bit-for-bit unchanged. File-less (it meshes a small block).
+        tests.append({'type': 'one_d_compatibility',
+                      'file': '1D elements vs the soil edge they lie on',
+                      'method': '-', 'source': 'one_d_compatibility'})
         # Guard the seepage post-processing — the gradient and Darcy velocity
         # differentiated out of the solved head — against the linear field whose
         # answer is exact on any mesh. It rides the DEFAULT set rather than --seep

@@ -417,6 +417,18 @@ def test_envelope_mutation():
 _SKIP_KEYS = {"element_ids", "pile_indices", "node_ids", "mechanism"}
 
 
+#: Series compared against the scale of the series rather than against 1e-9
+#: absolute. The soil reaction is a FOURTH derivative of the displacement field:
+#: the pile element reports it as EI times the fourth derivative of its own
+#: deflected shape, so the last digit the node sidecar writes -- a displacement
+#: is written to about sixteen figures, not to the bit -- reaches the reaction
+#: multiplied by EI/L^4, which is of order 1e5 on these models. It therefore
+#: agrees to nine figures of its own peak, and pinning it to 1e-9 absolute would
+#: be measuring the CSV's decimal rather than the profile.
+_SCALE_RELATIVE_KEYS = {"reaction", "reaction_ratio"}
+_SCALE_RTOL = 1e-9
+
+
 def _same_profile(a, b, label, fails):
     keys = sorted(set(a) | set(b))
     for k in keys:
@@ -425,13 +437,17 @@ def _same_profile(a, b, label, fails):
         va, vb = a.get(k), b.get(k)
         if isinstance(va, np.ndarray) or isinstance(vb, np.ndarray):
             va, vb = np.asarray(va, dtype=float), np.asarray(vb, dtype=float)
+            atol = 1e-9
+            if k in _SCALE_RELATIVE_KEYS and va.size:
+                atol = max(atol, _SCALE_RTOL * float(np.nanmax(np.abs(va))))
             if va.shape != vb.shape:
                 fails.append(f"{label}.{k}: shape {va.shape} != {vb.shape} after reload")
-            elif not np.allclose(va, vb, rtol=1e-9, atol=1e-9, equal_nan=True):
+            elif not np.allclose(va, vb, rtol=1e-9, atol=atol, equal_nan=True):
                 worst = float(np.nanmax(np.abs(va - vb)))
                 fails.append(f"{label}.{k}: differs after reload (max |d| = {worst:.3g})")
         elif isinstance(va, float) and isinstance(vb, float):
-            if not (np.isnan(va) and np.isnan(vb)) and abs(va - vb) > 1e-9:
+            tol = _SCALE_RTOL * abs(va) if k in _SCALE_RELATIVE_KEYS else 1e-9
+            if not (np.isnan(va) and np.isnan(vb)) and abs(va - vb) > max(tol, 1e-9):
                 fails.append(f"{label}.{k}: {va} != {vb} after reload")
         elif (isinstance(va, tuple) and isinstance(vb, tuple)
               and len(va) == len(vb)):
@@ -1605,6 +1621,77 @@ def test_the_inset_follows_the_selection():
     return fails
 
 
+def test_the_pile_is_read_at_every_node_it_stands_on():
+    """A pile profile reports one station per node of the pile, and the soil
+    reaction it reports does not alternate from node to node.
+
+    On a quadratic mesh each beam element stands on three nodes -- the two
+    corners of the soil edge and that edge's midside node -- so a chain of n
+    elements has 2n+1 nodes and the profiles are read at all of them. The
+    reaction is the beam's out-of-balance nodal force at each interior node,
+    spread over the length that node stands for, which is the element's own
+    consistent-load weight there: L/6 at a corner and 2L/3 at a midside node.
+    Divide by the spacing instead and a uniformly loaded pile reports its midside
+    nodes at twice its corner nodes, so the series alternates high and low all
+    the way down -- a sawtooth put there by the arithmetic and not by the soil.
+    """
+    from xslope.fem_details import pile_profile
+    fails = []
+    slope_data, fem_data, solution = _solved(PILES_XLSX)
+
+    types = np.asarray(fem_data.get("element_types_1d", []), dtype=int)
+    mask = np.asarray(fem_data.get("pile_elem_mask", []), dtype=bool)
+    if not len(types) or not mask.any():
+        return ["the piles sample carries no pile element"]
+    if int(types[mask].min()) < 3:
+        return ["the piles sample's beam elements are two-node, so the station "
+                "count below proves nothing"]
+
+    n_lines = len(slope_data.get("pile_lines", []))
+    for index in range(n_lines):
+        profile = pile_profile(fem_data, solution, index, slope_data)
+        n_elem = int(profile["n_elements"])
+        if not n_elem:
+            continue
+        want = 2 * n_elem + 1
+        got = len(profile["node_depth"])
+        if got != want:
+            fails.append(f"pile {index + 1}: {got} stations for {n_elem} "
+                         f"three-node elements, expected {want}")
+        if len(profile["u_lateral"]) != got:
+            fails.append(f"pile {index + 1}: the lateral displacement is "
+                         f"reported at {len(profile['u_lateral'])} stations and "
+                         f"the depth at {got}")
+        if len(profile["elem_depth"]) != n_elem:
+            fails.append(f"pile {index + 1}: {len(profile['elem_depth'])} "
+                         f"element shears for {n_elem} elements")
+
+        # Each three-node element reports its own reaction, at the station its
+        # shear is reported at.
+        reaction = np.asarray(profile["reaction"], dtype=float)
+        if len(reaction) != n_elem:
+            fails.append(f"pile {index + 1}: the reaction is reported at "
+                         f"{len(reaction)} stations for {n_elem} elements")
+        if len(profile["reaction_depth"]) != len(reaction):
+            fails.append(f"pile {index + 1}: the reaction has "
+                         f"{len(reaction)} values at "
+                         f"{len(profile['reaction_depth'])} depths")
+        # A sawtooth reverses sign at nearly every step. A real reaction
+        # distribution reverses where the pile crosses the mechanism, once or
+        # twice down its length.
+        if len(reaction) >= 5:
+            live = reaction[np.abs(reaction) > 1e-9 * max(
+                float(np.max(np.abs(reaction))), 1e-30)]
+            if len(live) >= 5:
+                flips = int(np.sum(np.sign(live[:-1]) != np.sign(live[1:])))
+                if flips > 0.4 * (len(live) - 1):
+                    fails.append(
+                        f"pile {index + 1}: the soil reaction changes sign at "
+                        f"{flips} of {len(live) - 1} steps, which reads as an "
+                        f"alternating artifact rather than a distribution")
+    return fails
+
+
 CHECKS = [
     ("the band's mark needs the mechanism", test_the_band_needs_the_mechanism),
     ("the reaction panel says where its limit is",
@@ -1628,6 +1715,8 @@ CHECKS = [
     ("at-failure profiles are the snapshot's", test_field_state_profiles),
     ("the field state survives save + reload", test_field_state_reload),
     ("the export records the field state", test_field_state_export),
+    ("a pile is read at every node it stands on",
+     test_the_pile_is_read_at_every_node_it_stands_on),
 ]
 
 # Checks that need the Studio layer; skipped when PySide6 is absent.

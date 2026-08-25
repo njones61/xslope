@@ -10504,7 +10504,12 @@ def test_the_mesh_sentence_counts_what_the_mesh_holds():
             continue
         mask = np.asarray(fem_data.get("pile_elem_mask", np.zeros(n_1d)), bool)
         n = int(mask.sum()) if member == "piles" else int((~mask).sum())
-        want = f"{n:,} two-node {element} elements for the {member}"
+        # Named for the nodes the elements actually stand on, which is three on a
+        # quadratic mesh (the soil edge's midside node as well as its corners)
+        # and two on a linear one.
+        from xslope.report import one_d_node_phrase
+        nodes = one_d_node_phrase(fem_data, pile=(member == "piles"))
+        want = f"{n:,} {nodes} {element} elements for the {member}"
         if want not in said:
             fails.append(f"{label}: the mesh sentence does not count the 1D "
                          f"elements as {want!r}: {said!r}")
@@ -10516,7 +10521,13 @@ def test_the_mesh_sentence_counts_what_the_mesh_holds():
         # on indexes the same node array the 2D elements do, and is a node of a
         # 2D element. A sentence stating a formulation fact must be falsifiable
         # by the formulation.
-        used = np.unique(np.asarray(e1)[:, :2])
+        # Over EVERY node the elements are built on, midside nodes included --
+        # the sentence claims the 1D and 2D elements share their nodes, and a
+        # node the member stands on that the soil does not would break it.
+        e1 = np.asarray(e1)
+        t1 = np.asarray(fem_data.get("element_types_1d", np.full(n_1d, 2)), int)
+        used = np.unique(np.concatenate(
+            [e1[i, :max(2, min(int(t1[i]), e1.shape[1]))] for i in range(n_1d)]))
         if used.max() >= len(fem_data["nodes"]):
             fails.append(f"{label}: a 1D element indexes a node outside the 2D "
                          f"mesh, so 'share the same nodes' is false")

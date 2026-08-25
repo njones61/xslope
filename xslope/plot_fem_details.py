@@ -483,9 +483,12 @@ def plot_pile_detail(profile, fig=None):
     rather than at its beam elements, so it is where the crossing is and not
     which element holds it.
 
-    The shear, moment and soil-reaction samples are element quantities: each
-    marker sits at the midpoint of the beam element it was read from, and the
-    displacement is nodal.
+    The shear and moment samples are element quantities: each marker sits at the
+    midpoint of the beam element it was read from, and the displacement is nodal.
+    The soil reaction is an element quantity too where the elements carry a
+    midside node, each one reporting the distributed load its own deflected shape
+    carries; where they do not, it sits at the node between two elements, which is
+    where a chain of cubics can read it.
 
     Capacity lines are drawn only for the capacities the model declares. Shear
     and moment capacities come from the ``Vcap`` and ``Mcap`` inputs; there is no

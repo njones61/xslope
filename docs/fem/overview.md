@@ -1287,7 +1287,8 @@ share nodes with the surrounding soil elements and participate in the viscoplast
 body-force corrections.
 
 - **[Soil Reinforcement](reinforcement.md)**: geotextiles, soil nails and ground anchors as
-  tension-only truss elements with axial stiffness $EA/L$ — including the failure modes (perfectly
+  tension-only truss elements with axial stiffness $EA/L$, on every node of the soil edge they lie
+  on — including the failure modes (perfectly
   plastic pullout, peak-residual softening, brittle rupture) and typical material properties.
 
 - **[Piles and Concrete Piers](piles.md)**: beam elements carrying both axial stiffness ($EA/L$) and

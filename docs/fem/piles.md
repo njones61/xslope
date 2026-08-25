@@ -74,7 +74,7 @@ study whose factor of safety carries the idealization above.
 
 ## Comparison with Reinforcement (Truss) Elements
 
-The existing FEM module models flexible reinforcement as **2-node truss elements** (axial only, tension only). Piles reuse much of this infrastructure but differ in key ways:
+The existing FEM module models flexible reinforcement as **truss elements** (axial only, tension only) on the same nodes. Piles reuse much of this infrastructure but differ in key ways:
 
 | Property | Reinforcement (Truss) | Pile (Beam) |
 |----------|----------------------|-------------|
@@ -92,11 +92,32 @@ For details on the truss element formulation used for reinforcement, see [Soil R
 
 ### Euler-Bernoulli Beam Stiffness
 
-XSLOPE uses the standard Euler-Bernoulli beam element with 3 DOFs per node ($u_x$, $u_y$, $\theta$), giving a 6×6 element stiffness matrix in local coordinates (beam axis along local $x$):
+XSLOPE uses the standard Euler-Bernoulli beam element with 3 DOFs per node ($u_x$, $u_y$, $\theta$). On a linear soil mesh the element has two nodes, giving a 6×6 element stiffness matrix in local coordinates (beam axis along local $x$):
 
 >$\mathbf{K}_{\text{local}} = \begin{bmatrix} \frac{EA}{L} & 0 & 0 & -\frac{EA}{L} & 0 & 0 \\ 0 & \frac{12EI}{L^3} & \frac{6EI}{L^2} & 0 & -\frac{12EI}{L^3} & \frac{6EI}{L^2} \\ 0 & \frac{6EI}{L^2} & \frac{4EI}{L} & 0 & -\frac{6EI}{L^2} & \frac{2EI}{L} \\ -\frac{EA}{L} & 0 & 0 & \frac{EA}{L} & 0 & 0 \\ 0 & -\frac{12EI}{L^3} & -\frac{6EI}{L^2} & 0 & \frac{12EI}{L^3} & -\frac{6EI}{L^2} \\ 0 & \frac{6EI}{L^2} & \frac{2EI}{L} & 0 & -\frac{6EI}{L^2} & \frac{4EI}{L} \end{bmatrix}$
 
 where $E$ is Young's modulus, $A$ is the cross-sectional area, $I$ is the moment of inertia, and $L$ is the element length.
+
+### Three-node elements on a quadratic mesh
+
+On a quadratic soil mesh (tri6, quad8, quad9) the edge a beam element lies on carries a midside node as well as its
+two corners, and the beam element stands on all three. It then has 9 DOFs — $u_x$, $u_y$ and $\theta$ at every one of
+its nodes — and its local stiffness is 9×9.
+
+Carrying that node is what ties the pile to the soil in the middle of each element. The soil's displacement along a
+quadratic edge is a parabola through all three nodes, so a beam attached at the corners alone leaves the edge free to
+bow away from it between them, and leaves the midside node free to move independently of the pile.
+
+The deflection of the three-node element is the quintic that matches a value and a slope at all three of its nodes —
+six conditions on six coefficients. That keeps Euler-Bernoulli exactly: the bending block is
+$EI \int H_i'' H_j'' \, dx$ over the same shape functions, and the quintic contains both the cubic and the quartic
+deflected shapes the classical beam solutions take, so the element reproduces them exactly. Axial action is the
+quadratic bar over the same three nodes. Bending and axial stay uncoupled, as on the two-node element.
+
+One thing the three-node element can say that the two-node element cannot is the distributed load along itself. A cubic
+deflection has a zero fourth derivative everywhere, so a chain of two-node elements can report the soil reaction only
+as the shear step between one element and the next; the quintic's fourth derivative is a genuine linear distribution
+along the element, and $EI$ times it is the reaction that element is carrying.
 
 ### Mixed DOF System
 
@@ -110,7 +131,7 @@ The local stiffness matrix is transformed to global coordinates using a 6×6 rot
 
 >$\mathbf{K}_{\text{global}} = \mathbf{T}^T \, \mathbf{K}_{\text{local}} \, \mathbf{T}$
 
-where $\mathbf{T}$ is a block-diagonal rotation matrix with $\cos\theta$, $\sin\theta$ direction cosines for translational DOFs and identity for rotational DOFs.
+where $\mathbf{T}$ is a block-diagonal rotation matrix with $\cos\theta$, $\sin\theta$ direction cosines for translational DOFs and identity for rotational DOFs — 6×6 on a two-node element, 9×9 on a three-node one.
 
 For a **vertical pile** ($\cos\theta = 0$, $\sin\theta = -1$), the axial stiffness $EA/L$ acts in the $y$-direction (vertical) and the lateral stiffness $12EI/L^3$ acts in the $x$-direction (horizontal) — exactly the behavior needed for resisting lateral slope movement.
 
@@ -210,7 +231,7 @@ This treatment is consistent with how reinforcement elements are handled in the 
 
 ### Shared-Node Coupling (Current Implementation)
 
-In XSLOPE, pile beam element nodes are the same nodes as the adjacent soil element nodes — the beam stiffness is assembled directly into the global stiffness matrix at the shared DOF indices. This means the pile and soil have **identical displacements** at every shared node. There is no relative slip between the pile shaft and the surrounding soil.
+In XSLOPE, pile beam element nodes are the same nodes as the adjacent soil element nodes — every node of the 2D element edge the beam lies on, the midside node included on a quadratic mesh. The beam stiffness is assembled directly into the global stiffness matrix at the shared DOF indices, so the pile and soil have **identical displacements** at every node of every element the pile is built from. There is no relative slip between the pile shaft and the surrounding soil.
 
 This shared-node approach is equivalent to a **perfectly bonded interface** with infinite shear strength. When the soil deforms (e.g., during SSRM strength reduction), the pile resists through its $EI$ and $EA$ stiffness, and whatever force is needed to maintain displacement compatibility is transmitted at each node. There is no cap on the interface shear stress — the force transfer is limited only by the soil elements yielding (via the viscoplastic algorithm) or the pile reaching its structural capacity ($V_{\text{cap}}$, $M_{\text{cap}}$).
 
@@ -313,8 +334,9 @@ Four panels share one depth axis, pile head at the top:
 - **Moment** — the bending moment, assembled from the beam elements' end moments into a continuous profile, with
   the maximum marked and its depth annotated. A free head and a free toe both read zero, which is a useful check
   that the profile is being read correctly.
-- **Soil reaction** — the lateral resistance the ground mobilizes per unit length of pile, obtained from the
-  shear discontinuity the soil imposes at each interior node. The Ito & Matsui limiting resistance
+- **Soil reaction** — the lateral resistance the ground mobilizes per unit length of pile. On a quadratic mesh each
+  beam element reports its own, from the distributed load its deflected shape carries; on a linear mesh, where the
+  element's deflection is a cubic and carries none, it is the shear step between consecutive elements. The Ito & Matsui limiting resistance
   $p(z) = (c A_1 + \gamma z A_2)/S$ is drawn dashed beside it, from the same coefficients the LEM uses for its
   passive-pile force (see [LEM Piles](../lem/piles.md)), and the peak fraction of that limit is stated in the
   panel. The limiting resistance grows with depth and is often far above anything mobilized, in which case the

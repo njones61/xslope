@@ -396,8 +396,10 @@ Each unique edge in the linear mesh receives one midside node at its midpoint, s
 both elements that use the edge, so the mesh stays conforming. A `quad9` also gets a
 center node at the average of its four corners. A leftover triangle in a `quad8` or
 `quad9` mesh becomes a `tri6` — the mesh stays mixed rather than forcing a bad
-quadrilateral. Embedded 1D elements stay 2-node: a truss uses only its end nodes, so a
-midside node there would add no stiffness and could leave the system singular.
+quadrilateral. Embedded 1D elements pick up the midside node of the 2D edge they lie on
+and become 3-node: a bar or beam couples to the soil only where they share a node, so an
+element on the corners alone would leave the soil free to bow away from it between them.
+An element on an edge that has no midside node — a linear mesh — stays 2-node.
 
 ## Reinforcement and pile lines
 

@@ -27,20 +27,33 @@ the same nodes. The 1D elements have their own set of material properties corres
 corresponding reinforcement lines input by the user and include $T_{max}$, $T_{res}$, $E$, and cross-sectional area
 $A$.
 
-Only the two end nodes of each 1D element are used for computing truss stiffness and axial forces. When the mesh uses
-quadratic (8-node) 2D elements, the 1D elements may have a mid-side node shared with the adjacent 2D elements. This
-mid-node participates in the 2D element shape functions for displacement interpolation but is ignored for the truss
-element formulation. A 2-node linear truss element is exact for a prismatic bar with constant axial stiffness, so
-the quadratic interpolation adds no physical fidelity for the 1D element.
+Each truss element stands on every node of the 2D element edge it lies on. On a linear mesh that is the edge's two
+end nodes and the element is a 2-node bar. On a quadratic mesh (tri6, quad8, quad9) the edge also carries a midside
+node, and the truss element is a 3-node bar carrying that node too.
+
+The midside node is what ties the bar to the soil in the middle of the edge. The soil's displacement along a quadratic
+edge is a parabola through all three nodes, so a bar attached at the corners alone leaves the edge free to bow away
+from it between them, and leaves the midside node free to slide along it: the bar and the soil around it displace
+together at only half the stations the edge has. Carrying the node closes that gap, and it costs no node and moves
+none, because the node is already there as part of the 2D element.
+
+The 3-node bar is the standard isoparametric quadratic bar, and its axial force at the element center is
+$EA(u_2 - u_1)/L$ — the same chord expression the 2-node bar uses, so an element's reported force means what it always
+did.
 
 The meshing algorithms used in XSLOPE, including the integration of 1D and 2D elements for problems involving soil
 reinforcement are documented in the [Mesh Generation](mesh.md) page.
 
 ## Mathematical Formulation
 
-**Truss Element Stiffness Matrix:** Each 1D truss element contributes to the global stiffness matrix through its element stiffness matrix. For a truss element with nodes $i$ and $j$, the element stiffness matrix in local coordinates is:
+**Truss Element Stiffness Matrix:** Each 1D truss element contributes to the global stiffness matrix through its element stiffness matrix. On a linear mesh the element has two nodes $i$ and $j$, and its stiffness in local (axial) coordinates is:
 
 >>$[K_e]_{local} = \dfrac{AE}{L} \begin{bmatrix} 1 & -1 \\ -1 & 1 \end{bmatrix}$
+
+On a quadratic mesh the element also carries the midside node $m$ of its soil edge, and its stiffness is the quadratic
+bar's, in the node order $(i, j, m)$:
+
+>>$[K_e]_{local} = \dfrac{AE}{3L} \begin{bmatrix} 7 & 1 & -8 \\ 1 & 7 & -8 \\ -8 & -8 & 16 \end{bmatrix}$
 
 where $A$ is the cross-sectional area, $E$ is the elastic modulus, and $L$ is the element length.
 
@@ -52,6 +65,9 @@ The transformation is built from $\psi$, the inclination of the reinforcement li
 angle the LEM formulation uses for the direction of an axial reinforcement force:
 
 >>$[R] = \begin{bmatrix} \cos\psi & \sin\psi & 0 & 0 \\ 0 & 0 & \cos\psi & \sin\psi \end{bmatrix}$
+
+with one more row, $\begin{bmatrix} 0 & 0 & 0 & 0 & \cos\psi & \sin\psi \end{bmatrix}$, for the midside node of a
+three-node bar.
 
 **Assembly Process:** The global stiffness matrix combines contributions from both 2D soil elements and 1D truss elements:
 

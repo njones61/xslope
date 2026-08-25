@@ -250,9 +250,18 @@ def _member_nodes(fem_data, kind, index):
         by_line = np.asarray(fem_data.get("pile_line_idx_by_pile_elem", []),
                              dtype=int)
         pairs = list(fem_data.get("pile_node_pairs", []))
+        # Every node the element stands on, which on a quadratic mesh includes
+        # the midside node of the soil edge; pile_elem_nodes carries all three,
+        # with -1 where the element has no midside node.
+        triples = np.asarray(fem_data.get("pile_elem_nodes", np.zeros((0, 3))),
+                             dtype=int)
         if len(by_line) != n_pile or len(pairs) != n_pile:
             return np.zeros((0, 2))
-        ids = [n for p in np.where(by_line == index)[0] for n in pairs[p]]
+        if len(triples) == n_pile:
+            ids = [n for p in np.where(by_line == index)[0]
+                   for n in triples[p] if n >= 0]
+        else:
+            ids = [n for p in np.where(by_line == index)[0] for n in pairs[p]]
     else:
         elements_1d = np.asarray(fem_data.get("elements_1d", np.zeros((0, 3))),
                                  dtype=int)
@@ -261,9 +270,15 @@ def _member_nodes(fem_data, kind, index):
                           dtype=int)
         mask = np.asarray(fem_data.get("pile_elem_mask", np.zeros(n_1d, bool)),
                           dtype=bool)
+        types = np.asarray(fem_data.get("element_types_1d", np.full(n_1d, 2)),
+                           dtype=int)
         if len(mats) != n_1d or len(mask) != n_1d:
             return np.zeros((0, 2))
-        ids = [n for e in elements_1d[(mats == index) & (~mask)] for n in e[:2]]
+        keep = (mats == index) & (~mask)
+        if len(types) != n_1d:
+            types = np.full(n_1d, 2, dtype=int)
+        ids = [n for e, t in zip(elements_1d[keep], types[keep])
+               for n in e[:max(2, min(int(t), len(e)))]]
     ids = [i for i in dict.fromkeys(int(n) for n in ids) if 0 <= i < len(nodes)]
     return nodes[ids] if ids else np.zeros((0, 2))
 
@@ -1042,6 +1057,62 @@ def _ito_matsui_limit(slope_data, props, depths, y_head, S):
     return p
 
 
+def _pile_reaction(fem_data, field, sel, node_ids, node_depth, elem_depth):
+    """``(depth, p)`` -- the lateral soil reaction per unit length along one
+    pile, and the depths it is reported at.
+
+    On three-node elements each element reports its own: EI times the fourth
+    derivative of its deflected shape, read at its midpoint, which is the
+    distributed load that shape is carrying. Every element then answers from its
+    own kinematics, at the station its shear is already reported at.
+
+    On two-node elements the deflection is a cubic and that quantity is zero
+    everywhere, so the reaction is the shear discontinuity between consecutive
+    elements, spread over the tributary length of the node between them -- the
+    only thing a chain of cubics can say, and what a linear mesh has always
+    reported.
+    """
+    empty = (np.zeros(0), np.zeros(0))
+    if len(sel) == 0:
+        return empty
+
+    disp = np.asarray((field or {}).get("displacements", np.zeros(0)), dtype=float)
+    n_dof_by = np.asarray(fem_data.get("n_dof_by_pile_elem", []), dtype=int)
+    dof_idx_all = np.asarray(fem_data.get("dof_indices_pile", np.zeros((0, 9))),
+                             dtype=int)
+    n_pile = int(fem_data.get("n_pile_elements", 0) or 0)
+    elem_len = _pile_array(fem_data, "elem_length_by_pile_elem", n_pile)[sel]
+
+    three_node = (len(n_dof_by) == n_pile
+                  and all(int(n_dof_by[p]) == 9 for p in sel))
+    if three_node and len(disp):
+        from .fem import pile_element_reaction
+        cos_t = np.asarray(fem_data.get("cos_theta_pile", np.zeros(n_pile)),
+                           dtype=float)
+        sin_t = np.asarray(fem_data.get("sin_theta_pile", np.zeros(n_pile)),
+                           dtype=float)
+        EI = _pile_array(fem_data, "EI_by_pile_elem", n_pile)
+        out = np.zeros(len(sel))
+        for k, p in enumerate(sel):
+            p = int(p)
+            idx = dof_idx_all[p][:9]
+            if int(idx.max()) >= len(disp):
+                return empty
+            value = pile_element_reaction(disp[idx], cos_t[p], sin_t[p],
+                                          float(elem_len[k]), float(EI[p]), 3)
+            out[k] = 0.0 if value is None else value
+        return elem_depth, out
+
+    shear = _sol_array(field, "forces_pile_lateral", n_pile)[sel]
+    if len(sel) < 2:
+        return empty
+    trib = 0.5 * (elem_len[:-1] + elem_len[1:])
+    return (node_depth[1:-1],
+            np.where(trib > 1e-12,
+                     (shear[:-1] - shear[1:]) / np.where(trib > 1e-12, trib, 1.0),
+                     0.0))
+
+
 def pile_profile(fem_data, solution, pile_index, slope_data=None,
                  field_state="converged", failure_solution=None):
     """Everything the detail view draws for one pile, ordered head to toe.
@@ -1056,14 +1127,18 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
     Keys
     ----
     ``kind``, ``index``, ``label``, ``length``, ``n_elements``
-    ``node_depth`` : depth below the pile head at each pile node
+    ``node_depth`` : depth below the pile head at each pile node, midside nodes
+        included, so a chain of n three-node elements reports 2n+1 stations
     ``u_lateral`` : displacement normal to the pile axis at each node
-    ``elem_depth`` : depth at each beam element's midpoint
+    ``elem_depth`` : depth at each beam element's midpoint, which is where its
+        shear is read
     ``shear`` : element shear force, ``V_cap`` : its capacity where declared
     ``moment_depth``, ``moment`` : the continuous bending-moment profile,
         assembled from the beam elements' end moments; ``M_cap`` where declared
-    ``reaction_depth``, ``reaction`` : lateral soil reaction per unit length,
-        from the shear discontinuity the soil imposes at each interior node
+    ``reaction_depth``, ``reaction`` : lateral soil reaction per unit length
+        (:func:`_pile_reaction`) -- at each element's midpoint where the elements
+        carry a midside node, and at the node between consecutive elements where
+        they do not
     ``limit_depth``, ``limit_p`` : the Ito & Matsui limiting resistance
         envelope (None when the model does not supply pile diameter and spacing)
     ``max_moment``, ``max_moment_depth``
@@ -1126,19 +1201,33 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         return max(nodes[n0][1], nodes[n1][1])
     sel = sel[np.argsort([-_elem_top(p) for p in sel], kind="stable")]
 
-    # Chain the node list head to toe.
+    # Chain the node list head to toe, through the midside node of each element
+    # where the mesh gave it one. Those nodes carry the beam's deflection and
+    # slope like any other node it stands on, so the profiles are read at every
+    # station the element actually has rather than at every second one.
+    triples = np.asarray(fem_data.get("pile_elem_nodes", np.zeros((0, 3))),
+                         dtype=int)
+    has_mid = len(triples) == n_pile
     node_ids = []
+    end_pos = []          # positions in node_ids of the element boundaries
     for p in sel:
         n0, n1 = pairs[p]
+        n_m = int(triples[p][2]) if has_mid else -1
         if nodes[n0][1] < nodes[n1][1]:
             n0, n1 = n1, n0
         if not node_ids:
             node_ids.append(int(n0))
+            end_pos.append(0)
+        if n_m >= 0:
+            node_ids.append(int(n_m))
         node_ids.append(int(n1))
+        end_pos.append(len(node_ids) - 1)
     node_ids = np.array(node_ids, dtype=int)
+    end_pos = np.array(end_pos, dtype=int)
     xy = nodes[node_ids]
     y_head = float(xy[0][1])
     node_depth = y_head - xy[:, 1]
+    end_depth = node_depth[end_pos]      # depth of each element boundary
     length = float(node_depth[-1])
 
     # Lateral displacement: the component of nodal displacement normal to the
@@ -1163,28 +1252,24 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
     if fm.shape != (n_pile, 2):
         fm = np.zeros((n_pile, 2))
     fm = fm[sel]
-    elem_len = _pile_array(fem_data, "elem_length_by_pile_elem", n_pile)[sel]
-    elem_depth = 0.5 * (node_depth[:-1] + node_depth[1:])
+    elem_depth = 0.5 * (end_depth[:-1] + end_depth[1:])
 
     # Continuous bending-moment profile: M1 of each element at its upper node,
     # and -M2 at its lower node (which equals the next element's M1).
     moment_depth = np.empty(2 * len(sel))
     moment = np.empty(2 * len(sel))
     for k in range(len(sel)):
-        moment_depth[2 * k] = node_depth[k]
-        moment_depth[2 * k + 1] = node_depth[k + 1]
+        moment_depth[2 * k] = end_depth[k]
+        moment_depth[2 * k + 1] = end_depth[k + 1]
         moment[2 * k] = fm[k, 0]
         moment[2 * k + 1] = -fm[k, 1]
 
-    # Lateral soil reaction per unit length: the shear discontinuity the soil
-    # imposes at each interior node, spread over that node's tributary length.
-    if len(sel) >= 2:
-        trib = 0.5 * (elem_len[:-1] + elem_len[1:])
-        reaction_depth = node_depth[1:-1]
-        reaction = np.where(trib > 1e-12, (shear[:-1] - shear[1:]) / np.where(trib > 1e-12, trib, 1.0), 0.0)
-    else:
-        reaction_depth = np.zeros(0)
-        reaction = np.zeros(0)
+    # Lateral soil reaction per unit length. Where the elements carry a midside
+    # node each one reports its own, from the distributed load its deflected
+    # shape is carrying; where they do not, it is the shear step between
+    # consecutive elements.
+    reaction_depth, reaction = _pile_reaction(
+        fem_data, field, sel, node_ids, end_depth, elem_depth)
 
     S = float(props.get("S")) if props.get("S") else (
         float(_pile_array(fem_data, "S_by_pile_elem", n_pile)[sel[0]]) or None)

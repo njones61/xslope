@@ -42,6 +42,29 @@ def _extract_nodal_uv(disp, fem_data):
     return u, v
 
 
+def _extract_nodal_theta(disp, fem_data):
+    """Per-node rotation from a mixed-DOF vector, or None where no node has one.
+
+    Only pile nodes carry a rotational degree of freedom; every other node is
+    reported at zero, so the column reads across the whole mesh.
+    """
+    dof_offset = fem_data.get("dof_offset", None)
+    is_pile_node = fem_data.get("is_pile_node", None)
+    if dof_offset is None or is_pile_node is None:
+        return None
+    is_pile_node = np.asarray(is_pile_node, dtype=bool)
+    if not is_pile_node.any():
+        return None
+    n_nodes = len(fem_data["nodes"])
+    theta = np.zeros(n_nodes)
+    for i in range(n_nodes):
+        if i < len(is_pile_node) and is_pile_node[i]:
+            base = int(dof_offset[i]) + 2
+            if base < len(disp):
+                theta[i] = disp[base]
+    return theta
+
+
 # Scalar fields of a solve_fem field carried across a save/reload for the
 # at-failure snapshot (the node/element CSVs carry the arrays). The trial F is
 # the only one the result-panel titles read; the rest round-trip the snapshot's
@@ -179,6 +202,14 @@ def _fem_solution_dataframes(fem_data, solution):
         "u_y_vp": uy_vp,
         "u_mag_vp": u_mag_vp,
     })
+
+    # Pile nodes carry a rotation as well as a displacement, and it is part of
+    # the field: the moment and the soil reaction a pile reports are read from it.
+    # Written only where the model has a pile, so a model without one exports
+    # exactly the columns it always did.
+    theta = _extract_nodal_theta(disp_total, fem_data)
+    if theta is not None:
+        node_df["theta"] = theta
 
     centroids = np.zeros((len(elements), 2))
     for i, elem_nodes in enumerate(elements):
@@ -707,10 +738,11 @@ def _reconstruct_fem_solution(fem_data, node_df, element_df):
     """Rebuild a solve_fem field dict from one persisted node/element CSV pair.
 
     Only the quantities the result plots need are restored: total and elastic
-    displacements (rebuilt into the mixed-DOF vector via ``dof_offset``; pile
-    rotational DOFs, which the CSV does not store, are left zero — the plots use
-    only translations), element stresses/strains, vp shear strain, the plastic
-    mask, and the yield function.
+    displacements (rebuilt into the mixed-DOF vector via ``dof_offset``, including
+    the pile nodes' rotations where the CSV carries a ``theta`` column — a file
+    written without one leaves them zero, which is what the plots, reading only
+    translations, always saw), element stresses/strains, vp shear strain, the
+    plastic mask, and the yield function.
 
     Raises:
         ValueError: if the CSV node/element counts do not match ``fem_data``.
@@ -732,10 +764,16 @@ def _reconstruct_fem_solution(fem_data, node_df, element_df):
     disp_vp = np.zeros(n_dof)
     ux, uy = node_df["u_x"].to_numpy(), node_df["u_y"].to_numpy()
     uxv, uyv = node_df["u_x_vp"].to_numpy(), node_df["u_y_vp"].to_numpy()
+    theta = (node_df["theta"].to_numpy() if "theta" in node_df.columns
+             else None)
+    is_pile_node = fem_data.get("is_pile_node", None)
     for i in range(len(nodes)):
         base = int(dof_offset[i]) if dof_offset is not None else 2 * i
         disp_total[base], disp_total[base + 1] = ux[i], uy[i]
         disp_vp[base], disp_vp[base + 1] = uxv[i], uyv[i]
+        if (theta is not None and is_pile_node is not None
+                and i < len(is_pile_node) and is_pile_node[i]):
+            disp_total[base + 2] = theta[i]
 
     return {
         "displacements": disp_total,
@@ -835,6 +873,242 @@ def import_fem_solution(fem_data, output_stem):
 _SIDE_EDGE_DRIFT_FRAC = 5e-3
 
 
+def _midside_1d_node(elements_1d, element_types_1d, elem_idx):
+    """The midside node of 1D element ``elem_idx``, or None where it has none.
+
+    A 1D element on a quadratic soil edge stands on that edge's midside node as
+    well as its two corners; ``element_types_1d`` records 3 for those and 2 for
+    an element on a linear edge, whose third column is a padding zero. Node 0 is
+    a real node, so the node count decides, never the stored value.
+    """
+    try:
+        if int(element_types_1d[elem_idx]) < 3:
+            return None
+    except (IndexError, TypeError, ValueError):
+        return None
+    element = elements_1d[elem_idx]
+    if len(element) < 3:
+        return None
+    return int(element[2])
+
+
+def _quintic_hermite_bending_matrix():
+    """The 6x6 bending stiffness of a three-node C1 beam element on the unit
+    interval, in the DOF order [v1, dv1, v2, dv2, v3, dv3].
+
+    The deflection is the quintic that matches a value and a slope at both ends
+    AND at the midside node -- six conditions, six coefficients, so the shape
+    functions are unique. Euler-Bernoulli is kept exactly: the entries are the
+    integrals of EI H_i'' H_j'' with EI and the length divided out, and the
+    quintic space contains both the cubic and the quartic exact solutions the
+    beam benchmarks are written for, so a three-node element reproduces them to
+    round-off just as the two-node cubic element does.
+
+    The element of length L with rotations measured in x follows by scaling:
+    K_bending = EI / L**3 * S @ M @ S with S = diag(1, L, 1, L, 1, L).
+    Integrated with four-point Gauss, which is exact for the degree-six
+    integrand.
+    """
+    # p(xi) = sum_k a_k xi**k, k = 0..5. Rows of C are the six conditions in DOF
+    # order, so a = C^-1 q and the shape functions are the columns of C^-1.
+    def row_value(x):
+        return np.array([1.0, x, x**2, x**3, x**4, x**5])
+
+    def row_slope(x):
+        return np.array([0.0, 1.0, 2*x, 3*x**2, 4*x**3, 5*x**4])
+
+    C = np.array([row_value(0.0), row_slope(0.0),
+                  row_value(1.0), row_slope(1.0),
+                  row_value(0.5), row_slope(0.5)])
+    C_inv = np.linalg.inv(C)
+
+    # Four-point Gauss-Legendre on [0, 1].
+    g = np.array([-0.8611363115940526, -0.3399810435848563,
+                  0.3399810435848563, 0.8611363115940526])
+    w = np.array([0.3478548451374538, 0.6521451548625461,
+                  0.6521451548625461, 0.3478548451374538])
+    xi = 0.5 * (g + 1.0)
+    wt = 0.5 * w
+
+    M = np.zeros((6, 6))
+    for x, weight in zip(xi, wt):
+        b = np.array([0.0, 0.0, 2.0, 6*x, 12*x**2, 20*x**3])   # p''(xi)
+        h2 = C_inv.T @ b                                        # H_i''(xi)
+        M += weight * np.outer(h2, h2)
+    return M
+
+
+def _quintic_hermite_third_derivative(xi):
+    """d3H/dxi3 of the three-node C1 beam shape functions at ``xi``, in the DOF
+    order [v1, dv1, v2, dv2, v3, dv3].
+
+    The shear at a station is EI v'''(x) = EI / L**3 * (d3H/dxi3) . q_hat, with
+    q_hat the DOFs scaled to the unit interval. On a two-node cubic element that
+    quantity is the element's constant shear, so reading it at the element center
+    is the same measurement carried onto the three-node element, where the shear
+    varies along the element.
+    """
+    def row_value(x):
+        return np.array([1.0, x, x**2, x**3, x**4, x**5])
+
+    def row_slope(x):
+        return np.array([0.0, 1.0, 2*x, 3*x**2, 4*x**3, 5*x**4])
+
+    C = np.array([row_value(0.0), row_slope(0.0),
+                  row_value(1.0), row_slope(1.0),
+                  row_value(0.5), row_slope(0.5)])
+    C_inv = np.linalg.inv(C)
+    b3 = np.array([0.0, 0.0, 0.0, 6.0, 24.0 * xi, 60.0 * xi**2])
+    return C_inv.T @ b3
+
+
+def _quintic_hermite_fourth_derivative(xi):
+    """d4H/dxi4 of the three-node C1 beam shape functions at ``xi``, in the DOF
+    order [v1, dv1, v2, dv2, v3, dv3].
+
+    EI times the fourth derivative of the deflection is the distributed lateral
+    load the element's own deflected shape carries -- what the soil is passing to
+    the pile along it, per unit length. For the quintic that is linear along the
+    element and generally not zero; for a two-node cubic element it is identically
+    zero, which is why a chain of them can only report the reaction by
+    differencing one element's shear against the next.
+    """
+    def row_value(x):
+        return np.array([1.0, x, x**2, x**3, x**4, x**5])
+
+    def row_slope(x):
+        return np.array([0.0, 1.0, 2*x, 3*x**2, 4*x**3, 5*x**4])
+
+    C = np.array([row_value(0.0), row_slope(0.0),
+                  row_value(1.0), row_slope(1.0),
+                  row_value(0.5), row_slope(0.5)])
+    C_inv = np.linalg.inv(C)
+    b4 = np.array([0.0, 0.0, 0.0, 0.0, 24.0, 120.0 * xi])
+    return C_inv.T @ b4
+
+
+#: The constants the three-node beam element is built from, computed once.
+_QUINTIC_BENDING_M = _quintic_hermite_bending_matrix()
+_QUINTIC_SHEAR_MID = _quintic_hermite_third_derivative(0.5)
+_QUINTIC_LOAD_MID = _quintic_hermite_fourth_derivative(0.5)
+
+
+def pile_element_reaction(u_elem, cos_t, sin_t, L, EI, n_node):
+    """The lateral soil reaction per unit length at a pile element's center, or
+    None on an element that cannot report one.
+
+    A three-node beam element carries its own distributed load: EI times the
+    fourth derivative of its deflected shape, which is linear along the element
+    and read here at its midpoint. The sign follows the element's local
+    transverse axis, the same sense its shear is reported in.
+
+    A two-node element's deflection is a cubic, whose fourth derivative is zero
+    everywhere, so it can say nothing about the load along itself -- a chain of
+    them reports the reaction at the nodes BETWEEN elements instead, by
+    differencing their shears.
+    """
+    if n_node != 3:
+        return None
+    u_local = _beam_rotation(cos_t, sin_t, 3) @ u_elem
+    q_hat = np.array([u_local[1], L * u_local[2],
+                      u_local[4], L * u_local[5],
+                      u_local[7], L * u_local[8]])
+    return -float(EI / (L ** 4) * (_QUINTIC_LOAD_MID @ q_hat))
+
+#: Quadratic bar axial stiffness on the unit interval, node order
+#: [end 1, end 2, mid]. K_axial = EA / (3 L) * this.
+_QUADRATIC_BAR_AXIAL = np.array([[ 7.0,  1.0, -8.0],
+                                 [ 1.0,  7.0, -8.0],
+                                 [-8.0, -8.0, 16.0]])
+
+
+def _beam_local_stiffness(EA, EI, L, three_node):
+    """The pile beam element's local stiffness matrix.
+
+    Two-node: the 6x6 Euler-Bernoulli matrix in [u1, v1, th1, u2, v2, th2].
+
+    Three-node: 9x9 in [u1, v1, th1, u2, v2, th2, u3, v3, th3] with node 3 the
+    midside node of the soil edge the element lies on. Bending is the quintic
+    Hermite block above, axial is the quadratic bar, and the two are uncoupled
+    exactly as they are on the two-node element.
+    """
+    L2 = L * L
+    L3 = L2 * L
+    if not three_node:
+        return np.array([
+            [ EA/L,   0.0,          0.0,        -EA/L,  0.0,          0.0       ],
+            [ 0.0,    12*EI/L3,     6*EI/L2,     0.0,  -12*EI/L3,    6*EI/L2   ],
+            [ 0.0,    6*EI/L2,      4*EI/L,      0.0,  -6*EI/L2,     2*EI/L    ],
+            [-EA/L,   0.0,          0.0,         EA/L,   0.0,         0.0       ],
+            [ 0.0,   -12*EI/L3,    -6*EI/L2,     0.0,   12*EI/L3,   -6*EI/L2   ],
+            [ 0.0,    6*EI/L2,      2*EI/L,      0.0,  -6*EI/L2,     4*EI/L    ],
+        ])
+
+    K = np.zeros((9, 9))
+    axial_dofs = [0, 3, 6]            # u at end 1, end 2, mid
+    K[np.ix_(axial_dofs, axial_dofs)] = (EA / (3.0 * L)) * _QUADRATIC_BAR_AXIAL
+
+    scale = np.diag([1.0, L, 1.0, L, 1.0, L])
+    K_bend = (EI / L3) * (scale @ _QUINTIC_BENDING_M @ scale)
+    bend_dofs = [1, 2, 4, 5, 7, 8]    # (v, theta) at end 1, end 2, mid
+    K[np.ix_(bend_dofs, bend_dofs)] = K_bend
+    return K
+
+
+def _pile_element_actions(u_elem, cos_t, sin_t, L, EA, EI, K_local, n_node):
+    """``(axial, V, M1, M2, u_local)`` for one pile beam element.
+
+    ``axial`` is the axial force at the element center and ``V`` the shear there;
+    ``M1`` and ``M2`` are the bending moments at the two END nodes, which is what
+    the moment profile is drawn from and what the plastic-hinge check compares
+    against M_cap.
+
+    On the two-node element the shear is constant along the element and these are
+    the closed forms the element has always used. On the three-node element the
+    end moments are rows 2 and 5 of K_local u_local -- the same quantity, read off
+    the assembled element rather than off a transcribed row -- and the shear is
+    EI v'''(L/2), which on a two-node element is exactly that constant shear.
+    """
+    T = _beam_rotation(cos_t, sin_t, n_node)
+    u_local = T @ u_elem
+
+    # Axial force at the element center: EA times the chord strain, on both the
+    # linear and the quadratic bar.
+    axial = EA / L * (u_local[3] - u_local[0])
+
+    if n_node == 2:
+        L2 = L * L
+        L3 = L2 * L
+        V = (12 * EI / L3 * (u_local[1] - u_local[4])
+             + 6 * EI / L2 * (u_local[2] + u_local[5]))
+        M1 = EI * (6.0 / L2 * u_local[1] + 4.0 / L * u_local[2]
+                   - 6.0 / L2 * u_local[4] + 2.0 / L * u_local[5])
+        M2 = EI * (6.0 / L2 * u_local[1] + 2.0 / L * u_local[2]
+                   - 6.0 / L2 * u_local[4] + 4.0 / L * u_local[5])
+        return axial, V, M1, M2, u_local
+
+    S = K_local @ u_local
+    M1, M2 = float(S[2]), float(S[5])
+    q_hat = np.array([u_local[1], L * u_local[2],
+                      u_local[4], L * u_local[5],
+                      u_local[7], L * u_local[8]])
+    V = float(EI / (L * L * L) * (_QUINTIC_SHEAR_MID @ q_hat))
+    return axial, V, M1, M2, u_local
+
+
+def _beam_rotation(cos_t, sin_t, n_node):
+    """Local-from-global rotation for a beam element, block diagonal with one
+    [[c, s, 0], [-s, c, 0], [0, 0, 1]] per node."""
+    n = 3 * n_node
+    T = np.zeros((n, n))
+    for k in range(n_node):
+        b = 3 * k
+        T[b, b], T[b, b + 1] = cos_t, sin_t
+        T[b + 1, b], T[b + 1, b + 1] = -sin_t, cos_t
+        T[b + 2, b + 2] = 1.0
+    return T
+
+
 def build_fem_data(slope_data, mesh=None, verbose=False):
     """
     Build a fem_data dictionary from slope_data and optional mesh.
@@ -896,13 +1170,19 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             - k_by_1d_elem: np.ndarray (n_1d_elements,) of axial stiffness values for reinforcement lines
             - cos_theta_1d: np.ndarray (n_1d_elements,) of direction cosines (x) for each 1D element
             - sin_theta_1d: np.ndarray (n_1d_elements,) of direction cosines (y) for each 1D element
-            - dof_indices_1d: np.ndarray (n_1d_elements, 4) of global DOF indices using dof_offset
-            - K_global_1d_elems: list of np.ndarray (4, 4) global stiffness matrices for each 1D element
+            - dof_indices_1d: np.ndarray (n_1d_elements, 6) of global DOF indices using dof_offset,
+              ordered [end 1, end 2, mid]; only the first n_dof_by_1d_elem entries of a row are used
+            - n_dof_by_1d_elem: np.ndarray (n_1d_elements,) of 4 (two-node bar) or 6 (three-node bar)
+            - K_global_1d_elems: list of np.ndarray (4, 4) or (6, 6) global stiffness matrices for each 1D element
             - dof_offset: np.ndarray (n_nodes+1,) cumulative DOF count; pile nodes get 3 DOFs, others get 2
             - is_pile_node: np.ndarray (n_nodes,) boolean, True for nodes belonging to pile elements
             - n_dof_total: int, total number of DOFs (dof_offset[n_nodes])
-            - dof_indices_pile: np.ndarray (n_pile_elements, 6) of global DOF indices for 6-DOF beam elements
-            - K_global_pile_elems: list of np.ndarray (6, 6) global stiffness matrices for pile beam elements
+            - dof_indices_pile: np.ndarray (n_pile_elements, 9) of global DOF indices for beam elements,
+              ordered [u, v, theta] at end 1, end 2 and mid; only the first n_dof_by_pile_elem entries are used
+            - n_dof_by_pile_elem: np.ndarray (n_pile_elements,) of 6 (two-node beam) or 9 (three-node beam)
+            - pile_elem_nodes: np.ndarray (n_pile_elements, 3) of [end 1, end 2, mid] node indices, mid = -1 without one
+            - K_local_by_pile_elem: list of local-frame beam stiffness matrices, one per pile element
+            - K_global_pile_elems: list of np.ndarray (6, 6) or (9, 9) global stiffness matrices for pile beam elements
             - EI_by_pile_elem: np.ndarray (n_pile_elements,) of flexural rigidity per unit width
             - EA_by_pile_elem: np.ndarray (n_pile_elements,) of axial rigidity per unit width
             - pile_head_nodes: np.ndarray of node indices for each pile line's top node
@@ -1281,7 +1561,11 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     k_by_1d_elem = np.zeros(n_1d_elements)
     cos_theta_1d = np.zeros(n_1d_elements)
     sin_theta_1d = np.zeros(n_1d_elements)
-    dof_indices_1d = np.zeros((n_1d_elements, 4), dtype=int)
+    # Six DOF slots per bar: (x, y) at end 1, end 2 and -- on a quadratic mesh --
+    # the midside node of the soil edge the bar lies on. n_dof_by_1d_elem says how
+    # many of them an element actually uses, 4 or 6, and every reader slices by it.
+    dof_indices_1d = np.zeros((n_1d_elements, 6), dtype=int)
+    n_dof_by_1d_elem = np.full(n_1d_elements, 4, dtype=int)
     K_global_1d_elems = []
     # Per-1D-element geometry along the reinforcement line, used by the 1D details
     # panel to order a line's elements and place them on its arc length. Zero for
@@ -1301,11 +1585,13 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             if line_id < len(reinforcement_lines):
                 line_data = reinforcement_lines[line_id]
 
-                # Get element geometry — use only end nodes [0] and [1],
-                # ignore mid-node for quadratic elements
+                # Element geometry. The chord runs between end nodes [0] and [1];
+                # node [2], where the mesh recorded one, is the midside node of
+                # the soil edge the bar lies on and is a node of the bar too.
                 elem_nodes_1d = elements_1d[elem_idx]
                 node_0 = elem_nodes_1d[0]
                 node_1 = elem_nodes_1d[1]
+                node_m = _midside_1d_node(elements_1d, element_types_1d, elem_idx)
                 coord_0 = nodes[node_0]
                 coord_1 = nodes[node_1]
 
@@ -1322,8 +1608,17 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     cos_theta_1d[elem_idx] = cos_t
                     sin_theta_1d[elem_idx] = sin_t
 
-                    # DOF indices for end nodes (4 DOFs total)
-                    dof_indices_1d[elem_idx] = [2*node_0, 2*node_0+1, 2*node_1, 2*node_1+1]
+                    # DOF indices, in the element's own node order
+                    # [end 1, end 2, mid]. Rebuilt against dof_offset below.
+                    if node_m is None:
+                        dof_indices_1d[elem_idx, :4] = [2*node_0, 2*node_0+1,
+                                                        2*node_1, 2*node_1+1]
+                        n_dof_by_1d_elem[elem_idx] = 4
+                    else:
+                        dof_indices_1d[elem_idx] = [2*node_0, 2*node_0+1,
+                                                    2*node_1, 2*node_1+1,
+                                                    2*node_m, 2*node_m+1]
+                        n_dof_by_1d_elem[elem_idx] = 6
 
                     # Compute distance from element centroid to line ends
                     x1, y1 = line_data.get("x1", 0), line_data.get("y1", 0)
@@ -1415,22 +1710,50 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                             f"The LEM does not — it applies the tensile capacity "
                             f"envelope (Tmax/Lp) directly — so this file can run in the "
                             f"LEM but not the FEM until E and Area are filled in.")
+                    # The CHORD stiffness EA/L. It is the axial stiffness of the
+                    # two-node bar, and it is also what force recovery multiplies
+                    # the chord elongation by on the three-node bar, where
+                    # EA(u2-u1)/L is the axial force at the element center.
                     k_val = E * A / elem_length
                     k_by_1d_elem[elem_idx] = k_val
 
-                    # Build 4x4 truss element stiffness matrix in global coordinates
-                    # T = [[cos, sin, 0, 0], [0, 0, cos, sin]]  (2x4)
-                    # K_local = k * [[1, -1], [-1, 1]]           (2x2)
-                    # K_global_elem = T^T @ K_local @ T          (4x4)
-                    c2 = cos_t * cos_t
-                    cs = cos_t * sin_t
-                    s2 = sin_t * sin_t
-                    K_global_elem = k_val * np.array([
-                        [ c2,  cs, -c2, -cs],
-                        [ cs,  s2, -cs, -s2],
-                        [-c2, -cs,  c2,  cs],
-                        [-cs, -s2,  cs,  s2]
-                    ])
+                    if node_m is None:
+                        # Two-node bar, DOFs [x1, y1, x2, y2].
+                        # T = [[cos, sin, 0, 0], [0, 0, cos, sin]]  (2x4)
+                        # K_axial = k * [[1, -1], [-1, 1]]          (2x2)
+                        # K_global_elem = T^T @ K_axial @ T         (4x4)
+                        c2 = cos_t * cos_t
+                        cs = cos_t * sin_t
+                        s2 = sin_t * sin_t
+                        K_global_elem = k_val * np.array([
+                            [ c2,  cs, -c2, -cs],
+                            [ cs,  s2, -cs, -s2],
+                            [-c2, -cs,  c2,  cs],
+                            [-cs, -s2,  cs,  s2]
+                        ])
+                    else:
+                        # Three-node isoparametric quadratic bar, axial DOFs in
+                        # the element's node order [end 1, end 2, mid]:
+                        #
+                        #   K_axial = EA/(3L) * [[ 7,  1, -8],
+                        #                        [ 1,  7, -8],
+                        #                        [-8, -8, 16]]
+                        #
+                        # (the exact two-point Gauss integral of EA (dN/dx)^2).
+                        # Rotated into global coordinates by the 3x6
+                        # T = [[c, s, 0, 0, 0, 0],
+                        #      [0, 0, c, s, 0, 0],
+                        #      [0, 0, 0, 0, c, s]].
+                        K_axial = (E * A / (3.0 * elem_length)) * np.array([
+                            [ 7.0,  1.0, -8.0],
+                            [ 1.0,  7.0, -8.0],
+                            [-8.0, -8.0, 16.0],
+                        ])
+                        T_bar = np.zeros((3, 6))
+                        T_bar[0, 0], T_bar[0, 1] = cos_t, sin_t
+                        T_bar[1, 2], T_bar[1, 3] = cos_t, sin_t
+                        T_bar[2, 4], T_bar[2, 5] = cos_t, sin_t
+                        K_global_elem = T_bar.T @ K_axial @ T_bar
                     K_global_1d_elems.append(K_global_elem)
                 else:
                     K_global_1d_elems.append(np.zeros((4, 4)))
@@ -1456,6 +1779,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     cos_theta_pile = []
     sin_theta_pile = []
     K_global_pile_elems = []
+    K_local_by_pile_elem = []   # local-frame stiffness, for end-action recovery
     pile_elem_indices = []  # maps pile element index to global 1D element index
     V_cap_by_pile_elem = []
     M_cap_by_pile_elem = []
@@ -1463,7 +1787,12 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     S_by_pile_elem = []
     EI_by_pile_elem = []
     EA_by_pile_elem = []
-    pile_node_pairs = []  # (node_0, node_1) for each pile element
+    pile_node_pairs = []  # (node_0, node_1) -- the END nodes of each pile element
+    # Every node of each pile element, [end 1, end 2, mid], with mid = -1 where
+    # the element has none. pile_node_pairs stays the end pair, so readers that
+    # chain elements end to end are unaffected.
+    pile_elem_nodes = []
+    n_dof_by_pile_elem = []  # 6 on a two-node element, 9 on a three-node one
     pile_line_idx_by_pile_elem = []  # which pile_line each pile element belongs to
 
     if n_1d_elements > 0 and n_pile_lines > 0:
@@ -1482,6 +1811,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             elem_nodes = elements_1d[elem_idx]
             node_0 = elem_nodes[0]
             node_1 = elem_nodes[1]
+            node_m = _midside_1d_node(elements_1d, element_types_1d, elem_idx)
             coord_0 = nodes[node_0]
             coord_1 = nodes[node_1]
 
@@ -1525,38 +1855,26 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
                 L = elem_length
 
-                # Build full 6x6 Euler-Bernoulli beam stiffness in local coords
-                # DOFs: [u1, v1, theta1, u2, v2, theta2]
-                # u = axial, v = transverse, theta = rotation
-                L2 = L * L
-                L3 = L2 * L
-                K_local = np.array([
-                    [ EA/L,   0.0,          0.0,        -EA/L,  0.0,          0.0       ],
-                    [ 0.0,    12*EI/L3,     6*EI/L2,     0.0,  -12*EI/L3,    6*EI/L2   ],
-                    [ 0.0,    6*EI/L2,      4*EI/L,      0.0,  -6*EI/L2,     2*EI/L    ],
-                    [-EA/L,   0.0,          0.0,         EA/L,   0.0,         0.0       ],
-                    [ 0.0,   -12*EI/L3,    -6*EI/L2,     0.0,   12*EI/L3,   -6*EI/L2   ],
-                    [ 0.0,    6*EI/L2,      2*EI/L,      0.0,  -6*EI/L2,     4*EI/L    ],
-                ])
-
-                # 6x6 rotation matrix T (local -> global)
-                # local x along element, local y perpendicular
-                c = cos_t
-                s = sin_t
-                T = np.array([
-                    [ c,  s, 0, 0, 0, 0],
-                    [-s,  c, 0, 0, 0, 0],
-                    [ 0,  0, 1, 0, 0, 0],
-                    [ 0,  0, 0, c, s, 0],
-                    [ 0,  0, 0,-s, c, 0],
-                    [ 0,  0, 0, 0, 0, 1],
-                ])
+                # Local beam stiffness. Two-node: 6x6 Euler-Bernoulli in
+                # [u1, v1, theta1, u2, v2, theta2]. Three-node -- on a quadratic
+                # mesh, where the element also stands on the midside node of the
+                # soil edge -- 9x9 in [u1, v1, th1, u2, v2, th2, u3, v3, th3],
+                # quintic Hermite bending with quadratic axial. Rotated into
+                # global coordinates by the matching block-diagonal T.
+                three_node = node_m is not None
+                n_node = 3 if three_node else 2
+                K_local = _beam_local_stiffness(EA, EI, L, three_node)
+                T = _beam_rotation(cos_t, sin_t, n_node)
                 K_beam = T.T @ K_local @ T
 
                 cos_theta_pile.append(cos_t)
                 sin_theta_pile.append(sin_t)
                 pile_node_pairs.append((node_0, node_1))
+                pile_elem_nodes.append((int(node_0), int(node_1),
+                                        int(node_m) if three_node else -1))
+                n_dof_by_pile_elem.append(3 * n_node)
                 K_global_pile_elems.append(K_beam)
+                K_local_by_pile_elem.append(K_local)
                 elem_length_by_pile_elem.append(elem_length)
                 EI_by_pile_elem.append(EI)
                 EA_by_pile_elem.append(EA)
@@ -1573,6 +1891,10 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
     cos_theta_pile = np.array(cos_theta_pile)
     sin_theta_pile = np.array(sin_theta_pile)
+    pile_elem_nodes = (np.array(pile_elem_nodes, dtype=int) if n_pile_elements > 0
+                       else np.zeros((0, 3), dtype=int))
+    n_dof_by_pile_elem = (np.array(n_dof_by_pile_elem, dtype=int)
+                          if n_pile_elements > 0 else np.zeros(0, dtype=int))
     pile_elem_indices = np.array(pile_elem_indices, dtype=int)
     V_cap_by_pile_elem = np.array(V_cap_by_pile_elem)
     M_cap_by_pile_elem = np.array(M_cap_by_pile_elem)
@@ -1584,25 +1906,30 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
     # === BUILD DOF OFFSET MAP ===
     # Pile nodes get 3 DOFs (ux, uy, theta), all other nodes get 2 DOFs (ux, uy).
+    # Every node a pile element stands on, midside nodes included: the midside
+    # node carries the beam's deflection and slope like any other node on it.
     is_pile_node = np.zeros(n_nodes, dtype=bool)
     for p_idx in range(n_pile_elements):
-        n0, n1 = pile_node_pairs[p_idx]
-        is_pile_node[n0] = True
-        is_pile_node[n1] = True
+        for nd in pile_elem_nodes[p_idx]:
+            if nd >= 0:
+                is_pile_node[nd] = True
 
     dof_offset = np.zeros(n_nodes + 1, dtype=int)
     for i in range(n_nodes):
         dof_offset[i + 1] = dof_offset[i] + (3 if is_pile_node[i] else 2)
     n_dof_total = int(dof_offset[n_nodes])
 
-    # Build 6-element DOF indices for pile elements (using dof_offset)
-    dof_indices_pile = np.zeros((n_pile_elements, 6), dtype=int) if n_pile_elements > 0 else np.zeros((0, 6), dtype=int)
+    # Pile element DOF indices against dof_offset: three per node, and nine slots
+    # per element so a three-node element fits. n_dof_by_pile_elem says how many
+    # of them each element uses, and every reader slices by it.
+    dof_indices_pile = np.zeros((n_pile_elements, 9), dtype=int) if n_pile_elements > 0 else np.zeros((0, 9), dtype=int)
     for p_idx in range(n_pile_elements):
-        n0, n1 = pile_node_pairs[p_idx]
-        dof_indices_pile[p_idx] = [
-            dof_offset[n0], dof_offset[n0] + 1, dof_offset[n0] + 2,
-            dof_offset[n1], dof_offset[n1] + 1, dof_offset[n1] + 2,
-        ]
+        row = []
+        for nd in pile_elem_nodes[p_idx]:
+            if nd < 0:
+                continue
+            row += [dof_offset[nd], dof_offset[nd] + 1, dof_offset[nd] + 2]
+        dof_indices_pile[p_idx, :len(row)] = row
 
     # Rebuild 1D truss DOF indices using dof_offset (in case any share nodes with piles)
     for elem_idx in range(n_1d_elements):
@@ -1611,8 +1938,12 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         elem_nodes_1d = elements_1d[elem_idx]
         node_0 = elem_nodes_1d[0]
         node_1 = elem_nodes_1d[1]
-        dof_indices_1d[elem_idx] = [dof_offset[node_0], dof_offset[node_0] + 1,
-                                     dof_offset[node_1], dof_offset[node_1] + 1]
+        node_m = _midside_1d_node(elements_1d, element_types_1d, elem_idx)
+        row = [dof_offset[node_0], dof_offset[node_0] + 1,
+               dof_offset[node_1], dof_offset[node_1] + 1]
+        if node_m is not None and n_dof_by_1d_elem[elem_idx] == 6:
+            row += [dof_offset[node_m], dof_offset[node_m] + 1]
+        dof_indices_1d[elem_idx, :len(row)] = row
 
     # Identify the pile end nodes and their rotation restraints for boundary
     # conditions. The head is the top node (highest y) of each pile line and the
@@ -1632,18 +1963,32 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         head_fixity = pile_data.get("head_fixity", pile_data.get("fixity", "free"))
         tip_fixity = pile_data.get("tip_fixity", "free")
 
-        # Collect all nodes belonging to this pile line
+        # Collect all nodes belonging to this pile line, midside nodes included,
+        # and the end nodes separately.
         pile_nodes_for_line = set()
+        end_nodes_for_line = set()
         for p_idx in range(n_pile_elements):
             if pile_line_idx_by_pile_elem[p_idx] == pl_idx:
                 n0, n1 = pile_node_pairs[p_idx]
-                pile_nodes_for_line.add(n0)
-                pile_nodes_for_line.add(n1)
+                end_nodes_for_line.update((int(n0), int(n1)))
+                for nd in pile_elem_nodes[p_idx]:
+                    if nd >= 0:
+                        pile_nodes_for_line.add(int(nd))
 
         if pile_nodes_for_line:
             # Top node = highest y coordinate; bottom node = lowest y
             top_node = max(pile_nodes_for_line, key=lambda nd: nodes[nd, 1])
             bottom_node = min(pile_nodes_for_line, key=lambda nd: nodes[nd, 1])
+            # A midside node sits at the midpoint of its element, strictly
+            # between the two ends in y, so the extremes are end nodes. The head
+            # and tip restraints are stated for the ends of the pile, and a
+            # midside node picked up here would put them mid-element.
+            if top_node not in end_nodes_for_line or bottom_node not in end_nodes_for_line:
+                raise ValueError(
+                    f"Pile line {pl_idx + 1}: the highest or lowest node of the "
+                    f"pile is not an end node of one of its elements, so the head "
+                    f"and tip restraints cannot be placed. Check that the pile "
+                    f"line is not horizontal.")
             pile_head_nodes.append(top_node)
             pile_head_fixed.append(head_fixity in ("unrotated", "fixed"))
             pile_head_pinned.append(head_fixity in ("pinned", "fixed"))
@@ -2235,6 +2580,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "cos_theta_1d": cos_theta_1d,
         "sin_theta_1d": sin_theta_1d,
         "dof_indices_1d": dof_indices_1d,
+        "n_dof_by_1d_elem": n_dof_by_1d_elem,
         "K_global_1d_elems": K_global_1d_elems,
         "unit_weight": unit_weight,
         "k_seismic": k_seismic,
@@ -2246,14 +2592,16 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "dof_offset": dof_offset,
         "is_pile_node": is_pile_node,
         "n_dof_total": n_dof_total,
-        # Pile beam elements (6-DOF Euler-Bernoulli)
+        # Pile beam elements (Euler-Bernoulli)
         "n_pile_elements": n_pile_elements,
         "pile_elem_mask": pile_elem_mask,
         "pile_elem_indices": pile_elem_indices,
         "cos_theta_pile": cos_theta_pile,
         "sin_theta_pile": sin_theta_pile,
         "dof_indices_pile": dof_indices_pile,
+        "n_dof_by_pile_elem": n_dof_by_pile_elem,
         "K_global_pile_elems": K_global_pile_elems,
+        "K_local_by_pile_elem": K_local_by_pile_elem,
         "V_cap_by_pile_elem": V_cap_by_pile_elem,
         "M_cap_by_pile_elem": M_cap_by_pile_elem,
         "elem_length_by_pile_elem": elem_length_by_pile_elem,
@@ -2261,6 +2609,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "EI_by_pile_elem": EI_by_pile_elem,
         "EA_by_pile_elem": EA_by_pile_elem,
         "pile_node_pairs": pile_node_pairs,
+        "pile_elem_nodes": pile_elem_nodes,
         "pile_line_idx_by_pile_elem": pile_line_idx_by_pile_elem,
         "pile_head_nodes": pile_head_nodes,
         "pile_head_fixed": pile_head_fixed,
@@ -3942,6 +4291,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         cos_theta_1d = fem_data["cos_theta_1d"]
         sin_theta_1d = fem_data["sin_theta_1d"]
         dof_indices_1d = fem_data["dof_indices_1d"]
+        # How many of each row's DOF slots the element uses: 4 for a two-node
+        # bar, 6 for a three-node bar that also stands on the midside node of
+        # its soil edge.
+        n_dof_1d = fem_data.get("n_dof_by_1d_elem",
+                                np.full(n_1d_elements, 4, dtype=int))
 
         # Tracking arrays for 1D element status
         forces_1d = np.zeros(n_1d_elements)
@@ -3971,7 +4325,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         if debug_level >= 1:
             print(f"  1D truss elements: {n_1d_elements}")
 
-    # Extract pile beam element data (6-DOF Euler-Bernoulli)
+    # Extract pile beam element data (Euler-Bernoulli)
     n_pile_elements = fem_data.get("n_pile_elements", 0)
     has_pile_elements = n_pile_elements > 0
     pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(n_1d_elements, dtype=bool))
@@ -3980,6 +4334,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         cos_theta_pile = fem_data["cos_theta_pile"]
         sin_theta_pile = fem_data["sin_theta_pile"]
         dof_indices_pile = fem_data["dof_indices_pile"]
+        # 6 on a two-node beam element, 9 on a three-node one.
+        n_dof_pile = fem_data.get("n_dof_by_pile_elem",
+                                  np.full(n_pile_elements, 6, dtype=int))
+        K_local_pile = fem_data.get("K_local_by_pile_elem", None)
         V_cap_pile = fem_data["V_cap_by_pile_elem"]
         M_cap_pile = fem_data["M_cap_by_pile_elem"]
         L_pile_elem = fem_data["elem_length_by_pile_elem"]
@@ -3994,7 +4352,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         yielded_pile_M = np.zeros(n_pile_elements, dtype=bool)
 
         if debug_level >= 1:
-            print(f"  Pile beam elements: {n_pile_elements} (6-DOF Euler-Bernoulli)")
+            _n_node_pile = sorted({int(n) // 3 for n in n_dof_pile}) or [2]
+            _pile_kind = "/".join(f"{n}-node" for n in _n_node_pile)
+            print(f"  Pile beam elements: {n_pile_elements} "
+                  f"({_pile_kind} Euler-Bernoulli)")
 
     # ---- Working Gauss-point groups: the F-DEPENDENT half, rebuilt each solve ----
     # The prepared model carries the F-INDEPENDENT halves of each group (geometry
@@ -4561,13 +4922,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 for elem_idx_1d in range(n_1d_elements):
                     if pile_elem_mask[elem_idx_1d]:
                         continue  # pile elements handled separately below
-                    dof_idx = dof_indices_1d[elem_idx_1d]
+                    dof_idx = dof_indices_1d[elem_idx_1d][:n_dof_1d[elem_idx_1d]]
                     k = k_by_1d_elem[elem_idx_1d]
                     cos_t = cos_theta_1d[elem_idx_1d]
                     sin_t = sin_theta_1d[elem_idx_1d]
 
-                    # Relative displacement projected along element axis
-                    u_elem = u[dof_idx]  # [u_x0, u_y0, u_x1, u_y1]
+                    # Relative displacement of the two ends, projected along the
+                    # element axis. On the three-node bar that chord elongation
+                    # gives the axial force AT THE ELEMENT CENTER exactly, which
+                    # is the station every reader of forces_1d already places it
+                    # at, so the formula and its meaning are unchanged.
+                    u_elem = u[dof_idx]  # [u_x0, u_y0, u_x1, u_y1, (u_xm, u_ym)]
                     du_x = u_elem[2] - u_elem[0]
                     du_y = u_elem[3] - u_elem[1]
                     delta = du_x * cos_t + du_y * sin_t
@@ -4627,7 +4992,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     correction_T = T - T_true
 
                     if abs(correction_T) > 1e-30:
-                        # Internal force pattern for tension T: [-cos, -sin, +cos, +sin]
+                        # Internal force pattern for a constant tension T:
+                        # [-cos, -sin, +cos, +sin] at the two ends. On the
+                        # three-node bar the consistent nodal forces for a
+                        # constant axial force are [-T, +T, 0] in node order, so
+                        # the midside node takes no share of the correction.
                         loads[dof_idx[0]] += correction_T * (-cos_t)
                         loads[dof_idx[1]] += correction_T * (-sin_t)
                         loads[dof_idx[2]] += correction_T * cos_t
@@ -4638,48 +5007,28 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                           f"{n_1d_exceeded} exceeded capacity, "
                           f"{np.sum(failed_1d)} total failed")
 
-            # ---- Pile beam element force computation and capacity checks (6-DOF) ----
+            # ---- Pile beam element force computation and capacity checks ----
             if has_pile_elements:
                 n_pile_yielded_V = 0
                 n_pile_yielded_M = 0
                 for p_idx in range(n_pile_elements):
-                    dof_idx = dof_indices_pile[p_idx]
+                    n_dof_e = int(n_dof_pile[p_idx])
+                    n_node_e = n_dof_e // 3
+                    dof_idx = dof_indices_pile[p_idx][:n_dof_e]
                     cos_t = cos_theta_pile[p_idx]
                     sin_t = sin_theta_pile[p_idx]
                     L = L_pile_elem[p_idx]
                     EI_val = EI_pile[p_idx]
                     EA_val = EA_pile[p_idx]
+                    Kl = K_local_pile[p_idx] if K_local_pile is not None else None
 
-                    # Extract 6 global DOFs: [ux1, uy1, theta1, ux2, uy2, theta2]
+                    # [ux, uy, theta] at end 1, end 2 and -- on a three-node
+                    # element -- the midside node of the soil edge.
                     u_elem = u[dof_idx]
+                    T_force, V, M1, M2, u_local = _pile_element_actions(
+                        u_elem, cos_t, sin_t, L, EA_val, EI_val, Kl, n_node_e)
 
-                    # Transform to local coordinates using rotation matrix T
-                    c = cos_t
-                    s = sin_t
-                    T = np.array([
-                        [ c,  s, 0, 0, 0, 0],
-                        [-s,  c, 0, 0, 0, 0],
-                        [ 0,  0, 1, 0, 0, 0],
-                        [ 0,  0, 0, c, s, 0],
-                        [ 0,  0, 0,-s, c, 0],
-                        [ 0,  0, 0, 0, 0, 1],
-                    ])
-                    u_local = T @ u_elem  # [u1_axial, v1_trans, theta1, u2_axial, v2_trans, theta2]
-
-                    # Axial force: T = EA/L * (u2_axial - u1_axial)
-                    T_force = EA_val / L * (u_local[3] - u_local[0])
                     forces_pile_axial[p_idx] = T_force
-
-                    # Shear force: V = dM/dx, from beam theory
-                    # V = 12*EI/L^3 * (v1 - v2) + 6*EI/L^2 * (theta1 + theta2)
-                    L2 = L * L
-                    L3 = L2 * L
-                    V = 12*EI_val/L3 * (u_local[1] - u_local[4]) + 6*EI_val/L2 * (u_local[2] + u_local[5])
-
-                    # Bending moments at node 1 and node 2 from K_local rows 2 and 5
-                    M1 = EI_val * (6.0/L2 * u_local[1] + 4.0/L * u_local[2] - 6.0/L2 * u_local[4] + 2.0/L * u_local[5])
-                    M2 = EI_val * (6.0/L2 * u_local[1] + 2.0/L * u_local[2] - 6.0/L2 * u_local[4] + 4.0/L * u_local[5])
-
                     forces_pile_moment[p_idx] = [M1, M2]
 
                     # --- V_cap check ---
@@ -4694,12 +5043,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     forces_pile_lateral[p_idx] = V
 
                     if abs(correction_V) > 1e-30:
-                        # Convert lateral correction to global nodal forces
-                        # In local coords, shear internal force pattern: [0, 1, 0, 0, -1, 0]
-                        # Transform to global: correction_V * T^T @ [0, 1, 0, 0, -1, 0]
-                        f_local = np.array([0.0, correction_V, 0.0, 0.0, -correction_V, 0.0])
-                        f_global = T.T @ f_local
-                        for k in range(6):
+                        # Convert lateral correction to global nodal forces.
+                        # In local coordinates the shear internal-force pattern is
+                        # [0, 1, 0, 0, -1, 0] at the two ends; on a three-node
+                        # element the midside node takes no share of it, so the
+                        # cap is delivered entirely at the ends. (Distributing it
+                        # over the element's own shear shape is a refinement, and
+                        # so is hinging at the midside node under M_cap.)
+                        f_local = np.zeros(n_dof_e)
+                        f_local[1] = correction_V
+                        f_local[4] = -correction_V
+                        f_global = _beam_rotation(cos_t, sin_t, n_node_e).T @ f_local
+                        for k in range(n_dof_e):
                             loads[dof_idx[k]] += f_global[k]
 
                     # --- M_cap check (plastic hinge at each node) ---
@@ -5179,7 +5534,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # ---- Step 10b: Compute final 1D truss element forces ----
     if has_1d_elements:
         for elem_idx_1d in range(n_1d_elements):
-            dof_idx = dof_indices_1d[elem_idx_1d]
+            dof_idx = dof_indices_1d[elem_idx_1d][:n_dof_1d[elem_idx_1d]]
             k = k_by_1d_elem[elem_idx_1d]
             cos_t = cos_theta_1d[elem_idx_1d]
             sin_t = sin_theta_1d[elem_idx_1d]
@@ -5201,39 +5556,21 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # ---- Step 10c: Compute final pile beam element forces (capped at capacity) ----
     if has_pile_elements:
         for p_idx in range(n_pile_elements):
-            dof_idx = dof_indices_pile[p_idx]
+            n_dof_e = int(n_dof_pile[p_idx])
+            n_node_e = n_dof_e // 3
+            dof_idx = dof_indices_pile[p_idx][:n_dof_e]
             cos_t = cos_theta_pile[p_idx]
             sin_t = sin_theta_pile[p_idx]
             L = L_pile_elem[p_idx]
             EI_val = EI_pile[p_idx]
             EA_val = EA_pile[p_idx]
+            Kl = K_local_pile[p_idx] if K_local_pile is not None else None
 
             u_elem = u[dof_idx]
+            T_force, V, M1, M2, u_local = _pile_element_actions(
+                u_elem, cos_t, sin_t, L, EA_val, EI_val, Kl, n_node_e)
 
-            c = cos_t
-            s = sin_t
-            T = np.array([
-                [ c,  s, 0, 0, 0, 0],
-                [-s,  c, 0, 0, 0, 0],
-                [ 0,  0, 1, 0, 0, 0],
-                [ 0,  0, 0, c, s, 0],
-                [ 0,  0, 0,-s, c, 0],
-                [ 0,  0, 0, 0, 0, 1],
-            ])
-            u_local = T @ u_elem
-
-            # Axial force
-            T_force = EA_val / L * (u_local[3] - u_local[0])
             forces_pile_axial[p_idx] = T_force
-
-            # Shear force
-            L2 = L * L
-            L3 = L2 * L
-            V = 12*EI_val/L3 * (u_local[1] - u_local[4]) + 6*EI_val/L2 * (u_local[2] + u_local[5])
-
-            # Bending moments
-            M1 = EI_val * (6.0/L2 * u_local[1] + 4.0/L * u_local[2] - 6.0/L2 * u_local[4] + 2.0/L * u_local[5])
-            M2 = EI_val * (6.0/L2 * u_local[1] + 2.0/L * u_local[2] - 6.0/L2 * u_local[4] + 4.0/L * u_local[5])
             forces_pile_moment[p_idx] = [M1, M2]
 
             # Cap shear at V_cap
@@ -7459,22 +7796,27 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
     # Assemble 1D truss element stiffness matrices (reinforcement only — skip pile elements)
     if fem_data is not None:
         K_global_1d_elems = fem_data.get("K_global_1d_elems", [])
-        dof_indices_1d = fem_data.get("dof_indices_1d", np.zeros((0, 4), dtype=int))
+        dof_indices_1d = fem_data.get("dof_indices_1d", np.zeros((0, 6), dtype=int))
         pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(len(K_global_1d_elems), dtype=bool))
 
         for elem_idx_1d in range(len(K_global_1d_elems)):
             if pile_elem_mask[elem_idx_1d]:
                 continue  # pile elements use beam stiffness, assembled below
+            # A two-node bar reaches four DOFs and a three-node bar six, so the
+            # element's own block size selects the DOFs it is staged against.
+            n_use = np.asarray(K_global_1d_elems[elem_idx_1d]).shape[0]
             _stage(K_global_1d_elems[elem_idx_1d],
-                   np.asarray(dof_indices_1d[elem_idx_1d]))
+                   np.asarray(dof_indices_1d[elem_idx_1d])[:n_use])
 
-        # Assemble pile beam element stiffness matrices (6x6 Euler-Bernoulli)
+        # Assemble pile beam element stiffness matrices (Euler-Bernoulli, 6x6 on
+        # a two-node element and 9x9 on a three-node one)
         K_global_pile_elems = fem_data.get("K_global_pile_elems", [])
-        dof_indices_pile = fem_data.get("dof_indices_pile", np.zeros((0, 6), dtype=int))
+        dof_indices_pile = fem_data.get("dof_indices_pile", np.zeros((0, 9), dtype=int))
 
         for p_idx in range(len(K_global_pile_elems)):
+            n_use = np.asarray(K_global_pile_elems[p_idx]).shape[0]
             _stage(K_global_pile_elems[p_idx],
-                   np.asarray(dof_indices_pile[p_idx]))
+                   np.asarray(dof_indices_pile[p_idx])[:n_use])
 
     return _coo_to_csr_ordered(coo_rows, coo_cols, coo_vals, (n_dof, n_dof))
 

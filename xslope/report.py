@@ -1555,12 +1555,44 @@ def one_d_counts(fem_data):
         n = int(keep.sum())
         if not n:
             continue
-        kinds = sorted({int(t) for t in types[keep]}) if len(types) == n_1d else [2]
-        nodes = _join(["two-node" if k == 2 else "three-node" if k == 3
-                       else f"{k}-node" for k in kinds]) or "two-node"
+        nodes = _one_d_node_phrase(types, keep, n_1d)
         out.append(f"{n:,} {nodes} {element} "
                    f"{'element' if n == 1 else 'elements'} for {many}")
     return out
+
+
+def _one_d_node_phrase(types, keep, n_1d):
+    """``"three-node"`` -- how many nodes one kind's 1D elements stand on, said
+    the way a reader would say it, and joined where a mesh carries both.
+
+    ``element_types_1d`` records 2 or 3 nodes per 1D element: 2 on a linear mesh,
+    3 on a quadratic one, where the element also stands on the midside node of
+    the soil edge it lies on.
+    """
+    import numpy as _np
+    types = _np.asarray(types)
+    kinds = sorted({int(t) for t in types[keep]}) if len(types) == n_1d else [2]
+    return _join(["two-node" if k == 2 else "three-node" if k == 3
+                  else f"{k}-node" for k in kinds]) or "two-node"
+
+
+def one_d_node_phrase(fem_data, pile):
+    """``"three-node"`` for the piles (``pile=True``) or the reinforcement
+    (``pile=False``) of one finite element mesh."""
+    import numpy as _np
+    elements = fem_data.get("elements_1d")
+    n_1d = 0 if elements is None else len(elements)
+    if not n_1d:
+        return "two-node"
+    mask = _np.asarray(fem_data.get("pile_elem_mask",
+                                    _np.zeros(n_1d, dtype=bool)), dtype=bool)
+    if mask.shape != (n_1d,):
+        mask = _np.zeros(n_1d, dtype=bool)
+    types = fem_data.get("element_types_1d", _np.full(n_1d, 2))
+    keep = mask if pile else ~mask
+    if not keep.any():
+        return "two-node"
+    return _one_d_node_phrase(types, keep, n_1d)
 
 
 #: Why the one- and two-dimensional elements sharing nodes matters, said once,
@@ -7943,11 +7975,13 @@ DETAIL_KINDS = {
 
 #: How each kind of member is modelled, in the terms its documentation page
 #: uses. The linked phrase is the element formulation itself, which is what
-#: separates this treatment from the limit equilibrium one.
+#: separates this treatment from the limit equilibrium one. ``{nodes}`` is
+#: filled in from the mesh by :func:`detail_modelling`, since a member on a
+#: quadratic mesh stands on three nodes per element and on a linear mesh on two.
 DETAIL_MODELLING = {
     "reinforcement": (
-        "two-node truss elements",
-        "Each reinforcement line is modeled as a chain of two-node truss "
+        "{nodes} truss elements",
+        "Each reinforcement line is modeled as a chain of {nodes} truss "
         "elements on the mesh's own nodes, and carries axial tension only. The force it can "
         "hold at a point along the line is the smaller of the tensile capacity "
         "T_max and the pullout resistance developed from the nearer free end "
@@ -7956,13 +7990,22 @@ DETAIL_MODELLING = {
         "the axial force builds along the line the soil is loading it, and where "
         "the force holds steady the soil is passing it nothing."),
     "pile": (
-        "Euler-Bernoulli beam elements",
-        "Each pile is modeled as a chain of Euler-Bernoulli beam elements on "
-        "the mesh's own nodes, with a rotational degree of freedom at each. The pile "
+        "{nodes} Euler-Bernoulli beam elements",
+        "Each pile is modeled as a chain of {nodes} Euler-Bernoulli beam "
+        "elements on the mesh's own nodes, with a rotational degree of freedom "
+        "at each. The pile "
         "resists the moving ground through its own bending stiffness rather "
         "than through a force applied to it, and the shear and moment "
         "capacities the model declares limit what it can carry."),
 }
+
+
+def detail_modelling(kind, fem_data):
+    """``(phrase, prose)`` for one member kind, with the element named for the
+    number of nodes it stands on in this mesh."""
+    nodes = one_d_node_phrase(fem_data, pile=(kind == "pile"))
+    phrase, prose = DETAIL_MODELLING[kind]
+    return phrase.format(nodes=nodes), prose.format(nodes=nodes)
 
 #: What one detail figure draws, per kind, as the sentence that cites it is
 #: built: the subject, the verb agreeing with it, and the clause the sentence
@@ -8259,7 +8302,7 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         return None
 
     sec = Section(spec["title"])
-    phrase, modelling = DETAIL_MODELLING[kind]
+    phrase, modelling = detail_modelling(kind, bundle.get("fem_data") or {})
     url = docs_url(FEM_DETAIL_DOC_PAGES[kind])
     sec.blocks.append(Prose(modelling, links=[(phrase, url)] if url else []))
 

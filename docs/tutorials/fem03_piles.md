@@ -377,13 +377,9 @@ is decided by the mechanism the smeared wall forces the soil into, not by how
 much moment each shaft carries.
 
 Run one point of it to see both. Open **Piles**, set `S` to `12` on both rows
-with `H` still blank, and **OK**. Search with Spencer again: **FS = 1.409**, and
-not on the deep circle the 6 ft spacing found. The 12 ft surface leaves the toe,
-reaches 10.1 ft below the ground at its deepest and exits 8.5 ft behind the
-crest; the 6 ft circle started 13.5 ft out in front of the toe, ran to 20.7 ft
-below the ground at its deepest — elevation −5.1, more than 5 ft below the toe —
-and exited 14.9 ft behind the crest. Widening the gap did not only lower the
-answer, it changed which surface governs, which [LEM-12](lem12_piles.md#what-the-spacing-is-worth) covers in full.
+with `H` still blank, and **OK**. Search with Spencer again: **FS = 1.409**, on
+a different, shallower circle than the 6 ft spacing found —
+[LEM-12](lem12_piles.md#what-the-spacing-is-worth) covers why.
 
 The mesh is still good: a pile row enters the mesh only as a constraint line, so
 Studio throws the mesh away when a row's endpoints move or a row is added or

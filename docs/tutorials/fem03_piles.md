@@ -251,10 +251,7 @@ Set **F min (SSRM)** to `1.00` and **F max (SSRM)** to `2.00`. A bracket has to
 contain the answer, and four of the runs below stand above 1.6 — the pile rows
 with their heads fixed, the same rows with their tips fixed, and the tip-fixed
 spacing sweep at all three of 3, 6 and 12 ft — so every run on this page uses the
-same 1.0 to 2.0 and the answers stay comparable. The lower end could sit higher
-for the piled runs, but it has to be a factor the slope stands at, the bare slope
-stands only to 1.16, and a wider bracket costs nothing here: halving to a
-tolerance of 0.01 takes seven trials from 1.0 to 2.0 and still seven from 1.3.
+same 1.0 to 2.0 and the answers stay comparable.
 Leave everything else as it opens: tolerance 0.0100, **Max iterations per trial**
 12,000, **Iteration ceiling** 50,000, **Rollers** on the sides, and
 **Non-convergence** as the failure criterion. Click **Run**.

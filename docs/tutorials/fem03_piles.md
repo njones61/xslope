@@ -174,7 +174,10 @@ reaches Mcap ÷ S. On this file every stiffness the finite element model uses
 comes from `D` and `S`: `I` and `Area` are blank, so the engine derives the solid
 circular section from the diameter,
 I = πD⁴/64 and Area = πD²/4, and then divides *EA* and *EI* by the spacing.
-Hovering `S` says what each engine does with it:
+That derivation is only right for a solid circular shaft. A pipe pile, an
+H-pile or a hollow drilled shaft has its own I and Area, and those are computed
+for the section and entered in the two cells; a value in either one overrides
+the derivation from `D`. Hovering `S` says what each engine does with it:
 
 > Center-to-center pile spacing. In the LEM, spacing is physics: it sets the
 > arching between piles (Ito & Matsui) and makes Vcap/Mcap per-pile. In the FEM,

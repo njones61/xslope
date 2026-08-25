@@ -360,9 +360,10 @@ shaft bearing on rock behaves that way. One socketed into the rock does not, and
 `Tip` is the cell that says which it is. The cell offers three settings: `free`,
 the tip restrained only by what surrounds it; `pinned`, its translations held
 and its rotation free, for a shaft bearing on a hard stratum inside the mesh;
-and `fixed`, translations and rotation held, the socket. On this model the base
-boundary already pins the tip, so `free` and `pinned` are the same run, and the
-only change on offer is `fixed`.
+and `fixed`, translations and rotation held, the socket. On this model the tip
+node sits on the base boundary, which already holds its translations, so `free`
+and `pinned` give the same answer. Setting `fixed` is the only setting that
+changes anything, and it is the one that models the socket.
 
 Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
 survives a fixity change, as it survived the spacing change. Run the same

@@ -135,6 +135,13 @@ measure against these two numbers.
 
 ## The discrete pile row
 
+With the bare slope's two numbers in hand, the first member goes in: the two
+rows of drilled shafts from the sketch above, which are already in the model
+[LEM-12](lem12_piles.md) built. This half runs that model through both engines,
+compares the two answers, sweeps the spacing in each, and then follows the
+finite element answer down to the one input that decides it — how the shafts
+are held at their toes.
+
 ### Opening the model and reading the pile rows
 
 Download [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx) and open it with

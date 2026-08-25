@@ -6,7 +6,8 @@ description: "Two rows of drilled shafts and a sheet pile wall on the same slope
 # Tutorial FEM-3 — Piles: LEM vs FEM
 
 This tutorial shows which of XSLOPE's two engines models which kind of pile,
-and why that is a question about the member rather than a matter of preference.
+and why that is a question about the structural member itself — the pile row or
+the wall — rather than a matter of preference.
 Both engines read the same pile rows out of the same file, and they build
 different things from them.
 
@@ -127,9 +128,10 @@ the body of the slope and comes out on the crest 10 to 15 ft behind its edge —
 the same surface Spencer found, drawn as a band of strain rather than a line,
 and reaching a few feet farther back.
 
-The two engines are 0.011 apart on the bare slope, so every difference between
-them on the rest of this page belongs to the member rather than to the engine.
-Both halves of the page measure against these two numbers.
+The two engines are 0.011 apart on the bare slope. Every larger difference
+between them on the rest of this page comes from how each engine models the
+piles or the wall, not from how it models the soil. Both halves of the page
+measure against these two numbers.
 
 ## The discrete pile row
 

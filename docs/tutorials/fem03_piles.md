@@ -66,9 +66,9 @@ the same file with the wall row entered; open it to skip to
 [the wall's run](#re-meshing-and-running-again). Neither wall file carries a
 mesh, so both are meshed on the page
 
-Every strength reduction run below finishes in under a few minutes on an
-ordinary laptop; the page states how the runs compare with each other, since
-the absolute times depend on the machine.
+Each strength reduction run below takes somewhere between a coffee sip and a
+coffee break, depending on the machine; the page only says which runs are the
+slow ones.
 </div>
 </div>
 
@@ -115,8 +115,9 @@ file declares **Quadratic triangles (tri6)** with **Auto-size from geometry** of
 at `2`, and the mesh comes out at **3,154 nodes and 1,509 triangles** with no
 beam elements. Then **Run → Run FEM…** — the file declares the bracket too, so
 **F min (SSRM)** and **F max (SSRM)** open on `1.00` and `2.00` — and **Run**.
-This is the longest run on the page — about twice the piled runs that follow —
-because a slope closer to failing takes more iterations at each trial to decide.
+This is one of the slower runs on the page — noticeably longer than the piled
+runs that follow — because a slope closer to failing takes more iterations at
+each trial to decide.
 **FS = 1.160**, from [1.1563, 1.1641].
 
 ![The strength-reduction mechanism at failure on the bare slope](images/fem03_fem_shear_bare.png){width=1000}
@@ -354,9 +355,8 @@ shaft bearing on rock behaves that way. One socketed into the rock does not, and
 
 Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
 survives a fixity change, as it survived the spacing change. Run the same
-bracket again. This run is the slowest of the piled ones — about three times
-the free-tip run — because its trials stand up to a higher factor and the
-bracket has further to walk.
+bracket again. This is the slowest run on the page, because its trials stand
+up to a higher factor and the bracket has further to walk.
 
 **FS = 1.793**, from [1.7891, 1.7969]. Both rows now reach their full
 60,000 lb·ft over most of their length: 12 beam elements are at capacity in
@@ -599,7 +599,7 @@ The wall's toe stands on the rigid base, and the first half's runs showed what
 the tip condition is worth to a member that ends there. Open **Piles**, set
 `Tip` to `fixed` — a wall driven or socketed into the base rather than standing
 on it — and **OK**. The mesh survives the change. Run the same bracket again;
-it finishes faster than the free-tip run, since a slope that is further from
+it finishes sooner than the free-tip run, since a slope that is further from
 failing decides each trial in fewer iterations.
 
 **FS = 1.543**, from [1.5391, 1.5469]: the credit over the bare slope goes from
@@ -640,7 +640,7 @@ The wall is ten beam elements over 20 ft, which is the mesh's own element size.
 **Run → Build Mesh…**, enter `0.5` in **1D element size**, and **Build**. The
 wall is now **40 beam elements**, and the soil mesh refines with it, from 1,510
 to **2,418 triangles**, because the constraint line's nodes are the soil mesh's
-nodes. Run the same bracket: it takes about twice as long as the run above.
+nodes. Run the same bracket: it takes noticeably longer than the run above.
 
 **FS = 1.551** against 1.543, and the peak moment 49,965 lb·ft/ft against
 50,762 — half a percent and one and a half percent. The profiles say where the

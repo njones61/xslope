@@ -258,14 +258,6 @@ Leave everything else as it is and click **Run**.
 bracket checks and seven bisections. Spencer's method gave 1.842 on the same
 file.
 
-The [FEM sample problem](../fem/samples.md) for this model reports 1.361. It is
-run on a bracket of 1.0 to 1.6 rather than 1.0 to 2.0, and at 16,000 iterations
-per trial rather than 12,000. A bisection stops once its bracket is narrower than
-the tolerance and returns the middle of it, so an answer carries the width of
-that last bracket — 0.008 here — and two brackets that start at different points
-close on different points inside it. Each of the two answers sits inside the
-other's final bracket.
-
 ![The mechanism at failure, with the pile rows colored by shear force](images/fem03_fem_shear_piles.png){width=1000}
 
 The contours are viscoplastic shear strain — the shearing left after the elastic

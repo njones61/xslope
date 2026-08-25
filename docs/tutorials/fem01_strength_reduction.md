@@ -169,7 +169,7 @@ care. Strength, geometry and weight are the whole of what it reads. Click
 **Spencer's method gives FS = 1.376** on a toe circle centered at (144.94,
 119.60) with a radius of 119.60 ft, entering the crest at x = 47.7 and leaving
 at x = 158.5, just short of the toe. The search evaluated 77 candidate circles
-and took about three seconds. Bishop's simplified method (1.378) and
+and took a few seconds. Bishop's simplified method (1.378) and
 Morgenstern-Price (1.375) settle on the **same circle**, within a quarter of a
 percent of Spencer — one mechanism, found three ways.
 

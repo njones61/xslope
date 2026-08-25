@@ -66,8 +66,9 @@ the same file with the wall row entered; open it to skip to
 [the wall's run](#re-meshing-and-running-again). Neither wall file carries a
 mesh, so both are meshed on the page
 
-Every strength reduction run below takes between 30 seconds and about
-two minutes.
+Every strength reduction run below finishes in under a few minutes on an
+ordinary laptop; the page states how the runs compare with each other, since
+the absolute times depend on the machine.
 </div>
 </div>
 
@@ -114,7 +115,7 @@ file declares **Quadratic triangles (tri6)** with **Auto-size from geometry** of
 at `2`, and the mesh comes out at **3,154 nodes and 1,509 triangles** with no
 beam elements. Then **Run → Run FEM…** — the file declares the bracket too, so
 **F min (SSRM)** and **F max (SSRM)** open on `1.00` and `2.00` — and **Run**.
-This run takes about **100 seconds**, longer than the piled runs that follow,
+This is the longest run on the page — about twice the piled runs that follow —
 because a slope closer to failing takes more iterations at each trial to decide.
 **FS = 1.160**, from [1.1563, 1.1641].
 
@@ -243,8 +244,7 @@ spacing sweep at all three of 3, 6 and 12 ft — so every run on this page uses 
 same 1.0 to 2.0 and the answers stay comparable.
 Leave everything else as it opens: tolerance 0.0100, **Max iterations per trial**
 12,000, **Iteration ceiling** 50,000, **Rollers** on the sides, and
-**Non-convergence** as the failure criterion. Click **Run**. The run takes about
-45 seconds.
+**Non-convergence** as the failure criterion. Click **Run**.
 
 **FS = 1.363**, from a final bracket of [1.3594, 1.3672] in nine trials — two
 bracket checks and seven bisections. Spencer's method gave 1.842 on the same
@@ -354,7 +354,9 @@ shaft bearing on rock behaves that way. One socketed into the rock does not, and
 
 Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
 survives a fixity change, as it survived the spacing change. Run the same
-bracket again. This run takes about two minutes.
+bracket again. This run is the slowest of the piled ones — about three times
+the free-tip run — because its trials stand up to a higher factor and the
+bracket has further to walk.
 
 **FS = 1.793**, from [1.7891, 1.7969]. Both rows now reach their full
 60,000 lb·ft over most of their length: 12 beam elements are at capacity in
@@ -548,8 +550,7 @@ Click **Run → Run FEM…**
 
 **Model checks — 1 warning**, the same blank `t_cut` on the clay, and no note
 this time: the wall states its own `I` and `Area`, so nothing is derived. The
-bracket is already `1.00` to `2.00`. Click **Run**. The run takes about
-45 seconds.
+bracket is already `1.00` to `2.00`. Click **Run**.
 
 **FS = 1.340**, from [1.3359, 1.3438]. The wall takes the slope from 1.160 to
 1.340, a credit of ×1.155.
@@ -598,7 +599,8 @@ The wall's toe stands on the rigid base, and the first half's runs showed what
 the tip condition is worth to a member that ends there. Open **Piles**, set
 `Tip` to `fixed` — a wall driven or socketed into the base rather than standing
 on it — and **OK**. The mesh survives the change. Run the same bracket again;
-this run takes about **30 seconds**.
+it finishes faster than the free-tip run, since a slope that is further from
+failing decides each trial in fewer iterations.
 
 **FS = 1.543**, from [1.5391, 1.5469]: the credit over the bare slope goes from
 ×1.155 to ×1.33.
@@ -638,7 +640,7 @@ The wall is ten beam elements over 20 ft, which is the mesh's own element size.
 **Run → Build Mesh…**, enter `0.5` in **1D element size**, and **Build**. The
 wall is now **40 beam elements**, and the soil mesh refines with it, from 1,510
 to **2,418 triangles**, because the constraint line's nodes are the soil mesh's
-nodes. Run the same bracket: about **60 seconds**, twice the run above.
+nodes. Run the same bracket: it takes about twice as long as the run above.
 
 **FS = 1.551** against 1.543, and the peak moment 49,965 lb·ft/ft against
 50,762 — half a percent and one and a half percent. The profiles say where the

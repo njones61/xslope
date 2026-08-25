@@ -377,7 +377,8 @@ its elastic response; from 12,000 the same field has moved 6.73 ft, 107 times.
 The factor of safety is the same either way, but the mechanism figure drawn
 from the smaller budget shows a collapse that has barely started.
 
-Leave both boxes as they open. Each run takes about two minutes.
+Leave both boxes as they open. Each run takes a few minutes on an ordinary
+laptop.
 
 ---
 

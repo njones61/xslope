@@ -5059,13 +5059,13 @@ def fem03_wall():
     #: (label, tip, 1D element size, keep Mcap, mesh figure, shear-strain figure,
     #: profile figure)
     runs = [
-        ("wall, tip free", "free", None, True, "fem03_mesh_wall.png",
+        ("wall, tip pinned", "pinned", None, True, "fem03_mesh_wall.png",
          "fem03_wall_shear.png", "fem03_wall_profiles.png"),
         ("wall, tip fixed", "fixed", None, True, None,
          "fem03_wall_shear_fixed.png", "fem03_wall_profiles_fixed.png"),
         ("wall, tip fixed, 1D 0.5", "fixed", FEM03_REFINED_1D, True, None, None,
          "fem03_wall_profiles_refined.png"),
-        ("wall, tip free, Mcap blank", "free", None, False, None, None, None),
+        ("wall, tip pinned, Mcap blank", "pinned", None, False, None, None, None),
     ]
     for label, tip, size_1d, keep_cap, mesh_fig, shear_fig, prof_fig in runs:
         sd = load_slope_data(FEM03_WALL_DONE)

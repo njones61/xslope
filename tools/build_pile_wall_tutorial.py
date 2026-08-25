@@ -80,7 +80,7 @@ WALL_ROW = {
     "H": None, "theta_p": 0.0, "D_pile": None, "S": 1.0,
     "E": 4.176e9, "I": 0.00888, "area": 0.0551,
     "V_cap": None, "M_cap": 90600.0,
-    "head_fixity": "free", "tip_fixity": "free",
+    "head_fixity": "free", "tip_fixity": "pinned",
     "appl": "active", "label": "sheet pile wall",
 }
 

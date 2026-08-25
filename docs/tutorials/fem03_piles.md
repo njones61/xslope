@@ -188,8 +188,8 @@ the derivation from `D`. Hovering `S` says what each engine does with it:
 `Appl` is `active`, meaning the computed force enters the equilibrium equations
 as it stands; the alternative, `passive`, divides it by the factor of safety,
 and [LEM-12](lem12_piles.md#the-pile-rows) reads the whole row column by column.
-Both rows open with `Head` and `Tip` on `free`, which a later section returns
-to. Click **Cancel**.
+Both rows open with `Head` and `Tip` on `free`; the finite element run below
+sets `Tip`, and a later section comes back to it. Click **Cancel**.
 
 ### The limit equilibrium answer
 
@@ -234,6 +234,12 @@ the lower row and 10 on the upper one:
 The two rows are drawn in green, each a chain of beam elements lying on
 triangle edges and sharing nodes with the clay on both sides; the base is fixed
 and the two vertical boundaries are rollers.
+
+One input is still to be stated before the run: where the shafts end. Each row
+runs to the rigid base, and a shaft standing on rock is pinned there — held in
+place, free to rotate. Open **Piles**, press **Table view**, set `Tip` to
+`pinned` on both rows, and **OK**. The mesh is unaffected, because a fixity is
+not geometry.
 
 Click **Run → Run FEM…**
 
@@ -298,10 +304,10 @@ the rows as shipped nothing reaches capacity anyway. What moves the answer is
 restraining rotation at an end.
 
 That is a physical question about the shafts rather than a modeling knob. Both
-rows run from the face down to the rigid base, and both open with `Head` and
-`Tip` on `free`. Each row's bottom node lands on that fixed base. Its
-translations are held there, but its rotation is not, so the tip behaves as a pin
-and the shaft swings about it: the moment falls to zero at both ends, and at the
+rows run from the face down to the rigid base with `Tip` on `pinned`, as
+entered above. Each row's bottom node lands on that fixed base. Its
+translations are held there, but its rotation is not, so the tip is a pin and
+the shaft swings about it: the moment falls to zero at both ends, and at the
 captured mechanism the shafts stand at 44% of their moment capacity. A drilled
 shaft bearing on rock behaves that way. One socketed into the rock does not, and
 `Tip` is the cell that says which it is. The cell offers three settings: `free`,
@@ -327,14 +333,13 @@ different one:
 
 The deep band that ran up from the flat ground beyond the toe is gone. What is
 left daylights at the upper row's head, where the strain peaks at 0.29 against
-the free-tip run's 0.75, and runs back from there into the crest — up the face
+the pinned-tip run's 0.75, and runs back from there into the crest — up the face
 above the row and along the ground surface to about x = 33 at elevation 15 to 20.
 Four elements stand above half that peak, all of them between x = 10.9 and 14.1
 at elevation 9.9 to 10.9. The mechanism has moved above the reinforcement
 instead of passing through it.
 
-Set `Tip` back to `free` on both rows, or reopen the file, before the next
-section.
+Set `Tip` back to `pinned` on both rows before the next section.
 
 ### What spacing does to each engine
 
@@ -397,7 +402,7 @@ does not.
 
 ### Which answer is right
 
-With the tips free the two engines are 0.48 apart. With the tips fixed they are
+With the tips pinned the two engines are 0.48 apart. With the tips fixed they are
 0.049 apart — 1.842 against 1.793, under 3%. The tip condition, not the engine,
 is most of the disagreement, and each engine treats it differently.
 
@@ -412,7 +417,7 @@ it, and the limit assumes the shaft develops its full moment capacity there.
 
 The finite element run does not assume it. It computes the moment the soil can
 actually push into the member under the restraint the file states, and reports
-it. With the toe free the shaft swings about the pin and reaches 44% of capacity
+it. With the toe pinned the shaft swings about the pin and reaches 44% of capacity
 at elevation −4, the elevation the limit equilibrium arm is measured to; fixing
 the toe makes it bend against a restraint instead, and it reaches 100%. So the
 two engines agree once the model is told what the limit equilibrium method had
@@ -539,9 +544,9 @@ never uses a stated pile force.
 A new row also opens with **Appl** on `active` and both **Head** and **Tip** on
 `free`. `Appl` is inert here: it is a limit equilibrium input, and a strength
 reduction run never reads it. `Head` `free` is a driven sheet pile with no
-capping beam. `Tip` `free` is the wall's toe standing on the base rather than
-driven into it — the base boundary pins it, exactly as it pinned the shafts —
-which is the first of the two runs below.
+capping beam. Set `Tip` to `pinned`: the wall's toe stands on the base rather
+than being driven into it, held in place and free to rotate, exactly as the
+shafts were — the first of the two runs below.
 
 Click **OK**.
 
@@ -610,7 +615,7 @@ The wall's toe stands on the rigid base, and the first half's runs showed what
 the tip condition is worth to a member that ends there. Open **Piles**, set
 `Tip` to `fixed` — a wall driven or socketed into the base rather than standing
 on it — and **OK**. The mesh survives the change. Run the same bracket again;
-it finishes sooner than the free-tip run, since a slope that is further from
+it finishes sooner than the pinned-tip run, since a slope that is further from
 failing decides each trial in fewer iterations.
 
 **FS = 1.543**, from [1.5391, 1.5469]: the credit over the bare slope goes from

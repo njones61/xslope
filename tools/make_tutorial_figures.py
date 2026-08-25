@@ -4978,7 +4978,7 @@ def _fem03_spacing_figure(lem, fixed, free, _u):
         series = [
             (lem, "LEM (Spencer, Ito & Matsui)", "#1f77b4", "o-", 9),
             (fixed, "FEM (SSRM, pile tips fixed)", "#9467bd", "^-", -16),
-            (free, "FEM (SSRM, pile tips free)", "#d62728", "s-", -16),
+            (free, "FEM (SSRM, pile tips pinned)", "#d62728", "s-", -16),
         ]
         if not with_fixed:
             series = [series[0], series[2]]

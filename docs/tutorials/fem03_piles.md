@@ -261,7 +261,9 @@ file.
 ![The mechanism at failure, with the pile rows colored by shear force](images/fem03_fem_shear_piles.png){width=1000}
 
 The contours are viscoplastic shear strain — the shearing left after the elastic
-response is subtracted. The band starts on the flat ground beyond the toe,
+response is subtracted — and the two pile lines are drawn in green, each beam
+element shaded by the shear force it carries per foot of slope, on the second
+color scale. The band starts on the flat ground beyond the toe,
 runs down to the rigid base at the pile tips, and comes back up the uphill side
 of the upper row to the face at its head, near (10, 10), where the strain peaks
 at 0.75 in the element centered on (10.5, 9.0). Nowhere does it pass *through*
@@ -269,8 +271,8 @@ a row, because in plane strain there is nothing to pass through: each row is a
 continuous obstruction over the full length of the slope. The soil between the
 toe and the upper row shears down to the base and carries both rows with it,
 each rotating about its toe, and the mass behind the upper row shears past its
-head. The pile shear bars say the same thing: the largest shear on each shaft is
-at its tip, where the rotation is resisted.
+head. The shading on the piles says the same thing: the largest shear on each
+shaft is at its tip, where the rotation is resisted.
 
 ### What spacing does to each engine
 

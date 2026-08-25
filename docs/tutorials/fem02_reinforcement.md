@@ -656,6 +656,26 @@ comparison: a stated development length is depth-blind, so it under-rates a
 deeply buried tail and over-rates a shallow one, and reinforced slopes are
 critical at the face.
 
+The factor of safety barely moves, and the field shows why that number
+understates what changed:
+
+![The mechanism at failure under the overburden law](images/fem02_shear_strain_law.png){width=1000}
+
+The main band is where it was. It runs from the toe up behind the buried tips
+to the crest, and its center is within half a foot of the stated-length run's.
+What has changed is at the two ends of every layer. At the buried ends the law
+allows the full 800 lb/ft right up to the tip, so the layers hold red to their
+ends and the band no longer cuts through the tails: under the stated lengths it
+crossed lines 2 to 6 between 16 and 18 ft in, through the weakening ramp, and
+under the law it slides just outside the tips, crossing lines 3, 4 and 6 within
+the last foot and line 5 not at all. At the face, where the law allows almost
+nothing, a second, thinner zone of strain follows the face through the outer
+few feet of the layers, and that is the crossing the line 2 profile reported at
+1 to 3 ft. The strain is also more concentrated: 56 elements above half the
+peak, against 117 under the stated lengths. The factor of safety reads one
+number for both fields; the fields say the mechanism moved from the tails to
+the face.
+
 Both answers move, and the smaller move is the finite element one, 1.5%.
 Spencer, searched again on the same file, moves from 1.587 to **1.559**, 1.8%,
 and that move is not a loss of capacity. On the circle Spencer already drew,

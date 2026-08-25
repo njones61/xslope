@@ -4496,6 +4496,40 @@ def fem02_pullout_law():
              prof["peak_utilization"], prof["status"]))
     capture("fem02_bar_profile_law.png", plot_reinforcement_detail, prof)
 
+    # The mechanism under the law, drawn and measured against the stated-length
+    # run on the same mesh: where the band crosses each line, and where it
+    # reaches the face. A capacity law that is weakest at the face can move the
+    # band there even when the factor of safety barely moves.
+    from xslope.plot_fem import plot_fem_results
+    capture("fem02_shear_strain_law.png", plot_fem_results, fem_data, result,
+            plot_type="shear_strain", fs=result["FS"],
+            failure_solution=result.get("failure_solution"),
+            field_state="failure")
+    import numpy as np
+    fem_con, res_con, _log = _fem02_solve(done, mesh, None)
+    print("   constant-law run for comparison · FS %.4f" % res_con["FS"])
+    for tag, fd, res, model in (("constant", fem_con, res_con, done),
+                                ("law", fem_data, result, law_done)):
+        fail = res.get("failure_solution") or res["last_solution"]
+        strain = np.asarray(fem_details._mechanism_field(fd, res["last_solution"], fail))
+        cent = np.asarray(fem_details._element_centroids(fd))
+        hot = strain >= 0.5 * np.nanmax(strain)
+        w = strain[hot]
+        print("   %-8s mechanism · %d elements above half the peak (%.3f) · "
+              "centroid (%.2f, %.2f) · x %.1f–%.1f, y %.1f–%.1f"
+              % (tag, int(hot.sum()), float(np.nanmax(strain)),
+                 float((cent[hot, 0] * w).sum() / w.sum()),
+                 float((cent[hot, 1] * w).sum() / w.sum()),
+                 cent[hot, 0].min(), cent[hot, 0].max(),
+                 cent[hot, 1].min(), cent[hot, 1].max()))
+        for ln in range(1, len(model["reinforcement_lines"]) + 1):
+            pr = fem_details.reinforcement_profile(
+                fd, res["last_solution"], ln, slope_data=model,
+                field_state="converged", failure_solution=res.get("failure_solution"))
+            print("        line %d · band %s–%s · hardest-worked at s %.2f (%.3f) · %s"
+                  % (ln, pr.get("band_lo"), pr.get("band_hi"), pr["peak_s"],
+                     pr["peak_utilization"], pr["status"]))
+
     # What the two laws allow along that line, so the page's claim about WHERE the
     # bond is critical is a measurement rather than a reading of the figure.
     from xslope.fileio import reinforce_available_tension

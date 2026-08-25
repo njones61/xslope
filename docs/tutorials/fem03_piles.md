@@ -252,9 +252,7 @@ contain the answer, and four of the runs below stand above 1.6 — the pile rows
 with their heads fixed, the same rows with their tips fixed, and the tip-fixed
 spacing sweep at all three of 3, 6 and 12 ft — so every run on this page uses the
 same 1.0 to 2.0 and the answers stay comparable.
-Leave everything else as it opens: tolerance 0.0100, **Max iterations per trial**
-12,000, **Iteration ceiling** 50,000, **Rollers** on the sides, and
-**Non-convergence** as the failure criterion. Click **Run**.
+Leave everything else as it is and click **Run**.
 
 **FS = 1.363**, from a final bracket of [1.3594, 1.3672] in nine trials — two
 bracket checks and seven bisections. Spencer's method gave 1.842 on the same

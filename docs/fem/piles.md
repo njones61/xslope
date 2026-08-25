@@ -350,12 +350,12 @@ moduli. Where the model does supply $D$ and $S$ but no structural capacities, th
 the mobilized soil reaction against the Ito & Matsui limit; with neither, the badge stays neutral rather than
 reporting a ratio the model does not support.
 
-The depths at which the viscoplastic shear strain concentrates across the pile are shaded across all four panels
-and named **Shear band crossing** in the legend on the displacement panel. The extent is measured by walking the
-pile from head to toe and sampling the soil's shear strain field at every step, so the shading is where the band
-crosses and not which beam elements hold the crossing. Which field it was read from, the mechanism an SSRM run
-captured or the shear strain in a section that is standing, is what the title says. A pile the concentration does
-not reach carries no mark.
+Unlike the reinforcement figures, the pile panels carry no shaded shear-band mark. A pile is loaded along its
+whole length by the soil moving past it, and its moment peaks where the displacement changes fastest rather than
+where a band happens to touch it, so the mark added nothing the shear-strain field does not show; the profile
+still records where the band meets the pile, and the field figure is where to read it. Which field the profiles
+were read from, the mechanism an SSRM run captured or the shear strain in a section that is standing, is what
+the title says.
 
 A **Field state** control at the foot of the panel selects which field the displacement, shear and moment profiles
 are read from — the at-failure mechanism an SSRM run captured, or the last converged solution — and is the same

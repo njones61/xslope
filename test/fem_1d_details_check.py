@@ -1274,10 +1274,13 @@ def test_the_band_marker_is_named_in_the_legend():
                 if band_label(prof) != BAND_LABEL:
                     fails.append(f"{kind} {prof['label']}: the {state} run's "
                                  f"mark is called {band_label(prof)!r}")
-                has_band = (prof.get("band_depth") is not None
-                            if kind == "pile" else prof.get("band_lo") is not None)
+                has_band = prof.get("band_lo") is not None
                 if has_band and banded is None:
                     banded = prof
+            if kind == "pile":
+                # The pile figure carries no band mark (owner's ruling); the
+                # profile still measures it, and that is checked above.
+                continue
             if banded is None:
                 fails.append(f"{kind}: the {state} run marks no member, so the "
                              f"name on the figure is untested")

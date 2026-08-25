@@ -17090,8 +17090,13 @@ def test_the_member_terms_are_defined_where_they_are_used():
     for label, xlsx, kind in (("reinforcement", FEM_REINF_XLSX, "reinforcement"),
                               ("piles", FEM_PILES_XLSX, "pile")):
         said = " ".join(_prose(_engine_report("fem", xlsx=xlsx)))
-        for what, phrase in (("utilization", UTILIZATION_DEFINED[kind]),
-                             ("the band", BAND_DEFINED["converged"])):
+        # A pile page carries no band sentence: the pile figure draws no mark
+        # (the owner's ruling), so the definition would describe nothing.
+        expected = ((("utilization", UTILIZATION_DEFINED[kind]),)
+                    if kind == "pile" else
+                    (("utilization", UTILIZATION_DEFINED[kind]),
+                     ("the band", BAND_DEFINED["converged"])))
+        for what, phrase in expected:
             n = said.count(phrase)
             if n != 1:
                 fails.append(f"{label}: {what} is defined {n} times on the page "

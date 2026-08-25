@@ -8117,6 +8117,10 @@ def _band_marked(profiles):
     what was drawn, so a reader is never told to look for a mark no figure
     carries.
     """
+    # A pile figure draws no mark (the owner's ruling: a pile's actions are set
+    # by the soil moving past its whole length, and the mark said nothing the
+    # shear-strain field does not), so only reinforcement members count here.
+    profiles = [p for p in profiles if p.get("kind") != "pile"]
     return any(p.get("band_lo") is not None and p.get("band_hi") is not None
                for p in profiles)
 

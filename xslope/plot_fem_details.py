@@ -474,14 +474,11 @@ def plot_pile_detail(profile, fig=None):
     Four panels sharing one depth axis, pile head at the top: lateral
     displacement, shear, bending moment, and the lateral soil reaction with the
     Ito & Matsui limiting resistance dashed beside it. The maximum-moment depth
-    is marked, and the stretch of the pile the shear band crosses is shaded
-    across all four so the profiles can be read against it — the same mark the
-    reinforcement figures carry, drawn from the same measurement
-    (:func:`xslope.fem_details._band_span`) and named the same way
-    (:data:`BAND_LABEL`), in a legend on the displacement panel. The stretch is
-    the depths the band crosses the pile between, measured along the pile itself
-    rather than at its beam elements, so it is where the crossing is and not
-    which element holds it.
+    is marked, as is the largest shear. The shear band crossing that the
+    reinforcement figures shade is not drawn on a pile: the profile still
+    carries it (``band_lo`` / ``band_hi``, from the same dense walk), but a
+    pile's actions are set by the soil moving past its whole length, and the
+    mark told the reader nothing the shear-strain field does not.
 
     The shear and moment samples are element quantities: each marker sits at the
     midpoint of the beam element it was read from, and the displacement is nodal.
@@ -594,13 +591,14 @@ def plot_pile_detail(profile, fig=None):
 
     # Depth marks that belong to every panel. The mechanism crosses the pile
     # over a stretch of it — the depths a dense walk of the pile finds it
-    # between — so the stretch is shaded, as it is on a reinforcement line.
-    band_lo, band_hi = profile.get("band_lo"), profile.get("band_hi")
-    banded = band_lo is not None and band_hi is not None
+    # between. The profile carries that stretch (band_lo / band_hi), but the
+    # pile figure does NOT draw it: a pile is loaded along its whole length by
+    # the soil moving past it, and its moment peaks where the displacement
+    # changes fastest, not where a band happens to touch it; on a row the
+    # mechanism climbs over, the mark degenerated to a sliver at the head that
+    # said nothing the shear-strain field did not say better (Norm 2026-08-25:
+    # keep it on reinforcement, drop it for piles).
     for ax in axes:
-        if banded:
-            ax.axhspan(band_lo, band_hi, color=C_BAND, alpha=0.13, zorder=0,
-                       linewidth=0)
         if profile.get("max_moment_depth") is not None:
             ax.axhline(profile["max_moment_depth"], color=C_PEAK, linewidth=0.8,
                        alpha=0.35, zorder=2)
@@ -615,13 +613,6 @@ def plot_pile_detail(profile, fig=None):
         vm, vd = profile["max_shear"], profile["max_shear_depth"]
         ax_v.plot([vm], [vd], "o", color=C_PEAK, markersize=6,
                   markerfacecolor="none", markeredgewidth=1.6, zorder=7)
-
-    # The mark is drawn across all four panels and named once, on the panel a
-    # depth axis is read down from. A name set beside the mark itself stood in
-    # the middle of a panel it belongs to no more than to the other three.
-    if banded:
-        ax_u.legend([_band_handle()], [band_label(profile)],
-                    loc="best", fontsize=7.5, framealpha=0.85)
 
     fig.suptitle(_title(profile), fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.95))

@@ -66,9 +66,9 @@ the same file with the wall row entered; open it to skip to
 [the wall's run](#re-meshing-and-running-again). Neither wall file carries a
 mesh, so both are meshed on the page
 
-Each strength reduction run below takes somewhere between a coffee sip and a
-coffee break, depending on the machine; the page only says which runs are the
-slow ones.
+Each strength reduction run below takes from well under a minute to a few
+minutes, depending on the machine; the page only says which runs are the slow
+ones.
 </div>
 </div>
 

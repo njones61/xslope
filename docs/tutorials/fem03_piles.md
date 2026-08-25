@@ -223,9 +223,7 @@ be quadratic, and [FEM-1](fem01_strength_reduction.md#building-the-mesh)
 measures what linear elements cost. Untick **Auto-size from geometry** and set
 **Target element size** to `2`, which is what the
 [FEM sample problem](../fem/samples.md) for this model uses. Leave the rest of
-the dialog alone. **Refine thin zones** stays ticked as it opens: it drives the
-local element size down through any material band thinner than one element, and
-this section is a single clay, so it finds nothing to act on. Click **Build**.
+the dialog alone and click **Build**.
 
 The mesh comes out at **3,180 nodes and 1,521 triangles**, with the two pile
 rows carried in as constraints and discretized into **18 beam elements** — 8 on

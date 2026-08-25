@@ -117,7 +117,7 @@ quadratic bar over the same three nodes. Bending and axial stay uncoupled, as on
 One thing the three-node element can say that the two-node element cannot is the distributed load along itself. A cubic
 deflection has a zero fourth derivative everywhere, so a chain of two-node elements can report the soil reaction only
 as the shear step between one element and the next; the quintic's fourth derivative is a genuine linear distribution
-along the element, and $EI$ times it is the reaction that element is carrying.
+along the element, and $EI$ times it is the reaction that element is carrying. A fourth derivative amplifies element-scale unevenness in the nodal loads, so each element's value is reported through a least-squares line fitted with its two neighbors, evaluated at its own depth — the reaction at the scale the mesh supports, with its shape and magnitude intact.
 
 ### Mixed DOF System
 

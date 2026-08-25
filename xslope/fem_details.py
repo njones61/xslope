@@ -1057,6 +1057,34 @@ def _ito_matsui_limit(slope_data, props, depths, y_head, S):
     return p
 
 
+def _reaction_at_mesh_scale(depth, p):
+    """The per-element reaction reported at the scale the mesh supports.
+
+    Each element's reaction is EI times the FOURTH derivative of its deflected
+    shape, and a fourth derivative amplifies whatever element-scale unevenness
+    the soil nodes handed the member: on a 0.5 ft wall the raw series wobbles by
+    a fifth of its value from one element to the next, with no physical content
+    at that scale. Each value is replaced by a least-squares straight line
+    fitted through it and its two neighbors (one at either end), evaluated at
+    its own depth -- a three-element window, about one and a half elements'
+    worth of length either side. Shape and magnitude survive; the element-scale
+    wobble does not. Fewer than three elements are returned as they are.
+    """
+    n = len(p)
+    if n < 3:
+        return p
+    out = np.empty(n)
+    for k in range(n):
+        lo, hi = max(0, k - 1), min(n, k + 2)
+        x, y = depth[lo:hi], p[lo:hi]
+        if hi - lo < 2 or np.ptp(x) < 1e-12:
+            out[k] = y.mean()
+            continue
+        a, b = np.polyfit(x, y, 1)
+        out[k] = a * depth[k] + b
+    return out
+
+
 def _pile_reaction(fem_data, field, sel, node_ids, node_depth, elem_depth):
     """``(depth, p)`` -- the lateral soil reaction per unit length along one
     pile, and the depths it is reported at.
@@ -1101,7 +1129,7 @@ def _pile_reaction(fem_data, field, sel, node_ids, node_depth, elem_depth):
             value = pile_element_reaction(disp[idx], cos_t[p], sin_t[p],
                                           float(elem_len[k]), float(EI[p]), 3)
             out[k] = 0.0 if value is None else value
-        return elem_depth, out
+        return elem_depth, _reaction_at_mesh_scale(np.asarray(elem_depth, dtype=float), out)
 
     shear = _sol_array(field, "forces_pile_lateral", n_pile)[sel]
     if len(sel) < 2:

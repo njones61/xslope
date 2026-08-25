@@ -311,9 +311,18 @@ That is a physical question about the shafts rather than a modeling knob. Both
 rows run from the face down to the rigid base with `Tip` on `pinned`, as
 entered above. Each row's bottom node lands on that fixed base. Its
 translations are held there, but its rotation is not, so the tip is a pin and
-the shaft swings about it: the moment falls to zero at both ends, and at the
-captured mechanism the shafts stand at 44% of their moment capacity. A drilled
-shaft that stops at the top of the rock and bears on it behaves that way. One
+the shaft swings about it. **Results → 1D Details** on the upper row, on its
+default **At failure** field, shows exactly that:
+
+![The upper row's 1D Details at failure with the tip pinned: a straight-line rotation about the toe, moment zero at both ends and peaking mid-shaft at 44% of capacity](images/fem03_piles_profile_pinned.png){width=1000}
+
+The lateral displacement is a straight line from the head to zero at the toe —
+the shaft is rotating as a rigid bar about its pin, not bending. The moment is
+zero at both ends, as it must be with neither end held, and peaks at 16 ft
+below the head: 4,372 lb·ft per foot of slope, 26,000 lb·ft per shaft, 44% of
+the 60,000 lb·ft capacity, with the Mcap lines well outside the curve. The
+shear is largest at the toe, the pin reaction. A drilled shaft that stops at
+the top of the rock and bears on it behaves that way. One
 that is drilled or driven some distance *into* the rock — a rock socket, in
 which the rock grips the shaft's lower length and holds it against rotation as
 well as translation — does not, and `Tip` is the cell that says which it is.
@@ -337,6 +346,19 @@ capacity in bending and one in shear. And the failure the run finds is a
 different one:
 
 ![The mechanism with both pile tips fixed: it relocates above the reinforcement, daylighting at the upper row's head and running back into the crest](images/fem03_fem_shear_piles_fixed.png){width=1000}
+
+Open **Results → 1D Details** on the upper row again:
+
+![The upper row's 1D Details at failure with the tip fixed: bending against the restraint, the moment at capacity from 6 ft down to the toe](images/fem03_piles_profile_fixed.png){width=1000}
+
+Every panel has changed. The head moves 0.12 ft instead of feet, and the
+displacement curves — the shaft is bending now, not rotating. The moment rises
+from zero at the head to the 10,000 lb·ft per foot that is M<sub>cap</sub> ÷ S
+at 6 ft below the head, and holds it all the way to the toe: the lower 14 ft of
+the shaft is a chain of plastic hinges. The shear at the toe has tripled, to
+4,992 lb/ft, and the soil reaction against the upper shaft is 178% of the Ito &
+Matsui limit. Held at its toe, the shaft finally develops the moment the limit
+equilibrium method assumed all along.
 
 The deep band that ran up from the flat ground beyond the toe is gone. What is
 left daylights at the upper row's head, where the strain peaks at 0.29 against

@@ -357,7 +357,12 @@ translations are held there, but its rotation is not, so the tip behaves as a pi
 and the shaft swings about it: the moment falls to zero at both ends, and at the
 captured mechanism the shafts stand at 44% of their moment capacity. A drilled
 shaft bearing on rock behaves that way. One socketed into the rock does not, and
-`Tip` is the cell that says which it is.
+`Tip` is the cell that says which it is. The cell offers three settings: `free`,
+the tip restrained only by what surrounds it; `pinned`, its translations held
+and its rotation free, for a shaft bearing on a hard stratum inside the mesh;
+and `fixed`, translations and rotation held, the socket. On this model the base
+boundary already pins the tip, so `free` and `pinned` are the same run, and the
+only change on offer is `fixed`.
 
 Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
 survives a fixity change, as it survived the spacing change. Run the same
@@ -536,7 +541,8 @@ A new row also opens with **Appl** on `active` and both **Head** and **Tip** on
 `free`. `Appl` is inert here: it is a limit equilibrium input, and a strength
 reduction run never reads it. `Head` `free` is a driven sheet pile with no
 capping beam. `Tip` `free` is the wall's toe standing on the base rather than
-driven into it, which is the first of the two runs below.
+driven into it — the base boundary pins it, exactly as it pinned the shafts —
+which is the first of the two runs below.
 
 Click **OK**.
 

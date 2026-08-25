@@ -5107,6 +5107,215 @@ def fem03_wall():
             capture(prof_fig, plot_pile_detail, profs[0])
 
 
+# --------------------------------------------------------------------------- #
+# COMBO-1 — Seepage into Stability
+#
+# One file, three engines, one mesh. The group runs the page's whole sequence in
+# order — build the mesh at Studio's own Build Mesh defaults, solve the seepage on
+# it, hand the solved field to a Spencer search, then to a strength reduction on
+# the same mesh — because that order IS the tutorial, and a figure produced out of
+# it would be a figure of a different model.
+#
+# Everything is at the settings the reader is told to use: the dialogs' own
+# defaults, except the one control the page changes (Method → Spencer). Nothing is
+# read from a companion sidecar; the tutorial copy of the workbook ships none, and
+# building the mesh is the step the page teaches.
+# --------------------------------------------------------------------------- #
+COMBO01 = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_johnson_res.xlsx")
+#: Build Mesh, at the dialog's own defaults: quadratic triangles, auto-sizing on,
+#: 100 divisions across the 750 ft section for a 7.5 ft target. Quadratic is the
+#: default AND the requirement — the same mesh carries the strength reduction.
+COMBO01_ELEMENT = "tri6"
+COMBO01_DIVISIONS = 100
+#: Run Seepage, at its defaults.
+COMBO01_TOL, COMBO01_MAX_ITER = 1e-4, 400
+#: Run LEM. Spencer is the one field the page changes from the dialog's default,
+#: because it satisfies both equilibrium conditions and is therefore the closest
+#: limit-equilibrium statement of what the strength reduction solves. The slice
+#: count is the dialog's own.
+COMBO01_METHOD = "spencer"
+COMBO01_SLICES = 40
+#: Run FEM, at its defaults: bracket [1.0, 2.0], 0.01 bisection tolerance, 12,000
+#: iterations a trial. ``non_convergence`` because that is the criterion Studio's
+#: Failure criterion list opens on.
+COMBO01_F_MIN, COMBO01_F_MAX = 1.0, 2.0
+COMBO01_TOLERANCE = 0.01
+COMBO01_CRITERION = "non_convergence"
+COMBO01_MAX_ITERATIONS = 12000
+#: The pore-pressure options the hinge section measures the workbook's own `seep`
+#: against — the two a reader could plausibly leave a material on.
+COMBO01_U_OPTIONS = ("none", "piezo")
+
+
+def _combo01_mesh(model):
+    """The mesh Build Mesh produces on this file with nothing changed."""
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    xs = [x for x, _ in model["ground_surface"].coords]
+    size = (max(xs) - min(xs)) / COMBO01_DIVISIONS
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(get_material_polygons(model), size,
+                                        COMBO01_ELEMENT,
+                                        size_regions=extract_size_regions(model))
+
+
+def _combo01_seep(model, mesh):
+    """One steady seepage solve, with the solved field attached to the model the
+    way Studio attaches it after a run — so the LEM and FEM steps below read the
+    field through the same path a reader's session does."""
+    from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                             run_seepage_analysis)
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        seep_data = build_seep_data(mesh, model)
+        solution = run_seepage_analysis(seep_data, tol=COMBO01_TOL,
+                                        max_iter=COMBO01_MAX_ITER)
+        model["mesh"] = mesh
+        apply_steady_stability_field(model, solution, bc=1)
+    return seep_data, solution, log.getvalue()
+
+
+def _combo01_search(model, method=COMBO01_METHOD):
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _path, _circles = circular_search(
+            model, method, num_slices=COMBO01_SLICES, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache
+
+
+def _combo01_reading(crit):
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    return ("FS %.4f on Xo %.3f Yo %.3f tangent elevation %.3f (R %.3f) · "
+            "entry (%.2f, %.2f) exit (%.2f, %.2f)"
+            % (crit["FS"], crit["Xo"], crit["Yo"], crit["Depth"],
+               crit["Yo"] - crit["Depth"], xs[0], ys[0], xs[-1], ys[-1]))
+
+
+def combo01_plots():
+    """The three runs of the combined page, in the order the reader makes them.
+
+    Printed rather than drawn: the mesh counts, the seepage discharge and the
+    iteration that produced it, the Spencer search and the pore pressures it picked
+    up off the field, the same search with each material's pore-pressure option
+    turned away from `seep`, and the strength reduction's whole bisection walk.
+    Every number the page quotes is on one of these lines.
+    """
+    import time
+
+    import numpy as np
+
+    from xslope.fem import build_fem_data, solve_ssrm
+    from xslope.plot_fem import plot_fem_results
+    from xslope.plot_seep import plot_seep_data, plot_seep_solution
+
+    model = load_slope_data(COMBO01)
+    _u = declared_unit_labels(model)
+    for m in model["materials"]:
+        print("   material    %-11s γ %g %s · c %g %s · φ %g° · k1 %g %s/%s · "
+              "u %s · E %g %s · ν %g"
+              % (m["name"], m["gamma"], _u["unit_weight"], m["c"], _u["stress"],
+                 m["phi"], m["k1"], _u["length"], model["time_unit"], m["u"],
+                 m["E"], _u["stress"], m["nu"]))
+    capture("combo01_inputs.png", plot_inputs, model, mode="seep",
+            title="Seepage Model Inputs", frame="content", show_mesh=False)
+
+    # ---- one mesh ----------------------------------------------------------- #
+    mesh = _combo01_mesh(model)
+    figsize = _seep02_figsize(mesh)
+    xs = [x for x, _ in model["ground_surface"].coords]
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g %s"
+          % (len(mesh["nodes"]), len(mesh["elements"]), COMBO01_ELEMENT,
+             COMBO01_DIVISIONS, (max(xs) - min(xs)) / COMBO01_DIVISIONS,
+             _u["length"]))
+
+    # ---- the seepage run ---------------------------------------------------- #
+    seep_data, solution, log = _combo01_seep(model, mesh)
+    stats = _seep02_log_stats(log)
+    capture("combo01_mesh.png", plot_seep_data, seep_data, figsize=figsize,
+            show_bc=True)
+    capture("combo01_seepage.png", plot_seep_solution, seep_data, solution,
+            figsize=figsize, levels=SEEP02_LEVELS, base_mat=SEEP02_BASE_MAT,
+            fill_contours=True, mesh=False)
+    head = np.asarray(solution["head"])
+    print("   seepage     q %.4f %s³/%s per %s · head %.3f to %.3f %s · "
+          "u %.1f to %.1f %s"
+          % (solution["flowrate"], _u["length"], model["time_unit"], _u["length"],
+             head.min(), head.max(), _u["length"], np.min(solution["u"]),
+             np.max(solution["u"]), _u["stress"]))
+    print("   iteration   %s" % stats)
+    print("   field       %d nodal pore pressures attached as seep_u"
+          % len(np.asarray(model["seep_u"])))
+
+    # ---- the hinge: each material's own pore-pressure option ---------------- #
+    # The workbook's three materials all read `seep`. What a reader who leaves one
+    # of them on something else gets is measured rather than asserted: the same
+    # search, the same mesh, the same solved field, with only the u column changed.
+    crit = _combo01_search(model)[0]
+    capture("combo01_lem_solution.png", plot_solution, model, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    sl = crit["slices"]
+    print("   LEM         %s %s · %d candidates"
+          % (COMBO01_METHOD, _combo01_reading(crit), len(_combo01_search(model))))
+    print("   slice u     %d slices · u %.1f to %.1f %s · %d slices with u > 0"
+          % (len(sl), sl["u"].min(), sl["u"].max(), _u["stress"],
+             int((sl["u"] > 0).sum())))
+
+    for option in COMBO01_U_OPTIONS:
+        alt = load_slope_data(COMBO01)
+        for m in alt["materials"]:
+            m["u"] = option
+        alt["mesh"] = mesh
+        alt["seep_u"] = model["seep_u"]
+        try:
+            other = _combo01_search(alt)[0]
+        except Exception as e:                  # a option the model cannot supply
+            print("   u = %-6s  refused: %s" % (option, e))
+            continue
+        print("   u = %-6s  %s %s (%+.1f%% of the seep run)"
+              % (option, COMBO01_METHOD, _combo01_reading(other),
+                 100.0 * (other["FS"] - crit["FS"]) / crit["FS"]))
+
+    # ---- the strength reduction, on the same mesh and the same field -------- #
+    fem_data = build_fem_data(model, mesh)
+    log = io.StringIO()
+    t0 = time.time()
+    with contextlib.redirect_stdout(log):
+        result = solve_ssrm(fem_data, F_min=COMBO01_F_MIN, F_max=COMBO01_F_MAX,
+                            tolerance=COMBO01_TOLERANCE, debug_level=1,
+                            failure_criterion=COMBO01_CRITERION,
+                            max_iterations=COMBO01_MAX_ITERATIONS)
+    print("   SSRM        FS %.4f from the bracket [%.4f, %.4f] (width %.4f) "
+          "after %d bisection steps · %.1f s wall"
+          % (result["FS"], result["final_interval"][0], result["final_interval"][1],
+             result["interval_width"], result["iterations_ssrm"], time.time() - t0))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s iterations"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+    last, fail = result["last_solution"], result.get("failure_solution")
+    nodes = np.asarray(mesh["nodes"])
+    for label, field in (("last converged", last), ("at failure", fail)):
+        if field is None:
+            print("   %-12s none" % label)
+            continue
+        d = np.asarray(field["displacements"]).reshape(-1, 2)
+        umag = np.hypot(d[:, 0], d[:, 1])
+        i = int(np.argmax(umag))
+        print("   %-12s F %.4f · %s in %s iterations · max|u| %.4f %s at "
+              "(%.1f, %.1f)"
+              % (label, field.get("F", float("nan")),
+                 "equilibrium" if field.get("converged") else "no equilibrium",
+                 field.get("iterations"), umag.max(), _u["length"],
+                 nodes[i, 0], nodes[i, 1]))
+    capture("combo01_fem_shear.png", plot_fem_results, fem_data, last,
+            plot_type="shear_strain", fs=result["FS"], failure_solution=fail,
+            field_state="failure")
+    print("   two answers Spencer %.4f · SSRM %.4f · difference %.1f%%"
+          % (crit["FS"], result["FS"],
+             100.0 * abs(result["FS"] - crit["FS"]) / crit["FS"]))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -5144,6 +5353,7 @@ GROUPS = {
     "fem03_tip": fem03_tip,
     "fem03_spacing": fem03_spacing,
     "fem03_wall": fem03_wall,
+    "combo01_plots": combo01_plots,
 }
 
 

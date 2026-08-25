@@ -80,6 +80,8 @@ nav:
       - 1. Strength Reduction Basics: tutorials/fem01_strength_reduction.md
       - "2. Reinforcement: LEM vs FEM": tutorials/fem02_reinforcement.md
       - "3. Piles: LEM vs FEM": tutorials/fem03_piles.md
+    - Combined:
+      - 1. Seepage → Stability: tutorials/combo01_seepage_stability.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

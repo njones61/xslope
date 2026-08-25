@@ -2534,6 +2534,154 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# COMBO-1 — Seepage into Stability
+#
+# The reader opens a finished file and runs it three ways, so these shots
+# photograph the three run dialogs and the one table that connects them: the
+# materials sheet's pore-pressure column, which is what makes a seepage solution
+# reach a stability run at all.
+#
+# Every dialog is photographed on a model that has been meshed AND solved for
+# seepage, because that is the state the reader is in when each one is opened —
+# and because the checks column is the subject of half of them: a material set to
+# u = seep with no solved field is an error that blocks the run.
+# --------------------------------------------------------------------------- #
+COMBO01 = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_johnson_res.xlsx")
+#: Build Mesh at the dialog's own defaults — quadratic triangles, auto-sizing on,
+#: 100 divisions across the 750 ft section.
+COMBO01_MESH = {"element_type": "tri6", "auto_size": True, "size_divisions": 100,
+                "target_size": 7.5}
+COMBO01_METHOD = "spencer"
+COMBO01_SLICES = 40
+COMBO01_BRACKET = (1.0, 2.0)
+COMBO01_TOLERANCE = 0.01
+
+_combo01_cache = {}
+
+
+def _combo01_solved():
+    """The workbook with the tutorial's mesh built on it and the seepage solution
+    attached, exactly as the reader's session carries it after the seepage run.
+
+    Built here rather than read from a companion file: the tutorial copy of the
+    workbook ships no sidecars, because building the mesh and solving the seepage
+    are the first two steps the page teaches. Cached, because three dialogs are
+    photographed on the same state and the solve is not free.
+    """
+    if "data" not in _combo01_cache:
+        from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                                 get_material_polygons)
+        from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                                 run_seepage_analysis)
+
+        data = _load(COMBO01)
+        with contextlib.redirect_stdout(io.StringIO()):
+            data["mesh"] = build_mesh_from_polygons(
+                get_material_polygons(data), COMBO01_MESH["target_size"],
+                COMBO01_MESH["element_type"],
+                size_regions=extract_size_regions(data))
+            seep_data = build_seep_data(data["mesh"], data)
+            solution = run_seepage_analysis(seep_data, tol=1e-4, max_iter=400)
+            apply_steady_stability_field(data, solution, bc=1)
+        _combo01_cache["data"] = data
+    return _combo01_cache["data"]
+
+
+def combo01_build_mesh():
+    """Build Mesh with nothing changed: quadratic triangles, auto-sizing on, 100
+    divisions.
+
+    The element type is the shot's subject. It is the dialog's own default, and on
+    this file it is also a requirement rather than a preference — the same mesh
+    goes on to carry the strength reduction, which linear elements cannot run
+    honestly.
+    """
+    from studio.dialogs import BuildMeshDialog
+
+    dlg = BuildMeshDialog(defaults=dict(COMBO01_MESH))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo01_studio_build_mesh.png")
+
+
+def combo01_run_seep():
+    """Run Seepage on the meshed dam, at the dialog's own two defaults."""
+    from studio.dialogs import RunSeepDialog
+
+    data = _load(COMBO01)
+    dlg = RunSeepDialog(defaults={"tol": 1e-4, "max_iter": 400}, slope_data=data,
+                        has_bc2=bool((data.get("seepage_bc2") or {})
+                                     .get("specified_heads")),
+                        has_tseep=bool(data.get("tseep")))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo01_studio_run_seep.png")
+
+
+def combo01_materials():
+    """The three zones in table view with the LEM columns showing — the shot the
+    page's hinge is read off.
+
+    The **u** column is the subject: all three rows read `seep`, which is what
+    sends the solved seepage field to every slice base and every Gauss point.
+    The LEM band rather than the seepage band, because u is a stability input —
+    it says what the stability engines do with a field the seepage run produced,
+    and a row left on `none` runs the same seepage solve and then ignores it.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _lem_only(MaterialsEditor().build(_load(COMBO01), None))
+    return _grab(_mat_table(dlg, through="u"), "combo01_studio_materials.png")
+
+
+def combo01_run_lem():
+    """Run LEM on the solved model, with Method set to Spencer — the one field
+    the page changes from the dialog's defaults.
+
+    Photographed with the seepage solution attached, so the checks column is
+    clean. The same dialog on the same file before the seepage run carries an
+    error instead: three materials read u = seep and there is no field for them
+    to read.
+    """
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": COMBO01_METHOD,
+                                 "analysis": "auto_search",
+                                 "num_slices": COMBO01_SLICES},
+                       slope_data=_combo01_solved())
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo01_studio_run_lem.png")
+
+
+def combo01_run_fem():
+    """Run FEM on the same solved model, at the dialog's own defaults: strength
+    reduction over [1.0, 2.0], a 0.01 bisection tolerance, 12,000 iterations a
+    trial, rollers on the sides and non-convergence as the failure criterion.
+
+    Nothing here names the seepage solution, which is the point: the pore
+    pressures reach the Gauss points through the materials' own u column, and the
+    run dialog has no water control of its own.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _combo01_solved()
+    dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": COMBO01_BRACKET[0],
+                                 "F_max": COMBO01_BRACKET[1],
+                                 "tolerance": COMBO01_TOLERANCE},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo01_studio_run_fem.png")
+
+
+SHOTS.update({
+    "combo01_build_mesh": combo01_build_mesh,
+    "combo01_run_seep": combo01_run_seep,
+    "combo01_materials": combo01_materials,
+    "combo01_run_lem": combo01_run_lem,
+    "combo01_run_fem": combo01_run_fem,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

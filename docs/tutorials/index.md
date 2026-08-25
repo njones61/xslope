@@ -76,3 +76,14 @@ writes, and how to send a whole project to somebody else.
 | 3 | [Piles: LEM vs FEM](fem03_piles.md) | Two rows of drilled shafts and a sheet pile wall on the same slope, each put through both engines — why a plane-strain finite element model has no gap between piles and turns a discrete row into a continuous wall, seen in the mechanism it forces; a spacing sweep in which the limit equilibrium answer swings 36% and changes which surface governs while the strength reduction answer does not move; the pile tip, which moves it by 0.43 and closes most of the gap between the two engines; the one benchmark with a published three-dimensional answer; and then the case the finite element engine is right for — a wall entered as a continuous member at spacing 1, run with its toe free and then fixed, and read for the moment, shear, deflection and soil reaction no limit equilibrium analysis can report | Finite element | piles, Ito &amp; Matsui, pile spacing, head and tip fixity, beam elements, smeared stiffness, plane strain, sheet pile wall, continuous member, strength reduction, quadratic triangles, 1D element size, shear strain, moment and shear profiles | ~60 min |
 
 </div>
+
+## Combined
+
+<div class="tut-summary" markdown>
+
+| # | Tutorial | What it covers | Analysis | Features | Time |
+|---|---|---|---|---|---|
+| 1 | [Seepage &rarr; Stability](combo01_seepage_stability.md) | The Johnson Reservoir dam run three ways from one file — a seepage solution on a quadratic mesh, then a Spencer search and a strength reduction on that same mesh and the same pore pressures — the element type a shared mesh has to be chosen for, the materials table's `u` column that decides whether the stability engines read the seepage answer at all and what leaving it on `none` costs, and the staleness rule that stops the three results belonging to three different models | Seepage + limit equilibrium + finite element | three materials, unconfined seepage, shared mesh, quadratic triangles, pore-pressure option, u = seep, Spencer, circular search, strength reduction, shear strain, stale results | ~20 min |
+
+</div>
+

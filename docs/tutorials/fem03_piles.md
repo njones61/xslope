@@ -295,8 +295,7 @@ At 3 ft the search's own critical circle gives 2.193, where
 spacing because its sweep holds the 6 ft circle fixed. The three strength
 reduction runs return the same bracket,
 [1.3594, 1.3672], and so the same answer, 1.363, with the same verdict at every
-trial. The purple line is a second set of strength reduction runs on the same
-rows, which the next section comes to.
+trial.
 
 Run one point of it to see both. Open **Piles**, set `S` to `12` on both rows
 with `H` still blank, and **OK**. Search with Spencer again: **FS = 1.409**, and
@@ -387,8 +386,11 @@ at elevation 9.9 to 10.9. The mechanism has moved above the reinforcement
 instead of passing through it.
 
 Run the spacing sweep again with the tips fixed and it is flat too, at 1.793,
-1.793 and 1.785 for 3, 6 and 12 ft — the purple line on the figure above. This
-time the shafts are at their moment capacity at every spacing, the peak moment
+1.793 and 1.785 for 3, 6 and 12 ft:
+
+![The spacing sweep with the tip-fixed runs added](images/fem03_spacing_sweep_tips.png){width=800}
+
+This time the shafts are at their moment capacity at every spacing, the peak moment
 per unit width tracking M<sub>cap</sub> ÷ S exactly: 20,000, 10,000 and
 5,000 lb·ft/ft. Whichever end condition the rows are given, the factor of safety
 is decided by the mechanism the smeared wall forces the soil into, not by how

@@ -4960,15 +4960,19 @@ def fem03_spacing():
 
 
 def _fem03_spacing_figure(lem, fixed, free, _u):
-    """The sweep on one axis: the limit equilibrium curve and the two
-    strength-reduction lines, each point labeled with its own answer.
+    """The sweep on one axis, drawn twice for the page's order: first the
+    limit equilibrium curve against the strength-reduction line with the tips
+    free (``fem03_spacing_sweep.png``, the figure the spacing section opens
+    on), then the same with the tip-fixed line added
+    (``fem03_spacing_sweep_tips.png``), for the section that runs the tips
+    fixed. Each point is labeled with its own answer.
 
     The labels sit above the limit equilibrium curve and below both flat lines,
     which is what keeps the 6 ft column readable: the limit equilibrium point and
     the tip-fixed point are 0.05 apart there, and a label above each would print
     one over the other.
     """
-    def _draw():
+    def _draw(with_fixed=True):
         fig, ax = plt.subplots(figsize=(7.0, 4.6))
         xs = list(FEM03_SPACINGS)
         series = [
@@ -4976,6 +4980,8 @@ def _fem03_spacing_figure(lem, fixed, free, _u):
             (fixed, "FEM (SSRM, pile tips fixed)", "#9467bd", "^-", -16),
             (free, "FEM (SSRM, pile tips free)", "#d62728", "s-", -16),
         ]
+        if not with_fixed:
+            series = [series[0], series[2]]
         for data, label, color, style, dy in series:
             ax.plot(xs, [data[s] for s in xs], style, color=color,
                     linewidth=2.0, markersize=7, label=label)
@@ -4998,7 +5004,8 @@ def _fem03_spacing_figure(lem, fixed, free, _u):
         ax.legend(loc="upper right", frameon=False, fontsize=9)
         fig.tight_layout()
 
-    capture("fem03_spacing_sweep.png", _draw)
+    capture("fem03_spacing_sweep.png", lambda: _draw(with_fixed=False))
+    capture("fem03_spacing_sweep_tips.png", lambda: _draw(with_fixed=True))
 
 
 def fem03_wall():

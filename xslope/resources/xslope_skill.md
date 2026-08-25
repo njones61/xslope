@@ -998,7 +998,7 @@ slope_data['pile_lines'] = [
      'V_cap': None, 'M_cap': None,              # shear / moment capacity per pile
      'appl': 'active',                          # 'active' (H not /FS) | 'passive' (H /FS; LEM only)
      'head_fixity': 'free',                     # 'free' or 'fixed' (FEM rotation at the top)
-     'tip_fixity': 'free'},                     # 'free' or 'fixed' (FEM rotation at the bottom)
+     'tip_fixity': 'free'},                     # 'free', 'pinned' (translation held) or 'fixed' (translation + rotation held) at the bottom; FEM
 ]
 ```
 

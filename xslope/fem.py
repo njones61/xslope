@@ -911,6 +911,8 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             - pile_tip_nodes: np.ndarray of node indices for each pile line's bottom node
             - pile_tip_fixed: np.ndarray of booleans, True where the pile tip's
               rotation is restrained ('Tip' = fixed in the piles sheet)
+            - pile_tip_pinned: np.ndarray of booleans, True where the pile tip's
+              translations are restrained ('Tip' = pinned or fixed)
             - unit_weight: float, unit weight of water
             - k_seismic: float, seismic coefficient (horizontal acceleration / gravity)
     """
@@ -1620,7 +1622,8 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     pile_head_nodes = []
     pile_head_fixed = []
     pile_tip_nodes = []
-    pile_tip_fixed = []
+    pile_tip_fixed = []      # rotation restrained ('Tip' = fixed)
+    pile_tip_pinned = []     # translations restrained ('Tip' = pinned or fixed)
     for pl_idx in range(n_pile_lines):
         pile_data = pile_lines[pl_idx]
         head_fixity = pile_data.get("head_fixity", pile_data.get("fixity", "free"))
@@ -1642,11 +1645,13 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             pile_head_fixed.append(head_fixity == "fixed")
             pile_tip_nodes.append(bottom_node)
             pile_tip_fixed.append(tip_fixity == "fixed")
+            pile_tip_pinned.append(tip_fixity in ("pinned", "fixed"))
 
     pile_head_nodes = np.array(pile_head_nodes, dtype=int)
     pile_head_fixed = np.array(pile_head_fixed, dtype=bool)
     pile_tip_nodes = np.array(pile_tip_nodes, dtype=int)
     pile_tip_fixed = np.array(pile_tip_fixed, dtype=bool)
+    pile_tip_pinned = np.array(pile_tip_pinned, dtype=bool)
 
     # Set up boundary conditions
     
@@ -2256,6 +2261,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "pile_head_fixed": pile_head_fixed,
         "pile_tip_nodes": pile_tip_nodes,
         "pile_tip_fixed": pile_tip_fixed,
+        "pile_tip_pinned": pile_tip_pinned,
     }
 
 
@@ -2624,6 +2630,7 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     pile_head_fixed = fem_data.get("pile_head_fixed", np.array([], dtype=bool))
     pile_tip_nodes = fem_data.get("pile_tip_nodes", np.array([], dtype=int))
     pile_tip_fixed = fem_data.get("pile_tip_fixed", np.array([], dtype=bool))
+    pile_tip_pinned = fem_data.get("pile_tip_pinned", np.array([], dtype=bool))
 
     constraint_dofs = []
     for i in range(n_nodes):
@@ -2637,9 +2644,11 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
             constraint_dofs.append(dof_y)
     if has_pile_elements:
         # A fixed end constrains that node's ROTATION degree of freedom (the
-        # third DOF a pile node carries); its translations are left to the
-        # boundary conditions and the surrounding soil. The head and the tip
-        # are restrained by the same mechanism, one end at a time.
+        # third DOF a pile node carries). The head's translations are always
+        # left to the surrounding soil. The tip has three states: 'free' (the
+        # soil or the boundary it sits on decides), 'pinned' (translations held,
+        # rotation free — bearing on a hard stratum), 'fixed' (translations and
+        # rotation held — socketed into rock).
         for _end_nodes, _end_fixed in ((pile_head_nodes, pile_head_fixed),
                                        (pile_tip_nodes, pile_tip_fixed)):
             for pe_idx in range(len(_end_nodes)):
@@ -2648,6 +2657,13 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                     rot_dof = dof_offset[pe_node] + 2 if dof_offset is not None else None
                     if rot_dof is not None:
                         constraint_dofs.append(rot_dof)
+        for pe_idx in range(len(pile_tip_nodes)):
+            if len(pile_tip_pinned) > pe_idx and pile_tip_pinned[pe_idx]:
+                pe_node = pile_tip_nodes[pe_idx]
+                constraint_dofs.append(dof_offset[pe_node] if dof_offset is not None
+                                       else 2 * pe_node)
+                constraint_dofs.append(dof_offset[pe_node] + 1 if dof_offset is not None
+                                       else 2 * pe_node + 1)
 
     constraint_set = set(constraint_dofs)
     free_dofs = np.array(sorted(set(range(n_dof)) - constraint_set))

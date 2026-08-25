@@ -5852,9 +5852,11 @@ PILES_HELP = {
     "head_fixity": "Rotation restraint at the top of the pile: free (default; a "
                    "stabilizing pile with no structural connection) or fixed (a cap "
                    "or wall that prevents rotation). FEM only.",
-    "tip_fixity": "Rotation restraint at the bottom of the pile: free (default; a "
-                  "tip resting on a stratum, or restrained only by the soil around "
-                  "it) or fixed (a shaft socketed into rock). FEM only.",
+    "tip_fixity": "Restraint at the bottom of the pile: free (default; the tip "
+                  "moves with the soil around it, or sits on the model boundary), "
+                  "pinned (translation held, rotation free — bearing on a hard "
+                  "stratum inside the mesh), or fixed (translation and rotation "
+                  "held — socketed into rock). FEM only.",
 }
 
 
@@ -5891,7 +5893,7 @@ class PilesEditor(CategoryEditor):
         Field("area", "Area", "optfloat", usage="fem", tooltip=PILES_HELP["area"]),
         Field("head_fixity", "Head", "choice", choices=["free", "fixed"], usage="fem",
               tooltip=PILES_HELP["head_fixity"]),
-        Field("tip_fixity", "Tip", "choice", choices=["free", "fixed"], usage="fem",
+        Field("tip_fixity", "Tip", "choice", choices=["free", "pinned", "fixed"], usage="fem",
               tooltip=PILES_HELP["tip_fixity"]),
     ]
 

@@ -2493,8 +2493,9 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                                      f"'fixed', got '{head_fixity}'")
                 tip_fixity = (str(row['tip']).strip().lower()
                               if pd.notna(row.get('tip')) else 'free')
-                if tip_fixity not in ('free', 'fixed'):
-                    raise ValueError(f"Tip must be 'free' or 'fixed', got '{tip_fixity}'")
+                if tip_fixity not in ('free', 'pinned', 'fixed'):
+                    raise ValueError(f"Tip must be 'free', 'pinned' or 'fixed', "
+                                     f"got '{tip_fixity}'")
                 # Force application (v12, LEM only): Active = allowable force, not
                 # divided by FS (default, pre-v12 behavior); Passive = ultimate
                 # capacity divided by FS.

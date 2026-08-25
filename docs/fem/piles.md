@@ -176,14 +176,13 @@ Both checks are applied independently at each iteration. An element can yield in
 
 ## Head and Tip Fixity
 
-Each end of a pile carries its own rotational boundary condition. The **Head** column in the `piles` sheet sets the condition at the top node (highest $y$) and the **Tip** column sets it at the bottom node (lowest $y$):
+Each end of a pile carries its own boundary condition. The **Head** column in the `piles` sheet sets the condition at the top node (highest $y$) and the **Tip** column sets it at the bottom node (lowest $y$).
 
-- **free** (default): the end rotates freely. At the head this is the standard assumption for a stabilizing pile with no structural connection at the top; at the tip it is the usual condition for a shaft the surrounding soil restrains.
-- **fixed**: zero rotation at that end. At the head this models a pile connected to a pile cap, a retaining wall, or another structure that prevents rotation; at the tip it models a shaft socketed into rock.
+**Head** — **free** (default): the head rotates freely, the standard assumption for a stabilizing pile with no structural connection at the top. **fixed**: zero rotation at the head, modeling a pile connected to a pile cap, a retaining wall, or another structure that prevents rotation. The head's translations always remain with the soil around it.
 
-A fixed end constrains the rotation degree of freedom at that node and nothing else — the translations remain with the boundary conditions and the soil elements around the pile.
+**Tip** — **free** (default): the tip is restrained only by what surrounds it — the soil, for a shaft that ends inside the mesh, or the boundary condition, for a shaft whose bottom node lands on the model boundary. **pinned**: the tip's translations are held and its rotation is free — a shaft bearing on a hard stratum that lies inside the mesh. **fixed**: translations and rotation are all held — a shaft socketed into rock.
 
-Whether a free tip needs restraining depends on where the pile ends. A shaft that continues well below the slip surface is restrained by the soil it passes through, and leaving the tip free is correct: the surrounding elements supply the rotational restraint the embedment provides. A shaft whose bottom node lands on a fixed boundary is a different case. Its translations are held there, but its rotation is not, so the tip behaves as a pin and the pile swings about it. Set **Tip** to fixed to model a shaft socketed into that base.
+Which tip condition is right depends on where the pile ends. A shaft that continues well below the slip surface is restrained by the soil it passes through, and leaving the tip free is correct. A shaft whose bottom node lands on a fixed boundary is already pinned by that boundary — its translations are held there but its rotation is not, so the pile swings about its toe — and `pinned` changes nothing; `fixed` is the socketed case. A shaft that ends on a hard stratum inside the mesh needs `pinned` to say so, since the soil elements below it would otherwise let the tip move.
 
 Neither column has any effect on LEM analysis.
 
@@ -281,7 +280,7 @@ Pile properties for FEM analysis are specified in the `piles` sheet of the input
 | N | $V_{\text{cap}}$ | Shear capacity per pile (force units). Blank = no limit. |
 | O | $M_{\text{cap}}$ | Moment capacity per pile (force × length units). Blank = no limit. |
 | P | Head | Pile head (top node) rotation: **free** (default) or **fixed** |
-| Q | Tip | Pile tip (bottom node) rotation: **free** (default) or **fixed** |
+| Q | Tip | Pile tip (bottom node) restraint: **free** (default), **pinned** (translations held) or **fixed** (translations and rotation held) |
 
 If $D$ is provided and $I$/$Area$ are omitted, a solid circular section is assumed:
 

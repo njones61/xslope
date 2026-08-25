@@ -188,8 +188,8 @@ the derivation from `D`. Hovering `S` says what each engine does with it:
 `Appl` is `active`, meaning the computed force enters the equilibrium equations
 as it stands; the alternative, `passive`, divides it by the factor of safety,
 and [LEM-12](lem12_piles.md#the-pile-rows) reads the whole row column by column.
-Both rows open with `Head` and `Tip` on `free`, which the spacing section below
-returns to. Click **Cancel**.
+Both rows open with `Head` and `Tip` on `free`, which a later section returns
+to. Click **Cancel**.
 
 ### The limit equilibrium answer
 
@@ -276,59 +276,7 @@ shaft is at its tip, which the rigid base holds in place while the soil above
 drags the shaft — the shear there is the reaction at that pinned toe, and the
 shaft is free to rotate about it.
 
-### What spacing does to each engine
-
-A designer adjusts the spacing once the diameter is set, and it is the input
-that separates the two engines most sharply. The sweep below runs both of them
-across a 4× range in spacing — 3, 6 and 12 ft, S/D 1.5 to 6 — with nothing
-changing but the `S` cell on the two rows. Ito & Matsui is applicable for S/D
-between about 2 and 8, so the 3 ft point sits below the band and raises the
-**Model checks** warning [LEM-12](lem12_piles.md#what-the-spacing-is-worth)
-discusses. Each limit equilibrium point is its own Spencer search, because
-spacing changes which surface governs.
-
-![Factor of safety against pile spacing, both engines on one axis](images/fem03_spacing_sweep.png){width=800}
-
-The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%.
-At 3 ft the search's own critical circle gives 2.193, where
-[LEM-12](lem12_piles.md#what-the-spacing-is-worth) reports 2.354 for the same
-spacing because its sweep holds the 6 ft circle fixed. The three strength
-reduction runs return the same bracket,
-[1.3594, 1.3672], and so the same answer, 1.363, with the same verdict at every
-trial.
-
-Run one point of it to see both. Open **Piles**, set `S` to `12` on both rows
-with `H` still blank, and **OK**. Search with Spencer again: **FS = 1.409**, and
-not on the deep circle the 6 ft spacing found. The 12 ft surface leaves the toe,
-reaches 10.1 ft below the ground at its deepest and exits 8.5 ft behind the
-crest; the 6 ft circle started 13.5 ft out in front of the toe, ran to 20.7 ft
-below the ground at its deepest — elevation −5.1, more than 5 ft below the toe —
-and exited 14.9 ft behind the crest. Widening the gap did not only lower the
-answer, it changed which surface governs, which [LEM-12](lem12_piles.md#what-the-spacing-is-worth) covers in full.
-
-The mesh is still good: a pile row enters the mesh only as a constraint line, so
-Studio throws the mesh away when a row's endpoints move or a row is added or
-removed, not when `S` or any other property on it changes. Switch to **FEM** and
-**Run → Run FEM…** with the same bracket: **FS = 1.363**, the same answer as at
-6 ft, on the same 3,180 nodes and 1,521 triangles.
-
-The flat line is not the model ignoring the spacing column. Over this sweep the
-smeared bending stiffness *EI*/S falls fourfold, and what the shafts carry moves
-with it. Each row below is read at that spacing's captured mechanism:
-
-| S (ft) | *EI*/S (lb·ft²) | Peak moment per unit width (lb·ft/ft) | Peak moment per shaft (lb·ft) | Fraction of M<sub>cap</sub> |
-|:---:|:---:|:---:|:---:|:---:|
-| 3 | 1.357 × 10<sup>8</sup> | 4,412 | 13,235 | 22% |
-| 6 | 6.786 × 10<sup>7</sup> | 4,412 | 26,470 | 44% |
-| 12 | 3.393 × 10<sup>7</sup> | 4,412 | 52,941 | 88% |
-
-The moment *per unit width of slope* does not move at all, which is the quantity
-the smear holds constant. The moment *per shaft* is that number times the
-spacing, so it quadruples, and at 12 ft each shaft is at 88% of its capacity.
-Every quantity a designer would check responds to spacing. The factor of safety
-does not.
-
-### What the flat line is measuring
+### What decides the finite element answer
 
 Four runs locate what is holding that answer at 1.363. Each changes one thing on
 both rows, and each is the same bracket on the same mesh, so the numbers are
@@ -385,19 +333,67 @@ Four elements stand above half that peak, all of them between x = 10.9 and 14.1
 at elevation 9.9 to 10.9. The mechanism has moved above the reinforcement
 instead of passing through it.
 
-Run the spacing sweep again with the tips fixed and it is flat too, at 1.793,
-1.793 and 1.785 for 3, 6 and 12 ft:
+Set `Tip` back to `free` on both rows, or reopen the file, before the next
+section.
 
-![The spacing sweep with the tip-fixed runs added](images/fem03_spacing_sweep_tips.png){width=800}
+### What spacing does to each engine
 
-This time the shafts are at their moment capacity at every spacing, the peak moment
-per unit width tracking M<sub>cap</sub> ÷ S exactly: 20,000, 10,000 and
-5,000 lb·ft/ft. Whichever end condition the rows are given, the factor of safety
+A designer adjusts the spacing once the diameter is set, and it is the input
+that separates the two engines most sharply. The sweep below runs both of them
+across a 4× range in spacing — 3, 6 and 12 ft, S/D 1.5 to 6 — with nothing
+changing but the `S` cell on the two rows. Ito & Matsui is applicable for S/D
+between about 2 and 8, so the 3 ft point sits below the band and raises the
+**Model checks** warning [LEM-12](lem12_piles.md#what-the-spacing-is-worth)
+discusses. Each limit equilibrium point is its own Spencer search, because
+spacing changes which surface governs.
+
+![Factor of safety against pile spacing: the limit equilibrium curve and the two strength reduction lines](images/fem03_spacing_sweep.png){width=800}
+
+The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%.
+At 3 ft the search's own critical circle gives 2.193, where
+[LEM-12](lem12_piles.md#what-the-spacing-is-worth) reports 2.354 for the same
+spacing because its sweep holds the 6 ft circle fixed. The three strength
+reduction runs return the same bracket,
+[1.3594, 1.3672], and so the same answer, 1.363, with the same verdict at every
+trial.
+
+The tip-fixed rows of the last section, swept the same way, are flat too, at
+1.793, 1.793 and 1.785 — the upper line. This time the shafts are at their
+moment capacity at every spacing, the peak moment per unit width tracking
+M<sub>cap</sub> ÷ S exactly: 20,000, 10,000 and 5,000 lb·ft/ft. Whichever end condition the rows are given, the factor of safety
 is decided by the mechanism the smeared wall forces the soil into, not by how
 much moment each shaft carries.
 
-Set `Tip` back to `free` on both rows, or reopen the file, before the next
-section.
+Run one point of it to see both. Open **Piles**, set `S` to `12` on both rows
+with `H` still blank, and **OK**. Search with Spencer again: **FS = 1.409**, and
+not on the deep circle the 6 ft spacing found. The 12 ft surface leaves the toe,
+reaches 10.1 ft below the ground at its deepest and exits 8.5 ft behind the
+crest; the 6 ft circle started 13.5 ft out in front of the toe, ran to 20.7 ft
+below the ground at its deepest — elevation −5.1, more than 5 ft below the toe —
+and exited 14.9 ft behind the crest. Widening the gap did not only lower the
+answer, it changed which surface governs, which [LEM-12](lem12_piles.md#what-the-spacing-is-worth) covers in full.
+
+The mesh is still good: a pile row enters the mesh only as a constraint line, so
+Studio throws the mesh away when a row's endpoints move or a row is added or
+removed, not when `S` or any other property on it changes. Switch to **FEM** and
+**Run → Run FEM…** with the same bracket: **FS = 1.363**, the same answer as at
+6 ft, on the same 3,180 nodes and 1,521 triangles.
+
+The pinned-tip line is not the model ignoring the spacing column. Over this sweep the
+smeared bending stiffness *EI*/S falls fourfold, and what the shafts carry moves
+with it. Each row below is read at that spacing's captured mechanism:
+
+| S (ft) | *EI*/S (lb·ft²) | Peak moment per unit width (lb·ft/ft) | Peak moment per shaft (lb·ft) | Fraction of M<sub>cap</sub> |
+|:---:|:---:|:---:|:---:|:---:|
+| 3 | 1.357 × 10<sup>8</sup> | 4,412 | 13,235 | 22% |
+| 6 | 6.786 × 10<sup>7</sup> | 4,412 | 26,470 | 44% |
+| 12 | 3.393 × 10<sup>7</sup> | 4,412 | 52,941 | 88% |
+
+The moment *per unit width of slope* does not move at all, which is the quantity
+the smear holds constant. The moment *per shaft* is that number times the
+spacing, so it quadruples, and at 12 ft each shaft is at 88% of its capacity.
+Every quantity a designer would check responds to spacing. The factor of safety
+does not.
 
 ### Which answer is right
 

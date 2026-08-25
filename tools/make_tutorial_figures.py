@@ -4960,12 +4960,9 @@ def fem03_spacing():
 
 
 def _fem03_spacing_figure(lem, fixed, free, _u):
-    """The sweep on one axis, drawn twice for the page's order: first the
-    limit equilibrium curve against the strength-reduction line with the tips
-    free (``fem03_spacing_sweep.png``, the figure the spacing section opens
-    on), then the same with the tip-fixed line added
-    (``fem03_spacing_sweep_tips.png``), for the section that runs the tips
-    fixed. Each point is labeled with its own answer.
+    """The sweep on one axis: the limit equilibrium curve and the two
+    strength-reduction lines (tips pinned by the base, tips fixed), each point
+    labeled with its own answer.
 
     The labels sit above the limit equilibrium curve and below both flat lines,
     which is what keeps the 6 ft column readable: the limit equilibrium point and
@@ -5004,8 +5001,7 @@ def _fem03_spacing_figure(lem, fixed, free, _u):
         ax.legend(loc="upper right", frameon=False, fontsize=9)
         fig.tight_layout()
 
-    capture("fem03_spacing_sweep.png", lambda: _draw(with_fixed=False))
-    capture("fem03_spacing_sweep_tips.png", lambda: _draw(with_fixed=True))
+    capture("fem03_spacing_sweep.png", _draw)
 
 
 def fem03_wall():

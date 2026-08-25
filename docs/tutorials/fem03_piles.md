@@ -313,14 +313,17 @@ entered above. Each row's bottom node lands on that fixed base. Its
 translations are held there, but its rotation is not, so the tip is a pin and
 the shaft swings about it: the moment falls to zero at both ends, and at the
 captured mechanism the shafts stand at 44% of their moment capacity. A drilled
-shaft bearing on rock behaves that way. One socketed into the rock does not, and
-`Tip` is the cell that says which it is. The cell offers three settings: `free`,
+shaft that stops at the top of the rock and bears on it behaves that way. One
+that is drilled or driven some distance *into* the rock — a rock socket, in
+which the rock grips the shaft's lower length and holds it against rotation as
+well as translation — does not, and `Tip` is the cell that says which it is.
+The cell offers three settings: `free`,
 the tip restrained only by what surrounds it; `pinned`, its translations held
 and its rotation free, for a shaft bearing on a hard stratum inside the mesh;
-and `fixed`, translations and rotation held, the socket. On this model the tip
+and `fixed`, translations and rotation held, the socketed shaft. On this model the tip
 node sits on the base boundary, which already holds its translations, so `free`
 and `pinned` give the same answer. Setting `fixed` is the only setting that
-changes anything, and it is the one that models the socket.
+changes anything, and it is the one that models the socketed shaft.
 
 Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
 survives a fixity change, as it survived the spacing change. Run the same
@@ -720,8 +723,8 @@ This tutorial covered:
   passing through them.
 - Why the two engines disagreed on the pile rows: the limit equilibrium force
   assumes each shaft develops its moment capacity, and with both ends free to
-  rotate the beam model computes that it does not. Socket the tips and the two
-  answers close to within 3%.
+  rotate the beam model computes that it does not. Fix the tips, as a rock
+  socket would, and the two answers close to within 3%.
 - What spacing does to each engine: a 36% swing in the limit equilibrium answer
   and a change in which surface governs, against a strength reduction answer
   that does not move at either tip condition, even though the moment per shaft

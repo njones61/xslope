@@ -176,11 +176,16 @@ Both checks are applied independently at each iteration. An element can yield in
 
 ## Head and Tip Fixity
 
-Each end of a pile carries its own boundary condition. The **Head** column in the `piles` sheet sets the condition at the top node (highest $y$) and the **Tip** column sets it at the bottom node (lowest $y$).
+Each end of a pile carries its own boundary condition. The **Head** column in the `piles` sheet sets the condition at the top node (highest $y$) and the **Tip** column sets it at the bottom node (lowest $y$). An end has two things that can be held, its translation and its rotation, so each column offers the same four settings, with the same meaning at either end:
 
-**Head** — **free** (default): the head rotates freely, the standard assumption for a stabilizing pile with no structural connection at the top. **fixed**: zero rotation at the head, modeling a pile connected to a pile cap, a retaining wall, or another structure that prevents rotation. The head's translations always remain with the soil around it.
+| Setting | Translation | Rotation | At the head | At the tip |
+|---|---|---|---|---|
+| **free** (default) | free | free | no structural connection at the top | floating in the soil, or resting on the model boundary |
+| **pinned** | held | free | tie-rods or anchors holding the head in place | bearing on a hard stratum inside the mesh |
+| **unrotated** | free | held | a cap beam tying the heads together | rarely meaningful; offered so the two lists match |
+| **fixed** | held | held | cap beam and anchors | socketed into rock |
 
-**Tip** — **free** (default): the tip is restrained only by what surrounds it — the soil, for a shaft that ends inside the mesh, or the boundary condition, for a shaft whose bottom node lands on the model boundary. **pinned**: the tip's translations are held and its rotation is free — a shaft bearing on a hard stratum that lies inside the mesh. **fixed**: translations and rotation are all held — a shaft socketed into rock.
+These are the four pile head conditions of Cai & Ugai (2000), by their names. A held rotation constrains the rotation degree of freedom the pile node carries; held translations constrain its two displacement degrees of freedom; a free end leaves all three to the surrounding soil and the boundary conditions.
 
 Which tip condition is right depends on where the pile ends. A shaft that continues well below the slip surface is restrained by the soil it passes through, and leaving the tip free is correct. A shaft whose bottom node lands on a fixed boundary is already pinned by that boundary — its translations are held there but its rotation is not, so the pile swings about its toe — and `pinned` changes nothing; `fixed` is the socketed case. A shaft that ends on a hard stratum inside the mesh needs `pinned` to say so, since the soil elements below it would otherwise let the tip move.
 
@@ -279,8 +284,8 @@ Pile properties for FEM analysis are specified in the `piles` sheet of the input
 | M | $Area$ | Cross-sectional area of pile cross-section |
 | N | $V_{\text{cap}}$ | Shear capacity per pile (force units). Blank = no limit. |
 | O | $M_{\text{cap}}$ | Moment capacity per pile (force × length units). Blank = no limit. |
-| P | Head | Pile head (top node) rotation: **free** (default) or **fixed** |
-| Q | Tip | Pile tip (bottom node) restraint: **free** (default), **pinned** (translations held) or **fixed** (translations and rotation held) |
+| P | Head | Pile head (top node) restraint: **free** (default), **pinned**, **unrotated** or **fixed** |
+| Q | Tip | Pile tip (bottom node) restraint: **free** (default), **pinned**, **unrotated** or **fixed** — the same four as Head |
 
 If $D$ is provided and $I$/$Area$ are omitted, a solid circular section is assumed:
 

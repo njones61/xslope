@@ -5849,14 +5849,16 @@ PILES_HELP = {
             "unit width.",
     "appl": "Force application — Active: H is an allowable force, not divided by "
            "FS (default). Passive: H is an ultimate capacity divided by FS. LEM only.",
-    "head_fixity": "Rotation restraint at the top of the pile: free (default; a "
-                   "stabilizing pile with no structural connection) or fixed (a cap "
-                   "or wall that prevents rotation). FEM only.",
+    "head_fixity": "Restraint at the top of the pile: free (default; no connection "
+                   "at the head), pinned (translation held, rotation free — tie-rods "
+                   "or anchors), unrotated (rotation held, translation free — a cap "
+                   "beam tying the heads), or fixed (both held — cap beam and "
+                   "anchors). FEM only.",
     "tip_fixity": "Restraint at the bottom of the pile: free (default; the tip "
                   "moves with the soil around it, or sits on the model boundary), "
                   "pinned (translation held, rotation free — bearing on a hard "
-                  "stratum inside the mesh), or fixed (translation and rotation "
-                  "held — socketed into rock). FEM only.",
+                  "stratum inside the mesh), unrotated (rotation held, translation "
+                  "free), or fixed (both held — socketed into rock). FEM only.",
 }
 
 
@@ -5891,9 +5893,9 @@ class PilesEditor(CategoryEditor):
         Field("E", "E", "optfloat", usage="fem", tooltip=PILES_HELP["E"]),
         Field("I", "I", "optfloat", usage="fem", tooltip=PILES_HELP["I"]),
         Field("area", "Area", "optfloat", usage="fem", tooltip=PILES_HELP["area"]),
-        Field("head_fixity", "Head", "choice", choices=["free", "fixed"], usage="fem",
+        Field("head_fixity", "Head", "choice", choices=["free", "pinned", "unrotated", "fixed"], usage="fem",
               tooltip=PILES_HELP["head_fixity"]),
-        Field("tip_fixity", "Tip", "choice", choices=["free", "pinned", "fixed"], usage="fem",
+        Field("tip_fixity", "Tip", "choice", choices=["free", "pinned", "unrotated", "fixed"], usage="fem",
               tooltip=PILES_HELP["tip_fixity"]),
     ]
 

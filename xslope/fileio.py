@@ -2488,14 +2488,15 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 M_cap = float(row['mcap']) if pd.notna(row.get('mcap')) else None
                 head_fixity = (str(row[_head_col]).strip().lower()
                                if pd.notna(row.get(_head_col)) else 'free')
-                if head_fixity not in ('free', 'fixed'):
-                    raise ValueError(f"{_head_col.capitalize()} must be 'free' or "
-                                     f"'fixed', got '{head_fixity}'")
+                if head_fixity not in ('free', 'pinned', 'unrotated', 'fixed'):
+                    raise ValueError(f"{_head_col.capitalize()} must be 'free', "
+                                     f"'pinned', 'unrotated' or 'fixed', got "
+                                     f"'{head_fixity}'")
                 tip_fixity = (str(row['tip']).strip().lower()
                               if pd.notna(row.get('tip')) else 'free')
-                if tip_fixity not in ('free', 'pinned', 'fixed'):
-                    raise ValueError(f"Tip must be 'free', 'pinned' or 'fixed', "
-                                     f"got '{tip_fixity}'")
+                if tip_fixity not in ('free', 'pinned', 'unrotated', 'fixed'):
+                    raise ValueError(f"Tip must be 'free', 'pinned', 'unrotated' or "
+                                     f"'fixed', got '{tip_fixity}'")
                 # Force application (v12, LEM only): Active = allowable force, not
                 # divided by FS (default, pre-v12 behavior); Passive = ultimate
                 # capacity divided by FS.

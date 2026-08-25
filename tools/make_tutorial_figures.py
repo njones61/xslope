@@ -4898,14 +4898,21 @@ def fem03_tip():
     from xslope.plot_fem import plot_fem_results
 
     E0 = load_slope_data(FEM03_PILES)["pile_lines"][0]["E"]
+    from xslope import fem_details
+    from xslope.plot_fem_details import plot_pile_detail
+
+    #: (label, model change, shear-strain figure, upper-row profile figure)
     cases = [
-        ("pile E ×100", dict(pile_E=E0 * 100.0), None),
-        ("pile E ÷100", dict(pile_E=E0 / 100.0), None),
-        ("Vcap and Mcap cleared", dict(caps=False), None),
-        ("heads fixed, tips free", dict(head="fixed"), None),
-        ("tips fixed", dict(tip="fixed"), "fem03_fem_shear_piles_fixed.png"),
+        ("tips pinned (as entered)", dict(tip="pinned"), None,
+         "fem03_piles_profile_pinned.png"),
+        ("pile E ×100", dict(pile_E=E0 * 100.0), None, None),
+        ("pile E ÷100", dict(pile_E=E0 / 100.0), None, None),
+        ("Vcap and Mcap cleared", dict(caps=False), None, None),
+        ("heads fixed, tips pinned", dict(head="fixed"), None, None),
+        ("tips fixed", dict(tip="fixed"), "fem03_fem_shear_piles_fixed.png",
+         "fem03_piles_profile_fixed.png"),
     ]
-    for label, kwargs, figure in cases:
+    for label, kwargs, figure, prof_fig in cases:
         sd = _fem03_piles_model(**kwargs)
         mesh = _fem03_mesh(sd)
         fem_data, result, solution, seconds = _fem03_solve(sd, mesh)
@@ -4914,6 +4921,13 @@ def fem03_tip():
                     plot_type="shear_strain", fs=result["FS"],
                     failure_solution=solution.get("failure_solution"),
                     field_state="failure")
+        if prof_fig:
+            # The upper row's 1D Details, at failure — the field the panel opens
+            # on, and the one the page's 44% / at-capacity readings come from.
+            prof = fem_details.pile_profile(
+                fem_data, solution, 1, slope_data=sd, field_state="failure",
+                failure_solution=solution.get("failure_solution"))
+            capture(prof_fig, plot_pile_detail, prof)
         _fem03_report(label, sd, mesh, fem_data, result, solution, seconds)
         _fem03_profiles(sd, fem_data, solution)
 

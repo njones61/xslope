@@ -2790,7 +2790,7 @@ Slide within 0.8% and with the originating paper within 2.4%.
 
 **Input files:** [vp106a_fem.xlsx](files/rocscience/vp106a_fem.xlsx) (no pile) ·
 [vp106c_fem.xlsx](files/rocscience/vp106c_fem.xlsx) (D1/D = 3, free head) ·
-[vp106c_fem_fix.xlsx](files/rocscience/vp106c_fem_fix.xlsx) (D1/D = 3, head rotation restrained)
+[vp106c_fem_fix.xlsx](files/rocscience/vp106c_fem_fix.xlsx) (D1/D = 3, unrotated head — rotation held, translation free)
 
 Cai & Ugai analysed this slope twice. The limit-equilibrium side is [VP106](#vp106) above. The other side is
 a **three-dimensional** shear-strength-reduction finite-element model that meshes the individual piles and
@@ -2809,14 +2809,14 @@ model, and the differences below are the measurement of what separates them rath
 |---|---|---|
 | No pile | 1.136 | 1.14 (−0.4%) |
 | Pile, free head | 1.453 | 1.36 (+6.8%) |
-| Pile, head rotation restrained | 1.570 | 1.45 (+8.3%) |
+| Pile, unrotated head | 1.570 | 1.45 (+8.3%) |
 
 Without a pile the two agree to −0.4%: the same section, the same soil, the same strength-reduction
 procedure, and nothing three-dimensional in either model. That row is what makes the other two readable —
 what they carry is the pile, not the slope.
 
 With the pile in place the two-dimensional model reads high, by +6.8% with a free head and +8.3% with the
-head rotation restrained. Read as the credit each model gives the pile row, XSLOPE multiplies its own
+the head unrotated. Read as the credit each model gives the pile row, XSLOPE multiplies its own
 unreinforced factor of safety by 1.279 and Cai & Ugai's model multiplies theirs by 1.193. The direction is
 the one the idealization predicts. In three dimensions the soil at three diameters' spacing arches onto the
 piles, some of it moves between them, and it can slip along each pile's surface; in a plane-strain smear the

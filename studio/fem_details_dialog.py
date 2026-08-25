@@ -168,7 +168,7 @@ class FemDetailsDialog(QDialog):
             "At failure — the member forces in the developed collapse mechanism "
             "(default).\n"
             "Last converged — the sub-critical converged solution instead.\n"
-            "The capacity envelopes and the shear band crossing marks are the "
+            "The capacity envelopes and the marks are the "
             "same in both.")
         if self._failure_solution is None:
             self.field_state.setCurrentIndex(self.field_state.findData("converged"))

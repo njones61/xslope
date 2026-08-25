@@ -4459,6 +4459,12 @@ def fem02_pullout_law():
     for tag, model in (("constant", start), ("law", law_start)):
         crit = _search(model)
         xs, ys = zip(*list(crit["failure_surface"].coords))
+        if tag == "law":
+            # The circle the law makes critical, beside the stated-length one
+            # the page drew first: the page says it daylights beyond the toe
+            # and clips line 1 near the face, and the reader should see it.
+            capture("fem02_lem_solution_law.png", plot_solution, model,
+                    crit["slices"], crit["failure_surface"], crit["solver_result"])
         print("   LEM %-9s %s FS %.4f on Xo %.4f Yo %.4f R %.4f · entry "
               "(%.3f, %.3f) exit (%.3f, %.3f) · ΣP %.0f %s"
               % (tag, FEM02_METHOD, crit["FS"], crit["Xo"], crit["Yo"],

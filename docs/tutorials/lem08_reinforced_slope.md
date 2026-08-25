@@ -377,8 +377,7 @@ However you built it, you now hold the same model:
 
 ![The finished model](images/lem08_inputs.png){width=1000}
 
-The six gray lines step up the face, each with a red tension point 4 ft in from
-either end — the points where its envelope reaches the full 800 lb/ft. The
+The six gray lines step up the face. The
 purple arrows are the crest surcharge, and the two dashed red arcs are the
 starting circles.
 
@@ -401,7 +400,10 @@ in gray and the critical circle in red:
 
 **FS = 1.587**, on a circle centered at (−5.13, 46.98) with a radius of 47.26.
 The solution plot draws that circle with the base stresses, the reinforcement
-lines it crosses (gray bars, tension points in red), and the line of thrust:
+lines it crosses (gray bars, with a red dot 4 ft in from each end where the
+line's capacity first reaches the full 800 lb/ft — the stretch between the dots
+carries `Tmax`, the stretches outside it are developing it), and the line of
+thrust:
 
 ![Spencer on the critical circle](images/lem08_solution.png){width=1000}
 

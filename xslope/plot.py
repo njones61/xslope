@@ -2990,7 +2990,7 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
 
 # ========== FOR PLOTTING INPUT DATA  =========
 
-def plot_reinforcement_lines(ax, slope_data, style=None):
+def plot_reinforcement_lines(ax, slope_data, style=None, solution=False):
     """
     Plots the reinforcement lines from slope_data.
     
@@ -3018,25 +3018,22 @@ def plot_reinforcement_lines(ax, slope_data, style=None):
                 linewidth=rfs.get('linewidth', 3), linestyle=rfs.get('linestyle', '-'),
                 alpha=rfs.get('alpha', 0.8), label='Reinforcement Line' if i == 0 else "")
         
-        # Add markers to show tension values. Under the constant-rate pullout
-        # law a line has a handful of points — the envelope's own breakpoints —
-        # and every one is worth a marker. The overburden-dependent law makes
-        # the envelope a curve, stored as a dense sampling, so the markers are
-        # thinned to about eight: enough to read the taper, not so many that
-        # they paint over the line they annotate.
-        step = max(1, (len(line) - 1) // 6)
-        for j, point in enumerate(line):
-            if j % step and j != len(line) - 1:
-                continue
-            tension = point.get('T', 0.0)
-            if tension > 0:
-                # Use smaller marker size proportional to tension (normalized)
-                max_tension = max(p.get('T', 0.0) for p in line)
-                marker_size = 10 + 15 * (tension / max_tension) if max_tension > 0 else 10
-                ax.scatter(point['X'], point['Y'], s=marker_size, 
-                          color='red', alpha=0.7, zorder=5,
-                          label='Tension Points' if not tension_points_plotted else "")
-                tension_points_plotted = True
+        # On a SOLUTION plot, two dots per line mark where the available
+        # tension first reaches its full value from each end -- the ends of the
+        # pullout ramps -- so the dots read like the Lp diagram: the stretch
+        # between them carries Tmax, the stretches outside it are developing
+        # it. An input plot draws none (Norm 2026-08-25: a dot at every stored
+        # tension point, thinned or not, meant nothing to a reader).
+        if solution and len(line) >= 2:
+            ts = [float(point.get('T', 0.0) or 0.0) for point in line]
+            t_max = max(ts)
+            if t_max > 0:
+                full = [k for k, t in enumerate(ts) if t >= 0.999 * t_max]
+                for k in (full[0], full[-1]):
+                    ax.scatter(line[k]['X'], line[k]['Y'], s=22, color='red',
+                               alpha=0.85, zorder=5,
+                               label='Development length ends' if not tension_points_plotted else "")
+                    tension_points_plotted = True
 
 
 def _line_load_tails(slope_data):
@@ -3951,7 +3948,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_dloads(ax, slope_data, style=style)
     plot_tcrack_surface(ax, slope_data, style=style)
     plot_tcrack_water_force(ax, slice_df, slope_data)
-    plot_reinforcement_lines(ax, slope_data, style=style)
+    plot_reinforcement_lines(ax, slope_data, style=style, solution=True)
     plot_piles(ax, slope_data, slice_df=slice_df, style=style, label_h=False)
     plot_line_loads(ax, slope_data, style=style)
     # Slice numbers go on last of all, once the frame and the layout are final —

@@ -8120,6 +8120,10 @@ def _band_marked(profiles):
     # A pile figure draws no mark (the owner's ruling: a pile's actions are set
     # by the soil moving past its whole length, and the mark said nothing the
     # shear-strain field does not), so only reinforcement members count here.
+    # No detail figure draws the mark any more (the owner's ruling, 2026-08-25:
+    # the shaded stretch was a threshold on a sampled field that no reader
+    # could recover from its legend), so no page carries the sentence.
+    return False
     profiles = [p for p in profiles if p.get("kind") != "pile"]
     return any(p.get("band_lo") is not None and p.get("band_hi") is not None
                for p in profiles)

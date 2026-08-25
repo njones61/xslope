@@ -341,12 +341,13 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     # The band's mark first, so everything else draws over it. It is where the
     # band crosses the line, read off a dense walk of it, so it is always a
     # stretch — one step of that walk at the narrowest.
-    lo, hi = profile.get("band_lo"), profile.get("band_hi")
-    banded = lo is not None and hi is not None
-    if banded:
-        for a in (ax, ax_b):
-            if a is not None:
-                a.axvspan(lo, hi, color=C_BAND, alpha=0.13, zorder=0, linewidth=0)
+    # The profile carries where a dense walk of the line found the soil's shear
+    # strain concentrated (band_lo / band_hi), but the figure does NOT draw it:
+    # the mark was a threshold on a sampled field (half the line's own peak), a
+    # rule no reader could recover from a legend that named a physical thing.
+    # The field figure shows where the mechanism crosses a layer; the profile
+    # shows what the layer carries (Norm 2026-08-25: drop it).
+    banded = False
 
     # Capacity envelope.
     if profile.get("env_s") is not None:
@@ -440,8 +441,6 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     entries.append((envelope, env_label))
     if residual is not None:
         entries.append((residual, "Residual capacity"))
-    if banded:
-        entries.append((_band_handle(), band_label(profile)))
     # Two columns past four entries: the panel is wide and shallow, and a legend
     # standing seven rows tall in it is a block the profile has to run around.
     ax.legend([h for h, _t in entries], [t for _h, t in entries],

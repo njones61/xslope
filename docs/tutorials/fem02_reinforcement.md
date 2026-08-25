@@ -100,10 +100,8 @@ feet, unit weights in pcf, and stresses, strengths and stiffnesses in psf.
 
 The Inputs plot shows the face band and the fill as two profile lines, the
 hatched maximum-depth line at elevation −10, the crest surcharge as purple
-arrows, and the six reinforcement lines as gray layers stepping up the face. Each
-layer carries two red **tension points**, 4 ft in from each end — the points where
-its capacity envelope first reaches the full 800 lb/ft. The two dashed red
-arcs are the starting circles the search begins from.
+arrows, and the six reinforcement lines as gray layers stepping up the face. The
+two dashed red arcs are the starting circles the search begins from.
 
 ---
 
@@ -649,8 +647,7 @@ the stated length allows 200 at both.
 
 The run puts line 2 at capacity from 7 to 15 ft — five interior elements at
 the full 800 lb/ft — and at the element out on the curve at 3 ft in, riding the
-law's 378 lb/ft. The shear band crosses it between **1.05 and 3.10 ft**, at the face,
-through that element. Under the stated lengths the same line's hardest-worked
+law's 378 lb/ft. Under the stated lengths the same line's hardest-worked
 point was an interior element at the full 800 lb/ft, 7 ft in. That is the engineering content of the
 comparison: a stated development length is depth-blind, so it under-rates a
 deeply buried tail and over-rates a shallow one, and reinforced slopes are
@@ -661,32 +658,40 @@ understates what changed:
 
 ![The mechanism at failure under the overburden law](images/fem02_shear_strain_law.png){width=1000}
 
-The main band is where it was. It runs from the toe up behind the buried tips
-to the crest, and its center is within half a foot of the stated-length run's.
-What has changed is at the two ends of every layer. At the buried ends the law
-allows the full 800 lb/ft right up to the tip, so the layers hold red to their
-ends and the band no longer cuts through the tails: under the stated lengths it
-crossed lines 2 to 6 between 16 and 18 ft in, through the weakening ramp, and
-under the law it slides just outside the tips, crossing lines 3, 4 and 6 within
-the last foot and line 5 not at all. At the face, where the law allows almost
-nothing, a second, thinner zone of strain follows the face through the outer
-few feet of the layers, and that is the crossing the line 2 profile reported at
-1 to 3 ft. The strain is also more concentrated: 56 elements above half the
-peak, against 117 under the stated lengths. The factor of safety reads one
-number for both fields; the fields say the mechanism moved from the tails to
-the face.
+The band is where it was — from the toe up behind the buried tips to the
+crest, its center within half a foot of the stated-length run's — and the
+strain in it is more concentrated, 56 elements above half the peak against 117.
+The story is in the colors on the layers. Under the stated lengths every layer
+faded from red to white over its last 4 ft, because the ramp allowed less and
+less toward the tip, and the band cut through those weakening tails. Under the
+law the layers are red to the tip: the buried ends develop the full 800 lb/ft
+within a foot, and the band passes just outside them. At the face the reverse
+happens — the outer few feet of every layer are blue and white, because under
+little cover the law allows almost nothing there, where the stated ramp allowed
+200, 400 and 600. The factor of safety reads one number for both fields; the
+layers say the weak end moved from the tail to the face.
 
 Both answers move, and the smaller move is the finite element one, 1.5%.
 Spencer, searched again on the same file, moves from 1.587 to **1.559**, 1.8%,
-and that move is not a loss of capacity. On the circle Spencer already drew,
-every one of the five crossings sits 8.4 ft or more from the nearer end, out
-where both laws allow the full 800 lb/ft, so that surface cannot tell them apart.
-What happens is that a *different* circle becomes critical: one that daylights
-8.4 ft beyond the toe, passes under line 1 and clips it 2 ft from the face, where
-the law offers 168 lb/ft against the stated ramp's 400. One sentence of caution on
+and that move is not a loss of capacity. On the critical circle from the
+stated-length search, every one of the five crossings sits 8.4 ft or more from
+the nearer end, out where both laws allow the full 800 lb/ft, so that surface
+cannot tell them apart.
+What happens is that the critical circle shifts slightly — it now daylights
+8.4 ft beyond the toe rather than at it, and clips line 1 two feet from the
+face, where the law offers 168 lb/ft against the stated ramp's 400. The red dots on the
+solution plot are where each line's available tension first reaches the full
+800 lb/ft from either end — the ends of its development lengths. Under the
+stated lengths they sat 4 ft in from both ends of every line; under the law they
+sit where the curved envelope reaches 800, about 4.4 ft in at the face and
+within a foot of the buried tip, so the stretch a line carries its full
+capacity over runs almost to its tail. One sentence of caution on
 σ′<sub>v</sub>: it is the weight of the soil column standing above the point and
 nothing else, so the 240 psf crest surcharge does not count toward pullout
 resistance — which is what FHWA directs for a live load.
+
+![Spencer's critical circle under the overburden law: daylighting beyond the toe and clipping line 1 near the face](images/fem02_lem_solution_law.png){width=1000}
+
 
 ---
 

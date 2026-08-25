@@ -17092,10 +17092,9 @@ def test_the_member_terms_are_defined_where_they_are_used():
         said = " ".join(_prose(_engine_report("fem", xlsx=xlsx)))
         # A pile page carries no band sentence: the pile figure draws no mark
         # (the owner's ruling), so the definition would describe nothing.
-        expected = ((("utilization", UTILIZATION_DEFINED[kind]),)
-                    if kind == "pile" else
-                    (("utilization", UTILIZATION_DEFINED[kind]),
-                     ("the band", BAND_DEFINED["converged"])))
+        # No page carries the band sentence: no figure draws the mark (the
+        # owner's ruling); only utilization is defined once.
+        expected = (("utilization", UTILIZATION_DEFINED[kind]),)
         for what, phrase in expected:
             n = said.count(phrase)
             if n != 1:
@@ -17114,13 +17113,12 @@ def test_the_member_terms_are_defined_where_they_are_used():
     else:
         at_failure = " ".join(_prose(_engine_report(
             "fem", bundle=ssrm["fem"], xlsx=FEM_REINF_XLSX)))
-        if at_failure.count(BAND_DEFINED["failure"]) != 1:
-            fails.append(
-                f"a run carrying a mechanism defines the failure band "
-                f"{at_failure.count(BAND_DEFINED['failure'])} times")
-        if BAND_DEFINED["converged"] in at_failure:
-            fails.append("a run carrying a mechanism calls its band the "
-                         "converged field's")
+        # No figure draws the band's mark any more (the owner's ruling), so no
+        # report defines it — of either kind.
+        for state in ("failure", "converged"):
+            if BAND_DEFINED[state] in at_failure:
+                fails.append(f"a run carrying a mechanism still defines the "
+                             f"{state} band, and no figure draws the mark")
         # A report of both kinds of run defines each band once: the term is two
         # terms, and the first must not silence the second.
         _gd, gravity = _fem_1d_bundle(FEM_REINF_XLSX)
@@ -17129,9 +17127,10 @@ def test_the_member_terms_are_defined_where_they_are_used():
             {"input_path": FEM_REINF_XLSX, "lem": False, "pd_figure": False})))
         for state in ("failure", "converged"):
             n = mixed.count(BAND_DEFINED[state])
-            if n != 1:
+            if n != 0:
                 fails.append(f"a report of a mechanism run and a gravity run "
-                             f"defines the {state} band {n} times")
+                             f"defines the {state} band {n} times; no figure "
+                             f"draws the mark")
 
     # The states, where the model declares a residual capacity for them to be
     # reachable — and the definition that they are the softening latch's, not
@@ -17163,8 +17162,7 @@ def test_the_member_terms_are_defined_where_they_are_used():
         fails.append(f"a report of two runs carries {len(subsections)} member "
                      f"subsection(s), so a repeated definition could not arise")
     twice = " ".join(_prose(two_runs))
-    for what, phrase in (("utilization", UTILIZATION_DEFINED["reinforcement"]),
-                         ("the band", BAND_DEFINED["converged"])):
+    for what, phrase in (("utilization", UTILIZATION_DEFINED["reinforcement"]),):
         n = twice.count(phrase)
         if n != 1:
             fails.append(f"a report of two runs defines {what} {n} times")

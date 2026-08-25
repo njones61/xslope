@@ -407,12 +407,10 @@ rest is drawn as the runs it really is, so a break in the thickened curve is whe
 legend calls the mark **At capacity**, or **Peak utilization** on a line that never reaches its envelope, and the
 title states the fraction of capacity the peak reaches.
 
-A band is shaded behind the profile where the viscoplastic shear strain concentrates along the line, called
-**Shear band crossing** in the legend: what a profile along one line can show is where the band crosses it. The
-extent is measured by walking the line itself and sampling the soil's shear strain field at every step, so the
-shading is where the band crosses and not which bar elements hold the crossing. A line the concentration does not
-reach carries no mark. Which field the band was read from, the mechanism an SSRM run captured or the shear strain
-in a section that is standing, is what the title says.
+The profile draws no mark for where the shear band crosses the line. The field figure is where a crossing is
+read — the band is drawn there as strain contours — and the profile is where what the line carries is read; a
+shaded stretch derived from a threshold on the sampled strain added a rule between the two that the legend
+could not explain.
 
 Every mark on the panel is named in the legend, and nothing is labeled over the curves: the panel is wide and
 shallow, and a label placed in it stands over the profile it describes.
@@ -425,8 +423,7 @@ soil displacement are the same number at every node. Load transfer is expressed 
 A **Field state** control at the foot of the panel selects which field the profiles are read from — the at-failure
 mechanism an SSRM run captured, or the last converged solution — and is the same switch, with the same default, as
 the one on the results view, so the two views can be set to the same instant of the analysis. It is dimmed for a
-run that captured no mechanism, where there is only one field to read, and neither the capacity envelope nor the
-shaded band moves with it. On a softening line the two fields can differ in kind: an element drops to its residual
+run that captured no mechanism, where there is only one field to read, and the capacity envelope does not move with it. On a softening line the two fields can differ in kind: an element drops to its residual
 only when an equilibrium state demands more than its capacity, so the last converged field may show no softened
 element at all while the at-failure field — which starts from the set the failed-edge trial shed to — shows the
 elements that gave way sitting on the residual line, marked *Softened*.

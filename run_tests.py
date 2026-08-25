@@ -4076,6 +4076,12 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='seep_field.missing', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_mats(sd, u='seep'),
          expect='carries no mesh'),
+    # The twin of piezo.no_consumer: a solved field is attached and no material
+    # reads it. Built on the LEM base (no mesh, so the node-count rule stays
+    # silent) with a field simply present.
+    dict(rule='seep_field.no_consumer', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_set(_pf_mats(sd, u='none'), seep_u=[0.0, 0.0, 0.0]),
+         expect='no material takes its pore pressure from it'),
     # The transient counterpart: the same u = seep materials, but the RUN states
     # that it will stage one instant of a transient march into the model before the
     # solver starts. The selection is the mutation — that fact is API-only, which is

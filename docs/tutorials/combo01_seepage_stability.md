@@ -183,13 +183,15 @@ prefers once the water is gone. The seepage analysis still ran, converged and
 reported its discharge; the stability run never read it, and every slice base
 took zero pore pressure.
 
-The model checks catch the omission in one direction only. A material set to
-`seep` on a model that carries no solved field is an **error** that blocks the
-run — *"takes pore pressure from a seepage solution (u = seep), but this model
-carries no pore-pressure field"* — so the sequence cannot be run backwards. A
-solved field that no material reads raises nothing, because a total stress
-analysis on a wet section is a legitimate thing to ask for. Setting the column is
-the modeler's decision, and the run below assumes it has been made.
+The model checks catch the omission both ways. A material set to `seep` on a
+model that carries no solved field is an **error** that blocks the run — *"takes
+pore pressure from a seepage solution (u = seep), but this model carries no
+pore-pressure field"* — so the sequence cannot be run backwards. A solved field
+that no material reads raises a **warning** — *"This model carries a solved
+seepage field, but no material takes its pore pressure from it"* — and the run
+is allowed, because a total stress analysis on a wet section is a legitimate
+thing to ask for. Setting the column is the modeler's decision; the warning
+makes sure it was a decision.
 
 ---
 

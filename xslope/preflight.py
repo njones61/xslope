@@ -2628,6 +2628,22 @@ def _seep_field_node_count(ctx):
     return out
 
 
+@rule("seep_field.no_consumer", WARNING, ("lem", "fem"),
+      "A solved seepage field no material reads produces no pore pressure.")
+def _seep_field_no_consumer(ctx):
+    # The twin of piezo.no_consumer: the field exists -- solved, or loaded from
+    # its sidecar -- and no material has u = seep, so the run computes with
+    # whatever the materials do say (none, piezo, ru) and the seepage solve is
+    # never read. Silent on a model with no field to read.
+    if ctx.sd.get("seep_u") is None or ctx.uses_seep_u:
+        return None
+    return ("This model carries a solved seepage field, but no material takes its "
+            "pore pressure from it: every material's u option is none, piezo or "
+            "ru, so the run never reads the seepage solution. Set u = seep on the "
+            "materials that should read it, or leave them as they are if the "
+            "seepage run was not meant to feed this analysis.")
+
+
 @rule("seep_field.missing", ERROR, ("lem",),
       "A material with u = seep needs a solved pore-pressure field.")
 def _seep_field_missing(ctx):

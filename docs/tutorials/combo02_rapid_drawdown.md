@@ -813,13 +813,21 @@ months after the drawdown.
 pressures instead of the re-equilibrated ones, still at drained strength, moves
 1.311 to 1.035. Nothing about the strengths differs between those two runs.
 
-**The undrained strength costs 0.12 — or 0.02.** On the re-equilibrated field
-it moves 1.311 to 1.195; on the day-50 field it moves 1.035 to only 1.016. The
-same envelope, and six times the effect on one field as on the other, because
-the retained pore pressure has already cut the effective stress the *drained*
-strength is computed from, bringing the two strengths close together. Where the
-water is decides how much the strength choice changes, which is why the three
-sources cannot be compared without saying which field each was read on.
+**The undrained strength costs 0.12 on one field and 0.02 on the other.** A
+drawdown hurts a clay core in two ways. The core keeps the pore pressure the full
+reservoir put into it — the *retained* pressure — and, being contractive, it
+generates more pore pressure when it is sheared without draining — the
+*shear-induced* pressure. The undrained envelope stands in for both. On the
+re-equilibrated field the pore pressures carry neither, so the envelope supplies
+both and the answer moves 1.311 to 1.195. On the day-50 transient field the
+retained pressure is already in the pore pressures, so the envelope adds only the
+shear-induced part, and the answer moves 1.035 to 1.016. On this core that part is
+small — its undrained strength sits close to its drained strength at these
+stresses, which is the same fact the [flip section](#the-governing-stage-flip)
+below measures; a more contractive core would show a larger step even on the
+transient field. Where the water is read decides how much the strength choice
+changes, which is why the three sources cannot be compared without saying which
+field each was read on.
 
 ---
 

@@ -54,10 +54,11 @@ SEEP-3's completed dam with a strength band on its materials table, a starting
 circle on the upstream face and a search window. It carries no mesh and no
 solution, so every run below is made from scratch
 
-**Part 2 model** — [xslope_johnson_rapid.xlsx](files/xslope_johnson_rapid.xlsx),
+**Part 2 model** — [xslope_johnson_fs_time.xlsx](files/xslope_johnson_fs_time.xlsx),
 COMBO-2's completed Johnson Reservoir dam: an undrained envelope on the core,
-`u = seep` on all three zones, the pool schedule and both stage times. It carries
-no mesh and no solution either
+`u = seep` on all three zones, the pool schedule and both stage times. This copy
+ships meshed and marched, so it opens with the twelve pore-pressure fields Part 2
+sweeps already on it; [COMBO-2](combo02_rapid_drawdown.md) builds both
 </div>
 </div>
 
@@ -573,11 +574,16 @@ kind of curve on the same twelve frames so the two can be set side by side.
 
 ### The model, and what Part 2 reads off it
 
-The file is COMBO-2's completed workbook, so nothing here builds it. Download
-[xslope_johnson_rapid.xlsx](files/xslope_johnson_rapid.xlsx) and open it with
-**File → Open…**, leaving the toolbar's mode strip on **LEM**.
+The march the sweep reads is the one COMBO-2 already solved, so Part 2 opens it
+rather than producing it again. Download
+[xslope_johnson_fs_time.xlsx](files/xslope_johnson_fs_time.xlsx) and open it with
+**File → Open…**, leaving the toolbar's mode strip on **LEM**. The mesh and the
+march travel with it — both are stored beside the workbook and Studio reads them
+on open — so the dam arrives meshed and marched, and the Log names each result as
+it is restored. In **LEM** the inputs view draws that mesh behind the zones,
+which the workbook on its own does not carry.
 
-![The Johnson Reservoir dam as the completed workbook carries it](images/combo03_rapid_inputs.png){width=1000}
+![The Johnson Reservoir dam as the shipped file opens, the mesh behind it](images/combo03_rapid_inputs.png){width=1000}
 
 The section is 750 ft long: a 100 ft foundation on rock at elevation 0 and an
 80 ft embankment on it, a sand **shell** on both faces and a compacted-clay
@@ -620,33 +626,27 @@ Every point of the curve below reads its consolidation stresses at stage 1, and
 stage 1 stays at t = 0 for the whole sweep. What moves from point to point is
 stage 2.
 
-### Building the mesh and marching the pool
+### The mesh and the march it carries
 
-Every pore pressure below comes from one transient solve, and that solve needs a
-mesh. Click **Run → Build Mesh…** and set **Element type** to **Linear triangles
-(tri3)**. Leave **Auto-size from geometry** ticked at **100** size divisions,
-which makes the target element size 750/100 = 7.5 ft. Click **Build**: **2,080
-nodes and 3,923 triangles**, the mesh
-[COMBO-2 builds](combo02_rapid_drawdown.md#meshing-and-both-solves) and every
-number in this part is computed on.
+The schedule states what the reservoir does; the saved frames hold what the dam
+did about it. Still in **Seepage**, click the **Seep · Transient** tab. The play
+bar steps through **twelve** instants — t = 0, 5, 35, 50, 80, 150, 200, 300, 400,
+600, 800 and 1000 — and every pore pressure the runs below read comes from one of
+them.
 
-Click **Run → Run Seep…** and set **Run type** to **Transient
-(time-dependent)**. **Convergence tol** and **Max iterations** gray out — they
-belong to the steady solve, and the march sets its own step size from how fast
-the field is moving. Click **Run**.
-
-This is the long run of the part; every stability run after it is far quicker.
-The march solves its initial condition first, at full pool, and then prints a
-line per saved frame, ending on **twelve frames** at t = 0, 5, 35, 50, 80, 150,
-200, 300, 400, 600, 800 and 1000.
-[COMBO-2](combo02_rapid_drawdown.md#marching-it) reads that log and the two
-frames the drawdown names in it.
+Those fields were solved on **2,080 nodes and 3,923 triangles**: linear triangles
+auto-sized at 100 divisions across the 750 ft section, which puts the target
+element size at 750/100 = 7.5 ft.
+[COMBO-2 builds that mesh](combo02_rapid_drawdown.md#meshing-and-both-solves) with
+**Run → Build Mesh…** and
+[marches the pool on it](combo02_rapid_drawdown.md#marching-it) with
+**Run → Run Seep…**, a run of several minutes on this dam. The file downloaded
+above arrives past both, so nothing below waits on a seepage solve.
 
 ### Running the rapid drawdown sweep
 
-The march has left twelve pore-pressure fields on the file, and the sweep asks
-the rapid drawdown question of each. Switch back to **LEM** (`Ctrl+1`) and click
-**Run → Parametric…**
+Those twelve fields are what the sweep questions, one at a time. Switch back to
+**LEM** (`Ctrl+1`) and click **Run → Parametric…**
 
 ![The Parametric dialog with the Rapid drawdown box ticked](images/combo03_rapid_parametric.png)
 
@@ -669,18 +669,12 @@ field changes, so there is nothing left for the toggle to decide: every point is
 searched from the file's starting circle at (275, 235).
 
 The note under the two boxes rewrites itself to match, and the **Model checks**
-panel carries two warnings. One repeats COMBO-2's — two of the three materials
-carry no $d$ / $\psi$ and keep their drained strength through the drawdown. The
-other is about the second boundary set, which the completed file still holds:
-
-> Boundary set 2 carries 2 specified head(s) and 0 specified flux(es), but this
-> rapid drawdown reads BOTH its stages from the transient march […] Set 2 is
-> ignored and editing it changes nothing.
-
-Nothing below is affected by it. A transient run solves boundary set 1 only, and
-both stages come out of that march;
-[COMBO-2 clears set 2](combo02_rapid_drawdown.md#clearing-boundary-set-2) at this
-point in its own build, which silences the warning without moving a number.
+panel carries one warning, which repeats COMBO-2's: two of the three materials
+carry no $d$ / $\psi$ and keep their drained strength through the drawdown.
+Boundary set 2 raises nothing here, because
+[COMBO-2 clears it](combo02_rapid_drawdown.md#clearing-boundary-set-2) before its
+own march and this file arrives without it. A transient run solves boundary set 1
+only, and both stages come out of that march.
 
 Click **Run**. Eleven of the twelve instants are drawdowns and each is searched
 in full, so the Log fills slowly; the table lands when the last search finishes:

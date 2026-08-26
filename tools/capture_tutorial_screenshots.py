@@ -3110,30 +3110,41 @@ def combo03_fs_time_result():
     return out
 
 
-#: The instants COMBO-2's march saves, which the Parametric dialog offers as a
-#: checklist. Named here rather than marched for: the frames list reads the times
-#: off the solution and nothing else, and a multi-minute transient run for one
-#: dialog shot is time the shot does not need. The producer in
-#: ``make_tutorial_figures.py`` runs that march for real and prints the same twelve.
+#: Part 2's shipped model. It carries the mesh and the march as companions, so
+#: loading it is the whole of the state the reader opens the dialog in, and the
+#: loader attaches the mesh without a build.
+COMBO03R_FILE = os.path.join(REPO_ROOT,
+                             "docs/tutorials/files/xslope_johnson_fs_time.xlsx")
+
+#: The instants the shipped march saves, which the Parametric dialog offers as a
+#: checklist. Named here rather than read off the march: the frames list reads the
+#: times off the solution and nothing else, and importing 12 frames of nodal head
+#: for one dialog shot is work the shot does not need. The producer in
+#: ``make_tutorial_figures.py`` reads the real march and prints the same twelve.
 COMBO03R_TIMES = (0.0, 5.0, 35.0, 50.0, 80.0, 150.0, 200.0, 300.0, 400.0, 600.0,
                   800.0, 1000.0)
 
 
 def combo03_rapid_parametric():
     """Run → Parametric… in Factor-of-safety-vs-time mode with **Rapid
-    drawdown at each time** ticked, on COMBO-2's completed dam.
+    drawdown at each time** ticked, on Part 2's shipped model.
 
     The checkbox is Part 2's whole control: it sits under the frames list because
     it changes what a ticked instant means — stage 2 of a fall that began at the
     march's initial pool rather than a state on its own — and ticking it holds
     **Re-search the critical surface at each step** on and greys it, which the shot
     has to show along with the note the dialog rewrites underneath.
+
+    Shot on the shipped model rather than on COMBO-2's, because the Model checks
+    panel beside the controls is part of what the page reads: that file carries no
+    boundary set 2, so the drawdown's one remaining warning is the free-draining
+    one.
     """
     from studio.dialogs import SensitivityDialog
 
     dlg = SensitivityDialog(defaults={"method": COMBO03_METHOD,
                                       "num_slices": COMBO03_SLICES},
-                            slope_data=_combo02_solved(), app_mode="lem",
+                            slope_data=_load(COMBO03R_FILE), app_mode="lem",
                             transient={"times": list(COMBO03R_TIMES)})
     dlg.mode.setCurrentIndex(dlg.mode.findData("fs_vs_time"))
     dlg.rapid.setChecked(True)

@@ -6640,18 +6640,18 @@ def combo03_plots():
 #
 #  Same march COMBO-2 Part 3 solves, on COMBO-2's own mesh and schedule, so the
 #  drawdown curve passes through COMBO-2's transient-route answer at the stage-2
-#  time. Two sweeps are run on that one march — every instant as a three-stage
-#  drawdown, and every instant as an ordinary single-stage analysis — because the
-#  page's whole reading is the distance between the two curves.
+#  time. It is read off the companions the model ships rather than solved again.
+#  Two sweeps are run on that one march — every instant as a three-stage drawdown,
+#  and every instant as an ordinary single-stage analysis — because the page's
+#  whole reading is the distance between the two curves.
 # --------------------------------------------------------------------------- #
-#: The completed COMBO-2 workbook: materials on ``seep``, d / psi on the core,
-#: the pool schedule and both stage times.
+#: Part 2's shipped model: COMBO-2's completed dam without boundary set 2, with the
+#: mesh and the march beside it as ``_mesh.json`` / ``_tseep.csv`` /
+#: ``_tseep_meta.json``. ``tools/build_johnson_rapid.py`` writes the whole set. The
+#: figures read those companions rather than meshing and marching again, so what the
+#: page shows is the state the reader's copy opens in.
 COMBO03R = os.path.join(REPO_ROOT,
-                        "docs/tutorials/files/xslope_johnson_rapid.xlsx")
-#: Build Mesh, at COMBO-2 Part 2's settings: linear triangles, auto-sizing on,
-#: 100 divisions across the 750 ft section.
-COMBO03R_ELEMENT = "tri3"
-COMBO03R_DIVISIONS = 100
+                        "docs/tutorials/files/xslope_johnson_fs_time.xlsx")
 COMBO03R_METHOD = "spencer"
 COMBO03R_SLICES = 40
 
@@ -6719,16 +6719,13 @@ def combo03_rapid():
     curve on the same march.
 
     Printed rather than drawn: the undrained envelope and the stage times the file
-    carries, the mesh, the march's saved frames, and both sweeps' own tables — the
+    carries, the mesh and the march it ships, and both sweeps' own tables — the
     text ``fs_vs_time`` prints, which is what the page quotes.
     """
     import time as _time
 
-    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
-                             get_material_polygons)
     from xslope.plot import plot_fs_vs_time
-    from xslope.seep import (build_seep_data, build_tseep_data,
-                             run_transient_seepage)
+    from xslope.seep import build_seep_data, import_transient_solution
     from xslope.sensitivity import fs_vs_time
 
     model = load_slope_data(COMBO03R)
@@ -6748,29 +6745,25 @@ def combo03_rapid():
     print("   circle      center (%g, %g) · R %g %s"
           % (_c["Xo"], _c["Yo"], _c["R"], _u["length"]))
 
+    # The mesh rides behind the model, because a file opened with a companion mesh
+    # beside it draws that way in Studio: the LEM inputs view leaves show_mesh to
+    # the mode, and every engine mode draws it.
     capture("combo03_rapid_inputs.png", plot_inputs, model, mode="lem",
-            title="Stability Model Inputs", frame="content", show_mesh=False)
+            title="Stability Model Inputs", frame="content")
 
-    # ---- the mesh and the march, at COMBO-2's settings ---------------------- #
-    xs = [x for x, _ in model["ground_surface"].coords]
-    size = (max(xs) - min(xs)) / COMBO03R_DIVISIONS
-    with contextlib.redirect_stdout(io.StringIO()):
-        mesh = build_mesh_from_polygons(get_material_polygons(model), size,
-                                        COMBO03R_ELEMENT,
-                                        size_regions=extract_size_regions(model))
-    model["mesh"] = mesh
-    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g %s"
-          % (len(mesh["nodes"]), len(mesh["elements"]), COMBO03R_ELEMENT,
-             COMBO03R_DIVISIONS, size, _u["length"]))
+    # ---- the mesh and the march the file ships ------------------------------ #
+    mesh = model["mesh"]                       # {stem}_mesh.json, read by the loader
+    print("   mesh        %d nodes · %d elements (from the shipped %s_mesh.json)"
+          % (len(mesh["nodes"]), len(mesh["elements"]),
+             os.path.basename(os.path.splitext(COMBO03R)[0])))
 
-    t0 = _time.time()
     with contextlib.redirect_stdout(io.StringIO()):
         seep_data = build_seep_data(mesh, model, seep_bc=1)
-        solution = run_transient_seepage(seep_data, build_tseep_data(model),
-                                         verbose=False)
-    print("   march       %d saved frames at t = %s · %.0f s wall"
+        solution = import_transient_solution(seep_data,
+                                             os.path.splitext(COMBO03R)[0])
+    print("   march       %d saved frames at t = %s (from the shipped _tseep.csv)"
           % (len(solution["times"]),
-             " ".join("%g" % t for t in solution["times"]), _time.time() - t0))
+             " ".join("%g" % t for t in solution["times"])))
 
     # ---- every instant as a three-stage drawdown ---------------------------- #
     t0 = _time.time()

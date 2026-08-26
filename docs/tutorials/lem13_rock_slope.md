@@ -366,22 +366,16 @@ range D has. The curve crosses FS = 1 instead, between D = 0 and D = 0.25:
 | 0.75 | 0.0088 | 7.72 × 10<sup>−7</sup> | 4.92 | 0.378 |
 | 1 | 0.0023 | 1.33 × 10<sup>−7</sup> | 1.66 | 0.176 |
 
-Nothing about the rock changed across those five runs — same σ<sub>ci</sub>, same
-m<sub>i</sub>, same jointing — only how the face was excavated. D sits in the
-denominator of both exponents, so it collapses m<sub>b</sub> and *s* the way a
-falling GSI does: m<sub>b</sub> from 0.0672 to 0.0023 and *s* from
-2.60 × 10<sup>−5</sup> to 1.33 × 10<sup>−7</sup>, and the unconfined mass strength
-with them, 43.5 kPa down to 1.66. The exponent *a* holds at 0.619 throughout,
-since GSI alone sets it.
+Nothing about the rock changed across those five runs — only how the face was
+excavated. Blast damage lowers m<sub>b</sub> and *s* the way a lower GSI does
+(the mass's unconfined strength falls from 43.5 kPa at D = 0 to 1.66 kPa at
+D = 1), and the factor of safety falls with them, 1.152 to 0.176.
 
-The first quarter of the range costs 0.279 of factor of safety, 1.152 to 0.873 —
-as much as the first three points of GSI returned — so the two field judgments
-carry comparable weight on this slope. They part company on what the sweep can
-conclude. GSI meets the 1.5 target inside its own range, at 8.611. D meets it
-nowhere: the best face this rock can be given, D = 0, returns the 1.152 Part A
-solved, and every value above that is worse. **A mass at GSI = 5 will not stand a
+The two sweeps end differently. GSI reaches the 1.5 target inside its range, at
+8.6. D never does: the best face this rock can be given, D = 0, is the 1.152 Part
+A solved, and every value above that is worse. **A mass at GSI 5 will not stand a
 45° cut at a factor of safety of 1.5 however carefully it is excavated** — the
-index has to be higher, or the slope flatter.
+rock has to be better, or the slope flatter.
 
 ### A friction angle steep enough to stop a method
 

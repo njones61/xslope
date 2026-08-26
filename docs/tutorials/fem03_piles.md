@@ -513,8 +513,8 @@ PZ-27 constants, each already per foot of wall. The moment capacity entered is
 the moment at which the steel first yields: M<sub>cap</sub> = F<sub>y</sub> × S
 = 36,000 psi × 30.2 in³/ft = 90,600 lb·ft/ft. A steel section can carry about
 20% more than that before it is fully plastic, but the beam element does not
-model that reserve — it stays elastic up to M<sub>cap</sub> and forms a hinge
-there — so first yield is the honest cap.
+model that reserve: it stays elastic up to M<sub>cap</sub> and forms a hinge
+there. So the capacity entered is the first-yield moment.
 
 Nothing else about the model changes, so every number in this half is
 comparable to the first half's.

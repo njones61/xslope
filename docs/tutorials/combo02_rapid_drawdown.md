@@ -246,14 +246,9 @@ the pool is down and the dam has come back to equilibrium — a straightedge ske
 between a few readings and a few assumptions. Where a seepage solution is available it
 replaces them, and the rest of this page measures what that replacement changes.
 
-Two rules govern the pair. Line 2 may not stand above Line 1 anywhere — a
-drawdown that raised the pool is not a drawdown, and the checks say so. And each
-line has to describe the same pool the rest of the model does. Line 1 leaves the
-upstream shell at exactly elevation 160, which is where the first seepage boundary
-set puts the reservoir when it is built later, and the checks measure the two
-against each other: a line that came off the shell a foot low would put two
-different pools on one model, and it is flagged. Line 2 leaves the face at exactly
-110 for the same reason, matched against the second boundary set by hand.
+The model checks hold the pair to the rest of the model: Line 2 may not stand
+above Line 1 anywhere, and each line has to leave the upstream face at the pool
+elevation the seepage boundaries use — 160 and 110 here.
 
 Both lines run the full width of the section, and both tails from x = 550 out to
 750 sit exactly on the ground surface. That matters for the water load: with

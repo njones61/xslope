@@ -158,8 +158,10 @@ LEM | Seepage | FEM; leave it on **LEM** for now.
 
 ### The materials, and the one undrained zone
 
-Click **Materials** in the Inputs tree and set the **Show parameters for:**
-toggles to **LEM** alone:
+The first of the three additions is the undrained envelope, and the place to
+see which material carries it is the materials table. Click **Materials** in
+the Inputs tree and set the **Show parameters for:** toggles to **LEM** alone,
+which narrows the table to the columns the drawdown run reads:
 
 ![The three zones, with d and psi on the core alone](images/combo02_studio_materials.png)
 

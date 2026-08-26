@@ -743,11 +743,20 @@ the undrained envelope being applied to the core. It is the price of the strengt
 substitution alone, measured with the water held still.
 
 **The minimum, 1.0158, falls on day 50 — the instant the pool stops falling.**
-That is not where Part 1's dam put its minimum, which came 17 days before the end
-of its drawdown. The nearest saved frames either side of day 50 are day 35 at
-1.0712 and day 80 at 1.0904, so the dip is resolved to those three points and no
-finer; Part 1's [refinement pass](#choosing-the-time-steps) is the way to ask
-whether the true minimum falls between them.
+That is not a rule. Two things race while the pool drops: the support the
+reservoir gives the face keeps falling until the pool stops, and the pore
+pressures in the core start dissipating from the moment the drop begins. On this
+dam the drawdown is fast against a core at 0.001 ft/day, the pore pressures barely
+move during the 45 days, and the worst instant is where the load is lowest — the
+end. Part 1's dam drained fast enough for dissipation to overtake the load loss
+mid-fall, and its minimum came 17 days *before* its drawdown ended. A slow enough
+drawdown shows no dip at all. Which of those a given dam does is exactly what
+the sweep is for; the instant cannot be named in advance.
+
+The dip here is resolved only as finely as the saved frames: the nearest either
+side of day 50 are day 35 at 1.0712 and day 80 at 1.0904, so the true minimum
+could sit between 35 and 50. Part 1's [refinement pass](#choosing-the-time-steps)
+— extra saved times around the end of the fall — is the way to pin it.
 
 **The recovery flattens onto COMBO-2's two-steady answer.** From 1.0158 the curve
 climbs to 1.0904 by day 80, 1.1524 by day 150, and then slows: 1.1701, 1.1848,

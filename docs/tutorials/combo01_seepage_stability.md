@@ -155,11 +155,12 @@ is written beside the workbook as `xslope_johnson_res_mesh.json` and
 
 ## The column that connects the modes
 
-Nothing about the two runs below names the seepage solution. The connection is
-made once, on the materials table, by each material's **pore-pressure option** —
-the `u` column. Click **Materials** in the Inputs tree and set the **Show
-parameters for:** toggles to **LEM** alone, which narrows the table to the
-columns the two stability engines read:
+With a seepage solution in hand, the next step is to make sure the stability
+runs use it. Neither the Run LEM nor the Run FEM dialog has a control for
+that; the connection is made once, on the materials table, by each material's
+**pore-pressure option** — the `u` column. Click **Materials** in the Inputs
+tree and set the **Show parameters for:** toggles to **LEM** alone, which
+narrows the table to the columns the two stability engines read:
 
 ![The three materials, with u = seep on every row](images/combo01_studio_materials.png)
 

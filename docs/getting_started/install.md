@@ -3,7 +3,7 @@ title: "Download XSLOPE Studio for macOS and Windows"
 description: "Download and install XSLOPE Studio, the free slope stability and seepage analysis application for macOS and Windows — system requirements, first launch, updates, and the pip alternative for Python users."
 ---
 
-# Install
+# Installation
 
 **XSLOPE Studio** is a desktop application for slope stability and seepage
 analysis. Download it, open it, and start working — there is nothing else to

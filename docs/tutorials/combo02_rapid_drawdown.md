@@ -191,7 +191,9 @@ the checks refuse the run rather than let a half-entered envelope pass.
 
 ### The two piezometric lines
 
-Click **Piezometric lines**. The editor has two tabs, and both are filled:
+The second addition is the drawn-down water state, and on this file it is the
+simplest form it can take: a second piezometric line. Click **Piezometric
+lines**. The editor has two tabs, and both are filled:
 
 ![Line 2, the drawn-down surface, with Line 1 dimmed behind it](images/combo02_studio_piezo.png)
 
@@ -275,8 +277,9 @@ analysis is about. The red dashed arc is the circle every run below uses.
 
 ## The drawdown from the piezometric pair
 
-Switch to **LEM** (`Ctrl+1`) if the mode strip is elsewhere, and click
-**Run → Run LEM…**
+With the envelope, the second line and the water load all on the file, the
+three-stage procedure can run. Switch to **LEM** (`Ctrl+1`) if the mode strip
+is elsewhere, and click **Run → Run LEM…**
 
 ![Run LEM, with Rapid drawdown ticked](images/combo02_studio_run_lem.png)
 
@@ -359,8 +362,9 @@ drawn-down pool — and that is what this section builds.
 
 ### The second boundary set
 
-Switch the mode strip to **Seepage** (`Ctrl+2`) and click **Seep BC** in the
-Inputs dock. The editor has two tabs.
+The two water states are described to the seepage engine as two sets of
+boundary conditions. Switch the mode strip to **Seepage** (`Ctrl+2`) and click
+**Seep BC** in the Inputs dock. The editor has two tabs.
 
 **Set 1** is the ordinary boundary set: it describes the dam under the full
 reservoir. Press **Add head** twice, then select the **Exit face** entry already
@@ -444,7 +448,8 @@ Click **OK**.
 
 ### Meshing, and both solves
 
-Click **Run → Build Mesh…** and set **Element type** to **Linear triangles
+Both sets solve on one mesh, which has to be built first. Click
+**Run → Build Mesh…** and set **Element type** to **Linear triangles
 (tri3)**. Head is a scalar field, so there is nothing for a linear element to
 lock up on, and no strength reduction runs on this page — the
 [quadratic requirement COMBO-1 meets](combo01_seepage_stability.md#one-mesh-for-all-three-analyses)
@@ -572,7 +577,9 @@ shell, 1 × 10<sup>−3</sup> /ft and 0.03 on the core, 2 × 10<sup>−4</sup> /
 
 ### The pool schedule and the stage times
 
-Switch to **Seepage** and click **Transient** in the Inputs dock.
+The storage properties say how the dam responds; the schedule says what the
+reservoir does. Switch to **Seepage** and click **Transient** in the Inputs
+dock.
 
 ![The schedule, with both stage times filled](images/combo02_studio_run_transient.png)
 
@@ -624,7 +631,8 @@ returns the same 1.9566 ft³/day per ft as before, and says so in its log —
 
 ### Marching it
 
-Click **Run → Run Seep…**. The dialog has grown a **Run type** selector, which
+With the schedule and the stage times on the file, the transient solve is one
+more run of the seepage dialog. Click **Run → Run Seep…**. The dialog has grown a **Run type** selector, which
 appears only on a file carrying a schedule; set it to **Transient
 (time-dependent)** and click **Run**. **Convergence tol** and **Max iterations**
 gray out — they belong to the steady solve, and the march sets its own step size
@@ -670,7 +678,8 @@ come back to within a few feet of the pool.
 
 ### The third answer
 
-Switch to **LEM** and run **Run → Run LEM…** once more — Spencer, Single surface,
+That pocket is what the drawdown run reads next. Switch to **LEM** and run
+**Run → Run LEM…** once more — Spencer, Single surface,
 Rapid drawdown ticked. The form has grown the group the schedule adds:
 
 ![Run LEM on the model with a schedule, showing the stage times](images/combo02_studio_run_lem_staged.png)

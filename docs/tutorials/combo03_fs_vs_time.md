@@ -86,7 +86,8 @@ the one that governs it half drained, so each instant gets its own search.
 
 ## The strengths this page adds
 
-Open [xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx) with
+The first thing to see is what the file carries beyond SEEP-3's seepage
+properties. Open [xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx) with
 **File → Open…**. The toolbar's mode strip reads LEM | Seepage | FEM; leave it on
 **LEM** for now and click **Materials** in the Inputs tree. Set the **Show
 parameters for:** toggles to **LEM** alone:
@@ -125,7 +126,8 @@ Click **OK**.
 
 ## The surface and the search window
 
-Click **Circles**. The file carries one starting circle, on the **upstream** face:
+The strengths say how strong the slope is; the circles say where the search
+looks for the failure. Click **Circles**. The file carries one starting circle, on the **upstream** face:
 
 | Xo | Yo | Option | Depth |
 |:---:|:---:|:---:|:---:|
@@ -189,8 +191,9 @@ center at (25, 44) sits above the top of the frame.
 
 ## The mesh and the initial condition
 
-Switch the mode strip to **Seepage** (`Ctrl+2`) and click **Run → Build Mesh…**
-Set **Element type** to **Linear triangles (tri3)**, leave **Auto-size from
+Every pore pressure on this page comes from the seepage engine, so the mesh and
+the full-pool steady solution come before any stability run. Switch the mode
+strip to **Seepage** (`Ctrl+2`) and click **Run → Build Mesh…** Set **Element type** to **Linear triangles (tri3)**, leave **Auto-size from
 geometry** ticked, and set **Size divisions** to `64`. Click **Build**: **614
 nodes and 1,089 triangles**, the mesh
 [SEEP-3 builds](seep03_reservoir_drawdown.md#building-the-mesh) and every number
@@ -218,8 +221,10 @@ and the baseline analysis below is run against it.
 
 ## The baseline: the slope under a full reservoir
 
-Switch back to **LEM** (`Ctrl+1`) and click **Run → Run LEM…** Leave every
-field at its default. **Method** opens on **Spencer**, which satisfies both force
+The curve needs a starting point, and that is the factor of safety with the
+reservoir full and the steady solution just made under it. Switch back to
+**LEM** (`Ctrl+1`) and click **Run → Run LEM…** Leave every field at its
+default. **Method** opens on **Spencer**, which satisfies both force
 and moment equilibrium and is the method behind every factor of safety on this
 page. **Analysis** opens on **Auto search**, which finds the run its own critical
 circle, and **Number of slices** at 40.
@@ -257,7 +262,8 @@ computed from. Both are what the drawdown is about to change.
 
 ## The march
 
-Switch to **Seepage** and click **Run → Run Seep…** again. Set **Run type** to
+Now the pool comes down. Switch to **Seepage** and click **Run → Run Seep…**
+again. Set **Run type** to
 **Transient (time-dependent)** and click **Run**. **Convergence tol** and **Max
 iterations** gray out — they belong to the steady solve, and the march sets its
 own step size from how fast the field is moving.
@@ -293,7 +299,9 @@ modeling decision made before the stability question is asked.
 
 ## One instant at a time
 
-Switch back to **LEM** and open **Run → Run LEM…** once more. The form has grown
+The march has left twelve pore-pressure fields on the file, and the stability
+run can read any one of them. Switch back to **LEM** and open
+**Run → Run LEM…** once more. The form has grown
 a group since the baseline run:
 
 ![Run LEM with the Seepage time group the march adds](images/combo03_studio_run_lem.png)

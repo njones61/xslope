@@ -353,6 +353,13 @@ different one:
 
 ![The mechanism with both pile tips fixed: it relocates above the reinforcement, daylighting at the upper row's head and running back into the crest](images/fem03_fem_shear_piles_fixed.png){width=1000}
 
+The deep band that ran up from the flat ground beyond the toe is gone. What is
+left daylights at the upper row's head, where the strain peaks at 0.23 against
+the pinned-tip run's 0.80, and runs back from there up the face above the row
+to about x = 21 at elevation 12. Twelve elements stand above half that peak,
+all of them between x = 10.9 and 20.8 at elevation 9.5 to 12.8. The mechanism has moved above the reinforcement
+instead of passing through it.
+
 Open **Results → 1D Details** on the upper row again:
 
 ![The upper row's 1D Details at failure with the tip fixed: bending against the restraint, the moment at capacity from 6 ft down to the toe](images/fem03_piles_profile_fixed.png){width=1000}
@@ -374,13 +381,6 @@ so the smeared wall takes a load a discrete shaft at this spacing never would;
 the panel is flagging exactly the idealization this page is about. Held at its
 toe, the shaft finally develops the moment the limit equilibrium method assumed
 all along.
-
-The deep band that ran up from the flat ground beyond the toe is gone. What is
-left daylights at the upper row's head, where the strain peaks at 0.23 against
-the pinned-tip run's 0.80, and runs back from there up the face above the row
-to about x = 21 at elevation 12. Twelve elements stand above half that peak,
-all of them between x = 10.9 and 20.8 at elevation 9.5 to 12.8. The mechanism has moved above the reinforcement
-instead of passing through it.
 
 Set `Tip` back to `pinned` on both rows before the next section.
 

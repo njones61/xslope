@@ -243,10 +243,7 @@ usually is: **a statement about where the water table is, not a trace of a solve
 head field.** In practice Line 1 comes from piezometers in a dam that has been standing at full
 pool, and Line 2 comes from judgment about where those readings will settle once
 the pool is down and the dam has come back to equilibrium — a straightedge sketch
-between a few readings and a few assumptions. The two above were sketched from the
-solved seepage fields further down this page and then rounded to something a
-designer would draw, which is why they follow those fields in shape without
-matching them anywhere in particular. Where a seepage solution is available it
+between a few readings and a few assumptions. Where a seepage solution is available it
 replaces them, and the rest of this page measures what that replacement changes.
 
 Two rules govern the pair. Line 2 may not stand above Line 1 anywhere — a

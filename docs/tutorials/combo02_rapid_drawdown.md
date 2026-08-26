@@ -270,10 +270,9 @@ Switch to **LEM** (`Ctrl+1`) if the mode strip is elsewhere, and click
 
 ![Run LEM, with Rapid drawdown ticked](images/combo02_studio_run_lem.png)
 
-Three fields change from the dialog's defaults:
-
-**Method → Spencer.** Spencer satisfies both force and moment equilibrium, and
-every number on this page is Spencer's.
+**Method** opens on **Spencer**, which satisfies both force and moment
+equilibrium, and every number on this page is Spencer's. Two fields change from
+the dialog's defaults:
 
 **Analysis → Single surface.** The dialog opens on **Auto search**, which finds
 each run its own critical circle. That is the right setting for a design check

@@ -336,8 +336,9 @@ Click **Run LEM…**. Choose:
 
 ![The Run LEM dialog](images/lem01_studio_run_lem.png)
 
-1. **Method** = `Spencer` — the method that satisfies both force and moment
-   equilibrium, and the one to reach for by default.
+1. **Method** = `Spencer`, which the dialog opens on — the method that
+   satisfies both force and moment equilibrium, and the one to reach for by
+   default.
 2. **Analysis** = `Auto search`. The search starts from your circle and refines
    toward the critical one. **Surface** below it is a fixed label reading
    `Circular`, not a choice: this model defines circles and no non-circular

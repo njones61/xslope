@@ -138,11 +138,11 @@ stands on. A search refines away from this circle, so its job is to point the
 refinement at the right part of the section, not to be the answer.
 
 The file also declares a **search window** — a set of limits confining where a
-searched surface may run. Those live in the **Search window** block at the right
-of the `circles` worksheet, which Studio reads and applies but does not offer an
-editor for, so they are entered in Excel and
-[the template page](../usage/input_template.md#search-window-optional) lists all
-ten. Four are filled here:
+searched surface may run. There are ten, and they are edited in the **Search
+window** group under this editor's table — the same cells as the **Search window**
+block at the right of the `circles` worksheet. A blank field is a limit that is not
+applied; [the template page](../usage/input_template.md#search-window-optional)
+lists all ten. Three of them are set here, filling five of the group's fields:
 
 | Limit | Value | What it does |
 |---|:---:|---|
@@ -165,6 +165,12 @@ wedge whose failure is raveling rather than a slide. 8 m on a 22 m dam holds the
 search on slides of the embankment. This is Slide2's minimum-depth filter, and
 the Run LEM dialog offers the same limit as **Ignore surficial (skin) failures**
 for a run that wants to set it rather than read it off the file.
+
+The preview draws the window along with the circle: the two bars lying on the
+ground surface are the exit range on the upstream face and the entry range
+straddling the crest, meeting at the waterline.
+
+![The starting circle and the search window that confines the search](images/combo03_studio_circles.png)
 
 Click **OK** on the Circles editor. The Inputs plot draws the model the runs
 below are made on:
@@ -212,10 +218,10 @@ and the baseline analysis below is run against it.
 
 ## The baseline: the slope under a full reservoir
 
-Switch back to **LEM** (`Ctrl+1`) and click **Run → Run LEM…** Change one field
-from the dialog's defaults — **Method → Spencer**, which satisfies both force and
-moment equilibrium and is the method behind every factor of safety on this page.
-Leave **Analysis** on **Auto search**, which finds the run its own critical
+Switch back to **LEM** (`Ctrl+1`) and click **Run → Run LEM…** Leave every
+field at its default. **Method** opens on **Spencer**, which satisfies both force
+and moment equilibrium and is the method behind every factor of safety on this
+page. **Analysis** opens on **Auto search**, which finds the run its own critical
 circle, and **Number of slices** at 40.
 
 Click **Run**. The Log reports the window before it reports anything else:
@@ -339,8 +345,8 @@ The parameter picker the other three modes use is gone, because nothing is
 substituted here: every point solves *this* model against a different instant's
 pore pressures. In its place is a **Saved frames** list holding the twelve the
 march stored, all ticked — **All** and **None** set the whole list, and unticking
-samples a long march, since each frame is a full stability run. Set **Method** to
-**Spencer** and leave **Number of slices** at 40 and **Re-search the critical
+samples a long march, since each frame is a full stability run. Leave **Method** on
+**Spencer** and **Number of slices** at 40 and **Re-search the critical
 surface at each step** ticked, which is the right setting here because the
 mechanism moves.
 

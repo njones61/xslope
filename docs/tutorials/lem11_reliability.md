@@ -477,8 +477,8 @@ The Taylor series put the spread of the factor of safety at
 in the unit weight and the uncertainty in the cohesion — and they do not
 contribute equally. Knowing the split is worth money: it says which
 parameter another round of testing should chase.
-The **Parametric…** dialog computes the split: set **Method** to `Spencer` and
-**Plot type** to `Variance Pareto (σ)`, which is offered only for a model that
+The **Parametric…** dialog computes the split: leave **Method** on `Spencer` and
+set **Plot type** to `Variance Pareto (σ)`, which is offered only for a model that
 carries standard deviations. Selecting it grays out the sweep table and its
 controls — **Add parameter**, the **±%** and **σ range** columns, and the
 sweep **Points** feed the dialog's tornado and spider sweeps

@@ -1789,13 +1789,13 @@ def _lem13_daylight(crit):
 
 
 def _lem13_envelopes(crit):
-    """Both rock masses' Hoek-Brown envelopes, drawn from the same tangent routine
-    the solvers call.
+    """The Hoek-Brown envelope, drawn from the same tangent routine the solvers
+    call, as two figures: Part A's and Part B's.
 
-    Two panels. The left is the file's own envelope over the stress range its
+    The first is the file's own envelope over the stress range its
     critical surface generates, with the instantaneous tangent at the mean base
     normal stress drawn across it — the straight line the method of slices actually
-    solves with. The right is the same rock at three values of GSI and nothing else
+    solves with. The second is the same rock at three values of GSI and nothing else
     changed, which is the picture behind Part B's sweep: the index moves s and the
     exponent a together, and the envelope it produces is a different curve rather
     than the same curve scaled.
@@ -1806,7 +1806,8 @@ def _lem13_envelopes(crit):
 
     a = load_slope_data(LEM13_A)["materials"][0]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.5, 5.0))
+    fig1, ax1 = plt.subplots(figsize=(7.0, 5.0))
+    fig2, ax2 = plt.subplots(figsize=(7.0, 5.0))
 
     # ---- left: Part A's envelope in its own stress units --------------------- #
     sig = np.linspace(0.0, 90.0, 400)
@@ -1835,7 +1836,7 @@ def _lem13_envelopes(crit):
                 label="σn′ range on the critical surface")
     ax1.set_xlabel("σn′  effective normal stress  (kPa)")
     ax1.set_ylabel("τ  shear strength  (kPa)")
-    ax1.set_title("Part A — the broken rock mass\nσci = 30,000 kPa, GSI = 5, "
+    ax1.set_title("The rock mass as entered\nσci = 30,000 kPa, GSI = 5, "
                   "mi = 2, a = %.3f" % hb_constants(a["hb_gsi"], a["hb_mi"],
                                                     a["hb_d"])[2])
     ax1.set_xlim(0, 90)
@@ -1862,11 +1863,11 @@ def _lem13_envelopes(crit):
     ax2.grid(True, which="both", alpha=0.3)
     ax2.legend(loc="lower right", fontsize=8.5)
 
-    fig.tight_layout()
-    out = os.path.join(OUT_DIR, "lem13_envelopes.png")
-    fig.savefig(out, dpi=200, bbox_inches="tight")
-    plt.close(fig)
-    print("-> lem13_envelopes.png")
+    for fig, name in ((fig1, "lem13_envelope.png"), (fig2, "lem13_gsi_envelopes.png")):
+        fig.tight_layout()
+        fig.savefig(os.path.join(OUT_DIR, name), dpi=200, bbox_inches="tight")
+        plt.close(fig)
+        print("-> " + name)
     print("   envelope A  σn′ %.2f mean · tangent c_i %.3f kPa φ_i %.2f°"
           % (sig_bar, c_bar, phi_bar))
     for gsi in LEM13_GSI_CURVES:

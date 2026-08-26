@@ -123,22 +123,17 @@ square-root shape, which is what makes this a demanding case for the criterion
 rather than for the geometry.
 
 The curve beside the fields draws the envelope those constants define, in
-τ–σ<sub>n</sub> space over the stress range σ<sub>ci</sub> implies. The left panel
-below redraws it over the stresses this slope actually generates; the right panel
-belongs to [Part B](#why-the-index-carries-it) and shows what GSI does to it:
+τ–σ<sub>n</sub> space over the stress range σ<sub>ci</sub> implies. The figure
+below redraws it over the stresses this slope actually generates:
 
-![The two rock masses' envelopes](images/lem13_envelopes.png){width=1000}
+![The rock mass's envelope over the slope's own stress range](images/lem13_envelope.png){width=800}
 
-That envelope is nowhere a straight line. It rises steeply out of the origin and
+The envelope is nowhere a straight line. It rises steeply out of the origin and
 flattens as the confinement grows, and it starts from almost nothing: the
 unconfined strength of the rock **mass** is σ<sub>ci</sub>·s<sup>a</sup>, which at
 this GSI comes to 43.5 kPa out of the intact rock's 30,000 — about one part in
 700. Almost none of the laboratory strength survives the jointing, and what the
 slope stands on instead is confinement.
-
-The two elastic properties the finite element half of this page needs, E = 5,000
-MPa and ν = 0.3, are already in the file. They sit behind the **FEM** toggle above
-the form, which is unticked here because a limit equilibrium run reads neither.
 
 ### Running the analysis
 
@@ -175,7 +170,7 @@ stresses runs from c<sub>i</sub> = 11.4 to 18.9 kPa with
 the criterion is evaluated for any slice the solution puts in tension.
 Length-weighted along the surface the pair averages c<sub>i</sub> = 15.9
 kPa and φ<sub>i</sub> = 26.7°, at a mean normal stress of 47.3
-kPa — the dashed line on the left panel of the envelope figure above, which touches
+kPa — the dashed line on the envelope figure above, which touches
 the curve at that stress and nowhere else.
 
 That single pair is not a substitute for the criterion. Entered as a
@@ -223,7 +218,9 @@ before the run started. Change **σci** back to `30000` before going on.
 The second half of Part A solves this slope again, in the finite element engine,
 by reducing the strength until it will no longer stand. Hoek-Brown needs no
 special handling there: the tangent is what gets divided by the trial factor, not
-σ<sub>ci</sub>. Switch the mode strip to **FEM**. **Run → Run FEM…** stays disabled
+σ<sub>ci</sub>. The two elastic properties the run needs, E = 5,000 MPa and
+ν = 0.3, are already on the materials table behind its **FEM** toggle. Switch the
+mode strip to **FEM**. **Run → Run FEM…** stays disabled
 until a mesh exists, so build one first — click **Run → Build Mesh…**
 
 ![Build Mesh, on the size the file declares](images/lem13_studio_build_mesh.png)
@@ -360,17 +357,20 @@ where m<sub>b</sub> divides it by 28, so *s* collapses about three times as fast
 That is what the table's σ<sub>ci</sub>·s<sup>a</sup> column carries: **the
 strength the mass has at zero confinement** — 43.5 kPa at GSI = 5 and 239 kPa at
 GSI = 20, five and a half times as much across fifteen points of the index, and
-5,641 kPa at the GSI = 70 of the envelope figure's third curve. A slope this size
+5,641 kPa at GSI = 70, the third curve of the figure below. A slope this size
 generates at most γH = 25 × 10 = 250 kPa of vertical stress and its critical
 surface averages 47 kPa, so it lives at the low-confinement end
 of the envelope — exactly where *s* decides the answer. The exponent *a* does the
 rest by bending the curve: it runs from 0.619 at GSI = 5 to 0.544 at GSI = 20 in
-the table, and reaches 0.501 at the envelope figure's GSI = 70 — the difference
-between an envelope that flattens quickly and the classical square-root form.
+the table, and reaches 0.501 at GSI = 70 — the difference between an envelope
+that flattens quickly and the classical square-root form.
 
-The right panel of [the envelope figure in Part A](#opening-the-model) draws that
-directly — the same σ<sub>ci</sub>, m<sub>i</sub> and D at three values of the
-index. The three curves are not one curve scaled: they start at different heights
+Drawn directly — the same σ<sub>ci</sub>, m<sub>i</sub> and D at three values of
+the index — the three envelopes look like this:
+
+![The same rock at three values of GSI](images/lem13_gsi_envelopes.png){width=800}
+
+The three curves are not one curve scaled: they start at different heights
 and bend by different amounts, which is why one field judgment moves the factor
 of safety as far as it does.
 

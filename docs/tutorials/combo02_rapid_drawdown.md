@@ -431,15 +431,9 @@ foreshore and up the face as far as the lowered pool wets it:
 | 380 | 180 |
 | 550 | 100 |
 
-Two things about Set 2 decide what it computes.
-
-**It carries plain heads only.** The `reservoir` type — the submerged-only
-boundary built for a pool that moves — and any value bound to a time series both
-belong on Set 1, because there is one timeline in a model and it is Set 1's. Set
-2 is a constant, steady state by construction, and the editor refuses the other
-kinds. That is why Head 1 is entered as a plain head along the wetted perimeter
-the residual pool reaches, ending at (220, 110) where elevation 110 meets the 2:1
-face, rather than as a reservoir the solver would trim for itself.
+Head 1 is a plain head, like Set 1's: both sets are steady states, and a
+constant head along the wetted perimeter the residual pool reaches, ending at
+(220, 110) where elevation 110 meets the 2:1 face, is all a steady solve needs.
 
 **Ten feet of head still cross the section.** The pool stops at 110 and the
 tailwater is at 100, so water still flows through the dam and still leaves it

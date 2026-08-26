@@ -25,8 +25,12 @@ family cannot drift apart:
 
 Everything is built deterministically from the committed transient **seepage**
 sample ``docs/seep/files/xslope_johnson_res_tseep.xlsx``, so the cross-section,
-zones, conductivities, storage properties, reservoir schedule and stage times can
-never diverge from the seepage side of the same dam. That file is never modified.
+zones, conductivities, storage properties, saved-frame schedule and stage times
+can never diverge from the seepage side of the same dam. That file is never
+modified. The one value the tutorial pair overrides is the level the reservoir is
+lowered to: the tutorial's drawdown stops at a residual pool 10 ft deep, while the
+worked example of ``docs/lem/rapid.md`` keeps the base file's total drawdown to
+the tailwater datum.
 
 Run:  PYTHONPATH=. python3 tools/build_johnson_rapid.py
 """
@@ -50,7 +54,7 @@ BASE = os.path.join(SEEP_FILES, "xslope_johnson_res_tseep.xlsx")
 
 #: Undrained core, Kc = 1 (CU) envelope, below the drained c' = 400 / phi' = 18.
 #: The free-draining sand shell and the silty-sand foundation carry no d/psi and
-#: are analysed drained through the drawdown.
+#: are analyzed drained through the drawdown.
 CORE_D, CORE_PSI = 250.0, 14.0
 
 #: The critical upstream circle, located by a rapid-drawdown circular search over
@@ -60,34 +64,56 @@ CORE_D, CORE_PSI = 250.0, 14.0
 CIRCLE = dict(Xo=275.0, Yo=235.0, R=160.0, Depth=75.0)
 
 #: The pool pair. The full pool is the reservoir at elevation 160 that the base
-#: file's `pool` series starts from; the drawn-down pool is the elevation-100
-#: tailwater datum the series ends at. The second seepage boundary set states the
-#: same drawn-down level as a steady problem.
-POOL_FULL, POOL_DOWN = 160.0, 100.0
+#: file's `pool` series starts from. The drawdown stops 10 ft above the
+#: elevation-100 tailwater datum: a residual pool at elevation 110 stands against
+#: the upstream toe at the end of it, which is the level the second seepage
+#: boundary set states as a steady problem and the level the tutorial's `pool`
+#: series ramps down to.
+POOL_FULL, POOL_DOWN = 160.0, 110.0
 
-#: The drawn-down steady boundary set. Both heads sit at the tailwater datum, so
-#: no head difference drives the section and no water discharges through the
-#: downstream face: the set carries its two heads and no exit face.
+#: The drawn-down steady boundary set: the residual pool along the upstream
+#: foreshore and up the face to elevation 110, the tailwater at 100, and the
+#: downstream slope as an exit face. Ten feet of head still cross the section, so
+#: this is an unconfined flow problem with a phreatic surface of its own, stated
+#: exactly the way set 1 states the full-pool one.
 BC2 = {
     "specified_heads": [
-        {"head": POOL_DOWN, "coords": [(0.0, 100.0), (200.0, 100.0)], "kind": "head"},
-        {"head": POOL_DOWN, "coords": [(550.0, 100.0), (750.0, 100.0)], "kind": "head"},
+        {"head": POOL_DOWN,
+         "coords": [(0.0, 100.0), (200.0, 100.0), (220.0, 110.0)], "kind": "head"},
+        {"head": 100.0, "coords": [(550.0, 100.0), (750.0, 100.0)], "kind": "head"},
     ],
     "specified_fluxes": [],
-    "exit_face": [],
+    "exit_face": [(380.0, 180.0), (550.0, 100.0)],
 }
 
+#: The tutorial's reservoir schedule: full pool held for five days, then lowered
+#: to the residual pool over the following 45. Only the last breakpoint differs
+#: from the base seepage sample's series, whose times and stage instants are kept.
+POOL_SCHEDULE = [POOL_FULL, POOL_FULL, POOL_DOWN]
+
 #: The coarse piezometric pair. These are five- and six-point polylines a designer
-#: would sketch from piezometer readings, not traces of a solved field: Line 1 is
-#: the full-pool phreatic surface, Line 2 the surface at the end of the drawdown,
-#: with the core still holding most of its head. Both were read off the solved
-#: fields and rounded. Line 1 leaves the upstream shell AT the reservoir level, so
-#: the pool it describes is the one the seepage boundary states; a line that came
-#: off the shell a foot low would put two different pools on one model.
+#: would sketch from piezometer readings, not traces of a solved field: Line 1
+#: mimics the full-pool phreatic surface of boundary set 1, Line 2 the drawn-down
+#: one of boundary set 2 — the residual pool at 110 upstream, falling through the
+#: core and running out to tailwater at 100. Both were read off the solved fields
+#: and rounded. Line 1 leaves the upstream shell AT the reservoir level and Line 2
+#: at the residual pool level, so the pools they describe are the ones the two
+#: seepage boundary sets state; a line that came off the shell a foot low would put
+#: two different pools on one model. Both tails sit on the ground surface from
+#: x = 550 out, so neither invents a pond on the downstream foreshore.
 PIEZO_1 = [(0.0, 160.0), (360.0, 160.0), (410.0, 120.0), (550.0, 100.0),
            (750.0, 100.0)]
-PIEZO_2 = [(0.0, 100.0), (200.0, 100.0), (360.0, 150.0), (410.0, 120.0),
+PIEZO_2 = [(0.0, 110.0), (220.0, 110.0), (360.0, 107.0), (410.0, 103.0),
            (550.0, 100.0), (750.0, 100.0)]
+
+
+def _tutorial_schedule(sd):
+    """The base file's transient schedule with the pool ramped to the residual
+    level instead of to the tailwater datum. The saved-frame schedule and both
+    stage times are the base file's own."""
+    ts = copy.deepcopy(sd["tseep"])
+    ts["series"]["pool"] = list(POOL_SCHEDULE)
+    return ts
 
 
 def _base():
@@ -118,6 +144,7 @@ def build_lem_worked_example():
 def build_tutorial_completed():
     """COMBO-2's completed model: both boundary sets, the schedule, u = seep."""
     sd = _base()
+    sd["tseep"] = _tutorial_schedule(sd)
     sd["seepage_bc2"] = copy.deepcopy(BC2)
     sd["has_seepage_bc2"] = True
     sd["piezo_line"] = list(PIEZO_1)

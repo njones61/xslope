@@ -551,9 +551,8 @@ never uses a stated pile force.
 A new row also opens with **Appl** on `active` and both **Head** and **Tip** on
 `free`. `Appl` is inert here: it is a limit equilibrium input, and a strength
 reduction run never reads it. `Head` `free` is a driven sheet pile with no
-capping beam. Set `Tip` to `pinned`: the wall's toe stands on the base rather
-than being driven into it, held in place and free to rotate, exactly as the
-shafts were — the first of the two runs below.
+capping beam. Set `Tip` to `fixed`: a sheet pile is driven into the base, not
+stood on it, and the first half showed what that restraint is worth.
 
 Click **OK**.
 
@@ -575,15 +574,16 @@ Click **Run → Run FEM…**
 this time: the wall states its own `I` and `Area`, so nothing is derived. The
 bracket is already `1.00` to `2.00`. Click **Run**.
 
-**FS = 1.371**, from [1.3672, 1.3750]. The wall takes the slope from 1.160 to
-1.371, a credit of ×1.18.
+**FS = 1.559**, from [1.5547, 1.5625]. The wall takes the slope from 1.160 to
+1.559, a credit of ×1.34.
 
-![The mechanism with the wall in place](images/fem03_wall_shear.png){width=1000}
+![The mechanism with the wall in place](images/fem03_wall_shear_fixed.png){width=1000}
 
-The band is the pile model's: up from the flat ground beyond the toe, over the
-wall, and out at the face just above the wall's head, peaking at 0.68 in the
-same element at (10.5, 9.0). One continuous member at x = 10 does to the
-mechanism what a smeared row at x = 10 did.
+The band follows the same path the pile model's did — up from the flat ground
+beyond the toe, over the wall, and out at the face just above its head — but
+the color bar reads 0.034 at the peak where the pile model's read 0.80: the
+collapse the run captured is barely developed, because a wall held at its toe
+leaves the soil very little room to move.
 
 ### What the wall carries
 
@@ -593,65 +593,30 @@ report. Click **1D Details…** on the results toolbar and select the wall in th
 list on the left. Set **Field state** to **Last converged**, which is the state
 the numbers below are read at.
 
-![Lateral displacement, shear, moment and soil reaction down the wall](images/fem03_wall_profiles.png){width=1000}
+![Lateral displacement, shear, moment and soil reaction down the wall: a cantilever fixed at the base](images/fem03_wall_profiles_fixed.png){width=1000}
 
 Four profiles, all plotted against depth below the pile head, which is at
 elevation 10 — so a depth of 14.00 ft on these axes is elevation −4.00.
 
-The **bending moment** is zero at the head and zero at the toe, which is the
-check that the profile is being read the right way round — both ends are free,
-so neither can carry a moment — and it peaks at **14,121 lb·ft/ft at a depth of
-14 ft**, well down the buried length. That is the shape of a wall whose toe can
-turn: the moment builds through the embedded length and comes back to zero at an
-end that cannot hold it. The **shear** changes sign twice — positive over the top
-3 ft, negative from there to about 14 ft, and positive again below, running to
-4,281 lb/ft at 19 ft — and the **soil reaction** changes sign once, between 8 and
-10 ft: the clay drives the wall downslope over the upper half of its length and
-pushes back over the lower. The **lateral displacement** is 0.156 ft at the head and decays smoothly to zero at the toe.
-
-The peak moment is **16% of the 90,600 lb·ft/ft** the section can carry, which
-is what the panel's title reports and why the moment panel draws no capacity
-line: the dashed M<sub>cap</sub> line appears only when the capacity is within
-about three times the peak, and here it would be off the axis. The cap is not
-merely unreached but inert — clearing `Mcap` and running again returns
-1.371 and the same moment profile.
-
-### Fixing the toe
-
-The wall's toe stands on the rigid base, and the first half's runs showed what
-the tip condition is worth to a member that ends there. Open **Piles**, set
-`Tip` to `fixed` — a wall driven or socketed into the base rather than standing
-on it — and **OK**. The mesh survives the change. Run the same bracket again;
-it finishes sooner than the pinned-tip run, since a slope that is further from
-failing decides each trial in fewer iterations.
-
-**FS = 1.559**, from [1.5547, 1.5625]: the credit over the bare slope goes from
-×1.18 to ×1.34.
-
-![The mechanism with the wall's toe fixed](images/fem03_wall_shear_fixed.png){width=1000}
-
-The band has the same shape as the free-toe run's, and the color bar reads a
-different scale: 0.034 at the peak against 0.677, so the collapse the run
-captured is twenty times less developed than the free-toe one.
-
-![The wall's profiles with its toe fixed: a cantilever fixed at the base](images/fem03_wall_profiles_fixed.png){width=1000}
-
-The moment profile has changed shape, not just scale. It is zero at the head and
-largest at the toe — **50,661 lb·ft/ft**, 56% of capacity — which is a member
-cantilevered from its base rather than one free to rotate there. The shear no
-longer reverses: it holds one sign the whole length, peaking at 3,998 lb/ft at
-11 ft. The head moves 0.163 ft.
+The **bending moment** is zero at the head, which is free, and largest at the
+toe — **50,661 lb·ft/ft**, 56% of the 90,600 lb·ft/ft the section can carry —
+which is the shape of a member cantilevered from its base. The dashed
+M<sub>cap</sub> lines on the moment panel are the capacity; the panel draws
+them whenever the capacity is within about three times the peak. The **shear**
+holds one sign the whole length, peaking at 3,998 lb/ft at 11 ft, and the
+**soil reaction** changes sign once, near 15 ft: the clay drives the wall
+downslope over its upper length and the base pushes back below. The **lateral
+displacement** is 0.163 ft at the head and decays smoothly to zero at the toe.
 
 Switch **Field state** to **At failure**, which is the state the panel opens on:
 
 ![The 1D details panel on the wall, at failure](images/fem03_studio_wall_1d_details.png)
 
 The moment at the toe reaches the full 90,600 lb·ft/ft, one beam element yields
-in bending, and the dashed M<sub>cap</sub> lines the moment panel draws are
-what the curve is standing on. The list on the left reports the same thing as a
-utilization — **100%** beside the wall's name — and the status beside the field
-selector reads *at capacity (moment vs Mcap)*. Two runs of the same model, one
-cell apart, and the second is the one that needs a section check.
+in bending, and the curve stands on the dashed M<sub>cap</sub> lines. The list
+on the left reports the same thing as a utilization — **100%** beside the wall's
+name — and the status beside the field selector reads *at capacity (moment vs
+Mcap)*. This is the run that needs a section check.
 
 ### A finer beam
 
@@ -682,11 +647,11 @@ distribution — and leave it alone when the factor of safety is.
 
 ## Which engine for which member
 
-| Member | Out of plane | Engine | What it gives |
-|---|---|---|---|
-| Sheet pile, diaphragm or secant wall | continuous | FEM, spacing `S` = 1 | factor of safety, plus moment, shear, deflection and soil reaction down the member |
-| Contiguous or very closely spaced row | nearly continuous | FEM, with the smear stated | the same, with the gap unrepresented |
-| Discrete row at spacing | discrete | LEM with Ito & Matsui | factor of safety per spacing, force per row, capacity checks |
+| Member | Engine | What it gives |
+|---|---|---|
+| Continuous wall (sheet pile, diaphragm, secant) | FEM, `S` = 1 | FS plus the wall's moment, shear, deflection, soil reaction |
+| Contiguous or very close row | FEM, smear stated | the same, gap unrepresented |
+| Discrete row at spacing | LEM, Ito & Matsui | FS per spacing, force per row, capacity checks |
 
 The middle row is a judgment rather than a threshold, and the bottom row has a
 band of its own: the Ito & Matsui theory applies for S/D between about 2 and 8,
@@ -731,9 +696,8 @@ This tutorial covered:
   that does not move at either tip condition, even though the moment per shaft
   quadruples.
 - How a continuous wall is entered — spacing 1, section constants per foot of
-  wall, no diameter — and what its toe condition is worth: 1.371 standing on the
-  base against 1.559 fixed into it, with the moment peaking inside the embedded
-  length in the first case and at the toe in the second.
+  wall, no diameter — driven into the base, so its tip is fixed, with the
+  moment peaking at the toe.
 - What the finite element engine reports that no limit equilibrium analysis can:
   moment, shear, deflection and soil reaction down the member, at whatever
   resolution the 1D element size is set to.

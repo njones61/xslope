@@ -5079,13 +5079,10 @@ def fem03_wall():
     #: (label, tip, 1D element size, keep Mcap, mesh figure, shear-strain figure,
     #: profile figure)
     runs = [
-        ("wall, tip pinned", "pinned", None, True, "fem03_mesh_wall.png",
-         "fem03_wall_shear.png", "fem03_wall_profiles.png"),
-        ("wall, tip fixed", "fixed", None, True, None,
+        ("wall, tip fixed", "fixed", None, True, "fem03_mesh_wall.png",
          "fem03_wall_shear_fixed.png", "fem03_wall_profiles_fixed.png"),
         ("wall, tip fixed, 1D 0.5", "fixed", FEM03_REFINED_1D, True, None, None,
          "fem03_wall_profiles_refined.png"),
-        ("wall, tip pinned, Mcap blank", "pinned", None, False, None, None, None),
     ]
     for label, tip, size_1d, keep_cap, mesh_fig, shear_fig, prof_fig in runs:
         sd = load_slope_data(FEM03_WALL_DONE)
@@ -5355,6 +5352,17 @@ COMBO02_D_SWEEP = (250.0, 300.0, 325.0, 350.0, 375.0, 400.0, 450.0, 500.0,
                    600.0, 700.0, 800.0, 1000.0, 1200.0)
 
 
+#: Two alternative Piezometric Line 2 sketches the page quotes, run on the starter
+#: file's own Line 1. The first puts the day-50 core pocket into the sketch; the
+#: second flattens the line onto the residual pool. They measure what the pair's
+#: answer is actually sensitive to.
+COMBO02_LINE2_VARIANTS = (
+    ("core at 150", [(0.0, 110.0), (220.0, 110.0), (360.0, 150.0), (410.0, 120.0),
+                     (550.0, 100.0), (750.0, 100.0)]),
+    ("flat at 110", [(0.0, 110.0), (220.0, 110.0), (550.0, 100.0), (750.0, 100.0)]),
+)
+
+
 def _combo02_mesh(model):
     """The mesh Build Mesh produces on this file with only the element type changed."""
     from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
@@ -5450,12 +5458,12 @@ def _combo02_stage_line(label, results):
                results["stage3_FS"], results["FS"], lower))
 
 
-def _combo02_field_panel(seep_data, solution, title, vmin, vmax, arc=None):
-    """One pore-pressure state, drawn through ``plot_seep_solution`` itself, with
-    the slip circle over it so the reader sees which part of the field the drawdown
-    check actually reads."""
-    import numpy as np
+def _combo02_field_panel(seep_data, solution, title, vmin, vmax):
+    """One head field, drawn through ``plot_seep_solution`` itself.
 
+    A seepage figure carries the seepage answer and nothing else: the slip circle
+    belongs on the limit equilibrium solution plots, where it is what was solved.
+    """
     from xslope.plot_seep import plot_seep_solution
 
     with _hold_show():
@@ -5465,11 +5473,7 @@ def _combo02_field_panel(seep_data, solution, title, vmin, vmax, arc=None):
                            cmap="Spectral_r", vmin=vmin, vmax=vmax,
                            show_title=False, show_legend=False,
                            show_bc_levels=True)
-    ax = plt.gcf().axes[0]
-    if arc is not None:
-        a = np.asarray(arc.coords)
-        ax.plot(a[:, 0], a[:, 1], color="#c1121f", lw=2.0, zorder=6)
-    ax.set_title(title, fontsize=11, pad=5)
+    plt.gcf().axes[0].set_title(title, fontsize=11, pad=5)
 
 
 def _combo02_sweep_figure(rows, crossing):
@@ -5556,10 +5560,13 @@ def combo02_plots():
     print("   piezo 1     %s" % (start["piezo_line"],))
     print("   piezo 2     %s" % (start["piezo_line2"],))
     derived = with_water_loads(start)
-    print("   water load  stage 1 peak %.1f %s from %s · stage 2 %d block(s) from %s"
+    _peak2 = max((float(p["Normal"]) for b in derived["dloads2_derived"] for p in b),
+                 default=0.0)
+    print("   water load  stage 1 peak %.1f %s from %s · stage 2 %d block(s), peak "
+          "%.1f %s, from %s"
           % (max(float(p["Normal"]) for b in derived["dloads_derived"] for p in b),
              _u["stress"], derived["water_derived"][1]["source"],
-             len(derived["dloads2_derived"]),
+             len(derived["dloads2_derived"]), _peak2, _u["stress"],
              derived["water_derived"][2]["source"] or "nothing above ground"))
     capture("combo02_inputs.png", plot_inputs, start, mode="lem",
             title="Rapid Drawdown Model Inputs", frame="content", show_mesh=False)
@@ -5574,6 +5581,10 @@ def combo02_plots():
           % (_combo02_drained(piezo_raw, 1), _combo02_drained(piezo_raw, 2)))
     capture("combo02_solution_piezo.png", plot_solution, start, piezo_df,
             piezo_surface, piezo_res)
+    for _label, _line in COMBO02_LINE2_VARIANTS:
+        _raw, _df, _s, _res = _combo02_rapid(dict(start, piezo_line2=list(_line)))
+        print("   line 2 %-11s FS %.4f · %d slices · u %.0f max at stage 2 %s"
+              % (_label, _res["FS"], len(_df), _raw["u2"].max(), _u["stress"]))
 
     # ---- the completed model: mesh and the two steady solves ---------------- #
     model = load_slope_data(COMBO02)
@@ -5597,8 +5608,8 @@ def combo02_plots():
                  _u["length"], head.min(), head.max(), _u["length"],
                  np.min(sol["u"]), np.max(sol["u"]), _u["stress"],
                  sol["converged"]))
-        # Set 2 carries no exit face, so it is a linear confined solve with no
-        # unconfined iteration to report; the log parser has nothing to read.
+        # Both sets carry an exit face, so both are unconfined solves with a
+        # sweep count to report; the fallback covers a set that has none.
         if "Converged in" in log:
             print("   %s       %s" % (label, _seep02_log_stats(log)))
         else:
@@ -5629,10 +5640,10 @@ def combo02_plots():
     vmax = float(max(h.max() for h in pair))
     panels = [capture("combo02_steady_1.png", _combo02_field_panel, sd1, sol1,
                       "Boundary set 1 — full pool, reservoir at el 160 ft",
-                      vmin, vmax, steady_surface),
+                      vmin, vmax),
               capture("combo02_steady_2.png", _combo02_field_panel, sd2, sol2,
-                      "Boundary set 2 — drawn down, pool at el 100 ft, "
-                      "fully re-equilibrated", vmin, vmax, steady_surface)]
+                      "Boundary set 2 — drawn down, pool at el 110 ft, "
+                      "fully re-equilibrated", vmin, vmax)]
     _stack_panels("combo02_steady_pair.png", panels)
 
     # ---- the transient march ------------------------------------------------ #
@@ -5674,7 +5685,7 @@ def combo02_plots():
     fmin, fmax = float(all_head.min()), float(all_head.max())
     panels = [capture("combo02_frame_t%g.png" % f["time"], _combo02_field_panel,
                       _as_shipped[0], f, "%s   (t = %g %s)" % (label, f["time"], _u["time"]),
-                      fmin, fmax, trans_surface)
+                      fmin, fmax)
               for f, label in stage_frames]
     _stack_panels("combo02_frames.png", panels)
 

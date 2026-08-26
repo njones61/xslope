@@ -274,8 +274,9 @@ are two pools and the engine turns each into its own load. The dark set is
 stage 1's: the reservoir standing against the slope, 3744 psf at the toe under
 60 ft of water and tapering to zero at the elevation-160 waterline. The pale set
 is stage 2's: the residual pool, 624 psf under its 10 ft of water and tapering to
-zero where it meets the face at elevation 110. Neither was entered anywhere — both
-are measured off the piezometric lines. The difference between them, 3120 psf at
+zero where it meets the face at elevation 110. Neither was entered anywhere: with
+**Water loads** = `auto` on the main sheet, the engine measures both off the
+piezometric lines where they stand above the ground surface. The difference between them, 3120 psf at
 the toe, is the load the drawdown takes away, and that removal is what the whole
 analysis is about. The red dashed arc is the circle every run below uses.
 

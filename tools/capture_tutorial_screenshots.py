@@ -3075,16 +3075,14 @@ SHOTS.update({
 # --------------------------------------------------------------------------- #
 # LEM-13 — Rock Slope (Hoek-Brown)
 #
-# The materials shots are LIST view: only the list view puts the four Hoek-Brown
+# The materials shot is LIST view: only the list view puts the four Hoek-Brown
 # field inputs beside the derived mb/s/a readout and the envelope those constants
-# draw, which is the whole subject of Part A. Two Run LEM shots carry a model check
-# rather than a control — Part A's after the page's deliberate MPa slip, which is
-# what the sigma_ci units rule exists to catch, and Part B's on the file as
-# downloaded, where the same rule reports a normalized sigma_ci that is small on
-# purpose.
+# draw, which is the whole subject of Part A. One Run LEM shot carries a model check
+# rather than a control — the one after the page's deliberate MPa slip, which is
+# what the sigma_ci units rule exists to catch. Part B photographs the Parametric
+# dialog in its Design mode, set to the GSI sweep the page runs.
 # --------------------------------------------------------------------------- #
 LEM13_A = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope.xlsx")
-LEM13_B = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope_li.xlsx")
 #: Part A's mis-entry: Hammah's 30 MPa typed as the 30 the paper prints, into a
 #: model whose stress unit is kPa.
 LEM13_A_MPA_SCI = 30.0
@@ -3185,42 +3183,45 @@ def lem13_build_mesh():
     return _grab(dlg, "lem13_studio_build_mesh.png")
 
 
-def lem13_li_materials():
-    """Part B's rock as the file carries it — the normalized σci of 4.37 kPa, whose
-    magnitude the model checks report."""
-    return _lem13_material(LEM13_B, "lem13_studio_li_materials.png")
-
-
-def lem13_li_run_lem():
-    """Part B's run, on the file as downloaded.
-
-    This is the shot that carries the units check: the model-checks column beside
-    the controls reports the σci magnitude, and **Run** stays enabled, because a
-    normalized model and a mis-keyed one are indistinguishable by magnitude alone.
-    """
-    from studio.dialogs import RunLemDialog
-
-    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
-                                 "num_slices": 40},
-                       slope_data=_load(LEM13_B))
-    dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "lem13_studio_li_run_lem.png")
-
-
-def lem13_li_run_lem_corps():
-    """The same dialog with the Corps of Engineers method selected.
+def lem13_run_lem_corps():
+    """Run LEM with the Corps of Engineers method selected on the Hoek-Brown rock.
 
     The method-and-material pairing raises its own check: a fixed-inclination
     force-equilibrium method against an envelope whose instantaneous friction angle
-    passes 55 degrees near the crest. Nothing else on the dialog changes.
+    can pass 55 degrees at low confinement. Nothing else on the dialog changes.
     """
     from studio.dialogs import RunLemDialog
 
-    dlg = RunLemDialog(defaults={"method": "corps",
-                                 "analysis": "auto_search", "num_slices": 40},
-                       slope_data=_load(LEM13_B))
+    dlg = RunLemDialog(defaults={"method": "corps", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM13_A))
     dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "lem13_studio_li_run_lem_corps.png")
+    return _grab(dlg, "lem13_studio_run_lem_corps.png")
+
+
+def lem13_parametric():
+    """The Parametric dialog set up for Part B's GSI sweep.
+
+    Design mode rather than Sensitivity: the page wants the whole curve across an
+    explicit range, not a percentage band about the current value. The parameter
+    picker is driven to ``mat:rock:hb_gsi`` the same way a reader drives it — pick
+    the material, then the property — so the shot carries the reference the run
+    actually sweeps, echoed on the **Sweeping** row.
+    """
+    from studio.dialogs import SensitivityDialog
+
+    data = _load(LEM13_A)
+    dlg = SensitivityDialog(defaults={"mode": "design", "method": "spencer",
+                                     "num_slices": 40, "low": 5.0, "high": 20.0,
+                                     "steps": 6, "target_fs": 1.5,
+                                     "search": True},
+                           slope_data=data, app_mode="lem")
+    i = dlg.prop.findData("mat:rock:hb_gsi")
+    if i < 0:
+        raise SystemExit("the Parametric dialog cannot reference mat:rock:hb_gsi")
+    dlg.prop.setCurrentIndex(i)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_parametric.png")
 
 
 SHOTS.update({
@@ -3229,9 +3230,8 @@ SHOTS.update({
     "lem13_run_lem_mpa": lem13_run_lem_mpa,
     "lem13_build_mesh": lem13_build_mesh,
     "lem13_run_fem": lem13_run_fem,
-    "lem13_li_materials": lem13_li_materials,
-    "lem13_li_run_lem": lem13_li_run_lem,
-    "lem13_li_run_lem_corps": lem13_li_run_lem_corps,
+    "lem13_run_lem_corps": lem13_run_lem_corps,
+    "lem13_parametric": lem13_parametric,
 })
 
 

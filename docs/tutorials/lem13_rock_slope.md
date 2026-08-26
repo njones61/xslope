@@ -1,41 +1,39 @@
 ---
 title: "Tutorial LEM-13 — A Rock Slope (Hoek-Brown)"
-description: "Two rock slopes whose strength comes from four field observations instead of a cohesion and a friction angle: a 10 m cut in a rock mass broken almost to rubble, solved by Spencer's method and then by strength reduction on the same file — and read once more with its intact strength typed in the megapascals the literature quotes — then a strong, lightly jointed mass stated in the normalized form rock-slope charts use."
+description: "A 10 m rock cut whose strength comes from four field observations instead of a cohesion and a friction angle: solved by Spencer's method and then by finite element strength reduction on the same file, read once more with its intact strength typed in the megapascals the literature quotes, and then swept — the Geological Strength Index across its whole range and the blast-disturbance factor across its own — to find which of the four field inputs the factor of safety actually turns on."
 ---
 
 # Tutorial LEM-13 — A Rock Slope (Hoek-Brown)
 
-Two rock slopes, neither of which has a cohesion or a friction angle to enter.
-Part A is a 10 m cut at 45° in a rock mass so heavily jointed that its strength
-is a small fraction of the intact rock's, taken through Spencer's method and then
-through finite element strength reduction on the same file — and read once more
-with its intact strength typed in the megapascals the literature quotes rather
-than the kilopascals the model works in. Part B is a slope in the opposite
-material, strong rock with widely spaced joints, stated in the normalized form
-rock-slope charts use. **A rock mass gets its strength from a curve, and the four
-numbers that curve is built from are field observations, not laboratory
-constants.**
+One rock slope, with no cohesion and no friction angle to enter. Part A is a 10 m
+cut at 45° in a mass so heavily jointed that its strength is a small fraction of
+the intact rock's, taken through Spencer's method and then through finite element
+strength reduction on the same file — and read once more with its intact strength
+typed in the megapascals the literature quotes rather than the kilopascals the
+model works in. Part B sweeps the two inputs that are judgments rather than
+measurements, to see which of the four the answer turns on. **A rock mass gets its
+strength from a curve, and the four numbers that curve is built from are field
+observations, not laboratory constants.**
 
 ![A 10 m rock slope at 45 degrees on a 5 m foundation](images/lem13_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
 <div class="tgt-tile"><span class="tg-label">Analysis</span><p>Limit equilibrium, finite element</p></div>
-<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~20 min</p></div>
+<div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~25 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to analyze a rock slope with the generalized
 Hoek-Brown criterion: what the four inputs mean and where they come from, what
 XSLOPE derives from them, how the criterion reaches a method of slices that wants
-a cohesion and a friction angle, and what stress units cost when the criterion is
-carried over from the literature.
+a cohesion and a friction angle, what stress units cost when the criterion is
+carried over from the literature, and which of the four field inputs the factor of
+safety is actually sensitive to.
 </div>
-<p><span class="tg-pill">one material</span><span class="tg-pill">Hoek-Brown</span><span class="tg-pill">GSI</span><span class="tg-pill">disturbance factor</span><span class="tg-pill">instantaneous tangent</span><span class="tg-pill">circular search</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">strength reduction</span><span class="tg-pill">model checks</span></p>
-<div class="tgm-model" markdown>**Completed models** — [xslope_rock_slope.xlsx](files/xslope_rock_slope.xlsx),
-the weak rock mass of [the Hoek-Brown verification problem](../verification/rs2.md#hoek-brown),
-and [xslope_rock_slope_li.xlsx](files/xslope_rock_slope_li.xlsx), the strong rock
-mass of [verification problem RS2-60](../verification/rs2.md#rs2-60). Neither
-carries a mesh, so Part A's meshing step is done on the file as downloaded</div>
+<p><span class="tg-pill">one material</span><span class="tg-pill">Hoek-Brown</span><span class="tg-pill">GSI</span><span class="tg-pill">disturbance factor</span><span class="tg-pill">instantaneous tangent</span><span class="tg-pill">circular search</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">strength reduction</span><span class="tg-pill">parametric study</span><span class="tg-pill">design sweep</span><span class="tg-pill">model checks</span></p>
+<div class="tgm-model" markdown>**Completed model** — [xslope_rock_slope.xlsx](files/xslope_rock_slope.xlsx),
+the weak rock mass of [the Hoek-Brown verification problem](../verification/rs2.md#hoek-brown).
+It carries no mesh, so the meshing step is done on the file as downloaded</div>
 </div>
 
 ---
@@ -126,7 +124,8 @@ rather than for the geometry.
 
 The curve beside the fields draws the envelope those constants define, in
 τ–σ<sub>n</sub> space over the stress range σ<sub>ci</sub> implies. The left panel
-below redraws it over the stresses this slope actually generates:
+below redraws it over the stresses this slope actually generates; the right panel
+belongs to [Part B](#why-the-index-carries-it) and shows what GSI does to it:
 
 ![The two rock masses' envelopes](images/lem13_envelopes.png){width=1000}
 
@@ -289,105 +288,169 @@ iteration.
 
 ---
 
-## Part B — The same criterion in strong rock
+## Part B — Which inputs move the answer
 
-The second slope runs the same criterion at the other end of its range. GSI = 70
-and m<sub>i</sub> = 15 describe a blocky, lightly jointed mass of a competent rock —
-the material Part A's would be if the joints were widely spaced and the surfaces
-unweathered. The section is a 45° face 1 m high on a 2 m foundation, with 4 m of
-level ground either side, at γ = 23 kN/m³. This is the β = 45° case of
+Four numbers describe this rock, and they are not four numbers of the same kind.
+σ<sub>ci</sub> comes off a core in a laboratory press, and m<sub>i</sub> is read
+from a table once the rock type is named. **GSI and D are judgments made standing
+at the outcrop** — how broken the mass looks, and how roughly it was excavated —
+and they are where the uncertainty in a rock slope actually lives. So the question
+worth asking of this model is which of them the answer is sensitive to.
 
-> [Li, A.J., Merifield, R.S., & Lyamin, A.V. (2008)](https://doi.org/10.1016/j.ijrmms.2007.08.010).
-> "Stability charts for rock slopes based on the Hoek-Brown failure criterion."
-> *International Journal of Rock Mechanics and Mining Sciences* 45(5), 689–700.
+Studio answers it with a **Parametric study**, which re-solves the model across a
+range of one input. Any numeric material property can be swept, including the
+Hoek-Brown columns, and the sweep re-runs the search at every step so the critical
+surface is allowed to move as the rock changes.
 
-and it is [verification problem RS2-60](../verification/rs2.md#rs2-60) in the RS2
-corpus.
+Make sure **σci** is back at `30000` before starting — the sweeps below are read
+against Part A's 1.152.
 
-![A 1 m rock slope at 45 degrees on a 2 m foundation](images/lem13_li_problem_sketch.png){width=1000}
+### Sweeping the Geological Strength Index
 
-### A slope stated as a ratio
+Click **Run → Parametric…** Set **Mode** to `Design (FS target)`, which sweeps one
+parameter between explicit bounds and reports where the curve meets a target,
+rather than the percentage band `Sensitivity` uses. Leave **Method** on `Spencer`
+and **Number of slices** at 40. Under **Parameter**, set **Material** to `rock` and
+**Property** to `hb_gsi` — the **Sweeping** row echoes `mat:rock:hb_gsi`, the
+reference the run will vary. Then set **From** `5`, **To** `20`, **Steps** `6` and
+**Target FS** `1.5`, and leave **Re-search the critical surface at each step**
+ticked:
 
-A 1 m rock slope is not a design problem, and it is not meant to be. Li's charts
-work in the dimensionless ratio σ<sub>ci</sub>/(γH), which is the only quantity a
-Hoek-Brown slope's stability depends on once the angle and the rock-mass constants
-are fixed. A 1 m slope in 4.37 kPa rock and a 100 m slope in 437 kPa rock are the
-same problem with the same factor of safety. Every case in Li's tables sits at a
-*critical* ratio — the value at which the slope is just at the point of collapse —
-so each one should read close to 1.
+![The Parametric dialog set up for the GSI sweep](images/lem13_studio_parametric.png)
 
-Download [xslope_rock_slope_li.xlsx](files/xslope_rock_slope_li.xlsx) and open it:
+The index runs to 100, but the sweep stops at 20 on purpose. Everything this slope
+has to say happens in the bottom fifth of the range — the factor of safety is 1.152
+at GSI 5 and already 2.185 at GSI 15 — and above that the rock simply cannot fail,
+which is also where the run gets expensive: one search takes 53 s at GSI 5 and 66 s
+at GSI 15, but had not finished after five minutes at GSI 25, because a search over
+a slope with no critical surface to find wanders the whole domain before it
+settles.
 
-![The loaded model](images/lem13_li_inputs.png){width=1000}
+Click **Run**. Each step is a full circular search, so give it several minutes:
 
-Open **Materials** and switch to **List view** again:
+![Factor of safety against GSI](images/lem13_gsi_sweep.png){width=800}
 
-![The strong rock mass](images/lem13_studio_li_materials.png)
+Six searches, and the factor of safety more than doubles across them: 1.152 at
+the file's own GSI = 5, then 1.439, 1.740, 2.069 and 2.419 at each further step of
+three, and 2.698 at GSI = 20. The green marker reads the target off the solved
+points — **GSI = 8.611 for FS = 1.5** — so three and a half points of a chart-read
+index separate this cut from the factor of safety a permanent rock slope is asked
+for. Each step solved with its own rock-mass constants:
 
-**σci** = 4.37, **GSI** = 70, **mi** = 15, **D** = 0, and the readout beside the
-plot shows what GSI does. Two of the three derived constants move by orders of
-magnitude between the two rock masses:
+| GSI | m<sub>b</sub> | *s* | *a* | σ<sub>ci</sub>·s<sup>a</sup> (kPa) | FS |
+|---:|---:|---:|---:|---:|---:|
+| 5 | 0.0672 | 2.60 × 10<sup>−5</sup> | 0.619 | 43.5 | 1.152 |
+| 8 | 0.0748 | 3.64 × 10<sup>−5</sup> | 0.598 | 66.7 | 1.439 |
+| 11 | 0.0833 | 5.07 × 10<sup>−5</sup> | 0.580 | 97.0 | 1.740 |
+| 14 | 0.0927 | 7.08 × 10<sup>−5</sup> | 0.565 | 135 | 2.069 |
+| 17 | 0.1032 | 9.88 × 10<sup>−5</sup> | 0.553 | 182 | 2.419 |
+| 20 | 0.1149 | 1.38 × 10<sup>−4</sup> | 0.544 | 239 | 2.698 |
 
-| | Part A (GSI 5) | Part B (GSI 70) |
-|---|:---:|:---:|
-| m<sub>b</sub> | 0.0672 | 5.138 |
-| *s* | 2.60 × 10<sup>−5</sup> | 0.0357 |
-| *a* | 0.619 | 0.501 |
-| σ<sub>ci</sub>·s<sup>a</sup> | 43.5 kPa | 0.822 kPa |
+### Why the index carries it
 
-**The exponent sets the envelope's shape and *s* sets how far above the origin it
-starts.** At GSI = 70, *a* = 0.501 — within a thousandth of the classical
-Hoek-Brown value of 0.5, so the curve is essentially the original 1980
-square-root form. At GSI = 5 it is 0.619, and the curve flattens noticeably
-faster. *s* decides the strength at zero confinement, σ<sub>ci</sub>·s<sup>a</sup>:
-0.822 kPa of Li's 4.37 here, against 43.5 kPa of Hammah's 30,000. The right panel
-of the envelope figure in Part A draws both curves on normalized axes,
-τ/σ<sub>ci</sub> against σ<sub>n</sub>′/σ<sub>ci</sub>, which is the only way to
-see them side by side — one rock is a 30,000 kPa material and the other a 4.37 kPa
-one.
+GSI enters all three rock-mass constants at once, and the three do not move
+together:
 
-### Running it
+$$m_b = m_i \exp\!\left(\frac{GSI - 100}{28 - 14D}\right), \quad
+s = \exp\!\left(\frac{GSI - 100}{9 - 3D}\right), \quad
+a = \tfrac12 + \tfrac16\!\left(e^{-GSI/15} - e^{-20/3}\right)$$
 
-Li's cases are stated at the ratio where the slope is on the point of collapse, so
-the run below has a number to hit before it has anything to compare against. Click
-**Run LEM…**, choose **Method** = `Spencer` and **Analysis** = `Auto search`, and
-leave the slice count at 40:
+Both exponentials are driven by the same *GSI* − 100, but *s* divides it by 9
+where m<sub>b</sub> divides it by 28, so *s* collapses about three times as fast.
+That is what the table's σ<sub>ci</sub>·s<sup>a</sup> column carries: **the
+strength the mass has at zero confinement** — 43.5 kPa at GSI = 5 and 239 kPa at
+GSI = 20, five and a half times as much across fifteen points of the index, and
+5,641 kPa at the GSI = 70 of the envelope figure's third curve. A slope this size
+generates at most γH = 25 × 10 = 250 kPa of vertical stress and its critical
+surface averages 47 kPa, so it lives at the low-confinement end
+of the envelope — exactly where *s* decides the answer. The exponent *a* does the
+rest by bending the curve: it runs from 0.619 at GSI = 5 to 0.544 at GSI = 20 in
+the table, and reaches 0.501 at the envelope figure's GSI = 70 — the difference
+between an envelope that flattens quickly and the classical square-root form.
 
-![The Run LEM dialog on Li's model](images/lem13_studio_li_run_lem.png)
+The right panel of [the envelope figure in Part A](#opening-the-model) draws that
+directly — the same σ<sub>ci</sub>, m<sub>i</sub> and D at three values of the
+index. The three curves are not one curve scaled: they start at different heights
+and bend by different amounts, which is why one field judgement moves the factor
+of safety as far as it does.
 
-**Model checks — 1 warning**, and it is the same σ<sub>ci</sub> magnitude check
-[the MPa slip](#the-mpa-slip) tripped in Part A — read here and left alone, because
-a normalized model is the one case the message itself names where a value that
-small is meant. Click **Run**:
+### The disturbance factor
 
-![Spencer's critical circle on the strong rock mass](images/lem13_li_spencer.png){width=1000}
+D describes how much the excavation damaged the mass beyond its natural jointing:
+0 for a face cut by machine or careful presplit blasting, 1 for one wrecked by
+production blasting. It appears in the denominators above, so raising it shrinks
+both m<sub>b</sub> and *s* — the same collapse GSI causes, from the other
+direction.
 
-**FS = 1.035**, against Slide2's Spencer 1.035 on the same section and
-Li's own reference value of 1.0 for a critical ratio. The circle is centered at
-(3.67, 3.53) and tangent at elevation 1.97, 1.59 m of surface
-carrying 6.3 kN/m — a shallow toe mechanism, which is what Li reports for this
-angle.
+Open **Run → Parametric…** again and change three things: **Property** to `hb_d`,
+**From** `0`, **To** `1`, **Steps** `5`. Everything else stays. Click **Run**:
+
+![Factor of safety against the disturbance factor](images/lem13_d_sweep.png){width=800}
+
+Five searches, and the answer falls the whole way down: 1.152 at D = 0, then
+0.873, 0.616 and 0.378, and 0.176 at D = 1. The target is never bracketed, and the
+banner across the top of the figure says so rather than extrapolating a value past
+the last solved point — the factor of safety spans [0.176, 1.15] over the entire
+range D has. The curve crosses FS = 1 instead, between D = 0 and D = 0.25:
+
+| D | m<sub>b</sub> | *s* | σ<sub>ci</sub>·s<sup>a</sup> (kPa) | FS |
+|---:|---:|---:|---:|---:|
+| 0 | 0.0672 | 2.60 × 10<sup>−5</sup> | 43.5 | 1.152 |
+| 0.25 | 0.0414 | 9.98 × 10<sup>−6</sup> | 24.0 | 0.873 |
+| 0.50 | 0.0217 | 3.15 × 10<sup>−6</sup> | 11.8 | 0.616 |
+| 0.75 | 0.0088 | 7.72 × 10<sup>−7</sup> | 4.92 | 0.378 |
+| 1 | 0.0023 | 1.33 × 10<sup>−7</sup> | 1.66 | 0.176 |
+
+Nothing about the rock changed across those five runs — same σ<sub>ci</sub>, same
+m<sub>i</sub>, same jointing — only how the face was excavated. D sits in the
+denominator of both exponents, so it collapses m<sub>b</sub> and *s* the way a
+falling GSI does: m<sub>b</sub> from 0.0672 to 0.0023 and *s* from
+2.60 × 10<sup>−5</sup> to 1.33 × 10<sup>−7</sup>, and the unconfined mass strength
+with them, 43.5 kPa down to 1.66. The exponent *a* holds at 0.619 throughout,
+since GSI alone sets it.
+
+The first quarter of the range costs 0.279 of factor of safety, 1.152 to 0.873 —
+as much as the first three points of GSI returned — so the two field judgments
+carry comparable weight on this slope. They part company on what the sweep can
+conclude. GSI meets the 1.5 target inside its own range, at 8.611. D meets it
+nowhere: the best face this rock can be given, D = 0, returns the 1.152 Part A
+solved, and every value above that is worse. **A mass at GSI = 5 will not stand a
+45° cut at a factor of safety of 1.5 however carefully it is excavated** — the
+index has to be higher, or the slope flatter.
 
 ### A friction angle steep enough to stop a method
 
-One more property of this rock mass decides which methods can solve it. A
-Hoek-Brown envelope is steep where the confinement is low, and at GSI = 70 it is
-very steep: on the critical surface above, φ<sub>i</sub> reaches 56.9° on
-the lightly loaded slices near the crest, against 36.9° at the same place
-on Part A's broken mass. The Corps of Engineers and Lowe & Karafiath methods fix
-the inclination of the interslice forces before solving rather than solving for
-it, and above about 55° they can fail to reach a solution at all — a property of
-those two force-equilibrium methods rather than of Hoek-Brown, since a plain
-Mohr-Coulomb material at φ > 55° defeats them the same way. Selecting either one
-on a Hoek-Brown material puts the pairing in the checks column before the run
-starts:
+A Hoek-Brown envelope is steepest where the confinement is lowest, and how steep
+it gets there is set by m<sub>i</sub> rather than by GSI. This rock's
+m<sub>i</sub> = 2 sits at the very soft end of the table, so its envelope never
+gets steep: the instantaneous friction angle at zero confinement is
+36.9° at GSI = 5 and 34.7° at GSI = 70, peaking at only
+46.7° in between. Put a granite's m<sub>i</sub> = 25 in the same cells and
+the same two ends read 72.5° and 71.9°.
 
-![Corps of Engineers selected on the Hoek-Brown material](images/lem13_studio_li_run_lem_corps.png)
+That second case is the one to know about before running a competent rock. The
+Corps of Engineers and Lowe & Karafiath methods fix the inclination of the
+interslice forces before solving rather than solving for it, and above about 55°
+they can fail to reach a solution at all — a property of those two
+force-equilibrium methods rather than of Hoek-Brown, since a plain Mohr-Coulomb
+material at φ > 55° defeats them the same way. Selecting either one on a
+Hoek-Brown material puts the pairing in the checks column before the run starts,
+whatever the constants happen to be:
+
+![Corps of Engineers selected on the Hoek-Brown material](images/lem13_studio_run_lem_corps.png)
 
 Spencer's method and the Morgenstern-Price method solve for the inclination
 instead of fixing it, which is why this page runs Spencer throughout. Bishop's
 simplified method avoids the difficulty another way, by carrying no interslice
-shear at all — which is why Part A's Bishop run converged on the same section.
+shear at all — which is why Part A's Bishop run converged on this section.
+
+One last note on the σ<sub>ci</sub> check from Part A: it fires on any
+σ<sub>ci</sub> below 1000 kPa, which includes models stated deliberately in
+normalized form — the Li, Merifield & Lyamin (2008) rock-slope charts hold
+σ<sub>ci</sub>/(γH) at a critical ratio and reach σ<sub>ci</sub> values of a few
+kilopascals, and [verification problem RS2-60](../verification/rs2.md#rs2-60)
+carries three of them. There the check is read and ignored, which is the one case
+its own message names.
 
 ---
 
@@ -404,13 +467,17 @@ This tutorial covered:
 - One rock slope solved by Spencer's method and by finite element strength
   reduction from the same file, the two engines agreeing to 1.2% and both landing
   within 1.4% of the published values.
-- What GSI does to the envelope's shape, from a nearly classical square-root curve
-  at GSI = 70 to a distinctly flatter one at GSI = 5.
+- A Design sweep in the Parametric study: which of the four field inputs the
+  factor of safety turns on, and why the Geological Strength Index has the leverage
+  it does — *s* collapses about three times as fast as m<sub>b</sub>, and a slope
+  this size lives at the low confinement where *s* decides the answer.
 - σ<sub>ci</sub> entered in the model's own stress units, the model check that
   reports a value small enough to have been carried over in MPa, and the 0.104 a
   slope reads once its rock mass has been mis-keyed a thousandfold weak.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
+[LEM-11](lem11_reliability.md) turns the same kind of input uncertainty into a
+probability of failure instead of a sweep.
 [LEM-7](lem07_strength_envelopes.md) covers the other two nonlinear strength
 options — a power-curve envelope and an undrained strength that grows with depth —
 and the [Limit Equilibrium Method overview](../lem/overview.md#hoek-brown-strength)

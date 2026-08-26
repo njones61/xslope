@@ -1,22 +1,19 @@
-"""Build Tutorial LEM-13's rock-slope PAIR (the Hoek-Brown models).
+"""Build Tutorial LEM-13's rock-slope model (the Hoek-Brown tutorial file).
 
-LEM-13 runs the generalized Hoek-Brown strength option at the two ends of the
-criterion, and both models are DERIVED from the committed verification corpus
-rather than restated here:
+LEM-13 runs the generalized Hoek-Brown strength option on one section, and that
+model is DERIVED from the committed verification corpus rather than restated here:
 
     docs/verification/files/rocscience/hammah_hb1.xlsx
-      -> docs/tutorials/files/xslope_rock_slope.xlsx        (Part A)
-
-    docs/verification/files/rocscience/rs2_60c.xlsx
-      -> docs/tutorials/files/xslope_rock_slope_li.xlsx     (Part B)
+      -> docs/tutorials/files/xslope_rock_slope.xlsx
 
 so the section, the four Hoek-Brown inputs and the unit weight a reader reads off
 the page can never drift from the ones
 [the verification page](../docs/verification/rs2.md#hoek-brown) measures. Nothing
-here hand-edits an xlsx; both files are written through the package writer at the
+here hand-edits an xlsx; the file is written through the package writer at the
 current template version.
 
-Part A — Hammah, Yacoub, Corkum & Curran (2005), ARMA/USRMS 05-810, Example 1.
+The problem — Hammah, Yacoub, Corkum & Curran (2005), ARMA/USRMS 05-810,
+Example 1.
 A 10 m, 45 degree slope in a badly broken rock mass: sigma_ci = 30 MPa entered as
 30,000 kPa, GSI = 5, mi = 2, D = 0, gamma = 25 kN/m3, with E = 5,000 MPa and
 nu = 0.3 for the strength-reduction half of the page. GSI = 5 puts the exponent
@@ -24,38 +21,26 @@ a at 0.619, far from the classical 0.5, which is what makes the case a test of
 the criterion rather than of the geometry. Locked at Bishop 1.150 / Spencer 1.152
 in the LEM and SSRM 1.159 on tri6 elements at a 0.9 m target size.
 
-Part B — Li, Merifield & Lyamin (2008), IJRMMS 45, 689-700, the beta = 45 degree
-case. The same criterion at GSI = 70 and mi = 15: a strong, lightly jointed rock
-mass whose exponent a is 0.501. The problem is NORMALIZED — H = 1 m, so gamma*H
-is 23 kPa and the critical strength ratio puts sigma_ci at 4.37 kPa. Those
-magnitudes carry the page's units trap, since Hoek-Brown convention invites MPa.
-Locked at Spencer 1.035.
-
-What the tutorial files change from the corpus, and why
-------------------------------------------------------
-* **The corpus's own starting circle is kept.** Both pages are open-and-run: the
-  reader downloads a completed model and never places a circle, so the seed's
-  only job is to put the search on the answer the verification page measures. It
-  does that and the standing Xo-mid-slope / Yo-at-twice-the-height / Depth-circle
-  seed does not, quite: on Li's 1 m section that seed refines onto a marginally
-  different circle and reports 1.033 against the corpus's 1.035, and on Hammah's
-  it reports Bishop 1.151 against the corpus's 1.150. Both are the same
-  mechanism at the same daylight point, but a tutorial that printed 1.033 beside
-  a verification page printing 1.035 would read as a disagreement between two
-  pages about one model.
-* **gamma_sat is cleared.** Neither model has a water table, and a saturated
+What the tutorial file changes from the corpus, and why
+-------------------------------------------------------
+* **The corpus's own starting circle is kept.** The page is open-and-run: the
+  reader downloads a completed model and never places a circle, so the seed's only
+  job is to put the search on the answer the verification page measures. It does
+  that and the standing Xo-mid-slope / Yo-at-twice-the-height / Depth-circle seed
+  does not, quite — that seed reports Bishop 1.151 against the corpus's 1.150, the
+  same mechanism at the same daylight point but a marginally different circle, and
+  a tutorial printing 1.151 beside a verification page printing 1.150 would read as
+  two pages disagreeing about one model.
+* **gamma_sat is cleared.** The model has no water table, and a saturated
   unit weight that can never apply raises a model check on a page whose runs are
   meant to open clean.
-* **Part A declares the finite element run it is solved on** — tri6 at a 0.9 m
+* **The file declares the finite element run it is solved on** — tri6 at a 0.9 m
   target size, the strength-reduction bracket 0.8 to 1.6, and K0 = 1 — so
   Studio's Build Mesh and Run FEM dialogs open on the tutorial's own run instead
-  of on the defaults. Those are the settings the SSRM lock tag names. Neither
-  file carries a mesh sidecar: the page builds the mesh in Studio.
-* **Part B declares no finite element settings.** SSRM is not locked on Li's
-  problem, and the page runs it in the limit equilibrium engine only.
+  of on the defaults. Those are the settings the SSRM lock tag names. The file
+  carries no mesh sidecar: the page builds the mesh in Studio.
 
-Run:  PYTHONPATH=. python3 tools/build_rock_slope.py          # both
-      PYTHONPATH=. python3 tools/build_rock_slope.py li       # one
+Run:  PYTHONPATH=. python3 tools/build_rock_slope.py
 """
 
 from __future__ import annotations
@@ -77,10 +62,7 @@ CORPUS = os.path.join(REPO_ROOT, "docs", "verification", "files", "rocscience")
 TUTORIAL_FILES = os.path.join(REPO_ROOT, "docs", "tutorials", "files")
 
 HAMMAH_BASE = os.path.join(CORPUS, "hammah_hb1.xlsx")
-LI_BASE = os.path.join(CORPUS, "rs2_60c.xlsx")
-
 HAMMAH_OUT = "xslope_rock_slope.xlsx"
-LI_OUT = "xslope_rock_slope_li.xlsx"
 
 #: Part A's finite element run, from the SSRM lock tag at
 #: docs/verification/rs2.md (element_type=tri6, target_size=0.9, f_min=0.8,
@@ -125,8 +107,8 @@ def _write(sd, filename):
 
 
 def build_hammah():
-    """Part A: the weak-rock slope, carrying the finite element run as well as the
-    limit equilibrium one, since it is the page's two-engine comparison."""
+    """The weak-rock slope, carrying the finite element run as well as the limit
+    equilibrium one, since the page is a two-engine comparison."""
     sd = _base(HAMMAH_BASE)
     sd["element_type"] = ELEMENT_TYPE
     sd["target_size"] = TARGET_SIZE
@@ -136,20 +118,5 @@ def build_hammah():
     return _write(sd, HAMMAH_OUT)
 
 
-def build_li():
-    """Part B: the strong-rock slope, limit equilibrium only."""
-    return _write(_base(LI_BASE), LI_OUT)
-
-
-TARGETS = {"hammah": build_hammah, "li": build_li}
-
-
-def main(argv):
-    for name in argv[1:] or list(TARGETS):
-        if name not in TARGETS:
-            raise SystemExit(f"unknown target {name!r}; choices: {list(TARGETS)}")
-        TARGETS[name]()
-
-
 if __name__ == "__main__":
-    main(sys.argv)
+    build_hammah()

@@ -298,11 +298,7 @@ the dialog's defaults:
 **Analysis** stays on **Auto search**, which the dialog opens on. The search
 starts from the circle the file carries — center (275, 235), radius 160 ft,
 tangent at elevation 75 — and moves the center and the tangent depth until the
-factor of safety stops falling. Both workbooks carry that same starting circle,
-so every run on this page starts in the same place and reports the critical
-surface it found for the water it was given. A surface critical under one water
-state is not critical under another, so a run handed a neighbor's surface would
-report a number that is not the lowest its own state can produce.
+factor of safety stops falling.
 
 Leave **Number of slices** at 40.
 

@@ -1,9 +1,9 @@
 ---
-title: "Tutorial COMBO-1 — Seepage → Stability"
+title: "Tutorial COMBO-1 — Seepage → LEM → FEM"
 description: "One XSLOPE file run three ways — a finite element seepage solution on the Johnson Reservoir dam, then a Spencer search and a strength reduction on the same mesh and the same pore pressures — and the one material column that decides whether the stability engines read the seepage answer or ignore it."
 ---
 
-# Tutorial COMBO-1 — Seepage → Stability
+# Tutorial COMBO-1 — Seepage → LEM → FEM
 
 The tutorials before this one work one analysis at a time: the limit equilibrium
 pages find a factor of safety, the seepage pages find a head field, the finite

@@ -81,7 +81,7 @@ nav:
       - "2. Reinforcement: LEM vs FEM": tutorials/fem02_reinforcement.md
       - "3. Piles: LEM vs FEM": tutorials/fem03_piles.md
     - Combined:
-      - 1. Seepage → Stability: tutorials/combo01_seepage_stability.md
+      - 1. Seepage → LEM → FEM: tutorials/combo01_seepage_stability.md
       - 2. Rapid Drawdown: tutorials/combo02_rapid_drawdown.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md

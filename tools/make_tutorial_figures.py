@@ -5970,8 +5970,15 @@ def _combo02_sweep_figure(rows, crossing, file_d):
             label="reported factor of safety — the lower of the two")
     ax.plot(ds, [r["stage2_FS"] for r in rows], "o-", color="#1f6fb4", lw=1.4,
             ms=5, label="Stage 2 — drawn down, undrained core")
-    ax.plot(ds, [r["stage3_FS"] for r in rows], "s-", color="#c1663a", lw=1.4,
-            ms=5, label="Stage 3 — drawn down, drained where drained is lower")
+    # Stage 3 is drawn only where it ran. Left of the handover no core slice is
+    # weaker drained than undrained, the stage is not run, and the engine reports
+    # stage 2 — drawing a stage-3 marker there would say the drained strength was
+    # the lower one on every slice, which is the opposite of what happened.
+    ran = [r for r in rows if r["n_drained"] > 0]
+    ax.plot([r["d"] for r in ran], [r["stage3_FS"] for r in ran], "s-",
+            color="#c1663a", lw=1.4, ms=5,
+            label="Stage 3 — drawn down, drained strength on the core slices "
+                  "where it is lower")
     ax.axvline(crossing, color="#7a8592", lw=0.9, ls="--")
     ax.axvline(file_d, color="#8a5a3b", lw=0.9, ls=":")
     x0, x1 = ax.get_xlim()
@@ -5979,7 +5986,8 @@ def _combo02_sweep_figure(rows, crossing, file_d):
     # Ticks off the swept values themselves, so the grid follows the sweep
     # wherever it is set rather than a hand-picked list.
     ax.set_xticks(sorted({min(ds), max(ds)} | {d for d in ds if d % 200 == 0}))
-    ax.text(x0 + 0.01 * (x1 - x0), ymin + 0.03 * span, "stage 2 governs",
+    ax.text(x0 + 0.01 * (x1 - x0), ymin + 0.03 * span,
+            "stage 2 governs:\nundrained lower on\nevery core slice",
             ha="left", color="#5b646f", fontsize=9)
     ax.text(x1 - 0.01 * (x1 - x0), ymin + 0.03 * span, "stage 3 governs",
             ha="right", color="#5b646f", fontsize=9)

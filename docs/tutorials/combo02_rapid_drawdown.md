@@ -847,8 +847,8 @@ lower of the two at every value.
 
 **The handover is at d = 223 psf**, 27 psf *below* the value on the file, which is
 why the model as shipped already reports stage 3. Below 223 psf every core slice
-is stronger undrained than drained, stage 3 is not run at all, and the two curves
-are one line. Past the crossover a stronger envelope changes almost nothing — the
+is stronger undrained than drained, so stage 3 is not run and only the stage-2
+curve is drawn. Past the crossover a stronger envelope changes almost nothing — the
 drained strength has become the limit — and a run that reports stage 3 as its
 governing stage is saying the undrained strengths never controlled.
 

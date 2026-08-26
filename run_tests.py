@@ -7049,8 +7049,16 @@ def run_fs_vs_time_mode_test(test):
     every failed row, the sentinel/negative screen, the refusal of a field
     interpolated between frames, one re-march for the whole set rather than one per
     instant, the base-model gate before the first solve, and the critical
-    time/minimum the curve reports. File-light (it loads the shipped ACADS sample
-    and builds synthetic frame ledgers) and solves no seepage.
+    time/minimum the curve reports. Those legs are file-light (they load the shipped
+    ACADS sample and build synthetic frame ledgers) and solve no seepage.
+
+    Two Studio legs follow, and skip cleanly without PySide6: the Parametric
+    dialog's fourth mode (the entry, its fields in place of the parameter picker,
+    and the plain reason on each model that cannot make a curve), and the whole path
+    end to end -- the COMBO-3 tutorial dam meshed, marched and swept through the
+    dialog's own options and the Studio runner, against that page's published curve.
+    The end-to-end leg solves real seepage and searches at every instant, so this row
+    costs a couple of minutes.
 
     Returns (0.0, None) on success, else (None, message) — a pass/fail test.
     """
@@ -11914,6 +11922,7 @@ def _expected_and_tol(test, default_tolerance):
 _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_elements': 5,
               'preflight_corpus': 5, 'preflight_rules': 4,
               'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'fs_vs_time': 5,
+              'fs_vs_time_mode': 4,
               'transient_seep': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2,
               'spencer_disclosure': 3}

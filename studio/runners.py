@@ -737,6 +737,9 @@ class SensitivityRunner(RunnerThread):
       * sensitivity, plot_type variance -> ``variance_contribution()``
       * sensitivity, plot_type rank     -> ``mc_rank_correlation()``
         -> bundle {'kind':'sensitivity', 'plot_type': …, <payload>, method}.
+      * fs_vs_time     -> ``fs_vs_time()``     -> bundle {'kind':'fs_vs_time', …},
+                          which sweeps the frames of the transient seepage
+                          solution handed in rather than a parameter.
     """
 
     succeeded = Signal(object)
@@ -744,10 +747,11 @@ class SensitivityRunner(RunnerThread):
     cancelled = Signal()
     progress = Signal(int, int, str)   # done, total, label
 
-    def __init__(self, slope_data, options, parent=None):
+    def __init__(self, slope_data, options, parent=None, transient=None):
         super().__init__(parent)
         self._sd = slope_data
         self._opts = options
+        self._transient = transient
         self._cancel = threading.Event()
 
     def cancel(self):
@@ -756,7 +760,9 @@ class SensitivityRunner(RunnerThread):
     def run(self):
         from xslope.search import AnalysisCancelled
         try:
-            if self._opts.get("mode") in ("design", "back_analysis"):
+            if self._opts.get("mode") == "fs_vs_time":
+                self._run_fs_vs_time()
+            elif self._opts.get("mode") in ("design", "back_analysis"):
                 self._run_design()
             else:
                 self._run_sensitivity()
@@ -808,6 +814,63 @@ class SensitivityRunner(RunnerThread):
         # 'study' field (set by back_analysis) drives the title/status wording.
         self.succeeded.emit({"kind": "design",
                              "study": res.get("study", "design"), **res})
+
+    def _run_fs_vs_time(self):
+        """The factor of safety at every chosen instant of the transient march.
+
+        The per-instant table is printed to the Log as it is the record of the run:
+        a curve is read for where it dips, and an instant that produced no result is
+        a row carrying its reason there rather than a gap nobody can account for.
+        """
+        from xslope.sensitivity import fs_vs_time
+        o = self._opts
+        emode = o.get("engine_mode", "lem")
+        method = o.get("method", "spencer")
+        times = [float(t) for t in (o.get("times") or [])]
+        if not times:
+            self.failed.emit("Tick at least one saved instant to evaluate.")
+            return
+        if self._transient is None:
+            self.failed.emit("Run a transient seepage analysis first — an "
+                             "FS-versus-time curve reads its saved frames.")
+            return
+        total = len(times)
+
+        def cb(done, _t, label):
+            self.progress.emit(int(done), total, str(label))
+
+        unit = str(self._sd.get("time_unit") or "").strip()
+        engine_tag = method if emode == "lem" else "SSRM"
+        print(f"Factor of safety vs time ({emode}): {total} instant(s) of the "
+              f"transient march, {engine_tag}, "
+              f"{'re-searching' if o.get('search', True) else 'on the entered surface'} "
+              f"at each…")
+        ok, res = fs_vs_time(self._sd, self._transient, times=times, mode=emode,
+                             methods=(method,), search=o.get("search", True),
+                             num_slices=o.get("num_slices", 40),
+                             fem_opts=o.get("fem_opts"),
+                             progress_callback=cb,
+                             cancel_check=self._cancel.is_set)
+        if not ok:
+            self.failed.emit(str(res))
+            return
+        for _i, row in res["df"].iterrows():
+            print("  t = %-10s %-9s %s"
+                  % (f"{row['value']:g}{(' ' + unit) if unit else ''}",
+                     row["method"],
+                     ("FS = %.4f" % row["fs"]) if row["success"]
+                     else "no result — %s" % row["msg"]))
+        if res.get("min_fs") is not None:
+            print("Lowest factor of safety %.4f at t = %g%s (%d instant(s), "
+                  "%d without a result)."
+                  % (res["min_fs"], res["critical_time"],
+                     (" " + unit) if unit else "", total, res["n_failed"]))
+        # The solution rides back with the result so a caller need not pay twice for
+        # a re-march; nothing re-marches on this path (only saved frames are
+        # offered), and the document already holds the march, so it is dropped
+        # rather than stored a second time.
+        res.pop("solution", None)
+        self.succeeded.emit({"kind": "fs_vs_time", "method": engine_tag, **res})
 
     def _run_sensitivity(self):
         o = self._opts

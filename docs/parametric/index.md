@@ -20,7 +20,9 @@ stability analysis against every saved instant of a
 [transient seepage](../seep/transient.md) solution and reports when the slope is at its
 weakest. It shares the machinery above and needs no parameter reference at all — nothing
 is substituted, because each point solves the same model against a different computed
-pore-pressure field.
+pore-pressure field. Studio offers it as the Parametric dialog's
+[Factor of safety vs time](../studio/analysis.md#factor-of-safety-vs-time) mode, which
+ticks the march's saved frames and draws the curve in an **FS vs Time** result tab.
 
 This is the geotechnical staple — Duncan & Wright present exactly these charts (FS vs
 parameter, and tornado diagrams comparing several parameters at their low/high bounds) —

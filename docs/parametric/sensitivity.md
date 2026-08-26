@@ -171,7 +171,11 @@ the `param` column reads `time`.
 
 Alongside `df` the result carries `critical_time` and `min_fs` — the instant of the lowest
 factor of safety and its value — plus `critical` (the same pair per method when several
-ran), `times`, `n_failed`, and `solution`.
+ran), `times`, `n_failed`, and `solution`. `xslope.plot.plot_fs_vs_time` draws the result
+directly: the curve, its lowest instant annotated, and the model's drawdown schedule behind
+it. In Studio the same run is the Parametric dialog's
+[Factor of safety vs time](../studio/analysis.md#factor-of-safety-vs-time) mode, where the
+instants are ticked off the loaded march and the curve opens in an **FS vs Time** tab.
 
 **The instant is never interpolated.** A time that names no saved frame is served by
 re-marching with that instant injected into the saved schedule — pass `seep_data=` to

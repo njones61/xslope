@@ -326,17 +326,48 @@ Critical FS = 1.496
 Sliding mass = 5,635.3 kN/m over 57.41 m of failure surface
 ```
 
-Repeating that for each of the twelve saved frames — twelve runs, a few seconds
-each — produces the whole curve. Studio runs one instant at a time; it has no
-control that sweeps them.
+That is one instant. Run LEM answers one at a time, which is what the **Seepage
+time** group is for, and repeating it twelve times would draw the curve by hand.
 
-### The whole curve in one call
+### The whole curve in one run
 
-The sweep itself is `xslope.sensitivity.fs_vs_time`, which runs the stability
-analysis against every saved frame and tabulates the result. The **assistant** in
-Studio drives it directly: ask it *"Run the factor of safety against every saved
-frame of the transient solution with Spencer and plot the curve"* and it builds
-the table and the figure below. From a script the call is:
+Click **Run → Parametric…** and set **Mode** to **Factor of safety vs time**:
+
+![The Parametric dialog sweeping the march's saved frames](images/combo03_studio_parametric.png)
+
+The parameter picker the other three modes use is gone, because nothing is
+substituted here: every point solves *this* model against a different instant's
+pore pressures. In its place is a **Saved frames** list holding the twelve the
+march stored, all ticked — **All** and **None** set the whole list, and unticking
+samples a long march, since each frame is a full stability run. Set **Method** to
+**Spencer** and leave **Number of slices** at 40 and **Re-search the critical
+surface at each step** ticked, which is the right setting here because the
+mechanism moves.
+
+Click **Run**. Twelve searches, a few seconds each, stream their factors of safety
+to the Log:
+
+```text
+Factor of safety vs time (lem): 12 instant(s) of the transient march, spencer, re-searching at each…
+  t = 0 day      spencer   FS = 1.8308
+  t = 2 day      spencer   FS = 1.8308
+  t = 15 day     spencer   FS = 1.6073
+  t = 30 day     spencer   FS = 1.4962
+  ...
+Lowest factor of safety 1.4962 at t = 30 day (12 instant(s), 0 without a result).
+```
+
+The run opens an **FS vs Time** tab with the curve, its lowest instant ringed and
+labelled, and the reservoir schedule that drives it drawn faintly behind:
+
+![The FS vs Time result tab](images/combo03_studio_fs_time.png)
+
+**Day 30 reads 1.4962 here too** — the sweep applies the same search window off
+the circles sheet that Run LEM applies, so one dialog run and twelve swept ones
+land on the same number. An instant that produces no result comes back as a row
+carrying its reason rather than as a gap in the curve.
+
+From a script the same run is `xslope.sensitivity.fs_vs_time`:
 
 ```python
 from xslope.sensitivity import fs_vs_time
@@ -345,12 +376,7 @@ ok, res = fs_vs_time(slope_data, solution, methods=("spencer",), search=True)
 print(f"minimum FS = {res['min_fs']:.3f} at t = {res['critical_time']:g}")
 ```
 
-It reads the same search window off the circles sheet that Run LEM reads, so a
-scripted curve and twelve dialog runs land on the same numbers — 1.4962 at
-t = 30 either way. `search=True` re-searches at every instant, which is the right
-default here because the mechanism moves. Alongside the per-instant table it
-returns `critical_time` and `min_fs`, and an instant that produces no result
-comes back as a row carrying its reason rather than as a gap in the curve.
+Alongside the per-instant table it returns `critical_time` and `min_fs`.
 [Factor of safety versus time](../parametric/sensitivity.md#factor-of-safety-versus-time)
 carries the mode in full.
 
@@ -518,7 +544,8 @@ This tutorial covered:
   points, so the axis is time and everything the curve does is the water moving.
 - How a frame reaches a stability run — `u = seep` on the materials table sends
   every slice base to a solved field, and Run LEM's **Seepage time** group names
-  which frame that is, with the option to write the choice back to the model.
+  which frame that is, with the option to write the choice back to the model;
+  **Run → Parametric… → Factor of safety vs time** sweeps all of them at once.
 - Why the curve needs a search window: the critical surface moves as the pore
   pressures change, and the limits on the circles sheet keep the movement inside
   one mechanism instead of letting it jump to the downstream slope or down to a

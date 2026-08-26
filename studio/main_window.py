@@ -236,6 +236,11 @@ class SweepCanvas(MplCanvas):
         self._draw(lambda fig: plot_sensitivity(df, target_fs=target_fs, fig=fig),
                    dxf=False)
 
+    def render_fs_vs_time(self, result, slope_data=None):
+        from xslope.plot import plot_fs_vs_time
+        self._draw(lambda fig: plot_fs_vs_time(result, slope_data=slope_data,
+                                               fig=fig), dxf=False)
+
     def render_design(self, df, target_fs, summary):
         from xslope.plot import plot_sensitivity
 
@@ -303,6 +308,7 @@ class MainWindow(QMainWindow):
         self.sens_canvas = None            # tornado
         self.sens_curve_canvas = None      # click-through FS-vs-value curve
         self.design_canvas = None          # design curve + target crossing
+        self.fs_time_canvas = None         # factor of safety vs time (transient)
         self.seep_data_canvas = {}        # bc set -> MplCanvas
         self.seep_solution_canvas = {}    # bc set -> MplCanvas
         self.transient_seep_view = None   # TransientSeepView (frames + play bar)
@@ -1877,6 +1883,7 @@ class MainWindow(QMainWindow):
             return
         single = ["search_canvas", "solution_canvas", "reliability_canvas",
                   "sens_canvas", "sens_curve_canvas", "design_canvas",
+                  "fs_time_canvas",
                   "fem_data_canvas", "fem_results_canvas"]
         if clear_mesh:
             single.append("mesh_canvas")
@@ -1903,7 +1910,7 @@ class MainWindow(QMainWindow):
         self.seep_solution_canvas = {}
         self.transient_seep_view = None
         for key in ("lem_solution", "seep_solutions", "transient_seep",
-                    "fem_solution", "design", "sensitivity"):
+                    "fem_solution", "design", "sensitivity", "fs_vs_time"):
             self.doc.results.pop(key, None)
         if clear_mesh:
             self.doc.slope_data["mesh"] = None
@@ -3133,7 +3140,8 @@ class MainWindow(QMainWindow):
             return
         dlg = SensitivityDialog(self, defaults=self._last_sens_opts.get(self._mode, {}),
                                 slope_data=self.doc.slope_data, app_mode=self._mode,
-                                document=self.doc)
+                                document=self.doc,
+                                transient=self.transient_solution())
         if not dlg.exec():
             return
         opts = dlg.options()
@@ -3152,14 +3160,15 @@ class MainWindow(QMainWindow):
             return
         self.act_sensitivity.setEnabled(False)
         self.act_run.setEnabled(False)
-        verb = {"design": "Design sweep", "back_analysis": "Back-analysis"}.get(
-            study, "Sensitivity sweep")
+        verb = {"design": "Design sweep", "back_analysis": "Back-analysis",
+                "fs_vs_time": "FS vs time"}.get(study, "Sensitivity sweep")
         self.statusBar().showMessage(f"{verb} — {opts['method']} …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
         self.cancel_btn.setEnabled(True)
         self.cancel_btn.setVisible(True)
-        self._sens_runner = SensitivityRunner(self.doc.slope_data, opts, parent=self)
+        self._sens_runner = SensitivityRunner(self.doc.slope_data, opts, parent=self,
+                                             transient=self.transient_solution())
         self._sens_runner.succeeded.connect(self._on_sens_succeeded)
         self._sens_runner.failed.connect(self._on_sens_failed)
         self._sens_runner.cancelled.connect(self._on_sens_cancelled)
@@ -3168,7 +3177,21 @@ class MainWindow(QMainWindow):
         self._sens_runner.start()
 
     def _on_sens_succeeded(self, bundle):
-        if bundle.get("kind") == "design":
+        if bundle.get("kind") == "fs_vs_time":
+            self.doc.results["fs_vs_time"] = bundle
+            self._show_fs_vs_time()
+            if self.fs_time_canvas is not None:
+                self.view_tabs.setCurrentWidget(self.fs_time_canvas)
+            unit = str(self.doc.slope_data.get("time_unit") or "").strip()
+            if bundle.get("min_fs") is not None:
+                self.statusBar().showMessage(
+                    f"FS vs time — lowest {bundle['min_fs']:.3f} at t = "
+                    f"{bundle['critical_time']:g}{(' ' + unit) if unit else ''} "
+                    f"over {len(bundle.get('times', []))} instant(s)")
+            else:
+                self.statusBar().showMessage(
+                    "FS vs time — no instant produced a result; see the Log pane.")
+        elif bundle.get("kind") == "design":
             self.doc.results["design"] = bundle
             self._show_design()
             if self.design_canvas is not None:
@@ -3218,6 +3241,21 @@ class MainWindow(QMainWindow):
             self._sens_runner.deleteLater()
             self._sens_runner = None
         self._update_run_actions()
+
+    def _show_fs_vs_time(self):
+        if self.fs_time_canvas is None:
+            self.fs_time_canvas = SweepCanvas(self)
+            self.view_tabs.addTab(self.fs_time_canvas, "FS vs Time")
+        self._rerender_fs_vs_time()
+
+    def _rerender_fs_vs_time(self):
+        bundle = self.doc.results.get("fs_vs_time")
+        if bundle and self.fs_time_canvas is not None:
+            try:
+                self.fs_time_canvas.render_fs_vs_time(bundle,
+                                                      slope_data=self.doc.slope_data)
+            except Exception:
+                traceback.print_exc()
 
     def _show_design(self):
         if self.design_canvas is None:

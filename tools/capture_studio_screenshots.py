@@ -57,6 +57,15 @@ Stability-time captures (the Run dialogs' transient controls):
     fixture, so the saved-frame dropdown lists the instants that solve actually
     saved.
 
+Parametric captures:
+
+  * ``analysis_sensitivity_fs_time_dialog.png`` / ``analysis_sensitivity_fs_time.png`` —
+    the Parametric dialog in **Factor of safety vs time** mode and the **FS vs Time**
+    result tab it opens. Both come off ONE real march of the COMBO-3 tutorial dam on
+    the mesh that page builds, because the mode reads saved frames: a synthesized
+    ledger would list instants no field stands behind, and the result tab would draw
+    a curve nothing computed. The march is the minute in this producer.
+
 The remaining dialogs and dock panels — Build mesh, the steady Run Seepage dialog,
 the welcome window, the DXF import wizard, the Global parameters form, the two
 Assistant dialogs, the Inputs tree and the two Display panels — are captured the
@@ -967,6 +976,90 @@ def analysis_reliability_dialog_lem():
     pix.save(out)
     print("  wrote", os.path.relpath(out, REPO_ROOT))
 
+# --------------------------------------------------------------------------- #
+# Parametric study — Factor of safety vs time
+# --------------------------------------------------------------------------- #
+#: The tutorial dam whose drawdown the FS-versus-time mode is documented on. Its
+#: march is the one COMBO-3 publishes, so the dialog lists the twelve instants the
+#: page names and the result tab draws the page's curve rather than a stand-in.
+COMBO03 = os.path.join(REPO_ROOT,
+                       "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
+COMBO03_DIVISIONS = 64
+_combo03 = {}
+
+
+def _combo03_marched():
+    """The COMBO-3 dam meshed and marched: ``(slope_data, transient_solution)``.
+
+    A real march, because the mode reads saved frames and a synthesized ledger
+    would put times in the list that no field stands behind. Cached — the dialog
+    shot and the result shot are two views of the same run, and the march is the
+    minute in it.
+    """
+    if "sol" not in _combo03:
+        from xslope.fileio import load_slope_data
+        from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                                 get_material_polygons)
+        from xslope.seep import (build_seep_data, build_tseep_data,
+                                 run_transient_seepage)
+
+        d = _quiet(load_slope_data, COMBO03)
+        xs = [x for x, _ in d["ground_surface"].coords]
+        d["mesh"] = _quiet(build_mesh_from_polygons, get_material_polygons(d),
+                           (max(xs) - min(xs)) / COMBO03_DIVISIONS, "tri3",
+                           size_regions=extract_size_regions(d))
+        seep_data = _quiet(build_seep_data, d["mesh"], d, seep_bc=1)
+        _combo03["data"] = d
+        _combo03["sol"] = _quiet(run_transient_seepage, seep_data,
+                                 build_tseep_data(d), verbose=False)
+    return _combo03["data"], _combo03["sol"]
+
+
+def capture_sensitivity_fs_time_dialog():
+    """The Parametric dialog in Factor-of-safety-vs-time mode.
+
+    The parameter picker is gone — no input is substituted at any point of this
+    run — and the saved frames of the march take its place, all ticked."""
+    from studio.dialogs import SensitivityDialog
+
+    d, sol = _combo03_marched()
+    dlg = SensitivityDialog(defaults={"method": "spencer", "num_slices": 40},
+                            slope_data=d, app_mode="lem", transient=sol)
+    dlg.mode.setCurrentIndex(dlg.mode.findData("fs_vs_time"))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_sensitivity_fs_time_dialog.png")
+
+
+def capture_sensitivity_fs_time_result():
+    """The FS vs Time result tab: the curve, its lowest instant annotated, and the
+    reservoir schedule that drives it drawn faintly behind."""
+    from studio.main_window import SweepCanvas
+    from studio.runners import SensitivityRunner
+
+    d, sol = _combo03_marched()
+    opts = {"mode": "fs_vs_time", "engine_mode": "lem", "method": "spencer",
+            "num_slices": 40, "search": True,
+            "times": [float(t) for t in sol["times"]]}
+    runner = SensitivityRunner(d, opts, transient=sol)
+    bundle, err = {}, {}
+    runner.succeeded.connect(lambda b: bundle.update(b))
+    runner.failed.connect(lambda m: err.setdefault("msg", m))
+    _quiet(runner._run_fs_vs_time)
+    if err or not bundle:
+        raise RuntimeError("FS-vs-time run failed: %s" % err.get("msg", "no result"))
+    canvas = SweepCanvas()
+    canvas.resize(1000, 620)
+    canvas.show()
+    _settle()
+    canvas.render_fs_vs_time(bundle, slope_data=d)
+    _settle()
+    canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, "analysis_sensitivity_fs_time.png")
+    canvas.grab().save(out)
+    canvas.close()
+    return out
+
 
 def main():
     print("capture_studio_screenshots: regenerating Studio dialog images")
@@ -976,6 +1069,8 @@ def main():
                capture_profile_editor, capture_dloads_editor,
                capture_run_fem_dialog, capture_run_lem_preflight,
                capture_run_lem_methods, capture_run_lem_dialog,
+               capture_sensitivity_fs_time_dialog,
+               capture_sensitivity_fs_time_result,
                capture_build_mesh_dialog, capture_build_mesh_dialog_refine,
                capture_run_seep_dialog, capture_unpack_package_dialog,
                capture_welcome_dialog,

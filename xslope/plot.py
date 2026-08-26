@@ -5099,6 +5099,117 @@ def annotate_design_crossing(ax, target_fs, summary):
     return ax
 
 
+def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
+                    dpi=300, fig=None, style=None):
+    """Plot an :func:`xslope.sensitivity.fs_vs_time` curve: the factor of safety at
+    every evaluated instant of a transient seepage march.
+
+    The curve is read for its SHAPE — where it dips, how far, how fast it recovers —
+    so the lowest point is annotated with its own time rather than left for the
+    reader to find, and the model's drawdown schedule (the ``tseep`` sheet's time
+    series) is drawn faintly behind it on a second axis when ``slope_data`` carries
+    one. A dip cannot be placed against a schedule drawn somewhere else: the whole
+    reading of a drawdown curve is WHEN the minimum falls relative to the water
+    that caused it.
+
+    Instants that produced no result are not drawn (they are rows carrying a reason
+    in ``result['df']``); their absence is stated in the legend as a count, so a
+    gap in the line is never silent.
+
+    Parameters:
+        result: the dict from ``fs_vs_time`` (reads 'df', 'critical_time',
+            'min_fs', 'output_label').
+        slope_data: the model, for the time/length unit labels and the ``tseep``
+            series drawn as the driver. Optional — without it the figure is the
+            curve alone.
+    """
+    import numpy as np
+    df = result['df'] if isinstance(result, dict) else result
+    output = df['output'].iloc[0] if 'output' in df.columns and len(df) else 'FS'
+    output_label = (df['output_label'].iloc[0]
+                    if 'output_label' in df.columns and len(df)
+                    else 'Factor of Safety')
+    ulab = declared_unit_labels(slope_data) if slope_data else None
+    t_unit = f" ({ulab['time']})" if ulab and ulab.get('time') else ""
+
+    if fig is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        ax = fig.add_subplot(111)
+
+    n_failed = 0
+    for method, g in df.groupby('method'):
+        pts = g.loc[g['success']].sort_values('value')
+        n_failed += int((~g['success']).sum())
+        if pts.empty:
+            continue
+        ax.plot(pts['value'], pts['fs'], marker='o', ms=5, lw=1.8, label=str(method))
+    if n_failed:
+        ax.plot([], [], ' ', label=f"{n_failed} instant(s) produced no result")
+
+    crit_t = result.get('critical_time') if isinstance(result, dict) else None
+    crit_fs = result.get('min_fs') if isinstance(result, dict) else None
+    if crit_t is not None and crit_fs is not None:
+        ax.plot([crit_t], [crit_fs], 'o', ms=11, mfc='none', mec='C3', mew=1.6,
+                zorder=5)
+        # The label goes UP and to the right of the ring: the annotated point is the
+        # curve's minimum, so the space below it is the figure's own bottom margin
+        # and a downward label lands on the axis.
+        ax.margins(y=0.10)
+        ax.annotate(f"lowest: {crit_fs:.3f} at t = {crit_t:g}"
+                    f"{(' ' + ulab['time']) if ulab and ulab.get('time') else ''}",
+                    xy=(crit_t, crit_fs), xytext=(20, 16),
+                    textcoords='offset points', fontsize=9, color='C3',
+                    arrowprops=dict(arrowstyle='-|>', color='C3', lw=0.9))
+    # FS = 1 is drawn when it is within the curve's OWN swing of the lowest point —
+    # the scale the reader is judging against. On a slope that never comes near
+    # failure the guide would otherwise set the y-axis and flatten a curve whose
+    # whole story is its shape; its absence claims nothing.
+    fs_ok = df.loc[df['success'], 'fs'].astype(float)
+    if output == 'FS' and len(fs_ok):
+        span = float(fs_ok.max() - fs_ok.min())
+        if float(fs_ok.min()) - 1.0 <= max(span, 0.0):
+            ax.axhline(1.0, color='r', linestyle='--', linewidth=0.8, label='FS = 1')
+    ax.set_xlabel(f"time{t_unit}")
+    ax.set_ylabel(output_label)
+    ax.set_title(f"{output} versus time")
+    ax.grid(True, alpha=0.3)
+
+    # The schedule that drives the curve, behind it: pale, dashed, on its own axis.
+    handles, labels_ = ax.get_legend_handles_labels()
+    ts = (slope_data or {}).get('tseep') or {}
+    series = {k: v for k, v in (ts.get('series') or {}).items()
+              if v is not None and len(v) == len(ts.get('times') or [])}
+    if series:
+        sched = ax.twinx()
+        # A series is held flat outside its own breakpoints, so the trace is carried
+        # to the ends of the time axis rather than stopping mid-figure at the last
+        # breakpoint, which would read as the schedule ending there.
+        t_lo, t_hi = ax.get_xlim()
+        for k, (name, vals) in enumerate(series.items()):
+            tt = [float(t) for t in ts['times']]
+            vv = [float(v) for v in vals]
+            if t_lo < tt[0]:
+                tt, vv = [t_lo] + tt, [vv[0]] + vv
+            if t_hi > tt[-1]:
+                tt, vv = tt + [t_hi], vv + [vv[-1]]
+            sched.plot(tt, vv, color='#3f4a55', lw=1.3,
+                       ls=(0, (5, 3)), alpha=0.55 - 0.12 * k, zorder=0,
+                       label=f"{name} (schedule)")
+        unit = f" ({ulab['length']})" if ulab and ulab.get('length') else ""
+        sched.set_ylabel(f"{' / '.join(series)}{unit}", color='#3f4a55')
+        sched.tick_params(axis='y', colors='#3f4a55')
+        sched.set_zorder(ax.get_zorder() - 1)
+        ax.patch.set_visible(False)
+        h2, l2 = sched.get_legend_handles_labels()
+        handles, labels_ = handles + h2, labels_ + l2
+    ax.legend(handles, labels_, fontsize=9)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig("fs_vs_time.png", dpi=dpi, bbox_inches='tight')
+    return fig
+
+
 def _bar_chart_height_in(n_bars, per_bar_in=0.5, margin_in=1.4, min_in=2.4,
                          max_in=None):
     """Content-proportionate figure height for a categorical bar chart (tornado,

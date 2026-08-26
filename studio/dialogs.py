@@ -21,9 +21,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView, QButtonGroup, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox,
-    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton,
-    QRadioButton, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget,
+    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QMessageBox, QPushButton, QRadioButton, QSpinBox, QStackedWidget,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .preflight_panel import (
@@ -1591,6 +1591,11 @@ class SensitivityDialog(QDialog):
     - **Back-Analysis** is the same single-parameter sweep framed as a failure
       investigation: FS = 1.0 is known, so it back-calculates the parameter value
       consistent with the observed slide.
+    - **Factor of safety vs time** sweeps the saved instants of a transient
+      seepage march instead of a parameter: no input changes, and each point
+      solves the same model against that instant's pore pressures. It needs a
+      transient solution in hand and a material reading ``u = seep``, and says so
+      when either is missing.
 
     The sweepable set is any numeric material property plus the global k_seismic;
     geometry design stays in main_design.py. A thin caller of ``xslope.sensitivity``:
@@ -1608,7 +1613,7 @@ class SensitivityDialog(QDialog):
     }
 
     def __init__(self, parent=None, defaults=None, slope_data=None, app_mode="lem",
-                 document=None):
+                 document=None, transient=None):
         super().__init__(parent)
         self.app_mode = app_mode if app_mode in self._OUTPUT else "lem"
         out_short, out_long, target_label = self._OUTPUT[self.app_mode]
@@ -1650,12 +1655,27 @@ class SensitivityDialog(QDialog):
         layout = QVBoxLayout()                  # the left column; see two_pane
         form = QFormLayout()
 
+        # FS-versus-time sweeps the frames of a transient march. Two things have to
+        # be true for it to mean anything, and each has its own plain sentence: a
+        # march to read, and a material that reads it.
+        self._times = [float(t) for t in (transient or {}).get("times", [])]
+        self._time_unit = str(slope_data.get("time_unit") or "").strip()
+        self._fs_time_reason = self._fs_time_unavailable(slope_data)
+
         ba_label = ("Back-Analysis (FS = 1)" if self.app_mode != "seep"
                     else f"Back-Analysis (target {out_short})")
         self.mode = self._combo([("sensitivity", "Sensitivity (tornado + plots)"),
                                  ("design", f"Design ({out_short} target)"),
-                                 ("back_analysis", ba_label)],
+                                 ("back_analysis", ba_label),
+                                 ("fs_vs_time", "Factor of safety vs time")],
                                 defaults.get("mode", "sensitivity"))
+        if self._fs_time_reason:
+            item = self.mode.model().item(self.mode.count() - 1)
+            if item is not None:
+                item.setEnabled(False)
+                item.setToolTip(self._fs_time_reason)
+            if self.mode.currentData() == "fs_vs_time":
+                self.mode.setCurrentIndex(0)
         form.addRow("Mode", self.mode)
 
         # Engine-specific solver row(s). LEM keeps method + slices; FEM swaps in the
@@ -1674,8 +1694,8 @@ class SensitivityDialog(QDialog):
         layout.addLayout(form)
 
         # --- parameter picker (shared by both modes) ------------------------
-        picker = QGroupBox("Parameter")
-        pform = QFormLayout(picker)
+        self.picker = QGroupBox("Parameter")
+        pform = QFormLayout(self.picker)
         self.material = QComboBox()
         for disp, key in self._groups:
             self.material.addItem(disp, key)
@@ -1685,12 +1705,13 @@ class SensitivityDialog(QDialog):
         pform.addRow("Property", self.prop)
         self.material.currentIndexChanged.connect(self._on_material_changed)
         self.prop.currentIndexChanged.connect(self._on_prop_changed)
-        layout.addWidget(picker)
+        layout.addWidget(self.picker)
 
         # --- mode pages -----------------------------------------------------
         self.stack = QStackedWidget()
         self.stack.addWidget(self._build_sens_page(defaults))
         self.stack.addWidget(self._build_design_page(defaults, target_label))
+        self.stack.addWidget(self._build_time_page(defaults))
         layout.addWidget(self.stack)
 
         # Re-search toggle is an LEM concept (FEM finds its own mechanism, seepage
@@ -1715,9 +1736,7 @@ class SensitivityDialog(QDialog):
         # per step (a swept value is a deliberate perturbation, not a mistake).
         self.preflight = PreflightPanel(
             analysis="sensitivity", slope_data=slope_data, document=document,
-            selection_fn=lambda: {"base": self.app_mode,
-                                  "method": self.method.currentData(),
-                                  "search": self.search.isChecked()},
+            selection_fn=self._selection,
             notes=(SEISMIC_NOTE_LEM if self.app_mode == "lem" else SEISMIC_NOTE_FEM,),
             parent=self)
 
@@ -1735,6 +1754,9 @@ class SensitivityDialog(QDialog):
         self._sync_run()
 
         self.mode.currentIndexChanged.connect(self._on_mode_changed)
+        # FS-versus-time names a frame the checks have to be told about, so a mode
+        # switch re-evaluates them rather than leaving the previous mode's answer.
+        self.mode.currentIndexChanged.connect(self.preflight.refresh)
         self.plot_type.currentIndexChanged.connect(self._on_plot_type_changed)
         self._on_material_changed()                 # populate property combo
         # Restore a remembered sensitivity table (from the previous run this session).
@@ -1919,6 +1941,83 @@ class SensitivityDialog(QDialog):
         self._design_seeded = "low" in defaults      # don't re-seed a remembered range
         return page
 
+    def _fs_time_unavailable(self, slope_data):
+        """Why an FS-versus-time run cannot be made on this model, or ``""``.
+
+        Three conditions, each with the sentence a user can act on. The engine mode
+        comes first because it is the one the mode strip decides: a seepage sweep
+        reports discharge, and the seepage solution is this run's INPUT.
+        """
+        if self.app_mode == "seep":
+            return ("A factor-of-safety curve needs a stability engine. Switch the "
+                    "mode strip to LEM or FEM — the seepage solution is this run's "
+                    "input, not its output.")
+        if not self._times:
+            return "Run a transient seepage analysis first."
+        uses_seep = any(str(m.get("u", "")).strip().lower() == "seep"
+                        for m in (slope_data.get("materials") or []))
+        if not uses_seep:
+            return ("No material takes its pore pressure from the seepage solution. "
+                    "Set u = seep on the materials table, or the curve would be flat.")
+        return ""
+
+    def _build_time_page(self, defaults):
+        """The instants to evaluate: every saved frame of the march, all ticked.
+
+        A checklist rather than a range, because the times are not a continuum — a
+        curve can only be drawn through instants the march SAVED, and a time between
+        two frames is never interpolated. Unticking is how a long march is sampled
+        (each instant is a full stability run) or how a leading frame is dropped.
+        """
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(0, 0, 0, 0)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Saved frames"))
+        row.addStretch(1)
+        self.times_all = QPushButton("All")
+        self.times_all.setToolTip("Tick every saved instant.")
+        self.times_all.clicked.connect(lambda: self._set_all_times(True))
+        self.times_none = QPushButton("None")
+        self.times_none.setToolTip("Untick every saved instant.")
+        self.times_none.clicked.connect(lambda: self._set_all_times(False))
+        row.addWidget(self.times_all)
+        row.addWidget(self.times_none)
+        v.addLayout(row)
+
+        self.times = QListWidget(page)
+        self.times.setToolTip("The instants the transient march saved. Each ticked "
+                              "one is a full stability run.")
+        unit = f" {self._time_unit}" if self._time_unit else ""
+        remembered = defaults.get("times")
+        for t in self._times:
+            item = QListWidgetItem(f"t = {_fmt_time(t)}{unit}")
+            item.setData(Qt.UserRole, float(t))
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            ticked = (True if remembered is None
+                      else any(abs(float(r) - t) < 1e-9 for r in remembered))
+            item.setCheckState(Qt.Checked if ticked else Qt.Unchecked)
+            self.times.addItem(item)
+        self.times.itemChanged.connect(lambda *_: self._on_times_changed())
+        v.addWidget(self.times, 1)
+        return page
+
+    def _set_all_times(self, on):
+        for i in range(self.times.count()):
+            self.times.item(i).setCheckState(Qt.Checked if on else Qt.Unchecked)
+
+    def selected_times(self):
+        """The ticked instants, in saved order."""
+        return [float(self.times.item(i).data(Qt.UserRole))
+                for i in range(self.times.count())
+                if self.times.item(i).checkState() == Qt.Checked]
+
+    def _on_times_changed(self):
+        if self.mode.currentData() == "fs_vs_time":
+            self._on_mode_changed()
+            self.preflight.refresh()
+
     # --- picker / mode logic ------------------------------------------------
     @staticmethod
     def _dspin(lo, hi, val, decimals=3, step=None):
@@ -1960,6 +2059,23 @@ class SensitivityDialog(QDialog):
         self.d_from.setValue(lo)
         self.d_to.setValue(hi)
 
+    def _selection(self):
+        """What preflight and capabilities() are asked about — read live.
+
+        In FS-versus-time mode the selection also names the frame that WILL be
+        staged: ``fs_vs_time`` gates the base model with its first instant already
+        placed, so a model whose materials read ``u = seep`` is not missing a
+        pore-pressure field here, and the checks must not refuse the one run the
+        transient controls exist to start.
+        """
+        sel = {"base": self.app_mode,
+               "method": self.method.currentData(),
+               "search": self.search.isChecked()}
+        if self.mode.currentData() == "fs_vs_time":
+            picked = self.selected_times()
+            sel["seep_frame"] = {"times": picked[:1]}
+        return sel
+
     def _sync_run(self):
         """Run refuses on an ERROR in the base model; a warning never blocks."""
         if self.app_mode == "lem":
@@ -1969,14 +2085,34 @@ class SensitivityDialog(QDialog):
                                             {"method": self.method.currentData(),
                                              "search": self.search.isChecked()}
                                             ).get("lem_method", {}))
-        blocked = self.preflight.blocked
-        self._ok.setEnabled(not blocked)
-        self._ok.setToolTip(self.preflight.block_reason() if blocked else "")
+        reason = self.preflight.block_reason() if self.preflight.blocked else None
+        if reason is None and self.mode.currentData() == "fs_vs_time":
+            if not self.selected_times():
+                reason = "Tick at least one saved instant to evaluate."
+        self._ok.setEnabled(reason is None)
+        self._ok.setToolTip(reason or "")
 
     def _on_mode_changed(self):
         m = self.mode.currentData()
         single = m in ("design", "back_analysis")
-        self.stack.setCurrentIndex(1 if single else 0)
+        is_time = m == "fs_vs_time"
+        self.stack.setCurrentIndex(2 if is_time else (1 if single else 0))
+        # No input is substituted at any point of an FS-versus-time run — the axis
+        # is time — so the parameter picker has nothing to say and steps aside.
+        self.picker.setVisible(not is_time)
+        if is_time:
+            n = len(self.selected_times())
+            self.note.setText(
+                f"Factor of safety vs time: one stability run per ticked instant of "
+                f"the transient seepage march — {n} of {len(self._times)} saved "
+                f"frames. No input changes between the points; each "
+                f"solves the same model against that instant's pore pressures, and "
+                f"the reservoir load is re-derived from the pool as it stood then. "
+                f"The circles sheet's search window is applied, which is what keeps "
+                f"the curve on one mechanism.")
+            self._prev_mode = m
+            self._sync_run()
+            return
         # Seed the target on an actual transition into a mode; FS = 1.0 is the
         # convention for a back-analysis, the design default otherwise. Seep sweeps
         # target a discharge q, so leave their target alone.
@@ -2127,7 +2263,9 @@ class SensitivityDialog(QDialog):
         elif self.app_mode == "seep":
             common["seep_opts"] = {"bc": self.seep_bc.currentData(),
                                    "tol": self.seep_tol.value()}
-        if common["mode"] in ("design", "back_analysis"):
+        if common["mode"] == "fs_vs_time":
+            common["times"] = self.selected_times()
+        elif common["mode"] in ("design", "back_analysis"):
             common.update({
                 "param": self.prop.currentData(),
                 "low": self.d_from.value(),

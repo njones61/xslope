@@ -2981,9 +2981,79 @@ def combo03_run_lem():
     return _grab(dlg, "combo03_studio_run_lem.png")
 
 
+def combo03_parametric():
+    """Run → Parametric… in Factor-of-safety-vs-time mode.
+
+    The whole curve in one run: the parameter picker steps aside (no input is
+    substituted at any point) and the march's twelve saved frames take its place,
+    every one ticked. Method and slice count are the baseline run's.
+    """
+    from studio.dialogs import SensitivityDialog
+
+    dlg = SensitivityDialog(defaults={"method": COMBO03_METHOD,
+                                      "num_slices": COMBO03_SLICES},
+                            slope_data=_combo03_solved(), app_mode="lem",
+                            transient={"times": list(COMBO03_TIMES)})
+    dlg.mode.setCurrentIndex(dlg.mode.findData("fs_vs_time"))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo03_studio_parametric.png")
+
+
+def combo03_fs_time_result():
+    """The **FS vs Time** result tab the run opens.
+
+    The only shot on this page that costs the march: the tab draws the factors of
+    safety the run computed, so the frames have to be real ones. Mesh, march and
+    sweep are the page's own — the twelve instants, Spencer, searching at each.
+    """
+    from xslope.seep import build_seep_data, build_tseep_data, run_transient_seepage
+    from studio.main_window import SweepCanvas
+    from studio.runners import SensitivityRunner
+
+    data = _load(COMBO03)
+    with contextlib.redirect_stdout(io.StringIO()):
+        xs = [x for x, _ in data["ground_surface"].coords]
+        from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                                 get_material_polygons)
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data),
+            (max(xs) - min(xs)) / COMBO03_MESH["size_divisions"],
+            COMBO03_MESH["element_type"], size_regions=extract_size_regions(data))
+        solution = run_transient_seepage(
+            build_seep_data(data["mesh"], data, seep_bc=1),
+            build_tseep_data(data), verbose=False)
+    opts = {"mode": "fs_vs_time", "engine_mode": "lem", "method": COMBO03_METHOD,
+            "num_slices": COMBO03_SLICES, "search": True,
+            "times": [float(t) for t in solution["times"]]}
+    runner = SensitivityRunner(data, opts, transient=solution)
+    bundle, err = {}, {}
+    runner.succeeded.connect(lambda b: bundle.update(b))
+    runner.failed.connect(lambda m: err.setdefault("msg", m))
+    with contextlib.redirect_stdout(io.StringIO()):
+        runner._run_fs_vs_time()
+    if err or not bundle:
+        raise RuntimeError("combo03_fs_time_result: the sweep failed: %s"
+                           % err.get("msg", "no result"))
+    canvas = SweepCanvas()
+    canvas.resize(1000, 620)
+    canvas.show()
+    _settle()
+    canvas.render_fs_vs_time(bundle, slope_data=data)
+    _settle()
+    canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, "combo03_studio_fs_time.png")
+    canvas.grab().save(out)
+    canvas.close()
+    print("-> combo03_studio_fs_time.png")
+    return out
+
+
 SHOTS.update({
     "combo03_materials": combo03_materials,
     "combo03_run_lem": combo03_run_lem,
+    "combo03_parametric": combo03_parametric,
+    "combo03_fs_time_result": combo03_fs_time_result,
 })
 
 

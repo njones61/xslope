@@ -166,8 +166,9 @@ same sweep engine as the library — see
 [Parametric Studies](../parametric/index.md) for the engine, and the
 [`/xslope` skill](../usage/claude/index.md) for the scripted recipes.
 
-One dialog covers three study modes, chosen by its **Mode** selector — **Sensitivity**,
-**Design**, and **Back-Analysis**. In **LEM** three controls are shared by all of them:
+One dialog covers four study modes, chosen by its **Mode** selector — **Sensitivity**,
+**Design**, **Back-Analysis**, and **Factor of safety vs time**. In **LEM** three controls
+are shared by all of them:
 **Method** (any of the seven LEM methods), **Number of slices**, and a **Parameter** picker —
 a **Material** dropdown (each material plus a *k_seismic (global)* entry) and a **Property**
 dropdown listing that material's option-aware sweepable fields (both drawn from the engine's
@@ -212,6 +213,30 @@ investigation: because a slide has occurred, the target defaults to **FS = 1.0**
 result is read as the parameter value consistent with the observed failure (the
 back-calculated strength, most commonly). The controls are identical to Design.
 
+### Factor of safety vs time
+
+The fourth mode sweeps the saved instants of a
+[transient seepage](../seep/transient.md) march instead of a parameter. Each point solves
+the same model against that instant's pore pressures — no input changes between them, so
+the axis is time — and the reservoir load is re-derived from the pool as it stood at that
+moment. The parameter picker steps aside and a **Saved frames** checklist takes its place,
+listing every instant the march stored with all of them ticked; **All** and **None** set the
+whole list, and unticking samples a long march, each frame being a full stability run. The
+**Method**, **Number of slices** and **Re-search the critical surface at each step**
+controls apply as they do everywhere else, and the circles sheet's search window is
+applied, which is what keeps the curve on one mechanism rather than letting it jump
+families between instants:
+
+![Parametric dialog in Factor of safety vs time mode](images/analysis_sensitivity_fs_time_dialog.png)
+
+The mode is available in **LEM** and **FEM** mode on a model that carries a transient
+seepage solution and at least one material reading `u = seep`. Without one of those it is
+disabled and names the reason — *Run a transient seepage analysis first*, *No material takes
+its pore pressure from the seepage solution*, or, in Seepage mode, that the seepage solution
+is this run's input rather than its output. The engine page
+[Factor of safety versus time](../parametric/sensitivity.md#factor-of-safety-versus-time)
+carries the sweep itself.
+
 ### Running and cancelling
 
 Clicking **Run** launches the sweep on a background thread, so the window stays responsive.
@@ -246,6 +271,15 @@ diamond and annotated *property = value for FS = target* (a **Back-Analysis** ru
 same tab, with the target at FS = 1.0):
 
 ![Design curve with crossing](images/analysis_sensitivity_design_curve.png)
+
+**Factor of safety vs time** opens an **FS vs Time** tab: the factor of safety at each
+evaluated instant as a line with a marker per point, the lowest of them ringed and
+annotated with its own time, and the model's `tseep` time series — the drawdown schedule
+that drives the curve — drawn faintly behind it on a second axis. The per-instant table
+(time, method, FS) streams to the [Log pane](interface.md#the-log-pane), and an instant
+that produced no result appears there with its reason rather than as a gap in the line:
+
+![FS vs Time result tab](images/analysis_sensitivity_fs_time.png)
 
 When the swept range never reaches the target, the result is honest about it: no crossing is
 drawn, and an amber note reports the FS span and which way to widen the range — the GUI face

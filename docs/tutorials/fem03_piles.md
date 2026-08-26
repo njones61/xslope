@@ -434,45 +434,36 @@ does not.
 ### Which answer is right
 
 At the 6 ft spacing the model was built with, Spencer gives 1.842. Strength
-reduction gives 1.379 with the shafts' tips pinned — 0.46 below — and 1.801
-with them fixed, 0.04 below, about 2%. Most of the disagreement between the
-engines is the tip condition, and the two engines treat it differently.
+reduction gives 1.379 with the shafts' tips pinned and 1.801 with them fixed —
+0.46 below Spencer, then 0.04 below, about 2%. Most of the gap between the
+engines is the tip condition, and the two engines handle it in opposite ways.
 
-The limit equilibrium force cannot state a tip condition. It is the smaller of
-the Ito & Matsui soil force and what the shaft's structure can carry, and on this
-model at 6 ft the structural cap governs: 60,000 lb·ft of moment capacity
-divided by the arm from the pressure centroid to the failure surface, and then
-by the 6 ft spacing, which
-[LEM-12](lem12_piles.md#what-the-structural-capacity-does) works through. That
-arm is a cantilever taken as fixed at the slip surface by the embedment below
-it, and the limit assumes the shaft develops its full moment capacity there.
+The limit equilibrium force has no tip condition to state. On this model it is
+the shaft's moment capacity, 60,000 lb·ft, divided by the arm from the failure
+surface up to the soil pressure's centroid and then by the 6 ft spacing
+([LEM-12](lem12_piles.md#what-the-structural-capacity-does) works it through).
+That force assumes the shaft develops its full moment capacity at the failure
+surface — which a shaft can do only if it is held below it.
 
-The finite element run does not assume it. It computes the moment the soil can
-actually push into the member under the restraint the file states, and reports
-it. With the toe pinned the shaft swings about the pin and reaches 44% of capacity
-at elevation −4, the elevation the limit equilibrium arm is measured to; fixing
-the toe makes it bend against a restraint instead, and it reaches 100%. So the
-two engines agree once the model is told what the limit equilibrium method had
-already assumed, and the real question is what holds the shaft — bearing on the
-stratum, or socketed into it. That is a question about the design, and it is one
-cell in the file.
+The finite element run assumes nothing about the moment. It computes what the
+soil can push into the shaft under the restraint the file states: 44% of
+capacity with the tip pinned, 100% with it fixed. Once the file says the tip is
+fixed, the two engines agree to 2%. The question that decides between 1.38 and
+1.80 is therefore not which engine to trust but how the shaft is held at its
+toe — bearing on the rock, or socketed into it — and that is one cell in the
+file.
 
-The 2% that is left at 6 ft is a difference in mechanism rather than in force.
-Spencer's search returns a deep circle that passes below the toe and daylights
-on the flat ground 13.5 ft beyond it; the tip-fixed strength reduction run fails
-in the patch of face above the upper row, which is a
-shallower and slightly weaker mechanism, and not one the circular search
-reports.
+The 2% that remains is a difference in mechanism: Spencer's circle passes below
+the toe, while the tip-fixed strength reduction run fails in the face above the
+upper row, a shallower surface the circular search does not return.
 
-Spacing separates the engines for a related reason, and the pile report says
-which limit is binding at each point of the sweep. At 3 and 6 ft the moment
-capacity governs both rows, and the Ito & Matsui soil force is far above it —
-26 and 55 times the force used at 3 ft, 3 and 7 times at 6 ft. Only at 12 ft
-does the soil force itself govern, at 6,007 and 15,193 lb per shaft. So over
-most of this sweep the falling blue curve is a structural capacity divided by a
-widening spacing on a moving critical circle, and arching becomes the binding
-mechanism only at the wide end — where the finite element model, having no gaps,
-has nothing to represent it with.
+Spacing separates the engines for a related reason. The pile report says which
+limit governs at each point of the sweep: at 3 and 6 ft it is the moment
+capacity, with the Ito & Matsui soil force far above it, and only at 12 ft
+does the soil force itself govern. So over most of the sweep the falling blue
+curve is a structural capacity divided by a widening spacing, and arching — the
+one thing the plane-strain model has no gap to represent — decides the answer
+only at the wide end.
 
 ### The one problem with a three-dimensional answer
 

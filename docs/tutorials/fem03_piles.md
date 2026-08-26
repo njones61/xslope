@@ -356,8 +356,9 @@ different one:
 The deep band that ran up from the flat ground beyond the toe is gone. What is
 left daylights at the upper row's head, where the strain peaks at 0.23 against
 the pinned-tip run's 0.80, and runs back from there up the face above the row
-to about x = 21 at elevation 12. Twelve elements stand above half that peak,
-all of them between x = 10.9 and 20.8 at elevation 9.5 to 12.8. The mechanism has moved above the reinforcement
+to about x = 21 at elevation 12. The zone of high strain is small — a strip a few feet thick just under the face,
+from the upper row's head back to about x = 21 — where the pinned-tip run's
+band filled the whole slope from the toe to the crest. The mechanism has moved above the reinforcement
 instead of passing through it.
 
 Open **Results → 1D Details** on the upper row again:

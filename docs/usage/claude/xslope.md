@@ -276,7 +276,7 @@ derivation so the user can go deeper than a chat reply. Real pages, all under
 | Reliability (Taylor series, Monte Carlo) | `reliability/`, `reliability/taylor/`, `reliability/monte_carlo/` |
 | Sensitivity, design mode, back-analysis | `parametric/` |
 | Accuracy against vendor programs | `verification/` and the corpus pages under it |
-| Getting started, the template, the input checks | `usage/installation/`, `usage/input_template/`, `usage/preflight/` |
+| Getting started, the template, the input checks | `getting_started/install/`, `usage/input_template/`, `usage/preflight/` |
 | Studio, the desktop app | `studio/`, `studio/editing/`, `studio/analysis/` |
 
 **Implementation questions — "what does xslope's Janbu actually do?"** Where this skill states

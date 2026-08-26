@@ -10,6 +10,7 @@ copyright: Copyright &copy; 2025 Norman L. Jones. Licensed under Apache 2.0.
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js
   - js/mathjax-config.js
+  - js/nav_collapse.js
 markdown_extensions:
     - attr_list
     - sane_lists
@@ -20,6 +21,8 @@ markdown_extensions:
 theme:
   name: readthedocs
   custom_dir: overrides
+  navigation_depth: 2
+  titles_only: true
 extra_css:
   - css/custom.css
 plugins:
@@ -36,10 +39,9 @@ hooks:
   - hooks/docs_packages.py
 nav:
   - Home: index.md
-  - Install: getting_started/install.md
+  - Installation: getting_started/install.md
   - Usage Guide:
     - Ways to Use XSLOPE: usage/index.md
-    - Python Package Install: usage/installation.md
     - Input Template: usage/input_template.md
     - Project Packaging: usage/packaging.md
     - Preflight Input Checks: usage/preflight.md

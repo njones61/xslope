@@ -125,16 +125,18 @@ Uninstalling leaves your projects alone, and it leaves the settings and keychain
 entries listed above in place, so a later reinstall starts where you left off.
 Remove them by hand if you want a clean slate.
 
-## For Python users
+## Python package
 
-XSLOPE is also a Python package. The engine that Studio runs is the `xslope`
-package documented under [API](../api/solve.md), and it reads and writes the same
-Excel format, so files move freely between Studio, scripts, and notebooks.
+XSLOPE is also a Python package. The engine Studio runs is the `xslope` package
+documented under [API](../api/solve.md), and it reads and writes the same Excel
+format, so files move freely between Studio, scripts, and notebooks. It installs
+from PyPI:
 
 ```bash
-pip install "xslope[gui]"        # Studio plus the analysis library
-pip install "xslope[gui,fem]"    # add gmsh, for seepage and FEM
-pip install "xslope[gui,fem,ai]" # add the AI assistant
+pip install xslope                # limit equilibrium only
+pip install "xslope[fem]"         # add gmsh, for seepage and FEM
+pip install "xslope[gui]"         # add Studio itself
+pip install "xslope[gui,fem,ai]"  # everything, including the AI assistant
 ```
 
 The `gui` extra registers a console command that opens the same window the
@@ -146,14 +148,34 @@ xslope-studio
 
 Installed this way, Studio reports updates but never changes your environment:
 the update dialog shows the `pip install -U "xslope[gui]"` line for you to run
-yourself.
+yourself. This is also how Studio runs on Linux and on Intel Macs, which the
+installers do not cover.
 
-This is also how Studio runs on Linux and on Intel Macs, which the installers do
-not cover.
+**Linux and Google Colab.** On Debian/Ubuntu (including Colab), gmsh needs system
+OpenGL libraries that are not installed by default. Run this once before
+installing the `fem` extra:
 
-For scripting and notebooks without the GUI, `pip install xslope` (add the `fem`
-extra for seepage and FEM) is enough — see
-[Python Package Install](../usage/installation.md) for the full set of
-extras, the Linux OpenGL prerequisite, and installing from source, and
-[Colab Notebooks](../usage/notebooks.md) to run XSLOPE in a browser with nothing
-installed at all.
+```bash
+apt-get update && apt-get install -y libgl1 libglu1-mesa
+```
+
+macOS and Windows need no extra step — gmsh ships its own libraries. To run XSLOPE
+in a browser with nothing installed at all, see
+[Colab Notebooks](../usage/notebooks.md).
+
+**Using the package.** After installing, import what you need:
+
+```python
+from xslope.fileio import load_slope_data
+from xslope.slice import generate_slices
+from xslope.solve import spencer
+from xslope.plot import plot_inputs, plot_solution
+```
+
+**Installing from source.** To work with the code itself, bypass PyPI and clone
+the repository at
+[github.com/njones61/xslope](https://github.com/njones61/xslope/tree/main):
+
+```bash
+git clone https://github.com/njones61/xslope.git
+```

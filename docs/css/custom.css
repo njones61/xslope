@@ -434,3 +434,9 @@
     white-space: nowrap;
 }
 
+
+/* Collapsed sidebar (js/nav_collapse.js): category captions toggle their lists. */
+.wy-menu-vertical p.caption.nav-collapsible { cursor: pointer; }
+.wy-menu-vertical p.caption.nav-collapsible .caption-text::before {
+  content: "\25BE"; display: inline-block; width: 1em; }
+.wy-menu-vertical p.caption.nav-closed .caption-text::before { content: "\25B8"; }

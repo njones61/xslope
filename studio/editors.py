@@ -3583,7 +3583,12 @@ class _MaterialListView(QWidget):
     # underlying keys/headers are untouched.
     _FRIENDLY = {"f": "φ", "psi": "ψ", "s(f)": "σ(φ)", "s(g)": "σ(γ)",
                  "s(c)": "σ(c)", "s(c/p)": "σ(c/p)", "s(d)": "σ(d)",
-                 "s(psi)": "σ(ψ)"}
+                 "s(psi)": "σ(ψ)",
+                 # The Hoek-Brown four, in the notation the criterion is published
+                 # in: σci, GSI, mi, D. The hb_ prefix disambiguates the sheet
+                 # columns from the power-curve ones; on a labeled field it only
+                 # gets in the way of recognizing the parameter.
+                 "hb_sci": "σci", "hb_gsi": "GSI", "hb_mi": "mi", "hb_d": "D"}
 
     def _label_for(self, key):
         f = self._field_by_key.get(key)
@@ -3898,7 +3903,8 @@ MATERIALS_HELP = {
     "pow_b": "Power-curve exponent b; b = 1 collapses to Mohr-Coulomb (pow option).",
     "pow_c": "Power-curve additive strength term c (pow option).",
     "pow_d": "Power-curve normal-stress offset d (pow option).",
-    "hb_sci": "σci — uniaxial compressive strength of the intact rock (hb option).",
+    "hb_sci": "σci — uniaxial compressive strength of the intact rock, in the model's "
+              "stress units: 30 MPa is 30,000 kPa (hb option).",
     "hb_gsi": "GSI — Geological Strength Index, (0, 100] (hb option).",
     "hb_mi": "mi — intact Hoek-Brown constant, a rock-type property (hb option).",
     "hb_d": "D — disturbance factor, 0 (undisturbed) to 1 (blast-damaged) (hb option).",

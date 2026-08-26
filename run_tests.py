@@ -3935,6 +3935,18 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='mat.ru_zero', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, u='ru', ru=0.0),
          expect='selects u = ru'),
+    # The pairing is the mutation: the SAME Hoek-Brown material under the two
+    # selections, so what the rule reads is the method and not the file. Corps and
+    # Lowe fix the interslice inclination up front; Spencer solves for it, which is
+    # the control.
+    dict(rule='mat.hb_method_convergence', base=PREFLIGHT_BASE_LEM, mode='excel',
+         selection={'surface': 'circular', 'method': 'corps'},
+         control_selection={'surface': 'circular', 'method': 'spencer'},
+         mutation=lambda sd: _pf_mat(sd, 0, option='hb', hb_sci=30000.0,
+                                     hb_gsi=50.0, hb_mi=10.0, hb_d=0.0),
+         control=lambda sd: _pf_mat(sd, 0, option='hb', hb_sci=30000.0,
+                                    hb_gsi=50.0, hb_mi=10.0, hb_d=0.0),
+         expect='stops converging above about 55 degrees'),
 
     # --- main-sheet scalars ------------------------------------------------
     dict(rule='main.seismic_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
@@ -4476,6 +4488,15 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=12.0),
          expect='outside that range'),
+    # The units slip itself: 30 MPa of intact rock typed as the bare 30 into a
+    # model whose stress unit is the kPa. The control is the same material with
+    # the same rock, entered in the model's units.
+    dict(rule='mat.hb_sci_units', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mat(sd, 0, option='hb', hb_sci=30.0,
+                                     hb_gsi=50.0, hb_mi=10.0, hb_d=0.0),
+         control=lambda sd: _pf_mat(sd, 0, option='hb', hb_sci=30000.0,
+                                    hb_gsi=50.0, hb_mi=10.0, hb_d=0.0),
+         expect='weaker in unconfined compression than any intact rock'),
 
     # --- material field ranges (what a swept or perturbed value trips) ------
     dict(rule='mat.strength_negative', base=PREFLIGHT_BASE_LEM, mode='excel',

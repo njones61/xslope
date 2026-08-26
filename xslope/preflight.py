@@ -186,6 +186,14 @@ LEM_METHOD_OPTIONS = ("oms", "bishop", "janbu", "corps", "lowe", "spencer", "mpr
 #: -- a circle truncated at bedrock still carries ``Xo``/``Yo``/``R``).
 CIRCULAR_ONLY_METHODS = ("oms", "bishop")
 
+#: Methods that FIX the interslice-force inclination from the geometry instead of
+#: solving for it, and which stop converging where the friction angle runs much
+#: above 55 degrees. That is a standing property of the two force-equilibrium
+#: formulations, not of any one strength model -- plain Mohr-Coulomb at phi > 55
+#: fails the same way -- but a curved envelope reaches those angles on its own,
+#: which is what makes the pairing worth reporting (docs/lem/overview.md).
+FIXED_INCLINATION_METHODS = ("corps", "lowe")
+
 #: Display names for the messages, so a refusal reads as the dialog's own label.
 _METHOD_NAMES = {
     "oms": "the Ordinary Method of Slices",
@@ -2058,6 +2066,27 @@ def _mat_ru_zero(ctx):
                    f"generated, which is identical to a dry model and "
                    f"non-conservative. Enter a positive pore pressure ratio, or set "
                    f"u = none {_AT_MAT}.")
+
+
+@rule("mat.hb_method_convergence", WARNING, ("lem",),
+      "Corps of Engineers and Lowe & Karafiath may not converge on a Hoek-Brown "
+      "material.")
+def _mat_hb_method_convergence(ctx):
+    m = ctx.method
+    if m not in FIXED_INCLINATION_METHODS:
+        return None
+    for i, mat in ctx.strength_materials():
+        if str(mat.get("option") or "").strip().lower() != "hb":
+            continue
+        yield (f"{ctx.mat_label(i)} uses the Hoek-Brown strength model "
+               f"(option = hb), and this run selects {_METHOD_NAMES[m]}. That "
+               f"method fixes the interslice force inclination from the geometry "
+               f"instead of solving for it, and stops converging above about 55 "
+               f"degrees of friction -- which the instantaneous tangent of a "
+               f"Hoek-Brown envelope reaches at the low normal stresses on a "
+               f"shallow slice near the crest. Run Spencer's Method or the "
+               f"Morgenstern-Price Method, which solve for the inclination "
+               f"(Materials table, mat sheet; Run LEM, main D14).")
 
 
 # ---------------------------------------------------------------------------
@@ -4478,6 +4507,47 @@ def _mat_nu_band(ctx):
                f"rock at 0.15-0.3; below 0.1 the material has almost no lateral "
                f"coupling, which changes the stress field the strength reduction "
                f"acts on {_AT_MAT}.")
+
+
+#: Floor below which a Hoek-Brown σci is weaker in unconfined compression than any
+#: intact rock -- expressed in kPa and converted for an Imperial model, the same way
+#: the structural modulus band below is. The magnitude is the diagnostic: σci is
+#: quoted in MPa everywhere in the rock-mechanics literature and entered here in the
+#: model's own stress unit, so a number typed straight off a lab report lands three
+#: orders of magnitude low. The corpus's own rock is Hammah's 30 MPa weak mass at
+#: 30,000 kPa, well clear of this; what sits below it is the Li normalized family
+#: (0.598-4.37 kPa), which is reported deliberately -- a normalized model is
+#: indistinguishable from a mis-keyed one by magnitude alone, which is exactly why
+#: this is a warning and not a refusal.
+_HB_SCI_MIN_KPA = 1.0e3
+
+
+def _hb_sci_floor(ctx):
+    from .units import KPA_TO_PSF, normalize_unit_system
+    if normalize_unit_system(ctx.sd.get("unit_system")) == "imperial":
+        return round(_HB_SCI_MIN_KPA * KPA_TO_PSF, -2), "psf"
+    return _HB_SCI_MIN_KPA, "kPa"
+
+
+@rule("mat.hb_sci_units", WARNING, ("lem", "fem"),
+      "A Hoek-Brown σci too small, in the declared unit system, to be intact rock.",
+      fields=("hb_sci",))
+def _mat_hb_sci_units(ctx):
+    lo, unit = _hb_sci_floor(ctx)
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "hb":
+            continue
+        sci = _num(m.get("hb_sci"))
+        if sci is None or sci <= 0 or sci >= lo:
+            continue
+        yield (f"{ctx.mat_label(i)} has σci = {sci:g}, below {lo:g} {unit} -- "
+               f"weaker in unconfined compression than any intact rock. σci is "
+               f"entered in this model's own stress units and xslope never "
+               f"converts: 30 MPa is 30,000 kPa or 626,000 psf, so a σci carried "
+               f"straight over in MPa describes a rock mass a thousand times "
+               f"weaker than the one intended. A normalized model, which holds "
+               f"σci/γH at a critical ratio, is the one case where a value this "
+               f"small is meant {_AT_MAT}.")
 
 
 #: Plausible Young's-modulus band for a structural element -- a geosynthetic sheet

@@ -63,6 +63,10 @@ Seepage — redraw as you type, so a wrong option choice is obvious at a glance:
 
 ![Materials list view](images/editing_materials_list.png)
 
+On a Hoek-Brown material the strength envelope also reads out the rock-mass constants
+$m_b$, $s$ and $a$ that σci, GSI, mi and D derive to — the three numbers a published
+Hoek-Brown table quotes, so the four entered inputs can be confirmed against one.
+
 A **blank property stays blank**. Leaving a unit weight, cohesion, friction angle,
 `d`/`ψ`, `E`, `ν`, `r_u` or `k₁` cell empty reads back as unset, not as zero, in both
 views — so a cohesionless material and one nobody has filled in are different models,

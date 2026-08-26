@@ -191,7 +191,7 @@ severity and one-line summary.
 | Family | What it looks at |
 |--------|------------------|
 | **Water** | The unit weight of water; a material reading a piezometric line that does not exist or stops short of the section; a line no material reads; standing water above the ground surface with no distributed load carrying its weight; and, on a model with [automatic water loads](#automatic-water-loads), a transcribed block the engine would derive a second time, a pool the derivation could not measure, and two water definitions that disagree |
-| **Materials** | The pore-pressure, unsaturated-model and strength-model vocabularies; a material inside the geometry with no strength model, no unit weight, or no strength at all; `u = ru` with no ratio; `option = cp` with no undrained strength |
+| **Materials** | The pore-pressure, unsaturated-model and strength-model vocabularies; a material inside the geometry with no strength model, no unit weight, or no strength at all; `u = ru` with no ratio; `option = cp` with no undrained strength; a Hoek-Brown material under the Corps of Engineers or Lowe & Karafiath method, which fix the interslice force inclination rather than solving for it and stop converging at the friction angles a curved envelope reaches near a slope face |
 | **Global parameters** | A blank seismic coefficient; a coefficient outside the plausible range, or entered with a sign the limit-equilibrium engine cannot use; water in the crack deeper than the crack that holds it |
 | **Surfaces** | A model with no failure surface at all; a method that cannot use the selected surface family; a model carrying both families where the run did not say which; a circle whose **Depth** sits below the base of the model and that cuts no failure surface inside it — reported against a search, whose refinement moves off its seeds and reaches the critical surface anyway, and raised to an error where that circle *is* the run's surface, so the Run dialog refuses it |
 | **Model domain** | A domain whose boundary crosses or retraces itself, or encloses no area — the shape every analysis is bounded by, derived from the zones rather than typed, so a defect in it is invisible where you are looking. A **Max depth** left at the elevation of the toe produces one: the base of the model runs back along the ground surface, and slicing, meshing and searching all fail on it with a geometry error naming no field |
@@ -204,7 +204,7 @@ severity and one-line summary.
 | **Rapid drawdown** | The stage-2 water source each pore-pressure option needs; the `d`/`psi` pair; a post-drawdown pool standing higher than the full pool, or above the ground with no stage-2 load; a stage-2 load that repeats stage 1 |
 | **Tension cracks** | A crack at or below the base of the slope; a crack that intersects no failure surface while its water thrust still applies; a depth far past the theoretical `2c/γ` |
 | **Reinforcement and piles** | Pile spacing that is blank, zero or negative wherever the run divides by it; a pile or reinforcement line the finite element engine cannot build; a pullout length longer than its own line, or negative; an element that crosses no failure surface |
-| **Plausibility** | A modulus far outside the band for its own soil type; a Poisson's ratio below any real soil; a structural modulus outside the range from geosynthetic to steel |
+| **Plausibility** | A modulus far outside the band for its own soil type; a Poisson's ratio below any real soil; a structural modulus outside the range from geosynthetic to steel; a Hoek-Brown $\sigma_{ci}$ too small, in the declared unit system, to be intact rock — the magnitude a strength quoted in MPa lands at when it is entered into a model whose stress unit is the kPa |
 
 ### The cross-analysis findings
 
@@ -262,6 +262,13 @@ its soil type's midpoint. And a value that *matches* a typical default is never
 evidence of anything — `E = 100,000` with `ν = 0.3` is both a common fallback pair and
 a perfectly ordinary thing to specify deliberately. These rules report an implausible
 magnitude. They never claim a value was left unset.
+
+The Hoek-Brown $\sigma_{ci}$ check is the one that reports correct models as well,
+and deliberately. A normalized study holds $\sigma_{ci}/\gamma H$ at a critical ratio
+and lands in the sub-kPa range on purpose; a strength read off a lab report in MPa
+and typed into a kPa model lands in the same range by mistake. Nothing in the number
+separates them, so the check states what it sees and leaves the judgment where it
+belongs — which is why it is a warning and never a refusal.
 
 ## Remedies
 

@@ -207,7 +207,10 @@ Corkum, 2002), written in principal stresses:
 The four inputs are the ones a geologist actually records; the rock-mass constants $m_b$, $s$ and $a$ are
 *derived* from them and are never entered directly:
 
-- **hb_sci** — $\sigma_{ci}$, the uniaxial compressive strength of the **intact** rock, **[F/L²]**.
+- **hb_sci** — $\sigma_{ci}$, the uniaxial compressive strength of the **intact** rock, **[F/L²]**. Enter it in
+  the model's own stress units, not the MPa the rock-mechanics literature quotes: 30 MPa is 30,000 kPa or
+  626,000 psf. A $\sigma_{ci}$ small enough to have been carried over in MPa is [reported before a
+  run](preflight.md#what-is-checked).
 - **hb_gsi** — GSI, the Geological Strength Index, from 0 (completely broken) to 100 (intact). Must be in (0, 100].
 - **hb_mi** — $m_i$, the intact Hoek-Brown constant, a rock-type property (≈ 4 for claystone, ≈ 10 for sandstone,
   ≈ 25 for granite).

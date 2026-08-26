@@ -161,7 +161,7 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         sci, gsi, mi, dfac = g("hb_sci"), g("hb_gsi"), g("hb_mi"), g("hb_d")
         if sci <= 0 or gsi <= 0 or mi <= 0:
             return _material_hint(ax, "enter hb_sci, hb_gsi, hb_mi", "Hoek–Brown")
-        from .hoekbrown import hb_tangent
+        from .hoekbrown import hb_constants, hb_tangent
         # Range derived from σci so both stiff rock and weak rock mass show the
         # envelope's curvature; the low-stress end (curvature) is what matters for
         # slopes. Evaluated through the SAME hb_tangent the solver linearizes with:
@@ -171,6 +171,21 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         c_i, phi_i = hb_tangent(s, sci, gsi, mi, dfac)
         tau = c_i + s * np.tan(np.radians(phi_i))
         ax.plot(s, tau, color=_STRENGTH_COLOR, lw=2)
+        # The rock-mass constants, derived rather than entered: mb, s and a are what
+        # GSI/mi/D actually produce, and they are the numbers a published table
+        # quotes. Showing them beside the envelope is what turns this into a
+        # confirmation of the three inputs rather than of a curve shape — s in
+        # particular spans orders of magnitude with GSI, and its exponent is the
+        # difference between competent rock and rubble. Anchored in axes fractions
+        # in the corner the envelope leaves empty (it rises left to right from the
+        # origin), so the block follows the axes at any canvas size.
+        mb_v, s_v, a_v = hb_constants(gsi, mi, dfac)
+        ax.text(0.03, 0.97,
+                f"mb = {float(mb_v):.4g}\n s = {float(s_v):.4g}\n a = {float(a_v):.4g}",
+                transform=ax.transAxes, va="top", ha="left",
+                fontsize=9, family="monospace", color=_REF_COLOR,
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
+                          edgecolor=_REF_COLOR, alpha=0.85))
         ax.set_xlabel("σₙ  (normal stress)")
         ax.set_ylabel("τ  (shear strength)")
         ax.set_title(f"Hoek–Brown   (σci={sci:g}, GSI={gsi:g}, mi={mi:g})")

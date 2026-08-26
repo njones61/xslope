@@ -313,20 +313,13 @@ one result.
 
 This tutorial covered:
 
-- Meshing once for three analyses, and why the element type has to be chosen for
-  the strictest of them: quadratic, because the same mesh carries the strength
-  reduction.
-- The seepage run that produces the field the other two need — 26 sweeps, a
-  discharge of 1.925 ft³/day per ft, and a pore pressure at each of the 8,082
-  mesh nodes.
-- The materials table's `u` column as the hinge between the modes: with `seep` on
-  every row the stability engines read the solved field, and with `none` the same
-  seepage run is computed and ignored, which moves the Spencer answer to 1.618.
-- Two stability answers from one model and one field — Spencer at 1.248 by
-  slices, strength reduction at 1.2305 on the same mesh, 1.4% apart on the same
-  mechanism — reached without exporting a file or retyping a number.
-- The staleness rule that keeps them honest: an input edit drops the results that
-  depended on it, and a geometry edit drops the mesh with them.
+- One quadratic mesh for all three analyses, chosen for the strictest of them.
+- A seepage run that leaves a pore pressure at every mesh node.
+- The materials table's `u` column: `seep` reads that field, `none` ignores it
+  (Spencer 1.618 instead of 1.248).
+- Spencer 1.248 and strength reduction 1.2305 from the same model and field,
+  with nothing exported or retyped.
+- Results go stale when the inputs they depend on change.
 
 **Where to go next:** [Seepage and Slope Stability](../seep/seep_slope.md)
 carries the interpolation, the negative-pressure treatment and the element-type

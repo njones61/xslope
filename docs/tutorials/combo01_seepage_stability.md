@@ -83,6 +83,11 @@ materials table, and nothing on this page enters them a second time.
 
 ## The seepage run
 
+The seepage analysis comes first because the other two read its answer. Three
+steps: build the mesh every engine will share, solve the steady flow through
+the dam on it, and see where the solution lands so the stability runs can find
+it.
+
 ### One mesh for all three analyses
 
 Switch the mode strip to **Seepage** (`Ctrl+2`) and click **Run → Build Mesh…**

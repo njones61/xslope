@@ -20,7 +20,12 @@ window.
 The procedure needs two states of the water — before the drawdown and after —
 and there are three ways to say where the water was in each. This page runs all
 three on one dam, one slip circle and one set of strengths, so the only thing
-that changes between the answers is the statement about the water.
+that changes between the answers is the statement about the water. The page is
+in three parts, one per statement: **Part 1** draws the two states as two
+piezometric lines and runs no seepage at all; **Part 2** replaces the lines with
+two steady-state seepage solutions, one at each pool; **Part 3** replaces those
+with a single transient seepage run and reads the two states out of it. The
+three answers are then set side by side.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -43,7 +48,7 @@ build below adds
 
 **Completed model** — [xslope_johnson_rapid.xlsx](files/xslope_johnson_rapid.xlsx),
 the same dam with both seepage boundary sets and the pool schedule on it; open it
-to skip the construction and start at [Two steady solutions](#two-steady-solutions)
+to skip the construction and start at [Part 2](#part-2-two-steady-state-seepage-solutions)
 </div>
 </div>
 
@@ -188,10 +193,20 @@ blank left by mistake is easy to catch. A material carrying **d** without
 **psi**, or the reverse, is an error rather than a warning: the checks refuse the
 run rather than let a half-entered envelope pass.
 
-### The two piezometric lines
+---
 
-The second addition is the drawn-down water state, and on this file it is the
-simplest form it can take: a second piezometric line. Click **Piezometric
+## Part 1 — Two piezometric lines
+
+The first way to describe the two water states is also the simplest: a
+piezometric line for each, one at full pool and one drawn down, sketched from
+the piezometers or from judgment, with no seepage run behind either. The file
+already carries both lines; Part 1 looks at them and then runs the procedure on
+the pair.
+
+### The two lines
+
+The drawn-down water state is the second of the three additions, and here it is
+a second piezometric line. Click **Piezometric
 lines**. The editor has two tabs, and both are filled:
 
 ![Line 2, the drawn-down surface, with Line 1 dimmed behind it](images/combo02_studio_piezo.png)
@@ -272,9 +287,7 @@ are measured off the piezometric lines. The difference between them, 3120 psf at
 the toe, is the load the drawdown takes away, and that removal is what the whole
 analysis is about. The red dashed arc is the circle every run below uses.
 
----
-
-## The drawdown from the piezometric pair
+### Running the drawdown on the pair
 
 With the envelope, the second line and the water load all on the file, the
 three-stage procedure can run. Switch to **LEM** (`Ctrl+1`) if the mode strip
@@ -350,14 +363,14 @@ together with which of the two drawn-down stages the reported factor came from.
 
 ---
 
-## Two steady solutions
+## Part 2 — Two steady-state seepage solutions
 
 A piezometric line says where the water table is. A seepage solution says what
 the head is everywhere, which is a stronger statement: it accounts for the flow
 through the core, the anisotropy of the zones, and the seepage face on the
 downstream slope, none of which a line drawn between piezometers knows about.
 Rapid drawdown can be given two of them — one at full pool and one at the
-drawn-down pool — and that is what this section builds.
+drawn-down pool — and that is what Part 2 builds.
 
 ### The second boundary set
 
@@ -554,7 +567,7 @@ model.
 
 ---
 
-## A transient march
+## Part 3 — A transient seepage run
 
 Two independent steady solutions describe two equilibrium states. What they do
 not describe is the passage between them: Set 2 is the dam *long after* the
@@ -713,15 +726,15 @@ the core's undissipated head, read straight off the frame.
 
 ## The three answers, and what brackets them
 
-All three runs used the same dam, the same circle, the same 42 slices, the same
+The three parts used the same dam, the same circle, the same 42 slices, the same
 strengths and the same Spencer solver. Only the statement about the water
 changed:
 
-| Where the two water states came from | Stage 1 | Stage 2 | Stage 3 | **Rapid drawdown FS** |
-|---|---:|---:|---:|---:|
-| Piezometric Lines 1 and 2 | 1.9351 | 1.4708 | not required | **1.471** |
-| Two steady seepage solutions | 2.0537 | 1.4987 | not required | **1.499** |
-| Two frames of a transient march | 2.0537 | 1.3192 | not required | **1.319** |
+| Part | Where the two water states came from | Stage 1 | Stage 2 | Stage 3 | **Rapid drawdown FS** |
+|:---:|---|---:|---:|---:|---:|
+| 1 | Piezometric Lines 1 and 2 | 1.9351 | 1.4708 | not required | **1.471** |
+| 2 | Two steady seepage solutions | 2.0537 | 1.4987 | not required | **1.499** |
+| 3 | Two frames of a transient march | 2.0537 | 1.3192 | not required | **1.319** |
 
 The spread is 0.18, 14% of the lowest answer, and almost all of it separates the
 transient route from the other two. The same circle solved as an ordinary drained

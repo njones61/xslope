@@ -181,13 +181,12 @@ $d$ that reverses it. The shell and the foundation are left blank on both
 columns, which declares them free-draining: they keep 100 psf and 35°, and
 100 psf and 27°, through every stage.
 
-That declaration is reported back rather than assumed. Every run on this page
-carries one warning — *"2 of 3 material(s) a failure surface can cross carry no
-d / psi and are treated as free-draining through the drawdown, keeping their
-drained strength"* — which is the model saying what it understood. The neighboring
-case is an error rather than a warning: a material carrying **d** without
-**psi**, or the reverse, would be treated as free-draining with nothing said, so
-the checks refuse the run rather than let a half-entered envelope pass.
+The model checks report this. Every run on this page carries one warning —
+*"2 of 3 material(s) a failure surface can cross carry no d / psi and are treated
+as free-draining through the drawdown, keeping their drained strength"* — so a
+blank left by mistake is easy to catch. A material carrying **d** without
+**psi**, or the reverse, is an error rather than a warning: the checks refuse the
+run rather than let a half-entered envelope pass.
 
 ### The two piezometric lines
 

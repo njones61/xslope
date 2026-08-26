@@ -128,12 +128,18 @@ below redraws it over the stresses this slope actually generates:
 
 ![The rock mass's envelope over the slope's own stress range](images/lem13_envelope.png){width=800}
 
-The envelope is nowhere a straight line. It rises steeply out of the origin and
-flattens as the confinement grows, and it starts from almost nothing: the
-unconfined strength of the rock **mass** is σ<sub>ci</sub>·s<sup>a</sup>, which at
-this GSI comes to 43.5 kPa out of the intact rock's 30,000 — about one part in
-700. Almost none of the laboratory strength survives the jointing, and what the
-slope stands on instead is confinement.
+The red curve is the envelope, and the shaded band is the range of effective
+normal stress the critical surface found in the next section actually carries,
+0 to 75 kPa. The curve is not a straight line: it is steepest near zero and
+flattens as the confinement grows, so the cohesion and friction angle it implies
+change from one slice base to the next. The dashed line is the tangent at the
+mean base stress, 47 kPa — c<sub>i</sub> = 15.8 kPa and φ<sub>i</sub> = 25.7°,
+the Mohr-Coulomb pair the method of slices solves with at that stress. Note the
+scale: tens of kPa of shear strength from a rock whose intact strength is 30,000.
+The unconfined strength of the rock **mass**, σ<sub>ci</sub>·s<sup>a</sup>, is
+43.5 kPa at this GSI, about one part in 700 of the laboratory value; the jointing
+has removed almost all of it, and what the slope stands on instead is
+confinement.
 
 ### Running the analysis
 

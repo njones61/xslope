@@ -319,9 +319,9 @@ Critical FS = 1.181
 Sliding mass = 1,101,634.4 lb/ft over 256.56 ft of failure surface
 ```
 
-Every trial surface in that search carried a full three-stage analysis, and the
-three stages of the winning one are written in the analysis report under
-**Rapid Drawdown**:
+Every trial surface in that search carried a full three-stage analysis. The Log
+pane prints only the search; the three stages of the winning surface are in the
+**Analysis Report** (**File → Generate Report…**), in its Rapid Drawdown section:
 
 | Stage | | FS |
 |---|---|---:|

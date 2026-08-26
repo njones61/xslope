@@ -5316,6 +5316,416 @@ def combo01_plots():
              100.0 * abs(result["FS"] - crit["FS"]) / crit["FS"]))
 
 
+# --------------------------------------------------------------------------- #
+# COMBO-2 — Rapid Drawdown
+# --------------------------------------------------------------------------- #
+# The same Johnson Reservoir dam COMBO-1 runs, drawn down. Two workbooks: the
+# starter carries the coarse piezometric pair and `u = piezo`; the completed model
+# carries both seepage boundary sets, the pool schedule and `u = seep`. Every run
+# below is made at the Run dialogs' own defaults except the two fields the page
+# changes — Method → Spencer, and Analysis → Single surface, because the three
+# pore-pressure sources are compared on ONE surface.
+# --------------------------------------------------------------------------- #
+COMBO02_START = os.path.join(REPO_ROOT,
+                             "docs/tutorials/files/xslope_johnson_rapid_start.xlsx")
+COMBO02 = os.path.join(REPO_ROOT,
+                       "docs/tutorials/files/xslope_johnson_rapid.xlsx")
+#: Build Mesh: linear triangles, auto-sizing on, 100 divisions across the 750 ft
+#: section for a 7.5 ft target. Linear because head is a scalar field and no
+#: strength reduction runs on this page — the transient march is thousands of
+#: steps, and the element order it is solved at is the whole of its cost.
+COMBO02_ELEMENT = "tri3"
+COMBO02_DIVISIONS = 100
+#: Run Seepage, at its defaults.
+COMBO02_TOL, COMBO02_MAX_ITER = 1e-4, 400
+#: Run LEM. Spencer, the drawdown checkbox, and the file's own circle at the
+#: dialog's slice count.
+COMBO02_METHOD = "spencer"
+COMBO02_SLICES = 40
+#: Contour count for the head panels, matching the sibling dam pages.
+COMBO02_LEVELS = 14
+#: Flow-net base material, 1-based into the mat sheet: the core, as on SEEP-2.
+COMBO02_BASE_MAT = 2
+#: Per-panel size for the stacked field series, this dam's aspect.
+COMBO02_PANEL_SIZE = (8.6, 3.05)
+#: The undrained core's Kc = 1 cohesion intercept, swept at the file's own
+#: psi = 14 deg. Below the crossover every core slice is stronger undrained than
+#: drained and stage 2 governs; above it, slice by slice, stage 3 takes over.
+COMBO02_D_SWEEP = (250.0, 300.0, 325.0, 350.0, 375.0, 400.0, 450.0, 500.0,
+                   600.0, 700.0, 800.0, 1000.0, 1200.0)
+
+
+def _combo02_mesh(model):
+    """The mesh Build Mesh produces on this file with only the element type changed."""
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    xs = [x for x, _ in model["ground_surface"].coords]
+    size = (max(xs) - min(xs)) / COMBO02_DIVISIONS
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(get_material_polygons(model), size,
+                                        COMBO02_ELEMENT,
+                                        size_regions=extract_size_regions(model))
+
+
+def _combo02_pinned(model):
+    """``model`` with the upstream boundary entered as a plain head at full pool.
+
+    This is boundary set 1 as the page builds it — a fixed head of 160 ft — before
+    the transient section rebinds it to the `pool` series. A steady solve reads a
+    series-bound value at t = 0 and would give the same field either way, but the
+    boundary is a runtime Dirichlet set while it is bound, so the fixed head is
+    what the mesh view marks and what the reader has in front of them at this step.
+    """
+    bc = {k: (list(v) if isinstance(v, list) else v)
+          for k, v in model["seepage_bc"].items()}
+    heads = [dict(h) for h in bc["specified_heads"]]
+    heads[0] = dict(heads[0], kind="head",
+                    head=float(model["tseep"]["series"]["pool"][0]))
+    bc["specified_heads"] = heads
+    return dict(model, seepage_bc=bc, tseep=None)
+
+
+def _combo02_steady(model, mesh, bc):
+    """One steady solve of one boundary set."""
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        seep_data = build_seep_data(mesh, model, seep_bc=bc)
+        solution = run_seepage_analysis(seep_data, tol=COMBO02_TOL,
+                                        max_iter=COMBO02_MAX_ITER)
+    return seep_data, solution, log.getvalue()
+
+
+def _combo02_rapid(model):
+    """The three-stage run on the model's own circle.
+
+    Returns ``(as_built, solved, failure_surface, results)``. ``rapid_drawdown``
+    writes the governing stage's strengths, pore pressures and base normals back
+    into the table it is handed, which is what the solution plot should show; the
+    untouched table is kept beside it because the ordinary drained runs that
+    bracket the answer have to start from the stage-1 columns as the slicer built
+    them.
+    """
+    from xslope.advanced import rapid_drawdown
+    from xslope.slice import generate_slices
+
+    ok, out = generate_slices(model, circle=model["circles"][0],
+                              num_slices=COMBO02_SLICES)
+    if not ok:
+        raise RuntimeError(out)
+    slice_df, failure_surface = out
+    as_built = slice_df.copy()
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, results = rapid_drawdown(slice_df, COMBO02_METHOD, debug_level=0)
+    if not ok:
+        raise RuntimeError(results)
+    return as_built, slice_df, failure_surface, results
+
+
+def _combo02_drained(slice_df, stage):
+    """The ordinary drained factor of safety on the same slices, at one stage's
+    water: stage 1 as the table stands, stage 2 with the drawn-down pore pressures
+    and loads swapped in. This is the bracket the drawdown answer sits inside."""
+    from xslope import solve
+
+    df = slice_df.copy()
+    if stage == 2:
+        for base, alt in (("u", "u2"), ("dload", "dload2"), ("d_x", "d_x2"),
+                          ("d_y", "d_y2"), ("beta", "beta2")):
+            if alt in df.columns:
+                df[base] = df[alt].values
+    ok, res = getattr(solve, COMBO02_METHOD)(df)
+    if not ok:
+        raise RuntimeError(res)
+    return res["FS"]
+
+
+def _combo02_stage_line(label, results):
+    lower = 2 if results["stage2_FS"] <= results["stage3_FS"] else 3
+    return ("   %-12s stage 1 %.4f · stage 2 %.4f · stage 3 %.4f · FS %.4f "
+            "(stage %d governs)"
+            % (label, results["stage1_FS"], results["stage2_FS"],
+               results["stage3_FS"], results["FS"], lower))
+
+
+def _combo02_field_panel(seep_data, solution, title, vmin, vmax, arc=None):
+    """One pore-pressure state, drawn through ``plot_seep_solution`` itself, with
+    the slip circle over it so the reader sees which part of the field the drawdown
+    check actually reads."""
+    import numpy as np
+
+    from xslope.plot_seep import plot_seep_solution
+
+    with _hold_show():
+        plot_seep_solution(seep_data, solution, figsize=COMBO02_PANEL_SIZE,
+                           levels=COMBO02_LEVELS, phreatic=True, flowlines=False,
+                           vectors=False, mesh=False, pad_frac=0.04,
+                           cmap="Spectral_r", vmin=vmin, vmax=vmax,
+                           show_title=False, show_legend=False,
+                           show_bc_levels=True)
+    ax = plt.gcf().axes[0]
+    if arc is not None:
+        a = np.asarray(arc.coords)
+        ax.plot(a[:, 0], a[:, 1], color="#c1121f", lw=2.0, zorder=6)
+    ax.set_title(title, fontsize=11, pad=5)
+
+
+def _combo02_sweep_figure(rows, crossing):
+    """Stage 2, stage 3 and the reported factor of safety against the core's
+    undrained cohesion intercept.
+
+    The two stage curves are the whole content: stage 2 climbs with d because the
+    undrained strength IS d plus a friction term, while stage 3 flattens onto the
+    drained answer — it can only ever substitute the drained strength, and once
+    every core slice has taken it there is nothing left for more d to buy. Where
+    the curves separate is where the governing stage changes hands, and the
+    reported factor of safety is the lower of the two throughout.
+
+    The vertical span is opened downward rather than fitted to the data, so the two
+    region labels sit in clear space under curves that otherwise run along the
+    bottom of the axes.
+    """
+    ds = [r["d"] for r in rows]
+    lo = min(r["stage3_FS"] for r in rows)
+    hi = max(r["stage2_FS"] for r in rows)
+    span = hi - lo
+    fig, ax = plt.subplots(figsize=(9, 5.4))
+    ax.set_xlim(min(ds) - 0.02 * (max(ds) - min(ds)),
+                max(ds) + 0.02 * (max(ds) - min(ds)))
+    ax.set_ylim(lo - 0.28 * span, hi + 0.08 * span)
+    ax.axvspan(ax.get_xlim()[0], crossing, color="#eef4f9", zorder=0)
+    ax.plot(ds, [r["FS"] for r in rows], "-", color="#3f4a55", lw=5.0,
+            alpha=0.28, solid_capstyle="butt",
+            label="reported factor of safety — the lower of the two")
+    ax.plot(ds, [r["stage2_FS"] for r in rows], "o-", color="#1f6fb4", lw=1.4,
+            ms=5, label="Stage 2 — drawn down, undrained core")
+    ax.plot(ds, [r["stage3_FS"] for r in rows], "s-", color="#c1663a", lw=1.4,
+            ms=5, label="Stage 3 — drawn down, drained where drained is lower")
+    ax.axvline(crossing, color="#7a8592", lw=0.9, ls="--")
+    ymin = ax.get_ylim()[0]
+    ax.set_xticks([min(ds), 400, 600, 800, 1000, max(ds)])
+    gap = 0.01 * (max(ds) - min(ds))
+    ax.text(crossing - gap, ymin + 0.03 * span, "stage 2 governs", ha="right",
+            color="#5b646f", fontsize=9)
+    ax.text(crossing + gap, ymin + 0.03 * span, "stage 3 governs", ha="left",
+            color="#5b646f", fontsize=9)
+    ax.annotate("d = %.0f psf — the first core slice\ntakes its drained strength"
+                % crossing, (crossing, ymin + 0.12 * span), xytext=(8, 0),
+                textcoords="offset points", color="#5b646f", fontsize=9,
+                va="bottom")
+    ax.set_xlabel("core undrained cohesion intercept d (psf), at ψ = 14°")
+    ax.set_ylabel("factor of safety")
+    ax.set_title("Which stage governs, against the core's Kc = 1 envelope")
+    ax.grid(True, color="#e3e7eb", lw=0.6)
+    ax.legend(loc="upper left", frameon=False)
+    fig.tight_layout()
+
+
+def combo02_plots():
+    """The drawdown page: one dam, one slip circle, three sources for the two
+    staged pore-pressure fields, and the strength sweep that moves the governing
+    stage.
+
+    Printed rather than drawn: the coarse piezometric pair against the solved
+    surfaces it approximates, the mesh, both steady solves, the transient march's
+    saved-frame log, the three-stage table for each of the three sources, the
+    drained brackets either side of them, and the whole d sweep. Every number the
+    page quotes is on one of these lines.
+    """
+    import re
+
+    import numpy as np
+
+    from xslope.plot_seep import plot_seep_data, plot_seep_solution
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             run_transient_seepage,
+                             stage_transient_for_drawdown)
+    from xslope.water import with_water_loads
+
+    # ---- the starter, and the piezometric route ----------------------------- #
+    start = load_slope_data(COMBO02_START)
+    _u = declared_unit_labels(start)
+    for m in start["materials"]:
+        print("   material    %-11s γ %g %s · c %g %s · φ %g° · d %s · ψ %s · "
+              "k1 %g %s/%s · u %s"
+              % (m["name"], m["gamma"], _u["unit_weight"], m["c"], _u["stress"],
+                 m["phi"], m["d"] or "—", m["psi"] or "—", m["k1"], _u["length"],
+                 start["time_unit"], m["u"]))
+    print("   piezo 1     %s" % (start["piezo_line"],))
+    print("   piezo 2     %s" % (start["piezo_line2"],))
+    derived = with_water_loads(start)
+    print("   water load  stage 1 peak %.1f %s from %s · stage 2 %d block(s) from %s"
+          % (max(float(p["Normal"]) for b in derived["dloads_derived"] for p in b),
+             _u["stress"], derived["water_derived"][1]["source"],
+             len(derived["dloads2_derived"]),
+             derived["water_derived"][2]["source"] or "nothing above ground"))
+    capture("combo02_inputs.png", plot_inputs, start, mode="lem",
+            title="Rapid Drawdown Model Inputs", frame="content", show_mesh=False)
+
+    piezo_raw, piezo_df, piezo_surface, piezo_res = _combo02_rapid(start)
+    print(_combo02_stage_line("piezo", piezo_res))
+    print("   piezo       %d slices · %d cut the core · u %.0f max at stage 1, "
+          "%.0f at stage 2 %s"
+          % (len(piezo_df), int((piezo_raw["d"] > 0).sum()),
+             piezo_raw["u"].max(), piezo_raw["u2"].max(), _u["stress"]))
+    print("   piezo       drained full pool %.4f · drained drawn down %.4f"
+          % (_combo02_drained(piezo_raw, 1), _combo02_drained(piezo_raw, 2)))
+    capture("combo02_solution_piezo.png", plot_solution, start, piezo_df,
+            piezo_surface, piezo_res)
+
+    # ---- the completed model: mesh and the two steady solves ---------------- #
+    model = load_slope_data(COMBO02)
+    mesh = _combo02_mesh(model)
+    model["mesh"] = mesh
+    figsize = _seep02_figsize(mesh)
+    xs = [x for x, _ in model["ground_surface"].coords]
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g %s"
+          % (len(mesh["nodes"]), len(mesh["elements"]), COMBO02_ELEMENT,
+             COMBO02_DIVISIONS, (max(xs) - min(xs)) / COMBO02_DIVISIONS,
+             _u["length"]))
+
+    pinned = _combo02_pinned(model)
+    sd1, sol1, log1 = _combo02_steady(pinned, mesh, 1)
+    sd2, sol2, log2 = _combo02_steady(pinned, mesh, 2)
+    for label, sol, log in (("set 1", sol1, log1), ("set 2", sol2, log2)):
+        head = np.asarray(sol["head"])
+        print("   %s       q %.4g %s³/%s per %s · head %.3f to %.3f %s · "
+              "u %.1f to %.1f %s · converged %s"
+              % (label, sol["flowrate"], _u["length"], model["time_unit"],
+                 _u["length"], head.min(), head.max(), _u["length"],
+                 np.min(sol["u"]), np.max(sol["u"]), _u["stress"],
+                 sol["converged"]))
+        # Set 2 carries no exit face, so it is a linear confined solve with no
+        # unconfined iteration to report; the log parser has nothing to read.
+        if "Converged in" in log:
+            print("   %s       %s" % (label, _seep02_log_stats(log)))
+        else:
+            print("   %s       confined solve, no unconfined iteration" % label)
+    _as_shipped = _combo02_steady(model, mesh, 1)
+    for line in _as_shipped[2].splitlines():
+        if "read at t = 0" in line:
+            print("   series      %s (as shipped, with the boundary bound to the "
+                  "series: q %.4f)" % (line.strip(), _as_shipped[1]["flowrate"]))
+
+    capture("combo02_mesh.png", plot_seep_data, sd1, figsize=figsize,
+            show_bc=True)
+
+    model["seep_u"], model["seep_u2"] = sol1["u"], sol2["u"]
+    steady_raw, steady_df, steady_surface, steady_res = _combo02_rapid(model)
+    print(_combo02_stage_line("two steady", steady_res))
+    print("   two steady  %d slices · %d cut the core · u %.0f max at stage 1, "
+          "%.0f at stage 2 %s"
+          % (len(steady_df), int((steady_raw["d"] > 0).sum()),
+             steady_raw["u"].max(), steady_raw["u2"].max(), _u["stress"]))
+    print("   two steady  drained full pool %.4f · drained drawn down %.4f"
+          % (_combo02_drained(steady_raw, 1), _combo02_drained(steady_raw, 2)))
+    capture("combo02_solution_steady.png", plot_solution, model, steady_df,
+            steady_surface, steady_res)
+
+    pair = [np.asarray(s["head"], float) for s in (sol1, sol2)]
+    vmin = float(min(h.min() for h in pair))
+    vmax = float(max(h.max() for h in pair))
+    panels = [capture("combo02_steady_1.png", _combo02_field_panel, sd1, sol1,
+                      "Boundary set 1 — full pool, reservoir at el 160 ft",
+                      vmin, vmax, steady_surface),
+              capture("combo02_steady_2.png", _combo02_field_panel, sd2, sol2,
+                      "Boundary set 2 — drawn down, pool at el 100 ft, "
+                      "fully re-equilibrated", vmin, vmax, steady_surface)]
+    _stack_panels("combo02_steady_pair.png", panels)
+
+    # ---- the transient march ------------------------------------------------ #
+    import time as _time
+
+    tlog = io.StringIO()
+    t0 = _time.time()
+    with contextlib.redirect_stdout(tlog):
+        solution = run_transient_seepage(_as_shipped[0], build_tseep_data(model),
+                                         verbose=True)
+    wall = _time.time() - t0
+    frames = solution["frames"]
+    print("   march       %d saved frames at t = %s · %.0f s wall"
+          % (len(frames), " ".join("%g" % f["time"] for f in frames), wall))
+    for line in tlog.getvalue().splitlines():
+        if "frame saved" in line or line.startswith("Transient"):
+            print("     %s" % line.strip())
+
+    staged = stage_transient_for_drawdown(load_slope_data(COMBO02), solution)
+    staged["mesh"] = mesh
+    trans_raw, trans_df, trans_surface, trans_res = _combo02_rapid(staged)
+    print(_combo02_stage_line("transient", trans_res))
+    print("   transient   %d slices · %d cut the core · u %.0f max at stage 1, "
+          "%.0f at stage 2 %s"
+          % (len(trans_df), int((trans_raw["d"] > 0).sum()),
+             trans_raw["u"].max(), trans_raw["u2"].max(), _u["stress"]))
+    print("   transient   drained full pool %.4f · drained drawn down %.4f"
+          % (_combo02_drained(trans_raw, 1), _combo02_drained(trans_raw, 2)))
+    capture("combo02_solution_transient.png", plot_solution, staged, trans_df,
+            trans_surface, trans_res)
+
+    ts = model["tseep"]
+    stage_frames = []
+    for t, label in ((ts["stage_1"], "stage 1 — full pool"),
+                     (ts["stage_2"], "stage 2 — end of drawdown")):
+        i = int(np.argmin([abs(f["time"] - float(t)) for f in frames]))
+        stage_frames.append((frames[i], label))
+    all_head = np.concatenate([np.asarray(f["head"], float) for f, _l in stage_frames])
+    fmin, fmax = float(all_head.min()), float(all_head.max())
+    panels = [capture("combo02_frame_t%g.png" % f["time"], _combo02_field_panel,
+                      _as_shipped[0], f, "%s   (t = %g %s)" % (label, f["time"], _u["time"]),
+                      fmin, fmax, trans_surface)
+              for f, label in stage_frames]
+    _stack_panels("combo02_frames.png", panels)
+
+    # ---- the sweep that moves the governing stage --------------------------- #
+    from xslope.advanced import rapid_drawdown
+    from xslope.slice import generate_slices
+
+    rows, crossing = [], None
+    for d in COMBO02_D_SWEEP:
+        trial = dict(staged)
+        trial["materials"] = copy.deepcopy(staged["materials"])
+        trial["materials"][1]["d"] = float(d)
+        ok, out = generate_slices(trial, circle=trial["circles"][0],
+                                  num_slices=COMBO02_SLICES)
+        df = out[0]
+        log = io.StringIO()
+        with contextlib.redirect_stdout(log):
+            ok, res = rapid_drawdown(df.copy(), COMBO02_METHOD, debug_level=2)
+        n = len(re.findall("Using drained strength for slice", log.getvalue()))
+        rows.append(dict(d=d, stage1_FS=res["stage1_FS"], stage2_FS=res["stage2_FS"],
+                         stage3_FS=res["stage3_FS"], FS=res["FS"], n_drained=n))
+        print("   d %-6g    stage 2 %.4f · stage 3 %.4f · FS %.4f · %2d of %d core "
+              "slices drained · stage %d governs"
+              % (d, res["stage2_FS"], res["stage3_FS"], res["FS"], n,
+                 int((df["d"] > 0).sum()), 3 if n else 2))
+    # Where the first core slice crosses over, bisected on the same staged fields.
+    lo = max(r["d"] for r in rows if r["n_drained"] == 0)
+    hi = min(r["d"] for r in rows if r["n_drained"] > 0)
+    for _ in range(14):
+        mid = 0.5 * (lo + hi)
+        trial = dict(staged)
+        trial["materials"] = copy.deepcopy(staged["materials"])
+        trial["materials"][1]["d"] = mid
+        ok, out = generate_slices(trial, circle=trial["circles"][0],
+                                  num_slices=COMBO02_SLICES)
+        log = io.StringIO()
+        with contextlib.redirect_stdout(log):
+            rapid_drawdown(out[0].copy(), COMBO02_METHOD, debug_level=2)
+        if "Using drained strength for slice" in log.getvalue():
+            hi = mid
+        else:
+            lo = mid
+    crossing = 0.5 * (lo + hi)
+    print("   crossover   the first core slice takes its drained strength at "
+          "d = %.1f psf (ψ = 14°)" % crossing)
+    capture("combo02_sweep.png", _combo02_sweep_figure, rows, crossing)
+
+    print("   three answers  piezometric %.4f · two steady %.4f · transient %.4f"
+          % (piezo_res["FS"], steady_res["FS"], trans_res["FS"]))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -5354,6 +5764,7 @@ GROUPS = {
     "fem03_spacing": fem03_spacing,
     "fem03_wall": fem03_wall,
     "combo01_plots": combo01_plots,
+    "combo02_plots": combo02_plots,
 }
 
 

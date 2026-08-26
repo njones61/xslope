@@ -2682,6 +2682,221 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# COMBO-2 — Rapid Drawdown
+#
+# Two workbooks, photographed at the point in the page where each dialog is
+# opened. The starter's shots carry the piezometric pair and u = piezo; the
+# completed model's carry the second boundary set, the schedule and the Run LEM
+# dialog with the drawdown checkbox on, where the two stage-time fields appear.
+# --------------------------------------------------------------------------- #
+COMBO02_START = os.path.join(REPO_ROOT,
+                             "docs/tutorials/files/xslope_johnson_rapid_start.xlsx")
+COMBO02 = os.path.join(REPO_ROOT,
+                       "docs/tutorials/files/xslope_johnson_rapid.xlsx")
+#: The mesh the page builds: linear triangles, auto-sizing on, 100 divisions
+#: across the 750 ft section.
+COMBO02_MESH = {"element_type": "tri3", "auto_size": True, "size_divisions": 100,
+                "target_size": 7.5}
+COMBO02_METHOD = "spencer"
+COMBO02_SLICES = 40
+
+_combo02_cache = {}
+
+
+def _combo02_solved():
+    """The completed workbook with the page's mesh built and BOTH steady fields
+    attached — the state the reader is in when Run LEM is opened for the
+    two-steady run, and the state the drawdown checks are reported against.
+
+    Cached: two solves and a mesh for one dialog is not free, and the shipped file
+    carries no sidecars because solving is what the page teaches.
+    """
+    if "data" not in _combo02_cache:
+        from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                                 get_material_polygons)
+        from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                                 run_seepage_analysis)
+
+        data = _load(COMBO02)
+        with contextlib.redirect_stdout(io.StringIO()):
+            data["mesh"] = build_mesh_from_polygons(
+                get_material_polygons(data), COMBO02_MESH["target_size"],
+                COMBO02_MESH["element_type"],
+                size_regions=extract_size_regions(data))
+            for bc in (1, 2):
+                seep_data = build_seep_data(data["mesh"], data, seep_bc=bc)
+                solution = run_seepage_analysis(seep_data, tol=1e-4, max_iter=400)
+                apply_steady_stability_field(data, solution, bc=bc)
+        _combo02_cache["data"] = data
+    return _combo02_cache["data"]
+
+
+#: Widest a preview-bearing editor is photographed at. A docs figure is rendered
+#: at 1000 px, so a dialog wider than this is downscaled past the point where its
+#: field labels stay legible.
+_PREVIEW_MAX_WIDTH = 1400
+
+
+def _size_preview(dlg, slope_data, width=_PREVIEW_MAX_WIDTH):
+    """Size a preview-bearing editor so its canvas carries the section's own aspect.
+
+    The preview figure is drawn to the canvas viewport, so a tall pane on a section
+    four times as wide as it is high strands the drawing in white space with the
+    padding all in y. Both dimensions are measured off the built dialog rather than
+    guessed: the height is the form's own ``sizeHint`` — the table is then never
+    clipped and the preview is no taller than it has to be — and the width is
+    solved for from two measurements of how much of it the layout gives the
+    canvas, so the viewport comes out as close to the section's width-to-height
+    ratio as the cap allows.
+    """
+    dlg.show()
+    _settle()
+    dlg.resize(dlg.width(), dlg.sizeHint().height())
+    _settle()
+    samples = []
+    for w in (900, width):
+        dlg.resize(w, dlg.height())
+        _settle()
+        samples.append((w, dlg._preview.canvas.view.viewport().width()))
+    (w0, v0), (w1, v1) = samples
+    xs = [x for x, _ in slope_data["ground_surface"].coords]
+    ys = [y for _, y in slope_data["ground_surface"].coords]
+    aspect = (max(xs) - min(xs)) / max(1e-9, max(ys) - min(ys))
+    want = aspect * dlg._preview.canvas.view.viewport().height()
+    slope = (v1 - v0) / float(w1 - w0) if w1 != w0 else 0.0
+    target = w1 if slope <= 0 else w0 + (want - v0) / slope
+    dlg.resize(int(min(max(target, w0), width)), dlg.height())
+    _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    dlg._preview.canvas._render_current()
+    _settle()
+    return dlg
+
+
+def combo02_materials():
+    """The three zones in table view with the LEM columns showing.
+
+    The **d** and **psi** columns are the subject: only the core carries the pair,
+    which is what makes it the one material the drawdown procedure treats as
+    undrained. The LEM band, because both columns are read by the limit
+    equilibrium engine alone.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _lem_only(MaterialsEditor().build(_load(COMBO02_START), None))
+    return _grab(_mat_table(dlg, through="u"), "combo02_studio_materials.png")
+
+
+def combo02_piezo():
+    """The piezometric editor with **Line 2** active.
+
+    Both lines are on the preview — the active one bold with its vertices, the
+    other dimmed — so the pair reads as what it is: one surface at full pool and
+    one at the end of the drawdown, six points and five, meeting again downstream
+    of the core where the drawdown has not reached.
+    """
+    from studio.editors import PiezoEditor
+
+    data = _load(COMBO02_START)
+    dlg = PiezoEditor().build(data, None)
+    dlg._tabs.setCurrentIndex(1)
+    _size_preview(dlg, data)
+    return _grab(dlg, "combo02_studio_piezo.png", settle=False)
+
+
+def combo02_seep_bc2():
+    """The boundary editor on its **Set 2 (rapid drawdown)** tab, with the
+    upstream entry selected.
+
+    Set 2 is the drawn-down steady problem: two heads at the elevation-100
+    tailwater datum and nothing else. It takes plain heads only — a reservoir
+    boundary and a series-bound value both belong on Set 1 — which is what the
+    help line above the tabs says.
+    """
+    from studio.editors import SeepBcEditor
+
+    dlg = SeepBcEditor().build(_load(COMBO02), None, select=(1, 0))
+    dlg.resize(1080, 560)
+    return _grab(dlg, "combo02_studio_seep_bc2.png")
+
+
+def combo02_transient():
+    """The Transient editor with the pool schedule and BOTH stage times filled.
+
+    The stage fields are the difference between this shot and SEEP-3's, where they
+    are deliberately blank: they name the two saved frames the drawdown analysis
+    reads, stage 1 at t = 0 with the reservoir still full and stage 2 at t = 50
+    with it down. Both are forced into the saved-frame schedule, so each is a
+    computed frame.
+
+    The preview is rendered explicitly rather than waited for: the pane's redraw
+    is debounced, so a grab taken straight after ``show()`` catches a blank canvas.
+    """
+    from studio.editors import TransientDialog
+
+    data = _load(COMBO02)
+    dlg = TransientDialog(data.get("tseep"), data, None)
+    dlg.resize(1220, 640)
+    dlg.show()
+    _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    dlg._preview.canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, "combo02_studio_run_transient.png")
+    dlg.grab().save(out)
+    dlg.close()
+    print("-> combo02_studio_run_transient.png")
+    return out
+
+
+def _combo02_run_lem(slope_data, name):
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": COMBO02_METHOD,
+                                 "analysis": "single_surface",
+                                 "num_slices": COMBO02_SLICES, "rapid": True},
+                       slope_data=slope_data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, name)
+
+
+def combo02_run_lem():
+    """Run LEM with **Rapid drawdown** ticked, on the starter file.
+
+    Three fields differ from the dialog's defaults: Method (Spencer), Analysis
+    (Single surface, so the three pore-pressure sources are compared on one
+    circle) and the drawdown checkbox itself, which runs the three-stage
+    procedure and puts the run through the drawdown checks as well as the
+    ordinary limit equilibrium ones. The starter carries no transient schedule,
+    so no stage-time fields are on the form yet.
+    """
+    return _combo02_run_lem(_load(COMBO02_START), "combo02_studio_run_lem.png")
+
+
+def combo02_run_lem_staged():
+    """The same dialog on the completed model, which carries the schedule.
+
+    The **Rapid-drawdown stage times** group is what the schedule adds: two
+    instants rather than the single seepage time an ordinary run on a transient
+    model selects, holding the tseep sheet's own stage_1 and stage_2.
+    """
+    return _combo02_run_lem(_combo02_solved(),
+                            "combo02_studio_run_lem_staged.png")
+
+
+SHOTS.update({
+    "combo02_materials": combo02_materials,
+    "combo02_piezo": combo02_piezo,
+    "combo02_seep_bc2": combo02_seep_bc2,
+    "combo02_transient": combo02_transient,
+    "combo02_run_lem": combo02_run_lem,
+    "combo02_run_lem_staged": combo02_run_lem_staged,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

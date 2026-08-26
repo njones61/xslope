@@ -177,7 +177,7 @@ crest-side end of the trace and exit the toe-side end, whichever way the slope
 faces, and the reservoir meets the face at (42, 18) — so the pair reads as *break
 above the full-pool waterline, daylight below it*. Without them the critical
 surface at full pool is a toe circle on the **downstream** slope, which the
-reservoir never touches and a drawdown curve says nothing about.
+reservoir never touches and a rapid drawdown curve says nothing about.
 
 The third limit sets a floor on the *size* of the mechanism, and the shell is why
 it takes one. A cohesionless soil has no length scale in it: with c′ = 0 the
@@ -555,12 +555,12 @@ stage time and the drawdown check run there.
 
 ---
 
-## Part 2 — Drawdown at every instant
+## Part 2 — Rapid drawdown at every instant
 
 Part 1's curve is a sequence of drained analyses, which is the right question for
 a slope that sheds pore water about as fast as the pool falls. A compacted clay
 core does not, and the section above says what that costs: the model carries no
-$d$ / $\psi$ pair, so it cannot be asked the drawdown question at all.
+$d$ / $\psi$ pair, so it cannot be asked the rapid drawdown question at all.
 
 [COMBO-2](combo02_rapid_drawdown.md)'s Johnson Reservoir dam can. Its core
 carries a $K_c = 1$ envelope, and COMBO-2 runs the three-stage Duncan, Wright and
@@ -642,13 +642,13 @@ line per saved frame, ending on **twelve frames** at t = 0, 5, 35, 50, 80, 150,
 [COMBO-2](combo02_rapid_drawdown.md#marching-it) reads that log and the two
 frames the drawdown names in it.
 
-### Running the drawdown sweep
+### Running the rapid drawdown sweep
 
 The march has left twelve pore-pressure fields on the file, and the sweep asks
-the drawdown question of each. Switch back to **LEM** (`Ctrl+1`) and click
+the rapid drawdown question of each. Switch back to **LEM** (`Ctrl+1`) and click
 **Run → Parametric…**
 
-![The Parametric dialog with the drawdown box ticked](images/combo03_rapid_parametric.png)
+![The Parametric dialog with the Rapid drawdown box ticked](images/combo03_rapid_parametric.png)
 
 Set **Mode** to **Factor of safety vs time**. **Method** opens on **Spencer**,
 which satisfies both force and moment equilibrium and is the method behind every
@@ -711,14 +711,14 @@ stage 1, a fall from the full pool to itself, so that instant comes back as a ro
 carrying its reason rather than as a point on the curve. Eleven of the twelve
 frames are drawdowns; the first is the state they all fall from.
 
-### The drawdown curve
+### The rapid drawdown curve
 
 The run opens a **Drawdown vs Time** tab — the same tab a single-stage sweep
 uses, renamed for the curve it is holding:
 
-![The drawdown factor of safety at every saved instant, with its three stages behind it](images/combo03_rapid_curve.png)
+![The rapid drawdown factor of safety at every saved instant, with its three stages behind it](images/combo03_rapid_curve.png)
 
-The heavy line is the drawdown's own factor of safety, the lower of stages 2 and
+The heavy line is the rapid drawdown factor of safety, the lower of stages 2 and
 3, and the two thin dashed lines behind it are stages 1 and 2. Stage 2 lies under
 the reported curve nearly everywhere, because it governs nearly everywhere, and
 the dotted stage-3 line is drawn only at the one instant stage 3 was required.
@@ -729,7 +729,7 @@ is never a silent gap.
 reports **1.016** on a circle at (243.93, 244.90) with a radius of 163.64 ft, and
 the day-50 row above carries the same factor of safety on the same circle to the
 hundredth of a foot. Nothing about that is a check of one page against another:
-at t = 50 this sweep runs precisely the drawdown COMBO-2 ran — stage 1 at 0,
+at t = 50 this sweep runs precisely the rapid drawdown COMBO-2 ran — stage 1 at 0,
 stage 2 at 50, the same march, the same starting circle — so the curve passes
 through COMBO-2's answer at day 50 because that answer is one of its points.
 
@@ -775,7 +775,7 @@ reports stage 1 on whichever circle that turned out to be.
 ### The same march at drained strengths
 
 The question Part 1 asks can be put to this dam too, on the same twelve frames,
-by leaving the drawdown box alone. Open **Run → Parametric…** again, keep every
+by leaving the **Rapid drawdown at each time** box unticked. Open **Run → Parametric…** again, keep every
 other field, untick **Rapid drawdown at each time**, and click **Run**.
 **Re-search the critical surface at each step** comes back live and stays ticked,
 which is the right setting for the same reason it was held on before.
@@ -817,9 +817,9 @@ Studio's result tab holds one curve at a time, so the two are set on one pair of
 axes here, drawn for this page. Running the sweep in both modes and plotting the
 two results together reproduces it:
 
-![The drawdown curve and the single-stage curve of the same march](images/combo03_rapid_compare.png){width=1000}
+![The rapid drawdown curve and the single-stage curve of the same march](images/combo03_rapid_compare.png){width=1000}
 
-**The drawdown curve is the lower of the two at every instant**, and the distance
+**The rapid drawdown curve is the lower of the two at every instant**, and the distance
 between them is not constant:
 
 | t (day) | drawdown | single-stage | difference |
@@ -837,7 +837,7 @@ between them is not constant:
 | 1000 | 1.1936 | 1.3015 | 0.1079 |
 
 **The gap is narrowest where the slope is weakest.** At day 50 the two analyses
-are 0.019 apart, 1.9% of the drawdown answer; by day 1000 they are 0.108 apart,
+are 0.019 apart, 1.9% of the rapid drawdown answer; by day 1000 they are 0.108 apart,
 9.0% of it. The undrained envelope changes the answer least at the moment the
 answer matters most.
 
@@ -857,7 +857,7 @@ of the curve. One curve climbs to 1.30 and the other stops at 1.19.
 The two curves answer two questions, and neither is the other's conservative
 version.
 
-**Through the fall and just after it, read the drawdown curve.** Its number for
+**Through the fall and just after it, read the rapid drawdown curve.** Its number for
 this dam is **1.016, on day 50**. During those 45 days the core cannot shed the
 reservoir's head, so the strength it can mobilize is the undrained one, and a
 single-stage drained analysis at the same instant credits it with a strength it
@@ -866,14 +866,14 @@ higher — does not make the distinction academic, because the drawdown run is
 what establishes that the two are close on this dam, and it costs one sweep.
 
 **Long after the fall, read the single-stage curve.** By day 1000 the core has
-drained, and 1.3015 is what the slope actually has. The drawdown curve's 1.1936
+drained, and 1.3015 is what the slope actually has. The rapid drawdown curve's 1.1936
 at that instant is still answering "what if the pool fell from full to here",
 which by then is not what happened. It describes the long-term drawdown state,
 the case COMBO-2's two steady solutions compute, and it applies only if the
 reservoir is filled and drawn down again.
 
 For a zoned dam with a core that does not drain, that puts the design number on
-the drawdown curve's minimum and the long-term number on the single-stage curve's
+the rapid drawdown curve's minimum and the long-term number on the single-stage curve's
 plateau. The sweep is what locates the first of those, without anyone having to
 name the instant in advance.
 
@@ -903,22 +903,22 @@ This tutorial covered:
 - Why that minimum falls mid-drawdown: the reservoir load tracks the pool exactly
   while the pore pressure behind the face lags, and the slope is weakest where
   the gap between them is widest — 17 days before the pool stops moving.
-- How to turn the same sweep into a drawdown curve — **Rapid drawdown at each
+- How to turn the same sweep into a rapid drawdown curve — **Rapid drawdown at each
   time** on the Parametric dialog makes every ticked instant stage 2 of a
   three-stage analysis whose stage 1 is the march's initial state, holds the
   re-search toggle on, and refuses the initial instant itself, which would be a
   fall from the full pool to itself.
-- The drawdown curve on COMBO-2's Johnson Reservoir dam — 1.4563 on day 5 with
+- The rapid drawdown curve on COMBO-2's Johnson Reservoir dam — 1.4563 on day 5 with
   the pool still standing, a minimum of **1.0158 on day 50** where the fall ends,
   and a recovery that flattens at 1.1936 by day 1000. Day 50 is COMBO-2's own
   transient-route answer of 1.016, on the same circle, because that instant is
   the drawdown COMBO-2 ran.
 - What the same twelve frames give at drained strengths — 1.5097 at full pool,
-  1.0351 on day 50 and 1.3015 by day 1000 — and that the drawdown curve is the
+  1.0351 on day 50 and 1.3015 by day 1000 — and that the rapid drawdown curve is the
   lower of the two at every instant, by 0.019 at day 50 and 0.108 by day 1000.
   The undrained envelope changes the answer least where the slope is weakest,
   because the retained pore pressure has already cut the drained strength there.
-- Which curve to read: the drawdown curve through the fall and just after it,
+- Which curve to read: the rapid drawdown curve through the fall and just after it,
   where the core cannot shed the reservoir's head; the single-stage curve for the
   long-term condition, once it has.
 

@@ -383,7 +383,7 @@ The rows it lands are the model this page runs: the same four points, the same
 Movement settings. Press **OK** and continue below — but a generated surface is a
 *starting* shape rather than an answer, which is what the
 [search](#what-the-search-found) and the reading
-[at the end of this page](#what-the-generated-surface-is-worth) are about.
+[at the end of this page](#the-generated-surface-as-a-starting-point) are about.
 
 ## Running the analysis
 
@@ -578,7 +578,7 @@ base and pick up most of the same weak ground. What the circle cannot do is
 *stay* in the seam — it touches the bottom at one point and curves away on both
 sides, where the polyline runs 23.1 ft along it.
 
-### What the generated surface is worth {#what-the-generated-surface-is-worth}
+### The generated surface as a starting point {#the-generated-surface-as-a-starting-point}
 
 The four points this page teaches are the weak-zone generator's own output.
 Solve them as they come — `Single surface`, said out loud because a held number

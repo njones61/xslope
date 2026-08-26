@@ -225,10 +225,10 @@ at elevation 77.3, and comes out on the foundation surface at x = 597.9, about
 48 ft beyond the downstream toe. The search evaluated 71 candidate circles and
 took a few seconds.
 
-Two things on that figure are the seepage solution, drawn rather than described.
-The thin gray contours behind the section are the solved total head, and the pale
-blue band under the failure surface is the **pore pressure on each slice base**,
-read off that field: it runs from 0 to 2,044 psf across the 40 slices, largest
+The seepage solution shows up twice on this figure. The thin gray contours
+behind the section are the solved total head, and the pale blue band under the
+failure surface is the **pore pressure on each slice base**, interpolated from
+that field: it runs from 0 to 2,044 psf across the 40 slices, largest
 where the surface is deepest and zero on the slices that lie above the phreatic
 surface. The green hatched band above it is the effective normal stress the
 strength was computed from, which is that base's total normal stress less the

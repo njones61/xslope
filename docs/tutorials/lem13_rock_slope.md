@@ -330,8 +330,8 @@ at low confinement, and this slope is a low-confinement problem: its critical
 surface carries an average normal stress of only 47 kPa. The table's
 σ<sub>ci</sub>·s<sup>a</sup> column is the mass's strength at zero confinement,
 and it climbs from 43.5 kPa at GSI 5 to 239 kPa at GSI 20 — five and a half times
-as much for fifteen points of GSI. Drawn out over the same three values of GSI
-the sweep spans and beyond, the envelopes look like this:
+as much for fifteen points of GSI. Drawn at GSI 5, 30 and 70 — the file's rock
+and the same rock at two better ratings — the envelopes look like this:
 
 ![The same rock at three values of GSI](images/lem13_gsi_envelopes.png){width=800}
 

@@ -399,9 +399,7 @@ spacing changes which surface governs.
 ![Factor of safety against pile spacing: the limit equilibrium curve and the two strength reduction lines](images/fem03_spacing_sweep.png){width=800}
 
 The limit equilibrium answer falls from 2.193 to 1.409 over that range, 36%.
-(LEM-12's sweep quotes 2.354 at 3 ft: it kept the circle found at 6 ft and
-re-solved it, where this page searches afresh at each spacing and finds a
-lower one.) The three strength
+The three strength
 reduction runs return the same bracket,
 [1.3750, 1.3828], and so the same answer, 1.379, with the same verdict at every
 trial.

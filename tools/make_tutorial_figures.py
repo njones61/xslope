@@ -1728,8 +1728,6 @@ LEM13_GSI_CURVES = (5.0, 30.0, 70.0)
 #: Part A's deliberate mis-entry — the slip the sigma_ci units check exists to
 #: catch. Hammah's rock is 30 MPa, which this model states as 30,000 kPa; a reader
 #: copying the number off the paper types 30, and the rock mass comes out a thousand
-#: times weaker than intended. Every other input is left alone.
-LEM13_A_MPA_SCI = 30.0
 #: The strength reduction Part A's second half runs, at the settings the completed
 #: file declares and the SSRM lock tag names: tri6 at a 0.9 m target size, the
 #: bracket [0.8, 1.6], a 0.01 tolerance and K0 = 1. The per-trial iteration
@@ -1877,7 +1875,7 @@ def _lem13_envelopes(crit):
 
 
 def lem13_plots():
-    """Part A's limit equilibrium runs — the correct entry, the MPa slip — and the
+    """Part A's limit equilibrium runs — the correct entry — and the
     envelope figure.
 
     Printed rather than drawn: every search's factor of safety, its circle, the
@@ -1898,17 +1896,6 @@ def lem13_plots():
     print("   A spencer  %s" % _lem13_reading(crit_s))
     print("   A spencer  %s" % _lem13_daylight(crit_s))
 
-    # ---- the MPa slip, searched exactly as the correct entry was ------------- #
-    mpa_mat = dict(a["materials"][0], hb_sci=LEM13_A_MPA_SCI)
-    mpa = dict(a, materials=[mpa_mat])
-    crit_mpa = _lem13_search(mpa, "spencer")
-    capture("lem13_mpa.png", plot_solution, mpa, crit_mpa["slices"],
-            crit_mpa["failure_surface"], crit_mpa["solver_result"])
-    print("   A σci=%g  %s" % (LEM13_A_MPA_SCI, _lem13_reading(crit_mpa)))
-    print("   A σci=%g  %s" % (LEM13_A_MPA_SCI, _lem13_daylight(crit_mpa)))
-    print("   A σci=%g  unconfined σci·s^a %.5f kPa against the correct entry's "
-          "%.4f" % (LEM13_A_MPA_SCI, _lem13_ucs(mpa_mat),
-                    _lem13_ucs(a["materials"][0])))
 
     # ---- the envelope the answer came off ------------------------------------ #
     _lem13_envelopes(crit_s)

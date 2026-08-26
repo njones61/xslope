@@ -3156,15 +3156,10 @@ SHOTS.update({
 #
 # The materials shot is LIST view: only the list view puts the four Hoek-Brown
 # field inputs beside the derived mb/s/a readout and the envelope those constants
-# draw, which is the whole subject of Part A. One Run LEM shot carries a model check
-# rather than a control — the one after the page's deliberate MPa slip, which is
-# what the sigma_ci units rule exists to catch. Part B photographs the Parametric
+# draw, which is the whole subject of Part A. Part B photographs the Parametric
 # dialog in its Design mode, set to the GSI sweep the page runs.
 # --------------------------------------------------------------------------- #
 LEM13_A = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope.xlsx")
-#: Part A's mis-entry: Hammah's 30 MPa typed as the 30 the paper prints, into a
-#: model whose stress unit is kPa.
-LEM13_A_MPA_SCI = 30.0
 
 
 def _lem13_material(model, name, edit=None, width=1180, height=780):
@@ -3200,25 +3195,6 @@ def lem13_run_lem():
                        slope_data=_load(LEM13_A))
     dlg.resize(dlg.sizeHint())
     return _grab(dlg, "lem13_studio_run_lem.png")
-
-
-def lem13_run_lem_mpa():
-    """Run LEM on Part A after the page's deliberate MPa slip.
-
-    sigma_ci reads 30 instead of 30,000, and the checks column carries the units
-    rule with its full text. **Run** stays enabled: nothing about the entry is
-    invalid, only implausible, so the check reports and the run proceeds.
-    """
-    from studio.dialogs import RunLemDialog
-
-    data = _load(LEM13_A)
-    data = dict(data, materials=[dict(data["materials"][0],
-                                      hb_sci=LEM13_A_MPA_SCI)])
-    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
-                                 "num_slices": 40},
-                       slope_data=data)
-    dlg.resize(dlg.sizeHint())
-    return _grab(dlg, "lem13_studio_run_lem_mpa.png")
 
 
 def lem13_run_fem():
@@ -3306,7 +3282,6 @@ def lem13_parametric():
 SHOTS.update({
     "lem13_materials": lem13_materials,
     "lem13_run_lem": lem13_run_lem,
-    "lem13_run_lem_mpa": lem13_run_lem_mpa,
     "lem13_build_mesh": lem13_build_mesh,
     "lem13_run_fem": lem13_run_fem,
     "lem13_run_lem_corps": lem13_run_lem_corps,

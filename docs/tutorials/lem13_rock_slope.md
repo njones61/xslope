@@ -26,9 +26,8 @@ observations, not laboratory constants.**
 **Objectives** — Learn how to analyze a rock slope with the generalized
 Hoek-Brown criterion: what the four inputs mean and where they come from, what
 XSLOPE derives from them, how the criterion reaches a method of slices that wants
-a cohesion and a friction angle, what stress units cost when the criterion is
-carried over from the literature, and which of the four field inputs the factor of
-safety is actually sensitive to.
+a cohesion and a friction angle, and which of the four field inputs the factor
+of safety is actually sensitive to.
 </div>
 <p><span class="tg-pill">one material</span><span class="tg-pill">Hoek-Brown</span><span class="tg-pill">GSI</span><span class="tg-pill">disturbance factor</span><span class="tg-pill">instantaneous tangent</span><span class="tg-pill">circular search</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">strength reduction</span><span class="tg-pill">parametric study</span><span class="tg-pill">design sweep</span><span class="tg-pill">model checks</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_rock_slope.xlsx](files/xslope_rock_slope.xlsx),
@@ -113,7 +112,9 @@ parameters beside a plot of the envelope they define:
 ![The Hoek-Brown material](images/lem13_studio_materials.png)
 
 The rock's **Model (option)** is `hb`, and the four fields under it are the four
-observations: **σci** = 30000, **GSI** = 5, **mi** = 2, **D** = 0. σ<sub>ci</sub>
+observations: **σci** = 30000, **GSI** = 5, **mi** = 2, **D** = 0 (σci is in
+the model's stress units — kPa here — so it is 30000, not the 30 MPa the paper
+prints; typed as 30, the model checks report a units warning). σ<sub>ci</sub>
 reads 30000 rather than 30 because **XSLOPE never converts units**: every stress
 in a model is in the model's own stress unit, kPa here, and 30 MPa is 30,000 kPa.
 The box at the top left of the plot reads out what those four produce —
@@ -190,40 +191,6 @@ Mohr-Coulomb material it would over-credit the lightly loaded slices near the
 crest and under-credit the heavily loaded ones near the toe, which is the whole
 reason the outer iteration exists: **the equivalent Mohr-Coulomb pair is an output
 of the analysis, one per slice, not an input to it.**
-
-### The MPa slip
-
-Every σ<sub>ci</sub> in the rock-mechanics literature is quoted in megapascals,
-and this model's stress unit is the kilopascal, so the number most likely to be
-copied wrong is the one the paper prints. Try it. Open **Materials**, change
-**σci** from `30000` to `30` — Hammah's 30 MPa, typed as the paper gives it —
-click **OK**, and open **Run LEM…** again with the same Spencer auto search:
-
-![The units check on the mis-keyed model](images/lem13_studio_run_lem_mpa.png)
-
-**Model checks — 1 warning**, and it names exactly this mistake:
-
-> Material 1 ('rock') has σci = 30, below 1000 kPa — weaker in unconfined
-> compression than any intact rock. σci is entered in this model's own stress units
-> and xslope never converts: 30 MPa is 30,000 kPa or 626,000 psf, so a σci carried
-> straight over in MPa describes a rock mass a thousand times weaker than the one
-> intended. A normalized model, which holds σci/γH at a critical ratio, is the one
-> case where a value this small is meant.
-
-**Run** stays enabled, because the entry is implausible rather than invalid. Click
-**Run**:
-
-![Spencer on the mis-keyed model](images/lem13_mpa.png){width=1000}
-
-**FS = 0.104**, against 1.152 on the same file a moment earlier. The mechanism is
-recognizably the same one — toe to crest, tangent at elevation 4.83 — but there is
-almost nothing holding it: c<sub>i</sub> now runs from 0.09 to 1.59 kPa where the
-correct entry gave 11.4 to 18.9, and φ<sub>i</sub> from 2.4° to 10.9° instead of
-23.2° to 36.9°. The unconfined strength of the mass, σ<sub>ci</sub>·s<sup>a</sup>,
-scales straight through with σ<sub>ci</sub>: 0.0435 kPa against 43.5.
-
-A factor of safety of a tenth is its own alarm, and the check named the cause
-before the run started. Change **σci** back to `30000` before going on.
 
 ### The same file through strength reduction
 
@@ -310,9 +277,6 @@ Studio answers it with a **Parametric study**, which re-solves the model across 
 range of one input. Any numeric material property can be swept, including the
 Hoek-Brown columns, and the sweep re-runs the search at every step so the critical
 surface is allowed to move as the rock changes.
-
-Make sure **σci** is back at `30000` before starting — the sweeps below are read
-against Part A's 1.152.
 
 ### Sweeping the Geological Strength Index
 
@@ -483,9 +447,6 @@ This tutorial covered:
   factor of safety turns on, and why the Geological Strength Index has the leverage
   it does — *s* collapses about three times as fast as m<sub>b</sub>, and a slope
   this size lives at the low confinement where *s* decides the answer.
-- σ<sub>ci</sub> entered in the model's own stress units, the model check that
-  reports a value small enough to have been carried over in MPa, and the 0.104 a
-  slope reads once its rock mass has been mis-keyed a thousandfold weak.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [LEM-11](lem11_reliability.md) turns the same kind of input uncertainty into a

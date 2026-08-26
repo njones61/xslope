@@ -184,13 +184,8 @@ install directly from the repository:
 
 [https://github.com/njones61/xslope/tree/main](https://github.com/njones61/xslope/tree/main)
 
-To clone the repository, click the green **Code** button and click the clipboard
-icon to copy the clone URL.
-
-![clone_repo.png](images/clone_repo.png)
-
-Then, in a terminal, navigate to the directory where the repository should live
-and run the following command (type the URL or paste it from the clipboard):
+In a terminal, navigate to the directory where the repository should live and
+run:
 
 ```bash
 git clone https://github.com/njones61/xslope.git

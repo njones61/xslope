@@ -431,10 +431,6 @@ foreshore and up the face as far as the lowered pool wets it:
 | 380 | 180 |
 | 550 | 100 |
 
-Head 1 is a plain head, like Set 1's: both sets are steady states, and a
-constant head along the wetted perimeter the residual pool reaches, ending at
-(220, 110) where elevation 110 meets the 2:1 face, is all a steady solve needs.
-
 **Ten feet of head still cross the section.** The pool stops at 110 and the
 tailwater is at 100, so water still flows through the dam and still leaves it
 through the downstream slope — which is why the exit face is on this set as well.

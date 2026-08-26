@@ -804,10 +804,13 @@ three are ordinary drained runs from the same starting circle, each reporting a
 critical surface of its own, and between them they separate the drawdown into its
 parts.
 
-**The load removal alone costs 0.20.** Taking 50 ft of reservoir off a dam whose
-pore pressures have fully caught up moves the slope from 1.510 to 1.311, at
-drained strength throughout. That is the long-term condition the dam settles into
-months after the drawdown.
+**The lowered pool costs 0.20 in the long run.** Taking 50 ft of reservoir off
+the dam and letting its pore pressures fully catch up moves the slope from 1.510
+to 1.311, at drained strength throughout. Two things change between those runs
+and they pull in opposite directions: the water load that was holding the face up
+is gone, and the pore pressures under the drawn-down pool are lower. The load
+removal is the larger effect, so the net result is a lower factor of safety. That
+is the long-term condition the dam settles into months after the drawdown.
 
 **The core's retained water costs a further 0.28.** Holding the day-50 pore
 pressures instead of the re-equilibrated ones, still at drained strength, moves

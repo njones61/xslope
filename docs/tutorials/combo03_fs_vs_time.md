@@ -856,8 +856,16 @@ this dam is **1.016, on day 50**. During those 45 days the core cannot shed the
 reservoir's head, so the strength it can mobilize is the undrained one, and a
 single-stage drained analysis at the same instant credits it with a strength it
 does not have. That the single-stage curve reads 1.0351 there — only 0.019
-higher — does not make the distinction academic, because the drawdown run is
-what establishes that the two are close on this dam, and it costs one sweep.
+higher — is a property of this dam, not of the method. The gap is the
+shear-induced pore pressure the undrained envelope adds on top of the retained
+head the transient solution already carries, and on this core the two strengths
+sit close together at the stresses the surface sees
+([COMBO-2](combo02_rapid_drawdown.md#the-governing-stage-flip) measures the
+crossover at 223 psf against the core's 250). A more contractive core — a lower
+$d$, a lower $\psi$ — a surface that crosses more of it, or a faster drawdown
+would open that gap well beyond 0.02, with the single-stage curve reading too
+high the whole way down. The sweep is what measures the gap for the dam at hand;
+it costs one run.
 
 **Long after the fall, read the single-stage curve.** By day 1000 the core has
 drained, and 1.3015 is what the slope actually has. The rapid drawdown curve's 1.1936

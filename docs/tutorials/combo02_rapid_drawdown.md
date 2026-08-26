@@ -238,9 +238,9 @@ x = 550 out:
 | 550 | 100 |
 | 750 | 100 |
 
-Five and six points is the whole of it, and the coarseness is deliberate. **A
-piezometric line is a statement about the water, not a trace of a solved field.**
-In practice Line 1 comes from piezometers in a dam that has been standing at full
+Each line is only five or six points, and that is all a piezometric line
+usually is: **a statement about where the water table is, not a trace of a solved
+head field.** In practice Line 1 comes from piezometers in a dam that has been standing at full
 pool, and Line 2 comes from judgment about where those readings will settle once
 the pool is down and the dam has come back to equilibrium — a straightedge sketch
 between a few readings and a few assumptions. The two above were sketched from the

@@ -133,11 +133,15 @@ The red curve is the envelope, and the shaded band is the range of effective
 normal stress the critical surface found in the next section actually carries,
 0 to 75 kPa. The curve is not a straight line: it is steepest near zero and
 flattens as the confinement grows, so the cohesion and friction angle it implies
-change from one slice base to the next. The dashed line is the straight line
-that touches the curve at the mean base stress, 47 kPa; its intercept,
-c<sub>i</sub> = 15.8 kPa, and its slope, φ<sub>i</sub> = 25.7°, are the cohesion
-and friction angle the method of slices is handed for a slice at that stress.
-Every slice gets its own such line at its own stress. Note the
+change from one slice base to the next. The dashed line is the strength one
+particular slice is given. A slice whose base carries an effective normal stress
+of 47 kPa — the average over the critical surface — is solved with the straight
+line that touches the curve at that stress: cohesion c<sub>i</sub> = 15.8 kPa
+(the line's intercept) and friction angle φ<sub>i</sub> = 25.7° (its slope). A
+slice at 20 kPa gets a steeper line with a smaller intercept; a slice at 70 kPa a
+flatter one with a larger intercept. Every slice is solved with its own line at
+its own stress, and the figure draws the average slice's so there is one line to
+read against the curve. Note the
 scale: tens of kPa of shear strength from a rock whose intact strength is 30,000.
 The unconfined strength of the rock **mass**, σ<sub>ci</sub>·s<sup>a</sup>, is
 43.5 kPa at this GSI, about one part in 700 of the laboratory value; the jointing

@@ -371,7 +371,7 @@ between an envelope that flattens quickly and the classical square-root form.
 The right panel of [the envelope figure in Part A](#opening-the-model) draws that
 directly — the same σ<sub>ci</sub>, m<sub>i</sub> and D at three values of the
 index. The three curves are not one curve scaled: they start at different heights
-and bend by different amounts, which is why one field judgement moves the factor
+and bend by different amounts, which is why one field judgment moves the factor
 of safety as far as it does.
 
 ### The disturbance factor

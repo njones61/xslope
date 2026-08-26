@@ -325,11 +325,13 @@ shear is largest at the toe, the pin reaction. A drilled shaft that stops at
 the top of the rock and bears on it behaves that way. One
 that is drilled or driven some distance *into* the rock — a rock socket, in
 which the rock grips the shaft's lower length and holds it against rotation as
-well as translation — does not, and `Tip` is the cell that says which it is.
-The cell offers three settings: `free`,
+well as translation — does not, and the `Tip` field in the pile properties is
+the cell that says which it is. The cell offers four settings: `free`,
 the tip restrained only by what surrounds it; `pinned`, its translations held
 and its rotation free, for a shaft bearing on a hard stratum inside the mesh;
-and `fixed`, translations and rotation held, the socketed shaft. On this model the tip
+`unrotated`, its rotation held and its translations free, which has little use
+at a tip and is offered so the two ends read alike; and `fixed`, translations
+and rotation held, the socketed shaft. On this model the tip
 node sits on the base boundary, which already holds its translations, so `free`
 and `pinned` give the same answer. Setting `fixed` is the only setting that
 changes anything, and it is the one that models the socketed shaft.

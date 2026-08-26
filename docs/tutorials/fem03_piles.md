@@ -508,16 +508,13 @@ wall rather than per member:
 | Area | 0.0551 ft²/ft | 7.94 in²/ft |
 | M<sub>cap</sub> | 90,600 lb·ft/ft | F<sub>y</sub> 36,000 psi × S 30.2 in³/ft |
 
-The moment of inertia, the elastic section modulus S and the area are the
-published PZ-27 constants, each of them already per foot of wall. The moment
-capacity is M<sub>cap</sub> = F<sub>y</sub> × S = 36,000 psi × 30.2 in³/ft =
-90,600 lb·ft/ft, the moment at first yield rather than the plastic moment
-F<sub>y</sub> × Z, which on this section's plastic modulus of 36.49 in³/ft is 21%
-higher. First yield is the right cap for a beam element, because the element is
-elastic up to M<sub>cap</sub> and releases a plastic hinge at it: nothing in the
-formulation carries the partial plastification of the section that lies between
-first yield and the full plastic moment, so crediting F<sub>y</sub> × Z would
-credit a reserve the member never develops.
+The moment of inertia, the section modulus and the area are the published
+PZ-27 constants, each already per foot of wall. The moment capacity entered is
+the moment at which the steel first yields: M<sub>cap</sub> = F<sub>y</sub> × S
+= 36,000 psi × 30.2 in³/ft = 90,600 lb·ft/ft. A steel section can carry about
+20% more than that before it is fully plastic, but the beam element does not
+model that reserve — it stays elastic up to M<sub>cap</sub> and forms a hinge
+there — so first yield is the honest cap.
 
 Nothing else about the model changes, so every number in this half is
 comparable to the first half's.

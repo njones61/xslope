@@ -360,11 +360,20 @@ Open **Results → 1D Details** on the upper row again:
 Every panel has changed. The head moves 0.11 ft instead of feet, and the
 displacement curves — the shaft is bending now, not rotating. The moment rises
 from zero at the head to the 10,000 lb·ft per foot that is M<sub>cap</sub> ÷ S
-at 6 ft below the head, and holds it all the way to the toe: the lower 14 ft of
-the shaft is a chain of plastic hinges. The shear at the toe has quadrupled, to
-6,180 lb/ft, and the soil reaction against the upper shaft is 178% of the Ito &
-Matsui limit. Held at its toe, the shaft finally develops the moment the limit
-equilibrium method assumed all along.
+at 6 ft below the head, and holds it all the way to the toe: every beam
+element over the lower 14 ft has reached its moment capacity and can bend
+further without carrying more — the shaft has yielded in bending along that
+whole length. The shear at the toe is 6,184 lb/ft, four times the pinned run's
+1,481 and of the opposite sign: the toe now pushes the other way, because it is
+holding the shaft against rotation instead of merely holding it in place. The
+soil reaction panel reports the lateral pressure the soil is putting on the
+shaft against the Ito & Matsui limit — the largest pressure the theory says soil
+can exert on a pile in a row before it squeezes between the piles — and here the
+peak is 178% of that limit. In plane strain there is no gap to squeeze through,
+so the smeared wall takes a load a discrete shaft at this spacing never would;
+the panel is flagging exactly the idealization this page is about. Held at its
+toe, the shaft finally develops the moment the limit equilibrium method assumed
+all along.
 
 The deep band that ran up from the flat ground beyond the toe is gone. What is
 left daylights at the upper row's head, where the strain peaks at 0.23 against

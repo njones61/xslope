@@ -364,6 +364,20 @@ downstream slope, none of which a line drawn between piezometers knows about.
 Rapid drawdown can be given two of them — one at full pool and one at the
 drawn-down pool — and that is what Part 2 builds.
 
+### Clearing the piezometric lines
+
+The two lines have done their work, and Part 2 replaces both of the jobs they
+did. Where a seepage analysis is defined, its head boundaries outrank the
+piezometric line for the water loads, and the `u` column set to `seep` outranks
+it for pore pressure — a line answers only for a model that has neither. Left on
+the file, the pair would be read by nothing, so delete it before building the
+boundary sets.
+
+Click **Piezometric lines**. On **Line 1**, select every row and click **Remove
+selected**; do the same on **Line 2 (rapid drawdown)**. Click **OK**. The
+**Piezometric lines** row in the Inputs dock falls to 0, and the section redraws
+without either line.
+
 ### The second boundary set
 
 The two water states are described to the seepage engine as two sets of
@@ -460,23 +474,34 @@ from the starter, the dialog carries a **Run type** selector at the top, because
 that file already has the schedule the next section adds; leave it on **Steady**.
 Leave **Convergence tol** at `0.0001` and **Max iterations** at `400`, and click
 **Run**. Because the file defines two boundary sets, one steady run solves
-**both** of them, each keeping its own results tab, and each writing a companion
-file beside the workbook — `_seep.csv` for Set 1 and `_seep2.csv` for Set 2 — so
-that reopening the file picks them up by name.
+**both** of them, each keeping its own results tab — **Seep · Solution** for
+Set 1 and **Seep · Solution 2** for Set 2 — and each writing a companion file
+beside the workbook, `_seep.csv` for Set 1 and `_seep2.csv` for Set 2, so that
+reopening the file picks them up by name.
 
-![The two steady solutions, on one color scale](images/combo02_steady_pair.png){width=1000}
+The **Seep · Solution** tab:
+
+![Set 1's steady solution, full pool](images/combo02_seep_set1.png){width=1000}
 
 **Set 1** settles in **22 unconfined sweeps** to a total discharge of
-**1.9566 ft³/day per ft** of dam. The head runs from 100.000 to 160.000 ft, the
-two boundary values and nothing outside them, and the heavy black line is the
-phreatic surface: nearly flat across the upstream shell at reservoir level,
-falling almost the whole 60 ft inside the core, and running low across the
-downstream shell to the tailwater. Almost the entire head loss is in the core,
-which is what a cutoff key is for.
+**1.9566 ft³/day per ft** of dam, printed on the figure as 1.957. The head runs
+from 100.000 to 160.000 ft, the two boundary values and nothing outside them.
+The heavy black line traces the phreatic surface: nearly
+flat across the upstream shell at reservoir level, falling almost the whole 60 ft
+inside the core, and running low across the downstream shell to the tailwater.
+A flow net covers the rest of the section: thin black total head contours, and
+blue flow lines running from the upstream face through the section to the exit
+face. The contours crowd where head falls fastest, and each channel between two
+flow lines carries an equal share of the discharge. Almost the entire head loss
+is in the core, which is what a cutoff key is for.
 ([COMBO-1](combo01_seepage_stability.md#solving-it) reports 1.925 for the same
 boundary set on a quadratic mesh at the same 7.5 ft target — 8,082 nodes rather
 than 2,080, because quadratic elements add a node on every edge. The 1.6%
 between the two answers is that discretization, not the physics.)
+
+The **Seep · Solution 2** tab:
+
+![Set 2's steady solution, drawn-down pool](images/combo02_seep_set2.png){width=1000}
 
 **Set 2** settles in **8 sweeps** to **0.2695 ft³/day per ft**, a seventh of
 Set 1's discharge on a sixth of the head difference. The head runs from 100.000 to
@@ -491,8 +516,8 @@ the negative pressures there are
 [clamped to zero](../seep/seep_slope.md#negative-pore-pressures) before any slice
 reads them.
 
-Both panels are drawn on one color scale, so Set 2's whole field sits in the
-bottom band of it — the section that carried 60 ft of head now carries 10.
+Each tab scales its colorbar to its own field, so color does not carry from one
+figure to the other: the ramp spans 60 ft of head in Set 1 and 10 ft in Set 2.
 
 ### Pointing the materials at the fields
 
@@ -504,12 +529,8 @@ per material rather than once for the model;
 covers its four values and what each one costs.
 
 A drawdown run reads **two** fields through that one column: `seep_u` from Set 1
-for stage 1, and `seep_u2` from Set 2 for stages 2 and 3. The checks hold the run
-to both. A material on `seep` with no solved field at all is an error; a material
-on `seep` with only Set 1 solved is a second error, naming the missing
-drawn-down field by the file name it would arrive under — because a stage-2 pore
-pressure that reads zero everywhere is a drawdown that removed the water *and*
-its pressure, and it returns a factor of safety that is too high.
+for stage 1, and `seep_u2` from Set 2 for stages 2 and 3. The checks refuse the
+run if either field is missing.
 
 Run **Run → Run LEM…** again with the same settings — Spencer, Auto search,
 40 slices, Rapid drawdown ticked. The search leaves the same starting circle and
@@ -563,6 +584,18 @@ storage properties it needs are already on the materials table:
 shell, 1 × 10<sup>−3</sup> /ft and 0.03 on the core, 2 × 10<sup>−4</sup> /ft and
 0.15 on the foundation.
 
+### Clearing boundary set 2
+
+The schedule built below states where the reservoir stands at every instant,
+including the stage 2 time the drawdown reads its second field at, so Set 2 has
+nothing left to say and the transient route does not consult it.
+
+Click **Seep BC** and open the **Set 2 (rapid drawdown)** tab. With the top entry
+selected, click **Remove head** twice, which takes out both heads. Select **Exit
+face**, select its rows and click **Remove selected**. Click **OK**. Set 1 is
+untouched: it carries the reservoir boundary the schedule drives, and the march
+starts from its steady solution.
+
 ### The pool schedule and the stage times
 
 The storage properties say how the dam responds; the schedule says what the
@@ -611,9 +644,6 @@ standing above it. Then clear **Head value (ft)** and type `pool` in its place. 
 value cell holding the name of a series is driven by that series instead of by a
 constant, and that is the whole of what makes a boundary time-varying.
 
-Set 2 is untouched by any of this, and cannot follow the series even if asked:
-it is the constant-steady set.
-
 Nothing about the numbers already computed changes. A steady solve reads a
 series-bound value at t = 0, so Set 1 with `pool` bound to it solves at 160 and
 returns the same 1.9566 ft³/day per ft as before, and says so in its log —
@@ -653,18 +683,34 @@ steps** sit behind them, and where the solver spent them is itself a reading:
 **440 of them, 26%, are inside the first 50 days**, which are 5% of the run's
 duration. The field moves while the pool is falling and barely at all afterward.
 
-The two frames the drawdown will read are the first and the fourth:
+The two frames the drawdown will read are the first and the fourth. The
+**Seep · Transient** tab holds one frame at a time; step its play bar back to
+t = 0:
 
-![The stage 1 and stage 2 frames, on one color scale](images/combo02_frames.png){width=1000}
+![The t = 0 frame, full pool](images/combo02_frame_stage1.png){width=1000}
 
-At **stage 1** the reservoir is full and the field is the steady one solved
-above. At **stage 2** the pool has reached elevation 110 — the upstream water
-level marker has dropped 50 ft — and the upstream shell has followed it partway
-down, with the foundation beneath the upstream slope beginning to unload. The core
-has barely moved. It still holds a pocket of head near 150 ft, in the middle
-of the section, exactly where every critical surface on this page crosses it. That pocket is the whole
-difference between this route and the two steady solves, where the same region has
-come back to within a few feet of the pool.
+then forward to t = 50:
+
+![The t = 50 frame, pool down at elevation 110](images/combo02_frame_stage2.png){width=1000}
+
+A transient frame carries no flow net — a flow net needs steady through-flow, and
+a draining section is releasing storage instead — so these two figures draw head
+contours and the phreatic surface without flow lines, and the title reports
+boundary inflow and outflow separately rather than one discharge. Pale blue
+waterlines with apex-down markers give the reservoir and tailwater levels the
+frame stands at.
+
+At **stage 1**, t = 0, the reservoir is full and the frame reproduces the steady
+solution above: inflow and outflow both read 1.957 ft³/day per ft, Set 1's
+discharge. At **stage 2**, t = 50, the pool has reached elevation 110 — the
+upstream water level marker has dropped 50 ft — and inflow has fallen to zero
+while 15.243 ft³/day per ft still leaves the section, every bit of it drained
+storage. The upstream shell has followed the pool partway down, with the
+foundation beneath the upstream slope beginning to unload. The core has barely
+moved. It still holds a pocket of head near 150 ft, in the middle of the section,
+exactly where every critical surface on this page crosses it. That pocket is the
+whole difference between this route and the two steady solves, where the same
+region has come back to within a few feet of the pool.
 
 ### The third answer
 
@@ -698,7 +744,7 @@ workbook.
 with a radius of 163.64 ft — 2 ft again from the two-steady route's. Stage 1
 reads 1.5546 against that route's 1.5514, on the same field: the frame at t = 0
 *is* the steady solution of Set 1, and the three thousandths between the two
-figures are the two searches settling on two circles.
+numbers are the two searches settling on two circles.
 
 The gap between the two answers opens at stage 2, where the peak pore pressure on
 the slice bases reaches **2692 psf** against the two-steady route's 1727 — the

@@ -1688,22 +1688,43 @@ def _interp(x, xs, ys):
 # --------------------------------------------------------------------------- #
 # LEM-13 — Rock Slope (Hoek-Brown)
 #
-# Two rock masses at opposite ends of the same criterion, both written by
-# ``tools/build_rock_slope.py`` from the verification corpus. Part A is Hammah et
-# al.'s badly broken mass (GSI = 5, exponent a = 0.619), solved by Spencer's method
-# and then by strength reduction on the same file — the only Hoek-Brown problem
-# locked in both engines, and the one the page's units trap runs on: sigma_ci typed
-# as the 30 the paper prints rather than the 30,000 kPa the model wants. Part B is
-# Li, Merifield & Lyamin's strong mass (GSI = 70, a = 0.501), whose normalized
-# sigma_ci of 4.37 kPa is small on purpose.
+# One section, written by ``tools/build_rock_slope.py`` from the verification
+# corpus: Hammah et al.'s badly broken rock mass (GSI = 5, exponent a = 0.619),
+# the only Hoek-Brown problem locked in both engines. Part A solves it by Spencer's
+# method and then by strength reduction, and runs the page's units trap on it —
+# sigma_ci typed as the 30 the paper prints rather than the 30,000 kPa the model
+# wants. Part B sweeps the two field inputs that decide the answer, GSI and the
+# disturbance factor D, through the same Design sweep Studio's Parametric dialog
+# runs, and draws each with the plotting functions Studio itself calls so the
+# figure and the reader's screen are the same picture.
 #
 # The envelope figure is drawn straight through ``hoekbrown.hb_tangent`` — the same
 # instantaneous tangent the solvers consume — so the curve on the page and the
 # strength in the answer cannot disagree.
 # --------------------------------------------------------------------------- #
 LEM13_A = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope.xlsx")
-LEM13_B = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope_li.xlsx")
 LEM13_SLICES = 40
+#: Part B's two sweeps, at the bounds and step counts the page's Parametric dialog
+#: is set to. GSI runs the full field range of the index; D runs its whole range,
+#: undisturbed to heavily blast-damaged, at the file's own GSI.
+#:
+#: GSI is swept to 20 rather than to the index's full 100, for a measured reason.
+#: The factor of safety crosses the 1.5 design target between GSI 5 and 15 (1.152
+#: and 2.185), so everything the sweep has to say happens in the bottom fifth of
+#: the range. Above it the slope simply cannot fail, and a search over a slope that
+#: cannot fail wanders the whole domain before it settles: one search costs 53 s at
+#: GSI 5 and 66 s at GSI 15, but had not finished after five minutes at GSI 25.
+#: Six steps to 20 resolve the knee, bracket the target, and keep the run something
+#: a reader will sit through.
+LEM13_GSI_RANGE = (5.0, 20.0, 6)
+LEM13_D_RANGE = (0.0, 1.0, 5)
+#: The design target both sweeps are read against — the Parametric dialog's own
+#: default, and the factor of safety a permanent rock cut is usually asked for.
+LEM13_TARGET_FS = 1.5
+#: The three rock masses the envelope figure compares: the file's own GSI, a
+#: middling one, and a lightly jointed mass, all at the file's sigma_ci, mi and D
+#: so the only thing separating the curves is the index.
+LEM13_GSI_CURVES = (5.0, 30.0, 70.0)
 #: Part A's deliberate mis-entry — the slip the sigma_ci units check exists to
 #: catch. Hammah's rock is 30 MPa, which this model states as 30,000 kPa; a reader
 #: copying the number off the paper types 30, and the rock mass comes out a thousand
@@ -1771,20 +1792,19 @@ def _lem13_envelopes(crit):
     """Both rock masses' Hoek-Brown envelopes, drawn from the same tangent routine
     the solvers call.
 
-    Two panels, because the two masses cannot share an absolute stress axis: one is
-    a 30 MPa intact rock and the other a 4.37 kPa normalized one. The left panel is
-    Part A's envelope over the stress range its own critical surface generates, with
-    the instantaneous tangent at the mean base normal stress drawn across it — the
-    straight line the method of slices actually solves with. The right panel puts
-    both masses on normalized axes, τ/σci against σn′/σci, where the only difference
-    left between them is the shape the constants give.
+    Two panels. The left is the file's own envelope over the stress range its
+    critical surface generates, with the instantaneous tangent at the mean base
+    normal stress drawn across it — the straight line the method of slices actually
+    solves with. The right is the same rock at three values of GSI and nothing else
+    changed, which is the picture behind Part B's sweep: the index moves s and the
+    exponent a together, and the envelope it produces is a different curve rather
+    than the same curve scaled.
     """
     import numpy as np
 
     from xslope.hoekbrown import hb_constants, hb_tangent
 
     a = load_slope_data(LEM13_A)["materials"][0]
-    b = load_slope_data(LEM13_B)["materials"][0]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.5, 5.0))
 
@@ -1823,23 +1843,24 @@ def _lem13_envelopes(crit):
     ax1.grid(True, alpha=0.3)
     ax1.legend(loc="upper left", fontsize=8.5)
 
-    # ---- right: both masses, normalized -------------------------------------- #
-    r = np.linspace(0.0, 0.30, 400)
-    for mat, color, label in ((a, "#c0392b", "GSI = 5, mi = 2 (Part A)"),
-                              (b, "#2980b9", "GSI = 70, mi = 15 (Part B)")):
-        mb, sc, ex = hb_constants(mat["hb_gsi"], mat["hb_mi"], mat["hb_d"])
-        c_i, phi_i = hb_tangent(r * mat["hb_sci"], mat["hb_sci"], mat["hb_gsi"],
-                                mat["hb_mi"], mat["hb_d"])
-        t = (c_i + r * mat["hb_sci"] * np.tan(np.radians(phi_i))) / mat["hb_sci"]
-        ax2.plot(r, t, color=color, lw=2.2,
-                 label="%s\nmb = %.3f, s = %.2e, a = %.3f" % (label, mb, sc, ex))
-    ax2.set_xlabel("σn′ / σci")
-    ax2.set_ylabel("τ / σci")
-    ax2.set_title("Both rock masses, normalized by σci")
-    ax2.set_xlim(0, 0.30)
-    ax2.set_ylim(bottom=0)
-    ax2.grid(True, alpha=0.3)
-    ax2.legend(loc="upper left", fontsize=8.5)
+    # ---- right: the same rock at three values of GSI -------------------------- #
+    for gsi, color in zip(LEM13_GSI_CURVES, ("#c0392b", "#e67e22", "#2980b9")):
+        mb, sc, ex = hb_constants(gsi, a["hb_mi"], a["hb_d"])
+        c_i, phi_i = hb_tangent(sig, a["hb_sci"], gsi, a["hb_mi"], a["hb_d"])
+        ax2.plot(sig, c_i + sig * np.tan(np.radians(phi_i)), color=color, lw=2.2,
+                 label="GSI = %g\nmb = %.3f, s = %.2e, a = %.3f"
+                       % (gsi, mb, sc, ex))
+    ax2.set_xlabel("σn′  effective normal stress  (kPa)")
+    ax2.set_ylabel("τ  shear strength  (kPa, log scale)")
+    ax2.set_title("The same rock at three values of GSI\nσci = 30,000 kPa, "
+                  "mi = 2, D = 0 throughout")
+    ax2.set_xlim(0, 90)
+    # A log strength axis, because the three curves span two orders of magnitude:
+    # on a linear axis GSI = 70 flattens the other two onto the floor and the
+    # comparison the panel exists for cannot be read at all.
+    ax2.set_yscale("log")
+    ax2.grid(True, which="both", alpha=0.3)
+    ax2.legend(loc="lower right", fontsize=8.5)
 
     fig.tight_layout()
     out = os.path.join(OUT_DIR, "lem13_envelopes.png")
@@ -1848,21 +1869,21 @@ def _lem13_envelopes(crit):
     print("-> lem13_envelopes.png")
     print("   envelope A  σn′ %.2f mean · tangent c_i %.3f kPa φ_i %.2f°"
           % (sig_bar, c_bar, phi_bar))
-    for tag, mat in (("A", a), ("B", b)):
-        mb, sc, ex = hb_constants(mat["hb_gsi"], mat["hb_mi"], mat["hb_d"])
-        print("   constants %s  σci %g · GSI %g · mi %g · D %g -> mb %.4f · "
-              "s %.4e · a %.4f · unconfined σci·s^a %.4f"
-              % (tag, mat["hb_sci"], mat["hb_gsi"], mat["hb_mi"], mat["hb_d"],
-                 mb, sc, ex, mat["hb_sci"] * sc ** ex))
+    for gsi in LEM13_GSI_CURVES:
+        mb, sc, ex = hb_constants(gsi, a["hb_mi"], a["hb_d"])
+        print("   constants GSI %-4g mb %.5f · s %.4e · a %.4f · unconfined "
+              "σci·s^a %.4f kPa" % (gsi, mb, sc, ex, a["hb_sci"] * sc ** ex))
 
 
 def lem13_plots():
-    """The limit equilibrium half of both parts, plus the envelope figure.
+    """Part A's limit equilibrium runs — the correct entry, the MPa slip — and the
+    envelope figure.
 
     Printed rather than drawn: every search's factor of safety, its circle, the
     surface length and sliding mass, and the range of instantaneous cohesion and
     friction angle the criterion supplied along that surface. The strength-reduction
-    half is ``lem13_ssrm``, which runs on the same file.
+    half is ``lem13_ssrm`` and Part B's sweeps are ``lem13_sweeps``; all three run
+    on the same file.
     """
     # ---- Part A: Hammah's weak rock mass ------------------------------------- #
     a = load_slope_data(LEM13_A)
@@ -1888,18 +1909,88 @@ def lem13_plots():
           "%.4f" % (LEM13_A_MPA_SCI, _lem13_ucs(mpa_mat),
                     _lem13_ucs(a["materials"][0])))
 
-    # ---- Part B: Li's strong rock mass, right and wrong ---------------------- #
-    b = load_slope_data(LEM13_B)
-    capture("lem13_li_inputs.png", plot_inputs, b,
-            title="Slope Geometry and Inputs")
-    crit_li = _lem13_search(b, "spencer")
-    capture("lem13_li_spencer.png", plot_solution, b, crit_li["slices"],
-            crit_li["failure_surface"], crit_li["solver_result"])
-    print("   B spencer  %s" % _lem13_reading(crit_li))
-    print("   B spencer  %s" % _lem13_daylight(crit_li))
-
-    # ---- the envelopes both answers came off --------------------------------- #
+    # ---- the envelope the answer came off ------------------------------------ #
     _lem13_envelopes(crit_s)
+
+
+def _lem13_sweep(name, param, low, high, steps):
+    """One Design sweep, drawn the way Studio draws it.
+
+    ``xslope.sensitivity.design`` is the function the Parametric dialog's runner
+    calls, and ``plot_sensitivity`` + ``annotate_design_crossing`` are the two the
+    result canvas calls (``studio/main_window.py``, ``MplCanvas.render_design``), so
+    the figure on the page is the picture on the reader's screen rather than a
+    lookalike of it. Returns the design() result so the caller can print it.
+    """
+    import time
+
+    from xslope.plot import annotate_design_crossing, plot_sensitivity
+    from xslope.sensitivity import design
+
+    model = load_slope_data(LEM13_A)
+    t0 = time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = design(model, param=param, low=low, high=high, steps=steps,
+                         target_fs=LEM13_TARGET_FS, mode="lem", method="spencer",
+                         search=True, num_slices=LEM13_SLICES, debug_level=0)
+    if not ok:
+        raise RuntimeError(res)
+    # No title of our own: plot_sensitivity names the swept reference itself, and
+    # that caption is what Studio's result canvas shows, so overriding it here would
+    # put a figure on the page the reader never sees.
+    fig = plt.figure(figsize=(8.5, 5.0))
+    plot_sensitivity(res["df"], target_fs=LEM13_TARGET_FS, fig=fig)
+    annotate_design_crossing(fig.axes[0], LEM13_TARGET_FS, res)
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT_DIR, name), dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print("-> %s  (%.0f s)" % (name, time.time() - t0))
+    return res
+
+
+def _lem13_sweep_reading(tag, res, mi, d=None, gsi=None):
+    """Every swept point, with the rock-mass constants that produced it.
+
+    The constants are printed beside the factor of safety because they are the
+    mechanism: the page claims GSI has its leverage through s and a, and a reader
+    checking that claim needs the three numbers at each step, not just the curve.
+    """
+    from xslope.hoekbrown import hb_constants
+
+    cross = res.get("crossing")
+    print("   %s target FS %.2f · bracketed %s · crossing %s · FS range %s"
+          % (tag, LEM13_TARGET_FS, res.get("bracketed"),
+             ("%.3f" % cross) if cross is not None else "none",
+             res.get("fs_range")))
+    if res.get("message"):
+        print("      %s" % str(res["message"])[:150])
+    for _i, row in res["df"].iterrows():
+        v = float(row["value"])
+        mb, sc, ex = hb_constants(gsi if gsi is not None else v, mi,
+                                  d if d is not None else v)
+        print("      %-7s %-7g FS %-9s mb %.5f  s %.4e  a %.4f  ucs %.5f kPa"
+              % (row["param"], v,
+                 ("%.4f" % row["fs"]) if row.get("success", True) else "FAILED",
+                 mb, sc, ex, 30000.0 * sc ** ex))
+
+
+def lem13_sweeps():
+    """Part B: which of the four field inputs moves the answer.
+
+    Two Design sweeps on the same file — the Geological Strength Index across its
+    whole field range, and the disturbance factor across its whole range at the
+    file's own GSI — each drawn with the functions Studio's own result canvas
+    calls. Printed: every swept point with the rock-mass constants behind it, and
+    the interpolated value where the curve meets the design target.
+    """
+    gsi_lo, gsi_hi, gsi_n = LEM13_GSI_RANGE
+    res_gsi = _lem13_sweep("lem13_gsi_sweep.png", "mat:rock:hb_gsi",
+                           gsi_lo, gsi_hi, gsi_n)
+    _lem13_sweep_reading("GSI ", res_gsi, mi=2.0, d=0.0)
+
+    d_lo, d_hi, d_n = LEM13_D_RANGE
+    res_d = _lem13_sweep("lem13_d_sweep.png", "mat:rock:hb_d", d_lo, d_hi, d_n)
+    _lem13_sweep_reading("D   ", res_d, mi=2.0, gsi=5.0)
 
 
 def lem13_ssrm():
@@ -5635,12 +5726,10 @@ COMBO02_TOL, COMBO02_MAX_ITER = 1e-4, 400
 #: starting circle at the dialog's slice count.
 COMBO02_METHOD = "spencer"
 COMBO02_SLICES = 40
-#: Contour count for the head panels, matching the sibling dam pages.
-COMBO02_LEVELS = 14
-#: Flow-net base material, 1-based into the mat sheet: the core, as on SEEP-2.
-COMBO02_BASE_MAT = 2
-#: Per-panel size for the stacked field series, this dam's aspect.
-COMBO02_PANEL_SIZE = (8.6, 3.05)
+# The head figures are drawn at SEEP-2's contour count and flow-net base
+# material: the same dam, and the values Studio's Display panel carries for it
+# (20 levels, and the nearest-to-squares base material the panel adopts).
+
 #: The undrained core's Kc = 1 cohesion intercept, swept at the file's own
 #: psi = 14 deg. Below the crossover every core slice is stronger undrained than
 #: drained and stage 2 governs; above it, slice by slice, stage 3 takes over. The
@@ -5800,22 +5889,52 @@ def _combo02_reading(label, crit):
                crit["Depth"], xs[-1], ys[-1], xs[0], ys[0]))
 
 
-def _combo02_field_panel(seep_data, solution, title, vmin, vmax):
-    """One head field, drawn through ``plot_seep_solution`` itself.
+def _combo02_steady_figures(sd1, sol1, sd2, sol2, figsize):
+    """The two steady solutions, one figure each, as the two **Seep · Solution**
+    tabs draw them.
 
-    A seepage figure carries the seepage answer and nothing else: the slip circle
-    belongs on the limit equilibrium solution plots, where it is what was solved.
+    The call is the one Studio's result canvas makes at the Display panel's
+    defaults for a steady view: flow lines on, the phreatic surface on, water
+    levels off, the flow-net base material at the nearest-to-squares pick, and the
+    plot's own title. The one tick added on top is **Filled contours**, the same
+    one COMBO-1's flow net is drawn with, so the sibling pages read alike. Nothing
+    else is imposed — no shared color scale, no replacement title — so each figure
+    carries its own head range and its own discharge line, which is what a reader
+    has on screen.
     """
     from xslope.plot_seep import plot_seep_solution
 
-    with _hold_show():
-        plot_seep_solution(seep_data, solution, figsize=COMBO02_PANEL_SIZE,
-                           levels=COMBO02_LEVELS, phreatic=True, flowlines=False,
-                           vectors=False, mesh=False, pad_frac=0.04,
-                           cmap="Spectral_r", vmin=vmin, vmax=vmax,
-                           show_title=False, show_legend=False,
-                           show_bc_levels=True)
-    plt.gcf().axes[0].set_title(title, fontsize=11, pad=5)
+    return [capture(name, plot_seep_solution, sd, sol, figsize=figsize,
+                    levels=SEEP02_LEVELS, base_mat=SEEP02_BASE_MAT,
+                    fill_contours=True, mesh=False)
+            for name, sd, sol in (("combo02_seep_set1.png", sd1, sol1),
+                                  ("combo02_seep_set2.png", sd2, sol2))]
+
+
+def _combo02_frame_figures(seep_data, frames, ts, figsize):
+    """The two staged transient frames, one figure each, as **Seep · Transient**
+    draws them.
+
+    The transient viewer renders every frame through the same result canvas, with
+    two differences the Display panel makes for a frame series: water levels are on
+    (the pool drops through a playback) and flow lines are never requested, because
+    a flow net needs divergence-free through-flow and a draining frame has none.
+    The title is the plot's own, which carries the frame time and the frame's
+    boundary inflow and outflow.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import plot_seep_solution
+
+    out = []
+    for stage, name in ((ts["stage_1"], "combo02_frame_stage1.png"),
+                        (ts["stage_2"], "combo02_frame_stage2.png")):
+        i = int(np.argmin([abs(f["time"] - float(stage)) for f in frames]))
+        out.append(capture(name, plot_seep_solution, seep_data, frames[i],
+                           figsize=figsize, levels=SEEP02_LEVELS,
+                           fill_contours=True, mesh=False, flowlines=False,
+                           show_bc_levels=True))
+    return out
 
 
 def _combo02_sweep_figure(rows, crossing, file_d):
@@ -6017,16 +6136,7 @@ def combo02_plots():
     steady_down = drained("set 2, drawn down",
                           _combo02_drawn_down(model, u2=sol2["u"]))
 
-    pair = [np.asarray(s["head"], float) for s in (sol1, sol2)]
-    vmin = float(min(h.min() for h in pair))
-    vmax = float(max(h.max() for h in pair))
-    panels = [capture("combo02_steady_1.png", _combo02_field_panel, sd1, sol1,
-                      "Boundary set 1 — full pool, reservoir at el 160 ft",
-                      vmin, vmax),
-              capture("combo02_steady_2.png", _combo02_field_panel, sd2, sol2,
-                      "Boundary set 2 — drawn down, pool at el 110 ft, "
-                      "fully re-equilibrated", vmin, vmax)]
-    _stack_panels("combo02_steady_pair.png", panels)
+    _combo02_steady_figures(sd1, sol1, sd2, sol2, figsize)
 
     # ---- the transient march ------------------------------------------------ #
     import time as _time
@@ -6071,18 +6181,7 @@ def combo02_plots():
     print("   bracket     piezo full pool %.4f · piezo drawn down %.4f"
           % (piezo_full, piezo_down))
 
-    stage_frames = []
-    for t, label in ((ts["stage_1"], "stage 1 — full pool"),
-                     (ts["stage_2"], "stage 2 — end of drawdown")):
-        i = int(np.argmin([abs(f["time"] - float(t)) for f in frames]))
-        stage_frames.append((frames[i], label))
-    all_head = np.concatenate([np.asarray(f["head"], float) for f, _l in stage_frames])
-    fmin, fmax = float(all_head.min()), float(all_head.max())
-    panels = [capture("combo02_frame_t%g.png" % f["time"], _combo02_field_panel,
-                      _as_shipped[0], f, "%s   (t = %g %s)" % (label, f["time"], _u["time"]),
-                      fmin, fmax)
-              for f, label in stage_frames]
-    _stack_panels("combo02_frames.png", panels)
+    _combo02_frame_figures(_as_shipped[0], frames, ts, figsize)
 
     # ---- the sweep that moves the governing stage --------------------------- #
     file_d = float(staged["materials"][1]["d"])
@@ -6127,6 +6226,58 @@ def combo02_plots():
              100.0 * (max(piezo_res["FS"], steady_res["FS"]) - trans_res["FS"])
              / trans_res["FS"]))
 
+
+def combo02_seep():
+    """The drawdown page's four seepage result figures on their own.
+
+    ``combo02_plots`` runs seven limit equilibrium searches, a fourteen-point
+    strength sweep and an eight-step bisection, each a full auto search — minutes
+    of work that none of the seepage figures depend on. This group runs the mesh,
+    the two steady solves and the transient march, and redraws the two
+    **Seep · Solution** tabs and the two staged **Seep · Transient** frames through
+    the same helpers the full group uses, so the four files come out identical
+    either way.
+
+    Printed: each steady solve's discharge, head range and sweep count, the
+    nearest-to-squares base material the figures are drawn at, and the march's
+    saved-frame times.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import flownet_base_material
+    from xslope.seep import build_tseep_data, run_transient_seepage
+
+    model = load_slope_data(COMBO02)
+    _u = declared_unit_labels(model)
+    mesh = _combo02_mesh(model)
+    model["mesh"] = mesh
+    figsize = _seep02_figsize(mesh)
+    print("   mesh        %d nodes · %d elements"
+          % (len(mesh["nodes"]), len(mesh["elements"])))
+
+    pinned = _combo02_pinned(model)
+    sd1, sol1, log1 = _combo02_steady(pinned, mesh, 1)
+    sd2, sol2, log2 = _combo02_steady(pinned, mesh, 2)
+    for label, sd, sol, log in (("set 1", sd1, sol1, log1),
+                                ("set 2", sd2, sol2, log2)):
+        head = np.asarray(sol["head"])
+        print("   %s       q %.4g %s³/%s per %s · head %.3f to %.3f %s · "
+              "base material %d (nearest to squares) · %s"
+              % (label, sol["flowrate"], _u["length"], model["time_unit"],
+                 _u["length"], head.min(), head.max(), _u["length"],
+                 flownet_base_material(sd, sol, levels=SEEP02_LEVELS),
+                 _seep02_log_stats(log) if "Converged in" in log
+                 else "confined solve"))
+    _combo02_steady_figures(sd1, sol1, sd2, sol2, figsize)
+
+    as_shipped = _combo02_steady(model, mesh, 1)
+    with contextlib.redirect_stdout(io.StringIO()):
+        solution = run_transient_seepage(as_shipped[0], build_tseep_data(model),
+                                         verbose=True)
+    frames = solution["frames"]
+    print("   march       %d saved frames at t = %s"
+          % (len(frames), " ".join("%g" % f["time"] for f in frames)))
+    _combo02_frame_figures(as_shipped[0], frames, model["tseep"], figsize)
 
 
 # --------------------------------------------------------------------------- #
@@ -6492,6 +6643,7 @@ GROUPS = {
     "lem12_plots": lem12_plots,
     "lem13_plots": lem13_plots,
     "lem13_ssrm": lem13_ssrm,
+    "lem13_sweeps": lem13_sweeps,
     "seep01_sheets": seep01_sheets,
     "seep01_plots": seep01_plots,
     "seep02_plots": seep02_plots,
@@ -6507,6 +6659,7 @@ GROUPS = {
     "fem03_wall": fem03_wall,
     "combo01_plots": combo01_plots,
     "combo02_plots": combo02_plots,
+    "combo02_seep": combo02_seep,
     "combo03_plots": combo03_plots,
 }
 

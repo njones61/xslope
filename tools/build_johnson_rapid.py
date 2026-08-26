@@ -18,10 +18,10 @@ family cannot drift apart:
       The completed COMBO-2 model: the same section with **both** seepage boundary
       sets (full pool and drawn down), the transient pool schedule with its
       ``stage_1`` / ``stage_2`` times, and ``u = seep`` on every material. The
-      piezometric pair is left on the file, so switching the ``u`` column back to
-      ``piezo`` reproduces the tutorial's first run. No ``_seep.csv`` /
-      ``_seep2.csv`` companions ship with it: a steady run writes them, and a
-      transient run stages its two frames in memory.
+      piezometric pair is deleted: the boundary sets outrank it for water loads and
+      ``u = seep`` outranks it for pore pressure, so it would feed nothing. No
+      ``_seep.csv`` / ``_seep2.csv`` companions ship with it: a steady run writes
+      them, and a transient run stages its two frames in memory.
 
 Everything is built deterministically from the committed transient **seepage**
 sample ``docs/seep/files/xslope_johnson_res_tseep.xlsx``, so the cross-section,
@@ -142,13 +142,25 @@ def build_lem_worked_example():
 
 
 def build_tutorial_completed():
-    """COMBO-2's completed model: both boundary sets, the schedule, u = seep."""
+    """COMBO-2's completed model: both boundary sets, the schedule, u = seep.
+
+    No piezometric lines. Once the boundary sets exist they state where the water
+    stands for every load, and ``u = seep`` states every pore pressure, so a line
+    left on the file would be read by nothing (``water.water_line_for_stage``:
+    seepage head boundaries wherever a seepage analysis is defined, otherwise the
+    piezometric line). The starter file keeps the pair, which is what the tutorial's
+    first run is made from.
+
+    Boundary set 2 IS kept. Part 2 of the tutorial runs the two-steady route on it,
+    and Part 3 has the reader clear it before the transient march — the same pattern
+    the piezometric pair follows one part earlier, each input deleted at the point
+    the next route stops reading it."""
     sd = _base()
     sd["tseep"] = _tutorial_schedule(sd)
     sd["seepage_bc2"] = copy.deepcopy(BC2)
     sd["has_seepage_bc2"] = True
-    sd["piezo_line"] = list(PIEZO_1)
-    sd["piezo_line2"] = list(PIEZO_2)
+    sd["piezo_line"] = []
+    sd["piezo_line2"] = []
     for m in sd["materials"]:
         m["u"] = "seep"
     return _save(sd, os.path.join(TUT_FILES, "xslope_johnson_rapid.xlsx"))

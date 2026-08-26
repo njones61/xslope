@@ -431,13 +431,6 @@ foreshore and up the face as far as the lowered pool wets it:
 | 380 | 180 |
 | 550 | 100 |
 
-**Ten feet of head still cross the section.** The pool stops at 110 and the
-tailwater is at 100, so water still flows through the dam and still leaves it
-through the downstream slope — which is why the exit face is on this set as well.
-What makes Set 2 the fully re-equilibrated limiting case is not that it is dry
-but that it is steady: it is the dam long after the drawdown, when every pore
-pressure has finished adjusting to the pool that is left.
-
 Click **OK**.
 
 ### Meshing, and both solves

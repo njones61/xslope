@@ -242,7 +242,10 @@ x = 550 out:
 
 Each line is only five or six points, and that is all a piezometric line
 usually is: **a statement about where the water table is, not a trace of a solved
-head field.** In practice Line 1 comes from piezometers in a dam that has been standing at full
+head field.** The engine reads it the way [LEM-4](lem04_water_in_the_slope.md)
+describes: the pore pressure at a slice base is the vertical distance from the
+base up to the line times the unit weight of water, 62.4 pcf, and zero where the
+base lies above the line. In practice Line 1 comes from piezometers in a dam that has been standing at full
 pool, and Line 2 comes from judgment about where those readings will settle once
 the pool is down and the dam has come back to equilibrium — a straightedge sketch
 between a few readings and a few assumptions. Where a seepage solution is available it

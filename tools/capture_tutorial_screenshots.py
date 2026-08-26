@@ -2962,6 +2962,20 @@ def combo03_materials():
     return _grab(_mat_table(dlg, through="u"), "combo03_studio_materials.png")
 
 
+def combo03_circles():
+    """The circles editor on the dam: one upstream starting circle and the window.
+
+    The page's search-window step is read off this shot — the five filled fields of
+    the **Search window** group, and the same limits drawn on the preview, where the
+    entry and exit bars sit on either side of the full-pool waterline on the
+    upstream face.
+    """
+    from studio.editors import CirclesEditor
+
+    return _grab(CirclesEditor().build(_load(COMBO03), None),
+                 "combo03_studio_circles.png")
+
+
 def combo03_run_lem():
     """Run LEM on a model carrying a solved transient march.
 
@@ -3051,6 +3065,7 @@ def combo03_fs_time_result():
 
 SHOTS.update({
     "combo03_materials": combo03_materials,
+    "combo03_circles": combo03_circles,
     "combo03_run_lem": combo03_run_lem,
     "combo03_parametric": combo03_parametric,
     "combo03_fs_time_result": combo03_fs_time_result,

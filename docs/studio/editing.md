@@ -165,6 +165,18 @@ already in the table it asks first, and can add to them instead of replacing the
 On a section with no room for a circle to daylight the button is dimmed and its
 tooltip says so.
 
+Under the table, the **Search window** group holds the ten optional limits that
+confine an automated circular search — entry and exit x ranges, a center box, a
+maximum tangent depth and a minimum slip depth. They are the `circles` sheet's own
+J8:K17 block, and each is independent: a blank field is a limit that is not applied,
+a range applies only when both of its ends are filled, and an all-blank group is the
+unconstrained search. A range typed backwards is refused when you press **OK**,
+naming the pair, because a file carrying one will not load. Whatever the group
+holds is drawn on the preview with the circles: the entry and exit ranges as bars
+lying on the ground surface, the center box as a dashed rectangle. Editing a limit
+drops any solution already computed — it changes what a search would find — but
+keeps the mesh, which the window has no bearing on.
+
 The non-circular editor carries a **Generate from the weak zone…** button. Some
 slopes fail along a weak layer rather than along their own geometry, and no circle
 passes through that mechanism — the surface runs flat inside the seam and turns up

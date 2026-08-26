@@ -684,6 +684,10 @@ described above.
 | **Max tangent depth** — **[L]** | The lowest **elevation** the circle's bottom (its tangent point) may reach. |
 | **Min slip depth** — **[L]** | Minimum depth below the ground surface a surface must reach. Rejects shallow surficial "skin" mechanisms, whose factor of safety is depth-independent on a cohesionless face and would otherwise win. |
 
+The same ten cells are edited in XSLOPE Studio by the **Search window** group under the
+circles table (see [Editing inputs](../studio/editing.md)), which draws the entry and exit
+ranges and the center box on its preview.
+
 A range is applied only when **both** of its ends are filled — half a range is not a
 window, and XSLOPE will not invent the missing end. Entry and exit ranges and the
 tangent-depth limit **reject** a trial surface that violates them rather than clamping it,

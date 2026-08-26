@@ -6,7 +6,8 @@ description: "The Johnson Reservoir dam with its pool lowered 50 ft, from elevat
 # Tutorial COMBO-2 — Rapid Drawdown
 
 [COMBO-1](combo01_seepage_stability.md) ran the Johnson Reservoir dam under a
-standing reservoir. This page lowers that reservoir 50 ft in 45 days.
+standing reservoir. This page lowers that reservoir 50 ft over 45 days, after
+five days at full pool, so the pool reaches its residual level at day 50.
 
 Lowering a pool removes the water pressing on the upstream face, which was
 holding the slope up. If the soil behind the face could shed its own pore water
@@ -570,7 +571,8 @@ Two independent steady solutions describe two equilibrium states. What they do
 not describe is the passage between them: Set 2 is the dam *long after* the
 drawdown, when the core has finished giving up the head the full reservoir left
 in it. On a core with a conductivity of 0.001 ft/day that is a long time, and the
-drawdown itself takes 45 days. A
+drawdown itself is over by day 50 — five days at full pool, then 45 days of
+lowering. A
 transient seepage run resolves that directly — it is a history of pore-pressure
 fields as the reservoir is lowered on a schedule, so the two stage fields are two
 frames read out of one march rather than two independent solves assembled by

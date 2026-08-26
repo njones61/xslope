@@ -117,7 +117,11 @@ deep one by stage 2 — for the same reason: the stress each plane consolidated 
 
 ### What the procedure needs on the inputs
 
-Three things, beyond an ordinary limit equilibrium model:
+Each of the three stages reads something an ordinary limit equilibrium model
+does not carry: stage 1 needs the reservoir load on the face, stage 2 needs the
+undrained envelope for the materials that hold their consolidation stresses, and
+stages 2 and 3 both need the pore pressures of the drawn-down state. That comes
+to three additions to the input file:
 
 **$d$ and $\psi$** on the materials table — the $K_c = 1$ envelope, on every
 material that does not drain during the drawdown. Both or neither: one alone

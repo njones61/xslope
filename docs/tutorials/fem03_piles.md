@@ -433,38 +433,23 @@ does not.
 
 ### Which answer is right
 
-At the 6 ft spacing the model was built with, Spencer gives 1.842. Strength
-reduction gives 1.379 with the shafts' tips pinned and 1.801 with them fixed —
-0.46 below Spencer, then 0.04 below, about 2%. Most of the gap between the
-engines is the tip condition, and the two engines handle it in opposite ways.
+Neither engine is wrong; they answer different questions about the shafts.
 
-The limit equilibrium force has no tip condition to state. On this model it is
-the shaft's moment capacity, 60,000 lb·ft, divided by the arm from the failure
-surface up to the soil pressure's centroid and then by the 6 ft spacing
-([LEM-12](lem12_piles.md#what-the-structural-capacity-does) works it through).
-That force assumes the shaft develops its full moment capacity at the failure
-surface — which a shaft can do only if it is held below it.
+The limit equilibrium force assumes each shaft develops its full moment
+capacity at the failure surface — it has no way to say otherwise. The finite
+element run computes how much of that capacity the toe restraint actually lets
+the shaft develop. When the toe is held, the two agree at this spacing to 2%.
+When it is not, the finite element answer is the lower one, and it is the
+answer for a shaft that can turn on its toe. So the choice between 1.38 and
+1.80 is a question about the shaft — bearing on the rock, or socketed into it
+— and it is one cell in the file.
 
-The finite element run assumes nothing about the moment. It computes what the
-soil can push into the shaft under the restraint the file states: 44% of
-capacity with the tip pinned, 100% with it fixed. At this spacing, once the
-file says the tip is fixed, the two engines agree to 2%; at other spacings the
-limit equilibrium answer moves and the finite element one does not, which the
-next paragraphs take up. The question that decides between 1.38 and 1.80 is
-therefore not which engine to trust but how the shaft is held at its toe —
-bearing on the rock, or socketed into it — and that is one cell in the file.
-
-The 2% that remains is a difference in mechanism: Spencer's circle passes below
-the toe, while the tip-fixed strength reduction run fails in the face above the
-upper row, a shallower surface the circular search does not return.
-
-Spacing separates the engines for a related reason. The pile report says which
-limit governs at each point of the sweep: at 3 and 6 ft it is the moment
-capacity, with the Ito & Matsui soil force far above it, and only at 12 ft
-does the soil force itself govern. So over most of the sweep the falling blue
-curve is a structural capacity divided by a widening spacing, and arching — the
-one thing the plane-strain model has no gap to represent — decides the answer
-only at the wide end.
+Spacing is where the engines part company for good. The limit equilibrium
+answer falls with spacing because its force is a capacity divided by a widening
+spacing; the finite element answer cannot follow, because a plane-strain wall
+has no gap between piles for the soil to arch across. Ito & Matsui is the only
+model on this page of what happens in that gap, and it matters most at the
+wide end of the sweep.
 
 ### The one problem with a three-dimensional answer
 

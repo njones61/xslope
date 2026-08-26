@@ -335,12 +335,6 @@ started, with its tangent 7 ft higher, at elevation 82.3 rather than 75. It
 daylights just past the crest at x = 392 and toes on the upstream foreshore at
 x = 174.
 
-**The reported surface carries 42 slices, not the 40 asked for.** The slicer puts
-a boundary wherever a feature crosses the surface, and the piezometric lines' own vertices are
-features, so two extra boundaries appear. The count follows the surface: the
-two-steady run below reports 41 slices and the transient run 42, and 12 cut the
-core in each.
-
 **Stage 3 was not required.** On all 12 core slices the drained strength at the
 stage-2 stresses came out higher than the undrained strength stage 2 used, so
 there was nothing lower to substitute. Stage 2 governs, and the drawdown costs

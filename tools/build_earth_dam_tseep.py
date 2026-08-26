@@ -243,12 +243,24 @@ def build_seep03_start():
     return _write(sd, TUTORIAL_FILES, SEEP03_START_OUT)
 
 
-def build_seep03():
-    """The completed file: the sample's boundary set and schedule, no staging."""
+def seep03_model():
+    """SEEP-3's completed model in memory: the sample's boundary set and schedule,
+    no staging.
+
+    Exposed separately from the write so a downstream tutorial can start from this
+    exact model rather than from a re-read of the file it produces — Tutorial
+    COMBO-3 adds strengths to it (``tools/build_earth_dam_fs_time.py``), and going
+    through the model keeps the two pages describing one dam.
+    """
     spec = SAMPLES[SEEP03]
     sd = _bind_reservoir(_soil(spec), spec)
     sd["tseep"] = {k: spec["tseep"][k] for k in SEEP03_TSEEP_KEYS}
-    return _write(sd, TUTORIAL_FILES, SEEP03_OUT)
+    return sd
+
+
+def build_seep03():
+    """The completed file: the sample's boundary set and schedule, no staging."""
+    return _write(seep03_model(), TUTORIAL_FILES, SEEP03_OUT)
 
 
 TUTORIALS = {

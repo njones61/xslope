@@ -5745,6 +5745,344 @@ def combo02_plots():
           % (piezo_res["FS"], steady_res["FS"], trans_res["FS"]))
 
 
+
+# --------------------------------------------------------------------------- #
+#  COMBO-3 — factor of safety versus time on SEEP-3's earth dam
+#
+#  The page runs SEEP-3's drawdown a second time and asks a stability question of
+#  every saved instant, so every seepage number here is produced at SEEP-3's own
+#  settings — same mesh, same solver defaults, same schedule — and the stability
+#  numbers are produced at the Run LEM dialog's defaults except Method (Spencer).
+#  The search reads the model's own window, which is what keeps one mechanism
+#  under the curve.
+# --------------------------------------------------------------------------- #
+COMBO03 = os.path.join(REPO_ROOT,
+                       "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
+#: Build Mesh: linear triangles, auto-sizing on, 64 divisions across the 110 m
+#: section — SEEP-3's mesh, because this page reads SEEP-3's fields.
+COMBO03_ELEMENT = "tri3"
+COMBO03_DIVISIONS = 64
+#: Run Seepage, at its defaults.
+COMBO03_TOL, COMBO03_MAX_ITER = 1e-4, 400
+#: Run LEM: Spencer at the dialog's slice count, searching at every instant.
+COMBO03_METHOD = "spencer"
+COMBO03_SLICES = 40
+#: The two instants the page draws a slice figure at: full pool, and whichever
+#: saved frame carries the lowest factor of safety (resolved from the curve).
+COMBO03_FULL_POOL = 0.0
+#: Instants the refinement pass asks for, spanning the two saved frames either
+#: side of the dip. Five of the seven name no saved frame, so the pass costs one
+#: re-march — which is the point being measured: what the finer grid is worth.
+COMBO03_REFINE = (15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 47.0)
+
+
+def _combo03_mesh(model):
+    """The mesh Build Mesh produces on this file with only the element type set."""
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    xs = [x for x, _ in model["ground_surface"].coords]
+    size = (max(xs) - min(xs)) / COMBO03_DIVISIONS
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(get_material_polygons(model), size,
+                                        COMBO03_ELEMENT,
+                                        size_regions=extract_size_regions(model))
+
+
+def _combo03_pinned(model):
+    """``model`` with the reservoir boundary entered as a plain head at full pool.
+
+    The steady run this page makes first is the march's own initial condition, and
+    at t = 0 the whole submerged face stands below the pool, so a submerged-only
+    reservoir at elevation 18 and a fixed head of 18 are the same boundary. Pinning
+    it lets the steady solve report a discharge, which a series-bound value has none
+    of. Identical to SEEP-3's construction, and it produces SEEP-3's field.
+    """
+    bc = {k: (list(v) if isinstance(v, list) else v)
+          for k, v in model["seepage_bc"].items()}
+    heads = [dict(h) for h in bc["specified_heads"]]
+    heads[0] = dict(heads[0], kind="head",
+                    head=float(model["tseep"]["series"]["pool"][0]))
+    bc["specified_heads"] = heads
+    return dict(model, seepage_bc=bc, tseep=None)
+
+
+def _combo03_steady(model, mesh):
+    """One steady seepage solve, returning ``(seep_data, solution, log)``."""
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        seep_data = build_seep_data(mesh, model)
+        solution = run_seepage_analysis(seep_data, tol=COMBO03_TOL,
+                                        max_iter=COMBO03_MAX_ITER)
+    return seep_data, solution, log.getvalue()
+
+
+def _combo03_march(model, mesh):
+    """The transient march, returning ``(seep_data, solution, log)`` — the call
+    Studio's seepage runner makes, on the model as shipped."""
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             run_transient_seepage)
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        seep_data = build_seep_data(mesh, model, seep_bc=1)
+        solution = run_transient_seepage(seep_data, build_tseep_data(model),
+                                         verbose=True)
+    return seep_data, solution, log.getvalue()
+
+
+def _combo03_at(model, solution, t):
+    """``model`` carrying one instant's pore pressures and that instant's water load.
+
+    The same three steps ``fs_vs_time`` takes per point, in the same order: copy,
+    drop any load derived for an earlier moment, place the frame, derive the load
+    from the pool as it stood AT that moment. A model that kept t = 0's reservoir
+    while reading day 30's pore pressures would load a draining slope with a full
+    pool, so the copy and the drop are not housekeeping.
+    """
+    from xslope.seep import select_transient_frame_u
+    from xslope.water import with_water_loads
+
+    sd = dict(model)
+    for key in ("dloads_derived", "dloads2_derived", "water_derived"):
+        sd.pop(key, None)
+    select_transient_frame_u(sd, solution, time=float(t))
+    return with_water_loads(sd)
+
+
+def _combo03_search(model):
+    """A Spencer search through the model's own search window, as Run LEM makes it."""
+    from xslope.search import file_search_window
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _conv, _path, _circles = circular_search(
+            model, COMBO03_METHOD, num_slices=COMBO03_SLICES,
+            **file_search_window(model))
+    return fs_cache[0]
+
+
+def _combo03_results(crit):
+    """The results dict ``plot_solution`` reads, from a search's cache entry.
+
+    A cache entry carries the geometry and the winning solver's own return under
+    ``solver_result``; the plot reads the method name off the top level (it draws a
+    thrust line for the two methods that compute one), so the two are merged here
+    rather than at four call sites.
+    """
+    return dict(crit, **crit["solver_result"])
+
+
+def _combo03_reading(crit):
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    return ("FS %.4f · center (%.2f, %.2f) · R %.2f · tangent elevation %.2f · "
+            "entry (%.2f, %.2f) exit (%.2f, %.2f) · %d slices"
+            % (crit["FS"], crit["Xo"], crit["Yo"], crit["Yo"] - crit["Depth"],
+               crit["Depth"], xs[-1], ys[-1], xs[0], ys[0], len(crit["slices"])))
+
+
+def _combo03_pool(model, t):
+    """The pool elevation the schedule puts at time ``t`` — linear between the
+    breakpoints, held flat outside them, which is the series' own rule."""
+    ts = model["tseep"]
+    return float(_interp(float(t), list(ts["times"]), list(ts["series"]["pool"])))
+
+
+def _combo03_curve_figure(model, times, fs, crit_t, crit_fs, baseline):
+    """The factor of safety at every saved instant, over the pool that drives it.
+
+    Two axes sharing one time axis rather than two figures: the whole reading is
+    WHEN the dip falls relative to the drawdown, and a dip cannot be placed against
+    a schedule drawn somewhere else. The pool is the driver, so it is the pale gray
+    trace and the factor of safety is the colored one.
+    """
+    import numpy as np
+
+    duration = float(model["tseep"]["duration"])
+    t0, t1 = model["tseep"]["times"][1], model["tseep"]["times"][-1]
+    _u = declared_unit_labels(model)
+
+    fig, ax = plt.subplots(figsize=(8.6, 5.0))
+    ax.axvspan(t0, t1, color="#eef4f9", zorder=0)
+    ax.plot(times, fs, "-o", color="#b5460f", lw=2.0, ms=5, zorder=3,
+            label="factor of safety (Spencer, searched at each instant)")
+    ax.axhline(baseline, color="#8a6d3b", lw=1.0, ls=(0, (4, 3)), zorder=2)
+    ax.annotate("full pool, %.3f" % baseline, xy=(duration, baseline),
+                xytext=(-4, -11), textcoords="offset points", fontsize=8.5,
+                color="#8a6d3b", ha="right", va="top")
+    ax.plot([crit_t], [crit_fs], "o", ms=11, mfc="none", mec="#b5460f", mew=1.8,
+            zorder=4)
+    ax.annotate("lowest of the saved instants:\n%.3f at t = %g %s"
+                % (crit_fs, crit_t, _u["time"]),
+                xy=(crit_t, crit_fs), xytext=(crit_t + 34.0, crit_fs + 0.055),
+                fontsize=9, color="#b5460f", ha="left", va="center",
+                arrowprops=dict(arrowstyle="-|>", color="#b5460f", lw=0.9))
+    ax.annotate("drawdown", xy=(0.5 * (t0 + t1), 0.985),
+                xycoords=("data", "axes fraction"), fontsize=8.5,
+                color="#2b7bb0", ha="center", va="top")
+    ax.set_xlim(-8.0, duration + 8.0)
+    # Headroom over the highest point so the full-pool reference and its label are
+    # inside the frame rather than on it.
+    span = max(fs) - min(fs)
+    ax.set_ylim(min(fs) - 0.10 * span, max(fs) + 0.10 * span)
+    ax.set_xlabel("time (%s)" % _u["time"])
+    ax.set_ylabel("factor of safety")
+    ax.grid(alpha=0.22)
+    ax.set_title("The upstream slope through the drawdown and after it",
+                 fontsize=11.5)
+
+    pool = ax.twinx()
+    pool.plot(times, [_combo03_pool(model, t) for t in times], color="#3f4a55",
+              lw=1.6, ls=(0, (5, 3)), zorder=1,
+              label="pool (the reservoir schedule)")
+    pool.set_ylabel("pool elevation (%s)" % _u["length"], color="#3f4a55")
+    pool.tick_params(axis="y", colors="#3f4a55")
+    pool.set_ylim(0.0, 1.35 * max(_combo03_pool(model, t) for t in times))
+
+    handles = ax.get_legend_handles_labels()
+    extra = pool.get_legend_handles_labels()
+    ax.legend(handles[0] + extra[0], handles[1] + extra[1], loc="center right",
+              frameon=False, fontsize=9)
+    fig.tight_layout()
+
+
+def combo03_plots():
+    """The FS-versus-time page: the model, the initial condition, the curve over
+    the whole march, and the critical instant against full pool.
+
+    Printed rather than drawn: the strengths and the search window the file
+    carries, the mesh, the steady discharge, the baseline search, the march's
+    saved-frame log, the factor of safety and the critical circle at every saved
+    instant, and the refinement pass that measures what a finer save grid is
+    worth. Every number the page quotes is on one of these lines.
+    """
+    import time as _time
+
+    import numpy as np
+
+    from xslope.sensitivity import fs_vs_time
+
+    model = load_slope_data(COMBO03)
+    _u = declared_unit_labels(model)
+    for m in model["materials"]:
+        print("   material    %-7s γ %g / γsat %g %s · c′ %g %s · φ′ %g° · u %s · "
+              "k1 %g k2 %g %s/%s · Ss %g Sy %g"
+              % (m["name"], m["gamma"], m["gamma_sat"], _u["unit_weight"],
+                 m["c"], _u["stress"], m["phi"], m["u"], m["k1"], m["k2"],
+                 _u["length"], model["time_unit"], m["Ss"], m["Sy"]))
+    _c = model["circles"][0]
+    print("   circle      center (%g, %g) · tangent elevation %g · R %g %s"
+          % (_c["Xo"], _c["Yo"], _c["Depth"], _c["R"], _u["length"]))
+    print("   window      %s" % ("  ".join("%s %g" % (k, v) for k, v in
+                                           model["search_window"].items())))
+    capture("combo03_inputs.png", plot_inputs, model, mode="lem",
+            title="Stability Model Inputs", frame="content", show_mesh=False)
+
+    mesh = _combo03_mesh(model)
+    model["mesh"] = mesh
+    xs = [x for x, _ in model["ground_surface"].coords]
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g %s"
+          % (len(mesh["nodes"]), len(mesh["elements"]), COMBO03_ELEMENT,
+             COMBO03_DIVISIONS, (max(xs) - min(xs)) / COMBO03_DIVISIONS,
+             _u["length"]))
+
+    # ---- the initial condition, solved as an ordinary steady run ------------ #
+    _seep_data, steady, log = _combo03_steady(_combo03_pinned(model), mesh)
+    head = np.asarray(steady["head"])
+    print("   steady      q %.5f %s · head %.3f to %.3f %s · u %.1f to %.1f %s"
+          % (steady["flowrate"], _u["flowrate"], head.min(), head.max(),
+             _u["length"], np.min(steady["u"]), np.max(steady["u"]), _u["stress"]))
+    print("   iteration   %s" % _seep02_log_stats(log))
+    # No figure: this solve reproduces SEEP-3's initial condition exactly — same
+    # section, same mesh, same solver defaults — so the page shows SEEP-3's own
+    # ``seep03_steady.png`` rather than carrying a second copy of it. The numbers
+    # printed above are what the page quotes, and they are produced here.
+
+    # ---- the baseline: one search on the full-pool field -------------------- #
+    from xslope.seep import apply_steady_stability_field
+    from xslope.water import with_water_loads
+
+    base = dict(model)
+    with contextlib.redirect_stdout(io.StringIO()):
+        apply_steady_stability_field(base, steady, bc=1)
+    base = with_water_loads(base)
+    t0 = _time.time()
+    base_crit = _combo03_search(base)
+    print("   baseline    %s · %.0f s"
+          % (_combo03_reading(base_crit), _time.time() - t0))
+    print("   water load  full pool peak %.1f %s"
+          % (max((float(p["Normal"]) for b in base["dloads_derived"] for p in b),
+                 default=0.0), _u["stress"]))
+    capture("combo03_solution_full.png", plot_solution, base,
+            base_crit["slices"], base_crit["failure_surface"],
+            _combo03_results(base_crit))
+
+    # ---- the march ---------------------------------------------------------- #
+    t0 = _time.time()
+    tseep_data, solution, tlog = _combo03_march(model, mesh)
+    print("   march       %d saved frames · %.0f s wall"
+          % (len(solution["frames"]), _time.time() - t0))
+    for line in tlog.splitlines():
+        if "frame saved" in line or line.startswith("Transient"):
+            print("     %s" % line.strip())
+
+    # ---- the curve ---------------------------------------------------------- #
+    t0 = _time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = fs_vs_time(model, solution, methods=(COMBO03_METHOD,),
+                             search=True, num_slices=COMBO03_SLICES)
+    if not ok:
+        raise RuntimeError(res)
+    print("   curve       %d instants · %d failed · %.0f s wall"
+          % (len(res["times"]), res["n_failed"], _time.time() - t0))
+    for _i, row in res["df"].iterrows():
+        print("     t %-5g pool %5.2f  FS %s  center (%.2f, %.2f) R %.2f"
+              % (row["value"], _combo03_pool(model, row["value"]),
+                 ("%.4f" % row["fs"]) if row["success"] else "failed",
+                 row["Xo"], row["Yo"], row["R"]))
+    print("   minimum     %.4f at t = %g %s · full pool %.4f · recovered %.4f"
+          % (res["min_fs"], res["critical_time"], _u["time"],
+             float(res["df"]["fs"].iloc[0]), float(res["df"]["fs"].iloc[-1])))
+    times = [float(t) for t in res["times"]]
+    fs = [float(v) for v in res["df"]["fs"]]
+    capture("combo03_curve.png", _combo03_curve_figure, model, times, fs,
+            float(res["critical_time"]), float(res["min_fs"]),
+            float(base_crit["FS"]))
+
+    # ---- the critical instant, drawn ---------------------------------------- #
+    worst = _combo03_at(model, solution, res["critical_time"])
+    worst_crit = _combo03_search(worst)
+    print("   worst       t = %g %s · %s"
+          % (res["critical_time"], _u["time"], _combo03_reading(worst_crit)))
+    print("   water load  t = %g peak %.1f %s"
+          % (res["critical_time"],
+             max((float(p["Normal"]) for b in worst["dloads_derived"] for p in b),
+                 default=0.0), _u["stress"]))
+    capture("combo03_solution_min.png", plot_solution, worst,
+            worst_crit["slices"], worst_crit["failure_surface"],
+            _combo03_results(worst_crit))
+
+    # ---- what a finer save grid is worth ------------------------------------ #
+    t0 = _time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, fine = fs_vs_time(model, solution, times=list(COMBO03_REFINE),
+                              methods=(COMBO03_METHOD,), search=True,
+                              num_slices=COMBO03_SLICES, seep_data=tseep_data,
+                              remarch=True)
+    if not ok:
+        raise RuntimeError(fine)
+    print("   refine      %d instants · re-marched %s · %.0f s wall"
+          % (len(fine["times"]), fine["remarched"], _time.time() - t0))
+    for _i, row in fine["df"].iterrows():
+        print("     t %-5g pool %5.2f  FS %s"
+              % (row["value"], _combo03_pool(model, row["value"]),
+                 ("%.4f" % row["fs"]) if row["success"] else "failed"))
+    print("   refine      minimum %.4f at t = %g %s · %+.4f against the saved grid"
+          % (fine["min_fs"], fine["critical_time"], _u["time"],
+             fine["min_fs"] - res["min_fs"]))
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -5784,6 +6122,7 @@ GROUPS = {
     "fem03_wall": fem03_wall,
     "combo01_plots": combo01_plots,
     "combo02_plots": combo02_plots,
+    "combo03_plots": combo03_plots,
 }
 
 

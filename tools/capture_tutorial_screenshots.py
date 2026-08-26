@@ -2897,6 +2897,96 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+#  COMBO-3 — factor of safety versus time
+# --------------------------------------------------------------------------- #
+COMBO03 = os.path.join(REPO_ROOT,
+                       "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
+#: The mesh the page builds, which is SEEP-3's: linear triangles, auto-sizing on,
+#: 64 divisions across the 110 m section.
+COMBO03_MESH = {"element_type": "tri3", "auto_size": True, "size_divisions": 64}
+COMBO03_METHOD = "spencer"
+COMBO03_SLICES = 40
+#: The instants the march saves, which the Run LEM dialog offers as a list. Named
+#: here rather than marched for: the selector reads the times off the solution and
+#: nothing else, and a 60-second transient run for one screenshot is a minute the
+#: shot does not need. The producer in ``make_tutorial_figures.py`` runs the march
+#: for real and prints these same twelve.
+COMBO03_TIMES = (0.0, 2.0, 15.0, 30.0, 47.0, 60.0, 80.0, 120.0, 180.0, 240.0,
+                 300.0, 360.0)
+
+_combo03_cache = {}
+
+
+def _combo03_solved():
+    """The model with the page's mesh built and the full-pool field attached.
+
+    The state the reader is in at the baseline run, and the state the Run LEM
+    checks are reported against: a model whose materials read ``u = seep`` needs a
+    solved field, and photographing the dialog before one exists would put an
+    error panel beside controls the page is describing. Cached — the shipped file
+    carries no sidecars, because solving is what the page teaches.
+    """
+    if "data" not in _combo03_cache:
+        from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                                 get_material_polygons)
+        from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                                 run_seepage_analysis)
+
+        data = _load(COMBO03)
+        xs = [x for x, _ in data["ground_surface"].coords]
+        size = (max(xs) - min(xs)) / COMBO03_MESH["size_divisions"]
+        # The reservoir boundary is bound to the pool series; a steady solve reads
+        # it at t = 0, which is full pool, and that is the field wanted here.
+        with contextlib.redirect_stdout(io.StringIO()):
+            data["mesh"] = build_mesh_from_polygons(
+                get_material_polygons(data), size, COMBO03_MESH["element_type"],
+                size_regions=extract_size_regions(data))
+            seep_data = build_seep_data(data["mesh"], data, seep_bc=1)
+            solution = run_seepage_analysis(seep_data, tol=1e-4, max_iter=400)
+            apply_steady_stability_field(data, solution, bc=1)
+        _combo03_cache["data"] = data
+    return _combo03_cache["data"]
+
+
+def combo03_materials():
+    """The two zones in table view with the LEM columns showing.
+
+    The band this page fills: a unit weight above the water table and a saturated
+    one below it, a drained effective-stress envelope on each zone, and ``u`` on
+    ``seep`` so every slice base reads its pore pressure from the solved field.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _lem_only(MaterialsEditor().build(_load(COMBO03), None))
+    return _grab(_mat_table(dlg, through="u"), "combo03_studio_materials.png")
+
+
+def combo03_run_lem():
+    """Run LEM on a model carrying a solved transient march.
+
+    The **Seepage time** group is what the march adds: an ordinary run reads ONE
+    instant, and this is where that instant is named. Its **Saved frame** list
+    holds the twelve the march stored, and the checkbox under it writes the choice
+    to the model so a scripted re-run reads the same frame.
+    """
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": COMBO03_METHOD,
+                                 "analysis": "auto_search",
+                                 "num_slices": COMBO03_SLICES},
+                       slope_data=_combo03_solved(),
+                       transient={"times": list(COMBO03_TIMES)})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo03_studio_run_lem.png")
+
+
+SHOTS.update({
+    "combo03_materials": combo03_materials,
+    "combo03_run_lem": combo03_run_lem,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

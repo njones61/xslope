@@ -461,7 +461,7 @@ solutions solves nothing.
 three blank. They
 belong to [rapid-drawdown staging](../seep/transient.md#rapid-drawdown-staging),
 used when a stability analysis consumes a transient solution and needs particular
-instants marked in it — the subject of a later tutorial. Nothing on this page reads
+instants marked in it — the subject of [COMBO-3](combo03_fs_vs_time.md). Nothing on this page reads
 them, and the Set 2 boundary tab left empty earlier is their counterpart.
 
 The plot on the right redraws as you type, so the schedule is visible before

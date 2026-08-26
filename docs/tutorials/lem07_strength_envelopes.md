@@ -311,6 +311,7 @@ This tutorial covered:
 [LEM-4](lem04_water_in_the_slope.md) covers the other input that changes the
 strength on a slice base — the pore pressure that turns total stress into
 effective — and the [Limit Equilibrium Method overview](../lem/overview.md)
-gives each strength option's equation, including the `hb` Hoek-Brown envelope
-for rock that this page did not use.
+gives each strength option's equation.
+[LEM-13](lem13_rock_slope.md) takes the third nonlinear option, the `hb`
+Hoek-Brown envelope for rock, through both engines.
 </content>

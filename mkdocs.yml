@@ -71,6 +71,7 @@ nav:
       - 10. Finding the Global Minimum: tutorials/lem10_global_minimum.md
       - 11. Reliability: tutorials/lem11_reliability.md
       - 12. Piles: tutorials/lem12_piles.md
+      - "13. A Rock Slope: Hoek-Brown": tutorials/lem13_rock_slope.md
     - Seepage:
       - 1. Confined Seepage Under a Sheetpile: tutorials/seep01_sheetpile.md
       - 2. Unconfined Seepage Through a Zoned Dam: tutorials/seep02_johnson_dam.md

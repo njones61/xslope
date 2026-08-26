@@ -3072,6 +3072,169 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# LEM-13 — Rock Slope (Hoek-Brown)
+#
+# The materials shots are LIST view: only the list view puts the four Hoek-Brown
+# field inputs beside the derived mb/s/a readout and the envelope those constants
+# draw, which is the whole subject of Part A. Two Run LEM shots carry a model check
+# rather than a control — Part A's after the page's deliberate MPa slip, which is
+# what the sigma_ci units rule exists to catch, and Part B's on the file as
+# downloaded, where the same rule reports a normalized sigma_ci that is small on
+# purpose.
+# --------------------------------------------------------------------------- #
+LEM13_A = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope.xlsx")
+LEM13_B = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope_li.xlsx")
+#: Part A's mis-entry: Hammah's 30 MPa typed as the 30 the paper prints, into a
+#: model whose stress unit is kPa.
+LEM13_A_MPA_SCI = 30.0
+
+
+def _lem13_material(model, name, edit=None, width=1180, height=780):
+    """The materials editor in list view, on the one rock material.
+
+    ``edit`` is applied before the editor is built, so the shot carries the state
+    the step ends in rather than a pre-edit row described in prose.
+    """
+    from studio.editors import MaterialsEditor
+
+    d = _load(model)
+    if edit:
+        d = dict(d, materials=[dict(d["materials"][0], **edit)])
+    dlg = _lem_only(MaterialsEditor().build(d, None))
+    dlg.set_view_mode("list")
+    dlg._list_view.list.setCurrentRow(0)
+    dlg.resize(width, height)
+    return _grab(dlg, name)
+
+
+def lem13_materials():
+    """Part A's rock as the file carries it: option `hb`, the four field inputs, and
+    the mb / s / a the editor derives from them beside the envelope they define."""
+    return _lem13_material(LEM13_A, "lem13_studio_materials.png")
+
+
+def lem13_run_lem():
+    """Part A's run: Spencer, auto search, the dialog's own 40 slices."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM13_A))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_run_lem.png")
+
+
+def lem13_run_lem_mpa():
+    """Run LEM on Part A after the page's deliberate MPa slip.
+
+    sigma_ci reads 30 instead of 30,000, and the checks column carries the units
+    rule with its full text. **Run** stays enabled: nothing about the entry is
+    invalid, only implausible, so the check reports and the run proceeds.
+    """
+    from studio.dialogs import RunLemDialog
+
+    data = _load(LEM13_A)
+    data = dict(data, materials=[dict(data["materials"][0],
+                                      hb_sci=LEM13_A_MPA_SCI)])
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_run_lem_mpa.png")
+
+
+def lem13_run_fem():
+    """Part A's strength reduction, on the meshed model, at the bracket the
+    completed file declares.
+
+    The mesh is built here because the file ships no sidecar — Studio's Run FEM
+    action is unreachable without one, so the dialog is photographed in the state
+    the Build Mesh step leaves behind.
+    """
+    from studio.dialogs import RunFemDialog
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    data = _load(LEM13_A)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data), data["target_size"], data["element_type"],
+            size_regions=extract_size_regions(data))
+    dlg = RunFemDialog(defaults={"analysis": "ssrm",
+                                 "F_min": float(data["ssrm_f_min"]),
+                                 "F_max": float(data["ssrm_f_max"]),
+                                 "tolerance": 0.01,
+                                 "k0": float(data["k0"])},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_run_fem.png")
+
+
+def lem13_build_mesh():
+    """Build Mesh on the size the completed file declares: tri6 at 0.9 m, with
+    auto-sizing off because a declared size is what turns it off."""
+    from studio.dialogs import BuildMeshDialog
+
+    data = _load(LEM13_A)
+    dlg = BuildMeshDialog(defaults={"element_type": data["element_type"],
+                                    "target_size": float(data["target_size"]),
+                                    "auto_size": False})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_build_mesh.png")
+
+
+def lem13_li_materials():
+    """Part B's rock as the file carries it — the normalized σci of 4.37 kPa, whose
+    magnitude the model checks report."""
+    return _lem13_material(LEM13_B, "lem13_studio_li_materials.png")
+
+
+def lem13_li_run_lem():
+    """Part B's run, on the file as downloaded.
+
+    This is the shot that carries the units check: the model-checks column beside
+    the controls reports the σci magnitude, and **Run** stays enabled, because a
+    normalized model and a mis-keyed one are indistinguishable by magnitude alone.
+    """
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM13_B))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_li_run_lem.png")
+
+
+def lem13_li_run_lem_corps():
+    """The same dialog with the Corps of Engineers method selected.
+
+    The method-and-material pairing raises its own check: a fixed-inclination
+    force-equilibrium method against an envelope whose instantaneous friction angle
+    passes 55 degrees near the crest. Nothing else on the dialog changes.
+    """
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "corps",
+                                 "analysis": "auto_search", "num_slices": 40},
+                       slope_data=_load(LEM13_B))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_li_run_lem_corps.png")
+
+
+SHOTS.update({
+    "lem13_materials": lem13_materials,
+    "lem13_run_lem": lem13_run_lem,
+    "lem13_run_lem_mpa": lem13_run_lem_mpa,
+    "lem13_build_mesh": lem13_build_mesh,
+    "lem13_run_fem": lem13_run_fem,
+    "lem13_li_materials": lem13_li_materials,
+    "lem13_li_run_lem": lem13_li_run_lem,
+    "lem13_li_run_lem_corps": lem13_li_run_lem_corps,
+})
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     os.makedirs(OUT_DIR, exist_ok=True)

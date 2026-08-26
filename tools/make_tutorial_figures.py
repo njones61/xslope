@@ -1686,6 +1686,292 @@ def _interp(x, xs, ys):
 
 
 # --------------------------------------------------------------------------- #
+# LEM-13 — Rock Slope (Hoek-Brown)
+#
+# Two rock masses at opposite ends of the same criterion, both written by
+# ``tools/build_rock_slope.py`` from the verification corpus. Part A is Hammah et
+# al.'s badly broken mass (GSI = 5, exponent a = 0.619), solved by Spencer's method
+# and then by strength reduction on the same file — the only Hoek-Brown problem
+# locked in both engines, and the one the page's units trap runs on: sigma_ci typed
+# as the 30 the paper prints rather than the 30,000 kPa the model wants. Part B is
+# Li, Merifield & Lyamin's strong mass (GSI = 70, a = 0.501), whose normalized
+# sigma_ci of 4.37 kPa is small on purpose.
+#
+# The envelope figure is drawn straight through ``hoekbrown.hb_tangent`` — the same
+# instantaneous tangent the solvers consume — so the curve on the page and the
+# strength in the answer cannot disagree.
+# --------------------------------------------------------------------------- #
+LEM13_A = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope.xlsx")
+LEM13_B = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope_li.xlsx")
+LEM13_SLICES = 40
+#: Part A's deliberate mis-entry — the slip the sigma_ci units check exists to
+#: catch. Hammah's rock is 30 MPa, which this model states as 30,000 kPa; a reader
+#: copying the number off the paper types 30, and the rock mass comes out a thousand
+#: times weaker than intended. Every other input is left alone.
+LEM13_A_MPA_SCI = 30.0
+#: The strength reduction Part A's second half runs, at the settings the completed
+#: file declares and the SSRM lock tag names: tri6 at a 0.9 m target size, the
+#: bracket [0.8, 1.6], a 0.01 tolerance and K0 = 1. The per-trial iteration
+#: budget is the Run FEM dialog's own 12,000 rather than the lock tag's 16,000:
+#: the budget extends itself while a trial is still converging, so the answer is
+#: the same and the figures are drawn at the settings the page's instructions
+#: leave on the dialog.
+LEM13_TOLERANCE = 0.01
+LEM13_MAX_ITERATIONS = 12000
+LEM13_CRITERION = "non_convergence"
+
+
+def _lem13_search(model, method, num_slices=LEM13_SLICES):
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(
+            copy.deepcopy(model), method, num_slices=num_slices, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache[0]
+
+
+def _lem13_ucs(mat):
+    """The rock MASS's unconfined strength, sigma_ci * s**a — what a Hoek-Brown
+    material has left at zero confinement, and the quantity a sigma_ci slip scales
+    straight through."""
+    from xslope.hoekbrown import hb_constants
+
+    _mb, s, a = hb_constants(mat["hb_gsi"], mat["hb_mi"], mat["hb_d"])
+    return float(mat["hb_sci"] * s ** a)
+
+
+def _lem13_reading(crit):
+    """The numbers the page quotes off one search: the factor of safety, the circle,
+    the surface it stands on, and the strength it mobilized.
+
+    The last pair is what a Hoek-Brown page is about. Every slice base carries its
+    own instantaneous tangent, taken at that slice's converged normal stress, so the
+    length-weighted mean of ``c`` and ``phi`` over the slices is the equivalent
+    Mohr-Coulomb pair the criterion supplied along this surface — and the spread
+    between the softest and the steepest slice is the curvature the envelope has.
+    """
+    s = crit["slices"]
+    dl = s["dl"]
+    sig = s["n_eff"] / dl
+    return ("FS %.4f · Xo %.4f Yo %.4f · tangent elev %.4f · R %.4f · L %.2f · "
+            "ΣW %.1f · σn′ %.2f–%.2f (mean %.2f) · c_i %.2f–%.2f (mean %.2f) · "
+            "φ_i %.1f–%.1f° (mean %.1f°)"
+            % (crit["FS"], crit["Xo"], crit["Yo"], crit["Depth"],
+               crit["Yo"] - crit["Depth"], dl.sum(), s["w"].sum(),
+               sig.min(), sig.max(), (sig * dl).sum() / dl.sum(),
+               s["c"].min(), s["c"].max(), (s["c"] * dl).sum() / dl.sum(),
+               s["phi"].min(), s["phi"].max(), (s["phi"] * dl).sum() / dl.sum()))
+
+
+def _lem13_daylight(crit):
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    return "entry (%.2f, %.2f) exit (%.2f, %.2f)" % (xs[0], ys[0], xs[-1], ys[-1])
+
+
+def _lem13_envelopes(crit):
+    """Both rock masses' Hoek-Brown envelopes, drawn from the same tangent routine
+    the solvers call.
+
+    Two panels, because the two masses cannot share an absolute stress axis: one is
+    a 30 MPa intact rock and the other a 4.37 kPa normalized one. The left panel is
+    Part A's envelope over the stress range its own critical surface generates, with
+    the instantaneous tangent at the mean base normal stress drawn across it — the
+    straight line the method of slices actually solves with. The right panel puts
+    both masses on normalized axes, τ/σci against σn′/σci, where the only difference
+    left between them is the shape the constants give.
+    """
+    import numpy as np
+
+    from xslope.hoekbrown import hb_constants, hb_tangent
+
+    a = load_slope_data(LEM13_A)["materials"][0]
+    b = load_slope_data(LEM13_B)["materials"][0]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.5, 5.0))
+
+    # ---- left: Part A's envelope in its own stress units --------------------- #
+    sig = np.linspace(0.0, 90.0, 400)
+    c_i, phi_i = hb_tangent(sig, a["hb_sci"], a["hb_gsi"], a["hb_mi"], a["hb_d"])
+    tau = c_i + sig * np.tan(np.radians(phi_i))
+    ax1.plot(sig, tau, color="#c0392b", lw=2.2,
+             label="Hoek-Brown envelope, GSI = 5")
+
+    #: The mean effective normal stress on the critical surface, which is where the
+    #: tangent the page quotes is taken. Taken from the search the caller already
+    #: ran rather than restated, so the line on the figure follows the answer on
+    #: the page and the search is not paid for twice.
+    s = crit["slices"]
+    sig_bar = float((s["n_eff"]).sum() / s["dl"].sum())
+    c_bar, phi_bar = hb_tangent(sig_bar, a["hb_sci"], a["hb_gsi"], a["hb_mi"],
+                                a["hb_d"])
+    c_bar, phi_bar = float(c_bar), float(phi_bar)
+    line = c_bar + sig * np.tan(np.radians(phi_bar))
+    ax1.plot(sig, line, color="#2c3e50", lw=1.6, ls="--",
+             label="instantaneous tangent at σn′ = %.0f kPa\n(c_i = %.1f kPa, "
+                   "φ_i = %.1f°)" % (sig_bar, c_bar, phi_bar))
+    ax1.plot([sig_bar], [c_bar + sig_bar * np.tan(np.radians(phi_bar))], "o",
+             color="#2c3e50", ms=6)
+    ax1.axvspan(float((s["n_eff"] / s["dl"]).min()),
+                float((s["n_eff"] / s["dl"]).max()), color="#f1c40f", alpha=0.18,
+                label="σn′ range on the critical surface")
+    ax1.set_xlabel("σn′  effective normal stress  (kPa)")
+    ax1.set_ylabel("τ  shear strength  (kPa)")
+    ax1.set_title("Part A — the broken rock mass\nσci = 30,000 kPa, GSI = 5, "
+                  "mi = 2, a = %.3f" % hb_constants(a["hb_gsi"], a["hb_mi"],
+                                                    a["hb_d"])[2])
+    ax1.set_xlim(0, 90)
+    ax1.set_ylim(bottom=0)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(loc="upper left", fontsize=8.5)
+
+    # ---- right: both masses, normalized -------------------------------------- #
+    r = np.linspace(0.0, 0.30, 400)
+    for mat, color, label in ((a, "#c0392b", "GSI = 5, mi = 2 (Part A)"),
+                              (b, "#2980b9", "GSI = 70, mi = 15 (Part B)")):
+        mb, sc, ex = hb_constants(mat["hb_gsi"], mat["hb_mi"], mat["hb_d"])
+        c_i, phi_i = hb_tangent(r * mat["hb_sci"], mat["hb_sci"], mat["hb_gsi"],
+                                mat["hb_mi"], mat["hb_d"])
+        t = (c_i + r * mat["hb_sci"] * np.tan(np.radians(phi_i))) / mat["hb_sci"]
+        ax2.plot(r, t, color=color, lw=2.2,
+                 label="%s\nmb = %.3f, s = %.2e, a = %.3f" % (label, mb, sc, ex))
+    ax2.set_xlabel("σn′ / σci")
+    ax2.set_ylabel("τ / σci")
+    ax2.set_title("Both rock masses, normalized by σci")
+    ax2.set_xlim(0, 0.30)
+    ax2.set_ylim(bottom=0)
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(loc="upper left", fontsize=8.5)
+
+    fig.tight_layout()
+    out = os.path.join(OUT_DIR, "lem13_envelopes.png")
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print("-> lem13_envelopes.png")
+    print("   envelope A  σn′ %.2f mean · tangent c_i %.3f kPa φ_i %.2f°"
+          % (sig_bar, c_bar, phi_bar))
+    for tag, mat in (("A", a), ("B", b)):
+        mb, sc, ex = hb_constants(mat["hb_gsi"], mat["hb_mi"], mat["hb_d"])
+        print("   constants %s  σci %g · GSI %g · mi %g · D %g -> mb %.4f · "
+              "s %.4e · a %.4f · unconfined σci·s^a %.4f"
+              % (tag, mat["hb_sci"], mat["hb_gsi"], mat["hb_mi"], mat["hb_d"],
+                 mb, sc, ex, mat["hb_sci"] * sc ** ex))
+
+
+def lem13_plots():
+    """The limit equilibrium half of both parts, plus the envelope figure.
+
+    Printed rather than drawn: every search's factor of safety, its circle, the
+    surface length and sliding mass, and the range of instantaneous cohesion and
+    friction angle the criterion supplied along that surface. The strength-reduction
+    half is ``lem13_ssrm``, which runs on the same file.
+    """
+    # ---- Part A: Hammah's weak rock mass ------------------------------------- #
+    a = load_slope_data(LEM13_A)
+    capture("lem13_inputs.png", plot_inputs, a, title="Slope Geometry and Inputs")
+
+    crit_b = _lem13_search(a, "bishop")
+    crit_s = _lem13_search(a, "spencer")
+    capture("lem13_spencer.png", plot_solution, a, crit_s["slices"],
+            crit_s["failure_surface"], crit_s["solver_result"])
+    print("   A bishop   %s" % _lem13_reading(crit_b))
+    print("   A spencer  %s" % _lem13_reading(crit_s))
+    print("   A spencer  %s" % _lem13_daylight(crit_s))
+
+    # ---- the MPa slip, searched exactly as the correct entry was ------------- #
+    mpa_mat = dict(a["materials"][0], hb_sci=LEM13_A_MPA_SCI)
+    mpa = dict(a, materials=[mpa_mat])
+    crit_mpa = _lem13_search(mpa, "spencer")
+    capture("lem13_mpa.png", plot_solution, mpa, crit_mpa["slices"],
+            crit_mpa["failure_surface"], crit_mpa["solver_result"])
+    print("   A σci=%g  %s" % (LEM13_A_MPA_SCI, _lem13_reading(crit_mpa)))
+    print("   A σci=%g  %s" % (LEM13_A_MPA_SCI, _lem13_daylight(crit_mpa)))
+    print("   A σci=%g  unconfined σci·s^a %.5f kPa against the correct entry's "
+          "%.4f" % (LEM13_A_MPA_SCI, _lem13_ucs(mpa_mat),
+                    _lem13_ucs(a["materials"][0])))
+
+    # ---- Part B: Li's strong rock mass, right and wrong ---------------------- #
+    b = load_slope_data(LEM13_B)
+    capture("lem13_li_inputs.png", plot_inputs, b,
+            title="Slope Geometry and Inputs")
+    crit_li = _lem13_search(b, "spencer")
+    capture("lem13_li_spencer.png", plot_solution, b, crit_li["slices"],
+            crit_li["failure_surface"], crit_li["solver_result"])
+    print("   B spencer  %s" % _lem13_reading(crit_li))
+    print("   B spencer  %s" % _lem13_daylight(crit_li))
+
+    # ---- the envelopes both answers came off --------------------------------- #
+    _lem13_envelopes(crit_s)
+
+
+def lem13_ssrm():
+    """Part A through the finite element engine: the mesh, the strength reduction,
+    and the result panels at the captured failure state.
+
+    The mesh and the bracket are read from the completed file rather than restated,
+    so the figures cannot be drawn at a discretization the workbook does not
+    declare. Printed: the mesh counts, every bisection trial, and the factor of
+    safety with the bracket it came from.
+    """
+    import time
+
+    import numpy as np
+
+    from xslope.fem import build_fem_data, solve_ssrm
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+    from xslope.plot_fem import plot_fem_data, plot_fem_results
+
+    model = load_slope_data(LEM13_A)
+    with contextlib.redirect_stdout(io.StringIO()):
+        mesh = build_mesh_from_polygons(get_material_polygons(model),
+                                        model["target_size"],
+                                        model["element_type"],
+                                        size_regions=extract_size_regions(model))
+    nodes = np.asarray(mesh["nodes"])
+    fem_data = build_fem_data(model, mesh)
+    print("   mesh        %d nodes · %d elements · every element %s at target "
+          "size %g m" % (len(nodes), len(mesh["elements"]), model["element_type"],
+                         model["target_size"]))
+    capture("lem13_mesh.png", plot_fem_data, fem_data)
+
+    log = io.StringIO()
+    t0 = time.time()
+    with contextlib.redirect_stdout(log):
+        result = solve_ssrm(fem_data, F_min=model["ssrm_f_min"],
+                            F_max=model["ssrm_f_max"], tolerance=LEM13_TOLERANCE,
+                            debug_level=1, failure_criterion=LEM13_CRITERION,
+                            max_iterations=LEM13_MAX_ITERATIONS,
+                            k0=model.get("k0"))
+    print("   SSRM        FS %.4f from the bracket [%.4f, %.4f] (width %.4f) after "
+          "%d bisection steps · %.1f s wall"
+          % (result["FS"], result["final_interval"][0], result["final_interval"][1],
+             result["interval_width"], result["iterations_ssrm"], time.time() - t0))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s iterations"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+
+    last, fail = result["last_solution"], result.get("failure_solution")
+    for label, field in (("last converged", last), ("at failure", fail)):
+        if field is None:
+            print("   %-13s none" % label)
+            continue
+        u = np.asarray(field["displacements"]).reshape(-1, 2)
+        umag = np.hypot(u[:, 0], u[:, 1])
+        i = int(np.argmax(umag))
+        print("   %-13s F %.4f · %s in %s iterations · max|u| %.5f m at (%.2f, %.2f)"
+              % (label, field.get("F", float("nan")),
+                 "equilibrium" if field.get("converged") else "no equilibrium",
+                 field.get("iterations"), umag.max(), nodes[i, 0], nodes[i, 1]))
+
+    # Two panels, not the FEM pages' three: this section is a cross-check of one
+    # number against the limit equilibrium answer, so the mechanism and the
+    # direction it moved in are what the prose reaches for.
+    for name, kind in (("lem13_shear_strain.png", "shear_strain"),
+                       ("lem13_displacement_vectors.png", "displace_vector")):
+        capture(name, plot_fem_results, fem_data, last, plot_type=kind,
+                fs=result["FS"], failure_solution=fail, field_state="failure")
+
+
+# --------------------------------------------------------------------------- #
 # SEEP-1 — Seepage Under a Sheetpile (built from scratch, one model, many meshes)
 #
 # The model is confined: two specified-head boundaries, no exit face, one soil. That
@@ -6204,6 +6490,8 @@ GROUPS = {
     "lem10_plots": lem10_plots,
     "lem11_plots": lem11_plots,
     "lem12_plots": lem12_plots,
+    "lem13_plots": lem13_plots,
+    "lem13_ssrm": lem13_ssrm,
     "seep01_sheets": seep01_sheets,
     "seep01_plots": seep01_plots,
     "seep02_plots": seep02_plots,

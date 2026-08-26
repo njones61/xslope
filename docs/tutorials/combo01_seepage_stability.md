@@ -11,14 +11,13 @@ element pages find a factor of safety a second way. This one runs all three from
 a single file, in the order a real analysis runs them — seepage first, because
 its answer is what the other two need.
 
-The point of the page is the handover. A seepage analysis produces a pore
-pressure at every node of a mesh. Both stability engines want exactly that, and
+A seepage analysis produces a pore pressure at every node of a mesh. Both stability engines want exactly that, and
 neither one re-enters it: the limit equilibrium search reads the field at every
 slice base, the strength reduction reads it at every Gauss point, and both read
 it off the same mesh the seepage run was solved on. No file is exported, no
 value is retyped, and nothing about the water is stated twice.
 
-The example is the Johnson Reservoir dam, already built.
+This page uses the Johnson Reservoir dam, already built.
 [SEEP-2](seep02_johnson_dam.md) constructs this model from nothing and works the
 seepage physics through in detail; this page opens the finished workbook and
 spends its length on the three runs and the one column that connects them.
@@ -142,7 +141,7 @@ values and nothing outside them, and the heavy black line is the **phreatic
 surface** — the locus of points where the pore pressure passes through zero,
 which is drawn from the solved field rather than entered.
 
-That solved field is what the rest of the page uses. It is now attached to the
+The rest of the page uses that solved field. It is now attached to the
 model in the session, as a pore pressure at each of the 8,082 mesh nodes, and it
 is written beside the workbook as `xslope_johnson_res_mesh.json` and
 `xslope_johnson_res_seep.csv` so that re-opening the file picks both up by name.

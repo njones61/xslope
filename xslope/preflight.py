@@ -2845,15 +2845,33 @@ def _seep_exit_only(ctx):
             "head that drives the flow (Seep BC; seep bc sheet).")
 
 
-@rule("seep.no_gradient", WARNING, ("seep",),
+@rule("seep.no_gradient", ERROR, ("seep",),
       "Two heads of the same value, or one head alone, drive no flow.")
 def _seep_no_gradient(ctx):
+    # An ERROR, not a warning (Norm 2026-08-26): a set of boundary conditions
+    # that is nothing but specified heads at one value poses no flow problem —
+    # there is no gradient and no solution, and the unconfined sweep runs to its
+    # limit looking for one. An exit face does not rescue it: it is a place
+    # water may leave, not a head that drives any.
     bc = ctx.seep_bc
     heads = bc.get("specified_heads") or []
     n_flux = len(bc.get("specified_fluxes") or [])
-    n_exit = len(bc.get("exit_face") or [])
-    if n_flux or n_exit or not heads:
+    if n_flux or not heads:
         return None
+    # An exit face IS an outlet where it lies below the water the heads set:
+    # there the pressure is zero and the head equals the elevation, which is a
+    # gradient (the corpus's dam-with-a-seepage-face cases). An exit face that
+    # sits entirely above every specified head drains nothing and rescues
+    # nothing.
+    exit_face = bc.get("exit_face") or []
+    finite_heads = [float(b.get("head")) for b in heads if _finite(b.get("head"))]
+    if exit_face and finite_heads:
+        try:
+            lowest_exit = min(float(pt[1]) for pt in exit_face)
+        except (TypeError, ValueError, IndexError):
+            lowest_exit = None
+        if lowest_exit is not None and lowest_exit < max(finite_heads) - 1e-9:
+            return None
     if ctx.sd.get("tseep") is not None:
         return None            # a transient run drives the heads from its series
     if any(isinstance(b.get("head"), str) for b in heads):
@@ -2862,9 +2880,10 @@ def _seep_no_gradient(ctx):
               if _finite(b.get("head"))}
     if len(values) >= 2:
         return None
-    return ("The specified heads all carry the same value, so this confined model "
-            "has no gradient and no flow. A confined model needs at least two "
-            "distinct head values, or a flux boundary (Seep BC; seep bc sheet).")
+    return ("The specified heads all carry the same value, so this model has no "
+            "gradient and no flow: the problem has no solution to find. Give the "
+            "boundary set at least two distinct head values, or a flux boundary "
+            "(Seep BC; seep bc sheet).")
 
 
 @rule("seep.bc_polyline_too_short", ERROR, ("seep",),

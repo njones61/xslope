@@ -206,8 +206,7 @@ Switch the mode strip to **LEM** (`Ctrl+1`) and click **Run → Run LEM…**
 
 ![Run LEM, with Spencer selected](images/combo01_studio_run_lem.png)
 
-Set **Method** to **Spencer** — the one field this page changes from the dialog's
-defaults. Spencer satisfies both force and moment equilibrium, which makes it the
+**Method** opens on **Spencer**, the dialog's default. Spencer satisfies both force and moment equilibrium, which makes it the
 closest limit equilibrium statement of what the strength reduction run solves, so
 it is the method to compare the two engines on. Leave **Analysis** on **Auto
 search** and **Number of slices** at 40, and click **Run**.

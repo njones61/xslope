@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog,
-    QDialogButtonBox, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QHeaderView,
+    QDialogButtonBox, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
     QScrollArea, QSplitter, QStackedWidget, QTableWidget, QTableWidgetItem,
     QTabWidget, QVBoxLayout, QWidget,
@@ -31,7 +31,7 @@ from .picking import _line_dist
 # can never drift. Same for the reinforcement support-type presets: the table the
 # Type column fills Dir/Appl from is the loader's, which is the sheet's.
 from xslope.fileio import (POLYGON_TYPE_WORDS, REINFORCE_TYPE_PRESETS,
-                           SSR_ZONE_LABELS, SSR_ZONE_SENTINELS)
+                           SEARCH_WINDOW_KEYS, SSR_ZONE_LABELS, SSR_ZONE_SENTINELS)
 
 # Column "usage" tags: which analysis a field applies to. Header text is colored
 # to mirror the input template's header coloring (red = LEM-specific inputs,
@@ -1330,13 +1330,74 @@ def _circle_arc(slope_data, Xo, Yo, R, depth):
         return None
 
 
-def _draw_circles_preview(ax, circles, selected, slope_data, style):
+#: Color for the search-window overlay in the circles preview — a limit on WHERE a
+#: search may run is neither a trial surface (red) nor the selected circle (orange),
+#: so it gets its own hue rather than borrowing one of theirs.
+_WINDOW_COLOR = "#00838f"
+
+
+def _ground_band(slope_data, x_lo, x_hi, n=48):
+    """The ground surface between ``x_lo`` and ``x_hi`` as (xs, ys), clipped to the
+    section's own x range, or None when the range falls outside it entirely."""
+    import numpy as np
+    gs = slope_data.get("ground_surface")
+    if gs is None or getattr(gs, "is_empty", False):
+        return None
+    coords = list(gs.coords)
+    gx = [p[0] for p in coords]
+    gy = [p[1] for p in coords]
+    if gx[0] > gx[-1]:
+        gx, gy = gx[::-1], gy[::-1]
+    lo = max(min(x_lo, x_hi), min(gx))
+    hi = min(max(x_lo, x_hi), max(gx))
+    if not hi > lo:
+        return None
+    xs = np.linspace(lo, hi, n)
+    return xs, np.interp(xs, gx, gy)
+
+
+def _draw_search_window(ax, slope_data, window, annot_line):
+    """The search window over the section: the entry and exit ranges as bars lying on
+    the ground surface, the center box as a dashed rectangle.
+
+    Only a limit the search will actually apply is drawn — a range with one end filled
+    is not a window and the engine ignores it, so drawing it would show a constraint
+    that is not there. The center box is an annotation artist (like the circle centers
+    it confines) because it usually sits well above the section and must not inflate
+    the framed view."""
+    for lo, hi, label in (("entry_x_min", "entry_x_max", "entry"),
+                          ("exit_x_min", "exit_x_max", "exit")):
+        if window.get(lo) is None or window.get(hi) is None:
+            continue
+        band = _ground_band(slope_data, window[lo], window[hi])
+        if band is None:
+            continue
+        xs, ys = band
+        ax.plot(xs, ys, color=_WINDOW_COLOR, linewidth=4.0, alpha=0.75,
+                solid_capstyle="butt", zorder=8)
+        text = ax.annotate(label, (xs[len(xs) // 2], ys[len(ys) // 2]),
+                           textcoords="offset points", xytext=(0, 6), ha="center",
+                           fontsize=7, color=_WINDOW_COLOR, zorder=9)
+        text.set_in_layout(False)
+    box = ("center_box_x_min", "center_box_x_max",
+           "center_box_y_min", "center_box_y_max")
+    if all(window.get(k) is not None for k in box):
+        x0, x1, y0, y1 = (window[k] for k in box)
+        annot_line([x0, x1, x1, x0, x0], [y0, y0, y1, y1, y0],
+                   color=_WINDOW_COLOR, linewidth=1.2, linestyle="--")
+
+
+def _draw_circles_preview(ax, circles, selected, slope_data, style, window=None):
     """Preview for the starting-circles editor: the full cross-section (base geometry
     + overlays) with the PENDING circles over it. Each circle's clipped failure arc is
     drawn as the engine does; the selected one is bold (emphasis color) with a center
     marker, a radius line and a depth line, the others faint. The center/radius are
     annotation-layer artists (in_layout=False, clipped) so a center far above the
-    section can't inflate the framed view — matching plot_circles."""
+    section can't inflate the framed view — matching plot_circles.
+
+    ``window`` is the pending search window (the editor's group, live as it is typed),
+    drawn under the circles: the entry/exit ranges as bars on the ground surface, the
+    center box dashed."""
     from matplotlib.lines import Line2D
     from xslope.plot import plot_base_geometry
     from xslope.style import resolve_style
@@ -1349,6 +1410,9 @@ def _draw_circles_preview(ax, circles, selected, slope_data, style):
         ln.set_clip_box(ax.bbox)         # tight-bbox layout + view autoscale
         ln.set_clip_on(True)
         ax.add_artist(ln)
+
+    if window:
+        _draw_search_window(ax, slope_data, window, _annot_line)
 
     for i, c in enumerate(circles):
         Xo, Yo, R, depth = _circle_radius_depth(c)
@@ -2095,6 +2159,13 @@ class TableEditorDialog(QDialog):
     so a table with more columns than a pane's width can hold takes the full width
     and the section, which is wide and short anyway, takes the space below it.
 
+    ``extra_widget`` is a widget of settings that belong to the table as a whole
+    rather than to any row of it (the circles editor's search window), placed under
+    the table and above the buttons. It is reached back as ``dlg.extra``. Two optional
+    hooks on it are honoured: ``set_on_change(cb)`` wires it to the live preview, and
+    ``validate() -> message`` refuses OK with that message rather than letting the
+    dialog save something the loader would reject.
+
     ``generate`` (a hook ``propose() -> (rows, message, reason)``) adds a button that
     derives the whole table from the model. It follows the same contract as a
     preflight remedy: a button that cannot run is DIMMED with the reason in its
@@ -2105,7 +2176,7 @@ class TableEditorDialog(QDialog):
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
                  usage_toggles=None, preview_draw=None, preview_caption=None,
                  pick_resolve=None, field_help=None, unit_labels=None,
-                 generate=None, preview_below=False):
+                 generate=None, preview_below=False, extra_widget=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -2161,6 +2232,11 @@ class TableEditorDialog(QDialog):
             layout.addWidget(self._editable)
         if generate is not None:
             layout.addLayout(self._build_generate_bar(generate))
+        self.extra = extra_widget
+        if extra_widget is not None:
+            layout.addWidget(extra_widget)
+            if self._preview is not None and hasattr(extra_widget, "set_on_change"):
+                extra_widget.set_on_change(self._schedule_preview)
         _ok_cancel(self, layout)
         if usage_toggles:
             self._apply_toggles()      # set initial column visibility
@@ -2178,6 +2254,17 @@ class TableEditorDialog(QDialog):
         if preview_below:
             # Last, so the measurement sees every strip the dialog ended up with.
             self._size_to_content()
+
+    def accept(self):
+        """OK, unless the extra widget says what it holds cannot be saved — a window
+        the loader would refuse to read back is stopped here, with the pair named,
+        rather than at the next open of the file."""
+        extra = getattr(self, "extra", None)
+        problem = extra.validate() if hasattr(extra, "validate") else ""
+        if problem:
+            QMessageBox.warning(self, self._title, problem)
+            return
+        super().accept()
 
     def _table_pane_height(self, rows_shown=None):
         """The height the table half needs for ``rows_shown`` rows (its own row count
@@ -2219,10 +2306,22 @@ class TableEditorDialog(QDialog):
         table scrolls, which is the pane that has a scroll bar for the purpose."""
         width = self._content_width()
         pane = self._table_pane_height()
+        # The caption wraps at the width it is GIVEN, which is the dialog's width less
+        # the layout margins -- reserving at the full width buys one line too few and
+        # cuts the last line off along the bottom edge.
+        margins = self.layout().contentsMargins()
+        caption_width = width - margins.left() - margins.right()
         preview = (_PREVIEW_MIN_LINES * self.fontMetrics().height()
-                   + self._preview.reserve_caption(width))
+                   + self._preview.reserve_caption(caption_width))
         self._preview.setMinimumHeight(preview)
         self._editable.setMinimumHeight(self._table_pane_height(rows_shown=0))
+        # A QSplitter does not carry its children's minimums into its own, so a strip
+        # that appears later (the generator's summary) is free to squeeze the split
+        # rather than grow the dialog -- and what gets cut is the bottom of the
+        # preview's caption. Stating the minimum here puts the panes into the layout's
+        # own minimum, so the dialog grows for the new strip instead.
+        self._split.setMinimumHeight(self._editable.minimumHeight() + preview
+                                     + self._split.handleWidth())
         # Everything that is not the splitter: help text, legend, generate bar,
         # buttons, help strip. sizeHint() knows them all; the splitter's own hint is
         # replaced by the two pane heights measured above.
@@ -2253,10 +2352,38 @@ class TableEditorDialog(QDialog):
         way it would only be overwriting the user's own arrangement."""
         if not getattr(self, "_content_sized", False):
             return
+        self._grow_to_layout_minimum()
         needed = self._content_width()
         if needed > self.width():
             self._grow(needed)
         self._grow_to_fit_columns()
+
+    def _grow_to_layout_minimum(self):
+        """Grow tall enough for everything the layout now holds, measured at the
+        width the dialog actually has.
+
+        A strip that appears after the dialog was sized — the generator's summary
+        line — needs room that nothing gave it, and what pays for it is the bottom of
+        the preview's caption. ``minimumSizeHint`` is no help: it measures every
+        wrapped label at the dialog's own MINIMUM width, where the same text takes
+        more lines than it does at the width on screen, so it answers a question
+        nobody asked. Summing the rows at the real width is the measurement that
+        matches what is drawn."""
+        layout = self.layout()
+        margins = layout.contentsMargins()
+        width = self.width() - margins.left() - margins.right()
+        want = margins.top() + margins.bottom()
+        want += layout.spacing() * max(0, layout.count() - 1)
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            if item.hasHeightForWidth():
+                want += item.heightForWidth(width)
+                continue
+            widget = item.widget()
+            want += (max(widget.sizeHint().height(), widget.minimumHeight())
+                     if widget is not None else item.sizeHint().height())
+        if want > self.height():
+            self.resize(self.width(), want)
 
     def _grow(self, width):
         """Widen to ``width``, never past the screen."""
@@ -2267,6 +2394,7 @@ class TableEditorDialog(QDialog):
     def showEvent(self, event):
         super().showEvent(event)
         if getattr(self, "_content_sized", False):
+            self._grow_to_layout_minimum()
             self._grow_to_fit_columns()
 
     def _grow_to_fit_columns(self):
@@ -4941,6 +5069,121 @@ CIRCLES_HELP = {
 }
 
 
+SEARCH_WINDOW_HELP = {
+    "entry_x_min": "X range the failure surface's crest-side (higher-ground) endpoint "
+                   "must fall in. A trial surface breaking outside it is rejected.",
+    "exit_x_min": "X range the toe-side (lower-ground) endpoint must fall in. A trial "
+                  "surface daylighting outside it is rejected.",
+    "center_box_x_min": "Rectangle the circle centers are confined to. The refining "
+                        "grid stays inside it, so the search cannot walk out. Applies "
+                        "only when all four cells are filled.",
+    "center_box_y_min": "Rectangle the circle centers are confined to. The refining "
+                        "grid stays inside it, so the search cannot walk out. Applies "
+                        "only when all four cells are filled.",
+    "max_tangent_depth": "The lowest ELEVATION the circle's bottom (its tangent point) "
+                         "may reach. A deeper trial surface is rejected.",
+    "min_slip_depth": "Minimum depth below the ground surface a surface must reach. "
+                      "Rejects shallow surficial “skin” mechanisms, whose factor "
+                      "of safety is depth-independent on a cohesionless face and would "
+                      "otherwise win.",
+}
+# Each grid row of the group: (label, key or None, key or None). The four ranges pair
+# their two ends on one row; the two single limits fill the min column alone.
+_SEARCH_WINDOW_ROWS = (
+    ("Entry x", "entry_x_min", "entry_x_max"),
+    ("Exit x", "exit_x_min", "exit_x_max"),
+    ("Center box x", "center_box_x_min", "center_box_x_max"),
+    ("Center box y", "center_box_y_min", "center_box_y_max"),
+    ("Max tangent depth", "max_tangent_depth", None),
+    ("Min slip depth", "min_slip_depth", None),
+)
+#: The four ranges, as (low key, high key) — what has to be increasing, and what has
+#: to be filled at both ends to apply at all.
+_SEARCH_WINDOW_PAIRS = tuple((lo, hi) for _lbl, lo, hi in _SEARCH_WINDOW_ROWS
+                             if hi is not None)
+
+
+class _SearchWindowGroup(QGroupBox):
+    """The circles sheet's optional search window (J8:K17), edited as a group.
+
+    Ten independent limits confining an automated circular search, every one of them
+    optional: a blank field is a limit that is not applied, and an all-blank group is
+    the unconstrained search. That is exactly what the loader produces for a blank
+    block — no ``search_window`` key at all — so :meth:`result_values` returns only
+    the filled keys and an empty dict for a group nobody filled in, and the editor
+    drops the key rather than storing ten Nones.
+
+    Each field is an ``optfloat`` :class:`Field`, so a value shown rounded for reading
+    is written back at full precision unless it was actually typed over."""
+
+    CAPTION = ("Optional limits confining an automated circular search. A blank field "
+               "is a limit that is not applied; a range applies only when BOTH of its "
+               "ends are filled.")
+
+    def __init__(self, window, unit_labels=None, parent=None):
+        super().__init__("Search window", parent)
+        self._stored = dict(window or {})
+        self._on_change = None
+        self._fields, self._edits = {}, {}
+        outer = QVBoxLayout(self)
+        outer.addWidget(_help_label(self.CAPTION))
+        grid = QGridLayout()
+        grid.addWidget(QLabel("min"), 0, 1)
+        grid.addWidget(QLabel("max"), 0, 2)
+        for r, (label, lo, hi) in enumerate(_SEARCH_WINDOW_ROWS, start=1):
+            tip = SEARCH_WINDOW_HELP[lo]
+            name = QLabel(_with_unit(label, Field(lo, label, unit="length"), unit_labels))
+            name.setToolTip(tip)
+            grid.addWidget(name, r, 0)
+            for col, key in ((1, lo), (2, hi)):
+                if key is None:
+                    continue
+                field = Field(key, label, "optfloat", unit="length", tooltip=tip)
+                edit = QLineEdit(field.to_text(self._stored.get(key)))
+                edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                edit.setToolTip(tip)
+                edit.textChanged.connect(self._changed)
+                self._fields[key] = field
+                self._edits[key] = edit
+                grid.addWidget(edit, r, col)
+        grid.setColumnStretch(3, 1)
+        outer.addLayout(grid)
+
+    def set_on_change(self, callback):
+        """Call ``callback`` whenever a field is typed in — how the dialog's live
+        preview follows the window being edited."""
+        self._on_change = callback
+
+    def _changed(self, _text=None):
+        if self._on_change is not None:
+            self._on_change()
+
+    def result_values(self):
+        """The window as the loader would produce it: only the filled keys, in sheet
+        order, each a float."""
+        out = {}
+        for key in SEARCH_WINDOW_KEYS:
+            field = self._fields[key]
+            value = field.read_text(self._edits[key].text(), self._stored.get(key))
+            if value is not None:
+                out[key] = float(value)
+        return out
+
+    def validate(self):
+        """The message to refuse OK with, or "" when the window is savable.
+
+        The one thing the loader rejects outright is a range that runs backwards, and
+        a file saved with one would not open again — so it is caught here, where the
+        user can still see which pair they typed."""
+        window = self.result_values()
+        for lo, hi in _SEARCH_WINDOW_PAIRS:
+            if lo in window and hi in window and window[lo] > window[hi]:
+                return (f"The search window has {lo} = {window[lo]:g} greater than "
+                        f"{hi} = {window[hi]:g}. Every range must be increasing "
+                        f"(min ≤ max).")
+        return ""
+
+
 def _circles_generate_spec(slope_data):
     """The Generate button's state and behaviour for the starting-circles editor.
 
@@ -5000,9 +5243,12 @@ class CirclesEditor(CategoryEditor):
 
     def build(self, slope_data, parent):
         style = _doc_style(parent)
+        window = _SearchWindowGroup(slope_data.get("search_window"),
+                                    _unit_labels_for(slope_data))
 
         def preview(ax, rows, selected):
-            _draw_circles_preview(ax, rows, selected, slope_data, style)
+            _draw_circles_preview(ax, rows, selected, slope_data, style,
+                                  window=window.result_values())
 
         return TableEditorDialog(
             "Circles", self.FIELDS, slope_data.get("circles", []), _new_circle, parent,
@@ -5014,7 +5260,9 @@ class CirclesEditor(CategoryEditor):
             preview_draw=preview,
             preview_caption="Preview shows the starting circles on the section "
                             "(selected circle bold with center, radius and depth "
-                            "lines; others faint). Click a circle to select it.",
+                            "lines; others faint). Click a circle to select it. Any "
+                            "search window is drawn with it: entry and exit ranges as "
+                            "bars on the ground surface, the center box dashed.",
             pick_resolve=lambda x, y, tol, rows: _pick_circles(rows, x, y, tol, slope_data),
             field_help=CIRCLES_HELP,
             generate=_circles_generate_spec(slope_data),
@@ -5022,7 +5270,10 @@ class CirclesEditor(CategoryEditor):
             # side by side, the table loses R off its right edge. Stacked, the table
             # gets the full width for its columns and the section — wide and short —
             # gets the room below.
-            preview_below=True)
+            preview_below=True,
+            # The search window limits where a SEARCH may run, so it belongs to the
+            # circle table as a whole rather than to any one starting circle.
+            extra_widget=window)
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -5037,6 +5288,14 @@ class CirclesEditor(CategoryEditor):
                 c["R"] = c["Yo"] - c["Depth"]
         slope_data["circles"] = rows
         slope_data["circular"] = len(rows) > 0
+        # Only the filled limits are stored, and a window nobody filled in leaves no
+        # key behind at all — the state the loader produces for a blank J8:K17 block,
+        # so an untouched model round-trips through this editor unchanged.
+        window = dlg.extra.result_values()
+        if window:
+            slope_data["search_window"] = window
+        else:
+            slope_data.pop("search_window", None)
 
 
 def _new_ncpt():

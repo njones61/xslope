@@ -1257,7 +1257,7 @@ class RunLemDialog(QDialog):
         layout = QVBoxLayout()                  # the left column; see two_pane
         form = QFormLayout()
 
-        self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
+        self.method = self._combo(LEM_METHODS, defaults.get("method", "spencer"))
         form.addRow("Method", self.method)
 
         self.analysis = self._combo(ANALYSIS_TYPES, defaults.get("analysis", "auto_search"))
@@ -1680,7 +1680,7 @@ class SensitivityDialog(QDialog):
 
         # Engine-specific solver row(s). LEM keeps method + slices; FEM swaps in the
         # SSRM knobs (each step is a full SSRM solve); Seep takes a BC set + tol.
-        self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
+        self.method = self._combo(LEM_METHODS, defaults.get("method", "spencer"))
         self.num_slices = QSpinBox()
         self.num_slices.setRange(5, 500)
         self.num_slices.setValue(int(defaults.get("num_slices", 40)))
@@ -2422,7 +2422,7 @@ class ReliabilityDialog(QDialog):
         self._mc_disabled_note.setVisible(self.app_mode == "fem")
 
         # --- LEM solver + surface (LEM mode only) --------------------------
-        self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
+        self.method = self._combo(LEM_METHODS, defaults.get("method", "spencer"))
         if self.app_mode == "lem":
             form.addRow("LEM method", self.method)
 

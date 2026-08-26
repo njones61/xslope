@@ -405,11 +405,13 @@ reduction runs return the same bracket,
 trial.
 
 The tip-fixed rows of the last section, swept the same way, are flat too, at
-1.801 at all three — the upper line. This time the shafts are at their
-moment capacity at every spacing, the peak moment per unit width tracking
-M<sub>cap</sub> ÷ S exactly: 20,000, 10,000 and 5,000 lb·ft/ft. Whichever end condition the rows are given, the factor of safety
-is decided by the mechanism the smeared wall forces the soil into, not by how
-much moment each shaft carries.
+1.801 at all three — the upper line. With the tips fixed the shafts reach their moment capacity at every spacing —
+the row can carry no more than M<sub>cap</sub> per shaft, spread over S — yet
+the factor of safety is the same at 3, 6 and 12 ft. So neither line's flatness
+comes from the shafts: with the tips pinned they carry a fraction of their
+capacity, with the tips fixed all of it, and in both cases the answer is set by
+the mechanism the continuous wall leaves the soil, which spacing does not
+change.
 
 The pinned-tip line is not the model ignoring the spacing column. Over this sweep the
 smeared bending stiffness *EI*/S falls fourfold, and what the shafts carry moves

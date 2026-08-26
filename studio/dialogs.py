@@ -1661,6 +1661,12 @@ class SensitivityDialog(QDialog):
         self._times = [float(t) for t in (transient or {}).get("times", [])]
         self._time_unit = str(slope_data.get("time_unit") or "").strip()
         self._fs_time_reason = self._fs_time_unavailable(slope_data)
+        # The instant a drawdown curve reads stage 1 at: the file's own stage_1
+        # (normally 0, full pool), or the earliest saved frame where it names none.
+        s1 = (slope_data.get("tseep") or {}).get("stage_1")
+        self._stage_1 = (float(s1) if s1 is not None
+                         else (min(self._times) if self._times else 0.0))
+        self._rapid_time_reason = self._rapid_time_unavailable(slope_data)
 
         ba_label = ("Back-Analysis (FS = 1)" if self.app_mode != "seep"
                     else f"Back-Analysis (target {out_short})")
@@ -1718,12 +1724,13 @@ class SensitivityDialog(QDialog):
         # has no failure surface) — only shown in LEM mode.
         self.search = QCheckBox("Re-search the critical surface at each step")
         self.search.setChecked(bool(defaults.get("search", True)))
-        self.search.setToolTip(
+        self._search_tip = (
             "On (recommended): re-run the search at every swept value, because the "
             "critical surface moves as the parameter changes — a fixed surface "
             "silently understates the sensitivity.\n\n"
             "Off: re-solve the entered surface only (much faster, but the answer is "
             "only right for that prescribed surface).")
+        self.search.setToolTip(self._search_tip)
         self.search.setVisible(self.app_mode == "lem")
         layout.addWidget(self.search)
 
@@ -1766,6 +1773,7 @@ class SensitivityDialog(QDialog):
                 self._add_row(e, pct=spec.get("pct", self.pct.value()),
                               use_sigma=spec.get("use_sigma", False))
         self._on_plot_type_changed()
+        self._on_rapid_toggled()            # a remembered drawdown holds Re-search
         self._on_mode_changed()
         self.resize(1000, 620)              # two columns: controls | model checks
 
@@ -1961,6 +1969,28 @@ class SensitivityDialog(QDialog):
                     "Set u = seep on the materials table, or the curve would be flat.")
         return ""
 
+    @staticmethod
+    def _rapid_time_unavailable(slope_data):
+        """Why the instants cannot be evaluated as rapid drawdowns, or ``""``.
+
+        The three-stage procedure is a comparison between undrained and drained
+        strengths on the drawn-down section, and both come from the d / psi columns.
+        With neither set anywhere, every stage reads the same strengths and the
+        drawdown is a single-stage analysis wearing three names — so the option is
+        offered only on a model that carries them.
+        """
+        for m in (slope_data.get("materials") or []):
+            for field in ("d", "psi"):
+                try:
+                    if float(m.get(field) or 0.0) > 0.0:
+                        return ""
+                except (TypeError, ValueError):
+                    continue
+        return ("No material carries the rapid-drawdown strengths d and "
+                "\N{GREEK SMALL LETTER PSI}, so all three stages would read the "
+                "same strengths. Set them on the low-permeability material(s) in "
+                "the materials table.")
+
     def _build_time_page(self, defaults):
         """The instants to evaluate: every saved frame of the march, all ticked.
 
@@ -2001,7 +2031,48 @@ class SensitivityDialog(QDialog):
             self.times.addItem(item)
         self.times.itemChanged.connect(lambda *_: self._on_times_changed())
         v.addWidget(self.times, 1)
+
+        # Each instant as a drawdown rather than a single state. It sits with the
+        # frames because it changes what a ticked instant MEANS: stage 2 of a fall
+        # that started at the march's initial pool, not a state on its own.
+        unit_txt = f" {self._time_unit}" if self._time_unit else ""
+        self.rapid = QCheckBox("Rapid drawdown at each time")
+        self.rapid.setToolTip(self._rapid_time_reason or (
+            f"On: every ticked instant is a three-stage Duncan-Wright-Brandon "
+            f"rapid drawdown — stage 1 the march's initial state at "
+            f"t = {_fmt_time(self._stage_1)}{unit_txt} (full pool), stage 2 that "
+            f"instant's drawn-down state, stage 3 the same section re-checked with "
+            f"drained strengths. The curve reports the drawdown's own factor of "
+            f"safety, the lower of stages 2 and 3.\n\n"
+            f"Off: every instant is a single-stage analysis against that instant's "
+            f"pore pressures."))
+        if self._rapid_time_reason:
+            self.rapid.setEnabled(False)
+        else:
+            self.rapid.setChecked(bool(defaults.get("rapid", False)))
+        self.rapid.toggled.connect(self._on_rapid_toggled)
+        v.addWidget(self.rapid)
         return page
+
+    def _on_rapid_toggled(self, *_):
+        """A drawdown point is always searched, so the Re-search toggle has nothing
+        left to decide: it is held on and greyed with the reason, rather than
+        offering a run this mode does not make."""
+        on = self.rapid.isChecked()
+        if hasattr(self, "search"):
+            if on:
+                self.search.setChecked(True)
+                self.search.setEnabled(False)
+                self.search.setToolTip(
+                    "Held on: a rapid drawdown's critical surface is not the "
+                    "drained one and moves as the drawn-down field changes, so "
+                    "every instant is searched from the starting circle.")
+            else:
+                self.search.setEnabled(True)
+                self.search.setToolTip(self._search_tip)
+        if self.mode.currentData() == "fs_vs_time":
+            self._on_mode_changed()
+            self.preflight.refresh()
 
     def _set_all_times(self, on):
         for i in range(self.times.count()):
@@ -2073,7 +2144,19 @@ class SensitivityDialog(QDialog):
                "search": self.search.isChecked()}
         if self.mode.currentData() == "fs_vs_time":
             picked = self.selected_times()
-            sel["seep_frame"] = {"times": picked[:1]}
+            if self.rapid.isChecked():
+                # Every point is a drawdown, so the checks are the drawdown's:
+                # base = 'rapid' brings that family in on top of the LEM rules, and
+                # the two instants say which route it runs (both from the march).
+                sel["base"] = "rapid"
+                sel["rapid"] = True
+                later = [t for t in picked if t > self._stage_1]
+                sel["seep_frame"] = {"times": [self._stage_1,
+                                               (later[-1] if later
+                                                else (picked[-1] if picked
+                                                      else self._stage_1))]}
+            else:
+                sel["seep_frame"] = {"times": picked[:1]}
         return sel
 
     def _sync_run(self):
@@ -2102,14 +2185,26 @@ class SensitivityDialog(QDialog):
         self.picker.setVisible(not is_time)
         if is_time:
             n = len(self.selected_times())
-            self.note.setText(
-                f"Factor of safety vs time: one stability run per ticked instant of "
-                f"the transient seepage march — {n} of {len(self._times)} saved "
-                f"frames. No input changes between the points; each "
-                f"solves the same model against that instant's pore pressures, and "
-                f"the reservoir load is re-derived from the pool as it stood then. "
-                f"The circles sheet's search window is applied, which is what keeps "
-                f"the curve on one mechanism.")
+            unit = f" {self._time_unit}" if self._time_unit else ""
+            if self.rapid.isChecked():
+                self.note.setText(
+                    f"Rapid drawdown vs time: one three-stage drawdown per ticked "
+                    f"instant of the transient seepage march — {n} of "
+                    f"{len(self._times)} saved frames. Stage 1 is the march's "
+                    f"initial state at t = {_fmt_time(self._stage_1)}{unit} and "
+                    f"stage 2 is that instant, so the curve answers how safe the "
+                    f"slope is if the pool falls to where it stands then. Each "
+                    f"point is searched from the starting circle, and the reported "
+                    f"value is the lower of stages 2 and 3.")
+            else:
+                self.note.setText(
+                    f"Factor of safety vs time: one stability run per ticked instant "
+                    f"of the transient seepage march — {n} of {len(self._times)} "
+                    f"saved frames. No input changes between the points; each "
+                    f"solves the same model against that instant's pore pressures, "
+                    f"and the reservoir load is re-derived from the pool as it stood "
+                    f"then. The circles sheet's search window is applied, which is "
+                    f"what keeps the curve on one mechanism.")
             self._prev_mode = m
             self._sync_run()
             return
@@ -2265,6 +2360,9 @@ class SensitivityDialog(QDialog):
                                    "tol": self.seep_tol.value()}
         if common["mode"] == "fs_vs_time":
             common["times"] = self.selected_times()
+            common["rapid"] = self.rapid.isChecked()
+            if common["rapid"]:
+                common["search"] = True
         elif common["mode"] in ("design", "back_analysis"):
             common.update({
                 "param": self.prop.currentData(),

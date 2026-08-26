@@ -1503,8 +1503,7 @@ The coupled-analysis curve the vendors publish. `fs_vs_time` runs a stability an
 **every saved frame** of a transient seepage solution and tabulates the result. No input is
 modified at any step — the axis is time, and each point solves the same model against a
 different computed pore-pressure field. **Recommend it whenever a model has a transient march
-and the user asks when the slope is most at risk**, rather than reporting the FS at one instant
-(and never instead of a rapid drawdown, which is one three-stage analysis, not a sequence).
+and the user asks when the slope is most at risk**, rather than reporting the FS at one instant.
 
 ```python
 from xslope.sensitivity import fs_vs_time
@@ -1523,6 +1522,16 @@ plot_sensitivity(res["df"], save_png=True)      # x-axis is time; param == 'time
   on one mechanism.
 - `mode='fem'` runs a full SSRM per frame — minutes each, so restrict `times`. `mode='seep'` is
   refused: the seepage solution is this run's input.
+- `rapid=True` makes every instant a three-stage rapid drawdown instead: stage 1 the march's
+  initial state (`tseep` `stage_1`, normally t = 0 at full pool), stage 2 the frame at t, and the
+  reported value the drawdown's own — the lower of stages 2 and 3. Rows gain `stage1_FS`,
+  `stage2_FS`, `stage3_FS`, `stage3_run` and `governs`. LEM only; every point is an auto search
+  from the starting circle, so `search` is not consulted. Use it when the question is "how safe
+  is the slope if the pool falls to where it stands at t"; leave it off for "how safe is the
+  slope in the state it is in at t".
+- The run prints an aligned per-instant table when the march is done (t, FS, the critical
+  circle; the three stages and the governing one in rapid mode). The same rows come back on
+  `res['table']` and the printed block on `res['table_text']`; `print_table=False` silences it.
 - `res` also carries `'times'`, `'critical'` (per method), `'n_failed'`, `'remarched'` and
   `'solution'` — keep the returned solution if it re-marched, rather than paying twice.
 
@@ -1736,7 +1745,9 @@ method with `rapid=True`. A transient solution with stage times takes precedence
 classic `{base}_seep.csv` / `_seep2.csv` files.
 
 To chart FS across the whole march instead of picking one instant, use `fs_vs_time` — see
-Parametric studies.
+Parametric studies. To chart the DRAWDOWN factor of safety instead, with stage 2 walked across
+the march, use `fs_vs_time(..., rapid=True)`; it stages each point itself, so no
+`apply_transient_stability_frame` call is needed.
 
 ---
 

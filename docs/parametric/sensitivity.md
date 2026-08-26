@@ -177,6 +177,46 @@ it. In Studio the same run is the Parametric dialog's
 [Factor of safety vs time](../studio/analysis.md#factor-of-safety-vs-time) mode, where the
 instants are ticked off the loaded march and the curve opens in an **FS vs Time** tab.
 
+When the march is done the run prints its own table — one aligned row per evaluated instant,
+carrying the factor of safety, the circle it was found on, and (on a drawdown curve) the
+three stage values and which stage governed. An instant that produced nothing carries its
+reason on its row. The same rows come back as `result['table']` (a list of dicts) and the
+printed block as `result['table_text']`, so a report or a notebook reads what the console
+showed rather than rebuilding it. `print_table=False` keeps the rows and prints nothing.
+
+### Each instant as a rapid drawdown
+
+`rapid=True` turns every instant into a full three-stage
+[Duncan, Wright and Brandon drawdown](../lem/rapid.md) rather than a single-stage
+analysis:
+
+```python
+ok, result = fs_vs_time(slope_data, transient_solution, rapid=True)
+```
+
+Stage 1 is the march's **initial** state — the `tseep` sheet's `stage_1` (normally t = 0 at
+full pool), or the earliest saved frame where the sheet names none — and stage 2 is the frame
+at *t*, with stage 3 re-checking the drawn-down section against drained strengths where they
+are the lower. The reported value is the drawdown's own, the lower of stages 2 and 3, so the
+curve answers *how safe is this slope if the pool falls to where it stands at t* — asked
+against pore pressures the march computed rather than a single assumed drawn-down state. The
+rows carry `stage1_FS`, `stage2_FS`, `stage3_FS`, `stage3_run` and `governs` beside `fs`, and
+`plot_fs_vs_time` draws the three stages as thin dashed lines behind the reported curve.
+
+Two consequences follow from the construction and are worth stating:
+
+* every point is an **auto search from the model's starting circle**, never the stored
+  circle, so `search` is not consulted on this branch — a drawdown's critical surface is not
+  the drained one, and it moves with the drawn-down field.
+* the stage values on a row are read **on that row's critical surface**, which is the
+  drawdown's, so `stage1_FS` varies slightly along the curve. It is the full-pool factor of
+  safety of the surface the drawdown settled on, not of the surface a full-pool search would
+  have found.
+
+The instant stage 1 itself is read at cannot be a drawdown — a fall from the pool to itself —
+and comes back as a `success=False` row saying so. `mode='fem'` is refused: the three-stage
+procedure is a limit-equilibrium construction with no SSRM equivalent.
+
 **The instant is never interpolated.** A time that names no saved frame is served by
 re-marching with that instant injected into the saved schedule — pass `seep_data=` to
 allow it, and the whole set of missing times is served by *one* re-march before the first
@@ -211,13 +251,15 @@ A worked comparison against a vendor-published curve — both drawdown rates of 
 GeoStudio rapid-drawdown example, 11 instants each — is on the
 [GeoStudio verification page](../verification/geostudio.md#seepw-t03).
 
-!!! note "Not a staged rapid drawdown"
-    A factor-of-safety-vs-time curve and a three-stage
-    [rapid drawdown](../lem/rapid.md) are different analyses of the same physical problem.
-    This curve is a sequence of single-stage analyses, one per instant, each reading the
-    pore pressures computed for that moment. A staged Duncan-Wright-Brandon drawdown is
-    one analysis reading two of them through undrained strength envelopes. Neither
-    substitutes for the other.
+!!! note "Two different questions"
+    The default curve and the `rapid=True` curve are different analyses of the same
+    physical problem. The default is a sequence of single-stage analyses, one per instant,
+    each reading the pore pressures computed for that moment — *how safe is the slope in
+    the state it is in at t*. The drawdown curve is a sequence of three-stage
+    [rapid drawdowns](../lem/rapid.md), each reading two instants through undrained
+    strength envelopes — *how safe is the slope if the pool falls from full to where it
+    stands at t*. Neither substitutes for the other, and on a model that carries `d` and ψ
+    the drawdown curve is the lower of the two everywhere the undrained envelope bites.
 
 ## Sensitivity plots
 

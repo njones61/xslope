@@ -3161,7 +3161,8 @@ class MainWindow(QMainWindow):
         self.act_sensitivity.setEnabled(False)
         self.act_run.setEnabled(False)
         verb = {"design": "Design sweep", "back_analysis": "Back-analysis",
-                "fs_vs_time": "FS vs time"}.get(study, "Sensitivity sweep")
+                "fs_vs_time": ("Rapid drawdown vs time" if opts.get("rapid")
+                               else "FS vs time")}.get(study, "Sensitivity sweep")
         self.statusBar().showMessage(f"{verb} — {opts['method']} …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
@@ -3183,14 +3184,16 @@ class MainWindow(QMainWindow):
             if self.fs_time_canvas is not None:
                 self.view_tabs.setCurrentWidget(self.fs_time_canvas)
             unit = str(self.doc.slope_data.get("time_unit") or "").strip()
+            what = ("Rapid drawdown vs time" if bundle.get("rapid")
+                    else "FS vs time")
             if bundle.get("min_fs") is not None:
                 self.statusBar().showMessage(
-                    f"FS vs time — lowest {bundle['min_fs']:.3f} at t = "
+                    f"{what} — lowest {bundle['min_fs']:.3f} at t = "
                     f"{bundle['critical_time']:g}{(' ' + unit) if unit else ''} "
                     f"over {len(bundle.get('times', []))} instant(s)")
             else:
                 self.statusBar().showMessage(
-                    "FS vs time — no instant produced a result; see the Log pane.")
+                    f"{what} — no instant produced a result; see the Log pane.")
         elif bundle.get("kind") == "design":
             self.doc.results["design"] = bundle
             self._show_design()
@@ -3246,6 +3249,15 @@ class MainWindow(QMainWindow):
         if self.fs_time_canvas is None:
             self.fs_time_canvas = SweepCanvas(self)
             self.view_tabs.addTab(self.fs_time_canvas, "FS vs Time")
+        # The tab says which curve it is holding: a drawdown curve and a
+        # single-stage curve are different analyses of the same march, and the tab
+        # is reused for whichever ran last.
+        i = self.view_tabs.indexOf(self.fs_time_canvas)
+        if i >= 0:
+            self.view_tabs.setTabText(
+                i, "Drawdown vs Time"
+                if (self.doc.results.get("fs_vs_time") or {}).get("rapid")
+                else "FS vs Time")
         self._rerender_fs_vs_time()
 
     def _rerender_fs_vs_time(self):

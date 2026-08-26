@@ -1197,7 +1197,7 @@ def back_analysis(slope_data, param=None, low=None, high=None, steps=11, target_
 # Factor of safety versus time
 # ---------------------------------------------------------------------------
 
-def _time_selection(slope_data, times, mode, search):
+def _time_selection(slope_data, times, mode, search, rapid=False):
     """What an FS-vs-time run's preflight rules are evaluated against.
 
     ``param`` is None: no input is substituted at any point -- every step solves
@@ -1205,19 +1205,214 @@ def _time_selection(slope_data, times, mode, search):
     swept-parameter rules have nothing to read and correctly stay silent. The
     engine mode, the surface family and the times are still declared, because the
     engine-appropriate rules do read those.
+
+    A rapid-drawdown curve declares ``base = 'rapid'``, which is how the drawdown
+    family of rules (stage times, stage-2 water, d/psi completeness) is brought
+    into a sweep's gate: every point of this curve IS a three-stage drawdown, so
+    a model that cannot make one cannot make the curve.
     """
-    return {'param': None, 'values': list(times), 'times': list(times),
-            'mode': mode, 'search': bool(search),
-            'base': _PREFLIGHT_BASE.get(mode, 'lem'),
-            'surface': 'circular' if slope_data.get('circular', True)
-                       else 'noncircular'}
+    sel = {'param': None, 'values': list(times), 'times': list(times),
+           'mode': mode, 'search': bool(search),
+           'base': 'rapid' if rapid else _PREFLIGHT_BASE.get(mode, 'lem'),
+           'surface': 'circular' if slope_data.get('circular', True)
+                      else 'noncircular'}
+    if rapid:
+        sel['rapid'] = True
+    return sel
+
+
+def _drawdown_stage_1(slope_data, transient_solution):
+    """The instant a rapid-drawdown FS-vs-time curve takes its stage 1 from.
+
+    The march's initial state: the ``tseep`` sheet's ``stage_1`` where the file
+    names one (normally 0, the full pool the drawdown starts from), and the
+    earliest saved frame otherwise. Never guessed from a schedule -- the frame has
+    to exist, because stage 1 is a solved field like every other stage.
+    """
+    ts = slope_data.get('tseep') or {}
+    s1 = ts.get('stage_1')
+    if s1 is not None:
+        return float(s1)
+    saved = [float(t) for t in (transient_solution.get('times') or [])]
+    return min(saved) if saved else 0.0
+
+
+def _stage_for_drawdown(slope_data, transient_solution, stage_1, t):
+    """A COPY of the model staged for a drawdown from ``stage_1`` to ``t``.
+
+    The two stages are two instants of one march, so the model's own stage times
+    are rewritten to this point's pair before
+    :func:`xslope.seep.stage_transient_for_drawdown` reads them. That single
+    rewrite is what makes the whole run consistent: the staging function fills
+    ``seep_u`` / ``seep_u2`` from those two frames and stamps their instants, and
+    the water derivation then reads the pool from boundary set 1 at each of them
+    (:func:`xslope.water.stage_water_source`) -- so the pool pressing on the slope
+    and the pore pressures inside it are the same two moments.
+    """
+    from .seep import stage_transient_for_drawdown
+
+    sd = _copy_for_edit(slope_data)
+    for key in ('dloads_derived', 'dloads2_derived', 'water_derived'):
+        sd.pop(key, None)
+    ts = dict(sd.get('tseep') or {})
+    ts['stage_1'], ts['stage_2'] = float(stage_1), float(t)
+    sd['tseep'] = ts
+    stage_transient_for_drawdown(sd, transient_solution)
+    return sd
+
+
+def _run_rapid_point(sd, methods, num_slices, search_opts=None,
+                     cancel_check=None):
+    """One instant of a rapid-drawdown curve: a three-stage Duncan-Wright-Brandon
+    drawdown, searched.
+
+    The surface is ALWAYS searched, on every method, from the model's own starting
+    circle -- never the stored circle. A drawdown's critical surface is not the
+    drained one and it moves as the drawn-down field changes, so a curve solved on
+    a fixed circle would be a curve of one surface's factor of safety rather than
+    of the slope's.
+
+    Rows carry the three stage factors of safety beside the reported one, because
+    the reported value is the LOWER of stages 2 and 3 and which of them supplied it
+    is the reading of the point.
+    """
+    from .search import (circular_search, noncircular_search,
+                         noncircular_search_opts)
+
+    rows, kw = [], dict(search_opts or {})
+    circular = bool(sd.get('circular', True))
+    for method in methods:
+        row = {'method': method, 'fs': np.nan, 'success': False, 'msg': '',
+               'Xo': np.nan, 'Yo': np.nan, 'R': np.nan,
+               'stage1_FS': np.nan, 'stage2_FS': np.nan, 'stage3_FS': np.nan,
+               'stage3_run': False, 'governs': np.nan}
+        try:
+            if circular:
+                out = circular_search(sd, method, rapid=True,
+                                      num_slices=num_slices,
+                                      cancel_check=cancel_check, **kw)
+                best = out[0][0]
+                if (best.get('Yo') is not None
+                        and best.get('Depth') is not None):
+                    row['R'] = best['Yo'] - best['Depth']
+                row['Xo'], row['Yo'] = best.get('Xo'), best.get('Yo')
+            else:
+                out = noncircular_search(sd, method, rapid=True,
+                                         num_slices=num_slices,
+                                         cancel_check=cancel_check,
+                                         **noncircular_search_opts(kw))
+                best = out[0][0]
+            fs = best.get('FS')
+            row['fs'] = fs
+            row['success'] = fs is not None
+            res = best.get('solver_result')
+            if isinstance(res, dict) and 'stage1_FS' in res:
+                row['stage1_FS'] = float(res['stage1_FS'])
+                row['stage2_FS'] = float(res['stage2_FS'])
+                row['stage3_FS'] = float(res['stage3_FS'])
+                row['stage3_run'] = bool(res.get('stage3_run'))
+                row['governs'] = (3 if (row['stage3_run']
+                                        and row['stage3_FS'] < row['stage2_FS'])
+                                  else 2)
+        except Exception as e:                             # noqa: BLE001
+            row['msg'] = f'rapid drawdown search failed: {e}'
+        rows.append(row)
+    return rows
+
+
+def _fmt_fs(v):
+    """A factor of safety for the table, or an em dash where there is none."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return '—'
+    return f'{f:.4f}' if np.isfinite(f) else '—'
+
+
+def _fs_vs_time_table(df, slope_data, rapid, time_unit=None):
+    """The run's own record: one row per evaluated instant, as a list of dicts and
+    as the fixed-width text printed once when the march is done.
+
+    A curve is read for where it dips, so the numbers behind it are printed rather
+    than left inside a figure: the reported factor of safety at every instant, the
+    circle it was found on, and -- on a drawdown curve -- the three stage factors
+    of safety and which of stages 2 and 3 supplied the answer. An instant that
+    produced nothing is a row carrying its reason, never a gap.
+    """
+    unit = str(time_unit or (slope_data or {}).get('time_unit') or '').strip()
+    t_head = f"t ({unit})" if unit else "t"
+    rows = []
+    for _i, r in df.iterrows():
+        row = {'time': float(r['value']), 'method': str(r['method']),
+               'fs': (float(r['fs']) if bool(r['success']) else None),
+               'success': bool(r['success']), 'msg': str(r['msg'] or ''),
+               'Xo': _opt(r.get('Xo')), 'Yo': _opt(r.get('Yo')),
+               'R': _opt(r.get('R'))}
+        if rapid:
+            row.update({'stage1_FS': _opt(r.get('stage1_FS')),
+                        'stage2_FS': _opt(r.get('stage2_FS')),
+                        'stage3_FS': _opt(r.get('stage3_FS')),
+                        'stage3_run': bool(r.get('stage3_run')),
+                        'governs': (int(r['governs'])
+                                    if _opt(r.get('governs')) is not None
+                                    else None)})
+        rows.append(row)
+    if not rows:
+        return [], ''
+
+    multi = len({r['method'] for r in rows}) > 1
+    has_circle = any(r['Xo'] is not None and r['R'] is not None for r in rows)
+    cols = [(t_head, [f"{r['time']:g}" for r in rows])]
+    if multi:
+        cols.append(('method', [r['method'] for r in rows]))
+    if rapid:
+        cols.append(('stage 1', [_fmt_fs(r['stage1_FS']) for r in rows]))
+        cols.append(('stage 2', [_fmt_fs(r['stage2_FS']) for r in rows]))
+        cols.append(('stage 3', [('not required' if (r['success']
+                                                     and not r['stage3_run'])
+                                  else _fmt_fs(r['stage3_FS'])) for r in rows]))
+    cols.append(('FS', [_fmt_fs(r['fs']) for r in rows]))
+    if rapid:
+        cols.append(('governs', [(str(r['governs']) if r['governs'] else '—')
+                                 for r in rows]))
+    if has_circle:
+        cols.append(('Xo', [_fmt_num(r['Xo']) for r in rows]))
+        cols.append(('Yo', [_fmt_num(r['Yo']) for r in rows]))
+        cols.append(('R', [_fmt_num(r['R']) for r in rows]))
+    # A failed instant says why in place of its numbers rather than printing a line
+    # of dashes the reader has to go and look up somewhere else.
+    reasons = [('' if r['success'] else (r['msg'] or 'no result')) for r in rows]
+
+    widths = [max(len(h), *(len(c) for c in vals)) for h, vals in cols]
+    lines = ['  '.join(h.rjust(w) for (h, _v), w in zip(cols, widths))]
+    for i in range(len(rows)):
+        cells = [cols[j][1][i].rjust(widths[j]) for j in range(len(cols))]
+        line = '  '.join(cells)
+        if reasons[i]:
+            line = f"{line}   {reasons[i]}"
+        lines.append(line)
+    return rows, '\n'.join(lines)
+
+
+def _opt(v):
+    """``v`` as a float, or None when it is missing / not a number."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if np.isfinite(f) else None
+
+
+def _fmt_num(v):
+    return '—' if v is None else f'{v:.2f}'
 
 
 def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
                methods=('spencer',), search=True, num_slices=40, fem_opts=None,
                search_opts=None, use_file_window=True, seep_data=None,
-               remarch=True, progress_callback=None,
-               cancel_check=None, check_inputs=True, debug_level=0):
+               remarch=True, rapid=False, progress_callback=None,
+               cancel_check=None, check_inputs=True, debug_level=0,
+               print_table=True):
     """Factor of safety at every instant of a transient seepage solution.
 
     The coupled-analysis output the vendors publish: a transient march produces a
@@ -1247,6 +1442,8 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
             (a full SSRM solve per frame; needs ``slope_data['mesh']``). Mode
             'seep' is refused: the seepage solution is the INPUT here, not the
             output.
+        rapid: evaluate each instant as a RAPID DRAWDOWN instead of a single-stage
+            analysis (LEM only; default False). See below.
         methods: LEM method names, any subset of the seven (mode='lem' only).
             Every method is evaluated at every instant, so a multi-method run
             reports one curve per method from a single set of frames.
@@ -1271,6 +1468,9 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
             instant.
         cancel_check: optional callable() -> bool; True raises
             ``xslope.search.AnalysisCancelled``.
+        print_table: print the results table when the march is done (default
+            True). The table is the run's record and is what Studio's Log pane
+            shows; the same rows come back on ``result['table']`` either way.
         check_inputs: run the input checks (default True). Same two-stage
             contract as :func:`sensitivity`: ONE full preflight of the base model
             for the engine this run will use, then a per-instant re-check. An
@@ -1292,12 +1492,34 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
           'solution'       -- the (possibly re-marched) solution the frames came
                               from, so a caller keeps it instead of paying twice.
           'n_failed'       -- instants that produced no result.
+          'table'          -- the printed table's rows, one dict per row: 'time',
+                              'method', 'fs', 'success', 'msg', the circle
+                              ('Xo', 'Yo', 'R'), and on a drawdown curve
+                              'stage1_FS' / 'stage2_FS' / 'stage3_FS' /
+                              'stage3_run' / 'governs'.
+          'table_text'     -- that table as it was printed.
+          'rapid'          -- True on a drawdown curve.
+          'stage_1_time'   -- the instant stage 1 was read at (rapid only).
           'mode' / 'output' / 'output_label' / 'runtime'.
 
-    A rapid-drawdown analysis is a different question about the same problem and
-    is deliberately not available here: this curve is a sequence of single-stage
-    analyses against successive fields, where a Duncan-Wright-Brandon drawdown is
-    one three-stage analysis reading two of them.
+    **Rapid drawdown (``rapid=True``).** Each instant becomes a full
+    Duncan-Wright-Brandon three-stage drawdown rather than a single-stage
+    analysis: stage 1 is the march's INITIAL state (the ``tseep`` sheet's
+    ``stage_1``, normally t = 0 at full pool, and the earliest saved frame where
+    the sheet names none), stage 2 is the frame at t, and stage 3 re-checks the
+    drawn-down section with drained strengths where they are the lower. The
+    reported factor of safety is the drawdown's own -- the lower of stages 2 and
+    3 -- so the curve reads as "how safe is this slope if the pool falls to where
+    it stands at t", answered instant by instant, against pore pressures the march
+    actually computed rather than a single assumed drawn-down state.
+
+    Every point is an auto search from the model's starting circle, never the
+    stored circle: the drawdown's critical surface is not the drained one and it
+    moves with the field, so ``search`` is not consulted on this branch. LEM only
+    -- the three-stage procedure is a limit-equilibrium construction, so
+    ``mode='fem'`` is refused. The instant stage 1 itself is read at cannot be a
+    drawdown (a fall from the pool to itself) and comes back as a failed row
+    saying so.
     """
     from .seep import (has_transient_frame, remarch_for_times,
                        select_transient_frame_u, transient_frame_index)
@@ -1316,6 +1538,10 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
     if mode == 'fem' and slope_data.get('mesh') is None:
         return False, ("mode='fem' needs a finite-element mesh in "
                        "slope_data['mesh'] -- build one before running.")
+    if rapid and mode != 'lem':
+        return False, ("a rapid-drawdown curve is a limit-equilibrium run: the "
+                       "three-stage Duncan-Wright-Brandon procedure has no SSRM "
+                       "equivalent. Use mode='lem', or turn the drawdown off.")
     output, output_label = _OUTPUT_BY_MODE[mode]
     t0 = time.perf_counter()
 
@@ -1339,16 +1565,32 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
             return False, f"re-march for the requested times failed: {e}"
 
     methods = (methods,) if isinstance(methods, str) else tuple(methods)
-    selection = _time_selection(slope_data, wanted, mode, search)
+    stage_1 = _drawdown_stage_1(slope_data, transient_solution) if rapid else None
+    selection = _time_selection(slope_data, wanted, mode, search, rapid=rapid)
     # The base model is gated WITH a frame in it. Every point of this run carries
     # one, so a model whose materials read u = seep is not missing a pore-pressure
     # field -- gating the bare model would refuse the whole run for the one
-    # condition the run itself removes at every step.
+    # condition the run itself removes at every step. A drawdown curve is gated
+    # with BOTH its stages placed, for the same reason and against the same
+    # instants a point will use: stage 1, and the latest instant asked for.
     gate_sd = _copy_for_edit(slope_data)
-    try:
-        select_transient_frame_u(gate_sd, transient_solution, time=wanted[0])
-    except (ValueError, KeyError, IndexError):
-        gate_sd = slope_data                   # no frame there: gate what we have
+    if rapid:
+        later = [t for t in wanted if t > stage_1]
+        try:
+            gate_sd = _stage_for_drawdown(slope_data, transient_solution,
+                                          stage_1, later[-1] if later else
+                                          wanted[-1])
+            selection['seep_frame'] = {'times': [stage_1,
+                                                 later[-1] if later
+                                                 else wanted[-1]]}
+        except (ValueError, KeyError, IndexError) as e:
+            return False, (f"the drawdown's stages cannot be read from this "
+                           f"march: {e}")
+    else:
+        try:
+            select_transient_frame_u(gate_sd, transient_solution, time=wanted[0])
+        except (ValueError, KeyError, IndexError):
+            gate_sd = slope_data               # no frame there: gate what we have
     gate = _sweep_gate(gate_sd, selection, check_inputs=check_inputs)
     if gate:
         return False, gate
@@ -1382,8 +1624,10 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
                          'is_base': False, 'analysis': mode, **pr})
 
     def fail(t, msg):
+        extra = ({'stage1_FS': np.nan, 'stage2_FS': np.nan, 'stage3_FS': np.nan,
+                  'stage3_run': False, 'governs': np.nan} if rapid else {})
         add_rows(t, [{'method': m, 'fs': np.nan, 'success': False, 'msg': msg,
-                      'Xo': np.nan, 'Yo': np.nan, 'R': np.nan}
+                      'Xo': np.nan, 'Yo': np.nan, 'R': np.nan, **extra}
                      for m in fail_methods])
 
     for t in wanted:
@@ -1399,6 +1643,34 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
             transient_frame_index(transient_solution, t)
         except ValueError as e:
             fail(t, str(e))
+            _tick(f"t = {t:g}")
+            continue
+        if rapid:
+            if t <= stage_1:
+                fail(t, f"a drawdown from t = {stage_1:g} to t = {t:g} is not a "
+                        f"drawdown -- the pool has not fallen yet; stage 2 must "
+                        f"be a later instant than stage 1")
+                _tick(f"t = {t:g}")
+                continue
+            try:
+                sd = _stage_for_drawdown(slope_data, transient_solution,
+                                         stage_1, t)
+            except Exception as e:                         # noqa: BLE001
+                fail(t, f"could not stage the drawdown at t = {t:g}: {e}")
+                _tick(f"t = {t:g}")
+                continue
+            sd = with_water_loads(sd)
+            err = _validate_model(sd, baseline, field=None, mode=mode,
+                                  selection=selection)
+            if err:
+                fail(t, err)
+                _tick(f"t = {t:g}")
+                continue
+            if debug_level > 0:
+                print(f"fs_vs_time: rapid drawdown {stage_1:g} -> {t:g}")
+            add_rows(t, _screen_point(
+                _run_rapid_point(sd, methods, num_slices, search_opts=kw,
+                                 cancel_check=cancel_check), mode))
             _tick(f"t = {t:g}")
             continue
         try:
@@ -1427,9 +1699,11 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
                        cancel_check=cancel_check, search_opts=kw), mode))
         _tick(f"t = {t:g}")
 
-    df = pd.DataFrame(rows, columns=['param', 'value', 'rel', 'is_base', 'analysis',
-                                     'method', 'fs', 'success', 'msg',
-                                     'Xo', 'Yo', 'R'])
+    cols = ['param', 'value', 'rel', 'is_base', 'analysis', 'method', 'fs',
+            'success', 'msg', 'Xo', 'Yo', 'R']
+    if rapid:
+        cols += ['stage1_FS', 'stage2_FS', 'stage3_FS', 'stage3_run', 'governs']
+    df = pd.DataFrame(rows, columns=cols)
     df['output'] = output
     df['output_label'] = output_label
 
@@ -1443,12 +1717,23 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
     lead = fail_methods[0] if fail_methods else None
     head = critical.get(str(lead)) or (next(iter(critical.values()))
                                        if critical else None)
+    # The record of the run, printed once with the march done rather than a line
+    # at a time: a curve is read across its instants, and the numbers behind it
+    # only compare when they are side by side.
+    table, table_text = _fs_vs_time_table(df, slope_data, rapid)
+    if print_table and table_text:
+        print(("Rapid drawdown versus time" if rapid
+               else "Factor of safety versus time")
+              + (f" (stage 1 at t = {stage_1:g})" if rapid else ""))
+        print(table_text)
     return True, {'df': df, 'param': 'time', 'times': wanted,
                   'critical_time': head['time'] if head else None,
                   'min_fs': head['fs'] if head else None,
                   'critical': critical, 'remarched': remarched,
                   'solution': transient_solution,
                   'n_failed': int((~df['success']).sum()),
+                  'rapid': bool(rapid), 'stage_1_time': stage_1,
+                  'table': table, 'table_text': table_text,
                   'mode': mode, 'output': output, 'output_label': output_label,
                   'runtime': time.perf_counter() - t0}
 

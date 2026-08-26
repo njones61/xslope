@@ -229,11 +229,23 @@ families between instants:
 
 ![Parametric dialog in Factor of safety vs time mode](images/analysis_sensitivity_fs_time_dialog.png)
 
+A **Rapid drawdown at each time** checkbox below the frames list turns every ticked instant
+into a three-stage [rapid drawdown](../lem/rapid.md) instead of a single-stage
+analysis: stage 1 is the march's initial state (the `tseep` sheet's `stage_1`, normally
+t = 0 at full pool), stage 2 is that instant's drawn-down state, and stage 3 re-checks the
+same section with drained strengths. The reported value is the drawdown's own — the lower of
+stages 2 and 3 — so the curve answers *how safe is this slope if the pool falls to where it
+stands at t*, instant by instant. The box is available only on a model whose materials carry
+the drawdown strengths `d` and ψ; without them it is greyed and says so, because all three
+stages would read the same strengths. A drawdown point is always searched from the starting
+circle, so **Re-search** is held on and greyed while the box is ticked.
+
 The mode is available in **LEM** and **FEM** mode on a model that carries a transient
 seepage solution and at least one material reading `u = seep`. Without one of those it is
 disabled and names the reason — *Run a transient seepage analysis first*, *No material takes
 its pore pressure from the seepage solution*, or, in Seepage mode, that the seepage solution
-is this run's input rather than its output. The engine page
+is this run's input rather than its output. The drawdown option is LEM only: the three-stage
+procedure is a limit-equilibrium construction with no SSRM equivalent. The engine page
 [Factor of safety versus time](../parametric/sensitivity.md#factor-of-safety-versus-time)
 carries the sweep itself.
 
@@ -275,9 +287,13 @@ same tab, with the target at FS = 1.0):
 **Factor of safety vs time** opens an **FS vs Time** tab: the factor of safety at each
 evaluated instant as a line with a marker per point, the lowest of them ringed and
 annotated with its own time, and the model's `tseep` time series — the drawdown schedule
-that drives the curve — drawn faintly behind it on a second axis. The per-instant table
-(time, method, FS) streams to the [Log pane](interface.md#the-log-pane), and an instant
-that produced no result appears there with its reason rather than as a gap in the line:
+that drives the curve — drawn faintly behind it on a second axis. When the march is done the
+per-instant table (time, factor of safety, the critical circle) is printed to the
+[Log pane](interface.md#the-log-pane), and an instant that produced no result appears there
+with its reason rather than as a gap in the line. A **rapid drawdown** run opens the same tab
+under the name **Drawdown vs Time**: its table carries the three stage factors of safety and
+which of stages 2 and 3 governed each instant, and the plot draws those stages as thin dashed
+lines behind the reported curve:
 
 ![FS vs Time result tab](images/analysis_sensitivity_fs_time.png)
 

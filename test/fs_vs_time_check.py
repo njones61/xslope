@@ -21,6 +21,16 @@ frames into a field that solves nothing, one re-march for a whole set of
 requested times rather than one per instant, the base-model gate running once
 before the first solve, and the critical instant the run reports.
 
+The **rapid-drawdown** mode adds a third way to mislead, and one section pins it:
+a drawdown row that is not the drawdown. Each point of that curve is a full
+three-stage analysis staged from the march's initial state to the instant, so the
+row at the model's own stage-2 time must be the SAME number a direct
+``run_lem_analysis(..., rapid=True)`` on the staged model reports — otherwise the
+curve is a family of near-drawdowns nobody can trace back to a run they could
+make by hand. The stage columns and the printed table are checked with it: a
+reported value with no stage 2 and stage 3 beside it hides which stage governed,
+which is the reading of a drawdown.
+
 Two Studio sections follow the engine ones, because the mode is reached from the
 Parametric dialog and a control that offers a run the model cannot make is its own
 kind of dropped instant:
@@ -28,7 +38,9 @@ kind of dropped instant:
   * **the dialog** — the mode list carries the entry, its fields replace the
     parameter picker rather than sitting beside it, and it is disabled with a plain
     reason on each of the three models that cannot make a curve (no march, no
-    material reading ``u = seep``, the seepage engine).
+    material reading ``u = seep``, the seepage engine). The drawdown box beside the
+    frames is offered only where the model carries d and psi, and holds the
+    Re-search toggle on while it is ticked.
   * **the whole path, end to end** — the COMBO-3 tutorial model meshed, marched and
     swept through the dialog's own options and the Studio runner, asserting the
     published curve. This one solves real seepage and searches at every instant, so
@@ -283,6 +295,214 @@ def check_the_reported_minimum(failures):
         failures.append(f"the per-method critical instant disagrees: {res['critical']}")
 
 
+# ---------------------------------------------------------------------------
+# Rapid drawdown at each instant
+# ---------------------------------------------------------------------------
+
+def _rapid_model():
+    """The ACADS sample given the two things a drawdown needs and nothing else:
+    the d / psi strengths on its one material, and stage times.
+
+    The frames are still synthetic and the material still reads ``u = none``, so
+    the pore pressures are the same at both stages and the drawdown is a pure
+    exercise of the STAGING — which is what this section is about. The factor of
+    safety it produces is whatever the geometry gives; nothing here quotes one.
+    """
+    sd = _model()
+    sd['materials'] = [dict(m, d=200.0, psi=15.0) for m in sd['materials']]
+    sd['tseep'] = dict(sd.get('tseep') or {}, stage_1=0.0, stage_2=20.0)
+    return sd
+
+
+def _staged_by_hand(sd, sol, t):
+    """The same model a rapid point stages, staged here instead — the reference the
+    curve's row is measured against."""
+    import copy
+
+    from xslope.seep import stage_transient_for_drawdown
+    from xslope.water import with_water_loads
+
+    out = copy.copy(sd)
+    out['materials'] = copy.deepcopy(sd['materials'])
+    out['tseep'] = dict(sd.get('tseep') or {}, stage_1=0.0, stage_2=float(t))
+    stage_transient_for_drawdown(out, sol)
+    return with_water_loads(out)
+
+
+def check_a_rapid_row_is_the_drawdown(failures):
+    """The row at the model's stage-2 time is the same three-stage answer a direct
+    ``run_lem_analysis(..., rapid=True)`` on the staged model gives — value, stages
+    and circle. A curve nobody can reproduce by hand is not a record of anything."""
+    import contextlib
+    import io
+
+    from xslope.search import run_lem_analysis
+
+    sd, sol = _rapid_model(), _frames([0.0, 10.0, 20.0])
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = S.fs_vs_time(sd, sol, rapid=True, methods=('bishop',),
+                               num_slices=20, check_inputs=False)
+    if not ok:
+        failures.append(f"the rapid-drawdown curve was refused: {res}")
+        return
+    if not res.get('rapid'):
+        failures.append("a rapid run does not report itself as one")
+    if res.get('stage_1_time') != 0.0:
+        failures.append(f"stage 1 was read at t = {res.get('stage_1_time')}, not "
+                        f"the march's initial state")
+    df = res['df']
+    for col in ('stage1_FS', 'stage2_FS', 'stage3_FS', 'stage3_run', 'governs'):
+        if col not in df.columns:
+            failures.append(f"a drawdown row carries no {col} — the reported value "
+                            f"is the lower of stages 2 and 3 and nothing says which")
+            return
+
+    row = df.loc[(df['value'] - 20.0).abs() < 1e-9]
+    if row.empty or not bool(row['success'].iloc[0]):
+        failures.append("the stage-2 instant produced no drawdown: "
+                        f"{'' if row.empty else row['msg'].iloc[0]}")
+        return
+    with contextlib.redirect_stdout(io.StringIO()):
+        bundle = run_lem_analysis(_staged_by_hand(sd, sol, 20.0), 'bishop',
+                                  analysis='auto_search', num_slices=20,
+                                  rapid=True, announce=False)
+    ref = bundle['results']
+    got = row.iloc[0]
+    for key, want in (('fs', ref['FS']), ('stage1_FS', ref['stage1_FS']),
+                      ('stage2_FS', ref['stage2_FS']),
+                      ('stage3_FS', ref['stage3_FS'])):
+        if abs(float(got[key]) - float(want)) > 1e-6:
+            failures.append(f"the t = 20 row's {key} is {float(got[key]):.4f}, but "
+                            f"a direct rapid run on the staged model gives "
+                            f"{float(want):.4f}")
+    if bool(got['stage3_run']) != bool(ref.get('stage3_run')):
+        failures.append("the row disagrees with the direct run about whether "
+                        "stage 3 was required")
+    want_gov = 3 if (ref.get('stage3_run')
+                     and ref['stage3_FS'] < ref['stage2_FS']) else 2
+    if int(got['governs']) != want_gov:
+        failures.append(f"the row says stage {int(got['governs'])} governs; the "
+                        f"stage values say {want_gov}")
+
+    # Stage 1 is not a drawdown: a fall from the pool to itself.
+    first = df.loc[(df['value'] - 0.0).abs() < 1e-9]
+    if first.empty:
+        failures.append("the stage-1 instant is missing from the table")
+    elif bool(first['success'].iloc[0]):
+        failures.append("a drawdown from t = 0 to t = 0 was answered")
+    elif 'drawdown' not in str(first['msg'].iloc[0]):
+        failures.append(f"the stage-1 instant's refusal does not say why: "
+                        f"{first['msg'].iloc[0]!r}")
+
+
+def check_the_table_is_printed(failures):
+    """The run's record reaches the console once, with a column per stage, and says
+    'not required' where stage 3 did not run rather than repeating stage 2's number
+    as though it had."""
+    import contextlib
+    import io
+
+    sd, sol = _rapid_model(), _frames([0.0, 10.0])
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        ok, res = S.fs_vs_time(sd, sol, rapid=True, methods=('bishop',),
+                               num_slices=20, check_inputs=False)
+    if not ok:
+        failures.append(f"refused: {res}")
+        return
+    text = out.getvalue()
+    if res.get('table_text') not in text:
+        failures.append("result['table_text'] is not what was printed")
+    header = res.get('table_text', '').splitlines()[:1]
+    if not header:
+        failures.append("the run printed no table")
+        return
+    if text.count(header[0]) != 1:
+        failures.append(f"the header line appears {text.count(header[0])} times; "
+                        f"the table is printed once, after the march")
+    for col in ('stage 1', 'stage 2', 'stage 3', 'FS', 'governs'):
+        if col not in header[0]:
+            failures.append(f"the printed table has no {col!r} column: {header[0]!r}")
+    rows = res.get('table')
+    if not isinstance(rows, list) or len(rows) != len(res['df']):
+        failures.append(f"result['table'] carries {rows and len(rows)} rows for "
+                        f"{len(res['df'])} instants")
+        return
+    for r in rows:
+        for key in ('time', 'fs', 'stage1_FS', 'stage2_FS', 'stage3_FS',
+                    'stage3_run', 'governs', 'Xo', 'Yo', 'R', 'success', 'msg'):
+            if key not in r:
+                failures.append(f"a table row carries no {key!r}: {sorted(r)}")
+                break
+    solved = [r for r in rows if r['success']]
+    if not solved:
+        failures.append("no instant produced a drawdown at all")
+        return
+
+    # An instant where stage 3 did not run says so, rather than repeating stage 2's
+    # number where a stage-3 answer belongs — which would read as a stage 3 that ran
+    # and agreed. Written against the formatter directly so both cases are on the
+    # page whichever way the solves happen to fall.
+    import pandas as pd
+    made_up = pd.DataFrame([
+        {'value': 1.0, 'method': 'bishop', 'fs': 1.20, 'success': True, 'msg': '',
+         'Xo': 10.0, 'Yo': 20.0, 'R': 5.0, 'stage1_FS': 1.50, 'stage2_FS': 1.20,
+         'stage3_FS': 1.20, 'stage3_run': False, 'governs': 2},
+        {'value': 2.0, 'method': 'bishop', 'fs': 1.05, 'success': True, 'msg': '',
+         'Xo': 10.0, 'Yo': 20.0, 'R': 5.0, 'stage1_FS': 1.50, 'stage2_FS': 1.10,
+         'stage3_FS': 1.05, 'stage3_run': True, 'governs': 3}])
+    made_rows, made_text = S._fs_vs_time_table(made_up, {'time_unit': 'day'},
+                                               rapid=True)
+    lines = made_text.splitlines()
+    if len(lines) != 3:
+        failures.append(f"two instants made {len(lines) - 1} table rows")
+    elif 'not required' not in lines[1]:
+        failures.append(f"the instant where stage 3 did not run does not say so: "
+                        f"{lines[1]!r}")
+    elif '1.0500' not in lines[2]:
+        failures.append(f"the instant where stage 3 DID run does not carry its "
+                        f"value: {lines[2]!r}")
+    if 't (day)' not in lines[0]:
+        failures.append(f"the time column does not carry the model's unit: "
+                        f"{lines[0]!r}")
+    if len({len(ln) for ln in lines}) != 1:
+        failures.append(f"the table's lines are {sorted({len(ln) for ln in lines})} "
+                        f"characters wide — a column does not line up")
+    if [r['governs'] for r in made_rows] != [2, 3]:
+        failures.append(f"the returned rows lose the governing stage: {made_rows}")
+
+    # ...and the single-stage table, which has no stages to print.
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        ok, res = _run(sd, sol)
+    if not ok:
+        failures.append(f"the single-stage run was refused: {res}")
+        return
+    text = out.getvalue()
+    if 'stage 2' in text or 'governs' in text:
+        failures.append("the single-stage table carries drawdown columns")
+    if not res.get('table') or res.get('rapid'):
+        failures.append("a single-stage run carries no table, or claims to be a "
+                        "drawdown")
+    if 'FS' not in text:
+        failures.append(f"the single-stage table has no FS column: {text!r}")
+    # Silenceable, without losing the rows. (The solvers still announce themselves;
+    # what must be gone is the table.)
+    quiet = io.StringIO()
+    with contextlib.redirect_stdout(quiet):
+        ok, res = _run(sd, sol, print_table=False)
+    if not ok:
+        failures.append(f"the silenced run was refused: {res}")
+        return
+    if not res.get('table'):
+        failures.append("print_table=False dropped the rows as well as the print")
+    elif res['table_text'].splitlines()[0] in quiet.getvalue():
+        failures.append(f"print_table=False still printed the table: "
+                        f"{quiet.getvalue()!r}")
+    if 'versus time' in quiet.getvalue():
+        failures.append("print_table=False still printed the table's title")
+
+
 def check_the_refusals(failures):
     """The three arguments that cannot make a curve."""
     sd, sol = _model(), _frames([0.0, 10.0])
@@ -295,6 +515,13 @@ def check_the_refusals(failures):
     ok, msg = S.fs_vs_time(sd, {'times': [], 'frames': []})
     if ok or 'frame' not in str(msg):
         failures.append(f"a march with no saved frames was not refused: {msg!r}")
+    # The three-stage procedure is a limit-equilibrium construction; SSRM has no
+    # equivalent, so the combination is refused rather than quietly ignored.
+    sd_fem = dict(sd, mesh={'nodes': [], 'elements': []})
+    ok, msg = S.fs_vs_time(sd_fem, sol, mode='fem', rapid=True)
+    if ok or 'limit-equilibrium' not in str(msg):
+        failures.append(f"a rapid drawdown under mode='fem' was not refused with "
+                        f"its reason: {msg!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -388,6 +615,73 @@ def check_the_dialog_offers_the_mode(failures):
     dlg.close()
 
 
+def check_the_dialog_offers_the_drawdown(failures):
+    """The drawdown box sits with the frames, is offered only where the model can
+    make a drawdown, holds Re-search on while it is ticked, and reaches the runner."""
+    if _qt() is None:
+        return
+    from studio.dialogs import SensitivityDialog
+
+    dry = _model()
+    seepy = dict(dry, materials=[dict(m, u='seep') for m in dry['materials']])
+    times = list(COMBO03_TIMES)
+
+    # No d / psi anywhere: every stage would read the same strengths.
+    dlg = SensitivityDialog(slope_data=seepy, app_mode='lem',
+                            transient={'times': times})
+    dlg.mode.setCurrentIndex(dlg.mode.findData('fs_vs_time'))
+    if dlg.rapid.isEnabled():
+        failures.append("the drawdown box is offered on a model that carries "
+                        "neither d nor \N{GREEK SMALL LETTER PSI}")
+    elif 'd and' not in dlg.rapid.toolTip():
+        failures.append(f"the greyed drawdown box does not name the columns: "
+                        f"{dlg.rapid.toolTip()!r}")
+    if dlg.rapid.isChecked():
+        failures.append("the drawdown box is ticked on a model that cannot make one")
+    dlg.close()
+
+    # ...and with them.
+    rapid_sd = dict(seepy, materials=[dict(m, d=200.0, psi=15.0)
+                                      for m in seepy['materials']],
+                    tseep={'stage_1': 0.0, 'stage_2': times[-1]})
+    dlg = SensitivityDialog(slope_data=rapid_sd, app_mode='lem',
+                            transient={'times': times})
+    dlg.show()
+    dlg.mode.setCurrentIndex(dlg.mode.findData('fs_vs_time'))
+    if not dlg.rapid.isEnabled():
+        failures.append("the drawdown box is greyed on a model carrying d and "
+                        "\N{GREEK SMALL LETTER PSI}")
+    if dlg.options().get('rapid'):
+        failures.append("the drawdown is on by default; the single-stage curve is")
+    dlg.rapid.setChecked(True)
+    opts = dlg.options()
+    if not opts.get('rapid'):
+        failures.append(f"options() does not carry the drawdown: {opts}")
+    if not opts.get('search'):
+        failures.append("a drawdown run reached the runner with the search off, "
+                        "which is not a run this mode makes")
+    if dlg.search.isEnabled():
+        failures.append("Re-search stays editable under a drawdown, where every "
+                        "point is searched from the starting circle")
+    if not dlg.search.isChecked():
+        failures.append("Re-search was left off under a drawdown")
+    if 'drawdown' not in dlg.note.text().lower():
+        failures.append(f"the mode note does not say the points are drawdowns: "
+                        f"{dlg.note.text()!r}")
+    sel = dlg._selection()
+    if sel.get('base') != 'rapid':
+        failures.append(f"the model checks are not asked the drawdown's own "
+                        f"questions: base = {sel.get('base')!r}")
+    if [float(t) for t in (sel.get('seep_frame') or {}).get('times', [])] != \
+            [0.0, float(times[-1])]:
+        failures.append(f"the checks are not told the two staged instants: "
+                        f"{sel.get('seep_frame')}")
+    dlg.rapid.setChecked(False)
+    if not dlg.search.isEnabled():
+        failures.append("Re-search stayed greyed after the drawdown was unticked")
+    dlg.close()
+
+
 def check_the_combo03_curve(failures):
     """COMBO-3 end to end: mesh, march, and the dialog's own options through the
     Studio runner, against the two factors of safety the tutorial publishes."""
@@ -477,8 +771,11 @@ def run():
                check_sentinel_and_negative_are_not_results,
                check_the_base_model_is_gated_once,
                check_the_reported_minimum,
+               check_a_rapid_row_is_the_drawdown,
+               check_the_table_is_printed,
                check_the_refusals,
                check_the_dialog_offers_the_mode,
+               check_the_dialog_offers_the_drawdown,
                check_the_combo03_curve):
         try:
             fn(failures)

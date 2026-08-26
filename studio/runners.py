@@ -816,11 +816,15 @@ class SensitivityRunner(RunnerThread):
                              "study": res.get("study", "design"), **res})
 
     def _run_fs_vs_time(self):
-        """The factor of safety at every chosen instant of the transient march.
+        """The factor of safety at every chosen instant of the transient march —
+        each instant a single-stage analysis, or a three-stage rapid drawdown from
+        the march's initial pool when the dialog's drawdown box is ticked.
 
-        The per-instant table is printed to the Log as it is the record of the run:
-        a curve is read for where it dips, and an instant that produced no result is
-        a row carrying its reason there rather than a gap nobody can account for.
+        The per-instant table reaches the Log as it is the record of the run: a
+        curve is read for where it dips, and an instant that produced no result is a
+        row carrying its reason there rather than a gap nobody can account for.
+        ``fs_vs_time`` prints it, so the drawdown's stage columns appear where the
+        run has them.
         """
         from xslope.sensitivity import fs_vs_time
         o = self._opts
@@ -841,25 +845,24 @@ class SensitivityRunner(RunnerThread):
 
         unit = str(self._sd.get("time_unit") or "").strip()
         engine_tag = method if emode == "lem" else "SSRM"
-        print(f"Factor of safety vs time ({emode}): {total} instant(s) of the "
+        rapid = bool(o.get("rapid", False))
+        what = "Rapid drawdown vs time" if rapid else "Factor of safety vs time"
+        print(f"{what} ({emode}): {total} instant(s) of the "
               f"transient march, {engine_tag}, "
-              f"{'re-searching' if o.get('search', True) else 'on the entered surface'} "
+              f"{'re-searching' if (rapid or o.get('search', True)) else 'on the entered surface'} "
               f"at each…")
         ok, res = fs_vs_time(self._sd, self._transient, times=times, mode=emode,
                              methods=(method,), search=o.get("search", True),
                              num_slices=o.get("num_slices", 40),
-                             fem_opts=o.get("fem_opts"),
+                             fem_opts=o.get("fem_opts"), rapid=rapid,
                              progress_callback=cb,
                              cancel_check=self._cancel.is_set)
         if not ok:
             self.failed.emit(str(res))
             return
-        for _i, row in res["df"].iterrows():
-            print("  t = %-10s %-9s %s"
-                  % (f"{row['value']:g}{(' ' + unit) if unit else ''}",
-                     row["method"],
-                     ("FS = %.4f" % row["fs"]) if row["success"]
-                     else "no result — %s" % row["msg"]))
+        # The per-instant table is printed by fs_vs_time itself, which is where the
+        # column set is known -- three stage factors of safety and the governing
+        # stage on a drawdown curve, the reported value alone otherwise.
         if res.get("min_fs") is not None:
             print("Lowest factor of safety %.4f at t = %g%s (%d instant(s), "
                   "%d without a result)."

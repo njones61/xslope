@@ -640,9 +640,9 @@ is the quickest check that they land where they were meant to. Click **OK**.
 
 The schedule is on the file, and no boundary follows it yet. Reopen **Seep BC**,
 select **Head 1** on **Set 1**, and change two fields. Set
-**Type:** to `reservoir` — a boundary that holds a node only while that node is
-at or below the water level, and releases any node the falling pool has left
-standing above it. Then clear **Head value (ft)** and type `pool` in its place. A
+**Type:** to `reservoir` — a boundary that holds a node at the pool's head only
+while that node is at or below the water level, and converts any node the
+falling pool has left standing above it to an exit face. Then clear **Head value (ft)** and type `pool` in its place. A
 value cell holding the name of a series is driven by that series instead of by a
 constant, and that is the whole of what makes a boundary time-varying.
 

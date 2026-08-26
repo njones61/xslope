@@ -90,8 +90,9 @@ The method of slices needs shear strength as a function of the normal stress on 
 slice base, which the principal-stress form does not give directly. XSLOPE
 converts it with **Balmer's (1952) transformation** into the equivalent Mohr
 envelope, then linearizes that envelope at each slice's own normal stress into an
-**instantaneous tangent** — a cohesion c<sub>i</sub> and a friction angle
-φ<sub>i</sub> that reproduce the curve exactly at that one stress. Every solution
+**instantaneous tangent** — the straight line that touches the curved envelope
+at that one stress, read as a cohesion c<sub>i</sub> (its intercept) and a
+friction angle φ<sub>i</sub> (its slope). Every solution
 method carries an outer iteration around this: solve with the current tangents,
 update the normal stresses from the solution, re-linearize, and repeat until the
 factor of safety stops moving. The
@@ -132,9 +133,11 @@ The red curve is the envelope, and the shaded band is the range of effective
 normal stress the critical surface found in the next section actually carries,
 0 to 75 kPa. The curve is not a straight line: it is steepest near zero and
 flattens as the confinement grows, so the cohesion and friction angle it implies
-change from one slice base to the next. The dashed line is the tangent at the
-mean base stress, 47 kPa — c<sub>i</sub> = 15.8 kPa and φ<sub>i</sub> = 25.7°,
-the Mohr-Coulomb pair the method of slices solves with at that stress. Note the
+change from one slice base to the next. The dashed line is the straight line
+that touches the curve at the mean base stress, 47 kPa; its intercept,
+c<sub>i</sub> = 15.8 kPa, and its slope, φ<sub>i</sub> = 25.7°, are the cohesion
+and friction angle the method of slices is handed for a slice at that stress.
+Every slice gets its own such line at its own stress. Note the
 scale: tens of kPa of shear strength from a rock whose intact strength is 30,000.
 The unconfined strength of the rock **mass**, σ<sub>ci</sub>·s<sup>a</sup>, is
 43.5 kPa at this GSI, about one part in 700 of the laboratory value; the jointing

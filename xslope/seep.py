@@ -5522,10 +5522,14 @@ def stage_transient_for_drawdown(slope_data, transient_solution):
     slope_data["seep_u"] = _frame_u(transient_solution, i1)
     slope_data["seep_u2"] = _frame_u(transient_solution, i2)
     # The moments the two staged fields belong to, for the same reason as in
-    # select_transient_frame_u: an automatic stage-1 water load is derived from the
-    # pool at the stage-1 time, not at t = 0. (Stage 2 already reads the tseep
-    # sheet's own stage_2 time, which is where i2 came from.)
+    # select_transient_frame_u: an automatic water load is derived from the pool as
+    # it stood at the instant the field was read, not at t = 0. Stage 2's instant
+    # does a second job -- it is the only mark that says this drawdown is running
+    # the transient-staged route, and the water derivation reads it to take the
+    # drawn-down pool from boundary set 1 at that instant instead of from boundary
+    # set 2, which belongs to the other route (xslope.water.stage_water_source).
     slope_data["seep_u_time"] = float(transient_solution["times"][i1])
+    slope_data["seep_u2_time"] = float(transient_solution["times"][i2])
     return slope_data
 
 
@@ -5612,12 +5616,14 @@ def apply_steady_stability_field(slope_data, solution, bc=1, verbose=True):
             f"Re-run the seepage analysis on this mesh.")
     key = "seep_u" if bc == 1 else "seep_u2"
     slope_data[key] = u
-    if bc == 1:
-        # A steady field belongs to no instant. Leaving a stale ``seep_u_time``
-        # behind would date these pressures to a moment of a march they did not
-        # come from -- and under automatic water loads that moment is what the
-        # surface load is derived from, so the pool would be read at the wrong time.
-        slope_data.pop("seep_u_time", None)
+    # A steady field belongs to no instant. Leaving a stale time behind would date
+    # these pressures to a moment of a march they did not come from -- and under
+    # automatic water loads that moment is what the surface load is derived from, so
+    # the pool would be read at the wrong time. For set 2 it would do worse: the
+    # stage-2 instant is also the mark of the transient-staged route, so a stale one
+    # would send the drawn-down water load back to boundary set 1 on a run that has
+    # just been given set 2's own solved field.
+    slope_data.pop("seep_u_time" if bc == 1 else "seep_u2_time", None)
     if verbose:
         print(f"Analysis uses the steady seepage solution (BC set {bc}), "
               f"{len(u)} nodal pore pressures.")

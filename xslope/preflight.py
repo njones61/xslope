@@ -142,6 +142,7 @@ _AT_PIEZO = "(Piezometric lines; piezo sheet)"
 _AT_DLOADS = "(Distributed loads; dloads sheet)"
 _AT_DLOADS2 = "(Distributed loads, Set 2; dloads (2) sheet)"
 _AT_SEEPBC = "(Seep BC; seep bc sheet)"
+_AT_SEEPBC2 = "(Seep BC, Set 2; seep bc (2) sheet)"
 _AT_PILES = "(Piles; piles sheet)"
 _AT_REINF = "(Reinforcement; reinforce sheet)"
 _AT_PROFILE = "(Profile lines; profile sheet)"
@@ -1143,6 +1144,32 @@ class _Ctx:
             if v is not None:
                 out.append(v)
         return out
+
+    @property
+    def staged_drawdown(self):
+        """True when this rapid drawdown will take BOTH its stages from the march.
+
+        Two routes reach a drawdown's stage 2: boundary set 2, solved on its own,
+        and two instants of a transient march. Which one is running is a property of
+        the RUN, not of the file -- a model can carry set 2, a pool schedule and
+        stage times together and be run either way -- so it is read from the two
+        places a run states it. An interface states it ahead of the run, as a
+        ``seep_frame`` naming two instants (:attr:`seep_frame`). A scripted run has
+        already staged the model by the time it gets here, and states it by the
+        stage-2 instant :func:`xslope.seep.stage_transient_for_drawdown` wrote.
+        """
+        if "rapid" not in self.analyses:
+            return False
+        return (len(self.seep_frame_times) >= 2
+                or self.sd.get("seep_u2_time") is not None)
+
+    @property
+    def staged_stage2_time(self):
+        """The instant :attr:`staged_drawdown` reads stage 2 at, or ``None``."""
+        times = self.seep_frame_times
+        if len(times) >= 2:
+            return times[1]
+        return _num(self.sd.get("seep_u2_time"))
 
     def series_at_start(self, name):
         """The first value of a named tseep series, or ``None`` when it has none."""
@@ -3624,6 +3651,40 @@ def _rapid_stage2_water(ctx):
             f"beside the .xlsx. It is not loaded, and the stage-2 pore pressure "
             f"would read zero everywhere.")
     return out
+
+
+@rule("rapid.stage2_bc_ignored", WARNING, ("rapid",),
+      "On the transient-staged route boundary set 2 supplies nothing: both stages "
+      "come from the march.")
+def _rapid_stage2_bc_ignored(ctx):
+    """Boundary set 2 left on a file whose drawdown is taking both stages from a march.
+
+    The two routes disagree about what the drawn-down state IS, and only one of them
+    can be right for a given run. On the transient-staged route the pool is a
+    schedule and the drawn-down state is where that schedule has got to at the
+    stage-2 time; boundary set 2 is a separate, constant-head statement of a
+    drawn-down state that this run neither solves nor reads. Left on the file it is
+    silent -- the run is correct without it -- but it is the obvious thing to edit
+    when the answer is not what the modeller expected, and editing it changes
+    nothing.
+    """
+    if not ctx.staged_drawdown:
+        return None
+    bc2 = ctx.sd.get("seepage_bc2") or {}
+    if not (bc2.get("specified_heads") or bc2.get("specified_fluxes")):
+        return None
+    t2 = ctx.staged_stage2_time
+    unit = str(ctx.sd.get("time_unit") or "").strip()
+    when = ("the stage-2 time" if t2 is None
+            else f"t = {_fmt(t2)}" + (f" {unit}" if unit else ""))
+    n_h, n_f, _n_e = ctx.bc_counts(2)
+    return (f"Boundary set 2 carries {n_h} specified head(s) and {n_f} specified "
+            f"flux(es), but this rapid drawdown reads BOTH its stages from the "
+            f"transient march: the drawn-down pool and pore pressures come from the "
+            f"pool schedule at {when}, on boundary set 1. Set 2 is ignored and "
+            f"editing it changes nothing. Clear it, or run the two-steady route -- "
+            f"clear the Stage 1 / Stage 2 times {_AT_TSEEP} and solve set 2 on its "
+            f"own -- to make it the drawn-down state {_AT_SEEPBC2}.")
 
 
 @rule("rapid.ru_has_no_stage2", WARNING, ("rapid",),

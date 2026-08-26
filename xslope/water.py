@@ -439,6 +439,62 @@ def seep_bc_water_line(ground_surface, bc, slope_data=None, time=0.0):
     return [(x, g if l is None else max(l, g)) for x, g, l in zip(xs, yg, level_at)]
 
 
+#: The moment the stage-2 pore-pressure field belongs to, written by
+#: :func:`xslope.seep.stage_transient_for_drawdown` and by nothing else. Its
+#: presence is what tells the water derivation that this drawdown is running the
+#: **transient-staged** route rather than the two-steady one -- see
+#: :func:`stage_water_source`.
+STAGE2_TIME_KEY = "seep_u2_time"
+
+
+def staged_from_transient(slope_data):
+    """True when this model's stage-2 pore pressures came out of a transient march.
+
+    The two rapid-drawdown routes cannot be told apart from what a file *contains*:
+    a model may carry boundary set 2, a pool schedule and stage times all at once,
+    and be run either way. Only the run says which, and it says so by what it wrote
+    into the model -- :data:`STAGE2_TIME_KEY`, the instant the stage-2 field was
+    read at. A model that has not been staged has no such instant.
+    """
+    return (slope_data or {}).get(STAGE2_TIME_KEY) is not None
+
+
+def stage_water_source(slope_data, stage=1, time=None):
+    """Which boundary set states one stage's pool, and at which moment.
+
+    Returns ``(bc, time, which)`` -- the boundary-condition set to read, the instant
+    to read it at, and the phrase that names it in a source description.
+
+    Stage 1 is boundary set 1, at the moment the run is solving for: the transient
+    frame's own time when one has been staged, t = 0 otherwise.
+
+    Stage 2 has two answers, one per route. On the **two-steady** route the
+    drawn-down state is boundary set 2, read directly -- that is what the second set
+    is for. On the **transient-staged** route it is not: the drawdown's two states
+    are two instants of one march, both governed by boundary set 1 and its
+    time-varying levels, and the stage-2 pool is set 1 as it stands at the stage-2
+    time. Reading set 2 there would price the slope against a pool from a different
+    analysis than the one supplying its pore pressures -- so on that route set 2 is
+    ignored, and preflight says so (``rapid.stage2_bc_ignored``).
+    """
+    sd = slope_data or {}
+    ts = sd.get("tseep") or {}
+    if stage == 1:
+        if time is None:
+            t = sd.get("seep_u_time")
+            time = 0.0 if t is None else float(t)
+        return sd.get("seepage_bc") or {}, time, "the seepage head boundaries"
+    if staged_from_transient(sd):
+        t2 = float(sd[STAGE2_TIME_KEY])
+        if time is None:
+            time = t2
+        return (sd.get("seepage_bc") or {}, time,
+                f"the seepage head boundaries at t = {t2:g}")
+    if time is None:
+        time = ts.get("stage_2", 0.0)
+    return sd.get("seepage_bc2") or {}, time, "the stage-2 seepage head boundaries"
+
+
 def water_line_for_stage(slope_data, stage=1, time=None):
     """Where the water stands for one stage, and which sheet says so.
 
@@ -449,9 +505,13 @@ def water_line_for_stage(slope_data, stage=1, time=None):
     stated the pool for the analysis that will actually be run; the piezometric
     line is the answer for a model that has no seepage analysis at all.
 
-    ``time`` selects the moment for a time-varying boundary level. It defaults to
-    t = 0 for stage 1 and to the ``tseep`` sheet's ``stage_2`` time for stage 2,
-    which are the two moments the staged analysis solves at.
+    Which set answers for stage 2 depends on the route the drawdown is running --
+    set 2 on the two-steady route, set 1 at the stage-2 instant on the
+    transient-staged one. :func:`stage_water_source` makes that choice.
+
+    ``time`` selects the moment for a time-varying boundary level. Left None it is
+    the moment that stage is solved at: the staged frame's own time, or t = 0 for
+    stage 1 and the ``tseep`` sheet's ``stage_2`` time for stage 2.
 
     Returns a dict with ``points`` (the water line, possibly empty), ``source``
     (where it came from, named the way the interface labels it) and ``reason`` (why
@@ -465,12 +525,7 @@ def water_line_for_stage(slope_data, stage=1, time=None):
         return {"points": [], "source": "",
                 "reason": "the ground surface's X values are not in increasing order"}
 
-    bc = sd.get("seepage_bc" if stage == 1 else "seepage_bc2") or {}
-    if time is None:
-        ts = sd.get("tseep") or {}
-        time = 0.0 if stage == 1 else ts.get("stage_2", 0.0)
-    which = "the seepage head boundaries" if stage == 1 else \
-        "the stage-2 seepage head boundaries"
+    bc, time, which = stage_water_source(sd, stage=stage, time=time)
     if bc.get("specified_heads"):
         pts = seep_bc_water_line(sd.get("ground_surface"), bc, sd, time)
         levels = bc_pool_levels(bc, sd.get("ground_surface"), sd, time)
@@ -593,13 +648,11 @@ def derive_water_loads(slope_data, stage=1, time=None):
                     reason=(f"{found['source']} does not stand above the ground "
                             f"surface anywhere, so there is no water load to add"))
 
-    bc = sd.get("seepage_bc" if stage == 1 else "seepage_bc2") or {}
+    bc, bc_time, _which = stage_water_source(sd, stage=stage, time=time)
     ambiguous = _vertical_face_ambiguity(
         ground, blocks,
         [lvl for lvl, _a, _lab in bc_pool_levels(
-            bc, sd.get("ground_surface"), sd,
-            time if time is not None else (0.0 if stage == 1
-                                           else (sd.get("tseep") or {}).get("stage_2", 0.0)))])
+            bc, sd.get("ground_surface"), sd, bc_time)])
     ys = [y for _x, y in ground] + [y for _x, y in found["points"]]
     extent = max(ys) - min(ys)
     fence = gamma_w * POOL_MIN_DEPTH_FRAC * extent
@@ -687,12 +740,14 @@ def with_water_loads(slope_data, time=None):
     and a load the user typed is never removed by an engine.
 
     ``time`` fixes the moment a time-varying boundary level is read at. Left
-    None, stage 1 is read at the moment the run is solving for -- the transient
-    frame's own time when one has been selected (``slope_data['seep_u_time']``,
-    set by :func:`xslope.seep.select_transient_frame_u`), otherwise t = 0 -- and
-    stage 2 at the ``tseep`` sheet's ``stage_2`` time. One derivation per moment,
-    so the water pressing on the slope and the pore-pressure field inside it can
-    never disagree about where the pool stood.
+    None, each stage is read at the moment it is solved for -- the staged
+    transient frame's own time when one has been selected
+    (``slope_data['seep_u_time']`` and ``['seep_u2_time']``, written by
+    :func:`xslope.seep.select_transient_frame_u` and
+    :func:`xslope.seep.stage_transient_for_drawdown`), otherwise t = 0 for stage 1
+    and the ``tseep`` sheet's ``stage_2`` time for stage 2. One derivation per
+    moment, so the water pressing on the slope and the pore-pressure field inside
+    it can never disagree about where the pool stood.
 
     Calling this on a model that already carries the derivation returns it
     unchanged, so an engine may call it defensively without deriving twice.

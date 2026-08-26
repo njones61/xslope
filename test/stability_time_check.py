@@ -18,6 +18,12 @@ a behaviour a wording change or a re-wired signal could break in silence:
      for, so ``stability_time`` joins ``stage_1``/``stage_2`` in the saved-frame
      schedule, and a re-march injects a requested time into the save times rather than
      interpolating a field between two frames.
+  G. THE OTHER STAGED QUANTITY — the drawdown's stage-2 WATER. Two instants of a
+     march supply stage 2's pore pressures, and the pool pressing on the slope has
+     to come from the same place: boundary set 1 as the schedule leaves it at the
+     stage-2 time, not boundary set 2, which states a different analysis's
+     drawn-down state. The same file can be run either way, so what the staging
+     wrote into the model decides — and a set-2 steady solve has to take it back.
   D. THE DIALOGS — the Run LEM / Run FEM seepage-time selector: it opens on the
      model's own answer, says in words which instant will be read (and that a blank
      stability time means the last frame), marks a free-entry time as needing a
@@ -248,6 +254,123 @@ def test_schedule():
             fails.append(f"a re-march kept t={t}, which no march can land on: {got}")
     if sd["tseep"]["save_times"] == got:
         fails.append("the re-march mutated the model's own save_times")
+    return fails
+
+
+# ------------------------------------------------- G. the drawdown's two pools
+def _two_route_model():
+    """A drawdown model that can be run either way, and that answers differently.
+
+    Boundary set 1 is a reservoir bound to a falling pool series -- 160 at t = 0,
+    110 at the stage-2 time. Boundary set 2 is a constant head at 130, which is a
+    level neither instant of the march ever stands at, so the derived stage-2 water
+    load says WITHOUT ambiguity which of the two the derivation read.
+    """
+    from shapely.geometry import LineString
+    return {
+        "ground_surface": LineString([(0.0, 100.0), (200.0, 100.0), (320.0, 160.0),
+                                      (400.0, 180.0), (550.0, 100.0), (750.0, 100.0)]),
+        "gamma_water": 62.4,
+        "water_loads": "auto",
+        "tseep": {"duration": 100.0, "stage_1": 0.0, "stage_2": 50.0,
+                  "times": [0.0, 50.0], "series": {"pool": [160.0, 110.0]}},
+        "seepage_bc": {"specified_heads": [
+            {"head": "pool", "kind": "reservoir",
+             "coords": [[0.0, 100.0], [200.0, 100.0], [320.0, 160.0]]}],
+            "specified_fluxes": [], "exit_face": []},
+        "seepage_bc2": {"specified_heads": [
+            {"head": 130.0, "kind": "head",
+             "coords": [[0.0, 100.0], [200.0, 100.0], [240.0, 130.0]]}],
+            "specified_fluxes": [], "exit_face": []},
+    }
+
+
+def _pool_level(found):
+    """The elevation the derived water line stands at over the flat foreshore."""
+    pts = found["points"]
+    return max((y for x, y in pts if x <= 200.0), default=None)
+
+
+def test_water_source():
+    """Which boundary set states the drawn-down pool -- the two routes disagree.
+
+    A rapid drawdown reaches its stage-2 state one of two ways, and the stage-2
+    WATER has to follow the same one as the stage-2 pore pressures. On the
+    two-steady route both come from boundary set 2. On the transient-staged route
+    both come from the march: the pore pressures from its stage-2 frame, the pool
+    from boundary set 1 as the schedule leaves it at that instant. Set 2 belongs to
+    the other analysis, and reading it here would press the slope with a pool from
+    a run that was never made -- the failure this section exists to catch, since
+    nothing about it shows on a factor of safety that still looks plausible.
+
+    The route is a property of the RUN, and the same file can be run either way, so
+    the marker is what the staging wrote into the model rather than anything the
+    file contains: both models below carry boundary set 2 and the schedule.
+    """
+    from xslope.water import (derive_water_loads, staged_from_transient,
+                              water_line_for_stage)
+    fails = []
+
+    # --- the two-steady route: set 2 states the drawn-down pool ---------------
+    sd = _two_route_model()
+    if staged_from_transient(sd):
+        fails.append("an unstaged model reported itself as transient-staged")
+    got = water_line_for_stage(sd, stage=1)
+    if _pool_level(got) != 160.0:
+        fails.append(f"two-steady stage 1 stands at {_pool_level(got)}, want 160.0")
+    got = water_line_for_stage(sd, stage=2)
+    if _pool_level(got) != 130.0:
+        fails.append(f"two-steady stage 2 stands at {_pool_level(got)}, want set 2's 130.0")
+    if "stage-2 seepage head boundaries" not in got["source"]:
+        fails.append(f"two-steady stage 2 named its source {got['source']!r}")
+
+    # --- the transient-staged route: set 1 at the stage-2 instant -------------
+    sol = _solution([0.0, 50.0, 100.0])
+    staged = _two_route_model()
+    stage_transient_for_drawdown(staged, sol)
+    if not staged_from_transient(staged):
+        fails.append("staging did not mark the model as transient-staged")
+    if staged.get("seep_u2_time") != 50.0:
+        fails.append(f"staging wrote seep_u2_time={staged.get('seep_u2_time')}, want 50.0")
+    got = water_line_for_stage(staged, stage=1)
+    if _pool_level(got) != 160.0:
+        fails.append(f"staged stage 1 stands at {_pool_level(got)}, want 160.0")
+    got = water_line_for_stage(staged, stage=2)
+    if _pool_level(got) != 110.0:
+        fails.append(f"staged stage 2 stands at {_pool_level(got)}, want the "
+                     f"series' 110.0 at t = 50")
+    if "at t = 50" not in got["source"]:
+        fails.append(f"staged stage 2 named its source {got['source']!r}, which does "
+                     f"not say which instant it was read at")
+
+    # Deleting set 2 must not change the staged answer: it was never read.
+    no_bc2 = dict(staged)
+    no_bc2.pop("seepage_bc2", None)
+    if water_line_for_stage(no_bc2, stage=2)["points"] != got["points"]:
+        fails.append("the staged stage-2 water line moved when set 2 was deleted")
+    load = derive_water_loads(no_bc2, stage=2)
+    if not load["blocks"]:
+        fails.append(f"the staged stage-2 water load vanished with set 2 deleted: "
+                     f"{load['reason']}")
+
+    # Stage 1 follows the instant its own frame came from, not t = 0.
+    late = _two_route_model()
+    late["tseep"] = dict(late["tseep"], stage_1=50.0, stage_2=100.0,
+                         times=[0.0, 50.0, 100.0],
+                         series={"pool": [160.0, 110.0, 100.0]})
+    stage_transient_for_drawdown(late, sol)
+    if _pool_level(water_line_for_stage(late, stage=1)) != 110.0:
+        fails.append("a stage 1 read at t = 50 still took its pool from t = 0")
+
+    # A steady set-2 field clears the mark: that run IS the two-steady route, and a
+    # stale instant would send its stage-2 water back to set 1.
+    from xslope.seep import apply_steady_stability_field
+    reused = dict(staged)
+    apply_steady_stability_field(reused, {"u": np.zeros(6)}, bc=2, verbose=False)
+    if staged_from_transient(reused):
+        fails.append("a steady set-2 field left the transient staging mark behind")
+    if _pool_level(water_line_for_stage(reused, stage=2)) != 130.0:
+        fails.append("after a steady set-2 solve the stage-2 pool did not return to set 2")
     return fails
 
 
@@ -675,6 +798,7 @@ def test_run_with_march():
 CHECKS = [("time resolution + entry surface", test_resolution),
           ("stability_time on the tseep sheet", test_file),
           ("saved-frame schedule + re-march injection", test_schedule),
+          ("the drawdown's stage-2 water source", test_water_source),
           ("the run gate against a loaded march", test_gate_with_march),
           ("run dialogs + write-back + the staging gate", test_studio),
           ("Run LEM end to end on a staged frame", test_run_with_march)]

@@ -227,6 +227,8 @@ The stage times are pure *extraction* parameters — they say which two instants
 
 Once the transient run is solved, `stage_transient_for_drawdown(slope_data, solution)` pulls the frames at `stage_1` and `stage_2` **in memory** and writes their pore-pressure fields into `slope_data['seep_u']` and `slope_data['seep_u2']` — exactly the structures the classic two-file path produces. No intermediate `seep.csv` / `seep2.csv` files are written; the two stage fields go straight into the structures the three-stage machinery already consumes, and `rapid_drawdown` then runs unchanged.
 
+Staging also settles where the **stage-2 water load** comes from under [automatic water loads](../usage/preflight.md#where-the-water-load-comes-from): the drawn-down pool is boundary set `seep bc` as the schedule leaves it at the `stage_2` time — the same instant the stage-2 field was read at — and `seep bc (2)`, which states a separate steady drawn-down analysis, is not read at all. A boundary set 2 left on a file being staged this way is reported by preflight (`rapid.stage2_bc_ignored`) rather than silently used.
+
 **Resolution order.** The classic two-file path remains fully supported. When `{base}_seep.csv` and `{base}_seep2.csv` sit next to the input workbook, `load_slope_data` reads their `u` columns into `seep_u` and `seep_u2` at load time. Calling `stage_transient_for_drawdown` afterward overwrites those two fields with the staged transient frames, so a transient solution carrying stage times takes precedence over the classic files. A model with no stage times cannot be staged this way — the call requires both `stage_1` and `stage_2` — so it falls back to the classic two-file path.
 
 ### When transient staging is preferable

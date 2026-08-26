@@ -433,9 +433,10 @@ does not.
 
 ### Which answer is right
 
-With the tips pinned the two engines are 0.46 apart. With the tips fixed they are
-0.041 apart — 1.842 against 1.801, about 2%. The tip condition, not the engine,
-is most of the disagreement, and each engine treats it differently.
+At the 6 ft spacing the model was built with, Spencer gives 1.842. Strength
+reduction gives 1.379 with the shafts' tips pinned — 0.46 below — and 1.801
+with them fixed, 0.04 below, about 2%. Most of the disagreement between the
+engines is the tip condition, and the two engines treat it differently.
 
 The limit equilibrium force cannot state a tip condition. It is the smaller of
 the Ito & Matsui soil force and what the shaft's structure can carry, and on this

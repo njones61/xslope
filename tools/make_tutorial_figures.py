@@ -5102,6 +5102,14 @@ def fem03_wall():
         profs = _fem03_profiles(sd, fem_data, solution)
         if prof_fig:
             capture(prof_fig, plot_pile_detail, profs[0])
+            if prof_fig == "fem03_wall_profiles_fixed.png":
+                # The same wall at the captured mechanism: the moment at the
+                # toe on its capacity, which the page reads next.
+                from xslope import fem_details
+                prof_f = fem_details.pile_profile(
+                    fem_data, solution, 0, slope_data=sd, field_state="failure",
+                    failure_solution=solution.get("failure_solution"))
+                capture("fem03_wall_profiles_fixed_failure.png", plot_pile_detail, prof_f)
 
 
 # --------------------------------------------------------------------------- #

@@ -610,18 +610,21 @@ displacement** is 0.163 ft at the head and decays smoothly to zero at the toe.
 
 Switch **Field state** to **At failure**, which is the state the panel opens on:
 
-![The 1D details panel on the wall, at failure](images/fem03_studio_wall_1d_details.png)
+![The wall's profiles at failure: the moment at the toe on its capacity](images/fem03_wall_profiles_fixed_failure.png){width=1000}
 
-The moment at the toe reaches the full 90,600 lb·ft/ft, one beam element yields
-in bending, and the curve stands on the dashed M<sub>cap</sub> lines. The list
-on the left reports the same thing as a utilization — **100%** beside the wall's
-name — and the status beside the field selector reads *at capacity (moment vs
-Mcap)*. This is the run that needs a section check.
+The moment at the toe reaches the full 90,600 lb·ft/ft — the curve stands on
+the dashed M<sub>cap</sub> line, one beam element has yielded in bending, and
+the title reads *at capacity*. This is the run that needs a section check.
 
 ### A finer beam
 
-The wall is ten beam elements over 20 ft, which is the mesh's own element size.
-**1D element size** on the Build Mesh dialog sets it independently.
+The profiles above are drawn from ten beam elements over 20 ft — one every
+2 ft, because the wall was meshed at the soil's element size. That is enough
+to put the moment where it belongs, but the shear and soil-reaction curves are
+polylines with a kink every 2 ft, and a section check reads those curves. The
+wall can be meshed finer than the soil without refining the whole model:
+**1D element size** on the Build Mesh dialog sets the element length along
+every reinforcement and pile line on its own.
 
 ![Build Mesh with a 1D element size of 0.5 ft](images/fem03_studio_build_mesh_1d.png)
 
@@ -653,27 +656,21 @@ distribution — and leave it alone when the factor of safety is.
 | Contiguous or very close row | FEM, smear stated | the same, gap unrepresented |
 | Discrete row at spacing | LEM, Ito & Matsui | FS per spacing, force per row, capacity checks |
 
-The middle row is a judgment rather than a threshold, and the bottom row has a
-band of its own: the Ito & Matsui theory applies for S/D between about 2 and 8,
-and XSLOPE says so in the **Model checks** panel when a spacing falls outside it
-— [LEM-12](lem12_piles.md#what-the-spacing-is-worth) runs the sweep to both
-edges.
+The line between "very close" and "discrete" is a judgment. Ito & Matsui's
+theory holds for S/D between about 2 and 8, and XSLOPE warns in the **Model
+checks** panel when a spacing falls outside that range.
 
-Two things follow for a discrete row, and both are stated in
-[LEM vs. FEM pile modeling](../lem/piles.md#lem-vs-fem-pile-modeling). Take its
-factor of safety from the limit equilibrium analysis, and read the finite
-element counterpart as a stiffness-and-force study — what the shafts carry, where
-they yield, and what their end conditions are worth — rather than as a competing
-factor of safety. And do not try to repair the plane-strain smear by adjusting
-the pile stiffness or by imposing the Ito & Matsui limit pressure on the beam:
-that limit pressure is a theory of the very mechanism the two-dimensional model
-does not contain, so applying it there counts the same resistance twice.
+For a discrete row, take the factor of safety from the limit equilibrium run.
+Use the finite element run to learn what the shafts carry, where they yield,
+and what their end conditions do — not as a second factor of safety. Do not
+try to fix the plane-strain wall by softening the piles or by putting the Ito &
+Matsui limit pressure on the beam; that pressure describes the soil squeezing
+between piles, which the two-dimensional model has no gap for, so adding it
+counts the same resistance twice.
 
-Whichever engine gives the factor of safety, the pile tip is an input to state
-rather than a default to accept. On the pile rows it moved the strength
-reduction answer further than the spacing, the shaft stiffness and the
-structural capacities together, and on the wall it was worth 0.20 of factor of
-safety.
+Whichever engine gives the factor of safety, say how the pile tip is held. On
+this page it changed the finite element answer more than spacing, stiffness and
+structural capacity combined.
 
 ---
 

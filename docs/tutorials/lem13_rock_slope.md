@@ -319,34 +319,25 @@ for. Each step solved with its own rock-mass constants:
 
 ### Why the index carries it
 
-GSI enters all three rock-mass constants at once, and the three do not move
-together:
+GSI sets all three rock-mass constants at once:
 
 $$m_b = m_i \exp\!\left(\frac{GSI - 100}{28 - 14D}\right), \quad
 s = \exp\!\left(\frac{GSI - 100}{9 - 3D}\right), \quad
 a = \tfrac12 + \tfrac16\!\left(e^{-GSI/15} - e^{-20/3}\right)$$
 
-Both exponentials are driven by the same *GSI* − 100, but *s* divides it by 9
-where m<sub>b</sub> divides it by 28, so *s* collapses about three times as fast.
-That is what the table's σ<sub>ci</sub>·s<sup>a</sup> column carries: **the
-strength the mass has at zero confinement** — 43.5 kPa at GSI = 5 and 239 kPa at
-GSI = 20, five and a half times as much across fifteen points of the index, and
-5,641 kPa at GSI = 70, the third curve of the figure below. A slope this size
-generates at most γH = 25 × 10 = 250 kPa of vertical stress and its critical
-surface averages 47 kPa, so it lives at the low-confinement end
-of the envelope — exactly where *s* decides the answer. The exponent *a* does the
-rest by bending the curve: it runs from 0.619 at GSI = 5 to 0.544 at GSI = 20 in
-the table, and reaches 0.501 at GSI = 70 — the difference between an envelope
-that flattens quickly and the classical square-root form.
-
-Drawn directly — the same σ<sub>ci</sub>, m<sub>i</sub> and D at three values of
-the index — the three envelopes look like this:
+The one that matters most here is *s*, because it sets the strength of the mass
+at low confinement, and this slope is a low-confinement problem: its critical
+surface carries an average normal stress of only 47 kPa. The table's
+σ<sub>ci</sub>·s<sup>a</sup> column is the mass's strength at zero confinement,
+and it climbs from 43.5 kPa at GSI 5 to 239 kPa at GSI 20 — five and a half times
+as much for fifteen points of GSI. Drawn out over the same three values of GSI
+the sweep spans and beyond, the envelopes look like this:
 
 ![The same rock at three values of GSI](images/lem13_gsi_envelopes.png){width=800}
 
-The three curves are not one curve scaled: they start at different heights
-and bend by different amounts, which is why one field judgment moves the factor
-of safety as far as it does.
+The three curves are not one curve scaled: they start at different heights and
+bend by different amounts, which is why one field judgment moves the factor of
+safety as far as it does.
 
 ### The disturbance factor
 

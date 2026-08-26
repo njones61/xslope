@@ -291,13 +291,11 @@ ticked:
 
 ![The Parametric dialog set up for the GSI sweep](images/lem13_studio_parametric.png)
 
-The index runs to 100, but the sweep stops at 20 on purpose. Everything this slope
-has to say happens in the bottom fifth of the range — the factor of safety is 1.152
-at GSI 5 and already 2.185 at GSI 15 — and above that the rock simply cannot fail,
-which is also where the run gets expensive: one search takes 53 s at GSI 5 and 66 s
-at GSI 15, but had not finished after five minutes at GSI 25, because a search over
-a slope with no critical surface to find wanders the whole domain before it
-settles.
+GSI runs to 100, but the sweep stops at 20 on purpose. The factor of safety is
+1.152 at GSI 5 and already 2.698 at GSI 20, and above that the rock cannot fail
+at all — a search over a slope with no critical surface to find wanders the whole
+domain before it settles, and each step takes many times longer than the ones
+below it.
 
 Click **Run**. Each step is a full circular search, so give it several minutes:
 

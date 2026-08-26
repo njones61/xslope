@@ -438,9 +438,10 @@ Neither engine is wrong; they answer different questions about the shafts.
 The limit equilibrium force assumes each shaft develops its full moment
 capacity at the failure surface — it has no way to say otherwise. The finite
 element run computes how much of that capacity the toe restraint actually lets
-the shaft develop. When the toe is held, the two agree at this spacing to 2%.
-When it is not, the finite element answer is the lower one, and it is the
-answer for a shaft that can turn on its toe. So the choice between 1.38 and
+the shaft develop. At the 6 ft spacing the model was built with, holding the
+toe brings the two within 2% of each other; leaving it free puts the finite
+element answer 0.46 lower, which is the answer for a shaft that can turn on
+its toe. So the choice between 1.38 and
 1.80 is a question about the shaft — bearing on the rock, or socketed into it
 — and it is one cell in the file.
 

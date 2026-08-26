@@ -681,26 +681,17 @@ safety.
 
 This tutorial covered:
 
-- What a pile row is to each engine — one computed force at the crossing in the
-  limit equilibrium method, a chain of beam elements carrying whatever the soil
-  pushes onto them in the finite element method.
-- Why a two-dimensional model turns a discrete row into a continuous wall, seen
-  in a shear strain field where the mechanism climbs over the rows rather than
-  passing through them.
-- Why the two engines disagreed on the pile rows: the limit equilibrium force
-  assumes each shaft develops its moment capacity, and with both ends free to
-  rotate the beam model computes that it does not. Fix the tips, as a rock
-  socket would, and the two answers close to within 2%.
-- What spacing does to each engine: a 36% swing in the limit equilibrium answer
-  and a change in which surface governs, against a strength reduction answer
-  that does not move at either tip condition, even though the moment per shaft
-  quadruples.
-- How a continuous wall is entered — spacing 1, section constants per foot of
-  wall, no diameter — driven into the base, so its tip is fixed, with the
-  moment peaking at the toe.
-- What the finite element engine reports that no limit equilibrium analysis can:
-  moment, shear, deflection and soil reaction down the member, at whatever
-  resolution the 1D element size is set to.
+- What a pile row is to each engine: one computed force at the crossing in the
+  limit equilibrium method, a chain of beam elements in the finite element
+  method.
+- Why a plane-strain model turns a discrete row into a continuous wall.
+- Why the engines disagreed on the pile rows — the toe condition — and that
+  fixing the tips brings them within 2% at the design spacing.
+- What spacing does to each engine: a 36% swing in the limit equilibrium
+  answer, none in the finite element one.
+- How a continuous wall is entered and what the finite element engine reports
+  for it that no limit equilibrium analysis can: moment, shear, deflection and
+  soil reaction down the member.
 
 **Where to go next:** [Piles and concrete piers in FEM](../fem/piles.md) carries
 the beam formulation, the assembly and the applicability rule in full, and

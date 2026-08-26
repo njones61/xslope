@@ -119,11 +119,15 @@ deep one by stage 2 — for the same reason: the stress each plane consolidated 
 
 Three things, beyond an ordinary limit equilibrium model:
 
-| Input | What it does |
-|---|---|
-| **$d$ and $\psi$**<br>Materials table | The $K_c = 1$ envelope, on every material that does not drain during the drawdown. Both or neither — one alone reverts silently to drained. |
-| **A second water state**<br>Piezometric Line 2, a second seepage solution, or a transient frame | The pore pressures stages 2 and 3 read. |
-| **Water loads** = `auto`<br>`main!D23` | The reservoir load on the face at stage 1, and whatever is left of it at stage 2. |
+**$d$ and $\psi$** on the materials table — the $K_c = 1$ envelope, on every
+material that does not drain during the drawdown. Both or neither: one alone
+reverts silently to drained.
+
+**A second water state** — Piezometric Line 2, a second seepage solution, or a
+transient frame; the pore pressures stages 2 and 3 read.
+
+**Water loads** = `auto` (`main!D23`) — the reservoir load on the face at stage
+1, and whatever is left of it at stage 2.
 
 The second and third are the same statement seen twice, which is why leaving
 **Water loads** on `auto` matters here more than anywhere else: the engine reads

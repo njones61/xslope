@@ -19,9 +19,9 @@ window.
 
 The procedure needs two states of the water — before the drawdown and after —
 and there are three ways to say where the water was in each. This page runs all
-three on one dam, one set of strengths and one starting circle, with **Analysis**
-left on the dialog's **Auto search** so that each run finds the surface its own
-water makes critical. Nothing else changes between the answers. The page is
+three on one dam, one set of strengths and one starting circle, so the only
+thing that changes between the answers is the statement about the water. The
+page is
 in three parts, one per statement: **Part 1** draws the two states as two
 piezometric lines and runs no seepage at all; **Part 2** replaces the lines with
 two steady-state seepage solutions, one at each pool; **Part 3** replaces those

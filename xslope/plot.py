@@ -1526,14 +1526,73 @@ def sliced_mass_bounds(ax, gids=SLICED_MASS_GIDS):
     y = np.concatenate(ys)
     return float(x.min()), float(x.max()), float(y.min()), float(y.max())
 
-def plot_piezo_line(ax, slope_data, style=None):
+def piezo_line_used(slope_data, stage=1):
+    """Whether the stage's piezometric line is READ by the analysis.
+
+    A piezometric line is an input sheet a model may carry without the analysis
+    consuming it, and the plots draw it only where it does something. Three things
+    read it:
+
+    * **Pore pressure** — a material whose ``u`` option is ``piezo`` takes the
+      pressure on a slice base from the line. The option is global to the
+      materials table, so it makes both lines live; Line 2 is the drawn-down pool
+      of a rapid-drawdown deck and exists only when that deck does, which is what
+      its own presence states.
+    * **The water load** — the weight of the pool standing on the ground surface.
+      Which sheet states that pool follows :func:`xslope.water.water_line_for_stage`'s
+      precedence — the seepage head boundaries wherever a seepage analysis is
+      defined, otherwise the stage's piezometric line — so a model whose materials
+      all read a seepage solution still draws its piezometric line when no
+      boundary set was defined and the line is what puts water on the slope. The
+      derivation itself (:func:`xslope.water.derive_water_loads`) answers this,
+      rather than the precedence being restated here, so the line drawn and the
+      load applied can never disagree.
+    * **The weight split** — a material carrying ``gamma_sat`` weighs its slice
+      saturated below the water table and moist above it, and the water table is
+      the seepage solution's u = 0 contour where there is one and the piezometric
+      line otherwise (``xslope.slice.generate_slices``). Line 1 alone: rapid
+      drawdown keys the weight to the pre-drawdown state, so Line 2 never sets it.
+
+    A line that does none of the three is not drawn: with ``u`` at ``none`` or
+    ``ru``, no saturated unit weight to place and no pool on the surface, nothing
+    in the run reads it.
+
+    ``stage`` is 1 for Line 1, 2 for Line 2.
+    """
+    sd = slope_data or {}
+    key = "piezo_line" if stage == 1 else "piezo_line2"
+    if not sd.get(key):
+        return False
+    materials = sd.get("materials") or []
+    if any(str(m.get("u") or "").strip().lower() == "piezo" for m in materials):
+        return True
+    has_seep_field = (sd.get("mesh") is not None and sd.get("seep_u") is not None)
+    if (stage == 1 and not has_seep_field
+            and any(m.get("gamma_sat") is not None for m in materials)):
+        return True
+    from .water import derive_water_loads
+    name = "Piezometric Line 1" if stage == 1 else "Piezometric Line 2"
+    try:
+        found = derive_water_loads(sd, stage=stage)
+    except Exception:
+        return True          # a half-built model shows its line rather than hiding it
+    return bool(found["blocks"]) and str(found["source"]).startswith(name)
+
+
+def plot_piezo_line(ax, slope_data, style=None, only_if_used=True):
     """
     Plots the piezometric line(s) with markers at their midpoints.
+
+    Each line is drawn only where the analysis reads it — see
+    :func:`piezo_line_used` for the three ways it does. Pass
+    ``only_if_used=False`` to draw whatever the model defines, which is what an
+    editor previewing the sheet being typed wants.
 
     Parameters:
         ax: matplotlib Axes object
         data: Dictionary containing plot data with 'piezo_line' and optionally 'piezo_line2'
         style: optional style sheet (see xslope.style); None → defaults.
+        only_if_used: skip a line the analysis does not read (default True).
 
     Returns:
         None
@@ -1564,9 +1623,14 @@ def plot_piezo_line(ax, slope_data, style=None):
     # Plot both piezometric lines
     f1 = feature_style(style, "piezo_line")
     f2 = feature_style(style, "piezo_line2")
-    plot_single_piezo_line(ax, slope_data.get('piezo_line'), f1.get('color', 'b'),
+    pz1 = slope_data.get('piezo_line')
+    pz2 = slope_data.get('piezo_line2')
+    if only_if_used:
+        pz1 = pz1 if piezo_line_used(slope_data, stage=1) else None
+        pz2 = pz2 if piezo_line_used(slope_data, stage=2) else None
+    plot_single_piezo_line(ax, pz1, f1.get('color', 'b'),
                            "Piezometric Line", f1.get('linewidth', 2), f1.get('linestyle', '-'))
-    plot_single_piezo_line(ax, slope_data.get('piezo_line2'), f2.get('color', 'skyblue'),
+    plot_single_piezo_line(ax, pz2, f2.get('color', 'skyblue'),
                            "Piezometric Line 2", f2.get('linewidth', 2), f2.get('linestyle', '-'))
 
 
@@ -3615,13 +3679,11 @@ def plot_inputs(
     # the model the SSRM will run.
     if mode == "fem":
         plot_ssr_zones(ax, slope_data, style=style)
-    # A defined piezometric line is the model's water table whether or not a
-    # material's u option consumes it: with u = "none" it still splits each
-    # slice's weight into saturated below / moist above, so it changes the
-    # answer and must be visible. It is a stability input — it sets the pore
-    # pressure on a slice base and at a node — so it is drawn where the engine
-    # that reads it is documented, and not on the shared section. Seep mode
-    # draws its own water surfaces.
+    # The piezometric line is a stability input — it sets the pore pressure on a
+    # slice base and at a node, and it states the pool whose weight presses on the
+    # slope — so it is drawn where the engine that reads it is documented, and not
+    # on the shared section. Seep mode draws its own water surfaces. Each line
+    # appears only where the analysis actually reads it (piezo_line_used).
     if mode not in ("seep", "shared"):
         plot_piezo_line(ax, slope_data, style=style)
         # The water surface the head/reservoir boundaries state, drawn beside
@@ -3902,8 +3964,9 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_base_geometry(ax, slope_data, style=style)
     plot_slices(ax, slice_df, fill=False)
     plot_failure_surface(ax, failure_surface)
-    # Drawn whenever the model defines one — a piezometric line read only for
-    # saturated unit weights (u = "none") still moves the factor of safety.
+    # Drawn where the analysis reads it: as a material's pore-pressure source, as
+    # the water table a gamma_sat weight split is measured from, or as the pool
+    # whose weight loads the slope (piezo_line_used).
     plot_piezo_line(ax, slope_data, style=style)
 
     # Seep overlays: head contours and phreatic surface when any material uses seep

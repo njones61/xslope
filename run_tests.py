@@ -3707,6 +3707,12 @@ PREFLIGHT_BASE_BOTH = _repo('docs/verification/files/rocscience/vp042.xlsx')
 PREFLIGHT_BASE_TSEEP = _repo('docs/seep/files/xslope_earth_dam_tseep.xlsx')
 PREFLIGHT_BASE_RAPID = _repo('docs/verification/files/rocscience/vp096.xlsx')
 PREFLIGHT_BASE_RAPID_MULTI = _repo('docs/verification/files/rocscience/vp099.xlsx')
+#: The one file that can be run as EITHER rapid-drawdown route: the Johnson
+#: Reservoir dam carries boundary set 1 bound to a pool schedule, boundary set 2 as
+#: a constant drawn-down state, and the stage times that couple the drawdown to the
+#: march. Which route it runs is a property of the run and not of the file, which is
+#: exactly what ``rapid.stage2_bc_ignored`` has to be able to tell apart.
+PREFLIGHT_BASE_RAPID_TSEEP = _repo('docs/tutorials/files/xslope_johnson_rapid.xlsx')
 PREFLIGHT_BASE_PILES = _repo('docs/lem/files/xslope_piles.xlsx')
 PREFLIGHT_BASE_PILES_FEM = _repo('docs/fem/files/xslope_piles_fem.xlsx')
 PREFLIGHT_BASE_REINF = _repo('docs/inputs/slope/xslope_reinf.xlsx')
@@ -4291,6 +4297,24 @@ PREFLIGHT_RULE_SPECS = [
          analysis='rapid',
          mutation=lambda sd: _pf_set(sd, piezo_line2=[]),
          expect='Piezometric Line 2'),
+    # The two ways a run says it is taking both drawdown stages from the march, each
+    # against the control that is the SAME file run the other way. The first is the
+    # scripted route, which has already staged the model and says so by the stage-2
+    # instant it wrote; the second is the interface route, which says so before the
+    # run as a seep_frame naming two instants. In both controls the file still
+    # carries boundary set 2 -- it is the route that changes, not the file, which is
+    # the whole point.
+    dict(rule='rapid.stage2_bc_ignored', base=PREFLIGHT_BASE_RAPID_TSEEP,
+         mode='dict', analysis='rapid',
+         mutation=lambda sd: _pf_set(sd, seep_u2_time=50.0),
+         expect='Set 2 is ignored'),
+    dict(rule='rapid.stage2_bc_ignored', base=PREFLIGHT_BASE_RAPID_TSEEP,
+         mode='dict', analysis='rapid',
+         selection={'surface': 'circular',
+                    'seep_frame': {'times': [0.0, 50.0]}},
+         control_selection={'surface': 'circular'},
+         mutation=lambda sd: sd,
+         expect='reads BOTH its stages from the transient march'),
     dict(rule='rapid.ru_has_no_stage2', base=PREFLIGHT_BASE_RAPID, mode='excel',
          analysis='rapid',
          mutation=lambda sd: _pf_mats(sd, u='ru', ru=0.3),
@@ -7162,6 +7186,39 @@ def run_water_hoist_test(test):
     if not path.exists():
         return None, f"missing {path}"
     spec = importlib.util.spec_from_file_location('water_hoist_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_piezo_visibility_test(test):
+    """Which piezometric lines the input and solution plots draw (``xslope.plot``).
+
+    A piezometric line is an input sheet a model may carry without the analysis
+    consuming it, and a line on the section that nothing reads is a statement
+    about the model the run does not honor. Each line is therefore drawn only
+    where it is read: as some material's pore-pressure source (u = piezo), or as
+    the sheet that states the pool loading the slope -- which is the seepage head
+    boundaries wherever a seepage analysis is defined, and the piezometric line
+    otherwise (``xslope.water.water_line_for_stage``).
+
+    The check itself lives in test/piezo_visibility_check.py: the predicate and
+    the rendered legend both, over a piezo-option model, a rapid-drawdown pair, a
+    seepage model with no line at all, and a reservoir model with and without its
+    boundary set -- plus the editor preview's opt-out, which draws the sheet as
+    typed. File-light: four shipped workbooks and one 20-slice solve.
+
+    Returns (0.0, None) on success, else (None, message) -- a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'piezo_visibility_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('piezo_visibility_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -11826,6 +11883,8 @@ def _dispatch_test(test):
         return run_fs_vs_time_mode_test(test)
     if test_type == 'sweep_window':
         return run_sweep_window_test(test)
+    if test_type == 'piezo_visibility':
+        return run_piezo_visibility_test(test)
     if test_type == 'water_hoist':
         return run_water_hoist_test(test)
     if test_type == 'mesh_elements':
@@ -11915,7 +11974,7 @@ def _expected_and_tol(test, default_tolerance):
                        'thread_safety',
                        'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
-                       'fs_vs_time_mode', 'sweep_window', 'water_hoist',
+                       'fs_vs_time_mode', 'sweep_window', 'water_hoist', 'piezo_visibility',
                        'project_package', 'docs_links',
                        'noncircular_generator', 'circles_editor', 'table_paste',
                        'updater', 'fem_1d_details',
@@ -12454,6 +12513,13 @@ def main():
         tests.append({'type': 'water_hoist',
                       'file': 'water load derived once per search',
                       'method': '-', 'source': 'water_hoist'})
+        # Guard which piezometric lines reach a figure: a line is drawn only where
+        # the analysis reads it -- as a material's pore-pressure source, or as the
+        # sheet that states the pool loading the slope. A line nothing reads is a
+        # statement about the model the run does not honor.
+        tests.append({'type': 'piezo_visibility',
+                      'file': 'piezometric lines drawn only where read',
+                      'method': '-', 'source': 'piezo_visibility'})
         # Guard the Build-mesh dialog's quadrilateral style radio group: the choice
         # is per-run and stored in no file, so a broken wire between the group and
         # build_mesh_from_polygons leaves no trace in any input file. Builds no mesh.

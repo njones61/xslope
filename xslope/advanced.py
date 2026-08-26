@@ -28,7 +28,8 @@ def validate_rapid_drawdown(slope_data):
         raise ValueError("Rapid drawdown requires at least one material with non-zero d or psi values. Check your input template.")
 
     # Warning: no second set of distributed loads
-    if not (slope_data.get('dloads2') or slope_data.get('dloads2_derived')):
+    from .water import water_loads_mode
+    if water_loads_mode(slope_data) != "auto" and not slope_data.get('dloads2'):
         print("[WARNING] Rapid drawdown: no second set of distributed loads (dloads2) found.")
 
     # Warning: piezo method selected but no second piezo line
@@ -324,6 +325,7 @@ def rapid_drawdown(df, method_name, debug_level=1):
     result['stage1_FS'] = stage1_FS
     result['stage2_FS'] = stage2_FS
     result['stage3_FS'] = stage3_FS
+    result['stage3_run'] = bool(need_stage3)
 
     return True, result
 

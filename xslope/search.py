@@ -1607,6 +1607,13 @@ def run_lem_analysis(slope_data, method, analysis="auto_search", surface="circul
         if announce:
             tail = "" if converged else "  (search did not fully converge)"
             print(f"Critical FS = {results.get('FS'):.3f}{tail}")
+            if "stage1_FS" in results:
+                s3_txt = ("not required" if not results.get("stage3_run")
+                          else f"{results['stage3_FS']:.4f}")
+                print("Rapid drawdown stages on the critical surface: "
+                      f"Stage 1 FS = {results['stage1_FS']:.4f}, "
+                      f"Stage 2 FS = {results['stage2_FS']:.4f}, "
+                      f"Stage 3 FS = {s3_txt}")
             mass = _sliding_mass_line(critical.get("slices"), slope_data)
             if mass:
                 print(mass)

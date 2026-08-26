@@ -316,12 +316,12 @@ Searching for the critical circular surface with SPENCER (rapid drawdown)…
 [🔁 iteration 17] center=(247.09, 241.58), FS=1.1805, grid=0.1778
 [✅ converged] Iter=17, FS=1.1805 (ΔFS<0.0005) at (x=247.09, y=241.58, depth=82.33)
 Critical FS = 1.181
+Rapid drawdown stages on the critical surface: Stage 1 FS = 1.4835, Stage 2 FS = 1.1805, Stage 3 FS = not required
 Sliding mass = 1,101,634.4 lb/ft over 256.56 ft of failure surface
 ```
 
-Every trial surface in that search carried a full three-stage analysis. The Log
-pane prints only the search; the three stages of the winning surface are in the
-**Analysis Report** (**File → Generate Report…**), in its Rapid Drawdown section:
+Every trial surface in that search carried a full three-stage analysis, and the
+last lines of the log give the three stages of the winning surface:
 
 | Stage | | FS |
 |---|---|---:|

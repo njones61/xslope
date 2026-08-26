@@ -28,7 +28,7 @@ def validate_rapid_drawdown(slope_data):
         raise ValueError("Rapid drawdown requires at least one material with non-zero d or psi values. Check your input template.")
 
     # Warning: no second set of distributed loads
-    if not slope_data.get('dloads2'):
+    if not (slope_data.get('dloads2') or slope_data.get('dloads2_derived')):
         print("[WARNING] Rapid drawdown: no second set of distributed loads (dloads2) found.")
 
     # Warning: piezo method selected but no second piezo line

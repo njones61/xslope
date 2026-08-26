@@ -2856,7 +2856,7 @@ def _combo02_run_lem(slope_data, name):
     from studio.dialogs import RunLemDialog
 
     dlg = RunLemDialog(defaults={"method": COMBO02_METHOD,
-                                 "analysis": "single_surface",
+                                 "analysis": "auto_search",
                                  "num_slices": COMBO02_SLICES, "rapid": True},
                        slope_data=slope_data)
     dlg.resize(dlg.sizeHint())
@@ -2866,12 +2866,12 @@ def _combo02_run_lem(slope_data, name):
 def combo02_run_lem():
     """Run LEM with **Rapid drawdown** ticked, on the starter file.
 
-    Three fields differ from the dialog's defaults: Method (Spencer), Analysis
-    (Single surface, so the three pore-pressure sources are compared on one
-    circle) and the drawdown checkbox itself, which runs the three-stage
-    procedure and puts the run through the drawdown checks as well as the
-    ordinary limit equilibrium ones. The starter carries no transient schedule,
-    so no stage-time fields are on the form yet.
+    Two fields differ from the dialog's defaults: Method (Spencer) and the
+    drawdown checkbox itself, which runs the three-stage procedure and puts the
+    run through the drawdown checks as well as the ordinary limit equilibrium
+    ones. Analysis stays on Auto search, so the run finds its own critical circle
+    from the starting circle the file carries. The starter carries no transient
+    schedule, so no stage-time fields are on the form yet.
     """
     return _combo02_run_lem(_load(COMBO02_START), "combo02_studio_run_lem.png")
 

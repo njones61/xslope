@@ -475,14 +475,14 @@ The schedule exists, but nothing is following it yet. Reopen **Seep BC**, select
 
 Set **Type:** to `reservoir`. A `head` boundary holds every node of its polyline at
 the value at all times, which is correct for a boundary that stays submerged and
-wrong for one the water is leaving. A `reservoir` boundary holds a node only while
-that node is at or below the water level, and releases any node the falling water
-has left standing above it to seep freely — which is what an upstream face does
-once the pool has dropped past it. [Head types](../seep/transient.md#head-types-head-and-reservoir)
+wrong for one the water is leaving. A `reservoir` boundary holds a node at the
+pool's head only while that node is at or below the water level, and converts
+any node the falling water has left standing above it to an exit face — which is
+what an upstream face becomes once the pool has dropped past it. [Head types](../seep/transient.md#head-types-head-and-reservoir)
 carries both. On a steady problem the choice makes no difference as long as the
 polyline is drawn no higher than the level, as it is here: every node on it is
 submerged either way. Drawn above its own level, a constant-value reservoir face
-releases the nodes standing above it to seep even in a steady run.
+turns the nodes standing above it into an exit face even in a steady run.
 
 Then clear the **Head value (m):** field and type `pool` in place of the number
 18. That is the whole of what makes a boundary condition time-varying: a value

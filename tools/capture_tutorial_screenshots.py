@@ -2852,13 +2852,43 @@ def combo02_transient():
     return out
 
 
-def _combo02_run_lem(slope_data, name):
+def _combo02_march():
+    """The solved transient march, as the Run LEM dialog receives it from the
+    results document once Part 3's seepage run has finished.
+
+    The dialog needs it for two things the drawdown page photographs: the stage
+    fields offer instants out of a solved march, and the model checks read the two
+    stage times as the statement that this run takes both of its states from the
+    march rather than from boundary set 2. Cached beside the mesh, since the march
+    is the long run of the page.
+    """
+    if "march" not in _combo02_cache:
+        from xslope.seep import (build_seep_data, build_tseep_data,
+                                 run_seepage_analysis, run_transient_seepage)
+
+        data = _combo02_solved()
+        with contextlib.redirect_stdout(io.StringIO()):
+            seep_data = build_seep_data(data["mesh"], data, seep_bc=1)
+            run_seepage_analysis(seep_data, tol=1e-4, max_iter=400)
+            _combo02_cache["march"] = run_transient_seepage(
+                seep_data, build_tseep_data(data))
+    return _combo02_cache["march"]
+
+
+def _combo02_cleared_bc2(slope_data):
+    """``slope_data`` with boundary set 2 emptied, as Part 3 has the reader clear it."""
+    return dict(slope_data,
+                seepage_bc2={"specified_heads": [], "specified_fluxes": [],
+                             "exit_face": []})
+
+
+def _combo02_run_lem(slope_data, name, transient=None):
     from studio.dialogs import RunLemDialog
 
     dlg = RunLemDialog(defaults={"method": COMBO02_METHOD,
                                  "analysis": "auto_search",
                                  "num_slices": COMBO02_SLICES, "rapid": True},
-                       slope_data=slope_data)
+                       slope_data=slope_data, transient=transient)
     dlg.resize(dlg.sizeHint())
     return _grab(dlg, name)
 
@@ -2882,9 +2912,25 @@ def combo02_run_lem_staged():
     The **Rapid-drawdown stage times** group is what the schedule adds: two
     instants rather than the single seepage time an ordinary run on a transient
     model selects, holding the tseep sheet's own stage_1 and stage_2.
+
+    The model is Part 3's: the march solved, and boundary set 2 cleared, which is
+    what leaves the checks column carrying the page's one standing warning.
+    """
+    return _combo02_run_lem(_combo02_cleared_bc2(_combo02_solved()),
+                            "combo02_studio_run_lem_staged.png",
+                            transient=_combo02_march())
+
+
+def combo02_run_lem_staged_bc2():
+    """The same dialog with boundary set 2 still on the file.
+
+    Two stage times and a solved march say the drawn-down state comes from the
+    march, so the second boundary set states an analysis this run neither solves
+    nor reads, and the checks say so rather than letting it look consulted.
     """
     return _combo02_run_lem(_combo02_solved(),
-                            "combo02_studio_run_lem_staged.png")
+                            "combo02_studio_run_lem_staged_bc2.png",
+                            transient=_combo02_march())
 
 
 SHOTS.update({
@@ -2894,6 +2940,7 @@ SHOTS.update({
     "combo02_transient": combo02_transient,
     "combo02_run_lem": combo02_run_lem,
     "combo02_run_lem_staged": combo02_run_lem_staged,
+    "combo02_run_lem_staged_bc2": combo02_run_lem_staged_bc2,
 })
 
 
@@ -3063,12 +3110,44 @@ def combo03_fs_time_result():
     return out
 
 
+#: The instants COMBO-2's march saves, which the Parametric dialog offers as a
+#: checklist. Named here rather than marched for: the frames list reads the times
+#: off the solution and nothing else, and a multi-minute transient run for one
+#: dialog shot is time the shot does not need. The producer in
+#: ``make_tutorial_figures.py`` runs that march for real and prints the same twelve.
+COMBO03R_TIMES = (0.0, 5.0, 35.0, 50.0, 80.0, 150.0, 200.0, 300.0, 400.0, 600.0,
+                  800.0, 1000.0)
+
+
+def combo03_rapid_parametric():
+    """Run → Parametric… in Factor-of-safety-vs-time mode with **Rapid
+    drawdown at each time** ticked, on COMBO-2's completed dam.
+
+    The checkbox is Part 2's whole control: it sits under the frames list because
+    it changes what a ticked instant means — stage 2 of a fall that began at the
+    march's initial pool rather than a state on its own — and ticking it holds
+    **Re-search the critical surface at each step** on and greys it, which the shot
+    has to show along with the note the dialog rewrites underneath.
+    """
+    from studio.dialogs import SensitivityDialog
+
+    dlg = SensitivityDialog(defaults={"method": COMBO03_METHOD,
+                                      "num_slices": COMBO03_SLICES},
+                            slope_data=_combo02_solved(), app_mode="lem",
+                            transient={"times": list(COMBO03R_TIMES)})
+    dlg.mode.setCurrentIndex(dlg.mode.findData("fs_vs_time"))
+    dlg.rapid.setChecked(True)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo03_rapid_parametric.png")
+
+
 SHOTS.update({
     "combo03_materials": combo03_materials,
     "combo03_circles": combo03_circles,
     "combo03_run_lem": combo03_run_lem,
     "combo03_parametric": combo03_parametric,
     "combo03_fs_time_result": combo03_fs_time_result,
+    "combo03_rapid_parametric": combo03_rapid_parametric,
 })
 
 

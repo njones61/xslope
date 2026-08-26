@@ -598,6 +598,13 @@ face**, select its rows and click **Remove selected**. Click **OK**. Set 1 is
 untouched: it carries the reservoir boundary the schedule drives, and the march
 starts from its steady solution.
 
+Left on the file Set 2 changes nothing the run computes, and the drawdown run
+below opens on a second warning saying so — *"Boundary set 2 carries 2 specified
+head(s) and 0 specified flux(es), but this rapid drawdown reads BOTH its stages
+from the transient march"*:
+
+![The check on a file that still carries Set 2](images/combo02_studio_run_lem_staged_bc2.png)
+
 ### The pool schedule and the stage times
 
 The storage properties say how the dam responds; the schedule says what the
@@ -732,11 +739,14 @@ with it added to the save schedule.
 Click **Run**. The two named frames come out of the solved march and their pore
 pressures go to the three stages in memory — no `_seep.csv` files are written or
 read, and staged frames take precedence over any that are sitting beside the
-workbook.
+workbook. The two water loads on the face come out of the same schedule: with
+**Water loads** on `auto` the engine reads Set 1's reservoir boundary at each
+stage time, so stage 1 carries the full pool at t = 0 and stage 2 the residual
+pool the schedule has reached at t = 50 — elevation 110, 624 psf at its deepest.
 
 | Stage | | FS |
 |---|---|---:|
-| 1 | full pool, drained | 1.5546 |
+| 1 | full pool, drained | 1.5545 |
 | 2 | drawn down, undrained core | 1.0164 |
 | 3 | drawn down, drained | **1.0158** |
 
@@ -744,7 +754,7 @@ workbook.
 
 **The rapid-drawdown factor of safety is 1.016**, on a circle at (243.93, 244.90)
 with a radius of 163.64 ft — 2 ft again from the two-steady route's. Stage 1
-reads 1.5546 against that route's 1.5514, on the same field: the frame at t = 0
+reads 1.5545 against that route's 1.5514, on the same field: the frame at t = 0
 *is* the steady solution of Set 1, and the three thousandths between the two
 numbers are the two searches settling on two circles.
 
@@ -772,7 +782,7 @@ each run searched from that circle for the surface its own water made critical:
 |:---:|---|---|---:|---:|---:|---:|
 | 1 | Piezometric Lines 1 and 2 | (247.1, 241.6) R 159.2 | 1.4835 | 1.1805 | not required | **1.181** |
 | 2 | Two steady seepage solutions | (245.3, 243.5) R 161.8 | 1.5514 | 1.1949 | not required | **1.195** |
-| 3 | Two frames of a transient march | (243.9, 244.9) R 163.6 | 1.5546 | 1.0164 | 1.0158 | **1.016** |
+| 3 | Two frames of a transient march | (243.9, 244.9) R 163.6 | 1.5545 | 1.0164 | 1.0158 | **1.016** |
 
 The three centers span 5 ft and the three radii 4 ft; all three surfaces daylight
 just past the crest at x = 392 and toe on the upstream foreshore between x = 168 and
@@ -815,62 +825,24 @@ sources cannot be compared without saying which field each was read on.
 
 ## The governing-stage flip
 
-Stage 2 governed the first two runs above. On the transient route stage 3 took
-over, on five of the twelve core slices, and lowered the answer by six
-ten-thousandths. Where that handover falls is a property of this core's
-envelopes, not of the method, and it moves.
-
-Hold the transient route fixed — same fields, same starting circle, same
-everything — and sweep the core's undrained cohesion intercept $d$ across its
-250 psf, with $\psi$ held at 14°. Raising $d$ raises the undrained strength
-stage 2 assigns, which raises the stage-2 factor of safety. It does nothing to
-the drained strength. So each step up makes it likelier that on some slice the
-drained strength is the lower of the two, which is exactly the test stage 3
-applies. Every row below is a search of its own.
-
-| d (psf) | Stage 2 | Stage 3 | Core slices on drained strength | Reported FS | Governs |
-|---:|---:|---:|:---:|---:|:---:|
-| 100 | 1.0015 | 1.0015 | 0 of 12 | 1.0015 | stage 2 |
-| 150 | 1.0065 | 1.0065 | 0 of 12 | 1.0065 | stage 2 |
-| 200 | 1.0114 | 1.0114 | 0 of 12 | 1.0114 | stage 2 |
-| 225 | 1.0139 | 1.0139 | 1 of 12 | 1.0139 | stage 3 |
-| 250 | 1.0164 | 1.0158 | 5 of 12 | 1.0158 | stage 3 |
-| 275 | 1.0189 | 1.0172 | 6 of 12 | 1.0172 | stage 3 |
-| 300 | 1.0214 | 1.0183 | 7 of 12 | 1.0183 | stage 3 |
-| 350 | 1.0264 | 1.0202 | 8 of 12 | 1.0202 | stage 3 |
-| 400 | 1.0314 | 1.0220 | 8 of 12 | 1.0220 | stage 3 |
-| 500 | 1.0414 | 1.0247 | 9 of 12 | 1.0247 | stage 3 |
-| 600 | 1.0524 | 1.0276 | 10 of 12 | 1.0276 | stage 3 |
-| 800 | 1.0727 | 1.0313 | 10 of 12 | 1.0313 | stage 3 |
-| 1000 | 1.0931 | 1.0331 | 11 of 12 | 1.0331 | stage 3 |
-| 1200 | 1.1136 | 1.0350 | 11 of 12 | 1.0350 | stage 3 |
+Stage 2 governed the first two runs; stage 3 governed the transient one. Sweeping
+the core's undrained intercept $d$ across its 250 psf — $\psi$ held at 14°, the
+transient route otherwise fixed, a search of its own at every value — finds where
+control passes from one to the other.
 
 ![Stage 2, stage 3 and the reported answer against the core's Kc = 1 intercept](images/combo02_sweep.png){width=1000}
 
-**The handover is at d = 223 psf**, 27 psf *below* the value on the file — which
-is why the model as shipped already reports stage 3. Below 223 every one of the
-12 core slices is stronger undrained than drained, stage 3 is not run at all, and
-the two curves are the same line. Above it the crossover spreads slice by slice —
-1 slice at 225 psf, 5 at 250, 8 at 350, 10 at 600, 11 by 1200 — and the two curves
-separate, with the reported answer following the lower one. That first slice
-changes the answer by less than a ten-thousandth, which is why the 225 psf row
-reads the same on both stages.
+Raising $d$ raises the undrained strength stage 2 assigns and does nothing to the
+drained strength, so the stage-2 curve climbs while the stage-3 curve flattens
+onto the ordinary drained answer at the day-50 pore pressures. The run reports the
+lower of the two at every value.
 
-The shapes of the two curves are the reason the handover does not reverse.
-Stage 2 climbs in a straight line, because $d$ enters the undrained strength
-directly. Stage 3 flattens, because it can only ever *substitute* the drained
-strength, and once a slice has taken the drained value more $d$ changes nothing
-on it. Its plateau at **1.0350** closes on the ordinary drained factor of safety
-at the same day-50 pore pressures, 1.0354 — the fourth row of the bracket table
-above. Stage 3 cannot buy the slope anything past that, however strong the
-undrained envelope is declared to be.
-
-The engineering reading is that the $K_c = 1$ envelope is not a safety margin.
-Overstating it does not make the drawdown answer better; past 223 psf a further
-thousand psf of $d$ buys two hundredths and then nothing, because the drained
-strength has become the limit. What the envelope decides is *which* mechanism is
-being checked, and a drawdown run that reports stage 3 as its governing stage is
-reporting that the undrained strengths never mattered.
+**The handover is at d = 223 psf**, 27 psf *below* the value on the file, which is
+why the model as shipped already reports stage 3. Below 223 psf every core slice
+is stronger undrained than drained, stage 3 is not run at all, and the two curves
+are one line. Past the crossover a stronger envelope changes almost nothing — the
+drained strength has become the limit — and a run that reports stage 3 as its
+governing stage is saying the undrained strengths never controlled.
 
 ---
 
@@ -878,48 +850,34 @@ reporting that the undrained strengths never mattered.
 
 Three answers on one dam, and they are not equally good.
 
-**The transient frames are the most faithful statement of a drawdown.** They
-carry the actual lowering rate and the actual elapsed time, so the stage-2 field
-is how far dissipation has genuinely progressed by day 50 rather than an
-assumption about it. Everything the time factor $T$ estimates at the top of this
-page is resolved directly by the solve. On this dam that moves the factor of
-safety by 0.179 against the two-steady route, and all of it is the core's
-retained head.
+**The transient frames are the most faithful statement of a drawdown.** They carry
+the actual lowering rate and the actual elapsed time, so the stage-2 field is how
+far dissipation has genuinely progressed by day 50 rather than an assumption about
+it. On this dam that reads **1.016**.
 
 **Two steady solutions state a limiting case, and on this model it is the
-optimistic one.** Set 2 is the dam after the pore pressures have fully caught up
-with the pool — the long-term condition, arrived at instantaneously. That is a
-legitimate thing to compute and it is the classic hand-calculation route, but on
-a section whose whole difficulty is a core that does not drain, assuming the core
-has drained answers a different question. Here it reads **1.195** where the
-transient reads **1.016**, 18% high. Where the two-steady route is right is on a
-section with no low-conductivity zone to hold water — where the re-equilibrated
-field is very nearly what exists a day after the drawdown.
+optimistic one.** Set 2 describes the dam after the pore pressures have fully
+caught up with the pool, arrived at instantaneously — the classic
+hand-calculation route, and on a section whose whole difficulty is a core that
+does not drain it answers a different question. It reads **1.195**, 18% high.
+Where it is right is on a section with no low-conductivity zone to hold water.
 
 **The piezometric pair inherits whatever state Line 2 was sketched from.** Line 2
-on this file follows the re-equilibrated surface, so the pair reads **1.181**,
-1% under the two-steady answer it was drawn from and 16% over the transient one.
-Nothing about that is a defect in the pair: it is the drawdown the line describes,
-which is the long-term one. Redraw Line 2 with the core still holding 150 ft of
-head — the day-50 state — and the same file reads **1.036**, within 0.02 of the
-transient answer. Flatten it onto the residual pool instead and it reads 1.185,
-barely moved, because the surface it replaces is nearly flat already. The whole
-sensitivity sits in what the line claims about the core, which is the one judgment
-the sketch is really making. The pair's real use is where there is no seepage
-model to solve: an existing dam with piezometers in it, a preliminary check, or a
-section that cannot be meshed. It should not be preferred to a solution when one
-can be had.
+on this file follows the re-equilibrated surface, so the pair reads **1.181**;
+redrawn with the core still holding 150 ft of head it reads **1.036**, within 0.02
+of the transient answer. Its use is where there is no seepage model to solve — an
+existing dam with piezometers in it, a preliminary check, a section that cannot be
+meshed — and not in preference to a solution that can be had.
 
-None of which makes the drawdown check itself a matter of taste. The procedure
-being run is the same in all three cases, and it is verified against published
-answers on four dams:
-[VP96](../verification/rocscience.md#vp96) is the USACE EM 1110-2-1902 Appendix G
-example (1.434 against the manual's 1.44),
-[VP97](../verification/rocscience.md#vp97) is Pilarcitos Dam, which failed in
-drawdown (1.044 against 1.05),
-[VP98](../verification/rocscience.md#vp98) is the Walter Bouldin Dam failure
-(1.046 against 1.04), and
-[VP99](../verification/rocscience.md#vp99) is the pumped-storage dam of Duncan,
+The procedure itself is the same in all three cases, and it is verified against
+published answers on four dams:
+[VP96](../verification/rocscience.md#vp96), the USACE EM 1110-2-1902 Appendix G
+example (1.434 against the manual's 1.44);
+[VP97](../verification/rocscience.md#vp97), Pilarcitos Dam, which failed in
+drawdown (1.044 against 1.05);
+[VP98](../verification/rocscience.md#vp98), the Walter Bouldin Dam failure
+(1.046 against 1.04); and
+[VP99](../verification/rocscience.md#vp99), the pumped-storage dam of Duncan,
 Wright and Wong's own paper (1.527 against 1.56). All four supply their two water
 states as piezometric pairs, which is how their sources published them.
 
@@ -929,30 +887,27 @@ states as piezometric pairs, which is how their sources published them.
 
 This tutorial covered:
 
-- The three-stage rapid-drawdown procedure and what each stage is for —
-  consolidation stresses at full pool, undrained strengths under the drawn-down
-  water, and a drained re-check that can only lower the answer.
-- The three inputs the procedure needs: a $d$ / $\psi$ pair on every material
-  that does not drain during the drawdown, a second statement of where the water
-  is, and **Water loads** on `auto` so the load on the face and the pressure
-  inside the dam come from the same place at both stages.
-- Three ways to supply the two water states on one dam — a sketched piezometric
-  pair, two steady seepage solutions from two boundary sets, and two frames of a
-  transient march — each searched from the same starting circle, reading 1.181,
-  1.195 and 1.016 on three circles whose centers span 5 ft.
-- The bracket those sit in, and the parts it separates the drawdown into: 0.20
-  for the load removal alone (1.510 to 1.311), a further 0.28 for the water the
-  core has not released by day 50 (1.311 to 1.035), and 0.12 or 0.02 for the
-  undrained strength depending on which of the two fields it is applied to.
-- The governing stage as a property of the material, not the method: control
-  passes from stage 2 to stage 3 at an undrained intercept of 223 psf, below the
-  250 psf this core carries, and past that point a stronger undrained envelope
-  buys nothing, because the drained strength has become the limit at 1.035.
+- The three-stage procedure: consolidation stresses at full pool, undrained
+  strengths under the drawn-down water, and a drained re-check that can only lower
+  the answer.
+- The three inputs it needs: $d$ and $\psi$ on every material that does not drain,
+  a second statement of where the water is, and **Water loads** on `auto`.
+- Three sources for that second statement on one dam — a piezometric pair, two
+  steady seepage solutions, two frames of a transient march — reading 1.181, 1.195
+  and 1.016, the first two governed by stage 2 and the third by stage 3.
+- What the spread is made of: 0.20 for the load removal alone, a further 0.28 for
+  the head the core has not released by day 50, and 0.12 or 0.02 for the undrained
+  strength depending on which field it is applied to.
+- The ranking of the three: solve the march where it can be had, take two steady
+  solves as the long-term case, and read a piezometric pair as the state Line 2
+  was drawn from.
+- The governing stage as a property of the material rather than the method:
+  control passes from stage 2 to stage 3 at an undrained intercept of 223 psf,
+  below the 250 psf this core carries.
 
 **Where to go next:** [Rapid drawdown analysis](../lem/rapid.md) carries the
 equations, the time-factor rubric and the interpolation between the two envelopes
 in full. [SEEP-3](seep03_reservoir_drawdown.md) builds a transient drawdown model
-from nothing and reads it as frames, histories and a water budget;
-[SEEP-2](seep02_johnson_dam.md) builds this dam;
-[COMBO-1](combo01_seepage_stability.md) runs it under a standing pool. The
+from nothing, [SEEP-2](seep02_johnson_dam.md) builds this dam,
+[COMBO-1](combo01_seepage_stability.md) runs it under a standing pool, and the
 [tutorials index](index.md) lists the series.

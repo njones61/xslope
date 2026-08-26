@@ -5872,6 +5872,20 @@ def _combo02_drawn_down(model, u2=None, line2=None):
     return out
 
 
+def _combo02_cleared_bc2(model):
+    """``model`` with boundary set 2 emptied, which is the file Part 3 runs on.
+
+    A drawdown staged from a transient march takes both of its states from boundary
+    set 1 and the pool schedule driving it — stage 2 from the schedule at the
+    stage-2 time — so boundary set 2 states a drawn-down analysis nothing on that
+    route solves or reads. Part 3 has the reader clear it, and the runs below start
+    from the same file, so the checks they report and the loads they derive are the
+    reader's.
+    """
+    empty = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
+    return dict(model, seepage_bc2=copy.deepcopy(empty))
+
+
 def _combo02_stage_line(label, results, n_drained):
     lower = 2 if results["stage2_FS"] <= results["stage3_FS"] else 3
     return ("   %-12s stage 1 %.4f · stage 2 %.4f · stage 3 %.4f · FS %.4f "
@@ -6154,8 +6168,16 @@ def combo02_plots():
         if "frame saved" in line or line.startswith("Transient"):
             print("     %s" % line.strip())
 
-    staged = stage_transient_for_drawdown(load_slope_data(COMBO02), solution)
+    staged = stage_transient_for_drawdown(
+        _combo02_cleared_bc2(load_slope_data(COMBO02)), solution)
     staged["mesh"] = mesh
+    _tderived = with_water_loads(staged)
+    for _stage, _key in ((1, "dloads_derived"), (2, "dloads2_derived")):
+        print("   transient   stage %d water load peak %.1f %s, from %s"
+              % (_stage, max((float(p["Normal"])
+                              for b in _tderived[_key] for p in b), default=0.0),
+                 _u["stress"], _tderived["water_derived"][_stage]["source"]
+                 or "nothing above ground"))
     trans_crit, trans_res, _tlog2 = _combo02_search(staged)
     trans_raw, _tres, trans_n = _combo02_detail(staged, trans_crit)
     print(_combo02_stage_line("transient", trans_res, trans_n))
@@ -6169,7 +6191,7 @@ def combo02_plots():
             trans_crit["solver_result"])
 
     ts = model["tseep"]
-    day50 = load_slope_data(COMBO02)
+    day50 = _combo02_cleared_bc2(load_slope_data(COMBO02))
     day50["mesh"] = mesh
     with contextlib.redirect_stdout(io.StringIO()):
         apply_transient_stability_frame(day50, solution,
@@ -6617,6 +6639,187 @@ def combo03_plots():
              fine["min_fs"] - res["min_fs"]))
 
 
+# --------------------------------------------------------------------------- #
+#  COMBO-3 Part 2 — a rapid drawdown at every instant of COMBO-2's march
+#
+#  Same march COMBO-2 Part 3 solves, on COMBO-2's own mesh and schedule, so the
+#  drawdown curve passes through COMBO-2's transient-route answer at the stage-2
+#  time. Two sweeps are run on that one march — every instant as a three-stage
+#  drawdown, and every instant as an ordinary single-stage analysis — because the
+#  page's whole reading is the distance between the two curves.
+# --------------------------------------------------------------------------- #
+#: The completed COMBO-2 workbook: materials on ``seep``, d / psi on the core,
+#: the pool schedule and both stage times.
+COMBO03R = os.path.join(REPO_ROOT,
+                        "docs/tutorials/files/xslope_johnson_rapid.xlsx")
+#: Build Mesh, at COMBO-2 Part 2's settings: linear triangles, auto-sizing on,
+#: 100 divisions across the 750 ft section.
+COMBO03R_ELEMENT = "tri3"
+COMBO03R_DIVISIONS = 100
+COMBO03R_METHOD = "spencer"
+COMBO03R_SLICES = 40
+
+
+def _combo03r_compare(model, rapid_res, plain_res):
+    """Both sweeps of one march on one axes: the drawdown answer at every instant
+    and the single-stage answer at the same instants.
+
+    The two curves are the page's measurement, and a measurement of a gap has to be
+    read on one pair of axes — two figures at two y-scales would leave the reader
+    subtracting labels. The pool the two share is drawn behind them, as it is on
+    the Studio figure, so a crossing can be placed against the drawdown that
+    causes it.
+    """
+    import numpy as np
+
+    _u = declared_unit_labels(model)
+    ts = model["tseep"]
+
+    def _pts(res):
+        g = res["df"]
+        g = g.loc[g["success"]].sort_values("value")
+        return [float(v) for v in g["value"]], [float(v) for v in g["fs"]]
+
+    rt, rfs = _pts(rapid_res)
+    pt, pfs = _pts(plain_res)
+
+    fig, ax = plt.subplots(figsize=(8.6, 5.0))
+    ax.plot(pt, pfs, "-o", color="#2b7bb0", lw=1.8, ms=5, zorder=3,
+            label="single-stage, drained (one field per instant)")
+    ax.plot(rt, rfs, "-o", color="#b5460f", lw=2.0, ms=5, zorder=4,
+            label="rapid drawdown (three stages, stage 1 at t = %g %s)"
+                  % (float(ts["stage_1"]), _u["time"]))
+    ax.axhline(1.0, color="r", ls="--", lw=0.8, zorder=2, label="FS = 1")
+    ax.set_xlabel("time (%s)" % _u["time"])
+    ax.set_ylabel("factor of safety")
+    ax.grid(alpha=0.25)
+    ax.set_title("Two analyses of one march: the drawdown answer and the "
+                 "single-stage answer", fontsize=11.5)
+
+    pool = ax.twinx()
+    tt = [float(t) for t in ts["times"]]
+    vv = [float(v) for v in ts["series"]["pool"]]
+    lo, hi = ax.get_xlim()
+    if lo < tt[0]:
+        tt, vv = [lo] + tt, [vv[0]] + vv
+    if hi > tt[-1]:
+        tt, vv = tt + [hi], vv + [vv[-1]]
+    pool.plot(tt, vv, color="#3f4a55", lw=1.3, ls=(0, (5, 3)), alpha=0.55,
+              zorder=0, label="pool (schedule)")
+    pool.set_ylabel("pool elevation (%s)" % _u["length"], color="#3f4a55")
+    pool.tick_params(axis="y", colors="#3f4a55")
+    pool.set_ylim(0.0, 1.35 * float(np.max(vv)))
+    pool.set_zorder(ax.get_zorder() - 1)
+    ax.patch.set_visible(False)
+
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = pool.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, fontsize=9, loc="upper center")
+    fig.tight_layout()
+
+
+def combo03_rapid():
+    """COMBO-3 Part 2: the drawdown curve on COMBO-2's dam, and the single-stage
+    curve on the same march.
+
+    Printed rather than drawn: the undrained envelope and the stage times the file
+    carries, the mesh, the march's saved frames, and both sweeps' own tables — the
+    text ``fs_vs_time`` prints, which is what the page quotes.
+    """
+    import time as _time
+
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+    from xslope.plot import plot_fs_vs_time
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             run_transient_seepage)
+    from xslope.sensitivity import fs_vs_time
+
+    model = load_slope_data(COMBO03R)
+    _u = declared_unit_labels(model)
+    for m in model["materials"]:
+        print("   material    %-11s γ %g %s · c′ %g %s · φ′ %g° · d %s ψ %s · u %s"
+              % (m["name"], m["gamma"], _u["unit_weight"], m["c"], _u["stress"],
+                 m["phi"], m["d"] or "—", m["psi"] or "—", m["u"]))
+    ts = model["tseep"]
+    print("   schedule    breakpoints %s · pool %s · duration %g · save every %g"
+          % (" ".join("%g" % t for t in ts["times"]),
+             " ".join("%g" % v for v in ts["series"]["pool"]),
+             ts["duration"], ts["save_interval"]))
+    print("   stages      stage 1 t = %g %s · stage 2 t = %g %s"
+          % (ts["stage_1"], _u["time"], ts["stage_2"], _u["time"]))
+    _c = model["circles"][0]
+    print("   circle      center (%g, %g) · R %g %s"
+          % (_c["Xo"], _c["Yo"], _c["R"], _u["length"]))
+
+    capture("combo03_rapid_inputs.png", plot_inputs, model, mode="lem",
+            title="Stability Model Inputs", frame="content", show_mesh=False)
+
+    # ---- the mesh and the march, at COMBO-2's settings ---------------------- #
+    xs = [x for x, _ in model["ground_surface"].coords]
+    size = (max(xs) - min(xs)) / COMBO03R_DIVISIONS
+    with contextlib.redirect_stdout(io.StringIO()):
+        mesh = build_mesh_from_polygons(get_material_polygons(model), size,
+                                        COMBO03R_ELEMENT,
+                                        size_regions=extract_size_regions(model))
+    model["mesh"] = mesh
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g %s"
+          % (len(mesh["nodes"]), len(mesh["elements"]), COMBO03R_ELEMENT,
+             COMBO03R_DIVISIONS, size, _u["length"]))
+
+    t0 = _time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        seep_data = build_seep_data(mesh, model, seep_bc=1)
+        solution = run_transient_seepage(seep_data, build_tseep_data(model),
+                                         verbose=False)
+    print("   march       %d saved frames at t = %s · %.0f s wall"
+          % (len(solution["times"]),
+             " ".join("%g" % t for t in solution["times"]), _time.time() - t0))
+
+    # ---- every instant as a three-stage drawdown ---------------------------- #
+    t0 = _time.time()
+    ok, rapid_res = fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
+                               num_slices=COMBO03R_SLICES, rapid=True,
+                               print_table=False)
+    if not ok:
+        raise RuntimeError(rapid_res)
+    print("   drawdown    %d instants · %d failed · lowest %.4f at t = %g %s · "
+          "%.0f s wall"
+          % (len(rapid_res["times"]), rapid_res["n_failed"], rapid_res["min_fs"],
+             rapid_res["critical_time"], _u["time"], _time.time() - t0))
+    print("   --- the drawdown table, as fs_vs_time prints it ---")
+    for line in rapid_res["table_text"].splitlines():
+        print("     %s" % line)
+    capture("combo03_rapid_curve.png", plot_fs_vs_time, rapid_res,
+            slope_data=model)
+
+    # ---- every instant as an ordinary single-stage analysis ----------------- #
+    t0 = _time.time()
+    ok, plain_res = fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
+                               num_slices=COMBO03R_SLICES, search=True,
+                               print_table=False)
+    if not ok:
+        raise RuntimeError(plain_res)
+    print("   single      %d instants · %d failed · lowest %.4f at t = %g %s · "
+          "%.0f s wall"
+          % (len(plain_res["times"]), plain_res["n_failed"], plain_res["min_fs"],
+             plain_res["critical_time"], _u["time"], _time.time() - t0))
+    print("   --- the single-stage table, as fs_vs_time prints it ---")
+    for line in plain_res["table_text"].splitlines():
+        print("     %s" % line)
+
+    # ---- the two curves against each other ---------------------------------- #
+    _r = {float(r["time"]): r["fs"] for r in rapid_res["table"] if r["success"]}
+    _p = {float(r["time"]): r["fs"] for r in plain_res["table"] if r["success"]}
+    for t in sorted(set(_r) & set(_p)):
+        print("   gap         t %-6g drawdown %.4f  single-stage %.4f  "
+              "single-stage %s by %.4f"
+              % (t, _r[t], _p[t], "above" if _p[t] > _r[t] else "below",
+                 abs(_p[t] - _r[t])))
+    capture("combo03_rapid_compare.png", _combo03r_compare, model, rapid_res,
+            plain_res)
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -6661,6 +6864,7 @@ GROUPS = {
     "combo02_plots": combo02_plots,
     "combo02_seep": combo02_seep,
     "combo03_plots": combo03_plots,
+    "combo03_rapid": combo03_rapid,
 }
 
 

@@ -447,11 +447,12 @@ surface — which a shaft can do only if it is held below it.
 
 The finite element run assumes nothing about the moment. It computes what the
 soil can push into the shaft under the restraint the file states: 44% of
-capacity with the tip pinned, 100% with it fixed. Once the file says the tip is
-fixed, the two engines agree to 2%. The question that decides between 1.38 and
-1.80 is therefore not which engine to trust but how the shaft is held at its
-toe — bearing on the rock, or socketed into it — and that is one cell in the
-file.
+capacity with the tip pinned, 100% with it fixed. At this spacing, once the
+file says the tip is fixed, the two engines agree to 2%; at other spacings the
+limit equilibrium answer moves and the finite element one does not, which the
+next paragraphs take up. The question that decides between 1.38 and 1.80 is
+therefore not which engine to trust but how the shaft is held at its toe —
+bearing on the rock, or socketed into it — and that is one cell in the file.
 
 The 2% that remains is a difference in mechanism: Spencer's circle passes below
 the toe, while the tip-fixed strength reduction run fails in the face above the

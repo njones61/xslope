@@ -416,8 +416,8 @@ of the formula:
 Carlo's 16.42% and 0.988. The checks are reported with the answer: across the 500 checking solves the formula reproduced the
 real factor of safety with a typical error of 0.018 (R² = 0.998), and only
 1 of the 500 landed on the other side of FS = 1 from where the formula put
-it. In a fuller test run for this page, we re-solved thirty thousand of the
-draws with the real model: the formula's P<sub>f</sub> came out 0.07
+it. In a fuller test run for this page, thirty thousand of the draws were
+re-solved with the real model: the formula's P<sub>f</sub> came out 0.07
 percentage points low. The counting wobble is gone, and that small fit error
 is what remains. The
 [response-surface section](../reliability/monte_carlo.md#sampling-a-fitted-response-surface)

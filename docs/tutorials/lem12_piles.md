@@ -37,7 +37,7 @@ it, and how to check for the shallow surface that bypasses the row.
 
 ## The slope
 
-We keep the slope itself simple so that everything interesting on this page
+The slope itself is simple on purpose, so that everything interesting on this page
 comes from the piles. It is a single soil — a medium-stiff clay with γ = 120 pcf,
 c = 200 psf, and φ = 20° — over a rigid
 base 10 ft below the toe. The face rises 20 ft at 1:1 from (0, 0) to (20, 20),

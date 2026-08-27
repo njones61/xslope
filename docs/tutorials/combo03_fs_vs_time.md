@@ -74,12 +74,12 @@ schedule differs here.
 Each saved frame carries a pore pressure at every node of the mesh. A run with
 `u = seep` reads that field at every slice base, so each frame gives one factor
 of safety. We compute one for each of the nineteen frames and plot them against
-time.
-Nothing else changes between the points, so everything the curve does is the pore
-pressures moving and the reservoir load leaving the face.
+time. Between one point and the next, only two things change: the pore
+pressures and the reservoir load on the face.
 
-Two consequences. **The curve can only be as fine as the save schedule**, because
-a time that is not a saved frame has no field to read. And **the critical surface
+This has two consequences. **The curve can only be as fine as the save
+schedule**, because a time that is not a saved frame has no field to read. And
+**the critical surface
 moves** — the mechanism that governs under a full reservoir is not the one that
 governs half drained, and on this dam not even on the same slope, so each instant
 gets its own search.

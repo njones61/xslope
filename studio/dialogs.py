@@ -1319,8 +1319,7 @@ class RunLemDialog(QDialog):
             "starting circles, and a single seed in the wrong place can converge to a "
             "local minimum that reads 20% or more too high, with no warning.\n\n"
             "Leave it off to interrogate a specific mechanism with your own circles.")
-        # The checks read grid_seed out of _selection(), so toggling it has to
-        # re-ask them: the several-starting-circles warning stands or falls on it.
+        # Toggling it changes the run the checks are describing, so re-ask them.
         self.grid_seed.toggled.connect(lambda *_: self._recheck())
         form.addRow("", self.grid_seed)
 
@@ -1462,8 +1461,7 @@ class RunLemDialog(QDialog):
                 "surface": self._surface_value(),
                 "search": self.analysis.currentData() == "auto_search",
                 # Grid seeding changes which mechanisms a search reaches, so the
-                # checks are told about it: several starting circles are a warning
-                # on a seeded search and none at all on a grid-seeded one.
+                # checks are handed the whole run description, seeding included.
                 "grid_seed": (self.grid_seed.isChecked()
                               if hasattr(self, "grid_seed") else False),
                 "seep_frame": self._seep_frame()}
@@ -2183,8 +2181,8 @@ class SensitivityDialog(QDialog):
                "search": self.search.isChecked()}
         if self.mode.currentData() == "fs_vs_time":
             picked = self.selected_times()
-            # Same key Run LEM passes: with Grid search on, every competing family
-            # is refined, so several starting circles raise nothing.
+            # Same key Run LEM passes, so both dialogs describe the run the
+            # checks are asked about the same way.
             sel["grid_seed"] = (self.grid_seed.isChecked()
                                 if hasattr(self, "grid_seed") else False)
             if self.rapid.isChecked():

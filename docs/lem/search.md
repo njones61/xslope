@@ -50,8 +50,7 @@ lower is dropped before refinement begins. Enter a single starting circle, on th
 face known to control, when the run is meant to interrogate one specific mechanism;
 turn on grid seeding, described next, when it is meant to find the critical surface
 anywhere in the model, since that mode refines up to four competing families with
-the sheet's own circles among them. Preflight reports the combination — two or more
-starting circles with **Grid search** off — as a warning.
+the sheet's own circles among them.
 
 ### Grid Seeding (Global Search)
 

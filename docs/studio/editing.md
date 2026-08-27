@@ -167,10 +167,7 @@ vertical edge of the section are dropped. It reports what it built and what it
 dropped, under the button, which is what you audit the rows against. With circles
 already in the table it asks first, and can add to them instead of replacing them.
 On a section with no room for a circle to daylight the button is dimmed and its
-tooltip says so. A table holding more than one circle is a set of candidates rather
-than a set of searches: without **Grid search**, an automated search refines only the
-circle that screens best on a coarse pass, and the Run LEM model checks warn when a
-run would do that.
+tooltip says so.
 
 Under the table, the **Search window** group holds the ten optional limits that
 confine an automated circular search — entry and exit x ranges, a center box, a

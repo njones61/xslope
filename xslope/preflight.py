@@ -841,20 +841,6 @@ class _Ctx:
         return bool(self.selection.get("search"))
 
     @property
-    def grid_seed(self):
-        """True when the circular search auto-seeds itself from the geometry.
-
-        ``grid_seed`` is the name the Run LEM dialog's **Grid search** toggle and
-        ``search.run_lem_analysis`` both use; ``circular_search`` spells the same
-        thing ``seed='grid'``, so either form is read here. Absent means OFF, which
-        is what every entry point defaults to.
-        """
-        sel = self.selection
-        if sel.get("grid_seed"):
-            return True
-        return str(sel.get("seed") or "").strip().lower() == "grid"
-
-    @property
     def surface_supplied(self):
         """True when the caller handed the run its failure surface directly.
 
@@ -1184,6 +1170,23 @@ class _Ctx:
         if len(times) >= 2:
             return times[1]
         return _num(self.sd.get("seep_u2_time"))
+
+    @property
+    def staged_stage1_time(self):
+        """The instant :attr:`staged_drawdown` reads stage 1 at, or ``None``.
+
+        The mirror of :attr:`staged_stage2_time`, read from the same three places
+        in the same order: the interface's ``seep_frame``, the instant a scripted
+        run already wrote, and -- for a run that has named its stage 2 without
+        naming its stage 1 -- the ``tseep`` sheet the staging would read.
+        """
+        times = self.seep_frame_times
+        if len(times) >= 2:
+            return times[0]
+        t = _num(self.sd.get("seep_u_time"))
+        if t is not None:
+            return t
+        return _num((self.tseep or {}).get("stage_1"))
 
     def series_at_start(self, name):
         """The first value of a named tseep series, or ``None`` when it has none."""
@@ -2403,50 +2406,6 @@ def _circle_below_domain_floor(ctx):
             f"above y = {_fmt(floor)} {_AT_CIRCLES}, or deepen the model so the "
             f"circle fits inside it -- {deeper}."))
     return out
-
-
-@rule("circles.multiple_without_grid", WARNING, ("lem",),
-      summary="A seeded circular search refines only the best-screening starting "
-              "circle; the other circles' families are never searched.")
-def _circles_multiple_without_grid(ctx):
-    # What the engine does, at search.py's launch selection: every starting circle
-    # gets ONE coarse 9-point grid, the starts are sorted by that coarse score, and
-    # `launches = all_starts[:1]` refines the top one alone. Grid search
-    # (`seed='grid'`) is the branch that refines up to four auto-seeded families
-    # plus every user circle.
-    #
-    # The cost is silent and it is not small. Two circles on a dam -- one upstream,
-    # one downstream -- read like two mechanisms being checked, and only one of them
-    # is. Which one survives is decided by a single coarse grid, at a resolution the
-    # refinement exists precisely because nobody trusts: a family that screens a few
-    # thousandths higher and refines far lower is dropped before refinement begins,
-    # and the run reports convergence on the survivor with nothing said about the
-    # rest. A single-surface run is silent here because it never claimed to search:
-    # it analyses circles[0] and says so.
-    if not ctx.is_search:
-        return None
-    if ctx.surface_supplied:
-        return None
-    if ctx.effective_surface_family != "circular":
-        return None
-    if ctx.grid_seed:
-        return None
-    n = len(ctx.sd.get("circles") or [])
-    if n < 2:
-        return None
-    rest = ("the other circle's family is not searched" if n == 2 else
-            f"the other {n - 1} circles' families are not searched")
-    return (
-        f"This model carries {n} starting circles and Grid search is off. A seeded "
-        f"search screens each starting circle with one coarse 9-point grid, ranks "
-        f"the circles by that screen, and then refines only the best-scoring one: "
-        f"{rest}, so a mechanism that "
-        f"screens slightly higher on the coarse pass and would refine lower is "
-        f"dropped before refinement begins and never appears in the result. Keep "
-        f"one starting circle, on the face known to be critical -- the upstream "
-        f"face for a drawdown, the downstream face for a full reservoir -- so the "
-        f"run states which mechanism it interrogates {_AT_CIRCLES}; or turn Grid "
-        f"search on, which refines every competing family, these circles included.")
 
 
 # ---------------------------------------------------------------------------
@@ -3743,6 +3702,57 @@ def _rapid_stage2_bc_ignored(ctx):
             f"editing it changes nothing. Clear it, or run the two-steady route -- "
             f"clear the Stage 1 / Stage 2 times {_AT_TSEEP} and solve set 2 on its "
             f"own -- to make it the drawn-down state {_AT_SEEPBC2}.")
+
+
+@rule("rapid.pool_static_between_stages", WARNING, ("rapid",),
+      "On the transient-staged route the pool has to fall between the stage times, "
+      "or both stages read the full pool.")
+def _rapid_pool_static(ctx):
+    """A staged drawdown whose boundary set 1 states the same pool at both instants.
+
+    On the transient-staged route the drawdown IS the pool schedule: stage 1 is
+    boundary set 1 as the schedule stands at the stage-1 time and stage 2 is the
+    same boundary set at the stage-2 time. Nothing else lowers the water. So a
+    reservoir head left as a fixed number, or bound to a series that is flat across
+    the two instants, does not describe a drawdown at all -- the march runs, both
+    frames come back, and the two stages are the same state. The answer is the
+    full-pool factor of safety wearing a drawdown's name, which is the
+    unconservative direction and reads as a perfectly ordinary result.
+
+    Only boundary set 1 is measured, because on this route it is the only set read
+    (see :func:`_rapid_stage2_bc_ignored`), and only blocks drawn ON the ground
+    surface count as a pool -- the same reading ``water.bc_pool_levels`` gives the
+    load derivation, so the rule and the water the run actually applies cannot
+    disagree.
+    """
+    if not ctx.staged_drawdown:
+        return None
+    t1, t2 = ctx.staged_stage1_time, ctx.staged_stage2_time
+    if t1 is None or t2 is None:
+        return None
+    from .water import bc_pool_levels           # local: water.py is a heavy import
+    ground = ctx.sd.get("ground_surface")
+    p1 = bc_pool_levels(ctx.seep_bc, ground, ctx.sd, t1)
+    p2 = bc_pool_levels(ctx.seep_bc, ground, ctx.sd, t2)
+    if not p1 or len(p1) != len(p2):
+        return None            # nothing states a pool, or the two readings do not pair
+    height = ctx.slope_height or 1.0
+    tol = max(1e-9, 1e-4 * height)
+    if any(a[0] - b[0] > tol for a, b in zip(p1, p2)):
+        return None            # some pool falls -- this run has a drawdown in it
+    top1, _anchors, label = max(p1, key=lambda e: e[0])
+    top2 = max(e[0] for e in p2)
+    unit = str(ctx.sd.get("time_unit") or "").strip()
+    unit = f" {unit}" if unit else ""
+    return (f"The pool stands at elevation {top1:g} at the stage-1 time "
+            f"(t = {_fmt(t1)}{unit}) and at {top2:g} at the stage-2 time "
+            f"(t = {_fmt(t2)}{unit}): it does not fall between them. This rapid "
+            f"drawdown reads BOTH its stages from the transient march, so nothing "
+            f"else lowers the water -- the march never lowers the pool, and the "
+            f"drawdown answer is the full-pool state read twice, which is too high. "
+            f"Bind {label.split(' at elevation')[0]}'s Value to a time series "
+            f"that falls across the two stage times {_AT_SEEPBC}, and give the "
+            f"series the levels it holds at each of them {_AT_TSEEP}.")
 
 
 @rule("rapid.ru_has_no_stage2", WARNING, ("rapid",),

@@ -3972,6 +3972,13 @@ def _pf_tseep(sd, **kw):
     return sd
 
 
+def _pf_bc_head(sd, i, value, which=1):
+    """Set the VALUE of one specified-head block: a number, or a tseep series name."""
+    bc = sd['seepage_bc' if which == 1 else 'seepage_bc2']
+    bc['specified_heads'][i]['head'] = value
+    return sd
+
+
 def _pf_pts(obj):
     """(x, y) pairs from a shapely line or a plain coordinate list."""
     return [(float(x), float(y)) for x, y in getattr(obj, 'coords', obj)]
@@ -4211,17 +4218,6 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_circle_depth(sd, 200.0),
          control=lambda sd: _pf_circle_depth(sd, 20.0),
          expect='no slices can be generated from it'),
-    # Nothing about the FILE is broken here -- xslope_dam.xlsx carries two starting
-    # circles because a dam has two faces -- so the model is the same in both halves
-    # and the only difference is the RUN: Grid search off refines the best-screening
-    # circle alone, Grid search on refines every family. That makes the control the
-    # proof the toggle is read rather than merely accepted.
-    dict(rule='circles.multiple_without_grid', base=PREFLIGHT_BASE_LEM, mode='dict',
-         selection={'surface': 'circular', 'search': True},
-         control_selection={'surface': 'circular', 'search': True,
-                            'grid_seed': True},
-         mutation=lambda sd: sd, control=lambda sd: sd,
-         expect='refines only the best-scoring one'),
 
     # --- polyline ordering -------------------------------------------------
     dict(rule='order.piezo_reversed', base=PREFLIGHT_BASE_LEM, mode='excel',
@@ -4518,6 +4514,23 @@ PREFLIGHT_RULE_SPECS = [
          control_selection={'surface': 'circular'},
          mutation=lambda sd: sd,
          expect='reads BOTH its stages from the transient march'),
+    # The two ways the pool schedule can fail to be a drawdown, each against the
+    # SAME file staged the same way with its real falling schedule in place: a
+    # reservoir head typed as a fixed number (no series bound at all), and one bound
+    # to a series that is flat across the stage times. In both the march runs and
+    # both frames come back -- what is missing is the fall.
+    dict(rule='rapid.pool_static_between_stages', base=PREFLIGHT_BASE_RAPID_TSEEP,
+         mode='dict', analysis='rapid',
+         mutation=lambda sd: _pf_set(_pf_bc_head(sd, 0, 160.0), seep_u2_time=50.0),
+         control=lambda sd: _pf_set(sd, seep_u2_time=50.0),
+         expect='does not fall between them'),
+    dict(rule='rapid.pool_static_between_stages', base=PREFLIGHT_BASE_RAPID_TSEEP,
+         mode='dict', analysis='rapid',
+         selection={'surface': 'circular',
+                    'seep_frame': {'times': [0.0, 50.0]}},
+         mutation=lambda sd: _pf_tseep(sd, series={
+             k: [v[0]] * len(v) for k, v in sd['tseep']['series'].items()}),
+         expect='does not fall between them'),
     dict(rule='rapid.ru_has_no_stage2', base=PREFLIGHT_BASE_RAPID, mode='excel',
          analysis='rapid',
          mutation=lambda sd: _pf_mats(sd, u='ru', ru=0.3),

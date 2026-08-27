@@ -72,8 +72,9 @@ schedule differs here.
 #### How the curve is built
 
 Each saved frame carries a pore pressure at every node of the mesh. A run with
-`u = seep` reads one such field at every slice base, so one frame gives one
-factor of safety, and nineteen frames plotted against their times draw the curve.
+`u = seep` reads that field at every slice base, so each frame gives one factor
+of safety. We compute one for each of the nineteen frames and plot them against
+time.
 Nothing else changes between the points, so everything the curve does is the pore
 pressures moving and the reservoir load leaving the face.
 

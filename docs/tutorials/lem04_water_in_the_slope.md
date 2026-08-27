@@ -23,8 +23,7 @@ off and 1.301 with them on.**
 <div class="tgm-obj" markdown>
 **Objectives** — Learn how to put water in a slope model: how to define a
 piezometric line and the pore pressure it produces on every slice base, what the
-two unit-weight columns do, and when the r<sub>u</sub> alternative is worth
-using.
+two unit-weight columns do, and when to reach for the r<sub>u</sub> alternative.
 </div>
 <p><span class="tg-pill">three materials</span><span class="tg-pill">piezometric line</span><span class="tg-pill">effective stress</span><span class="tg-pill">saturated unit weight</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_method_slices_problem.xlsx](../lem/files/xslope_method_slices_problem.xlsx) — the same file used by [LEM Sample Problem 5](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)</div>
@@ -118,10 +117,10 @@ this page measures is the one the search finds, not this one:
 | 195 | 150 | Depth | 18.1 |
 
 Every number the model needs is in the tables above, and each table is laid out
-exactly as its destination is — the template's worksheets and Studio's editors,
+exactly as its destination — the template's worksheets and Studio's editors,
 same columns in the same order. Select a table's block of values, copy, and
-paste it straight into the sheet or editor rather than retyping it; the
-eight-point piezometric line is the one most worth pasting.
+paste it straight into the sheet or editor rather than retyping it — the
+eight-point piezometric line especially.
 
 ---
 
@@ -249,7 +248,7 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 ## C — Building it in Studio {#c-building-it-in-studio}
 
-Start with **File → New** and work down the **Inputs** tree.
+We start with **File → New** and work down the **Inputs** tree.
 
 ### 1. Materials and profile lines
 
@@ -262,8 +261,8 @@ every row's **u** is `piezo`:
 
 Then **Profile lines**: set **Max depth (bottom boundary elevation):** to `0`,
 and press **Add line** three times, each line taking its **Material:** and its
-vertices from the geometry tables above. The mechanics are
-[LEM-3's](lem03_layered_slope.md#c-building-it-in-studio), one line more. With
+vertices from the geometry tables above. The mechanics are the same as in
+[LEM-3](lem03_layered_slope.md#c-building-it-in-studio), one line more. With
 the ground surface selected, the editor holds its vertices and the preview draws
 the three lines stacked down the section:
 
@@ -298,7 +297,7 @@ Continue below.
 
 ## Running the analysis
 
-However you built it, you now hold the same model:
+However you built it, the model is now the same:
 
 ![The finished model](images/lem04_inputs.png){width=1000}
 
@@ -324,7 +323,7 @@ the critical one in red:
 
 ![The circular search](images/lem04_search.png){width=1000}
 
-**FS = 1.301**, and the critical circle is not the one you entered: the search
+**FS = 1.301**, and the critical circle is not the one we entered: the search
 settled on a deep circle through the soft foundation clay — **Xo = 182.37,
 Yo = 88.32, Depth = 26.90** — entering the crest well behind the shoulder and
 exiting past the toe, with most of its base in soil 3. That is where the answer
@@ -333,9 +332,9 @@ above it come back around 1.37 or higher.
 
 ### Holding the circle still {#holding-the-circle-still}
 
-Everything below asks *what is the water worth on this slope*, and the way to
-ask a question about one variable is to change one variable. So put the circle
-the search found into the model and stop searching.
+Everything below asks what the water costs on this slope, and the way to ask a
+question about one variable is to change one variable. So we put the circle the
+search found into the model and stop searching.
 
 There is no need to read the circle off the picture: the search states it when
 it converges, in Studio's **Log** pane, as
@@ -362,19 +361,19 @@ crest at elevation 84 and that slice's base, at 77.5, is still above the line.
 
 ### What the water costs
 
-Now take the water out of the strength calculation. Set every material's pore
+Now we take the water out of the strength calculation. Set every material's pore
 pressure option to `none` and leave everything else exactly as it is:
 
 - **Studio** — open **Materials** and set each row's **u** to `none`.
 - **Excel** — `mat!O11`, `mat!O12`, `mat!O13` = `none`.
 - **Assistant** — say: *"Set every material's pore pressure option to none."*
 
-Run the same single surface again:
+We run the same single surface again:
 
 ![Spencer on the held circle, dry](images/lem04_solution_dry.png){width=1000}
 
 **FS = 1.667.** Same circle, same 131.4 ft of base, same 349,677 lb/ft of soil
-— the pore pressure is worth **22% of the factor of safety** and nothing else
+— the pore pressure costs **22% of the factor of safety** and nothing else
 moved. (The weight is identical because the piezometric line is still there
 doing its *other* job, [splitting the weight](#the-two-unit-weight-columns);
 switching `u` off stops the line producing pressure, not the soil below it
@@ -389,7 +388,7 @@ friction, and it is countable: Σ u Δℓ tan φ′ over the 39 slices is
 **46,471 lb/ft** of frictional resistance that the pore pressure erases. In the
 wet figure the blue bars visibly hollow out the green ones.
 
-Run the other methods on both states and the pattern holds everywhere:
+We run the other methods on both states, and the pattern holds everywhere:
 
 | | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -431,8 +430,8 @@ the engine splits each slice's column at the water table — γ above, γ_sat
 below, with the piezometric line serving as the water table. With **gsat**
 blank it uses **γ** for the whole column instead.
 
-That split is already in every number on this page. To see what it is worth,
-clear the three **gsat** cells and run the held circle again:
+That split is already in every number on this page. To measure it, we clear the
+three **gsat** cells and run the held circle again:
 
 | | ΣW (lb/ft) | FS (Spencer) |
 | --- | :---: | :---: |

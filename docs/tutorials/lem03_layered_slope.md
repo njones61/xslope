@@ -87,10 +87,10 @@ twice the slope height, one tangent to the base of each layer:
 | 20 | 40 | Depth | 0 |
 | 20 | 40 | Depth | -10 |
 
-The tables are the model, and each is laid out exactly as its destination is —
-the template's worksheets and Studio's editors, same columns in the same order.
-Select a table's block of values, copy, and paste it straight into the sheet or
-editor rather than retyping it.
+Each table above is laid out exactly as its destination — the template's
+worksheets and Studio's editors, same columns in the same order. Select a
+table's block of values, copy, and paste it straight into the sheet or editor
+rather than retyping it.
 
 ---
 
@@ -199,7 +199,7 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 ## C — Building it in Studio {#c-building-it-in-studio}
 
-Start with **File → New** and work down the **Inputs** tree.
+We start with **File → New** and work down the **Inputs** tree.
 
 ### 1. Materials
 
@@ -256,15 +256,15 @@ says so: *"Generated 3 circles: 3 on the left-facing face (toe at x = 0, height
 | 2 | −10 | tangent to the rigid rock, the base of the foundation |
 | 3 | 0 | tangent to the top of the foundation, the base of the embankment |
 
-The summary reports all three candidates kept — on a section where a circle
-cannot daylight — come back up to the ground surface — inside the model, it
-says so instead. Click **OK**.
+The summary reports all three candidates kept. On a section where a circle cannot
+daylight — come back up to the ground surface — inside the model, the summary says
+so instead. Click **OK**.
 
 Continue below.
 
 ## Running the analysis
 
-However you built it, you now hold the same model:
+However you built it, the model is now the same:
 
 ![The finished model](images/lem03_inputs.png){width=1000}
 
@@ -286,11 +286,11 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 
 ### What the starting circles say before anything is searched
 
-Each starting circle is a complete failure surface in its own right, and solving
+Each starting circle is a complete failure surface in its own right, so we solve
 the three of them — the two the file carries, plus the generator's toe circle —
-is the fastest read on which mechanism this section has. **The table below is
-this page's own comparison, not something the program prints.** Each row is a
-run you can repeat: solve that circle alone with **Run LEM…** and **Analysis** =
+for the fastest read on which mechanism this section has. **The table below
+collects three separate runs; the program does not print it.** Each row is a run
+you can repeat: solve that circle alone with **Run LEM…** and **Analysis** =
 `Single surface`; the factor of safety is the number on that run's solution
 plot, and the weight is ΣW summed over the run's slices:
 
@@ -330,18 +330,18 @@ outside the slice on 15% of the boundaries. This is the crest tension of a φ = 
 slope that [LEM-1](lem01_simple_embankment.md) diagnoses and fixes with a tension
 crack; adding one here at z<sub>c</sub> = 2c/γ = 6.15 ft gives a clean solution at
 **FS = 1.175**, on a circle still tangent to the contact. It changes nothing
-about which surface is critical, and unlike LEM-1's uncracked embankment it never
-prevented one from being solved: Spencer answered on all 529 trial surfaces the
-search tried.
+about which surface is critical, and unlike in the uncracked embankment of LEM-1
+the tension never prevented a surface from being solved: Spencer answered on all
+529 trial surfaces the search tried.
 
 ### Guarding against local minima
 
 A search walks downhill from its starting circle, so what it returns is the best
 surface in the neighborhood it started in — not necessarily the model's minimum.
 The guard is simple: **try several starting circle locations and confirm they
-agree.** That is what the per-layer set is for. Run the search from the shallow
-circle, the deep circle, or the generator's toe circle and every one returns the
-same surface here — tangent to the contact, FS = 1.244.
+agree.** That is what the per-layer set is for. We run the search from the shallow
+circle, the deep circle and the generator's toe circle: every one returns the same
+surface here — tangent to the contact, FS = 1.244.
 
 The failure this guards against looks like success. Seed the search with an arc
 wildly out of scale with the section — a center 220 ft above the slope, R = 269
@@ -361,8 +361,8 @@ you left out costs the answer.
 ### When the deep circle is the answer
 
 Which layer is weak is a property of the soils, not of the geometry, and it is
-the whole question. Take the same section and give the foundation c = 300 psf —
-below the fill's 400 — with everything else unchanged:
+the whole question. Now we take the same section and give the foundation
+c = 300 psf — below the fill's 400 — with everything else unchanged:
 
 ![Spencer on the same section with a weak foundation](images/lem03_solution_weak.png){width=1000}
 
@@ -417,7 +417,7 @@ This tutorial covered:
 
 **Where to go next:** [Tutorial LEM-4](lem04_water_in_the_slope.md) adds the
 input every layer here went without — a piezometric line through a three-layer
-section, and a measure of what the pore pressure it produces is worth on the
+section, and a measure of what the pore pressure it produces costs on the
 critical circle. The sample problems carry the layering further —
 [three layers with a piezometric line](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
 through them, a section whose

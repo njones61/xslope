@@ -32,7 +32,7 @@ to sweep strength against a target factor of safety.
 
 ## The problem
 
-This tutorial starts from a model that already exists. Build it in
+We start from a model that already exists. Build it in
 [LEM-1](lem01_simple_embankment.md), or open that page's completed file
 directly — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx)
 — and save a copy under a name of your own. Nothing in it changes here:
@@ -58,8 +58,8 @@ carries nothing. **A distributed load stops where its points stop** — the
 intensity is not spread over the rest of the crest, and it is not tapered at the
 ends unless you enter a point saying so.
 
-The table is the input, laid out exactly as the `dloads` worksheet and Studio's
-loads editor are — **X**, **Y**, **N**, one point per row. Select the two rows
+The table above is laid out exactly as the `dloads` worksheet and Studio's
+loads editor — **X**, **Y**, **N**, one point per row. Select the two rows
 of values, copy, and paste them straight into the sheet or editor rather than
 retyping them.
 
@@ -110,7 +110,7 @@ written to disk until you use **Save As**.
   decides which end carries which value on a load that is not uniform. If they
   came back reversed, say: *"List the load points in increasing x."*
 - **Nothing else moved.** The material, the profile line, the maximum depth and
-  the starting circle are LEM-1's, unchanged.
+  the starting circle are unchanged from LEM-1.
 
 Continue at [Running the analysis](#running-the-analysis).
 
@@ -126,8 +126,8 @@ The sheet carries six load blocks side by side, four columns apart — **X**,
 Enter (or copy-paste) the two load points from the table above, and leave
 `dloads!D5` **Direction** blank. A blank cell means `normal` — the load acts
 perpendicular to its own line — and on a level crest that is straight down
-anyway. It is the [face load](#which-way-the-load-pushes) further down this
-page where the word starts to matter.
+anyway. The word starts to matter on the [face load](#which-way-the-load-pushes)
+further down this page.
 
 ![The finished dloads worksheet](images/lem02_sheet_dloads.png)
 
@@ -165,7 +165,7 @@ Continue below.
 
 ## Running the analysis
 
-However you added it, you now hold the same model:
+However you added it, the model is now the same:
 
 ![The finished model](images/lem02_inputs.png){width=1000}
 
@@ -209,17 +209,16 @@ than the unloaded critical surface while carrying 7500 lb/ft more force.
 
 ### The warnings LEM-1 left behind
 
-LEM-1's uncracked embankment could not be solved cleanly: Spencer and Bishop
+The uncracked embankment in LEM-1 could not be solved cleanly: Spencer and Bishop
 disagreed (1.276 against 1.215) because the crest slices were being asked to
 carry tension, and 26 of the trial circles that ranked below the reported minimum
-admitted no solution at all. Run the loaded model with Bishop, the Ordinary
-Method of Slices (OMS) or
-Morgenstern-Price and all three return **0.918 on the same circle** as Spencer,
-and no trial circle below the minimum goes unsolved.
+admitted no solution at all. Now we run the loaded model with Bishop, the Ordinary
+Method of Slices (OMS) and Morgenstern-Price: all three return **0.918 on the same
+circle** as Spencer, and no trial circle below the minimum goes unsolved.
 
 The surcharge is what changed: pressing down on the crest is the opposite of the
 tension that was breaking those solutions, and it shows up between the slices
-rather than under them. On LEM-1's critical surface Spencer's most tensile
+rather than under them. On the critical surface in LEM-1 Spencer's most tensile
 interslice force was −3258 lb/ft against a largest compression of 5568 — 58% of
 it. Under the surcharge it is −822 lb/ft against 6234, or 13%, and Spencer's
 line-of-thrust warning clears. The base itself barely moves: the most tensile
@@ -233,8 +232,8 @@ surface the search is able to report.
 
 A **line load** is a concentrated force per unit width, acting at one point on
 the ground surface: a footing, or the weight of a wall facing. The surcharge
-above amounts to 750 psf × 10 ft = **7500 lb/ft**. Put all of it on the single
-point at the middle of the strip instead — one row, in the columns the `lloads`
+above amounts to 750 psf × 10 ft = **7500 lb/ft**. Now we put all of it on the
+single point at the middle of the strip — one row, in the columns the `lloads`
 worksheet and Studio's line-loads editor share:
 
 | Label | x (ft) | y (ft) | P (lb/ft) | Angle (deg) |
@@ -297,8 +296,7 @@ in almost equal measure.
 stockpile.** A pile of gravel does not push horizontally into a hillside. Choose
 `normal` for a pressure — ponded water, a reservoir, anything acting *on* a
 surface — and `vertical` for anything whose load is its own weight. On level
-ground the choice is free; on a face it is worth a quarter of the factor of
-safety.
+ground the choice is free; on a face it costs a quarter of the factor of safety.
 
 ### A second kind of demand
 
@@ -333,8 +331,8 @@ safety* but *what would it take to reach the one I need* — and that is a sweep
 not a guess.
 
 **Design mode** varies one input across a range, solves the model at every step,
-and reports the value where the answer crosses a target. Ask it what cohesion
-would hold FS = 1.5 under the surcharge.
+and reports the value where the answer crosses a target. Here we ask it what
+cohesion would hold FS = 1.5 under the surcharge.
 
 In Studio, click **Run → Parametric…**:
 
@@ -395,8 +393,8 @@ This tutorial covered:
 - Loads reshape the critical surface, so every load case gets its own search.
 
 **Where to go next:** [Tutorial LEM-3](lem03_layered_slope.md) gives the ground
-under the slope a second material — the case this page's design sweep names as
-the one where the critical surface migrates as the parameter moves.
+under the slope a second material — the case flagged in the design sweep above,
+where the critical surface migrates as the parameter moves.
 [Design Mode](../parametric/design.md) and
 [Back-Analysis](../parametric/back_analysis.md) carry the sweep above further —
 every parameter it can vary, and what a sweep that never reaches its target

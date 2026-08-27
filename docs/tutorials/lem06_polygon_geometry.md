@@ -32,8 +32,8 @@ and how to let circles truncate against the base instead of being refused by it.
 
 ## The problem
 
-**Geometry** — a section's geometry is entered one of two ways, and this is the
-page for the second. **Profile lines** give the *top* of each material layer and
+**Geometry** — a section's geometry is entered one of two ways, and this model
+uses the second. **Profile lines** give the *top* of each material layer and
 a single maximum depth beneath them all, which is the faster input wherever the
 layers lie flat and span the section — the geometry of
 [LEM-3](lem03_layered_slope.md), [LEM-4](lem04_water_in_the_slope.md) and
@@ -117,7 +117,7 @@ base touches it at a single point rather than running along it — which is what
 the [last section](#circles-that-will-not-fit) of this page is about.
 
 Every number the model needs is in the tables above, and each is laid out exactly
-as its destination is — the template's worksheets and Studio's editors, same
+as its destination — the template's worksheets and Studio's editors, same
 columns in the same order. Select a table's block of values, copy, and paste it
 straight into the sheet or editor rather than retyping it.
 
@@ -277,7 +277,7 @@ Continue below.
 
 ## Running the analysis
 
-However you built it, you now hold the same model:
+However you built it, the model is now the same:
 
 ![The finished model](images/lem06_inputs.png){width=1000}
 
@@ -345,8 +345,8 @@ satisfies both force and moment equilibrium and is the one to report.
 
 ### Circles that will not fit {#circles-that-will-not-fit}
 
-Take the second starting circle, whose lowest point grazes the bedrock, and push
-it 1.2 ft deeper — **Depth** `-12` in place of `-10.7887` — then run it as a
+We take the second starting circle, whose lowest point grazes the bedrock, and
+push it 1.2 ft deeper — **Depth** `-12` in place of `-10.7887` — then run it as a
 **Single surface**. There is no answer:
 
 > **LEM run failed** — Failure surface extends outside the domain polygon
@@ -356,7 +356,7 @@ x = 12 and x = 34, and there is no soil down there to shear.
 
 The alternative to refusing such a circle is to cut it off at the boundary, and
 the Run LEM dialog has a checkbox for exactly that: **Composite surfaces
-(truncate circles at the base)**. Tick it and run the same circle again:
+(truncate circles at the base)**. We tick it and run the same circle again:
 
 ![Spencer on the truncated circle](images/lem06_solution_composite.png){width=1000}
 
@@ -380,9 +380,9 @@ follows.
 
 ### When the base decides
 
-Which layer is weak is a property of the soils, not of the geometry. Give the
-foundation c = 300 psf — below the fill's 400 — with everything else unchanged,
-and search again:
+Which layer is weak is a property of the soils, not of the geometry. Now we give
+the foundation c = 300 psf — below the fill's 400 — with everything else
+unchanged, and search again:
 
 ![Spencer on the same section with a weak foundation](images/lem06_solution_weak.png){width=1000}
 
@@ -391,7 +391,7 @@ bottoms out at elevation −10.85, grazing the bedrock, with 162,210 lb/ft of so
 above it and most of its base in the foundation. This is the surface the second
 starting circle was there to describe, and the search reached it from that seed.
 
-Run this one with composite surfaces on and it returns 0.782 — two tenths of a
+We run this one with composite surfaces on: it returns 0.782 — two tenths of a
 percent. A 3.4° dip is gentle enough that an ordinary circle can hug it for most
 of its length, so there is little left for truncation to add. The gap opens on a
 base that is steep or irregular, or on a soft seam lying directly on rock, where
@@ -419,7 +419,7 @@ stands because of what is buried in it. The [tutorials index](index.md) lists th
 series, and the sample problems carry each page further.
 [Sample Problem 11](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)
 catalogs this model, [DXF Import/Export](../usage/dxf.md) is the route from a
-CAD drawing to the `polygon` sheet this page filled by hand, and
+CAD drawing to the `polygon` sheet we filled by hand here, and
 [Composite Failure Surfaces](../lem/overview.md#composite-failure-surfaces)
 derives what the truncated surface does to the moment methods that assumed a
 constant radius.

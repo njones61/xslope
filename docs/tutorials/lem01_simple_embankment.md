@@ -54,10 +54,10 @@ The three vertices are the toe, the crest break — 20 ft up over 20 ft across, 
 1:1 face — and the back of the crest. Maximum depth = `0`, the elevation of the
 rigid base.
 
-The tables are the model, and each is laid out exactly as its destination is —
-the template's worksheets and Studio's editors, same columns in the same order.
-Select a table's block of values, copy, and paste it straight into the sheet or
-editor rather than retyping it.
+Each table above is laid out exactly as its destination — the template's
+worksheets and Studio's editors, same columns in the same order. Select a
+table's block of values, copy, and paste it straight into the sheet or editor
+rather than retyping it.
 
 ---
 
@@ -113,9 +113,8 @@ until you use **Save As**.
 
 ### Check its work
 
-This is the part that teaches. Read what it built against the section it was given,
-and correct it in the same conversation — plain sentences work, and each correction
-is undoable.
+Now we read what it built against the section it was given, and correct it in the
+same conversation — plain sentences work, and each correction is undoable.
 
 - **φ = 0.** Check this first: it is the judgment the drawing leaves to you, and the
   likeliest miss, because the drawing never states it. If the assistant supplied a
@@ -147,9 +146,9 @@ yours and compare. Continue at [Running the analysis](#running-the-analysis).
 Start from [input_template.xlsx](../inputs/input_template.xlsx) and save a copy under
 a name of your own.
 
-Fill the worksheets in the order the model depends on them: `main` first, since the
-unit system it declares is what every number after it means; then materials; then
-geometry; then the failure surface.
+We fill the worksheets in the order the model depends on them: `main` first, since
+the unit system it declares is what every number after it means; then materials;
+then geometry; then the failure surface.
 
 ### 1. The `main` worksheet
 
@@ -226,9 +225,9 @@ open the file in Studio and run it there.
 
 ## C — Building the problem in Studio {#c-building-the-problem-in-studio}
 
-Start with **File → New**, an empty project. Work down the **Inputs** tree in the
-order the model depends on: settings, then the material, then the geometry, then
-the starting circle.
+We start with **File → New**, an empty project, and work down the **Inputs** tree
+in the order the model depends on: settings, then the material, then the geometry,
+then the starting circle.
 
 ### 1. Global parameters
 
@@ -246,7 +245,7 @@ Click **OK**.
 
 ### 2. Materials
 
-Here you name each material in the model and enter its properties — unit weight
+Here we name each material in the model and enter its properties — unit weight
 and strength parameters. Everything else will reference the material by its ID,
 which is why it comes first. This problem has one material. Click **Materials**.
 The editor opens on **Table view**, a material per row; press **List view** for
@@ -301,8 +300,8 @@ face, its y-coordinate at twice the slope's height, and sizes the circle so it
 just touches the rigid base. You can type that — or have it built for you.
 
 Click **Circles**, then press **Generate starting circles…**. The generator reads
-the geometry you just entered and proposes the circle this page's Excel path types
-by hand — center (10, 40), above the middle of the face at twice the slope height,
+the geometry you just entered and proposes the same circle typed by hand on the
+Excel path — center (10, 40), above the middle of the face at twice the slope height,
 tangent to the rigid base.
 
 Its rule is the one to learn: **one circle through the toe, and one at the base of
@@ -316,16 +315,16 @@ the section.
 
 ![The circles editor on the generated circle](images/lem01_studio_circles.png)
 
-Audit what it made — the same check-its-work step the assistant path teaches —
-and click **OK**.
+Audit what it made — the same check-its-work step as on the assistant path — and
+click **OK**.
 
 Continue below.
 
 ## Running the analysis
 
-However you built it, you now hold the same model. Open Studio's Inputs view and
-compare against this before running anything — a geometry error is far cheaper to
-find here than in a factor of safety:
+However you built it, the model is now the same. Before running anything, open
+Studio's Inputs view and compare it against this — a geometry error is far cheaper
+to find here than in a factor of safety:
 
 ![The finished model](images/lem01_inputs_geometry.png){width=1000}
 
@@ -352,12 +351,12 @@ Click **Run LEM…**. Choose:
 
 ### The search result — and the warnings that come with it
 
-When the search completes, the search-results plot shows every circle it tried:
+When the search completes, the search-results plot shows every circle it tried in
+gray, the path its center walked in green, and the critical circle it settled on:
 
 ![The circular search](images/lem01_search.png){width=1000}
 
-The search plot shows every circle it tried in gray, the path its center walked in
-green, and the critical circle it settled on. Spencer's answer:
+Spencer's answer on that circle:
 
 ![Spencer's critical surface](images/lem01_solution_search.png){width=1000}
 
@@ -369,7 +368,7 @@ soil to do something soil cannot do — here, carry tension.
 
 ### Reading the anomaly
 
-Run the same search again with **Method** = `Bishop's Simplified`. Bishop satisfies
+Now we run the same search with **Method** = `Bishop's Simplified`. Bishop satisfies
 moment equilibrium only, and for a φ = 0 soil that has a useful consequence: on any
 one circle, every moment-equilibrium method — Bishop, Spencer, Morgenstern-Price —
 computes exactly the same factor of safety. They cannot disagree about a circle;
@@ -409,7 +408,7 @@ surface — in the field, it cracks. The theoretical depth of that tension crack
 
 $$ z_c = \frac{2c}{\gamma} = \frac{2 \times 500}{125} = 8 \text{ ft} $$
 
-Add the crack to the model:
+We add the crack to the model:
 
 - **Studio** — open **Global parameters** and set **Tension crack depth** = `8`
   (leave **Depth of water in crack** at `0`; the crack is dry).
@@ -420,7 +419,7 @@ The crack truncates every trial surface where it reaches 8 ft below the crest �
 model stops counting shear strength along the stretch the soil would have cracked
 away from.
 
-Run the Spencer search again:
+We run the Spencer search again:
 
 ![Spencer on the cracked model](images/lem01_solution_cracked.png){width=1000}
 
@@ -430,7 +429,7 @@ Bishop or Morgenstern-Price on the cracked model and they land on the *same* cir
 and the *same* 1.084 — once the model stops asking the soil to carry tension, the
 methods stop disagreeing.
 
-Two things worth carrying out of this:
+Two things to carry out of this:
 
 - **The cracked answer is lower.** 1.276 → 1.084 is a 15% drop: the uncracked model
   was counting cohesion along a stretch of surface that the soil would in reality
@@ -447,8 +446,8 @@ the tension zone behind a real slope crest is shallower. A crack just deep enoug
 to eliminate the tension is the smallest change that fixes the model — anything
 deeper removes strength the soil actually has.
 
-You can find that depth with the tool you just learned: re-run the search at a few
-trial depths and watch for the shallowest clean solution. On this slope the
+We can find that depth with the search itself: re-run it at a few trial depths and
+watch for the shallowest clean solution. On this slope the
 warnings persist at 4 ft, and clear at about **4¾ ft** — well short of the
 theoretical 8. Spencer there gives **FS = 1.107**, about 2% above the 8-ft
 answer, with no tension anywhere.

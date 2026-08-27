@@ -124,8 +124,8 @@ columns the `non-circ` worksheet and Studio's editor share:
 The two interior points sit inside the clay, so the segment between them is 19 ft
 of base running flat along the seam at y = −5.8 — a fifth of a foot above the
 contact at −6, which is 10% of the seam's 2 ft thickness. The deeper in the seam
-a track runs the lower the factor of safety it returns, worth 11% across the
-layer ([measured below](#where-the-track-belongs-inside-the-seam)), so the track
+a track runs the lower the factor of safety it returns — an 11% spread across the
+layer ([measured below](#where-the-track-belongs-inside-the-seam)) — so the track
 sits as low as it can while keeping clear of the contact itself. The two end
 segments are ramps: one down from the toe at x = 0, one up to the back of the
 crest. That shape — ramp down, run along the seam, ramp up — is the whole of a
@@ -139,16 +139,16 @@ here are the weak-layer pattern: the two end points are `Free`, so a search
 can walk the entry and exit along the ground, and the two seam points are
 `Horiz`, so the flat run can shift along the seam but never climb out of it.
 The column binds only once a search runs, and
-[what these settings do to one](#what-the-search-found) is the first thing this
-page measures. The surface does not have to be typed in by hand, either: these
+[what these settings do to one](#what-the-search-found) is the first thing we
+measure below. The surface does not have to be typed in by hand, either: these
 four points are what Studio's non-circular editor derives from the geometry when
 its **Generate from the weak zone…** button is pressed, as the
 [Studio path below](#3-generating-the-surface) shows.
 
-The tables are the model, and each is laid out exactly as its destination is —
-the template's worksheets and Studio's editors, same columns in the same order.
-Select a table's block of values, copy, and paste it straight into the sheet or
-editor rather than retyping it.
+Each table above is laid out exactly as its destination — the template's
+worksheets and Studio's editors, same columns in the same order. Select a
+table's block of values, copy, and paste it straight into the sheet or editor
+rather than retyping it.
 
 Three rules govern the non-circular failure surface table:
 
@@ -302,7 +302,7 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 ## C — Building it in Studio {#c-building-it-in-studio}
 
-Start with **File → New** and work down the **Inputs** tree.
+We start with **File → New** and work down the **Inputs** tree.
 
 ### 1. Materials, profile lines and water
 
@@ -314,8 +314,8 @@ the row order is what fixes the Mat IDs. The seam is the row to check: `Soft Cla
 
 Then **Profile lines**: set **Max depth (bottom boundary elevation):** to `-10`,
 and press **Add line** four times, each line taking its **Material:** and its
-vertices from the geometry tables above. The mechanics are
-[LEM-3's](lem03_layered_slope.md#c-building-it-in-studio), twice over. Selecting
+vertices from the geometry tables above. The mechanics are the same as in
+[LEM-3](lem03_layered_slope.md#c-building-it-in-studio), twice over. Selecting
 line 3 puts the top of the clay in the table, and the preview draws the seam
 inside the section:
 
@@ -367,9 +367,9 @@ button:
 > zone's thickness above its base from x = 0 to 39.1221, with a 28 degree ramp to
 > the ground at the toe; a 60 degree ramp to the ground at the crest.
 
-Every part of that line is auditable, and [worth auditing](#where-the-track-belongs-inside-the-seam):
-the zone it chose and the margin it chose it by, where in the seam the track
-runs, how far it reaches, and the angle of each end ramp. The rows land in the
+Every part of that line is auditable: the zone it chose and the margin it chose
+it by, [where in the seam the track runs](#where-the-track-belongs-inside-the-seam),
+how far it reaches, and the angle of each end ramp. The rows land in the
 table, so they can be edited before **OK**, and **Cancel** discards them.
 
 Four points is the whole shape: two on the ground and two where the end ramps
@@ -379,7 +379,7 @@ could not use it either, since an interior vertex may only slide horizontally an
 that slide would leave it on the same line. On a seam that dips, the same track
 keeps its intermediate vertices, because there sliding one does change the shape.
 
-The rows it lands are the model this page runs: the same four points, the same
+The rows it lands are the model we run below: the same four points, the same
 Movement settings. Press **OK** and continue below — but a generated surface is a
 *starting* shape rather than an answer, which is what the
 [search](#what-the-search-found) and the reading
@@ -387,7 +387,7 @@ Movement settings. Press **OK** and continue below — but a generated surface i
 
 ## Running the analysis
 
-However you built it, you now hold the same model:
+However you built it, the model is now the same:
 
 ![The finished model](images/lem05_inputs.png){width=1000}
 
@@ -410,10 +410,10 @@ non-circular counterpart.
 The dialog's own note says what the two analyses do — *"Single surface analyzes
 the first circle / the non-circular surface as entered. Auto-search refines from
 there to the critical surface."* **Auto search is the normal way to run a model,
-and it is what this page runs first**: the four points entered are where a search
-begins, not what it answers. `Single surface` solves them exactly as typed, and
-this page uses it further down — announced each time — wherever a comparison has
-to hold the surface still.
+and it is what we run first**: the four points entered are where a search begins,
+not what it answers. `Single surface` solves them exactly as typed, and we use it
+further down — announced each time — wherever a comparison has to hold the
+surface still.
 
 ---
 
@@ -426,7 +426,7 @@ and the critical one in red:
 
 ![The Spencer search on the four points](images/lem05_search.png){width=1000}
 
-**FS = 1.656.** Grey is every surface the search tried; red is the one it kept.
+**FS = 1.656.** Gray is every surface the search tried; red is the one it kept.
 It starts from the four points the model carries and walks them, taking whatever
 move lowers the factor of safety — and the **Movement** column is what says how
 each point may walk:
@@ -441,7 +441,7 @@ each point may walk:
 Both seam points slid along the seam toward the toe — 6.6 ft and 2.8 ft — and
 neither left y = −5.8. That is `Horiz` doing its work: the flat run stretched from
 19.3 ft to 23.1 ft without either end climbing out of the clay. The two end
-points travelled 7.6 ft and 1.7 ft and stayed on the ground surface, at y = 0 and
+points traveled 7.6 ft and 1.7 ft and stayed on the ground surface, at y = 0 and
 y = 10, which is what an entry or exit point does whatever its Movement says —
 `Free` is what lets it travel there at all. The entry point walked out past the toe onto the flat
 ground, which is what lengthens the sliding mass.
@@ -449,8 +449,8 @@ ground, which is what lengthens the sliding mass.
 Change the column and the search answers differently, and here `Horiz` is the
 setting that finds the lowest surface. With all four `Free` the interior points
 leave the track — one drops to the base of the seam at y = −6.00, the other
-climbs to −4.30 near its top contact — and the tilted run they leave behind is
-worth **1.727**. With the interior pair `Fixed` they cannot move at all, the ends
+climbs to −4.30 near its top contact — and the tilted run they leave behind
+returns **1.727**. With the interior pair `Fixed` they cannot move at all, the ends
 still slide, and the best the search reaches is **1.763**. A blank cell is
 `Fixed`, not a default.
 
@@ -466,8 +466,8 @@ black line against the shape you meant before reading the number on it.
 
 ### Which methods support non-circular surfaces {#which-methods-support-non-circular-surfaces}
 
-Ask for the same search with the Ordinary Method of Slices and the run is refused
-before it starts:
+If we ask for the same search with the Ordinary Method of Slices, the run is
+refused before it starts:
 
 > A non-circular search cannot be run with the Ordinary Method of Slices: it takes
 > moments about a circle center, which a non-circular surface does not have, so
@@ -499,7 +499,7 @@ against the limit below, where the other four enter the seam between 26.4° and
 ### The end ramps a search will start from {#the-end-ramps-a-search-will-start-from}
 
 A non-circular surface is steepest where it breaks out at the ground, and those
-two end ramps are the part of the shape a search is most particular about. Pull
+two end ramps are the part of the shape a search is most particular about. We pull
 the crest point in from x = 39.1 to x = 35 — which stands the exit ramp up from
 60° to 72.4° — leave everything else alone, and press **Run**. What comes back is
 a box titled **LEM run failed**:
@@ -519,8 +519,8 @@ The line is sharp: an exit ramp of 64.9° searches normally and reaches the same
 all five methods refuse the 72.4° seed.
 
 What is Spencer's, and every other method's, is what happens if that shape is
-solved anyway. Hold the 72.4° surface still — **Analysis** = `Single surface` —
-and the five read 2.014 (Janbu), 2.356 (M-P), 2.597 (Spencer), 3.713 (Corps) and
+solved anyway. We hold the 72.4° surface still — **Analysis** = `Single surface`
+— and the five read 2.014 (Janbu), 2.356 (M-P), 2.597 (Spencer), 3.713 (Corps) and
 13.223 (Lowe & Karafiath): a factor of six and a half across one geometry. At an
 82.4° exit Janbu and Lowe return no solution at all while the Corps method
 reports 10.710. Those are the answers the 65° cap exists to keep a search from
@@ -529,8 +529,8 @@ reporting as critical surfaces.
 Sixty-five degrees is the active-wedge inclination 45° + φ/2 for a φ of about 40°,
 the steep end of real soils. **The generator's ramps sit under it deliberately** —
 its hard ceiling is 60°, chosen below the search's limit — and on this section it
-builds 28° at the toe and 60° at the crest, which is why the surface this page
-runs is a seed a search will start from.
+builds 28° at the toe and 60° at the crest, which is why the surface we run here
+is a seed a search will start from.
 
 ### Where the track belongs inside the seam {#where-the-track-belongs-inside-the-seam}
 
@@ -538,7 +538,7 @@ runs is a seed a search will start from.
 run on the four points as typed, with only the two interior Y values changed. No
 search anywhere: a search would move the ends and the track together and each row
 would be an answer about a different shape, where the question here is what the
-depth alone is worth.
+depth alone changes.
 
 | Track elevation | −4.2 | −4.5 | −5.0 | −5.5 | **−5.8** | −6.0 |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -558,7 +558,7 @@ column, low in the seam and still clear of the contact itself.
 
 The seam is what the non-circular surface was drawn for, so the fair question is
 what a circle makes of the same ground — and the fair comparison is search against
-search. Add starting circles derived from the geometry and run the ordinary
+search. We add starting circles derived from the geometry and run the ordinary
 circular search with the same method:
 
 ![Spencer's critical circle on the same section](images/lem05_solution_circle.png){width=1000}
@@ -580,9 +580,9 @@ sides, where the polyline runs 23.1 ft along it.
 
 ### The generated surface as a starting point {#the-generated-surface-as-a-starting-point}
 
-The four points this page teaches are the weak-zone generator's own output.
-Solve them as they come — `Single surface`, said out loud because a held number
-and a searched one answer different questions:
+The four points used throughout this page are the weak-zone generator's own
+output. We solve them as they come — `Single surface`, said out loud because a
+held number and a searched one answer different questions:
 
 ![Spencer on the generated surface](images/lem05_solution_generated.png){width=1000}
 

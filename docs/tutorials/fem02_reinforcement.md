@@ -777,7 +777,7 @@ against each other rather than one at a time.
 
 ---
 
-## How much the residual is worth
+## How much the residual strength changes the answer
 
 The residual we entered above, 600 lb/ft, was one choice out of a range. Running
 the same model across the column — and running it blank, and running it at zero,

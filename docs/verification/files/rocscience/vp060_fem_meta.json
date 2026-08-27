@@ -1,12 +1,12 @@
 {
   "benchmark": "RS2-P4-VP60",
   "analysis": "ssrm",
-  "FS": 0.990625,
-  "expected_fs": "0.991",
+  "FS": 1.009375,
+  "expected_fs": "1.009",
   "file": "files/rocscience/vp060.xlsx",
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 2717,
-  "residual": 4.2199449433710755e-07,
-  "max_displacement": 0.0834165671444656
+  "iterations": 849,
+  "residual": 0.0009996091052226288,
+  "max_displacement": 3.42688183615214e-05
 }

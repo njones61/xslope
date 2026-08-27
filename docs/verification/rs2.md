@@ -377,7 +377,7 @@ piggyback row may cover fewer cases than the corpus row it links to.
 | [51](#p4-vp51) | 🟢 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | Spencer 1.300 vs Slide2 1.293 (+0.5%) | Own Part IV build, LEM (partial) — [details](#p4-vp51). RS2 SSRM 1.22; Slide2 GLE 1.304. |
 | [56](#rs2-33) | 🟢 | Homogeneous, water table, TC (Pockoski & Duncan slope 2) | SSRM 1.269 vs RS2 SSRM 1.28 (−0.9%) | Piggyback on [RS2-33](#rs2-33). Part IV publishes RS2 SSRM 1.26; an eight-program LEM table spans 1.02–1.32. |
 | [57](#p4-vp57) | 🟢 | Layered, TC (Pockoski & Duncan slope 3) | SSRM 1.323 vs RS2 SSRM 1.32 (+0.2%) | Own SSRM build carrying the vendor's T = 0 crack zone; the eight-program LEM table sits near 1.40. |
-| [60](#p4-vp60) | 🟢 | Soil-nailed wall (Pockoski & Duncan slope 7) | SSRM 0.991 vs RS2 SSRM 0.98 (+1.1%) | Own SSRM build with five passive nail rows rooted in the vertical wall face, just under XSLOPE's own Spencer 1.010. GOLD-NAIL 0.91 / UTEXAS4 1.02. |
+| [60](#p4-vp60) | 🟢 | Soil-nailed wall (Pockoski & Duncan slope 7) | SSRM 1.009 vs RS2 SSRM 0.98 (+3.0%) | Own SSRM build with five passive nail rows rooted in the vertical wall face, just under XSLOPE's own Spencer 1.010. GOLD-NAIL 0.91 / UTEXAS4 1.02. |
 | [61](#rs2-34) | 🟢 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | M-C: SSRM 1.373 vs RS2 SSRM 1.38 (−0.5%) · power curve: SSRM 1.497 vs RS2 SSRM 1.47 (+1.8%) | Piggyback on [RS2-34](#rs2-34). Part IV publishes RS2 SSRM 1.34 / 1.45; Baker 1.35 / 1.48. |
 | [62](#rs2-68) | 🟢 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) | Piggyback on [RS2-68](#rs2-68), Case 1. RS2 SSRM 0.96. |
 | [63](#rs2-68) | 🔴 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Bishop: k꜀ 0.169 vs Slide2 Bishop 0.155 (+9.0%) · Spencer: k꜀ 0.167 vs Loukidis Spencer 0.155 (+7.7%) | Piggyback on [RS2-68](#rs2-68), Case 3. The paper's Table 3 publishes Spencer 0.155 and no Bishop value for this example, so Slide2 is the Bishop authority. RS2's own SSRM k꜀ is 0.161, a cross-bearing here; Part IV's 0.99 is the SSR factor of safety RS2 reports at the paper's fixed k = 0.155, not a k꜀. |
@@ -3479,7 +3479,7 @@ convention); the soil elastic constants are the vendor model's own, E = 1×10⁶
 
 | Method | XSLOPE | RS2 SSRM | XSLOPE LEM | Slide2 | UTEXAS4 | GOLD-NAIL |
 |---|---|---|---|---|---|---|
-| SSRM (2.0 ft mesh) | 0.991 | 0.98 (+1.1%) | Spencer 1.010 / Janbu 1.043 | Spencer 1.009 / Janbu 1.041 | 1.02 / 1.08 | 0.91 |
+| SSRM (2.0 ft mesh) | 1.009 | 0.98 (+3.0%) | Spencer 1.010 / Janbu 1.043 | Spencer 1.009 / Janbu 1.041 | 1.02 / 1.08 | 0.91 |
 
 *The XSLOPE and Slide2 LEM values are on Slide's printed circle; the published spread is 0.91–1.02.*
 
@@ -3487,7 +3487,7 @@ The inclined nails root **on the vertical wall face**. A long inclined 1D line r
 boundary is meshed by splitting the soil surface along the line (an OCC boolean-fragment build) so
 the nail nodes are shared with the 2D mesh by construction, rather than embedded and edge-recovered
 — which leaves such wall-rooted lines non-conforming. With the nails conforming, XSLOPE's SSRM
-lands at **0.991** — squarely inside the published 0.91–1.02 spread, just under XSLOPE's own LEM
+lands at **1.009** — squarely inside the published 0.91–1.02 spread, just under XSLOPE's own LEM
 Spencer 1.010. For undrained φ = 0 clay the nail bond is adhesion-governed
 (stress-independent), so the fixed-ramp pull-out is faithful. Mesh-stable (0.991 at both 2.0 and 1.5 ft); the conforming mesh equilibrates at a uniform
 size without feature refinement. ψ = 0.
@@ -3496,7 +3496,7 @@ size without feature refinement. ψ = 0.
 eleven other models: a duplicate of the firm-soil foundation carrying *"Plasticity
 Specifications: None"* over 33.9% of the domain by area, which cannot yield at any
 strength-reduction factor. RS2's published 0.98 was produced with it; the corpus run above is
-unconstrained. The two agree to +1.1% anyway, but the comparison is not constrained-against-constrained the way
+unconstrained. The two agree to +3.0% anyway, but the comparison is not constrained-against-constrained the way
 [P4-VP67](#p4-vp67) and [P4-VP69](#p4-vp69) are, and the partition is the reason this row's
 agreement carries a caveat.
 
@@ -3506,15 +3506,15 @@ with a **tensile-strength cutoff T = 0** filling everything above a boundary tha
 face at el 22.5 and runs 40 ft down at the nails' own 15° declination to (38.637, 12.147) before
 running flat to the right edge — Slide's printed truncation point (17.157, 18.003), where the
 critical arc meets the crack, lies on it. That zone is 23% of the domain and covers the whole upper
-retained mass. Transcribed as a second material it costs **7.6%** of the factor: SSRM **0.916**
-against the 0.991 locked above, which moves the row from +1.1% on RS2's own SSR 0.98 to −6.5%. RS2
+retained mass. Transcribed as a second material it costs **9.2%** of the factor: SSRM **0.916**
+against the 1.009 locked above, which moves the row from +3.0% on RS2's own SSR 0.98 to −6.5%. RS2
 publishes 0.98 *with* the zone in place, so what separates the two is the treatment of a zero
 tensile cutoff on a φ = 0 clay rather than the geometry. The zone is therefore recorded here
 rather than carried, and the crack stays stated the LEM way, through `tcrack_depth`.
 
-<!-- test: file=files/rocscience/vp060.xlsx, type=fem_ssrm, expected_fs=0.991, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP60 -->
+<!-- test: file=files/rocscience/vp060.xlsx, type=fem_ssrm, expected_fs=1.009, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP60 -->
 
-![RS2 Part IV VP60: soil-nailed wall (P&D slope 7), SSRM 0.991 vs RS2 SSRM 0.98 — FEM inputs, mesh with the wall-rooted nails conforming into the 2D mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP60.png)
+![RS2 Part IV VP60: soil-nailed wall (P&D slope 7), SSRM 1.009 vs RS2 SSRM 0.98 — FEM inputs, mesh with the wall-rooted nails conforming into the 2D mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP60.png)
 
 ### RS2 Part IV VP64: USACE end-of-construction dam (Fig 4-1) {#p4-vp64}
 

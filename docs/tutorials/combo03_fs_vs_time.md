@@ -58,10 +58,9 @@ Part 2 sweeps already on it; [COMBO-2](combo02_rapid_drawdown.md) builds both
 
 ## Part 1 — Drained strengths at every instant
 
-SEEP-3's dam is the simpler of the two: both its zones carry drained
-effective-stress envelopes, so every point of the curve below is an ordinary
-effective-stress analysis run against the pore pressures the march computed for
-that moment.
+Part 1 uses the SEEP-3 dam. Both of its zones are assigned drained strengths
+(c′ and φ′), so at each saved time the analysis is an ordinary effective-stress
+analysis using the pore pressures from that time step.
 
 ### The dam and the drawdown
 

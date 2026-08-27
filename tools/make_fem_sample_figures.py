@@ -47,8 +47,10 @@ is drawn from the run committed beside it.
 
 The reinforcement sample's results panel is drawn here too, for the same reason:
 it labels every bar with the post-peak state the solve left it in, so it is a
-reading of a run and not a picture of a model. Its inputs and mesh panels, and
-all of the non-circular sample's figures, are still hand grabs with no producer.
+reading of a run and not a picture of a model. Its inputs panel is drawn here as
+well, because it carries the reinforcement lines and the marks they are drawn
+with are a plotting convention that changes under it. Its mesh panel, and all of
+the non-circular sample's figures, are still hand grabs with no producer.
 
     PYTHONPATH=. python3 tools/make_fem_sample_figures.py
 """
@@ -82,11 +84,13 @@ DPI = 200
 CASES = {
     "xslope_piles_fem": ("piles_fem", ("inputs", "mesh", "results")),
     "xslope_piles_fem_nopile": ("piles_fem_no_pile", ("results",)),
-    # The reinforcement sample contributes its results panel only. Its inputs and
-    # mesh pictures are hand grabs that the run does not touch; the results panel
-    # states a member's post-peak state on every bar, so it has to be drawn from
-    # the run the page reports rather than from a session nobody has.
-    "xslope_reinforce_fem": ("reinforce_fem", ("results",)),
+    # The reinforcement sample contributes its inputs and results panels. The
+    # results panel states a member's post-peak state on every bar, so it has to
+    # be drawn from the run the page reports rather than from a session nobody
+    # has; the inputs panel draws the reinforcement lines, whose marks are a
+    # plotting convention that changes, so it cannot stay a hand grab either.
+    # The mesh picture is still a hand grab that the run does not touch.
+    "xslope_reinforce_fem": ("reinforce_fem", ("inputs", "results")),
 }
 
 

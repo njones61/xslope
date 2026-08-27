@@ -596,7 +596,7 @@ def plot_pile_detail(profile, fig=None):
     # changes fastest, not where a band happens to touch it; on a row the
     # mechanism climbs over, the mark degenerated to a sliver at the head that
     # said nothing the shear-strain field did not say better (Norm 2026-08-25:
-    # keep it on reinforcement, drop it for piles).
+    # the band mark is drawn on neither reinforcement nor piles).
     for ax in axes:
         if profile.get("max_moment_depth") is not None:
             ax.axhline(profile["max_moment_depth"], color=C_PEAK, linewidth=0.8,

@@ -654,8 +654,8 @@ Those fields were solved on **2,080 nodes and 3,923 triangles**, linear triangle
 auto-sized at 100 divisions across the 750 ft section, a target element size of
 750/100 = 7.5 ft. We built
 [that mesh in COMBO-2](combo02_rapid_drawdown.md#meshing-and-both-solves) and
-[marched the pool on it](combo02_rapid_drawdown.md#marching-it); the file
-downloaded above arrives past both.
+[ran the transient seepage analysis on it](combo02_rapid_drawdown.md#marching-it);
+both are already done in the file downloaded above.
 
 ### Running the rapid drawdown sweep
 

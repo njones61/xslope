@@ -5,9 +5,9 @@ description: "Two rows of drilled shafts and a sheet pile wall on the same slope
 
 # Tutorial FEM-3 — Piles: LEM vs FEM
 
-This tutorial shows which of XSLOPE's two engines models which kind of pile,
-and why that is a question about the structural member itself — the pile row or
-the wall — rather than a matter of preference.
+Here we look at which of XSLOPE's two engines models which kind of pile, and why
+that is a question about the structural member itself — the pile row or the wall
+— rather than a matter of preference.
 Both engines read the same pile rows out of the same file, and they build
 different things from them.
 
@@ -24,21 +24,21 @@ width of section. Nothing is prescribed. The beam carries whatever the deforming
 soil pushes onto it, over its whole length rather than at one point, and the run
 reports the moment, shear, deflection and soil reaction down the member.
 
-Two things follow from that difference, and both are measured below. A
+Two things follow from that difference, and we measure both below. A
 two-dimensional analysis is **plane strain**: every member in it is continuous
 out of plane, so a discrete row put into the finite element engine is a wall
 with no gaps for soil to squeeze through. And a beam model computes what the
 limit equilibrium force assumes — whether the shaft can develop the moment its
 capacity allows — which turns out to depend on what holds the pile at its ends.
 
-Work through [LEM-12](lem12_piles.md) before this page: it builds the pile model
-used in the first half and covers the Ito & Matsui force, the structural
-capacities that cap it, and what spacing does to a limit equilibrium answer.
-[FEM-1](fem01_strength_reduction.md) covers strength reduction, meshing for a
-stability run and the controls on the Run FEM dialog. Neither is repeated here.
-[LEM-9](lem09_tieback_wall.md) is useful background for the second half, where a
-wall appears: it enters its soldier pile the other way, with the force stated
-directly per foot of wall.
+Work through [LEM-12](lem12_piles.md) first: that is where we build the pile
+model used in the first half, and it covers the Ito & Matsui force, the
+structural capacities that cap it, and what spacing does to a limit equilibrium
+answer. Strength reduction, meshing for a stability run and the controls on the
+Run FEM dialog are covered in [FEM-1](fem01_strength_reduction.md). Neither is
+repeated here. [LEM-9](lem09_tieback_wall.md) is useful background for the second
+half, where a wall appears: there the soldier pile is entered the other way, with
+the force stated directly per foot of wall.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -47,8 +47,8 @@ directly per foot of wall.
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Learn which engine models which kind of pile: why a plane-strain
-model turns a discrete row into a wall, what the pile tip is worth to each
-engine, what spacing does to both, and how to model a continuous wall and read
+model turns a discrete row into a wall, what the pile tip does to each engine's
+answer, what spacing does to both, and how to model a continuous wall and read
 the moment, shear and deflection it carries.
 </div>
 <p><span class="tg-pill">piles</span><span class="tg-pill">Ito &amp; Matsui</span><span class="tg-pill">pile spacing</span><span class="tg-pill">head and tip fixity</span><span class="tg-pill">beam elements</span><span class="tg-pill">smeared stiffness</span><span class="tg-pill">plane strain</span><span class="tg-pill">sheet pile wall</span><span class="tg-pill">continuous member</span><span class="tg-pill">strength reduction</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">1D element size</span><span class="tg-pill">shear strain</span><span class="tg-pill">moment and shear profiles</span></p>
@@ -56,11 +56,11 @@ the moment, shear and deflection it carries.
 **Pile row model** — [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx), the
 completed model from [LEM-12](lem12_piles.md), which is also
 [FEM sample problem 2](../fem/samples.md). It already carries both engines'
-inputs, so nothing is entered on the first half of this page
+inputs, so we enter nothing in the first half
 
 **Bare slope** — [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx),
-the slope with no structural member in it; it is run first, as the baseline both
-halves measure against, and the wall half builds on it
+the slope with no structural member in it; we run it first, as the baseline both
+halves measure against, and build the wall on it
 
 **Wall completed model** — [xslope_pile_wall.xlsx](files/xslope_pile_wall.xlsx),
 the same file with the wall row entered; open it to skip to
@@ -68,8 +68,7 @@ the same file with the wall row entered; open it to skip to
 mesh, so both are meshed on the page
 
 Each strength reduction run below takes from well under a minute to a few
-minutes, depending on the machine; the page only says which runs are the slow
-ones.
+minutes, depending on the machine; only the slow ones are called out below.
 </div>
 </div>
 
@@ -95,15 +94,15 @@ engines run on it as it stands.
 
 ### The slope on its own
 
-Before either member goes in, run the slope with nothing in it, both ways. Download
+Before either member goes in, we run the slope with nothing in it, both ways. Download
 [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx) and open it with
 **File → Open…** — the same slope with no structural line in it at all:
 
 ![The bare slope: the same section with nothing in it](images/fem03_inputs_wall.png){width=1000}
 
 The mode strip opens on **LEM**. **Run → Run LEM…**, `Spencer`, `Auto search`,
-40 slices, **Run**: **FS = 1.149**, the search
-[LEM-12](lem12_piles.md#what-the-two-rows-are-worth) runs on the same bare slope.
+40 slices, **Run**: **FS = 1.149**, the same search we run on this bare slope in
+[LEM-12](lem12_piles.md#what-the-two-rows-are-worth).
 
 ![Spencer's critical circle on the bare slope](images/fem03_lem_solution_bare.png){width=1000}
 
@@ -134,22 +133,21 @@ and reaching a few feet farther back.
 
 The two engines are 0.011 apart on the bare slope. Every larger difference
 between them on the rest of this page comes from how each engine models the
-piles or the wall, not from how it models the soil. Both halves of the page
-measure against these two numbers.
+piles or the wall, not from how it models the soil. Both halves below measure
+against these two numbers.
 
 ## The discrete pile row
 
-With the bare slope's two numbers in hand, the first member goes in: the two
-rows of drilled shafts from the sketch above, which are already in the model
-[LEM-12](lem12_piles.md) built. This half runs that model through both engines,
-compares the two answers, sweeps the spacing in each, and then follows the
-finite element answer down to the one input that decides it — how the shafts
-are held at their toes.
+With the bare slope's two numbers in hand, we put the first member in: the two
+rows of drilled shafts from the sketch above, already in the model we built in
+[LEM-12](lem12_piles.md). We run that model through both engines, compare the two
+answers, sweep the spacing in each, and then follow the finite element answer
+down to the one input that decides it — how the shafts are held at their toes.
 
 ### Opening the model and reading the pile rows
 
 Download [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx) and open it with
-**File → Open…**. The mode strip opens on **LEM**, which is where the first run
+**File → Open…**. The mode strip opens on **LEM**, which is where our first run
 happens.
 
 ![The pile model as it opens: two rows through the face and the starting circle](images/fem03_inputs_piles.png){width=1000}
@@ -190,20 +188,22 @@ the derivation from `D`. Hovering `S` says what each engine does with it:
 > arching between piles.
 
 `Appl` is `active`, meaning the computed force enters the equilibrium equations
-as it stands; the alternative, `passive`, divides it by the factor of safety,
-and [LEM-12](lem12_piles.md#the-pile-rows) reads the whole row column by column.
-Both rows open with `Head` and `Tip` on `free`; the finite element run below
-sets `Tip`, and a later section comes back to it. Click **Cancel**.
+as it stands; the alternative, `passive`, divides it by the factor of safety, and
+the whole row is read column by column in
+[LEM-12](lem12_piles.md#the-pile-rows). Both rows open with `Head` and `Tip` on
+`free`; we set `Tip` for the finite element run below, and come back to it in a
+later section. Click **Cancel**.
 
 ### The limit equilibrium answer
 
-The limit equilibrium run comes first because it is the reference the finite
-element run is read against, and because the file is already complete for it.
+We run the limit equilibrium analysis first because it is the reference the
+finite element run is read against, and because the file is already complete for
+it.
 
 Click **Run → Run LEM…**, set **Method** to `Spencer` and **Analysis** to
-`Auto search`, and leave the slice count at 40. Spencer is the method to compare
-against because it satisfies both force and moment equilibrium, which makes it
-the closest limit equilibrium statement of what a strength reduction run solves.
+`Auto search`, and leave the slice count at 40. We compare against Spencer
+because it satisfies both force and moment equilibrium, which makes it the
+closest limit equilibrium statement of what a strength reduction run solves.
 Click **Run**.
 
 ![Spencer's critical circle, with the two pile crossings marked](images/fem03_lem_solution_piles.png){width=1000}
@@ -213,8 +213,8 @@ and exits on the crest at x = 35. The two red dots are where it crosses the pile
 rows. The rows deliver **4,367.6 lb/ft** to the slices there — 15,244 lb from
 each shaft of the lower row and 10,962 lb from each of the upper, both of them
 limited by the shafts' moment capacity rather than by what the soil could
-supply; [LEM-12](lem12_piles.md#how-the-force-is-computed) works through that
-calculation.
+supply. That calculation is worked through in
+[LEM-12](lem12_piles.md#how-the-force-is-computed).
 
 <!-- Spencer's 1.842 on this same file at 40 slices is locked by the LEM sample tag on docs/lem/samples.md (Problem 10, fs_spencer=1.842); not duplicated here. -->
 
@@ -225,8 +225,8 @@ The same file, the same rows, the other engine. Switch the mode strip to
 first with **Run → Build Mesh…**
 
 Set **Element type** to **Quadratic triangles (tri6)** — a stability mesh has to
-be quadratic, and [FEM-1](fem01_strength_reduction.md#building-the-mesh)
-measures what linear elements cost. Untick **Auto-size from geometry** and set
+be quadratic, and in [FEM-1](fem01_strength_reduction.md#building-the-mesh) we
+measure what linear elements cost. Untick **Auto-size from geometry** and set
 **Target element size** to `2`, which is what the
 [FEM sample problem](../fem/samples.md) for this model uses. Leave the rest of
 the dialog alone and click **Build**.
@@ -253,17 +253,18 @@ Click **Run → Run FEM…**
 
 **Model checks — 1 warning**, and **Run** is enabled. The warning is the blank
 tensile cutoff `t_cut` on the clay, which lets it carry tension up to its
-Mohr-Coulomb apex, c/tan(φ) = 549.5 psf;
-[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) covers what
-that means and when to enter a cap. The note below it says that the two pile
+Mohr-Coulomb apex, c/tan(φ) = 549.5 psf; what that means and when to enter a cap
+are covered in
+[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction). The note
+below it says that the two pile
 rows carry a diameter with no `Area` or `I`, so the engine is deriving the solid
 circular section — the derivation described above, reported rather than assumed.
 
 Set **F min (SSRM)** to `1.00` and **F max (SSRM)** to `2.00`. A bracket has to
 contain the answer, and four of the runs below stand above 1.6 — the pile rows
 with their heads fixed, the same rows with their tips fixed, and the tip-fixed
-spacing sweep at all three of 3, 6 and 12 ft — so every run on this page uses the
-same 1.0 to 2.0 and the answers stay comparable.
+spacing sweep at all three of 3, 6 and 12 ft — so every run below uses the same
+1.0 to 2.0 and the answers stay comparable.
 Leave everything else as it is and click **Run**.
 
 **FS = 1.379**, from a final bracket of [1.3750, 1.3828] in nine trials — two
@@ -293,8 +294,8 @@ shaft is free to rotate about it.
 ### What decides the finite element answer
 
 Four runs locate what is holding that answer at 1.379. Each changes one thing on
-both rows, and each is the same bracket on the same mesh, so the numbers are
-comparable to the 1.379 above.
+both rows, on the same mesh and the same bracket, so the numbers are comparable
+to the 1.379 above.
 
 | Change | FS |
 | --- | :---: |
@@ -349,7 +350,7 @@ the only setting that changes anything, and it is the one that models the
 socketed shaft.
 
 Open **Piles**, set `Tip` to `fixed` on both rows, and **OK** — the mesh
-survives a fixity change, as it survived the spacing change. Run the same
+survives a fixity change, as it survived the spacing change. We run the same
 bracket again. This is the slowest run on the page, because its trials stand
 up to a higher factor and the bracket has further to walk.
 
@@ -387,7 +388,7 @@ shaft against the Ito & Matsui limit — the largest pressure the theory says so
 can exert on a pile in a row before it squeezes between the piles — and here the
 peak is 178% of that limit. In plane strain there is no gap to squeeze through,
 so the smeared wall takes a load a discrete shaft at this spacing never would;
-the panel is flagging exactly the idealization this page is about. Held at its
+the panel is flagging exactly the idealization at issue here. Held at its
 toe, the shaft finally develops the moment the limit equilibrium method assumed
 all along.
 
@@ -396,13 +397,13 @@ Set `Tip` back to `pinned` on both rows before the next section.
 ### What spacing does to each engine
 
 A designer adjusts the spacing once the diameter is set, and it is the input
-that separates the two engines most sharply. The sweep below runs both of them
-across a 4× range in spacing — 3, 6 and 12 ft, S/D 1.5 to 6 — with nothing
+that separates the two engines most sharply. In the sweep below we run both of
+them across a 4× range in spacing — 3, 6 and 12 ft, S/D 1.5 to 6 — with nothing
 changing but the `S` cell on the two rows. Ito & Matsui is applicable for S/D
 between about 2 and 8, so the 3 ft point sits below the band and raises the
-**Model checks** warning [LEM-12](lem12_piles.md#what-the-spacing-is-worth)
-discusses. Each limit equilibrium point is its own Spencer search, because
-spacing changes which surface governs.
+**Model checks** warning discussed in
+[LEM-12](lem12_piles.md#what-the-spacing-is-worth). Each limit equilibrium point
+is its own Spencer search, because spacing changes which surface governs.
 
 ![Factor of safety against pile spacing: the limit equilibrium curve and the two strength reduction lines](images/fem03_spacing_sweep.png){width=800}
 
@@ -533,8 +534,8 @@ The wall goes into the bare slope run [at the top of the page](#the-slope-on-its
 reopen [xslope_pile_wall_start.xlsx](files/xslope_pile_wall_start.xlsx) with
 **File → Open…** if another file is open.
 
-The wall goes in as one row of the piles table, and which cells it fills is the
-content of this step. Open **Piles** in the **Inputs** dock, press **Table
+The wall goes in as one row of the piles table, and which cells it fills is what
+this step is about. Open **Piles** in the **Inputs** dock, press **Table
 view**, and click **Add row**. The new row opens with its **Label** reading
 `Pile`; type `sheet pile wall` over it, which is the name the results panels
 use.
@@ -560,7 +561,7 @@ A new row also opens with **Appl** on `active` and both **Head** and **Tip** on
 `free`. `Appl` is inert here: it is a limit equilibrium input, and a strength
 reduction run never reads it. `Head` `free` is a driven sheet pile with no
 capping beam. Set `Tip` to `fixed`: a sheet pile is driven into the base, not
-stood on it, and the first half showed what that restraint is worth.
+stood on it, and the first half measured what that restraint does.
 
 Click **OK**.
 
@@ -703,6 +704,7 @@ This tutorial covered:
 **Where to go next:** [Piles and concrete piers in FEM](../fem/piles.md) carries
 the beam formulation, the assembly and the applicability rule in full, and
 [stabilizing piles in LEM](../lem/piles.md) carries the Ito & Matsui theory and
-the same rule from the other side; [LEM-12](lem12_piles.md) is the pile row on
-its own. For a sheet pile wall checked against a published analysis, see
+the same rule from the other side; in [LEM-12](lem12_piles.md) the pile row is
+analyzed on its own. For a sheet pile wall checked against a published analysis,
+see
 [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall).

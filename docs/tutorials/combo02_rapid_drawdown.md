@@ -5,9 +5,9 @@ description: "The Johnson Reservoir dam with its pool lowered 50 ft, from elevat
 
 # Tutorial COMBO-2 — Rapid Drawdown
 
-[COMBO-1](combo01_seepage_stability.md) ran the Johnson Reservoir dam under a
-standing reservoir. This page lowers that reservoir 50 ft over 45 days, after
-five days at full pool, so the pool reaches its residual level at day 50.
+In [COMBO-1](combo01_seepage_stability.md) we ran the Johnson Reservoir dam under
+a standing reservoir. Here we lower that reservoir 50 ft over 45 days, after five
+days at full pool, so the pool reaches its residual level at day 50.
 
 Lowering a pool removes the water pressing on the upstream face, which was
 holding the slope up. If the soil behind the face could shed its own pore water
@@ -19,15 +19,14 @@ against a strength it no longer has. Rapid drawdown is the analysis of that
 window.
 
 The procedure needs two states of the water — before the drawdown and after —
-and there are three ways to say where the water was in each. This page runs all
-three on one dam, one set of strengths and one starting circle, so the only
-thing that changes between the answers is the statement about the water. The
-page is
-in three parts, one per statement: **Part 1** draws the two states as two
-piezometric lines and runs no seepage at all; **Part 2** replaces the lines with
-two steady-state seepage solutions, one at each pool; **Part 3** replaces those
-with a single transient seepage run and reads the two states out of it. The
-three answers are then set side by side.
+and there are three ways to say where the water was in each. We run all three on
+one dam, one set of strengths and one starting circle, so the only thing that
+changes between the answers is the statement about the water. There are three
+parts, one per statement: in **Part 1** we draw the two states as two piezometric
+lines and run no seepage at all; in **Part 2** we replace the lines with two
+steady-state seepage solutions, one at each pool; in **Part 3** we replace those
+with a single transient seepage run and read the two states out of it. Then we
+set the three answers side by side.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -115,9 +114,9 @@ undrained strength is the lower of the two, and the drawdown is a strength
 problem. Stage 3 governing says the opposite — on at least some of those slices
 the undrained strength assigned in stage 2 came out *higher* than the drained
 strength at the same stresses, so what limits the slope is the ordinary drained
-strength at the drawn-down pore pressures. The
-[flip section](#the-governing-stage-flip) below moves this dam from one to the
-other and reports what it takes. Duncan, Wright and Brandon (2014) work the whole
+strength at the drawn-down pore pressures. In the
+[flip section](#the-governing-stage-flip) below we move this dam from one to the
+other and report what it takes. Duncan, Wright and Brandon (2014) work the whole
 procedure by hand in their Table 9.2, on two slip planes in one submerged infinite
 slope that are governed by different stages — the shallow one by stage 3 and the
 deep one by stage 2 — for the same reason: the stress each plane consolidated at.
@@ -156,19 +155,21 @@ The section is 750 ft long: a 100 ft foundation on rock at elevation 0, and an
 upstream and falls at about 2.1:1 downstream, with a compacted-clay core through
 the middle carried 40 ft into the foundation as a cutoff key. The reservoir
 stands at elevation 160 and the tailwater at 100. The drawdown this page runs
-lowers the pool 50 ft, to a residual reservoir 10 ft deep at elevation 110.
-[SEEP-2](seep02_johnson_dam.md) builds the model and covers the geometry in full.
+lowers the pool 50 ft, to a residual reservoir 10 ft deep at elevation 110. The
+model is built in [SEEP-2](seep02_johnson_dam.md), where the geometry is covered
+in full.
 
-Download [xslope_johnson_rapid_start.xlsx](files/xslope_johnson_rapid_start.xlsx)
-and open it with **File → Open…**. The toolbar's mode strip reads
+We start by downloading
+[xslope_johnson_rapid_start.xlsx](files/xslope_johnson_rapid_start.xlsx)
+and opening it with **File → Open…**. The toolbar's mode strip reads
 LEM | Seepage | FEM; leave it on **LEM** for now.
 
 ### The materials, and the one undrained zone
 
-The first of the three additions is the undrained envelope, and the place to
-see which material carries it is the materials table. Click **Materials** in
-the Inputs tree and set the **Show parameters for:** toggles to **LEM** alone,
-which narrows the table to the columns the drawdown run reads:
+The first of the three additions is the undrained envelope. To see which material
+carries it, click **Materials** in the Inputs tree and set the **Show parameters
+for:** toggles to **LEM** alone, which narrows the table to the columns the
+drawdown run reads:
 
 ![The three zones, with d and psi on the core alone](images/combo02_studio_materials.png)
 
@@ -183,8 +184,8 @@ core carries them. Its $K_c = 1$ envelope is $d = 250$ psf and $\psi = 14°$, we
 under its drained envelope of $c' = 400$ psf and $\phi' = 18°$. Over most of the
 core that makes the undrained strength the lower of the two and stage 2 governs,
 but the margin is thin: on the transient route below, five core slices come out
-stronger undrained than drained and hand the answer to stage 3.
-[The sweep](#the-governing-stage-flip) at the end of the page finds the value of
+stronger undrained than drained and hand the answer to stage 3. In
+[the sweep](#the-governing-stage-flip) at the end of the page we find the value of
 $d$ that separates the two. The shell and the foundation carry 0 on both
 columns, which declares them free-draining: they keep 100 psf and 35°, and
 100 psf and 27°, through every stage.
@@ -203,8 +204,8 @@ run rather than let a half-entered envelope pass.
 The first way to describe the two water states is also the simplest: a
 piezometric line for each, one at full pool and one drawn down, sketched from
 the piezometers or from judgment, with no seepage run behind either. The file
-already carries both lines; Part 1 looks at them and then runs the procedure on
-the pair.
+already carries both lines, so we look at them first and then run the procedure
+on the pair.
 
 ### The two lines
 
@@ -243,14 +244,15 @@ x = 550 out:
 
 Each line is only five or six points, and that is all a piezometric line
 usually is: **a statement about where the water table is, not a trace of a solved
-head field.** The engine reads it the way [LEM-4](lem04_water_in_the_slope.md)
-describes: the pore pressure at a slice base is the vertical distance from the
-base up to the line times the unit weight of water, 62.4 pcf, and zero where the
-base lies above the line. In practice Line 1 comes from piezometers in a dam that has been standing at full
-pool, and Line 2 comes from judgment about where those readings will settle once
-the pool is down and the dam has come back to equilibrium — a straightedge sketch
-between a few readings and a few assumptions. Where a seepage solution is available it
-replaces them, and the rest of this page measures what that replacement changes.
+head field.** The engine reads it as described in
+[LEM-4](lem04_water_in_the_slope.md): the pore pressure at a slice base is the
+vertical distance from the base up to the line times the unit weight of water,
+62.4 pcf, and zero where the base lies above the line. In practice Line 1 comes
+from piezometers in a dam that has been standing at full pool, and Line 2 comes
+from judgment about where those readings will settle once the pool is down and
+the dam has come back to equilibrium — a straightedge sketch between a few
+readings and a few assumptions. Where a seepage solution is available it replaces
+them, and in the rest of this page we measure what that replacement changes.
 
 The model checks hold the pair to the rest of the model: Line 2 may not stand
 above Line 1 anywhere, and each line has to leave the upstream face at the pool
@@ -285,13 +287,13 @@ zero where it meets the face at elevation 110. Neither was entered anywhere: wit
 piezometric lines where they stand above the ground surface. The difference between them, 3120 psf at
 the toe, is the load the drawdown takes away, and that removal is what the whole
 analysis is about. The red dashed arc marks the starting circle, and every search
-on this page begins from it.
+below starts from it.
 
 ### Running the drawdown on the pair
 
-With the envelope, the second line and the water load all on the file, the
-three-stage procedure can run. Switch to **LEM** (`Ctrl+1`) if the mode strip
-is elsewhere, and click **Run → Run LEM…**
+With the envelope, the second line and the water load all on the file, we can run
+the three-stage procedure. Switch to **LEM** (`Ctrl+1`) if the mode strip is
+elsewhere, and click **Run → Run LEM…**
 
 ![Run LEM, with Rapid drawdown ticked](images/combo02_studio_run_lem.png)
 
@@ -366,12 +368,12 @@ the head is everywhere, which is a stronger statement: it accounts for the flow
 through the core, the anisotropy of the zones, and the seepage face on the
 downstream slope, none of which a line drawn between piezometers knows about.
 Rapid drawdown can be given two of them — one at full pool and one at the
-drawn-down pool — and that is what Part 2 builds.
+drawn-down pool — and that is what we build next.
 
 ### Clearing the piezometric lines
 
-The two lines have done their work, and Part 2 replaces both of the jobs they
-did. Where a seepage analysis is defined, its head boundaries outrank the
+The two lines have done their work, and the seepage solutions replace both of the
+jobs they did. Where a seepage analysis is defined, its head boundaries outrank the
 piezometric line for the water loads, and the `u` column set to `seep` outranks
 it for pore pressure — a line answers only for a model that has neither. Left on
 the file, the pair would be read by nothing, so delete it before building the
@@ -384,7 +386,7 @@ without either line.
 
 ### The second boundary set
 
-The two water states are described to the seepage engine as two sets of
+We describe the two water states to the seepage engine as two sets of
 boundary conditions. Switch the mode strip to **Seepage** (`Ctrl+2`) and click
 **Seep BC** in the Inputs dock. The editor has two tabs.
 
@@ -415,8 +417,8 @@ foreshore and up the submerged part of the face:
 | 380 | 180 |
 | 550 | 100 |
 
-[SEEP-2](seep02_johnson_dam.md#4-boundary-conditions) is where the three boundary
-types and the no-flow default are worked through, and it solves this same set.
+The three boundary types and the no-flow default are worked through in
+[SEEP-2](seep02_johnson_dam.md#4-boundary-conditions), on this same set.
 
 **Set 2 (rapid drawdown)** is a second, independent boundary set on the same
 section. Its job is to describe the dam under the drawn-down pool, so that a
@@ -453,11 +455,11 @@ Click **OK**.
 
 ### Meshing, and both solves
 
-Both sets solve on one mesh, which has to be built first. Click
+Both sets solve on one mesh, so we build that first. Click
 **Run → Build Mesh…** and set **Element type** to **Linear triangles
 (tri3)**. Head is a scalar field, so there is nothing for a linear element to
 lock up on, and no strength reduction runs on this page — the
-[quadratic requirement COMBO-1 meets](combo01_seepage_stability.md#one-mesh-for-all-three-analyses)
+[quadratic requirement met in COMBO-1](combo01_seepage_stability.md#one-mesh-for-all-three-analyses)
 comes from the finite element stability engine, not from seepage. Element order
 also sets the cost of the transient march below, which takes thousands of steps
 on whatever mesh it is given.
@@ -498,8 +500,8 @@ blue flow lines running from the upstream face through the section to the exit
 face. The contours crowd where head falls fastest, and each channel between two
 flow lines carries an equal share of the discharge. Three-quarters of the head loss
 is in the core, which is what a cutoff key is for.
-([COMBO-1](combo01_seepage_stability.md#solving-it) reports 1.925 for the same
-boundary set on a quadratic mesh at the same 7.5 ft target — 8,082 nodes rather
+(In [COMBO-1](combo01_seepage_stability.md#solving-it) the same boundary set
+reads 1.925 on a quadratic mesh at the same 7.5 ft target — 8,082 nodes rather
 than 2,080, because quadratic elements add a node on every edge. The 1.6%
 between the two answers is that discretization, not the physics.)
 
@@ -528,16 +530,16 @@ figure to the other: the ramp spans 60 ft of head in Set 1 and 10 ft in Set 2.
 The seepage solutions exist, and nothing reads them yet. Switch back to **LEM**
 (`Ctrl+1`), open **Materials**, and set the **u** column to `seep` on all three
 rows. That column is what sends a solved field to every slice base, and it is set
-per material rather than once for the model;
-[COMBO-1](combo01_seepage_stability.md#the-column-that-connects-the-modes)
-covers its four values and what each one costs.
+per material rather than once for the model; we covered its four values and what
+each one costs in
+[COMBO-1](combo01_seepage_stability.md#the-column-that-connects-the-modes).
 
 A drawdown run reads **two** fields through that one column: `seep_u` from Set 1
 for stage 1, and `seep_u2` from Set 2 for stages 2 and 3. The checks refuse the
 run if either field is missing.
 
-Run **Run → Run LEM…** again with the same settings — Spencer, Auto search,
-40 slices, Rapid drawdown ticked. The search leaves the same starting circle and
+Now we run **Run → Run LEM…** again with the same settings — Spencer, Auto
+search, 40 slices, Rapid drawdown ticked. The search leaves the same starting circle and
 settles a little upstream of where the pair's did, at (245.31, 243.53) with a
 radius of 161.82 ft:
 
@@ -585,17 +587,17 @@ fields as the reservoir is lowered on a schedule, so the two stage fields are tw
 frames read out of one march rather than two independent solves assembled by
 hand.
 
-[SEEP-3](seep03_reservoir_drawdown.md) builds a transient model from nothing and
-covers the storage properties, the time series, the initial condition and the
-saved-frame schedule. The build below is the same shape on this dam, and the
-storage properties it needs are already on the materials table:
+In [SEEP-3](seep03_reservoir_drawdown.md) we build a transient model from
+nothing, covering the storage properties, the time series, the initial condition
+and the saved-frame schedule. What we build here is the same shape on this dam,
+and the storage properties it needs are already on the materials table:
 *S<sub>s</sub>* and *S<sub>y</sub>* of 1 × 10<sup>−4</sup> /ft and 0.22 on the
 shell, 1 × 10<sup>−3</sup> /ft and 0.03 on the core, 2 × 10<sup>−4</sup> /ft and
 0.15 on the foundation.
 
 ### Clearing boundary set 2
 
-The schedule built below states where the reservoir stands at every instant,
+The schedule we build below states where the reservoir stands at every instant,
 including the stage 2 time the drawdown reads its second field at, so Set 2 has
 nothing left to say and the transient route does not consult it.
 
@@ -640,8 +642,8 @@ drawdown so the dam's recovery toward its new steady state is in the answer too;
 the extra times put frames where the regular grid would miss them.
 
 **Stage 1 time (day)** `0` and **Stage 2 time (day)** `50`. These two fields are
-what a drawdown run reads, and SEEP-3 leaves them deliberately blank because a
-seepage page has no use for them. Stage 1 at t = 0 is the full-pool state the
+what a drawdown run reads; in SEEP-3 they are left blank, because a seepage run
+has no use for them. Stage 1 at t = 0 is the full-pool state the
 march starts from; stage 2 at t = 50 is the instant the pool reaches elevation
 110 and stops falling. Both are forced into the saved-frame schedule, so each is a
 *computed* frame rather than a blend of two neighbors. Set both or neither, and
@@ -667,8 +669,8 @@ returns the same 1.9566 ft³/day per ft as before, and says so in its log —
 
 ### Marching it
 
-With the schedule and the stage times on the file, the transient solve is one
-more run of the seepage dialog. Click **Run → Run Seep…**. The dialog has grown
+With the schedule and the stage times on the file, we march the transient solve
+from the same seepage dialog. Click **Run → Run Seep…**. The dialog has grown
 a **Run type** selector, which appears only on a file carrying a schedule; set it
 to **Transient (time-dependent)**. **Convergence tol** and **Max iterations** gray
 out — they belong to the steady solve, and the march sets its own step size from
@@ -691,7 +693,7 @@ the steady run — and then prints a line per saved frame:
   t=1000: frame saved (steps so far=1671, mass-balance closure=2.41e-02)
 ```
 
-This is the long run of the page, taking far longer than every other run on it.
+This is the long run of the page, taking far longer than any other on it.
 **Twelve frames** come out of it, at t = 0, 5, 35, 50, 80, 150, 200, 300, 400,
 600, 800 and 1000: the union of the save-interval grid, the extra
 save times, the schedule's own breakpoints, and the two stage times. **1,671
@@ -700,8 +702,8 @@ steps** sit behind them, and where the solver spent them is itself a reading:
 duration. The field moves while the pool is falling and barely at all afterward.
 
 The two frames the drawdown will read are the first and the fourth. The
-**Seep · Transient** tab holds one frame at a time; step its play bar back to
-t = 0:
+**Seep · Transient** tab holds one frame at a time, so we step its play bar back
+to t = 0:
 
 ![The t = 0 frame, full pool](images/combo02_frame_stage1.png){width=1000}
 
@@ -730,7 +732,7 @@ region has come back to within a few feet of the pool.
 
 ### The third answer
 
-That pocket is what the drawdown run reads next. Switch to **LEM** and run
+That pocket is what the drawdown run reads next. We switch to **LEM** and run
 **Run → Run LEM…** once more — Spencer, Auto search, 40 slices, Rapid drawdown
 ticked. The form has grown the group the schedule adds:
 
@@ -773,10 +775,10 @@ frame.
 **Stage 3 ran here, and it governs.** Five of the 12 core slices the same table
 counts came out stronger undrained than drained at these stresses, so the drained
 strength was substituted on them and the reported answer is stage 3's 1.0158 rather than
-stage 2's 1.0164. Six ten-thousandths separate the two. The
-[sweep below](#the-governing-stage-flip) finds why they are this close: the core's
-own $d$ of 250 psf sits 27 psf above the value at which the first slice crosses
-over.
+stage 2's 1.0164. Six ten-thousandths separate the two. In the
+[sweep below](#the-governing-stage-flip) we find why they are this close: the
+core's own $d$ of 250 psf sits 27 psf above the value at which the first slice
+crosses over.
 
 <!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.016, tolerance=0.005, benchmark=COMBO-2-transient -->
 
@@ -784,8 +786,8 @@ over.
 
 ## The three answers, and what brackets them
 
-The three parts used the same dam, the same strengths, the same Spencer solver
-and the same starting circle. Only the statement about the water changed, and
+In all three parts we used the same dam, the same strengths, the same Spencer
+solver and the same starting circle. Only the statement about the water changed, and
 each run searched from that circle for the surface its own water made critical:
 
 | Part | Two water states from | Critical circle | Stage 1 | Stage 2 | Stage 3 | **FS** |
@@ -849,10 +851,10 @@ field each was read on.
 
 ## The governing-stage flip
 
-Stage 2 governed the first two runs; stage 3 governed the transient one. Sweeping
-the core's undrained intercept $d$ across its 250 psf — $\psi$ held at 14°, the
-transient route otherwise fixed, a search of its own at every value — finds where
-control passes from one to the other.
+Stage 2 governed the first two runs; stage 3 governed the transient one. To find
+where control passes from one to the other, we sweep the core's undrained
+intercept $d$ across its 250 psf — $\psi$ held at 14°, the transient route
+otherwise fixed, a search of its own at every value.
 
 ![Stage 2, stage 3 and the reported answer against the core's Kc = 1 intercept](images/combo02_sweep.png){width=1000}
 
@@ -872,7 +874,7 @@ governing stage is saying the undrained strengths never controlled.
 
 ## Which source to use
 
-Three answers on one dam, and they are not equally good.
+We have three answers on one dam, and they are not equally good.
 
 **The transient frames are the most faithful statement of a drawdown.** They carry
 the actual lowering rate and the actual elapsed time, so the stage-2 field is how
@@ -933,7 +935,7 @@ This tutorial covered:
 
 **Where to go next:** [Rapid drawdown analysis](../lem/rapid.md) carries the
 equations, the time-factor rubric and the interpolation between the two envelopes
-in full. [SEEP-3](seep03_reservoir_drawdown.md) builds a transient drawdown model
-from nothing, [SEEP-2](seep02_johnson_dam.md) builds this dam,
-[COMBO-1](combo01_seepage_stability.md) runs it under a standing pool, and the
+in full. In [SEEP-3](seep03_reservoir_drawdown.md) we build a transient drawdown
+model from nothing; in [SEEP-2](seep02_johnson_dam.md) we build this dam, and in
+[COMBO-1](combo01_seepage_stability.md) we run it under a standing pool. The
 [tutorials index](index.md) lists the series.

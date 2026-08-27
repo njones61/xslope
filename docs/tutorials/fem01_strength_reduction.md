@@ -5,31 +5,31 @@ description: "A 50 ft embankment solved twice in XSLOPE — once with Spencer's 
 
 # Tutorial FEM-1 — Strength Reduction Basics
 
-Every stability tutorial before this one found a factor of safety by choosing a
-failure surface and checking the equilibrium of the soil above it. This one never
-chooses a surface. A finite element analysis meshes the whole slope, gives the
-soil a stiffness as well as a strength, and solves for the stress and the
-displacement at every point of it. The **strength reduction method** (SSRM on the
-dialogs) turns that solver into a stability analysis: it weakens the soil, step
-by step, until the slope can no longer hold itself up. Where it fails, and on
-what shape, is something the run reports rather than something you supply.
+In every stability tutorial before this one we found a factor of safety by
+choosing a failure surface and checking the equilibrium of the soil above it.
+Here we never choose a surface. A finite element analysis meshes the whole slope,
+gives the soil a stiffness as well as a strength, and solves for the stress and
+the displacement at every point of it. The **strength reduction method** (SSRM on
+the dialogs) turns that solver into a stability analysis: it weakens the soil,
+step by step, until the slope can no longer hold itself up. Where it fails, and
+on what shape, is something the run reports rather than something we supply.
 
-The example is a 50 ft embankment on a rigid base — one soil, no water, no
-loads — which is the simplest slope the method can be shown on. It is
-solved twice. First with **Spencer's method**, on its own search, and that
-answer is the reference everything after it is read against. Then the same
-model is meshed and run by **strength reduction**, and the two numbers are put
-side by side. In between are the three things a finite element stability run
-needs that a limit equilibrium run does not: two elastic properties, a mesh,
-and a set of convergence controls that decide whether the answer you are given
-is the answer the model has.
+Our example is a 50 ft embankment on a rigid base — one soil, no water, no
+loads — the simplest slope the method can be shown on. We solve it twice. First
+with **Spencer's method**, on its own search, and that answer is the reference
+everything after it is read against. Then we mesh the same model, run it by
+**strength reduction**, and put the two numbers side by side. In between come the
+three things a finite element stability run needs that a limit equilibrium run
+does not: two elastic properties, a mesh, and a set of convergence controls that
+decide whether the answer we are given is the answer the model has.
 
-[LEM-1](lem01_simple_embankment.md) built a slope of this kind from nothing and
-covers the geometry, the material and the circular search, and
-[SEEP-1](seep01_sheetpile.md#building-the-mesh) covers mesh building and element
-order; this page does not repeat either. It starts from a **starter file** that
-already carries the section, the soil strength and one starting circle, so the
-only inputs added here are the ones the finite element side needs.
+In [LEM-1](lem01_simple_embankment.md) we built a slope of this kind from
+nothing, covering the geometry, the material and the circular search, and mesh
+building and element order are covered in
+[SEEP-1](seep01_sheetpile.md#building-the-mesh); neither is repeated here. We
+start from a **starter file** that already
+carries the section, the soil strength and one starting circle, so the only
+inputs we add are the ones the finite element side needs.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -112,9 +112,8 @@ the only load is the soil's own weight.
 
 E and ν are on the sketch because the finished model carries them, but they are
 not in the starter file and the limit equilibrium run below does not want them.
-They are added
-[further down](#youngs-modulus-and-poissons-ratio), at the point where the
-finite element run refuses to start without them.
+We add them [further down](#youngs-modulus-and-poissons-ratio), at the point
+where the finite element run refuses to start without them.
 
 The section, the soil and the answer are
 [Griffiths & Lane's (1999) Example 1](../verification/ssrm.md#verification-griffiths1),
@@ -126,12 +125,12 @@ so both runs on this page have a published number to be checked against.
 
 Download [xslope_ssrm_embankment_start.xlsx](files/xslope_ssrm_embankment_start.xlsx)
 and open it with **File → Open…**. The toolbar's mode strip reads
-LEM | Seepage | FEM, and it opens on **LEM**, which is where the first run
+LEM | Seepage | FEM, and it opens on **LEM**, which is where our first run
 happens.
 
 Its global parameters are already set: **Units** `imperial`, so lengths read in
-feet, unit weights in pcf, and stresses, strengths and stiffnesses in psf.
-[SEEP-1](seep01_sheetpile.md#1-global-parameters) covers those fields.
+feet, unit weights in pcf, and stresses, strengths and stiffnesses in psf. Those
+fields are covered in [SEEP-1](seep01_sheetpile.md#1-global-parameters).
 
 The Inputs plot shows what the file carries:
 
@@ -142,8 +141,8 @@ elevation 0 standing for the rigid base, and one starting circle as a red dashed
 arc with its radius arrow — centered at (120, 80) with a radius of 80 ft, a
 base-tangent circle that touches the rigid base and leaves the face about 11 ft
 short of the toe, roughly where a slope of this shape is expected to fail.
-[LEM-1](lem01_simple_embankment.md) is where starting circles and what a search
-does with them are worked through.
+Starting circles, and what a search does with them, are worked through in
+[LEM-1](lem01_simple_embankment.md).
 
 ---
 
@@ -154,12 +153,11 @@ Click **Run → Run LEM…**
 ![Run LEM on the starter file](images/fem01_studio_run_lem.png)
 
 The dialog opens on **Spencer**, **Auto search** and 40 slices, which is what
-this run wants, so there is nothing to change. Spencer is the method to compare
-against later because it satisfies both force and moment equilibrium, which
-makes it the closest limit equilibrium statement of what a finite element run
-solves.
+this run wants, so there is nothing to change. We compare against Spencer later
+because it satisfies both force and moment equilibrium, which makes it the
+closest limit equilibrium statement of what a finite element run solves.
 
-Note the **Model checks** column: **No problems found for this run.** The file
+The **Model checks** column reads **No problems found for this run.** The file
 has no Young's modulus and no Poisson's ratio, and limit equilibrium does not
 care. Strength, geometry and weight are the whole of what it reads. Click
 **Run**.
@@ -175,7 +173,7 @@ percent of Spencer — one mechanism, found three ways.
 
 <!-- test: file=files/xslope_ssrm_embankment_start.xlsx, type=circular_search, num_slices=40, fs_spencer=1.376, fs_bishop=1.378, fs_mprice=1.375, tolerance=0.005 -->
 
-That number is the target. Everything below is a second, independent route to
+That number is our target. Everything below is a second, independent route to
 it.
 
 ---
@@ -286,9 +284,9 @@ better either,
 tabulates ranges by soil type in both kPa and psf.
 
 What a nominal stiffness costs, on this model and for the factor of safety, is
-nothing at all. The same mesh and the same bracket, all three at the default
-iteration budget, run at a tenth of the file's modulus, at it, and at ten times
-it:
+nothing at all. We run the same mesh and the same bracket, all three at the
+default iteration budget, at a tenth of the file's modulus, at it, and at ten
+times it:
 
 | E (psf) | vs. the file | SSRM FS | Largest displacement at *F* = 1 (ft) |
 | :---: | :---: | :---: | :---: |
@@ -397,7 +395,7 @@ yielded soil before it can balance, and the count climbs steeply: 490 at 1.3125,
 2,790 at 1.3438, and **11,904** at 1.3594, the highest trial that made it. Past
 the transition the count stops meaning anything, because there is nothing to
 converge to — the last trial, at 1.3672, was still moving after 36,000
-iterations when the search gave up on it. Read down that column and the method's
+iterations when the search gave up on it. Down that column the method's
 definition of failure stops being an abstraction: the slope does not snap at
 some *F*, it takes longer and longer to find equilibrium until there is no
 equilibrium to find.
@@ -407,8 +405,8 @@ equilibrium to find.
 ## The two convergence controls
 
 Two fields on that dialog decide how hard the search works, and they are easy to
-mix up, because both look like knobs for how carefully the run works. They are
-not the same kind of thing.
+mix up: both look like knobs for how carefully the run is done. They are not the
+same kind of thing.
 
 ### Tolerance is the width of the bracket
 
@@ -429,7 +427,7 @@ highest *F* that actually reached equilibrium. It climbs from 1.3438 to 1.3594
 to 1.3633 as the search is allowed to look between trials it previously skipped
 over, and the reported midpoint follows it up. The upper edge barely moves,
 because the failed trials above the transition fail wherever they are tried. The
-default is a sensible place to leave it: the last halving is worth 0.002.
+default is a sensible place to leave it: the last halving moves the answer 0.002.
 
 ### Max iterations per trial decides how long a near-critical trial may work
 
@@ -505,8 +503,8 @@ on **At failure**.
 
 ![The mechanism, found without assuming a surface](images/fem01_shear_strain.png){width=1000}
 
-This is the panel to read first, because it is the one that shows where the
-slope failed. The contours are the viscoplastic shear strain — the shearing
+We read this panel first, because it shows where the slope failed. The contours
+are the viscoplastic shear strain — the shearing
 that is left after the elastic response is subtracted — and the band they draw
 is the failure mechanism. It runs from the crest at about x = 50, down through
 the body of the slope, to a hot spot at the toe between x = 120 and x = 150,
@@ -561,7 +559,7 @@ had under its own weight before anything yielded.
 ### What failure actually looked like
 
 The run kept two fields, and putting them side by side is where the method's
-definition of failure becomes concrete. Switch **Field state** to **Last
+definition of failure becomes concrete. We switch **Field state** to **Last
 converged** to see the other one. The panel that comes up is as fully colored as
 the one before it, because Studio scales each field state to its own range. The
 number to read is the color bar beside it: it tops out around **0.008** instead
@@ -639,10 +637,10 @@ viscoplastic iteration, the four failure criteria, K0 initial stress, exclusion
 zones and the rest of the plot types;
 [the SSRM benchmarks](../verification/ssrm.md#verification-griffiths1) run this
 embankment and five more Griffiths & Lane problems against their published
-answers. [LEM-1](lem01_simple_embankment.md) is the same kind of slope solved by
-limit equilibrium from nothing, and
-[SEEP-1](seep01_sheetpile.md#building-the-mesh) works through mesh generation and
-element order on a problem where that choice is a trade rather than a
-requirement. [FEM-2](fem02_reinforcement.md) takes the method to a reinforced
-slope, where the bars carry a stiffness of their own and the two engines'
-answers begin to diverge, for reasons FEM-2 measures.
+answers. In [LEM-1](lem01_simple_embankment.md) the same kind of slope is solved
+by limit equilibrium from nothing, and in
+[SEEP-1](seep01_sheetpile.md#building-the-mesh) mesh generation and element order
+are worked through on a problem where that choice is a trade rather than a
+requirement. In [FEM-2](fem02_reinforcement.md) we take the method to a
+reinforced slope, where the bars carry a stiffness of their own and the two
+engines' answers begin to diverge — and we measure why.

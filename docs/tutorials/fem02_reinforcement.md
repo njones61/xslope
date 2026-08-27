@@ -5,8 +5,8 @@ description: "Six layers of geogrid in a 24 ft sand fill, solved by Spencer's me
 
 # Tutorial FEM-2 — Reinforcement: LEM vs FEM
 
-This tutorial shows how a finite element analysis models soil reinforcement and
-how its answer differs from the limit equilibrium answer for the same slope.
+Here we look at how a finite element analysis models soil reinforcement, and how
+its answer differs from the limit equilibrium answer for the same slope.
 Both engines read the same reinforcement lines out of the same file, and they do
 different things with them. A limit equilibrium method has no strain in it:
 wherever a trial surface crosses a line it adds the tensile force that line can
@@ -15,24 +15,24 @@ calculation. A finite element method meshes each line into a row of bar elements
 sharing nodes with the soil around them, and the force in every one of those
 elements comes out of how far the soil beside it has moved.
 
-The example is the geogrid-reinforced sand fill from
+Our example is the geogrid-reinforced sand fill from
 [LEM-8](lem08_reinforced_slope.md) — six layers of geogrid in a 24 ft fill under
-a crest surcharge — and it is solved three times. Spencer's method gives the
-reference answer. Then the same model is meshed and run by **strength
+a crest surcharge — and we solve it three times. Spencer's method gives the
+reference answer. Then we mesh the same model and run it by **strength
 reduction** twice: once with the layers holding their full strength after they
 yield, which is what every mainstream finite element code assumes unless told
 otherwise, and once with a residual capacity that takes effect after the layer
 ruptures.
 
-Work through [LEM-8](lem08_reinforced_slope.md) before this page if you have
-not: it built this model and covers reinforcement lines, the capacity envelope
-and pullout lengths, all of which this page leans on.
-[FEM-1](fem01_strength_reduction.md) covers strength reduction, meshing for a
-stability run and the controls that decide whether a trial is allowed to finish.
-This page does not repeat either. It starts from a **starter file** that carries
-the whole LEM-8 model and nothing else, so the inputs added here are the ones the
-finite element engine needs and the limit equilibrium engine does not: the soils'
-two elastic properties, and three columns on every reinforcement line.
+Work through [LEM-8](lem08_reinforced_slope.md) first if you have not: that is
+where we built this model, and it covers reinforcement lines, the capacity
+envelope and pullout lengths, all of which we lean on here. Strength reduction,
+meshing for a stability run and the controls that decide whether a trial is
+allowed to finish are covered in [FEM-1](fem01_strength_reduction.md). Neither is
+repeated here. We start from a **starter file** that carries the whole
+LEM-8 model and nothing else, so the inputs we add are the ones the finite
+element engine needs and the limit equilibrium engine does not: the soils' two
+elastic properties, and three columns on every reinforcement line.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -43,7 +43,7 @@ two elastic properties, and three columns on every reinforcement line.
 **Objectives** — Learn how reinforcement enters a finite element stability
 analysis: the two limits a reinforcement model carries, the axial stiffness the
 run needs, how to read what each layer is doing at the factor of safety, and how
-much the post-peak assumption is worth.
+much the post-peak assumption costs.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">reinforcement lines</span><span class="tg-pill">capacity envelope</span><span class="tg-pill">pullout length</span><span class="tg-pill">bar elements</span><span class="tg-pill">axial stiffness</span><span class="tg-pill">elastic-perfectly-plastic</span><span class="tg-pill">residual capacity</span><span class="tg-pill">strength reduction</span><span class="tg-pill">quadratic triangles</span><span class="tg-pill">thin zones</span><span class="tg-pill">iteration budget</span><span class="tg-pill">overburden pullout</span><span class="tg-pill">1D details</span><span class="tg-pill">shear strain</span></p>
 <div class="tgm-model" markdown>
@@ -75,17 +75,17 @@ perpendicular to it; its 300 psf of cohesion keeps the search off the face. Six 
 the face. Each develops **800 lb/ft** of tension over a pullout length of
 **4 ft at both ends**, which is the published example's own value. It treats the
 two ends as alike, and they are not — the buried end carries 4 to 16 ft of fill
-and the face end almost none — so
-[pullout from the overburden](#pullout-from-the-overburden) below runs the same
+and the face end almost none — so in
+[pullout from the overburden](#pullout-from-the-overburden) below we run the same
 model with the bond read from the depth of burial instead.
 
 The sketch shows the soils' elastic properties, E = 1.0 × 10<sup>6</sup> psf and
 ν = 0.3, the geogrid's axial stiffness, *EA* = 80,000 lb/ft, and its residual
 capacity, 600 lb/ft, because the finished model carries them; none of the four is
-in the starter file, and all are entered on this page when the finite element run
-calls for them. The geometry, the soils and the reinforcement are Example 5 from
-the UTEXASED user manual, and [LEM-8](lem08_reinforced_slope.md) builds all of
-it from nothing.
+in the starter file, and we enter all of them as the finite element run calls for
+them. The geometry, the soils and the reinforcement are Example 5 from the
+UTEXASED user manual, built from nothing in
+[LEM-8](lem08_reinforced_slope.md).
 
 ---
 
@@ -93,7 +93,7 @@ it from nothing.
 
 Download [xslope_reinforced_slope_start.xlsx](files/xslope_reinforced_slope_start.xlsx)
 and open it with **File → Open…**. The toolbar's mode strip opens on **LEM**,
-which is where the first run happens. Units are `imperial`, so lengths read in
+which is where our first run happens. Units are `imperial`, so lengths read in
 feet, unit weights in pcf, and stresses, strengths and stiffnesses in psf.
 
 ![The starter file: two profile lines, six reinforcement lines, the crest surcharge and two starting circles](images/fem02_inputs.png){width=1000}
@@ -107,16 +107,16 @@ two dashed red arcs are the starting circles the search begins from.
 
 ## The limit equilibrium answer
 
-The limit equilibrium run comes first because it gives the reference the two
-finite element runs are read against, and because the starter file is already
+We run the limit equilibrium analysis first because it gives the reference the
+two finite element runs are read against, and because the starter file is already
 complete for it.
 
 Click **Run → Run LEM…**, choose **Method** = `Spencer` and **Analysis** =
 `Auto search`, and leave the slice count at 40. **Model checks** reads
 *No problems found for this run*.
-Spencer is the method to compare against because it satisfies both force and
-moment equilibrium, which makes it the closest limit equilibrium statement of
-what a finite element run solves. Click **Run**.
+We compare against Spencer because it satisfies both force and moment
+equilibrium, which makes it the closest limit equilibrium statement of what a
+finite element run solves. Click **Run**.
 
 ![Spencer's critical circle through the reinforced block](images/fem02_lem_solution.png){width=1000}
 
@@ -125,8 +125,8 @@ with a radius of 47.26 ft. The surface daylights at the toe, cuts up through the
 reinforced block and comes out on the crest at **x = 36.2**, behind the last
 geogrid. It crosses five of the six layers and takes 800 lb/ft from each of
 them, for 4,000 lb/ft of tension in total.
-[LEM-8](lem08_reinforced_slope.md#where-the-surface-meets-the-lines) works
-through that crossing-by-crossing.
+That crossing-by-crossing is worked through in
+[LEM-8](lem08_reinforced_slope.md#where-the-surface-meets-the-lines).
 
 <!-- test: file=files/xslope_reinforced_slope_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.587, tolerance=0.005 -->
 
@@ -155,8 +155,8 @@ The bond limit can be stated either way. Those codes compute bond from the
 stress on the layer-soil interface, so the length a layer needs to develop its full
 capacity depends on how deep it is buried; XSLOPE offers that form through the
 `Adhesion` and `Delta` columns, and reads the length directly from the input —
-the pullout lengths `Lp1` and `Lp2` — when they are left blank, which is what
-this page does. The distinction between the two limits matters when the
+the pullout lengths `Lp1` and `Lp2` — when they are left blank, which is what we
+do here. The distinction between the two limits matters when the
 results are read: the 1D Details panel reports whether a line reached its bond
 limit (**pullout**) or its rupture limit (**yielded**), and the two mean
 different things for the design.
@@ -169,8 +169,8 @@ ramps from zero at an end up to the full 800 lb/ft over that length, and past it
 the embedment can develop the whole capacity. Here the ramp is 4 ft at each end.
 (Stating `Adhesion` and `Delta` instead makes that ramp follow the effective
 overburden along the line rather than rise at a fixed rate; this model uses the
-lengths, and [the section below](#pullout-from-the-overburden) runs it the other
-way.) The ramp
+lengths, and in [the section below](#pullout-from-the-overburden) we run it the
+other way.) The ramp
 and the plateau together are the **capacity envelope**. Bond is **perfectly plastic**:
 when the force reaches what the embedment can develop, the line slips there and
 goes on carrying that force. Interface friction does not disappear once it has
@@ -182,9 +182,9 @@ geogrid itself. What happens after it is reached is the `Tres` column: leave it
 blank and the line holds its capacity indefinitely while the soil around it goes
 on straining, which is the **elastic-perfectly-plastic** model and the industry
 default; enter a number and a ruptured element drops to that residual; enter
-zero and it ruptures brittly and carries nothing afterwards. This page runs the
-blank case first, because it is what a published reinforced-slope analysis
-assumes unless it says otherwise.
+zero and it ruptures brittly and carries nothing afterwards. We run the blank
+case first, because it is what a published reinforced-slope analysis assumes
+unless it says otherwise.
 
 ![The same layer, seen by each engine](images/fem02_bar_two_engines.png){width=1000}
 
@@ -218,10 +218,10 @@ type.
 
 ## Building the mesh
 
-The model has to be meshed before the finite element engine can run. On a
+We have to mesh the model before the finite element engine can run. On a
 reinforced slope the mesh also sets where each bar element falls along its
 line, and with it the capacity that element gets from the envelope. Two of the
-Build Mesh defaults are changed here because of that.
+Build Mesh defaults change here because of that.
 
 Switch the mode strip to **FEM**. **Run → Run FEM…** stays disabled until a mesh
 exists, so build one first. Click **Run → Build Mesh…**
@@ -244,8 +244,8 @@ model.
 
 Untick **Refine thin zones** as well. Checked — and it is checked by default —
 the mesher guarantees about four element rows across every thin material zone;
-the thin zone here is the `shell`, the cohesive band down the face. On this
-model the box is left off, for a reason particular to this slope. The fill is a
+the thin zone here is the `shell`, the cohesive band down the face. We leave the
+box off on this model, for a reason particular to this slope. The fill is a
 37° sand on a 1.25:1 face — a face slightly steeper than its friction angle —
 and only the cohesive band holds the face up. Resolve that band finely enough,
 by ticking the box or by shrinking the whole mesh, and the model begins to find
@@ -253,9 +253,9 @@ a second, real mechanism: shallow sloughing of the sand face, the same one a
 tiny starting circle on the face would find in the limit equilibrium search.
 The reported factor of safety then drifts down toward the sloughing answer
 (from 1.51 at this page's mesh to 1.43 at 1 ft elements, on the run with a
-residual) — a different failure, not a better estimate of this one. This page
-is about the general mechanism through the reinforced block, the one Spencer's
-circle finds, so it stays on the published sample's mesh, where that mechanism
+residual) — a different failure, not a better estimate of this one. We are after
+the general mechanism through the reinforced block, the one Spencer's circle
+finds, so we stay on the published sample's mesh, where that mechanism
 governs. To study a fine mesh and still hold the search on the general
 mechanism, the Run FEM dialog has the tools: **Ignore surficial (skin)
 failures** with a **Min slip depth**, or an **SSR exclusion** over the face
@@ -286,11 +286,11 @@ The mesh exists, but the run cannot start on it yet. The starter carries the
 limit equilibrium model and nothing beyond it, so every input the continuum
 needs is still blank: the two elastic properties on each soil, and two of the
 three finite element columns on each reinforcement line. Opening **Run → Run
-FEM…** now would show the same refusal
-[FEM-1](fem01_strength_reduction.md#youngs-modulus-and-poissons-ratio) walked
-through — errors naming each blank input, with **Run** disabled — so this
-section goes straight to entering them, soils first, because what a layer's
-stiffness does depends on the stiffness of the soil it is buried in.
+FEM…** now would show the same refusal we walked through in
+[FEM-1](fem01_strength_reduction.md#youngs-modulus-and-poissons-ratio) — errors
+naming each blank input, with **Run** disabled — so we go straight to entering
+them, soils first, because what a layer's stiffness does depends on the stiffness
+of the soil it is buried in.
 
 Click **Materials** in the Inputs dock. On **Table view**, set
 the **Show parameters for:** toggles to **FEM** alone, and give both soils an
@@ -307,11 +307,11 @@ problem gives you nothing better.
 
 ![The materials table with both soils' elastic properties entered](images/fem02_studio_materials.png)
 
-A single round modulus is used for both layers here rather than values from a
-soil-type table, and
+We use a single round modulus for both layers here rather than values from a
+soil-type table, and we measure
 [what a stiffness does and does not change](#what-the-two-stiffnesses-change)
-is measured further down, because on a reinforced model the answer is different
-from the one FEM-1 reports. Click **OK**.
+further down, because on a reinforced model the answer differs from the one in
+FEM-1. Click **OK**.
 
 The reinforcement's two columns are next. Open **Reinforcement** in the Inputs
 dock, and set the **Show parameters for:** toggles to **FEM** alone, as on the
@@ -349,7 +349,7 @@ under a name of your own.
 ## The iteration budget
 
 Two controls on the Run FEM dialog decide how long each trial is allowed to
-iterate. Neither needs changing for this page; what they do matters on the first run.
+iterate. Neither needs changing here; what they do matters on the first run.
 
 **Max iterations per trial**, which opens at **12,000**, is the budget each
 trial reduction factor starts with. It is a budget rather than a limit: a
@@ -393,16 +393,16 @@ against Spencer's before any post-peak assumption is added on top of it. Click
 
 **Model checks — 2 warnings**, and **Run** is enabled. Both warnings are
 expected on this model. The first is the blank tensile cutoff `t_cut`, which
-lets each soil carry tension up to its Mohr-Coulomb apex —
-[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction) works
-through what that means and when to enter a cap. The second is the thin `shell`
+lets each soil carry tension up to its Mohr-Coulomb apex; what that means and
+when to enter a cap are worked through in
+[FEM-1](fem01_strength_reduction.md#running-the-strength-reduction). The second is the thin `shell`
 zone, which is the refinement declined during meshing.
 
 The rest of the dialog opens on the defaults this run wants: **SSRM (find FS)**,
 a bracket of 1.00 to 2.00, a tolerance of 0.0100, **Rollers** on the sides, and
 **Non-convergence** as the failure criterion — the plain reading, that a trial
-which cannot reach equilibrium has failed. FEM-1 compares it against the three
-other criteria the list offers. Click **Run**.
+which cannot reach equilibrium has failed. In FEM-1 we compare it against the
+three other criteria the list offers. Click **Run**.
 
 **FS = 1.566**, from a final bracket of [1.5625, 1.5703], in seven bisection
 steps. This is **1.8% below** Spencer's 1.587. The two engines solve the
@@ -453,8 +453,8 @@ where it is most utilized. It is at 97%, its hardest-worked element sitting 1 ft
 in from the face carrying 193 of the 200 lb/ft its embedment develops there.
 That point is working against its bond limit, not its rupture limit.
 
-Line 5 is one of the five that yield, and it carries both limits at once, so it
-is the one to open:
+Line 5 is one of the five that yield, and it carries both limits at once, so we
+open that one:
 
 ![Line 5 at the last converged trial, elastic-perfectly-plastic](images/fem02_bar_profile_epp.png){width=1000}
 
@@ -701,10 +701,10 @@ resistance — which is what FHWA directs for a live load.
 
 ## Why the two answers differ
 
-The three runs the page compares are finished and no two of them agree. The disagreement has two
-separate sources, and this section separates them: the post-peak assumption,
-which the section above already measured, and the different ways the two engines
-decide what force a reinforcement line carries.
+Our three runs are finished and no two of them agree. The disagreement has two
+separate sources: the post-peak assumption, which the section above already
+measured, and the different ways the two engines decide what force a
+reinforcement line carries.
 
 Three readings of the same slope, from the same file:
 
@@ -715,7 +715,7 @@ Three readings of the same slope, from the same file:
 | Strength reduction, layers with a 600 lb/ft residual | 1.496 |
 
 The gap between Spencer and the peak-residual run is 0.091, and the section
-above measured what post-peak behavior is worth: **0.070 of it**. The other
+above measured what post-peak behavior costs: **0.070 of it**. The other
 0.021 separates Spencer from the elastic-perfectly-plastic run, which is the
 same physical assumption about the layers — hold capacity once yielded — applied
 two different ways.
@@ -729,7 +729,7 @@ than 97% of what its embedment allows at the face, four of the six lines are hel
 at their buried tips by 200 lb/ft of bond once the residual is in play, and the
 force in every layer tapers away from the shear band instead of standing at its
 envelope value everywhere. Prescribing the maximum available force at one point
-is the more generous of the two, and 1.8% is what that generosity is worth on
+is the more generous of the two, and 1.8% is what that generosity amounts to on
 this slope.
 
 The mechanisms differ in the same direction. Spencer's circle had to be a
@@ -742,11 +742,11 @@ search had on offer.
 
 ## What the two stiffnesses change
 
-[FEM-1](fem01_strength_reduction.md#where-e-comes-from-and-what-it-changes)
-measured that a hundredfold sweep in Young's modulus left the factor of safety
+In [FEM-1](fem01_strength_reduction.md#where-e-comes-from-and-what-it-changes)
+we measured that a hundredfold sweep in Young's modulus left the factor of safety
 identical to every printed digit. A reinforced slope has a second stiffness in
-it — the layers' — and the two do not have to move together, so that result needs
-checking here rather than assuming.
+it — the layers' — and the two do not have to move together, so we check that
+result here rather than assume it.
 
 The same run, at the same mesh and bracket, with the soils' modulus and the
 layers' modulus scaled separately:
@@ -769,8 +769,8 @@ allows and there is nothing further to mobilize.
 Scale the layers by the same ten as the soil and the answer returns to 1.5586, to
 the printed digit and from the same bracket. What a reinforced finite element
 model responds to is the **ratio** of soil stiffness to layer stiffness, not the
-absolute value of either. FEM-1's invariance holds only where there is one
-stiffness to sweep; put a second one in the model and the pair matters. A round
+absolute value of either. The invariance measured in FEM-1 holds only where there
+is one stiffness to sweep; put a second one in the model and the pair matters. A round
 soil modulus against a catalog number for the geogrid is a modeling decision with
 a real consequence for the factor of safety, and the two values should be chosen
 against each other rather than one at a time.
@@ -779,7 +779,7 @@ against each other rather than one at a time.
 
 ## How much the residual is worth
 
-The residual entered above, 600 lb/ft, was one choice out of a range. Running
+The residual we entered above, 600 lb/ft, was one choice out of a range. Running
 the same model across the column — and running it blank, and running it at zero,
 which is brittle rupture — measures how much the answer depends on that choice:
 
@@ -805,7 +805,7 @@ mostly *whether* there is a residual, not how large it is: the step from holding
 capacity to shedding to three quarters of it is 4.5% of factor of safety, and a
 third of the residual range below that — 600 down to 400 — is invisible at this
 bisection tolerance. The second is that the whole range, from a blank cell to a
-brittle zero, is worth 0.094, about 6%. Leaving `Tres` blank claims the geogrid
+brittle zero, spans 0.094, about 6%. Leaving `Tres` blank claims the geogrid
 holds its capacity once it yields, which is what the mainstream codes assume and
 what most published capacities describe; entering zero claims it snaps. Neither
 claim is one a catalog value settles, and the meshing step showed that the answer
@@ -833,16 +833,15 @@ This tutorial covered:
 - Reading a reinforced result: the mechanism out of shear strain, and each
   layer's force profile, bond transfer and verdict out of the 1D details panel at
   the last converged trial.
-- What the two engines' answers are worth against each other, a residual
-  capacity that lands on steps rather than a curve, and what changes when the
-  bond is read from the depth of burial instead of a stated length.
+- How the two engines' answers stand against each other, a residual capacity that
+  lands on steps rather than a curve, and what changes when the bond is read from
+  the depth of burial instead of a stated length.
 
 **Where to go next:** [Soil reinforcement in FEM](../fem/reinforcement.md) and
-[soil reinforcement in LEM](../lem/reinforcement.md) carry both formulations;
-[LEM-8](lem08_reinforced_slope.md) builds this model from nothing and measures
-what the geogrid is worth against the bare section;
-[FEM-1](fem01_strength_reduction.md) is strength reduction on an unreinforced
-embankment.
-[FEM-3](fem03_piles.md) puts stabilizing piles through the same two-engine
-comparison, and measures which engine a discrete row belongs in and which a
-continuous wall does.
+[soil reinforcement in LEM](../lem/reinforcement.md) carry both formulations; in
+[LEM-8](lem08_reinforced_slope.md) we build this model from nothing and measure
+what the geogrid adds to the bare section, and in
+[FEM-1](fem01_strength_reduction.md) the method is run on an unreinforced
+embankment. In [FEM-3](fem03_piles.md) we put stabilizing piles through the same
+two-engine comparison, and measure which engine a discrete row belongs in and
+which a continuous wall does.

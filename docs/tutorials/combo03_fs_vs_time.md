@@ -5,36 +5,28 @@ description: "Two dams run for stability against every saved frame of a transien
 
 # Tutorial COMBO-3 — Factor of Safety vs Time
 
-A steady seepage analysis gives a stability run one pore-pressure field, so the
-run has one answer. A transient analysis gives it a *sequence* of fields, one per
-saved instant, and the stability question can be asked of each of them in turn.
-The result comes back as a curve — a factor of safety against time — and it
-answers something a single analysis cannot: **when** the slope is at its weakest,
-not only how weak.
+A steady seepage analysis produces one pore-pressure field, so a stability run
+on it has one answer. A transient analysis produces a field at every saved
+instant, and the stability question can be asked at each of them. The result is
+a factor of safety plotted against time, which shows *when* the slope is
+weakest as well as how weak.
 
 [Tutorial SEEP-3](seep03_reservoir_drawdown.md) built a small earth dam with a
-granular shell and a clay core and lowered its reservoir 16 m over 45 days. That
-page stopped at the pore pressures. This one carries them into a limit
-equilibrium analysis of the dam and runs it against every frame the march saved.
-The analysis is offered both slopes, because over a run this long neither one
-governs throughout: a drawdown attacks the upstream face, since lowering the pool
-takes the water off it and leaves the water inside the embankment, but a full
-reservoir loads that same face and leaves the downstream slope the weaker of the
-two.
+granular shell and a clay core and lowered its reservoir 16 m over 45 days,
+stopping at the pore pressures. This page adds strengths to that model — a
+seepage analysis needs none — and runs a limit equilibrium analysis against
+every frame the march saved. Both faces are searched, because over a run this
+long neither one governs the whole time: a falling pool weakens the upstream
+face, but a full reservoir loads that face and leaves the downstream slope the
+weaker of the two.
 
-The one thing SEEP-3's dam does not carry is strength, because a seepage analysis
-reads none. Part 1 assigns it, and everything else about the model comes
-across unchanged.
-
-A curve like that is only as good as the strengths under it, and drained
-strengths are not the right ones for every dam. **Part 1** asks the stability
-question of a dam whose zones both carry drained effective-stress envelopes, so
-each instant is an ordinary effective-stress analysis of the water as it stands
-then. **Part 2** asks the same question of
-[COMBO-2](combo02_rapid_drawdown.md)'s Johnson Reservoir dam, whose compacted
-clay core carries an undrained envelope, so each instant is a full three-stage
-rapid drawdown instead — and the two curves that come out of that one march are
-what a designer compares.
+Drained strengths are the right choice for the SEEP-3 dam, and **Part 1** runs
+it that way: every instant is an ordinary effective-stress analysis with the
+water as it stands at that time. A compacted clay core needs the undrained
+treatment as well, so **Part 2** repeats the exercise on
+[COMBO-2](combo02_rapid_drawdown.md)'s Johnson Reservoir dam, running the
+three-stage rapid drawdown at every instant, and sets the two curves from that
+one march side by side.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

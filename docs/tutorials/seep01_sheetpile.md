@@ -94,7 +94,7 @@ specified-head type comes in two flavors, which is why the table below has four
 rows:
 
 | Type | What it states | Typical use |
-|---|---|---|
+| --- | --- | --- |
 | **Specified head** (`head`) | Total head held at a stated value, every node, all times | Reservoir floor, tailwater, a matched piezometer |
 | **Reservoir** (`reservoir`) | Held only while submerged; nodes above the water line seep freely | A pool that falls; a partly submerged face |
 | **Exit face** | Water may leave to the atmosphere; where it starts leaving is part of the answer | Downstream face of a dam; a seeping slope |
@@ -140,7 +140,7 @@ models this problem does not use. The row carries no strength properties:
 this model is analyzed for flow only.
 
 | mat | name | k1 | k2 | alpha | unsat |
-|:---:|---|:---:|:---:|:---:|---|
+| :---: | --- | :---: | :---: | :---: | --- |
 | 1 | `soil` | 30 | 30 | 0 | `lf` |
 
 **Geometry** — Profile Line 1, on material 1 (`soil`), one vertex per row, with
@@ -151,7 +151,7 @@ depth supplies:
 ![The profile line's vertices](../seep/images/clay_blanket_geometry.png){width=650}
 
 | x (m) | y (m) |
-|:---:|:---:|
+| :---: | :---: |
 | 0 | 10 |
 | 20 | 10 |
 | 29.9 | 10 |
@@ -170,7 +170,7 @@ a material: as a slit in the flow region that water cannot cross.
 **Boundary conditions** — two specified-head blocks:
 
 | Block | Type | Value (m) | From | To |
-|---|---|:---:|:---:|:---:|
+| --- | --- | :---: | :---: | :---: |
 | Head/Flux BC #1 | `head` | 13 | (0, 10) | (20, 10) |
 | Head/Flux BC #2 | `head` | 10 | (30.1, 10) | (50, 10) |
 
@@ -744,7 +744,7 @@ one. Rebuild the mesh at a range of element sizes — untick **Auto-size from
 geometry** and type each size into **Target element size** — and run each one:
 
 | Target size (m) | Nodes | Triangles | q (m³/yr per m) |
-|:---:|---:|---:|---:|
+| :---: | :---: | :---: | :---: |
 | 2.0 | 191 | 316 | 41.978 |
 | 1.0 | 670 | 1,212 | 40.797 |
 | 0.5 | 2,490 | 4,726 | 40.111 |
@@ -781,7 +781,7 @@ quadrilateral, the four-cornered counterpart of tri3. Meshing the same section a
 a 1 m target size with each of the five element types gives:
 
 | Element type | Nodes | Elements | q (m³/yr per m) |
-|---|---:|---:|---:|
+| --- | :---: | :---: | :---: |
 | `tri3` | 670 | 1,212 | 40.797 |
 | `tri6` | 2,551 | 1,212 | 39.866 |
 | `quad4` | 568 | 503 | 40.288 |

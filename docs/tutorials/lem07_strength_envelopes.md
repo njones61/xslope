@@ -110,7 +110,7 @@ Open **Materials** again, and on the same clay change **Model (option)** from
 are three adjacent cells:
 
 | option | c | φ |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | mc | 11.64 | 24.7 |
 
 The power-curve coefficients do not need to be deleted — under `mc` nothing
@@ -252,7 +252,7 @@ from `cp` to `mc` with a single constant strength — the average of the layer's
 would use:
 
 | option | c | φ |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | mc | 22.5 | 0 |
 
 The `c/p` and `r-elev` fields leave the form with the option that read them,
@@ -275,7 +275,7 @@ The lost 5% is not simply the constant being too low. Running the same edit at
 four different constants isolates that:
 
 | Lower-layer strength | s<sub>u</sub> (kPa) | Bishop FS | Tangent elevation |
-|---|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: |
 | Constant, layer top | 15.00 | 0.872 | 0.00 |
 | Constant, layer average | 22.50 | 1.075 | 0.00 |
 | Constant, mobilized average | 22.91 | 1.086 | 0.00 |

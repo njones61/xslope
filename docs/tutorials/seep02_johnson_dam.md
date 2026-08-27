@@ -212,7 +212,7 @@ profile lines will use, top of the section first — and fill the three rows:
 ![The three zones with the seepage columns showing](images/seep02_studio_materials.png)
 
 | mat | name | k1 (ft/day) | k2 (ft/day) | alpha | unsat | kr0 | h0 (ft) | vg_a | vg_n |
-|:---:|---|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
+| :---: | --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: |
 | 1 | `shell` | 1 | 1 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
 | 2 | `core` | 0.001 | 0.001 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
 | 3 | `foundation` | 0.1 | 0.1 | 0 | `lf` | 0.01 | −1 | 0 | 0 |
@@ -255,7 +255,7 @@ set each line's **Material**, and paste (or type) its vertex table.
 **Line 1 — `shell`** is the embankment surface, toe to toe:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 200 | 100 |
 | 320 | 160 |
 | 360 | 180 |
@@ -270,7 +270,7 @@ will end.
 **Line 2 — `core`** is the top of the clay:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 320 | 100 |
 | 360 | 165 |
 | 380 | 165 |
@@ -283,7 +283,7 @@ is carved out from below, by the foundation's own line, next.
 under the core it dives around the key:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 0 | 100 |
 | 320 | 100 |
 | 360 | 60 |
@@ -314,7 +314,7 @@ lines, paste each table into the points grid, or **Add row** and type it.
 **Head value (ft):** to `160`, and enter (or copy-paste) the points:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 0 | 100 |
 | 200 | 100 |
 | 320 | 160 |
@@ -329,7 +329,7 @@ polyline is under water, so holding it at a head of 160 is exact.
 out to the end of the section:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 550 | 100 |
 | 750 | 100 |
 
@@ -337,7 +337,7 @@ out to the end of the section:
 waiting for points — and enter its two:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 380 | 180 |
 | 550 | 100 |
 
@@ -518,7 +518,7 @@ soil still carries water. Splitting the same velocity integral at the phreatic
 surface, in the downstream shell where the unsaturated zone is thickest:
 
 | Section | q across it (ft³/day per ft) | Phreatic surface (ft) | Above it | Share |
-|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: |
 | x = 400 | 1.9531 | 124.98 | 0.0998 | 5.1% |
 | x = 450 | 1.8955 | 112.31 | 0.0846 | 4.5% |
 | x = 500 | 2.0676 | 108.84 | 0.2139 | 10.3% |
@@ -594,7 +594,7 @@ dam is where it matters. Try all three. With 20 contour levels, so 19 head
 drops of 3.158 ft each, and a 60 ft head drop:
 
 | base_mat | Zone | k (ft/day) | N<sub>f</sub> = q·N<sub>d</sub>/(k·Δh) | φ contour levels requested |
-|:---:|---|:---:|:---:|:---:|
+| :---: | --- | :---: | :---: | :---: |
 | 1 | shell | 1 | 0.62 | 2 |
 | 2 | core | 0.001 | 618.96 | 620 |
 | 3 | foundation | 0.1 | 6.19 | 7 |
@@ -707,7 +707,7 @@ log *k<sub>r</sub>* over suctions from 0.01 to 100 ft. Fitting them that way is
 what makes the three-way comparison a comparison of models rather than of soils.
 
 | Material | k (ft/day) | Texture | vg `a` (1/ft) | vg `n` | gard `a` | gard `n` | RMS misfit |
-|---|:---:|---|:---:|:---:|:---:|:---:|:---:|
+| --- | :---: | --- | :---: | :---: | :---: | :---: | :---: |
 | shell | 1 | sandy clay loam | 1.798 | 1.48 | 115.5 | 2.29 | 0.164 |
 | core | 0.001 | clay | 0.244 | 1.09 | 128.2 | 1.03 | 0.252 |
 | foundation | 0.1 | clay loam | 0.579 | 1.31 | 52.8 | 1.61 | 0.237 |
@@ -749,7 +749,7 @@ conditions are identical across the three runs; only the curve above the phreati
 surface changes.
 
 | Model | q (ft³/day per ft) | Iterations | Flow above the phreatic surface at x = 500 |
-|---|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: |
 | `lf` | 1.9546 | 23 | 10.3% |
 | `vg` | 1.8649 | 28 | 8.3% |
 | `gard` | 1.8661 | 27 | 8.6% |
@@ -825,7 +825,7 @@ The head tolerance is the only one of the three the dialog exposes, and it turns
 out to control the iteration count rather than the answer:
 
 | Convergence tol | Scaled to | q | Iterations |
-|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: |
 | 0.001 | 0.18 | 1.954617 | 23 |
 | 0.0001 | 0.018 | 1.954617 | 23 |
 | 0.00001 | 0.0018 | 1.954618 | 24 |
@@ -887,7 +887,7 @@ material 2 — and it makes the face work. Everything else, including the exit-f
 polyline itself, stays exactly as it was:
 
 | Core k (ft/day) | q (ft³/day per ft) | Exit-face nodes wet | Highest wet node | Iterations |
-|:---:|:---:|:---:|---|:---:|
+| :---: | :---: | :---: | :---: | :---: |
 | 0.001 | 1.9546 | 1 of 31 | (544.5, 102.6) | 23 |
 | 0.01 | 2.2258 | 1 of 31 | (544.5, 102.6) | 17 |
 | 0.1 | 4.3501 | 2 of 31 | (539.0, 105.2) | 20 |

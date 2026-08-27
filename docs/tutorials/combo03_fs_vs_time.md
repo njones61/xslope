@@ -126,7 +126,7 @@ parameters for:** toggles to **LEM** alone:
 ![The two zones with their strength band filled](images/combo03_studio_materials.png)
 
 | mat | name | γ (kN/m³) | γsat (kN/m³) | option | c′ (kPa) | φ′ (deg) | u |
-|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | --- | :---: | :---: | --- | :---: | :---: | --- |
 | 1 | `shell` | 20 | 21 | `mc` | 0 | 32 | `seep` |
 | 2 | `core` | 19 | 20 | `mc` | 10 | 25 | `seep` |
 
@@ -160,7 +160,7 @@ starts looking. Click **Circles**. The file carries two, one on each face of the
 dam:
 
 | Xo | Yo | Option | Depth |
-|:---:|:---:|:---:|:---:|
+| :---: | :---: | --- | :---: |
 | 7 | 56 | `Depth` | 0 |
 | 103 | 59 | `Depth` | 0 |
 
@@ -203,7 +203,7 @@ not applied;
 ten. One is set here:
 
 | Limit | Value | What it does |
-|---|:---:|---|
+| --- | :---: | --- |
 | Min slip depth | 8 | The surface must reach at least 8 m below the ground surface |
 
 It sets a floor on the *size* of the mechanism, and the shell is why the model
@@ -479,7 +479,7 @@ carries the mode in full.
 ### The curve
 
 | t (day) | pool (m) | FS | center | R (m) | face |
-|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: | --- |
 | 0 | 18.00 | 1.5311 | (103.00, 56.79) | 56.79 | downstream |
 | 2 | 18.00 | 1.5311 | (103.00, 56.79) | 56.79 | downstream |
 | 5 | 16.93 | 1.5132 | (5.20, 65.90) | 65.88 | upstream |
@@ -596,7 +596,7 @@ Those nine halve the resolution the schedule already has across the dip, and fou
 of them name no saved frame:
 
 | t (day) | pool (m) | FS |
-|:---:|:---:|:---:|
+| :---: | :---: | :---: |
 | 20 | 11.60 | 1.3773 |
 | 22.5 | 10.71 | 1.3620 |
 | 25 | 9.82 | 1.3510 |
@@ -713,7 +713,7 @@ $\phi' = 18°$ — and the shell and the foundation are blank on both columns, w
 declares them free-draining through the drawdown.
 
 | mat | name | γ (pcf) | c′ (psf) | φ′ (deg) | d (psf) | ψ (deg) | u |
-|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | --- | :---: | :---: | :---: | :---: | :---: | --- |
 | 1 | `shell` | 130 | 100 | 35 | — | — | `seep` |
 | 2 | `core` | 125 | 400 | 18 | 250 | 14 | `seep` |
 | 3 | `foundation` | 127 | 100 | 27 | — | — | `seep` |
@@ -973,7 +973,7 @@ two results together reproduces it:
 between them is not constant:
 
 | t (day) | drawdown | single-stage | difference |
-|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: |
 | 5 | 1.4563 | 1.5097 | 0.0535 |
 | 10 | 1.3496 | 1.3944 | 0.0448 |
 | 15 | 1.2704 | 1.3093 | 0.0389 |

@@ -297,7 +297,7 @@ both rows, and each is the same bracket on the same mesh, so the numbers are
 comparable to the 1.379 above.
 
 | Change | FS |
-|---|:---:|
+| --- | :---: |
 | the file as it stands | 1.379 |
 | shaft modulus `E` × 100 | 1.379 |
 | shaft modulus `E` ÷ 100 | 1.277 |
@@ -337,7 +337,7 @@ well as translation — does not, and the `Tip` field in the pile properties is
 the cell that says which it is. The cell offers four settings, the same four `Head` offers:
 
 | Setting | Translation | Rotation | At a tip, this is |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `free` | free | free | a shaft floating in the soil, or resting on the model boundary |
 | `pinned` | held | free | a shaft bearing on a hard stratum inside the mesh |
 | `unrotated` | free | held | little use at a tip; offered so the two ends read alike |
@@ -426,7 +426,7 @@ smeared bending stiffness *EI*/S falls fourfold, and what the shafts carry moves
 with it. Each row below is read at that spacing's captured mechanism:
 
 | S (ft) | *EI*/S (lb·ft²) | Peak moment per unit width (lb·ft/ft) | Peak moment per shaft (lb·ft) | Fraction of M<sub>cap</sub> |
-|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: |
 | 3 | 1.357 × 10<sup>8</sup> | 4,651 | 13,950 | 23% |
 | 6 | 6.786 × 10<sup>7</sup> | 4,651 | 27,910 | 47% |
 | 12 | 3.393 × 10<sup>7</sup> | 4,651 | 55,810 | 93% |
@@ -472,7 +472,7 @@ pile's surface. XSLOPE runs the same slope through both of its engines in
 [the VP106 finite-element diagnostic](../verification/rocscience.md#vp106-fem):
 
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | No pile | 1.136 | 1.14 (−0.4%) |
 | Pile at D<sub>1</sub>/D = 3, free head | 1.472 | 1.36 (+8.2%) |
 | Pile, head rotation restrained | 1.587 | 1.45 (+9.4%) |
@@ -510,7 +510,7 @@ The section is a PZ-27 steel sheet pile, and its properties are per foot of
 wall rather than per member:
 
 | Property | Value | From |
-|---|---:|---|
+| --- | :---: | :---: |
 | E | 4.176 × 10<sup>9</sup> psf | 29,000 ksi |
 | I | 0.00888 ft⁴/ft | 184.20 in⁴/ft |
 | Area | 0.0551 ft²/ft | 7.94 in²/ft |
@@ -661,7 +661,7 @@ distribution — and leave it alone when the factor of safety is.
 ## Which engine for which member
 
 | Member | Engine | What it gives |
-|---|---|---|
+| --- | --- | --- |
 | Continuous wall (sheet pile, diaphragm, secant) | FEM, `S` = 1 | FS plus the wall's moment, shear, deflection, soil reaction |
 | Contiguous or very close row | FEM, smear stated | the same, gap unrepresented |
 | Discrete row at spacing | LEM, Ito & Matsui | FS per spacing, force per row, capacity checks |

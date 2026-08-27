@@ -81,7 +81,7 @@ Each row of the sheet describes one pile row. The columns after the
 endpoints control how the pile force is computed, limited, and applied:
 
 | Label | x1 | y1 | x2 | y2 | H | Appl | D | S | Vcap | Mcap |
-|---|:---:|:---:|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: |
 | `lower row` | 5 | 5 | 5 | -10 | | active | 2 | 6 | 46000 | 60000 |
 | `upper row` | 10 | 10 | 10 | -10 | | active | 2 | 6 | 46000 | 60000 |
 
@@ -189,7 +189,7 @@ critical circle from the search with both rows present — **one surface, no sea
 changing** — each row can be removed on its own:
 
 | Piles present | Spencer FS |
-|---|:---:|
+| --- | :---: |
 | Neither | 1.481 |
 | Lower row only | 1.675 |
 | Upper row only | 1.613 |
@@ -224,7 +224,7 @@ every surface a search evaluates — a deeper surface means a taller soil column
 pushing on the pile. On the critical surface above:
 
 | | Lower row | Upper row |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | Depth to the surface, z<sub>f</sub> (ft) | 10.07 | 14.48 |
 | Soil force per pile, F<sub>pile</sub> (lb) | 44,178 | 81,729 |
 | Soil force per foot of slope, F<sub>pile</sub>/S (lb/ft) | 7,363.0 | 13,621.5 |
@@ -256,7 +256,7 @@ surface.
 On the critical surface both shafts are governed by bending:
 
 | | Lower row | Upper row |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | Soil force per pile (lb) | 44,178 | 81,729 |
 | Shear limit, V<sub>cap</sub> (lb) | 46,000 | 46,000 |
 | Moment arm, L<sub>m</sub> (ft) | 3.94 | 5.47 |
@@ -277,7 +277,7 @@ run on the search's own critical circle, with only the two capacity cells
 changing**:
 
 | Capacities given | ΣH (lb/ft) | Spencer FS |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | Vcap and Mcap (as shipped) | 4,367.6 | 1.842 |
 | Mcap only | 4,367.6 | 1.842 |
 | Vcap only | 15,029.7 | 4.207 |
@@ -327,7 +327,7 @@ uncapped Ito & Matsui force, lower row then upper row; ΣH is what survives the
 capacities and reaches the slices:
 
 | S (ft) | S/D | A₁ (ft) | A₂ (ft) | Soil force per pile (lb) | ΣH used (lb/ft) | Spencer FS |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 3 | 1.5 | 41.709 | 17.181 | 188,549 / 336,891 | 8,386.6 | 2.354 |
 | 4 | 2.0 | 15.184 | 7.526 | 76,378 / 138,639 | 6,405.7 | 2.072 |
 | 5 | 2.5 | 9.792 | 5.564 | 53,580 / 98,345 | 5,192.2 | 1.929 |
@@ -389,7 +389,7 @@ A natural test is to enter the forces the automatic run computed — the
 two values the report printed:
 
 | H |
-|:---:|
+| :---: |
 | 2540.7 |
 | 1827.0 |
 
@@ -410,7 +410,7 @@ Searching with the stated forces shows the difference:
 circle, the two ways of entering the pile no longer agree:
 
 | Surface | Computed (H blank) | Stated (2,540.7 / 1,827.0) | No piles |
-|---|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: |
 | The auto search's critical circle | 1.842 | 1.842 | 1.481 |
 | The shallower circle above | 1.896 | 1.752 | 1.213 |
 

@@ -184,7 +184,7 @@ solves, five of them here — and combines the swings into a variance. The
 per-parameter table is written to the Log pane:
 
 | Parameter | MLV | σ | F⁺ | F⁻ | ΔF |
-|---|:---:|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: | :---: |
 | soil γ | 120 | 8 | 1.189 | 1.572 | 0.383 |
 | soil c | 400 | 100 | 1.692 | 1.015 | 0.677 |
 
@@ -437,7 +437,7 @@ P<sub>f</sub> is the area of that distribution below FS = 1, so
 P<sub>f</sub> = Φ(−β) and the two always move together:
 
 | Estimator | F | σ<sub>F</sub> | β | P<sub>f</sub> |
-|---|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: |
 | Taylor series (TSPM) | 1.354 | 0.389 | 0.935 (lognormal) | 17.48% |
 | Monte Carlo, 10,000 samples (Latin hypercube) | 1.381 | 0.402 | 0.988 (lognormal) | 16.42% (counted) |
 | Monte Carlo, 10,000 samples (random) | 1.381 | 0.408 | 0.969 (lognormal) | 16.71% (counted) |
@@ -541,7 +541,7 @@ Open **Materials**, select the clay, and change the **± σ** beside **c** from
 of the two-column **Standard Deviations** block:
 
 | σ(γ) | σ(c) |
-|:---:|:---:|
+| :---: | :---: |
 | 8 | 50 |
 
 Nothing else on the row moves: **γ** is still `120`, its σ still `8`, and the
@@ -558,7 +558,7 @@ The histogram is the same shape drawn on a narrower base. Beside the run before
 it:
 
 | Run | F | σ<sub>F</sub> | β<sub>LN</sub> | P<sub>f</sub> |
-|---|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: |
 | TSPM, σ(c) = 100 | 1.354 | 0.389 | 0.935 | 17.48% |
 | TSPM, σ(c) = 50 | 1.354 | 0.256 | 1.526 | 6.36% |
 | Monte Carlo, σ(c) = 100 | 1.381 | 0.402 | 0.988 | 16.42% |
@@ -591,7 +591,7 @@ All three engines read the same σ columns and none needs an input the others do
 not, so the choice is about cost and about what is being asked.
 
 | Engine | Real solves here | What it returns | What it assumes |
-|---|:---:|---|---|
+| --- | :---: | --- | --- |
 | Taylor series | 5 | β, lognormal P<sub>f</sub>, the per-parameter table | F changes in a straight line near the means |
 | Monte Carlo | 2,000–10,000 | the whole distribution; P<sub>f</sub> *counted* | only the input distributions |
 | Response surface | ~710 | MC-grade statistics with sampling error removed | F fits a curved formula — an assumption it checks |

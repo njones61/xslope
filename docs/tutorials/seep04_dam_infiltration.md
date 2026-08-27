@@ -117,7 +117,7 @@ to **Seepage** alone. One row, with the seepage band of the `mat` worksheet
 across it:
 
 | mat | name | k1 (m/sec) | k2 (m/sec) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n |
-|:---:|---|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|
+| :---: | --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: |
 | 1 | `Dam fill` | 1 × 10<sup>−7</sup> | 1 × 10<sup>−7</sup> | 0 | `vg` | 0 | 0 | 0.2452 | 2.5739 |
 
 The soil is **isotropic**: `k1` and `k2` are equal, so the direction `alpha` would
@@ -158,7 +158,7 @@ upstream face, from the heel to the waterline. Enter or copy-paste the following
 points:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 0 | 0 |
 | 20 | 10 |
 
@@ -170,7 +170,7 @@ the list. Its line runs along the base, over the 12 m the drain occupies. Enter
 or copy-paste the following points:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 40 | 0 |
 | 52 | 0 |
 
@@ -330,7 +330,7 @@ The check that the projection is right is that the water it delivers is the wate
 that fell. A block of length *L* at a uniform *q* puts *qL* into the model, so:
 
 | block | from | to | length (m) | *q* (m/s) | *qL* (m³/s per m) | footprint (m) |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | upstream face | (20, 10) | (24, 12) | 4.4721 | 8.94427 × 10<sup>−9</sup> | 4.0000 × 10<sup>−8</sup> | 4 |
 | crest | (24, 12) | (28, 12) | 4.0000 | 1 × 10<sup>−8</sup> | 4.0000 × 10<sup>−8</sup> | 4 |
 | downstream face | (28, 12) | (52, 0) | 26.8328 | 8.94427 × 10<sup>−9</sup> | 2.4000 × 10<sup>−7</sup> | 24 |
@@ -358,21 +358,21 @@ set **Flux value (m/sec):**, and enter or copy-paste the block's two points.
 `8.94427191e-09`:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 20 | 10 |
 | 24 | 12 |
 
 **Flux 2 — the crest.** Flux value `1e-08`:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 24 | 12 |
 | 28 | 12 |
 
 **Flux 3 — the downstream face.** Flux value `8.94427191e-09`:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 28 | 12 |
 | 52 | 0 |
 
@@ -453,7 +453,7 @@ was added to what the reservoir was already supplying. It was not. Each boundary
 reports the water crossing it, and the ledger says something else:
 
 | | dry weather | with infiltration |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | in at the reservoir | +2.808 × 10<sup>−7</sup> | +1.800 × 10<sup>−7</sup> |
 | in as rain, assembled | 0 | +3.2000 × 10<sup>−7</sup> |
 | of that, discarded on head and draining nodes | 0 | −0.0844 × 10<sup>−7</sup> |
@@ -492,7 +492,7 @@ Here q = 1 × 10<sup>−8</sup> m/s and k = 1 × 10<sup>−7</sup> m/s, so
 Click **Seep BC** in the Inputs dock and double all three flux values:
 
 | block | at q/k = 0.1 | at q/k = 0.2 |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | Flux 1 — upstream face | `8.94427191e-09` | `1.788854382e-08` |
 | Flux 2 — crest | `1e-08` | `2e-08` |
 | Flux 3 — downstream face | `8.94427191e-09` | `1.788854382e-08` |
@@ -516,7 +516,7 @@ whole family on one section:
 ![The phreatic surface at six rain rates, dry to four times the file's rain](images/seep04_rain_sweep.png){width=1000}
 
 | q/k | q (m/s) | discharge Q (m³/s per m) | water table at x = 26 (m) |
-|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: |
 | 0 | 0 | 2.808 × 10<sup>−7</sup> | 7.58 |
 | 0.025 | 2.5 × 10<sup>−9</sup> | 3.340 × 10<sup>−7</sup> | 7.80 |
 | 0.05 | 5 × 10<sup>−9</sup> | 3.869 × 10<sup>−7</sup> | 8.03 |

@@ -173,7 +173,7 @@ which narrows the table to the columns the drawdown run reads:
 ![The three zones, with d and psi on the core alone](images/combo02_studio_materials.png)
 
 | mat | name | γ (pcf) | c′ (psf) | φ′ (deg) | d (psf) | ψ (deg) | u |
-|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | --- | :---: | :---: | :---: | :---: | :---: | --- |
 | 1 | `shell` | 130 | 100 | 35 | — | — | `piezo` |
 | 2 | `core` | 125 | 400 | 18 | 250 | 14 | `piezo` |
 | 3 | `foundation` | 127 | 100 | 27 | — | — | `piezo` |
@@ -219,7 +219,7 @@ surface at elevation 160, across the upstream shell at that level, down through
 the core, and out to the tailwater at 100:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 0 | 160 |
 | 360 | 160 |
 | 410 | 120 |
@@ -233,7 +233,7 @@ long shallow fall through the shell and the core, and the tailwater at 100 from
 x = 550 out:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 0 | 110 |
 | 220 | 110 |
 | 360 | 107 |
@@ -328,7 +328,7 @@ Every trial surface in that search carried a full three-stage analysis, and the
 last lines of the log give the three stages of the winning surface:
 
 | Stage | | FS |
-|---|---|---:|
+| :---: | --- | :---: |
 | 1 | full pool, drained | 1.4835 |
 | 2 | drawn down, undrained core | **1.1805** |
 | 3 | drawn down, drained | not required |
@@ -395,7 +395,7 @@ in the list.
 foreshore and up the submerged part of the face:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 0 | 100 |
 | 200 | 100 |
 | 320 | 160 |
@@ -403,14 +403,14 @@ foreshore and up the submerged part of the face:
 *Head 2 — the tailwater*, at `100`, along the downstream foreshore:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 550 | 100 |
 | 750 | 100 |
 
 *Exit face*, over the whole downstream slope, from the crest to the tailwater:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 380 | 180 |
 | 550 | 100 |
 
@@ -429,7 +429,7 @@ carries, with the reservoir 50 ft lower. Press **Add head** twice, then select t
 foreshore and up the face as far as the lowered pool wets it:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 0 | 100 |
 | 200 | 100 |
 | 220 | 110 |
@@ -437,14 +437,14 @@ foreshore and up the face as far as the lowered pool wets it:
 *Head 2 — the tailwater*, at `100`, unchanged:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 550 | 100 |
 | 750 | 100 |
 
 *Exit face*, over the whole downstream slope, unchanged:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 380 | 180 |
 | 550 | 100 |
 
@@ -541,7 +541,7 @@ settles a little upstream of where the pair's did, at (245.31, 243.53) with a
 radius of 161.82 ft:
 
 | Stage | | FS |
-|---|---|---:|
+| :---: | --- | :---: |
 | 1 | full pool, drained | 1.5514 |
 | 2 | drawn down, undrained core | **1.1949** |
 | 3 | drawn down, drained | not required |
@@ -625,7 +625,7 @@ cell, which is the last step of this section.
 then falls to the residual pool over the following 45.
 
 | time | pool |
-|---:|---:|
+| :---: | :---: |
 | 0 | 160 |
 | 5 | 160 |
 | 50 | 110 |
@@ -749,7 +749,7 @@ stage time, so stage 1 carries the full pool at t = 0 and stage 2 the residual
 pool the schedule has reached at t = 50 — elevation 110, 624 psf at its deepest.
 
 | Stage | | FS |
-|---|---|---:|
+| :---: | --- | :---: |
 | 1 | full pool, drained | 1.5545 |
 | 2 | drawn down, undrained core | 1.0164 |
 | 3 | drawn down, drained | **1.0158** |
@@ -785,7 +785,7 @@ and the same starting circle. Only the statement about the water changed, and
 each run searched from that circle for the surface its own water made critical:
 
 | Part | Two water states from | Critical circle | Stage 1 | Stage 2 | Stage 3 | **FS** |
-|:---:|---|---|---:|---:|---:|---:|
+| :---: | --- | :---: | :---: | :---: | :---: | :---: |
 | 1 | Piezometric Lines 1 and 2 | (247.1, 241.6) R 159.2 | 1.4835 | 1.1805 | not required | **1.181** |
 | 2 | Two steady seepage solutions | (245.3, 243.5) R 161.8 | 1.5514 | 1.1949 | not required | **1.195** |
 | 3 | Two frames of a transient march | (243.9, 244.9) R 163.6 | 1.5545 | 1.0164 | 1.0158 | **1.016** |
@@ -798,7 +798,7 @@ route from the other two. Ordinary drained searches at each end of the drawdown
 put that spread in context:
 
 | Run | Core strength | Pore pressures | FS |
-|---|---|---|---:|
+| --- | --- | --- | :---: |
 | Full pool | drained | full-pool field | 1.510 |
 | Drawn down, long term | drained | re-equilibrated field | 1.311 |
 | Drawn down, long term | **undrained** | re-equilibrated field | **1.195** |

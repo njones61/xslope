@@ -302,7 +302,7 @@ covers what each of the two is and where a nominal modulus comes from when the
 problem gives you nothing better.
 
 | E (psf) | n |
-|---:|---:|
+| :---: | :---: |
 | 1000000 | 0.3 |
 
 ![The materials table with both soils' elastic properties entered](images/fem02_studio_materials.png)
@@ -329,7 +329,7 @@ columns are empty.
 Fill `E (psf)` and `Area` on all six rows, and leave `Tres` empty:
 
 | E (psf) | Area |
-|---:|---:|
+| :---: | :---: |
 | 800000 | 0.1 |
 
 An elastic modulus of 800,000 psf and an area of 0.1 ft² per foot of wall give
@@ -709,7 +709,7 @@ decide what force a reinforcement line carries.
 Three readings of the same slope, from the same file:
 
 | Reading | FS |
-|---|:---:|
+| --- | :---: |
 | Spencer's method, searched on this page | 1.587 |
 | Strength reduction, layers elastic-perfectly-plastic | 1.566 |
 | Strength reduction, layers with a 600 lb/ft residual | 1.496 |
@@ -752,7 +752,7 @@ The same run, at the same mesh and bracket, with the soils' modulus and the
 layers' modulus scaled separately:
 
 | Soil E | Layer E | FS |
-|:---:|:---:|:---:|
+| :---: | :---: | :---: |
 | ×0.1 | ×1 | 1.5586 |
 | ×1 (the file) | ×1 | 1.5586 |
 | ×10 | ×1 | 1.2383 |
@@ -784,7 +784,7 @@ the same model across the column — and running it blank, and running it at zer
 which is brittle rupture — measures how much the answer depends on that choice:
 
 | `Tres` | FS |
-|:---:|:---:|
+| :---: | :---: |
 | blank | 1.5664 |
 | 800 | 1.5664 |
 | 600 | 1.4961 |

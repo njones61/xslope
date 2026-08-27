@@ -264,7 +264,7 @@ reported back. Enter the two values, in the columns headed `E (psf)` and `n`
 (the Poisson's ratio column is labeled with a plain `n`):
 
 | E (psf) | n |
-|---:|---:|
+| :---: | :---: |
 | 2088500 | 0.3 |
 
 ![The materials table with the FEM parameters filled in](images/fem01_studio_materials.png)
@@ -291,7 +291,7 @@ iteration budget, run at a tenth of the file's modulus, at it, and at ten times
 it:
 
 | E (psf) | vs. the file | SSRM FS | Largest displacement at *F* = 1 (ft) |
-|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: |
 | 208,850 | ×0.1 | 1.3633 | 0.5699 |
 | 2,088,500 | ×1 | 1.3633 | 0.05699 |
 | 20,885,000 | ×10 | 1.3633 | 0.005699 |
@@ -372,7 +372,7 @@ one.
 That is what the Log reports, trial by trial:
 
 | Trial | *F* | Verdict | Iterations | Bracket after it |
-|---|:---:|:---:|:---:|:---:|
+| --- | :---: | --- | :---: | :---: |
 | lower bound | 1.0000 | converged | 56 | — |
 | upper bound | 2.0000 | failed | 12,000 | [1.0000, 2.0000] |
 | 1 | 1.5000 | failed | 12,000 | [1.0000, 1.5000] |
@@ -419,7 +419,7 @@ tests live in the engine and are not on this dialog. Tightening it buys
 resolution on the answer and costs one more trial per halving:
 
 | Tolerance | FS | Final bracket | Trials |
-|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: |
 | 0.05 | 1.3594 | [1.3438, 1.3750] | 7 |
 | 0.01 (default) | 1.3633 | [1.3594, 1.3672] | 9 |
 | 0.005 | 1.3652 | [1.3633, 1.3672] | 10 |
@@ -465,7 +465,7 @@ trial has to be decided. No trial on this model reaches it.
 ## The two answers side by side
 
 | Reading | FS |
-|---|:---:|
+| --- | :---: |
 | Spencer's method, searched on this page | 1.376 |
 | Strength reduction, this page's run | 1.363 |
 | Strength reduction, as [the FEM overview reports it](../fem/overview.md#what-to-expect) for this model | 1.366 |
@@ -569,7 +569,7 @@ of 0.646, about eighty times smaller. That range, not the colors, is what says
 the converged state has barely moved.
 
 | | Last converged trial | Captured failed state |
-|---|:---:|:---:|
+| --- | --- | --- |
 | *F* | 1.3594 | 1.5678 |
 | Equilibrium reached | yes | no |
 | Viscoplastic iterations | 11,904 | 12,000 — the budget |

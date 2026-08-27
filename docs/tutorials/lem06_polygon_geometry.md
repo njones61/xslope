@@ -51,7 +51,7 @@ paired columns its worksheet block carries:
 **Polygon 1 — material 1 (`embankment`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | 0 | 0 |
 | 40 | 20 |
 | 120 | 20 |
@@ -60,7 +60,7 @@ paired columns its worksheet block carries:
 **Polygon 2 — material 2 (`foundation`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | -50 | 0 |
 | 120 | 0 |
 | 120 | -5 |
@@ -97,7 +97,7 @@ rings reference, and neither soil carries pore pressures — `u` stays `none` �
 so the table ends at φ:
 
 | name | γ | γsat | option | c | φ |
-|---|:---:|:---:|---|:---:|:---:|
+| --- | :---: | :---: | --- | :---: | :---: |
 | `embankment` | 130 |  | `mc` | 400 | 0 |
 | `foundation` | 135 |  | `mc` | 800 | 0 |
 
@@ -105,7 +105,7 @@ so the table ends at φ:
 twice the slope height:
 
 | Xo | Yo | Option | Depth |
-|:---:|:---:|---|:---:|
+| :---: | :---: | --- | :---: |
 | 20 | 40 | Depth | 0 |
 | 20 | 40 | Depth | -10.7887 |
 
@@ -334,7 +334,7 @@ with a tension crack.
 Each method gets its own search and its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |
 
 The four that satisfy moment equilibrium — OMS, Bishop, Spencer and

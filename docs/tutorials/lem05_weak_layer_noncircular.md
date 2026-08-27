@@ -42,7 +42,7 @@ pcf and cohesions psf; the row order is the Mat ID, and the columns none of the
 four use stay blank:
 
 | name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
-|---|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
 | `Sand Fill` | 120 |  | `mc` | 0 | 37 |  |  |  |  |  |  |  | `piezo` |
 | `Sand` | 123 |  | `mc` | 0 | 33 |  |  |  |  |  |  |  | `piezo` |
 | `Soft Clay` | 118 |  | `mc` | 200 | 0 |  |  |  |  |  |  |  | `none` |
@@ -67,7 +67,7 @@ row, in the paired `x` / `y` columns its worksheet block carries.
 **Profile Line 1 — material 1 (`Sand Fill`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | 0 | 0 |
 | 30 | 10 |
 | 50 | 10 |
@@ -75,21 +75,21 @@ row, in the paired `x` / `y` columns its worksheet block carries.
 **Profile Line 2 — material 2 (`Sand`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | -20 | 0 |
 | 50 | 0 |
 
 **Profile Line 3 — material 3 (`Soft Clay`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | -20 | -4 |
 | 50 | -4 |
 
 **Profile Line 4 — material 4 (`Dense Sand`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | -20 | -6 |
 | 50 | -6 |
 
@@ -103,7 +103,7 @@ line 4 at y = −6 are what make the clay a 2 ft seam.
 one point per row as the `piezo` worksheet and Studio's editor take them:
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | -20 | -2 |
 | 50 | -2 |
 
@@ -115,7 +115,7 @@ not: τ = S<sub>u</sub> whatever the pore pressure, so its `u` is `none`.
 columns the `non-circ` worksheet and Studio's editor share:
 
 | X (ft) | Y (ft) | Movement |
-|:---:|:---:|---|
+| :---: | :---: | --- |
 | 0 | 0 | Free |
 | 10.6823 | -5.8 | Horiz |
 | 30 | -5.8 | Horiz |
@@ -432,7 +432,7 @@ move lowers the factor of safety — and the **Movement** column is what says ho
 each point may walk:
 
 | Point | As entered | Where the search left it | Movement |
-|---|:---:|:---:|---|
+| --- | :---: | :---: | --- |
 | toe end | (0.00, 0.00) | (−7.57, 0.00) | `Free` |
 | seam | (10.68, −5.80) | (4.09, −5.80) | `Horiz` |
 | seam | (30.00, −5.80) | (27.23, −5.80) | `Horiz` |
@@ -482,7 +482,7 @@ sample page's factor-of-safety table shows a dash in their two columns rather th
 a number. The five that remain, each one run as its own search:
 
 | Janbu | Corps | Lowe | Spencer | M-P |
-|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: |
 | 1.575 | 1.523 | 1.315 | **1.656** | 1.634 |
 
 Every entry is a separate search that found its own critical surface, which is the
@@ -541,7 +541,7 @@ would be an answer about a different shape, where the question here is what the
 depth alone is worth.
 
 | Track elevation | −4.2 | −4.5 | −5.0 | −5.5 | **−5.8** | −6.0 |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | Factor of safety (Spencer) | 2.237 | 2.180 | 2.105 | 2.048 | **2.022** | 2.007 |
 
 **The lower in the seam the track runs, the lower the answer**, across the whole

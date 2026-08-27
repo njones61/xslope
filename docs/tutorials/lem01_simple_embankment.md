@@ -39,13 +39,13 @@ as one block; the row order is the Mat ID. There are no pore pressures — `u`
 stays `none` — so the table ends at φ:
 
 | name | γ | γsat | option | c | φ |
-|---|:---:|:---:|---|:---:|:---:|
+| --- | :---: | :---: | --- | :---: | :---: |
 | `soil` | 125 |  | `mc` | 500 | 0 |
 
 **Geometry** — Profile Line 1, on material 1 (`soil`), one vertex per row:
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | 0 | 0 |
 | 20 | 20 |
 | 60 | 20 |

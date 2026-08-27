@@ -86,7 +86,7 @@ the embankment — tangent to the top of the foundation instead of the bottom of
 the clay:
 
 | Xo | Yo | Option | Depth |
-|:---:|:---:|---|:---:|
+| :---: | :---: | --- | :---: |
 | 16.875 | 30 | Depth | 0 |
 
 ![The circles editor holding the embankment circle](images/lem10_studio_circles.png)

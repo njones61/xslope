@@ -254,7 +254,7 @@ reaches the toe.
 Three readings of one file:
 
 | Reading | XSLOPE | Hammah et al. |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | Bishop's simplified | 1.150 | 1.153 |
 | Spencer's method | 1.152 | 1.152 |
 | Strength reduction | 1.166 | 1.15 |
@@ -313,7 +313,7 @@ index separate this cut from the factor of safety a permanent rock slope is aske
 for. Each step solved with its own rock-mass constants:
 
 | GSI | m<sub>b</sub> | *s* | *a* | σ<sub>ci</sub>·s<sup>a</sup> (kPa) | FS |
-|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: | :---: |
 | 5 | 0.0672 | 2.60 × 10<sup>−5</sup> | 0.619 | 43.5 | 1.152 |
 | 8 | 0.0748 | 3.64 × 10<sup>−5</sup> | 0.598 | 66.7 | 1.439 |
 | 11 | 0.0833 | 5.07 × 10<sup>−5</sup> | 0.580 | 97.0 | 1.740 |
@@ -363,7 +363,7 @@ the last solved point — the factor of safety spans [0.176, 1.15] over the enti
 range D has. The curve crosses FS = 1 instead, between D = 0 and D = 0.25:
 
 | D | m<sub>b</sub> | *s* | σ<sub>ci</sub>·s<sup>a</sup> (kPa) | FS |
-|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: |
 | 0 | 0.0672 | 2.60 × 10<sup>−5</sup> | 43.5 | 1.152 |
 | 0.25 | 0.0414 | 9.98 × 10<sup>−6</sup> | 24.0 | 0.873 |
 | 0.50 | 0.0217 | 3.15 × 10<sup>−6</sup> | 11.8 | 0.616 |

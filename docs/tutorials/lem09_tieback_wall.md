@@ -62,7 +62,7 @@ and neither soil carries pore pressures — `u` stays `none` — so the table en
 at φ:
 
 | name | γ | γsat | option | c | φ |
-|---|:---:|:---:|---|:---:|:---:|
+| --- | :---: | :---: | --- | :---: | :---: |
 | `Layer 1` | 120 | 120 | `mc` | 600 | 24 |
 | `Layer 2` | 130 | 130 | `mc` | 300 | 34 |
 
@@ -74,7 +74,7 @@ runs beneath it and carries the wall face itself, a vertical run from (0, 0) to
 **Profile Line 1 — material 1 (Layer 1):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | 33 | 53 |
 | 60 | 66 |
 | 70 | 71 |
@@ -84,7 +84,7 @@ runs beneath it and carries the wall face itself, a vertical run from (0, 0) to
 **Profile Line 2 — material 2 (Layer 2):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | -20 | 0 |
 | 0 | 0 |
 | 0 | 30 |
@@ -102,7 +102,7 @@ starts at elevation 20 on the face and runs 35 ft back; the lower one starts at
 elevation 8 and runs 33 ft. Both are declined 25°:
 
 | Label | x1 | y1 | x2 | y2 |
-|---|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: |
 | tieback y=20 | 0 | 20 | 31.7208 | 5.20836 |
 | tieback y=8 | 0 | 8 | 29.9082 | -5.9464 |
 
@@ -110,7 +110,7 @@ elevation 8 and runs 33 ft. Both are declined 25°:
 over two settings:
 
 | Type | Dir | Appl |
-|---|---|---|
+| --- | --- | --- |
 | Geosynthetic | Tangent | Active |
 | Nail | Axial | Passive |
 | Tieback | Axial | Active |
@@ -129,7 +129,7 @@ table rather than running on from the endpoints: Type and its two settings sit
 between.
 
 | Tmax | Lp1 | Lp2 | Adhesion | Delta | Tend1 | Tend2 | Spacing |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 15043.1 | 0 | 8.86735 |  |  | 0 | 0 | 1 |
 | 20527.2 | 0 | 12.1 |  |  | 0 | 0 | 1 |
 
@@ -152,7 +152,7 @@ the plate is already expressed as Lp1 = 0.
 a pile resists in shear and bending rather than in tension:
 
 | Label | x1 | y1 | x2 | y2 | H | θp | Appl | D | S |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | --- | :---: | :---: |
 | soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 |  |  | 0.5 | 1 |
 
 A real soldier-pile wall is discrete — piles at intervals along the wall, with
@@ -179,7 +179,7 @@ uses it directly.
 manual this problem comes from, entered as three points:
 
 | X | Y | Movement |
-|:---:|:---:|---|
+| :---: | :---: | --- |
 | 0 | 0 | Free |
 | 37 | 33.6 | Free |
 | 61 | 67.069 | Free |
@@ -426,7 +426,7 @@ pile adds its 5,900 lb/ft of shear where the surface passes it at the toe.
 Each method runs its own search and finds its own critical surface:
 
 | Janbu | Corps | Lowe | Spencer |
-|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: |
 | 1.431 | 1.415 | 1.412 | 1.412 |
 
 All four land between 1.412 and 1.431. The Ordinary Method of Slices and Bishop's
@@ -486,7 +486,7 @@ Removing supports one at a time separates the two contributions, each answer on
 its own searched surface:
 
 | Support present | Janbu FS |
-|---|:---:|
+| --- | :---: |
 | Anchors and pile | 1.431 |
 | Anchors only | 1.325 |
 | Pile only | 0.921 |
@@ -506,7 +506,7 @@ published both ways — a 20 ft cut in saturated clay, γ = 98 pcf, c = 350 psf,
 evaluated on the circle its source prints for it:
 
 | Model | Appl | XSLOPE FS |
-|---|---|:---:|
+| --- | --- | :---: |
 | `vp085a` | Active | 1.567 |
 | `vp085b` | Passive | 1.319 |
 

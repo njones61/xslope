@@ -42,7 +42,7 @@ lines reference, and neither soil carries pore pressures — `u` stays `none` �
 so the table ends at φ:
 
 | name | γ | γsat | option | c | φ |
-|---|:---:|:---:|---|:---:|:---:|
+| --- | :---: | :---: | --- | :---: | :---: |
 | `shell` | 130 |  | `mc` | 300 | 37 |
 | `base` | 130 |  | `mc` | 0 | 37 |
 
@@ -59,7 +59,7 @@ in the paired `x` / `y` columns:
 **Profile Line 1 — material 1 (`shell`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | 0 | 0 |
 | 30 | 24 |
 | 32 | 24 |
@@ -67,7 +67,7 @@ in the paired `x` / `y` columns:
 **Profile Line 2 — material 2 (`base`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | -30 | 0 |
 | 2 | 0 |
 | 32 | 24 |
@@ -83,7 +83,7 @@ model.
 edge:
 
 | X | Y | N |
-|:---:|:---:|:---:|
+| :---: | :---: | :---: |
 | 30 | 24 | 240 |
 | 100 | 24 | 240 |
 
@@ -97,7 +97,7 @@ crossing point. Each line here starts on the face and runs 20 ft back into the
 fill, the lowest at the toe:
 
 | Label | x1 | y1 | x2 | y2 |
-|---|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: |
 | Line 1 | 0 | 0 | 20 | 0 |
 | Line 2 | 5 | 4 | 25 | 4 |
 | Line 3 | 10 | 8 | 30 | 8 |
@@ -109,7 +109,7 @@ fill, the lowest at the toe:
 preset over two settings:
 
 | Type | Dir | Appl |
-|---|---|---|
+| --- | --- | --- |
 | Geosynthetic | Tangent | Active |
 | Nail | Axial | Passive |
 | Tieback | Axial | Active |
@@ -138,7 +138,7 @@ friction against the soil, over some length of embedment. That is what the secon
 block says, the same eight values on every line:
 
 | Tmax | Lp1 | Lp2 | Adhesion | Delta | Tend1 | Tend2 | Spacing |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 800 | 4 | 4 |  |  | 0 | 0 | 1 |
 | 800 | 4 | 4 |  |  | 0 | 0 | 1 |
 | 800 | 4 | 4 |  |  | 0 | 0 | 1 |
@@ -174,7 +174,7 @@ buried end, and under the overburden law alike.
 height:
 
 | Xo | Yo | Option | Depth |
-|:---:|:---:|---|:---:|
+| :---: | :---: | --- | :---: |
 | 0 | 40 | Depth | 0 |
 | 15 | 40 | Depth | -10 |
 
@@ -418,7 +418,7 @@ The critical circle crosses five of the six layers, and the capacity envelope
 decides what each one gives:
 
 | Line | Crossing x | To the nearer end (ft) | T (lb/ft) |
-|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: |
 | 2 | 14.52 | 9.52 | 800 |
 | 3 | 21.59 | 8.41 | 800 |
 | 4 | 26.65 | 8.35 | 800 |
@@ -448,7 +448,7 @@ plotted surface rather than by counting the rows in the sheet.
 Each method gets its own search and its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 1.480 | 1.594 | 1.524 | 1.381 | 1.598 | 1.587 | 1.587 |
 
 Spencer and Morgenstern-Price agree to four figures on the same circle and are
@@ -483,7 +483,7 @@ each line held, the back end moved, so length is the only thing changing. Every
 length gets its own search and its own critical circle:
 
 | Line length (ft) | FS | Tension mobilized (lb/ft) | Lines crossed |
-|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: |
 | 10 | 1.270 | 532 | 2 of 6 |
 | 15 | 1.426 | 1,466 | 4 of 6 |
 | 20 | 1.587 | 4,000 | 5 of 6 |

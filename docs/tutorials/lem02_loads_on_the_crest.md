@@ -38,7 +38,7 @@ directly — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankme
 — and save a copy under a name of your own. Nothing in it changes here:
 
 | | |
-|---|---|
+| --- | --- |
 | **Material** | one Mohr-Coulomb soil, γ = 125 pcf, c = 500 psf, φ = 0 |
 | **Geometry** | a 20 ft embankment, 1:1 face, level crest, rigid base at y = 0 |
 | **Failure surface** | one starting circle, center (10, 40), tangent to the base |
@@ -49,7 +49,7 @@ Two points are the whole load here, because the intensity is uniform between
 them:
 
 | X (ft) | Y (ft) | N (psf) |
-|:---:|:---:|:---:|
+| :---: | :---: | :---: |
 | 25 | 20 | 750 |
 | 35 | 20 | 750 |
 
@@ -192,7 +192,7 @@ small-looking input, and the reason is visible in the figure rather than in the
 number: **the surface moved to find the load.**
 
 | | unloaded | with the surcharge |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | Factor of safety (Spencer) | 1.276 | 0.918 |
 | Circle radius (ft) | 40.4 | 33.8 |
 | Surface exits the crest at x = | 44.5 | 35.0 |
@@ -238,7 +238,7 @@ point at the middle of the strip instead — one row, in the columns the `lloads
 worksheet and Studio's line-loads editor share:
 
 | Label | x (ft) | y (ft) | P (lb/ft) | Angle (deg) |
-|---|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: |
 | footing | 30 | 20 | 7500 | -90 |
 
 - **Studio** — click **Line loads** in the **Inputs** tree, **Add row**, and
@@ -313,7 +313,7 @@ earthquake would do. It is a single global number:
 With the crest surcharge back in place:
 
 | k | 0.00 | 0.10 | 0.15 |
-|---|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: |
 | Factor of safety (Spencer) | 0.918 | 0.817 | 0.774 |
 
 ![Spencer at k = 0.15](images/lem02_solution_seismic.png){width=1000}

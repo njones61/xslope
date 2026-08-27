@@ -165,7 +165,7 @@ alone, and the table shows the seepage band of the `mat` worksheet — ten colum
 the last two of which need a scroll to the right to reach:
 
 | mat | name | k1 (m/day) | k2 (m/day) | alpha | unsat | kr0 | h0 (m) | vg_a | vg_n | Ss (1/m) | Sy |
-|:---:|---|:---:|:---:|:---:|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | --- | :---: | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | 1 | `shell` | 1.5 | 0.5 | 0 | `lf` | 0.01 | −0.3 | 0 | 0 | 3 × 10<sup>−4</sup> | 0.22 |
 | 2 | `core` | 0.012 | 0.005 | 0 | `lf` | 0.01 | −0.3 | 0 | 0 | 3 × 10<sup>−3</sup> | 0.03 |
 
@@ -238,7 +238,7 @@ the points grid.
 the heel and up the submerged part of the upstream face:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 0 | 0 |
 | 42 | 18 |
 
@@ -255,7 +255,7 @@ fully submerged the two behave identically, so the steady build keeps the plain
 water:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 105 | 2 |
 | 110 | 0 |
 
@@ -266,7 +266,7 @@ worked through. Draw it over the whole downstream slope, from the crest to the
 tailwater:
 
 | x | y |
-|---:|---:|
+| :---: | :---: |
 | 59 | 22 |
 | 105 | 2 |
 
@@ -418,7 +418,7 @@ unused, which is what `t2` through `t5` are on this model.
 elevation each:
 
 | time | pool |
-|---:|---:|
+| :---: | :---: |
 | 0 | 18 |
 | 2 | 18 |
 | 47 | 2 |
@@ -660,7 +660,7 @@ The gray dashed line is the pool, the shaded band is the drawdown window, and th
 three solid traces are the nodes. Four instants tell the story:
 
 | t (day) | pool (m) | core *h* (m) | shell *h* (m) | core ψ (m) | shell ψ (m) |
-|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: | :---: |
 | 0 | 18.00 | 13.56 | 17.98 | +4.65 | +9.06 |
 | 30 | 8.04 | 10.50 | 9.84 | +1.59 | +0.92 |
 | 47 | 2.00 | 9.35 | 6.54 | +0.44 | −2.37 |
@@ -696,7 +696,7 @@ water budget, and it is the one that says where the water in those frames came
 from. Each saved frame reports the flow across the boundary in each direction:
 
 | t (day) | pool (m) | inflow (m³/day per m) | outflow (m³/day per m) |
-|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: |
 | 0 | 18.00 | 0.16488 | 0.16488 |
 | 2 | 18.00 | 0.16488 | 0.16488 |
 | 15 | 13.38 | 0.00000 | 1.25079 |

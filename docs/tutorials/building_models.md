@@ -30,7 +30,7 @@ collects beside its workbook, and how to send a whole project to somebody else.
 ## One model, three ways in
 
 | Path | You work in | Reach for it when |
-|---|---|---|
+| --- | --- | --- |
 | **The Excel template** | a spreadsheet, cell by cell | you want to see exactly what the file holds |
 | **Studio's editors** | forms and tables, beside a redrawing section | you are drawing geometry, or auditing a model |
 | **The AI assistant** | a chat box, inside Studio | you have a sketch or a description to start from |
@@ -140,7 +140,7 @@ That workbook is the model. Everything an analysis *produces* is written beside 
 in files named after it:
 
 | File | Written by |
-|---|---|
+| --- | --- |
 | `{base}.xlsx` | you, or Studio — the model itself |
 | `{base}_mesh.json` | Build Mesh |
 | `{base}_seep.csv` | a steady seepage run |

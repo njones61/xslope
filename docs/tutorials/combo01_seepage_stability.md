@@ -170,7 +170,7 @@ The column takes four values, and it is set per material rather than once for th
 model, so a section can mix them:
 
 | `u` | Where the pore pressure comes from |
-|---|---|
+| --- | --- |
 | `none` | Nowhere — a dry material, or a total stress analysis |
 | `piezo` | A piezometric line drawn on the `piezo` sheet |
 | `seep` | The finite element seepage solution |

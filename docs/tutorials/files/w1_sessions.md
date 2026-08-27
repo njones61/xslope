@@ -39,7 +39,7 @@ longest was 254 s.
 > a search.
 
 **Files:** `images/w1_build_from_image_1.png` (560 × 5552),
-`w1_build_from_image_transcript.md`, `w1_build_from_image_after.xlsx`.
+`w1_build_from_image_transcript.txt`, `w1_build_from_image_after.xlsx`.
 **Cost:** 6 completions, 105,747 in (62,610 cached) / 17,181 out, 254 s.
 
 **Right.** The model is complete and it solves. Both materials carry the right γ,
@@ -91,7 +91,7 @@ base. Reloading the saved workbook and running Spencer independently reproduces
 > (b) Add a distributed load of 500 psf on the crest from x = 60 to x = 90 and rerun.
 > (c) Extend all the reinforcement lines 5 ft to the right and rerun.
 
-**Files:** `images/w1_modify_1.png` … `_3.png`, `w1_modify_transcript.md`,
+**Files:** `images/w1_modify_1.png` … `_3.png`, `w1_modify_transcript.txt`,
 `w1_modify_after_1.xlsx`, `_2.xlsx`, `_3.xlsx` (one per turn).
 **Cost:** 12 completions, 215,159 in (163,848 cached) / 7,243 out, 187 s.
 
@@ -154,7 +154,7 @@ about the same (12 completions against 13), and the wall time is shorter.
 > Sweep the geogrid Tmax from 500 to 3000 lb/ft in 6 steps with a search at each
 > step and plot FS against Tmax.
 
-**Files:** `images/w1_sweep_builtin_1.png`, `w1_sweep_builtin_transcript.md`. No
+**Files:** `images/w1_sweep_builtin_1.png`, `w1_sweep_builtin_transcript.txt`. No
 workbook — the sweep restored the project, and the harness correctly wrote
 nothing.
 **Cost:** 2 completions, 26,868 in (25,044 cached) / 1,577 out, 104 s.
@@ -191,7 +191,7 @@ the mechanism offered for it is a plausible story that a measurement contradicts
 > Run the analysis with 2, 3, 4, 5 and 6 geogrid layers (removing the top layers
 > first), searching each time, and tabulate FS against the number of layers.
 
-**Files:** `images/w1_sweep_adhoc_1.png`, `w1_sweep_adhoc_transcript.md`. No
+**Files:** `images/w1_sweep_adhoc_1.png`, `w1_sweep_adhoc_transcript.txt`. No
 workbook — the model was restored, and the harness confirms it by writing none.
 **Cost:** 7 completions, 114,999 in (95,578 cached) / 5,603 out, 140 s.
 
@@ -246,7 +246,7 @@ way. This is the same waste as session 1.
 > analysis.
 
 **Files:** `images/w1_elastic_fem_1.png`, `_2.png`,
-`w1_elastic_fem_transcript.md`, `w1_elastic_fem_after.xlsx`.
+`w1_elastic_fem_transcript.txt`, `w1_elastic_fem_after.xlsx`.
 **Cost:** 5 completions, 71,104 in (62,610 cached) / 2,654 out, 175 s.
 
 **Right, and the SSRM number is exact.** It called `suggest_elastic()` and
@@ -279,7 +279,7 @@ the mesh type came back empty.
 > have a few tests?
 
 **Files:** `images/w1_conceptual_1.png`, `_2.png`,
-`w1_conceptual_transcript.md`.
+`w1_conceptual_transcript.txt`.
 **Cost:** 3 completions, 44,084 in (40,962 cached) / 3,315 out, 58 s.
 
 **Right on the engines.** It grounded the answer in the open model (it printed
@@ -336,7 +336,7 @@ Spencer with a search returns 0.071 on it.
 > This model gives a factor of safety below 1. Can you find what is wrong?
 
 **Files:** `images/w1_diagnose_1.png` (560 × 2950),
-`w1_diagnose_transcript.md`. No workbook — it changed nothing and said so, and
+`w1_diagnose_transcript.txt`. No workbook — it changed nothing and said so, and
 the harness confirms it by writing none.
 **Cost:** 3 completions, 47,432 in (40,962 cached) / 5,764 out, 129 s.
 
@@ -404,7 +404,7 @@ could not take over the machine's copy of Word.
 > (a) Run Spencer with a search.
 > (b) Generate the analysis report for this model.
 
-**Files:** `images/w1_report_1.png`, `_2.png`, `w1_report_transcript.md`,
+**Files:** `images/w1_report_1.png`, `_2.png`, `w1_report_transcript.txt`,
 `w1_report_after.docx`.
 **Cost:** 4 completions, 59,170 in (40,962 cached) / 1,059 out, 50 s.
 

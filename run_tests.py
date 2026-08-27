@@ -6618,6 +6618,39 @@ def run_spencer_disclosure_test(test):
     return 0.0, None
 
 
+def run_circle_vertex_test(test):
+    """A circle that daylights exactly on a ground-surface vertex.
+
+    Crossings are solved segment by segment, so a circle passing precisely through
+    a vertex reported it once per adjoining segment. get_sorted_intersections saw
+    three points where there are two crossings, read that as "the circle re-enters
+    beyond the toe", and kept the two copies of the vertex — the clipped surface
+    came back as a zero-length segment standing at one x, drawn as nothing and
+    scored as a surface rather than refused.
+
+    The check itself lives in test/circle_vertex_intersection_check.py (file-less
+    apart from the shipped models it loads): the earth dam's exact-vertex circle
+    (44^2 + 33^2 = 55^2 on the crest edge), the arc it must span, FS continuity
+    through it against nudged neighbors, a tangent circle refused by the usual
+    reason, the six shipped reinforcement circles held to their exact endpoints,
+    and a mutation that restores the bug with the dedupe disabled.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'circle_vertex_intersection_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('circle_vertex_intersection_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_seep_cycle_test(test):
     """The unconfined solver's two limit-cycle escapes, and their inertness.
 
@@ -11846,6 +11879,8 @@ def _dispatch_test(test):
         return run_flow_recovery_test(test)
     if test_type == 'spencer_disclosure':
         return run_spencer_disclosure_test(test)
+    if test_type == 'circle_vertex':
+        return run_circle_vertex_test(test)
     if test_type == 'stability_time':
         return run_stability_time_test(test)
     if test_type == 'steady_seep_save':
@@ -11997,7 +12032,7 @@ def _expected_and_tol(test, default_tolerance):
                        'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'piezo_u_guard',
-                       'spencer_disclosure',
+                       'spencer_disclosure', 'circle_vertex',
                        'gsat_pair', 'seep_head',
                        'tseep_head', 'design_callable', 'kernel_xcheck'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
@@ -12016,7 +12051,7 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'fs_vs_time_mode': 4,
               'transient_seep': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2,
-              'spencer_disclosure': 3}
+              'spencer_disclosure': 3, 'circle_vertex': 2}
 
 
 def _parallel_worker(item):
@@ -12370,6 +12405,14 @@ def main():
         tests.append({'type': 'spencer_disclosure',
                       'file': 'Spencer insoluble surfaces + search disclosure',
                       'method': 'spencer', 'source': 'spencer_disclosure'})
+        # A circle daylighting exactly on a ground-surface vertex reported that
+        # vertex once per adjoining segment, and the extra point sent the
+        # count-and-prune to two copies of it — a zero-length "surface" that was
+        # scored instead of refused. The arc, its FS continuity, a tangent circle's
+        # refusal, and the shipped vertex circles' endpoints are pinned together.
+        tests.append({'type': 'circle_vertex',
+                      'file': 'circle through a ground-surface vertex',
+                      'method': '-', 'source': 'circle_vertex'})
 
     # Preflight (xslope.preflight) — the rule registry's own regression family.
     # The contract and mutation checks are file-less; the corpus check is one row

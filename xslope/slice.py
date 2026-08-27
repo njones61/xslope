@@ -151,9 +151,37 @@ def get_piezometric_y_coordinates(x_coords, piezo_line):
     return y_coords
 
 
+def _dedupe_coincident(points, tol=1e-6):
+    """
+    Collapse runs of coincident points to one representative, preserving order.
+
+    Crossings are found segment by segment, so a circle that passes exactly
+    through a polyline VERTEX produces that vertex twice — once as the end root
+    of the segment arriving at it, once as the start root of the segment leaving
+    it. A tangent circle likewise yields its single touch point twice, from the
+    two equal roots of one segment. Both are one geometric crossing, and callers
+    that count crossings must not see them as two.
+
+    ``tol`` is the module's geometric tolerance in model units (see
+    _resolve_right_facing and the clip-endpoint test in generate_failure_surface);
+    two genuinely distinct daylight points a micron apart would be a degenerate
+    sliver, not a surface worth slicing.
+    """
+    kept = []
+    for p in points:
+        if any(abs(p.x - q.x) <= tol and abs(p.y - q.y) <= tol for q in kept):
+            continue
+        kept.append(p)
+    return kept
+
+
 def _circle_polyline_all(Xo, Yo, R, polyline):
     """
-    Every crossing of a full circle with a polyline, unfiltered.
+    Every crossing of a full circle with a polyline, one point per crossing.
+
+    Coincident roots from adjoining segments (a vertex hit) or from one segment
+    (a tangency) are collapsed by _dedupe_coincident, so the length of the
+    returned list is a crossing count callers can trust.
 
     Callers almost always want circle_polyline_intersections instead — see its
     docstring for why crossings above the equator must not reach the slicer.
@@ -182,7 +210,7 @@ def _circle_polyline_all(Xo, Yo, R, polyline):
             t = (-b + sign * sqrt_disc) / (2 * a)
             if 0 <= t <= 1:
                 intersections.append(Point(x1 + t * dx, y1 + t * dy))
-    return intersections
+    return _dedupe_coincident(intersections)
 
 
 def circle_polyline_intersections(Xo, Yo, R, polyline):
@@ -260,6 +288,15 @@ def get_sorted_intersections(failure_surface, ground_surface, circle_params=None
             points = [g for g in intersections.geoms if isinstance(g, Point)]
         else:
             points = []
+
+    # Collapse coincident crossings BEFORE counting or pruning. A circle through a
+    # ground-surface vertex reports it once per adjoining segment; unmerged, that
+    # third point sent the pair-picking below to two copies of the same vertex and
+    # the clipped surface came back as a zero-length segment instead of the arc.
+    # Shapely's intersection on the non-circular path can double a vertex the same
+    # way. After this, a surface that still has fewer than two DISTINCT crossings is
+    # rejected below by the usual reason, as a tangent or grazing circle should be.
+    points = _dedupe_coincident(points)
 
     # need at least two
     if len(points) < 2:

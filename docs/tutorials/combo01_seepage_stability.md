@@ -260,8 +260,9 @@ Everything else opens on the defaults this run wants. **Analysis** is **SSRM
 (find FS)**, the strength reduction: it divides both Mohr-Coulomb strength
 parameters by a trial factor *F*, solves the whole slope for equilibrium under
 its own weight, and reports the largest *F* the slope still stands at.
-**F min** and **F max** are 1.00 and 2.00, the ends of the bracket to search, and
-**Tolerance** is 0.0100, the width the bracket is bisected down to.
+**F min (SSRM)** and **F max (SSRM)** are 1.00 and 2.00, the ends of the bracket
+to search, and **Tolerance (SSRM)** is 0.0100, the width the bracket is bisected
+down to.
 [FEM-1](fem01_strength_reduction.md) covers all of them. Leave everything as it
 is and click **Run**. This run takes a few minutes, where the seepage and limit
 equilibrium runs took seconds.

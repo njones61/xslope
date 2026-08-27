@@ -119,7 +119,8 @@ reads 30000 rather than 30 because **XSLOPE never converts units**: every stress
 in a model is in the model's own stress unit, kPa here, and 30 MPa is 30,000 kPa.
 The box at the top left of the plot reads out what those four produce —
 m<sub>b</sub> = 0.0672, *s* = 2.60 × 10<sup>−5</sup>, *a* = 0.619 — reproducing
-Hammah's Table 1 (0.067, 2.5 × 10⁻⁵, 0.619) to its printed digits. Watch the
+m<sub>b</sub> and *a* to Hammah's printed digits; *s* is 4% above the paper's
+rounded 2.5 × 10⁻⁵. Watch the
 exponent: at *a* = 0.619 the envelope is a long way from the classical
 square-root shape, which is what makes this a demanding case for the criterion
 rather than for the geometry.
@@ -132,7 +133,7 @@ below redraws it over the stresses this slope actually generates:
 
 The red curve is the envelope, and the shaded band is the range of effective
 normal stress the critical surface found in the next section actually carries,
-0 to 75 kPa. The curve is not a straight line: it is steepest near zero and
+−2 to 75 kPa (the band is clipped at zero). The curve is not a straight line: it is steepest near zero and
 flattens as the confinement grows, so the cohesion and friction angle it implies
 change from one slice base to the next. The dashed line shows how one slice
 is handled, using 47 kPa as the example — chosen only because it is the average
@@ -185,8 +186,7 @@ stresses runs from c<sub>i</sub> = 11.4 to 18.9 kPa with
 the criterion is evaluated for any slice the solution puts in tension.
 Length-weighted along the surface the pair averages c<sub>i</sub> = 15.9
 kPa and φ<sub>i</sub> = 26.7°, at a mean normal stress of 47.3
-kPa — the dashed line on the envelope figure above, which touches
-the curve at that stress and nowhere else.
+kPa.
 
 That single pair is not a substitute for the criterion. Entered as a
 Mohr-Coulomb material it would over-credit the lightly loaded slices near the
@@ -388,7 +388,7 @@ it gets there is set by m<sub>i</sub> rather than by GSI. This rock's
 m<sub>i</sub> = 2 sits at the very soft end of the table, so its envelope never
 gets steep: the instantaneous friction angle at zero confinement is
 36.9° at GSI = 5 and 34.7° at GSI = 70, peaking at only
-46.7° in between. Put a granite's m<sub>i</sub> = 25 in the same cells and
+47.0° in between. Put a granite's m<sub>i</sub> = 25 in the same cells and
 the same two ends read 72.5° and 71.9°.
 
 That second case is the one to know about before running a competent rock. The
@@ -405,7 +405,11 @@ whatever the constants happen to be:
 Spencer's method and the Morgenstern-Price method solve for the inclination
 instead of fixing it, which is why this page runs Spencer throughout. Bishop's
 simplified method avoids the difficulty another way, by carrying no interslice
-shear at all — which is why Part A's Bishop run converged on this section.
+shear at all. None of that bites on this rock: its instantaneous friction angle
+peaks at 36.9° and never approaches 55°, so Bishop, the Corps of Engineers method
+and Lowe & Karafiath all converge on this section. The caution belongs to a
+competent rock mass, where a higher m<sub>i</sub> carries the envelope past that
+limit.
 
 One last note on the σ<sub>ci</sub> check from Part A: it fires on any
 σ<sub>ci</sub> below 1000 kPa, which includes models stated deliberately in

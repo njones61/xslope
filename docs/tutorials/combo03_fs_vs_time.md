@@ -193,7 +193,8 @@ and the starting circle should be drawn to cut it too.
 
 A circle sketched through the core still reaches a shell slide from a single
 face: one drawn at (22, 52) with a radius of 51 m, crossing 14 m of core, refines
-on day 35 to 1.338 at (9.12, 46.76), against 1.331 for the circle in the table.
+on day 35 to 1.338 at (9.12, 46.76) (measured by searching from that circle
+alone), against 1.331 for the circle in the table.
 The search walks it out of the core and down to the rock.
 
 Under the table, the **Search window** group holds the limits that confine where
@@ -327,7 +328,7 @@ again. Set **Run type** to
 iterations** gray out — they belong to the steady solve, and the march sets its
 own step size from how fast the field is moving.
 
-This is the long run of the page; every other run here is seconds. The march
+This is the long run of the page; every other run here finishes far sooner. The march
 solves its initial condition first — the same field the steady run just produced
 — and then prints a line per saved frame:
 
@@ -360,9 +361,10 @@ core is left draining on its own, and the frames follow that.
 The **mass-balance closure** on each line is a diagnostic: the gap between the
 stored-water change and the net inflow, as a fraction of the flow that has
 passed so far. Early in the march that flow is still small, so the ratio at t = 5
-reads large without meaning anything — the absolute gap there is a third of a
-cubic meter per meter, no larger than at later frames, and the head field at
-t = 5 moves by less than 0.04 m under a step size four times finer.
+reads large without meaning anything. Measured on this march, the absolute gap
+there is a third of a cubic meter per meter, no larger than at later frames, and
+the head field at t = 5 moves by less than 0.04 m under a step size four times
+finer.
 
 ### One instant at a time
 
@@ -421,22 +423,26 @@ hand.
 
 #### The whole curve in one run
 
-Click **Run → Parametric…** and set **Mode** to **Factor of safety vs time**:
+A parametric sweep does that repetition itself, stepping through the saved
+frames and solving each one. Click **Run → Parametric…** and set **Mode** to **Factor of
+safety vs time**:
 
 ![The Parametric dialog sweeping the march's saved frames](images/combo03_studio_parametric.png)
 
-The parameter picker the other three modes use is gone, because nothing is
-substituted here: every point solves *this* model against a different instant's
-pore pressures. In its place is a **Saved frames** list holding the nineteen the
-march stored, all ticked — **All** and **None** set the whole list, and unticking
-samples a long march, since each frame is a full stability run. Leave **Method** on
-**Spencer** and **Number of slices** at 40 and **Re-search the critical
-surface at each step** ticked, which is the right setting here because the
-mechanism moves. Leave **Grid search (auto-seed the circular search)** off: the
-two circles the file carries already reach both faces.
+Leave **Method** on **Spencer** and **Number of slices** at 40. The parameter
+picker the other three modes use is gone, because nothing is substituted here:
+every point solves *this* model against a different instant's pore pressures. In
+its place is a **Saved frames** list holding the nineteen the march stored, all
+ticked — **All** and **None** set the whole list, and unticking samples a long
+march, since each frame is a full stability run. Leave **Rapid drawdown at each
+time** unticked, which keeps every point a single-stage analysis at that
+instant's pore pressures; Part 2 below ticks it. Leave **Grid search (auto-seed
+the circular search)** off: the two circles the file carries already reach both
+faces. **Re-search the critical surface at each step** stays ticked, which is the
+right setting here because the mechanism moves.
 
-Click **Run**. Nineteen searches, a few seconds each, stream their factors of
-safety to the Log:
+Click **Run**. Nineteen searches, each far shorter than the march, stream their
+factors of safety to the Log:
 
 ```text
 Factor of safety vs time (lem): 19 instant(s) of the transient march, spencer, re-searching at each…
@@ -449,7 +455,7 @@ Lowest factor of safety 1.3313 at t = 35 day (19 instant(s), 0 without a result)
 ```
 
 The run opens an **FS vs Time** tab with the curve, its lowest instant ringed and
-labelled, and the reservoir schedule that drives it drawn faintly behind:
+labeled, and the reservoir schedule that drives it drawn faintly behind:
 
 ![The FS vs Time result tab](images/combo03_studio_fs_time.png)
 
@@ -500,8 +506,8 @@ carries the mode in full.
 | 240 | 2.00 | 1.5566 | (103.00, 56.79) | 56.79 | downstream |
 | 300 | 2.00 | 1.5572 | (103.00, 56.79) | 56.79 | downstream |
 
-Every circle above is tangent to the rock at elevation 0. The **face** column is
-read off the center: the crest runs from x = 51 to x = 59, so a center left of it
+Every circle above bottoms at, or within a tenth of a meter of, the rock at
+elevation 0. The **face** column is read off the center: the crest runs from x = 51 to x = 59, so a center left of it
 is an upstream mechanism and a center right of it a downstream one.
 
 ![The factor of safety at every saved instant, over the pool that drives it](images/combo03_curve.png){width=1000}
@@ -527,7 +533,7 @@ the downstream shell, each step gaining less than the one before.
 
 #### Which face governs, and when
 
-The face column is the second reading the curve carries, and it is not the same
+The face column carries the curve's second reading, and it is not the same
 shape as the factor of safety.
 
 **At full pool the downstream face governs, at 1.5311.** Eighteen meters of water
@@ -687,7 +693,7 @@ kind of curve on the same twenty-one frames so the two can be set side by side.
 
 ### The model, and what Part 2 reads off it
 
-The march the sweep reads is the one COMBO-2 already solved, so Part 2 opens it
+The sweep reads the march COMBO-2 already solved, so Part 2 opens it
 rather than producing it again. Download
 [xslope_johnson_fs_time.xlsx](files/xslope_johnson_fs_time.xlsx) and open it with
 **File → Open…**, leaving the toolbar's mode strip on **LEM**. The mesh and the
@@ -725,8 +731,8 @@ each slice consolidated at.
 
 **`u` is `seep` on all three rows**, so every slice base takes its pore pressure
 from a solved seepage field. The file's two piezometric lines were deleted when
-COMBO-2 replaced them, which is why the figure above draws water surfaces and
-their derived loads and no piezometric line at all.
+COMBO-2 replaced them, which is why the figure above draws the reservoir's water
+surface and its derived load, and no piezometric line at all.
 
 **The schedule and the stage times.** Switch the mode strip to **Seepage**
 (`Ctrl+2`) and click **Transient** in the Inputs dock. The `pool` series holds at
@@ -759,7 +765,7 @@ element size at 750/100 = 7.5 ft.
 [COMBO-2 builds that mesh](combo02_rapid_drawdown.md#meshing-and-both-solves) with
 **Run → Build Mesh…** and
 [marches the pool on it](combo02_rapid_drawdown.md#marching-it) with
-**Run → Run Seep…**, a run of several minutes on this dam. The file downloaded
+**Run → Run Seep…**, much the longer of the two on this dam. The file downloaded
 above arrives past both, so nothing below waits on a seepage solve.
 
 ### Running the rapid drawdown sweep
@@ -842,32 +848,33 @@ frames are drawdowns; the first is the state they all fall from.
 The run opens a **Drawdown vs Time** tab — the same tab a single-stage sweep
 uses, renamed for the curve it is holding:
 
-![The rapid drawdown factor of safety at every saved instant, with its three stages behind it](images/combo03_rapid_curve.png)
+![The rapid drawdown factor of safety at every saved instant, over the pool schedule that drives it](images/combo03_rapid_curve.png)
 
 One curve is drawn, and it carries the rapid drawdown factor of safety at each
 instant — the lower of stages 2 and 3. The three stages themselves stay in the
 table above, where the governing one is named per row; a figure holding a line
 per stage would draw three answers where only one of them is reported. Behind
 the curve, on the right axis, runs the pool schedule that drives it. The lowest
-instant is ringed and labelled with its own time, the red guide marks FS = 1 —
+instant is ringed and labeled with its own time, the red guide marks FS = 1 —
 drawn here because the curve comes within its own swing of it — and the legend
 counts the instant that produced no result, so the missing t = 0 point is never
 a silent gap.
 
 **Day 50 reads 1.0157, and that is COMBO-2's answer.** COMBO-2's transient route
-reports **1.016** on a circle at (243.93, 244.90) with a radius of 163.64 ft, and
-the day-50 row above carries the same factor of safety on the same circle to the
-hundredth of a foot. Nothing about that is a check of one page against another:
-at t = 50 this sweep runs precisely the rapid drawdown COMBO-2 ran — stage 1 at 0,
-stage 2 at 50, the same march, the same starting circle — so the curve passes
-through COMBO-2's answer at day 50 because that answer is one of its points.
+reports **1.0158** on a circle at (243.93, 244.90) with a radius of 163.64 ft,
+and the day-50 row above lands on that same circle at 1.0157 — one
+ten-thousandth between them, which is how far apart the two code paths fall in
+the fourth decimal. Nothing about that is a check of one page against another: at
+t = 50 this sweep poses the rapid drawdown COMBO-2 posed — stage 1 at 0, stage 2 at 50, the
+same march, the same starting circle — so the curve passes through COMBO-2's
+answer at day 50 because that answer is one of its points.
 
 <!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, num_slices=40, expected_first=1.4563, critical_time=50, min_fs=1.0157, tolerance=0.005, benchmark=COMBO-3-rapid -->
 
 **Stage 3 runs on three rows, all of them at the bottom of the dip.** Days 45, 50
-and 60 read 3 in the **governs** column, and on each the margin is a single
-ten-thousandth — 1.0278 against stage 2's 1.0279, 1.0157 against 1.0163, 1.0522
-against 1.0523. Every other row reads `not required`, which means no core slice
+and 60 read 3 in the **governs** column, and on days 45 and 60 the margin is a
+single ten-thousandth and on day 50 six — 1.0279 / 1.0278, 1.0163 / 1.0157,
+1.0523 / 1.0522. Every other row reads `not required`, which means no core slice
 came out weaker drained than undrained and stage 2 is the answer.
 [COMBO-2's sweep of the core's intercept](combo02_rapid_drawdown.md#the-governing-stage-flip)
 finds why those margins are so thin: the handover from stage 2 to stage 3
@@ -904,7 +911,7 @@ dam after the pore pressures have fully caught up with the residual pool, which 
 march of finite length only approaches: by day 500 the core has nearly, but not
 quite, finished draining.
 
-**Stage 1 moves, and the water is not why.** Its column reads 1.5514 on the six
+**Stage 1 moves, and the water is not why.** Its column reads 1.5514 on the seven
 rows from day 100 on, 1.5512 on day 80, 1.5545 on day 50, 1.5453 on day 35 and
 1.5109 on day 5. Every one of those is the same physical state — full pool,
 drained, the march's initial field — so the spread is the surface it was
@@ -969,12 +976,12 @@ two results together reproduces it:
 
 ![The rapid drawdown curve and the single-stage curve of the same march](images/combo03_rapid_compare.png){width=1000}
 
-**The rapid drawdown curve is the lower of the two at every instant**, and the distance
-between them is not constant:
+**The rapid drawdown curve runs below the single-stage curve at every instant**,
+and the distance between them is not constant:
 
 | t (day) | drawdown | single-stage | difference |
 | :---: | :---: | :---: | :---: |
-| 5 | 1.4563 | 1.5097 | 0.0535 |
+| 5 | 1.4563 | 1.5097 | 0.0534 |
 | 10 | 1.3496 | 1.3944 | 0.0448 |
 | 15 | 1.2704 | 1.3093 | 0.0389 |
 | 20 | 1.2036 | 1.2374 | 0.0338 |
@@ -984,19 +991,19 @@ between them is not constant:
 | 40 | 1.0457 | 1.0656 | 0.0199 |
 | 45 | 1.0278 | 1.0469 | 0.0191 |
 | 50 | **1.0157** | **1.0350** | **0.0193** |
-| 60 | 1.0522 | 1.0765 | 0.0244 |
+| 60 | 1.0522 | 1.0765 | 0.0243 |
 | 70 | 1.0743 | 1.1037 | 0.0294 |
 | 80 | 1.0902 | 1.1244 | 0.0342 |
-| 100 | 1.1159 | 1.1587 | 0.0429 |
-| 130 | 1.1414 | 1.1949 | 0.0536 |
+| 100 | 1.1159 | 1.1587 | 0.0428 |
+| 130 | 1.1414 | 1.1949 | 0.0535 |
 | 170 | 1.1612 | 1.2252 | 0.0640 |
 | 220 | 1.1744 | 1.2475 | 0.0731 |
-| 300 | 1.1848 | 1.2684 | 0.0835 |
+| 300 | 1.1848 | 1.2684 | 0.0836 |
 | 400 | 1.1893 | 1.2802 | 0.0909 |
 | 500 | 1.1912 | 1.2870 | 0.0958 |
 
 **The gap is narrowest where the slope is weakest.** Across the bottom of the dip
-— days 40 to 50 — the two analyses run 0.019 to 0.020 apart, about 1.9% of the
+— days 40 to 50 — the two analyses run 0.019 apart, about 1.9% of the
 rapid drawdown answer; by day 500 they are 0.096 apart, 8.0% of it. The undrained
 envelope changes the answer least at the moment the answer matters most.
 

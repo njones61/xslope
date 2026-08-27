@@ -174,9 +174,9 @@ which narrows the table to the columns the drawdown run reads:
 
 | mat | name | γ (pcf) | c′ (psf) | φ′ (deg) | d (psf) | ψ (deg) | u |
 | :---: | --- | :---: | :---: | :---: | :---: | :---: | --- |
-| 1 | `shell` | 130 | 100 | 35 | — | — | `piezo` |
+| 1 | `shell` | 130 | 100 | 35 | 0 | 0 | `piezo` |
 | 2 | `core` | 125 | 400 | 18 | 250 | 14 | `piezo` |
-| 3 | `foundation` | 127 | 100 | 27 | — | — | `piezo` |
+| 3 | `foundation` | 127 | 100 | 27 | 0 | 0 | `piezo` |
 
 The **d** and **psi** columns are what make this a drawdown model, and only the
 core carries them. Its $K_c = 1$ envelope is $d = 250$ psf and $\psi = 14°$, well
@@ -185,7 +185,7 @@ core that makes the undrained strength the lower of the two and stage 2 governs,
 but the margin is thin: on the transient route below, five core slices come out
 stronger undrained than drained and hand the answer to stage 3.
 [The sweep](#the-governing-stage-flip) at the end of the page finds the value of
-$d$ that separates the two. The shell and the foundation are left blank on both
+$d$ that separates the two. The shell and the foundation carry 0 on both
 columns, which declares them free-draining: they keep 100 psf and 35°, and
 100 psf and 27°, through every stage.
 
@@ -271,7 +271,7 @@ Click **OK**, and the Inputs plot draws the whole model:
 
 Three profile lines carve the section into shell, core and foundation. The heavy
 dark blue line is Piezometric Line 1 and the pale one Line 2, each carrying the
-inverted-triangle water-table symbol at its midpoint: 50 ft apart over the
+inverted-triangle water-table symbol: 50 ft apart over the
 upstream foreshore, 53 ft apart above the core, and the same line from x = 550
 out.
 
@@ -490,12 +490,12 @@ The **Seep · Solution** tab:
 **1.9566 ft³/day per ft** of dam, printed on the figure as 1.957. The head runs
 from 100.000 to 160.000 ft, the two boundary values and nothing outside them.
 The heavy black line traces the phreatic surface: nearly
-flat across the upstream shell at reservoir level, falling almost the whole 60 ft
+flat across the upstream shell at reservoir level, falling about three-quarters of the 60 ft
 inside the core, and running low across the downstream shell to the tailwater.
 A flow net covers the rest of the section: thin black total head contours, and
 blue flow lines running from the upstream face through the section to the exit
 face. The contours crowd where head falls fastest, and each channel between two
-flow lines carries an equal share of the discharge. Almost the entire head loss
+flow lines carries an equal share of the discharge. Three-quarters of the head loss
 is in the core, which is what a cutoff key is for.
 ([COMBO-1](combo01_seepage_stability.md#solving-it) reports 1.925 for the same
 boundary set on a quadratic mesh at the same 7.5 ft target — 8,082 nodes rather
@@ -603,7 +603,7 @@ untouched: it carries the reservoir boundary the schedule drives, and the march
 starts from its steady solution.
 
 Left on the file Set 2 changes nothing the run computes, and the drawdown run
-below opens on a second warning saying so — *"Boundary set 2 carries 2 specified
+below adds a second warning, which sorts above the d / ψ one — *"Boundary set 2 carries 2 specified
 head(s) and 0 specified flux(es), but this rapid drawdown reads BOTH its stages
 from the transient march"*:
 

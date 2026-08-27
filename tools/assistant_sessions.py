@@ -377,7 +377,7 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
                           out_dir=IMAGES_DIR, files_dir=FILES_DIR,
                           timeout_s=600, dry_run=False, dock_width=560,
                           window_size=(1500, 950), max_height=6400,
-                          save_after=None):
+                          save_after=None, save_each_turn=False, settings=None):
     """Record one assistant conversation against a real model, offscreen.
 
     Opens ``model_path`` in an offscreen ``MainWindow``, pins ``provider`` /
@@ -415,6 +415,15 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
     save_after : bool, optional
         Whether to write the workbook the session left behind. Default (``None``)
         writes it exactly when the session actually changed the model.
+    settings : dict, optional
+        Extra QSettings keys pinned for the length of the run, beside the provider
+        pins — anything the session needs the app to be set to (``report/finalize``
+        off, say, so an unattended capture never drives Word).
+    save_each_turn : bool
+        Also write the workbook AFTER EACH TURN, as ``w1_{name}_after_{i}.xlsx``.
+        A conversation that edits the model over several turns is only checkable
+        turn by turn — the end state cannot show what the second of three edits
+        did — so a multi-edit session records one file per turn.
 
     Returns
     -------
@@ -432,6 +441,7 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
 
     pins = {"ai/provider": provider, "ai/model/%s" % provider: model,
             "ai/confirm": False}
+    pins.update(settings or {})
     result = {"name": name, "images": [], "transcript": transcript_path,
               "workbook": None, "turns": [], "usage": {}, "seconds": 0.0,
               "error": None}
@@ -448,6 +458,12 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
             win.resize(*window_size)
             if model_path:
                 win.open_path(model_path)
+            else:
+                # File -> New: the reader's own starting point for a build-from
+                # scratch session. Without it the document is closed, the dock's
+                # MODEL SUMMARY has nothing to describe, and the first snippet
+                # would be the thing that creates the project.
+                win.new_project()
             win.show()
             _settle()
             win.resizeDocks([win.chat_dock], [dock_width], Qt.Horizontal)
@@ -475,6 +491,13 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
                 png = _grab_dock(win, os.path.join(out_dir, "%s_%d.png"
                                                    % (stem, i)), max_height)
                 record["image"] = png
+                if save_each_turn and win.doc.is_open:
+                    step = os.path.join(files_dir, "%s_after_%d.xlsx" % (stem, i))
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        win.doc.save(step)
+                    record["workbook"] = step
+                    result.setdefault("step_workbooks", []).append(step)
+                    print("   -> %s" % os.path.basename(step))
                 result["images"].append(png)
                 result["turns"].append(record)
                 _append_turn(transcript_path, i, record)
@@ -670,6 +693,114 @@ def w1_smoke(dry_run=False):
 
 
 SESSIONS["w1_smoke"] = w1_smoke
+
+
+# --- the recorded conversations the tutorial is built from ------------------ #
+#: The reinforced slope of LEM-8, finished — the project every session but the
+#: first and the seventh opens.
+W1_MODEL = os.path.join(REPO_ROOT,
+                        "docs/tutorials/files/xslope_reinforced_slope.xlsx")
+#: The same slope with three transcription errors written into it (material 2's
+#: friction angle 3 instead of 37, the crest surcharge 2400 instead of 240, and
+#: the bottom of the model at -100 instead of -10). Built by hand for the
+#: diagnosis session; Spencer returns 0.07 on it.
+W1_BROKEN = os.path.join(REPO_ROOT, "docs/tutorials/files/w1_diagnose_start.xlsx")
+#: The drawing of the problem, the same figure LEM-8 opens on. The build session
+#: pastes it into the dock and gives the assistant nothing else.
+W1_SKETCH = os.path.join(IMAGES_DIR, "lem08_problem_sketch.png")
+
+
+def w1_build_from_image(dry_run=False):
+    """From an empty project and a drawing, to a solved model."""
+    return run_assistant_session(
+        "build_from_image", None,
+        [("Build this model. Use the dimensions and properties on the drawing. "
+          "Unit system: US customary (ft, psf, pcf). Add a starting circle and "
+          "run Spencer with a search.", W1_SKETCH)],
+        timeout_s=900, max_height=20000, dry_run=dry_run)
+
+
+def w1_modify(dry_run=False):
+    """Three edits to a finished model, in one conversation, each rerun."""
+    return run_assistant_session(
+        "modify", W1_MODEL,
+        ["Change the slope face to 2:1 and rerun the search.",
+         "Add a distributed load of 500 psf on the crest from x = 60 to x = 90 "
+         "and rerun.",
+         "Extend all the reinforcement lines 5 ft to the right and rerun."],
+        timeout_s=900, max_height=20000, save_each_turn=True, dry_run=dry_run)
+
+
+def w1_sweep_builtin(dry_run=False):
+    """A sweep the kernel already has a mode for."""
+    return run_assistant_session(
+        "sweep_builtin", W1_MODEL,
+        ["Sweep the geogrid Tmax from 500 to 3000 lb/ft in 6 steps with a search "
+         "at each step and plot FS against Tmax."],
+        timeout_s=900, max_height=20000, dry_run=dry_run)
+
+
+def w1_sweep_adhoc(dry_run=False):
+    """A study with no mode behind it — a loop the assistant has to write."""
+    return run_assistant_session(
+        "sweep_adhoc", W1_MODEL,
+        ["Run the analysis with 2, 3, 4, 5 and 6 geogrid layers (removing the top "
+         "layers first), searching each time, and tabulate FS against the number "
+         "of layers."],
+        timeout_s=900, max_height=20000, dry_run=dry_run)
+
+
+def w1_elastic_fem(dry_run=False):
+    """Asking for stiffnesses, then running the finite element analysis on them."""
+    return run_assistant_session(
+        "elastic_fem", W1_MODEL,
+        ["Suggest values of Young's modulus and Poisson's ratio for these "
+         "materials so I can run a finite element analysis, and explain your "
+         "choice.",
+         "Enter them, build a quadratic mesh at 2 ft, and run the strength "
+         "reduction analysis."],
+        timeout_s=1200, max_height=20000, dry_run=dry_run)
+
+
+def w1_conceptual(dry_run=False):
+    """Two questions that change nothing — what the assistant knows, not runs."""
+    return run_assistant_session(
+        "conceptual", W1_MODEL,
+        ["How does a reliability analysis work in XSLOPE?",
+         "How do I decide standard deviations for a reliability analysis if I "
+         "only have a few tests?"],
+        timeout_s=600, max_height=20000, save_after=False, dry_run=dry_run)
+
+
+def w1_diagnose(dry_run=False):
+    """A broken model, and no hint about where the breakage is."""
+    return run_assistant_session(
+        "diagnose", W1_BROKEN,
+        ["This model gives a factor of safety below 1. Can you find what is "
+         "wrong?"],
+        timeout_s=900, max_height=20000, dry_run=dry_run)
+
+
+def w1_report(dry_run=False):
+    """The analysis report, asked for in a sentence.
+
+    Two turns because the report documents what the session solved: the first
+    turn is the search whose result the second turn writes up. ``report/finalize``
+    is pinned off for the length of the run — the finish drives Word, and an
+    unattended capture must never take over the machine's copy.
+    """
+    return run_assistant_session(
+        "report", W1_MODEL,
+        ["Run Spencer with a search.",
+         "Generate the analysis report for this model."],
+        timeout_s=900, max_height=20000, settings={"report/finalize": False},
+        dry_run=dry_run)
+
+
+for _fn in (w1_build_from_image, w1_modify, w1_sweep_builtin, w1_sweep_adhoc,
+            w1_elastic_fem, w1_conceptual, w1_diagnose, w1_report):
+    SESSIONS["w1_" + _fn.__name__[3:]] = _fn
+del _fn
 
 
 def main(argv=None):

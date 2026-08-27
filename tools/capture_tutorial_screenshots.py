@@ -3362,6 +3362,112 @@ SHOTS.update({
 
 
 # --------------------------------------------------------------------------- #
+# W-1 — The AI Assistant: the setup shots
+#
+# The two figures the tutorial's "Setting it up" section needs, and the only W-1
+# figures that are ordinary offscreen grabs: the settings dialog and the dock, both
+# in the state a first open leaves them in. Everything else on that page is a
+# recorded conversation and lives in the session registry below.
+# --------------------------------------------------------------------------- #
+def w01_settings():
+    """The Assistant settings dialog as a first open finds it.
+
+    A throwaway settings file and a config whose stored key is empty, for the reason
+    ``tools/capture_studio_screenshots.py`` gives: the shot must not depend on which
+    provider the person running it uses, and it must never read the keychain. Empty
+    rather than a dummy key, because this figure's subject is the setup a reader has
+    not done yet — the field shows its ``sk-…`` placeholder, and the caption under
+    the model box says the list is the offline fallback until a key is entered.
+
+    ``auto_refresh=False`` keeps the grab off the network. The provider and model are
+    the shipped defaults, read from the provider table rather than spelled here, so
+    the figure follows the default if it changes.
+    """
+    import tempfile
+
+    from PySide6.QtCore import QSettings
+
+    from studio.ai.config import PROVIDERS, AssistantConfig
+    from studio.ai.settings_dialog import AssistantSettingsDialog
+
+    class _EmptyKeyConfig(AssistantConfig):
+        def api_key(self, provider):
+            return ""
+
+    with tempfile.TemporaryDirectory() as tmp:
+        settings = QSettings(os.path.join(tmp, "w01.ini"), QSettings.IniFormat)
+        settings.setValue("ai/provider", "anthropic")
+        settings.setValue("ai/model/anthropic", PROVIDERS["anthropic"]["models"][0])
+        dlg = AssistantSettingsDialog(_EmptyKeyConfig(settings), auto_refresh=False)
+        dlg.resize(dlg.sizeHint())
+        return _grab(dlg, "w01_settings.png")
+
+
+def w01_chat_dock():
+    """The Assistant dock, empty, on an open project.
+
+    Grabbed off a real ``MainWindow`` rather than a bare ``ChatDock`` so the shot
+    carries the dock's own title bar and the width Studio gives it, and on LEM-1's
+    model so the dock is the one a reader would be looking at with a project open.
+
+    The provider and model caption is read from the machine's stored settings, so the
+    selection is pinned to the shipped default for the length of the grab and put
+    back afterwards — the same reason and the same technique as ``t0_studio_window``.
+
+    The transcript is empty and so is the usage line: that line is written when a
+    turn reports its tokens, and this dock has not run one. The page's session
+    figures show it filled.
+    """
+    from PySide6.QtCore import QSettings, Qt
+
+    from studio.ai.config import PROVIDERS
+    from studio.main_window import MainWindow
+
+    settings = QSettings("XSlope", "XSlope Studio")
+    pinned = {"ai/provider": "anthropic",
+              "ai/model/anthropic": PROVIDERS["anthropic"]["models"][0]}
+    stashed = {k: (settings.value(k) if settings.contains(k) else None)
+               for k in pinned}
+    win = None
+    try:
+        for key, value in pinned.items():
+            settings.setValue(key, value)
+        settings.sync()
+
+        # Short on purpose: the dock's own height is the main window's, and an
+        # empty transcript stretched to 1000 px is a figure that is mostly blank
+        # paper. This is tall enough for the controls above and below it.
+        win = MainWindow()
+        win.resize(1400, 560)
+        win.open_path(LEM01)
+        win.show()
+        _settle()
+        win.resizeDocks([win.chat_dock], [430], Qt.Horizontal)
+        _settle()
+        pix = win.chat_dock.grab()
+        out = os.path.join(OUT_DIR, "w01_chat_dock.png")
+        pix.save(out)
+        print("-> w01_chat_dock.png  (%dx%d, %s)"
+              % (pix.width(), pix.height(), pinned["ai/model/anthropic"]))
+        return out
+    finally:
+        for key, value in stashed.items():
+            if value is None:
+                settings.remove(key)
+            else:
+                settings.setValue(key, value)
+        settings.sync()
+        if win is not None:
+            win.close()
+
+
+SHOTS.update({
+    "w01_settings": w01_settings,
+    "w01_chat_dock": w01_chat_dock,
+})
+
+
+# --------------------------------------------------------------------------- #
 # W-1 — Working with the assistant
 #
 # Not a dialog capture. The assistant tutorial's figures are recorded CONVERSATIONS

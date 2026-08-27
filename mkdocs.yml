@@ -87,6 +87,8 @@ nav:
       - 1. Seepage → LEM → FEM: tutorials/combo01_seepage_stability.md
       - 2. Rapid Drawdown: tutorials/combo02_rapid_drawdown.md
       - 3. Factor of Safety vs Time: tutorials/combo03_fs_vs_time.md
+    - Workflow:
+      - 1. The AI Assistant: tutorials/w01_ai_assistant.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

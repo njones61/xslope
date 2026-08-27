@@ -279,8 +279,7 @@ your guardrails.
 - **Inline figures** — plots the assistant produces appear inline in the transcript.
 - **New chat** — starts a fresh conversation and resets the kernel.
 - **What it cost** — a line under the input reports the tokens the provider read and
-  wrote: `this turn: 41,207 in (38,912 cached) / 1,864 out · session: 96,430 in /
-  4,102 out`. One agentic turn is many model calls, and every one of them counts, so
+  wrote: `this turn: 41,207 in (38,912 cached) / 1,864 out · session: 96,430 in / 4,102 out`. One agentic turn is many model calls, and every one of them counts, so
   the turn figure keeps climbing while the assistant works. *Cached* is the part of
   the input the provider served from its prompt cache — a subset of the input count,
   not an addition to it, and the reason a long conversation with a caching provider

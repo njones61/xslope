@@ -55,10 +55,9 @@ it; we build both in [COMBO-2](combo02_rapid_drawdown.md)
 
 For Part 1 we will use the SEEP-3 dam. Both of its zones will take drained
 strengths (c′ and φ′), so at each saved time we will run an ordinary
-effective-stress analysis with the pore pressures from that time step. The model
-arrives meshed and marched — the nineteen pore-pressure fields the curve is
-drawn through ship beside the workbook — so the seepage work is done and only
-the strengths are missing. We will open the file, look at what came with it,
+effective-stress analysis with the pore pressures from that time step. The download
+includes the mesh and the transient seepage solution (all nineteen time steps),
+so the seepage work is already done; only the strengths are missing. We will open the file, look at what came with it,
 type the strengths in, run one instant, and then sweep all nineteen.
 
 ### The dam and the drawdown

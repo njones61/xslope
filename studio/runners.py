@@ -846,15 +846,23 @@ class SensitivityRunner(RunnerThread):
         unit = str(self._sd.get("time_unit") or "").strip()
         engine_tag = method if emode == "lem" else "SSRM"
         rapid = bool(o.get("rapid", False))
+        # Grid seeding, when the dialog asks for it: every instant's search starts
+        # from a geometry-derived sweep of centers and tangent elevations instead of
+        # the circles sheet alone. A curve crosses states whose critical mechanisms
+        # sit in different parts of the section, so which family a seeded search
+        # lands in can change from instant to instant.
+        grid_seed = bool(o.get("grid_seed", False)) and emode == "lem"
+        search_opts = {"seed": "grid"} if grid_seed else None
         what = "Rapid drawdown vs time" if rapid else "Factor of safety vs time"
         print(f"{what} ({emode}): {total} instant(s) of the "
               f"transient march, {engine_tag}, "
               f"{'re-searching' if (rapid or o.get('search', True)) else 'on the entered surface'} "
-              f"at each…")
+              f"at each{', grid-seeded' if grid_seed else ''}…")
         ok, res = fs_vs_time(self._sd, self._transient, times=times, mode=emode,
                              methods=(method,), search=o.get("search", True),
                              num_slices=o.get("num_slices", 40),
                              fem_opts=o.get("fem_opts"), rapid=rapid,
+                             search_opts=search_opts,
                              progress_callback=cb,
                              cancel_check=self._cancel.is_set)
         if not ok:

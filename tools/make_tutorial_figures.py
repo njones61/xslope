@@ -6322,10 +6322,16 @@ COMBO03_SLICES = 40
 #: The two instants the page draws a slice figure at: full pool, and whichever
 #: saved frame carries the lowest factor of safety (resolved from the curve).
 COMBO03_FULL_POOL = 0.0
-#: Instants the refinement pass asks for, spanning the two saved frames either
-#: side of the dip. Five of the seven name no saved frame, so the pass costs one
-#: re-march — which is the point being measured: what the finer grid is worth.
-COMBO03_REFINE = (15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 47.0)
+#: Instants the refinement pass asks for: the saved frames across the dip with the
+#: midpoint of every gap between them added, so the pass halves the resolution the
+#: schedule already has. Four of the nine name no saved frame, so it costs one
+#: re-march — which is what the section measures: whether a schedule already dense
+#: across the fall has anything left to find.
+COMBO03_REFINE = (20.0, 22.5, 25.0, 27.5, 30.0, 32.5, 35.0, 37.5, 40.0)
+#: No grid seeding anywhere on this page: the two circles the file carries are
+#: placed on the mechanisms that govern, so an ordinary seeded search reaches the
+#: lower face at every instant. ``None`` is what ``fs_vs_time`` takes for that.
+COMBO03_SEED = None
 
 
 def _combo03_mesh(model):
@@ -6405,14 +6411,20 @@ def _combo03_at(model, solution, t):
 
 
 def _combo03_search(model):
-    """A Spencer search through the model's own search window, as Run LEM makes it."""
-    from xslope.search import file_search_window
+    """A Spencer search from the file's own circles, as Run LEM makes it at its
+    defaults — no grid seeding.
 
-    with contextlib.redirect_stdout(io.StringIO()):
-        fs_cache, _conv, _path, _circles = circular_search(
-            model, COMBO03_METHOD, num_slices=COMBO03_SLICES,
-            **file_search_window(model))
-    return fs_cache[0]
+    The file carries one circle per face, each placed on the deep mechanism its
+    slope can make, so the search reaches either face from the sheet alone.
+    """
+    from xslope.search import run_lem_analysis
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        bundle = run_lem_analysis(model, COMBO03_METHOD, analysis="auto_search",
+                                  num_slices=COMBO03_SLICES)
+    crit = bundle["search"]["fs_cache"][0]
+    return crit, log.getvalue()
 
 
 def _combo03_results(crit):
@@ -6426,12 +6438,45 @@ def _combo03_results(crit):
     return dict(crit, **crit["solver_result"])
 
 
-def _combo03_reading(crit):
-    xs, ys = zip(*list(crit["failure_surface"].coords))
+def _combo03_face(model, x):
+    """Which face of the dam an x coordinate falls on — 'upstream', 'crest' or
+    'downstream'.
+
+    The crest is the flat top of the ground surface, so its two ends are the
+    highest points of the profile and everything left of them is the reservoir
+    side. Reading the face off a reported circle center this way is what lets a
+    curve say which mechanism it is on at each instant, with no window declaring
+    the answer in advance.
+    """
+    coords = list(model["ground_surface"].coords)
+    y_max = max(y for _, y in coords)
+    crest = [px for px, py in coords if py == y_max]
+    if x < min(crest):
+        return "upstream"
+    if x > max(crest):
+        return "downstream"
+    return "crest"
+
+
+def _combo03_reading(crit, model=None):
+    """One line describing a searched critical surface.
+
+    Entry is the crest-side end of the trace and exit the toe-side end, whichever
+    way the slope faces, so the two are picked by ELEVATION rather than by the
+    order the coordinates happen to run in — a downstream surface traces the other
+    way round from an upstream one.
+    """
+    pts = list(crit["failure_surface"].coords)
+    entry, exit_ = (pts[0], pts[-1]) if pts[0][1] >= pts[-1][1] else (pts[-1], pts[0])
+    face = "" if model is None else (" · %s face"
+                                     % _combo03_face(model, crit["Xo"]))
+    df = crit["slices"]
     return ("FS %.4f · center (%.2f, %.2f) · R %.2f · tangent elevation %.2f · "
-            "entry (%.2f, %.2f) exit (%.2f, %.2f) · %d slices"
+            "entry (%.2f, %.2f) exit (%.2f, %.2f) · %d slices · "
+            "W %.1f over %.2f%s"
             % (crit["FS"], crit["Xo"], crit["Yo"], crit["Yo"] - crit["Depth"],
-               crit["Depth"], xs[-1], ys[-1], xs[0], ys[0], len(crit["slices"])))
+               crit["Depth"], entry[0], entry[1], exit_[0], exit_[1], len(df),
+               float(df["w"].sum()), float(df["dl"].sum()), face))
 
 
 def _combo03_pool(model, t):
@@ -6441,13 +6486,18 @@ def _combo03_pool(model, t):
     return float(_interp(float(t), list(ts["times"]), list(ts["series"]["pool"])))
 
 
-def _combo03_curve_figure(model, times, fs, crit_t, crit_fs, baseline):
+def _combo03_curve_figure(model, times, fs, crit_t, crit_fs, baseline, faces):
     """The factor of safety at every saved instant, over the pool that drives it.
 
     Two axes sharing one time axis rather than two figures: the whole reading is
     WHEN the dip falls relative to the drawdown, and a dip cannot be placed against
     a schedule drawn somewhere else. The pool is the driver, so it is the pale gray
     trace and the factor of safety is the colored one.
+
+    Each point is marked by the face its critical circle came out on. The curve is
+    two mechanisms in sequence rather than one moving surface — the reservoir loads
+    the upstream slope and the downstream slope governs while it stands — and a
+    single-colored line would hide the handover the page reads.
     """
     import numpy as np
 
@@ -6457,8 +6507,17 @@ def _combo03_curve_figure(model, times, fs, crit_t, crit_fs, baseline):
 
     fig, ax = plt.subplots(figsize=(8.6, 5.0))
     ax.axvspan(t0, t1, color="#eef4f9", zorder=0)
-    ax.plot(times, fs, "-o", color="#b5460f", lw=2.0, ms=5, zorder=3,
+    # Neutral connector, colored markers: the reported curve is the lower of two
+    # mechanisms, so the line itself belongs to neither face.
+    ax.plot(times, fs, "-", color="#6f7883", lw=2.0, zorder=3,
             label="factor of safety (Spencer, searched at each instant)")
+    for face, color, label in (("upstream", "#b5460f", "critical on the upstream face"),
+                               ("downstream", "#2b7bb0",
+                                "critical on the downstream face")):
+        pts = [(t, v) for t, v, f in zip(times, fs, faces) if f == face]
+        if pts:
+            ax.plot([t for t, _ in pts], [v for _, v in pts], "o", color=color,
+                    ms=6, zorder=5, label=label)
     ax.axhline(baseline, color="#8a6d3b", lw=1.0, ls=(0, (4, 3)), zorder=2)
     ax.annotate("full pool, %.3f" % baseline, xy=(duration, baseline),
                 xytext=(-4, -11), textcoords="offset points", fontsize=8.5,
@@ -6481,8 +6540,7 @@ def _combo03_curve_figure(model, times, fs, crit_t, crit_fs, baseline):
     ax.set_xlabel("time (%s)" % _u["time"])
     ax.set_ylabel("factor of safety")
     ax.grid(alpha=0.22)
-    ax.set_title("The upstream slope through the drawdown and after it",
-                 fontsize=11.5)
+    ax.set_title("The dam through the drawdown and after it", fontsize=11.5)
 
     pool = ax.twinx()
     pool.plot(times, [_combo03_pool(model, t) for t in times], color="#3f4a55",
@@ -6523,9 +6581,11 @@ def combo03_plots():
               % (m["name"], m["gamma"], m["gamma_sat"], _u["unit_weight"],
                  m["c"], _u["stress"], m["phi"], m["u"], m["k1"], m["k2"],
                  _u["length"], model["time_unit"], m["Ss"], m["Sy"]))
-    _c = model["circles"][0]
-    print("   circle      center (%g, %g) · tangent elevation %g · R %g %s"
-          % (_c["Xo"], _c["Yo"], _c["Depth"], _c["R"], _u["length"]))
+    for _i, _c in enumerate(model["circles"]):
+        print("   circle %d    center (%g, %g) · tangent elevation %g · R %g %s · "
+              "%s face"
+              % (_i + 1, _c["Xo"], _c["Yo"], _c["Depth"], _c["R"], _u["length"],
+                 _combo03_face(model, _c["Xo"])))
     print("   window      %s" % ("  ".join("%s %g" % (k, v) for k, v in
                                            model["search_window"].items())))
     capture("combo03_inputs.png", plot_inputs, model, mode="lem",
@@ -6560,9 +6620,12 @@ def combo03_plots():
         apply_steady_stability_field(base, steady, bc=1)
     base = with_water_loads(base)
     t0 = _time.time()
-    base_crit = _combo03_search(base)
+    base_crit, base_log = _combo03_search(base)
     print("   baseline    %s · %.0f s"
-          % (_combo03_reading(base_crit), _time.time() - t0))
+          % (_combo03_reading(base_crit, model), _time.time() - t0))
+    print("   --- Run LEM's log at full pool, as Studio prints it ---")
+    for line in base_log.splitlines():
+        print("     %s" % line.rstrip())
     print("   water load  full pool peak %.1f %s"
           % (max((float(p["Normal"]) for b in base["dloads_derived"] for p in b),
                  default=0.0), _u["stress"]))
@@ -6583,30 +6646,38 @@ def combo03_plots():
     t0 = _time.time()
     with contextlib.redirect_stdout(io.StringIO()):
         ok, res = fs_vs_time(model, solution, methods=(COMBO03_METHOD,),
-                             search=True, num_slices=COMBO03_SLICES)
+                             search=True, num_slices=COMBO03_SLICES,
+                             search_opts=COMBO03_SEED)
     if not ok:
         raise RuntimeError(res)
     print("   curve       %d instants · %d failed · %.0f s wall"
           % (len(res["times"]), res["n_failed"], _time.time() - t0))
     for _i, row in res["df"].iterrows():
-        print("     t %-5g pool %5.2f  FS %s  center (%.2f, %.2f) R %.2f"
+        print("     t %-5g pool %5.2f  FS %s  center (%.2f, %.2f) R %.2f  "
+              "%s face"
               % (row["value"], _combo03_pool(model, row["value"]),
                  ("%.4f" % row["fs"]) if row["success"] else "failed",
-                 row["Xo"], row["Yo"], row["R"]))
+                 row["Xo"], row["Yo"], row["R"],
+                 _combo03_face(model, row["Xo"])))
     print("   minimum     %.4f at t = %g %s · full pool %.4f · recovered %.4f"
           % (res["min_fs"], res["critical_time"], _u["time"],
              float(res["df"]["fs"].iloc[0]), float(res["df"]["fs"].iloc[-1])))
     times = [float(t) for t in res["times"]]
     fs = [float(v) for v in res["df"]["fs"]]
+    faces = [_combo03_face(model, x) for x in res["df"]["Xo"]]
     capture("combo03_curve.png", _combo03_curve_figure, model, times, fs,
             float(res["critical_time"]), float(res["min_fs"]),
-            float(base_crit["FS"]))
+            float(base_crit["FS"]), faces)
 
     # ---- the critical instant, drawn ---------------------------------------- #
     worst = _combo03_at(model, solution, res["critical_time"])
-    worst_crit = _combo03_search(worst)
+    worst_crit, worst_log = _combo03_search(worst)
     print("   worst       t = %g %s · %s"
-          % (res["critical_time"], _u["time"], _combo03_reading(worst_crit)))
+          % (res["critical_time"], _u["time"],
+             _combo03_reading(worst_crit, model)))
+    print("   --- Run LEM's log at the critical instant ---")
+    for line in worst_log.splitlines():
+        print("     %s" % line.rstrip())
     print("   water load  t = %g peak %.1f %s"
           % (res["critical_time"],
              max((float(p["Normal"]) for b in worst["dloads_derived"] for p in b),
@@ -6621,15 +6692,17 @@ def combo03_plots():
         ok, fine = fs_vs_time(model, solution, times=list(COMBO03_REFINE),
                               methods=(COMBO03_METHOD,), search=True,
                               num_slices=COMBO03_SLICES, seep_data=tseep_data,
-                              remarch=True)
+                              remarch=True, search_opts=COMBO03_SEED)
     if not ok:
         raise RuntimeError(fine)
     print("   refine      %d instants · re-marched %s · %.0f s wall"
           % (len(fine["times"]), fine["remarched"], _time.time() - t0))
     for _i, row in fine["df"].iterrows():
-        print("     t %-5g pool %5.2f  FS %s"
+        print("     t %-5g pool %5.2f  FS %s  center (%.2f, %.2f) R %.2f  %s face"
               % (row["value"], _combo03_pool(model, row["value"]),
-                 ("%.4f" % row["fs"]) if row["success"] else "failed"))
+                 ("%.4f" % row["fs"]) if row["success"] else "failed",
+                 row["Xo"], row["Yo"], row["R"],
+                 _combo03_face(model, row["Xo"])))
     print("   refine      minimum %.4f at t = %g %s · %+.4f against the saved grid"
           % (fine["min_fs"], fine["critical_time"], _u["time"],
              fine["min_fs"] - res["min_fs"]))
@@ -6710,7 +6783,9 @@ def _combo03r_compare(model, rapid_res, plain_res):
 
     h1, l1 = ax.get_legend_handles_labels()
     h2, l2 = pool.get_legend_handles_labels()
-    ax.legend(h1 + h2, l1 + l2, fontsize=9, loc="upper center")
+    # Lower right: both curves rise to the right, so the top of the frame is where
+    # the single-stage line ends up and a legend there covers the measurement.
+    ax.legend(h1 + h2, l1 + l2, fontsize=9, loc="lower right")
     fig.tight_layout()
 
 
@@ -6741,9 +6816,10 @@ def combo03_rapid():
              ts["duration"], ts["save_interval"]))
     print("   stages      stage 1 t = %g %s · stage 2 t = %g %s"
           % (ts["stage_1"], _u["time"], ts["stage_2"], _u["time"]))
-    _c = model["circles"][0]
-    print("   circle      center (%g, %g) · R %g %s"
-          % (_c["Xo"], _c["Yo"], _c["R"], _u["length"]))
+    for _i, _c in enumerate(model["circles"]):
+        print("   circle %d    center (%g, %g) · R %g %s · %s face"
+              % (_i + 1, _c["Xo"], _c["Yo"], _c["R"], _u["length"],
+                 _combo03_face(model, _c["Xo"])))
 
     # The mesh rides behind the model, because a file opened with a companion mesh
     # beside it draws that way in Studio: the LEM inputs view leaves show_mesh to
@@ -6769,7 +6845,7 @@ def combo03_rapid():
     t0 = _time.time()
     ok, rapid_res = fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
                                num_slices=COMBO03R_SLICES, rapid=True,
-                               print_table=False)
+                               search_opts=COMBO03_SEED, print_table=False)
     if not ok:
         raise RuntimeError(rapid_res)
     print("   drawdown    %d instants · %d failed · lowest %.4f at t = %g %s · "
@@ -6779,6 +6855,10 @@ def combo03_rapid():
     print("   --- the drawdown table, as fs_vs_time prints it ---")
     for line in rapid_res["table_text"].splitlines():
         print("     %s" % line)
+    for row in rapid_res["table"]:
+        if row["success"]:
+            print("   face        t %-6g %s" % (row["time"],
+                                                _combo03_face(model, row["Xo"])))
     capture("combo03_rapid_curve.png", plot_fs_vs_time, rapid_res,
             slope_data=model)
 
@@ -6786,7 +6866,7 @@ def combo03_rapid():
     t0 = _time.time()
     ok, plain_res = fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
                                num_slices=COMBO03R_SLICES, search=True,
-                               print_table=False)
+                               search_opts=COMBO03_SEED, print_table=False)
     if not ok:
         raise RuntimeError(plain_res)
     print("   single      %d instants · %d failed · lowest %.4f at t = %g %s · "
@@ -6796,6 +6876,10 @@ def combo03_rapid():
     print("   --- the single-stage table, as fs_vs_time prints it ---")
     for line in plain_res["table_text"].splitlines():
         print("     %s" % line)
+    for row in plain_res["table"]:
+        if row["success"]:
+            print("   face        t %-6g %s" % (row["time"],
+                                                _combo03_face(model, row["Xo"])))
 
     # ---- the two curves against each other ---------------------------------- #
     _r = {float(r["time"]): r["fs"] for r in rapid_res["table"] if r["success"]}

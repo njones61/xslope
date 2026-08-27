@@ -144,6 +144,34 @@ def _tutorial_schedule(sd):
     return ts
 
 
+#: COMBO-3 Part 2's saved-frame schedule, which is the one input its file does not
+#: share with COMBO-2's. A sweep asks the stability question once per saved frame,
+#: so the frames decide what the curve can resolve: every five days through the
+#: hold and the fall, which ends on day 50, then widening steps through the
+#: recovery. The march stops at day 500 because the curve is flat well before it —
+#: the pore pressures the reservoir left in the core are what is still draining,
+#: and by day 300 that has stopped moving the answer. COMBO-2's own workbook keeps
+#: its coarser schedule and its 1,000-day run.
+#:
+#: ``save_interval`` is set to the full duration so the interval grid contributes
+#: only the last frame and the list states the schedule outright; the widest gap
+#: between two saved times is 100 days, so it never caps a step.
+FS_TIME_DURATION = 500.0
+FS_TIME_SAVE_TIMES = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0,
+                      60.0, 70.0, 80.0, 100.0, 130.0, 170.0, 220.0, 300.0, 400.0,
+                      500.0]
+
+
+def _fs_time_schedule(sd):
+    """:func:`_tutorial_schedule` with COMBO-3 Part 2's denser frames and its
+    shorter run. Stage 1 and stage 2 are untouched at 0 and 50."""
+    ts = _tutorial_schedule(sd)
+    ts["duration"] = FS_TIME_DURATION
+    ts["save_interval"] = FS_TIME_DURATION
+    ts["save_times"] = list(FS_TIME_SAVE_TIMES)
+    return ts
+
+
 def _base():
     """The seepage sample with the two rapid-drawdown additions every file shares:
     the undrained core and the critical upstream circle."""
@@ -224,16 +252,24 @@ def build_tutorial_fs_time():
     checks say so on every sweep. COMBO-2's Part 3 has the reader clear it by hand
     at this same point; the solved file arrives with it already cleared.
 
-    The mesh and the march are the ones COMBO-2 builds — tri3, auto-sized at 100
-    divisions, and the schedule's own twelve saved frames — so Part 2's numbers are
-    computed on exactly the state COMBO-2 leaves behind."""
+    The mesh is the one COMBO-2 builds — tri3, auto-sized at 100 divisions — so the
+    section under Part 2's numbers is exactly the one COMBO-2 leaves behind. The
+    saved-frame schedule is this file's own: a sweep resolves nothing between two
+    frames, so the instants are packed across the fall and spread through the
+    recovery, and the run stops at day 500.
+
+    The circles sheet carries the one upstream circle COMBO-2 searches from. A
+    rapid drawdown is an upstream-face problem -- lowering the pool takes the water
+    off that face and leaves it inside the embankment -- so every instant of the
+    sweep interrogates the same slope, and the curve reports one mechanism moving
+    rather than two trading places."""
     from xslope.mesh import (build_mesh_from_polygons, export_mesh_to_json,
                              get_material_polygons)
     from xslope.seep import (build_seep_data, build_tseep_data,
                              export_transient_solution, run_transient_seepage)
 
     sd = _base()
-    sd["tseep"] = _tutorial_schedule(sd)
+    sd["tseep"] = _fs_time_schedule(sd)
     sd["seepage_bc2"] = {"specified_heads": [], "specified_fluxes": [],
                          "exit_face": []}
     sd["has_seepage_bc2"] = False

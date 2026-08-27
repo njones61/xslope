@@ -236,6 +236,12 @@ Two settings matter more here than in a value sweep:
   `use_file_window=False` ignores it. Without a window, a curve can jump between competing
   minima from one instant to the next, and the jump reads as a change in the slope rather
   than a change in which surface was measured.
+* `search_opts={'seed': 'grid'}` — Studio's **Grid search (auto-seed the circular search)**
+  box on the same dialog — seeds every instant from a geometry-derived sweep of centers and
+  tangent elevations instead of the circles sheet alone, which is what a curve needs when
+  the critical mechanism sits in a different part of the section at one end of the run than
+  at the other (a dam governed by its downstream face at full pool and by its upstream face
+  during a drawdown).
 
 `mode='fem'` runs a full SSRM solve per instant instead (needs a mesh in
 `slope_data['mesh']`); `mode='seep'` is refused, because the seepage solution is this

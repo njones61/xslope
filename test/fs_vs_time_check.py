@@ -41,6 +41,10 @@ kind of dropped instant:
     material reading ``u = seep``, the seepage engine). The drawdown box beside the
     frames is offered only where the model carries d and psi, and holds the
     Re-search toggle on while it is ticked.
+  * **grid seeding** — the **Grid search** box on the FS-versus-time page reaches
+    the engine as ``search_opts={'seed': 'grid'}``. The option decides which
+    mechanism each instant reports, so a box that is ticked in the dialog and
+    dropped on the way down is a curve drawn on the wrong family, silently.
   * **the whole path, end to end** — the COMBO-3 tutorial model meshed, marched and
     swept through the dialog's own options and the Studio runner, asserting the
     published curve. This one solves real seepage and searches at every instant, so
@@ -531,10 +535,15 @@ COMBO03 = Path(__file__).resolve().parent.parent / 'docs' / 'tutorials' / \
     'files' / 'xslope_earth_dam_fs_time.xlsx'
 #: The twelve instants COMBO-3's march saves, and the two factors of safety the
 #: page quotes. Literals: the check never computes its own reference.
-COMBO03_TIMES = (0.0, 2.0, 15.0, 30.0, 47.0, 60.0, 80.0, 120.0, 180.0, 240.0,
-                 300.0, 360.0)
-COMBO03_FULL_POOL_FS = 1.8308
-COMBO03_MIN_FS, COMBO03_CRITICAL_TIME = 1.4962, 30.0
+COMBO03_TIMES = (0.0, 2.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 47.0,
+                 55.0, 65.0, 80.0, 100.0, 130.0, 180.0, 240.0, 300.0)
+#: COMBO-3 Part 1 publishes these under the run the page makes: Spencer, 40
+#: slices, searched at every instant from the two circles the file carries, with
+#: Grid search OFF. The full-pool answer is on the dam's DOWNSTREAM face and the
+#: minimum on its upstream one, which is the reading the page is built around, so
+#: a check that reached only one face would pin neither number.
+COMBO03_FULL_POOL_FS = 1.5311
+COMBO03_MIN_FS, COMBO03_CRITICAL_TIME = 1.3313, 35.0
 COMBO03_METHOD, COMBO03_SLICES, COMBO03_DIVISIONS = 'spencer', 40, 64
 
 
@@ -682,6 +691,86 @@ def check_the_dialog_offers_the_drawdown(failures):
     dlg.close()
 
 
+def check_the_dialog_offers_grid_seeding(failures):
+    """**Grid search** on the FS-versus-time page reaches ``fs_vs_time`` as
+    ``search_opts={'seed': 'grid'}``.
+
+    The option decides WHICH mechanism each instant reports, so a box that is
+    ticked in the dialog and dropped on the way to the engine is a curve drawn on
+    the wrong family with nothing in the record to say so. This runs the whole path
+    the dialog uses -- ``options()`` into ``SensitivityRunner._run_fs_vs_time`` --
+    and reads the keyword ``fs_vs_time`` was actually called with.
+    """
+    if _qt() is None:
+        return
+    from studio.dialogs import SensitivityDialog
+    from studio import runners as R
+
+    dry = _model()
+    seepy = dict(dry, materials=[dict(m, u='seep') for m in dry['materials']])
+    times = list(COMBO03_TIMES)
+    sol = _frames(times)
+
+    dlg = SensitivityDialog(slope_data=seepy, app_mode='lem',
+                            transient={'times': times})
+    dlg.mode.setCurrentIndex(dlg.mode.findData('fs_vs_time'))
+    if not dlg.grid_seed.isEnabled():
+        failures.append("Grid search is greyed on a circular LEM curve, where it "
+                        "is the option the mode most often needs")
+    if dlg.options().get('grid_seed'):
+        failures.append("Grid search is on by default; the seeded search is")
+    if 'grid of circle centers' not in dlg.grid_seed.toolTip():
+        failures.append(f"Grid search does not carry Run LEM's own tooltip: "
+                        f"{dlg.grid_seed.toolTip()!r}")
+
+    # Off: no seeding keyword at all, so the engine's default is untouched.
+    seen = {}
+
+    def _spy(*a, **kw):
+        seen.clear()
+        seen.update(kw)
+        return False, 'stopped by the check'
+
+    # The runner imports the engine function inside the call, so the module
+    # attribute is what it will reach for.
+    import xslope.sensitivity as XS
+    orig = XS.fs_vs_time
+    XS.fs_vs_time = _spy
+    try:
+        for want, tick in (({}, False), ({'seed': 'grid'}, True)):
+            dlg.grid_seed.setChecked(tick)
+            opts = dlg.options()
+            if bool(opts.get('grid_seed')) != tick:
+                failures.append(f"options() carries grid_seed="
+                                f"{opts.get('grid_seed')!r} with the box {tick}")
+            runner = R.SensitivityRunner(seepy, opts, transient=sol)
+            runner.failed.connect(lambda *_: None)
+            import contextlib
+            import io
+            with contextlib.redirect_stdout(io.StringIO()):
+                runner._run_fs_vs_time()
+            got = seen.get('search_opts')
+            if tick and got != want:
+                failures.append(f"Grid search ticked reached the engine as "
+                                f"search_opts={got!r}, not {want!r}")
+            if not tick and got not in (None, {}):
+                failures.append(f"Grid search unticked still sent "
+                                f"search_opts={got!r}")
+    finally:
+        XS.fs_vs_time = orig
+    dlg.close()
+
+    # A non-circular model has no circle centers to sweep, so the box goes away.
+    noncirc = dict(seepy, circular=False)
+    dlg = SensitivityDialog(slope_data=noncirc, app_mode='lem',
+                            transient={'times': times})
+    dlg.mode.setCurrentIndex(dlg.mode.findData('fs_vs_time'))
+    if dlg.grid_seed.isEnabled() or dlg.grid_seed.isChecked():
+        failures.append("Grid search is live on a non-circular model, which has "
+                        "no circle centers to sweep")
+    dlg.close()
+
+
 def check_the_combo03_curve(failures):
     """COMBO-3 end to end: mesh, march, and the dialog's own options through the
     Studio runner, against the two factors of safety the tutorial publishes."""
@@ -717,8 +806,14 @@ def check_the_combo03_curve(failures):
                                       'num_slices': COMBO03_SLICES},
                             transient=solution)
     dlg.mode.setCurrentIndex(dlg.mode.findData('fs_vs_time'))
+    # Grid search stays OFF, as the page runs it: the two published numbers are on
+    # opposite faces of the dam and both are reached from the circles sheet alone,
+    # so a run that needed the grid seed to find them would not be the page's run.
     opts = dlg.options()
     dlg.close()
+    if opts.get('grid_seed'):
+        failures.append('the dialog carried Grid search into a run the page makes '
+                        'with it off')
 
     runner = SensitivityRunner(sd, opts, transient=solution)
     got = {}
@@ -776,6 +871,7 @@ def run():
                check_the_refusals,
                check_the_dialog_offers_the_mode,
                check_the_dialog_offers_the_drawdown,
+               check_the_dialog_offers_grid_seeding,
                check_the_combo03_curve):
         try:
             fn(failures)

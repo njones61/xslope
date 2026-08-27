@@ -1319,6 +1319,9 @@ class RunLemDialog(QDialog):
             "starting circles, and a single seed in the wrong place can converge to a "
             "local minimum that reads 20% or more too high, with no warning.\n\n"
             "Leave it off to interrogate a specific mechanism with your own circles.")
+        # The checks read grid_seed out of _selection(), so toggling it has to
+        # re-ask them: the several-starting-circles warning stands or falls on it.
+        self.grid_seed.toggled.connect(lambda *_: self._recheck())
         form.addRow("", self.grid_seed)
 
         self.diagnostic = QCheckBox("Diagnostic output (verbose log)")
@@ -1458,6 +1461,11 @@ class RunLemDialog(QDialog):
         return {"method": self.method.currentData(),
                 "surface": self._surface_value(),
                 "search": self.analysis.currentData() == "auto_search",
+                # Grid seeding changes which mechanisms a search reaches, so the
+                # checks are told about it: several starting circles are a warning
+                # on a seeded search and none at all on a grid-seeded one.
+                "grid_seed": (self.grid_seed.isChecked()
+                              if hasattr(self, "grid_seed") else False),
                 "seep_frame": self._seep_frame()}
 
     def _seep_frame(self):
@@ -1660,6 +1668,9 @@ class SensitivityDialog(QDialog):
         # march to read, and a material that reads it.
         self._times = [float(t) for t in (transient or {}).get("times", [])]
         self._time_unit = str(slope_data.get("time_unit") or "").strip()
+        # Grid seeding sweeps circle centers, so it has nothing to offer a model
+        # whose surface is non-circular.
+        self._circular = bool(slope_data.get("circular", True))
         self._fs_time_reason = self._fs_time_unavailable(slope_data)
         # The instant a drawdown curve reads stage 1 at: the file's own stage_1
         # (normally 0, full pool), or the earliest saved frame where it names none.
@@ -1732,6 +1743,7 @@ class SensitivityDialog(QDialog):
             "only right for that prescribed surface).")
         self.search.setToolTip(self._search_tip)
         self.search.setVisible(self.app_mode == "lem")
+        self.search.toggled.connect(lambda *_: self._sync_grid_seed())
         layout.addWidget(self.search)
 
         self.note = QLabel()
@@ -2052,7 +2064,33 @@ class SensitivityDialog(QDialog):
             self.rapid.setChecked(bool(defaults.get("rapid", False)))
         self.rapid.toggled.connect(self._on_rapid_toggled)
         v.addWidget(self.rapid)
+
+        # Grid seeding, the same option Run LEM offers, and the one this mode most
+        # often needs: a curve spans states whose critical mechanisms are in
+        # different places, and a search refined from one starting circle stays in
+        # that circle's neighborhood at every instant. Same label and tooltip as Run
+        # LEM's, so the two dialogs name one option once.
+        self.grid_seed = QCheckBox("Grid search (auto-seed the circular search)")
+        self.grid_seed.setChecked(bool(defaults.get("grid_seed", False)))
+        self.grid_seed.setToolTip(
+            "Sweep a grid of circle centers against a range of tangent elevations, "
+            "derived from the slope geometry, and refine from the best circle of every "
+            "competing family — plus your entered circles, if any.\n\n"
+            "This is a GLOBAL search: it reports the most critical surface anywhere in "
+            "the model. Without it the search only refines the neighborhood of your "
+            "starting circles, and a single seed in the wrong place can converge to a "
+            "local minimum that reads 20% or more too high, with no warning.\n\n"
+            "Leave it off to interrogate a specific mechanism with your own circles.")
+        self.grid_seed.toggled.connect(lambda *_: self._on_grid_seed_toggled())
+        v.addWidget(self.grid_seed)
         return page
+
+    def _on_grid_seed_toggled(self, *_):
+        """The note says how each point is searched and the checks read the same
+        flag out of ``_selection()``, so both are re-asked when the box moves."""
+        self._on_mode_changed()
+        if hasattr(self, "preflight"):
+            self.preflight.refresh()
 
     def _on_rapid_toggled(self, *_):
         """A drawdown point is always searched, so the Re-search toggle has nothing
@@ -2070,6 +2108,7 @@ class SensitivityDialog(QDialog):
             else:
                 self.search.setEnabled(True)
                 self.search.setToolTip(self._search_tip)
+        self._sync_grid_seed()
         if self.mode.currentData() == "fs_vs_time":
             self._on_mode_changed()
             self.preflight.refresh()
@@ -2144,6 +2183,10 @@ class SensitivityDialog(QDialog):
                "search": self.search.isChecked()}
         if self.mode.currentData() == "fs_vs_time":
             picked = self.selected_times()
+            # Same key Run LEM passes: with Grid search on, every competing family
+            # is refined, so several starting circles raise nothing.
+            sel["grid_seed"] = (self.grid_seed.isChecked()
+                                if hasattr(self, "grid_seed") else False)
             if self.rapid.isChecked():
                 # Every point is a drawdown, so the checks are the drawdown's:
                 # base = 'rapid' brings that family in on top of the LEM rules, and
@@ -2186,6 +2229,10 @@ class SensitivityDialog(QDialog):
         if is_time:
             n = len(self.selected_times())
             unit = f" {self._time_unit}" if self._time_unit else ""
+            seed_txt = ("over a grid of centers and tangent elevations"
+                        if getattr(self, "grid_seed", None)
+                        and self.grid_seed.isChecked()
+                        else "from the starting circles")
             if self.rapid.isChecked():
                 self.note.setText(
                     f"Rapid drawdown vs time: one three-stage drawdown per ticked "
@@ -2194,7 +2241,7 @@ class SensitivityDialog(QDialog):
                     f"initial state at t = {_fmt_time(self._stage_1)}{unit} and "
                     f"stage 2 is that instant, so the curve answers how safe the "
                     f"slope is if the pool falls to where it stands then. Each "
-                    f"point is searched from the starting circle, and the reported "
+                    f"point is searched {seed_txt}, and the reported "
                     f"value is the lower of stages 2 and 3.")
             else:
                 self.note.setText(
@@ -2203,9 +2250,10 @@ class SensitivityDialog(QDialog):
                     f"saved frames. No input changes between the points; each "
                     f"solves the same model against that instant's pore pressures, "
                     f"and the reservoir load is re-derived from the pool as it stood "
-                    f"then. The circles sheet's search window is applied, which is "
-                    f"what keeps the curve on one mechanism.")
+                    f"then. Each point is searched {seed_txt}, and the circles "
+                    f"sheet's search window is applied.")
             self._prev_mode = m
+            self._sync_grid_seed()
             self._sync_run()
             return
         # Seed the target on an actual transition into a mode; FS = 1.0 is the
@@ -2231,6 +2279,19 @@ class SensitivityDialog(QDialog):
                 f"crosses, the plot says which way to widen the range.")
         else:
             self._on_plot_type_changed()
+
+    def _sync_grid_seed(self):
+        """Grid seeding drives a circular SEARCH, so it is live only when this run
+        makes one — LEM, a circular model, and either the re-search toggle on or a
+        rapid drawdown, which holds it on. Mirrors Run LEM's own rule."""
+        if not hasattr(self, "grid_seed"):
+            return
+        searching = self.rapid.isChecked() or self.search.isChecked()
+        live = (self.app_mode == "lem" and self._circular and searching
+                and self.mode.currentData() == "fs_vs_time")
+        self.grid_seed.setEnabled(live)
+        if not live:
+            self.grid_seed.setChecked(False)
 
     def _on_plot_type_changed(self):
         """Toggle the scaling / MC-sample controls and the sensitivity note to match
@@ -2361,6 +2422,7 @@ class SensitivityDialog(QDialog):
         if common["mode"] == "fs_vs_time":
             common["times"] = self.selected_times()
             common["rapid"] = self.rapid.isChecked()
+            common["grid_seed"] = self.grid_seed.isChecked()
             if common["rapid"]:
                 common["search"] = True
         elif common["mode"] in ("design", "back_analysis"):

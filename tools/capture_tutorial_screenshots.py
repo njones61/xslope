@@ -2959,8 +2959,8 @@ COMBO03_SLICES = 40
 #: nothing else, and a 60-second transient run for one screenshot is a minute the
 #: shot does not need. The producer in ``make_tutorial_figures.py`` runs the march
 #: for real and prints these same twelve.
-COMBO03_TIMES = (0.0, 2.0, 15.0, 30.0, 47.0, 60.0, 80.0, 120.0, 180.0, 240.0,
-                 300.0, 360.0)
+COMBO03_TIMES = (0.0, 2.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 47.0,
+                 55.0, 65.0, 80.0, 100.0, 130.0, 180.0, 240.0, 300.0)
 
 _combo03_cache = {}
 
@@ -3010,12 +3010,13 @@ def combo03_materials():
 
 
 def combo03_circles():
-    """The circles editor on the dam: one upstream starting circle and the window.
+    """The circles editor on the dam: a starting circle on each face.
 
-    The page's search-window step is read off this shot — the five filled fields of
-    the **Search window** group, and the same limits drawn on the preview, where the
-    entry and exit bars sit on either side of the full-pool waterline on the
-    upstream face.
+    The page's starting-circle step is read off this shot — two rows in the table,
+    the two arcs the preview draws over the two slopes, and a **Search window**
+    group holding one value, the minimum slip depth. Which face governs is what the
+    curve measures, so the entry and exit ranges that would confine the search to
+    one of them are left blank.
     """
     from studio.editors import CirclesEditor
 
@@ -3047,7 +3048,9 @@ def combo03_parametric():
 
     The whole curve in one run: the parameter picker steps aside (no input is
     substituted at any point) and the march's twelve saved frames take its place,
-    every one ticked. Method and slice count are the baseline run's.
+    every one ticked. Method and slice count are the baseline run's, and every
+    solver control is at its default — the two circles the file carries reach both
+    faces of the dam, so nothing here has to be turned on.
     """
     from studio.dialogs import SensitivityDialog
 
@@ -3121,8 +3124,8 @@ COMBO03R_FILE = os.path.join(REPO_ROOT,
 #: times off the solution and nothing else, and importing 12 frames of nodal head
 #: for one dialog shot is work the shot does not need. The producer in
 #: ``make_tutorial_figures.py`` reads the real march and prints the same twelve.
-COMBO03R_TIMES = (0.0, 5.0, 35.0, 50.0, 80.0, 150.0, 200.0, 300.0, 400.0, 600.0,
-                  800.0, 1000.0)
+COMBO03R_TIMES = (0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0,
+                  60.0, 70.0, 80.0, 100.0, 130.0, 170.0, 220.0, 300.0, 400.0, 500.0)
 
 
 def combo03_rapid_parametric():

@@ -225,7 +225,13 @@ whole list, and unticking samples a long march, each frame being a full stabilit
 **Method**, **Number of slices** and **Re-search the critical surface at each step**
 controls apply as they do everywhere else, and the circles sheet's search window is
 applied, which is what keeps the curve on one mechanism rather than letting it jump
-families between instants:
+families between instants. A **Grid search (auto-seed the circular search)** checkbox
+under the frames list does here what it does in
+[Limit equilibrium](#limit-equilibrium-lem): every instant is
+searched from a geometry-derived sweep of centers and tangent elevations rather than from
+the circles sheet alone, which is what a curve needs when the critical mechanism moves
+between parts of the section — a dam whose downstream face governs at full pool and whose
+upstream face governs during a drawdown, for instance:
 
 ![Parametric dialog in Factor of safety vs time mode](images/analysis_sensitivity_fs_time_dialog.png)
 

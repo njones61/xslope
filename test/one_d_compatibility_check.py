@@ -39,9 +39,9 @@ What is checked here:
      last, which is the defect this element replaced.
 
   C. THE LINEAR MESH DOES NOT MOVE -- on a tri3 mesh there is no midside node to
-     attach, the elements stay two-node, and the assembled stiffness and the
-     recovered member forces are bit-for-bit what they are with the
-     XSLOPE_LINEAR_1D escape hatch set. Nothing about a linear mesh changed.
+     attach, the elements stay two-node, and the attachment pass leaves the
+     element table bit-for-bit as the mesher wrote it. The assembled stiffness
+     and the recovered member forces come out of the ordinary path unchanged.
 
 Run directly:  PYTHONPATH=. python3 test/one_d_compatibility_check.py
 """
@@ -185,32 +185,6 @@ def test_mesh_attaches_the_midside_node():
     return fails
 
 
-def test_the_escape_hatch_holds_the_old_element():
-    """XSLOPE_LINEAR_1D=1 keeps the elements two-node on a quadratic mesh.
-
-    The hatch exists so a model can be solved both ways while results measured
-    against the two-node element are re-measured. It is temporary, and this check
-    is what says it still does what it says.
-    """
-    fails = []
-    old = os.environ.get('XSLOPE_LINEAR_1D')
-    os.environ['XSLOPE_LINEAR_1D'] = '1'
-    try:
-        mesh = build_block('tri6')
-    finally:
-        if old is None:
-            os.environ.pop('XSLOPE_LINEAR_1D', None)
-        else:
-            os.environ['XSLOPE_LINEAR_1D'] = old
-    types = np.asarray(mesh.get('element_types_1d', []), dtype=int)
-    if not len(types):
-        return ["the meshed block carries no 1D element under the hatch"]
-    if int(types.max()) != 2:
-        fails.append(f"XSLOPE_LINEAR_1D=1 still produced "
-                     f"{int(types.max())}-node 1D elements")
-    return fails
-
-
 # --------------------------------------------------------------------------- #
 # B. the patch test
 # --------------------------------------------------------------------------- #
@@ -326,39 +300,34 @@ def _tri3_state():
 
 
 def test_a_linear_mesh_is_untouched():
-    """On tri3 the elements stay two-node, and the stiffness and member forces
-    are bit-for-bit what the two-node escape hatch gives."""
+    """On tri3 the elements stay two-node, the attachment pass is a no-op on the
+    element table, and the ordinary path still assembles and recovers them."""
     fails = []
+    from xslope.mesh import attach_1d_midside_nodes
+
+    mesh = build_block('tri3')
+    before = np.array(mesh['elements_1d'], dtype=int, copy=True)
+    types_before = np.array(mesh['element_types_1d'], dtype=int, copy=True)
+    attach_1d_midside_nodes(mesh)
+    after = np.asarray(mesh['elements_1d'], dtype=int)
+    types_after = np.asarray(mesh['element_types_1d'], dtype=int)
+
+    if before.shape != after.shape or not np.array_equal(before, after):
+        fails.append("attaching midside nodes changed a tri3 mesh's 1D element "
+                     "table, and a linear mesh has no midside node to attach")
+    if not np.array_equal(types_before, types_after):
+        fails.append("attaching midside nodes changed a tri3 mesh's 1D element "
+                     "node counts")
+
     K_now, forces_now, types_now = _tri3_state()
-
-    old = os.environ.get('XSLOPE_LINEAR_1D')
-    os.environ['XSLOPE_LINEAR_1D'] = '1'
-    try:
-        K_hatch, forces_hatch, _types = _tri3_state()
-    finally:
-        if old is None:
-            os.environ.pop('XSLOPE_LINEAR_1D', None)
-        else:
-            os.environ['XSLOPE_LINEAR_1D'] = old
-
     if len(types_now) and int(types_now.max()) != 2:
         fails.append(f"a tri3 mesh produced {int(types_now.max())}-node 1D "
                      f"elements")
-    if K_now.shape != K_hatch.shape:
-        fails.append(f"the stiffness changed shape on tri3: {K_now.shape} vs "
-                     f"{K_hatch.shape}")
-    else:
-        diff = np.abs((K_now - K_hatch).data) if hasattr(K_now - K_hatch, "data") \
-            else np.abs(np.asarray(K_now - K_hatch))
-        if diff.size and float(diff.max()) != 0.0:
-            fails.append(f"the tri3 stiffness moved by {float(diff.max()):.3e}, "
-                         f"and should be bit-identical")
-    if forces_now.shape != forces_hatch.shape:
-        fails.append("the tri3 member force array changed length")
-    elif forces_now.size and not np.array_equal(forces_now, forces_hatch):
-        worst = float(np.max(np.abs(forces_now - forces_hatch)))
-        fails.append(f"the tri3 member forces moved by {worst:.3e}, and should "
-                     f"be bit-identical")
+    if K_now.shape[0] != 2 * len(mesh['nodes']):
+        fails.append(f"the tri3 stiffness is {K_now.shape[0]} rows for "
+                     f"{len(mesh['nodes'])} nodes")
+    if not forces_now.size:
+        fails.append("the tri3 run recovered no member forces at all")
     return fails
 
 
@@ -366,8 +335,6 @@ def test_a_linear_mesh_is_untouched():
 
 CHECKS = [
     ("the mesh attaches the midside node", test_mesh_attaches_the_midside_node),
-    ("the escape hatch holds the old element",
-     test_the_escape_hatch_holds_the_old_element),
     ("a bar under uniform axial strain", test_uniform_axial_strain),
     ("a linear mesh is untouched", test_a_linear_mesh_is_untouched),
 ]

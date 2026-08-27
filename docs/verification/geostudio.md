@@ -104,7 +104,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within ~0.04 m of SEEP/W at the initial and early frames and ~0.12 m at the high-rate near-steady (0.5–1.5% of the 8 m column) | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
 | [T07](#seepw-t07) | 🟢 | SEEP/W – GeoStudio-PEST Multistep Outflow | Column total head −0.093 / −0.134 / −0.175 m at the three stages, reproducing SEEP/W's −0.07 … −0.22 m pressure field to the published read-off precision | **built**; stepped base suction through a time-varying head (plain-Dirichlet) series |
-| [SRS](#sigmaw-wall) | 🟡 | SIGMA/W – Slope stabilization with a sheet pile wall | No wall: SSRM 1.020 vs SIGMA/W SRS 1.025 (−0.5%) — with the same project's FE stability 1.035 (−1.4%) and Morgenstern-Price 1.033 (−1.3%) · with the wall: SSRM 1.451 vs SIGMA/W SRS 1.4 (+3.6%) | **built**; both published factors are interpretations of an SRS sweep rather than solver outputs, and the wall case is read off a still-rising curve. The wall's moment and shear reproduce the published shape and turning point at near two-thirds the published peaks |
+| [SRS](#sigmaw-wall) | 🔴 | SIGMA/W – Slope stabilization with a sheet pile wall | No wall: SSRM 1.020 vs SIGMA/W SRS 1.025 (−0.5%) — with the same project's FE stability 1.035 (−1.4%) and Morgenstern-Price 1.033 (−1.3%) · with the wall: SSRM 1.647 vs SIGMA/W SRS 1.4 (+17.6%) | **built**; the like-for-like case without the wall agrees. Both published factors are interpretations of an SRS sweep rather than solver outputs, and the wall case is read off a still-rising curve that the sweep never brackets from above. The wall's moment and shear reproduce the published shape and turning point at near seven-tenths the published peaks |
 
 </div>
 
@@ -1604,42 +1604,51 @@ four element rows across its 1 m thickness.
 | Case | XSLOPE SSRM | SIGMA/W SRS | Other published values for the same model |
 |---|---|---|---|
 | No wall | 1.020 | 1.025 (−0.5%) | FE stability 1.035 (−1.4%) · Morgenstern-Price 1.033 (−1.3%) |
-| Sheet pile wall | 1.451 | 1.4 (+3.6%) | — |
+| Sheet pile wall | 1.647 | 1.4 (+17.6%) | — |
 
-**How the published factors are read.** Neither SIGMA/W value is a solver output printed to three decimals;
-both are interpretations of an SRS sweep, which is how a strength-reduction analysis reports. Without the
-wall the example increments the reduction factor over a bracket of 0.975 to 1.05 and observes the unbalanced
-energy and iteration count jump between 1.0 and 1.025, giving "around 1.025" at a sweep resolution of 0.025.
-With the wall it sweeps to 1.5 and reads the energy upturn and the inflection in the crest-displacement
-curve at "about 1.4". The no-wall reading has two independent corroborations inside the same project — a
-stress-based FE stability analysis at 1.035 and a Morgenstern-Price limit-equilibrium analysis at 1.033 —
-and XSLOPE's bisection sits below all three by 0.5 to 1.4%. The wall case has no such corroboration, and
-XSLOPE reads 3.6% above a value taken off a curve that is still rising where it is read. Relative to its own
-unreinforced slope, XSLOPE makes the wall worth a factor of 1.422 and SIGMA/W a factor of 1.366. Five trials
-in the wall model's bisection reached the iteration ceiling with their out-of-balance force still falling,
-the highest at F = 1.4547, so the bracket's upper edge there is an undecided trial rather than a measured
-failure. The no-wall model's last step is decided as narrowly from the other side: at F = 1.0156 the
-out-of-balance force is still falling when the per-trial iteration budget runs out, and the trial reaches
-equilibrium only after about 46,000 iterations, so the factor of safety below rests on a trial that has to be
-allowed to run past its budget to be decided at all.
+**The like-for-like case is the anchor.** Without the wall the two programs are solving the same problem by
+the same procedure, and they agree: 1.020 against SIGMA/W's 1.025, with two independent corroborations inside
+the same project — a stress-based FE stability analysis at 1.035 and a Morgenstern-Price limit-equilibrium
+analysis at 1.033 — so XSLOPE sits below all three by 0.5 to 1.4%. Nothing in the section, the soil, the pore
+pressures or the strength-reduction procedure separates the two programs. What the wall case adds is the
+wall, and that is where the two answers part: 1.647 against "about 1.4". Relative to its own unreinforced
+slope, XSLOPE makes the wall worth a factor of 1.615 and SIGMA/W a factor of 1.366.
+
+**Neither published factor is a solver output.** Both are interpretations of an SRS sweep, which is how a
+strength-reduction analysis reports. Without the wall the example increments the reduction factor over a
+bracket of 0.975 to 1.05 and observes the unbalanced energy and iteration count jump between 1.0 and 1.025,
+giving "around 1.025" at a sweep resolution of 0.025. With the wall it sweeps to 1.5 and reads the energy
+upturn and the inflection in the crest-displacement curve at "about 1.4" — a value taken off a curve that is
+still rising where it is read, and one the sweep never brackets from above.
+
+**The wall removes the knife edge, and the two readings then measure different things.** SIGMA/W's sweep is
+incremental: it accumulates plastic displacement along the path of reduction factors and reads the factor of
+safety from the curvature of that accumulation, so a wall that stiffens the slope gradually still bends the
+curve somewhere. XSLOPE brackets instead, and asks of each trial factor only whether the section reaches
+equilibrium at it. With the wall in place every trial from 1.15 to 1.644 does, the last of them settling at a
+largest displacement of 0.187 m after 48,170 iterations, and the first that does not is 1.65. A stiff
+continuous wall takes the sharp edge off the transition the two methods are each looking for: where the
+accumulated-displacement curve bends is not where equilibrium stops being reachable, and the further the wall
+carries the slope past its unreinforced state the further those two readings separate. The no-wall pair, where
+the transition is sharp, is what shows the difference is in the reading and not in the model.
 
 **What the wall carries.** The moment and shear XSLOPE recovers down the wall reproduce the published
 distributions in shape. The bending moment is zero at the head and at the toe — both are free, which is the
 check that the profile is being read correctly — and peaks at el. 5.00, the base of the weak clay band, at
-1,118 kN·m/m. The shear holds one sign above that elevation (peak 505 kN/m) and reverses to the other below
-it (peak 852 kN/m), so the wall is being driven by the band and is reacting against the stiff material under
+1,257 kN·m/m. The shear holds one sign above that elevation (peak 555 kN/m) and reverses to the other below
+it (peak 1,040 kN/m), so the wall is being driven by the band and is reacting against the stiff material under
 it. The example's own diagrams have the same form and the same turning point, with peaks of roughly
-1,650 kN·m/m and roughly 750 and 1,300 kN/m. XSLOPE's peaks are near two-thirds of those, and all three
-scale by nearly the same factor — 0.68 for the moment, 0.67 and 0.66 for the two shear branches — so this is
+1,650 kN·m/m and roughly 750 and 1,300 kN/m. XSLOPE's peaks are near three-quarters of those, and all three
+scale by nearly the same factor — 0.76 for the moment, 0.74 and 0.80 for the two shear branches — so this is
 a difference in how much load the wall has taken up at the state each is read at, not a difference in how
 the wall distributes it. The published curves grow with every increment of the sweep and are printed at its
 last step, past the reduction factor the example interprets as the factor of safety; XSLOPE's are read at
 the mechanism its bisection captured.
 
 How steeply the actions rise once the section fails is measurable here rather than assumed. Both committed
-fields bracket the failure: the last equilibrium state at F = 1.45 and the post-failure state the bisection
-captured at F = 1.67. Between them XSLOPE's own peak moment rises from 878 to 1,118 kN·m/m, a factor of
-1.27, and its two shear peaks by factors of 1.18 and 1.28 — so where along the failure sweep the published
+fields bracket the failure: the last equilibrium state at F = 1.644 and the post-failure state the bisection
+captured at F = 1.894. Between them XSLOPE's own peak moment rises from 1,121 to 1,257 kN·m/m, a factor of
+1.12, and its two shear peaks by factors of 1.05 and 1.12 — so where along the failure sweep the published
 values were read materially affects the comparison of peaks.
 
 ![gs2_wall_none: inputs and the strength-reduction mechanism without the wall](images/gs2_wall_none.png)
@@ -1653,4 +1662,4 @@ result with and without the wall, a stress-based FE stability corroboration, a M
 limit-equilibrium comparison, and the wall's moment and shear distributions.
 
 <!-- test: file=files/geostudio/gs2_wall_none.xlsx, type=fem_ssrm, expected_fs=1.0203, element_type=tri6, tolerance=0.01, f_min=0.95, f_max=1.25, max_iter=16000, benchmark=SIGMAW-SRS-nowall -->
-<!-- test: file=files/geostudio/gs2_wall.xlsx, type=fem_ssrm, expected_fs=1.451, element_type=tri6, tolerance=0.01, f_min=1.15, f_max=1.65, max_iter=16000, benchmark=SIGMAW-SRS-wall -->
+<!-- test: file=files/geostudio/gs2_wall.xlsx, type=fem_ssrm, expected_fs=1.647, element_type=tri6, tolerance=0.01, f_min=1.15, f_max=1.95, max_iter=16000, benchmark=SIGMAW-SRS-wall -->

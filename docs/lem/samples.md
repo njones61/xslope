@@ -574,9 +574,9 @@ unconservatively high factor of safety.
 #### LEM vs. FEM Comparison
 
 The same model solved with the finite element engine (see
-[FEM Samples](../fem/samples.md#2-slope-stabilized-with-drilled-shaft-piles)) reads FS = 1.361 with the
+[FEM Samples](../fem/samples.md#2-slope-stabilized-with-drilled-shaft-piles)) reads FS = 1.380 with the
 piles and 1.164 without them, where Spencer reads 1.842 with them and 1.149 without. The two engines
-credit the same row by factors of 1.17 and 1.60. That gap is an idealization, not a numerical difference:
+credit the same row by factors of 1.19 and 1.60. That gap is an idealization, not a numerical difference:
 a plane-strain finite element model has no space between the piles, so it represents the row as a
 continuous wall carrying one pile's stiffness smeared over the spacing, while the Ito & Matsui force is
 a theory of the soil flowing between them. For a discrete row at spacing the limit equilibrium result is the applicable one,

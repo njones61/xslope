@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import math
-import os
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -2763,20 +2762,6 @@ _QUADRATIC_EDGE_MIDSIDE = {
 }
 
 
-def _linear_1d_elements_requested():
-    """True when XSLOPE_LINEAR_1D is set, which keeps embedded 1D elements
-    two-node on a quadratic mesh.
-
-    TEMPORARY. It exists so a model can be solved both ways in one session while
-    the locked results that predate three-node members are re-measured, and it is
-    to be removed once that is done. It is not a modelling option: with it set,
-    a bar or beam on a tri6 edge is tied to the soil only at the edge's corners
-    and slides freely past its midside node.
-    """
-    return os.environ.get("XSLOPE_LINEAR_1D", "").strip().lower() in (
-        "1", "true", "yes", "on")
-
-
 def attach_1d_midside_nodes(mesh, debug=False):
     """Give every embedded 1D element the midside node of the 2D edge it lies on.
 
@@ -2801,9 +2786,6 @@ def attach_1d_midside_nodes(mesh, debug=False):
     e1d = mesh.get("elements_1d")
     if e1d is None or len(e1d) == 0:
         return mesh
-    if _linear_1d_elements_requested():
-        return mesh
-
     elements = mesh.get("elements")
     element_types = mesh.get("element_types")
     if elements is None or element_types is None or len(elements) == 0:

@@ -35,11 +35,12 @@ finite element path is verified on, at both levels:
   Frame* verification).
 - The whole path — wall, soil, pore pressures and strength reduction together — is measured against
   GeoStudio's SIGMA/W *slope stabilization with piles* example, where a sheet pile wall driven from a bench
-  through a weak clay band takes the slope from marginal stability to comfortably stable. XSLOPE reads
-  1.020 without the wall and 1.451 with it, against SIGMA/W's own readings of about 1.025 and about 1.4,
-  and recovers the wall's bending moment and shear down its length with the published shape and turning
-  point. See [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall), which states how the
-  published factors are read and how far XSLOPE sits from each.
+  through a weak clay band takes the slope from marginal stability to comfortably stable. Without the wall
+  the two programs agree, 1.020 against SIGMA/W's about 1.025, and XSLOPE recovers the wall's bending moment
+  and shear down its length with the published shape and turning point. With the wall in place it reads
+  1.647 against their about 1.4. See [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall),
+  which states how the published factors are read and what separates the two readings once a stiff
+  continuous member is in the section.
 
 **Discrete pile rows** are not continuous out of plane. Soil arches onto the piles and, at wide enough
 spacing, moves between them, so the load a pile attracts is set by a three-dimensional mechanism. Dividing
@@ -53,11 +54,11 @@ pile-stabilized slope with a three-dimensional strength reduction finite element
 individual piles with slip interfaces, and XSLOPE's SSRM is run on the same slope at a spacing of three
 diameters in [the VP106 diagnostic](../verification/rocscience.md#vp106-fem). With no pile the two agree to
 0.4%, which is what makes the rest of the comparison readable. With the pile row in place the
-two-dimensional model reads 6.8% high with a free head and 8.3% high with the head rotation restrained: it
-credits the row with multiplying the unreinforced factor of safety by 1.279 where the three-dimensional
-model credits 1.193. Limit equilibrium with the Ito & Matsui force credits the same row 1.269 — a
-comparable distance above the three-dimensional value rather than a materially smaller one. Neither
-two-dimensional route recovers the three-dimensional credit; what the benchmark establishes about the
+two-dimensional model reads 8.2% high with a free head and 9.4% high with the head rotation restrained: it
+credits the row with multiplying the unreinforced factor of safety by 1.296 where the three-dimensional
+model credits 1.193. Limit equilibrium with the Ito & Matsui force credits the same row 1.269 — above the
+three-dimensional value by 0.076 where the beam is above it by 0.103, the 0.027 between them small beside
+either gap. Neither two-dimensional route recovers the three-dimensional credit; what the benchmark establishes about the
 plane-strain beam is that it over-credits the row against the only three-dimensional answer available.
 
 **Which path to use.** For a discrete pile row, the validated route is limit equilibrium with the Ito &
@@ -367,7 +368,7 @@ field state, with that state also recorded in the CSV's header.
 The panel is non-modal and reads the solution it was opened with, and works the same on a solution reloaded from
 its saved sidecar files as on a fresh solve.
 
-The screenshot above is the piles sample's own strength reduction run, $FS = 1.361$, read at the mechanism it
+The screenshot above is the piles sample's own strength reduction run, $FS = 1.380$, read at the mechanism it
 developed (see [FEM sample problems](samples.md)).
 
 ## References

@@ -1054,6 +1054,24 @@ def _broken_tie_set(fd, fem_data, bundle, slope_data, tied_lines, fails):
     return [(state, line_id, out, gaps)]
 
 
+def _gap_breaks(prof, gaps):
+    """How many separate breaks the gap samples make in the thickened stretch.
+
+    ``peak_gap_s`` lists every sample inside the span that stands below it. Two
+    such samples that are neighbours on the line are one break in the drawing,
+    not two, so the samples are mapped back to their indices along ``s`` and
+    consecutive indices are grouped."""
+    s_vals = np.asarray(prof["s"], dtype=float)
+    idx = sorted({int(np.argmin(np.abs(s_vals - g))) for g in gaps})
+    if not idx:
+        return 0
+    breaks = 1
+    for a, b in zip(idx, idx[1:]):
+        if b != a + 1:
+            breaks += 1
+    return breaks
+
+
 def test_the_peak_utilization_is_tie_aware():
     """A member at its greatest utilization over a stretch reports the stretch.
 
@@ -1173,9 +1191,13 @@ def test_the_peak_utilization_is_tie_aware():
                 fails.append(f"{state} line {line_id}: a thickened run "
                              f"{spanning} spans {gap:,.2f}, where the line "
                              f"stands below capacity")
-        if len(runs) < len(gaps) + 1:
+        # Adjacent samples below capacity are ONE hole in the drawing, not two:
+        # the thickened curve breaks once across a run of them. Count the breaks
+        # the figure can show, not the samples that are down.
+        n_breaks = _gap_breaks(prof, gaps)
+        if len(runs) < n_breaks + 1:
             fails.append(f"{state} line {line_id}: {len(runs)} thickened run(s) "
-                         f"for a stretch broken at {len(gaps)} position(s)")
+                         f"for a stretch broken at {n_breaks} position(s)")
         if _figure_text(fig):
             fails.append(f"{state} line {line_id}: the panel carries a label "
                          f"over it: {_figure_text(fig)!r}")

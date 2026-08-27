@@ -3993,7 +3993,7 @@ s differs by 4.2%, the paper's 2.5 × 10⁻⁵ being a rounded print of exp(−9
 | Spencer | 1.152 | 1.152 (0.0%) |
 | Janbu corrected | 1.144 | — |
 | Morgenstern-Price | 1.148 | — |
-| SSRM | 1.159 | 1.15 (+0.8%) |
+| SSRM | 1.166 | 1.15 (+1.4%) |
 
 *Hammah et al. report the same SSRM 1.15 for the generalized Hoek-Brown criterion and for its
 equivalent Mohr-Coulomb form.*
@@ -4010,6 +4010,6 @@ angle at low confinement exceeds ~55°; at GSI = 5 the envelope is weak enough t
 well behaved. See the note in the [LEM overview](../lem/overview.md#hoek-brown-strength).
 
 <!-- test: file=files/rocscience/hammah_hb1.xlsx, type=circular_search, num_slices=40, fs_bishop=1.150, fs_spencer=1.152, fs_janbu=1.144, fs_mprice=1.148, benchmark=HB-lem -->
-<!-- test: file=files/rocscience/hammah_hb1.xlsx, type=fem_ssrm, expected_fs=1.159, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, max_iter=16000, k0=1, benchmark=HB-ssrm -->
+<!-- test: file=files/rocscience/hammah_hb1.xlsx, type=fem_ssrm, expected_fs=1.166, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, max_iter=16000, k0=1, benchmark=HB-ssrm -->
 
-![Hoek-Brown SSRM (Hammah et al. 2005 example 1): a 10 m, 45° slope in a GSI = 5 rock mass, SSRM 1.159 against the paper's 1.15 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the band exiting at the toe](images/HB-ssrm.png)
+![Hoek-Brown SSRM (Hammah et al. 2005 example 1): a 10 m, 45° slope in a GSI = 5 rock mass, SSRM 1.166 against the paper's 1.15 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the band exiting at the toe](images/HB-ssrm.png)

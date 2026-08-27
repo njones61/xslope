@@ -5429,7 +5429,7 @@ def transient_frame_index(transient_solution, t, tol=None):
             f"No saved transient frame at time {t}; nearest is {times[i]} "
             f"(available: {', '.join(f'{x:g}' for x in times)}). Add it to "
             f"save_times / stage_1 / stage_2 / stability_time so the stepper lands "
-            f"on it, or re-march with remarch_for_times().")
+            f"on it, or re-run the analysis with remarch_for_times().")
     return i
 
 
@@ -5555,7 +5555,7 @@ def remarch_for_times(seep_data, slope_data, times, progress_callback=None, **ma
     tseep_data = build_tseep_data(slope_data)
     if tseep_data is None:
         raise SeepInputError("remarch_for_times: this model has no 'tseep' sheet, so "
-                             "there is no transient march to re-run.")
+                             "there is no transient seepage analysis to re-run.")
     duration = tseep_data.get("duration")
     if duration is None or duration <= 0:
         raise SeepInputError("remarch_for_times: the tseep controls set no positive "
@@ -5669,7 +5669,7 @@ def apply_transient_stability_frame(slope_data, transient_solution, time=None,
     """
     if transient_solution is None:
         raise ValueError("apply_transient_stability_frame needs a transient solution; "
-                         "run or import the march first.")
+                         "run or import the transient seepage analysis first.")
     remarched = False
     if rapid:
         ts = slope_data.get("tseep") or {}
@@ -5685,7 +5685,7 @@ def apply_transient_stability_frame(slope_data, transient_solution, time=None,
         source = "stages"
         if verbose:
             print(f"Rapid drawdown uses transient stages {used[0]:g} / {used[1]:g}"
-                  + (" (re-marched)." if remarched else "."))
+                  + (" (re-run)." if remarched else "."))
     else:
         t, source = resolve_stability_time(slope_data, transient_solution, time)
         if remarch and seep_data is not None and not has_transient_frame(
@@ -5700,7 +5700,7 @@ def apply_transient_stability_frame(slope_data, transient_solution, time=None,
                      "file": "from the file's stability_time",
                      "default": "the last saved frame (no stability_time set)"}[source]
             print(f"Analysis uses transient seepage frame t = {used[0]:g} — {where}"
-                  + (", re-marched." if remarched else "."))
+                  + (", re-run." if remarched else "."))
     return {"times": used, "source": source, "remarched": remarched,
             "solution": transient_solution}
 

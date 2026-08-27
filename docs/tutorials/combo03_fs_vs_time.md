@@ -26,7 +26,7 @@ Johnson Reservoir dam, whose clay core needs an undrained treatment.
 </div>
 <div class="tgm-obj" markdown>
 **Objectives** — Run a stability analysis at every saved instant of a transient
-seepage march, choose the saved times and the starting circles, read which face
+seepage analysis, choose the saved times and the starting circles, read which face
 governs, and repeat the run as a rapid drawdown for a dam with a clay core.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">three materials</span><span class="tg-pill">transient seepage</span><span class="tg-pill">u = seep</span><span class="tg-pill">saved frames</span><span class="tg-pill">seepage time</span><span class="tg-pill">FS vs time</span><span class="tg-pill">rapid drawdown</span><span class="tg-pill">three-stage procedure</span><span class="tg-pill">Kc = 1 envelope</span><span class="tg-pill">d and ψ</span><span class="tg-pill">stage times</span><span class="tg-pill">Spencer</span><span class="tg-pill">circular search</span><span class="tg-pill">starting circles</span><span class="tg-pill">minimum slip depth</span><span class="tg-pill">automatic water loads</span></p>
@@ -130,8 +130,8 @@ Those fields were solved on **614 nodes and 1,089 triangles**, linear triangles
 auto-sized at 64 divisions across the 110 m section, a target element size of
 110/64 = 1.72 m. Head is a scalar field, so linear elements are enough. We build
 [that mesh in SEEP-3](seep03_reservoir_drawdown.md#building-the-mesh), solve
-[the full-pool state the march starts from](seep03_reservoir_drawdown.md#the-steady-solution-at-full-pool)
-and [march the pool down on it](seep03_reservoir_drawdown.md#running-the-transient-march);
+[the full-pool state the transient run starts from](seep03_reservoir_drawdown.md#the-steady-solution-at-full-pool)
+and [lower the pool on it](seep03_reservoir_drawdown.md#running-the-transient-seepage-analysis);
 the file downloaded above arrives past all three.
 
 ### Entering the soil properties
@@ -264,19 +264,19 @@ carries each sit on the mechanism their face can make, so the search reaches
 either face from the circles sheet alone. On a model with one starting circle and
 no idea which face governs, ticking it is the safer choice.
 
-**Seepage time**, the group a loaded march adds, names the instant this run reads,
-three ways. **Saved frame** lists the nineteen the march stored. **Frame shown in
+**Seepage time**, the group a loaded transient solution adds, names the instant this
+run reads, three ways. **Saved frame** lists the nineteen the run stored. **Frame shown in
 the results viewer** takes whatever frame the play bar is on, and appears only
-while a transient results tab is open. **Another time (re-marches the solution)**
-accepts any instant in the run duration and re-runs the march with that time added
-to the save schedule; a field blended between two frames is never invented.
+while a transient results tab is open. **Another time (reruns the analysis)**
+accepts any instant in the run duration and re-solves the transient seepage analysis
+with that time added to the save schedule; a field blended between two frames is never invented.
 
 **Save as the model's stability time** writes the choice to the `tseep` sheet, so
 a scripted or headless re-run reads the same frame; left off, it governs this run
 only. The dialog opens on the last saved frame, t = 300, which is what any run
 reads while the model's stability time is blank.
 
-Set **Saved frame** to `t = 0 day`, the full reservoir the march starts from:
+Set **Saved frame** to `t = 0 day`, the full reservoir the transient run starts from:
 
 ![Run LEM with the Seepage time group set to the first saved frame](images/combo03_studio_run_lem.png)
 
@@ -341,13 +341,13 @@ draw the whole curve this way.
 A parametric sweep does that repetition itself. Click **Run → Parametric…** and
 set **Mode** to **Factor of safety vs time**:
 
-![The Parametric dialog sweeping the march's saved frames](images/combo03_studio_parametric.png)
+![The Parametric dialog sweeping the transient run's saved frames](images/combo03_studio_parametric.png)
 
 Leave **Method** on **Spencer** and **Number of slices** at 40. The parameter
 picker the other three modes use is gone, because nothing is substituted — every
 point solves *this* model against a different instant's pore pressures. In its
-place is a **Saved frames** list holding the nineteen the march stored, all
-ticked, and unticking samples a long march. **Rapid drawdown at each time** is
+place is a **Saved frames** list holding the nineteen the run stored, all
+ticked, and unticking samples a long one. **Rapid drawdown at each time** is
 grayed out, because neither zone on this dam carries the $d$ / $\psi$ pair that
 analysis reads; Part 2 runs it on a dam that does. Leave **Grid search (auto-seed
 the circular search)** off, and leave **Re-search the critical surface at each
@@ -356,7 +356,7 @@ step** ticked, because the mechanism moves.
 Click **Run**. Nineteen searches report their factors of safety to the Log:
 
 ```text
-Factor of safety vs time (lem): 19 instant(s) of the transient march, spencer, re-searching at each…
+Factor of safety vs time (lem): 19 instant(s) of the transient solution, spencer, re-searching at each…
   t = 0 day      spencer   FS = 1.5311
   t = 2 day      spencer   FS = 1.5311
   t = 5 day      spencer   FS = 1.5132
@@ -378,7 +378,7 @@ its reason rather than as a gap in the curve.
 <!-- test: file=files/xslope_earth_dam_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, expected_first=1.5311, critical_time=35, min_fs=1.3313, tolerance=0.005, benchmark=COMBO-3-drained -->
 
 From a script we make the same run with `xslope.sensitivity.fs_vs_time`, reading
-the march off the companion files the workbook ships with:
+the transient solution off the companion files the workbook ships with:
 
 ```python
 from xslope.seep import build_seep_data, import_transient_solution
@@ -485,8 +485,8 @@ heel at (0.80, 0.34) to the crest edge at (51.94, 22.00), tangent to the rock.
 
 The minimum sits on a saved frame, which leaves open whether the true minimum
 falls between two of them. `fs_vs_time` takes a set of unsaved instants
-through `times=`, with the seepage data to re-march from, and serves the whole
-set with **one** re-march before the first solve rather than one per instant:
+through `times=`, with the seepage data to re-solve from, and serves the whole
+set with **one** rerun before the first solve rather than one per instant:
 
 ```python
 ok, fine = fs_vs_time(slope_data, solution, seep_data=seep_data, remarch=True,
@@ -494,7 +494,7 @@ ok, fine = fs_vs_time(slope_data, solution, seep_data=seep_data, remarch=True,
                       methods=("spencer",))
 ```
 
-The re-march runs on the mesh, the boundary conditions and the schedule the file
+That rerun uses the mesh, the boundary conditions and the schedule the file
 already carries, so nothing has to be solved in Studio first; `seep_data` and
 `solution` are the two the sweep above built.
 
@@ -521,7 +521,7 @@ upstream face.
 A coarse schedule is what makes that check necessary. SEEP-3's own twelve-frame
 schedule saves nothing between day 30 and day 47, so a curve drawn through it
 would report a minimum of 1.3344 on day 30 and never evaluate the lowest instant.
-Re-march when the minimum falls on the first or last saved frame, or when the
+Rerun the transient seepage analysis when the minimum falls on the first or last saved frame, or when the
 points either side of it are still falling steeply.
 
 ### Reading the curve
@@ -553,7 +553,7 @@ three-stage Duncan, Wright and Wong procedure, on a dam whose core carries an
 undrained $K_c = 1$ envelope. That analysis names **two** instants, the slope
 before the drawdown and the slope after it, and computes one factor of safety for
 the second from consolidation stresses read at the first — two frames of a
-transient march, named by `stage_1` and `stage_2` on the `tseep` sheet.
+transient run, named by `stage_1` and `stage_2` on the `tseep` sheet.
 
 A curve cannot replace that check, and this model carries no $d$ / $\psi$ pair to
 run one, but it says *which* instant the second stage should be read at. A check
@@ -574,7 +574,7 @@ The Johnson Reservoir dam from [COMBO-2](combo02_rapid_drawdown.md) can be
 asked. Its core
 carries a $K_c = 1$ envelope, and in COMBO-2 we ran the three-stage procedure on
 it three times, once per statement of where the water is, reading 1.181, 1.195
-and 1.016 — the last from a transient march, stage 1 at t = 0 and stage 2 at
+and 1.016 — the last from a transient run, stage 1 at t = 0 and stage 2 at
 t = 50. Here we will run it at **every** saved instant, and then run Part 1's
 kind of curve on the same twenty-one frames for comparison.
 
@@ -645,7 +645,7 @@ the answer moves, and the run stops at day 500 because the curve has flattened
 before then. Every point below reads its consolidation stresses at stage 1, which
 stays at t = 0 for the whole sweep; what moves is stage 2.
 
-**The mesh and the march.** Still in **Seepage**, click the **Seep · Transient**
+**The mesh and the transient solution.** Still in **Seepage**, click the **Seep · Transient**
 tab. The play bar steps through **twenty-one** instants — t = 0, 5, 10, 15, 20,
 25, 30, 35, 40, 45, 50, 60, 70, 80, 100, 130, 170, 220, 300, 400 and 500 — and
 every pore pressure the runs below read comes from one of them.
@@ -654,24 +654,24 @@ Those fields were solved on **2,080 nodes and 3,923 triangles**, linear triangle
 auto-sized at 100 divisions across the 750 ft section, a target element size of
 750/100 = 7.5 ft. We built
 [that mesh in COMBO-2](combo02_rapid_drawdown.md#meshing-and-both-solves) and
-[ran the transient seepage analysis on it](combo02_rapid_drawdown.md#marching-it);
+[ran the transient seepage analysis on it](combo02_rapid_drawdown.md#running-the-transient-seepage-analysis);
 both are already done in the file downloaded above.
 
 ### Running the rapid drawdown sweep
 
-That is everything a run reads, so we can sweep the march in one go. Switch back
+That is everything a run reads, so we can sweep the whole transient solution in one go. Switch back
 to **LEM** (`Ctrl+1`) and click **Run → Parametric…**
 
 ![The Parametric dialog with the Rapid drawdown box ticked](images/combo03_rapid_parametric.png)
 
 Set **Mode** to **Factor of safety vs time**. **Method** opens on **Spencer** and
 **Number of slices** on 40; leave both. **Saved frames** lists the twenty-one this
-march stored, all ticked — leave them, because the comparison at the end of this
-part needs the whole march.
+run stored, all ticked — leave them, because the comparison at the end of this
+part needs all of them.
 
 **Rapid drawdown at each time → ticked.** Left off, each instant is one
 single-stage analysis of that instant's water. Ticked, each instant becomes stage
-2 of a three-stage drawdown whose stage 1 is the march's initial state, so the
+2 of a three-stage drawdown whose stage 1 is the transient run's initial state, so the
 curve gives the factor of safety if the pool falls from full to where it stands
 at that moment.
 
@@ -683,13 +683,13 @@ The **Model checks** panel repeats COMBO-2's one warning: two of the three
 materials carry no $d$ / $\psi$ and keep their drained strength through the
 drawdown. Boundary set 2 raises nothing, because
 [we cleared it in COMBO-2](combo02_rapid_drawdown.md#clearing-boundary-set-2)
-before that march; a transient run solves boundary set 1 only.
+before that run; a transient run solves boundary set 1 only.
 
 Click **Run**. Twenty of the twenty-one instants are drawdowns, each searched in
 full, so the table lands when the last search finishes:
 
 ```text
-Rapid drawdown vs time (lem): 21 instant(s) of the transient march, spencer, re-searching at each…
+Rapid drawdown vs time (lem): 21 instant(s) of the transient solution, spencer, re-searching at each…
 Rapid drawdown versus time (stage 1 at t = 0)
 t (day)  stage 1  stage 2       stage 3      FS  governs      Xo      Yo       R
       0        —        —             —       —        —       —       —       —   a drawdown from t = 0 to t = 0 is not a drawdown …
@@ -737,7 +737,7 @@ and the legend counts the instant that produced no result.
 **Day 50 reads 1.0157, the answer we got in COMBO-2.** The transient route there
 reports **1.0158** on a circle at (243.93, 244.90) with a radius of 163.64 ft,
 and the day-50 row lands on that circle at 1.0157. At t = 50 this sweep poses the
-drawdown we posed in COMBO-2 — stage 1 at 0, stage 2 at 50, the same march and
+drawdown we posed in COMBO-2 — stage 1 at 0, stage 2 at 50, the same transient run and
 the same starting circle — so the curve passes through that answer.
 
 <!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, num_slices=40, expected_first=1.4563, critical_time=50, min_fs=1.0157, tolerance=0.005, benchmark=COMBO-3-rapid -->
@@ -789,7 +789,7 @@ Each point now runs about three times faster, solving the section once rather
 than three times:
 
 ```text
-Factor of safety vs time (lem): 21 instant(s) of the transient march, spencer, re-searching at each…
+Factor of safety vs time (lem): 21 instant(s) of the transient solution, spencer, re-searching at each…
 Factor of safety versus time
 t (day)      FS      Xo      Yo       R
       0  1.5097  240.00  261.13  169.97
@@ -823,14 +823,14 @@ Two of these rows repeat the drained bracket runs from COMBO-2: **day 0's
 1.5097** is the full-pool drained figure of **1.510** there, and **day 50's
 1.0350** the day-50 figure of **1.035**. The third of those, the long-term
 **1.311**, is not on this curve — day 500 reads 1.2870 and is still climbing,
-because a march of this length leaves the core part drained.
+because a run of this length leaves the core part drained.
 
 <!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, times=0;50;500, expected=1.5097;1.0350;1.2870, tolerance=0.005, benchmark=COMBO-3-single -->
 
 Studio's result tab holds one curve at a time, so the figure below plots both
 results on one pair of axes:
 
-![The rapid drawdown curve and the single-stage curve of the same march](images/combo03_rapid_compare.png){width=1000}
+![The rapid drawdown curve and the single-stage curve of the same transient run](images/combo03_rapid_compare.png){width=1000}
 
 **The rapid drawdown curve runs below the single-stage curve at every instant**,
 and the distance between them is not constant:
@@ -910,7 +910,7 @@ In this tutorial we covered:
   solved field, Run LEM's **Seepage time** group names which frame, and
   **Run → Parametric… → Factor of safety vs time** sweeps all of them at once.
 - Where those frames come from — both models on this page ship with their mesh
-  and their whole march beside the workbook, so every curve here is drawn on
+  and their whole transient solution beside the workbook, so every curve here is drawn on
   fields that were solved once, in [SEEP-3](seep03_reservoir_drawdown.md) and
   [COMBO-2](combo02_rapid_drawdown.md).
 - Where to put a starting circle when either face may govern — one per face, each
@@ -924,7 +924,7 @@ In this tutorial we covered:
   the frame spacing across the dip moved it by 0.0001.
 - How to turn the same sweep into a rapid drawdown curve — **Rapid drawdown at
   each time** makes every ticked instant stage 2 of a three-stage analysis whose
-  stage 1 is the march's initial state.
+  stage 1 is the transient run's initial state.
 - The rapid drawdown curve on COMBO-2's Johnson Reservoir dam — a minimum of
   **1.0157 on day 50** where the fall ends and a recovery to 1.1912 by day 500;
   the same frames at drained strengths give 1.5097, 1.0350 and 1.2870.

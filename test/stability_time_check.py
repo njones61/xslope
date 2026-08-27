@@ -411,7 +411,7 @@ def test_studio():
         fails.append(f"a free-entry time was not marked for a re-march: {o!r}")
     if dlg.seep_time.problem() is not None:
         fails.append("a valid free-entry time was refused")
-    if "re-march" not in dlg.seep_time.note.text():
+    if "re-solve" not in dlg.seep_time.note.text():
         fails.append("the re-march cost is not stated: " + dlg.seep_time.note.text())
     dlg.seep_time.other.setText("9999")
     if dlg.seep_time.problem() is None:

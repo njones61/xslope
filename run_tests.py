@@ -4523,7 +4523,7 @@ PREFLIGHT_RULE_SPECS = [
                     'seep_frame': {'times': [0.0, 50.0]}},
          control_selection={'surface': 'circular'},
          mutation=lambda sd: sd,
-         expect='reads BOTH its stages from the transient march'),
+         expect='reads BOTH its stages from the transient seepage analysis'),
     # The two ways the pool schedule can fail to be a drawdown, each against the
     # SAME file staged the same way with its real falling schedule in place: a
     # reservoir head typed as a fixed number (no series bound at all), and one bound

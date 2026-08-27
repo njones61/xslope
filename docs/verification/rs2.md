@@ -209,7 +209,7 @@ locks against the constrained value ([#9](#rs2-9), [#23](#rs2-23),
 [#43](#rs2-39)). Each *blocked* row names
 its gap; some FE-seepage cases do not converge on the high-contrast tri6 mesh. XSLOPE's
 uncoupled transient-seepage solver carries the RS2 Part IV VP102 rapid-drawdown series. RS2-67
-needs no literal-time march at all: its Case 2 (steady) and Case 4 (RS2's fully-drained drawn-down
+needs no literal-time transient analysis at all: its Case 2 (steady) and Case 4 (RS2's fully-drained drawn-down
 steady state) are each reconstructed by an own steady-seepage solve from the vendor BC block (built
 and locked, within 1.2% of RS2's own SSR — see [RS2-67](#rs2-67)), and the transient solver independently reproduces RS2's own
 90 h drawdown field as a fidelity check. Where a
@@ -3109,13 +3109,13 @@ over the dam body, and no head on either vertical end boundary, which the vendor
 **Own transient-flow cross-check.** XSLOPE's uncoupled transient solver is exercised directly on
 this dam (`benchmarks/rocscience/make_rs2_67_fielddiff.py`): starting from the steady full pool
 (el 24.4), the reservoir is stepped to the tailwater (el 7.3) at *t* = 0 and the dam drains with
-RS2's own hydraulics (k = 1 × 10⁻⁷ m/s, m_v = 2 × 10⁻⁴). The march runs on the same 90 h section
+RS2's own hydraulics (k = 1 × 10⁻⁷ m/s, m_v = 2 × 10⁻⁴). The run covers the same 90 h section
 as the field it is compared against, so what the comparison measures is flow, not geometry. At 90 h the computed phreatic surface
 overlays RS2's own imported 90 h field to a mean 0.02 m (max 0.28 m) on the upstream face — a
 direct fidelity check of the transient *flow* solver against the vendor's solved field — parting
-only in the thin crest/core (whole-section RMS 3.4 m). With RS2's slow conductivity the same march
+only in the thin crest/core (whole-section RMS 3.4 m). With RS2's slow conductivity the same run
 is still far from drained at 1500 h (crest head ≈ 23 m of the 24.4 → 7.3 span), which is exactly
-why RS2 renders Case 4 by the drained steady limit rather than the literal-time march.
+why RS2 renders Case 4 by the drained steady limit rather than the literal-time solution.
 
 ![RS2-67 90 h phreatic surface: own transient flow vs RS2 imported field](images/rs2_67_fielddiff.png)
 

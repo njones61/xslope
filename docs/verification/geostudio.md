@@ -1198,7 +1198,7 @@ reservoir series held at 8 m, the same repeated-time step-series construction
 
 ![SEEPW-T03: interior total head vs time, XSLOPE vs SEEP/W](images/gs2_rdd.png)
 
-The example is compared twice: the pore-pressure field the march produces, and the
+The example is compared twice: the pore-pressure field the transient analysis produces, and the
 factor-of-safety-vs-time curve the vendor publishes from it. The seepage comparison
 below is against SEEP/W's own solved `node.csv` field, with the locked values XSLOPE's
 own solved total heads at four interior stations, checked at the initial state,
@@ -1235,7 +1235,7 @@ stations at the IC, mid-drawdown, and end state, at a 0.03 m regression toleranc
 XSLOPE's own values.
 
 **Factor of safety versus time.** The example's *published* answer is a curve: the pore pressures
-of every saved step of the march are read by a stability analysis, once per step, and the
+of every saved step of the transient run are read by a stability analysis, once per step, and the
 resulting factor of safety plotted against time. It is the coupled result the seepage
 comparison above exists to support — the field feeding it is verified against SEEP/W
 before the stability question is asked, so a disagreement in the curve can only be in the
@@ -1256,7 +1256,7 @@ falling with the ramp in the slow case.
 minimum at that step: the lowest factor of safety among the 396 trial surfaces its
 entry-and-exit search evaluates, taken from the solved results rather than read off the
 published figure. XSLOPE's column is the minimum its own search settles on at the same
-instant, from the same march the head table above locks.
+instant, from the same transient run the head table above locks.
 
 **Instantaneous drawdown** (reservoir removed at t = 0):
 
@@ -1317,7 +1317,7 @@ is actually run for.
 A note on what this is not: a factor-of-safety-vs-time curve and a three-stage
 Duncan-Wright-Brandon rapid drawdown are different analyses of the same physical problem.
 This curve is a sequence of single-stage analyses, one per instant, each reading the pore
-pressures the march computed for that moment; the staged analysis is one analysis reading
+pressures the transient run computed for that moment; the staged analysis is one analysis reading
 two of them through undrained strength envelopes. Neither substitutes for the other.
 
 **Sources:** GeoStudio SEEP/W example "Rapid Drawdown" (Seequent), whose SEEP/W water

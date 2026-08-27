@@ -221,7 +221,7 @@ The three-stage method needs two pore-pressure fields along the slip surface: on
 
 A transient run is driven by the [**tseep** sheet](../usage/input_template.md#worksheet-tseep), which carries two optional control times, **stage_1** and **stage_2** (with `stage_1 < stage_2`). They tag the two frames the drawdown analysis will use — for instance the full-reservoir steady state at `stage_1` and the drawn-down state at `stage_2`. Both times are forced into the transient solver's saved-frame schedule, so each is a *computed* frame, never interpolated between steps. Set both or neither; setting one without the other is an error, as is a `stage_1` at or after `stage_2`.
 
-The stage times are pure *extraction* parameters — they say which two instants are read out of a march, and change nothing about how the march is solved, since the drawdown schedule itself lives in the boundary conditions. That is why XSLOPE Studio lets them be set at their point of use, in the [Run LEM dialog](../studio/analysis.md#stage-times), as well as in the transient inputs editor; the file stores them either way. Stage times that name instants a solved march never saved are served by re-marching with those times added to the save schedule.
+The stage times are pure *extraction* parameters — they say which two instants are read out of the transient solution, and change nothing about how that solution is computed, since the drawdown schedule itself lives in the boundary conditions. That is why XSLOPE Studio lets them be set at their point of use, in the [Run LEM dialog](../studio/analysis.md#stage-times), as well as in the transient inputs editor; the file stores them either way. Stage times that name instants a solved transient run never saved are served by rerunning the transient seepage analysis with those times added to the save schedule.
 
 ### In-memory staging
 
@@ -259,7 +259,7 @@ Excel input file: [xslope_johnson_res_rapid.xlsx](files/xslope_johnson_res_rapid
 
 ![johnson_res_rapid_stages.png](rapid_images/johnson_res_rapid_stages.png)
 
-The staging is a three-call sequence: march the transient seepage solution, place the two stage frames into `slope_data`, then run the ordinary three-stage `rapid_drawdown`.
+The staging is a three-call sequence: run the transient seepage analysis, place the two stage frames into `slope_data`, then run the ordinary three-stage `rapid_drawdown`.
 
 ```python
 from xslope.fileio import load_slope_data
@@ -271,7 +271,7 @@ from xslope.solve import solve_selected
 
 slope_data = load_slope_data("docs/lem/files/xslope_johnson_res_rapid.xlsx")
 
-# March the transient drawdown seepage solution
+# Run the transient drawdown seepage analysis
 mesh = build_mesh_from_polygons(get_material_polygons(slope_data), 10.0, "tri3")
 seep_data = build_seep_data(mesh, slope_data)
 solution = run_transient_seepage(seep_data, build_tseep_data(slope_data))

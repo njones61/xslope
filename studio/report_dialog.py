@@ -146,14 +146,14 @@ CONTENT_TREE = [
           "hydraulic gradient magnitude — the same fields the seepage results "
           "view offers. Only the ones the saved solution carries."),
          ("seep_transient_figures", "Transient frame plots",
-          "The section at selected states of a transient march — the first, the "
+          "The section at selected states of a transient seepage run — the first, the "
           "last, and the rest spaced evenly through the ones between — each "
           "drawn for the same fields a steady solution is, on one colour scale "
-          "across every state. Only where a transient march was run."),
+          "across every state. Only where a transient analysis was run."),
          ("seep_transient_history", "Transient history plot",
-          "The march on one time axis: the level the reservoir boundary is held "
+          "The transient run on one time axis: the level the reservoir boundary is held "
           "at, the phreatic elevation and the top of the seepage face above, and "
-          "the boundary inflow and outflow below. Only where a transient march "
+          "the boundary inflow and outflow below. Only where a transient analysis "
           "was run."),
      ]),
     ("fem", "Deformation and strength reduction",

@@ -4059,7 +4059,7 @@ EQUATION_SYMBOLS = {
     "Z_i": "interslice resultant on the left side of the slice, carried in from "
            "the slice before it",
     "Z_{i+1}": "interslice resultant on the right side of the slice, which the "
-               "march solves for and carries into the next slice",
+               "slice-by-slice sweep solves for and carries into the next slice",
     "m_α": "the base-normal denominator, which carries the factor of safety and "
            "is what makes the solution iterative",
     "f_o": "Janbu's empirical correction factor for the neglected interslice shear",
@@ -4075,7 +4075,7 @@ EQUATION_SYMBOLS = {
            "at the solution",
     "R_2": "moment imbalance of the whole sliding mass at a trial (F, θ) — zero "
            "at the solution",
-    "Z_n": "interslice force left over at the far end of the march — zero at the "
+    "Z_n": "interslice force left over at the far end of the sweep — zero at the "
            "solution",
     "M_O": "moment about the coordinate origin O of one force acting on the "
            "sliding mass; the sum over every force is the moment of the mass "
@@ -4283,15 +4283,15 @@ WHOLE_MASS_BALANCE_PHRASE = "the force-equilibrium derivation"
 #: to the first, and the reader had the interslice forces leaving the equilibrium
 #: of the mass.
 WHOLE_MASS_BALANCE_LEAD = (
-    "Summing the march's equation (6) over the slices cancels the interslice "
+    "Summing the per-slice equation (6) over the slices cancels the interslice "
     "forces, since each enters one slice with the value it left the one "
     "before. What remains is the horizontal equilibrium of the whole sliding "
     "mass. Rearranged for the factor of safety, it is equation (12) of the "
     "force-equilibrium derivation, which carries every force a slice can take. "
     "It is not solved directly for F: the factor of safety stands on both "
     "sides, inside N' and in the strength mobilized on the slice bases. The "
-    "march is what solves for F, and equation (12) is the balance that holds "
-    "at the factor of safety the march reaches:")
+    "sweep is what solves for F, and equation (12) is the balance that holds "
+    "at the factor of safety the sweep reaches:")
 
 #: The registry contributions equation (12) is assembled from. They are the same
 #: two the evaluated quotient below it is formed from, so the published form and
@@ -4735,7 +4735,7 @@ TRANSCRIPTIONS = {
     "corps": Transcription(
         consumers=("march_x", "march_y"), build="march",
         lead="Equations (6) and (7) of the derivation are the horizontal and "
-             "vertical equilibrium of one slice. The march solves them on each "
+             "vertical equilibrium of one slice. The sweep solves them on each "
              "slice in turn for the base normal N' and the interslice resultant "
              "Z_{i+1} on its right, given the Z_i carried in from the slice "
              "before it:",
@@ -4743,14 +4743,14 @@ TRANSCRIPTIONS = {
     "lowe": Transcription(
         consumers=("march_x", "march_y"), build="march",
         lead="Equations (6) and (7) of the derivation are the horizontal and "
-             "vertical equilibrium of one slice. The march solves them on each "
+             "vertical equilibrium of one slice. The sweep solves them on each "
              "slice in turn for the base normal N' and the interslice resultant "
              "Z_{i+1} on its right, given the Z_i carried in from the slice "
              "before it:",
         reduces="so equations (6) and (7) reduce to:"),
     "mprice": Transcription(
         consumers=("march_x", "march_y"), build="march",
-        lead="The march solves the same per-slice system as the "
+        lead="The sweep solves the same per-slice system as the "
              "force-equilibrium methods — equations (6) and (7) of that "
              "derivation, the horizontal and vertical equilibrium of one slice "
              "— for the base normal N' and the interslice resultant Z_{i+1} on "
@@ -5965,7 +5965,7 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     # say so: what reaches their solution is a slice-by-slice march, and the
     # quotient under it is a balance that holds because the march closed.
     if method in WHOLE_MASS_BALANCE_METHODS:
-        intro = (f"The slice-by-slice march that reaches this solution is the "
+        intro = (f"The slice-by-slice sweep that reaches this solution is the "
                  f"derivation published for {label}, in the symbols of the "
                  f"XSLOPE documentation; the numbers below are the converged "
                  f"values.")
@@ -6212,7 +6212,7 @@ def _quotient_close(calc, table_number, bookmark, unit_labels):
         blocks.append(Prose(
             "Summed over every force on every slice it vanishes at the "
             "solution, as does the interslice force left at the far end of the "
-            "march:"))
+            "sweep:"))
         blocks.append(Math(f"Z_n = {format_residual(residuals[0])}"))
         blocks.append(Math(f"sum{{M_O}} = {format_residual(residuals[1])}"))
     return blocks
@@ -7062,7 +7062,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     # than one: a model documented on the steady states alone has no other basis
     # for the sentence to distinguish it from.
     basis = ("This is a steady state: the field was solved with the boundary "
-             "conditions held where this set puts them, not marched. "
+             "conditions held where this set puts them, not stepped through time. "
              if basis_named else "")
     if unconfined is None:
         text = basis + SEEP_BC_UNRECORDED
@@ -7407,7 +7407,7 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     text = ("Flow was solved as a transient analysis: the head field is marched "
             "through time rather than solved at a single state.")
     if ledger["duration"] is not None:
-        text += (f" The march ran from t = 0 to "
+        text += (f" The analysis ran from t = 0 to "
                  f"{_time_phrase(slope_data, ledger['duration'], plural=True)}")
         text += (f" and saved {saved:,} states." if saved
                  else " and saved no states.")
@@ -7435,18 +7435,18 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     if converged is not None:
         if not converged:
             sub.blocks.append(Prose(
-                "The march did not converge at every step, and the fields it "
+                "The analysis did not converge at every step, and the fields it "
                 "reports are not reliable."))
         elif ledger["closure"] is not None:
             sub.blocks.append(Prose(
-                f"The march converged, closing the change in stored water "
+                f"The analysis converged, closing the change in stored water "
                 f"against the net boundary flow to within "
                 f"{100.0 * ledger['closure']:.3g} percent."))
         else:
-            sub.blocks.append(Prose("The march converged."))
+            sub.blocks.append(Prose("The analysis converged."))
     elif ledger["closure"] is not None:
         sub.blocks.append(Prose(
-            f"The march closed the change in stored water against the net "
+            f"The analysis closed the change in stored water against the net "
             f"boundary flow to within {100.0 * ledger['closure']:.3g} percent."))
 
     # A transient state has no flow net, and the head figures below say so before
@@ -7548,7 +7548,7 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
                     if history.get("outflow") is not None else "",
                 ])
                 sub.blocks.append(Prose(
-                    f"The march over time is shown in {where}, including "
+                    f"The transient solution over time is shown in {where}, including "
                     f"{traces}.", links=links))
                 sub.blocks.append(figure)
     return sub
@@ -7813,11 +7813,11 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                         f"in {where}, colored by material")
                 if marked and n_face:
                     lead += (f", with the nodes that keep one boundary type "
-                             f"throughout the march marked: the {marked} "
+                             f"throughout the run marked: the {marked} "
                              f"nodes" + for_set)
                     lead += (f" The {n_face:,} nodes of the reservoir face are not "
                              f"marked: each takes its boundary type at every step "
-                             f"of the march from where the water line stands at "
+                             f"of the run from where the water line stands at "
                              f"that step.")
                 elif marked:
                     lead += f", with every {marked} node marked" + for_set

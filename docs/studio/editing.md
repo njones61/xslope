@@ -281,7 +281,7 @@ with the selected one highlighted, and clicking a boundary there selects it:
 ### Transient seepage
 
 **Transient** edits the model's transient-seepage inputs — the data that a
-[transient run](analysis.md#transient-seepage) marches through. There is no on/off
+[transient run](analysis.md#transient-seepage) steps through. There is no on/off
 toggle: with no times or values entered the model stays steady (the
 steady-vs-transient *run* choice lives on the Run Seepage dialog). It gathers:
 

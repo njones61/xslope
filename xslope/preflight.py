@@ -2756,7 +2756,7 @@ def _seep_field_missing(ctx):
 
 
 @rule("seep_field.transient_frame", INFO, ("lem", "fem"),
-      "u = seep against a transient march reads one named instant of it.")
+      "u = seep against a transient seepage analysis reads one named instant of it.")
 def _seep_field_transient_frame(ctx):
     """Name the instant the run will read out of the attached transient solution.
 
@@ -3445,7 +3445,7 @@ def _tseep_storage(ctx):
                    f"{_fmt(m.get('Ss'))} on a transient run. A zero removes the "
                    f"entire storage term where the material is saturated, and with "
                    f"Sy zero as well the residual storage floor collapses too and "
-                   f"the time march no longer terminates {_AT_MAT}.")
+                   f"the time stepping no longer terminates {_AT_MAT}.")
         if unconfined and not _pos(m.get("Sy")):
             yield (f"{ctx.mat_label(i)} has no specific yield: Sy is "
                    f"{_fmt(m.get('Sy'))}, and this model is unconfined (an exit face "
@@ -3484,7 +3484,7 @@ def _tseep_duration(ctx):
     if _pos(ts.get("duration")):
         return None
     return (f"Duration is {_fmt(ts.get('duration'))}. A transient run needs a "
-            f"positive duration -- it is the length of the march, and there is "
+            f"positive duration -- it is the length of the run, and there is "
             f"deliberately no default {_AT_TSEEP}.")
 
 
@@ -3509,7 +3509,7 @@ def _tseep_save_interval(ctx):
                 f"Save interval = {si:g} is longer than the Duration ({dur:g}), so "
                 f"only the endpoint and the scheduled breakpoints are saved. A "
                 f"stability run asking for an intermediate time would have to "
-                f"re-march to reach it {_AT_TSEEP}.")
+                f"re-run the analysis to reach it {_AT_TSEEP}.")
     return None
 
 
@@ -3538,7 +3538,7 @@ def _tseep_stage_times(ctx):
     if s1 >= s2:
         return (f"Stage 1 time = {s1:g} is not earlier than Stage 2 time = {s2:g}. "
                 f"The full-pool state must precede the drawn-down state. Today the "
-                f"march runs to completion and reports success; the ordering only "
+                f"run completes and reports success; the ordering only "
                 f"surfaces if the staging is invoked afterwards {_AT_TSEEP}.")
     dur = _num(ts.get("duration"))
     if dur is not None and s2 > dur:
@@ -3562,7 +3562,7 @@ def _tseep_save_times(ctx):
     if not over:
         return None
     return (f"{len(over)} extra save time(s) lie beyond the Duration ({dur:g}) -- "
-            f"{', '.join(f'{_num(t):g}' for t in over[:4])}. The march stops at the "
+            f"{', '.join(f'{_num(t):g}' for t in over[:4])}. The run stops at the "
             f"duration, so no frame is saved at those times {_AT_TSEEP}.")
 
 
@@ -3587,7 +3587,7 @@ def _tseep_initial_condition(ctx):
                 f"so it holds flat at its first defined breakpoint until that point. "
                 f"The initial condition is a steady solve at the t = 0 boundary "
                 f"configuration, so give the driving series its t = 0 value to "
-                f"control the state the march starts from {_AT_TSEEP}.")
+                f"control the state the transient run starts from {_AT_TSEEP}.")
     return out
 
 
@@ -3612,7 +3612,7 @@ def _steady_reads_series_at_t0(ctx):
     listed = ", ".join(parts)
     return (f"Boundary values bound to a time series are read at their t = 0 "
             f"values for a steady run ({listed}) -- the initial-condition "
-            f"snapshot, the same field a transient march starts from. The Log "
+            f"snapshot, the same field a transient run starts from. The Log "
             f"states each reading {_AT_SEEPBC}.")
 
 
@@ -3687,7 +3687,7 @@ def _rapid_stage2_water(ctx):
 
 @rule("rapid.stage2_bc_ignored", WARNING, ("rapid",),
       "On the transient-staged route boundary set 2 supplies nothing: both stages "
-      "come from the march.")
+      "come from the transient run.")
 def _rapid_stage2_bc_ignored(ctx):
     """Boundary set 2 left on a file whose drawdown is taking both stages from a march.
 
@@ -3712,7 +3712,7 @@ def _rapid_stage2_bc_ignored(ctx):
     n_h, n_f, _n_e = ctx.bc_counts(2)
     return (f"Boundary set 2 carries {n_h} specified head(s) and {n_f} specified "
             f"flux(es), but this rapid drawdown reads BOTH its stages from the "
-            f"transient march: the drawn-down pool and pore pressures come from the "
+            f"transient seepage analysis: the drawn-down pool and pore pressures come from the "
             f"pool schedule at {when}, on boundary set 1. Set 2 is ignored and "
             f"editing it changes nothing. Clear it, or run the two-steady route -- "
             f"clear the Stage 1 / Stage 2 times {_AT_TSEEP} and solve set 2 on its "
@@ -3762,8 +3762,8 @@ def _rapid_pool_static(ctx):
     return (f"The pool stands at elevation {top1:g} at the stage-1 time "
             f"(t = {_fmt(t1)}{unit}) and at {top2:g} at the stage-2 time "
             f"(t = {_fmt(t2)}{unit}): it does not fall between them. This rapid "
-            f"drawdown reads BOTH its stages from the transient march, so nothing "
-            f"else lowers the water -- the march never lowers the pool, and the "
+            f"drawdown reads BOTH its stages from the transient seepage analysis, so nothing "
+            f"else lowers the water -- the run never lowers the pool, and the "
             f"drawdown answer is the full-pool state read twice, which is too high. "
             f"Bind {label.split(' at elevation')[0]}'s Value to a time series "
             f"that falls across the two stage times {_AT_SEEPBC}, and give the "

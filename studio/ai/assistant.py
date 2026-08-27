@@ -942,7 +942,7 @@ def _settings_line(sd):
 _RESULT_LABELS = (("lem_solution", "an LEM solution"),
                   ("fem_solution", "an FEM/SSRM solution"),
                   ("mesh", "a mesh"),
-                  ("transient_seep", "a transient seepage march"),
+                  ("transient_seep", "a transient seepage solution"),
                   ("fs_vs_time", "an FS-vs-time series"),
                   ("sensitivity", "a sensitivity study"),
                   ("design", "a design study"),

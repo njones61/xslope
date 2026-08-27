@@ -1,6 +1,6 @@
 ---
 title: "Tutorial COMBO-2 — Rapid Drawdown"
-description: "The Johnson Reservoir dam with its pool lowered 50 ft, from elevation 160 to a residual pool at 110 — the Duncan, Wright and Wong three-stage procedure run from three statements of where the water is: a sketched piezometric pair, two steady seepage solutions, and two frames of a transient march, each searching from the same starting circle for a critical surface of its own."
+description: "The Johnson Reservoir dam with its pool lowered 50 ft, from elevation 160 to a residual pool at 110 — the Duncan, Wright and Wong three-stage procedure run from three statements of where the water is: a sketched piezometric pair, two steady seepage solutions, and two frames of a transient seepage analysis, each searching from the same starting circle for a critical surface of its own."
 ---
 
 # Tutorial COMBO-2 — Rapid Drawdown
@@ -37,7 +37,7 @@ set the three answers side by side.
 **Objectives** — Learn what the three-stage rapid-drawdown procedure computes and
 what it needs on the inputs; how to supply its two water states from a
 piezometric pair, from two steady seepage solutions and from two frames of a
-transient march; how to read which stage governed; and what changes the answer
+transient seepage analysis; how to read which stage governed; and what changes the answer
 between the three sources.
 </div>
 <p><span class="tg-pill">three materials</span><span class="tg-pill">rapid drawdown</span><span class="tg-pill">three-stage procedure</span><span class="tg-pill">Kc = 1 envelope</span><span class="tg-pill">d and ψ</span><span class="tg-pill">piezometric lines</span><span class="tg-pill">second boundary set</span><span class="tg-pill">transient seepage</span><span class="tg-pill">stage times</span><span class="tg-pill">automatic water loads</span><span class="tg-pill">Spencer</span><span class="tg-pill">circular search</span><span class="tg-pill">parametric sweep</span></p>
@@ -461,7 +461,7 @@ Both sets solve on one mesh, so we build that first. Click
 lock up on, and no strength reduction runs on this page — the
 [quadratic requirement met in COMBO-1](combo01_seepage_stability.md#one-mesh-for-all-three-analyses)
 comes from the finite element stability engine, not from seepage. Element order
-also sets the cost of the transient march below, which takes thousands of steps
+also sets the cost of the transient run below, which takes thousands of steps
 on whatever mesh it is given.
 
 Leave **Auto-size from geometry** ticked at **100** size divisions, which makes
@@ -584,7 +584,7 @@ drawdown itself is over by day 50 — five days at full pool, then 45 days of
 lowering. A
 transient seepage run resolves that directly — it is a history of pore-pressure
 fields as the reservoir is lowered on a schedule, so the two stage fields are two
-frames read out of one march rather than two independent solves assembled by
+frames read out of one transient run rather than two independent solves assembled by
 hand.
 
 In [SEEP-3](seep03_reservoir_drawdown.md) we build a transient model from
@@ -604,13 +604,13 @@ nothing left to say and the transient route does not consult it.
 Click **Seep BC** and open the **Set 2 (rapid drawdown)** tab. With the top entry
 selected, click **Remove head** twice, which takes out both heads. Select **Exit
 face**, select its rows and click **Remove selected**. Click **OK**. Set 1 is
-untouched: it carries the reservoir boundary the schedule drives, and the march
+untouched: it carries the reservoir boundary the schedule drives, and the transient run
 starts from its steady solution.
 
 Left on the file Set 2 changes nothing the run computes, and the drawdown run
 below adds a second warning, which sorts above the d / ψ one — *"Boundary set 2 carries 2 specified
 head(s) and 0 specified flux(es), but this rapid drawdown reads BOTH its stages
-from the transient march"*:
+from the transient seepage analysis"*:
 
 ![The check on a file that still carries Set 2](images/combo02_studio_run_lem_staged_bc2.png)
 
@@ -644,7 +644,7 @@ the extra times put frames where the regular grid would miss them.
 **Stage 1 time (day)** `0` and **Stage 2 time (day)** `50`. These two fields are
 what a drawdown run reads; in SEEP-3 they are left blank, because a seepage run
 has no use for them. Stage 1 at t = 0 is the full-pool state the
-march starts from; stage 2 at t = 50 is the instant the pool reaches elevation
+transient run starts from; stage 2 at t = 50 is the instant the pool reaches elevation
 110 and stops falling. Both are forced into the saved-frame schedule, so each is a
 *computed* frame rather than a blend of two neighbors. Set both or neither, and
 stage 1 must come before stage 2.
@@ -667,16 +667,16 @@ series-bound value at t = 0, so Set 1 with `pool` bound to it solves at 160 and
 returns the same 1.9566 ft³/day per ft as before, and says so in its log —
 *"Series 'pool' read at t = 0 for the steady solve: reservoir value 160"*.
 
-### Marching it
+### Running the transient seepage analysis
 
-With the schedule and the stage times on the file, we march the transient solve
-from the same seepage dialog. Click **Run → Run Seep…**. The dialog has grown
+With the schedule and the stage times on the file, we run the transient seepage
+analysis from the same seepage dialog. Click **Run → Run Seep…**. The dialog has grown
 a **Run type** selector, which appears only on a file carrying a schedule; set it
 to **Transient (time-dependent)**. **Convergence tol** and **Max iterations** gray
-out — they belong to the steady solve, and the march sets its own step size from
+out — they belong to the steady solve, and the transient run sets its own step size from
 how fast the field is moving. Click **Run**.
 
-The march solves its initial condition first — the same unconfined iteration as
+The run solves its initial condition first — the same unconfined iteration as
 the steady run — and then prints a line per saved frame:
 
 ```text
@@ -742,10 +742,10 @@ ticked. The form has grown the group the schedule adds:
 where the Transient editor stored them, and editing them here changes the model
 the same way editing them there does. They replace the single seepage-time
 selector an ordinary run on a transient model gets, because a drawdown reads two
-instants rather than one; a stage time the solved march never saved re-marches
-with it added to the save schedule.
+instants rather than one; a stage time the solved run never saved is served by
+rerunning the transient seepage analysis with it added to the save schedule.
 
-Click **Run**. The two named frames come out of the solved march and their pore
+Click **Run**. The two named frames come out of the solved run and their pore
 pressures go to the three stages in memory — no `_seep.csv` files are written or
 read, and staged frames take precedence over any that are sitting beside the
 workbook. The two water loads on the face come out of the same schedule: with
@@ -794,7 +794,7 @@ each run searched from that circle for the surface its own water made critical:
 | :---: | --- | :---: | :---: | :---: | :---: | :---: |
 | 1 | Piezometric Lines 1 and 2 | (247.1, 241.6) R 159.2 | 1.4835 | 1.1805 | not required | **1.181** |
 | 2 | Two steady seepage solutions | (245.3, 243.5) R 161.8 | 1.5514 | 1.1949 | not required | **1.195** |
-| 3 | Two frames of a transient march | (243.9, 244.9) R 163.6 | 1.5545 | 1.0164 | 1.0158 | **1.016** |
+| 3 | Two frames of a transient run | (243.9, 244.9) R 163.6 | 1.5545 | 1.0164 | 1.0158 | **1.016** |
 
 The three centers span 5 ft and the three radii 4 ft; all three surfaces daylight
 just past the crest at x = 392 and toe on the upstream foreshore between x = 168 and
@@ -921,12 +921,12 @@ This tutorial covered:
 - The three inputs it needs: $d$ and $\psi$ on every material that does not drain,
   a second statement of where the water is, and **Water loads** on `auto`.
 - Three sources for that second statement on one dam — a piezometric pair, two
-  steady seepage solutions, two frames of a transient march — reading 1.181, 1.195
+  steady seepage solutions, two frames of a transient run — reading 1.181, 1.195
   and 1.016, the first two governed by stage 2 and the third by stage 3.
 - What the spread is made of: 0.20 for the load removal alone, a further 0.28 for
   the head the core has not released by day 50, and 0.12 or 0.02 for the undrained
   strength depending on which field it is applied to.
-- The ranking of the three: solve the march where it can be had, take two steady
+- The ranking of the three: run the transient analysis where it can be had, take two steady
   solves as the long-term case, and read a piezometric pair as the state Line 2
   was drawn from.
 - The governing stage as a property of the material rather than the method:

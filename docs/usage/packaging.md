@@ -12,7 +12,7 @@ the workbook, named after it:
 | `{base}_mesh.json` | Build Mesh | the finite element mesh |
 | `{base}_seep.csv` | a steady seepage run | the pore-pressure field |
 | `{base}_seep2.csv` | a rapid-drawdown run | the drawn-down field (stage 2) |
-| `{base}_tseep.csv`, `{base}_tseep_meta.json` | a transient seepage run | every frame of the march |
+| `{base}_tseep.csv`, `{base}_tseep_meta.json` | a transient seepage run | every saved frame |
 | `{base}_fem_*.csv`, `{base}_fem_meta.json` | an FEM or SSRM run | nodal and element results, member forces |
 
 The workbook is loaded by name and the sidecars follow it automatically — opening

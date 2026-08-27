@@ -7199,7 +7199,7 @@ def _tseep_fmt(v):
 
 TSEEP_HELP = {
     "duration": "Total simulated time of the run, in the model's declared Time unit. "
-                "The march ends here — scheduled times beyond the duration are never "
+                "The run ends here — scheduled times beyond the duration are never "
                 "reached.",
     "save_interval": "Spacing of the regularly-saved frames (one every interval, up to "
                      "the duration). The saved set is the UNION of this grid, the extra "
@@ -7210,8 +7210,8 @@ TSEEP_HELP = {
     "stage_2": "Rapid-drawdown STAGE 2 time — must be later than Stage 1. Set BOTH "
                "stage times, or neither.",
     "stability_time": "Which instant an LEM or FEM run with u = seep reads its pore "
-                      "pressures from. It selects a frame out of the march; it does "
-                      "not change the march. Leave it blank and a run reads the LAST "
+                      "pressures from. It selects a frame out of the transient solution; it "
+                      "does not change it. Leave it blank and a run reads the LAST "
                       "saved frame. The Run LEM and Run FEM dialogs set it too — this "
                       "is the same value.",
     "time": "The shared time axis for every series (ascending, in the Time unit). A "
@@ -7579,7 +7579,7 @@ class TransientDialog(QDialog):
                 QMessageBox.warning(
                     self, "Transient seepage",
                     "The stability time must be greater than 0 and no later than the "
-                    "run duration — the march never reaches an instant outside it.")
+                    "run duration — the run never reaches an instant outside it.")
                 return
         super().accept()
 

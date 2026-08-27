@@ -175,9 +175,9 @@ ran), `times`, `n_failed`, and `solution`. `xslope.plot.plot_fs_vs_time` draws t
 directly: the curve, its lowest instant annotated, and the model's drawdown schedule behind
 it. In Studio the same run is the Parametric dialog's
 [Factor of safety vs time](../studio/analysis.md#factor-of-safety-vs-time) mode, where the
-instants are ticked off the loaded march and the curve opens in an **FS vs Time** tab.
+instants are ticked off the loaded transient solution and the curve opens in an **FS vs Time** tab.
 
-When the march is done the run prints its own table — one aligned row per evaluated instant,
+When the sweep is done the run prints its own table — one aligned row per evaluated instant,
 carrying the factor of safety, the circle it was found on, and (on a drawdown curve) the
 three stage values and which stage governed. An instant that produced nothing carries its
 reason on its row. The same rows come back as `result['table']` (a list of dicts) and the
@@ -194,12 +194,12 @@ analysis:
 ok, result = fs_vs_time(slope_data, transient_solution, rapid=True)
 ```
 
-Stage 1 is the march's **initial** state — the `tseep` sheet's `stage_1` (normally t = 0 at
+Stage 1 is the transient run's **initial** state — the `tseep` sheet's `stage_1` (normally t = 0 at
 full pool), or the earliest saved frame where the sheet names none — and stage 2 is the frame
 at *t*, with stage 3 re-checking the drawn-down section against drained strengths where they
 are the lower. The reported value is the drawdown's own, the lower of stages 2 and 3, so the
 curve answers *how safe is this slope if the pool falls to where it stands at t* — asked
-against pore pressures the march computed rather than a single assumed drawn-down state. The
+against pore pressures the transient run computed rather than a single assumed drawn-down state. The
 rows carry `stage1_FS`, `stage2_FS`, `stage3_FS`, `stage3_run` and `governs` beside `fs`, and
 `plot_fs_vs_time` draws the three stages as thin dashed lines behind the reported curve.
 
@@ -218,9 +218,9 @@ and comes back as a `success=False` row saying so. `mode='fem'` is refused: the 
 procedure is a limit-equilibrium construction with no SSRM equivalent.
 
 **The instant is never interpolated.** A time that names no saved frame is served by
-re-marching with that instant injected into the saved schedule — pass `seep_data=` to
-allow it, and the whole set of missing times is served by *one* re-march before the first
-solve. Without `seep_data` such a time becomes a `success=False` row saying so. A field
+rerunning the transient seepage analysis with that instant injected into the saved schedule —
+pass `seep_data=` to allow it, and the whole set of missing times is served by *one* rerun
+before the first solve. Without `seep_data` such a time becomes a `success=False` row saying so. A field
 blended between two frames is not a solution of anything, which is why the mode declines
 to invent one.
 

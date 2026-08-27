@@ -468,7 +468,7 @@ class SeepRunner(RunnerThread):
                 tseep_data = dict(tseep_data)
                 tseep_data["save_times"] = sorted(
                     set(tseep_data.get("save_times") or []) | set(extra))
-                print("Re-marching with extra save time(s): "
+                print("Re-running the transient seepage analysis with extra save time(s): "
                       + ", ".join(f"{t:g}" for t in extra))
             print("Running transient seepage analysis…")
             time_unit = sd.get("time_unit")
@@ -855,7 +855,7 @@ class SensitivityRunner(RunnerThread):
         search_opts = {"seed": "grid"} if grid_seed else None
         what = "Rapid drawdown vs time" if rapid else "Factor of safety vs time"
         print(f"{what} ({emode}): {total} instant(s) of the "
-              f"transient march, {engine_tag}, "
+              f"transient solution, {engine_tag}, "
               f"{'re-searching' if (rapid or o.get('search', True)) else 'on the entered surface'} "
               f"at each{', grid-seeded' if grid_seed else ''}…")
         ok, res = fs_vs_time(self._sd, self._transient, times=times, mode=emode,

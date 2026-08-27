@@ -76,13 +76,13 @@ range across the pair**, with both flow nets scaled to one zone. A contour then
 means the same head in both, a flow channel the same flow, and the drawdown is
 the difference between the two figures.
 
-**A transient march** ([Transient Seepage](../seep/transient.md)) is documented
+**A transient seepage analysis** ([Transient Seepage](../seep/transient.md)) is documented
 at a few of its saved states — four by default. The first and the last are two
 of them; the rest are weighted onto the interval the reservoir level falls over,
 so a drawdown report shows the drawdown happening rather than its two ends, and
-a march no level falls in is spaced evenly through the states it saved. Each
+a run no level falls in is spaced evenly through the states it saved. Each
 state is drawn for the same four fields, on one colour scale across every state
-so the march can be read down the page. A history figure closes the
+so the run can be read down the page. A history figure closes the
 section: the level the reservoir boundary is held at, the phreatic elevation and
 the top of the seepage face above it, and the boundary inflow and outflow below.
 
@@ -417,7 +417,7 @@ and its default is declared in `xslope.report.DEFAULT_OPTIONS`, including a few
 the dialog does not offer:
 
 - `method` — which methods get a full block. A name or a list of them.
-- `seep_transient_frames` — how many saved states of a transient march are
+- `seep_transient_frames` — how many saved states of a transient run are
   documented. Four by default.
 - `progress` — a callable, called `progress(done, total, label)` once per
   figure; `planned_figures()` gives the same total up front.

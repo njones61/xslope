@@ -1066,7 +1066,7 @@ solved and locked as a third frame.
 **The two solutions agree on the shape of the steady profile and on the timing of the
 approach to it, and differ by about 0.2 m of head along it.** XSLOPE's
 steady toe-slope profile lands within 0.21 m of Fig 20.5's 19656 h curve at every station,
-and the 19656 h frame of the transient march itself is within 0.197 m rms / 0.283 m worst of
+and the 19656 h frame of the transient run itself is within 0.197 m rms / 0.283 m worst of
 that curve — at the ≈0.2 m the chart can be read to in rms, and past it over the upper third
 of the slope, where XSLOPE sits below the digitized curve by about 0.28 m. By 19656 h
 XSLOPE has closed to
@@ -1189,7 +1189,7 @@ against the model's initial total head of 0.300, so the digitization is good to 
 **RS2 is at steady state by 208 s; XSLOPE arrives around 400 s.** RS2's 208 s markers sit on
 the steady field — XSLOPE's own steady solve of the identical slope ([GW7](#gw7)) reproduces
 them to 0.005 m rms over 21 stations, which is where GW7's numeric lock now comes from.
-XSLOPE's *transient* march is not quite there at 208 s: it is still 0.105 m rms below,
+XSLOPE's *transient* run is not quite there at 208 s: it is still 0.105 m rms below,
 uniformly along the whole line (0.096 to 0.126 m at every station). It reaches the profile by
 400 s and then holds it:
 

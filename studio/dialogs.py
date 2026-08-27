@@ -183,11 +183,11 @@ class SeepageTimeSelector(QGroupBox):
         self.mode.addItem("Saved frame", "saved")
         if self._current_time is not None:
             self.mode.addItem("Frame shown in the results viewer", "current")
-        self.mode.addItem("Another time (re-marches the solution)", "other")
+        self.mode.addItem("Another time (reruns the analysis)", "other")
         self.mode.setToolTip(
             "A saved frame and the viewer's frame are instant — the pore pressures "
-            "already exist. Another time re-runs the transient march with that "
-            "instant added to the save schedule, because a field between two frames "
+            "already exist. Another time re-runs the transient seepage analysis with "
+            "that instant added to the save schedule, because a field between two frames "
             "is not a solution of anything and is never interpolated.")
         form.addRow("Time", self.mode)
 
@@ -271,17 +271,17 @@ class SeepageTimeSelector(QGroupBox):
             if self._duration is not None and not (0 < raw <= float(self._duration)):
                 self.note.setText(
                     f"t = {_fmt_time(raw)}{self._unit} is outside the run "
-                    f"(0 to {_fmt_time(self._duration)}{self._unit}); the march "
+                    f"(0 to {_fmt_time(self._duration)}{self._unit}); the run "
                     f"cannot land on it.")
                 return
             if self._nearest_index(raw) is not None:
                 self.note.setText(f"t = {_fmt_time(raw)}{self._unit} is already a "
-                                  f"saved frame — no re-march needed.")
+                                  f"saved frame — nothing to re-solve.")
                 return
             self.note.setText(
                 f"t = {_fmt_time(raw)}{self._unit} is not a saved frame. The run "
-                f"re-marches the transient solution with this instant added to the "
-                f"save schedule — a full re-solve, which on a long march takes "
+                f"re-runs the transient seepage analysis with this instant added to "
+                f"the save schedule — a full re-solve, which on a long run takes "
                 f"minutes. It reports progress and can be cancelled.")
             return
         if mode == "current":
@@ -411,8 +411,8 @@ class StageTimeFields(QGroupBox):
             return
         self.note.setText(
             "Stored on the tseep sheet, so a scripted run reads the same two "
-            "instants. A stage time the loaded solution never saved re-marches the "
-            "transient march with it added to the save schedule.")
+            "instants. A stage time the loaded solution never saved re-runs the "
+            "transient seepage analysis with it added to the save schedule.")
 
     def values(self):
         """``(stage_1, stage_2)`` as floats or ``None``; ``'bad'`` for a typo."""
@@ -2027,7 +2027,7 @@ class SensitivityDialog(QDialog):
         v.addLayout(row)
 
         self.times = QListWidget(page)
-        self.times.setToolTip("The instants the transient march saved. Each ticked "
+        self.times.setToolTip("The instants the transient run saved. Each ticked "
                               "one is a full stability run.")
         unit = f" {self._time_unit}" if self._time_unit else ""
         remembered = defaults.get("times")
@@ -2049,7 +2049,7 @@ class SensitivityDialog(QDialog):
         self.rapid = QCheckBox("Rapid drawdown at each time")
         self.rapid.setToolTip(self._rapid_time_reason or (
             f"On: every ticked instant is a three-stage Duncan-Wright-Brandon "
-            f"rapid drawdown — stage 1 the march's initial state at "
+            f"rapid drawdown — stage 1 the transient run's initial state at "
             f"t = {_fmt_time(self._stage_1)}{unit_txt} (full pool), stage 2 that "
             f"instant's drawn-down state, stage 3 the same section re-checked with "
             f"drained strengths. The curve reports the drawdown's own factor of "
@@ -2234,8 +2234,8 @@ class SensitivityDialog(QDialog):
             if self.rapid.isChecked():
                 self.note.setText(
                     f"Rapid drawdown vs time: one three-stage drawdown per ticked "
-                    f"instant of the transient seepage march — {n} of "
-                    f"{len(self._times)} saved frames. Stage 1 is the march's "
+                    f"instant of the transient seepage run — {n} of "
+                    f"{len(self._times)} saved frames. Stage 1 is that run's "
                     f"initial state at t = {_fmt_time(self._stage_1)}{unit} and "
                     f"stage 2 is that instant, so the curve answers how safe the "
                     f"slope is if the pool falls to where it stands then. Each "
@@ -2244,7 +2244,7 @@ class SensitivityDialog(QDialog):
             else:
                 self.note.setText(
                     f"Factor of safety vs time: one stability run per ticked instant "
-                    f"of the transient seepage march — {n} of {len(self._times)} "
+                    f"of the transient seepage run — {n} of {len(self._times)} "
                     f"saved frames. No input changes between the points; each "
                     f"solves the same model against that instant's pore pressures, "
                     f"and the reservoir load is re-derived from the pool as it stood "

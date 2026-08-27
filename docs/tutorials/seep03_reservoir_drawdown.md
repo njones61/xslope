@@ -11,7 +11,7 @@ analysis adds to a steady one. Two of the additions are things the modeler
 supplies: the **storage properties** that decide how much water a soil gives up
 as the head in it falls, and the **schedule** that states when the boundary moves
 and which instants get saved. A third is computed rather than entered — the
-**initial condition** the march starts from. And the answer comes back as a
+**initial condition** the transient run starts from. And the answer comes back as a
 sequence rather than as a picture, so we close on how one is read: as
 frames on a play bar, as a head history at a point, and as a ledger of water
 crossing the boundary against water leaving storage.
@@ -122,12 +122,12 @@ the water table never reaches still gives up its elastic storage.
 [Storage properties](../seep/transient.md#storage) carries both with typical
 values by soil type and the form the storage coefficient takes between them.
 
-### The initial condition and the march
+### The initial condition and the transient run
 
 A field that changes with time has to start somewhere. XSLOPE computes the
 starting field as a **steady solve at the t = 0 boundary configuration** — the
 series are evaluated at time zero and the ordinary steady solver is run — so the
-march begins from a genuine steady state rather than from a guess. The
+run begins from a genuine steady state rather than from a guess. The
 [initial conditions](../seep/transient.md#initial-conditions) section states the
 rule, and it is why we solve the full-pool steady problem before building
 the schedule: that solution *is* the first frame.
@@ -322,7 +322,7 @@ markers.
 ## The steady solution at full pool
 
 Before the pool moves, the dam is in steady state under 18 m of water, and that
-state is the field the march will start from. Solving it now serves a second
+state is the field the transient run will start from. Solving it now serves a second
 purpose as well: it is the reference we read every transient number on this page
 against.
 
@@ -428,14 +428,14 @@ first and after the last, so those three rows are the entire schedule drawn at t
 of this page: flat at 18 from the start of the run through day 2, straight down to
 2 by day 47, and flat at 2 from there to the end. The first row
 matters twice over, because the initial condition is a steady solve at the t = 0
-value, so `0, 18` is what makes the march start from the full-pool solution
+value, so `0, 18` is what makes the run start from the full-pool solution
 computed above. The second row buys a check: with the pool still at 18 on day 2,
 the frame saved there should show a field that has not moved. Repeating a *time*
 on two rows instead, with two different values, would give a vertical step rather
 than a ramp; [time series](../seep/transient.md#time-series) has the full set of
 breakpoint rules.
 
-**Duration (day).** Set it to `360`. This is how long the march runs, and the
+**Duration (day).** Set it to `360`. This is how long the run lasts, and the
 right value is one that carries the answer past the question being asked. Here the
 drawdown itself is over on day 47, but the dam goes on draining for months
 afterward, and 360 days is long enough for the outflow to fall to two thousandths
@@ -508,7 +508,7 @@ Save the model. The completed file calls it `xslope_earth_dam_drawdown.xlsx`.
 
 ---
 
-## Running the transient march
+## Running the transient seepage analysis
 
 Click **Run → Run Seep…** again. The dialog has grown a control since the steady
 run:
@@ -516,13 +516,13 @@ run:
 ![The Run Seepage dialog with a transient run selected](images/seep03_studio_run_seep.png)
 
 **Run type** appears only on a file that carries a schedule, and it offers the
-choice between solving the model as it stands and marching it through the
+choice between solving the model as it stands and stepping it through the
 schedule. Set it to **Transient (time-dependent)**.
 
 **Convergence tol** and **Max iterations** gray out the moment **Transient** is
 chosen, and there is nothing to do to them. They belong to the steady solve — the
 nonlinear iteration we measured on the unconfined problem in SEEP-2 — while the
-march carries its own step-size and iteration controls and sets them from how
+transient run carries its own step-size and iteration controls and sets them from how
 fast the field is moving.
 
 The **Model checks** panel reports **No problems found for this run.** with
@@ -531,7 +531,7 @@ the material table stated back: both materials have `k1` ≠ `k2` with `alpha`
 blank, so the major conductivity is taken along +x on each. That is what this
 model intends, so the notes are confirmation rather than a problem.
 
-Click **Run**. The march first solves its initial condition — the same unconfined
+Click **Run**. The run first solves its initial condition — the same unconfined
 iteration as the steady run above, at the tighter tolerance it sets for itself —
 and then prints a line per saved frame:
 
@@ -713,7 +713,7 @@ from. Each saved frame reports the flow across the boundary in each direction:
 
 The first two rows are the check the two-day hold was entered for: inflow equals
 outflow at **0.16488**, which is the steady discharge computed at full pool, and it
-is unchanged on day 2. The march starts from a genuine steady state and sits in it
+is unchanged on day 2. The run starts from a genuine steady state and sits in it
 until the pool is asked to move.
 
 **The inflow then goes to zero and stays there.** Once the level starts falling,
@@ -739,7 +739,7 @@ The solver also keeps a running ledger of the whole run, which is the transient
 counterpart of the steady solver's flow-closure check. Over the 360 days,
 **105.109 m³ per m of dam crossed the boundary outward**, and the soil released
 **105.828 m³ per m** from storage. Those two are the same volume counted two
-ways, so their difference is a measure of how well the march conserved water: over
+ways, so their difference is a measure of how well the run conserved water: over
 the whole run it comes to **0.7% of the volume transferred**. That difference is
 the `mass-balance closure` printed on each frame line of the log — a running
 figure, the imbalance accumulated up to that instant rather than the frame's own.

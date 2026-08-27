@@ -6705,8 +6705,8 @@ def _combo03r_compare(model, rapid_res, plain_res):
     ax.set_xlabel("time (%s)" % _u["time"])
     ax.set_ylabel("factor of safety")
     ax.grid(alpha=0.25)
-    ax.set_title("Two analyses of one march: the drawdown answer and the "
-                 "single-stage answer", fontsize=11.5)
+    ax.set_title("Two analyses of one transient run: the drawdown answer and "
+                 "the single-stage answer", fontsize=11.5)
 
     pool = ax.twinx()
     tt = [float(t) for t in ts["times"]]

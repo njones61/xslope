@@ -22,7 +22,7 @@ weakest. It shares the machinery above and needs no parameter reference at all �
 is substituted, because each point solves the same model against a different computed
 pore-pressure field. Studio offers it as the Parametric dialog's
 [Factor of safety vs time](../studio/analysis.md#factor-of-safety-vs-time) mode, which
-ticks the march's saved frames and draws the curve in an **FS vs Time** result tab.
+ticks the transient run's saved frames and draws the curve in an **FS vs Time** result tab.
 
 This is the geotechnical staple — Duncan & Wright present exactly these charts (FS vs
 parameter, and tornado diagrams comparing several parameters at their low/high bounds) —

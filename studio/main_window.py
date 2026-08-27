@@ -2175,7 +2175,7 @@ class MainWindow(QMainWindow):
         # A re-march started for a stability run takes that run down with it.
         if self._pending_run is not None:
             self._pending_run = None
-            self.statusBar().showMessage("Re-march cancelled — the analysis was not run.")
+            self.statusBar().showMessage("Seepage re-run cancelled — the analysis was not run.")
             return
         self.statusBar().showMessage("Run cancelled.")
 
@@ -2217,13 +2217,13 @@ class MainWindow(QMainWindow):
         unit = self.doc.slope_data.get("time_unit")
         listed = ", ".join(f"t = {t:g}" + (f" {unit}" if unit else "") for t in times)
         if QMessageBox.question(
-                self, "Re-march the transient solution",
+                self, "Re-run the transient seepage analysis",
                 f"The loaded transient solution has no saved frame at {listed}.\n\n"
                 f"Pore pressures are never interpolated between frames, so the "
-                f"transient march will be re-run with {'this instant' if len(times) == 1 else 'these instants'} "
+                f"transient seepage analysis will be re-run with {'this instant' if len(times) == 1 else 'these instants'} "
                 f"added to the save schedule, and the analysis will start when it "
-                f"finishes. A re-march is a full re-solve — seconds on a short march, "
-                f"minutes on a long one. It can be cancelled.\n\nRe-march now?",
+                f"finishes. It is a full re-solve — seconds on a short run, "
+                f"minutes on a long one. It can be cancelled.\n\nRe-run now?",
                 QMessageBox.Yes | QMessageBox.Cancel,
                 QMessageBox.Yes) != QMessageBox.Yes:
             return
@@ -2232,7 +2232,7 @@ class MainWindow(QMainWindow):
         opts = {"mode": "transient", "bc": 1,
                 "tol": (self._last_seep_opts or {}).get("tol", 1e-4),
                 "extra_save_times": [float(t) for t in times]}
-        self.statusBar().showMessage("Re-marching transient seepage …")
+        self.statusBar().showMessage("Re-running transient seepage …")
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)

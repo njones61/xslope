@@ -7992,7 +7992,7 @@ def test_the_equation_is_cited_for_what_it_is():
             if "symbols of the derivation published" in intro.text:
                 fails.append(f"{method}: cites the derivation for an equation "
                              f"that page does not publish: {intro.text!r}")
-            if "march" not in intro.text:
+            if "sweep" not in intro.text:
                 fails.append(f"{method}: the derivation is linked without "
                              f"saying what it derives: {intro.text!r}")
             fails += _quotient_is_introduced(section, method)
@@ -8013,14 +8013,14 @@ def test_the_equation_is_cited_for_what_it_is():
 #: the balance that holds at the value it reaches", two pronouns pointing
 #: opposite ways in five words: "this" forward to the equation about to be
 #: printed, "it" back past the balance to the march.
-_QUOTIENT_LEAD = ("Summing the march's equation (6) over the slices",
+_QUOTIENT_LEAD = ("Summing the per-slice equation (6) over the slices",
                   "cancels the interslice forces",
                   "horizontal equilibrium of the whole sliding mass",
                   "equation (12) of the force-equilibrium derivation",
                   "not solved directly for F",
-                  "The march is what solves for F",
+                  "The sweep is what solves for F",
                   "equation (12) is the balance that holds at the factor of "
-                  "safety the march reaches")
+                  "safety the sweep reaches")
 
 
 def _quotient_is_introduced(section, method):
@@ -12264,11 +12264,11 @@ def test_tseep_section():
     # sentence said "The march runs from t = 0 to t = 360 day and saved 12
     # states" — half of it present, and a duration carrying the unit label as an
     # axis carries it rather than as an amount of time.
-    want = (f"The march ran from t = 0 to t = {ledger['duration']:g} days and "
+    want = (f"The analysis ran from t = 0 to t = {ledger['duration']:g} days and "
             f"saved {len(ledger['times']):,} states.")
     if want not in text:
         fails.append(f"the march is not stated as {want!r}: {text!r}")
-    if "The march runs" in text:
+    if "The analysis runs" in text:
         fails.append(f"the march is described in the present tense: {text!r}")
     if f"{ledger['duration']:g} day " in text:
         fails.append(f"a duration of {ledger['duration']:g} is given in the "
@@ -12375,7 +12375,7 @@ def test_tseep_mesh_figure_marks_what_it_says():
                          f"specified-head node while the {n_face} of the "
                          f"reservoir face are drawn as plain mesh: {lead!r}")
         want = (f"The {n_face:,} nodes of the reservoir face are not marked: each "
-                f"takes its boundary type at every step of the march")
+                f"takes its boundary type at every step of the run")
         if want not in lead:
             fails.append(f"{name}: the inputs never say the reservoir face is "
                          f"unmarked, or why: {lead!r}")

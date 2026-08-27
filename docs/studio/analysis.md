@@ -216,12 +216,12 @@ back-calculated strength, most commonly). The controls are identical to Design.
 ### Factor of safety vs time
 
 The fourth mode sweeps the saved instants of a
-[transient seepage](../seep/transient.md) march instead of a parameter. Each point solves
+[transient seepage](../seep/transient.md) analysis instead of a parameter. Each point solves
 the same model against that instant's pore pressures — no input changes between them, so
 the axis is time — and the reservoir load is re-derived from the pool as it stood at that
 moment. The parameter picker steps aside and a **Saved frames** checklist takes its place,
-listing every instant the march stored with all of them ticked; **All** and **None** set the
-whole list, and unticking samples a long march, each frame being a full stability run. The
+listing every instant the run stored with all of them ticked; **All** and **None** set the
+whole list, and unticking samples a long one, each frame being a full stability run. The
 **Method**, **Number of slices** and **Re-search the critical surface at each step**
 controls apply as they do everywhere else, and the circles sheet's search window is
 applied, which is what keeps the curve on one mechanism rather than letting it jump
@@ -237,7 +237,7 @@ upstream face governs during a drawdown, for instance:
 
 A **Rapid drawdown at each time** checkbox below the frames list turns every ticked instant
 into a three-stage [rapid drawdown](../lem/rapid.md) instead of a single-stage
-analysis: stage 1 is the march's initial state (the `tseep` sheet's `stage_1`, normally
+analysis: stage 1 is the transient run's initial state (the `tseep` sheet's `stage_1`, normally
 t = 0 at full pool), stage 2 is that instant's drawn-down state, and stage 3 re-checks the
 same section with drained strengths. The reported value is the drawdown's own — the lower of
 stages 2 and 3 — so the curve answers *how safe is this slope if the pool falls to where it
@@ -293,7 +293,7 @@ same tab, with the target at FS = 1.0):
 **Factor of safety vs time** opens an **FS vs Time** tab: the factor of safety at each
 evaluated instant as a line with a marker per point, the lowest of them ringed and
 annotated with its own time, and the model's `tseep` time series — the drawdown schedule
-that drives the curve — drawn faintly behind it on a second axis. When the march is done the
+that drives the curve — drawn faintly behind it on a second axis. When the sweep is done the
 per-instant table (time, factor of safety, the critical circle) is printed to the
 [Log pane](interface.md#the-log-pane), and an instant that produced no result appears there
 with its reason rather than as a gap in the line. A **rapid drawdown** run opens the same tab
@@ -513,9 +513,9 @@ so the dialog carries no stage fields, only a caption pointing there.
 
 ![Run Seep dialog in Transient mode](images/analysis_run_seep_transient.png)
 
-Because the march covers a known duration, the run reports **determinate progress** —
+Because the run covers a known duration, it reports **determinate progress** —
 the status bar's progress bar tracks the simulated-time fraction (`t / duration`) —
-and a **Cancel** button beside it stops the march cleanly; a cancelled run stores no
+and a **Cancel** button beside it stops the run cleanly; a cancelled run stores no
 partial result and returns the UI to idle.
 
 The run produces a single **Seep · Transient** tab that shows one frame at a time
@@ -566,8 +566,8 @@ instant:
   displaying. Also instant, and offered only while that tab is open.
 - **Another time** — any instant within the run duration. The pore pressures for it
   do not exist yet and are never interpolated between frames, so choosing it
-  **re-marches** the transient solution with that instant added to the save schedule,
-  then starts the analysis. The dialog says so before you commit, the re-march reports
+  **reruns** the transient seepage analysis with that instant added to the save schedule,
+  then starts the stability analysis. The dialog says so before you commit, the rerun reports
   progress, and it can be cancelled — cancelling it abandons the analysis too.
 
 The group opens on the model's own `stability_time` when the tseep sheet declares one,
@@ -598,7 +598,7 @@ checks refuse as they would on any other model: run the seepage analysis first.
 
 Ticking **Rapid drawdown** in the Run LEM dialog replaces the single-instant selector
 with **Stage 1 time** and **Stage 2 time**, pre-filled from the model. These are the
-two instants the drawdown stages read out of the march — pure extraction parameters,
+two instants the drawdown stages read out of the transient solution — pure extraction parameters,
 since the drawdown schedule itself lives in the boundary conditions — so they are
 edited here, at the point of use, as well as under
 [Inputs → Transient](editing.md#transient-seepage). Both places write the same two
@@ -606,7 +606,7 @@ values on the tseep sheet, and an edit here lands in the model immediately.
 
 Run refuses stage times it cannot use — one blank, stage 2 at or before stage 1, or a
 stage beyond the run duration — and says which. Stage times the loaded solution never
-saved trigger the same re-march as a free-entry seepage time.
+saved trigger the same rerun as a free-entry seepage time.
 
 ---
 

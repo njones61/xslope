@@ -2548,10 +2548,10 @@ The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn
 yield is released over the pressure band *h*<sub>0</sub> < ψ < 0, so on a 2.5 m mesh the file's
 *h*<sub>0</sub> = −1.0 m is narrower than one element — the same under-resolution
 [VP77](#vp77) fixes by setting *h*<sub>0</sub> to roughly one element of its own seepage mesh.
-Porting that rule here means *h*<sub>0</sub> = −2.5 m, and it is worth almost nothing: re-marching
+Porting that rule here means *h*<sub>0</sub> = −2.5 m, and it is worth almost nothing: re-running
 the drawdown returns Spencer **2.051** at 300 h against the committed field's **2.045**, i.e. −2.0%
 against Slide2's 2.092 where the committed field gives −2.2%. An eighth of the residual, not the
-residual. Widening it further is not free either: at *h*<sub>0</sub> = −5.0 m the 1500 h march does
+residual. Widening it further is not free either: at *h*<sub>0</sub> = −5.0 m the 1500 h run does
 not converge at all. VP77's other half cannot port either: it solves its flow on a
 tri3 mesh because "tri6 midside k<sub>r</sub> sampling whips the front", and here the snapshot mesh
 is the mesh the [strength-reduction rows](rs2.md#p4-vp102) consume, so it has to stay quadratic.

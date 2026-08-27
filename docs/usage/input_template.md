@@ -1090,8 +1090,8 @@ repeating a time on two consecutive rows with different values.
   drawdown; if you set one you must set the other, with `stage_1` earlier than `stage_2`.
 - **stability_time** — **[t]**: the optional instant that a single-time
   [LEM or FEM stability analysis](../seep/transient.md#stability-time) with `u = seep` reads its
-  pore pressures from. Like the stage times it selects a frame out of the march rather than
-  changing the march, and the stepper is forced to land on it. **Leave it blank and a stability
+  pore pressures from. Like the stage times it selects a frame out of the transient solution rather than
+  changing it, and the stepper is forced to land on it. **Leave it blank and a stability
   run reads the LAST saved frame** — usually the drained end state. A run started from Studio can
   name a different instant for that run alone; storing it here is what makes a scripted or
   headless re-run read the same frame. (Version 22 and later.)

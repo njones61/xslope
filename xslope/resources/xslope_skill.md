@@ -201,8 +201,8 @@ If the user asks to **run an analysis** (and an input file already exists):
 
 Every solver entry point gates on the input checks. If a run is **refused**, read the message —
 it names the sheet and the cell — fix the input, and re-run; do not switch the check off. See
-"Input Checks" below. If the model carries a **transient** seepage march, stage the frame the
-run reads before solving — see "Stability at one instant of a transient march".
+"Input Checks" below. If the model carries a **transient** seepage solution, stage the frame the
+run reads before solving — see "Stability at one instant of a transient run".
 
 **IMPORTANT — Show all plots.** Each analysis produces multiple plots at different stages. You MUST
 display every plot to the user, not just the final result. The full plot sequence for each analysis type is:
@@ -1133,7 +1133,7 @@ print(report.format())                 # report.ok / .errors / .warnings / .info
 `selection` dict states what the run chose where the model does not say: `method`, `surface`
 (`"circular"` / `"noncircular"`), `search`, `base` (for a sweep), and `seep_frame`.
 
-**Transient models:** with `u = 'seep'` against a transient march the pore pressures are not in
+**Transient models:** with `u = 'seep'` against a transient solution the pore pressures are not in
 the file, so stage the frame BEFORE the check (`apply_transient_stability_frame`) and the gate
 sees the field. To check first instead, declare the frame that is coming —
 `selection={"seep_frame": {"times": [30.0]}}` (two instants for a rapid drawdown). A staged frame
@@ -1497,12 +1497,12 @@ ok, res = design(slope_data, {"seep_bc": {"set": 1, "head_index": 0}},
                  low=3.0, high=8.0, steps=11, target_fs=6e-6, mode="seep")
 ```
 
-#### FS vs time: the factor of safety across a transient march
+#### FS vs time: the factor of safety across a transient run
 
 The coupled-analysis curve the vendors publish. `fs_vs_time` runs a stability analysis against
 **every saved frame** of a transient seepage solution and tabulates the result. No input is
 modified at any step — the axis is time, and each point solves the same model against a
-different computed pore-pressure field. **Recommend it whenever a model has a transient march
+different computed pore-pressure field. **Recommend it whenever a model has a transient solution
 and the user asks when the slope is most at risk**, rather than reporting the FS at one instant.
 
 ```python
@@ -1515,25 +1515,25 @@ plot_sensitivity(res["df"], save_png=True)      # x-axis is time; param == 'time
 ```
 
 - `times=` restricts (or extends) the set; the default is every saved frame. An instant with no
-  saved frame is served by ONE re-march with all of them injected (`seep_data=seep_data`,
-  `remarch=True`) — otherwise it is a `success=False` row saying so. Never interpolated.
+  saved frame is served by ONE rerun of the transient seepage analysis with all of them injected
+  (`seep_data=seep_data`, `remarch=True`) — otherwise it is a `success=False` row saying so. Never interpolated.
 - `search=True` is the right default here: the critical surface MOVES as the pore pressures
   change, and that is the phenomenon. Use `search_opts` (or the file's window) to hold the curve
   on one mechanism.
 - `mode='fem'` runs a full SSRM per frame — minutes each, so restrict `times`. `mode='seep'` is
   refused: the seepage solution is this run's input.
-- `rapid=True` makes every instant a three-stage rapid drawdown instead: stage 1 the march's
-  initial state (`tseep` `stage_1`, normally t = 0 at full pool), stage 2 the frame at t, and the
+- `rapid=True` makes every instant a three-stage rapid drawdown instead: stage 1 the transient
+  run's initial state (`tseep` `stage_1`, normally t = 0 at full pool), stage 2 the frame at t, and the
   reported value the drawdown's own — the lower of stages 2 and 3. Rows gain `stage1_FS`,
   `stage2_FS`, `stage3_FS`, `stage3_run` and `governs`. LEM only; every point is an auto search
   from the starting circle, so `search` is not consulted. Use it when the question is "how safe
   is the slope if the pool falls to where it stands at t"; leave it off for "how safe is the
   slope in the state it is in at t".
-- The run prints an aligned per-instant table when the march is done (t, FS, the critical
+- The run prints an aligned per-instant table when the sweep is done (t, FS, the critical
   circle; the three stages and the governing one in rapid mode). The same rows come back on
   `res['table']` and the printed block on `res['table_text']`; `print_table=False` silences it.
 - `res` also carries `'times'`, `'critical'` (per method), `'n_failed'`, `'remarched'` and
-  `'solution'` — keep the returned solution if it re-marched, rather than paying twice.
+  `'solution'` — keep the returned solution if the analysis was re-run, rather than paying twice.
 
 #### Tornado: rank several parameters
 
@@ -1695,7 +1695,7 @@ i = transient_frame_index(solution, 47.0)          # plot ONE saved frame
 plot_seep_solution(seep_data, solution["frames"][i], variable="u",
                    flowlines=False, vectors=True, phreatic=True, save_png=True)
 export_transient_solution(seep_data, solution, "earth_dam", input_file=input_file)
-# import_transient_solution(seep_data, "earth_dam") reads it back — a march is expensive,
+# import_transient_solution(seep_data, "earth_dam") reads it back — a transient run is expensive,
 # so export it once and reuse it rather than re-solving for each stability question.
 ```
 
@@ -1717,9 +1717,9 @@ h = [f["head"][i] for f in solution["frames"]]                          # or f["
 ax.plot(t, h); ax.plot(ts["times"], ts["series"]["pool"], "k--")        # ts = slope_data["tseep"]
 ```
 
-### Stability at one instant of a transient march
+### Stability at one instant of a transient run
 
-A stability run reads **one frame**, never a blend — the march is never interpolated. Stage it
+A stability run reads **one frame**, never a blend — the transient solution is never interpolated. Stage it
 before the solver:
 
 ```python
@@ -1735,8 +1735,9 @@ Which instant, in order of precedence:
 3. neither, and it reads the **LAST saved frame** (`source='default'`) — usually the drained end
    state, which is often but not always the critical one. Say so when you report the FS.
 
-A requested time that names no saved frame is served by re-marching with it injected
-(`seep_data=seep_data, remarch=True`), which is a full re-solve — never by interpolation.
+A requested time that names no saved frame is served by rerunning the transient seepage analysis
+with it injected (`seep_data=seep_data, remarch=True`), which is a full re-solve — never by
+interpolation.
 
 **Rapid drawdown** uses two instants instead: set `tseep!stage_1` and `stage_2` (both, with
 `stage_1 < stage_2`) and call `apply_transient_stability_frame(slope_data, solution, rapid=True)`
@@ -1744,9 +1745,9 @@ A requested time that names no saved frame is served by re-marching with it inje
 method with `rapid=True`. A transient solution with stage times takes precedence over the
 classic `{base}_seep.csv` / `_seep2.csv` files.
 
-To chart FS across the whole march instead of picking one instant, use `fs_vs_time` — see
-Parametric studies. To chart the DRAWDOWN factor of safety instead, with stage 2 walked across
-the march, use `fs_vs_time(..., rapid=True)`; it stages each point itself, so no
+To chart FS across the whole transient solution instead of picking one instant, use `fs_vs_time`
+— see Parametric studies. To chart the DRAWDOWN factor of safety instead, with stage 2 walked
+across the saved frames, use `fs_vs_time(..., rapid=True)`; it stages each point itself, so no
 `apply_transient_stability_frame` call is needed.
 
 ---
@@ -1870,9 +1871,9 @@ Rules:
   u="piezo") or from a seepage pair (u="seep"): run the seepage analysis for BOTH BC sets on
   the SAME mesh and export `<name>_mesh.json`, `<name>_seep.csv` (full pool), and
   `<name>_seep2.csv` (drawn down) — `load_slope_data()` then imports all three automatically.
-- Or from a **transient** march: set `stage_1` and `stage_2` on the tseep sheet (both, with
+- Or from a **transient** run: set `stage_1` and `stage_2` on the tseep sheet (both, with
   `stage_1 < stage_2`) and call `apply_transient_stability_frame(slope_data, solution, rapid=True)` — it stages `seep_u`/`seep_u2` from those two instants, and takes precedence
-  over the `_seep.csv` / `_seep2.csv` files. See "Stability at one instant of a transient march".
+  over the `_seep.csv` / `_seep2.csv` files. See "Stability at one instant of a transient run".
 - dloads set 1 = full-pool reservoir load; dloads (2) = drawn-down load (recompute the
   water-line intercept on the slope face for the lower pool) — **in `manual` water-load mode
   only**. On a v22 `auto` file the engine derives BOTH stages' loads from the stage-1 and

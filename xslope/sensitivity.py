@@ -1531,7 +1531,8 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
                        f"discharge, and the seepage solution is this run's INPUT.")
     if transient_solution is None:
         return False, ("fs_vs_time needs a transient seepage solution -- run or "
-                       "import the march first (xslope.seep.run_transient_seepage "
+                       "import the transient seepage analysis first "
+                       "(xslope.seep.run_transient_seepage "
                        "/ import_transient_solution).")
     if not (transient_solution.get('times') or []):
         return False, "the transient solution carries no saved frames."
@@ -1562,7 +1563,7 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
                 seep_data, slope_data, missing)
             remarched = True
         except Exception as e:                             # noqa: BLE001
-            return False, f"re-march for the requested times failed: {e}"
+            return False, f"re-running the seepage analysis for the requested times failed: {e}"
 
     methods = (methods,) if isinstance(methods, str) else tuple(methods)
     stage_1 = _drawdown_stage_1(slope_data, transient_solution) if rapid else None
@@ -1585,7 +1586,7 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
                                                  else wanted[-1]]}
         except (ValueError, KeyError, IndexError) as e:
             return False, (f"the drawdown's stages cannot be read from this "
-                           f"march: {e}")
+                           f"transient solution: {e}")
     else:
         try:
             select_transient_frame_u(gate_sd, transient_solution, time=wanted[0])

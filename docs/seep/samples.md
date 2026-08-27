@@ -224,7 +224,7 @@ described on the [Transient Seepage](transient.md) page; this entry is a worked 
   t = 47) pair marks the critical states a rapid-drawdown analysis would draw on.
 
 Because a **day** time base is declared, the conductivities are given in **m/day** (the storage
-march balances against `div(k grad h)`, so `k` must share the schedule's time unit): shell
+term balances against `div(k grad h)`, so `k` must share the schedule's time unit): shell
 `k1 = 1.5`, `k2 = 0.5`; core `k1 = 0.012`, `k2 = 0.005` — a fine-sand shell over a much less
 permeable compacted-clay core. These are not the steady sample's 46 and 4.5 m/yr: at 18 m/yr the
 shell would drain at `k2/Sy` = 82 m/yr, which is 0.22 m/day — slower than the pool falls, so

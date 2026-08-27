@@ -87,8 +87,9 @@ gets its own search.
 
 SEEP-3 built this dam for a seepage analysis, so its materials carry
 conductivities and storage properties but no strengths. A stability run needs
-c′, φ′ and a unit weight for each zone, and the file this page opens has them
-filled in. Open [xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx) with
+c′, φ′ and a unit weight for each zone. The workbook for this tutorial,
+[xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx), is the
+SEEP-3 model with those values added. Open it with
 **File → Open…**, leave the mode strip (LEM | Seepage | FEM) on **LEM**, click
 **Materials** in the Inputs tree, and set the **Show parameters for:** toggles to
 **LEM** alone:

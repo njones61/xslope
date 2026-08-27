@@ -174,15 +174,16 @@ are measuring.
 
 ![Two starting circles and the one search limit the file sets](images/combo03_studio_circles.png)
 
-
 Click **OK** on the Circles editor. The Inputs plot draws the model:
 
 ![The stability model: two zones, the reservoir load, and the two starting circles](images/combo03_inputs.png){width=1000}
 
 The blue arrows on the upstream face are the reservoir pressing on the slope,
-marked **derived** because nothing entered them. **Water loads** on the `main`
-sheet is `auto`, so the engine turns whatever pool stands above the ground into a
-distributed load, re-derived at every instant from the pool as it stood then. The
+marked *derived* because nothing entered them. **Water loads** on the main sheet
+is `auto`, so the engine reads the pool elevation from the specified-head
+boundary conditions of the seepage model and turns the water standing above the
+ground into a distributed load, re-derived at every instant from the pool as it
+stood then. The
 two red dashed arcs are the starting circles, both centers sitting above the
 frame.
 
@@ -218,12 +219,9 @@ The curve starts from the factor of safety at full pool. Switch back to **LEM**
 satisfies both force and moment equilibrium and is the method behind every factor
 of safety on this page; **Analysis** opens on **Auto search**, which finds the
 run its own critical circle, and **Number of slices** on 40. Leave every field
-alone. The **Model checks** column shows one warning,
-`circles.multiple_without_grid`: with two starting circles and Grid search off,
-the search refines only the circle that screens better on its first coarse
-pass. That is what we want here, because each circle already sits on the
-mechanism its face can make. When the critical face is not known in advance,
-ticking **Grid search** is the safer choice.
+alone. The two circles each sit on the mechanism their face can make, and when
+the critical face is not known in advance, ticking **Grid search** is the safer
+choice.
 
 Click **Run**. The Log reports the limit it read off the file, then the
 refinement:

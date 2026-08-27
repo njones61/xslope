@@ -2998,7 +2998,7 @@
         "sigmas": [],
         "ssr_zones": 0,
         "suction_strength": false,
-        "template_version": 22,
+        "template_version": 25,
         "tensile_cutoff": false,
         "tension_crack": false,
         "tension_crack_water": false,
@@ -20021,7 +20021,7 @@
         "non_circular": false,
         "piezo_line": false,
         "pile_fixities": [
-          "fixed"
+          "unrotated"
         ],
         "piles": 1,
         "polygon_geometry": true,

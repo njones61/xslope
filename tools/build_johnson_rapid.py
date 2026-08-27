@@ -1,7 +1,17 @@
 """Build the Johnson Reservoir rapid-drawdown workbooks from one parameter block.
 
-Four files come out of the single set of constants below, so the rapid-drawdown
+Five files come out of the single set of constants below, so the rapid-drawdown
 family cannot drift apart:
+
+  ``docs/lem/files/xslope_johnson_rapid_KEY.xlsx``
+      The rapid-drawdown sample of ``docs/lem/samples.md``, and the locked anchor for
+      the **two-steady** route: the two pools stated as the two steady seepage
+      boundary sets, ``u = seep`` on every material, and the fixed circle. The mesh
+      and the two solved fields ship beside it as ``_mesh.json``, ``_seep.csv`` and
+      ``_seep2.csv``, so the sample reads its stage pore pressures off committed
+      answers rather than re-solving. No piezometric lines: the boundary sets state
+      where the water stands for the loads and ``u = seep`` states every pore
+      pressure, so a line on this file would feed nothing.
 
   ``docs/lem/files/xslope_johnson_res_rapid.xlsx``
       The worked example of ``docs/lem/rapid.md`` ("Rapid Drawdown from a Transient
@@ -42,13 +52,16 @@ can never diverge from the seepage side of the same dam. That file is never
 modified. The one value the tutorial pair overrides is the level the reservoir is
 lowered to: the tutorial's drawdown stops at a residual pool 10 ft deep, while the
 worked example of ``docs/lem/rapid.md`` keeps the base file's total drawdown to
-the tailwater datum.
+the tailwater datum. The docs sample additionally pins the unsaturated and elastic
+block it was solved under (``SAMPLE_KR0`` / ``SAMPLE_E``), because it ships solved
+fields and a locked sweep count that were produced with those values.
 
-Run:  PYTHONPATH=. python3 tools/build_johnson_rapid.py           # all four
+Run:  PYTHONPATH=. python3 tools/build_johnson_rapid.py           # all five
+      PYTHONPATH=. python3 tools/build_johnson_rapid.py sample    # the docs sample
       PYTHONPATH=. python3 tools/build_johnson_rapid.py fs_time   # the solved set
 
 The solved set carries the transient march, so it takes a few minutes; the other
-three are written in seconds.
+four are written in seconds.
 """
 
 from __future__ import annotations
@@ -104,6 +117,31 @@ BC2 = {
     "specified_fluxes": [],
     "exit_face": [(380.0, 180.0), (550.0, 100.0)],
 }
+
+#: The full-pool steady boundary set. It is the base file's set 1 with the
+#: reservoir stated as a fixed head instead of as the `pool` series: a steady
+#: problem has no schedule to read a level from, so the sample states elevation 160
+#: outright along the upstream foreshore and up the face. Set 2 (`BC2` above) is the
+#: drawn-down partner, so the two of them are the two pools of the drawdown.
+BC1 = {
+    "specified_heads": [
+        {"head": POOL_FULL,
+         "coords": [(0.0, 100.0), (200.0, 100.0), (320.0, 160.0)], "kind": "head"},
+        {"head": 100.0, "coords": [(550.0, 100.0), (750.0, 100.0)], "kind": "head"},
+    ],
+    "specified_fluxes": [],
+    "exit_face": [(380.0, 180.0), (550.0, 100.0)],
+}
+
+#: The docs sample's unsaturated and elastic block, which is deliberately NOT the
+#: base file's. The sample ships a committed mesh and the two solved steady fields
+#: (`_mesh.json`, `_seep.csv`, `_seep2.csv`), and test/seep_cycle_check.py locks the
+#: unconfined solver's limit-cycle escape on that exact model — sweep count included.
+#: Those are recorded answers, so the residual relative conductivity that produced
+#: them is a fixed input here rather than a free parameter. Storage properties stay
+#: unset because the sample states no transient problem.
+SAMPLE_KR0 = 1.0e-4
+SAMPLE_E = {"shell": 200000.0, "core": 30000.0, "foundation": 50000.0}
 
 #: The tutorial's reservoir schedule: full pool held for five days, then lowered
 #: to the residual pool over the following 45. Only the last breakpoint differs
@@ -195,6 +233,37 @@ def build_lem_worked_example():
     """``docs/lem/rapid.md``'s transient worked example — the base file plus the
     undrained core and the circle, and nothing else."""
     return _save(_base(), os.path.join(LEM_FILES, "xslope_johnson_res_rapid.xlsx"))
+
+
+def build_lem_sample():
+    """``docs/lem/samples.md``'s rapid-drawdown sample: the two-steady route.
+
+    The dam of the tutorial family with each pool stated as its own steady seepage
+    problem — set 1 at full pool, set 2 at the residual pool — and ``u = seep`` on
+    every material, so both stages read pore pressures off the committed solved
+    fields. The fixed upstream circle is the family's.
+
+    No piezometric lines. The boundary sets state where the water stands for every
+    load and ``u = seep`` states every pore pressure, so a line here would be read by
+    nothing — the same rule :func:`build_tutorial_completed` follows. The
+    piezometric pair belongs to the starter file, which is where COMBO-2 Part 1
+    works from.
+    """
+    sd = _base()
+    sd["piezo_line"] = []
+    sd["piezo_line2"] = []
+    sd["seepage_bc"] = copy.deepcopy(BC1)
+    sd["seepage_bc2"] = copy.deepcopy(BC2)
+    sd["has_seepage_bc2"] = True
+    sd["tseep"] = None
+    sd["time_unit"] = None
+    for m in sd["materials"]:
+        m["u"] = "seep"
+        m["kr0"] = SAMPLE_KR0
+        m["Ss"] = None
+        m["Sy"] = None
+        m["E"] = SAMPLE_E[m["name"]]
+    return _save(sd, os.path.join(LEM_FILES, "xslope_johnson_rapid_KEY.xlsx"))
 
 
 def build_tutorial_completed():
@@ -312,7 +381,10 @@ def build_tutorial_fs_time():
 def build(which=None):
     if which in ("fs_time", "solved"):
         return [build_tutorial_fs_time()]
-    return [build_lem_worked_example(),
+    if which in ("sample", "key"):
+        return [build_lem_sample()]
+    return [build_lem_sample(),
+            build_lem_worked_example(),
             build_tutorial_starter(),
             build_tutorial_completed(),
             build_tutorial_fs_time()]

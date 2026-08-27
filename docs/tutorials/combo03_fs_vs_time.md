@@ -130,8 +130,8 @@ Click **Circles**. The file carries two, one on each face of the dam:
 | 7 | 56 | `Depth` | 0 |
 | 103 | 59 | `Depth` | 0 |
 
-We drew each on the deep mechanism its face can make, its center beyond the heel
-or the toe, with **Depth** putting the bottom of the circle at elevation 0 — an
+There is one circle for each face, drawn on the deep mechanism that face can
+make: its center sits beyond the heel or the toe, and **Depth** puts the bottom of the circle at elevation 0 — an
 elevation rather than a distance, and 0 is the rock. The upstream circle runs
 from (0.80, 0.34) to the crest edge at (51.50, 22.00), 57.63 m of surface; the
 downstream one from (57.04, 22.00) to (109.19, 0.33), 58.88 m.
@@ -141,7 +141,7 @@ weakens the upstream slope, but a full reservoir *loads* it, and under 18 m of
 water the downstream side is the weaker of the two. A curve from a full pool to
 an empty one crosses both states.
 
-**We drew both deep because a shallower seed refines into a smaller
+**Both circles are drawn deep because a shallower seed refines into a smaller
 mechanism.** A search steps away from its starting circle and stops where the
 steps no longer lower the factor of safety, so a seed part way up the slope
 settles near where it started.
@@ -168,7 +168,7 @@ is drawn, so an unconstrained search settles on a surficial wedge that ravels
 rather than slides. 8 m on a 22 m dam keeps the search on embankment slides; the
 Run LEM dialog offers the same limit as **Ignore surficial (skin) failures**.
 
-We left the entry and exit ranges blank on purpose. Filling them would confine
+The entry and exit ranges are left blank on purpose. Filling them would confine
 the trace to one slope, and which slope governs at a given instant is what we
 are measuring.
 
@@ -289,8 +289,8 @@ Transient seepage complete — 19 saved frame(s).
 **Nineteen frames**, at t = 0, 2, 5, 10, 15, 20, 25, 30, 35, 40, 47, 55, 65, 80,
 100, 130, 180, 240 and 300 — all a curve can be drawn through, which makes the
 save schedule a modeling decision taken before the stability question is asked.
-We made it uneven on purpose, five-day frames through the drawdown and widening
-steps after, because the answer moves fastest while the pool is falling.
+It is uneven on purpose — five-day frames through the drawdown and widening
+steps after — because the answer moves fastest while the pool is falling.
 
 The **mass-balance closure** on each line is the gap between the stored-water
 change and the net inflow, as a fraction of the flow passed so far. That flow is
@@ -618,8 +618,8 @@ end of the fall and widening steps after. **Stage 1 time** is `0` and **Stage 2
 time** is `50`. Click **OK**.
 
 That schedule is this file's own; the [COMBO-2](combo02_rapid_drawdown.md)
-workbook keeps a coarser one and a 1,000-day run. We packed the instants where
-the answer moves, and stopped the run at day 500 because the curve has flattened
+workbook keeps a coarser one and a 1,000-day run. Its instants are packed where
+the answer moves, and the run stops at day 500 because the curve has flattened
 before then. Every point below reads its consolidation stresses at stage 1, which
 stays at t = 0 for the whole sweep; what moves is stage 2.
 

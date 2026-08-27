@@ -17,6 +17,12 @@ carries a generated placeholder for each (see ``tools/make_tutorial_figures.py``
 
 Run:  python3 tools/capture_tutorial_screenshots.py           # every shot
       python3 tools/capture_tutorial_screenshots.py lem01     # by name
+      python3 tools/capture_tutorial_screenshots.py w1        # a recorded session
+      python3 tools/capture_tutorial_screenshots.py w1 --dry-run   # no API call
+
+The W-1 entries are not dialog captures but recorded assistant conversations, each
+of which makes a real (billed) provider call; they run only when named, never in an
+argument-less sweep. See ``tools/assistant_sessions.py``.
 
 Exits 0 with a note if PySide6 is not installed (engine-only install — no Studio
 layer to capture), mirroring the Studio capture pipeline.
@@ -2947,8 +2953,16 @@ SHOTS.update({
 # --------------------------------------------------------------------------- #
 #  COMBO-3 — factor of safety versus time
 # --------------------------------------------------------------------------- #
+COMBO03_START = os.path.join(
+    REPO_ROOT, "docs/tutorials/files/xslope_earth_dam_fs_time_start.xlsx")
 COMBO03 = os.path.join(REPO_ROOT,
                        "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
+#: The six cells the page's materials step has the reader type, per zone, in the
+#: order the Materials editor lists them. Applied to the START file for the
+#: materials shot, so the photographed table is the one the reader has just filled
+#: rather than a table that shipped filled.
+COMBO03_TYPED = ({"c": 0.0, "phi": 32.0, "gamma": 20.0},
+                 {"c": 10.0, "phi": 25.0, "gamma": 19.0})
 COMBO03_METHOD = "spencer"
 COMBO03_SLICES = 40
 #: The instants the shipped march saves, which the Run LEM and Parametric dialogs
@@ -2996,16 +3010,24 @@ def _combo03_solved():
 
 
 def combo03_materials():
-    """The two zones in table view with the LEM columns showing.
+    """The two zones in table view with the LEM columns showing, the strengths in.
 
     The band this page reads out: a unit weight above the water table and a
     saturated one below it, a drained effective-stress envelope on each zone, and
     ``u`` on ``seep`` so every slice base reads its pore pressure from the solved
     field.
+
+    Photographed on the START file with the six cells the page has the reader type
+    written in first, so the table in the figure is the table the reader has just
+    finished filling. The completed workbook carries the same six values, and this
+    shot must show what the reader's screen shows, not what a second file ships.
     """
     from studio.editors import MaterialsEditor
 
-    dlg = _lem_only(MaterialsEditor().build(_load(COMBO03), None))
+    data = _load(COMBO03_START)
+    for mat, typed in zip(data["materials"], COMBO03_TYPED):
+        mat.update(typed)
+    dlg = _lem_only(MaterialsEditor().build(data, None))
     return _grab(_mat_table(dlg, through="u"), "combo03_studio_materials.png")
 
 
@@ -3339,17 +3361,41 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# W-1 — Working with the assistant
+#
+# Not a dialog capture. The assistant tutorial's figures are recorded CONVERSATIONS
+# — a real provider call, a real run_python in the live document — so they come
+# from their own harness, and from their own registry: a session is run only when
+# it is named on the command line, never by an argument-less sweep, because each
+# one spends API credit. See tools/assistant_sessions.py.
+# --------------------------------------------------------------------------- #
+from tools.assistant_sessions import SESSIONS  # noqa: E402
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    dry_run = "--dry-run" in argv
+    argv = [a for a in argv if not a.startswith("-")]
     os.makedirs(OUT_DIR, exist_ok=True)
     names = [n for n in SHOTS if not argv or any(a in n for a in argv)]
-    if not names:
-        print("no shot matching %s; known shots: %s" % (argv, ", ".join(sorted(SHOTS))))
+    # Recorded assistant sessions cost real money against the key in the keychain,
+    # so they are NEVER swept: an argument-less run captures every dialog and no
+    # session. They run only when named.
+    sessions = [n for n in SESSIONS if argv and any(a in n for a in argv)]
+    if not names and not sessions:
+        print("no shot matching %s; known shots: %s\nknown sessions: %s"
+              % (argv, ", ".join(sorted(SHOTS)), ", ".join(sorted(SESSIONS))))
         return 1
     with _app_defaults():
         for name in names:
             SHOTS[name]()
+        for name in sessions:
+            SESSIONS[name](dry_run=dry_run)
     print("\nwrote %d screenshot(s) to docs/tutorials/images/" % len(names))
+    if sessions:
+        print("recorded %d assistant session(s)%s"
+              % (len(sessions), " (dry run)" if dry_run else ""))
     return 0
 
 

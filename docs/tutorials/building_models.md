@@ -122,8 +122,9 @@ What matters for building models is where its work lands:
 - **Nothing is saved until you use Save As.** The assistant writes no file.
 
 An assistant draft is a draft. Read what it built against what you gave it, and
-correct it in the same conversation — [LEM-1](lem01_simple_embankment.md) walks that
-audit on a real model, and the checking is most of what that path teaches.
+correct it in the same conversation — in [LEM-1](lem01_simple_embankment.md) we
+walk that audit on a real model, and the checking is most of what that path
+teaches.
 
 ---
 
@@ -193,8 +194,8 @@ The next tutorial's completed model is published as a package:
 
 ## Your first real build
 
-[**Tutorial LEM-1 — Simple Embankment**](lem01_simple_embankment.md) builds the
-smallest complete XSLOPE model down all three of these paths, searches it for a
-critical failure surface, and reads what the result says about the model. Pick one
+In [**Tutorial LEM-1 — Simple Embankment**](lem01_simple_embankment.md) we build
+the smallest complete XSLOPE model down all three of these paths, search it for a
+critical failure surface, and read what the result says about the model. Pick one
 path; the other two are there when you want to see what the same model looks like
 from the other side.

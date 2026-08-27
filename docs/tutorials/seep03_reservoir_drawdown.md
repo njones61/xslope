@@ -5,14 +5,14 @@ description: "Model a reservoir drawn down through a cored earth dam in XSLOPE �
 
 # Tutorial SEEP-3 — Transient Seepage: Reservoir Drawdown
 
-This tutorial works a **transient** seepage problem — one where the boundaries
-move and the answer depends on when the ground is examined — and what such an
+Here we work a **transient** seepage problem — one where the boundaries move and
+the answer depends on when the ground is examined — and see what such an
 analysis adds to a steady one. Two of the additions are things the modeler
 supplies: the **storage properties** that decide how much water a soil gives up
 as the head in it falls, and the **schedule** that states when the boundary moves
 and which instants get saved. A third is computed rather than entered — the
 **initial condition** the march starts from. And the answer comes back as a
-sequence rather than as a picture, so the page closes on how one is read: as
+sequence rather than as a picture, so we close on how one is read: as
 frames on a play bar, as a head history at a point, and as a ledger of water
 crossing the boundary against water leaving storage.
 
@@ -24,10 +24,10 @@ different rates: the shell follows the pool down, the core does not, and the
 head left inside the core after the drawdown ends is what a rapid-drawdown
 stability check has to account for.
 
-[Tutorial SEEP-2](seep02_johnson_dam.md) built a zoned dam from nothing and
-solved the steady unconfined flow through it. This page does not repeat that
-work. It starts from a **starter file** that already carries the geometry, the
-two zones and the material properties, so that the build on this page is only the
+In [Tutorial SEEP-2](seep02_johnson_dam.md) we built a zoned dam from nothing and
+solved the steady unconfined flow through it, and we do not repeat that work
+here. We start from a **starter file** that already carries the geometry, the
+two zones and the material properties, so the build on this page is only the
 part that is new — the boundary set, and then the transient schedule that drives
 it. (To skip the construction and go straight to the analysis, download the
 completed file below and pick the page back up at
@@ -91,7 +91,7 @@ building them is the featured step of this page.
 A steady seepage analysis solves for the total head *h* at every point of the
 ground — the elevation a column of water would stand to in a standpipe at that
 point, in meters here — and everything else follows from that one field.
-[SEEP-1](seep01_sheetpile.md) works through what total head is, and
+In [SEEP-1](seep01_sheetpile.md) we work through what total head is, and in
 [SEEP-2](seep02_johnson_dam.md) through what an unconfined problem adds to it. A
 transient analysis solves for the same field, but for *h*(*x*, *y*, *t*) rather
 than for one answer, and it needs two things a steady analysis does not.
@@ -129,7 +129,7 @@ starting field as a **steady solve at the t = 0 boundary configuration** — the
 series are evaluated at time zero and the ordinary steady solver is run — so the
 march begins from a genuine steady state rather than from a guess. The
 [initial conditions](../seep/transient.md#initial-conditions) section states the
-rule, and it is why this page solves the full-pool steady problem before it builds
+rule, and it is why we solve the full-pool steady problem before building
 the schedule: that solution *is* the first frame.
 
 From there the solver advances the head field step by step to the end of the run,
@@ -149,12 +149,12 @@ menu offer the seepage tables rather than the limit equilibrium ones.
 
 The file carries the section — two profile lines, one per zone, with the maximum
 depth at elevation 0 — and the material properties. It carries no boundary
-conditions and no schedule, which is what the rest of this page builds.
+conditions and no schedule, which is what we build in the rest of this page.
 
 Its global parameters are already set: **Units** `SI`, so the unit weight of
 water is 9.81 kN/m³ and heads read in meters, and **Time** `day`, which puts
 `k1 (m/day)` on the material form and makes every discharge on this page cubic
-meters per day per meter of dam. Those two fields are explained on
+meters per day per meter of dam. Those two fields are explained in
 [SEEP-1](seep01_sheetpile.md#1-global-parameters). On a transient model the time
 unit does one more thing: it is the unit of every time on the schedule, so
 `Duration (day)` and the breakpoint times below are all in days because of it.
@@ -177,8 +177,8 @@ That is the right reading for lifts placed horizontally, and the run reports it
 back to you in its model checks rather than assuming silently.
 
 The `unsat` selector and the two parameters after it are the linear-front
-relative-conductivity model, which
-[SEEP-2](seep02_johnson_dam.md#the-three-unsaturated-models) covers in full.
+relative-conductivity model, covered in full in
+[SEEP-2](seep02_johnson_dam.md#the-three-unsaturated-models).
 `vg_a` and `vg_n` carry the curve the van Genuchten and Gardner models use, and
 sit at zero here because this model uses neither.
 
@@ -190,13 +190,12 @@ both cases read straight off the
 sits in the sand row and the clean-sand-and-gravel row, and the core's in the
 plastic-clay row and the clay row. Those tables are quoted in 1/m and
 *S<sub>s</sub>* is entered in the model's own length unit, so on a model in meters
-the values go in as they stand.
-Note that the two properties move in opposite directions with soil
-type: the clay is the *more* compressible of the two and so has the larger
-*S<sub>s</sub>*, but it holds nearly all of its pore water against gravity and so
-has by far the smaller *S<sub>y</sub>*.
+the values go in as they stand. The two properties move in opposite directions
+with soil type: the clay is the *more* compressible of the two and so has the
+larger *S<sub>s</sub>*, but it holds nearly all of its pore water against gravity
+and so has by far the smaller *S<sub>y</sub>*.
 
-That opposition is the source of everything this page measures. A falling water
+That opposition is the source of everything we measure here. A falling water
 table drains **downward**, so the rate it can fall through a zone goes as that
 zone's *vertical* conductivity over its *S<sub>y</sub>* — the conductivity that
 moves the water divided by the volume that has to be moved. For the shell that is
@@ -214,19 +213,19 @@ Click **OK**.
 
 ## Building the boundary conditions
 
-The model gets built in two passes. This section and the two after it build and
-solve an ordinary **steady** model of the dam at full pool — the same kind of
-model SEEP-2 built — and only then is it converted to transient, by adding the
+The build comes in two passes. In this section and the two after it we build
+and solve an ordinary **steady** model of the dam at full pool — the same kind of
+model we built in SEEP-2 — and only then convert it to transient, by adding the
 schedule and pointing the reservoir boundary at it. Building the steady model
 first is not a detour: its solution becomes the transient run's starting state,
 as the steady-solution section explains.
 
 The dam has water on both sides of it and a face that water may leave through, so
-it takes three boundary condition entries. Their mechanics — what each type does, why an
-exit face is drawn over the whole slope, and what the no-flow default covers — are
-[SEEP-2's subject](seep02_johnson_dam.md#4-boundary-conditions), and this section
-does not repeat them. What follows is the set this dam needs and the points that
-define it.
+it takes three boundary condition entries. Their mechanics — what each type does,
+why an exit face is drawn over the whole slope, and what the no-flow default
+covers — are the subject of
+[SEEP-2](seep02_johnson_dam.md#4-boundary-conditions), and we do not repeat them
+here. What follows is the set this dam needs and the points that define it.
 
 Click **Seep BC** in the Inputs dock. The editor opens on **Set 1**. Press **Add
 head** twice and fill the two entries, then select the **Exit face** entry already
@@ -261,8 +260,8 @@ water:
 
 **Exit face.** An exit face is the boundary where water may discharge to the
 atmosphere, and its wet extent is an output rather than an input —
-[SEEP-2](seep02_johnson_dam.md#the-seepage-face) is where that active-set rule is
-worked through. Draw it over the whole downstream slope, from the crest to the
+[SEEP-2](seep02_johnson_dam.md#the-seepage-face) is where we work that active-set
+rule through. Draw it over the whole downstream slope, from the crest to the
 tailwater:
 
 | x | y |
@@ -297,7 +296,7 @@ analysis a transient seepage run puts no restriction on element order. The one
 plan that would restrict it: a finite-element stability analysis reading its
 pore pressures from this solution runs on this same mesh, and the FEM side
 requires quadratic elements — for that workflow, build the mesh as
-**Quadratic triangles (tri6)** from the start. This page stays with seepage, so
+**Quadratic triangles (tri6)** from the start. We stay with seepage here, so
 tri3 is sufficient.
 
 Leave **Auto-size from geometry** ticked, and set **Size divisions** to `64`. The
@@ -323,7 +322,8 @@ markers.
 ## The steady solution at full pool
 
 Before the pool moves, the dam is in steady state under 18 m of water, and that
-state is the field the march will start from. Solving it now also serves a second purpose: it is the reference every transient number on this page is read
+state is the field the march will start from. Solving it now serves a second
+purpose as well: it is the reference we read every transient number on this page
 against.
 
 If you opened the completed download rather than the starter file, this section
@@ -372,10 +372,10 @@ it would not be.
 
 In the **Display** panel, tick **Filled contours**. **Base material** already
 reads `2: core`: the selector supplies the conductivity the flow-net scaling
-runs on, and it opens on the zone whose k draws the net as squares —
-[SEEP-2 works through the rule](seep02_johnson_dam.md#scaling-the-flow-net-on-a-zoned-section)
-on a three-zone dam. Here that is the core: nearly the entire head drop happens
-inside it, so the net reads there and nowhere else. Leave it.
+runs on, and it opens on the zone whose k draws the net as squares — in
+[SEEP-2](seep02_johnson_dam.md#scaling-the-flow-net-on-a-zoned-section) we work
+that rule through on a three-zone dam. Here that is the core: nearly the entire
+head drop happens inside it, so the net reads there and nowhere else. Leave it.
 
 ![The full-pool steady solution](images/seep03_steady.png){width=1000}
 
@@ -397,9 +397,9 @@ why the slope above it stays dry.
 
 ## Building the transient schedule
 
-Everything so far describes a dam under a pool that does not move. This section is
-where the pool is given a history, a run is given a length, and the boundary that
-holds the reservoir is told to follow the one rather than stay put.
+Everything so far describes a dam under a pool that does not move. Here we give
+the pool a history, give the run a length, and tell the boundary that holds the
+reservoir to follow the one rather than stay put.
 
 Click **Transient** in the Inputs dock — the row reads `off` before it is filled
 in and `on` afterward.
@@ -410,9 +410,9 @@ in and `on` afterward.
 sharing one time column, and the boxes across the top are their names. They arrive
 carrying the input template's defaults, `t1` through `t5`. Type `pool` over `t1`.
 The name is not decoration: a boundary becomes time-varying by having this exact
-name typed into its value cell, which is the last step of this section, so a name
-you will recognize there is worth choosing. A name column left blank is simply
-unused, which is what `t2` through `t5` are on this model.
+name typed into its value cell, which is the last step of this section, so choose
+a name you will recognize there. A name column left blank is simply unused, which
+is what `t2` through `t5` are on this model.
 
 **The breakpoints.** Fill the first three rows of the table, one time and one pool
 elevation each:
@@ -521,9 +521,9 @@ schedule. Set it to **Transient (time-dependent)**.
 
 **Convergence tol** and **Max iterations** gray out the moment **Transient** is
 chosen, and there is nothing to do to them. They belong to the steady solve — the
-nonlinear iteration SEEP-2 measured on the unconfined problem — while the march
-carries its own step-size and iteration controls and sets them from how fast the
-field is moving.
+nonlinear iteration we measured on the unconfined problem in SEEP-2 — while the
+march carries its own step-size and iteration controls and sets them from how
+fast the field is moving.
 
 The **Model checks** panel reports **No problems found for this run.** with
 **2 notes** collapsed beneath it. Opening them shows the anisotropy reading from
@@ -592,14 +592,14 @@ inside the dam still stands at elevation 13.2 over the core, more than 5 m above
 the water that used to hold it up.
 
 The arrows are **velocity vectors**, which is how direction is read on a transient
-frame. The flow-line display SEEP-2 used is offered only for steady solutions: flow
-lines are contours of a stream function, and a stream function exists only where
-the flow field is divergence-free, which storage exchange breaks — water is
-appearing from and disappearing into the soil throughout the section. The
-[outputs](../seep/transient.md#outputs) section states this. Note the vectors in
-the upstream shell pointing back *toward* the reservoir: with the pool down to
-elevation 8 and still falling, the shell drains out through the face it was filled
-through.
+frame. The flow-line display we used in SEEP-2 is offered only for steady
+solutions: flow lines are contours of a stream function, and a stream function
+exists only where the flow field is divergence-free, which storage exchange
+breaks — water is appearing from and disappearing into the soil throughout the
+section. The [outputs](../seep/transient.md#outputs) section states this. The
+vectors in the upstream shell point back *toward* the reservoir: with the pool
+down to elevation 8 and still falling, the shell drains out through the face it
+was filled through.
 
 The play bar shows one frame at a time, drawn on the transient view's defaults —
 line contours with velocity vectors, each frame scaled to itself. The figure
@@ -610,7 +610,7 @@ the play bar does not do — so the dam's emptying reads as one map fading:
 ![Four frames: the initial condition, mid drawdown, the end of drawdown, and recovery](images/seep03_frames.png){width=1000}
 
 **t = 0, the initial condition.** The full-pool steady solution, and the same one
-the previous section solved on its own.
+we solved on its own in the previous section.
 
 **t = 15, mid drawdown.** The pool has dropped to elevation 13.4. The phreatic
 surface in the upstream shell has followed it down and largely flattened, but it
@@ -641,13 +641,13 @@ surface is within **0.05 m** of the pool it stands over.
 ## The head history inside the core and the shell
 
 The frames show the lag as a shape. Following two points through every frame shows
-it as a history, and puts numbers on how far apart the two zones get. Take one
+it as a history, and puts numbers on how far apart the two zones get. We take one
 node in the middle of the core, at (54.5, 8.9), and one in the upstream shell at
 the same elevation, (30.7, 8.9), so the comparison is like for like; a third at
 (75.3, 6.8) in the downstream shell gives a control — a point the reservoir never
 supplied.
 
-The figure below is drawn by this page, not by a Studio display option — the
+The figure below is not from a Studio display option — the
 solution views show one frame at a time. But the saved frames sit on disk beside
 the model, and the **assistant** can plot them: ask it
 *"Plot total head versus time at (54.5, 8.9) and (30.7, 8.9) from the saved
@@ -684,8 +684,9 @@ the core node 24 m away at the same elevation is **still saturated** at
 ψ = +0.44 m. The water table has passed below one and not the other.
 
 The downstream shell node barely notices any of it, its head easing just over a
-meter — from 4.21 m to 3.18 m — over the whole drawdown. It was never supplied by the reservoir in the
-first place — the core saw to that — so removing the reservoir asks little of it.
+meter — from 4.21 m to 3.18 m — over the whole drawdown. It was never supplied by
+the reservoir in the first place — the core saw to that — so removing the
+reservoir asks little of it.
 
 ---
 
@@ -771,10 +772,10 @@ tables, the time-stepping scheme and the boundary types in full;
 [Sample Problem 8](../seep/samples.md#8-earth-dam-reservoir-drawdown-transient)
 catalogs this dam as a worked example, and
 [Sample Problem 9](../seep/samples.md#9-johnson-reservoir-zoned-drawdown-transient)
-is SEEP-2's larger Johnson Reservoir dam taken through a drawdown of its own.
-[Rapid Drawdown Analysis](../lem/rapid.md) is where the stage times left blank
-here are used, taking a transient solution like this one into a stability
-analysis. [SEEP-2](seep02_johnson_dam.md) is where the unconfined steady problem
-and its seepage face are built from nothing, and
-[SEEP-4](seep04_dam_infiltration.md) adds rain to a dam through the third boundary
-type, a specified flux.
+is the larger Johnson Reservoir dam from SEEP-2, taken through a drawdown of its
+own. [Rapid Drawdown Analysis](../lem/rapid.md) is where the stage times left
+blank here are used, taking a transient solution like this one into a stability
+analysis. [SEEP-2](seep02_johnson_dam.md) is where we build the unconfined steady
+problem and its seepage face from nothing, and in
+[SEEP-4](seep04_dam_infiltration.md) we add rain to a dam through the third
+boundary type, a specified flux.

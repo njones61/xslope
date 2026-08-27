@@ -5,15 +5,15 @@ description: "Build the Johnson Reservoir dam in XSLOPE — three stacked profil
 
 # Tutorial SEEP-2 — Unconfined Seepage Through a Zoned Dam
 
-This tutorial works an unconfined seepage problem — one where the water table
-inside the ground is part of the answer rather than part of the input — and the
-choices that kind of problem forces on the modeler. It covers the boundary
-conditions an unconfined problem needs and the seepage face that is peculiar to
-it, how the phreatic surface is arrived at and how much water moves above it, the
-three unsaturated conductivity models XSLOPE offers and what each one is worth,
-the base material a flow net drawn on a zoned section has to be scaled to, and
-what the iteration does when the conductivity curve is steep enough to give it
-trouble.
+Here we work an unconfined seepage problem — one where the water table inside the
+ground is part of the answer rather than part of the input — and the choices that
+kind of problem forces on the modeler. We cover the boundary conditions an
+unconfined problem needs and the seepage face that is peculiar to it, how the
+phreatic surface is arrived at and how much water moves above it, the three
+unsaturated conductivity models XSLOPE offers and how much each one changes the
+answer, the base material a flow net drawn on a zoned section has to be scaled
+to, and what the iteration does when the conductivity curve is steep enough to
+give it trouble.
 
 The example is the Johnson Reservoir dam: an 80 ft embankment with a shell, a
 clay core keyed 40 ft into the foundation, and 60 ft of water behind it. It is a
@@ -21,10 +21,10 @@ better vehicle for these questions than a one-soil section, because a zoned dam 
 where the base material stops being obvious and where the conductivities are far
 enough apart that the choices show up in the numbers.
 
-[Tutorial SEEP-1](seep01_sheetpile.md) built a one-soil model three different
-ways and solved a confined problem on it. This page builds its model too — in
-Studio, once — because the two things a zoned dam adds to the inputs are worth
-doing rather than reading: a **stack of profile lines** that carves one section
+In [Tutorial SEEP-1](seep01_sheetpile.md) we built a one-soil model three
+different ways and solved a confined problem on it. Here we build this dam too —
+in Studio, once — because the two things a zoned dam adds to the inputs are
+better done than read about: a **stack of profile lines** that carves one section
 into three materials, and a **boundary set** with the exit face an unconfined
 problem turns on. (To skip the construction and go straight to the analysis,
 download the completed file below and pick the page back up at
@@ -77,8 +77,8 @@ traces back to those ratios rather than to their absolute size.
 
 A seepage analysis solves for the total head *h* at every point of the ground, and
 everything else — pore pressure, velocity, hydraulic gradient, total discharge —
-follows from that field by arithmetic. [SEEP-1](seep01_sheetpile.md) works through
-what total head is and where the governing equation comes from, and the
+follows from that field by arithmetic. In [SEEP-1](seep01_sheetpile.md) we work
+through what total head is and where the governing equation comes from, and the
 [Seepage Analysis](../seep/overview.md#governing-equations) page carries the
 equations in full.
 
@@ -115,8 +115,8 @@ iterated, and a model without them is confined and is solved directly.
 ## Boundary conditions on an unconfined problem
 
 The boundary condition types XSLOPE offers are the same on both kinds of
-problem, and
-[SEEP-1](seep01_sheetpile.md#boundary-condition-types) tabulates them. Every
+problem, and are tabulated in
+[SEEP-1](seep01_sheetpile.md#boundary-condition-types). Every
 boundary condition is defined the same way: by a **polyline** — the sequence of
 points along the boundary where the condition applies — with a value beside it
 where the type takes one. Three of the types place the water:
@@ -185,8 +185,8 @@ beside it. There is nothing to give it a value from.
 Start with **File → New**, an empty project, and switch the toolbar's **Mode**
 selector to **Seepage** (`Ctrl+2`) so the run buttons start a seepage analysis.
 Work down the **Inputs** tree in the order the model depends on: settings, then
-the materials, then the geometry, then the boundary conditions. The build below
-runs in Studio; the same tables paste into the
+the materials, then the geometry, then the boundary conditions. We build it in
+Studio below; the same tables paste into the
 [Excel template](../usage/input_template.md)'s `mat`, `profile` and `seep bc`
 worksheets just as well. And to skip the construction entirely, download
 [xslope_johnson_res.xlsx](files/xslope_johnson_res.xlsx), open it with
@@ -219,8 +219,8 @@ profile lines will use, top of the section first — and fill the three rows:
 
 All three zones are isotropic — `k1` equals `k2`, so `alpha` means nothing and
 stays at 0 — and the whole of the zoning is in the conductivities, as the problem
-statement said. Unlike SEEP-1's confined model, the `unsat` selector and the two
-parameters after it are entered here rather than left blank: they are read above
+statement said. Unlike the confined model in SEEP-1, the `unsat` selector and the
+two parameters after it are entered here rather than left blank: they are read above
 the phreatic surface, and an unconfined problem has one. Set **unsat** to `lf`,
 **kr0** to `0.01` and **h0** to `-1` on every row — what those numbers mean, and
 what the other two models in the selector would do instead, is the subject of
@@ -231,7 +231,7 @@ because the `lf` model does not read them.
 cohesions, friction angles — because the same workbook feeds the limit
 equilibrium and finite element analyses of the
 [seepage-to-stability worked example](../seep/seep_slope.md#worked-example). A
-seepage analysis never reads them, so this build leaves them empty.)
+seepage analysis never reads them, so we leave them empty here.)
 
 Click **OK**.
 
@@ -239,7 +239,7 @@ Click **OK**.
 
 A profile line is the *top* of a material's zone: everything below it, down to
 the next profile line or the maximum depth, is that material.
-[SEEP-1's model](seep01_sheetpile.md#3-profile-lines) needed one line; a zoned
+[The model in SEEP-1](seep01_sheetpile.md#3-profile-lines) needed one line; a zoned
 section takes a **stack** of them, one per row of the material table and in the
 same order, and how the lines share their vertices is what carves a single
 section into shell, core and foundation. Every vertex the three lines need is on
@@ -305,9 +305,9 @@ vertices are in. Click **OK**.
 
 ### 4. Boundary conditions
 
-Click **Seep BC**. The editor opens on **Set 1** — the dialog SEEP-1's
-[boundary-condition step](seep01_sheetpile.md#4-boundary-conditions) walks
-through — and the set this problem needs is three entries. As with the profile
+Click **Seep BC**. The editor opens on **Set 1** — the dialog we walk through in
+the [boundary-condition step](seep01_sheetpile.md#4-boundary-conditions) of
+SEEP-1 — and the set this problem needs is three entries. As with the profile
 lines, paste each table into the points grid, or **Add row** and type it.
 
 **Head 1 — the reservoir.** Press **Add head**, leave **Type:** at `head`, set
@@ -355,7 +355,7 @@ continues past the toe along the flat ground to (750, 100), with no tailwater
 head at all. Along that flat stretch the tailwater head of 100 equals the ground
 elevation — and head = elevation is exactly the condition a saturated exit-face
 node enforces, so the two are the same statement written two ways, and solving
-it either way returns the same discharge to four figures. This page keeps the
+it either way returns the same discharge to four figures. We keep the
 explicit head because it also states where the tailwater stands, which is what
 puts the downstream water level on the Inputs plot.
 
@@ -402,9 +402,9 @@ Set **Size divisions** to `120`. The section is 750 ft wide, so the target eleme
 size becomes 750/120 = 6.25 ft, and the grayed **Target element size** box shows
 it.
 
-Leave every other control at its default — SEEP-1's
-[Building the mesh](seep01_sheetpile.md#building-the-mesh) explains each one, and
-none of them does work on this model.
+Leave every other control at its default — each one is explained in
+[Building the mesh](seep01_sheetpile.md#building-the-mesh) in SEEP-1, and none of
+them does work on this model.
 
 Click **Build**. The mesh comes out at **2,913 nodes and 5,543 triangles**, with
 the boundary nodes marked on it:
@@ -427,8 +427,9 @@ Click **Run Seep…**:
 ![The Run Seepage dialog](images/seep02_studio_run_seep.png)
 
 **Convergence tol** is the head-change tolerance the unconfined iteration is
-tested against, and unlike on SEEP-1's confined problem it is live here. Leave it
-at `0.0001` for now — a later section measures what changing it does.
+tested against, and unlike on the confined problem in SEEP-1 it is live here.
+Leave it at `0.0001` for now — we measure what changing it does in a later
+section.
 
 The **Model checks** panel filling the right half of the dialog is the preflight
 report for this run: it reads the geometry, the material table and the boundary
@@ -456,11 +457,11 @@ Asking for the tolerance as a fraction of the domain rather than as a length is
 what lets one default work on a 10 m sheetpile section and on a 180 ft dam.
 
 The run finishes in **23 iterations**. In the **Display** panel, tick
-**Filled contours** — worth having on a zoned section, where the wash shows the
+**Filled contours** — useful on a zoned section, where the wash shows the
 core carrying the drop. **Base material** already reads `3: foundation`: the
-selector opens on the zone whose conductivity makes the flow lines legible;
-[Scaling the flow net](#scaling-the-flow-net-on-a-zoned-section) below is what
-that control does and why the other two choices fail here:
+selector opens on the zone whose conductivity makes the flow lines legible; in
+[Scaling the flow net](#scaling-the-flow-net-on-a-zoned-section) below we work
+through what that control does and why the other two choices fail here:
 
 ![The seepage solution](images/seep02_solution.png){width=1000}
 
@@ -557,9 +558,9 @@ one element instead of snapping it across a node.
 Two consequences follow for reading the result. The phreatic surface is resolved to
 about one element — 6.25 ft here — so a phreatic elevation quoted to better than
 that is quoting the interpolation rather than the physics. And the surface is a
-consequence of the head field, so it moves only when the head field moves: the
-next section runs three different unsaturated models and finds the surface moving
-by less than half a foot between them.
+consequence of the head field, so it moves only when the head field moves: in the
+next section we run three different unsaturated models and find the surface
+moving by less than half a foot between them.
 
 ---
 
@@ -584,8 +585,8 @@ head-contour count requested through **levels**, so it computes the
 *N<sub>f</sub>* + 1 stream-function levels — one more line than channels, and
 never fewer than two.
 
-That leaves one thing to supply — the *k*. On SEEP-1's single-soil problem there
-was only one candidate and the choice was inert. On a zoned section there are
+That leaves one thing to supply — the *k*. On the single-soil problem in SEEP-1
+there was only one candidate and the choice was inert. On a zoned section there are
 three, they differ by three orders of magnitude, and the answer changes by three
 orders of magnitude with them. The choice is the Display panel's **Base
 material** selector — one entry per material, opening on the zone XSLOPE picks
@@ -720,10 +721,10 @@ values are not comparable: with *n* fixed, *k<sub>r</sub>* falls to one half at 
 suction of *a*<sup>−1/*n*</sup>, so a large *a* means a curve that starts dropping
 immediately.
 
-Drawn against each other, on this dam's own soils and parameters, with both axes
-logarithmic — the curves differ by log cycles, over a suction range spanning log
-cycles of its own, and on log axes the
-linear front's straight line reads as the cliff a solver sees:
+Drawn against each other on this dam's own soils and parameters, with both axes
+logarithmic, the curves differ by log cycles over a suction range spanning log
+cycles of its own, and the linear front's straight line reads as the cliff a
+solver sees:
 
 ![The three relative-conductivity curves per material](images/seep02_kr_models.png){width=1000}
 
@@ -756,9 +757,9 @@ surface changes.
 
 The two calibrated models agree with each other to **0.06%** in discharge, and
 both sit **4.5 to 4.6% below** the linear front. That gap is the whole of what the
-choice of model is worth on this dam's total discharge.
+choice of model changes in this dam's total discharge.
 
-On the phreatic surface it is worth less still:
+On the phreatic surface it changes less still:
 
 ![The phreatic surface under each model](images/seep02_phreatic_models.png){width=1000}
 
@@ -780,8 +781,8 @@ analysis are the ones *below* the phreatic surface, and those are set by the
 saturated conductivities and the boundary conditions. If the deliverable is a factor of
 safety, any of the three gives it. If the deliverable is a discharge — a seepage
 collection design, a reservoir loss estimate, a comparison against a measured
-tailwater flow — a 4.6% spread is worth caring about, and the model whose
-parameters can be defended from measurements is the one to use.
+tailwater flow — a 4.6% spread matters, and the model whose parameters can be
+defended from measurements is the one to use.
 
 The 4.6% gap itself is the floor's doing. The linear front holds *k<sub>r</sub>* at its
 floor of 0.01 through the deep unsaturated zone — a hundred times the
@@ -973,6 +974,5 @@ the one it exported to SEEP2D;
 [Seepage and Slope Stability](../seep/seep_slope.md) takes this head field into a
 limit equilibrium search and a finite element strength reduction on the same file;
 and [Sample Problem 9](../seep/samples.md#9-johnson-reservoir-zoned-drawdown-transient)
-is this same dam solved through a 45-day reservoir drawdown, where the boundaries
-move and the answer depends on when the dam is examined.
-[SEEP-1](seep01_sheetpile.md) is where a seepage model gets built from nothing.
+is this same dam solved through a 45-day reservoir drawdown.
+[SEEP-1](seep01_sheetpile.md) is where we build a seepage model from nothing.

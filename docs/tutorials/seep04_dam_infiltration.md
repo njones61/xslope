@@ -16,18 +16,18 @@ water arriving at the ground surface at a known rate, which can just as well be
 snowmelt or irrigation — and everything here applies to any of them.
 
 The example is a 12 m earth dam holding 10 m of water, with a horizontal drain
-at its downstream toe. It is solved twice. The first run is the dam in dry
+at its downstream toe. We solve it twice. The first run is the dam in dry
 weather, and it is the reference. The second is the same model with steady rain
 falling on it at 1 × 10<sup>−8</sup> m/s, and nothing else changed — one input
-added, the run repeated, the two answers compared. Most of what the page measures
+added, the run repeated, the two answers compared. Most of what we measure
 comes out of that comparison: where the water enters, where it leaves, how far the
 phreatic surface climbs, and the result that the drain passes 75% more water while
-the reservoir supplies a third less. A closing sweep of six rain rates then asks
-what the dam does when the weather changes.
+the reservoir supplies a third less. We close with a sweep of six rain rates,
+asking what the dam does when the weather changes.
 
-[SEEP-2](seep02_johnson_dam.md) built an unconfined dam from nothing and
-[SEEP-1](seep01_sheetpile.md) covers what a seepage analysis computes; this page
-does not repeat either. It starts from a **starter file** that already carries the
+In [SEEP-2](seep02_johnson_dam.md) we built an unconfined dam from nothing, and
+[SEEP-1](seep01_sheetpile.md) covers what a seepage analysis computes; we repeat
+neither here. We start from a **starter file** that already carries the
 section and the soil, so the build here is only the boundary set — the reservoir,
 the drain, and the rain. (To skip the construction, download the completed file
 below and pick the page back up at [Building the mesh](#building-the-mesh). That
@@ -85,8 +85,8 @@ The rain is a **vertical** Darcy velocity of 1 × 10<sup>−8</sup> m/s, a tenth
 the soil's saturated conductivity, applied over the whole exposed surface: the
 upstream face above the waterline, the crest, and the downstream face down to the
 toe. Turning that one vertical number into the two numbers the boundary condition
-takes is the first thing the build has to get right, and the
-[flux section](#adding-the-rain) works it out.
+takes is the first thing the build has to get right, and we work it out in the
+[flux section](#adding-the-rain).
 
 The dam, the soil and the rain are all from a published verification problem, so
 both runs on this page have an answer to be checked against —
@@ -104,13 +104,13 @@ Run menu offer the seepage tables rather than the limit equilibrium ones.
 
 The file carries the section as one profile line with its maximum depth at
 elevation 0, and it carries the material. It carries no boundary conditions,
-which is what the next two sections build.
+which is what we build in the next two sections.
 
 Its global parameters are already set: **Units** `SI` and **Time** `sec`, so the
 unit weight of water is 9.81 kN/m³, heads read in meters, conductivities and
 fluxes in m/s, and every discharge in cubic meters per second per meter of dam
-measured along its axis.
-[SEEP-1](seep01_sheetpile.md#1-global-parameters) covers those fields.
+measured along its axis. Those fields are covered in
+[SEEP-1](seep01_sheetpile.md#1-global-parameters).
 
 Click **Materials**, and on **Table view** set the **Show parameters for:** toggles
 to **Seepage** alone. One row, with the seepage band of the `mat` worksheet
@@ -129,8 +129,8 @@ relative-conductivity model, and `vg_a` and `vg_n` are the only two parameters a
 steady solve needs from it. `vg_a` = 0.2452 is α, in 1/m on a model in meters, and
 it sets the suction scale over which the soil desaturates; `vg_n` = 2.5739 is
 dimensionless and controls how steeply the conductivity falls once it does.
-[SEEP-2](seep02_johnson_dam.md#the-three-unsaturated-models) runs all three
-unsaturated models against one another and measures what the choice is worth;
+In [SEEP-2](seep02_johnson_dam.md#the-three-unsaturated-models) we run all three
+unsaturated models against one another and measure how much the choice changes;
 `kr0` and `h0` belong to the linear-front model and sit at zero here because this
 model uses neither. The two van Genuchten values are a least-squares fit to the
 conductivity table the source problem publishes, described with its residuals
@@ -146,9 +146,9 @@ before it reaches the water table. Click **OK**.
 
 The dam takes two boundary conditions before the rain: the reservoir on the
 upstream face, and the drain at the downstream toe. What each type does and why an
-exit face goes where the discharge point is unknown is
-[SEEP-2's subject](seep02_johnson_dam.md#4-boundary-conditions), and this section
-does not repeat it.
+exit face goes where the discharge point is unknown is the subject of
+[SEEP-2](seep02_johnson_dam.md#4-boundary-conditions), and we do not repeat it
+here.
 
 Click **Seep BC** in the Inputs dock. The editor opens on **Set 1**.
 
@@ -203,7 +203,7 @@ analysis a seepage run puts no restriction on element order. One plan does
 restrict it. A finite element stability analysis reading its pore pressures from
 this solution runs on this same mesh, and the FEM side requires quadratic
 elements, so for that workflow build the mesh as **Quadratic triangles (tri6)**
-from the start. This page stays with seepage, so tri3 is sufficient.
+from the start. We stay with seepage here, so tri3 is sufficient.
 
 Untick **Auto-size from geometry**, which enables the **Target element size** box
 below it, and confirm that box reads `1.0`. Leave the rest of the dialog alone and
@@ -262,7 +262,7 @@ head is positive; above it the soil is unsaturated and the pressure head is
 negative, which on the crest centerline reaches −4.2 m at the crest itself.
 
 This is materially different from an exit face on a slope, like the downstream
-face of [SEEP-2's dam](seep02_johnson_dam.md#the-seepage-face). There the
+face of [the dam in SEEP-2](seep02_johnson_dam.md#the-seepage-face). There the
 phreatic surface meets the face partway up, and the face **above** that point
 deactivates: the soil behind it is unsaturated, gravity carries what water it
 holds down and away from the face rather than out through it, and the iteration
@@ -326,8 +326,8 @@ The crest is horizontal, θ = 0 and cos θ = 1, so there *q*<sub>n</sub> is the
 the waterline, the crest, and the downstream face — because the surface has three
 slopes.
 
-The check that the projection is right is that the water it delivers is the water
-that fell. A block of length *L* at a uniform *q* puts *qL* into the model, so:
+The projection is right if the water it delivers is the water that fell. A block
+of length *L* at a uniform *q* puts *qL* into the model, so:
 
 | block | from | to | length (m) | *q* (m/s) | *qL* (m³/s per m) | footprint (m) |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -346,8 +346,8 @@ length = 3.5305 × 10<sup>−7</sup>, 10% more water than fell on it.
 The projection is geometry alone, and it assumes every drop that lands soaks in.
 On a real slope some of the rain runs off instead — more as the face steepens —
 so in practice the rate applied to an inclined boundary is often reduced
-further, to a net infiltration rate the modeler judges. This page keeps the full
-geometric values, which is what the source problem applies.
+further, to a net infiltration rate the modeler judges. We keep the full
+geometric values here, which is what the source problem applies.
 
 ### Entering the flux boundary conditions
 
@@ -438,11 +438,12 @@ The head still ranges from **0 to 10 m**: the rain lifts heads inside the dam bu
 does not push any of them above the reservoir that is the model's high point.
 
 The two solution figures are drawn on the **same color scale**, 0 to 10 m of total
-head, so they can be read against each other directly. Everything downstream of the
+head, so we can read them against each other directly. Everything downstream of the
 crest is warmer under rain — heads there are higher — and the phreatic surface is
 visibly higher along its whole length, meeting the drain in both cases but
-arriving from further up and landing about a meter further along it. The extra flow lines entering through the
-downstream face are the rain, water that never touched the reservoir.
+arriving from further up and landing about a meter further along it. The extra
+flow lines entering through the downstream face are the rain, water that never
+touched the reservoir.
 
 ---
 
@@ -524,7 +525,7 @@ whole family on one section:
 | 0.2 | 2 × 10<sup>−8</sup> | 6.949 × 10<sup>−7</sup> | 9.55 |
 | 0.4 | 4 × 10<sup>−8</sup> | 1.246 × 10<sup>−6</sup> | none — saturated to the surface |
 
-All six runs are on the mesh this page has been using, all six converge in the
+All six runs are on the mesh we have been using, all six converge in the
 same eight sweeps, and all thirteen drain nodes drain in every one of them, so
 nothing below is the drain switching on or off.
 
@@ -589,12 +590,12 @@ This tutorial covered:
 [Seepage Analysis](../seep/overview.md#specified-flux-boundary-conditions-neumann)
 carries the flux formulation, the nodal loads it assembles into, and the rest of
 the boundary condition types;
-[GW6](../verification/rocscience_groundwater.md#gw6) runs this dam through five
-published cases, among them the dry dam solved here, the same dam under rain, and
+[GW6](../verification/rocscience_groundwater.md#gw6) carries five published cases
+for this dam, among them the dry dam solved here, the same dam under rain, and
 the same dam again with its drain replaced by a seepage face.
-[SEEP-2](seep02_johnson_dam.md) is where the unconfined steady problem and its
-seepage face are built from nothing, and
-[SEEP-3](seep03_reservoir_drawdown.md) takes a dam's boundary and makes it move
-with time. [FEM-1](fem01_strength_reduction.md) meshes a slope for stability
-instead of seepage and finds its factor of safety by reducing the soil's
+[SEEP-2](seep02_johnson_dam.md) is where we build the unconfined steady problem
+and its seepage face from nothing, and in
+[SEEP-3](seep03_reservoir_drawdown.md) we take a dam's boundary and make it move
+with time. In [FEM-1](fem01_strength_reduction.md) we mesh a slope for stability
+instead of seepage and find its factor of safety by reducing the soil's
 strength until it fails.

@@ -12,8 +12,8 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 You: How does a reliability analysis work in XSLOPE?
 
 Ran code:
-    for i, m in enumerate(slope_data['materials'], 1):
-        print(i, m['name'], {k: m.get(k) for k in ('sigma_gamma','sigma_c','sigma_phi','sigma_cp','sigma_d','sigma_psi')})
+    for i,m in enumerate(slope_data['materials'],1):
+        print(i, m['name'], {k:m.get(k) for k in ('sigma_gamma','sigma_c','sigma_phi','sigma_cp','sigma_d','sigma_psi')})
 
 Output:
     1 shell {'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0}
@@ -21,173 +21,116 @@ Output:
 
 Assistant: ## The idea
 
-You give each uncertain material property a **standard deviation** alongside its mean, and XSLOPE propagates that scatter through the LEM solver to get a distribution of FS rather than a single number. The outputs are:
+A reliability analysis treats the strength (and unit weight) inputs as **random variables** instead of single numbers, propagates that scatter through the LEM solver, and reports the distribution of FS rather than one value. The outputs are:
 
-- **μ_FS** — mean factor of safety
-- **σ_FS** — standard deviation of FS
-- **β = (μ_FS − 1) / σ_FS** — the reliability index, how many standard deviations the mean sits above failure
-- **p_f** — probability of failure, `Φ(−β)` under a normal assumption (lognormal variants shift this)
+- **E[FS]**, **σ_FS**
+- **β = (E[FS] − 1) / σ_FS** — the reliability index, how many standard deviations the mean FS sits above failure
+- **P_f** — probability of failure, `P(FS < 1)`, from a normal (or lognormal) fit
 
-β is the number that matters: FS = 1.5 with tight strength data and FS = 1.5 with wildly scattered data are not the same slope.
-
-## Where the inputs live
-
-On the materials, as the `sigma_*` fields — `sigma_gamma`, `sigma_c`, `sigma_phi`, `sigma_cp`, `sigma_d`, `sigma_psi`. A σ of 0 means "treated as deterministic," and **that is where your model stands right now** — both `shell` and `base` have every σ at 0.0, so a reliability run would report σ_FS = 0 and β = ∞. You'd need to set at least `sigma_c` and `sigma_phi` before any of the engines below say anything.
+Inputs are the **σ columns on each material**: `sigma_gamma`, `sigma_c`, `sigma_phi`, `sigma_cp`, `sigma_d`, `sigma_psi`. A σ of 0 means that property is deterministic.
 
 ## The three engines
 
-`reliability(method='bishop', engine=...)` is the front door; each engine also has its own entry point.
+| Call | How it samples | Failure surface |
+|:--|:--|:--|
+| `reliability_taylor(method='bishop')` | Taylor-series (FOSM): 1 base solve + 2 per random variable, at mean ± σ; σ_FS from the summed partial derivatives | **Re-searched on every one of the 1 + 2N solves** — the critical surface migrates with the parameter values |
+| `reliability_mc(method='bishop', n_samples=…, rng_seed=…)` | Monte Carlo: random draws from each variable's distribution | **Held FIXED** — never re-searched |
+| `reliability_rs(method='bishop')` | Response surface: a fitted polynomial surrogate, then sampled cheaply | **Held FIXED** |
 
-**Taylor series** (`reliability_taylor`) — the classic Duncan MSE method. For each variable it re-solves at mean ± σ, takes ΔFS/2 as that variable's contribution, and combines them in quadrature:
+Front door: `reliability(method='bishop', engine='taylor'|'mc'|'rs')`. Each renders its own plot.
+
+That surface difference is reportable, not cosmetic: Taylor's β accounts for the critical surface moving as strengths vary; MC and RS give β and P_f **conditional on one surface**, which is cheaper and usually slightly optimistic. Cost runs the other way — Taylor is 1 + 2N solves (cheap), MC is `n_samples` solves (expensive but distribution-free), RS buys MC-like sampling at a handful of real solves.
+
+## Micro-example
+
+With `E[FS] = 1.45` and `σ_FS = 0.18`:
 
 ```
-σ_FS = sqrt( Σ (ΔFS_i / 2)² )
+β  = (1.45 − 1)/0.18 = 2.50
+P_f = Φ(−2.50) ≈ 0.6%
 ```
 
-Cost is 2n + 1 solves for n variables — cheap, and it hands you a per-variable breakdown showing which property dominates the uncertainty. It assumes FS is roughly linear in each variable over ±σ.
+## Your model right now
 
-**Monte Carlo** (`reliability_mc(n_samples=..., rng_seed=...)`) — samples the full parameter set N times and solves each realization, so p_f is counted from the empirical distribution rather than assumed normal. No linearity assumption, but N solves; use `rng_seed` so the run is reproducible.
+Both `shell` and `base` carry **σ = 0 on every property**, so a reliability run has nothing to randomize — it would return σ_FS = 0 and an infinite β. You'd need to fill in at least `sigma_c` and `sigma_phi` (typical COVs: c ≈ 20–40%, φ ≈ 5–15%, γ ≈ 3–7%) before any engine gives a meaningful answer.
 
-**Response surface** (`reliability_rs`) — fits a polynomial surrogate to a small designed set of real solves, then samples the surrogate millions of times. Monte Carlo accuracy at Taylor-ish cost, valid as long as the surface fits.
-
-Each renders its own plot.
-
-## A micro-example
-
-Say Taylor gives μ_FS = 1.62, σ_FS = 0.21. Then β = (1.62 − 1)/0.21 = 2.95, and p_f = Φ(−2.95) ≈ 1.6×10⁻³ — about 1 in 600. Drop σ_FS to 0.12 with better site data and β jumps to 5.2, p_f ≈ 1×10⁻⁷, with the mean FS completely unchanged.
-
-## Caveats worth stating
-
-- The σ's are **your** estimate of parameter uncertainty; they don't include model error, and p_f is a notional probability, not an actuarial one.
-- Variables are treated as independent unless you say otherwise — real c and φ from a common test set are usually negatively correlated, which makes independent sampling conservative on σ_FS.
-- Each realization runs the critical-surface search for the chosen method, so the critical surface can migrate between samples. That's physical, not noise.
-
-Details: `https://xslope.readthedocs.io/en/latest/reliability/`, with `reliability/taylor/` and `reliability/monte_carlo/` for the formulations.
-
-Want me to put representative σ values on `shell` and `base` (say σ_c and σ_φ) and run a Taylor analysis with Spencer so you can see the breakdown on this model?
+Say the word and I'll set the σ values you want and run one — or read the derivations at `reliability/`, `reliability/taylor/`, and `reliability/monte_carlo/`.
 ````
 
-Tokens: input 26,319 · cached_input 25,044 · output 1,568 · calls 2 · 26.4s
+Tokens: input 28,581 · cached_input 27,308 · output 1,380 · calls 2 · 19.8s
 
 ## Turn 2 — How do I decide standard deviations for a reliability analy…
 
 ````text
 You: How do I decide standard deviations for a reliability analysis if I only have a few tests?
 
-Ran code:
-    import math
-    # d2: expected sample range in units of sigma (SQC table) -> range/d2 estimates sigma
-    d2 = {3:1.693, 4:2.059, 5:2.326, 6:2.534, 8:2.847, 10:3.078, 20:3.735, 30:4.086}
-    print("N   divide range by")
-    for n,v in d2.items(): print(f"{n:<4}{v:.2f}")
-    
-    print("\nCOV-based sigmas for THIS model (imperial):")
-    cov = {'gamma':(0.03,0.07), 'c':(0.20,0.40), 'phi':(0.05,0.13)}
-    for m in slope_data['materials']:
-        print(f"\n {m['name']}: gamma={m['gamma']}, c={m['c']}, phi={m['phi']}")
-        for k,(lo,hi) in cov.items():
-            v = m[k]
-            print(f"   sigma_{k:<6} {v*lo:8.2f} .. {v*hi:8.2f}")
-    
-    # sampling error in s itself
-    print("\nrelative uncertainty in s estimated from N tests  = 1/sqrt(2(N-1)):")
-    for n in (3,5,10,20,30): print(f"  N={n:<3} +/- {100/math.sqrt(2*(n-1)):.0f}%")
+Assistant: ## Short answer
 
-Output:
-    N   divide range by
-    3   1.69
-    4   2.06
-    5   2.33
-    6   2.53
-    8   2.85
-    10  3.08
-    20  3.73
-    30  4.09
-    
-    COV-based sigmas for THIS model (imperial):
-    
-     shell: gamma=130.0, c=300.0, phi=37.0
-       sigma_gamma      3.90 ..     9.10
-       sigma_c         60.00 ..   120.00
-       sigma_phi        1.85 ..     4.81
-    
-     base: gamma=130.0, c=0.0, phi=37.0
-       sigma_gamma      3.90 ..     9.10
-       sigma_c          0.00 ..     0.00
-       sigma_phi        1.85 ..     4.81
-    
-    relative uncertainty in s estimated from N tests  = 1/sqrt(2(N-1)):
-      N=3   +/- 50%
-      N=5   +/- 35%
-      N=10  +/- 24%
-      N=20  +/- 16%
-      N=30  +/- 13%
+With a handful of tests you don't *estimate* σ statistically — you **bound** it and check that the answer isn't sensitive to which bound you chose. Three ways, in the order you should reach for them.
 
-Assistant: With three or five tests, the sample standard deviation you compute is itself nearly worthless — from N = 3 it carries about ±50% uncertainty (the last block above: relative error in s is 1/√(2(N−1))). So don't just trust `np.std` on four numbers. Use it as one of three estimates and reconcile them.
+### 1. Published COV × your mean
 
-## 1. The three-sigma rule (Duncan's method)
+The most defensible default. σ = COV · mean, with COV from the literature (Duncan 2000, *Factors of Safety and Reliability in Geotechnical Engineering*, ASCE JGGE):
 
-Ask yourself the highest conceivable value (HCV) and lowest conceivable value (LCV) of the parameter — the range you'd bet the property will not escape. Then
+| Property | Typical COV |
+|:--|:--|
+| γ (total unit weight) | 3–7% |
+| c′ (effective cohesion) | 20–40% |
+| φ′ (friction angle) | 5–15% |
+| S_u (undrained strength) | 20–40% |
+| tan φ′ | 5–15% |
+
+Use the **high** end when your few tests came from scattered locations or different labs, the low end for a uniform compacted fill with controlled QC.
+
+### 2. The three-sigma rule
+
+Ask yourself the highest and lowest **conceivable** values (not "likely" — conceivable), then
 
 ```
 σ ≈ (HCV − LCV) / 6
 ```
 
-because ±3σ spans ~99.7% of a normal distribution. For your shell, if you'd say c is conceivably as low as 150 psf and as high as 450 psf, σ_c ≈ (450−150)/6 = **50 psf**.
+because ±3σ spans ~99.7% of a normal distribution. The known failure mode: engineers pick ranges that are **too narrow**, so Duncan recommends dividing by **4** instead of 6 unless you're confident in the extremes. With 3–5 tests, use /4.
 
-The failure mode here is people picking too narrow a range — imagining plausible values rather than conceivable ones — which underestimates σ and inflates β. Duncan's own advice: widen your first guess.
+### 3. Small-sample statistics, inflated
 
-## 2. The range method on the tests you actually have
+If you do compute `s` from n tests with the (n−1) denominator, remember that for n < 10 the sample range badly understates the population range. Treat `s` as a **lower bound** on σ, and carry the larger of `s` and the COV-based estimate.
 
-With N tests, the observed range divided by the d₂ factor is an unbiased σ estimate, and it works far better on tiny samples than the sample s does:
+## Three things that trip people up
 
-| N | divide range by |
-|---|---|
-| 3 | 1.69 |
-| 4 | 2.06 |
-| 5 | 2.33 |
-| 6 | 2.53 |
-| 8 | 2.85 |
-| 10 | 3.08 |
+**Separate the sources of scatter.** Total variability = inherent spatial variability + measurement/test error + statistical uncertainty in the mean. Only the *inherent* part is real strength variation; lab scatter isn't a property of the ground. With few tests you can't decompose it, so using total scatter is conservative — say so.
 
-Four triaxials giving c = 260, 290, 320, 350 psf → range 90, σ ≈ 90/2.06 ≈ **44 psf**.
+**Spatial averaging reduces the effective σ.** A slip surface 100 ft long mobilizes the *average* strength along it, not a point value. Where the scale of fluctuation is short compared to the surface, the effective σ on the surface is well below the point σ. Ignoring this is conservative, which is usually fine — but it's why a P_f of a few percent from point-scale σ is not a literal failure probability.
 
-## 3. Published coefficients of variation as a floor
+**Correlation matters and the Taylor engine assumes none.** c′ and φ′ from the same tests are typically *negatively* correlated (a steeper envelope gives a lower intercept). Treating them as independent overstates σ_FS — conservative again.
 
-COV = σ/μ from the literature (Duncan 2000; Harr; Lacasse & Nadim), typical ranges:
+## The practical workflow in Studio
 
-| Property | COV |
-|---|---|
-| γ (unit weight) | 3–7% |
-| c, Su | 20–40% |
-| φ (drained) | 5–13% |
-| tan φ | 5–15% |
+Don't agonize over every σ. Find out which one matters first, then bracket only that one:
 
-Applied to your model's means:
+```python
+# 1. which variable dominates?
+parametric_sweep(plot='tornado')
 
-| | shell | base |
-|---|---|---|
-| σ_γ | 3.9 – 9.1 pcf | 3.9 – 9.1 pcf |
-| σ_c | 60 – 120 psf | 0 (c = 0 by definition) |
-| σ_φ | 1.9 – 4.8° | 1.9 – 4.8° |
+# 2. bracket the dominant σ: low and high estimates
+for cov in (0.15, 0.40):
+    for m in slope_data['materials']:
+        m['sigma_c'] = cov * m['c']
+    print(cov, reliability_taylor(method='bishop', plot=False))
+```
 
-## How to reconcile them
+If β stays on the same side of your target (commonly β ≥ 3, P_f ≤ 0.1% for a permanent slope) across the whole bracket, your σ choice didn't decide the answer and you can report it with the range stated. If β crosses the target inside the bracket, **that is your justification for more testing** — and it tells you exactly which property to test.
 
-Take the **largest** of the three unless you have a specific reason not to. A four-test range method giving σ_c = 44 psf against a 20% COV floor of 60 psf means your four samples happened to come from one homogeneous pocket — use 60. Small samples systematically under-sample the tails.
+Note that `reliability_taylor` needs only the mean and σ, not a distribution shape, which is why it's the right engine when your data are thin. Monte Carlo makes you commit to a distribution you can't support with five tests.
 
-Two more things that matter for your model specifically:
+Derivations: `reliability/taylor/` and `reliability/` at `https://xslope.readthedocs.io/en/latest/`.
 
-- **`base` has c = 0 as a definition, not a measurement.** Leave `sigma_c = 0` there — randomizing a cohesionless material's cohesion invents strength that the soil model says doesn't exist. Put the base's uncertainty entirely in σ_φ.
-- **Spatial averaging.** A long failure surface crosses high and low patches that partly cancel, so the σ relevant to FS is smaller than the point-property σ from lab tests — sometimes by half for a long surface in a spatially variable deposit. If you skip this correction (most people do), your β is conservative. Say so rather than silently claiming precision.
-
-Sanity check afterward: run Taylor and look at the per-variable breakdown. If one property contributes 80% of σ_FS, that's the one worth more tests, and it's also the one where a sloppy σ guess is actually costing you an answer.
-
-Want me to set σ_γ, σ_c, σ_φ on the two materials using the mid-range COVs above and run a Taylor analysis so you can see which variable dominates?
+Want me to put a first-pass set of σ values on your two materials — say COV 30% on c and 10% on φ — and run the bracket above?
 ````
 
-Tokens: input 30,160 · cached_input 25,044 · output 3,221 · calls 2 · 49.5s
+Tokens: input 15,503 · cached_input 13,654 · output 1,935 · calls 1 · 29.4s
 
 ## Session total
 
-- Tokens: input 56,479 · cached_input 50,088 · output 4,789 · calls 4
-- Wall time: 82.8s
+- Tokens: input 44,084 · cached_input 40,962 · output 3,315 · calls 3
+- Wall time: 57.6s

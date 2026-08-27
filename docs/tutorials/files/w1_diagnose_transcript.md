@@ -8,366 +8,154 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 
 ## Turn 1 — This model gives a factor of safety below 1. Can you find w…
 
-````text
+```text
 You: This model gives a factor of safety below 1. Can you find what is wrong?
 
-Assistant: I'll inspect the model's geometry, materials, water, and surfaces together.
+Assistant: I'll pull the full picture of the model in one pass.
 
 Ran code:
     
     import numpy as np
-    print("max_depth:", slope_data['max_depth'], " gamma_water:", slope_data['gamma_water'],
-          " k_seismic:", slope_data.get('k_seismic'), " tcrack:", slope_data.get('tcrack_depth'), slope_data.get('tcrack_water'))
+    print("max_depth:", slope_data['max_depth'], " gamma_w:", slope_data['gamma_water'],
+          " k_seismic:", slope_data.get('k_seismic'), " tcrack:", slope_data.get('tcrack_depth'),
+          " circular:", slope_data.get('circular'), " lem_method:", slope_data.get('lem_method'))
+    print("\n-- polygons --")
     for p in slope_data['polygons']:
-        print("mat_id", p['mat_id'], list(p['polygon'].exterior.coords))
-    print()
-    for i,m in enumerate(slope_data['materials']):
-        print(i+1, {k:m.get(k) for k in ('name','gamma','gsat','option','c','phi','u','k1','kr0')})
-    print()
-    print("circles:")
-    for c in slope_data['circles']: print(c)
-    print()
-    print("piezo:", slope_data.get('piezo_line'))
-    print("dloads:")
-    for blk in slope_data['dloads']:
-        print([ (round(p['X'],2), round(p['Y'],2), round(p['Normal'],1)) for p in blk ])
-    print()
-    print("reinforcement:")
-    for r in slope_data['reinforcement_lines']:
-        print({k:r.get(k) for k in ('x1','y1','x2','y2','t_max','t_res','lp1','lp2','spacing','E','area')})
+        print(" mat_id", p['mat_id'], list(p['polygon'].exterior.coords))
+    print("\n-- ground_surface --")
     gs = slope_data.get('ground_surface')
-    print()
-    print("ground_surface:", list(gs.coords) if gs is not None else None)
+    print(list(gs.coords) if gs is not None else None)
+    print("\n-- materials --")
+    for i,m in enumerate(slope_data['materials']):
+        print(i+1, {k:m[k] for k in ('name','gamma','option','c','phi','u','gamma_sat') if k in m})
+    print("\n-- circles --")
+    for c in slope_data['circles']: print(c)
+    print("\n-- dloads --")
+    for b in slope_data['dloads']:
+        print(" block, %d pts:" % len(b), [(round(q['X'],2), round(q['Y'],2), round(q['Normal'],1)) for q in b])
+    print("\n-- piezo --", slope_data.get('piezo_line'))
+    print("\n-- reinforcement --")
+    for r in slope_data['reinforcement_lines']:
+        print({k:r.get(k) for k in ('x1','y1','x2','y2','t_max','t_res','lp1','lp2','spacing','type','dir','appl')})
 
 Output:
-    max_depth: -100.0  gamma_water: 62.4  k_seismic: 0.0  tcrack: 0.0 0.0
-    mat_id 0 [(0.0, 0.0), (30.0, 24.0), (32.0, 24.0), (2.0, 0.0), (0.0, 0.0)]
-    mat_id 1 [(-30.0, 0.0), (0.0, 0.0), (2.0, 0.0), (32.0, 24.0), (100.0, 24.0), (100.0, -100.0), (-30.0, -100.0), (-30.0, 0.0)]
+    max_depth: -100.0  gamma_w: 62.4  k_seismic: 0.0  tcrack: 0.0  circular: True  lem_method: None
     
-    1 {'name': 'shell', 'gamma': 130.0, 'gsat': None, 'option': 'mc', 'c': 300.0, 'phi': 37.0, 'u': 'none', 'k1': 0.0, 'kr0': 0.0}
-    2 {'name': 'base', 'gamma': 130.0, 'gsat': None, 'option': 'mc', 'c': 0.0, 'phi': 3.0, 'u': 'none', 'k1': 0.0, 'kr0': 0.0}
+    -- polygons --
+     mat_id 0 [(0.0, 0.0), (30.0, 24.0), (32.0, 24.0), (2.0, 0.0), (0.0, 0.0)]
+     mat_id 1 [(-30.0, 0.0), (0.0, 0.0), (2.0, 0.0), (32.0, 24.0), (100.0, 24.0), (100.0, -100.0), (-30.0, -100.0), (-30.0, 0.0)]
     
-    circles:
+    -- ground_surface --
+    [(-30.0, 0.0), (0.0, 0.0), (30.0, 24.0), (32.0, 24.0), (100.0, 24.0)]
+    
+    -- materials --
+    1 {'name': 'shell', 'gamma': 130.0, 'option': 'mc', 'c': 300.0, 'phi': 37.0, 'u': 'none', 'gamma_sat': None}
+    2 {'name': 'base', 'gamma': 130.0, 'option': 'mc', 'c': 0.0, 'phi': 3.0, 'u': 'none', 'gamma_sat': None}
+    
+    -- circles --
     {'Xo': 0.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}
     {'Xo': 15.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}
     
-    piezo: []
-    dloads:
-    [(30.0, 24.0, 2400.0), (100.0, 24.0, 2400.0)]
+    -- dloads --
+     block, 2 pts: [(30.0, 24.0, 2400.0), (100.0, 24.0, 2400.0)]
     
-    reinforcement:
-    {'x1': 0.0, 'y1': 0.0, 'x2': 20.0, 'y2': 0.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    {'x1': 5.0, 'y1': 4.0, 'x2': 25.0, 'y2': 4.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    {'x1': 10.0, 'y1': 8.0, 'x2': 30.0, 'y2': 8.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    {'x1': 15.0, 'y1': 12.0, 'x2': 35.0, 'y2': 12.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    {'x1': 20.0, 'y1': 16.0, 'x2': 40.0, 'y2': 16.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    {'x1': 25.0, 'y1': 20.0, 'x2': 45.0, 'y2': 20.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
+    -- piezo -- []
     
-    ground_surface: [(-30.0, 0.0), (0.0, 0.0), (30.0, 24.0), (32.0, 24.0), (100.0, 24.0)]
+    -- reinforcement --
+    {'x1': 0.0, 'y1': 0.0, 'x2': 20.0, 'y2': 0.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'type': 'geosynthetic', 'dir': 'tangent', 'appl': 'active'}
+    {'x1': 5.0, 'y1': 4.0, 'x2': 25.0, 'y2': 4.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'type': 'geosynthetic', 'dir': 'tangent', 'appl': 'active'}
+    {'x1': 10.0, 'y1': 8.0, 'x2': 30.0, 'y2': 8.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'type': 'geosynthetic', 'dir': 'tangent', 'appl': 'active'}
+    {'x1': 15.0, 'y1': 12.0, 'x2': 35.0, 'y2': 12.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'type': 'geosynthetic', 'dir': 'tangent', 'appl': 'active'}
+    {'x1': 20.0, 'y1': 16.0, 'x2': 40.0, 'y2': 16.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'type': 'geosynthetic', 'dir': 'tangent', 'appl': 'active'}
+    {'x1': 25.0, 'y1': 20.0, 'x2': 45.0, 'y2': 20.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'spacing': 1.0, 'type': 'geosynthetic', 'dir': 'tangent', 'appl': 'active'}
+
+Assistant: Model read. Let me confirm with an actual search which zone the failure is in.
 
 Ran code:
     
-    for p in slope_data['polygons']:
-        print(slope_data['materials'][p['mat_id']]['name'], "area =", round(p['polygon'].area,1), "sf")
-    
-    res = run_lem(method='bishop', search=True)
-    print("\nBishop critical FS =", round(res['FS'],3))
-    for k in ('Xo','Yo','R','Depth'):
-        if k in res: print(k, res[k])
+    import math
+    res = run_lem(search=True, plot=True)
+    print("FS =", round(res['FS'],4), " Xo,Yo,R,Depth =", res['Xo'], res['Yo'], res['R'], res['Depth'])
+    print("x_entry, x_exit =", res.get('x_entry'), res.get('x_exit'))
     print("warnings:", res.get('warnings'))
+    beta = math.degrees(math.atan(24/30))
+    print("\nface angle beta = %.2f deg" % beta)
+    for m in slope_data['materials']:
+        print("%-6s infinite-slope tanphi/tanbeta = %.3f  (c=%.0f, phi=%.0f)" %
+              (m['name'], math.tan(math.radians(m['phi']))/math.tan(math.radians(beta)), m['c'], m['phi']))
+    # who owns the embankment body?
+    from shapely.geometry import Point
+    for pt in [(10,4),(20,12),(50,12),(15,-20)]:
+        for p in slope_data['polygons']:
+            if p['polygon'].contains(Point(pt)):
+                print("point", pt, "-> material", slope_data['materials'][p['mat_id']]['name'])
+    print("\nshell zone area = %.1f sf ; base zone area = %.1f sf" %
+          (slope_data['polygons'][0]['polygon'].area, slope_data['polygons'][1]['polygon'].area))
+    print("crest surcharge: 2400 psf over x=30..100  = %.1f ft of water-equivalent" % (2400/62.4))
 
 Output:
-    shell area = 48.0 sf
-    base area = 14992.0 sf
-    bishop (auto search, circular): FS = 0.083 on the circle Xo=-5.29, Yo=49.04, R=49.58
+    spencer (auto search, circular): FS = 0.071 on the circle Xo=-3.09, Yo=49.09, R=45.93
+      Spencer could not solve 6 of 406 trial surfaces (4 admit no admissible solution, 2 failed to converge); 0 of them rank lower than the reported minimum by the moment measure.
+      admissibility: interslice tension (min Z = -2687.3 vs max compression 3978.8)
+      admissibility: line of thrust outside the slice on 59% of boundaries
+    FS = 0.0709  Xo,Yo,R,Depth = -3.0861328125 49.0861328125 45.93435440063476 3.1517784118652346
+    x_entry, x_exit = 35.393093462423 4.790089851916673
+    warnings: ['interslice tension (min Z = -2687.3 vs max compression 3978.8)', 'line of thrust outside the slice on 59% of boundaries']
     
-    Bishop critical FS = 0.083
-    warnings: None
+    face angle beta = 38.66 deg
+    shell  infinite-slope tanphi/tanbeta = 0.942  (c=300, phi=37)
+    base   infinite-slope tanphi/tanbeta = 0.066  (c=0, phi=3)
+    point (10, 4) -> material base
+    point (20, 12) -> material base
+    point (50, 12) -> material base
+    point (15, -20) -> material base
+    
+    shell zone area = 48.0 sf ; base zone area = 14992.0 sf
+    crest surcharge: 2400 psf over x=30..100  = 38.5 ft of water-equivalent
 
-Ran code:
-    
-    import copy
-    from shapely.geometry import Polygon
-    save_poly = copy.deepcopy(slope_data['polygons'])
-    save_dl   = copy.deepcopy(slope_data['dloads'])
-    
-    def fs():
-        return run_lem(method='bishop', search=True, plot=False)['FS']
-    
-    # A: as-is, no dload
-    slope_data['dloads'] = []
-    print("A  as-is, dload removed          FS =", round(fs(),3))
-    
-    # B: embankment made of shell, dload removed
-    slope_data['polygons'] = [
-        {'polygon': Polygon([(0,0),(30,24),(32,24),(32,0)]), 'mat_id':0},
-        {'polygon': Polygon([(-30,0),(32,0),(100,0),(100,-100),(-30,-100)]), 'mat_id':1},
-    ]
-    print("B  embankment=shell, no dload    FS =", round(fs(),3))
-    
-    # C: same, with the 2400 psf crest load back
-    slope_data['dloads'] = copy.deepcopy(save_dl)
-    print("C  embankment=shell, dload back  FS =", round(fs(),3))
-    
-    # restore original model exactly
-    slope_data['polygons'] = save_poly
-    slope_data['dloads']   = save_dl
-    resync_geometry()
-    print("\nrestored:", len(slope_data['polygons']), "polygons,", len(slope_data['dloads']), "dload block(s)")
+Assistant: ## Found it — the embankment is built out of the foundation clay
 
-Output:
-    bishop (auto search, circular): FS = 0.088 on the circle Xo=9.56, Yo=32.52, R=32.46
-      Bishop's method could not solve 196 of 786 trial surfaces; their ranking could not be measured.
-    A  as-is, dload removed          FS = 0.088
-    bishop (auto search, circular): FS = 0.088 on the circle Xo=9.56, Yo=32.52, R=32.46
-      Bishop's method could not solve 196 of 786 trial surfaces; their ranking could not be measured.
-    B  embankment=shell, no dload    FS = 0.088
-    bishop (auto search, circular): FS = 0.083 on the circle Xo=-5.29, Yo=49.04, R=49.58
-    C  embankment=shell, dload back  FS = 0.083
-    
-    restored: 2 polygons, 1 dload block(s)
+The critical Spencer surface comes back at **FS = 0.071**, and that number is the tell: for the face angle β = atan(24/30) = 38.7°, the infinite-slope value for the *base* material is
 
-Assistant: Let me isolate the causes with explicit resyncs.
+$$\frac{\tan\varphi}{\tan\beta} = \frac{\tan 3°}{\tan 38.7°} = 0.066$$
 
-Ran code:
-    
-    import copy
-    from shapely.geometry import Polygon
-    save_poly = copy.deepcopy(slope_data['polygons'])
-    save_mats = copy.deepcopy(slope_data['materials'])
-    save_md   = slope_data['max_depth']
-    
-    def fs(tag):
-        resync_geometry()
-        r = run_lem(method='bishop', search=True, plot=False)
-        print(f"{tag:45s} FS = {r['FS']:.3f}   circle Xo={r['Xo']:.1f} Yo={r['Yo']:.1f} R={r['R']:.1f} Depth={r['Yo']-r['R']:.1f}")
-    
-    fs("0  original")
-    
-    # Fix 1: make the embankment body 'shell' instead of a 2-ft sliver
-    slope_data['polygons'] = [
-        {'polygon': Polygon([(0,0),(30,24),(32,24),(32,0)]), 'mat_id':0},
-        {'polygon': Polygon([(-30,0),(0,0),(32,0),(100,0),(100,-100),(-30,-100)]), 'mat_id':1},
-    ]
-    fs("1  embankment = shell (base still phi=3)")
-    
-    # Fix 2: on top of that, base phi = 30
-    slope_data['materials'][1]['phi'] = 30.0
-    fs("2  + base phi=30")
-    
-    # Fix 3: on top of that, max_depth/base bottom at -24 instead of -100
-    slope_data['polygons'][1] = {'polygon': Polygon([(-30,0),(100,0),(100,-24),(-30,-24)]), 'mat_id':1}
-    slope_data['max_depth'] = -24.0
-    fs("3  + base bottom/max_depth = -24")
-    
-    # restore
-    slope_data['polygons']  = save_poly
-    slope_data['materials'] = save_mats
-    slope_data['max_depth'] = save_md
-    resync_geometry()
-    print("\nrestored to original:", len(slope_data['polygons']), "polygons, base phi =",
-          slope_data['materials'][1]['phi'], ", max_depth =", slope_data['max_depth'])
+FS ≈ 0.07 means the sliding mass is essentially **cohesionless, φ = 3° soil with no reinforcement credit**. That is not a numerical problem; the model really is that weak.
 
-Output:
-    bishop (auto search, circular): FS = 0.083 on the circle Xo=-5.29, Yo=49.04, R=49.58
-    ERROR:
-    Traceback (most recent call last):
-      File "/Users/njones/python_projects/xslope/.claude/worktrees/agent-a0973c2a5a7ca6dff/studio/ai/kernel.py", line 1222, in run
-        exec(code, self._ns)
-        ~~~~^^^^^^^^^^^^^^^^
-      File "<string>", line 13, in <module>
-      File "<string>", line 11, in fs
-    KeyError: 'Xo'
+### The cause: the `shell` polygon is a degenerate sliver
 
-Ran code:
-    
-    import copy
-    from shapely.geometry import Polygon
-    save_poly = copy.deepcopy(slope_data['polygons'])
-    save_mats = copy.deepcopy(slope_data['materials'])
-    save_md   = slope_data['max_depth']
-    
-    def fs(tag):
-        resync_geometry()
-        r = run_lem(method='bishop', search=True, plot=False)
-        print(f"{tag:45s} FS = {r['FS']:.3f}")
-    
-    fs("0  original")
-    
-    slope_data['polygons'] = [
-        {'polygon': Polygon([(0,0),(30,24),(32,24),(32,0)]), 'mat_id':0},
-        {'polygon': Polygon([(-30,0),(100,0),(100,-100),(-30,-100)]), 'mat_id':1},
-    ]
-    fs("1  embankment = shell (base still phi=3)")
-    
-    slope_data['materials'][1]['phi'] = 30.0
-    fs("2  + base phi=30")
-    
-    slope_data['polygons'][1] = {'polygon': Polygon([(-30,0),(100,0),(100,-24),(-30,-24)]), 'mat_id':1}
-    slope_data['max_depth'] = -24.0
-    fs("3  + base bottom & max_depth = -24")
-    
-    slope_data['polygons']  = save_poly
-    slope_data['materials'] = save_mats
-    slope_data['max_depth'] = save_md
-    resync_geometry()
-    print("\nrestored:", len(slope_data['polygons']), "polys, base phi =",
-          slope_data['materials'][1]['phi'], ", max_depth =", slope_data['max_depth'])
+| zone | material | area |
+|:--|:--|--:|
+| 1 | shell (c = 300, φ = 37) | **48 ft²** |
+| 2 | base (c = 0, φ = 3) | 14,992 ft² |
 
-Output:
-    bishop (auto search, circular): FS = 0.083 on the circle Xo=-5.29, Yo=49.04, R=49.58
-    0  original                                   FS = 0.083
-    bishop (auto search, circular): FS = 0.083 on the circle Xo=-5.29, Yo=49.04, R=49.58
-    1  embankment = shell (base still phi=3)      FS = 0.083
-    bishop (auto search, circular): FS = 0.917 on the circle Xo=-4.22, Yo=47.08, R=47.48
-    2  + base phi=30                              FS = 0.917
-    bishop (auto search, circular): FS = 0.917 on the circle Xo=-4.22, Yo=47.08, R=47.48
-    3  + base bottom & max_depth = -24            FS = 0.917
-    
-    restored: 2 polys, base phi = 3.0 , max_depth = -100.0
+The shell polygon is `(0,0) → (30,24) → (32,24) → (2,0)` — a **2 ft wide ribbon along the slope face**, not a fill zone. The `base` polygon then covers *everything else*, including the entire embankment body above the toe elevation:
 
-Assistant: Base strength is the dominant term. One more pass to check whether the reinforcement is actually contributing.
+- point (10, 4) → **base**
+- point (20, 12) → **base**
+- point (50, 12) → **base**
 
-Ran code:
-    
-    import copy
-    from shapely.geometry import Polygon
-    save_poly = copy.deepcopy(slope_data['polygons'])
-    save_mats = copy.deepcopy(slope_data['materials'])
-    save_rl   = copy.deepcopy(slope_data['reinforcement_lines'])
-    
-    def fs(tag):
-        resync_geometry()
-        r = run_lem(method='bishop', search=True, plot=False)
-        print(f"{tag:48s} FS = {r['FS']:.3f}")
-    
-    # geometry + strength fixed
-    slope_data['polygons'] = [
-        {'polygon': Polygon([(0,0),(30,24),(32,24),(32,0)]), 'mat_id':0},
-        {'polygon': Polygon([(-30,0),(100,0),(100,-100),(-30,-100)]), 'mat_id':1},
-    ]
-    slope_data['materials'][1]['phi'] = 30.0
-    fs("fixed geom + base phi=30, WITH reinforcement")
-    
-    slope_data['reinforcement_lines'] = []
-    fs("fixed geom + base phi=30, NO reinforcement")
-    
-    slope_data['reinforcement_lines'] = copy.deepcopy(save_rl)
-    
-    # how much of the critical circle sits in each material / how deep does it go
-    r = run_lem(method='bishop', search=True, plot=False)
-    print("\ncritical circle: Xo=%.1f Yo=%.1f R=%.1f  lowest y=%.1f" % (r['Xo'],r['Yo'],r['R'],r['Yo']-r['R']))
-    
-    slope_data['polygons']  = save_poly
-    slope_data['materials'] = save_mats
-    slope_data['reinforcement_lines'] = save_rl
-    resync_geometry()
-    print("\nrestored: base phi =", slope_data['materials'][1]['phi'],
-          ", shell poly area =", round(slope_data['polygons'][0]['polygon'].area,1),
-          ", reinf lines =", len(slope_data['reinforcement_lines']))
+So the whole 24 ft fill, plus the crest, is c = 0 / φ = 3° clay. The 2 ft skin of strong shell is too thin for any circle to care about.
 
-Output:
-    bishop (auto search, circular): FS = 0.917 on the circle Xo=-4.22, Yo=47.08, R=47.48
-    fixed geom + base phi=30, WITH reinforcement     FS = 0.917
-    bishop (auto search, circular): FS = 0.917 on the circle Xo=-4.22, Yo=47.08, R=47.48
-    fixed geom + base phi=30, NO reinforcement       FS = 0.917
-    bishop (auto search, circular): FS = 0.917 on the circle Xo=-4.22, Yo=47.08, R=47.48
-    ERROR:
-    Traceback (most recent call last):
-      File "/Users/njones/python_projects/xslope/.claude/worktrees/agent-a0973c2a5a7ca6dff/studio/ai/kernel.py", line 1222, in run
-        exec(code, self._ns)
-        ~~~~^^^^^^^^^^^^^^^^
-      File "<string>", line 28, in <module>
-    KeyError: 'Xo'
+### Two consequences that follow from the same error
 
-Ran code:
-    
-    print("polys:", [(slope_data['materials'][p['mat_id']]['name'], round(p['polygon'].area,1)) for p in slope_data['polygons']])
-    print("base phi:", slope_data['materials'][1]['phi'], " shell phi:", slope_data['materials'][0]['phi'])
-    print("max_depth:", slope_data['max_depth'], " reinf lines:", len(slope_data['reinforcement_lines']))
-    print("dloads blocks:", len(slope_data['dloads']))
-    print("ground_surface:", list(slope_data['ground_surface'].coords))
+1. **The six geosynthetic layers do essentially nothing.** They sit at y = 0…20, inside what should be compacted fill. Pullout in a c = 0, φ = 3° soil is negligible, so the reinforcement adds almost no resisting force — which is why FS lands at the bare infinite-slope value.
+2. **The Spencer admissibility notes** (interslice tension, thrust line outside the slice on 59% of boundaries) are the expected symptom of a solution at FS ≪ 1, not an independent defect. They should clear once the strength is right.
 
-Output:
-    polys: [('shell', 48.0), ('base', 14992.0)]
-    base phi: 3.0  shell phi: 37.0
-    max_depth: -100.0  reinf lines: 6
-    dloads blocks: 1
-    ground_surface: [(-30.0, 0.0), (0.0, 0.0), (30.0, 24.0), (32.0, 24.0), (100.0, 24.0)]
+### The intended geometry, most likely
 
-Assistant: One more check — the reinforcement contributed nothing in either test, so let me look at its full field set.
+The shell zone should be the embankment fill above the toe elevation — toe (0,0) → crest (30,24) → (100,24) → (100,0) → back to (0,0) — with `base` occupying only the foundation from y = 0 down. That puts c = 300 / φ = 37 fill around the reinforcement and leaves the weak clay as a foundation layer, which is clearly what the model was drawn to represent.
 
-Ran code:
-    
-    r = slope_data['reinforcement_lines'][0]
-    print("full field set of reinforcement line 1:")
-    for k,v in r.items(): print("  ", k, "=", repr(v))
-    print("\nderived reinforce_lines present?", 'reinforce_lines' in slope_data,
-          "->", len(slope_data.get('reinforce_lines') or []))
+### Two things I want you to confirm before I change anything
 
-Output:
-    full field set of reinforcement line 1:
-       x1 = 0.0
-       y1 = 0.0
-       x2 = 20.0
-       y2 = 0.0
-       t_max = 800.0
-       t_res = 600.0
-       lp1 = 4.0
-       lp2 = 4.0
-       E = 800000.0
-       area = 0.1
-       label = 'Line 1'
-       type = 'geosynthetic'
-       dir = 'tangent'
-       appl = 'active'
-       tend1 = 0.0
-       tend2 = 0.0
-       spacing = 1.0
-       adhesion = nan
-       delta = nan
-       _pullout_profile = None
-       _pullout_key = (nan, nan, 1.0, 0.0, 0.0, 20.0, 0.0)
-    
-    derived reinforce_lines present? True -> 6
+- **`max_depth = -100`** is 100 ft of foundation below the toe. Is that a real base elevation from your source, or a placeholder? It isn't driving this failure (the critical circle bottoms at y = +3.2), but it governs how deep the search may go once the fill is fixed.
+- **The 2,400 psf crest load** over x = 30…100 is large — the equivalent of 38.5 ft of water. Intentional surcharge, or a units slip?
 
-Assistant: I ran the model and then isolated the causes one at a time (restoring the model afterward — **your file is unchanged**). Bishop with search gives **FS = 0.083**. Here's what's driving it.
-
-## The primary bug: the `base` material has essentially no strength
-
-```
-base:  c = 0,  phi = 3°,  gamma = 130
+Say the word and I'll redraw the shell polygon as the fill zone; I'll leave `max_depth` and the surcharge alone unless you tell me otherwise.
 ```
 
-A c = 0 / φ = 3° material cannot hold any slope — it's weaker than wet mud. And because of bug #2 below, this material makes up **14,992 sf of the 15,040 sf domain**, embankment included. Changing φ to 30° alone lifts FS from **0.083 → 0.917**. φ = 3 looks like a dropped zero for 30.
-
-## The second bug: the `shell` zone is a 2-ft sliver, not the embankment
-
-```
-shell polygon: (0,0) (30,24) (32,24) (2,0)   →  area = 48 sf
-```
-
-That's a 2-ft-wide parallelogram painted along the slope face. The good material (c = 300, φ = 37) is a paper-thin skin; the entire embankment body behind it is `base`. The shell polygon was almost certainly meant to be the full embankment, `(0,0) (30,24) (32,24) (32,0)`.
-
-Note this one is masked: fixing the zoning *by itself* leaves FS at 0.083, because the critical circle runs through the weak foundation regardless. Both fixes are needed, and even together they only reach **FS = 0.917** — so the base strength likely needs more than φ = 30, or the foundation isn't meant to be cohesionless.
-
-## Third: the 6 reinforcement lines are doing nothing
-
-FS is **identical to three decimals** with and without them (0.917 either way). The critical circle centers at x ≈ −4 and bottoms at y ≈ −0.4 — it daylights left of the toe and passes *under* the reinforced block entirely. The reinforcement can't engage a foundation failure, so it isn't the fix; it's just not being tested.
-
-## Two things to confirm rather than assume
-
-- **`max_depth = -100`** — 100 ft of foundation below a 24-ft slope. I can't tell from the file whether the problem describes a base that deep. It isn't what's causing FS < 1 here (capping at −24 gave the same 0.917 and the same circle), but it's a lot of invented room. What does your source say the base elevation is?
-- **The 2400 psf crest load** over x = 30→100. That's ~18.5 ft of soil equivalent across the whole plateau, and it's the only water/load feature in a model with no piezo line. Is it a real surcharge, or was it meant as ponded water?
-
-**Recommended order:** fix `base` φ first (biggest single effect), then re-zone the shell polygon to the full embankment, then re-check whether the reinforcement intersects the new critical surface.
-
-Want me to apply the φ and polygon fixes and re-run, or would you rather confirm the intended base strength and `max_depth` first?
-````
-
-Tokens: input 151,873 · cached_input 112,698 · output 14,802 · calls 9 · 288.0s
+Tokens: input 47,432 · cached_input 40,962 · output 5,764 · calls 3 · 121.3s
 
 ## Session total
 
-- Tokens: input 151,873 · cached_input 112,698 · output 14,802 · calls 9
-- Wall time: 294.5s
+- Tokens: input 47,432 · cached_input 40,962 · output 5,764 · calls 3
+- Wall time: 129.4s

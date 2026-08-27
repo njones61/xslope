@@ -12,91 +12,141 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 You: Change the slope face to 2:1 and rerun the search.
 
 Ran code:
-    
     for i,p in enumerate(slope_data['polygons']):
         print(i, p['mat_id'], list(p['polygon'].exterior.coords))
-    print('max_depth', slope_data['max_depth'])
     print('circles', slope_data['circles'])
+    print('max_depth', slope_data['max_depth'])
     for r in slope_data['reinforcement_lines']:
         print({k:r[k] for k in ('x1','y1','x2','y2')})
-    print('dload', slope_data['dloads'])
+    for b in slope_data['dloads']:
+        print('dload', b)
+    print('gs', slope_data.get('ground_surface'))
 
 Output:
     0 0 [(0.0, 0.0), (30.0, 24.0), (32.0, 24.0), (2.0, 0.0), (0.0, 0.0)]
     1 1 [(-30.0, 0.0), (0.0, 0.0), (2.0, 0.0), (32.0, 24.0), (100.0, 24.0), (100.0, -10.0), (-30.0, -10.0), (-30.0, 0.0)]
-    max_depth -10.0
     circles [{'Xo': 0.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 15.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}]
+    max_depth -10.0
     {'x1': 0.0, 'y1': 0.0, 'x2': 20.0, 'y2': 0.0}
     {'x1': 5.0, 'y1': 4.0, 'x2': 25.0, 'y2': 4.0}
     {'x1': 10.0, 'y1': 8.0, 'x2': 30.0, 'y2': 8.0}
     {'x1': 15.0, 'y1': 12.0, 'x2': 35.0, 'y2': 12.0}
     {'x1': 20.0, 'y1': 16.0, 'x2': 40.0, 'y2': 16.0}
     {'x1': 25.0, 'y1': 20.0, 'x2': 45.0, 'y2': 20.0}
-    dload [[{'X': 30.0, 'Y': 24.0, 'Normal': 240.0}, {'X': 100.0, 'Y': 24.0, 'Normal': 240.0}]]
+    dload [{'X': 30.0, 'Y': 24.0, 'Normal': 240.0}, {'X': 100.0, 'Y': 24.0, 'Normal': 240.0}]
+    gs LINESTRING (-30 0, 0 0, 30 24, 32 24, 100 24)
 
 Ran code:
-    
     from shapely.geometry import Polygon
-    H=24.0; old_run=30.0; new_run=48.0   # 2:1 (H:V)
+    # Face 1.25:1 -> 2:1 (H:V), H=24 ft => crest break moves x=30 -> 48; shell strip keeps 2-ft horiz offset
+    slope_data['polygons'][0]['polygon'] = Polygon([(0,0),(48,24),(50,24),(2,0)])
+    slope_data['polygons'][1]['polygon'] = Polygon([(-30,0),(0,0),(2,0),(48,24),(100,24),(100,-10),(-30,-10)])
     
-    # 2-ft-thick (horizontal) shell strip along the new face
-    slope_data['polygons'][0]['polygon'] = Polygon([(0,0),(new_run,H),(new_run+2,H),(2,0)])
-    slope_data['polygons'][1]['polygon'] = Polygon([(-30,0),(0,0),(2,0),(new_run+2,H),(100,H),(100,-10),(-30,-10)])
+    # reinforcement: keep each layer anchored on the new face, same 20-ft length
+    for k,r in enumerate(slope_data['reinforcement_lines']):
+        y = 4.0*k
+        r['x1'] = 2.0*y      # face x at elevation y for 2:1
+        r['y1'] = y
+        r['x2'] = r['x1'] + 20.0
+        r['y2'] = y
     
-    # reinforcement: keep elevations and 20-ft length, restart on the new face (x = 2y)
-    for r in slope_data['reinforcement_lines']:
-        L = r['x2']-r['x1']
-        r['x1'] = 2.0*r['y1']
-        r['x2'] = r['x1']+L
+    # crest surcharge now starts at the new crest break
+    slope_data['dloads'][0][0]['X'] = 48.0
     
-    # crest surcharge block starts at the new crest
-    slope_data['dloads'][0][0]['X'] = new_run
+    # deep starting circle recentred between toe (0) and crest (48)
+    slope_data['circles'][1]['Xo'] = 24.0
     
-    # starting circles for the flatter face
-    Xo, Yo = 24.0, 48.0
-    Rtoe = (Xo**2 + Yo**2)**0.5
-    slope_data['circles'] = [
-        {'Xo':Xo,'Yo':Yo,'Depth':Yo-Rtoe,'R':Rtoe},          # through the toe (0,0)
-        {'Xo':Xo,'Yo':Yo,'Depth':-10.0,'R':Yo+10.0},          # tangent to the rigid base
-    ]
-    print([ (round(c['Xo'],2),round(c['Yo'],2),round(c['Depth'],2),round(c['R'],2)) for c in slope_data['circles']])
+    resync_geometry()
+    print(list(slope_data['polygons'][0]['polygon'].exterior.coords))
+    print(list(slope_data['polygons'][1]['polygon'].exterior.coords))
     print([(r['x1'],r['y1'],r['x2'],r['y2']) for r in slope_data['reinforcement_lines']])
+    print(slope_data['dloads'][0], slope_data['circles'])
+    print(slope_data['ground_surface'])
 
 Output:
-    [(24.0, 48.0, -5.67, 53.67), (24.0, 48.0, -10.0, 58.0)]
+    [(0.0, 0.0), (30.0, 24.0), (32.0, 24.0), (2.0, 0.0), (0.0, 0.0)]
+    [(-30.0, 0.0), (0.0, 0.0), (2.0, 0.0), (32.0, 24.0), (100.0, 24.0), (100.0, -10.0), (-30.0, -10.0), (-30.0, 0.0)]
     [(0.0, 0.0, 20.0, 0.0), (8.0, 4.0, 28.0, 4.0), (16.0, 8.0, 36.0, 8.0), (24.0, 12.0, 44.0, 12.0), (32.0, 16.0, 52.0, 16.0), (40.0, 20.0, 60.0, 20.0)]
+    [{'X': 48.0, 'Y': 24.0, 'Normal': 240.0}, {'X': 100.0, 'Y': 24.0, 'Normal': 240.0}] [{'Xo': 0.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}, {'Xo': 24.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}]
+    LINESTRING (-30 0, 0 0, 30 24, 32 24, 100 24)
+    WARNING: polygons were edited on a profile-line model and have been rebuilt from profile_lines; edit profile_lines instead (and the ground surface if it is separate), then call resync_geometry(). The polygon edit did not take.
     === MODEL CHECKS: clean ===
 
 Ran code:
-    res = run_lem(method='bishop', search=True)
-    print('FS =', round(res['FS'],3))
-    print('center', res.get('Xo'), res.get('Yo'), 'depth', res.get('Depth'))
-    print('warnings', res.get('warnings'))
+    for i,pl in enumerate(slope_data['profile_lines']):
+        print(i, pl)
 
 Output:
-    bishop (auto search, circular): FS = 1.228 on the circle Xo=-7.43, Yo=47.42, R=45.86
-    Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
-    Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
-    Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
-    FS = 1.228
-    center None None depth None
-    warnings None
+    0 {'coords': [(0.0, 0.0), (30.0, 24.0), (32.0, 24.0)], 'mat_id': 0, 'size': None}
+    1 {'coords': [(-30.0, 0.0), (2.0, 0.0), (32.0, 24.0), (100.0, 24.0)], 'mat_id': 1, 'size': None}
+
+Ran code:
+    slope_data['profile_lines'][0]['coords'] = [(0.0,0.0),(48.0,24.0),(50.0,24.0)]
+    slope_data['profile_lines'][1]['coords'] = [(-30.0,0.0),(2.0,0.0),(50.0,24.0),(100.0,24.0)]
+    
+    # toe circle rebuilt for the new face: center midway toe-crest, 2H above toe
+    import math
+    Xo,Yo = 24.0, 48.0
+    R = math.hypot(Xo-0.0, Yo-0.0)
+    slope_data['circles'][0] = {'Xo':Xo,'Yo':Yo,'Depth':Yo-R,'R':R}
+    
+    resync_geometry()
+    print(slope_data['profile_lines'])
+    print(slope_data['ground_surface'])
+    print(slope_data['circles'])
+    for i,p in enumerate(slope_data['polygons']):
+        print(i, p['mat_id'], list(p['polygon'].exterior.coords))
+
+Output:
+    [{'coords': [(0.0, 0.0), (48.0, 24.0), (50.0, 24.0)], 'mat_id': 0, 'size': None}, {'coords': [(-30.0, 0.0), (2.0, 0.0), (50.0, 24.0), (100.0, 24.0)], 'mat_id': 1, 'size': None}]
+    LINESTRING (-30 0, 0 0, 48 24, 50 24, 100 24)
+    [{'Xo': 24.0, 'Yo': 48.0, 'Depth': -5.665631459994955, 'R': 53.665631459994955}, {'Xo': 24.0, 'Yo': 40.0, 'Depth': -10.0, 'R': 50.0}]
+    0 0 [(0.0, 0.0), (48.0, 24.0), (50.0, 24.0), (2.0, 0.0), (0.0, 0.0)]
+    1 1 [(-30.0, 0.0), (0.0, 0.0), (2.0, 0.0), (50.0, 24.0), (100.0, 24.0), (100.0, -10.0), (-30.0, -10.0), (-30.0, 0.0)]
     === MODEL CHECKS: clean ===
 
-Assistant: The face is now 2:1 and the search has rerun.
+Ran code:
+    res = run_lem(search=True)
+    print(res['FS'], res['Xo'], res['Yo'], res['R'], res['Depth'], res['x_entry'], res['x_exit'])
+    print(res.get('warnings'))
 
-**What changed**
-- Slope face laid back from 30 ft of run to **48 ft** (24 ft high, 2H:1V). Both zone polygons were rebuilt; the 2-ft shell strip still hugs the face.
-- The six reinforcement layers kept their elevations (y = 0, 4, …, 20) and their 20-ft lengths, but each now starts **on** the new face (x = 2y), so they still embed from the slope surface.
-- The 240 psf crest surcharge block now begins at x = 48 (the new crest), running to x = 100.
-- Starting circles regenerated for the flatter geometry: one through the toe (Xo=24, Yo=48, R=53.67, Depth=−5.67) and one tangent to the rigid base at Depth = −10.0. Both sit at or above max_depth = −10; max_depth was not touched.
+Output:
+    spencer (auto search, circular): FS = 1.948 on the circle Xo=7.39, Yo=59.83, R=61.14
+      Spencer could not solve 3 of 774 trial surfaces (3 admit no admissible solution); 0 of them rank lower than the reported minimum by the moment measure.
+    Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
+    Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
+    Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
+    1.947903288221304 7.392183767055897 59.8254203869161 61.14498910459265 -1.3195687176765531 56.94265245002085 -5.242244123811087
+    []
+    === MODEL CHECKS: clean ===
 
-**Result** — Bishop, automated search: **FS = 1.228**, critical circle Xo = −7.43, Yo = 47.42, R = 45.86. No convergence warnings, and the model checks came back clean.
+Assistant: ## Slope face flattened to 2:1 and re-searched
 
-Note the critical center drifted well left of the toe, so the critical surface is a fairly deep circle exiting beyond the toe. Want me to run Spencer with a search as a cross-check — the base material is cohesionless (c = 0, φ = 37°), so a shallow face-parallel mechanism is worth confirming against as well?
+**Geometry edit** (the model is profile-line native, so I edited `profile_lines` and resynced):
+
+| Feature | Before (1.25:1) | After (2:1) |
+|---|---|---|
+| Face | (0,0) → (30,24) | (0,0) → (48,24) |
+| Crest break (shell/base line) | x = 32 | x = 50 |
+| Crest surcharge start | X = 30 | X = 48 |
+| Reinforcement layer starts | x = 0,5,10,…,25 | x = 0,8,16,…,40 (on the new face, lengths still 20 ft) |
+| Toe starting circle | Xo=0, Yo=40, R=40 | Xo=24, Yo=48, R=53.67 (through the toe, Depth = −5.67) |
+| Deep circle | Xo=15, Yo=40, tangent −10 | Xo=24, Yo=40, tangent to base at −10 |
+
+Toe stays at (0,0), crest elevation stays 24 ft, `max_depth` unchanged at −10.
+
+**Search result — Spencer (the method the model declares), automated circular search:**
+
+- **FS = 1.95**
+- Critical circle: Xo = 7.39, Yo = 59.83, R = 61.14 (lowest point at el. −1.32, above the base)
+- Trace daylights from x = −5.24 to x = 56.94 — well inside the −30…100 extents.
+
+Note from the run: Spencer found no admissible solution on 3 of 774 trial surfaces; none of them ranked below the reported minimum, so the critical FS is unaffected. Model checks are clean.
+
+Want me to compare against Bishop/Janbu, or check FS without the reinforcement to see how much the geogrid is carrying at the flatter face?
 ```
 
-Tokens: input 56,402 · cached_input 50,088 · output 3,070 · calls 4 · 51.5s
+Tokens: input 96,380 · cached_input 81,924 · output 5,217 · calls 6 · 86.2s
 
 ## Turn 2 — Add a distributed load of 500 psf on the crest from x = 60 …
 
@@ -107,80 +157,46 @@ Ran code:
     slope_data['dloads'].append([{'X':60.0,'Y':24.0,'Normal':500.0},
                                  {'X':90.0,'Y':24.0,'Normal':500.0}])
     for i,b in enumerate(slope_data['dloads']):
-        print(i, [(p['X'],p['Y'],p['Normal']) for p in b])
+        print(i, b)
 
 Output:
-    0 [(48.0, 24.0, 240.0), (100.0, 24.0, 240.0)]
-    1 [(60.0, 24.0, 500.0), (90.0, 24.0, 500.0)]
+    0 [{'X': 48.0, 'Y': 24.0, 'Normal': 240.0}, {'X': 100.0, 'Y': 24.0, 'Normal': 240.0}]
+    1 [{'X': 60.0, 'Y': 24.0, 'Normal': 500.0}, {'X': 90.0, 'Y': 24.0, 'Normal': 500.0}]
     === MODEL CHECKS: clean ===
 
 Ran code:
-    res = run_lem(method='bishop', search=True)
-    print('FS =', round(res['FS'],3), 'warnings:', res.get('warnings'))
+    res = run_lem(search=True)
+    print(res['FS'], res['Xo'], res['Yo'], res['R'], res['Depth'], res['x_entry'], res['x_exit'])
+    print(res.get('warnings'))
 
 Output:
-    bishop (auto search, circular): FS = 1.228 on the circle Xo=-7.43, Yo=47.42, R=45.86
+    spencer (auto search, circular): FS = 1.916 on the circle Xo=2.69, Yo=84.39, R=84.39
+      Spencer could not solve 1 of 1099 trial surfaces (1 admit no admissible solution); 0 of them rank lower than the reported minimum by the moment measure.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
-    FS = 1.228 warnings: None
+    1.9157867678551528 2.6876749836547997 84.38626603723111 84.38893300379583 -0.0026669665647230142 61.63672830599314 0.07554021654444418
+    []
 
-Ran code:
-    Xo,Yo,R = -7.43,47.42,45.86
-    # where this circle meets ground: face y=x/2 (0..48), crest y=24 (x>48)
-    import numpy as np
-    th=np.linspace(0,2*np.pi,20000); xs=Xo+R*np.cos(th); ys=Yo+R*np.sin(th)
-    gs=slope_data['ground_surface']
-    print('ground surface coords:', list(gs.coords)[:8])
-    # sample ground elevation
-    from shapely.geometry import LineString, Point
-    def gy(x):
-        v=LineString([(x,-50),(x,60)]).intersection(gs)
-        return v.y if hasattr(v,'y') else max(p.y for p in v.geoms)
-    for x in [0,10,20,30,32,40,48,60,90]:
-        print(x, round(gy(x),2), 'circle_y=', round(Yo-np.sqrt(max(R**2-(x-Xo)**2,0)),2) if abs(x-Xo)<R else 'outside')
+Assistant: ## Load added and re-searched
 
-Output:
-    ground surface coords: [(-30.0, 0.0), (0.0, 0.0), (30.0, 24.0), (32.0, 24.0), (100.0, 24.0)]
-    0 0.0 circle_y= 2.17
-    10 8.0 circle_y= 5.0
-    20 16.0 circle_y= 10.67
-    30 24.0 circle_y= 20.92
-    32 24.0 circle_y= 24.0
-    40 24.0 circle_y= outside
-    48 24.0 circle_y= outside
-    60 24.0 circle_y= outside
-    90 24.0 circle_y= outside
+**Edit:** a second `dloads` block on the crest — 500 psf applied normal to the ground from (60, 24) to (90, 24). It sits on top of the existing 240 psf block that spans x = 48 → 100, so the total crest pressure over x = 60–90 is **740 psf**; 240 psf elsewhere on the crest. Tell me if you meant the 500 psf to *replace* the 240 psf over that strip instead.
 
-Ran code:
-    for i,p in enumerate(slope_data['polygons']):
-        print(i,p['mat_id'],list(p['polygon'].exterior.coords))
-    print('reinf:',[(r['x1'],r['y1'],r['x2'],r['y2']) for r in slope_data['reinforcement_lines']])
-    print('circles:',slope_data['circles'])
+**Spencer, automated circular search:**
 
-Output:
-    0 0 [(0.0, 0.0), (30.0, 24.0), (32.0, 24.0), (2.0, 0.0), (0.0, 0.0)]
-    1 1 [(-30.0, 0.0), (0.0, 0.0), (2.0, 0.0), (32.0, 24.0), (100.0, 24.0), (100.0, -10.0), (-30.0, -10.0), (-30.0, 0.0)]
-    reinf: [(0.0, 0.0, 20.0, 0.0), (8.0, 4.0, 28.0, 4.0), (16.0, 8.0, 36.0, 8.0), (24.0, 12.0, 44.0, 12.0), (32.0, 16.0, 52.0, 16.0), (40.0, 20.0, 60.0, 20.0)]
-    circles: [{'Xo': 24.0, 'Yo': 48.0, 'Depth': -5.665631459994955, 'R': 53.665631459994955}, {'Xo': 24.0, 'Yo': 48.0, 'Depth': -10.0, 'R': 58.0}]
+| | Before load | After load |
+|---|---|---|
+| FS | 1.948 | **1.916** |
+| Critical circle | Xo=7.39, Yo=59.83, R=61.14 | Xo=2.69, Yo=84.39, R=84.39 |
+| Lowest point | el. −1.32 | el. −0.003 |
+| Trace | x = −5.24 → 56.94 | x = 0.08 → 61.64 |
 
-Assistant: Load added, and the search reran — but the number did not move, and there are two things you should see.
+The surcharge costs about 1.6% of FS and pulls the critical surface shallower and longer — it now exits essentially at the toe and reaches back to x ≈ 62, just into the loaded strip. Model checks clean; 1 of 1099 trial surfaces had no admissible Spencer solution and none ranked below the minimum.
 
-**The edit** — a second `dloads` block, 500 psf normal at (60, 24) and (90, 24), on top of the existing 240 psf crest block. Model checks came back clean.
-
-**The rerun** — Bishop with search: **FS = 1.228**, critical circle Xo = −7.43, Yo = 47.42, R = 45.86 — bit-for-bit the previous answer. That is real, not a stale run: I traced where that circle meets the ground and it enters the face near x ≈ 5 and exits the crest at **x ≈ 32**. The new load sits from x = 60 to 90, entirely behind the failure mass, so it contributes no driving weight to this surface. A surcharge outside the sliding block simply does not enter the equilibrium.
-
-**The thing I have to flag.** This model's geometry is *not* the 2:1 face from the last turn. The polygons here run the face from (0,0) to (30,24) — the original **1.25:1** — while the circles, the six reinforcement lines (each starting at x = 2y) and the 240 psf block (starting at x = 48) all carry the 2:1 layout. Consequences, in the current file:
-
-- The 240 psf crest block starts at x = 48, leaving the crest **from x = 30 to 48 unloaded**; before the 2:1 edit it covered the crest from its edge.
-- The reinforcement layers no longer start on the slope face — at y = 20 the face is at x = 25, but that layer starts at x = 40, buried 15 ft inside the embankment with no face connection.
-
-Tell me which geometry you actually want and I'll make the rest consistent with it: either lay the face back to 2:1 again (crest edge at x = 48), or restore the loads and reinforcement to the 1.25:1 face.
-
-Separately — because the surcharge falls outside the critical mass, it is worth seeding a few larger circles whose crest exit reaches past x = 60 to confirm the load doesn't drive a bigger, deeper mechanism. Want me to add those and re-search?
+Want me to also check a surface that captures the full loaded strip (a deeper/wider circle out to x = 90), or run Bishop for comparison?
 ```
 
-Tokens: input 83,162 · cached_input 62,610 · output 4,742 · calls 5 · 78.7s
+Tokens: input 56,963 · cached_input 40,962 · output 999 · calls 3 · 46.0s
 
 ## Turn 3 — Extend all the reinforcement lines 5 ft to the right and re…
 
@@ -190,94 +206,58 @@ You: Extend all the reinforcement lines 5 ft to the right and rerun.
 Ran code:
     for r in slope_data['reinforcement_lines']:
         r['x2'] += 5.0
-    print([(r['x1'], r['y1'], r['x2'], r['y2'], r['x2']-r['x1']) for r in slope_data['reinforcement_lines']])
+    print([(r['x1'],r['y1'],r['x2'],r['y2']) for r in slope_data['reinforcement_lines']])
 
 Output:
-    [(0.0, 0.0, 25.0, 0.0, 25.0), (8.0, 4.0, 33.0, 4.0, 25.0), (16.0, 8.0, 41.0, 8.0, 25.0), (24.0, 12.0, 49.0, 12.0, 25.0), (32.0, 16.0, 57.0, 16.0, 25.0), (40.0, 20.0, 65.0, 20.0, 25.0)]
+    [(0.0, 0.0, 25.0, 0.0), (8.0, 4.0, 33.0, 4.0), (16.0, 8.0, 41.0, 8.0), (24.0, 12.0, 49.0, 12.0), (32.0, 16.0, 57.0, 16.0), (40.0, 20.0, 65.0, 20.0)]
     === MODEL CHECKS: clean ===
 
 Ran code:
-    res = run_lem(method='bishop', search=True)
-    print('FS =', round(res['FS'],3), 'warnings:', res.get('warnings'))
+    res = run_lem(search=True)
+    print(res['FS'], res['Xo'], res['Yo'], res['R'], res['Depth'], res['x_entry'], res['x_exit'])
+    print(res.get('warnings'))
 
 Output:
-    bishop (auto search, circular): FS = 1.228 on the circle Xo=-7.43, Yo=47.42, R=45.86
+    spencer (auto search, circular): FS = 2.029 on the circle Xo=8.65, Yo=72.99, R=74.80
+      Spencer could not solve 3 of 758 trial surfaces (3 admit no admissible solution); 0 of them rank lower than the reported minimum by the moment measure.
+      admissibility: line of thrust outside the slice on 13% of boundaries
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
-    FS = 1.228 warnings: None
-    [saved 1 file(s) the user can open: assistant_plot_003.png]
+    2.0291617639543746 8.65478697499561 72.98552114365404 74.8002553112413 -1.8147341675872644 65.18351341484657 -7.721778538448039
+    ['line of thrust outside the slice on 13% of boundaries']
     === MODEL CHECKS: clean ===
 
-[file: assistant_plot_003.png]
+Assistant: ## Reinforcement extended 5 ft and re-searched
 
-Ran code:
-    for r in slope_data['reinforcement_lines']:
-        print({k:r.get(k) for k in ('x1','y1','x2','y2','t_max','t_res','lp1','lp2','adhesion','delta','spacing','E','area')})
-    print('---derived reinforce_lines---')
-    rl = slope_data.get('reinforce_lines')
-    print(type(rl), len(rl) if rl is not None else None)
-    if rl:
-        for line in rl:
-            print(line if not isinstance(line,list) else line[:3], '...')
+Each of the 6 layers keeps its start on the face; only the far end moved +5 ft, so every layer is now 25 ft long:
 
-Output:
-    {'x1': 0.0, 'y1': 0.0, 'x2': 25.0, 'y2': 0.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'adhesion': nan, 'delta': nan, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    {'x1': 8.0, 'y1': 4.0, 'x2': 33.0, 'y2': 4.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'adhesion': nan, 'delta': nan, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    {'x1': 16.0, 'y1': 8.0, 'x2': 41.0, 'y2': 8.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'adhesion': nan, 'delta': nan, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    {'x1': 24.0, 'y1': 12.0, 'x2': 49.0, 'y2': 12.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'adhesion': nan, 'delta': nan, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    {'x1': 32.0, 'y1': 16.0, 'x2': 57.0, 'y2': 16.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'adhesion': nan, 'delta': nan, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    {'x1': 40.0, 'y1': 20.0, 'x2': 65.0, 'y2': 20.0, 't_max': 800.0, 't_res': 600.0, 'lp1': 4.0, 'lp2': 4.0, 'adhesion': nan, 'delta': nan, 'spacing': 1.0, 'E': 800000.0, 'area': 0.1}
-    ---derived reinforce_lines---
-    <class 'list'> 6
-    [{'X': 0.0, 'Y': 0.0, 'T': 0.0, 'Tres': 0.0, 'E': 800000.0, 'Area': 0.1}, {'X': 4.0, 'Y': 0.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}, {'X': 21.0, 'Y': 0.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}] ...
-    [{'X': 8.0, 'Y': 4.0, 'T': 0.0, 'Tres': 0.0, 'E': 800000.0, 'Area': 0.1}, {'X': 12.0, 'Y': 4.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}, {'X': 29.0, 'Y': 4.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}] ...
-    [{'X': 16.0, 'Y': 8.0, 'T': 0.0, 'Tres': 0.0, 'E': 800000.0, 'Area': 0.1}, {'X': 20.0, 'Y': 8.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}, {'X': 37.0, 'Y': 8.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}] ...
-    [{'X': 24.0, 'Y': 12.0, 'T': 0.0, 'Tres': 0.0, 'E': 800000.0, 'Area': 0.1}, {'X': 28.0, 'Y': 12.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}, {'X': 45.0, 'Y': 12.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}] ...
-    [{'X': 32.0, 'Y': 16.0, 'T': 0.0, 'Tres': 0.0, 'E': 800000.0, 'Area': 0.1}, {'X': 36.0, 'Y': 16.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}, {'X': 53.0, 'Y': 16.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}] ...
-    [{'X': 40.0, 'Y': 20.0, 'T': 0.0, 'Tres': 0.0, 'E': 800000.0, 'Area': 0.1}, {'X': 44.0, 'Y': 20.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}, {'X': 61.0, 'Y': 20.0, 'T': 800.0, 'Tres': 600.0, 'E': 800000.0, 'Area': 0.1}] ...
-
-Assistant: Extended and reran — and again the number did not move. This time I dug into why, and the answer is worth your attention.
-
-**The edit** — every reinforcement line's far (right-hand) end pushed +5 ft; each layer is now 25 ft long instead of 20:
-
-| y | x₁ (start) | x₂ (was → now) |
-|---|---|---|
-| 0 | 0 | 20 → 25 |
-| 4 | 8 | 28 → 33 |
-| 8 | 16 | 36 → 41 |
-| 12 | 24 | 44 → 49 |
-| 16 | 32 | 52 → 57 |
-| 20 | 40 | 60 → 65 |
-
-Model checks clean. **Bishop with search: FS = 1.228**, same circle Xo = −7.43, Yo = 47.42, R = 45.86.
-
-**Why nothing changed — the reinforcement isn't in the failure mass at all.** Taking that critical circle and solving for where it crosses each reinforcement elevation:
-
-| layer y | circle crosses at x ≈ | layer spans | crossed? |
+| Layer (y) | x1 | x2 before | x2 after |
 |---|---|---|---|
-| 0 | — (circle bottoms at y ≈ 1.6) | 0–25 | no, layer is *below* the circle |
-| 4 | 7.3 | 8–33 | no — starts 0.7 ft too far right |
-| 8 | 16.0 | 16–41 | grazes the very endpoint |
-| 12 | 21.7 | 24–49 | no |
-| 16 | 26.0 | 32–57 | no |
-| 20 | 29.3 | 40–65 | no |
+| 0 | 0 | 20 | 25 |
+| 4 | 8 | 28 | 33 |
+| 8 | 16 | 36 | 41 |
+| 12 | 24 | 44 | 49 |
+| 16 | 32 | 52 | 57 |
+| 20 | 40 | 60 | 65 |
 
-Not one layer meaningfully intersects the critical surface, so they deliver zero restoring force and lengthening their tails cannot register. Worse: even for a surface that *did* cut them, the +5 ft is added at the anchored end behind the surface, which only raises **pullout** capacity — and with t_max = 800 lb and only lp2 = 4 ft of pullout length declared, tension is already governed by t_max, not pullout. Extending the tail would still be invisible.
+**Spencer, automated circular search:**
 
-**Root cause is the geometry mismatch I flagged last turn, and it's now doing real damage.** The face polygons are still the original **1.25:1** (toe (0,0) to crest (30,24)), while the reinforcement starts sit on the 2:1 line x₁ = 2y. So every layer begins buried 0–15 ft *inside* the embankment with no connection to the slope face, and the critical circle — which hugs the actual steeper face — slides past in front of all of them. That is not a reinforced slope; it's an unreinforced 1.25:1 slope with some inert strips in the backfill. FS = 1.228 is the unreinforced answer.
+| | Before | After |
+|---|---|---|
+| FS | 1.916 | **2.029** |
+| Critical circle | Xo=2.69, Yo=84.39, R=84.39 | Xo=8.65, Yo=72.99, R=74.80 |
+| Lowest point | el. −0.003 | el. −1.81 |
+| Trace | x = 0.08 → 61.64 | x = −7.72 → 65.18 |
 
-I don't want to guess which way you meant it. Pick one and I'll make the model consistent, then rerun:
+The extra 5 ft of anchorage raises FS about 6% and pushes the critical circle deeper and further back — the search now prefers a surface that passes beyond the reinforced block rather than cutting through it.
 
-1. **Lay the face back to 2:1** (crest edge to x = 48) — then x₁ = 2y puts every layer on the face, and the 240 psf block at x = 48 lines up too.
-2. **Keep the 1.25:1 face** — then I reset x₁ = 1.25y (0, 5, 10, 15, 20, 25) with your new 25-ft lengths, and pull the 240 psf block back to start at x = 30.
-
-Which one?
+**One caveat to report:** Spencer's admissibility screen flags *line of thrust outside the slice on 13% of boundaries*. FS is unchanged by that screen, but it means the interslice force line leaves the slice body on some boundaries — common where concentrated reinforcement forces enter the slices. If you want a cross-check, I can run Bishop or Morgenstern-Price on the same model. (3 of 758 trial surfaces had no admissible Spencer solution; none ranked below the minimum.)
 ```
 
-Tokens: input 78,685 · cached_input 50,088 · output 4,144 · calls 4 · 68.1s
+Tokens: input 61,816 · cached_input 40,962 · output 1,027 · calls 3 · 36.7s
 
 ## Session total
 
-- Tokens: input 218,249 · cached_input 162,786 · output 11,956 · calls 13
-- Wall time: 210.3s
+- Tokens: input 215,159 · cached_input 163,848 · output 7,243 · calls 12
+- Wall time: 186.5s

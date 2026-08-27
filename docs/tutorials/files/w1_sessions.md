@@ -7,14 +7,25 @@ and re-solved independently, and each number the assistant reported was compared
 against that run. This file is the producer's record — the prompts in order, the
 files each session produced, and what the audit found.
 
+Five of the eight — `modify`, `sweep_adhoc`, `conceptual`, `diagnose` and
+`report` — were recorded a second time after the kernel changes of `aa63d45f`:
+`run_lem` now stores its bundle on `doc.results['lem_solution']`, defaults to the
+method the model declares, and returns the surface it solved on; a polygon edit
+on a profile-line model is warned about; `generate_report` passes the input path;
+and the chat renders markdown. Their prompts are unchanged. Each of those five
+sections ends with **what changed** against the first recording. The other three
+— `build_from_image`, `sweep_builtin`, `elastic_fem` — are the first recording
+and stand as they were.
+
 The base model is the LEM-8 reinforced slope
 (`xslope_reinforced_slope.xlsx`): a 24 ft sand embankment at 1.25:1 with a 2 ft
 cohesive face band, a 240 psf crest surcharge, and six geogrid layers at 800
 lb/ft. Its published answer is **Spencer FS = 1.587** on a circle centered at
-(−5.13, 46.98) with R = 47.26, and Bishop = 1.594.
+(−5.13, 46.98) with R = 47.26, and Bishop = 1.594. The model declares no LEM
+method of its own, so `run_lem` called without one now runs Spencer.
 
 Every session ran under both budget guards (400k tokens, 15 minutes). The
-longest was 294 s.
+longest was 254 s.
 
 ---
 
@@ -82,47 +93,57 @@ base. Reloading the saved workbook and running Spencer independently reproduces
 
 **Files:** `images/w1_modify_1.png` … `_3.png`, `w1_modify_transcript.md`,
 `w1_modify_after_1.xlsx`, `_2.xlsx`, `_3.xlsx` (one per turn).
-**Cost:** 13 completions, 218,249 in (162,786 cached) / 11,956 out, 210 s.
+**Cost:** 12 completions, 215,159 in (163,848 cached) / 7,243 out, 187 s.
 
-**This is the session that earns the tutorial its title.**
+**All three edits took, and all three numbers reproduce.** Every workbook was
+reloaded from disk and re-searched independently with Spencer:
 
-**Turn (a) did not do what was asked, and said it had.** The assistant rebuilt
-`slope_data['polygons']` for the 2:1 face. But this model is profile-line
-native, and Studio's automatic resync rebuilds `polygons` *from* `profile_lines`
-after every snippet — so the edit was silently discarded and the face stayed at
-1.25:1. The saved `w1_modify_after_1.xlsx` still carries
-`(0,0) (30,24) (32,24)`. Everything *else* in that turn did apply: the six
-reinforcement lines were moved to start at x = 2y, and the 240 psf block was
-moved to start at x = 48. The result is an internally inconsistent model — a
-1.25:1 face with 2:1 reinforcement hanging inside it — and the MODEL CHECKS
-called it clean, because after the revert the geometry was valid.
+| Turn | assistant | independent re-run | critical circle |
+| --- | ---: | ---: | :--- |
+| (a) 2:1 face | 1.948 | 1.9479 | (7.39, 59.83), R = 61.14 |
+| (b) + 500 psf | 1.916 | 1.9158 | (2.69, 84.39), R = 84.39 |
+| (c) + 5 ft tails | 2.029 | 2.0292 | (8.65, 72.99), R = 74.80 |
 
-Measured cost of the failure: re-running the saved file gives **1.2276**, which
-is what the assistant reported (1.228). Doing the same edit *correctly* — through
-`profile_lines`, with a resync — gives **Bishop 1.948 / Spencer 1.948**. The
-reported answer is 37% low.
+**Turn (a) is the one to show a reader, because it corrects itself.** The
+assistant's first move was to rebuild `slope_data['polygons']` for the 2:1 face —
+the same move that was silently discarded in the first recording. The snippet's
+result now carries the line
 
-**It also ran the wrong method.** "Rerun the search" on a model whose published
-answer is Spencer got **Bishop**, because `run_lem`'s default method is bishop.
-It offered Spencer as a cross-check afterwards. The same thing happens in
-session 4.
+> `WARNING: polygons were edited on a profile-line model and have been rebuilt
+> from profile_lines; edit profile_lines instead …`
 
-**Turns (b) and (c) are the recovery, and they are excellent.** Both edits were
-applied correctly (the 500 psf block lands as a second `dloads` block from
-(60, 24) to (90, 24); every `x2` gains exactly 5 ft). Both reported "FS did not
-move" — and rather than accept it, the assistant traced where the critical circle
-meets the ground, discovered the geometry mismatch **itself** in turn (b), stated
-it plainly, showed in turn (c) that not one reinforcement layer intersects the
-critical surface, refused to guess which geometry the user meant, and offered two
-specific repairs. Its diagnosis is correct in every particular.
+It read that, printed `profile_lines` back out, rewrote them
+(`(0,0) (48,24) (50,24)` for the shell band and `(−30,0) (2,0) (50,24) (100,24)`
+for the base), resynced, printed the vertices again to confirm, and only then
+ran. The saved `w1_modify_after_1.xlsx` carries the 2:1 face.
 
-Both "no change" conclusions are artifacts of the broken geometry. On a correctly
-laid-back 2:1 face, the 500 psf block moves Bishop from 1.9481 to **1.9157**, and
-the 5 ft tails move it to **2.0315**.
+Everything the edit implies was carried with it: the six reinforcement layers
+moved to start at x = 2y on the new face, each still 20 ft long with 4 ft of
+pullout at both ends; the 240 psf block moved to start at the new crest break
+x = 48; the toe starting circle was rebuilt through the toe (Xo = 24, Yo = 48,
+R = 53.67) and the deep circle recentred. It stated all of it in a before/after
+table.
 
-**What a reader should verify:** after any geometry edit, open the profile-line
-editor (or reload the saved file) and confirm the vertices actually changed.
-"Model checks clean" does not mean the edit took.
+**It ran Spencer**, without being told to and without naming a method, because
+that is what the model resolves to — and it said so: "Spencer (the method the
+model declares)".
+
+**Turns (b) and (c) are ordinary competent work.** The 500 psf block lands as a
+second `dloads` entry from (60, 24) to (90, 24); the assistant noticed on its own
+that it overlaps the existing 240 psf block, said the crest therefore carries
+740 psf over x = 60–90, and asked whether replacement was meant instead. In turn
+(c) every `x2` gains exactly 5 ft and the pullout breakpoints stay 4 ft from each
+tip. It reported the Spencer admissibility note it got on the last run (line of
+thrust outside the slice on 13% of boundaries) rather than dropping it.
+
+**What changed vs. the first run.** Everything that was wrong here is gone. The
+first recording rebuilt the polygons on a profile-line model, had the edit
+reverted with nothing said, reported **1.228** for a slope that was still at
+1.25:1, and ran Bishop by default; turns (b) and (c) then reported "FS did not
+move" and spent themselves diagnosing the mismatch. This run edits the right
+source, reports 1.948 — the value the first audit measured as the correct
+answer — and the following two turns measure real changes instead. Cost is
+about the same (12 completions against 13), and the wall time is shorter.
 
 ---
 
@@ -172,25 +193,46 @@ the mechanism offered for it is a plausible story that a measurement contradicts
 
 **Files:** `images/w1_sweep_adhoc_1.png`, `w1_sweep_adhoc_transcript.md`. No
 workbook — the model was restored, and the harness confirms it by writing none.
-**Cost:** 3 completions, 40,530 in (37,566 cached) / 1,594 out, 55 s.
+**Cost:** 7 completions, 114,999 in (95,578 cached) / 5,603 out, 140 s.
 
-**Right.** A hand-written loop with a `try/finally` restore, `plot=False` inside
-it, one search per row. Two rows re-run independently, and they match the
-assistant's table exactly — FS *and* critical circle:
+**Right, and now in the model's own method.** A hand-written loop with a
+`try/finally` restore, `plot=False` inside it, one search per row, and
+`ensure_reinforce_pullout` / `build_reinforce_lines` called after each edit so the
+pullout envelopes are rebuilt for the layers that remain. Three rows were re-run
+independently — FS *and* critical circle — and match exactly:
 
 | layers | assistant | independent re-run |
 | ---: | ---: | ---: |
-| 3 | 1.274, centre (2.73, 43.07), R 35.80 | 1.2739, (2.73, 43.07), R 35.80 |
-| 5 | 1.519, centre (−6.00, 47.74), R 48.11 | 1.5195, (−6.00, 47.74), R 48.11 |
-| 6 | 1.594 | 1.5937 — LEM-8's published Bishop |
+| 2 | 1.210, center (−5.71, 48.23), R 45.51 | 1.2097, (−5.71, 48.23), R 45.51 |
+| 3 | 1.272, center (2.73, 43.07), R 35.80 | 1.2722, (2.73, 43.07), R 35.80 |
+| 5 | 1.512, center (−6.00, 47.74), R 48.11 | 1.5117, (−6.00, 47.74), R 48.11 |
+| 6 | 1.587 | 1.5867 — LEM-8's published Spencer |
 
-Its reading of the table is sound: each row is its own search, the 3-layer case
-legitimately finds a shallower, smaller-radius mechanism, and FS ≥ 1.5 first
-occurs at 5 layers.
+**Its mechanism claim survives the measurement.** It reads the 3→4 step as the
+point where the critical surface changes character: with 2–3 layers the minimum
+is a circle bottoming at el. +2.7 and +7.3, above the reinforcement, so the grids
+are bypassed. Tested by deleting the reinforcement and re-solving *on the same
+circles*: FS is identical to four figures either way, and the reinforcement force
+summed over the slices is exactly zero. Those circles do bypass the grids. What
+the grids buy at 2–3 layers is the mechanism itself — with every layer removed
+the search drops to **1.1674**, so the reinforcement is holding the deeper
+surface shut and forcing the minimum up above itself.
 
-**Again Bishop, not Spencer** — "run the analysis" took `run_lem`'s default. The
-values are Bishop values throughout, and it said so, but a reader comparing them
-against the tutorial's Spencer numbers would be comparing two different methods.
+**One unsupported sentence.** It writes that "each added layer buys progressively
+less" and then lists increments that say otherwise: 2→3 buys 0.062, 3→4 buys
+0.161, then 0.079 and 0.075. The largest step is the fourth layer, which is the
+step its own next paragraph explains. The claim and the evidence are in adjacent
+sentences.
+
+**What changed vs. the first run.** The method is right — the first recording ran
+Bishop from `run_lem`'s old default and produced a table a reader would have
+compared against the tutorial's Spencer numbers. The rows are the same shape and
+the readings are the same. What got worse is the cost: 7 completions and 115k
+tokens against 3 and 41k, because four of the seven went on schema exploration —
+`inspect.getsource`, `dir()`, `pkgutil.iter_modules`, `inspect.signature` — before
+any analysis ran, including one snippet that raised `AttributeError: module
+'xslope' has no attribute 'solve'`. The brief tells it not to open a turn that
+way. This is the same waste as session 1.
 
 ---
 
@@ -238,31 +280,45 @@ the mesh type came back empty.
 
 **Files:** `images/w1_conceptual_1.png`, `_2.png`,
 `w1_conceptual_transcript.md`.
-**Cost:** 4 completions, 56,479 in (50,088 cached) / 4,789 out, 83 s.
+**Cost:** 3 completions, 44,084 in (40,962 cached) / 3,315 out, 58 s.
 
-**Right.** It grounded the answer in the open model (it printed the `sigma_*`
-fields first and told the user every one of them is zero). The Taylor formula it
-quotes — σ_F = √Σ(ΔF_i/2)² over 1 + 2N solves — matches `reliability/taylor/`
-exactly. Its description of the response-surface engine (quadratic surrogate over
-a designed set of solves, then mass sampling) matches the implementation. Turn
-(b) is sound practice content: Duncan's three-sigma rule, the range ÷ d₂ estimator
-for tiny samples, published COV bands, the 1/√(2(N−1)) uncertainty in s itself,
-and the point that `base` has c = 0 by definition rather than by measurement.
+**Right on the engines.** It grounded the answer in the open model (it printed
+the `sigma_*` fields first and told the user every one of them is zero). Its
+three-engine table matches the implementation, including the distinction the
+first recording got wrong: Taylor re-searches on every one of its 1 + 2N solves,
+Monte Carlo and the response surface hold the failure surface fixed. Every helper
+it names is real and correctly spelled — `reliability_taylor`, `reliability_mc`,
+`reliability_rs`, the `reliability(engine=…)` front door, and
+`parametric_sweep(plot='tornado')` in turn (b). Turn (b) is sound practice
+content: Duncan's three-sigma rule with the /4 caution, published COV bands,
+sample `s` as a lower bound with few tests, spatial averaging, and the negative
+c′–φ′ correlation the Taylor engine does not model.
 
-**Wrong.** It states as a caveat that "each realization runs the critical-surface
-search … so the critical surface can migrate between samples." That is true of
-the Taylor engine (1 + 2N searches) and **false of Monte Carlo**, where
-`xslope.reliability.reliability_mc` holds the surface fixed by design: *"The
-failure surface is never randomized."* Stated where it is, next to the Monte
-Carlo description, it is a wrong caveat about the engine the reader is most
-likely to run.
+**Wrong: the reliability index it defines is not the one xslope reports.** It
+gives β = (E[FS] − 1)/σ_FS and works a micro-example to β = 2.50, P_f ≈ 0.6% for
+E[FS] = 1.45, σ_FS = 0.18. `reliability_taylor` returns only the **lognormal**
+index, `beta_ln`; for those same two numbers it prints **β = 2.943 and
+P_f = 0.16%**. A reader who follows the answer and then runs the tool gets a
+different number for the same inputs.
 
-**Missed.** The links it gives — `reliability/`, `reliability/taylor/`,
+**Wrong: what an all-zero-σ model does.** It says a run "would return σ_FS = 0
+and an infinite β". Run on this model, `reliability_taylor` returns no result at
+all — it refuses with a message naming the blank σ columns and the sheet they
+live on.
+
+**Still missed.** The links it gives — `reliability/`, `reliability/taylor/`,
 `reliability/monte_carlo/` — are real pages and are correct. But it never called
 `corpus_index` and named no worked example, though the corpus has plenty:
 VP28, VP29 (Duncan's LASH terminal, TSPM vs Monte Carlo), VP33, VP34, RS2-25
 (Syncrude tailings dyke), LEM sample 15 and FEM sample 4. It also never mentioned
 `reliability/fem/` or the LEM-11 tutorial.
+
+**What changed vs. the first run.** The Monte Carlo error is gone — the brief now
+states the surface treatment of each engine, and the answer states it correctly
+and calls it out as reportable. The corpus is still not consulted, unprompted. In
+its place are two new factual slips, both about numbers it did not run: the β
+definition and the zero-σ behavior. It is a shorter, denser answer (3 completions
+against 4) and it costs less.
 
 ---
 
@@ -275,43 +331,66 @@ transcription errors written into it by the producer:
 2. the crest surcharge = **2400 psf** instead of 240 (a decimal slip);
 3. `max_depth` = **−100** instead of −10 (a dropped digit).
 
-Bishop with a search returns 0.083 on it.
+Spencer with a search returns 0.071 on it.
 
 > This model gives a factor of safety below 1. Can you find what is wrong?
 
-**Files:** `images/w1_diagnose_1.png` (560 × 6086),
-`w1_diagnose_transcript.md`. No workbook — it restored everything it touched and
-said so, and the harness confirms it by writing none.
-**Cost:** 9 completions, 151,873 in (112,698 cached) / 14,802 out, 295 s.
+**Files:** `images/w1_diagnose_1.png` (560 × 2950),
+`w1_diagnose_transcript.md`. No workbook — it changed nothing and said so, and
+the harness confirms it by writing none.
+**Cost:** 3 completions, 47,432 in (40,962 cached) / 5,764 out, 129 s.
 
-**Found, with the right ranking.** It isolated the causes one at a time rather
-than guessing, and it led with the real one: `base` at c = 0, φ = 3° "cannot hold
-any slope — it's weaker than wet mud", and it correctly read it as a dropped
-digit. Its measurements are exactly reproducible: broken model **0.0830**, φ = 30
-alone **0.9174** — both match its report to three figures. It also noticed on its
-own that φ = 30 does not get the slope back and said the base strength probably
-needs more; it does — the true value is 37, which alone gives 1.1836.
+**Its measurements are exact and its conclusion is wrong.** The search it ran
+reproduces to four figures — **FS = 0.0709** on the circle (−3.09, 49.09) with
+R = 45.93 — as do the zone areas it quotes (48 ft² and 14,992 ft²).
 
-**Fault 3 found and correctly de-ranked.** It flagged `max_depth = −100` as "a
-lot of invented room", and — importantly — *measured* that it is not what is
-driving FS below 1 before saying so. Correct: fixing max_depth changes nothing
-(1.5937 either way).
+**Fault 1 was missed.** It read `base` as c = 0, φ = 3°, computed the
+infinite-slope ratio tan 3° / tan 38.7° = 0.066, matched it against the FS it had
+just measured, and concluded: "That is not a numerical problem; the model really
+is that weak." The planted dropped digit was printed on screen and accepted as
+the design. It is the fault that matters: restoring φ = 37 alone takes Spencer
+from **0.0709 to 1.1805**, and restoring the 240 psf surcharge as well gives
+**1.5867**, the published Spencer answer exactly.
 
-**Fault 2 flagged but not identified.** It called out the 2,400 psf crest load as
-"~18.5 ft of soil equivalent" and asked whether it was real or meant as ponded
-water — but did not read it as a decimal slip from 240. It is the second real
-bug: with φ restored to 37, dropping the surcharge back to 240 psf returns
-**1.5937**, LEM-8's published Bishop value exactly.
+**The invented bug of the first recording is now the headline.** Having accepted
+φ = 3°, it needed a culprit and named the geometry: the `shell` zone is "a
+degenerate sliver", the embankment body is therefore built out of foundation
+clay, and the shell polygon "should be" the whole fill above the toe — toe (0,0)
+→ crest (30,24) → (100,24) → (100,0). It offered to redraw it. The 2 ft cohesive
+face band is the model's design and the point of the published problem, and the
+proposed redraw would replace the problem with a different one.
 
-**One invented bug.** It reports as "the second bug" that the `shell` zone is a
-2 ft sliver rather than the whole embankment, and that it "was almost certainly
-meant to be the full embankment". That is wrong — the thin cohesive face band is
-the model's design and the point of the published problem. The claim is stated
-with the same confidence as the true findings.
+**Fault 2 flagged, not identified.** It called the 2,400 psf crest load "large —
+the equivalent of 38.5 ft of water" and asked "intentional surcharge, or a units
+slip?" It offers the right reading without committing to it, and leaves it as a
+question rather than measuring it. Measured: on the broken model the surcharge
+alone is worth 0.0709 → 0.0964; with φ restored it is worth 1.1805 → 1.5867.
 
-**One rough edge:** a snippet crashed with `KeyError: 'Xo'` reading a circle
-centre off `run_lem`'s result dict, which does not carry one. It recovered on the
-next snippet.
+**Fault 3 flagged and correctly de-ranked**, on the argument that the critical
+circle bottoms at el. +3.2 and so cannot be reaching a base at −100. That is
+right — max_depth is inert here (1.5867 either way once the other two are fixed)
+— but it is an argument, not the measurement the first recording made.
+
+**One claim worth checking, and it holds.** It says the six geogrid layers "do
+essentially nothing" in a φ = 3° soil. On its own critical circle, FS is 0.0709
+with the reinforcement and 0.0605 without.
+
+**What changed vs. the first run — this is the session that got worse.** The
+first recording isolated the faults one at a time over nine completions, led with
+the real one, read it as a dropped digit, and measured that φ = 30 alone still
+does not recover the slope. This run spent three completions — two reads and a
+narrative — never varied a single input, missed the controlling fault entirely,
+and promoted the first run's one invented bug to the answer. It is also the only
+session whose failure is more confident than its predecessor's: the first
+recording called the sliver "the second bug"; this one calls it the cause and
+titles the answer with it.
+
+**A rendering defect this session exposes.** Now that the chat renders markdown,
+the assistant reaches for LaTeX, and the dock does not render math: the display
+equation comes through as literal
+`$$\frac{\tan\varphi}{\tan\beta} = \frac{\tan 3°}{\tan 38.7°} = 0.066$$` in the
+figure. Qt's markdown is the GitHub dialect — headings, tables, lists and fenced
+code — and nothing else.
 
 ---
 
@@ -327,32 +406,52 @@ could not take over the machine's copy of Word.
 
 **Files:** `images/w1_report_1.png`, `_2.png`, `w1_report_transcript.md`,
 `w1_report_after.docx`.
-**Cost:** 4 completions, 53,779 in (50,088 cached) / 868 out, 39 s.
+**Cost:** 4 completions, 59,170 in (40,962 cached) / 1,059 out, 50 s.
 
 **Turn (a) is exactly right:** Spencer with a search returns **FS = 1.587** on
 the circle (−5.13, 46.98), R = 47.26 — LEM-8's published answer to four figures,
-and identical to the independent baseline run.
+and identical to the independent baseline run. It read the circle straight off
+the result dict (`Xo`, `Yo`, `R`, `Depth`, `x_entry`, `x_exit`) and laid the six
+numbers out in a small table.
 
-**Turn (b) produced a report that does not contain it.** The .docx exists, opens,
-and renders (checked by converting it to PDF with LibreOffice headless and
-reading the pages). It is **three pages**, and its only sections are
-*1 Traceability* and *2 Project Definition*. **There is no results section and no
-factor of safety anywhere in it.** The assistant nevertheless wrote: "the results
-section covers that run — FS = 1.587 on the critical circle at (−5.13, 46.98),
-R = 47.26". That claim is false, and a reader who does not open the file will not
-learn it.
+**Turn (b) produced a report that contains it.** The .docx is **12 pages** and
+its contents are *1 Traceability*, *2 Project Definition* and *3 Limit
+Equilibrium Analysis*, with 3.1 Analysis Inputs, 3.2 Materials, 3.3 Loads, 3.4
+Reinforcement and 3.5 Spencer's Method — the last split into the search, the
+results, the slice table and the calculations, six figures in all. Section 3.5.2
+reads "Spencer's Method gives a factor of safety of 1.587 on the critical surface
+of Figure 4." Checked two ways: by converting the file to PDF with LibreOffice
+headless and reading the pages, and by extracting `word/document.xml` and
+grepping it.
 
-The cause is in the kernel, not the model: `run_lem` never stores its bundle on
-`doc.results['lem_solution']`, though `run_fem` stores `fem_solution` and
-`run_seep` stores `seep_solutions`. `MainWindow.report_solutions()` reads
-`doc.results['lem_solution']`, finds nothing, and the report is built with no LEM
-run to document. A second, smaller gap: the kernel's `generate_report` never
-passes `input_path`, so the traceability page reads **"Input file: not saved to a
-file"** and carries no SHA-256, even for a project opened from disk.
+**Traceability now identifies the file.** The stamp reads
+`xslope_reinforced_slope.xlsx` with SHA-256
+`43bb96b090d647c594102c40142e4eed9acd181a6f1802318b132e0e8b412bb3`, which is the
+digest of `docs/tutorials/files/xslope_reinforced_slope.xlsx`.
 
-The report also lands at `<model>_report.docx` beside the project — here that put
-`xslope_reinforced_slope_report.docx` into `docs/tutorials/files/`; the producer
-renamed it to `w1_report_after.docx`.
+Everything the assistant said about the deliverable is true of the deliverable:
+6 figures, the model as built, and the one analysis solved this session.
+
+**Two rough edges, neither the assistant's.** The report still lands at
+`<model>_report.docx` beside the project — here that put
+`xslope_reinforced_slope_report.docx` into `docs/tutorials/files/`, and the
+producer renamed it to `w1_report_after.docx`. And inside the report, the search
+summary says "Trial surfaces evaluated **96**" while the same run's own console
+line says it evaluated **838** trial surfaces. Both counts are real and they
+count different things: 96 is the number of grid centers held in the search's
+`fs_cache`, 838 the number of trial surfaces actually solved across all depths at
+those centers. The report's label names the wrong one
+(`xslope/report.py`, `len(fs_cache)`).
+
+**What changed vs. the first run.** This is the failure the changes were made
+for. The first recording produced a three-page report whose only sections were
+Traceability and Project Definition — no results, no factor of safety anywhere in
+it — while the assistant wrote that "the results section covers that run —
+FS = 1.587". `run_lem` now stores its bundle where `report_solutions()` looks for
+it, so the run the session made is the run the report documents; and
+`generate_report` now passes the input path, so the traceability page names the
+file and its digest instead of reading "not saved to a file". Same two prompts,
+same cost, a report four times as long that says what the assistant says it says.
 
 ---
 
@@ -361,39 +460,56 @@ renamed it to `w1_report_after.docx`.
 | Session | Turns | Completions | Tokens in (cached) | Tokens out | Wall |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | build_from_image | 1 | 6 | 105,747 (62,610) | 17,181 | 254 s |
-| modify | 3 | 13 | 218,249 (162,786) | 11,956 | 210 s |
+| modify | 3 | 12 | 215,159 (163,848) | 7,243 | 187 s |
 | sweep_builtin | 1 | 2 | 26,868 (25,044) | 1,577 | 104 s |
-| sweep_adhoc | 1 | 3 | 40,530 (37,566) | 1,594 | 55 s |
+| sweep_adhoc | 1 | 7 | 114,999 (95,578) | 5,603 | 140 s |
 | elastic_fem | 2 | 5 | 71,104 (62,610) | 2,654 | 175 s |
-| conceptual | 2 | 4 | 56,479 (50,088) | 4,789 | 83 s |
-| diagnose | 1 | 9 | 151,873 (112,698) | 14,802 | 295 s |
-| report | 2 | 4 | 53,779 (50,088) | 868 | 39 s |
-| **total** | **13** | **46** | **724,629 (563,490)** | **55,421** | **1,215 s** |
+| conceptual | 2 | 3 | 44,084 (40,962) | 3,315 | 58 s |
+| diagnose | 1 | 3 | 47,432 (40,962) | 5,764 | 129 s |
+| report | 2 | 4 | 59,170 (40,962) | 1,059 | 50 s |
+| **total** | **13** | **42** | **684,563 (532,576)** | **44,396** | **1,097 s** |
 
 At `claude-opus-5` list rates ($5.00 / MTok input, $0.50 / MTok cache read,
-$25.00 / MTok output), that is roughly **$2.50** for the whole capture — about
-$0.81 of uncached input, $0.28 of cache reads and $1.39 of output, plus whatever
-the cache writes cost (the accumulator does not break them out).
+$25.00 / MTok output), that is roughly **$2.14** for the whole capture — about
+$0.76 of uncached input, $0.27 of cache reads and $1.11 of output, plus whatever
+the cache writes cost (the accumulator does not break them out). The five
+re-recorded sessions are about $1.26 of that.
 
 ## The pattern across all eight
 
-Every number the assistant reported was reproducible: eleven separate
-FS values, the SSRM factor of safety to eight digits, and two critical-circle
-centres all matched an independent re-run exactly. **Not one arithmetic or
-solver-level error.**
+Every number the assistant reported was reproducible. Across the eight sessions
+that is thirteen separate factors of safety, the SSRM factor of safety to eight
+digits, and eight critical-circle centers, every one of them matching an
+independent re-run. **Not one arithmetic or solver-level error.**
 
 Every failure was upstream of the arithmetic — in what was modelled, which
-method was run, or what was claimed about the output:
+method was run, or what was claimed about the output. Four of the six failures
+the first recording found are gone, and they were the four the tool could fix:
 
-- an edit that was silently reverted and reported as done (session 2);
-- Bishop run where the model's method is Spencer, twice, from a default
-  (sessions 2 and 4);
+- the edit that was silently reverted and reported as done is now warned about,
+  and the assistant reads the warning and repairs the edit itself (session 2);
+- Bishop-where-the-model-means-Spencer is gone from both sessions it appeared in
+  (2 and 4);
+- the wrong statement about how Monte Carlo treats the failure surface is
+  corrected (session 6);
+- the report that did not contain the result it was said to contain now contains
+  it (session 8).
+
+What is left is the class no interface change reaches — a confident account of
+something the assistant did not measure:
+
 - a mechanism offered for a curve that a measurement contradicts (session 3);
-- a wrong statement about how one of the engines treats the failure surface
+- a summary sentence its own numbers contradict (session 4);
+- a reliability index defined the textbook way rather than the way the engine
+  reports it, and a prediction of what a zero-σ run does that the run does not do
   (session 6);
-- a confidently-stated bug that is not a bug (session 7);
-- a description of a deliverable that the deliverable does not contain
-  (session 8).
+- a planted dropped digit read as the design, and a bug invented to explain the
+  consequence (session 7).
+
+Session 7 is the one to read closely. It is cheaper than its first recording by a
+factor of three and worse by every other measure, and the difference is entirely
+that it stopped varying inputs: it read the model twice, ran one search, and
+reasoned. The first recording changed one thing at a time and got the answer.
 
 That is the lesson the page has to teach: the assistant computes correctly and
 narrates optimistically. Check the model, check the method, and open the file.

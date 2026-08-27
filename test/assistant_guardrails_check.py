@@ -48,6 +48,15 @@ does regardless of the model, and that is what this file covers:
      edit-answerable ERROR is quoted every time, a changed finding un-collapses,
      the staged-by-a-run label survives the collapse, nothing is dropped without
      being named, and a new session starts from silence. Mutations for each.
+  I. THE THINGS THE HARNESS OWNS WHATEVER THE MODEL DOES — every helper the
+     prompt tells the model to call is in the namespace with the arguments the
+     prompt names (a helper described and absent is a NameError followed by the
+     hand-rolled pipeline the helpers exist to prevent); every provider and every
+     model the settings dialog offers can accept an image, since the headline
+     request is a cross section handed over as a picture; the Kimi key is stored
+     under the name the ruling fixed; and the token meter reads each completion's
+     usage, accumulates it per turn and per session, and survives a response that
+     carries no usage at all.
 
 Everything runs offscreen against the real Assistant, the real PythonKernel and
 the real document; no provider is contacted and no network is touched (the agent
@@ -1216,6 +1225,208 @@ def check_mutation_disables_the_checks():
     return out
 
 
+# --- I. the helpers, the providers, the meter ------------------------------
+# Three things the harness owns whatever the model does: which functions the
+# snippet namespace can actually call, which providers the dialog can offer, and
+# what the turn cost.
+
+#: Every helper the system prompt tells the model to reach for, with the
+#: arguments the prompt names. A helper described in the prompt and absent from
+#: the namespace is the worst shape of this failure: the model writes the call
+#: the prompt taught it, gets a NameError, and reconstructs the pipeline by hand
+#: — which is the failure the helpers exist to prevent.
+HELPERS = {
+    "run_lem": ("method", "num_slices", "plot", "slope_data"),
+    "run_seep": ("bc", "tol", "max_iter", "plot", "slope_data"),
+    "run_fem": ("analysis", "F", "F_min", "F_max", "tolerance", "plot",
+                "slope_data"),
+    "suggest_elastic": ("material_or_soil_type", "unit_system", "slope_data"),
+    "generate_report": ("path", "finalize"),
+    "resync_geometry": ("slope_data",),
+    "sensitivity": ("values", "apply", "param"),
+    "list_params": ("slope_data", "mode"),
+    "design_sweep": ("param", "low", "high", "target_fs", "mode"),
+    "parametric_sweep": ("params", "plot"),
+    "parametric_design": ("param", "low", "high"),
+    "parametric_back_analysis": ("param", "low", "high"),
+    "reliability": ("method", "engine"),
+    "reliability_taylor": ("method",),
+    "reliability_mc": ("method", "n_samples"),
+    "reliability_rs": ("method",),
+}
+
+
+def check_helpers_are_callable():
+    """Every helper the prompt names is in the namespace a snippet runs in, takes
+    the arguments the prompt gives it, and is described where the model reads."""
+    import inspect
+    from studio.ai.assistant import SCHEMA_BRIEF, STUDIO_SYSTEM
+    out = []
+    mw, asst = _session()
+    kernel = asst._kernel
+    _quiet(kernel.run, "pass")                     # force the seed
+    ns = kernel._ns
+    for name, args in HELPERS.items():
+        fn = ns.get(name)
+        if not callable(fn):
+            out.append(f"{name}() is not in the kernel namespace")
+            continue
+        params = inspect.signature(fn).parameters
+        for arg in args:
+            if arg not in params:
+                out.append(f"{name}() takes no {arg!r} argument")
+    prompt = STUDIO_SYSTEM + SCHEMA_BRIEF
+    for name in ("run_seep", "run_fem", "suggest_elastic", "generate_report"):
+        if name not in prompt:
+            out.append(f"{name}() is never mentioned to the model")
+    mw.deleteLater()
+    return out
+
+
+def check_every_offered_model_can_see():
+    """The provider list is exactly the providers that can be handed a picture.
+
+    The assistant's headline request is a cross section given as a sketch or a
+    photograph. A provider whose models cannot accept one turns that request into
+    a conversation about what the picture shows, so it is not offered at a lower
+    tier — it is not offered, and neither is a text-only model inside a mixed
+    catalogue.
+    """
+    from studio.ai.config import PROVIDERS, model_is_vision
+    from studio.ai.models import LISTING, is_offerable
+    out = []
+    if "kimi" not in PROVIDERS:
+        out.append("Kimi (Moonshot) is not offered")
+    if "deepseek" in PROVIDERS:
+        out.append("DeepSeek is still offered — its API takes no images")
+    if "deepseek" in LISTING:
+        out.append("DeepSeek still has a list-models endpoint")
+    for provider, spec in PROVIDERS.items():
+        for model in spec.get("models") or []:
+            if model_is_vision(provider, model) is not True:
+                out.append(f"{provider} offers {model!r}, which cannot read an image")
+            if not is_offerable(provider, model):
+                out.append(f"{provider}'s own list drops {model!r}")
+        if spec.get("vision") is False:
+            out.append(f"{provider} is declared text-only and still listed")
+    # The mixed catalogues are filtered, not merely labelled.
+    for provider, text_only in (("kimi", "moonshot-v1-8k"), ("zai", "glm-5.2"),
+                                ("ollama", "llama3.1:8b")):
+        if is_offerable(provider, text_only):
+            out.append(f"{provider} would still list the text-only {text_only!r}")
+    # Kimi reaches litellm as its own route, with its key under its own name.
+    kimi = PROVIDERS.get("kimi", {})
+    if kimi.get("prefix") != "moonshot/":
+        out.append(f"Kimi's litellm prefix is {kimi.get('prefix')!r}")
+    if not str(kimi.get("base", "")).startswith("https://api.moonshot.ai"):
+        out.append(f"Kimi's base URL is {kimi.get('base')!r}")
+    return out
+
+
+def check_the_keychain_name():
+    """Kimi's key is stored under ``kimi_api_key`` — the name the ruling fixed,
+    and the one an existing install would already carry."""
+    out = []
+    stored = {}
+
+    class _Keyring:
+        @staticmethod
+        def set_password(service, user, key):
+            stored[(service, user)] = key
+
+        @staticmethod
+        def get_password(service, user):
+            return stored.get((service, user))
+
+        @staticmethod
+        def delete_password(service, user):
+            stored.pop((service, user), None)
+
+    from studio.ai import config as C
+    original = C._keyring
+    C._keyring = lambda: _Keyring
+    try:
+        mw, asst = _session()
+        asst.config.set_api_key("kimi", "sk-kimi-test")
+        if (C.KEYRING_SERVICE, "kimi_api_key") not in stored:
+            out.append(f"the key went to {sorted(stored)} instead of kimi_api_key")
+        if asst.config.api_key("kimi") != "sk-kimi-test":
+            out.append("the stored key did not read back")
+        mw.deleteLater()
+    finally:
+        C._keyring = original
+    return out
+
+
+class _FakeUsage:
+    """One provider's usage object: attributes, and a nested details object for
+    the cached-prompt count."""
+
+    class _Details:
+        cached_tokens = 900
+
+    def __init__(self, prompt=1000, completion=250, cached=True):
+        self.prompt_tokens = prompt
+        self.completion_tokens = completion
+        self.prompt_tokens_details = self._Details() if cached else None
+
+
+class _FakeResponse:
+    def __init__(self, usage):
+        self.usage = usage
+
+
+def check_usage_accumulates():
+    """Tokens are read off each completion, accumulate per turn and per session,
+    and survive a response that carries no usage at all."""
+    from studio.ai.assistant import format_usage, usage_from_response
+    out = []
+    got = usage_from_response(_FakeResponse(_FakeUsage()))
+    if got != {"input": 1000, "cached_input": 900, "output": 250}:
+        out.append(f"a completion's usage read as {got}")
+    # A dict-shaped usage, and Anthropic's own cache-read field name.
+    got = usage_from_response(_FakeResponse(
+        {"prompt_tokens": 10, "completion_tokens": 2,
+         "cache_read_input_tokens": 8}))
+    if got != {"input": 10, "cached_input": 8, "output": 2}:
+        out.append(f"a dict usage read as {got}")
+    for empty in (_FakeResponse(None), object(), None):
+        if usage_from_response(empty) != {"input": 0, "cached_input": 0, "output": 0}:
+            out.append(f"a response with no usage did not read as zero: {empty!r}")
+
+    mw, asst = _session()
+    seen = []
+    asst.usage_changed.connect(seen.append)
+    if asst.usage["session"] != {"input": 0, "cached_input": 0, "output": 0}:
+        out.append("a fresh session did not start at zero")
+    for _ in range(3):
+        asst.add_usage(usage_from_response(_FakeResponse(_FakeUsage())))
+    if asst.usage["session"] != {"input": 3000, "cached_input": 2700, "output": 750}:
+        out.append(f"three completions accumulated to {asst.usage['session']}")
+    if asst.usage["turn"] != asst.usage["session"]:
+        out.append("the turn and the session diverged inside one turn")
+    if len(seen) != 3:
+        out.append(f"the dock was told {len(seen)} time(s), expected 3")
+    # A new turn counts from zero while the session keeps running.
+    asst._usage["turn"] = {"input": 0, "cached_input": 0, "output": 0}
+    asst.add_usage(usage_from_response(_FakeResponse(_FakeUsage(prompt=5, completion=1,
+                                                               cached=False))))
+    if asst.usage["turn"] != {"input": 5, "cached_input": 0, "output": 1}:
+        out.append(f"the new turn read as {asst.usage['turn']}")
+    if asst.usage["session"]["input"] != 3005:
+        out.append("the session was reset by a new turn")
+    line = format_usage(asst.usage["turn"], asst.usage["session"])
+    for fragment in ("this turn:", "session:", " in", " out", "3,005"):
+        if fragment not in line:
+            out.append(f"the readout {line!r} is missing {fragment!r}")
+    # A new conversation starts the meter over.
+    _quiet(asst.reset)
+    if asst.usage["session"] != {"input": 0, "cached_input": 0, "output": 0}:
+        out.append("a new chat kept the old session's tokens")
+    mw.deleteLater()
+    return out
+
+
 CHECKS = [
     ("A. iron rules, once per prompt tier", check_iron_rules_once),
     ("A. the live prompts carry them", check_assembled_prompt_is_the_real_one),
@@ -1246,6 +1457,11 @@ CHECKS = [
      check_every_finding_is_quoted_once),
     ("H. two faults on one row stay two", check_two_faults_on_one_row),
     ("H. mutation: the delta's seven seams", check_delta_mutations),
+    ("I. every helper the prompt names is callable", check_helpers_are_callable),
+    ("I. every offered model can read an image",
+     check_every_offered_model_can_see),
+    ("I. Kimi's key is stored as kimi_api_key", check_the_keychain_name),
+    ("I. the token meter accumulates", check_usage_accumulates),
 ]
 
 

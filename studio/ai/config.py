@@ -1,12 +1,23 @@
 """AssistantConfig — provider/model selection and credential storage.
 
-Holds the user's choice of provider (Claude / OpenAI / local Ollama) and model in
-``QSettings``, and API keys in the OS keychain via ``keyring`` (falling back to
-QSettings if keyring is unavailable). Produces the kwargs for a ``litellm``
-completion call, so the agent loop stays provider-agnostic.
+Holds the user's choice of provider (Claude / OpenAI / Kimi / Z.ai / local
+Ollama) and model in ``QSettings``, and API keys in the OS keychain via
+``keyring`` (falling back to QSettings if keyring is unavailable). Produces the
+kwargs for a ``litellm`` completion call, so the agent loop stays
+provider-agnostic.
+
+**Every provider offered here can read an image.** The assistant's headline case
+is a cross section handed over as a sketch or a photograph, and a model that
+cannot see one turns that request into a conversation about what the picture
+shows. So a text-only provider is not offered at a lower tier — it is not
+offered. Where a provider's catalogue is mixed (Z.ai's GLM-V models beside its
+text GLMs, a local Ollama library that is mostly text), ``vision_only`` filters
+the list down to the models that can, and the settings dialog says so.
 """
 
 from __future__ import annotations
+
+import re
 
 from PySide6.QtCore import QSettings
 
@@ -22,7 +33,10 @@ KEYRING_SERVICE = "XSlope Studio"
 # falls back to these; see studio/ai/models.py. Every model box is editable, so
 # any id can be typed whatever the list says.
 # `tools`/`vision` are capability defaults (True/False, or None = depends on the
-# chosen model — used for the hosted presets; local models vary).
+# chosen model, resolved from `vision_match` against the model id).
+# `vision_only` means the dialog LISTS only the models whose id matches
+# `vision_match` — the filter that keeps a mixed catalogue offering only models
+# this assistant can hand a sketch to.
 PROVIDERS = {
     "anthropic": {
         "label": "Claude (Anthropic)", "prefix": "anthropic/", "needs_key": True,
@@ -36,12 +50,25 @@ PROVIDERS = {
         # automatically, so repeat turns are cheap.
         "tools": True, "vision": True, "skill": True,
     },
-    "deepseek": {
-        "label": "DeepSeek", "prefix": "deepseek/", "needs_key": True,
-        "models": ["deepseek-chat"],   # V3 chat: function-calling capable
-        # Text-only (no vision). Cheap + caches the prompt prefix server-side, so
-        # it gets the full skill (`skill`) without Anthropic cache_control blocks.
-        "tools": True, "vision": False, "skill": True,
+    "kimi": {
+        # Moonshot AI's OpenAI-compatible endpoint. litellm routes it natively
+        # under the `moonshot/` prefix (its default base is this same URL), so
+        # the base stays editable only for the .cn host and for proxies.
+        "label": "Kimi (Moonshot AI)", "prefix": "moonshot/", "needs_key": True,
+        "base": "https://api.moonshot.ai/v1", "editable_model": True,
+        # The K-series models that accept images, newest first, then the
+        # moonshot-v1 vision previews. The text-only ids Moonshot also lists
+        # (moonshot-v1-8k, kimi-k2-0711-preview, kimi-k2-thinking) are filtered
+        # out by `vision_only` wherever the list comes from.
+        "models": ["kimi-k2.6", "kimi-k2.5", "kimi-k3", "kimi-latest",
+                   "kimi-latest-128k", "moonshot-v1-128k-vision-preview",
+                   "moonshot-v1-32k-vision-preview"],
+        # Moonshot prices a cache-hit input token separately, i.e. it caches the
+        # prompt prefix server-side like OpenAI and needs no cache_control
+        # blocks — so it can afford the full skill.
+        "tools": True, "vision": None, "skill": True,
+        "vision_only": True,
+        "vision_match": r"(kimi-latest|kimi-k2\.[5-9]|kimi-k[3-9]|vision)",
     },
     "zai": {
         "label": "Z.ai (GLM)", "prefix": "openai/", "needs_key": True,
@@ -49,30 +76,53 @@ PROVIDERS = {
         # different base — .../api/coding/paas/v4). Gets the full skill.
         "base": "https://api.z.ai/api/paas/v4",
         # Suggestions only — model is editable so you can type any current GLM id
-        # (the lineup changes fast). Text models first, then the V (vision) models.
-        # GLM-OCR is omitted: OCR-only, no function calling, so it can't drive the
-        # assistant (which needs tool calls).
+        # (the lineup changes fast). The V (vision) models ONLY: the text GLMs
+        # cannot read a cross section, and GLM-OCR — the other model that takes an
+        # image — has no function calling, so it cannot drive the assistant.
         "editable_model": True,
-        "models": ["glm-4.6", "glm-4.7", "glm-5.2", "glm-5.1", "glm-5",
-                   "glm-5-turbo", "glm-4.7-flashx", "glm-4.7-flash", "glm-4.5",
-                   "glm-4.5-x", "glm-4.5-air", "glm-4.5-airx", "glm-4.5-flash",
-                   "glm-4-32b-0414-128k",
-                   "glm-5v-turbo", "glm-4.6v", "glm-4.6v-flashx", "glm-4.6v-flash",
-                   "glm-4.5v"],
-        # vision depends on the chosen model — GLM vision models carry a "V" right
-        # after the version (glm-4.6v, glm-5v-turbo). tools across all.
+        "models": ["glm-5v-turbo", "glm-4.6v", "glm-4.6v-flashx",
+                   "glm-4.6v-flash", "glm-4.5v"],
+        # A GLM vision model carries a "V" right after the version number
+        # (glm-4.6v, glm-5v-turbo); that is what both the list filter and the
+        # per-model capability read.
         "tools": True, "vision": None, "skill": True,
+        "vision_only": True,
         "vision_match": r"\dv",
     },
     "ollama": {
         "label": "Ollama (local, free)", "prefix": "ollama_chat/", "needs_key": False,
         "base": "http://localhost:11434", "editable_model": True,
-        "models": ["llama3.1", "qwen2.5-coder", "mistral"],
-        "tools": None, "vision": None,   # depends on the local model
+        # Local vision models, by family. An Ollama library is whatever the user
+        # pulled, so this is a starting list and the tag list is filtered to the
+        # same families — a text-only local model would leave the assistant
+        # unable to read the sketch it is being shown.
+        "models": ["llava", "llama3.2-vision", "gemma3", "qwen2.5vl",
+                   "minicpm-v"],
+        # Tool use still depends on the local model (many vision builds have no
+        # function calling); vision is resolved from the tag name.
+        "tools": None, "vision": None,
+        "vision_only": True,
+        "vision_match": (r"(llava|bakllava|vision|moondream|minicpm-v|gemma3|"
+                         r"qwen2\.?5-?vl|qwen3-?vl|internvl|llama4|"
+                         r"granite3\.\d+-vision|mistral-small3)"),
     },
 }
 DEFAULT_PROVIDER = "anthropic"
 DEFAULT_OLLAMA_BASE = "http://localhost:11434"
+
+
+def model_is_vision(provider, model):
+    """Whether ``model`` can accept images, for ``provider``.
+
+    The provider default when it has one, otherwise the ``vision_match`` pattern
+    read against the model id — which is what makes a typed-in id answer the
+    question too, rather than inheriting the capability of whatever was listed.
+    """
+    spec = PROVIDERS.get(provider) or {}
+    pat = spec.get("vision_match")
+    if pat is None:
+        return spec.get("vision")
+    return bool(re.search(pat, str(model or "").lower()))
 
 
 def _keyring():
@@ -186,17 +236,24 @@ class AssistantConfig:
         return f"{PROVIDERS[self.provider()]['label']} · {self.model()}"
 
     def capabilities(self):
-        """Capability hints for the current provider/model: ``{tools, vision}`` each
-        True / False / None (None = depends on the chosen local model). When the
-        provider lists ``vision_models`` (e.g. Z.ai's GLM-V models), vision is
-        resolved from the selected model rather than the provider default."""
+        """Capability flags for the current provider/model.
+
+        ``{tools, vision, prompt_cache, skill}``. ``tools`` and ``vision`` are
+        True / False / None (None = depends on the chosen local model); where the
+        provider carries a ``vision_match`` pattern (Kimi, Z.ai's GLM-V models, a
+        local Ollama tag) vision is resolved from the SELECTED model rather than
+        the provider default, so a typed-in id answers for itself.
+        ``prompt_cache`` is whether the system prompt is sent in a cache_control
+        block (Anthropic), and ``skill`` whether the full skill body is sent at
+        all — the two questions :meth:`supports_prompt_cache` and
+        :meth:`wants_skill` answer, reported here so one call describes the
+        selection.
+        """
         spec = PROVIDERS[self.provider()]
-        vision = spec.get("vision")
-        pat = spec.get("vision_match")
-        if pat is not None:
-            import re
-            vision = bool(re.search(pat, (self.model() or "").lower()))
-        return {"tools": spec.get("tools"), "vision": vision}
+        return {"tools": spec.get("tools"),
+                "vision": model_is_vision(self.provider(), self.model()),
+                "prompt_cache": self.supports_prompt_cache(),
+                "skill": self.wants_skill()}
 
     def supports_prompt_cache(self):
         """Whether to mark the system prompt cacheable with cache_control blocks
@@ -206,8 +263,9 @@ class AssistantConfig:
     def wants_skill(self):
         """Whether to send the full xslope skill body in the system prompt. True
         for providers that can afford it — Anthropic (prompt-cached) and any
-        provider flagged ``skill`` (e.g. DeepSeek: cheap + server-side prefix
-        caching). Others get the compact prompt to keep per-turn cost/latency low."""
+        provider flagged ``skill`` (Kimi and Z.ai: server-side prefix caching, so
+        a repeat turn re-reads the skill at cache rates). Others get the compact
+        prompt to keep per-turn cost/latency low."""
         spec = PROVIDERS[self.provider()]
         return bool(spec.get("prompt_cache") or spec.get("skill"))
 

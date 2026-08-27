@@ -106,7 +106,10 @@ already ran. If unsure whether an edit applied, print the current value first.
 `run_lem(method='bishop')` (methods: oms, bishop, janbu, spencer, corps, lowe, \
 mprice). It handles the loaded project's failure surface, returns the result \
 dict (with 'FS'), and shows the solution plot — don't rebuild that pipeline by \
-hand.
+hand. `run_seep(bc=1)` and `run_fem(analysis='ssrm')` are its seepage and finite \
+element counterparts, with the same shape: they build the mesh from the file's \
+declared settings if the model has none, attach the answer where Studio attaches \
+it, and plot. An SSRM run takes MINUTES — tell the user before you start one.
 
 For slope-stability modeling rules (geometry extents, starting circles, ponded \
 water, diagram reading, etc.) FOLLOW the xslope skill reference — it is the \
@@ -248,6 +251,39 @@ head boundary (`seep_bc:<set>:<head_index>`, or the dict
 `{'seep_bc': {'set': 1, 'head_index': 0}}`) and finds the value giving the
 target q — the classic "reservoir level vs seepage discharge" study. Both mesh
 modes error with "build a mesh first" if none is present.
+
+To RUN the seepage or finite element engine (rather than sweep it), use
+`run_seep(bc=1)` and `run_fem(analysis='ssrm')`. Each builds the mesh from the
+model's own declared settings (main!D18 element type, main!D19 target size) when
+`slope_data['mesh']` is None, so neither needs a mesh built first, and each
+attaches its answer the way Studio does: `run_seep` puts the nodal pore pressures
+on the model (`slope_data['seep_u']`, or `['seep_u2']` for bc=2) so a later
+stability run with `u = 'seep'` reads THAT field, and both store their bundle on
+`doc.results`, where the report and the results tabs find it. `run_fem` returns
+{'FS', 'solution', 'fem_data', …} — 'FS' is the SSRM factor of safety, None for
+`analysis='single'`. An SSRM run costs MINUTES: say so before starting one, and
+never start one to answer a question limit equilibrium already answers.
+
+When asked what Young's modulus and Poisson's ratio to use for a material that
+has none, call `suggest_elastic('Clay')` (a material name, its 1-based row
+number, the dict itself, a soil-type name like 'stiff clay', or nothing at all
+for every material). It classifies the material from its STRENGTH and returns
+{'soil_type', 'E', 'nu', 'unit_system', 'reason'} with E in the model's own
+stress unit. Do NOT invent an elastic pair, and do not carry one over from
+another model. It is a LAST RESORT: where the problem states E or nu, that value
+is an input and you transcribe it. When you do fall back to this, SAY so and name
+the soil type it classified as — a blank E is a singular stiffness matrix, and an
+E of the wrong system's magnitude leaves FS untouched while corrupting every
+displacement the FEM reports.
+
+For a written report, call `generate_report()` — the same Analysis Report the
+Report dialog builds, over the model and everything this session has solved,
+finished so its contents page carries page numbers. It returns the path, which
+the user can open from the chat. `path=` names the file (default:
+`<model>_report.docx` beside the project); every other keyword is a report option
+as the dialog's checkboxes set them (`title`, `analyst`, the section switches).
+A report asked for a method this session never ran RUNS it first, which is the
+longest thing in such a build — tell the user to expect the wait.
 """
 
 # Compact modeling rules — appended ONLY when the full skill is NOT loaded (i.e.
@@ -828,11 +864,79 @@ def _load_skill_text():
         return ""
 
 
+# --- what a turn cost --------------------------------------------------------
+# Tokens, and only tokens. A price would have to be a table of per-model rates,
+# and those move faster than a release: a stale table quoting dollars is worse
+# than no dollars at all. The counts are exact, come from the provider's own
+# response, and are the number a user checks a long agentic turn against.
+
+def _usage_value(usage, *names):
+    """One usage field, wherever this provider's response object keeps it.
+
+    LiteLLM normalizes most of the shape but not all of it — an object here, a
+    dict there, and the cached-prompt count under a different name per provider —
+    so each field is asked for by every name it goes by, and anything missing or
+    unreadable counts as zero. A usage readout must never be able to fail a turn.
+    """
+    for name in names:
+        value = None
+        if isinstance(usage, dict):
+            value = usage.get(name)
+        else:
+            value = getattr(usage, name, None)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return 0
+
+
+def usage_from_response(response):
+    """``{"input", "cached_input", "output"}`` for one completion. Never raises.
+
+    ``cached_input`` is the part of ``input`` the provider served from its prompt
+    cache (Anthropic's cache reads, or the automatic prefix caching OpenAI, Kimi
+    and Z.ai do) — it is a SUBSET of the input count, not an addition to it, which
+    is why the readout prints it in parentheses.
+    """
+    usage = getattr(response, "usage", None)
+    if usage is None and isinstance(response, dict):
+        usage = response.get("usage")
+    if usage is None:
+        return {"input": 0, "cached_input": 0, "output": 0}
+    details = getattr(usage, "prompt_tokens_details", None)
+    if details is None and isinstance(usage, dict):
+        details = usage.get("prompt_tokens_details")
+    cached = _usage_value(details, "cached_tokens") if details is not None else 0
+    if not cached:
+        cached = _usage_value(usage, "cache_read_input_tokens")
+    return {"input": _usage_value(usage, "prompt_tokens", "input_tokens"),
+            "cached_input": cached,
+            "output": _usage_value(usage, "completion_tokens", "output_tokens")}
+
+
+def _zero_usage():
+    return {"input": 0, "cached_input": 0, "output": 0}
+
+
+def format_usage(turn, session):
+    """The dock's one-line readout: this turn, then the session behind it."""
+    def part(u):
+        text = f"{u['input']:,} in"
+        if u.get("cached_input"):
+            text += f" ({u['cached_input']:,} cached)"
+        return text + f" / {u['output']:,} out"
+    return f"this turn: {part(turn)} · session: {part(session)}"
+
+
 class _AgentWorker(QThread):
     """Runs the LiteLLM tool-use loop off the GUI thread."""
 
     text = Signal(str)              # an assistant text block
     tool_call = Signal(object)      # {id, name, input, holder} — handled on GUI thread
+    usage = Signal(object)          # {input, cached_input, output} for one completion
     failed = Signal(str)
     done = Signal()
 
@@ -874,6 +978,10 @@ class _AgentWorker(QThread):
                 resp = litellm.completion(
                     messages=[self._system_message()] + self._messages,
                     tools=self._tools, max_tokens=MAX_TOKENS, **self._kwargs)
+                # Every completion in the turn counts, not just the last: an
+                # agentic turn is a dozen of these, and the tool results between
+                # them are what the input count grows by.
+                self.usage.emit(usage_from_response(resp))
                 msg = resp.choices[0].message
                 tool_calls = getattr(msg, "tool_calls", None) or []
 
@@ -937,6 +1045,7 @@ class Assistant(QObject):
     assistant_text = Signal(str)
     tool_ran = Signal(str, str, object)   # code, output_text, [figure_paths]
     tool_declined = Signal(str)           # code
+    usage_changed = Signal(object)        # {"turn": {...}, "session": {...}}
     failed = Signal(str)
     finished = Signal()
 
@@ -944,10 +1053,14 @@ class Assistant(QObject):
         super().__init__(main_window)
         from .kernel import PythonKernel
         self._mw = main_window
-        self._kernel = PythonKernel(main_window.doc)
+        self._kernel = PythonKernel(main_window.doc, window=main_window)
         self.config = AssistantConfig(getattr(main_window, "settings", None))
         self._messages = []
         self._worker = None
+        # Tokens this turn and this session. Accumulated from every completion the
+        # worker makes (an agentic turn is many), so the dock can show what a long
+        # autonomous run is actually costing while it is still running.
+        self._usage = {"turn": _zero_usage(), "session": _zero_usage()}
         # What the MODEL CHECKS blocks have already said, so a later block reports
         # the delta. A new or reopened project is a different model, and its
         # findings are different findings, so the document clears it too.
@@ -961,10 +1074,33 @@ class Assistant(QObject):
     def is_busy(self):
         return self._worker is not None and self._worker.isRunning()
 
+    # --- tokens ----------------------------------------------------------
+    @property
+    def usage(self):
+        """``{"turn": {...}, "session": {...}}`` — tokens read and written, each
+        ``{input, cached_input, output}``. ``turn`` covers every completion since
+        the last :meth:`send`; ``session`` every completion since the conversation
+        began. ``cached_input`` is the part of ``input`` the provider served from
+        its prompt cache, so it is inside that count rather than beside it."""
+        return {"turn": dict(self._usage["turn"]),
+                "session": dict(self._usage["session"])}
+
+    def add_usage(self, delta):
+        """Add one completion's tokens (:func:`usage_from_response`'s dict) to the
+        turn and the session, and announce the new totals."""
+        for scope in ("turn", "session"):
+            for key in ("input", "cached_input", "output"):
+                self._usage[scope][key] += int((delta or {}).get(key) or 0)
+        self.usage_changed.emit(self.usage)
+
     def reset(self):
         self._messages = []
         self._kernel.reset()          # fresh kernel — variables cleared, re-seeds
         self._checks_memo.reset()     # nothing has been reported to this session
+        # A new conversation is a new session: its cost starts at zero, like the
+        # transcript and the history it is the cost of.
+        self._usage = {"turn": _zero_usage(), "session": _zero_usage()}
+        self.usage_changed.emit(self.usage)
 
     def _system(self):
         # Full skill body only for Anthropic (prompt-cached, so cheap). Local /
@@ -999,12 +1135,14 @@ class Assistant(QObject):
             self._messages.append({"role": "user", "content": content})
         else:
             self._messages.append({"role": "user", "content": user_text})
+        self._usage["turn"] = _zero_usage()      # a new turn, counted from zero
         self._worker = _AgentWorker(self.config.completion_kwargs(), self._system(),
                                     self._messages, [RUN_PYTHON_TOOL],
                                     cache_system=self.config.supports_prompt_cache(),
                                     parent=self)
         self._worker.text.connect(self.assistant_text)
         self._worker.tool_call.connect(self._on_tool_call)   # queued -> GUI thread
+        self._worker.usage.connect(self.add_usage)
         self._worker.failed.connect(self._on_failed)
         self._worker.done.connect(self._on_done)
         self._worker.start()

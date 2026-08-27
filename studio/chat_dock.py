@@ -144,6 +144,19 @@ class ChatDock(QWidget):
         row.addWidget(self.send_btn)
         row.addWidget(self.stop_btn)
 
+        # What the conversation has cost, in tokens: this turn, and the session
+        # behind it. Tokens only — a price would need a per-model rate table, and
+        # those change faster than a release, so a stale one quoting dollars would
+        # be worse than no dollars at all. It sits under the input, where the user
+        # decides whether to send the next one.
+        self.usage_label = QLabel()
+        self.usage_label.setObjectName("assistant_usage")
+        self.usage_label.setWordWrap(True)
+        self.usage_label.setStyleSheet("color:#777; font-size:11px;")
+        self.usage_label.setToolTip(
+            "Tokens read and written by the model. 'cached' is the part of the "
+            "input the provider served from its prompt cache.")
+
         layout = QVBoxLayout(self)
         layout.addLayout(top)
         layout.addWidget(self.transcript, 1)
@@ -151,6 +164,7 @@ class ChatDock(QWidget):
         layout.addWidget(self.attach_row)
         layout.addWidget(self.input)
         layout.addLayout(row)
+        layout.addWidget(self.usage_label)
         self.setMinimumWidth(220)
 
         self.input.image_added.connect(self._add_attachment)
@@ -162,6 +176,7 @@ class ChatDock(QWidget):
         self.settings_btn.clicked.connect(self._open_settings)
 
         self._assistant.assistant_text.connect(self._on_assistant_text)
+        self._assistant.usage_changed.connect(self._on_usage)
         self._assistant.tool_ran.connect(self._on_tool_ran)
         self._assistant.tool_declined.connect(self._on_tool_declined)
         self._assistant.failed.connect(self._on_failed)
@@ -200,8 +215,8 @@ class ChatDock(QWidget):
         if not self._assistant.config.capabilities().get("vision", True):
             self.transcript.append(
                 '<div style="color:#9a6700;margin-top:8px;">The current model '
-                'has no vision support — switch to a Claude/OpenAI (or vision-'
-                'capable Ollama) model in Settings to send images.</div>')
+                'cannot read images. Every model the Settings dialog lists can — '
+                'pick one from the list rather than a typed-in id.</div>')
             return
         self._pending.append(img)
         self._refresh_attachments()
@@ -235,6 +250,16 @@ class ChatDock(QWidget):
         self._assistant.send(text, images=[qimage_to_data_url(i) for i in images])
 
     # --- assistant signals ----------------------------------------------
+    def _on_usage(self, usage):
+        """Show the running token count. Blank until the first completion, so a
+        fresh dock (and a new chat) carries no line at all rather than zeros."""
+        from .ai.assistant import format_usage
+        session = (usage or {}).get("session") or {}
+        if not any(session.get(k) for k in ("input", "cached_input", "output")):
+            self.usage_label.clear()
+            return
+        self.usage_label.setText(format_usage(usage["turn"], session))
+
     def _on_assistant_text(self, text):
         self._add_block("Assistant", text, "#2e7d32")
 

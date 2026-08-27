@@ -23,8 +23,14 @@ _FIG_EXTS = (".png", ".pdf", ".svg", ".jpg", ".jpeg")
 
 
 class PythonKernel:
-    def __init__(self, doc):
+    def __init__(self, doc, window=None):
         self._doc = doc
+        # The main window, where there is one. Only ever asked for what Studio
+        # itself knows and the document does not — which solutions a report may
+        # document, and the app's settings — and always through ``getattr``, so
+        # the kernel runs unchanged against a document with no window (the
+        # guardrail checks).
+        self._window = window
         self._ns = {}
         self._seeded = False
         self._outdir = None
@@ -63,6 +69,17 @@ class PythonKernel:
 
         - ``run_lem(method='bishop', ...)`` — one single-surface LEM solve on the
           loaded surface; returns the result dict, shows the solution plot.
+        - ``run_seep(bc=1, ...)`` — one steady seepage solve; builds the mesh from
+          the file's declared settings if there is none, attaches the solved field
+          to the model and the bundle to the session, shows the solution plot.
+        - ``run_fem(analysis='ssrm', ...)`` — one finite element run (SSRM factor
+          of safety, or a single trial); same mesh handling, attaches the bundle,
+          shows the results plot.
+        - ``suggest_elastic(material_or_soil_type=None, ...)`` — soil-type E and
+          nu for a material that carries none, with the classification it came
+          from. A LAST-RESORT fill, never a preference over a stated value.
+        - ``generate_report(path=None, **options)`` — the Analysis Report the
+          Report dialog builds, written and finished; returns the path.
         - ``resync_geometry(slope_data=None)`` — rebuild derived geometry after an
           in-snippet geometry edit (call inside sweep loops).
         - ``sensitivity(values, apply, param=..., ...)`` — callback-driven FS-vs-
@@ -107,6 +124,7 @@ class PythonKernel:
           door (kept under the plain name for back-compat).
         """
         doc = self._doc
+        window = self._window
 
         def resync_geometry(slope_data=None):
             """Rebuild the derived geometry (ground_surface, polygons,
@@ -157,6 +175,354 @@ class PythonKernel:
                 plot_solution(sd, slice_df, surface, result,
                               fig=plt.figure(figsize=(11, 6)))
             return result
+
+        def _ensure_mesh(sd, quiet=False):
+            """The model's finite-element mesh, building one from the FILE'S OWN
+            declared settings if it carries none.
+
+            A mesh is a computed artifact, not an input, so it is attached to the
+            model directly (no undo step, no dirty flag) exactly as Studio's own
+            mesh build attaches it. The element type and target size come from the
+            model (main!D18 / main!D19); with no declared size the automatic one is
+            used — the ground-surface width over 100 — which is the Build mesh
+            dialog's own default. Reinforcement and pile lines become constraint
+            lines and per-polygon Size overrides are honoured, so the mesh a run
+            gets here is the mesh the dialog would have built.
+            """
+            if sd.get("mesh") is not None:
+                return sd["mesh"]
+            from xslope.mesh import (build_mesh_from_polygons,
+                                     extract_constraint_line_geometry,
+                                     extract_size_regions, get_material_polygons)
+            resync_geometry(sd)
+            lines, _n_reinf, _n_pile = extract_constraint_line_geometry(sd)
+            polygons = get_material_polygons(sd, reinf_lines=lines)
+            element_type = sd.get("element_type") or "tri6"
+            target = sd.get("target_size")
+            if not target:
+                xs = [x for x, _y in sd["ground_surface"].coords]
+                target = (max(xs) - min(xs)) / 100.0
+            mesh = build_mesh_from_polygons(
+                polygons, target_size=float(target), element_type=element_type,
+                lines=lines or None,
+                element_size_1d=sd.get("element_size_1d"),
+                size_regions=extract_size_regions(sd))
+            sd["mesh"] = mesh
+            if not quiet:
+                print(f"Built a {element_type} mesh (target size {float(target):.4g}): "
+                      f"{len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements.")
+            return mesh
+
+        def _show(*calls):
+            """Put a solved run in front of the user the way a Run does — the
+            results tab for that engine — where there is a window to put it in.
+
+            Best effort by construction: the answer is already attached to the
+            model and the session, and the chat carries its plot, so a view that
+            cannot be built (no window, a panel that objects) must not turn a
+            successful analysis into a failed snippet.
+            """
+            for name, args in calls:
+                try:
+                    method = getattr(window, name, None)
+                    if callable(method):
+                        method(*args)
+                except Exception:
+                    pass
+
+        def run_seep(bc=1, tol=1e-4, max_iter=400, plot=True, slope_data=None):
+            """Run a STEADY seepage analysis and return the solution dict — the
+            seepage counterpart of `run_lem`.
+
+            Builds the seepage data from the model's mesh (building the mesh from the
+            file's declared settings when there is none), solves, and does what
+            Studio does with the answer: the nodal pore pressures are attached to the
+            model (`slope_data['seep_u']` for BC set 1, `['seep_u2']` for set 2), so a
+            later stability run with a material set to `u = 'seep'` reads THIS field,
+            and the bundle is stored on the session (`doc.results['seep_solutions']`)
+            so the report and the results tabs can find it. Shows the head/flow-net
+            plot when plot=True (pass plot=False in a sweep).
+
+            `bc` picks the boundary-condition set (1, or 2 for the drawn-down state
+            rapid drawdown reads). `tol` is the relative head-change tolerance and
+            `max_iter` the cap on the unconfined iteration. Returns the solution dict
+            ('head', 'u', 'velocity', 'gradient', 'phi', 'flowrate', 'converged',
+            'closure_error', …). For a TRANSIENT march, drive
+            `xslope.seep.run_transient_seepage` directly — this helper is the steady
+            solve.
+            """
+            from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                                     run_seepage_analysis)
+            sd = doc.slope_data if slope_data is None else slope_data
+            mesh = _ensure_mesh(sd)
+            seep_data = build_seep_data(mesh, sd, seep_bc=bc)
+            solution = run_seepage_analysis(seep_data, tol=tol, max_iter=int(max_iter))
+            if solution is None:
+                raise RuntimeError("Seepage analysis returned no solution.")
+            bundle = {"seep_data": seep_data, "solution": solution,
+                      "options": {"bc": bc, "tol": tol, "max_iter": int(max_iter)}}
+            doc.results.setdefault("seep_solutions", {})[bc] = bundle
+            # The solved field belongs to the MODEL, not only to a results tab —
+            # this is what a u='seep' stability run reads.
+            apply_steady_stability_field(sd, solution, bc=bc, verbose=False)
+            _show(("_show_seep_data", (seep_data, bc)),
+                  ("_show_seep_solution", (bc,)))
+            q = solution.get("flowrate")
+            print(f"seepage (BC set {bc}): converged={solution.get('converged')}"
+                  + (f", total flow q = {q:.4g}" if q is not None else ""))
+            if plot:
+                from xslope.plot_seep import plot_seep_solution
+                import matplotlib.pyplot as plt
+                plot_seep_solution(seep_data, solution, fig=plt.figure(figsize=(11, 6)))
+            return solution
+
+        def run_fem(analysis="ssrm", F=1.0, F_min=None, F_max=None, tolerance=0.01,
+                    failure_criterion="non_convergence", min_slip_depth=None,
+                    k0=None, tension_srf=None, plot=True, slope_data=None, **kwargs):
+            """Run a finite element analysis and return the result bundle — the FEM
+            counterpart of `run_lem`. MINUTES, not seconds: say so before starting one.
+
+            `analysis='ssrm'` (default) runs the shear-strength reduction search and
+            returns a bundle whose 'FS' is the factor of safety; `analysis='single'`
+            runs ONE trial at strength factor `F` and returns the stress/displacement
+            field with 'FS' None. Builds the mesh from the file's declared settings if
+            the model carries none, attaches the bundle to the session
+            (`doc.results['fem_solution']`) the way Studio does, and shows the standard
+            results plot when plot=True.
+
+            `F_min`/`F_max` bracket the SSRM search (default: the model's own
+            main!D21/D22 values, else 1.0-2.0); `tolerance` closes it. `k0` and
+            `tension_srf` default to the model's declared values. `failure_criterion`
+            and `min_slip_depth` are the SSRM failure test. Extra keyword arguments
+            pass through to `solve_ssrm` / `solve_fem`.
+
+            Returns {'fem_data', 'solution', 'failure_solution', 'FS', 'analysis'}.
+            A non-converged SSRM raises with the solver's own reason rather than
+            returning a number that is not a factor of safety.
+            """
+            from xslope.fem import build_fem_data, solve_fem, solve_ssrm
+            import matplotlib.pyplot as plt
+            sd = doc.slope_data if slope_data is None else slope_data
+            mesh = _ensure_mesh(sd)
+            fem_data = build_fem_data(sd, mesh)
+            if k0 is None:
+                k0 = sd.get("k0")
+            if analysis == "single":
+                solution = solve_fem(fem_data, F=float(F), debug_level=1, k0=k0,
+                                     **kwargs)
+                bundle = {"fem_data": fem_data, "solution": solution,
+                          "failure_solution": None, "FS": None, "analysis": "single"}
+                print(f"FEM single trial (F = {float(F):g}): "
+                      f"converged={solution.get('converged')}, "
+                      f"iterations={solution.get('iterations')}")
+            else:
+                lo = sd.get("ssrm_f_min") if F_min is None else F_min
+                hi = sd.get("ssrm_f_max") if F_max is None else F_max
+                lo = 1.0 if lo is None else float(lo)
+                hi = 2.0 if hi is None else float(hi)
+                if tension_srf is None:
+                    tension_srf = sd.get("tension_srf")
+                result = solve_ssrm(fem_data, F_min=lo, F_max=hi,
+                                    tolerance=float(tolerance), debug_level=1,
+                                    failure_criterion=failure_criterion,
+                                    min_slip_depth=min_slip_depth, k0=k0,
+                                    tension_srf=tension_srf, **kwargs)
+                if not result.get("converged", False):
+                    raise RuntimeError(f"SSRM did not converge: "
+                                       f"{result.get('error', 'unknown error')}")
+                from xslope.fem import ssrm_run_record
+                bundle = {"fem_data": fem_data, "solution": result["last_solution"],
+                          "failure_solution": result.get("failure_solution"),
+                          "FS": result.get("FS"), "analysis": "ssrm",
+                          "meta": ssrm_run_record(result, fem_data, {})}
+                print(f"SSRM: FS = {result['FS']:.3f}")
+                if result.get("note"):
+                    # The factor of safety is the bracket midpoint however the
+                    # bracket closed, so an undecided upper edge is invisible in
+                    # the number itself.
+                    print(f"  {result['note']}")
+            doc.results["fem_solution"] = bundle
+            _show(("_show_fem_data", (fem_data,)), ("_show_fem_results", ()))
+            if plot:
+                from xslope.plot_fem import plot_fem_results
+                plot_fem_results(fem_data, bundle["solution"], fs=bundle["FS"],
+                                 failure_solution=bundle.get("failure_solution"),
+                                 fig=plt.figure(figsize=(11, 7)))
+            return bundle
+
+        def suggest_elastic(material_or_soil_type=None, unit_system=None,
+                            slope_data=None):
+            """Soil-type Young's modulus and Poisson's ratio for a material that
+            carries none — the answer to "what E and nu should I use for this clay?".
+
+            Thin wrapper over `xslope.units.classify_elastic`. Give it a material
+            (its name, its 1-based row number, or the dict itself) and it classifies
+            the material FROM ITS STRENGTH — a Hoek-Brown material is rock, a
+            frictional material grades by phi, a phi = 0 material by its undrained
+            shear strength, a c-phi soil on its cohesive component — and returns E in
+            the MODEL'S OWN stress unit with the soil type it decided on. A soil-type
+            name ('stiff clay', 'dense sand', 'soft rock') is also accepted, for a
+            material that does not exist yet. With no argument it does every material
+            in the model and prints the table.
+
+            `unit_system` ('si' / 'metric' / 'imperial') overrides the model's
+            declared system; without either, the unit system is inferred from the
+            material unit weights.
+
+            Returns a dict (or a list of them) with 'material', 'soil_type', 'E',
+            'nu', 'unit_system' and 'reason'.
+
+            THIS IS A LAST RESORT, never a preference. A value the problem states is
+            an input: transcribe it. Use this only to fill a genuine blank — and SAY
+            that you did, and which soil type it came from, because a blank E is a
+            singular stiffness matrix while a wrong-magnitude E leaves the factor of
+            safety untouched and corrupts every displacement the FEM reports.
+            """
+            from xslope import units as _units
+            from xslope.units import (KPA_TO_PSF, classify_elastic,
+                                      infer_unit_system, normalize_unit_system)
+            sd = doc.slope_data if slope_data is None else slope_data
+            materials = list(sd.get("materials") or [])
+
+            system = normalize_unit_system(unit_system)
+            if system is None:
+                system = normalize_unit_system(sd.get("unit_system"))
+            if system is None:
+                system = infer_unit_system(sd.get("materials")) or "si"
+            imperial = (system == "imperial")
+
+            # The published per-soil-type table lives in xslope.units as one
+            # constant per type; read it by value rather than restating it here, so
+            # a revision to the table reaches this helper with no second edit.
+            table = {}
+            for name, value in vars(_units).items():
+                if (name.isupper() and isinstance(value, tuple) and len(value) == 3
+                        and isinstance(value[0], str)):
+                    table[value[0].lower()] = value
+
+            def _one(mat, label):
+                soil, E, nu = classify_elastic(mat, imperial=imperial,
+                                               declared_system=system)
+                opt = str(mat.get("option", "mc") or "mc").lower()
+                if opt in ("hb", "hoek", "hoek-brown"):
+                    why = "a Hoek-Brown strength model means rock"
+                else:
+                    why = (f"c = {float(mat.get('c') or 0):g}, "
+                           f"phi = {float(mat.get('phi') or 0):g}")
+                return {"material": label, "soil_type": soil, "E": E, "nu": nu,
+                        "unit_system": system,
+                        "reason": (f"{label} classified as {soil} from {why}; E is the "
+                                   f"midpoint of the published range for that soil "
+                                   f"type and nu its typical value, in "
+                                   f"{'psf' if imperial else 'kPa'}. Last-resort fill "
+                                   f"— a stated value outranks it.")}
+
+            if material_or_soil_type is None:
+                rows = [_one(m, m.get("name") or f"Material {i + 1}")
+                        for i, m in enumerate(materials)]
+                for r in rows:
+                    print(f"  {r['material']:<20} {r['soil_type']:<12} "
+                          f"E = {r['E']:,.0f}   nu = {r['nu']:g}")
+                return rows
+
+            mat = None
+            label = str(material_or_soil_type)
+            if isinstance(material_or_soil_type, dict):
+                mat = material_or_soil_type
+                label = mat.get("name") or "material"
+            elif isinstance(material_or_soil_type, int):
+                mat = materials[material_or_soil_type - 1]      # 1-based, as the sheet
+                label = mat.get("name") or f"Material {material_or_soil_type}"
+            else:
+                key = label.strip().lower()
+                for m in materials:
+                    if str(m.get("name", "")).strip().lower() == key:
+                        mat = m
+                        label = m.get("name")
+                        break
+                if mat is None:
+                    row = table.get(key)
+                    if row is None:
+                        raise ValueError(
+                            f"{material_or_soil_type!r} is neither a material in this "
+                            f"model ({', '.join(str(m.get('name')) for m in materials) or 'none'}) "
+                            f"nor a soil type ({', '.join(sorted(table))}).")
+                    soil, e_kpa, nu = row
+                    E = round(e_kpa * KPA_TO_PSF if imperial else e_kpa, -2)
+                    out = {"material": None, "soil_type": soil, "E": E, "nu": nu,
+                           "unit_system": system,
+                           "reason": (f"Published range for {soil}: E is its midpoint "
+                                      f"and nu its typical value, in "
+                                      f"{'psf' if imperial else 'kPa'}. Last-resort "
+                                      f"fill — a stated value outranks it.")}
+                    print(f"  {soil}: E = {E:,.0f}, nu = {nu:g} ({system})")
+                    return out
+            out = _one(mat, label)
+            print(f"  {out['material']}: {out['soil_type']} — E = {out['E']:,.0f}, "
+                  f"nu = {out['nu']:g} ({system})")
+            return out
+
+        def generate_report(path=None, finalize=True, **options):
+            """Build the Analysis Report — the same document File → Generate Report
+            produces — and return the path it was written to.
+
+            Runs `xslope.report.generate_report` over the model and everything this
+            session has solved (the LEM run with the method it was run under, the
+            seepage solutions in boundary-condition order, a transient march, the
+            finite element run), then hands the finished .docx to whatever lays pages
+            out (Word, or LibreOffice) so its contents page carries real page numbers
+            — the dialog's own last step. A method the report is asked for that this
+            session never ran is RUN by the builder, which is the longest thing in
+            such a build: warn the user before asking for one.
+
+            `path` defaults to `<model>_report.docx` beside the project (the home
+            directory for a project never saved). `finalize=False` skips the page-
+            number pass. Every other keyword is a report option, exactly as the
+            Report dialog's checkboxes set them — `title`, `analyst`, and the section
+            switches (`lem_slices`, `fem_piles`, …); `xslope.report.DEFAULT_OPTIONS`
+            names them all. Returns the output path.
+            """
+            from xslope.report import generate_report as _generate
+            from ..report_dialog import (default_output_path, document_finish,
+                                         finalization_enabled)
+            sd = doc.slope_data
+            solutions = _report_solutions()
+            out_path = path or default_output_path(getattr(doc, "path", None))
+            opts = dict(options)
+            style = getattr(doc, "style", None)
+            if style is not None:
+                opts.setdefault("style", style)
+            ok, res = _generate(sd, solutions, opts, out_path)
+            if not ok:
+                raise RuntimeError(res)
+            if finalize:
+                settings = getattr(window, "settings", None)
+                document_finish(out_path, finalization_enabled(settings))
+            print(f"Report written to {res['path']} "
+                  f"({len(res.get('figures') or ())} figures).")
+            return res["path"]
+
+        def _report_solutions():
+            """What the report can document, in `xslope.report`'s shape. Studio's own
+            assembly where there is a window (it also carries the method the LEM run
+            was made under), and the same thing off `doc.results` where there is
+            not."""
+            builder = getattr(window, "report_solutions", None)
+            if callable(builder):
+                return builder()
+            results = doc.results or {}
+            out = {}
+            lem = results.get("lem_solution")
+            if lem:
+                out["lem"] = [dict(lem, method=lem.get("method"))]
+            seep = results.get("seep_solutions") or {}
+            if seep:
+                out["seep"] = [seep[bc] for bc in sorted(seep)]
+            if results.get("transient_seep"):
+                out["tseep"] = [results["transient_seep"]]
+            if results.get("fem_solution"):
+                out["fem"] = [results["fem_solution"]]
+            return out
 
         def sensitivity(values, apply, param="value", method="spencer", search=True,
                         num_slices=40, rapid=False, name="sensitivity", plot=True,
@@ -604,7 +970,10 @@ class PythonKernel:
                 return reliability_rs(method=method, **kwargs)
             return reliability_taylor(method=method, **kwargs)
 
-        return {"run_lem": run_lem, "resync_geometry": resync_geometry,
+        return {"run_lem": run_lem, "run_seep": run_seep, "run_fem": run_fem,
+                "suggest_elastic": suggest_elastic,
+                "generate_report": generate_report,
+                "resync_geometry": resync_geometry,
                 "sensitivity": sensitivity, "list_params": list_params,
                 "design_sweep": design_sweep,
                 "parametric_sweep": parametric_sweep,

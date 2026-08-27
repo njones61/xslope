@@ -1,8 +1,7 @@
 {
   "schema": 1,
-  "updated": "2026-07-31",
-  "note": "Curated model recommendations for the XSLOPE Studio assistant. Published as a release asset beside latest.json and read at most once a day, so the advice can be corrected between app releases. It only MARKS and ORDERS what the provider itself lists - nothing here hides a model, and any model id can still be typed into the dialog by hand. 'recommended' is what a fresh install selects; 'good_choices' sort to the top with the labels below; 'deprecated' ids stay selectable and are marked as superseded. Ollama is deliberately absent: its list is whatever the user has pulled locally.",
-
+  "updated": "2026-08-27",
+  "note": "Curated model recommendations for the XSLOPE Studio assistant. Published as a release asset beside latest.json and read at most once a day, so the advice can be corrected between app releases. It only MARKS and ORDERS what the dialog lists - nothing here hides a model, and any model id can still be typed into the dialog by hand. 'recommended' is what a fresh install selects; 'good_choices' sort to the top with the labels below; 'deprecated' ids stay selectable and are marked as superseded. Only models that can read an image are offered, since the assistant is regularly shown a sketch or a photograph of a cross section - so every id named here is a vision model. Ollama is deliberately absent: its list is whatever the user has pulled locally.",
   "providers": {
     "anthropic": {
       "recommended": "claude-opus-5",
@@ -33,7 +32,6 @@
         "claude-3-opus-20240229"
       ]
     },
-
     "openai": {
       "recommended": "gpt-5.1",
       "good_choices": [
@@ -64,53 +62,57 @@
         "o3-mini"
       ]
     },
-
-    "deepseek": {
-      "recommended": "deepseek-chat",
+    "kimi": {
+      "recommended": "kimi-k2.6",
       "good_choices": [
         {
-          "id": "deepseek-chat",
-          "label": "recommended for tool use",
-          "note": "Function-calling capable and inexpensive, with server-side prefix caching. Text only - no vision."
+          "id": "kimi-k2.6",
+          "label": "flagship",
+          "note": "Current K2 flagship: tool use, images, and server-side caching of the prompt prefix."
         },
         {
-          "id": "deepseek-reasoner",
-          "label": "reasoning",
-          "note": "Deeper reasoning, but tool-call support is weaker than deepseek-chat, so run-code may not work."
+          "id": "kimi-k2.5",
+          "label": "stable",
+          "note": "The previous K2 generation, still widely available and cheaper per token."
+        },
+        {
+          "id": "kimi-k3",
+          "label": "long context",
+          "note": "Newest generation with the largest context window; check your account has access."
+        },
+        {
+          "id": "kimi-latest",
+          "label": "always current",
+          "note": "Moonshot's rolling alias — it moves to their newest vision model without a settings change."
         }
       ],
       "deprecated": [
-        "deepseek-coder"
+        "moonshot-v1-8k-vision-preview",
+        "moonshot-v1-32k-vision-preview",
+        "moonshot-v1-128k-vision-preview"
       ]
     },
-
     "zai": {
-      "recommended": "glm-5.2",
+      "recommended": "glm-4.6v",
       "good_choices": [
         {
-          "id": "glm-5.2",
-          "label": "flagship",
-          "note": "Newest GLM text model: tool use, no vision. Pick a V model (glm-5v-turbo, glm-4.6v) if images matter."
+          "id": "glm-4.6v",
+          "label": "flagship vision",
+          "note": "The current GLM-V model: tool use and images both."
         },
         {
-          "id": "glm-5-turbo",
+          "id": "glm-5v-turbo",
+          "label": "faster",
+          "note": "Quicker and cheaper per turn than the flagship V model."
+        },
+        {
+          "id": "glm-4.6v-flash",
           "label": "economical",
-          "note": "Faster and cheaper than the flagship for routine turns."
-        },
-        {
-          "id": "glm-4.6",
-          "label": "stable",
-          "note": "The previous generation, still widely available on older plans."
+          "note": "The cheapest GLM-V tier; fine for short edits and questions."
         }
       ],
       "deprecated": [
-        "glm-4.5",
-        "glm-4.5-x",
-        "glm-4.5-air",
-        "glm-4.5-airx",
-        "glm-4.5-flash",
-        "glm-4.5v",
-        "glm-4-32b-0414-128k"
+        "glm-4.5v"
       ]
     }
   }

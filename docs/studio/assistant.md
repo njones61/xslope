@@ -132,9 +132,26 @@ dependency is missing. See [Installation](index.md#installation).
 The assistant is an **agent with code execution**, not a chatbot. Its core tool is
 an in-process Python kernel: the model writes small Python snippets, and Studio runs
 them with `xslope` imported and the **live project in scope** — `doc` (the project),
-`slope_data` (its inputs), and `results` are all preloaded, along with helpers like
-`run_lem()` and `sensitivity()`. Most requests reduce to "write and run a little
-Python, show me the figure or number," exactly like the notebook workflow.
+`slope_data` (its inputs), and `results` are all preloaded. Most requests reduce to
+"write and run a little Python, show me the figure or number," exactly like the
+notebook workflow.
+
+The pipelines a request usually needs are preloaded as helpers, so the model calls
+one rather than reassembling the engine by hand:
+
+| Helper | What it does |
+| --- | --- |
+| `run_lem(method='bishop')` | One limit-equilibrium solve on the project's failure surface. |
+| `run_seep(bc=1)` | One steady seepage solve. The solved pore pressures are attached to the model, so a later stability run with `u = seep` reads them. |
+| `run_fem(analysis='ssrm')` | One finite element run — the SSRM factor of safety, or a single trial. Minutes, not seconds. |
+| `generate_report(path=None)` | The [Analysis Report](reports.md), built and finished exactly as the Report dialog builds it. |
+| `suggest_elastic('Clay')` | Soil-type `E` and `ν` for a material that carries none, classified from its strength. A last resort, never a substitute for a stated value. |
+| `sensitivity()`, `design_sweep()`, `parametric_sweep()`, `reliability_*()` | The parameter-study and probabilistic families. |
+
+`run_seep` and `run_fem` build the mesh from the file's own declared settings
+(`main!D18`, `main!D19`) when the project has none, so neither needs a mesh built
+first, and both attach their results where Studio attaches them — the results tab
+opens as it would after a Run.
 
 Because edits go through the same path as the editors, anything the assistant changes:
 
@@ -154,18 +171,27 @@ automatically if none is, so the first snippet works.)
 The assistant is **bring-your-own-model**. A **Settings…** button in the dock opens
 a dialog to pick the provider and model and store credentials:
 
-| Provider | Notes |
-| --- | --- |
-| **Claude** (Anthropic) | Tool use + vision; prompt caching keeps the large system prompt cheap on repeat turns. |
-| **OpenAI / GPT** | Tool use + vision. |
-| **Ollama** (local) | Runs models on your machine — free, no API key, fully offline. Capability depends on the chosen model. |
-| **DeepSeek** | Tool use; vision per model. |
-| **Z.ai (GLM)** | Tool use; vision per model. |
+| Provider | Models offered | Notes |
+| --- | --- | --- |
+| **Claude** (Anthropic) | The current Claude family | Tool use + vision; prompt caching keeps the large system prompt cheap on repeat turns. |
+| **OpenAI / GPT** | The current GPT family | Tool use + vision; the prompt prefix is cached server-side. |
+| **Kimi** (Moonshot AI) | The K-series vision models (`kimi-k2.6`, `kimi-k2.5`, `kimi-k3`, `kimi-latest`) and the `moonshot-v1` vision previews | Tool use + vision, with server-side prefix caching, so it gets the full system prompt. |
+| **Z.ai (GLM)** | The GLM-**V** models only (`glm-4.6v`, `glm-5v-turbo`, …) | Tool use + vision. The text GLMs are not offered — see below. |
+| **Ollama** (local) | Vision models only (`llava`, `llama3.2-vision`, `gemma3`, `qwen2.5vl`, `minicpm-v`, …) | Runs on your machine — free, no API key, fully offline. Whether a given local model can run code depends on the model. |
+
+**Every model on offer can read an image.** Building a model from a photograph or a
+sketch of a cross section is one of the things the assistant is for, and a text-only
+model turns that request into a conversation about what the picture shows. So a
+provider whose API takes no images is not listed, and where a provider's catalogue is
+mixed — Z.ai's text GLMs beside its V models, a local library that is mostly text —
+the list is filtered to the part of it that can see, and the caption under the box
+says so. The model box still accepts free text, so a text-only id can be typed in if
+you want one.
 
 ![Assistant Settings dialog](images/assistant_settings.png)
 
-API keys are stored in the **OS keychain** (not in plaintext), and the Ollama base
-URL is configurable for local models. The dock shows the active provider · model,
+API keys are stored in the **OS keychain** (not in plaintext), and the base URL is
+configurable for Kimi, Z.ai and Ollama. The dock shows the active provider · model,
 and a caption warns when the selected model can't (or may not) run code or accept
 images, so the UI degrades gracefully.
 
@@ -238,7 +264,7 @@ process, a bad snippet could hang the app — the confirm mode and Stop button a
 your guardrails.
 
 !!! warning "Network egress"
-    Hosted models (Claude, OpenAI, DeepSeek, Z.ai) send your prompts and any
+    Hosted models (Claude, OpenAI, Kimi, Z.ai) send your prompts and any
     attached images off your machine. **Ollama stays local.** Choose accordingly
     for sensitive work.
 
@@ -249,9 +275,16 @@ your guardrails.
 ![Building from a sketch (vision)](images/assistant_vision.png)
 
 - **Images** — paste or drop an image into the chat (e.g. a hand sketch or a screen
-  capture) for models that support vision.
+  capture). Every model the dialog lists can read one.
 - **Inline figures** — plots the assistant produces appear inline in the transcript.
 - **New chat** — starts a fresh conversation and resets the kernel.
+- **What it cost** — a line under the input reports the tokens the provider read and
+  wrote: `this turn: 41,207 in (38,912 cached) / 1,864 out · session: 96,430 in /
+  4,102 out`. One agentic turn is many model calls, and every one of them counts, so
+  the turn figure keeps climbing while the assistant works. *Cached* is the part of
+  the input the provider served from its prompt cache — a subset of the input count,
+  not an addition to it, and the reason a long conversation with a caching provider
+  costs far less than the raw input number suggests. A new chat starts the count over.
 - Press **Enter** to send; the transcript renders markdown with collapsible code
   blocks and surfaces actionable error messages.
 

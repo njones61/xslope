@@ -3059,8 +3059,20 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
     kind = search.get("kind", "circular")
 
     items = [("Surface family", "circular" if kind == "circular" else "non-circular"),
-             ("Method", method_label(method)),
-             ("Trial surfaces evaluated", f"{len(fs_cache):,}")]
+             ("Method", method_label(method))]
+    # A circular search's factor-of-safety cache holds one entry per grid CENTER,
+    # and each center is solved at many depths: the cache length is not the number
+    # of trial surfaces and reporting it as such understated an 838-surface
+    # search as 96. The true count is the one the search itself discloses — the unique
+    # surfaces handed to the solver (:class:`~xslope.search.UnsolvedTrials`). The
+    # non-circular search caches one entry per surface, so there the cache length
+    # IS the count and there is no second number to give.
+    trials = _num((search.get("unsolved") or {}).get("attempted"))
+    if trials:
+        items.append(("Trial surfaces evaluated", f"{int(trials):,}"))
+        items.append(("Grid centers refined", f"{len(fs_cache):,}"))
+    else:
+        items.append(("Trial surfaces evaluated", f"{len(fs_cache):,}"))
     if path_pts:
         items.append(("Refinement stages", str(len(path_pts))))
     valid = [c for c in fs_cache if _num(c.get("FS")) is not None

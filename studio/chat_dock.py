@@ -1,7 +1,8 @@
 """ChatDock — the AI assistant panel.
 
 A narrow right-side dock: a transcript (the assistant's markdown rendered — tables,
-headings, fenced code — with inline figures and "ran code" blocks), a multi-line
+headings, fenced code, and math reduced to plain text since the dialect renders
+none — with inline figures and "ran code" blocks), a multi-line
 input (Ctrl/Cmd+Enter sends), Send/Stop, and a Settings button (provider/model,
 key, confirm-before-running). It wires to
 ``studio.ai.assistant.Assistant`` and renders its signals. The header is kept
@@ -33,6 +34,151 @@ _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
 #: renders as code rather than as a wall of entities.
 _CODE_SPANS = re.compile(r"(```.*?```|```[\s\S]*$|``.*?``|`[^`\n]*`)", re.S)
 
+#: Greek letters a slope-stability answer actually uses, as the letters
+#: themselves. ``\phi`` renders as the same phi the rest of the program shows
+#: (φ, not the variant glyph) so a reply and the material table agree.
+_LATEX_LETTERS = {
+    "alpha": "α", "beta": "β", "gamma": "γ", "Gamma": "Γ", "delta": "δ",
+    "Delta": "Δ", "epsilon": "ε", "varepsilon": "ε", "eta": "η", "theta": "θ",
+    "Theta": "Θ", "kappa": "κ", "lambda": "λ", "Lambda": "Λ", "mu": "μ",
+    "nu": "ν", "xi": "ξ", "pi": "π", "rho": "ρ", "sigma": "σ", "Sigma": "Σ",
+    "tau": "τ", "phi": "φ", "varphi": "φ", "Phi": "Φ", "chi": "χ", "psi": "ψ",
+    "Psi": "Ψ", "omega": "ω", "Omega": "Ω",
+}
+
+#: Operators and relations, as the Unicode character.
+_LATEX_SYMBOLS = {
+    "times": "×", "cdot": "·", "div": "÷", "pm": "±", "mp": "∓",
+    "le": "≤", "leq": "≤", "ge": "≥", "geq": "≥", "ne": "≠", "neq": "≠",
+    "approx": "≈", "sim": "~", "equiv": "≡", "propto": "∝", "infty": "∞",
+    "partial": "∂", "nabla": "∇", "int": "∫", "sum": "Σ", "prod": "Π",
+    "rightarrow": "→", "to": "→", "leftarrow": "←", "Rightarrow": "⇒",
+    "circ": "°", "degree": "°", "deg": "°", "ldots": "…", "dots": "…",
+    "quad": " ", "qquad": " ", "%": "%", "$": "$", "&": "&", "#": "#",
+    "{": "{", "}": "}", "_": "_", "^": "^",
+}
+
+#: Functions, kept as their plain names with the space LaTeX implies.
+_LATEX_FUNCS = ("arctan", "arcsin", "arccos", "tan", "sin", "cos", "tanh",
+                "sinh", "cosh", "ln", "log", "exp", "sec", "csc", "cot",
+                "max", "min")
+
+#: Macros handled structurally (they take arguments), so the letter/symbol pass
+#: must leave them alone.
+_LATEX_STRUCTURAL = {"frac", "dfrac", "tfrac", "sqrt", "text", "textrm",
+                     "mathrm", "mathit", "mathbf", "operatorname",
+                     "left", "right", "big", "Big", "bigg", "Bigg"}
+
+_SUP_OK = "0123456789+-()ni"
+_SUB_OK = "0123456789+-()aehijklmnoprstuvx"
+_SUPERSCRIPTS = str.maketrans(_SUP_OK, "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁽⁾ⁿⁱ")
+_SUBSCRIPTS = str.maketrans(_SUB_OK, "₀₁₂₃₄₅₆₇₈₉₊₋₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ")
+_SUP_OK, _SUB_OK = set(_SUP_OK), set(_SUB_OK)
+
+#: ``$$…$$`` and ``\[…\]`` are always math; so is ``\(…\)``.
+_MATH_DISPLAY = re.compile(r"\$\$(.+?)\$\$", re.S)
+_MATH_BRACKET = re.compile(r"\\\[(.+?)\\\]", re.S)
+_MATH_PAREN = re.compile(r"\\\((.+?)\\\)", re.S)
+#: ``$…$`` is the ambiguous one — a reply that quotes a price ("$5.00 input,
+#: $0.50 cached") has the same shape — so it is math only where it carries a
+#: LaTeX signal (a macro, a brace, a script) or reads as a stated equation whose
+#: first character is not a digit.
+_MATH_INLINE = re.compile(r"(?<![\\$])\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\$)")
+_MATH_SIGNAL = re.compile(r"[\\{^_]")
+
+
+def _latex_body_to_text(body):
+    """One math expression, rendered as the plain text a reader can read.
+
+    Qt's markdown is the GitHub dialect and has no math, so an equation arriving
+    as LaTeX reaches the transcript as its own source. Every command this
+    converts is one seen in a real reply; anything else loses its backslash and
+    keeps its name, which is still readable, where the raw macro is not.
+    """
+    text = body
+
+    # Functions first, and letters with them: the fraction pass below decides
+    # its spacing from whether the converted numerator reads as one token
+    # ("1/2") or as words ("tan φ / tan β").
+    for name in _LATEX_FUNCS:
+        text = re.sub(r"\\" + name + r"(?![A-Za-z])", name + " ", text)
+
+    def _one(m):
+        name = m.group(1)
+        if name in _LATEX_STRUCTURAL:
+            return m.group(0)
+        return _LATEX_LETTERS.get(name, _LATEX_SYMBOLS.get(name, name))
+
+    text = re.sub(r"\\([A-Za-z]+|[%${}&#_^])", _one, text)
+    text = re.sub(r"\\[ ,;:!]", " ", text)               # spacing macros
+
+    # A script is lifted only when EVERY character of it has a Unicode form —
+    # "sigma_{n}" becomes σₙ, while "x^{a+b}" keeps its caret rather than
+    # becoming half-raised nonsense. It runs before the argument-taking macros
+    # so their braces are the only ones left for those to match.
+    def _script(table, allowed):
+        def sub(m):
+            group = m.group(1) if m.group(1) is not None else m.group(2)
+            if group and set(group) <= allowed:
+                return group.translate(table)
+            return m.group(0)
+        return sub
+
+    text = re.sub(r"\^\{([^{}]*)\}|\^(\w)", _script(_SUPERSCRIPTS, _SUP_OK), text)
+    text = re.sub(r"_\{([^{}]*)\}|_(\w)", _script(_SUBSCRIPTS, _SUB_OK), text)
+
+    def _fraction(m):
+        # Parenthesized where the operand is a sum, since a fraction bar groups
+        # what a slash does not: (c' + σ' tan φ') / τ, never c' + σ' tan φ' / τ.
+        def side(s):
+            s = s.strip()
+            return (f"({s})" if re.search(r"(?<=\S)\s*[+\-±]\s*(?=\S)", s)
+                    else s)
+        top, bottom = side(m.group(1)), side(m.group(2))
+        joint = " / " if " " in top or " " in bottom else "/"
+        return f"{top}{joint}{bottom}"
+
+    # Argument-taking macros, innermost group first so nesting resolves.
+    for _ in range(6):
+        before = text
+        text = re.sub(r"\\(?:text|textrm|mathrm|mathit|mathbf|operatorname)"
+                      r"\s*\{([^{}]*)\}", r"\1", text)
+        text = re.sub(r"\\sqrt\s*\{([^{}]*)\}", r"sqrt(\1)", text)
+        text = re.sub(r"\\(?:d|t)?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}",
+                      _fraction, text)
+        if text == before:
+            break
+    text = re.sub(r"\\(?:left|right|[Bb]igg?)(?![A-Za-z])", "", text)
+
+    text = text.replace("\\\\", " ").replace("{", "").replace("}", "")
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
+
+
+def strip_latex(text):
+    """A reply's LaTeX math as plain text, leaving code and prose alone.
+
+    The assistant is told to write math as plain text; this is what happens when
+    it writes LaTeX anyway. Delimiters (``$$…$$``, ``$…$``, ``\\[…\\]``,
+    ``\\(…\\)``) are removed and the expression inside converted, so the reader
+    gets ``tan φ / tan β = 0.066`` rather than the macro that produced it. Code
+    spans are untouched: a snippet that contains a dollar sign or a backslash
+    means them literally.
+    """
+    def inline(m):
+        body = m.group(1)
+        if _MATH_SIGNAL.search(body) or ("=" in body and not body[:1].isdigit()):
+            return _latex_body_to_text(body)
+        return m.group(0)
+
+    def convert(part):
+        for pattern in (_MATH_DISPLAY, _MATH_BRACKET, _MATH_PAREN):
+            part = pattern.sub(lambda m: _latex_body_to_text(m.group(1)), part)
+        return _MATH_INLINE.sub(inline, part)
+
+    return "".join(part if part.startswith("`") else convert(part)
+                   for part in _CODE_SPANS.split(text or ""))
+
 
 def _escape_outside_code(text):
     """HTML-escape prose while leaving code spans alone.
@@ -55,10 +201,13 @@ def markdown_to_html(text):
     wrapper and its font declaration are dropped so the appended block inherits
     the transcript's. A parse that fails falls back to escaped plain text, since
     an unrendered reply must still be a readable one.
+
+    The dialect has no math, so any LaTeX the reply carries is converted to plain
+    text first (:func:`strip_latex`) rather than shown as its own source.
     """
     try:
         doc = QTextDocument()
-        doc.setMarkdown(_escape_outside_code(text),
+        doc.setMarkdown(_escape_outside_code(strip_latex(text)),
                         QTextDocument.MarkdownDialectGitHub)
         rendered = doc.toHtml()
         open_tag = rendered.find("<body")

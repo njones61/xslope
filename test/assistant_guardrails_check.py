@@ -56,7 +56,9 @@ does regardless of the model, and that is what this file covers:
      than a hardcoded one, the result says which surface it is the answer for, a
      geometry edit made on the source the resync overwrites is named rather than
      silently reverted, and the transcript renders the assistant's markdown
-     instead of printing its tables as rows of pipes.
+     instead of printing its tables as rows of pipes — math included, which the
+     dialect has no notion of: the brief says write it as plain text, and LaTeX
+     that arrives anyway is converted rather than shown as its own source.
   I. THE THINGS THE HARNESS OWNS WHATEVER THE MODEL DOES — every helper the
      prompt tells the model to call is in the namespace with the arguments the
      prompt names (a helper described and absent is a NameError followed by the
@@ -1879,6 +1881,57 @@ def check_chat_renders_markdown():
     return out
 
 
+def check_chat_degrades_latex():
+    """Math reaches the reader as text, whichever way the model writes it.
+
+    The dialect Qt renders has no math, so the moment the transcript began
+    rendering markdown the assistant reached for LaTeX and a display equation
+    arrived as its own source — literal ``$$\\frac{\\tan\\varphi}{...}$$`` in the
+    reply. Both ends are checked: the brief tells the model to write math as
+    plain text, and the dock converts LaTeX that arrives anyway.
+    """
+    from studio.ai.assistant import _load_brief_text
+    from studio.chat_dock import ChatDock, strip_latex
+    out = []
+
+    brief = _load_brief_text()
+    if "LaTeX" not in brief:
+        out.append("the brief never tells the model to avoid LaTeX")
+    if "tan φ / tan β" not in brief:
+        out.append("the brief gives no plain-text example of an equation")
+
+    mw, asst = _session()
+    dock = ChatDock(asst)
+    reply = ("The reinforcement is what carries it.\n\n"
+             "$$\\frac{\\tan\\varphi}{\\tan\\beta} = "
+             "\\frac{\\tan 3°}{\\tan 38.7°} = 0.066$$\n\n"
+             "So $\\varphi$ contributes almost nothing at $\\beta$ = 38.7°, and "
+             "$T \\le 3000$ lb/ft with $\\sigma_{n}$ in units of $x^{2}$. "
+             "The answer is $FS = 1.587$ on that circle.\n")
+    dock._on_assistant_text(reply)
+    text = dock.transcript.toPlainText()
+    if "$" in text:
+        out.append(f"a dollar delimiter reached the transcript: {text!r}")
+    if "\\" in text:
+        out.append(f"a backslash command reached the transcript: {text!r}")
+    for wanted in ("tan φ / tan β = tan 3° / tan 38.7° = 0.066",
+                   "φ contributes almost nothing at β = 38.7°",
+                   "T ≤ 3000 lb/ft", "σₙ", "x²", "FS = 1.587"):
+        if wanted not in text:
+            out.append(f"the converted math lost {wanted!r}: {text!r}")
+
+    # What must NOT be touched: a price, a shell variable, and any code span —
+    # a snippet means its dollar signs and backslashes literally.
+    kept = ("At $5.00 / MTok input and $0.50 cached, `echo $HOME` costs "
+            "`\\frac{a}{b}` nothing.")
+    if strip_latex(kept) != kept:
+        out.append(f"prose prices or code spans were rewritten as math: "
+                   f"{strip_latex(kept)!r}")
+    dock.deleteLater()
+    mw.deleteLater()
+    return out
+
+
 CHECKS = [
     ("A. iron rules, once per prompt tier", check_iron_rules_once),
     ("A. the live prompts carry them", check_assembled_prompt_is_the_real_one),
@@ -1928,6 +1981,7 @@ CHECKS = [
     ("L. a geometry edit on the wrong source is named",
      check_polygon_edit_on_a_profile_model_is_named),
     ("L. the chat renders markdown", check_chat_renders_markdown),
+    ("L. the chat degrades LaTeX to text", check_chat_degrades_latex),
 ]
 
 

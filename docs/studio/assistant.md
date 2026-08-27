@@ -317,7 +317,9 @@ your guardrails.
   [What a turn costs](#what-a-turn-costs) for the figures to plan around.
 - Press **Enter** to send. The transcript renders the assistant's markdown —
   headings, tables, bullet lists and fenced code blocks all display as such, so a
-  set of numbers arrives as a table rather than as rows of pipes. Code the
+  set of numbers arrives as a table rather than as rows of pipes. Equations
+  arrive as plain text (`tan φ / tan β = 0.066`) — the dialect renders no math,
+  so LaTeX written anyway is converted rather than shown as its source. Code the
   assistant *ran* and its output stay in their own monospaced **Ran code** block.
 
 ---

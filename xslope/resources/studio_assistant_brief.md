@@ -286,6 +286,12 @@ The chat **renders markdown** — `##` headings, tables, lists, and fenced code 
 all display as such — so a set of numbers belongs in a small table, and a snippet the
 user might reuse belongs in a fenced block.
 
+It does **not render math**. Write every equation as plain text (or in a fenced block
+when it needs its own line): Greek letters as the letters themselves, division as a
+slash, a power as `^2`. **No LaTeX, no `$…$`, no `$$…$$`, no `\frac`, no `\tan`.**
+
+> tan φ / tan β = tan 3° / tan 38.7° = 0.066
+
 ---
 
 ## 7. Round-trip discipline

@@ -1431,6 +1431,64 @@ def test_search_figure_is_read_for_the_engineer():
     return fails
 
 
+def test_the_search_counts_trial_surfaces_not_grid_centers():
+    """The trial-surface count is a count of surfaces, not of grid centers.
+
+    A circular search's factor-of-safety cache holds one entry per grid CENTER,
+    and each center is solved at many depths: a recorded session's report said
+    it evaluated 96 trial surfaces while the same run's console line said 838.
+    The count printed here is the one the search itself discloses, and the
+    center count keeps its own row rather than borrowing the other's label.
+    """
+    from xslope.report import _search_section, _Counter, resolve_options
+    from xslope.search import UnsolvedTrials
+    fails = []
+    slope_data, solutions = _solved()
+    bundle = next(b for b in solutions["lem"] if b.get("search"))
+    run = bundle["search"]
+    centers = len(run["fs_cache"])
+    opts = resolve_options({"input_path": REINF_XLSX, "lem_search_figure": False})
+    tmp = tempfile.mkdtemp(prefix="xslope_searchcount_")
+
+    def rows(search):
+        with contextlib.redirect_stdout(io.StringIO()):
+            sub = _search_section(slope_data, dict(bundle, search=search),
+                                  opts, _Counter(), tmp, "spencer")
+        return dict(item for b in sub.blocks if b.kind == "keyvalues"
+                    for item in b.items)
+
+    told = rows(dict(run, unsolved={"method": "spencer", "attempted": 838,
+                                    "unsolved": 12}))
+    if told.get("Trial surfaces evaluated") != "838":
+        fails.append(f"the search reports "
+                     f"{told.get('Trial surfaces evaluated')!r} trial surfaces "
+                     f"where the search itself counted 838")
+    if told.get("Grid centers refined") != f"{centers:,}":
+        fails.append(f"the {centers} grid centers are not reported as centers: "
+                     f"{told.get('Grid centers refined')!r}")
+
+    # A search that carries no count of its own — the non-circular branch, whose
+    # cache IS one entry per surface — reports the cache and invents no second row.
+    plain = rows(dict(run, kind="noncircular", unsolved=None))
+    if plain.get("Trial surfaces evaluated") != f"{centers:,}":
+        fails.append(f"a search with no count of its own reports "
+                     f"{plain.get('Trial surfaces evaluated')!r} rather than its "
+                     f"{centers} cached surfaces")
+    if "Grid centers refined" in plain:
+        fails.append("a non-circular search reports grid centers, which it has none of")
+
+    # The number the report prints is the number the console line quotes: both
+    # read the tally's `attempted`, so the two can never again disagree.
+    tally = UnsolvedTrials("spencer")
+    for i in range(3):
+        tally.record(float(i), 1.0, 0.0, True, None)
+    tally.record(9.0, 1.0, 0.0, False, None, "no admissible solution")
+    if f"of {tally.attempted} trial surfaces" not in tally.sentence():
+        fails.append(f"the console line no longer quotes the count the report "
+                     f"prints: {tally.sentence()!r}")
+    return fails
+
+
 def _two_searches():
     """The sample model with BOTH methods searched, each over its own grid.
 
@@ -20066,6 +20124,8 @@ CHECKS = [
     ("the stability section opens on its own model", test_lem_inputs_figure),
     ("the search plot is read for the engineer",
      test_search_figure_is_read_for_the_engineer),
+    ("the search counts surfaces, not grid centers",
+     test_the_search_counts_trial_surfaces_not_grid_centers),
     ("the slice key stands before its table", test_slice_key_figure),
     ("the figures are counted for the caller", test_figure_progress_counts),
     ("the seepage section", test_seep_section),

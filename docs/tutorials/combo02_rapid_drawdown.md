@@ -208,7 +208,7 @@ the pair.
 
 ### The two lines
 
-The drawn-down water state is the second of the three additions, and here it is
+The drawn-down water state comes second of the three additions, and here it is
 a second piezometric line. Click **Piezometric lines**. The editor has two tabs,
 and both are filled:
 
@@ -284,8 +284,8 @@ zero where it meets the face at elevation 110. Neither was entered anywhere: wit
 **Water loads** = `auto` on the main sheet, the engine measures both off the
 piezometric lines where they stand above the ground surface. The difference between them, 3120 psf at
 the toe, is the load the drawdown takes away, and that removal is what the whole
-analysis is about. The red dashed arc is the starting circle, and every search on
-this page begins from it.
+analysis is about. The red dashed arc marks the starting circle, and every search
+on this page begins from it.
 
 ### Running the drawdown on the pair
 
@@ -310,8 +310,7 @@ Leave **Number of slices** at 40.
 procedure instead of a single solve, and puts the run through the drawdown checks
 as well as the ordinary limit equilibrium ones.
 
-Click **Run**. The search takes about half a minute, and the Log pane follows
-it:
+Click **Run**. The Log pane follows the search:
 
 ```text
 Searching for the critical circular surface with SPENCER (rapid drawdown)…
@@ -339,7 +338,8 @@ started, with its tangent 7 ft higher, at elevation 82.3 rather than 75. It
 daylights just past the crest at x = 392 and toes on the upstream foreshore at
 x = 174.
 
-**Stage 3 was not required.** On all 12 core slices the drained strength at the
+**Stage 3 was not required.** Twelve of the 40 slices cut the core, a count the
+analysis report's slice table gives, and on all 12 the drained strength at the
 stage-2 stresses came out higher than the undrained strength stage 2 used, so
 there was nothing lower to substitute. Stage 2 governs, and the drawdown costs
 this slope 0.30 against its own full-pool stage-1 figure of 1.484.
@@ -350,9 +350,10 @@ this slope 0.30 against its own full-pool stage-1 figure of 1.484.
 
 The figure is the governing stage's own state, not stage 1's: the pale blue band
 under the failure surface is the stage-2 pore pressure on each slice base,
-reaching 1692 psf, and the green hatched band above it is the effective normal
-stress the stage-2 strengths were computed from. Both water loads are drawn on
-the upstream face — the stage-1 reservoir as well as the residual pool — because
+reaching 1692 psf on the slice table's `u` column, and the green hatched band
+above it is the effective normal stress the stage-2 strengths were computed from.
+Both water loads are drawn on the upstream face — the stage-1 reservoir as well
+as the residual pool — because
 the consolidation stresses stage 2 reads its strengths from came from the first
 of them.
 
@@ -549,8 +550,9 @@ radius of 161.82 ft:
 ![The three-stage answer from two steady solutions](images/combo02_solution_steady.png){width=1000}
 
 **The rapid-drawdown factor of safety is 1.195**, against 1.181 from the
-piezometric pair. Stage 2 governs again, on all 12 core slices, and the pale blue
-band under the surface peaks at 1727 psf against the pair's 1692.
+piezometric pair. Stage 2 governs again, on all 12 core slices the slice table
+counts, and the pale blue band under the surface peaks at 1727 psf on its `u`
+column against the pair's 1692.
 
 <!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, rapid=true, seep=steady, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.195, tolerance=0.005, benchmark=COMBO-2-steady -->
 
@@ -561,9 +563,10 @@ undrained envelope shows that most clearly. Run as ordinary drained problems —
 **Rapid drawdown** unticked, each searching for itself — the drawn-down state
 gives 1.3125 from Line 2 and 1.3105 from Set 2, the same model to within two
 thousandths, because Line 2 was traced off Set 2's own phreatic surface. At full
-pool the same pair of runs gives 1.4670 and 1.5098, and the sketch comes out 2.8%
-lower: a static column measured down from Line 1 puts more pore pressure deep in
-the section than the solved field does. That full-pool difference reaches the
+pool — the same two drained searches, run from Line 1 and from Set 1 — the pair
+gives 1.4670 and 1.5098, and the sketch comes out 2.8% lower: a static column
+measured down from Line 1 puts more pore pressure deep in the section than the
+solved field does. That full-pool difference reaches the
 drawdown answer, because stage 2 computes its undrained strengths from the
 stage-1 effective stresses — and 1.181 against 1.195 is what is left of it.
 
@@ -688,9 +691,9 @@ the steady run — and then prints a line per saved frame:
   t=1000: frame saved (steps so far=1671, mass-balance closure=2.41e-02)
 ```
 
-This is the long run of the page — a few minutes, where every other run here has
-been seconds. **Twelve frames** come out of it, at t = 0, 5, 35, 50, 80, 150,
-200, 300, 400, 600, 800 and 1000: the union of the save-interval grid, the extra
+This is the long run of the page, taking far longer than every other run on it.
+**Twelve frames** come out of it, at t = 0, 5, 35, 50, 80, 150, 200, 300, 400,
+600, 800 and 1000: the union of the save-interval grid, the extra
 save times, the schedule's own breakpoints, and the two stage times. **1,671
 steps** sit behind them, and where the solver spent them is itself a reading:
 **440 of them, 26%, are inside the first 50 days**, which are 5% of the run's
@@ -763,12 +766,13 @@ reads 1.5545 against that route's 1.5514, on the same field: the frame at t = 0
 numbers are the two searches settling on two circles.
 
 The gap between the two answers opens at stage 2, where the peak pore pressure on
-the slice bases reaches **2692 psf** against the two-steady route's 1727 — the
-core's undissipated head, read straight off the frame.
+the slice bases reaches **2692 psf** on the slice table's `u` column against the
+two-steady route's 1727 — the core's undissipated head, read straight off the
+frame.
 
-**Stage 3 ran here, and it governs.** Five of the 12 core slices came out
-stronger undrained than drained at these stresses, so the drained strength was
-substituted on them and the reported answer is stage 3's 1.0158 rather than
+**Stage 3 ran here, and it governs.** Five of the 12 core slices the same table
+counts came out stronger undrained than drained at these stresses, so the drained
+strength was substituted on them and the reported answer is stage 3's 1.0158 rather than
 stage 2's 1.0164. Six ten-thousandths separate the two. The
 [sweep below](#the-governing-stage-flip) finds why they are this close: the core's
 own $d$ of 250 psf sits 27 psf above the value at which the first slice crosses
@@ -884,8 +888,10 @@ Where it is right is on a section with no low-conductivity zone to hold water.
 
 **The piezometric pair inherits whatever state Line 2 was sketched from.** Line 2
 on this file follows the re-equilibrated surface, so the pair reads **1.181**;
-redrawn with the core still holding 150 ft of head it reads **1.036**, within 0.02
-of the transient answer. Its use is where there is no seepage model to solve — an
+redrawn with the core still holding 150 ft of head — the same six-point line with
+its two points through the core lifted to elevations 150 and 120 rather than 107
+and 103, and searched the same way — it reads **1.036**, within 0.02 of the
+transient answer. Its use is where there is no seepage model to solve — an
 existing dam with piezometers in it, a preliminary check, a section that cannot be
 meshed — and not in preference to a solution that can be had.
 

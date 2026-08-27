@@ -125,15 +125,23 @@ are visible in the mesh rather than only in the answer.
 
 ### Solving it
 
-Click **Run → Run Seep…**
+The boundary conditions are on the mesh, so the flow solution is one run of the
+seepage dialog. Click **Run → Run Seep…**
 
 ![Run Seepage, at its defaults](images/combo01_studio_run_seep.png)
 
-The **Model checks** panel is the preflight report for this run, and on this
+The **Model checks** panel carries the preflight report for this run, and on this
 model it reports **No problems found for this run.** Leave **Convergence tol** at
 `0.0001` and **Max iterations** at `400`, and click **Run**. The unconfined
 iteration settles in **26 sweeps**, and the run is over almost as soon as it
-starts.
+starts. The Log pane's closing lines carry the last sweep and the convergence it
+reached:
+
+```text
+Iteration 25: residual = 9.822325e-04, closure = 1.038e-03, relax = 0.500, 0/52 exit face active
+Converged in 26 iterations (residual = 6.971e-04, closure = 6.404e-04, exit face stable)
+Flow closure check: inflow = 1.525146e-08, outflow = -0.000000e+00, error = 1.525146e-08
+```
 
 ![The seepage solution](images/combo01_seepage.png){width=1000}
 
@@ -219,6 +227,17 @@ The checks column reads **No problems found for this run**, which is itself the
 handover working: the three materials read `u = seep`, and the field they need is
 in the model because the seepage run put it there.
 
+The Log pane follows the search. Its last two refinement steps and its closing
+lines read:
+
+```text
+[🔁 iteration 11] center=(508.96, 262.80), FS=1.2481, grid=1.4927
+[🔁 iteration 12] center=(508.96, 262.80), FS=1.2481, grid=0.7463
+[✅ converged] Iter=12, FS=1.2481 (ΔFS<0.0005) at (x=508.96, y=262.80, depth=77.28)
+Critical FS = 1.248
+Sliding mass = 1,284,328.7 lb/ft over 290.62 ft of failure surface
+```
+
 ![Spencer's critical circle](images/combo01_lem_solution.png){width=1000}
 
 **Spencer's method gives FS = 1.248** on a circle centered at (508.96, 262.80)
@@ -226,17 +245,17 @@ with a radius of 185.52 ft. It enters the upstream face at x = 346.5, elevation
 173.2 — above the reservoir and 6.8 ft below the crest — cuts down through the
 core, crosses into the foundation where the core pinches out at x = 420, bottoms
 at elevation 77.3, and comes out on the foundation surface at x = 597.9, about
-48 ft beyond the downstream toe. The search evaluated 71 candidate circles and
-took a few seconds.
+48 ft beyond the downstream toe. The search evaluated 71 candidate circles over
+the 12 refinement steps the log counts.
 
 The seepage solution shows up twice on this figure. The thin gray contours
 behind the section are the solved total head, and the pale blue band under the
 failure surface is the **pore pressure on each slice base**, interpolated from
-that field: it runs from 0 to 2,044 psf across the 40 slices, largest
-where the surface is deepest and zero on the slices that lie above the phreatic
-surface. The green hatched band above it is the effective normal stress the
-strength was computed from, which is that base's total normal stress less the
-blue.
+that field: read off the slice table's `u` column it runs from 0 to 2,044 psf
+across the 40 slices, largest where the surface is deepest and zero on the slices
+that lie above the phreatic surface. The green hatched band above it is the
+effective normal stress the strength was computed from, which is that base's
+total normal stress less the blue.
 
 <!-- test: file=files/xslope_johnson_res.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, num_slices=40, expected_fs=1.248, tolerance=0.005 -->
 
@@ -264,8 +283,8 @@ its own weight, and reports the largest *F* the slope still stands at.
 to search, and **Tolerance (SSRM)** is 0.0100, the width the bracket is bisected
 down to.
 [FEM-1](fem01_strength_reduction.md) covers all of them. Leave everything as it
-is and click **Run**. This run takes a few minutes, where the seepage and limit
-equilibrium runs took seconds.
+is and click **Run**. This is the long run of the page, taking far longer than
+the seepage solve and the search before it.
 
 ![Shear strain at failure](images/combo01_fem_shear.png){width=1000}
 

@@ -120,8 +120,7 @@ in a model is in the model's own stress unit, kPa here, and 30 MPa is 30,000 kPa
 The box at the top left of the plot reads out what those four produce —
 m<sub>b</sub> = 0.0672, *s* = 2.60 × 10<sup>−5</sup>, *a* = 0.619 — reproducing
 m<sub>b</sub> and *a* to Hammah's printed digits; *s* is 4% above the paper's
-rounded 2.5 × 10⁻⁵. Watch the
-exponent: at *a* = 0.619 the envelope is a long way from the classical
+rounded 2.5 × 10⁻⁵. At *a* = 0.619 the envelope is a long way from the classical
 square-root shape, which is what makes this a demanding case for the criterion
 rather than for the geometry.
 
@@ -131,7 +130,7 @@ below redraws it over the stresses this slope actually generates:
 
 ![The rock mass's envelope over the slope's own stress range](images/lem13_envelope.png){width=800}
 
-The red curve is the envelope, and the shaded band is the range of effective
+The red curve draws the envelope, and the shaded band marks the range of effective
 normal stress the critical surface found in the next section actually carries,
 −2 to 75 kPa (the band is clipped at zero). The curve is not a straight line: it is steepest near zero and
 flattens as the confinement grows, so the cohesion and friction angle it implies
@@ -142,8 +141,9 @@ straight line that touches the curve there: cohesion c<sub>i</sub> = 15.8 kPa
 (the line's intercept) and friction angle φ<sub>i</sub> = 25.7° (its slope). Any
 other stress would give a different line — a slice at 20 kPa a steeper line with
 a smaller intercept, a slice at 70 kPa a flatter one with a larger intercept.
-Every slice is solved with its own line at its own base stress. Note the
-scale: tens of kPa of shear strength from a rock whose intact strength is 30,000.
+Every slice is solved with its own line at its own base stress. The scale tells
+its own story: tens of kPa of shear strength from a rock whose intact strength is
+30,000.
 The unconfined strength of the rock **mass**, σ<sub>ci</sub>·s<sup>a</sup>, is
 43.5 kPa at this GSI, about one part in 700 of the laboratory value; the jointing
 has removed almost all of it, and what the slope stands on instead is
@@ -176,7 +176,10 @@ gives 1.150 against the paper's 1.153.
 ### What the criterion supplied along the surface
 
 Every slice base on that surface got its own cohesion and friction angle, because
-every slice base sits at its own normal stress. Across the 40 slices the
+every slice base sits at its own normal stress. The solved slice table carries
+both, one row per slice: the effective normal force `N'` over the base length
+`Δl` is the stress, and the `c` and `φ` columns hold the tangent the criterion
+supplied there. Across the 40 slices the
 effective normal stress reaches 74.5 kPa at the deepest part of the arc
 and falls to −2.3 kPa at the crest, where the surface is nearly vertical
 and there is almost nothing standing on it. The tangent XSLOPE linearized at those
@@ -219,7 +222,7 @@ Now click **Run → Run FEM…**
 
 ![Run FEM on the meshed model](images/lem13_studio_run_fem.png)
 
-**Model checks — 1 warning**, and **Run** is enabled. The warning is the blank
+**Model checks — 1 warning**, and **Run** is enabled. The warning names the blank
 tensile cutoff `t_cut`, which lets the rock carry tension up to its Mohr-Coulomb
 cone apex; [FEM-1](fem01_strength_reduction.md#running-the-strength-reduction)
 covers what that means and when to enter a cap. The dialog opens on **SSRM (find
@@ -227,7 +230,7 @@ FS)** with the bracket the file declares, **F min (SSRM)** = 0.80 and **F max
 (SSRM)** = 1.60, a **Tolerance (SSRM)** of 0.0100, the iteration budget and ceiling
 at their own 12,000 and 50,000, **Rollers** on the sides, **K0 initial stress**
 ticked at 1.000, and **Non-convergence** as the failure criterion. Click **Run**.
-The run takes a few minutes on an ordinary laptop.
+This is the long run of Part A, taking far longer than the search above.
 
 **FS = 1.166**, from a final bracket of [1.1625, 1.1688] in
 seven bisection steps. Hammah et al. report 1.15 for the same slope,
@@ -275,7 +278,7 @@ Four numbers describe this rock, and they are not four numbers of the same kind.
 from a table once the rock type is named. **GSI and D are judgments made standing
 at the outcrop** — how broken the mass looks, and how roughly it was excavated —
 and they are where the uncertainty in a rock slope actually lives. So the question
-worth asking of this model is which of them the answer is sensitive to.
+this model can answer is which of them the factor of safety turns on.
 
 Studio answers it with a **Parametric study**, which re-solves the model across a
 range of one input. Any numeric material property can be swept, including the
@@ -284,8 +287,10 @@ surface is allowed to move as the rock changes.
 
 ### Sweeping the Geological Strength Index
 
-Click **Run → Parametric…** Set **Mode** to `Design (FS target)`, which sweeps one
-parameter between explicit bounds and reports where the curve meets a target,
+The index goes first, because it is the one input all three rock-mass constants
+are built from. Click **Run → Parametric…** Set **Mode** to `Design (FS target)`,
+which sweeps one parameter between explicit bounds and reports where the curve
+meets a target,
 rather than the percentage band `Sensitivity` uses. Leave **Method** on `Spencer`
 and **Number of slices** at 40. Under **Parameter**, set **Material** to `rock` and
 **Property** to `hb_gsi` — the **Sweeping** row echoes `mat:rock:hb_gsi`, the
@@ -301,7 +306,8 @@ at all — a search over a slope with no critical surface to find wanders the wh
 domain before it settles, and each step takes many times longer than the ones
 below it.
 
-Click **Run**. Each step is a full circular search, so give it several minutes:
+Click **Run**. Each step is a full circular search, so the sweep runs far longer
+than the single search Part A made:
 
 ![Factor of safety against GSI](images/lem13_gsi_sweep.png){width=800}
 
@@ -391,7 +397,7 @@ gets steep: the instantaneous friction angle at zero confinement is
 47.0° in between. Put a granite's m<sub>i</sub> = 25 in the same cells and
 the same two ends read 72.5° and 71.9°.
 
-That second case is the one to know about before running a competent rock. The
+That second case matters for a competent rock. The
 Corps of Engineers and Lowe & Karafiath methods fix the inclination of the
 interslice forces before solving rather than solving for it, and above about 55°
 they can fail to reach a solution at all — a property of those two
@@ -411,7 +417,7 @@ and Lowe & Karafiath all converge on this section. The caution belongs to a
 competent rock mass, where a higher m<sub>i</sub> carries the envelope past that
 limit.
 
-One last note on the σ<sub>ci</sub> check from Part A: it fires on any
+The σ<sub>ci</sub> check from Part A fires here too: on any
 σ<sub>ci</sub> below 1000 kPa, which includes models stated deliberately in
 normalized form — the Li, Merifield & Lyamin (2008) rock-slope charts hold
 σ<sub>ci</sub>/(γH) at a critical ratio and reach σ<sub>ci</sub> values of a few

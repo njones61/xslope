@@ -34,8 +34,8 @@ governs, and repeat the run as a rapid drawdown for a dam with a clay core.
 **Part 1 starter file** — [xslope_earth_dam_fs_time_start.xlsx](files/xslope_earth_dam_fs_time_start.xlsx),
 SEEP-3's dam with a starting circle on each face and a minimum slip depth, and no
 strengths on its materials table — those are the three values per zone we type in
-below. It ships meshed and marched, with the nineteen pore-pressure fields we
-sweep in Part 1 already on it; we build the seepage side of it in
+below. The download includes the mesh and the transient seepage solution (nineteen
+time steps) that we sweep in Part 1; we build the seepage side of it in
 [SEEP-3](seep03_reservoir_drawdown.md)
 
 **Part 1 completed model** — [xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx),
@@ -43,9 +43,9 @@ the same dam with the strength band filled in; open it to skip the typing
 
 **Part 2 model** — [xslope_johnson_fs_time.xlsx](files/xslope_johnson_fs_time.xlsx),
 COMBO-2's Johnson Reservoir dam — an undrained envelope on the core, `u = seep`
-on all three zones, the pool schedule and both stage times. It ships meshed and
-marched, with the twenty-one pore-pressure fields we sweep in Part 2 already on
-it; we build both in [COMBO-2](combo02_rapid_drawdown.md)
+on all three zones, the pool schedule and both stage times. The download includes
+the mesh and the transient seepage solution (twenty-one time steps) that we sweep
+in Part 2; we build both in [COMBO-2](combo02_rapid_drawdown.md)
 </div>
 </div>
 
@@ -103,8 +103,8 @@ Three companion files carry the seepage work and travel with the workbook:
 `xslope_earth_dam_fs_time_start_mesh.json` holds the mesh,
 `xslope_earth_dam_fs_time_start_tseep.csv` the head and pore pressure at every
 node of every saved frame, and `xslope_earth_dam_fs_time_start_tseep_meta.json`
-the ledger naming the frames. Studio finds them beside the workbook and reads them
-on open, so the dam arrives meshed and marched.
+the ledger naming the frames. Studio finds them in the same folder as the workbook and reads them
+on open, so the mesh and the seepage solution are already loaded.
 
 [xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx) carries the
 same dam with the strengths already on it, and its own copies of the three
@@ -583,8 +583,9 @@ kind of curve on the same twenty-one frames for comparison.
 Download [xslope_johnson_fs_time.xlsx](files/xslope_johnson_fs_time.xlsx) and
 open it with **File → Open…**, leaving the mode strip on **LEM**. Its three
 companions — `xslope_johnson_fs_time_mesh.json`, `xslope_johnson_fs_time_tseep.csv`
-and `xslope_johnson_fs_time_tseep_meta.json` — sit beside the workbook and Studio
-reads them on open, so the dam arrives meshed and marched. In **LEM** the inputs
+and `xslope_johnson_fs_time_tseep_meta.json` — sit in the same folder as the workbook and Studio
+reads them on open, so the mesh and the seepage solution are already loaded. In
+**LEM** the inputs
 view draws that mesh behind the zones.
 
 ![The Johnson Reservoir dam as the shipped file opens, the mesh behind it](images/combo03_rapid_inputs.png){width=1000}

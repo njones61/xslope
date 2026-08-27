@@ -376,7 +376,11 @@ read there. Run as **two instants of a transient march** — Stage 1 time and St
 time set on the `tseep` sheet — the drawn-down state is `seep bc` as the pool
 schedule leaves it at the Stage 2 time, and `seep bc (2)` is not read at all.
 `rapid.stage2_bc_ignored` reports a boundary set 2 left on a file being run that
-way, since editing it would change nothing.
+way, since editing it would change nothing. `rapid.pool_static_between_stages`
+reports a staged run whose reservoir stands at the same elevation at the two
+stage times — a reservoir head typed as a constant instead of bound to a falling
+series — because the march then never lowers the pool and the drawdown answer is
+the full-pool state read twice.
 
 Only a boundary drawn *on the ground surface* is read as a pool. A head boundary
 along a deep aquifer or a model side is a groundwater condition, and reading its

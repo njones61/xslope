@@ -97,7 +97,9 @@ structural checks — the template version, the sheet parsing, the option
 vocabularies — which catch a *corrupt* file rather than an *incomplete* one. A
 half-built model must always open, because that is how a model gets built: you draw
 the geometry, then the materials, then the water, and at no point in between should
-the file refuse to load.
+the file refuse to load. A material with no unit weight yet is the plain case: the
+workbook opens, and `mat.gamma_nonpositive` reports the empty cell when a run is
+checked.
 
 The gate is at the solver entry points instead:
 
@@ -200,7 +202,7 @@ severity and one-line summary.
 | **Mesh** | An element type the seepage solver does not support; a mesh referencing a material the Materials table does not define; a stored pore-pressure field whose node count does not match the mesh it is used with; a zone element size that is not finer than the global target; and, before a finite element run, a material zone too thin to fit three element rows across its width — which cannot develop a shear band, so the run returns a factor of safety that is too high rather than failing. The zone's own **Size** and the Build mesh dialog's **Refine thin zones** both answer it, and where a mesh is attached the check measures that mesh rather than inferring anything. A zone whose material is `option = elastic` is not reported: it cannot yield at any element size, so there is no shear band for a coarse mesh to lose. A thin zone that is merely strong still is |
 | **Seepage** | A conductivity of zero; `k2` greater than `k1`; missing unsaturated parameters on an unconfined model; a boundary set with no boundary conditions, no specified head, or no gradient |
 | **Transient seepage** | A missing time unit; a specific storage or specific yield of zero; a missing or non-positive duration; stage times that are half-set or out of order; a save schedule that reaches past the end of the run; a driving series with no value at t = 0 |
-| **Finite element** | A blank or non-positive Young's modulus or Poisson's ratio; a blank tensile cap; K0 with no zone geometry to integrate the overburden through; a strength-reduction zone that contains no mesh elements |
+| **Finite element** | A blank or non-positive Young's modulus, Poisson's ratio or unit weight — on every row of the Materials table, which is what the engine reads; a blank tensile cap; K0 with no zone geometry to integrate the overburden through; a strength-reduction zone that contains no mesh elements |
 | **Rapid drawdown** | The stage-2 water source each pore-pressure option needs; the `d`/`psi` pair; a post-drawdown pool standing higher than the full pool, or above the ground with no stage-2 load; a stage-2 load that repeats stage 1; a boundary set 2 left on a file whose drawdown takes both stages from a transient march, where it supplies nothing and editing it changes nothing; and, on that same route, a pool that stands at the same level at both stage times — a reservoir head typed as a fixed number, or bound to a series that does not fall between them — so the march never lowers the water and the drawdown answer is the full-pool state read twice |
 | **Tension cracks** | A crack at or below the base of the slope; a crack that intersects no failure surface while its water thrust still applies; a depth far past the theoretical `2c/γ` |
 | **Reinforcement and piles** | Pile spacing that is blank, zero or negative wherever the run divides by it; a pile or reinforcement line the finite element engine cannot build; a pullout length longer than its own line, or negative; an element that crosses no failure surface |

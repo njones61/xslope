@@ -2699,20 +2699,12 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 f"A geometry zone references an invalid Mat ID ({mid + 1}); it must "
                 f"reference a material in the 'mat' sheet (1..{len(materials)}).")
 
-    # For slope-stability (non seep-only) runs, every material referenced by the
-    # geometry must have a positive unit weight. A gamma of 0 silently produces
-    # zero slice weights and meaningless factors of safety; seep-only runs do not
-    # use unit weight, so they are exempt.
-    if not is_seepage_only:
-        for poly in polygons:
-            mid = poly.get('mat_id')
-            if mid is not None and 0 <= mid < len(materials):
-                if materials[mid].get('gamma', 0) <= 0:
-                    raise ValueError(
-                        f"Material '{materials[mid]['name']}' (Mat ID {mid + 1}) has a "
-                        f"non-positive unit weight (gamma = {materials[mid]['gamma']}). "
-                        f"A positive unit weight is required for slope-stability analysis.")
-
+    # A missing unit weight is NOT refused here. Loading answers "is this workbook
+    # structurally readable" -- sheet shapes, required columns, ID references -- and
+    # a model being built legitimately has values still to type. Whether gamma is
+    # usable is a question about the RUN, and preflight's 'mat.gamma_nonpositive'
+    # asks it for every stability analysis (and stays silent for a seepage-only one,
+    # which never reads unit weight).
 
     # === TRANSIENT-SEEPAGE VALIDATION (only when a tseep sheet is in use) ===
     if tseep is not None:

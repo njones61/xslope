@@ -1,6 +1,7 @@
-"""Build ``xslope_earth_dam_fs_time.xlsx``, Tutorial COMBO-3 Part 1's model — the
-cored earth dam of Tutorial SEEP-3, meshed and marched, with the strengths a
-stability run reads.
+"""Build Tutorial COMBO-3 Part 1's pair of models — the cored earth dam of Tutorial
+SEEP-3, meshed and marched, without the strengths a stability run reads
+(``xslope_earth_dam_fs_time_start.xlsx``, the file the page opens) and with them
+(``xslope_earth_dam_fs_time.xlsx``, the file it ends on).
 
 COMBO-3 puts a factor-of-safety-versus-time curve on the drawdown SEEP-3 solved,
 and it needs no new seepage input to do it. The build starts from
@@ -10,19 +11,21 @@ run reads: a starting circle on each face, a minimum slip depth that keeps the
 search off surficial slivers, and a denser saved-frame schedule for the curve to
 be drawn through.
 
-The file arrives SOLVED. The mesh and the whole transient march ship beside the
+Both files arrive SOLVED. The mesh and the whole transient march ship beside each
 workbook as ``_mesh.json``, ``_tseep.csv`` and ``_tseep_meta.json``, so the reader
 opens a dam whose nineteen pore-pressure fields already exist and goes straight to
 the stability runs. Building a transient seepage model is Tutorial SEEP-3's
-subject, and COMBO-3 does not repeat it.
+subject, and COMBO-3 does not repeat it. The march is the same for both files:
+seepage reads conductivity and storage, and none of the three cells the reader
+fills changes a pore pressure.
 
-One file rather than a starter/completed pair, and the strength band is on it. A
-strengthless variant was the shorter route — the page's first step would have the
-reader type the band in — but a workbook that declares circles and leaves the unit
-weights blank does not load at all: ``load_slope_data`` refuses a material with a
-non-positive gamma on any model that is not seepage-only, and this one carries two
-starting circles. So the band ships filled in and the page has the reader open the
-Materials editor and confirm it.
+The two workbooks differ in six cells. The start file leaves ``c``, ``f`` and ``g``
+blank on both zones, which is what the page's materials step has the reader type
+in; the completed file carries them, and the page's tagged results are read off it.
+Blank is the honest state for a value nobody has entered — the workbook still loads,
+and ``mat.gamma_nonpositive`` reports the missing unit weight when a run is checked.
+The saturated unit weight ``gsat`` is on both files: it is a property of the same
+zone, and the exercise is the strength band.
 
 The strengths are typical values for a granular shell and a compacted clay core,
 chosen for the exercise rather than measured on this dam; SEEP-3's file carries
@@ -31,7 +34,8 @@ same words.
 
 Run:  PYTHONPATH=. python3 tools/build_earth_dam_fs_time.py
 
-The build solves the whole march, so it takes a couple of minutes.
+The build solves the whole march once and writes both file sets from it, so it
+takes a couple of minutes.
 """
 
 from __future__ import annotations
@@ -47,6 +51,12 @@ from build_earth_dam_tseep import (REPO_ROOT, TUTORIAL_FILES, _write,  # noqa: E
                                    seep03_model)
 
 OUT = "xslope_earth_dam_fs_time.xlsx"
+OUT_START = "xslope_earth_dam_fs_time_start.xlsx"
+
+#: The three cells per zone the page has the reader type, in the order the
+#: Materials editor lists them. They are left blank on the start file and filled on
+#: the completed one; everything else on the two mat rows is identical.
+TYPED_IN = ("c", "phi", "gamma")
 
 #: The limit equilibrium band the page reads out, indexed to the base file's
 #: material order. Drained effective-stress strengths on both zones, and
@@ -115,12 +125,20 @@ MESH_ELEMENT_TYPE = "tri3"
 MESH_SIZE_DIVISIONS = 64
 
 
-def _model():
-    """SEEP-3's completed model with the strengths, both starting surfaces, the
-    search floor and the denser saved-frame schedule."""
+def _model(strengths=True):
+    """SEEP-3's completed model with both starting surfaces, the search floor and
+    the denser saved-frame schedule.
+
+    ``strengths=False`` returns the same model with the three cells the reader
+    types left unset. They are None rather than 0.0 on purpose: the writer puts a
+    blank cell down for None, and a cohesionless material and an unfilled one are
+    not the same model.
+    """
     sd = seep03_model()
     for mat, upd in zip(sd["materials"], STRENGTHS):
         mat.update(upd)
+        if not strengths:
+            mat.update({k: None for k in TYPED_IN})
     sd["tseep"] = dict(sd["tseep"], duration=DURATION,
                        save_interval=DURATION, save_times=list(SAVE_TIMES))
     sd["circles"] = [dict(c) for c in CIRCLES]
@@ -134,8 +152,33 @@ def _quiet(fn, *a, **k):
         return fn(*a, **k)
 
 
+def _companions(path, mesh, seep_data, solution, export_mesh_to_json,
+                export_transient_solution):
+    """The mesh and the march, written under one workbook's own base name.
+
+    Companion discovery is by base name — ``{base}_mesh.json``, ``{base}_tseep.csv``
+    and ``{base}_tseep_meta.json`` beside the ``.xlsx`` — so each workbook needs its
+    own set, and each set names its own workbook in the meta file's provenance.
+    """
+    stem = os.path.splitext(path)[0]
+    mesh_path = f"{stem}_mesh.json"
+    export_mesh_to_json(mesh, mesh_path)
+    csv_path, meta_path = _quiet(
+        export_transient_solution, seep_data, solution, stem,
+        input_file=os.path.basename(path),
+        mesh_file=os.path.basename(mesh_path))
+    for written in (mesh_path, csv_path, meta_path):
+        print(f"  wrote {os.path.relpath(written, REPO_ROOT)} "
+              f"({os.path.getsize(written) / 1024:.0f} KB)")
+
+
 def build():
-    """The workbook, and the mesh and march that ship beside it."""
+    """Both workbooks, and the mesh and march that ship beside each.
+
+    The march is solved once. Seepage reads conductivity and storage, so the three
+    strength cells that separate the two files cannot move a pore pressure, and
+    solving twice would only produce the same nineteen frames again.
+    """
     from xslope.fileio import load_slope_data
     from xslope.mesh import (build_mesh_from_polygons, export_mesh_to_json,
                              extract_size_regions, get_material_polygons)
@@ -143,6 +186,7 @@ def build():
                              export_transient_solution, run_transient_seepage)
 
     path = _write(_model(), TUTORIAL_FILES, OUT)
+    start_path = _write(_model(strengths=False), TUTORIAL_FILES, OUT_START)
 
     # Re-read what was written, so the companions are built on the model as the
     # file states it rather than on the dict that produced it.
@@ -160,16 +204,9 @@ def build():
           f"converged={solution['converged']}, "
           f"closure={solution['mass_balance']['final_closure']:.3e}")
 
-    stem = os.path.splitext(path)[0]
-    mesh_path = f"{stem}_mesh.json"
-    export_mesh_to_json(mesh, mesh_path)
-    csv_path, meta_path = _quiet(
-        export_transient_solution, seep_data, solution, stem,
-        input_file=os.path.basename(path),
-        mesh_file=os.path.basename(mesh_path))
-    for written in (mesh_path, csv_path, meta_path):
-        print(f"  wrote {os.path.relpath(written, REPO_ROOT)} "
-              f"({os.path.getsize(written) / 1024:.0f} KB)")
+    for p in (path, start_path):
+        _companions(p, mesh, seep_data, solution, export_mesh_to_json,
+                    export_transient_solution)
     return path
 
 

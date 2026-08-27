@@ -4128,9 +4128,19 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='mat.gamma_nonpositive', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_mats(sd, gamma=0.0),
          expect='has no unit weight'),
+    # Through the writer and the loader: a workbook with the unit weight column
+    # blank LOADS (a model still being built has values left to type), and the
+    # missing weight is caught here rather than at load time.
     dict(rule='mat.gamma_nonpositive', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, gamma=0.0),
-         load_error='non-positive unit weight'),
+         expect='has no unit weight'),
+    # The finite element engine weighs EVERY material table row, elastic ones
+    # included -- a row a failure surface would never cross, and which the limit
+    # equilibrium half of the rule skips.
+    dict(rule='mat.gamma_nonpositive', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_mats(sd, option='elastic', gamma=0.0),
+         expect='weighs every material it meshes'),
     dict(rule='mat.no_shear_strength', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, option='mc', c=0.0, phi=0.0),
          expect='no shear strength at all'),

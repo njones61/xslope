@@ -12,7 +12,7 @@ against time shows *when* the slope is weakest, not just how weak.
 
 In [Tutorial SEEP-3](seep03_reservoir_drawdown.md) we built a small earth dam
 with a granular shell and a clay core and lowered its reservoir 16 m over
-45 days, stopping at the pore pressures. **Part 1** picks that solution up with
+45 days, stopping at the pore pressures. **Part 1** picks that solution up, puts
 drained strengths on it and runs one analysis per saved frame, searching both
 faces — a falling pool weakens the upstream face, but a full reservoir loads it
 and leaves the downstream slope weaker. In **Part 2** we repeat the exercise as
@@ -31,11 +31,15 @@ governs, and repeat the run as a rapid drawdown for a dam with a clay core.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">three materials</span><span class="tg-pill">transient seepage</span><span class="tg-pill">u = seep</span><span class="tg-pill">saved frames</span><span class="tg-pill">seepage time</span><span class="tg-pill">FS vs time</span><span class="tg-pill">rapid drawdown</span><span class="tg-pill">three-stage procedure</span><span class="tg-pill">Kc = 1 envelope</span><span class="tg-pill">d and ψ</span><span class="tg-pill">stage times</span><span class="tg-pill">Spencer</span><span class="tg-pill">circular search</span><span class="tg-pill">starting circles</span><span class="tg-pill">minimum slip depth</span><span class="tg-pill">automatic water loads</span></p>
 <div class="tgm-model" markdown>
-**Part 1 model** — [xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx),
-SEEP-3's dam with strengths on its materials table, a starting circle on each
-face and a minimum slip depth. It ships meshed and marched, with the nineteen
-pore-pressure fields we sweep in Part 1 already on it; we build the seepage side
-of it in [SEEP-3](seep03_reservoir_drawdown.md)
+**Part 1 starter file** — [xslope_earth_dam_fs_time_start.xlsx](files/xslope_earth_dam_fs_time_start.xlsx),
+SEEP-3's dam with a starting circle on each face and a minimum slip depth, and no
+strengths on its materials table — those are the three values per zone we type in
+below. It ships meshed and marched, with the nineteen pore-pressure fields we
+sweep in Part 1 already on it; we build the seepage side of it in
+[SEEP-3](seep03_reservoir_drawdown.md)
+
+**Part 1 completed model** — [xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx),
+the same dam with the strength band filled in; open it to skip the typing
 
 **Part 2 model** — [xslope_johnson_fs_time.xlsx](files/xslope_johnson_fs_time.xlsx),
 COMBO-2's Johnson Reservoir dam — an undrained envelope on the core, `u = seep`
@@ -49,11 +53,13 @@ it; we build both in [COMBO-2](combo02_rapid_drawdown.md)
 
 ## Part 1 — Drained analysis at each time step
 
-We use the SEEP-3 dam for Part 1. Both of its zones carry drained strengths
+We use the SEEP-3 dam for Part 1. Both of its zones take drained strengths
 (c′ and φ′), so at each saved time we run an ordinary effective-stress analysis
 on the pore pressures from that time step. The model arrives meshed and marched —
 the nineteen pore-pressure fields the curve is drawn through ship beside the
-workbook — so we go straight to the stability runs.
+workbook — so the seepage work is done and only the strengths are missing. We
+open the file, look at what came with it, type the strengths in, run one instant,
+then sweep all nineteen.
 
 ### The dam and the drawdown
 
@@ -87,17 +93,61 @@ moves** — the mechanism that governs under a full reservoir is not the one tha
 governs half drained, and on this dam not even on the same slope, so each instant
 gets its own search.
 
-### The soil strength parameters
+### Opening the model
 
-This dam was built for a seepage analysis in the [SEEP-3](seep03_reservoir_drawdown.md)
-tutorial, so its materials carry conductivities and storage properties but no
-strengths. A stability run needs c′, φ′ and a unit weight for each zone. The
-workbook for this tutorial,
-[xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx), is the
-SEEP-3 model with those values on it. Download it and open it with
-**File → Open…**, leave the mode strip (LEM | Seepage | FEM) on **LEM**, click
-**Materials** in the Inputs tree, and set the **Show parameters for:** toggles to
-**LEM** alone. The two rows carry the band a stability run reads:
+Download
+[xslope_earth_dam_fs_time_start.xlsx](files/xslope_earth_dam_fs_time_start.xlsx)
+and open it with **File → Open…**, leaving the mode strip (LEM | Seepage | FEM) on
+**LEM**.
+
+Three companion files carry the seepage work and travel with the workbook:
+`xslope_earth_dam_fs_time_start_mesh.json` holds the mesh,
+`xslope_earth_dam_fs_time_start_tseep.csv` the head and pore pressure at every
+node of every saved frame, and `xslope_earth_dam_fs_time_start_tseep_meta.json`
+the ledger naming the frames. Studio finds them beside the workbook and reads them
+on open, so the dam arrives meshed and marched.
+
+[xslope_earth_dam_fs_time.xlsx](files/xslope_earth_dam_fs_time.xlsx) carries the
+same dam with the strengths already on it, and its own copies of the three
+companions; open that one to skip the typing below.
+
+### The mesh and the seepage solution shipped with the file
+
+Every pore pressure the runs below read comes from the seepage engine, and the
+file arrives with those fields solved, so the first thing to do with it is look
+at what it carries. Switch the mode strip to **Seepage** (`Ctrl+2`) and click the
+**Seep · Transient** tab. The play bar steps through **nineteen** instants —
+t = 0, 2, 5, 10, 15, 20, 25, 30, 35, 40, 47, 55, 65, 80, 100, 130, 180, 240 and
+300 — and every run below reads one of them.
+
+![The Seep · Transient tab, its play bar parked on day 35](images/combo03_studio_playbar.png)
+
+The schedule is uneven on purpose: five-day frames through the fall, which ends
+on day 47, and widening steps after, because the answer moves fastest while the
+pool is dropping. Only a saved frame can carry a point of the curve, so the
+schedule is a modeling decision taken before the stability question is asked.
+
+Those fields were solved on **614 nodes and 1,089 triangles**, linear triangles
+auto-sized at 64 divisions across the 110 m section, a target element size of
+110/64 = 1.72 m. Head is a scalar field, so linear elements are enough. We build
+[that mesh in SEEP-3](seep03_reservoir_drawdown.md#building-the-mesh), solve
+[the full-pool state the march starts from](seep03_reservoir_drawdown.md#the-steady-solution-at-full-pool)
+and [march the pool down on it](seep03_reservoir_drawdown.md#running-the-transient-march);
+the file downloaded above arrives past all three.
+
+### Entering the soil properties
+
+The dam was built for a seepage analysis, and a seepage analysis reads
+conductivity and storage — never a strength. A stability run reads a unit weight
+and a strength envelope from every zone a failure surface can cross, and those
+cells are empty on both rows, which is what we fill in now.
+
+Switch back to **LEM** (`Ctrl+1`) and click **Materials** in the Inputs tree. Set
+the **Show parameters for:** toggles to **LEM** alone — that hides the
+conductivity and finite element columns and leaves the band a stability run
+reads. Working across the table in the order it lists its columns, type **γ 20**,
+**c 0** and **φ 32** on the `shell` row, then **γ 19**, **c 10** and **φ 25** on
+the `core` row:
 
 ![The two zones with their strength band filled](images/combo03_studio_materials.png)
 
@@ -109,12 +159,17 @@ SEEP-3 model with those values on it. Download it and open it with
 **These are typical values for a granular shell and a compacted clay core, chosen
 for the exercise rather than measured on this dam.**
 
-**Two unit weights per row.** γ applies above the water table and γsat below it,
-and the slicer splits each slice's weight where the two meet, so the shell gets
-lighter as the pool drains it.
+Every column in that table is load-bearing, the three we typed and the three that
+came with the file:
 
-**Both strengths are drained.** c′ and φ′ are effective-stress parameters, so
-each slice base needs a pore pressure to form an effective normal stress from.
+**Two unit weights per row.** γ is the value we typed and applies above the water
+table; γsat, already on both rows, applies below it. The slicer splits each
+slice's weight where the two meet, so the shell gets lighter as the pool drains
+it.
+
+**Both strengths are drained.** c′ and φ′ are effective-stress parameters under
+`option` `mc`, the Mohr-Coulomb envelope the file already selects, so each slice
+base needs a pore pressure to form an effective normal stress from.
 
 **`u` is `seep` on both rows.** That column decides where a slice base gets its
 pore pressure, and `seep` sends it to a solved seepage field;
@@ -122,11 +177,18 @@ pore pressure, and `seep` sends it to a solved seepage field;
 its four values. With a transient solution loaded, `seep` means one frame of it,
 chosen at the run rather than here.
 
+**The checks notice an empty cell.** Open a run dialog on the file as it
+downloads and **Model checks** carries an error on each row — *Material 1
+('shell') has no unit weight* — with **Run** disabled, because a zero unit weight
+makes zero slice weights and a factor of safety that means nothing. With the six
+values typed in, the materials raise nothing.
+
 Click **OK**.
 
 ### Starting circles
 
-Click **Circles**. The file carries two, one on each face of the dam:
+With the strengths in, the last input a search needs is somewhere to start
+from. Click **Circles**. The file carries two, one on each face of the dam:
 
 | Xo | Yo | Option | Depth |
 | :---: | :---: | --- | :---: |
@@ -190,35 +252,14 @@ stood then. The
 two red dashed arcs are the starting circles, both centers sitting above the
 frame.
 
-### The mesh and the march shipped with the file
-
-Every pore pressure the runs below read comes from the seepage engine, and the
-file arrives with those fields solved. Switch the mode strip to **Seepage**
-(`Ctrl+2`) and click the **Seep · Transient** tab. The play bar steps through
-**nineteen** instants — t = 0, 2, 5, 10, 15, 20, 25, 30, 35, 40, 47, 55, 65, 80,
-100, 130, 180, 240 and 300 — and every run below reads one of them.
-
-![The Seep · Transient tab, its play bar parked on day 35](images/combo03_studio_playbar.png)
-
-The schedule is uneven on purpose: five-day frames through the fall, which ends
-on day 47, and widening steps after, because the answer moves fastest while the
-pool is dropping. Only a saved frame can carry a point of the curve, so the
-schedule is a modeling decision taken before the stability question is asked.
-
-Those fields were solved on **614 nodes and 1,089 triangles**, linear triangles
-auto-sized at 64 divisions across the 110 m section, a target element size of
-110/64 = 1.72 m. Head is a scalar field, so linear elements are enough. We build
-[that mesh in SEEP-3](seep03_reservoir_drawdown.md#building-the-mesh), solve
-[the full-pool state the march starts from](seep03_reservoir_drawdown.md#the-steady-solution-at-full-pool)
-and [march the pool down on it](seep03_reservoir_drawdown.md#running-the-transient-march);
-the file downloaded above arrives past all three.
-
 ### Stability at one time step
 
-Switch back to **LEM** (`Ctrl+1`) and click **Run → Run LEM…** **Method** opens on
-**Spencer**, which satisfies both force and moment equilibrium and is the method
-behind every factor of safety on this page; **Analysis** opens on **Auto search**,
-which finds the run its own critical circle, and **Number of slices** on 40.
+The model is complete — geometry, strengths, pore pressures and a place to start
+searching from — so we can ask it for a factor of safety, at one instant first.
+Click **Run → Run LEM…** **Method** opens on **Spencer**, which satisfies both
+force and moment equilibrium and is the method behind every factor of safety on
+this page; **Analysis** opens on **Auto search**, which finds the run its own
+critical circle, and **Number of slices** on 40.
 Leave all three, and leave **Grid search** unticked: the two circles the file
 carries each sit on the mechanism their face can make, so the search reaches
 either face from the circles sheet alone. On a model with one starting circle and
@@ -537,22 +578,29 @@ and 1.016 — the last from a transient march, stage 1 at t = 0 and stage 2 at
 t = 50. Here we run it at **every** saved instant, then run Part 1's kind of
 curve on the same twenty-one frames.
 
-### The model
+### Opening the model
 
 Download [xslope_johnson_fs_time.xlsx](files/xslope_johnson_fs_time.xlsx) and
-open it with **File → Open…**, leaving the mode strip on **LEM**. The mesh and
-the march are stored beside the workbook and Studio reads them on open, so the
-dam arrives meshed and marched. In **LEM** the inputs view draws that mesh behind
-the zones.
+open it with **File → Open…**, leaving the mode strip on **LEM**. Its three
+companions — `xslope_johnson_fs_time_mesh.json`, `xslope_johnson_fs_time_tseep.csv`
+and `xslope_johnson_fs_time_tseep_meta.json` — sit beside the workbook and Studio
+reads them on open, so the dam arrives meshed and marched. In **LEM** the inputs
+view draws that mesh behind the zones.
 
 ![The Johnson Reservoir dam as the shipped file opens, the mesh behind it](images/combo03_rapid_inputs.png){width=1000}
+
+### What the file carries
+
+Nothing on this dam has to be built, so before running anything we go through
+what came with it.
 
 The section is 750 ft long, a 100 ft foundation on rock at elevation 0 with an
 80 ft embankment on it, a sand **shell** on both faces and a compacted-clay
 **core** carried 40 ft into the foundation as a cutoff key. The reservoir stands
 at elevation 160 and the tailwater at 100, and the drawdown lowers the pool 50 ft
-to 110. Three of the additions we made in COMBO-2 to
-[SEEP-2](seep02_johnson_dam.md)'s geometry matter here.
+to 110. That geometry is [SEEP-2](seep02_johnson_dam.md)'s, and in COMBO-2 we put
+the seepage boundary sets, the pool schedule and the stage times on it. Five
+things the file carries decide what the sweep can do.
 
 **The undrained envelope.** Click **Materials** and set the **Show parameters
 for:** toggles to **LEM** alone. Only the core carries a $K_c = 1$ envelope —
@@ -576,6 +624,13 @@ from a solved seepage field. In COMBO-2 we deleted the file's two piezometric
 lines when we replaced them, which is why the figure above draws a water surface
 and a derived load and no piezometric line.
 
+**One starting circle, on the upstream face.** Click **Circles**: the file carries
+a single one, center (275, 235) with a radius of 160 ft, tangent at elevation 75.
+Every search below starts from it. One circle is enough here because which face
+governs is not in question — lowering the pool takes the water off the upstream
+slope and leaves it inside the embankment — where Part 1's dam needed a circle on
+each face. Click **OK**.
+
 **The schedule and the stage times.** Switch the mode strip to **Seepage**
 (`Ctrl+2`) and click **Transient** in the Inputs dock. The `pool` series holds at
 elevation 160 for five days and falls to 110 over the following 45, the run lasts
@@ -589,12 +644,10 @@ the answer moves, and the run stops at day 500 because the curve has flattened
 before then. Every point below reads its consolidation stresses at stage 1, which
 stays at t = 0 for the whole sweep; what moves is stage 2.
 
-### The mesh and transient solution shipped with the file
-
-Still in **Seepage**, click the **Seep · Transient** tab. The play bar steps
-through **twenty-one** instants — t = 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50,
-60, 70, 80, 100, 130, 170, 220, 300, 400 and 500 — and every pore pressure the
-runs below read comes from one of them.
+**The mesh and the march.** Still in **Seepage**, click the **Seep · Transient**
+tab. The play bar steps through **twenty-one** instants — t = 0, 5, 10, 15, 20,
+25, 30, 35, 40, 45, 50, 60, 70, 80, 100, 130, 170, 220, 300, 400 and 500 — and
+every pore pressure the runs below read comes from one of them.
 
 Those fields were solved on **2,080 nodes and 3,923 triangles**, linear triangles
 auto-sized at 100 divisions across the 750 ft section, a target element size of
@@ -605,7 +658,8 @@ downloaded above arrives past both.
 
 ### Running the rapid drawdown sweep
 
-Switch back to **LEM** (`Ctrl+1`) and click **Run → Parametric…**
+That is everything a run reads, so we can sweep the march in one go. Switch back
+to **LEM** (`Ctrl+1`) and click **Run → Parametric…**
 
 ![The Parametric dialog with the Rapid drawdown box ticked](images/combo03_rapid_parametric.png)
 
@@ -622,9 +676,7 @@ at that moment.
 
 **Re-search the critical surface at each step** goes gray and is held on, because
 a drawdown's critical surface is not the drained one and moves as the field does.
-Every point is searched from the file's starting circle at (275, 235), on the
-upstream face — lowering the pool takes the water off that slope and leaves it
-inside the embankment.
+Every point searches from the starting circle described above.
 
 The **Model checks** panel repeats COMBO-2's one warning: two of the three
 materials carry no $d$ / $\psi$ and keep their drained strength through the

@@ -2051,21 +2051,36 @@ def _mat_option_missing(ctx):
                    f"or elastic) {_AT_MAT}.")
 
 
-@rule("mat.gamma_nonpositive", ERROR, ("lem",),
-      "A material carrying strength data needs a positive unit weight.",
+@rule("mat.gamma_nonpositive", ERROR, ("lem", "fem"),
+      "A material a stability run weighs needs a positive unit weight.",
       fields=("gamma", "gamma_sat"))
 def _mat_gamma_nonpositive(ctx):
-    for i, m in enumerate(ctx.materials):
+    # This is the ONLY place a missing unit weight is caught: the loader reads the
+    # workbook whatever the mat sheet says, so that a model still being built opens.
+    # Every stability analysis reaches here -- lem, rapid (inherits lem), fem, ssrm
+    # (inherits fem), and a sweep or reliability run on either base. A seepage-only
+    # run never weighs anything, so the rule is silent there.
+    #
+    # WHICH rows: the finite element engine demands gamma of every material table
+    # row and refuses the run on the first bad one (fem.py:1304-1317), so a finite
+    # element run is checked row by row, elastic rows included. A limit equilibrium
+    # run only weighs what a failure surface can cross, which is the rows carrying a
+    # strength model.
+    fem = "fem" in ctx.analyses
+    for i, m in (ctx.fem_materials() if fem else enumerate(ctx.materials)):
         opt = str(m.get("option") or "").strip().lower()
-        if opt not in ("mc", "cp", "pow", "hb"):
+        if not fem and opt not in ("mc", "cp", "pow", "hb"):
             continue
         if _pos(m.get("gamma")):
             continue
+        why = (f"the finite element engine weighs every material it meshes"
+               if fem else
+               f"the row carries a strength model (option = {opt}), so it is a "
+               f"slope-stability material")
         yield (f"{ctx.mat_label(i)} has no unit weight: g is "
-               f"{_fmt(m.get('gamma'))}. The row carries a strength model "
-               f"(option = {opt}), so it is a slope-stability material and needs a "
-               f"positive unit weight -- a gamma of zero produces zero slice weights "
-               f"and a meaningless factor of safety {_AT_MAT}.")
+               f"{_fmt(m.get('gamma'))}. Enter one -- {why}, and a gamma of zero "
+               f"produces zero weights and a meaningless factor of safety "
+               f"{_AT_MAT}.")
 
 
 @rule("mat.no_shear_strength", WARNING, ("lem",),

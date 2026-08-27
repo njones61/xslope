@@ -4992,7 +4992,7 @@
       "model": "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx",
       "references": [
         {
-          "anchor": "the-strengths-this-page-adds",
+          "anchor": "opening-the-model",
           "checks": [
             "COMBO-3-drained"
           ],
@@ -5000,8 +5000,8 @@
           "page": "tutorials/combo03_fs_vs_time/",
           "resolution": "input-link",
           "source_md": "docs/tutorials/combo03_fs_vs_time.md",
-          "title": "The strengths this page adds",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo03_fs_vs_time/#the-strengths-this-page-adds"
+          "title": "Opening the model",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model"
         }
       ],
       "topics": [
@@ -5060,7 +5060,7 @@
       "model": "docs/tutorials/files/xslope_johnson_fs_time.xlsx",
       "references": [
         {
-          "anchor": "the-model-and-what-part-2-reads-off-it",
+          "anchor": "opening-the-model_1",
           "checks": [
             "COMBO-3-rapid",
             "COMBO-3-single"
@@ -5069,8 +5069,8 @@
           "page": "tutorials/combo03_fs_vs_time/",
           "resolution": "input-link",
           "source_md": "docs/tutorials/combo03_fs_vs_time.md",
-          "title": "The model, and what Part 2 reads off it",
-          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo03_fs_vs_time/#the-model-and-what-part-2-reads-off-it"
+          "title": "Opening the model",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model_1"
         }
       ],
       "topics": [

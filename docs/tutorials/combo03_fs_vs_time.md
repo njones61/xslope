@@ -357,6 +357,13 @@ through the drawdown, which ends on day 47, then widening steps through the
 recovery. The answer moves fastest while the pool is falling and slowest once the
 core is left draining on its own, and the frames follow that.
 
+The **mass-balance closure** on each line is a diagnostic: the gap between the
+stored-water change and the net inflow, as a fraction of the flow that has
+passed so far. Early in the march that flow is still small, so the ratio at t = 5
+reads large without meaning anything — the absolute gap there is a third of a
+cubic meter per meter, no larger than at later frames, and the head field at
+t = 5 moves by less than 0.04 m under a step size four times finer.
+
 ### One instant at a time
 
 The march has left nineteen pore-pressure fields on the file, and the stability

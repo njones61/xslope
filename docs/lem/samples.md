@@ -648,7 +648,7 @@ automated regression suite. See also the [Verification](../verification/index.md
 ### 12. Rapid Drawdown (Johnson Reservoir Dam)
 
 This sample exercises XSLOPE's **rapid drawdown** capability — the three-stage
-procedure (Duncan, Wright & Brandon) for the *upstream* slope of an earth dam
+procedure (Duncan, Wright and Wong (1990)) for the *upstream* slope of an earth dam
 after the reservoir is lowered faster than the low-permeability zones can drain.
 The Johnson Reservoir dam is analyzed on its upstream design circle:
 

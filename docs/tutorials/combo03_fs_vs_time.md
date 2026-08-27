@@ -161,11 +161,12 @@ ten. The file sets one:
 | --- | :---: | --- |
 | Min slip depth | 8 | The surface must reach at least 8 m below the ground surface |
 
-That limit sets a floor on the *size* of the mechanism. With c′ = 0 the factor of
-safety on a shallow surface parallel to the face does not depend on how deep it
-is drawn, so an unconstrained search settles on a surficial wedge that ravels
-rather than slides. 8 m on a 22 m dam keeps the search on embankment slides; the
-Run LEM dialog offers the same limit as **Ignore surficial (skin) failures**.
+That limit sets a minimum size for the failure surface. With c′ = 0 the factor of
+safety of a shallow surface parallel to the face is the same at any depth, so
+without the limit the search settles on a very thin surface layer just under the
+face — a skin failure, not a slide. A minimum of 8 m on a 22 m dam keeps the
+search on embankment slides; the Run LEM dialog offers the same limit as
+**Ignore surficial (skin) failures**.
 
 The entry and exit ranges are left blank on purpose. Filling them would confine
 the trace to one slope, and which slope governs at a given instant is what we

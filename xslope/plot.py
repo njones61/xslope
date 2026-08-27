@@ -5194,15 +5194,10 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
     in ``result['df']``); their absence is stated in the legend as a count, so a
     gap in the line is never silent.
 
-    On a **rapid-drawdown** curve (``rapid=True``, so the run's rows carry
-    ``stage1_FS`` / ``stage2_FS`` / ``stage3_FS``) the reported curve is the
-    drawdown's own factor of safety — the lower of stages 2 and 3 — and the three
-    stages are drawn behind it as thin dashed lines. Reading a drawdown means
-    seeing how far stage 2 falls below stage 1 and where stage 3 takes over, and a
-    figure that showed only the governing value would hide the crossover it is
-    made of. Stage 3 is drawn only at the instants it was actually required;
-    elsewhere the drawdown's answer is stage 2 and a stage-3 line there would be a
-    copy of it.
+    On a **rapid-drawdown** curve (``rapid=True``) the reported curve is the
+    drawdown's own factor of safety — the lower of stages 2 and 3 — and only that
+    curve is drawn; the per-stage values are in the run's console table and in
+    ``result['df']``.
 
     Parameters:
         result: the dict from ``fs_vs_time`` (reads 'df', 'critical_time',
@@ -5234,24 +5229,6 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
             continue
         line, = ax.plot(pts['value'], pts['fs'], marker='o', ms=5, lw=1.8,
                         label=(f"{method} (drawdown)" if rapid else str(method)))
-        if not rapid:
-            continue
-        # The stages behind the answer, in the reported curve's own color and
-        # thinner than it: same quantity, same slope, one construction — a second
-        # color family would read as a second analysis.
-        for col, dash, lab in (('stage1_FS', (0, (6, 3)), 'stage 1 — full pool'),
-                               ('stage2_FS', (0, (3, 2)),
-                                'stage 2 — drawn down, undrained')):
-            v = pts[col].astype(float)
-            if v.notna().any():
-                ax.plot(pts['value'], v, lw=1.0, ls=dash, color=line.get_color(),
-                        alpha=0.75, label=lab)
-        s3 = pts.loc[pts['stage3_run'].astype(bool)] if 'stage3_run' in pts \
-            else pts.iloc[0:0]
-        if len(s3) and s3['stage3_FS'].notna().any():
-            ax.plot(s3['value'], s3['stage3_FS'].astype(float), lw=1.0,
-                    ls=(0, (1, 1.5)), marker='.', ms=5, color=line.get_color(),
-                    alpha=0.75, label='stage 3 — drawn down, drained')
     if n_failed:
         ax.plot([], [], ' ', label=f"{n_failed} instant(s) produced no result")
 

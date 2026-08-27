@@ -15,7 +15,7 @@ calculation. A finite element method meshes each line into a row of bar elements
 sharing nodes with the soil around them, and the force in every one of those
 elements comes out of how far the soil beside it has moved.
 
-Our example is the geogrid-reinforced sand fill from
+The example is the geogrid-reinforced sand fill from
 [LEM-8](lem08_reinforced_slope.md) — six layers of geogrid in a 24 ft fill under
 a crest surcharge — and we solve it three times. Spencer's method gives the
 reference answer. Then we mesh the same model and run it by **strength
@@ -155,8 +155,8 @@ The bond limit can be stated either way. Those codes compute bond from the
 stress on the layer-soil interface, so the length a layer needs to develop its full
 capacity depends on how deep it is buried; XSLOPE offers that form through the
 `Adhesion` and `Delta` columns, and reads the length directly from the input —
-the pullout lengths `Lp1` and `Lp2` — when they are left blank, which is what we
-do here. The distinction between the two limits matters when the
+the pullout lengths `Lp1` and `Lp2` — when they are left blank, which is what
+this model does. The distinction between the two limits matters when the
 results are read: the 1D Details panel reports whether a line reached its bond
 limit (**pullout**) or its rupture limit (**yielded**), and the two mean
 different things for the design.
@@ -745,8 +745,8 @@ search had on offer.
 In [FEM-1](fem01_strength_reduction.md#where-e-comes-from-and-what-it-changes)
 we measured that a hundredfold sweep in Young's modulus left the factor of safety
 identical to every printed digit. A reinforced slope has a second stiffness in
-it — the layers' — and the two do not have to move together, so we check that
-result here rather than assume it.
+it — the layers' — and the two do not have to move together, so that result is
+checked here rather than assumed.
 
 The same run, at the same mesh and bracket, with the soils' modulus and the
 layers' modulus scaled separately:

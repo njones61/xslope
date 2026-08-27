@@ -14,7 +14,7 @@ the dialogs) turns that solver into a stability analysis: it weakens the soil,
 step by step, until the slope can no longer hold itself up. Where it fails, and
 on what shape, is something the run reports rather than something we supply.
 
-Our example is a 50 ft embankment on a rigid base — one soil, no water, no
+The example is a 50 ft embankment on a rigid base — one soil, no water, no
 loads — the simplest slope the method can be shown on. We solve it twice. First
 with **Spencer's method**, on its own search, and that answer is the reference
 everything after it is read against. Then we mesh the same model, run it by
@@ -284,9 +284,9 @@ better either,
 tabulates ranges by soil type in both kPa and psf.
 
 What a nominal stiffness costs, on this model and for the factor of safety, is
-nothing at all. We run the same mesh and the same bracket, all three at the
-default iteration budget, at a tenth of the file's modulus, at it, and at ten
-times it:
+nothing at all. The same mesh and the same bracket are run at a tenth of the
+file's modulus, at it, and at ten times it, all three at the default iteration
+budget:
 
 | E (psf) | vs. the file | SSRM FS | Largest displacement at *F* = 1 (ft) |
 | :---: | :---: | :---: | :---: |

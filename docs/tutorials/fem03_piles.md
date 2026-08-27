@@ -397,7 +397,7 @@ Set `Tip` back to `pinned` on both rows before the next section.
 ### What spacing does to each engine
 
 A designer adjusts the spacing once the diameter is set, and it is the input
-that separates the two engines most sharply. In the sweep below we run both of
+that separates the two engines most sharply. The sweep below runs both of
 them across a 4× range in spacing — 3, 6 and 12 ft, S/D 1.5 to 6 — with nothing
 changing but the `S` cell on the two rows. Ito & Matsui is applicable for S/D
 between about 2 and 8, so the 3 ft point sits below the band and raises the

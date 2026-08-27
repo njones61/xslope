@@ -22,8 +22,8 @@ The procedure needs two states of the water — before the drawdown and after �
 and there are three ways to say where the water was in each. We run all three on
 one dam, one set of strengths and one starting circle, so the only thing that
 changes between the answers is the statement about the water. There are three
-parts, one per statement: in **Part 1** we draw the two states as two piezometric
-lines and run no seepage at all; in **Part 2** we replace the lines with two
+parts, one per statement: in **Part 1** the two states are two piezometric
+lines with no seepage behind them; in **Part 2** we replace the lines with two
 steady-state seepage solutions, one at each pool; in **Part 3** we replace those
 with a single transient seepage run and read the two states out of it. Then we
 set the three answers side by side.
@@ -114,9 +114,9 @@ undrained strength is the lower of the two, and the drawdown is a strength
 problem. Stage 3 governing says the opposite — on at least some of those slices
 the undrained strength assigned in stage 2 came out *higher* than the drained
 strength at the same stresses, so what limits the slope is the ordinary drained
-strength at the drawn-down pore pressures. In the
-[flip section](#the-governing-stage-flip) below we move this dam from one to the
-other and report what it takes. Duncan, Wright and Brandon (2014) work the whole
+strength at the drawn-down pore pressures. The
+[flip section](#the-governing-stage-flip) below moves this dam from one to the
+other and reports what it takes. Duncan, Wright and Brandon (2014) work the whole
 procedure by hand in their Table 9.2, on two slip planes in one submerged infinite
 slope that are governed by different stages — the shallow one by stage 3 and the
 deep one by stage 2 — for the same reason: the stress each plane consolidated at.
@@ -852,9 +852,9 @@ field each was read on.
 ## The governing-stage flip
 
 Stage 2 governed the first two runs; stage 3 governed the transient one. To find
-where control passes from one to the other, we sweep the core's undrained
-intercept $d$ across its 250 psf — $\psi$ held at 14°, the transient route
-otherwise fixed, a search of its own at every value.
+where control passes from one to the other, the core's undrained intercept $d$ is
+swept across its 250 psf — $\psi$ held at 14°, the transient route otherwise
+fixed, a search of its own at every value.
 
 ![Stage 2, stage 3 and the reported answer against the core's Kc = 1 intercept](images/combo02_sweep.png){width=1000}
 

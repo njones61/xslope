@@ -4019,6 +4019,17 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_circle_depth(sd, 200.0),
          control=lambda sd: _pf_circle_depth(sd, 20.0),
          expect='no slices can be generated from it'),
+    # Nothing about the FILE is broken here -- xslope_dam.xlsx carries two starting
+    # circles because a dam has two faces -- so the model is the same in both halves
+    # and the only difference is the RUN: Grid search off refines the best-screening
+    # circle alone, Grid search on refines every family. That makes the control the
+    # proof the toggle is read rather than merely accepted.
+    dict(rule='circles.multiple_without_grid', base=PREFLIGHT_BASE_LEM, mode='dict',
+         selection={'surface': 'circular', 'search': True},
+         control_selection={'surface': 'circular', 'search': True,
+                            'grid_seed': True},
+         mutation=lambda sd: sd, control=lambda sd: sd,
+         expect='refines only the best-scoring one'),
 
     # --- polyline ordering -------------------------------------------------
     dict(rule='order.piezo_reversed', base=PREFLIGHT_BASE_LEM, mode='excel',

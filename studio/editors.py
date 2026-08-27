@@ -5210,7 +5210,11 @@ def _circles_generate_spec(slope_data):
             "tooltip": "Derive a starting set from the slope's own geometry: for each "
                        "significant face, a circle through the toe and one at the base "
                        "of each layer, centered above the middle of the face at twice "
-                       "the slope height."}
+                       "the slope height.\n\n"
+                       "These are candidates, not separate searches: an automated "
+                       "search with Grid search off refines only the circle that "
+                       "screens best on a coarse pass. Tick Grid search in the Run LEM "
+                       "dialog to refine every competing family."}
     probe = generate_starting_circles(slope_data, report=True)
     if not probe["circles"]:
         spec["available"] = False

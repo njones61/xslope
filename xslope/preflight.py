@@ -841,6 +841,20 @@ class _Ctx:
         return bool(self.selection.get("search"))
 
     @property
+    def grid_seed(self):
+        """True when the circular search auto-seeds itself from the geometry.
+
+        ``grid_seed`` is the name the Run LEM dialog's **Grid search** toggle and
+        ``search.run_lem_analysis`` both use; ``circular_search`` spells the same
+        thing ``seed='grid'``, so either form is read here. Absent means OFF, which
+        is what every entry point defaults to.
+        """
+        sel = self.selection
+        if sel.get("grid_seed"):
+            return True
+        return str(sel.get("seed") or "").strip().lower() == "grid"
+
+    @property
     def surface_supplied(self):
         """True when the caller handed the run its failure surface directly.
 
@@ -2389,6 +2403,50 @@ def _circle_below_domain_floor(ctx):
             f"above y = {_fmt(floor)} {_AT_CIRCLES}, or deepen the model so the "
             f"circle fits inside it -- {deeper}."))
     return out
+
+
+@rule("circles.multiple_without_grid", WARNING, ("lem",),
+      summary="A seeded circular search refines only the best-screening starting "
+              "circle; the other circles' families are never searched.")
+def _circles_multiple_without_grid(ctx):
+    # What the engine does, at search.py's launch selection: every starting circle
+    # gets ONE coarse 9-point grid, the starts are sorted by that coarse score, and
+    # `launches = all_starts[:1]` refines the top one alone. Grid search
+    # (`seed='grid'`) is the branch that refines up to four auto-seeded families
+    # plus every user circle.
+    #
+    # The cost is silent and it is not small. Two circles on a dam -- one upstream,
+    # one downstream -- read like two mechanisms being checked, and only one of them
+    # is. Which one survives is decided by a single coarse grid, at a resolution the
+    # refinement exists precisely because nobody trusts: a family that screens a few
+    # thousandths higher and refines far lower is dropped before refinement begins,
+    # and the run reports convergence on the survivor with nothing said about the
+    # rest. A single-surface run is silent here because it never claimed to search:
+    # it analyses circles[0] and says so.
+    if not ctx.is_search:
+        return None
+    if ctx.surface_supplied:
+        return None
+    if ctx.effective_surface_family != "circular":
+        return None
+    if ctx.grid_seed:
+        return None
+    n = len(ctx.sd.get("circles") or [])
+    if n < 2:
+        return None
+    rest = ("the other circle's family is not searched" if n == 2 else
+            f"the other {n - 1} circles' families are not searched")
+    return (
+        f"This model carries {n} starting circles and Grid search is off. A seeded "
+        f"search screens each starting circle with one coarse 9-point grid, ranks "
+        f"the circles by that screen, and then refines only the best-scoring one: "
+        f"{rest}, so a mechanism that "
+        f"screens slightly higher on the coarse pass and would refine lower is "
+        f"dropped before refinement begins and never appears in the result. Keep "
+        f"one starting circle, on the face known to be critical -- the upstream "
+        f"face for a drawdown, the downstream face for a full reservoir -- so the "
+        f"run states which mechanism it interrogates {_AT_CIRCLES}; or turn Grid "
+        f"search on, which refines every competing family, these circles included.")
 
 
 # ---------------------------------------------------------------------------

@@ -34,6 +34,25 @@ At the end of the process, the search results can be displayed using the **plot_
 
 Note that all circles tested in the search are displayed along with all grid points evaluated using the 9-point search algorithm. Furthermore, the sequence of center points for the moving 9-point grids are connected with a series of arrows showing the "search path".
 
+### Several Starting Circles Are Not Several Searches
+
+The circles sheet may hold any number of starting circles, but a seeded search
+(`seed='circles'`, the default) does not refine them all. Each starting circle is
+screened once — a single nine-point grid at its own launch spacing — the circles are
+ranked by that one coarse score, and the adaptive refinement then runs from the
+best-scoring circle alone. The other circles' families are never explored, and
+nothing in the output says so: the run reports convergence, one factor of safety,
+and one critical surface. Two circles entered to check two mechanisms, such as an
+upstream and a downstream surface on a dam, therefore report one mechanism, and
+which one survives is decided at the coarse resolution the refinement exists to
+improve on — a family screening a few thousandths higher that would refine much
+lower is dropped before refinement begins. Enter a single starting circle, on the
+face known to control, when the run is meant to interrogate one specific mechanism;
+turn on grid seeding, described next, when it is meant to find the critical surface
+anywhere in the model, since that mode refines up to four competing families with
+the sheet's own circles among them. Preflight reports the combination — two or more
+starting circles with **Grid search** off — as a warning.
+
 ### Grid Seeding (Global Search)
 
 The adaptive search described above is a **local** optimizer: it refines whatever neighborhood its starting circles put it in, and it will do so even when a far better minimum exists elsewhere. This matters more than it might appear. On an embankment over a layered foundation, a shallow circle in the fill and a deep circle riding the base of the foundation are two *competing families* of failure surface, separated by a ridge of higher factors of safety that the local search will not cross. Started from a single circle in the wrong family, the search converges cleanly — reporting convergence, a stable factor of safety, and a plausible-looking surface — at a value that can be 20% or more too high. Nothing in the output warns you.

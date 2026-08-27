@@ -355,9 +355,9 @@ continues past the toe along the flat ground to (750, 100), with no tailwater
 head at all. Along that flat stretch the tailwater head of 100 equals the ground
 elevation — and head = elevation is exactly the condition a saturated exit-face
 node enforces, so the two are the same statement written two ways, and solving
-it either way returns the same discharge to four figures. We keep the
-explicit head because it also states where the tailwater stands, which is what
-puts the downstream water level on the Inputs plot.
+it either way returns the same discharge to four figures. The explicit head is
+kept because it also states where the tailwater stands, which is what puts the
+downstream water level on the Inputs plot.
 
 Everything else is no-flow — the rock at elevation 0, the two ends of the section,
 and the strip along the top of the dam between the two: the crest, and the part of

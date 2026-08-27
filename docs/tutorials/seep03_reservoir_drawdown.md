@@ -641,8 +641,8 @@ surface is within **0.05 m** of the pool it stands over.
 ## The head history inside the core and the shell
 
 The frames show the lag as a shape. Following two points through every frame shows
-it as a history, and puts numbers on how far apart the two zones get. We take one
-node in the middle of the core, at (54.5, 8.9), and one in the upstream shell at
+it as a history, and puts numbers on how far apart the two zones get. One node
+sits in the middle of the core, at (54.5, 8.9), and one in the upstream shell at
 the same elevation, (30.7, 8.9), so the comparison is like for like; a third at
 (75.3, 6.8) in the downstream shell gives a control — a point the reservoir never
 supplied.

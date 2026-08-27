@@ -78,7 +78,7 @@ stand for above them, 160 ft upstream and 100 ft downstream; the heavy red dashe
 line down the whole downstream slope is the exit face; and the hatched line at
 elevation 0 is the maximum depth, the rock the foundation rests on. The strengths
 and stiffnesses the two stability runs read are on the same file, on the
-materials table, and we never enter them a second time.
+materials table, and they are never entered a second time.
 
 ---
 
@@ -313,8 +313,8 @@ to, not because anything was pointed at it.
 
 ## What integration means here
 
-One definition produced three results. We entered the geometry once, the
-materials once and the reservoir level once, and built the mesh once; the
+One definition produced three results. The geometry was entered once, the
+materials once and the reservoir level once, and the mesh built once; the
 seepage run turned that into a head field, and both stability engines read the
 pore pressures out of it without a single input being restated.
 

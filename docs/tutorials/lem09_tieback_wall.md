@@ -38,8 +38,8 @@ worth and the two ways their force can be applied.
 
 A tieback is a steel bar or strand grouted into a hole drilled back through the
 failing mass into ground that is not moving, stressed against a plate on the wall
-face. The machinery that puts it into an analysis is the machinery
-[LEM-8](lem08_reinforced_slope.md) builds — a line with two endpoints and a
+face. It enters an analysis through the same machinery we built in
+[LEM-8](lem08_reinforced_slope.md) — a line with two endpoints and a
 tensile capacity, applied to the sliding mass wherever a trial surface crosses
 it — and three things about it are different from a geogrid:
 
@@ -156,9 +156,9 @@ a pile resists in shear and bending rather than in tension:
 | soldier pile | 0.5 | 30 | 0.5 | -7 | 5900 |  |  | 0.5 | 1 |
 
 A real soldier-pile wall is discrete — piles at intervals along the wall, with
-the anchors seating on them. The reference states no pile spacing; it models
-the row as Slide does, a micro-pile smeared per foot of wall, and this row
-enters it the same way. **H** = 5900 is the reference's shear resistance, per
+the anchors seating on them. The reference states no pile spacing; like Slide,
+it models the row as a micro-pile smeared per foot of wall, and we enter it the
+same way. **H** = 5900 is the reference's shear resistance, per
 foot of wall, delivered to any surface that crosses the pile axis; **S** = 1
 because the division by spacing is already in that number — a
 continuous-equivalent of the discrete row, exactly as the anchors are entered —
@@ -172,8 +172,8 @@ pile row as squeezing plastically through the gaps between piles and integrates
 the resulting pressure on the pile from the ground surface down to each trial
 surface. That is the route to take when the design gives a diameter and spacing
 but no resistance number, and [Piles and Concrete Piers](../lem/piles.md)
-derives it. Here the reference publishes the 5,900 lb/ft itself, so the row
-uses it directly.
+derives it. Here the reference publishes the 5,900 lb/ft itself, so we use it
+directly.
 
 **Failure surface** — a bilinear wedge from the wall toe, given by the reference
 manual this problem comes from, entered as three points:
@@ -188,7 +188,7 @@ manual this problem comes from, entered as three points:
 the ground: the search walks an end point horizontally and re-anchors its Y to
 the ground surface at the new x, so a `Free` end tracks the ground
 automatically — the behavior some programs mark with an `Auto` vertex is built
-in. [LEM-5](lem05_weak_layer_noncircular.md) covers the column and what the
+in. In [LEM-5](lem05_weak_layer_noncircular.md) we cover the column and what the
 other two options do.
 
 The tables are the model, and each is laid out exactly as its destination is — the
@@ -305,7 +305,8 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 ### 1. Materials and profile lines
 
-Build them as [LEM-3](lem03_layered_slope.md#c-building-it-in-studio) does. In
+We build them as we did in
+[LEM-3](lem03_layered_slope.md#c-building-it-in-studio). In
 **Materials**, two rows take the table above, both unit-weight columns filled at
 the same value because there is no water in this model:
 
@@ -320,7 +321,8 @@ behind it:
 
 ### 2. The failure surface
 
-Build it as [LEM-5](lem05_weak_layer_noncircular.md#2-the-failure-surface) does:
+We build it as we did in
+[LEM-5](lem05_weak_layer_noncircular.md#2-the-failure-surface):
 **Non-circular pts**, three rows from the table above, `Free` on every one. The
 preview draws the wedge running back and up from the wall toe:
 
@@ -339,7 +341,7 @@ own, and paste the capacity block into the first `Tmax` cell:
 
 Press **List view** to read what was entered one line at a time, as a form in
 five groups — **Identity**, **Geometry**, **Capacity**, **Anchorage**, **Type**
-— with the list on the left labelling each line by its support type and the
+— with the list on the left labeling each line by its support type and the
 x-range it spans:
 
 ![The reinforcement editor's list view on the upper tieback](images/lem09_studio_reinforcement.png){width=1000}
@@ -384,10 +386,10 @@ point where its envelope reaches full capacity; the green bar at x = 0.5 is the
 soldier pile, labeled with its 5,900 lb/ft; and the red dashed polyline from the
 wall toe is the failure surface as entered.
 
-Click **Run LEM…** and choose **Method** = `Janbu (Corrected)` — the method
-both of this problem's references report their factor of safety in, so the
-results here read directly against theirs — and **Analysis** = `Auto search`,
-with the slice count left at 40:
+Now we search it. Click **Run LEM…** and choose **Method** =
+`Janbu (Corrected)` — the method both of this problem's references report their
+factor of safety in, so we can read our results directly against theirs — and
+**Analysis** = `Auto search`, with the slice count left at 40:
 
 ![The Run LEM dialog on the wall](images/lem09_studio_run_lem.png)
 
@@ -438,7 +440,7 @@ starting surface is not viable.
 
 ### Why not a circle?
 
-The wedge family is a modeling choice, and it can be tested. Open **Circles**
+The wedge family is a modeling choice, and we can test it. Open **Circles**
 and click **Generate starting circles…** to give the search one circular seed —
 the model now holds both surface families, so **Surface** in the Run dialog
 becomes a choice — and run the same Janbu auto search on `Circular`:
@@ -449,15 +451,15 @@ The best circle bottoms out deep and climbs back to the crest break, because a
 circle cannot run flat along a plane. It reads **FS = 1.473, 3% above the
 wedge's 1.431**, and the other methods agree: Spencer 1.473 against 1.412, and
 Bishop — which joins the list because a circle restores its moment arm — 1.487.
-Searched only in circles, this wall would look 3 to 4% safer than it is; the
-non-circular surface is not a nicety, it is the mechanism.
+Searched only in circles, this wall would look 3 to 4% safer than it is, and the
+non-circular family is what carries its real mechanism.
 
 ### The wedge the reference manual gives
 
-The three points entered are a specified surface from the manual this problem
-comes from, and evaluating it is a **single-surface run — no search, the surface
-exactly as typed**. Set **Analysis** to `Single surface` and raise the slice count
-to 60:
+The three points we entered are a specified surface from the manual this problem
+comes from, and we evaluate it with a **single-surface run — no search, the
+surface exactly as typed**. Set **Analysis** to `Single surface` and raise the
+slice count to 60:
 
 ![Janbu on the manual's wedge](images/lem09_solution_wedge.png){width=1000}
 
@@ -472,8 +474,8 @@ candidate, not an answer, which is why the search comes first.
 
 ### What the tiebacks are worth
 
-Take both anchors out and search the same wall again — same soils, same pile, same
-starting points, a separate search with its own critical surface:
+Now we take both anchors out and search the same wall again — same soils, same
+pile, same starting points, a separate search with its own critical surface:
 
 ![Janbu on the wall with no tiebacks](images/lem09_solution_bare.png){width=1000}
 
@@ -482,8 +484,8 @@ anchors, not just the number: without them the critical surface exits at
 (41.77, 57.22) on the cut slope, 13 ft closer to the wall, and cuts 87,264 lb/ft
 of soil against 119,150.
 
-Removing supports one at a time separates the two contributions, each answer on
-its own searched surface:
+Removing the supports one at a time separates the two contributions, each answer
+on its own searched surface:
 
 | Support present | Janbu FS |
 | --- | :---: |
@@ -510,9 +512,9 @@ evaluated on the circle its source prints for it:
 | `vp085a` | Active | 1.567 |
 | `vp085b` | Passive | 1.319 |
 
-Those two answers sit on two different circles, so isolating the setting means
-holding the surface still. On vp085a's circle — **one surface, no search, Bishop,
-only Appl changing** — active reads 1.567 and passive 1.331, against 0.914 with no
+Those two answers sit on two different circles, so to isolate the setting we hold
+the surface still. On the vp085a circle — **one surface, no search, Bishop, only
+Appl changing** — active reads 1.567 and passive 1.331, against 0.914 with no
 anchor at all. Passive delivers about six-tenths of what active is worth here, and
 that fraction is not a constant, since the divisor is the factor of safety being
 solved for. Neither convention is a correction of the other, which is why the Type
@@ -535,9 +537,9 @@ This tutorial covered:
 - The wall searched with and without its support, and the active/passive
   application difference measured on one held surface.
 
-**Where to go next:** [LEM-10](lem10_global_minimum.md) searches a section that
-holds two competing mechanisms, where the surface a search returns depends on the
-circle it started from. The [tutorials index](index.md) lists the series.
+**Where to go next:** in [LEM-10](lem10_global_minimum.md) we search a section
+that holds two competing mechanisms, where the surface a search returns depends
+on the circle it started from. The [tutorials index](index.md) lists the series.
 [VP49](../verification/rocscience.md#vp49) catalogs this model against the
 published solutions it comes from, [Soil Reinforcement in LEM](../lem/reinforcement.md)
 derives the capacity envelope and the per-method equations the anchor force enters,

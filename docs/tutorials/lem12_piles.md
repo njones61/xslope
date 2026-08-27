@@ -13,9 +13,9 @@ in the model. XSLOPE computes it instead — the lateral force the soil can
 push onto each pile, from the pile diameter and the center-to-center
 spacing, by the Ito & Matsui (1975) method — and recomputes it for every
 trial surface the search tries. This is the second of
-the two ways XSLOPE models a pile: the tieback wall tutorial
-([LEM-9](lem09_tieback_wall.md)) entered its soldier pile the other way,
-with the force stated directly, and this page compares the two routes.
+the two ways XSLOPE models a pile: in the tieback wall tutorial
+([LEM-9](lem09_tieback_wall.md)) we entered the soldier pile the other way,
+with the force stated directly, and here we compare the two routes.
 
 ![A 20 ft slope stabilized by two rows of piles](images/lem12_problem_sketch.png){width=1000}
 
@@ -37,7 +37,7 @@ it, and how to check for the shallow surface that bypasses the row.
 
 ## The slope
 
-The slope itself is kept simple so that everything interesting on this page
+We keep the slope itself simple so that everything interesting on this page
 comes from the piles. It is a single soil — a medium-stiff clay with γ = 120 pcf,
 c = 200 psf, and φ = 20° — over a rigid
 base 10 ft below the toe. The face rises 20 ft at 1:1 from (0, 0) to (20, 20),
@@ -55,21 +55,21 @@ elevation 5.
 
 ### Opening the model
 
-Download [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx) and open it in
+We download [xslope_piles.xlsx](../lem/files/xslope_piles.xlsx) and open it in
 Studio — **File → Open**. The Inputs plot draws the section, the starting circle
 the file carries, and the two pile rows as green bars:
 
 ![The loaded model](images/lem12_inputs.png){width=1000}
 
 The piles carry no force label, because on this model the force is not an input.
-Where a pile states its own force — the soldier pile of
+Where a pile states its own force — as the soldier pile in
 [LEM-9](lem09_tieback_wall.md#running-the-analysis) does — the Inputs plot prints
 it beside the bar.
 
 ### The pile rows
 
 Everything XSLOPE needs to know about the two pile rows sits in two rows of
-the piles sheet. Read them closely before running anything. Open
+the piles sheet, and we read them closely before running anything. Open
 **Piles** in the **Inputs** tree and press **Table view**. Its columns match
 the piles worksheet; with **Show parameters for:** set to **LEM**, the
 columns only the finite element engine reads (`E`, `I`, `Area`, `Head`, `Tip`)
@@ -119,9 +119,9 @@ per-shaft units in their labels: **Vcap (per element, lb)** and
 
 ## Running the analysis
 
-With the inputs understood, run the search and see what the slope does
-with the pile rows in place. Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40:
+With the inputs understood, we run the search and see what the slope does
+with the pile rows in place. Click **Run LEM…** and choose **Method** = `Spencer`
+and **Analysis** = `Auto search`, with the slice count left at 40:
 
 ![The Run LEM dialog on the loaded model](images/lem12_studio_run_lem.png)
 
@@ -162,13 +162,13 @@ resistance mobilized at the slice base, per unit thickness* — placing
 **2,540.7** and **1,827.0 lb/ft** on the two slices the rows cross
 ([Analysis Report](../studio/reports.md)).
 
-Each piece of those Log lines gets its own section below: where the soil
-force comes from, and what "bending governs" means for the shafts.
+Below we take those Log lines apart: where the soil force comes from, and
+what "bending governs" means for the shafts.
 
 ### What the two rows are worth
 
 FS = 1.842 describes the reinforced slope, but it does not say what the
-piles contributed. Measuring that takes two comparisons: first the slope
+piles contributed. To measure that we make two comparisons: first the slope
 without any piles, then the same surface with each row removed in turn.
 
 Taking the piles out and searching the same slope again — same clay, same
@@ -184,9 +184,9 @@ factor of safety by 0.69, and they also change the failure mechanism: the surfac
 search settles on with them present is deeper, longer and three times the mass,
 because the shallower one now has two shafts across it.
 
-To separate the two rows' contributions, hold the surface still. On the
-critical circle from the search with both rows present — **one surface, no search, only which piles are present
-changing** — each row can be removed on its own:
+To separate the two rows' contributions, we hold the surface still. On the
+critical circle from the search with both rows present — **one surface, no
+search, only which piles are present changing** — we remove each row on its own:
 
 | Piles present | Spencer FS |
 | --- | :---: |
@@ -203,11 +203,9 @@ where the base is flatter and the force resolves more directly against sliding.
 
 ## How the force is computed
 
-The console log and the report say what the piles delivered. This section
-explains where those
-numbers come from, because understanding the calculation is what makes the
-rest of the page — the capacity limits, the spacing study — predictable
-rather than mysterious.
+The console log and the report say what the piles delivered. Where those
+numbers come from is what makes the rest of the page — the capacity limits,
+the spacing study — predictable rather than mysterious.
 
 Ito & Matsui treat the soil between two adjacent piles as squeezing plastically
 through the gap between them, and derive from Mohr-Coulomb plasticity the lateral
@@ -240,7 +238,7 @@ model's S/D = 3 sits in the middle of that band.
 These are the forces the soil can deliver, not the forces the run applied.
 The Log lines show 2,540.7 and 1,827.0 lb/ft — a fraction of the 7,363.0
 and 13,621.5 computed above. The difference is the structural capacity of
-the shafts, which the next section covers.
+the shafts, which we take up next.
 
 ---
 
@@ -272,7 +270,7 @@ hardest on — ends up delivering *less* than the shallower one, because its
 pressure centroid sits further above the failure surface and the same moment
 capacity buys a smaller force at a longer arm.
 
-To see how much the caps matter, remove them. This too is a **single-surface
+To see how much the caps matter, we remove them. This too is a **single-surface
 run on the search's own critical circle, with only the two capacity cells
 changing**:
 
@@ -344,8 +342,8 @@ the applicable band. The top row, at S/D = 1.5, is below it: that close, the
 row acts more like a continuous wall than a line of piles soil can flow
 between. (A wall itself is modeled the other way — a pile line with its
 resistance stated directly per foot of wall, from the wall's structural
-capacity, the way the soldier-pile wall of
-[LEM-9](lem09_tieback_wall.md#the-problem) enters its 5,900 lb/ft — because
+capacity, the way we entered the 5,900 lb/ft of the soldier-pile wall in
+[LEM-9](lem09_tieback_wall.md#the-problem) — because
 a wall has no gaps for the soil to arch across.) The bottom row sits at the band's upper edge, S/D = 8; spaced any
 wider, the arching the theory is built on fades away and the computed force
 overestimates what the row can develop. XSLOPE says so before the run: enter
@@ -378,14 +376,14 @@ Slide2 and against the paper.
 ## Giving the force yourself
 
 Everything so far has used the computed path. The other way to enter a pile
-is to state its force outright, as
-[LEM-9's soldier pile](lem09_tieback_wall.md#the-problem) does — a number from
+is to state its force outright, as we did for the soldier pile in
+[LEM-9](lem09_tieback_wall.md#the-problem) — a number from
 a p-y analysis (a lateral load–deflection model of the shaft), a structural
 check or a published chart, entered per foot of slope.
 Typing one into **H** turns the Ito & Matsui calculation off for that row; nothing
 else changes.
 
-A natural test is to enter the forces the automatic run computed — the
+As a test we enter the forces the automatic run computed — the
 two values the report printed:
 
 | H |
@@ -451,8 +449,9 @@ everywhere it should? Every search so far started from the circle on the
 sheet, and that circle
 reaches the rigid base. **Grid search (auto-seed the circular search)** ignores
 the circles sheet and sweeps a grid of centers against a range of tangent
-elevations instead ([LEM-10](lem10_global_minimum.md#grid-search) is where that
-tool is built). Back in **Run LEM…**, tick it and leave everything else:
+elevations instead (we build that tool in
+[LEM-10](lem10_global_minimum.md#grid-search)). Back in **Run LEM…**, tick it
+and leave everything else:
 
 ![The Run LEM dialog with grid search on](images/lem12_studio_run_lem_grid.png)
 
@@ -507,7 +506,8 @@ This tutorial covered:
 the capacity checks and the per-unit-width convention;
 [Sample Problem 10](../lem/samples.md#10-slope-stabilized-with-piles) catalogs
 this model with its factor of safety by every method;
-[LEM-9](lem09_tieback_wall.md) enters a pile with its force stated, beside the
-tieback anchors it carries; and [VP106](../verification/rocscience.md#vp106) and
+in [LEM-9](lem09_tieback_wall.md) we enter a pile with its force stated, beside
+the tieback anchors it carries; and
+[VP106](../verification/rocscience.md#vp106) and
 [VP54](../verification/rocscience.md#vp54) check the computed and stated routes
 against published solutions.

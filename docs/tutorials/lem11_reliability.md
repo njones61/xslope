@@ -14,9 +14,9 @@ Nor does the scatter have to be measured on site — typical uncertainties for
 the properties of each soil type are well documented
 ([Parameter Uncertainty](../reliability/index.md#parameter-uncertainty)
 tabulates them), so a defensible standard deviation can be assigned from
-published values without a large testing program. Entering a standard deviation beside each value brings that second piece of
-information into the analysis, which carries it through the
-computation — and the answer comes back correspondingly richer: a distribution
+published values without a large testing program. Entering a standard deviation
+beside each value brings that second piece of information into the analysis, and
+the answer comes back correspondingly richer: a distribution
 of factors of safety, summarized by a **probability of failure** and a
 **reliability index** rather than by one number.
 [Reliability Analysis](../reliability/index.md) gives the theory behind both.
@@ -28,7 +28,7 @@ another at the same value — while "one chance in six, and the retrofit takes
 it to one in a hundred" is a statement a decision can rest on, and one that
 can be weighed against cost and consequence.
 
-This page's slope — 30 ft of undrained clay standing under 40 ft of water —
+The slope on this page — 30 ft of undrained clay standing under 40 ft of water —
 makes the difference concrete. The deterministic answer is FS = 1.354; the
 stochastic answer is that the slope has roughly one chance in six of failing.
 **The factor of safety does not change; what changes is what is known about
@@ -64,8 +64,8 @@ entered once, as a flat piezometric line at elevation 40, and the model's
 water above the ground into the surface loads it is. The clay's **u** stays
 `none`, because a total-stress φ = 0 analysis carries no pore pressures on its
 slice bases — here the line defines the reservoir, not a pore-pressure field.
-[LEM-4](lem04_water_in_the_slope.md) covers the pore-pressure inputs this model
-deliberately does without.
+In [LEM-4](lem04_water_in_the_slope.md) we cover the pore-pressure inputs this
+model deliberately does without.
 
 What makes the slope a reliability problem is two extra pieces of data: a
 standard deviation of 8 pcf on the unit weight and 100 psf on the cohesion —
@@ -74,7 +74,7 @@ model would leave blank.
 
 ### Opening the model
 
-Download
+We download
 [xslope_reliability.xlsx](../lem/files/xslope_reliability.xlsx)
 and open it in Studio — **File → Open**. The Inputs plot draws the section, the
 starting circle the file carries, the piezometric line at elevation 40 with the
@@ -116,8 +116,9 @@ high and a low estimate rather than from a data set.
 
 ## The deterministic run
 
-Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40:
+We start with the ordinary deterministic answer. Click **Run LEM…** and choose
+**Method** = `Spencer` and **Analysis** = `Auto search`, with the slice count
+left at 40:
 
 ![The Run LEM dialog on the loaded model](images/lem11_studio_run_lem.png)
 
@@ -127,8 +128,8 @@ Click **Run**. The search deepens the file's circle onto the base of the model:
 
 **FS = 1.354**, on a circle centered at (23.14, 47.36), tangent to the rigid base
 at elevation −20, 141.27 ft of failure surface carrying 370,624 lb/ft of clay.
-This is the answer every deterministic analysis in the previous ten tutorials
-would stop at, and it is the number the rest of this page is about: not whether
+This is where every deterministic analysis in the previous ten tutorials would
+stop, and it is the number the rest of this page is about: not whether
 1.354 is right, but how much of it is real.
 
 ---
@@ -147,8 +148,8 @@ rest of this page is built on. It takes two
 shortcuts to get there: it treats the factor of safety as changing in a
 straight line with each parameter over that range, and it assumes the shape
 of the FS distribution instead of observing it. Whether either shortcut
-matters on this slope is exactly what the Monte Carlo section answers, by
-solving the same problem with no shortcuts at all.
+matters on this slope is what we settle later with Monte Carlo, solving the
+same problem with no shortcuts at all.
 
 **Reliability…** sits beside **Parametric…** on the **Run** menu and on the
 toolbar. Where a parametric sweep answers deterministic what-ifs, this one turns
@@ -225,14 +226,14 @@ approximation. One realization works like this:
 
 Because every value was drawn from its parameter's own probability
 distribution — likely values drawn often, unlikely ones rarely — **each
-realization is an equally probable version of the slope**. The objective is
-to explore an exhaustive set of these versions and determine what portion of
-them fail. The pile of ten thousand factors of safety *is* the answer: its
+realization is an equally probable version of the slope**. We explore an
+exhaustive set of these versions and count what portion of them fail. The
+pile of ten thousand factors of safety *is* the answer: its
 histogram is the distribution of FS, its mean and spread are read off
 directly, and the probability of failure is simply the fraction of versions
 that came back below FS = 1 — **counted, not inferred**.
 
-The contrast with the Taylor series is the whole lesson. TSPM solved the
+The Taylor series works the other way. TSPM solved the
 model five times at carefully chosen points (the MLV and ±σ probes), then
 *assumed* a shape for the answer to turn those five numbers into a
 probability — so its probability of failure is computed from an assumed
@@ -266,9 +267,9 @@ percentage point. A rarer failure needs more: at a P<sub>f</sub> of a couple
 percent, only a couple hundred realizations fail, and reaching the same
 precision takes several times more. Raising the count costs only time, and
 not much of it: the solves are heavily optimized, and this model's full
-ten-thousand-realization campaign finishes in about twenty seconds. The best habit is to tick the convergence stop
-described below and let the campaign decide when to stop — this field then
-becomes the upper limit.
+ten-thousand-realization campaign finishes in about twenty seconds. Ticking the
+convergence stop described below lets the campaign decide when to stop, and this
+field then becomes the upper limit.
 
 **MC seed** `20240117` starts the random-number generator. The value itself
 means nothing — any integer serves — but keeping it fixed means the same
@@ -283,8 +284,8 @@ few realizations — the fix is more samples, not a better seed.
 from the symmetric bell curve centered on the material's own value with the σ
 column as its spread — the same reading the Taylor series gives those
 columns. The alternative, `Lognormal`, is a skewed relative of the bell curve
-that can never produce a negative value, matched to the same mean and σ; it
-is worth considering when a σ is so large that the bell would spill past
+that can never produce a negative value, matched to the same mean and σ, which
+matters when a σ is so large that the bell would spill past
 zero. That is not the case here — the largest COV on this model is the
 cohesion's 25% — and either way every draw is cut off at zero, so a sample
 can never hand the solver a negative strength.
@@ -343,7 +344,7 @@ right about different things. F<sub>MLV</sub> is the factor of safety *at* the
 mean inputs; the Monte Carlo mean is the *mean of* the factors of safety, and
 the two differ whenever F does not change in a straight line with a
 parameter. The Taylor table above shows which parameter is responsible.
-Average each parameter's own F⁺ and F⁻ and compare against F<sub>MLV</sub>:
+We average each parameter's own F⁺ and F⁻ and compare against F<sub>MLV</sub>:
 if the response were a straight line, moving the parameter up and down by the
 same amount would move F by equal and opposite amounts, and the average would
 land back on F<sub>MLV</sub>. The cohesion's pair does exactly that — 1.354
@@ -356,7 +357,7 @@ draw.
 
 ### Trying random sampling
 
-The **MC sampling** control is one click to test. Set it to `Random` and
+We can test the **MC sampling** control with one click: set it to `Random` and
 **Run** again. The result is **P<sub>f</sub> = 16.71%**, with the mean and
 σ<sub>F</sub> nearly unchanged. That is the expected outcome: both runs
 estimate the same number, and both landed inside the ±0.7-point band that a
@@ -415,8 +416,8 @@ of the formula:
 Carlo's 16.42% and 0.988. The checks are reported with the answer: across the 500 checking solves the formula reproduced the
 real factor of safety with a typical error of 0.018 (R² = 0.998), and only
 1 of the 500 landed on the other side of FS = 1 from where the formula put
-it. In a fuller test run for this page, thirty thousand of the draws were
-re-solved with the real model: the formula's P<sub>f</sub> came out 0.07
+it. In a fuller test run for this page, we re-solved thirty thousand of the
+draws with the real model: the formula's P<sub>f</sub> came out 0.07
 percentage points low. The counting wobble is gone, and that small fit error
 is what remains. The
 [response-surface section](../reliability/monte_carlo.md#sampling-a-fitted-response-surface)
@@ -475,7 +476,7 @@ assumed distribution shape — free, but only as good as the assumption.
 The Taylor series put the spread of the factor of safety at
 σ<sub>F</sub> = 0.389. That spread comes from two sources — the uncertainty
 in the unit weight and the uncertainty in the cohesion — and they do not
-contribute equally. Knowing the split is worth money: it says which
+contribute equally. Knowing the split pays: it says which
 parameter another round of testing should chase.
 The **Parametric…** dialog computes the split: leave **Method** on `Spencer` and
 set **Plot type** to `Variance Pareto (σ)`, which is offered only for a model that
@@ -496,7 +497,7 @@ Each bar is that parameter's own (ΔF/2)² term as a share of σ<sub>F</sub>², 
 is the same arithmetic the Taylor series already did — the cohesion carries
 **75.8%** of the variance and the unit weight **24.2%**. Cohesion dominates
 because its uncertainty is wide, not because the slope is more sensitive to
-it. To see that, divide each ΔF by its own coefficient of variation: a 1%
+it. To see that, we divide each ΔF by its own coefficient of variation: a 1%
 change in γ moves the factor of safety by 0.057 (0.383 over 6.7%), while a 1%
 change in c moves it by only 0.027 (0.677 over 25%). Per percent of change,
 the unit weight is twice as powerful — but the cohesion is uncertain over an
@@ -527,13 +528,13 @@ Three quarters of the uncertainty in the answer traces to a single input:
 what controls the reliability — and it also means the computed
 P<sub>f</sub> leans hard on the σ(c) *estimate*, which is often one of the
 softest numbers in the model, assigned from the scatter of a few tests or
-from published ranges. Before trusting the answer, it is worth measuring
-how hard it leans. The next section does exactly that.
+from published ranges. Before trusting the answer, we measure how hard it
+leans.
 
 ### Halving σ(c)
 
 How much do the results depend on the value of σ(c)? The quickest way to
-find out is to change it and re-run. Set the spread to 50 instead of 100,
+find out is to change it and re-run: we set the spread to 50 instead of 100,
 leave the cohesion itself at 400 psf, and compare.
 
 Open **Materials**, select the clay, and change the **± σ** beside **c** from

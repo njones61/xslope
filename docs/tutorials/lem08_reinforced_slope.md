@@ -9,7 +9,7 @@ A 24 ft embankment of clean sand — c = 0, φ = 37° — standing at 1.25:1 und
 240 psf surcharge. Sand alone cannot stand that steep at those numbers; six
 layers of geogrid do, each 20 ft long, 4 ft apart vertically, developing 800
 lb/ft of tension. The face is wrapped in a 2 ft band of cohesive fill, and the
-bottom of the problem is 10 ft below the toe. The problem is Example 5 from the
+bottom of the model is 10 ft below the toe. This is Example 5 from the
 UTEXASED user manual, S. G. Wright's educational version of UTEXAS.
 
 ![A 24 ft sand embankment at 1.25:1 with a 2 ft cohesive band along the face, six geogrid layers 4 ft apart and 20 ft long developing their tension over 4 ft at each end, and a 240 psf surcharge across the crest](images/lem08_problem_sketch.png){width=1000}
@@ -381,8 +381,8 @@ The six gray lines step up the face. The
 purple arrows are the crest surcharge, and the two dashed red arcs are the
 starting circles.
 
-Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40:
+Now we search it. Click **Run LEM…** and choose **Method** = `Spencer` and
+**Analysis** = `Auto search`, with the slice count left at 40:
 
 ![The Run LEM dialog on the reinforced model](images/lem08_studio_run_lem.png)
 
@@ -429,7 +429,7 @@ Every crossing lands more than 8 ft from the nearer end of its line, twice the
 4 ft it takes to develop the full capacity, so pullout limits nothing here and
 all five deliver 800 lb/ft.
 
-To see the pullout lengths at work, solve this same circle as a **Single
+To see the pullout lengths at work, we solve this same circle as a **Single
 surface** run — no search, so changing `Lp1` and `Lp2` is the only thing that
 moves — at two other values. At `Lp1` = `Lp2` = 0, fully anchored, the answer
 stays **1.587**: anchorage had nothing to add. At 10 ft, a longer development
@@ -440,8 +440,8 @@ the factor of safety drops to **1.539**.
 Line 1 gives nothing at all. It runs from the toe at elevation 0, and the
 surface daylights at the toe and climbs away from it, so the whole line lies in
 the soil below the sliding mass. A layer the critical surface never crosses is
-not in the analysis — which is why the plotted lines are read against the
-plotted surface rather than by counting the rows in the sheet.
+not in the analysis — which is why we read the plotted lines against the
+plotted surface rather than counting rows in the sheet.
 
 ### What the other methods say
 
@@ -459,8 +459,8 @@ elevation −9.7, just above the base of the model.
 
 ### What the reinforcement is worth
 
-Take the six lines out and search the same section again — same soils, same
-surcharge, same starting circles, a separate search with its own critical
+Now we take the six lines out and search the same section again — same soils,
+same surcharge, same starting circles, a separate search with its own critical
 circle:
 
 ![Spencer on the unreinforced section](images/lem08_solution_bare.png){width=1000}
@@ -478,9 +478,9 @@ mechanism available, not from the missing tension.
 
 ### How long the lines have to be
 
-Re-cut all six layers to a different length and search again — the face end of
-each line held, the back end moved, so length is the only thing changing. Every
-length gets its own search and its own critical circle:
+Next we re-cut all six layers to a different length and search again — the face
+end of each line held, the back end moved, so length is the only thing changing.
+Every length gets its own search and its own critical circle:
 
 | Line length (ft) | FS | Tension mobilized (lb/ft) | Lines crossed |
 | :---: | :---: | :---: | :---: |
@@ -521,14 +521,14 @@ lengthening a geogrid changes the answer.
 
 ### What Dir and Appl change
 
-Both settings are per line, and both move this answer. Switch all six lines to
-`Axial` — the direction a nail or a tieback would use — and the search returns
-**1.606**: the horizontal geogrids now pull along their own axis rather than
-along the slip surface, which delivers less force down the slice bases but
-presses the mass onto them, and on a φ = 37° sand that trade is worth a little
-more than it costs. Switch instead to `Passive`, so the same 800 lb/ft is
-treated as an ultimate capacity divided by the factor of safety, and the search
-returns **1.453**. Neither is a correction to the other; they are two published
+Both settings are per line, and both move this answer. When we switch all six
+lines to `Axial` — the direction a nail or a tieback would use — the search
+returns **1.606**: the horizontal geogrids now pull along their own axis rather
+than along the slip surface, which delivers less force down the slice bases but
+presses the mass onto them, and on a φ = 37° sand that trade gains a little more
+than it costs. Switching instead to `Passive`, so the same 800 lb/ft is treated
+as an ultimate capacity divided by the factor of safety, the search returns
+**1.453**. Neither is a correction to the other; they are two published
 conventions, which is why the type presets set them together and the reference
 page states which support wants which.
 
@@ -550,14 +550,14 @@ This tutorial covered:
 - A length study finding where added embedment stops buying anything — once
   every crossing clears its pullout ramp, rupture capacity governs.
 
-**Where to go next:** [LEM-9](lem09_tieback_wall.md) is the other reinforced
-problem — a tieback wall, where the support is discrete and stiff rather than
-continuous and flexible, and the Type preset that describes it changes both **Dir**
-and **Appl**. [FEM-2](fem02_reinforcement.md) runs this same model through the
-finite element engine, where each line is meshed into bar elements that carry an
-axial stiffness and develop their force from the movement of the soil around
-them. The [tutorials index](index.md) lists the series, and the sample
-problems carry each page further.
+**Where to go next:** in [LEM-9](lem09_tieback_wall.md) we build the other
+reinforced problem — a tieback wall, where the support is discrete and stiff
+rather than continuous and flexible, and the Type preset that describes it
+changes both **Dir** and **Appl**. In [FEM-2](fem02_reinforcement.md) we run
+this same model through the finite element engine, where each line is meshed
+into bar elements that carry an axial stiffness and develop their force from the
+movement of the soil around them. The [tutorials index](index.md) lists the
+series, and the sample problems carry each page further.
 [Sample Problem 9](../lem/samples.md#9-reinforced-slope) catalogs this model
 alongside the published solution it comes from,
 [Soil Reinforcement in LEM](../lem/reinforcement.md) derives the capacity

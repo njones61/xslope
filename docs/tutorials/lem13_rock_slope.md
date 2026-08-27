@@ -10,7 +10,7 @@ cut at 45° in a mass so heavily jointed that its strength is a small fraction o
 the intact rock's, taken through Spencer's method and then through finite element
 strength reduction on the same file — and read once more with its intact strength
 typed in the megapascals the literature quotes rather than the kilopascals the
-model works in. Part B sweeps the two inputs that are judgments rather than
+model works in. In Part B we sweep the two inputs that are judgments rather than
 measurements, to see which of the four the answer turns on. **A rock mass gets its
 strength from a curve, and the four numbers that curve is built from are field
 observations, not laboratory constants.**
@@ -100,7 +100,7 @@ carries Balmer's equations and the closed form for the tangent.
 
 ### Opening the model
 
-Download [xslope_rock_slope.xlsx](files/xslope_rock_slope.xlsx) and open it in
+We download [xslope_rock_slope.xlsx](files/xslope_rock_slope.xlsx) and open it in
 Studio — **File → Open**. The Inputs plot draws the section: one profile line, the
 hatched maximum depth at elevation 0, and the starting circle the file carries.
 
@@ -141,9 +141,8 @@ straight line that touches the curve there: cohesion c<sub>i</sub> = 15.8 kPa
 (the line's intercept) and friction angle φ<sub>i</sub> = 25.7° (its slope). Any
 other stress would give a different line — a slice at 20 kPa a steeper line with
 a smaller intercept, a slice at 70 kPa a flatter one with a larger intercept.
-Every slice is solved with its own line at its own base stress. The scale tells
-its own story: tens of kPa of shear strength from a rock whose intact strength is
-30,000.
+Every slice is solved with its own line at its own base stress. That leaves tens
+of kPa of shear strength on a rock whose intact strength is 30,000.
 The unconfined strength of the rock **mass**, σ<sub>ci</sub>·s<sup>a</sup>, is
 43.5 kPa at this GSI, about one part in 700 of the laboratory value; the jointing
 has removed almost all of it, and what the slope stands on instead is
@@ -151,8 +150,8 @@ confinement.
 
 ### Running the analysis
 
-The limit equilibrium answer comes first, because it is the reference the strength
-reduction run is read against. Click **Run LEM…** and choose **Method** =
+We take the limit equilibrium answer first, because it is the reference we read
+the strength reduction run against. Click **Run LEM…** and choose **Method** =
 `Spencer` and **Analysis** = `Auto search`, with the slice count left at 40:
 
 ![The Run LEM dialog on the loaded model](images/lem13_studio_run_lem.png)
@@ -160,9 +159,9 @@ reduction run is read against. Click **Run LEM…** and choose **Method** =
 **Model checks** reads *No problems found for this run*. Spencer's method solves
 for the inclination of the interslice forces rather than fixing it before it
 starts, which matters on a rock slope:
-[Part B](#a-friction-angle-steep-enough-to-stop-a-method) covers the two methods a
-Hoek-Brown envelope can defeat. Click **Run**. The search refines the file's circle
-onto a surface that exits at the toe:
+in [Part B](#a-friction-angle-steep-enough-to-stop-a-method) we cover the two
+methods a Hoek-Brown envelope can defeat. Click **Run**. The search refines the
+file's circle onto a surface that exits at the toe:
 
 ![Spencer's critical circle](images/lem13_spencer.png){width=1000}
 
@@ -199,8 +198,8 @@ of the analysis, one per slice, not an input to it.**
 
 ### The same file through strength reduction
 
-The second half of Part A solves this slope again, in the finite element engine,
-by reducing the strength until it will no longer stand. Hoek-Brown needs no
+Now we solve this slope again, in the finite element engine, by reducing the
+strength until it will no longer stand. Hoek-Brown needs no
 special handling there: the tangent is what gets divided by the trial factor, not
 σ<sub>ci</sub>. The two elastic properties the run needs, E = 5,000 MPa and
 ν = 0.3, are already on the materials table behind its **FEM** toggle. Switch the
@@ -224,8 +223,8 @@ Now click **Run → Run FEM…**
 
 **Model checks — 1 warning**, and **Run** is enabled. The warning names the blank
 tensile cutoff `t_cut`, which lets the rock carry tension up to its Mohr-Coulomb
-cone apex; [FEM-1](fem01_strength_reduction.md#running-the-strength-reduction)
-covers what that means and when to enter a cap. The dialog opens on **SSRM (find
+cone apex; in [FEM-1](fem01_strength_reduction.md#running-the-strength-reduction)
+we cover what that means and when to enter a cap. The dialog opens on **SSRM (find
 FS)** with the bracket the file declares, **F min (SSRM)** = 0.80 and **F max
 (SSRM)** = 1.60, a **Tolerance (SSRM)** of 0.0100, the iteration budget and ceiling
 at their own 12,000 and 50,000, **Rollers** on the sides, **K0 initial stress**
@@ -277,8 +276,8 @@ Four numbers describe this rock, and they are not four numbers of the same kind.
 σ<sub>ci</sub> comes off a core in a laboratory press, and m<sub>i</sub> is read
 from a table once the rock type is named. **GSI and D are judgments made standing
 at the outcrop** — how broken the mass looks, and how roughly it was excavated —
-and they are where the uncertainty in a rock slope actually lives. So the question
-this model can answer is which of them the factor of safety turns on.
+and they are where the uncertainty in a rock slope actually lives. So we ask
+which of them the factor of safety turns on.
 
 Studio answers it with a **Parametric study**, which re-solves the model across a
 range of one input. Any numeric material property can be swept, including the
@@ -300,14 +299,14 @@ ticked:
 
 ![The Parametric dialog set up for the GSI sweep](images/lem13_studio_parametric.png)
 
-GSI runs to 100, but the sweep stops at 20 on purpose. The factor of safety is
+GSI runs to 100, but we stop the sweep at 20 on purpose. The factor of safety is
 1.152 at GSI 5 and already 2.698 at GSI 20, and above that the rock cannot fail
 at all — a search over a slope with no critical surface to find wanders the whole
 domain before it settles, and each step takes many times longer than the ones
 below it.
 
 Click **Run**. Each step is a full circular search, so the sweep runs far longer
-than the single search Part A made:
+than the single search in Part A:
 
 ![Factor of safety against GSI](images/lem13_gsi_sweep.png){width=800}
 
@@ -382,10 +381,10 @@ excavated. Blast damage lowers m<sub>b</sub> and *s* the way a lower GSI does
 D = 1), and the factor of safety falls with them, 1.152 to 0.176.
 
 The two sweeps end differently. GSI reaches the 1.5 target inside its range, at
-8.6. D never does: the best face this rock can be given, D = 0, is the 1.152 Part
-A solved, and every value above that is worse. **A mass at GSI 5 will not stand a
-45° cut at a factor of safety of 1.5 however carefully it is excavated** — the
-rock has to be better, or the slope flatter.
+8.6. D never does: the best face this rock can be given, D = 0, is the 1.152 we
+solved in Part A, and every value above that is worse. **A mass at GSI 5 will
+not stand a 45° cut at a factor of safety of 1.5 however carefully it is
+excavated** — the rock has to be better, or the slope flatter.
 
 ### A friction angle steep enough to stop a method
 
@@ -409,7 +408,7 @@ whatever the constants happen to be:
 ![Corps of Engineers selected on the Hoek-Brown material](images/lem13_studio_run_lem_corps.png)
 
 Spencer's method and the Morgenstern-Price method solve for the inclination
-instead of fixing it, which is why this page runs Spencer throughout. Bishop's
+instead of fixing it, which is why we run Spencer throughout. Bishop's
 simplified method avoids the difficulty another way, by carrying no interslice
 shear at all. None of that bites on this rock: its instantaneous friction angle
 peaks at 36.9° and never approaches 55°, so Bishop, the Corps of Engineers method
@@ -417,7 +416,7 @@ and Lowe & Karafiath all converge on this section. The caution belongs to a
 competent rock mass, where a higher m<sub>i</sub> carries the envelope past that
 limit.
 
-The σ<sub>ci</sub> check from Part A fires here too: on any
+The σ<sub>ci</sub> check from Part A fires here too, on any
 σ<sub>ci</sub> below 1000 kPa, which includes models stated deliberately in
 normalized form — the Li, Merifield & Lyamin (2008) rock-slope charts hold
 σ<sub>ci</sub>/(γH) at a critical ratio and reach σ<sub>ci</sub> values of a few
@@ -433,7 +432,7 @@ This tutorial covered:
 
 - The four Hoek-Brown inputs — σ<sub>ci</sub>, GSI, m<sub>i</sub> and D — and the
   three rock-mass constants m<sub>b</sub>, *s* and *a* that XSLOPE derives from
-  them and the reader never enters.
+  them and we never enter.
 - The instantaneous tangent: a cohesion and a friction angle recomputed at every
   slice's own normal stress, as an output of the analysis rather than an input to
   it.
@@ -446,13 +445,13 @@ This tutorial covered:
   this size lives at the low confinement where *s* decides the answer.
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
-[LEM-11](lem11_reliability.md) turns the same kind of input uncertainty into a
-probability of failure instead of a sweep.
-[LEM-7](lem07_strength_envelopes.md) covers the other two nonlinear strength
+In [LEM-11](lem11_reliability.md) we turn the same kind of input uncertainty into
+a probability of failure instead of a sweep.
+In [LEM-7](lem07_strength_envelopes.md) we cover the other two nonlinear strength
 options — a power-curve envelope and an undrained strength that grows with depth —
 and the [Limit Equilibrium Method overview](../lem/overview.md#hoek-brown-strength)
 carries Balmer's transformation and the two cautions a rock slope raises: the
 methods that struggle against steep instantaneous friction angles, and the shallow
 crest mechanism a very weak rock mass invites.
-[FEM-1](fem01_strength_reduction.md) is strength reduction on its own, on an
-embankment.
+In [FEM-1](fem01_strength_reduction.md) we take strength reduction on its own, on
+an embankment.

@@ -42,12 +42,12 @@ factor of safety against sliding down the face, while the soft clay puts a
 second, deep mechanism underneath. The completed file carries the section as
 two profile lines with the maximum depth at the bottom of the clay, and one
 starting circle, centered above the face and reaching the bottom of the
-foundation. That circle is the one input this part changes.
+foundation. That circle is the one input we change here.
 
 ### Opening the model
 
-Download
-[xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) and open it
+We start by downloading
+[xslope_mult_min_KEY.xlsx](../lem/files/xslope_mult_min_KEY.xlsx) and opening it
 in Studio — **File → Open**. (It is an ordinary input workbook: the same file
 opens in Excel, one worksheet per input.) The Inputs plot draws what loaded:
 
@@ -61,8 +61,8 @@ is the starting circle, bottoming out on the hatched maximum depth at elevation
 
 ### Running the analysis
 
-Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
-`Auto search`, with the slice count left at 40:
+Now we run the search. Click **Run LEM…** and choose **Method** = `Spencer` and
+**Analysis** = `Auto search`, with the slice count left at 40:
 
 ![The Run LEM dialog on the loaded model](images/lem10_studio_run_lem.png)
 
@@ -79,11 +79,12 @@ The starting circle is a seed and not an answer — solved as entered it gives
 
 ### Move the seed and the answer moves
 
-[LEM-3's rule](lem03_layered_slope.md#guarding-against-local-minima) is one
+The rule from
+[LEM-3](lem03_layered_slope.md#guarding-against-local-minima) is one
 starting circle per layer, and this model's second layer has a mechanism of its
-own. Open **Circles** and replace the file's circle with one that belongs to
-the embankment — tangent to the top of the foundation instead of the bottom of
-the clay:
+own. So we open **Circles** and replace the file's circle with one that belongs
+to the embankment — tangent to the top of the foundation instead of the bottom
+of the clay:
 
 | Xo | Yo | Option | Depth |
 | :---: | :---: | --- | :---: |
@@ -133,7 +134,7 @@ reporting the answer.
 
 ### Which answer the model reports
 
-Run every circle in one search and it reports the lowest surface any seed
+If we run every circle in one search, it reports the lowest surface any seed
 reached — here, the 1.299 sliver. **Several starting circles, and agreement
 between them, is the check**; where they disagree, the surfaces decide, and the
 design number is the deep one.
@@ -153,7 +154,7 @@ that runs beneath it and daylights beyond.
 
 ### Opening the model
 
-Download
+We download
 [xslope_james_bay.xlsx](../lem/files/xslope_james_bay.xlsx) — the dyke's
 model, carrying a single starting circle an engineer might reasonably place:
 centered over the slope face, reaching mid-depth into the clays — and open it
@@ -181,9 +182,9 @@ is there to hold that mechanism.
 
 ### Grid search
 
-Now the seeding-independent tool. **Grid search (auto-seed the circular
-search)**, the checkbox beside the surficial filter, sweeps a grid of circle
-centers against a range of tangent elevations before refining, instead of
+Now we bring in the seeding-independent tool. **Grid search (auto-seed the
+circular search)**, the checkbox beside the surficial filter, sweeps a grid of
+circle centers against a range of tangent elevations before refining, instead of
 refining only the neighborhood of the circles on the sheet. Back in
 **Run LEM…**, tick it — the grid ignores the circles sheet entirely, so it
 does not matter what is seeded:
@@ -199,8 +200,8 @@ it — 23% below the single seed's answer, against Slide's 1.464 and Duncan &
 Wright's published 1.45. The wrongly seeded search missed by far more than the
 programs and the textbook differ among themselves, and it reported nothing
 unusual. The full **Generate starting circles…** set also finds 1.420 with the
-2 m filter on — the deep member of the per-layer family reaches it, which is
-[LEM-3's rule](lem03_layered_slope.md#guarding-against-local-minima) doing its
+2 m filter on — the deep member of the per-layer family reaches it, which is the
+[LEM-3](lem03_layered_slope.md#guarding-against-local-minima) rule doing its
 job. Grid search is the version of that rule that does not depend on any
 circle having been placed at all.
 
@@ -223,5 +224,5 @@ This tutorial covered:
 
 **Where to go next:** the [tutorials index](index.md) lists the series.
 [Sample Problem 13](../lem/samples.md#13-multiple-local-minima) catalogs this
-model, [LEM-3](lem03_layered_slope.md) is where the per-layer starting-circle rule
-is built, and [Automated Search](../lem/search.md) documents the search itself.
+model, in [LEM-3](lem03_layered_slope.md) we build the per-layer starting-circle
+rule, and [Automated Search](../lem/search.md) documents the search itself.

@@ -34,15 +34,10 @@ one march side by side.
 <div class="tgt-tile"><span class="tg-label">Open &amp; run</span><p>~45 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Learn what a factor-of-safety-versus-time curve is and what it
-adds to a single analysis; how a transient seepage field reaches a stability run
-one instant at a time, and where that instant is chosen; how to place one
-starting circle per face so a curve that spans a full reservoir and an empty one
-can report either, and how to read which face governs at each instant; how the
-saved times set the curve's resolution and how to choose them; how to read the
-curve's minimum against the drawdown that caused it; and how to run a three-stage
-rapid drawdown at every instant of a march and compare that curve against the
-drained one.
+**Objectives** — Learn how to run a stability analysis against every saved
+instant of a transient seepage march, choose the saved times and the starting
+circles so the curve means something, read which face governs and when, and
+repeat the run as a rapid drawdown at each instant for a dam with a clay core.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">three materials</span><span class="tg-pill">transient seepage</span><span class="tg-pill">u = seep</span><span class="tg-pill">saved frames</span><span class="tg-pill">seepage time</span><span class="tg-pill">FS vs time</span><span class="tg-pill">rapid drawdown</span><span class="tg-pill">three-stage procedure</span><span class="tg-pill">Kc = 1 envelope</span><span class="tg-pill">d and ψ</span><span class="tg-pill">stage times</span><span class="tg-pill">Spencer</span><span class="tg-pill">circular search</span><span class="tg-pill">starting circles</span><span class="tg-pill">minimum slip depth</span><span class="tg-pill">automatic water loads</span></p>
 <div class="tgm-model" markdown>

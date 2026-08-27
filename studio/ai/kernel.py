@@ -21,6 +21,85 @@ from io import StringIO
 # auto-save its open figures (which would show the same plot twice).
 _FIG_EXTS = (".png", ".pdf", ".svg", ".jpg", ".jpeg")
 
+#: Parsed corpus index, built once per process (the JSON is ~650 KB).
+_CORPUS_CACHE = None
+
+
+def _repo_root():
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _corpus_rows():
+    """``(topics, rows)`` for the verification corpus.
+
+    ``topics`` maps a topic key to its display label; ``rows`` is one dict per
+    cited page — ``{topic, label, title, url}``.
+
+    Two sources, because two installs. A repo checkout has the generated index
+    (``docs/verification/corpus_index.json``, the authoritative one). A pip install
+    has no docs/ tree, but it does ship the Claude Code skill, whose corpus-index
+    block is the same table already rendered — so the same rows are recovered from
+    it rather than shipping a second 650 KB copy of the JSON that would then need a
+    sync check to stay honest.
+    """
+    global _CORPUS_CACHE
+    if _CORPUS_CACHE is None:
+        _CORPUS_CACHE = _corpus_from_json() or _corpus_from_skill() or ({}, [])
+    return _CORPUS_CACHE
+
+
+def _corpus_from_json():
+    import json
+    path = os.path.join(_repo_root(), "docs", "verification", "corpus_index.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception:
+        return None
+    labels = data.get("topic_labels") or {}
+    counts = (data.get("stats") or {}).get("topics") or {}
+    topics = {k: f"{labels.get(k, k)} ({counts.get(k, 0)} models)" for k in labels}
+    rows = []
+    for entry in data.get("models") or []:
+        for topic in entry.get("topics") or []:
+            for ref in entry.get("references") or []:
+                if ref.get("url"):
+                    rows.append({"topic": topic, "label": labels.get(topic, topic),
+                                 "title": ref.get("title", ""), "url": ref["url"]})
+    return (topics, rows) if rows else None
+
+
+def _corpus_from_skill():
+    """The same rows out of the rendered table in the shipped skill (pip install)."""
+    import re
+    text = ""
+    try:
+        from importlib import resources
+        text = (resources.files("xslope") / "resources" / "xslope_skill.md").read_text(
+            encoding="utf-8")
+    except Exception:
+        return None
+    block = re.search(r"<!-- corpus-index:begin -->(.*?)<!-- corpus-index:end -->",
+                      text, re.S)
+    if not block:
+        return None
+    topics, rows = {}, []
+    for line in block.group(1).splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) != 2 or not cells[0] or set(cells[0]) <= set(":-"):
+            continue
+        label = cells[0]
+        if label.lower() == "topic":
+            continue
+        key = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
+        links = re.findall(r"\[([^\]]+)\]\((https?://[^)]+)\)", cells[1])
+        if not links:
+            continue
+        topics[key] = label
+        rows += [{"topic": key, "label": label, "title": t, "url": u}
+                 for t, u in links]
+    return (topics, rows) if rows else None
+
 
 class PythonKernel:
     def __init__(self, doc, window=None):
@@ -67,8 +146,13 @@ class PythonKernel:
         """Convenience functions seeded into the namespace so the model doesn't
         have to reconstruct the engine pipeline (a common failure mode). Seeded:
 
-        - ``run_lem(method='bishop', ...)`` — one single-surface LEM solve on the
-          loaded surface; returns the result dict, shows the solution plot.
+        - ``run_lem(method='bishop', search=False, ...)`` — one LEM solve; returns
+          the result dict and shows the solution plot. ``search=True`` searches for
+          the CRITICAL surface for that method (Studio's Run LEM default, and what
+          "the factor of safety of this model" means); ``search=False`` solves the
+          surface the model already defines.
+        - ``corpus_index(query=None)`` — verification-corpus rows matching a topic
+          or phrase, so a citation is looked up rather than remembered.
         - ``run_seep(bc=1, ...)`` — one steady seepage solve; builds the mesh from
           the file's declared settings if there is none, attaches the solved field
           to the model and the bundle to the session, shows the solution plot.
@@ -143,17 +227,26 @@ class PythonKernel:
             return sd.get("ground_surface")
 
         def run_lem(method="bishop", num_slices=40, rapid=False, plot=True,
-                    slope_data=None):
-            """Run a single-surface LEM analysis on the loaded project's failure
-            surface and return the result dict (includes 'FS'). `method` is one of
-            oms, bishop, janbu, spencer, corps, lowe, mprice. Shows the solution
-            plot when plot=True (pass plot=False in sweeps to avoid many figures).
-            Rebuilds derived geometry first, so edits to profile_lines/polygons
-            this snippet made are reflected."""
+                    slope_data=None, search=False):
+            """Run an LEM analysis on the loaded project and return the result dict
+            (includes 'FS'). `method` is one of oms, bishop, janbu, spencer, corps,
+            lowe, mprice. Shows the solution plot when plot=True (pass plot=False in
+            sweeps to avoid many figures). Rebuilds derived geometry first, so edits
+            to profile_lines/polygons this snippet made are reflected.
+
+            `search=True` runs the automated search for the CRITICAL surface for
+            this method — what Studio's Run LEM does by default, and what "the
+            factor of safety of this model" means. Each method searches for itself,
+            so two methods legitimately settle on two surfaces. `search=False`
+            (default) solves only the surface the model already defines, which is
+            the right call inside a sweep or when the user named that surface.
+            """
             from xslope.slice import generate_slices
             from xslope.solve import solve_selected
             sd = doc.slope_data if slope_data is None else slope_data
             resync_geometry(sd)        # reflect any in-snippet geometry edits
+            if search:
+                return _run_lem_search(sd, method, num_slices, rapid, plot)
             circle = (sd["circles"][0] if sd.get("circular") and sd.get("circles")
                       else None)
             non_circ = sd.get("non_circ") or None
@@ -173,6 +266,54 @@ class PythonKernel:
                 from xslope.plot import plot_solution
                 import matplotlib.pyplot as plt
                 plot_solution(sd, slice_df, surface, result,
+                              fig=plt.figure(figsize=(11, 6)))
+            return result
+
+        def _run_lem_search(sd, method, num_slices, rapid, plot):
+            """`run_lem(search=True)` — the critical surface for this method.
+
+            :func:`xslope.search.run_lem_analysis` is the same entry point Studio's
+            Run LEM dialog drives, so the assistant's answer and the app's answer
+            are the same run. Its per-iteration progress is captured rather than
+            printed: a converging search writes a dozen lines the model has to read
+            back as tokens, and only the last of them is the answer. What the search
+            reports about ITSELF — unsolved trials, admissibility notes — is kept,
+            because those are findings about the model.
+            """
+            import contextlib
+            import io as _io
+            from xslope.search import run_lem_analysis
+
+            family = ("circular" if (sd.get("circular", True) and sd.get("circles"))
+                      else "noncircular")
+            with contextlib.redirect_stdout(_io.StringIO()):
+                bundle = run_lem_analysis(sd, method, analysis="auto_search",
+                                          surface=family, num_slices=num_slices,
+                                          rapid=rapid, announce=False)
+            result = bundle.get("results")
+            if not isinstance(result, dict):
+                raise RuntimeError("The search found no solvable surface: %s"
+                                   % (bundle.get("failure") or "no solution"))
+            surf = bundle.get("failure_surface")
+            info = bundle.get("search") or {}
+            where = ""
+            cache = info.get("fs_cache") or []
+            if family == "circular" and cache:
+                best = cache[0]
+                xo, yo, depth = best.get("Xo"), best.get("Yo"), best.get("Depth")
+                if xo is not None and yo is not None and depth is not None:
+                    where = (f" on the circle Xo={float(xo):.2f}, Yo={float(yo):.2f},"
+                             f" R={float(yo) - float(depth):.2f}")
+            print(f"{method} (auto search, {family}): FS = {result['FS']:.3f}{where}")
+            unsolved = info.get("unsolved") or {}
+            if unsolved.get("sentence"):
+                print("  " + unsolved["sentence"])
+            for note in (result.get("warnings") or []):
+                print(f"  admissibility: {note}")
+            if plot:
+                from xslope.plot import plot_solution
+                import matplotlib.pyplot as plt
+                plot_solution(sd, bundle["slice_df"], surf, result,
                               fig=plt.figure(figsize=(11, 6)))
             return result
 
@@ -970,7 +1111,55 @@ class PythonKernel:
                 return reliability_rs(method=method, **kwargs)
             return reliability_taylor(method=method, **kwargs)
 
+        def corpus_index(query=None, limit=10):
+            """Worked examples from the verification corpus, matching `query`.
+
+            The corpus is 300-odd solved models, each carrying a published
+            comparison against the source or the vendor program — the pages to cite
+            when a question matches a topic. The whole table is far too big to sit
+            in a system prompt on every completion, so it is asked for instead:
+            `corpus_index('rapid drawdown')` returns the matching rows as
+            `[{'topic', 'title', 'url'}]` (also printed), and `corpus_index()` with
+            no query lists the topics.
+
+            Matching is on topic key, topic label, and title, so a plain-English
+            phrase works. `limit` caps the rows so a broad query cannot flood the
+            conversation.
+            """
+            topics, all_rows = _corpus_rows()
+            if not all_rows:
+                print("The verification corpus index is not available in this "
+                      "install; the pages are at "
+                      "https://xslope.readthedocs.io/en/latest/verification/")
+                return []
+            if not query:
+                print("Corpus topics (pass one to corpus_index):")
+                for key in sorted(topics):
+                    print(f"  {key:22s} {topics[key]}")
+                return sorted(topics)
+            words = [w for w in str(query).lower().split() if len(w) > 2]
+            rows, seen = [], set()
+            for row in all_rows:
+                text = f"{row['topic']} {row['label']} {row['title']}".lower()
+                if not all(w in text for w in words):
+                    continue
+                if row["url"] in seen:
+                    continue
+                seen.add(row["url"])
+                rows.append({"topic": row["topic"], "title": row["title"],
+                             "url": row["url"]})
+                if len(rows) >= int(limit):
+                    break
+            if not rows:
+                print(f"No corpus entry matches {query!r}. Try a topic from "
+                      "corpus_index().")
+                return []
+            for r in rows:
+                print(f"- {r['title']}  [{r['topic']}]\n  {r['url']}")
+            return rows
+
         return {"run_lem": run_lem, "run_seep": run_seep, "run_fem": run_fem,
+                "corpus_index": corpus_index,
                 "suggest_elastic": suggest_elastic,
                 "generate_report": generate_report,
                 "resync_geometry": resync_geometry,

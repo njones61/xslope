@@ -283,13 +283,13 @@ IRON_ANCHORS = (
 def _prompts():
     """The system prompt as each tier assembles it: with the skill, and without."""
     from studio.ai.assistant import (MODELING_BRIEF, SCHEMA_BRIEF, STUDIO_SYSTEM,
-                                     _load_skill_text)
-    skill = _load_skill_text()
-    if not skill:
-        raise AssertionError("the skill body could not be loaded")
-    with_skill = STUDIO_SYSTEM + skill + SCHEMA_BRIEF
+                                     _load_brief_text)
+    brief = _load_brief_text()
+    if not brief:
+        raise AssertionError("the Studio brief could not be loaded")
+    with_brief = STUDIO_SYSTEM + brief + SCHEMA_BRIEF
     without = STUDIO_SYSTEM + SCHEMA_BRIEF + MODELING_BRIEF
-    return {"skill": with_skill, "compact": without}
+    return {"brief": with_brief, "compact": without}
 
 
 def check_iron_rules_once():
@@ -316,11 +316,11 @@ def check_assembled_prompt_is_the_real_one():
     """
     out = []
     mw, asst = _session()
-    for provider, model, tier in (("anthropic", "claude-opus-5", "skill"),
+    for provider, model, tier in (("anthropic", "claude-opus-5", "brief"),
                                   ("ollama", "llama3.1", "compact")):
         asst.config.set_selection(provider, model)
         want_skill = asst.config.wants_skill()
-        if want_skill != (tier == "skill"):
+        if want_skill != (tier == "brief"):
             out.append(f"{provider}: wants_skill={want_skill}, expected "
                        f"{tier == 'skill'}")
         prompt = asst._system()
@@ -1236,7 +1236,8 @@ def check_mutation_disables_the_checks():
 #: the prompt taught it, gets a NameError, and reconstructs the pipeline by hand
 #: — which is the failure the helpers exist to prevent.
 HELPERS = {
-    "run_lem": ("method", "num_slices", "plot", "slope_data"),
+    "run_lem": ("method", "num_slices", "plot", "slope_data", "search"),
+    "corpus_index": ("query",),
     "run_seep": ("bc", "tol", "max_iter", "plot", "slope_data"),
     "run_fem": ("analysis", "F", "F_min", "F_max", "tolerance", "plot",
                 "slope_data"),
@@ -1260,7 +1261,7 @@ def check_helpers_are_callable():
     """Every helper the prompt names is in the namespace a snippet runs in, takes
     the arguments the prompt gives it, and is described where the model reads."""
     import inspect
-    from studio.ai.assistant import SCHEMA_BRIEF, STUDIO_SYSTEM
+    from studio.ai.assistant import SCHEMA_BRIEF, STUDIO_SYSTEM, _load_brief_text
     out = []
     mw, asst = _session()
     kernel = asst._kernel
@@ -1275,8 +1276,8 @@ def check_helpers_are_callable():
         for arg in args:
             if arg not in params:
                 out.append(f"{name}() takes no {arg!r} argument")
-    prompt = STUDIO_SYSTEM + SCHEMA_BRIEF
-    for name in ("run_seep", "run_fem", "suggest_elastic", "generate_report"):
+    prompt = STUDIO_SYSTEM + SCHEMA_BRIEF + (_load_brief_text() or "")
+    for name in HELPERS:
         if name not in prompt:
             out.append(f"{name}() is never mentioned to the model")
     mw.deleteLater()
@@ -1427,6 +1428,176 @@ def check_usage_accumulates():
     return out
 
 
+# --- J. the brief is what ships, and the skill body is not ------------------
+# The in-app assistant used to be handed the whole Claude Code skill — ~34k tokens
+# of file-first workflow, corpus tables and template layout, re-read on every
+# completion of every turn, six of them in a measured single-question turn. It is
+# replaced by a Studio brief that ships as package data. What is asserted here is
+# the shipping and the size, plus the negative that matters: no part of the skill
+# body is in the prompt any more, whatever the skill says next month.
+
+#: Ceiling on the brief, in the offline counter :func:`count_tokens` uses (a check
+#: must not make a network call to know whether it passes). That counter reads
+#: about 1.48x low against Anthropic's own count_tokens endpoint — the brief
+#: measures 4,347 here and 6,432 there — so this bound is the ~9k of billed tokens
+#: the brief is allowed, expressed in the units the check can measure.
+BRIEF_TOKEN_BOUND = 6000
+
+
+def check_the_brief_ships():
+    """The brief is package data, is what the loader returns, and fits the budget."""
+    from importlib import resources
+    from studio.ai.assistant import BRIEF_RESOURCE, _load_brief_text, count_tokens
+    out = []
+    brief = _load_brief_text()
+    if not brief.strip():
+        return ["the Studio brief could not be loaded"]
+    try:
+        shipped = (resources.files("xslope") / "resources"
+                   / BRIEF_RESOURCE).read_text(encoding="utf-8")
+    except Exception as exc:
+        return [f"the brief is not package data under xslope/resources: {exc!r}"]
+    if shipped != brief:
+        out.append("the loader does not return the shipped brief")
+    n = count_tokens(brief)
+    if n is None:
+        print("      (litellm unavailable — brief token bound not measured)")
+    elif n > BRIEF_TOKEN_BOUND:
+        out.append(f"the brief measures {n:,} tokens, over the "
+                   f"{BRIEF_TOKEN_BOUND:,} bound")
+    for anchor in ("run_lem(", "corpus_index(", "gamma_water", "MODEL CHECKS"):
+        if anchor not in brief:
+            out.append(f"the brief never mentions {anchor!r}")
+    return out
+
+
+def check_skill_body_is_not_in_the_prompt():
+    """No part of the Claude Code skill reaches the Studio system prompt.
+
+    Sampled rather than spot-checked on a phrase: a named sentence stops proving
+    anything the moment the skill is edited, whereas a spread of slices of whatever
+    the skill says today cannot go stale.
+    """
+    from importlib import resources
+    out = []
+    try:
+        skill = (resources.files("xslope") / "resources"
+                 / "xslope_skill.md").read_text(encoding="utf-8")
+    except Exception:
+        return ["the shipped skill could not be read, so its absence is unproven"]
+    slices = [skill[i:i + 120]
+              for i in range(0, max(len(skill) - 120, 1), max(len(skill) // 40, 1))]
+    for tier, prompt in _prompts().items():
+        hits = [sl for sl in slices if sl and sl in prompt]
+        if hits:
+            out.append(f"{tier}: the skill body is still in the prompt "
+                       f"({len(hits)} of {len(slices)} sampled slices matched)")
+    return out
+
+
+# --- K. the model summary ---------------------------------------------------
+# The other half of the cost: the model opened a turn by discovering what it was
+# looking at — dump slope_data, dump the materials, help(run_lem) — three or four
+# completions before the one that did the work. The summary is given instead, once,
+# and again whenever an edit has made it wrong.
+
+def check_model_summary_is_injected():
+    """First turn carries it, the next does not, and an edit brings it back."""
+    from studio.ai.assistant import MODEL_SUMMARY_END, MODEL_SUMMARY_OPEN
+    out = []
+    mw, asst = _session()
+
+    def carries(text):
+        return MODEL_SUMMARY_OPEN in text and MODEL_SUMMARY_END in text
+
+    first = asst._user_content("what is this model?")
+    if not carries(first):
+        out.append("the first turn carries no model summary")
+    if "what is this model?" not in first:
+        out.append("the user's own words were lost from the first turn")
+    if carries(asst._user_content("and now?")):
+        out.append("an unchanged model is described twice")
+
+    _run(asst, "slope_data['max_depth'] = -12.0")
+    if not carries(asst._user_content("after the edit")):
+        out.append("an edit does not refresh the model summary")
+    if carries(asst._user_content("and after that")):
+        out.append("the refreshed summary repeats on the following turn")
+
+    # An image turn is the multimodal content shape; the summary must ride in its
+    # text part rather than being dropped on the floor.
+    _run(asst, "slope_data['max_depth'] = -14.0")
+    content = asst._user_content("look", images=["data:image/png;base64,AAAA"])
+    if not isinstance(content, list):
+        out.append("an image turn no longer produces multimodal content")
+    elif not carries(content[0].get("text", "")):
+        out.append("an image turn drops the model summary")
+    mw.deleteLater()
+    return out
+
+
+def check_model_summary_says_what_the_model_is():
+    """It names the things a first snippet used to be spent discovering."""
+    from studio.ai.assistant import model_summary_text
+    sd = {"unit_system": "imperial", "gamma_water": 62.4, "max_depth": -10.0,
+          "circular": True, "template_version": 24,
+          "materials": [{"name": "shell", "gamma": 130.0, "option": "mc",
+                         "c": 300.0, "phi": 37.0, "u": "none"},
+                        {"name": "clay", "gamma": 120.0, "option": "mc",
+                         "c": 0.0, "phi": 0.0, "u": "piezo"}],
+          "profile_lines": [{"mat_id": 0, "coords": [(0, 0), (30, 24)]}],
+          "circles": [{"Xo": 0.0, "Yo": 40.0, "Depth": 0.0, "R": 40.0}],
+          "non_circ": [], "piezo_line": [(0, 5), (100, 5)],
+          "dloads": [[{"X": 30, "Y": 24, "Normal": 240}]],
+          "reinforcement_lines": [{}] * 6, "pile_lines": [], "line_loads": []}
+    text = model_summary_text(sd, {"lem_solution": object()},
+                              name="thing.xlsx")
+    out = []
+    for want in ("thing.xlsx", "imperial", "max_depth=-10", "shell", "clay",
+                 "phi=0", "gamma_water=62.4", "piezo line", "1 circle(s)",
+                 "6 reinforcement line(s)", "an LEM solution"):
+        if want not in text:
+            out.append(f"the model summary never says {want!r}")
+    if "help()" not in text:
+        out.append("the model summary does not tell the model the helpers are "
+                   "preloaded")
+    # A model with nothing open must still produce a block, not an exception.
+    if "No project is open" not in model_summary_text(None):
+        out.append("an empty session produces no summary")
+    return out
+
+
+def check_corpus_index_returns_rows():
+    """The corpus pointer resolves: a topic query comes back with real pages."""
+    out = []
+    mw, asst = _session()
+    kernel = asst._kernel
+    _quiet(kernel.run, "pass")
+    corpus_index = kernel._ns.get("corpus_index")
+    if not callable(corpus_index):
+        mw.deleteLater()
+        return ["corpus_index() is not in the kernel namespace"]
+    topics = _quiet(corpus_index)
+    if not topics:
+        out.append("corpus_index() lists no topics")
+    for query in ("rapid drawdown", "piles", "reinforcement"):
+        rows = _quiet(corpus_index, query)
+        if not rows:
+            out.append(f"corpus_index({query!r}) returned no rows")
+            continue
+        for row in rows:
+            if not str(row.get("url", "")).startswith("https://"):
+                out.append(f"corpus_index({query!r}) returned a row with no URL")
+                break
+            if not row.get("title"):
+                out.append(f"corpus_index({query!r}) returned an untitled row")
+                break
+    if _quiet(corpus_index, "zzzz no such topic zzzz"):
+        out.append("corpus_index() invents rows for a query that matches nothing")
+    mw.deleteLater()
+    return out
+
+
 CHECKS = [
     ("A. iron rules, once per prompt tier", check_iron_rules_once),
     ("A. the live prompts carry them", check_assembled_prompt_is_the_real_one),
@@ -1462,6 +1633,13 @@ CHECKS = [
      check_every_offered_model_can_see),
     ("I. Kimi's key is stored as kimi_api_key", check_the_keychain_name),
     ("I. the token meter accumulates", check_usage_accumulates),
+    ("J. the Studio brief ships and fits", check_the_brief_ships),
+    ("J. the skill body is out of the prompt",
+     check_skill_body_is_not_in_the_prompt),
+    ("K. the model summary is injected", check_model_summary_is_injected),
+    ("K. the model summary says what the model is",
+     check_model_summary_says_what_the_model_is),
+    ("K. the corpus pointer resolves", check_corpus_index_returns_rows),
 ]
 
 

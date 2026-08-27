@@ -46,7 +46,7 @@ PROVIDERS = {
     "openai": {
         "label": "OpenAI", "prefix": "openai/", "needs_key": True,
         "models": ["gpt-4o", "gpt-4o-mini", "o4-mini"],
-        # Gets the full skill; OpenAI caches the prompt prefix server-side
+        # Gets the Studio brief; OpenAI caches the prompt prefix server-side
         # automatically, so repeat turns are cheap.
         "tools": True, "vision": True, "skill": True,
     },
@@ -65,7 +65,7 @@ PROVIDERS = {
                    "moonshot-v1-32k-vision-preview"],
         # Moonshot prices a cache-hit input token separately, i.e. it caches the
         # prompt prefix server-side like OpenAI and needs no cache_control
-        # blocks — so it can afford the full skill.
+        # blocks — so it can afford the Studio brief.
         "tools": True, "vision": None, "skill": True,
         "vision_only": True,
         "vision_match": r"(kimi-latest|kimi-k2\.[5-9]|kimi-k[3-9]|vision)",
@@ -73,7 +73,7 @@ PROVIDERS = {
     "zai": {
         "label": "Z.ai (GLM)", "prefix": "openai/", "needs_key": True,
         # OpenAI-compatible endpoint (editable: GLM coding-plan keys use a
-        # different base — .../api/coding/paas/v4). Gets the full skill.
+        # different base — .../api/coding/paas/v4). Gets the Studio brief.
         "base": "https://api.z.ai/api/paas/v4",
         # Suggestions only — model is editable so you can type any current GLM id
         # (the lineup changes fast). The V (vision) models ONLY: the text GLMs
@@ -244,8 +244,8 @@ class AssistantConfig:
         local Ollama tag) vision is resolved from the SELECTED model rather than
         the provider default, so a typed-in id answers for itself.
         ``prompt_cache`` is whether the system prompt is sent in a cache_control
-        block (Anthropic), and ``skill`` whether the full skill body is sent at
-        all — the two questions :meth:`supports_prompt_cache` and
+        block (Anthropic), and ``skill`` whether the Studio reference brief is sent
+        at all — the two questions :meth:`supports_prompt_cache` and
         :meth:`wants_skill` answer, reported here so one call describes the
         selection.
         """
@@ -261,11 +261,20 @@ class AssistantConfig:
         return bool(PROVIDERS[self.provider()].get("prompt_cache"))
 
     def wants_skill(self):
-        """Whether to send the full xslope skill body in the system prompt. True
-        for providers that can afford it — Anthropic (prompt-cached) and any
-        provider flagged ``skill`` (Kimi and Z.ai: server-side prefix caching, so
-        a repeat turn re-reads the skill at cache rates). Others get the compact
-        prompt to keep per-turn cost/latency low."""
+        """Whether to send the Studio reference brief in the system prompt.
+
+        True for providers that can afford a reference body — Anthropic
+        (prompt-cached) and any provider flagged ``skill`` (Kimi and Z.ai:
+        server-side prefix caching, so a repeat turn re-reads it at cache rates).
+        Others get the compact prompt, to keep per-turn cost and latency low on a
+        local model.
+
+        The name is historical: what this used to gate was the full Claude Code
+        skill body, ~34k tokens re-read on every completion of every turn. It now
+        gates ``studio_assistant_brief.md``, which says the same things Studio
+        actually needs in a fraction of that. The tiers are unchanged — the
+        providers that got the skill get the brief.
+        """
         spec = PROVIDERS[self.provider()]
         return bool(spec.get("prompt_cache") or spec.get("skill"))
 

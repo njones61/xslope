@@ -48,6 +48,15 @@ does regardless of the model, and that is what this file covers:
      edit-answerable ERROR is quoted every time, a changed finding un-collapses,
      the staged-by-a-run label survives the collapse, nothing is dropped without
      being named, and a new session starts from silence. Mutations for each.
+  L. A RUN IS THE SESSION'S RUN — a recorded session was told its report covered
+     a run the report did not contain, because `run_lem` computed an answer and
+     stored it nowhere. So: the bundle lands where `report_solutions` reads it, a
+     report built afterwards carries the run and a traceability stamp that names
+     the input file, an unqualified run runs the method the MODEL declares rather
+     than a hardcoded one, the result says which surface it is the answer for, a
+     geometry edit made on the source the resync overwrites is named rather than
+     silently reverted, and the transcript renders the assistant's markdown
+     instead of printing its tables as rows of pipes.
   I. THE THINGS THE HARNESS OWNS WHATEVER THE MODEL DOES — every helper the
      prompt tells the model to call is in the namespace with the arguments the
      prompt names (a helper described and absent is a NameError followed by the
@@ -194,6 +203,40 @@ slope_data['materials'][0]['u'] = 'seep'
 print('material now reads a seepage field')
 """
 
+#: Drop the deep base circle and keep the toe circle, so the surface the model
+#: DEFINES is one a single-surface run can solve.
+SNIPPET_ONE_CIRCLE = """
+slope_data['circles'] = [slope_data['circles'][1]]
+print('kept the toe circle')
+"""
+
+#: The session-2 failure, replayed: the face is laid back by rebuilding
+#: `polygons` on a model whose geometry source is `profile_lines`. The resync
+#: rebuilds them from the profile lines and the edit is gone.
+SNIPPET_POLYGON_EDIT_ON_PROFILE_MODEL = """
+slope_data['polygons'] = [{'coords': [(0.0, 5.0), (45.0, 20.0), (90.0, 20.0),
+                                      (90.0, -20.0), (0.0, -20.0)], 'mat_id': 0}]
+print('polygons rebuilt for a 3:1 face')
+"""
+
+#: The same section built the OTHER way — polygons and no profile lines — and
+#: then edited on its own source, which must not be warned about.
+SNIPPET_POLYGON_NATIVE_BUILD = """
+slope_data['profile_lines'] = []
+slope_data['max_depth'] = -20.0
+slope_data['polygons'] = [{'coords': [(0.0, 5.0), (30.0, 20.0), (90.0, 20.0),
+                                      (90.0, -20.0), (0.0, -20.0)], 'mat_id': 0}]
+slope_data['circular'] = True
+slope_data['circles'] = [{'Xo': 15.0, 'Yo': 50.0, 'Depth': 2.57, 'R': 47.43}]
+print('polygon-native model built')
+"""
+
+SNIPPET_POLYGON_NATIVE_EDIT = """
+slope_data['polygons'][0]['coords'] = [(0.0, 5.0), (45.0, 20.0), (90.0, 20.0),
+                                       (90.0, -20.0), (0.0, -20.0)]
+print('face laid back on the polygon the model is built from')
+"""
+
 
 # --- harness ---------------------------------------------------------------
 
@@ -227,11 +270,22 @@ def _session():
             self.settings = QSettings(tmp.name, QSettings.IniFormat)
             self.refreshed = 0
             self.invalidated = 0
+            # What MainWindow.report_solutions labels the LEM run with. Empty
+            # until something runs, exactly as it is in a fresh window.
+            self._last_lem_opts = {}
 
         mesh_signature = staticmethod(MainWindow.mesh_signature)
 
         def invalidate_results(self, clear_mesh=False):
             self.invalidated += 1
+            # What the real sweep does to the document: every cached solution
+            # goes, because the inputs it was solved on have changed. Counting
+            # the calls is not enough — a run made AFTER the edit that triggers
+            # this has to survive it, and that is only visible if the keys
+            # actually go.
+            for key in ("lem_solution", "seep_solutions", "transient_seep",
+                        "fem_solution", "design", "sensitivity", "fs_vs_time"):
+                self.doc.results.pop(key, None)
 
         def refresh_inputs_view(self):
             self.refreshed += 1
@@ -1598,6 +1652,233 @@ def check_corpus_index_returns_rows():
     return out
 
 
+# --- L. a run is the session's run -----------------------------------------
+# The eighth recorded session asked for a report on a run it had just made, and
+# got a three-page document with no results section in it -- because `run_lem`
+# computed an answer and told nobody. What follows is that whole chain, asserted:
+# the bundle lands where the report reads it, the report then documents it, the
+# method is the model's own rather than a hardcoded one, and the answer says
+# which surface it is the answer for.
+
+def _solved_session():
+    """A live session on the standard section, with one solvable circle and one
+    single-surface LEM run already made. Returns ``(window, assistant, result)``
+    where ``result`` is the tool output of the run."""
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    _run(asst, SNIPPET_ONE_CIRCLE)
+    out = _run(asst, "res = run_lem(search=False, plot=False)\n"
+                     "print('CIRCLE', {k: res.get(k) for k in "
+                     "('Xo', 'Yo', 'R', 'Depth', 'x_entry', 'x_exit')})")
+    return mw, asst, out
+
+
+def _docx_text(path):
+    """The visible text of a .docx, tags stripped."""
+    import re
+    import zipfile
+    with zipfile.ZipFile(path) as z:
+        xml = z.read("word/document.xml").decode("utf-8", "replace")
+    return re.sub(r"<[^>]+>", "", xml)
+
+
+def check_run_lem_is_the_sessions_run():
+    """`run_lem` stores its bundle where the report reads it, and the report
+    built afterwards carries the run."""
+    from studio.main_window import MainWindow
+    out = []
+    mw, asst, _ = _solved_session()
+    bundle = mw.doc.results.get("lem_solution")
+    if not isinstance(bundle, dict):
+        mw.deleteLater()
+        return ["run_lem() left no bundle on doc.results['lem_solution']"]
+    for key in ("slice_df", "failure_surface", "results", "search", "method",
+                "options"):
+        if key not in bundle:
+            out.append(f"the stored LEM bundle has no {key!r}")
+    solutions = MainWindow.report_solutions(mw)
+    if not solutions.get("lem"):
+        out.append("MainWindow.report_solutions() finds no LEM run to document")
+    elif solutions["lem"][0].get("method") != bundle.get("method"):
+        out.append("the report would label the run with a method it was not run "
+                   f"under ({solutions['lem'][0].get('method')!r} vs "
+                   f"{bundle.get('method')!r})")
+    # "Lay the face back and rerun" is ONE snippet, and the stale-result sweep
+    # the edit triggers runs after it — so the run the user was just shown has to
+    # survive a sweep aimed at the solution that predates the edit.
+    _run(asst, "slope_data['profile_lines'][0]['coords'] = "
+               "[(0.0, 5.0), (45.0, 20.0), (90.0, 20.0)]\n"
+               "print(run_lem(search=False, plot=False)['FS'])")
+    if not mw.doc.results.get("lem_solution"):
+        out.append("a snippet that edited the model and then ran it kept no run: "
+                   "the stale-result sweep took the run made after the edit")
+    # And the document that comes out of it: the results section, and the
+    # traceability stamp that names the file the model was opened from.
+    bundle = mw.doc.results.get("lem_solution") or bundle
+    fs = (bundle.get("results") or {}).get("FS")
+    tmpdir = tempfile.mkdtemp(prefix="xslope_assistant_report_")
+    model_path = os.path.join(tmpdir, "small_slope.xlsx")
+    with open(model_path, "wb") as fh:
+        fh.write(b"not a workbook -- only the traceability digest reads it")
+    mw.doc.path = model_path
+    report_path = os.path.join(tmpdir, "report.docx")
+    result = _run(asst, f"print('REPORT', generate_report(path={report_path!r}, "
+                        f"finalize=False))")
+    if not os.path.exists(report_path):
+        out.append(f"generate_report() wrote no document: {result[-400:]}")
+    else:
+        text = _docx_text(report_path)
+        if "Limit Equilibrium" not in text:
+            out.append("the report has no limit equilibrium section — the run it "
+                       "was asked to document is missing from it")
+        if fs is not None and f"{fs:.3f}" not in text:
+            out.append(f"the report never states the factor of safety ({fs:.3f})")
+        if "not saved to a file" in text:
+            out.append("the traceability stamp says the model is not saved to a "
+                       "file, for a project opened from one")
+        if os.path.basename(model_path) not in text:
+            out.append("the traceability stamp does not name the input file")
+        if "SHA-256" not in text:
+            out.append("the traceability stamp carries no SHA-256 of the input")
+    mw.deleteLater()
+    return out
+
+
+def check_run_lem_runs_the_models_method():
+    """A run made with no method named runs the method the MODEL declares.
+
+    Two recorded sessions asked to "rerun" a Spencer model and got Bishop, from a
+    hardcoded default. The model's declared method is what the Run LEM dialog
+    opens on, so it is what an unqualified run means.
+    """
+    from studio.ai.kernel import _declared_lem_method
+    out = []
+    cases = [({}, "spencer"), ({"lem_method": "janbu"}, "janbu"),
+             ({"lem_method": "all"}, "spencer"), ({"lem_method": None}, "spencer"),
+             ({"lem_method": "bishop"}, "bishop")]
+    for sd, want in cases:
+        got = _declared_lem_method(sd)
+        if got != want:
+            out.append(f"a model declaring {sd.get('lem_method')!r} defaults to "
+                       f"{got!r}, expected {want!r}")
+    if _declared_lem_method({"lem_method": "janbu"}, "oms") != "oms":
+        out.append("a named method does not win over the model's declaration")
+    # And live: the declared method is the one that actually runs.
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    _run(asst, SNIPPET_ONE_CIRCLE)
+    _run(asst, "slope_data['lem_method'] = 'janbu'\nprint('method declared')")
+    _run(asst, "run_lem(search=False, plot=False)")
+    ran = (mw.doc.results.get("lem_solution") or {}).get("method")
+    if ran != "janbu":
+        out.append(f"a model declaring janbu was run as {ran!r}")
+    mw.deleteLater()
+    return out
+
+
+def check_run_lem_returns_the_surface():
+    """The result dict says which surface it is the answer for.
+
+    A session crashed with ``KeyError: 'Xo'`` reading the critical circle off a
+    run's result, which carried no geometry at all.
+    """
+    out = []
+    mw, asst, result = _solved_session()
+    for key in ("Xo", "Yo", "R", "Depth", "x_entry", "x_exit"):
+        if f"'{key}': None" in result or f"'{key}'" not in result:
+            out.append(f"the result dict carries no usable {key!r}")
+    # The circle it reports is the circle the model defines.
+    circle = mw.doc.slope_data["circles"][0]
+    if f"'Xo': {float(circle['Xo'])}" not in result:
+        out.append("the result's Xo is not the solved circle's center")
+    mw.deleteLater()
+    return out
+
+
+def check_polygon_edit_on_a_profile_model_is_named():
+    """A geometry edit made on the source the resync OVERWRITES is reported.
+
+    On a profile-line model the polygons are rebuilt from the profile lines after
+    every snippet, so a face laid back by rewriting `polygons` is reverted — and
+    the input checks call the result clean, because after the rebuild the geometry
+    is valid. The warning is the only thing that says the edit did not take.
+    """
+    from studio.ai.kernel import POLYGON_EDIT_WARNING
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    result = _run(asst, SNIPPET_POLYGON_EDIT_ON_PROFILE_MODEL)
+    if POLYGON_EDIT_WARNING not in result:
+        out.append("a polygon edit on a profile-line model is not reported: "
+                   f"{result[:400]!r}")
+    if "profile_lines" not in result:
+        out.append("the warning does not name the source to edit instead")
+    # The premise of the warning: the edit really was discarded.
+    face = list(mw.doc.slope_data["profile_lines"][0]["coords"])
+    if face != [tuple(c) for c in GROUND]:
+        out.append("the profile lines moved, so the polygon edit was not the "
+                   "silent revert this warning is about")
+    mw.deleteLater()
+
+    # The same edit on a model whose polygons ARE the source is just an edit.
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_POLYGON_NATIVE_BUILD)
+    result = _run(asst, SNIPPET_POLYGON_NATIVE_EDIT)
+    if "WARNING:" in result:
+        out.append("editing polygons on a polygon-native model is warned about: "
+                   f"{result[:400]!r}")
+    mw.deleteLater()
+    return out
+
+
+def check_chat_renders_markdown():
+    """The transcript renders the assistant's markdown.
+
+    A reply is markdown — headings, tables, fenced code — and the dock used to
+    escape it and break the lines, so a table of results reached the user as rows
+    of pipes and a heading as a line of hashes.
+    """
+    from studio.chat_dock import ChatDock
+    out = []
+    mw, asst = _session()
+    dock = ChatDock(asst)
+    reply = ("Here is what the sweep found.\n\n"
+             "## Results\n\n"
+             "| Tmax | FS |\n| ---: | ---: |\n| 500 | 1.425 |\n| 3000 | 1.681 |\n\n"
+             "Run it yourself with `run_lem(search=True)`:\n\n"
+             "```python\nres = run_lem(search=True)\n```\n\n"
+             "- the plateau is the circle migrating\n"
+             "- FS < 1.5 below 800 lb/ft\n")
+    dock._on_assistant_text(reply)
+    text = dock.transcript.toPlainText()
+    if "|" in text:
+        out.append("the table reached the transcript as raw pipes")
+    if "##" in text:
+        out.append("the heading reached the transcript as raw hashes")
+    if "```" in text:
+        out.append("the code fence reached the transcript as raw backticks")
+    for wanted in ("Results", "1.425", "res = run_lem(search=True)",
+                   "the plateau is the circle migrating", "FS < 1.5"):
+        if wanted not in text:
+            out.append(f"the rendered reply lost {wanted!r}")
+    html = dock.transcript.toHtml()
+    if "<table" not in html:
+        out.append("the table is not rendered as a table")
+    if "monospace" not in html:
+        out.append("the code block is not monospaced")
+    # The user's own text is still verbatim, markdown or not.
+    dock._add_block("You", "use | pipes | and ## hashes", "#1a5fb4")
+    if "| pipes |" not in dock.transcript.toPlainText():
+        out.append("the user's own message is no longer shown as typed")
+    dock.deleteLater()
+    mw.deleteLater()
+    return out
+
+
 CHECKS = [
     ("A. iron rules, once per prompt tier", check_iron_rules_once),
     ("A. the live prompts carry them", check_assembled_prompt_is_the_real_one),
@@ -1640,6 +1921,13 @@ CHECKS = [
     ("K. the model summary says what the model is",
      check_model_summary_says_what_the_model_is),
     ("K. the corpus pointer resolves", check_corpus_index_returns_rows),
+    ("L. the LEM run is the session's run", check_run_lem_is_the_sessions_run),
+    ("L. an unqualified run runs the model's method",
+     check_run_lem_runs_the_models_method),
+    ("L. the result names its own surface", check_run_lem_returns_the_surface),
+    ("L. a geometry edit on the wrong source is named",
+     check_polygon_edit_on_a_profile_model_is_named),
+    ("L. the chat renders markdown", check_chat_renders_markdown),
 ]
 
 

@@ -107,9 +107,13 @@ changes — so do NOT open a turn by dumping `slope_data`, printing \
 `sorted(slope_data)`, or calling `help()` / `dir()` on a helper. Inspect at \
 runtime only when something genuinely surprises you.
 - To run a limit-equilibrium analysis, prefer the preloaded helper \
-`run_lem(method='bishop', search=False)` (methods: oms, bishop, janbu, spencer, \
-corps, lowe, mprice). It returns the result dict (with 'FS') and shows the \
-solution plot — don't rebuild that pipeline by hand. **A question about THE \
+`run_lem(search=False)` (methods: oms, bishop, janbu, spencer, corps, lowe, \
+mprice). **Name a method only when the user does** — left out, it runs the \
+method the MODEL declares, which is what Studio's Run LEM dialog opens on. It \
+returns the result dict — 'FS', 'warnings', and the surface it was solved on \
+('Xo', 'Yo', 'R', 'Depth', and 'x_entry'/'x_exit') — shows the solution plot, \
+and stores the run where the results tabs and the report read it. Don't rebuild \
+that pipeline by hand. **A question about THE \
 factor of safety of a model means the critical one: pass `search=True`**, which \
 runs the automated search for that method the way Studio's Run LEM does. \
 `search=False` solves only the surface the model already defines. `run_seep(bc=1)` and `run_fem(analysis='ssrm')` are its seepage and finite \
@@ -177,6 +181,12 @@ the canvas re-renders automatically.
   (`from shapely.geometry import Polygon`). The canvas rebuilds ground_surface and
   domain_polygon from the polygons automatically — do NOT call plot_inputs,
   build_ground_surface_*, or set ground_surface/domain_polygon yourself.
+  ONE of the two is the model's geometry SOURCE and the other is rebuilt from it:
+  a NON-EMPTY profile_lines means the polygons are rebuilt from the profile lines
+  after every snippet, so writing polygons there is silently undone (the checks
+  still read clean — the rebuilt geometry is valid, just not yours). Edit
+  profile_lines on such a model, polygons on one that has none, and print the
+  vertices back before reporting a geometry edit done.
 - circles[i]: {'Xo':20.0,'Yo':40.0,'Depth':-10.0,'R':50.0}  # Depth = elevation of
   the circle's lowest point, R = Yo - Depth. In-memory there is no intercept key,
   so a TOE circle (one passing THROUGH the toe point) is R = distance(center, toe),
@@ -1435,7 +1445,7 @@ class Assistant(QObject):
             holder["event"].set()
             return
 
-        stdout, outputs, error, checks = self._run_python(code)
+        stdout, outputs, error, checks, warnings = self._run_python(code)
         parts = []
         if stdout.strip():
             parts.append(stdout.rstrip())
@@ -1446,6 +1456,9 @@ class Assistant(QObject):
             parts.append("ERROR:\n" + error)
         if not parts:
             parts.append("(no output)")
+        # A geometry edit made on the source the resync overwrites: the snippet
+        # succeeded, the model did not change, and nothing else would say so.
+        parts += list(warnings)
         if checks:
             parts.append(checks)        # LAST: the final thing the model reads
         result_text = "\n".join(parts)
@@ -1455,7 +1468,8 @@ class Assistant(QObject):
         self.tool_ran.emit(code, result_text, outputs)
 
     def _run_python(self, code):
-        """Run one snippet and return ``(stdout, outputs, error, checks)``.
+        """Run one snippet and return
+        ``(stdout, outputs, error, checks, warnings)``.
 
         ``checks`` is the MODEL CHECKS block, and it is produced ONLY when the
         snippet actually changed the model — the same per-key signature comparison
@@ -1463,6 +1477,11 @@ class Assistant(QObject):
         nothing extra, and an edit pays one preflight pass. The session's
         :class:`ChecksMemo` carries what earlier blocks already said, so a repeat
         of a standing finding costs one line instead of its paragraph.
+
+        ``warnings`` is the kernel's own account of a geometry edit made on the
+        source the resync rebuilds FROM — polygons on a profile-line model — which
+        the input checks cannot see, because after the rebuild the geometry is
+        valid and merely not the one the snippet wrote.
         """
         doc = self._mw.doc
         if doc.slope_data is None:
@@ -1498,12 +1517,18 @@ class Assistant(QObject):
                 # Inputs changed: any cached solution is now stale (and the mesh
                 # too, if the geometry changed).
                 self._mw.invalidate_results(clear_mesh=geom_changed)
+                # …except a solution THIS snippet made, which was solved on the
+                # edited model. "Change the face and rerun" is one snippet, and
+                # the sweep above runs after it: without this the run the user
+                # was just shown is not the session's run, and the report that
+                # documents the session finds nothing to document.
+                self._kernel.restore_fresh_results()
             self._mw.refresh_inputs_view()
         except Exception:
             pass
         checks = (model_checks_text(doc.slope_data, self._checks_memo)
                   if edited else "")
-        return stdout, outputs, error, checks
+        return stdout, outputs, error, checks, self._kernel.geometry_warnings()
 
     def output_dir(self):
         """Folder where the assistant writes generated files (plots, CSVs, …)."""

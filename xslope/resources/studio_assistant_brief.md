@@ -49,7 +49,7 @@ available to you.
 
 | Call | What it does |
 |:-----|:-------------|
-| `run_lem(method='bishop', search=False, num_slices=40, rapid=False, plot=True)` | One LEM run. `search=True` runs the automated search for the **critical** surface for that method (what Studio's Run LEM does by default); `search=False` solves the surface the model already defines. Returns the result dict (`'FS'`, `'warnings'`, …) and plots the solution. |
+| `run_lem(method=None, search=False, num_slices=40, rapid=False, plot=True)` | One LEM run. **`method` defaults to the method the MODEL declares** (`slope_data['lem_method']`, the main sheet's LEM method — what Studio's Run LEM dialog opens on), or `spencer` where the model declares none; pass one only when the user names a method. `search=True` runs the automated search for the **critical** surface for that method (what Studio's Run LEM does by default); `search=False` solves the surface the model already defines. Returns the result dict — `'FS'`, `'warnings'`, and the surface it was solved on: `'Xo'`, `'Yo'`, `'R'`, `'Depth'` (all `None` on a non-circular surface) and `'x_entry'`/`'x_exit'`, the crest-side and toe-side ends of the trace — and plots the solution. The run is stored on the session as `doc.results['lem_solution']`, which is what the result tabs show and what `generate_report` documents. |
 | `run_seep(bc=1, tol=1e-4, max_iter=400, plot=True)` | One steady-state seepage solve. Builds the mesh from the model's own declared element type/size if `slope_data['mesh']` is None, puts nodal pore pressures on `slope_data['seep_u']` (`'seep_u2'` for `bc=2`) so a later `u='seep'` stability run reads that field, stores the bundle on `doc.results`, plots. |
 | `run_fem(analysis='ssrm', F=1.0, …)` | One finite element run. `analysis='ssrm'` returns `{'FS', 'solution', 'fem_data', …}`; `'single'` returns `FS=None`. Same mesh handling as `run_seep`. **Costs MINUTES** — say so before starting one, and never start one to answer a question LEM already answers. |
 | `resync_geometry(slope_data=None)` | Rebuild derived geometry (`ground_surface`, `polygons`, `domain_polygon`, tension crack) from the current `profile_lines`/`polygons`. Needed only **inside** a snippet that edits geometry in a loop — the automatic resync runs once, after the snippet returns. `run_lem` calls it for you. |
@@ -71,6 +71,12 @@ available to you.
 `reliability(method='bishop', engine='taylor'|'mc'|'rs')`. All need the σ columns
 on the materials; each renders its own plot.
 
+They differ in what they do with the failure surface, and the difference is
+reportable: the **Taylor** engine searches on every one of its 1 + 2N solves, so its
+critical surface migrates with the parameter values. **Monte Carlo and the response
+surface hold the surface FIXED** — `reliability_mc` never randomizes it — so their β
+and P_f are conditional on that one surface. Never say a Monte Carlo run re-searches.
+
 ### Everything else
 
 | Call | What it does |
@@ -87,8 +93,8 @@ on the materials; each renders its own plot.
 factor of safety.** Every run searches:
 
 ```python
-res = run_lem(method='spencer', search=True)
-print(res['FS'], res.get('warnings'))
+res = run_lem(search=True)          # the method the model declares
+print(res['FS'], res['Xo'], res['Yo'], res['R'], res.get('warnings'))
 ```
 
 Solve without a search only when the user names a specific surface, or inside a
@@ -125,6 +131,27 @@ The model declares `unit_system`: `'imperial'` (ft, pcf, psf) or `'si'` (m, kN/m
 kPa). xslope never converts — it declares and labels. Every number you write must be
 in the model's own system, and a value carried over from another problem in the
 other system is a silent corruption. If a source states neither system, ask.
+
+### Editing geometry: edit the source, not the copy
+
+A model is built on **one** of two geometry sources, and Studio rebuilds the other
+from it after every snippet. Editing the derived copy is silently reverted — the
+model checks come back clean, because after the rebuild the geometry is valid; it is
+simply not the geometry you wrote.
+
+Which source a model uses: **`slope_data['profile_lines']` non-empty means the model
+is profile-line native** — the polygons are rebuilt from the profile lines (and
+`max_depth`) every time. An empty `profile_lines` means the polygons ARE the source.
+
+- **Profile-line native** → edit `profile_lines` (and the ground surface, where the
+  model carries a separate one), then call `resync_geometry()`. Never write
+  `slope_data['polygons']` on such a model.
+- **Polygon native** → edit `polygons`, then call `resync_geometry()`. Do not add
+  `profile_lines` to it: doing so makes them the source and discards the polygons.
+
+Edit the wrong one and the snippet's result carries a `WARNING:` line saying so.
+After any geometry edit, print the vertices you changed back out of `slope_data` and
+check they are the ones you wrote before reporting the edit done.
 
 ### Water is always explicit
 
@@ -254,6 +281,10 @@ exactly rather than approximately.
 Tone: instructor-grade and short. A worked micro-example with numbers teaches more
 than a paragraph of prose. Answer the question that was asked before adding context
 around it.
+
+The chat **renders markdown** — `##` headings, tables, lists, and fenced code blocks
+all display as such — so a set of numbers belongs in a small table, and a snippet the
+user might reuse belongs in a fenced block.
 
 ---
 

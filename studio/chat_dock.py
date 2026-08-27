@@ -1,8 +1,9 @@
 """ChatDock — the AI assistant panel.
 
-A narrow right-side dock: a transcript (markdown-ish HTML with inline figures and
-"ran code" blocks), a multi-line input (Ctrl/Cmd+Enter sends), Send/Stop, and a
-Settings button (provider/model, key, confirm-before-running). It wires to
+A narrow right-side dock: a transcript (the assistant's markdown rendered — tables,
+headings, fenced code — with inline figures and "ran code" blocks), a multi-line
+input (Ctrl/Cmd+Enter sends), Send/Stop, and a Settings button (provider/model,
+key, confirm-before-running). It wires to
 ``studio.ai.assistant.Assistant`` and renders its signals. The header is kept
 minimal (a wrapping model label + Settings) so the dock can be made narrow.
 """
@@ -11,17 +12,63 @@ from __future__ import annotations
 
 import html
 import os
+import re
 import subprocess
 import sys
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QImage, QTextDocument
+from PySide6.QtGui import (
+    QDesktopServices, QImage, QTextDocument, QTextOption,
+)
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QTextBrowser,
     QVBoxLayout, QWidget,
 )
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
+
+#: Fenced blocks and inline code spans, kept whole so their contents are never
+#: HTML-escaped — inside a code span ``&lt;`` is four characters, not a ``<``.
+#: The unterminated fence is matched too, so a reply cut off mid-block still
+#: renders as code rather than as a wall of entities.
+_CODE_SPANS = re.compile(r"(```.*?```|```[\s\S]*$|``.*?``|`[^`\n]*`)", re.S)
+
+
+def _escape_outside_code(text):
+    """HTML-escape prose while leaving code spans alone.
+
+    The assistant writes markdown, and markdown passes raw HTML through: an
+    unescaped ``<not html>`` in a sentence is swallowed by the parser and the
+    reader never sees it. Escaping first fixes that everywhere the escape is
+    decoded again — which is everywhere except inside code, where markdown is
+    literal by definition.
+    """
+    return "".join(part if part.startswith("`") else html.escape(part, quote=False)
+                   for part in _CODE_SPANS.split(text or ""))
+
+
+def markdown_to_html(text):
+    """One markdown message as an HTML fragment for the transcript.
+
+    Qt's own parser (GitHub dialect: tables, headings, lists, fenced code) does
+    the work, and the fragment is the body of what it produces — the document
+    wrapper and its font declaration are dropped so the appended block inherits
+    the transcript's. A parse that fails falls back to escaped plain text, since
+    an unrendered reply must still be a readable one.
+    """
+    try:
+        doc = QTextDocument()
+        doc.setMarkdown(_escape_outside_code(text),
+                        QTextDocument.MarkdownDialectGitHub)
+        rendered = doc.toHtml()
+        open_tag = rendered.find("<body")
+        start = rendered.find(">", open_tag)
+        end = rendered.rfind("</body>")
+        if open_tag != -1 and start != -1 and end > start:
+            return rendered[start + 1:end]
+        return rendered
+    except Exception:
+        return html.escape(text or "").replace("\n", "<br>")
 
 
 def qimage_to_data_url(img):
@@ -90,6 +137,13 @@ class ChatDock(QWidget):
         self._paths = {}          # link-id -> output file path (open / reveal)
 
         self.transcript = QTextBrowser()
+        # A long unbroken token (a URL, a path, a JSON blob) wraps rather than
+        # widening the dock — what the per-block ``word-wrap`` style used to do,
+        # set once here because the markdown blocks carry Qt's own styles.
+        self.transcript.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        # A fenced code block in a reply reads as the "Ran code" blocks do.
+        self.transcript.document().setDefaultStyleSheet(
+            "pre { background-color: #f4f4f4; }")
         self.transcript.setOpenExternalLinks(False)
         self.transcript.setOpenLinks(False)            # we handle clicks ourselves
         self.transcript.anchorClicked.connect(self._on_anchor)
@@ -261,7 +315,7 @@ class ChatDock(QWidget):
         self.usage_label.setText(format_usage(usage["turn"], session))
 
     def _on_assistant_text(self, text):
-        self._add_block("Assistant", text, "#2e7d32")
+        self._add_markdown_block("Assistant", text, "#2e7d32")
 
     def _on_tool_ran(self, code, output, outputs):
         pre = ("background:#f4f4f4;padding:6px;border-radius:4px;"
@@ -298,11 +352,25 @@ class ChatDock(QWidget):
         self.status_label.clear()
 
     def _add_block(self, who, text, color):
+        """A block of VERBATIM text (what the user typed), escaped and line-broken
+        as written."""
         body = html.escape(text).replace("\n", "<br>")
-        # word-wrap so a long unbroken token (URL/JSON) still wraps in the box.
         self.transcript.append(
-            f'<div style="margin-top:8px;word-wrap:break-word;">'
+            f'<div style="margin-top:8px;">'
             f'<b style="color:{color};">{who}:</b> {body}</div>')
+
+    def _add_markdown_block(self, who, text, color):
+        """A block of MARKDOWN (what the assistant wrote), rendered: tables as
+        tables, ``##`` as headings, fenced code as monospaced blocks.
+
+        The speaker's label leads on its own line rather than inline, because a
+        reply that opens on a heading or a table has no first line to sit in.
+        """
+        self.transcript.append(f'<div style="margin-top:8px;">'
+                               f'<b style="color:{color};">{who}:</b></div>')
+        body = markdown_to_html(text)
+        if body.strip():
+            self.transcript.append(body)
 
     # --- generated outputs (clickable to open / reveal) -----------------
     def _register(self, path):

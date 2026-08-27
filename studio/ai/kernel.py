@@ -24,6 +24,107 @@ _FIG_EXTS = (".png", ".pdf", ".svg", ".jpg", ".jpeg")
 #: Parsed corpus index, built once per process (the JSON is ~650 KB).
 _CORPUS_CACHE = None
 
+#: The inputs a geometry resync reads. Compared before and after a snippet to
+#: tell an edit made on the model's OWN geometry source from one made on the
+#: derived copy, which the resync silently overwrites.
+_GEOM_KEYS = ("profile_lines", "polygons", "max_depth")
+
+#: What the resync says when a geometry edit was made on the wrong source. The
+#: model reads these on its own tool result, so they name the fix, not the fault.
+POLYGON_EDIT_WARNING = (
+    "WARNING: polygons were edited on a profile-line model and have been rebuilt "
+    "from profile_lines; edit profile_lines instead (and the ground surface if it "
+    "is separate), then call resync_geometry(). The polygon edit did not take.")
+PROFILE_EDIT_WARNING = (
+    "WARNING: profile_lines were added on a polygon-native model; the polygons are "
+    "now rebuilt from those profile lines, so the model's own polygons no longer "
+    "apply. Edit polygons instead on this model.")
+
+
+def _geometry_native(slope_data):
+    """Which geometry source this model is built on — ``"profile"`` when it has
+    profile lines (:func:`studio.editors._resync_geometry` rebuilds the polygons
+    from them), ``"polygon"`` when the polygons are the source, None for a model
+    that has neither yet."""
+    if (slope_data or {}).get("profile_lines"):
+        return "profile"
+    if (slope_data or {}).get("polygons"):
+        return "polygon"
+    return None
+
+
+def _geometry_sigs(slope_data):
+    """Per-key JSON signatures of the geometry inputs (shapely objects fall back
+    to their WKT via ``str``), so a snippet's geometry edits can be located."""
+    import json
+    out = {}
+    for key in _GEOM_KEYS:
+        try:
+            out[key] = json.dumps((slope_data or {}).get(key), sort_keys=True,
+                                  default=str)
+        except Exception:
+            out[key] = None
+    return out
+
+
+def _declared_lem_method(slope_data, method=None):
+    """The method a run made without one uses: the method the MODEL declares
+    (main!D14 — what Studio's Run LEM dialog opens on), else spencer.
+
+    ``'all'`` is the batch-report sweep and names no single method, so it seeds
+    nothing and the fallback stands.
+    """
+    if method:
+        return str(method).lower()
+    declared = str((slope_data or {}).get("lem_method") or "").lower()
+    return declared if declared and declared != "all" else "spencer"
+
+
+def _surface_keys(bundle, slope_data):
+    """The failure surface this run settled on, as plain numbers on the result
+    dict: ``Xo``, ``Yo``, ``R``, ``Depth`` (the tangent elevation) and the trace's
+    ``x_entry`` / ``x_exit``.
+
+    Every key is always present — None on a non-circular surface — so reading the
+    critical circle off a result never depends on which branch produced it. Entry
+    and exit follow the search's own convention (:func:`xslope.search
+    ._endpoints_in_ranges`): the ENTRY point is the crest-side (higher ground) end
+    of the trace and the EXIT the toe-side one, whichever way the slope faces.
+    """
+    keys = {"Xo": None, "Yo": None, "R": None, "Depth": None,
+            "x_entry": None, "x_exit": None}
+    search = bundle.get("search") or {}
+    circle = None
+    if search.get("kind") == "circular":
+        cache = search.get("fs_cache") or []
+        if cache:
+            circle = cache[0]
+    elif search:
+        circle = None                       # a non-circular search: no circle
+    elif slope_data.get("circular", True) and slope_data.get("circles"):
+        circle = slope_data["circles"][0]
+    if circle is not None:
+        xo, yo = circle.get("Xo"), circle.get("Yo")
+        depth, r = circle.get("Depth"), circle.get("R")
+        if r is None and yo is not None and depth is not None:
+            r = float(yo) - float(depth)
+        if depth is None and yo is not None and r is not None:
+            depth = float(yo) - float(r)
+        keys.update({"Xo": None if xo is None else float(xo),
+                     "Yo": None if yo is None else float(yo),
+                     "R": None if r is None else float(r),
+                     "Depth": None if depth is None else float(depth)})
+    surf = bundle.get("failure_surface")
+    try:
+        coords = list(surf.coords)
+    except Exception:
+        coords = []
+    if len(coords) >= 2:
+        (xl, yl), (xr, yr) = coords[0], coords[-1]
+        entry, exit_ = ((xl, xr) if yl >= yr else (xr, xl))
+        keys["x_entry"], keys["x_exit"] = float(entry), float(exit_)
+    return keys
+
 
 def _repo_root():
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -114,6 +215,15 @@ class PythonKernel:
         self._seeded = False
         self._outdir = None
         self._fig_seq = 0
+        #: Solutions THIS snippet computed, keyed as the document stores them,
+        #: with the views that put each in front of the user. Studio's
+        #: stale-result sweep runs after the snippet, so a snippet that edited
+        #: the model AND then ran it would otherwise lose the run it just made.
+        self._fresh_results = {}
+        #: Geometry warnings raised during the snippet (see
+        #: :meth:`geometry_warnings`), and the state it started from.
+        self._geom_warnings = []
+        self._geom_watch = None
 
     @property
     def outdir(self):
@@ -129,6 +239,101 @@ class PythonKernel:
         """Drop all variables; the engine + helpers re-seed on the next run."""
         self._ns = {}
         self._seeded = False
+        self._fresh_results = {}
+        self._geom_warnings = []
+
+    # --- what a snippet produced, for the caller that has to survive it ------
+    def _show_views(self, *calls):
+        """Put a solved run in front of the user the way a Run does — the
+        results tab for that engine — where there is a window to put it in.
+
+        Best effort by construction: the answer is already attached to the
+        model and the session, and the chat carries its plot, so a view that
+        cannot be built (no window, a panel that objects) must not turn a
+        successful analysis into a failed snippet.
+        """
+        for name, args in calls:
+            try:
+                method = getattr(self._window, name, None)
+                if callable(method):
+                    method(*args)
+            except Exception:
+                pass
+
+    def _store_result(self, key, value, show=(), lead=None):
+        """Attach a solved bundle where Studio attaches it, show it, and record
+        that THIS snippet made it.
+
+        ``show`` is the (method name, args) list that raises the engine's result
+        tabs and ``lead`` the attribute naming the canvas the run leads with, both
+        replayed by :meth:`restore_fresh_results`.
+        """
+        self._doc.results[key] = value
+        self._fresh_results[key] = (value, tuple(show), lead)
+        self._show_views(*show)
+        self._lead_tab(lead)
+
+    def _lead_tab(self, attr):
+        """Bring the tab a run leads with to the front, as the dialog run does."""
+        if not attr:
+            return
+        try:
+            canvas = getattr(self._window, attr, None)
+            if canvas is not None:
+                self._window.view_tabs.setCurrentWidget(canvas)
+        except Exception:
+            pass
+
+    def restore_fresh_results(self):
+        """Re-attach (and re-show) the solutions this snippet computed.
+
+        Studio drops every cached result when the inputs change, which is right
+        for a solution that predates the edit and wrong for one made after it: a
+        snippet that lays the face back and reruns computes its answer on the model
+        as it now stands. That sweep runs after the snippet returns, so the run is
+        put back here rather than never stored.
+        """
+        for key, (value, show, lead) in list(self._fresh_results.items()):
+            self._doc.results[key] = value
+            self._show_views(*show)
+            self._lead_tab(lead)
+
+    def geometry_warnings(self):
+        """Warnings about geometry the last snippet edited on the wrong source —
+        polygons on a profile-line model, or the reverse. Empty for every snippet
+        whose geometry edit reached the model's own source."""
+        return list(self._geom_warnings)
+
+    def _note_geometry_source(self, slope_data=None):
+        """Check, at the moment before a resync would discard it, whether the
+        snippet edited the geometry the model is NOT built from.
+
+        The resync rebuilds polygons from profile_lines on a profile-line model,
+        so a snippet that rebuilt ``polygons`` there has its edit reverted with
+        nothing said — the failure this exists to name. Called before every resync
+        and once more when the snippet ends, since a snippet that never ran
+        anything has its polygons overwritten later, by the checks' own resync.
+        """
+        watch = self._geom_watch
+        if not watch:
+            return
+        native, before = watch
+        sd = self._doc.slope_data if slope_data is None else slope_data
+        if native is None or sd is not self._doc.slope_data:
+            return                      # a copy (a sweep's own model): not the doc
+        now = _geometry_sigs(sd)
+        if now["max_depth"] != before["max_depth"]:
+            return                      # the polygons legitimately rebuild
+        if (native == "profile" and now["polygons"] != before["polygons"]
+                and now["profile_lines"] == before["profile_lines"]):
+            self._warn_geometry(POLYGON_EDIT_WARNING)
+        elif (native == "polygon"
+                and now["profile_lines"] != before["profile_lines"]):
+            self._warn_geometry(PROFILE_EDIT_WARNING)
+
+    def _warn_geometry(self, text):
+        if text not in self._geom_warnings:
+            self._geom_warnings.append(text)
 
     def _seed(self):
         import matplotlib
@@ -146,11 +351,15 @@ class PythonKernel:
         """Convenience functions seeded into the namespace so the model doesn't
         have to reconstruct the engine pipeline (a common failure mode). Seeded:
 
-        - ``run_lem(method='bishop', search=False, ...)`` — one LEM solve; returns
-          the result dict and shows the solution plot. ``search=True`` searches for
-          the CRITICAL surface for that method (Studio's Run LEM default, and what
-          "the factor of safety of this model" means); ``search=False`` solves the
-          surface the model already defines.
+        - ``run_lem(method=None, search=False, ...)`` — one LEM solve; returns
+          the result dict (with the surface it was solved on: Xo/Yo/R/Depth and
+          the trace's x_entry/x_exit) and shows the solution plot. ``method``
+          defaults to the one the MODEL declares, else spencer. ``search=True``
+          searches for the CRITICAL surface for that method (Studio's Run LEM
+          default, and what "the factor of safety of this model" means);
+          ``search=False`` solves the surface the model already defines. The
+          bundle is attached to the session as ``doc.results['lem_solution']``,
+          which is what the report and the result tabs read.
         - ``corpus_index(query=None)`` — verification-corpus rows matching a topic
           or phrase, so a citation is looked up rather than remembered.
         - ``run_seep(bc=1, ...)`` — one steady seepage solve; builds the mesh from
@@ -223,16 +432,19 @@ class PythonKernel:
             `circular_search` / `solve_*` if you drive the pipeline directly."""
             from studio.editors import _resync_geometry
             sd = doc.slope_data if slope_data is None else slope_data
+            self._note_geometry_source(sd)   # before the rebuild discards an edit
             _resync_geometry(sd)
             return sd.get("ground_surface")
 
-        def run_lem(method="bishop", num_slices=40, rapid=False, plot=True,
+        def run_lem(method=None, num_slices=40, rapid=False, plot=True,
                     slope_data=None, search=False):
             """Run an LEM analysis on the loaded project and return the result dict
             (includes 'FS'). `method` is one of oms, bishop, janbu, spencer, corps,
-            lowe, mprice. Shows the solution plot when plot=True (pass plot=False in
-            sweeps to avoid many figures). Rebuilds derived geometry first, so edits
-            to profile_lines/polygons this snippet made are reflected.
+            lowe, mprice; left out, it is THE METHOD THE MODEL DECLARES (main!D14 —
+            what Studio's Run LEM dialog opens on), or spencer where it declares
+            none. Shows the solution plot when plot=True (pass plot=False in sweeps
+            to avoid many figures). Rebuilds derived geometry first, so edits to
+            profile_lines/polygons this snippet made are reflected.
 
             `search=True` runs the automated search for the CRITICAL surface for
             this method — what Studio's Run LEM does by default, and what "the
@@ -240,82 +452,88 @@ class PythonKernel:
             so two methods legitimately settle on two surfaces. `search=False`
             (default) solves only the surface the model already defines, which is
             the right call inside a sweep or when the user named that surface.
-            """
-            from xslope.slice import generate_slices
-            from xslope.solve import solve_selected
-            sd = doc.slope_data if slope_data is None else slope_data
-            resync_geometry(sd)        # reflect any in-snippet geometry edits
-            if search:
-                return _run_lem_search(sd, method, num_slices, rapid, plot)
-            circle = (sd["circles"][0] if sd.get("circular") and sd.get("circles")
-                      else None)
-            non_circ = sd.get("non_circ") or None
-            if circle is None and not non_circ:
-                raise RuntimeError("No failure surface defined (add a circle or "
-                                   "non-circular surface first).")
-            ok, res = generate_slices(sd, circle=circle, non_circ=non_circ,
-                                      num_slices=num_slices)
-            if not ok:
-                raise RuntimeError(res)
-            slice_df, surface = res
-            result = solve_selected(method, slice_df, rapid=rapid)
-            if not isinstance(result, dict):
-                raise RuntimeError(f"No solution: {result}")
-            print(f"{method}: FS = {result['FS']:.3f}")
-            if plot:
-                from xslope.plot import plot_solution
-                import matplotlib.pyplot as plt
-                plot_solution(sd, slice_df, surface, result,
-                              fig=plt.figure(figsize=(11, 6)))
-            return result
 
-        def _run_lem_search(sd, method, num_slices, rapid, plot):
-            """`run_lem(search=True)` — the critical surface for this method.
+            The run is :func:`xslope.search.run_lem_analysis` — the entry point
+            Studio's Run LEM dialog drives — and its bundle is attached to the
+            session (`doc.results['lem_solution']`) exactly as a dialog run attaches
+            it, so the result tabs show it and the Analysis Report documents it.
 
-            :func:`xslope.search.run_lem_analysis` is the same entry point Studio's
-            Run LEM dialog drives, so the assistant's answer and the app's answer
-            are the same run. Its per-iteration progress is captured rather than
-            printed: a converging search writes a dozen lines the model has to read
-            back as tokens, and only the last of them is the answer. What the search
-            reports about ITSELF — unsolved trials, admissibility notes — is kept,
-            because those are findings about the model.
+            The returned dict is the solver's, plus the surface it was solved on:
+            'Xo', 'Yo', 'R', 'Depth' (the circle, None on a non-circular surface)
+            and 'x_entry' / 'x_exit', the crest-side and toe-side ends of the trace.
             """
             import contextlib
             import io as _io
-            from xslope.search import run_lem_analysis
+            from xslope.search import AnalysisError, run_lem_analysis
 
+            sd = doc.slope_data if slope_data is None else slope_data
+            method = _declared_lem_method(sd, method)
+            resync_geometry(sd)        # reflect any in-snippet geometry edits
+            if not (sd.get("circles") or sd.get("non_circ")):
+                raise RuntimeError("No failure surface defined (add a circle or "
+                                   "non-circular surface first).")
             family = ("circular" if (sd.get("circular", True) and sd.get("circles"))
                       else "noncircular")
-            with contextlib.redirect_stdout(_io.StringIO()):
-                bundle = run_lem_analysis(sd, method, analysis="auto_search",
-                                          surface=family, num_slices=num_slices,
-                                          rapid=rapid, announce=False)
+            # A converging search writes a dozen progress lines the model would
+            # have to read back as tokens, and only the last of them is the answer,
+            # so a SEARCH runs muted. What the search reports about ITSELF —
+            # unsolved trials, admissibility notes — is kept below, because those
+            # are findings about the model. A single solve prints little and what
+            # it prints is the solver's, so it is left alone.
+            muted = (contextlib.redirect_stdout(_io.StringIO()) if search
+                     else contextlib.nullcontext())
+            try:
+                with muted:
+                    bundle = run_lem_analysis(
+                        sd, method,
+                        analysis="auto_search" if search else "single_surface",
+                        surface=family, num_slices=num_slices, rapid=rapid,
+                        announce=False)
+            except AnalysisError as exc:
+                raise RuntimeError(str(exc)) from None
             result = bundle.get("results")
             if not isinstance(result, dict):
-                raise RuntimeError("The search found no solvable surface: %s"
-                                   % (bundle.get("failure") or "no solution"))
-            surf = bundle.get("failure_surface")
-            info = bundle.get("search") or {}
+                raise RuntimeError(
+                    ("The search found no solvable surface: %s" if search
+                     else "No solution: %s") % (bundle.get("failure")
+                                                or "no solution"))
+            surface = _surface_keys(bundle, sd)
             where = ""
-            cache = info.get("fs_cache") or []
-            if family == "circular" and cache:
-                best = cache[0]
-                xo, yo, depth = best.get("Xo"), best.get("Yo"), best.get("Depth")
-                if xo is not None and yo is not None and depth is not None:
-                    where = (f" on the circle Xo={float(xo):.2f}, Yo={float(yo):.2f},"
-                             f" R={float(yo) - float(depth):.2f}")
-            print(f"{method} (auto search, {family}): FS = {result['FS']:.3f}{where}")
-            unsolved = info.get("unsolved") or {}
+            if search and surface["Xo"] is not None:
+                where = (f" on the circle Xo={surface['Xo']:.2f}, "
+                         f"Yo={surface['Yo']:.2f}, R={surface['R']:.2f}")
+            head = f"{method} (auto search, {family})" if search else method
+            print(f"{head}: FS = {result['FS']:.3f}{where}")
+            info = bundle.get("search") or {}
+            unsolved = (info.get("unsolved") or {}) if info else {}
             if unsolved.get("sentence"):
                 print("  " + unsolved["sentence"])
             for note in (result.get("warnings") or []):
                 print(f"  admissibility: {note}")
+            # Only a run on the OPEN model is the session's run: a sweep hands in
+            # its own copy, and those answers are the sweep's, not the project's.
+            if sd is doc.slope_data:
+                # The options this run was made under are the session's last LEM
+                # options, exactly as the dialog's are: they are what the report
+                # labels the run with, and what the Run LEM dialog next opens on.
+                if window is not None and hasattr(window, "_last_lem_opts"):
+                    try:
+                        window._last_lem_opts = dict(bundle.get("options") or {},
+                                                     method=method)
+                    except Exception:
+                        pass
+                _store_result("lem_solution", bundle,
+                              show=([("_show_search", (bundle["search"],))]
+                                    if bundle.get("search") else [])
+                                   + [("_show_solution", (bundle,))],
+                              lead=("search_canvas" if bundle.get("search")
+                                    else "solution_canvas"))
             if plot:
                 from xslope.plot import plot_solution
                 import matplotlib.pyplot as plt
-                plot_solution(sd, bundle["slice_df"], surf, result,
-                              fig=plt.figure(figsize=(11, 6)))
-            return result
+                plot_solution(sd, bundle["slice_df"], bundle["failure_surface"],
+                              result, fig=plt.figure(figsize=(11, 6)))
+            return dict(result, **surface)
 
         def _ensure_mesh(sd, quiet=False):
             """The model's finite-element mesh, building one from the FILE'S OWN
@@ -354,22 +572,9 @@ class PythonKernel:
                       f"{len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements.")
             return mesh
 
-        def _show(*calls):
-            """Put a solved run in front of the user the way a Run does — the
-            results tab for that engine — where there is a window to put it in.
-
-            Best effort by construction: the answer is already attached to the
-            model and the session, and the chat carries its plot, so a view that
-            cannot be built (no window, a panel that objects) must not turn a
-            successful analysis into a failed snippet.
-            """
-            for name, args in calls:
-                try:
-                    method = getattr(window, name, None)
-                    if callable(method):
-                        method(*args)
-                except Exception:
-                    pass
+        # Attach a solved bundle where a Run attaches it, raise its result tabs,
+        # and record that this snippet is what made it.
+        _store_result = self._store_result
 
         def run_seep(bc=1, tol=1e-4, max_iter=400, plot=True, slope_data=None):
             """Run a STEADY seepage analysis and return the solution dict — the
@@ -406,8 +611,9 @@ class PythonKernel:
             # The solved field belongs to the MODEL, not only to a results tab —
             # this is what a u='seep' stability run reads.
             apply_steady_stability_field(sd, solution, bc=bc, verbose=False)
-            _show(("_show_seep_data", (seep_data, bc)),
-                  ("_show_seep_solution", (bc,)))
+            _store_result("seep_solutions", doc.results["seep_solutions"],
+                          show=[("_show_seep_data", (seep_data, bc)),
+                                ("_show_seep_solution", (bc,))])
             q = solution.get("flowrate")
             print(f"seepage (BC set {bc}): converged={solution.get('converged')}"
                   + (f", total flow q = {q:.4g}" if q is not None else ""))
@@ -482,8 +688,9 @@ class PythonKernel:
                     # bracket closed, so an undecided upper edge is invisible in
                     # the number itself.
                     print(f"  {result['note']}")
-            doc.results["fem_solution"] = bundle
-            _show(("_show_fem_data", (fem_data,)), ("_show_fem_results", ()))
+            _store_result("fem_solution", bundle,
+                          show=[("_show_fem_data", (fem_data,)),
+                                ("_show_fem_results", ())])
             if plot:
                 from xslope.plot_fem import plot_fem_results
                 plot_fem_results(fem_data, bundle["solution"], fs=bundle["FS"],
@@ -628,8 +835,14 @@ class PythonKernel:
                                          finalization_enabled)
             sd = doc.slope_data
             solutions = _report_solutions()
-            out_path = path or default_output_path(getattr(doc, "path", None))
+            model_path = getattr(doc, "path", None)
+            out_path = path or default_output_path(model_path)
             opts = dict(options)
+            # The traceability stamp names the input file and its SHA-256; without
+            # this it reads "not saved to a file" even for a project opened from
+            # disk. The Report dialog passes the same value.
+            if model_path:
+                opts.setdefault("input_path", model_path)
             style = getattr(doc, "style", None)
             if style is not None:
                 opts.setdefault("style", style)
@@ -1210,6 +1423,15 @@ class PythonKernel:
         self._ns["OUTPUT_DIR"] = self.outdir
 
         code = self._normalize(code)
+        # This snippet's own bookkeeping: what it solves (so Studio's stale-result
+        # sweep cannot take a run made after the edit that triggered it) and the
+        # geometry it starts from (so an edit made on the source the resync
+        # overwrites is named rather than silently reverted).
+        self._fresh_results = {}
+        self._geom_warnings = []
+        sd = self._doc.slope_data
+        self._geom_watch = ((_geometry_native(sd), _geometry_sigs(sd))
+                            if isinstance(sd, dict) else None)
         os.makedirs(self.outdir, exist_ok=True)     # may have been cleared by the OS
         before_figs = set(plt.get_fignums())
         existing = set(os.listdir(self.outdir))     # to detect files the snippet writes
@@ -1227,6 +1449,17 @@ class PythonKernel:
                 os.chdir(prev_cwd)
             except Exception:
                 pass
+        if error:
+            # A snippet that raised is rolled back whole, so its geometry edit is
+            # not the model's problem and its results were never the session's.
+            self._geom_warnings = []
+            self._fresh_results = {}
+        else:
+            # A snippet that ran nothing still has its polygons rebuilt — by the
+            # checks' own resync, after this returns — so the last word on the
+            # source of a geometry edit is said here.
+            self._note_geometry_source()
+        self._geom_watch = None
 
         # Auto-save figures the snippet left open — but only if it didn't already
         # save a figure itself (e.g. savefig('plot.png') without closing), so a

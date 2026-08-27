@@ -105,7 +105,7 @@ the answer you will get.*
 > recovers the pre-drawdown effective stresses on the slip surface, stage 2 computes FS
 > after drawdown with undrained strengths derived from those stresses, and stage 3
 > re-checks with drained strengths; the reported FS is the lower of stages 2 and 3. So a
-> drop is the expected behaviour, not a defect — what is worth checking is whether rapid
+> drop is the expected behavior, not a defect — what is worth checking is whether rapid
 > drawdown applies at all, via the time factor T = c_v·t/D².
 >
 > Procedure and the T rubric:
@@ -141,10 +141,10 @@ one rather than reassembling the engine by hand:
 
 | Helper | What it does |
 | --- | --- |
-| `run_lem(method='bishop', search=True)` | One limit-equilibrium solve. `search=True` searches for the critical surface for that method, exactly as [Run LEM](analysis.md) does; `search=False` solves the surface already on the project. |
+| `run_lem(search=True)` | One limit-equilibrium solve. `search=True` searches for the critical surface for that method, exactly as [Run LEM](analysis.md) does; `search=False` solves the surface already on the project. The method defaults to the one the **model** declares (the `main` sheet's LEM method, which is what the Run LEM dialog opens on), so the assistant and the dialog run the same method unless you name another. The result carries the surface it was solved on — `Xo`, `Yo`, `R`, `Depth`, and the `x_entry`/`x_exit` ends of the trace — and the run is stored where a dialog run is stored, so the results tabs show it and the report documents it. |
 | `run_seep(bc=1)` | One steady seepage solve. The solved pore pressures are attached to the model, so a later stability run with `u = seep` reads them. |
 | `run_fem(analysis='ssrm')` | One finite element run — the SSRM factor of safety, or a single trial. Minutes, not seconds. |
-| `generate_report(path=None)` | The [Analysis Report](reports.md), built and finished exactly as the Report dialog builds it. |
+| `generate_report(path=None)` | The [Analysis Report](reports.md), built and finished exactly as the Report dialog builds it — over every engine the session has solved, and stamped with the project file and its SHA-256 where the project has been saved. |
 | `suggest_elastic('Clay')` | Soil-type `E` and `ν` for a material that carries none, classified from its strength. A last resort, never a substitute for a stated value. |
 | `sensitivity()`, `design_sweep()`, `parametric_sweep()`, `reliability_*()` | The parameter-study and probabilistic families. |
 | `corpus_index('rapid drawdown')` | Worked examples from the [verification corpus](../verification/index.md) matching a topic, with their page URLs. |
@@ -315,8 +315,10 @@ your guardrails.
   the provider served from its prompt cache — a subset of the input count, not an
   addition to it. A new chat starts the count over; see
   [What a turn costs](#what-a-turn-costs) for the figures to plan around.
-- Press **Enter** to send; the transcript renders markdown with collapsible code
-  blocks and surfaces actionable error messages.
+- Press **Enter** to send. The transcript renders the assistant's markdown —
+  headings, tables, bullet lists and fenced code blocks all display as such, so a
+  set of numbers arrives as a table rather than as rows of pipes. Code the
+  assistant *ran* and its output stay in their own monospaced **Ran code** block.
 
 ---
 

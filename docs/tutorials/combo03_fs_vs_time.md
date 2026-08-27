@@ -146,12 +146,11 @@ mechanism.** A search steps away from its starting circle and stops where the
 steps no longer lower the factor of safety, so a seed part way up the slope
 settles near where it started.
 
-Neither circle cuts the core on this dam. Its core is 8 m wide across the top
-with its crown 4 m below the crest, so a circle from the crest edge to the rock
-passes over the shoulder. Where a core is wider or carried closer to the crest,
-draw the starting circle to cut it. Even one drawn through the core refines out
-of it — at (22, 52) with a radius of 51 m it reaches 1.338 at (9.12, 46.76) on
-day 35, against 1.331 for the circle in the table.
+Normally the critical circle in a zoned dam passes through the core, and the
+starting circle should be drawn to cut it. This dam is small and its core is
+narrow — 8 m wide at the top, with its crown 4 m below the crest — so the
+critical circles stay mainly in the shell, and neither starting circle here cuts
+the core.
 
 Under the table, the **Search window** group holds ten limits on where a searched
 surface may run; a blank field is a limit that is not applied, and

@@ -174,13 +174,6 @@ are measuring.
 
 ![Two starting circles and the one search limit the file sets](images/combo03_studio_circles.png)
 
-Two circles with **Grid search** off raises `circles.multiple_without_grid` in
-the **Model checks** panel on every run below, because a seeded search screens
-each starting circle on one coarse grid and refines only the best-scoring one.
-That is what we want here, since both circles sit on a real mechanism. Where
-the critical face is not known in advance, **Grid search (auto-seed the circular
-search)** sweeps a grid of centers against tangent elevations from the geometry
-instead.
 
 Click **OK** on the Circles editor. The Inputs plot draws the model:
 
@@ -225,7 +218,12 @@ The curve starts from the factor of safety at full pool. Switch back to **LEM**
 satisfies both force and moment equilibrium and is the method behind every factor
 of safety on this page; **Analysis** opens on **Auto search**, which finds the
 run its own critical circle, and **Number of slices** on 40. Leave every field
-alone.
+alone. The **Model checks** column shows one warning,
+`circles.multiple_without_grid`: with two starting circles and Grid search off,
+the search refines only the circle that screens better on its first coarse
+pass. That is what we want here, because each circle already sits on the
+mechanism its face can make. When the critical face is not known in advance,
+ticking **Grid search** is the safer choice.
 
 Click **Run**. The Log reports the limit it read off the file, then the
 refinement:

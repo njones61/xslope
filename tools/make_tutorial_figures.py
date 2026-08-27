@@ -6310,18 +6310,21 @@ def combo02_seep():
 # --------------------------------------------------------------------------- #
 COMBO03 = os.path.join(REPO_ROOT,
                        "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
-#: Build Mesh: linear triangles, auto-sizing on, 64 divisions across the 110 m
-#: section — SEEP-3's mesh, because this page reads SEEP-3's fields.
+#: The mesh the file ships, stated the way Studio's Build Mesh dialog states it:
+#: linear triangles, auto-sized at 64 divisions across the 110 m section. It is
+#: SEEP-3's mesh, because this page reads SEEP-3's fields. Named here so the line
+#: the page quotes is produced rather than transcribed.
 COMBO03_ELEMENT = "tri3"
 COMBO03_DIVISIONS = 64
-#: Run Seepage, at its defaults.
-COMBO03_TOL, COMBO03_MAX_ITER = 1e-4, 400
 #: Run LEM: Spencer at the dialog's slice count, searching at every instant.
 COMBO03_METHOD = "spencer"
 COMBO03_SLICES = 40
-#: The two instants the page draws a slice figure at: full pool, and whichever
-#: saved frame carries the lowest factor of safety (resolved from the curve).
+#: The two instants the page runs one at a time, through the Run LEM dialog's
+#: Seepage time selector: the full reservoir the march starts from, and the frame
+#: three quarters of the way down the fall. The second is also where the curve
+#: turns out to be lowest, so the figure of the critical instant is that run.
 COMBO03_FULL_POOL = 0.0
+COMBO03_SECOND = 35.0
 #: Instants the refinement pass asks for: the saved frames across the dip with the
 #: midpoint of every gap between them added, so the pass halves the resolution the
 #: schedule already has. Four of the nine name no saved frame, so it costs one
@@ -6334,61 +6337,20 @@ COMBO03_REFINE = (20.0, 22.5, 25.0, 27.5, 30.0, 32.5, 35.0, 37.5, 40.0)
 COMBO03_SEED = None
 
 
-def _combo03_mesh(model):
-    """The mesh Build Mesh produces on this file with only the element type set."""
-    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
-                             get_material_polygons)
+def _combo03_march(model):
+    """The mesh and the march the file ships, returning ``(seep_data, solution)``.
 
-    xs = [x for x, _ in model["ground_surface"].coords]
-    size = (max(xs) - min(xs)) / COMBO03_DIVISIONS
-    with contextlib.redirect_stdout(io.StringIO()):
-        return build_mesh_from_polygons(get_material_polygons(model), size,
-                                        COMBO03_ELEMENT,
-                                        size_regions=extract_size_regions(model))
-
-
-def _combo03_pinned(model):
-    """``model`` with the reservoir boundary entered as a plain head at full pool.
-
-    The steady run this page makes first is the march's own initial condition, and
-    at t = 0 the whole submerged face stands below the pool, so a submerged-only
-    reservoir at elevation 18 and a fixed head of 18 are the same boundary. Pinning
-    it lets the steady solve report a discharge, which a series-bound value has none
-    of. Identical to SEEP-3's construction, and it produces SEEP-3's field.
+    Read off the companions rather than solved again: the workbook arrives with
+    ``_mesh.json`` and ``_tseep.csv`` beside it and Studio attaches both on open,
+    so this is the state the reader's copy is in before the first stability run.
     """
-    bc = {k: (list(v) if isinstance(v, list) else v)
-          for k, v in model["seepage_bc"].items()}
-    heads = [dict(h) for h in bc["specified_heads"]]
-    heads[0] = dict(heads[0], kind="head",
-                    head=float(model["tseep"]["series"]["pool"][0]))
-    bc["specified_heads"] = heads
-    return dict(model, seepage_bc=bc, tseep=None)
+    from xslope.seep import build_seep_data, import_transient_solution
 
-
-def _combo03_steady(model, mesh):
-    """One steady seepage solve, returning ``(seep_data, solution, log)``."""
-    from xslope.seep import build_seep_data, run_seepage_analysis
-
-    log = io.StringIO()
-    with contextlib.redirect_stdout(log):
-        seep_data = build_seep_data(mesh, model)
-        solution = run_seepage_analysis(seep_data, tol=COMBO03_TOL,
-                                        max_iter=COMBO03_MAX_ITER)
-    return seep_data, solution, log.getvalue()
-
-
-def _combo03_march(model, mesh):
-    """The transient march, returning ``(seep_data, solution, log)`` — the call
-    Studio's seepage runner makes, on the model as shipped."""
-    from xslope.seep import (build_seep_data, build_tseep_data,
-                             run_transient_seepage)
-
-    log = io.StringIO()
-    with contextlib.redirect_stdout(log):
-        seep_data = build_seep_data(mesh, model, seep_bc=1)
-        solution = run_transient_seepage(seep_data, build_tseep_data(model),
-                                         verbose=True)
-    return seep_data, solution, log.getvalue()
+    with contextlib.redirect_stdout(io.StringIO()):
+        seep_data = build_seep_data(model["mesh"], model, seep_bc=1)
+        solution = import_transient_solution(seep_data,
+                                             os.path.splitext(COMBO03)[0])
+    return seep_data, solution
 
 
 def _combo03_at(model, solution, t):
@@ -6558,18 +6520,16 @@ def _combo03_curve_figure(model, times, fs, crit_t, crit_fs, baseline, faces):
 
 
 def combo03_plots():
-    """The FS-versus-time page: the model, the initial condition, the curve over
-    the whole march, and the critical instant against full pool.
+    """The FS-versus-time page: the model, the two single-instant runs, the curve
+    over the whole march, and the critical instant drawn.
 
     Printed rather than drawn: the strengths and the search window the file
-    carries, the mesh, the steady discharge, the baseline search, the march's
-    saved-frame log, the factor of safety and the critical circle at every saved
-    instant, and the refinement pass that measures what a finer save grid is
-    worth. Every number the page quotes is on one of these lines.
+    carries, the mesh and the march it ships, the two Run LEM logs, the factor of
+    safety and the critical circle at every saved instant, and the refinement pass
+    that measures what a finer save grid is worth. Every number the page quotes is
+    on one of these lines.
     """
     import time as _time
-
-    import numpy as np
 
     from xslope.sensitivity import fs_vs_time
 
@@ -6591,56 +6551,38 @@ def combo03_plots():
     capture("combo03_inputs.png", plot_inputs, model, mode="lem",
             title="Stability Model Inputs", frame="content", show_mesh=False)
 
-    mesh = _combo03_mesh(model)
-    model["mesh"] = mesh
+    # ---- the mesh and the march the file ships ------------------------------ #
+    mesh = model["mesh"]                        # {stem}_mesh.json, read by the loader
     xs = [x for x, _ in model["ground_surface"].coords]
-    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g %s"
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g %s "
+          "(from the shipped %s_mesh.json)"
           % (len(mesh["nodes"]), len(mesh["elements"]), COMBO03_ELEMENT,
              COMBO03_DIVISIONS, (max(xs) - min(xs)) / COMBO03_DIVISIONS,
-             _u["length"]))
+             _u["length"], os.path.basename(os.path.splitext(COMBO03)[0])))
+    seep_data, solution = _combo03_march(model)
+    print("   march       %d saved frames at t = %s (from the shipped _tseep.csv)"
+          % (len(solution["times"]),
+             " ".join("%g" % t for t in solution["times"])))
 
-    # ---- the initial condition, solved as an ordinary steady run ------------ #
-    _seep_data, steady, log = _combo03_steady(_combo03_pinned(model), mesh)
-    head = np.asarray(steady["head"])
-    print("   steady      q %.5f %s · head %.3f to %.3f %s · u %.1f to %.1f %s"
-          % (steady["flowrate"], _u["flowrate"], head.min(), head.max(),
-             _u["length"], np.min(steady["u"]), np.max(steady["u"]), _u["stress"]))
-    print("   iteration   %s" % _seep02_log_stats(log))
-    # No figure: this solve reproduces SEEP-3's initial condition exactly — same
-    # section, same mesh, same solver defaults — so the page shows SEEP-3's own
-    # ``seep03_steady.png`` rather than carrying a second copy of it. The numbers
-    # printed above are what the page quotes, and they are produced here.
-
-    # ---- the baseline: one search on the full-pool field -------------------- #
-    from xslope.seep import apply_steady_stability_field
-    from xslope.water import with_water_loads
-
-    base = dict(model)
-    with contextlib.redirect_stdout(io.StringIO()):
-        apply_steady_stability_field(base, steady, bc=1)
-    base = with_water_loads(base)
-    t0 = _time.time()
-    base_crit, base_log = _combo03_search(base)
-    print("   baseline    %s · %.0f s"
-          % (_combo03_reading(base_crit, model), _time.time() - t0))
-    print("   --- Run LEM's log at full pool, as Studio prints it ---")
-    for line in base_log.splitlines():
-        print("     %s" % line.rstrip())
-    print("   water load  full pool peak %.1f %s"
-          % (max((float(p["Normal"]) for b in base["dloads_derived"] for p in b),
-                 default=0.0), _u["stress"]))
-    capture("combo03_solution_full.png", plot_solution, base,
-            base_crit["slices"], base_crit["failure_surface"],
-            _combo03_results(base_crit))
-
-    # ---- the march ---------------------------------------------------------- #
-    t0 = _time.time()
-    tseep_data, solution, tlog = _combo03_march(model, mesh)
-    print("   march       %d saved frames · %.0f s wall"
-          % (len(solution["frames"]), _time.time() - t0))
-    for line in tlog.splitlines():
-        if "frame saved" in line or line.startswith("Transient"):
-            print("     %s" % line.strip())
+    # ---- one instant at a time, the way Run LEM asks for one ---------------- #
+    single = {}
+    for _t in (COMBO03_FULL_POOL, COMBO03_SECOND):
+        staged = _combo03_at(model, solution, _t)
+        t0 = _time.time()
+        crit, log = _combo03_search(staged)
+        single[_t] = (staged, crit)
+        print("   instant     t = %g %s · %s · %.0f s"
+              % (_t, _u["time"], _combo03_reading(crit, model), _time.time() - t0))
+        print("   --- Run LEM's log at t = %g, as Studio prints it ---" % _t)
+        for line in log.splitlines():
+            print("     %s" % line.rstrip())
+        print("   water load  t = %g peak %.1f %s"
+              % (_t, max((float(p["Normal"]) for b in staged["dloads_derived"]
+                          for p in b), default=0.0), _u["stress"]))
+    full, full_crit = single[COMBO03_FULL_POOL]
+    capture("combo03_solution_full.png", plot_solution, full,
+            full_crit["slices"], full_crit["failure_surface"],
+            _combo03_results(full_crit))
 
     # ---- the curve ---------------------------------------------------------- #
     t0 = _time.time()
@@ -6667,21 +6609,22 @@ def combo03_plots():
     faces = [_combo03_face(model, x) for x in res["df"]["Xo"]]
     capture("combo03_curve.png", _combo03_curve_figure, model, times, fs,
             float(res["critical_time"]), float(res["min_fs"]),
-            float(base_crit["FS"]), faces)
+            float(full_crit["FS"]), faces)
 
     # ---- the critical instant, drawn ---------------------------------------- #
-    worst = _combo03_at(model, solution, res["critical_time"])
-    worst_crit, worst_log = _combo03_search(worst)
-    print("   worst       t = %g %s · %s"
-          % (res["critical_time"], _u["time"],
-             _combo03_reading(worst_crit, model)))
-    print("   --- Run LEM's log at the critical instant ---")
-    for line in worst_log.splitlines():
-        print("     %s" % line.rstrip())
-    print("   water load  t = %g peak %.1f %s"
-          % (res["critical_time"],
-             max((float(p["Normal"]) for b in worst["dloads_derived"] for p in b),
-                 default=0.0), _u["stress"]))
+    # The lowest instant is one of the two run singly above whenever the curve
+    # turns where the page says it does, and re-searching it would be the same
+    # search twice; it is only staged again if the minimum moves.
+    _ct = float(res["critical_time"])
+    if _ct in single:
+        worst, worst_crit = single[_ct]
+    else:
+        worst = _combo03_at(model, solution, _ct)
+        worst_crit, worst_log = _combo03_search(worst)
+        print("   worst       t = %g %s · %s"
+              % (_ct, _u["time"], _combo03_reading(worst_crit, model)))
+        for line in worst_log.splitlines():
+            print("     %s" % line.rstrip())
     capture("combo03_solution_min.png", plot_solution, worst,
             worst_crit["slices"], worst_crit["failure_surface"],
             _combo03_results(worst_crit))
@@ -6691,7 +6634,7 @@ def combo03_plots():
     with contextlib.redirect_stdout(io.StringIO()):
         ok, fine = fs_vs_time(model, solution, times=list(COMBO03_REFINE),
                               methods=(COMBO03_METHOD,), search=True,
-                              num_slices=COMBO03_SLICES, seep_data=tseep_data,
+                              num_slices=COMBO03_SLICES, seep_data=seep_data,
                               remarch=True, search_opts=COMBO03_SEED)
     if not ok:
         raise RuntimeError(fine)

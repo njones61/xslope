@@ -1,18 +1,28 @@
-"""Build ``xslope_earth_dam_fs_time.xlsx``, Tutorial COMBO-3's model — the cored
-earth dam of Tutorial SEEP-3 given the strengths a stability run needs.
+"""Build ``xslope_earth_dam_fs_time.xlsx``, Tutorial COMBO-3 Part 1's model — the
+cored earth dam of Tutorial SEEP-3, meshed and marched, with the strengths a
+stability run reads.
 
 COMBO-3 puts a factor-of-safety-versus-time curve on the drawdown SEEP-3 solved,
 and it needs no new seepage input to do it. The build starts from
 ``build_earth_dam_tseep.seep03_model()`` — the same section, the same two zones,
-the same storage, the same boundary set and the same schedule — and adds only
-what a limit equilibrium run reads: a strength band on the materials table, a
-starting circle on each face, and a minimum slip depth that keeps the search off
-surficial slivers.
+the same storage, the same boundary set — and adds only what a limit equilibrium
+run reads: a starting circle on each face, a minimum slip depth that keeps the
+search off surficial slivers, and a denser saved-frame schedule for the curve to
+be drawn through.
 
-One file rather than a starter/completed pair, on COMBO-1's pattern: the page
-opens a finished model and spends its length on the runs. It is sidecar-free —
-meshing, the steady solve and the march are what the page teaches, so nothing may
-arrive already solved.
+The file arrives SOLVED. The mesh and the whole transient march ship beside the
+workbook as ``_mesh.json``, ``_tseep.csv`` and ``_tseep_meta.json``, so the reader
+opens a dam whose nineteen pore-pressure fields already exist and goes straight to
+the stability runs. Building a transient seepage model is Tutorial SEEP-3's
+subject, and COMBO-3 does not repeat it.
+
+One file rather than a starter/completed pair, and the strength band is on it. A
+strengthless variant was the shorter route — the page's first step would have the
+reader type the band in — but a workbook that declares circles and leaves the unit
+weights blank does not load at all: ``load_slope_data`` refuses a material with a
+non-positive gamma on any model that is not seepage-only, and this one carries two
+starting circles. So the band ships filled in and the page has the reader open the
+Materials editor and confirm it.
 
 The strengths are typical values for a granular shell and a compacted clay core,
 chosen for the exercise rather than measured on this dam; SEEP-3's file carries
@@ -20,26 +30,31 @@ none, because a seepage analysis reads none. The tutorial page states this in th
 same words.
 
 Run:  PYTHONPATH=. python3 tools/build_earth_dam_fs_time.py
+
+The build solves the whole march, so it takes a couple of minutes.
 """
 
 from __future__ import annotations
 
+import contextlib
+import io
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from build_earth_dam_tseep import TUTORIAL_FILES, _write, seep03_model  # noqa: E402
+from build_earth_dam_tseep import (REPO_ROOT, TUTORIAL_FILES, _write,  # noqa: E402
+                                   seep03_model)
 
 OUT = "xslope_earth_dam_fs_time.xlsx"
 
-#: The limit equilibrium band, indexed to the base file's material order. Drained
-#: effective-stress strengths on both zones, and ``u = seep`` on both so every
-#: slice base reads its pore pressure from the solved field rather than from a
-#: sketched line — which is the whole point of a curve driven by a march.
-#: ``gamma`` is the moist unit weight above the water table and ``gamma_sat`` the
-#: saturated one below it; the slicer splits each slice's weight at the water
-#: table, so a drawdown that drains the shell lightens it.
+#: The limit equilibrium band the page reads out, indexed to the base file's
+#: material order. Drained effective-stress strengths on both zones, and
+#: ``u = seep`` on both so every slice base reads its pore pressure from the solved
+#: field rather than from a sketched line — which is the whole point of a curve
+#: driven by a march. ``gamma`` is the moist unit weight above the water table and
+#: ``gamma_sat`` the saturated one below it; the slicer splits each slice's weight
+#: at the water table, so a drawdown that drains the shell lightens it.
 STRENGTHS = [
     dict(option="mc", gamma=20.0, gamma_sat=21.0, c=0.0, phi=32.0, u="seep"),
     dict(option="mc", gamma=19.0, gamma_sat=20.0, c=10.0, phi=25.0, u="seep"),
@@ -91,10 +106,18 @@ DURATION = 300.0
 SAVE_TIMES = [2.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 47.0,
               55.0, 65.0, 80.0, 100.0, 130.0, 180.0, 240.0, 300.0]
 
+#: The mesh the file ships, stated the way Studio's Build Mesh dialog states it:
+#: linear triangles, auto-sized from the geometry at 64 divisions across the 110 m
+#: section. Head is a scalar field, so linear elements resolve it. This is SEEP-3's
+#: own mesh, so the fields under COMBO-3's curve are the fields that tutorial
+#: solves.
+MESH_ELEMENT_TYPE = "tri3"
+MESH_SIZE_DIVISIONS = 64
 
-def build():
-    """SEEP-3's completed model with the strengths, both surfaces, the floor and
-    the denser saved-frame schedule."""
+
+def _model():
+    """SEEP-3's completed model with the strengths, both starting surfaces, the
+    search floor and the denser saved-frame schedule."""
     sd = seep03_model()
     for mat, upd in zip(sd["materials"], STRENGTHS):
         mat.update(upd)
@@ -103,7 +126,51 @@ def build():
     sd["circles"] = [dict(c) for c in CIRCLES]
     sd["circular"] = True
     sd["search_window"] = dict(SEARCH_WINDOW)
-    return _write(sd, TUTORIAL_FILES, OUT)
+    return sd
+
+
+def _quiet(fn, *a, **k):
+    with contextlib.redirect_stdout(io.StringIO()):
+        return fn(*a, **k)
+
+
+def build():
+    """The workbook, and the mesh and march that ship beside it."""
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import (build_mesh_from_polygons, export_mesh_to_json,
+                             extract_size_regions, get_material_polygons)
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             export_transient_solution, run_transient_seepage)
+
+    path = _write(_model(), TUTORIAL_FILES, OUT)
+
+    # Re-read what was written, so the companions are built on the model as the
+    # file states it rather than on the dict that produced it.
+    sd = load_slope_data(path)
+    xs = [x for x, _ in sd["ground_surface"].coords]
+    target = (max(xs) - min(xs)) / MESH_SIZE_DIVISIONS
+    mesh = _quiet(build_mesh_from_polygons, get_material_polygons(sd), target,
+                  MESH_ELEMENT_TYPE, size_regions=extract_size_regions(sd))
+    seep_data = _quiet(build_seep_data, mesh, sd, seep_bc=1)
+    solution = _quiet(run_transient_seepage, seep_data, build_tseep_data(sd),
+                      verbose=False)
+    print(f"  mesh: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements "
+          f"(target size {target:g})")
+    print(f"  march: {len(solution['frames'])} frames, "
+          f"converged={solution['converged']}, "
+          f"closure={solution['mass_balance']['final_closure']:.3e}")
+
+    stem = os.path.splitext(path)[0]
+    mesh_path = f"{stem}_mesh.json"
+    export_mesh_to_json(mesh, mesh_path)
+    csv_path, meta_path = _quiet(
+        export_transient_solution, seep_data, solution, stem,
+        input_file=os.path.basename(path),
+        mesh_file=os.path.basename(mesh_path))
+    for written in (mesh_path, csv_path, meta_path):
+        print(f"  wrote {os.path.relpath(written, REPO_ROOT)} "
+              f"({os.path.getsize(written) / 1024:.0f} KB)")
+    return path
 
 
 if __name__ == "__main__":

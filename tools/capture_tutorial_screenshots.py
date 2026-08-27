@@ -2949,59 +2949,59 @@ SHOTS.update({
 # --------------------------------------------------------------------------- #
 COMBO03 = os.path.join(REPO_ROOT,
                        "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
-#: The mesh the page builds, which is SEEP-3's: linear triangles, auto-sizing on,
-#: 64 divisions across the 110 m section.
-COMBO03_MESH = {"element_type": "tri3", "auto_size": True, "size_divisions": 64}
 COMBO03_METHOD = "spencer"
 COMBO03_SLICES = 40
-#: The instants the march saves, which the Run LEM dialog offers as a list. Named
-#: here rather than marched for: the selector reads the times off the solution and
-#: nothing else, and a 60-second transient run for one screenshot is a minute the
-#: shot does not need. The producer in ``make_tutorial_figures.py`` runs the march
-#: for real and prints these same twelve.
+#: The instants the shipped march saves, which the Run LEM and Parametric dialogs
+#: offer as a list. Named here rather than read off the march: both selectors read
+#: the times off the solution and nothing else, and importing nineteen frames of
+#: nodal head for a dialog shot is work the shot does not need. The producer in
+#: ``make_tutorial_figures.py`` reads the real march and prints the same nineteen.
 COMBO03_TIMES = (0.0, 2.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 47.0,
                  55.0, 65.0, 80.0, 100.0, 130.0, 180.0, 240.0, 300.0)
+#: The frame the Run LEM shot is set to: the page's first single-instant run, the
+#: full reservoir the march starts from. The dialog opens on the LAST saved frame,
+#: so a shot on this one is the reader having changed it, which is what the page is
+#: showing.
+COMBO03_DIALOG_TIME = 0.0
+#: The frame the play bar is parked on: three quarters of the way down the fall,
+#: where the pool has left the upper face and the core still holds its head.
+COMBO03_PLAYBAR_TIME = 35.0
 
 _combo03_cache = {}
 
 
 def _combo03_solved():
-    """The model with the page's mesh built and the full-pool field attached.
+    """The shipped model with the mesh and the march it carries, one frame staged.
 
-    The state the reader is in at the baseline run, and the state the Run LEM
-    checks are reported against: a model whose materials read ``u = seep`` needs a
-    solved field, and photographing the dialog before one exists would put an
-    error panel beside controls the page is describing. Cached — the shipped file
-    carries no sidecars, because solving is what the page teaches.
+    The state the reader is in at the first stability run: the loader attaches the
+    companion mesh, the march is read off ``_tseep.csv``, and one instant of it is
+    placed on the model — which a file whose materials read ``u = seep`` needs
+    before Run LEM will report anything but an error panel. Cached, because the
+    import is the same work for every shot.
     """
     if "data" not in _combo03_cache:
-        from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
-                                 get_material_polygons)
-        from xslope.seep import (apply_steady_stability_field, build_seep_data,
-                                 run_seepage_analysis)
+        from xslope.seep import (build_seep_data, import_transient_solution,
+                                 select_transient_frame_u)
 
         data = _load(COMBO03)
-        xs = [x for x, _ in data["ground_surface"].coords]
-        size = (max(xs) - min(xs)) / COMBO03_MESH["size_divisions"]
-        # The reservoir boundary is bound to the pool series; a steady solve reads
-        # it at t = 0, which is full pool, and that is the field wanted here.
         with contextlib.redirect_stdout(io.StringIO()):
-            data["mesh"] = build_mesh_from_polygons(
-                get_material_polygons(data), size, COMBO03_MESH["element_type"],
-                size_regions=extract_size_regions(data))
             seep_data = build_seep_data(data["mesh"], data, seep_bc=1)
-            solution = run_seepage_analysis(seep_data, tol=1e-4, max_iter=400)
-            apply_steady_stability_field(data, solution, bc=1)
+            solution = import_transient_solution(seep_data,
+                                                 os.path.splitext(COMBO03)[0])
+            select_transient_frame_u(data, solution, time=COMBO03_DIALOG_TIME)
         _combo03_cache["data"] = data
+        _combo03_cache["solution"] = solution
+        _combo03_cache["seep_data"] = seep_data
     return _combo03_cache["data"]
 
 
 def combo03_materials():
     """The two zones in table view with the LEM columns showing.
 
-    The band this page fills: a unit weight above the water table and a saturated
-    one below it, a drained effective-stress envelope on each zone, and ``u`` on
-    ``seep`` so every slice base reads its pore pressure from the solved field.
+    The band this page reads out: a unit weight above the water table and a
+    saturated one below it, a drained effective-stress envelope on each zone, and
+    ``u`` on ``seep`` so every slice base reads its pore pressure from the solved
+    field.
     """
     from studio.editors import MaterialsEditor
 
@@ -3025,12 +3025,16 @@ def combo03_circles():
 
 
 def combo03_run_lem():
-    """Run LEM on a model carrying a solved transient march.
+    """Run LEM on the shipped model, with the **Seepage time** group set to the
+    instant the page runs.
 
-    The **Seepage time** group is what the march adds: an ordinary run reads ONE
-    instant, and this is where that instant is named. Its **Saved frame** list
-    holds the twelve the march stored, and the checkbox under it writes the choice
-    to the model so a scripted re-run reads the same frame.
+    The group is what a march adds: an ordinary run reads ONE instant, and this is
+    where that instant is named. Its **Saved frame** list holds the nineteen the
+    march stored, the note under it restates which field the run will read, and
+    the checkbox writes the choice to the model so a scripted re-run reads the
+    same frame. The shot is taken on the frame the page's first run uses rather
+    than on the dialog's opening one, because the page is showing the reader how to
+    change it.
     """
     from studio.dialogs import RunLemDialog
 
@@ -3039,18 +3043,59 @@ def combo03_run_lem():
                                  "num_slices": COMBO03_SLICES},
                        slope_data=_combo03_solved(),
                        transient={"times": list(COMBO03_TIMES)})
+    dlg.seep_time.frame.setCurrentIndex(COMBO03_TIMES.index(COMBO03_DIALOG_TIME))
     dlg.resize(dlg.sizeHint())
     return _grab(dlg, "combo03_studio_run_lem.png")
+
+
+def combo03_playbar():
+    """The **Seep · Transient** results tab on the march the file ships.
+
+    Every pore pressure the page reads comes from one of the frames under this play
+    bar, and the reader gets them without solving anything: the workbook arrives
+    with ``_tseep.csv`` beside it. Parked mid-drawdown, at the instant the page
+    runs singly, where the pool has left the upper face and the core still holds
+    its head. The display options are the transient panel's defaults — no flow
+    lines, since a storage-release state has no flow net.
+    """
+    from studio.transient import TransientSeepView
+
+    data = _combo03_solved()
+    seep_data = _combo03_cache["seep_data"]
+    solution = _combo03_cache["solution"]
+
+    opts = {"variable": "head", "levels": 12, "flowlines": False,
+            "vectors": True, "phreatic": True, "show_bc_levels": True}
+    view = TransientSeepView()
+    # The canvas sizes its figure to the viewport, and this dam is five times as
+    # wide as it is tall, so a tall view leaves the frame stranded in white space.
+    view.resize(1000, 540)
+    view.set_frames(seep_data, solution["frames"],
+                    opts_getter=lambda: opts, style_getter=lambda: None,
+                    keep_index=False)
+    view.show()
+    _settle()
+    times = [float(f["time"]) for f in solution["frames"]]
+    view.set_index(min(range(len(times)),
+                       key=lambda i: abs(times[i] - COMBO03_PLAYBAR_TIME)))
+    _settle()
+    view.canvas._render_current()          # force the raster into the scene
+    _settle()
+    out = os.path.join(OUT_DIR, "combo03_studio_playbar.png")
+    view.grab().save(out)
+    view.close()
+    print("-> combo03_studio_playbar.png")
+    return out
 
 
 def combo03_parametric():
     """Run → Parametric… in Factor-of-safety-vs-time mode.
 
     The whole curve in one run: the parameter picker steps aside (no input is
-    substituted at any point) and the march's twelve saved frames take its place,
-    every one ticked. Method and slice count are the baseline run's, and every
-    solver control is at its default — the two circles the file carries reach both
-    faces of the dam, so nothing here has to be turned on.
+    substituted at any point) and the march's nineteen saved frames take its place,
+    every one ticked. Method and slice count are the single-instant run's, and
+    every solver control is at its default — the two circles the file carries reach
+    both faces of the dam, so nothing here has to be turned on.
     """
     from studio.dialogs import SensitivityDialog
 
@@ -3066,26 +3111,16 @@ def combo03_parametric():
 def combo03_fs_time_result():
     """The **FS vs Time** result tab the run opens.
 
-    The only shot on this page that costs the march: the tab draws the factors of
-    safety the run computed, so the frames have to be real ones. Mesh, march and
-    sweep are the page's own — the twelve instants, Spencer, searching at each.
+    The tab draws the factors of safety the run computed, so this shot costs the
+    whole sweep — nineteen searches. The frames are read off the shipped
+    ``_tseep.csv`` rather than marched again, which is what the reader's copy does
+    too, and the sweep is the page's own: Spencer, searching at each instant.
     """
-    from xslope.seep import build_seep_data, build_tseep_data, run_transient_seepage
     from studio.main_window import SweepCanvas
     from studio.runners import SensitivityRunner
 
-    data = _load(COMBO03)
-    with contextlib.redirect_stdout(io.StringIO()):
-        xs = [x for x, _ in data["ground_surface"].coords]
-        from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
-                                 get_material_polygons)
-        data["mesh"] = build_mesh_from_polygons(
-            get_material_polygons(data),
-            (max(xs) - min(xs)) / COMBO03_MESH["size_divisions"],
-            COMBO03_MESH["element_type"], size_regions=extract_size_regions(data))
-        solution = run_transient_seepage(
-            build_seep_data(data["mesh"], data, seep_bc=1),
-            build_tseep_data(data), verbose=False)
+    data = _combo03_solved()
+    solution = _combo03_cache["solution"]
     opts = {"mode": "fs_vs_time", "engine_mode": "lem", "method": COMBO03_METHOD,
             "num_slices": COMBO03_SLICES, "search": True,
             "times": [float(t) for t in solution["times"]]}
@@ -3159,6 +3194,7 @@ SHOTS.update({
     "combo03_materials": combo03_materials,
     "combo03_circles": combo03_circles,
     "combo03_run_lem": combo03_run_lem,
+    "combo03_playbar": combo03_playbar,
     "combo03_parametric": combo03_parametric,
     "combo03_fs_time_result": combo03_fs_time_result,
     "combo03_rapid_parametric": combo03_rapid_parametric,

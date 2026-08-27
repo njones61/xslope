@@ -533,7 +533,7 @@ def check_the_refusals(failures):
 # ---------------------------------------------------------------------------
 COMBO03 = Path(__file__).resolve().parent.parent / 'docs' / 'tutorials' / \
     'files' / 'xslope_earth_dam_fs_time.xlsx'
-#: The twelve instants COMBO-3's march saves, and the two factors of safety the
+#: The nineteen instants COMBO-3's march saves, and the two factors of safety the
 #: page quotes. Literals: the check never computes its own reference.
 COMBO03_TIMES = (0.0, 2.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 47.0,
                  55.0, 65.0, 80.0, 100.0, 130.0, 180.0, 240.0, 300.0)
@@ -797,8 +797,8 @@ def check_the_combo03_curve(failures):
             verbose=False)
     saved = [float(t) for t in solution['times']]
     if saved != list(COMBO03_TIMES):
-        failures.append(f"the march saved {saved}, not the twelve frames COMBO-3 "
-                        f"publishes")
+        failures.append(f"the march saved {saved}, not the nineteen frames "
+                        f"COMBO-3 publishes")
         return
 
     dlg = SensitivityDialog(slope_data=sd, app_mode='lem',

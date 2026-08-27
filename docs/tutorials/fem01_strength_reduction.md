@@ -173,6 +173,8 @@ and took a few seconds. Bishop's simplified method (1.378) and
 Morgenstern-Price (1.375) settle on the **same circle**, within a quarter of a
 percent of Spencer — one mechanism, found three ways.
 
+<!-- test: file=files/xslope_ssrm_embankment_start.xlsx, type=circular_search, num_slices=40, fs_spencer=1.376, fs_bishop=1.378, fs_mprice=1.375, tolerance=0.005 -->
+
 That number is the target. Everything below is a second, independent route to
 it.
 
@@ -385,6 +387,8 @@ That is what the Log reports, trial by trial:
 nine solves. Seven bisection steps is not luck: each one halves the bracket, so
 from a starting width of 1.0 it takes seven halvings to get under the 0.01
 tolerance, and seven is what it took.
+
+<!-- test: file=files/xslope_ssrm_embankment.xlsx, type=fem_ssrm, expected_fs=1.3633, element_type=tri6, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-1-ssrm -->
 
 **The iteration column is where the physics is.** Trials well below the critical
 factor settle almost immediately — 56 iterations at *F* = 1.00, 124 at 1.25.

@@ -111,6 +111,8 @@ The critical circle enters at the toe and exits on the crest about 6 ft behind
 its edge, dipping only 3 ft below the toe — the shallow surface a 1:1 clay slope
 with c = 200 psf and φ = 20° fails on.
 
+<!-- test: file=files/xslope_pile_wall_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.149, tolerance=0.005 -->
+
 Switch the mode strip to **FEM**, click **Run → Build Mesh…** and **Build**: the
 file declares **Quadratic triangles (tri6)** with **Auto-size from geometry** off
 at `2`, and the mesh comes out at **3,154 nodes and 1,509 triangles** with no
@@ -127,6 +129,8 @@ The shear band starts at the toe, where the strain is highest, runs up through
 the body of the slope and comes out on the crest 10 to 15 ft behind its edge —
 the same surface Spencer found, drawn as a band of strain rather than a line,
 and reaching a few feet farther back.
+
+<!-- test: file=files/xslope_pile_wall_start.xlsx, type=fem_ssrm, expected_fs=1.160, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-bare-ssrm -->
 
 The two engines are 0.011 apart on the bare slope. Every larger difference
 between them on the rest of this page comes from how each engine models the
@@ -212,6 +216,8 @@ limited by the shafts' moment capacity rather than by what the soil could
 supply; [LEM-12](lem12_piles.md#how-the-force-is-computed) works through that
 calculation.
 
+<!-- Spencer's 1.842 on this same file at 40 slices is locked by the LEM sample tag on docs/lem/samples.md (Problem 10, fs_spencer=1.842); not duplicated here. -->
+
 ### The finite element answer
 
 The same file, the same rows, the other engine. Switch the mode strip to
@@ -263,6 +269,8 @@ Leave everything else as it is and click **Run**.
 **FS = 1.379**, from a final bracket of [1.3750, 1.3828] in nine trials — two
 bracket checks and seven bisections. Spencer's method gave 1.842 on the same
 file.
+
+<!-- test: file=../lem/files/xslope_piles.xlsx, type=fem_ssrm, expected_fs=1.379, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-piles-ssrm -->
 
 ![The mechanism at failure, with the pile rows colored by shear force](images/fem03_fem_shear_piles.png){width=1000}
 
@@ -576,6 +584,8 @@ bracket is already `1.00` to `2.00`. Click **Run**.
 
 **FS = 1.559**, from [1.5547, 1.5625]. The wall takes the slope from 1.160 to
 1.559, a credit of ×1.34.
+
+<!-- test: file=files/xslope_pile_wall.xlsx, type=fem_ssrm, expected_fs=1.559, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-3-wall-ssrm -->
 
 ![The mechanism with the wall in place](images/fem03_wall_shear_fixed.png){width=1000}
 

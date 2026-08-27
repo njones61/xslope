@@ -3359,6 +3359,18 @@
           "source_md": "docs/lem/samples.md",
           "title": "10. Slope Stabilized with Piles",
           "url": "https://xslope.readthedocs.io/en/latest/lem/samples/#10-slope-stabilized-with-piles"
+        },
+        {
+          "anchor": "opening-the-model-and-reading-the-pile-rows",
+          "checks": [
+            "FEM-3-piles-ssrm"
+          ],
+          "level": 3,
+          "page": "tutorials/fem03_piles/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_piles.md",
+          "title": "Opening the model and reading the pile rows",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_piles/#opening-the-model-and-reading-the-pile-rows"
         }
       ],
       "topics": [
@@ -4926,6 +4938,841 @@
       "topics": [
         "cutoff-walls",
         "seepage-coupled",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": true,
+        "seepage_problem": true,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": true,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx",
+      "references": [
+        {
+          "anchor": "the-strengths-this-page-adds",
+          "checks": [
+            "COMBO-3-drained"
+          ],
+          "level": 3,
+          "page": "tutorials/combo03_fs_vs_time/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/combo03_fs_vs_time.md",
+          "title": "The strengths this page adds",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo03_fs_vs_time/#the-strengths-this-page-adds"
+        }
+      ],
+      "topics": [
+        "transient-seepage",
+        "seepage-coupled"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": true,
+        "seepage_problem": true,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": true,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_johnson_fs_time.xlsx",
+      "references": [
+        {
+          "anchor": "the-model-and-what-part-2-reads-off-it",
+          "checks": [
+            "COMBO-3-rapid",
+            "COMBO-3-single"
+          ],
+          "level": 3,
+          "page": "tutorials/combo03_fs_vs_time/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/combo03_fs_vs_time.md",
+          "title": "The model, and what Part 2 reads off it",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo03_fs_vs_time/#the-model-and-what-part-2-reads-off-it"
+        }
+      ],
+      "topics": [
+        "transient-seepage",
+        "seepage-coupled",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": true,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": true,
+        "seepage_problem": true,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": true,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_johnson_rapid.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-combo-2-rapid-drawdown",
+          "checks": [
+            "COMBO-2-drained-day50",
+            "COMBO-2-drained-full",
+            "COMBO-2-steady",
+            "COMBO-2-transient"
+          ],
+          "level": 1,
+          "page": "tutorials/combo02_rapid_drawdown/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/combo02_rapid_drawdown.md",
+          "title": "Tutorial COMBO-2 — Rapid Drawdown",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#tutorial-combo-2-rapid-drawdown"
+        }
+      ],
+      "topics": [
+        "rapid-drawdown",
+        "transient-seepage",
+        "seepage-coupled",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": true,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": true,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_johnson_rapid_start.xlsx",
+      "references": [
+        {
+          "anchor": "the-dam",
+          "checks": [
+            "circular_search"
+          ],
+          "level": 2,
+          "page": "tutorials/combo02_rapid_drawdown/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/combo02_rapid_drawdown.md",
+          "title": "The dam",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#the-dam"
+        }
+      ],
+      "topics": [
+        "rapid-drawdown",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 3,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": true,
+        "seepage_problem": true,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 23,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_johnson_res.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-combo-1-seepage-lem-fem",
+          "checks": [
+            "COMBO-1-ssrm",
+            "circular_search",
+            "seep"
+          ],
+          "level": 1,
+          "page": "tutorials/combo01_seepage_stability/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/combo01_seepage_stability.md",
+          "title": "Tutorial COMBO-1 — Seepage → LEM → FEM",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/combo01_seepage_stability/#tutorial-combo-1-seepage-lem-fem"
+        }
+      ],
+      "topics": [
+        "seepage-coupled",
+        "zoned-dams"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [
+          "free"
+        ],
+        "piles": 1,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_pile_wall.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-fem-3-piles-lem-vs-fem",
+          "checks": [
+            "FEM-3-wall-ssrm"
+          ],
+          "level": 1,
+          "page": "tutorials/fem03_piles/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_piles.md",
+          "title": "Tutorial FEM-3 — Piles: LEM vs FEM",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_piles/#tutorial-fem-3-piles-lem-vs-fem"
+        }
+      ],
+      "topics": [
+        "piles",
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_pile_wall_start.xlsx",
+      "references": [
+        {
+          "anchor": "the-slope-on-its-own",
+          "checks": [
+            "FEM-3-bare-ssrm",
+            "circular_search"
+          ],
+          "level": 3,
+          "page": "tutorials/fem03_piles/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem03_piles.md",
+          "title": "The slope on its own",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem03_piles/#the-slope-on-its-own"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 1,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 6,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": true,
+          "residual_drop": true,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 24,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_reinforced_slope.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-fem-2-reinforcement-lem-vs-fem",
+          "checks": [
+            "FEM-2-ssrm"
+          ],
+          "level": 1,
+          "page": "tutorials/fem02_reinforcement/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem02_reinforcement.md",
+          "title": "Tutorial FEM-2 — Reinforcement: LEM vs FEM",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem02_reinforcement/#tutorial-fem-2-reinforcement-lem-vs-fem"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 1,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": false,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 2,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [
+            "active"
+          ],
+          "count": 6,
+          "dirs": [
+            "tangent"
+          ],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": true,
+          "residual_drop": false,
+          "types": [
+            "geosynthetic"
+          ]
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 24,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_reinforced_slope_start.xlsx",
+      "references": [
+        {
+          "anchor": "opening-the-starter-file",
+          "checks": [
+            "circular_search"
+          ],
+          "level": 2,
+          "page": "tutorials/fem02_reinforcement/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem02_reinforcement.md",
+          "title": "Opening the starter file",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem02_reinforcement/#opening-the-starter-file"
+        }
+      ],
+      "topics": [
+        "reinforcement"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": true,
+        "homogeneous": true,
+        "k0": 1.0,
+        "line_loads": 0,
+        "material_options": [
+          "hb"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 25,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "si",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_rock_slope.xlsx",
+      "references": [
+        {
+          "anchor": "opening-the-model",
+          "checks": [
+            "LEM-13-ssrm",
+            "circular_search"
+          ],
+          "level": 3,
+          "page": "tutorials/lem13_rock_slope/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/lem13_rock_slope.md",
+          "title": "Opening the model",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/lem13_rock_slope/#opening-the-model"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": "tri6",
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 23,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_ssrm_embankment.xlsx",
+      "references": [
+        {
+          "anchor": "tutorial-fem-1-strength-reduction-basics",
+          "checks": [
+            "FEM-1-ssrm"
+          ],
+          "level": 1,
+          "page": "tutorials/fem01_strength_reduction/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem01_strength_reduction.md",
+          "title": "Tutorial FEM-1 — Strength Reduction Basics",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem01_strength_reduction/#tutorial-fem-1-strength-reduction-basics"
+        }
+      ],
+      "topics": [
+        "homogeneous"
+      ]
+    },
+    {
+      "features": {
+        "circular": true,
+        "cutoff_walls": 0,
+        "dloads": 0,
+        "element_type": null,
+        "hoek_brown": false,
+        "homogeneous": true,
+        "k0": null,
+        "line_loads": 0,
+        "material_options": [
+          "mc"
+        ],
+        "n_materials": 1,
+        "non_circular": false,
+        "piezo_line": false,
+        "pile_fixities": [],
+        "piles": 0,
+        "polygon_geometry": true,
+        "probabilistic": false,
+        "rapid_drawdown": false,
+        "reinforcement": {
+          "appls": [],
+          "count": 0,
+          "dirs": [],
+          "discrete_spacing": false,
+          "end_anchorage": false,
+          "pullout": false,
+          "residual_drop": false,
+          "types": []
+        },
+        "ru": false,
+        "seepage_coupled": false,
+        "seepage_problem": false,
+        "seismic_k": 0.0,
+        "sigmas": [],
+        "ssr_zones": 0,
+        "suction_strength": false,
+        "template_version": 23,
+        "tensile_cutoff": false,
+        "tension_crack": false,
+        "tension_crack_water": false,
+        "transient_seepage": false,
+        "unit_system": "imperial",
+        "unsaturated_models": [
+          "lf"
+        ]
+      },
+      "model": "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx",
+      "references": [
+        {
+          "anchor": "opening-the-starter-file",
+          "checks": [
+            "circular_search"
+          ],
+          "level": 2,
+          "page": "tutorials/fem01_strength_reduction/",
+          "resolution": "input-link",
+          "source_md": "docs/tutorials/fem01_strength_reduction.md",
+          "title": "Opening the starter file",
+          "url": "https://xslope.readthedocs.io/en/latest/tutorials/fem01_strength_reduction/#opening-the-starter-file"
+        }
+      ],
+      "topics": [
         "homogeneous"
       ]
     },
@@ -22565,13 +23412,20 @@
   ],
   "schema": 1,
   "stats": {
-    "models": 318,
+    "models": 330,
     "pages": [
       "fem/samples/",
       "lem/samples/",
       "parametric/sensitivity/",
       "seep/samples/",
       "seep/seep_slope/",
+      "tutorials/combo01_seepage_stability/",
+      "tutorials/combo02_rapid_drawdown/",
+      "tutorials/combo03_fs_vs_time/",
+      "tutorials/fem01_strength_reduction/",
+      "tutorials/fem02_reinforcement/",
+      "tutorials/fem03_piles/",
+      "tutorials/lem13_rock_slope/",
       "verification/geostudio/",
       "verification/published/",
       "verification/rocscience/",
@@ -22580,22 +23434,22 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 542,
+    "tags": 564,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,
-      "homogeneous": 153,
+      "homogeneous": 158,
       "non-circular": 32,
-      "piles": 15,
+      "piles": 16,
       "probabilistic": 15,
-      "rapid-drawdown": 6,
-      "reinforcement": 22,
-      "seepage-coupled": 67,
+      "rapid-drawdown": 8,
+      "reinforcement": 24,
+      "seepage-coupled": 71,
       "seismic": 10,
       "soil-nails": 5,
       "tension-cracks": 19,
-      "transient-seepage": 20,
-      "zoned-dams": 40
+      "transient-seepage": 23,
+      "zoned-dams": 44
     },
     "unloadable": 0
   },
@@ -22660,6 +23514,11 @@
       "docs/seep/files/xslope_clay_blanket.xlsx",
       "docs/seep/files/xslope_confined_radial.xlsx",
       "docs/seep/files/xslope_sheetpile_s50.xlsx",
+      "docs/tutorials/files/xslope_pile_wall.xlsx",
+      "docs/tutorials/files/xslope_pile_wall_start.xlsx",
+      "docs/tutorials/files/xslope_rock_slope.xlsx",
+      "docs/tutorials/files/xslope_ssrm_embankment.xlsx",
+      "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx",
       "docs/verification/files/geostudio/gs2_26.xlsx",
       "docs/verification/files/geostudio/gs2_33.xlsx",
       "docs/verification/files/geostudio/gs2_45.xlsx",
@@ -22824,6 +23683,7 @@
       "docs/lem/files/xslope_hassiotis_p1.xlsx",
       "docs/lem/files/xslope_hassiotis_p2.xlsx",
       "docs/lem/files/xslope_piles.xlsx",
+      "docs/tutorials/files/xslope_pile_wall.xlsx",
       "docs/verification/files/geostudio/gs2_wall.xlsx",
       "docs/verification/files/rocscience/vp049.xlsx",
       "docs/verification/files/rocscience/vp054b.xlsx",
@@ -22854,6 +23714,8 @@
     "rapid-drawdown": [
       "docs/lem/files/xslope_gsat_rapid.xlsx",
       "docs/lem/files/xslope_johnson_rapid_KEY.xlsx",
+      "docs/tutorials/files/xslope_johnson_rapid.xlsx",
+      "docs/tutorials/files/xslope_johnson_rapid_start.xlsx",
       "docs/verification/files/rocscience/vp096.xlsx",
       "docs/verification/files/rocscience/vp097.xlsx",
       "docs/verification/files/rocscience/vp098.xlsx",
@@ -22862,6 +23724,8 @@
     "reinforcement": [
       "docs/fem/files/xslope_reinforce_fem.xlsx",
       "docs/lem/files/xslope_reinforce.xlsx",
+      "docs/tutorials/files/xslope_reinforced_slope.xlsx",
+      "docs/tutorials/files/xslope_reinforced_slope_start.xlsx",
       "docs/verification/files/geostudio/gs2_18.xlsx",
       "docs/verification/files/published/fhwa_e1.xlsx",
       "docs/verification/files/rocscience/vp030a.xlsx",
@@ -22891,6 +23755,10 @@
       "docs/seep/files/xslope_johnson_res_tseep.xlsx",
       "docs/seep/files/xslope_rface_SEEP_KEY.xlsx",
       "docs/seep/files/xslope_sheetpile_s50.xlsx",
+      "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx",
+      "docs/tutorials/files/xslope_johnson_fs_time.xlsx",
+      "docs/tutorials/files/xslope_johnson_rapid.xlsx",
+      "docs/tutorials/files/xslope_johnson_res.xlsx",
       "docs/verification/files/geostudio/gs2_46.xlsx",
       "docs/verification/files/geostudio/gs2_cons.xlsx",
       "docs/verification/files/geostudio/gs2_heap.xlsx",
@@ -22995,6 +23863,9 @@
     "transient-seepage": [
       "docs/seep/files/xslope_earth_dam_tseep.xlsx",
       "docs/seep/files/xslope_johnson_res_tseep.xlsx",
+      "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx",
+      "docs/tutorials/files/xslope_johnson_fs_time.xlsx",
+      "docs/tutorials/files/xslope_johnson_rapid.xlsx",
       "docs/verification/files/geostudio/gs2_cons.xlsx",
       "docs/verification/files/geostudio/gs2_heap.xlsx",
       "docs/verification/files/geostudio/gs2_infil.xlsx",
@@ -23031,6 +23902,10 @@
       "docs/seep/files/xslope_levee_poly.xlsx",
       "docs/seep/files/xslope_rface_PIEZO_KEY.xlsx",
       "docs/seep/files/xslope_rface_SEEP_KEY.xlsx",
+      "docs/tutorials/files/xslope_johnson_fs_time.xlsx",
+      "docs/tutorials/files/xslope_johnson_rapid.xlsx",
+      "docs/tutorials/files/xslope_johnson_rapid_start.xlsx",
+      "docs/tutorials/files/xslope_johnson_res.xlsx",
       "docs/verification/files/geostudio/gs2_wall.xlsx",
       "docs/verification/files/geostudio/gs2_wall_none.xlsx",
       "docs/verification/files/rocscience/rs2_51.xlsx",

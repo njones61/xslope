@@ -170,6 +170,8 @@ onto a surface that exits at the toe:
 surface carrying 954 kN/m of rock. Bishop's simplified method on the same file
 gives 1.150 against the paper's 1.153.
 
+<!-- test: file=files/xslope_rock_slope.xlsx, type=circular_search, num_slices=40, fs_spencer=1.152, fs_bishop=1.150, tolerance=0.005 -->
+
 ### What the criterion supplied along the surface
 
 Every slice base on that surface got its own cohesion and friction angle, because
@@ -231,6 +233,8 @@ The run takes a few minutes on an ordinary laptop.
 seven bisection steps. Hammah et al. report 1.15 for the same slope,
 solved both with the generalized criterion and with an equivalent Mohr-Coulomb
 fit.
+
+<!-- test: file=files/xslope_rock_slope.xlsx, type=fem_ssrm, expected_fs=1.166, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, k0=1, benchmark=LEM-13-ssrm -->
 
 ![The mechanism at failure](images/lem13_shear_strain.png){width=1000}
 

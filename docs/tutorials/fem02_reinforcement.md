@@ -128,6 +128,8 @@ them, for 4,000 lb/ft of tension in total.
 [LEM-8](lem08_reinforced_slope.md#where-the-surface-meets-the-lines) works
 through that crossing-by-crossing.
 
+<!-- test: file=files/xslope_reinforced_slope_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.587, tolerance=0.005 -->
+
 ---
 
 ## What a reinforcement line is to each engine
@@ -496,6 +498,8 @@ the 0.3 to 0.7 usually quoted for geosynthetics. Click **OK**, then
 **FS = 1.496**, from a bracket of [1.4922, 1.5000]. Post-peak behavior cost
 **0.070** of factor of safety, 4.5% — three times the 0.021 between Spencer's
 1.587 and the elastic-perfectly-plastic 1.566.
+
+<!-- test: file=files/xslope_reinforced_slope.xlsx, type=fem_ssrm, expected_fs=1.496, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=2.0, benchmark=FEM-2-ssrm -->
 
 Where the cost comes from is simple. The elastic-perfectly-plastic slope
 reaches equilibrium at every trial up to *F* = 1.5625 with elements standing at

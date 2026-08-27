@@ -344,6 +344,8 @@ stage-2 stresses came out higher than the undrained strength stage 2 used, so
 there was nothing lower to substitute. Stage 2 governs, and the drawdown costs
 this slope 0.30 against its own full-pool stage-1 figure of 1.484.
 
+<!-- test: file=files/xslope_johnson_rapid_start.xlsx, type=circular_search, method=spencer, rapid=true, num_slices=40, expected_fs=1.181, tolerance=0.005 -->
+
 ![The three-stage answer from the piezometric pair](images/combo02_solution_piezo.png){width=1000}
 
 The figure is the governing stage's own state, not stage 1's: the pale blue band
@@ -549,6 +551,8 @@ radius of 161.82 ft:
 **The rapid-drawdown factor of safety is 1.195**, against 1.181 from the
 piezometric pair. Stage 2 governs again, on all 12 core slices, and the pale blue
 band under the surface peaks at 1727 psf against the pair's 1692.
+
+<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, rapid=true, seep=steady, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.195, tolerance=0.005, benchmark=COMBO-2-steady -->
 
 The two surfaces sit about 3 ft apart. Both daylight just past the crest at
 x = 392 and toe on the upstream foreshore within 4 ft of each other, at x = 171 against
@@ -770,6 +774,8 @@ stage 2's 1.0164. Six ten-thousandths separate the two. The
 own $d$ of 250 psf sits 27 psf above the value at which the first slice crosses
 over.
 
+<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.016, tolerance=0.005, benchmark=COMBO-2-transient -->
+
 ---
 
 ## The three answers, and what brackets them
@@ -803,6 +809,9 @@ The two bold rows are the two-steady and transient drawdown answers; the other
 three are ordinary drained runs from the same starting circle, each reporting a
 critical surface of its own, and between them they separate the drawdown into its
 parts.
+
+<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.510, tolerance=0.005, benchmark=COMBO-2-drained-full -->
+<!-- test: file=files/xslope_johnson_rapid.xlsx, type=circular_search, method=spencer, seep=transient, seep_time=50, element_type=tri3, size_divisions=100, num_slices=40, expected_fs=1.035, tolerance=0.005, benchmark=COMBO-2-drained-day50 -->
 
 **The lowered pool costs 0.20 in the long run.** Taking 50 ft of reservoir off
 the dam and letting its pore pressures fully catch up moves the slope from 1.510

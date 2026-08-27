@@ -459,6 +459,8 @@ the same two circles, so one dialog run and nineteen swept ones land on the same
 numbers. An instant that produces no result comes back as a row carrying its
 reason rather than as a gap in the curve.
 
+<!-- test: file=files/xslope_earth_dam_fs_time.xlsx, type=fs_vs_time, method=spencer, element_type=tri3, size_divisions=64, num_slices=40, expected_first=1.5311, critical_time=35, min_fs=1.3313, tolerance=0.005, benchmark=COMBO-3-drained -->
+
 From a script the same run is `xslope.sensitivity.fs_vs_time`:
 
 ```python
@@ -860,6 +862,8 @@ at t = 50 this sweep runs precisely the rapid drawdown COMBO-2 ran — stage 1 a
 stage 2 at 50, the same march, the same starting circle — so the curve passes
 through COMBO-2's answer at day 50 because that answer is one of its points.
 
+<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, num_slices=40, expected_first=1.4563, critical_time=50, min_fs=1.0157, tolerance=0.005, benchmark=COMBO-3-rapid -->
+
 **Stage 3 runs on three rows, all of them at the bottom of the dip.** Days 45, 50
 and 60 read 3 in the **governs** column, and on each the margin is a single
 ten-thousandth — 1.0278 against stage 2's 1.0279, 1.0157 against 1.0163, 1.0522
@@ -956,6 +960,8 @@ direction. **Day 0's 1.5097** is its full-pool drained figure of **1.510**, and
 the same strengths. Its third drained figure, the long-term **1.311**, is not on
 this curve: day 500 reads 1.2870 and is still climbing, because a march of this
 length leaves the core part drained.
+
+<!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, times=0;50;500, expected=1.5097;1.0350;1.2870, tolerance=0.005, benchmark=COMBO-3-single -->
 
 Studio's result tab holds one curve at a time, so the two are set on one pair of
 axes here, drawn for this page. Running the sweep in both modes and plotting the

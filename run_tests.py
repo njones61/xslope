@@ -2,8 +2,8 @@
 """
 Regression test suite for xslope.
 
-Scans docs/{lem,fem,seep}/samples.md and docs/seep/seep_slope.md for test
-tags of the form:
+Scans docs/{lem,fem,seep}/samples.md, docs/seep/seep_slope.md, docs/verification/,
+docs/parametric/ and docs/tutorials/ for test tags of the form:
 
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, expected_fs=1.234, num_slices=30 -->
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025 -->
@@ -15,6 +15,16 @@ tags of the form:
     <!-- test: file=files/foo.xlsx, type=fem_elements, expected_fs=1.36, target_size=3.5, tolerance=0.04, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
     <!-- test: file=files/foo.xlsx, type=mesh_elements, element_type=tri6, target_size=6.5, expected_elements=3166, expected_nodes=6555, benchmark=RS2-4-mesh -->
     <!-- test: file=files/foo.xlsx, type=pullout_envelope, expected_pullout=10.28:5378;9.22:7488, tolerance=0.002, benchmark=FHWA-E1 -->
+    <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.248 -->
+    <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, size_divisions=100, expected_fs=1.016 -->
+    <!-- test: file=files/foo.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, expected_first=1.4563, critical_time=50, min_fs=1.0157 -->
+
+``seep=steady`` / ``seep=transient`` RUN the model's own seepage before the
+stability analysis and stage its pore pressures, instead of reading a solved
+sidecar shipped beside the workbook — the route of a page that meshes, solves the
+flow, and only then searches or reduces strength (see ``_stage_seep_fields``).
+``size_divisions`` is the Build Mesh dialog's auto-size spinner: the section width
+over that number, so a page is locked at the mesh it actually built.
 
 The pullout_envelope type locks a published PULLOUT TABLE -- the resistance a
 reinforcement layer develops beyond an assumed failure surface, layer by layer.
@@ -464,6 +474,155 @@ def _refine_kwargs(test):
     return kw
 
 
+def _tag_target_size(test, slope_data, default_divisions=120):
+    """The mesh target size a tag asks for.
+
+    ``target_size`` is the size itself. ``size_divisions`` is instead what the
+    Build Mesh dialog's *Auto-size from geometry* spinner holds — the section width
+    over that number — so a page that states its divisions is locked at the mesh it
+    actually built rather than at a size back-computed by hand and rounded. Neither
+    key present: the width over ``default_divisions``, the historical default."""
+    ts = test.get('target_size')
+    if ts is not None and str(ts).strip() != '':
+        return float(ts)
+    xs = [x for x, _ in slope_data['ground_surface'].coords]
+    width = max(xs) - min(xs)
+    div = test.get('size_divisions')
+    if div is not None and str(div).strip() != '':
+        return width / float(div)
+    return width / float(default_divisions)
+
+
+def _tag_mesh(slope_data, test, default_element_type='tri3', default_divisions=120):
+    """Build the mesh a tag describes and attach it to ``slope_data``.
+
+    The Build Mesh step of a page that runs seepage before stability: same
+    polygons, same constraint lines and same size regions Studio's mesh runner
+    uses, at the tag's ``element_type`` / ``target_size`` (or ``size_divisions``).
+    Attached to the model because the ``u = 'seep'`` interpolation reads it from
+    there, and because a seepage-coupled FEM row must solve on the very mesh the
+    field was computed on."""
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_constraint_line_geometry, extract_size_regions)
+    constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+    polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
+    mesh = build_mesh_from_polygons(
+        polygons,
+        target_size=_tag_target_size(test, slope_data, default_divisions),
+        element_type=test.get('element_type', default_element_type),
+        lines=constraint_lines or None,
+        element_size_1d=slope_data.get('element_size_1d'),
+        size_regions=extract_size_regions(slope_data),
+        **_refine_kwargs(test))
+    slope_data['mesh'] = mesh
+    return mesh
+
+
+def _tag_transient_solution(slope_data, test):
+    """The transient march a tag's stability run reads, plus the ``seep_data`` it
+    was solved on.
+
+    ``march=file`` reads the frames shipped beside the workbook
+    (``{base}_tseep.csv`` + meta) on the model's own companion mesh, which is what
+    a reader who opens a solved model gets. Otherwise the march is recomputed here
+    from the file's own ``tseep`` schedule on the tag's mesh — the same rebuild
+    ``run_tseep_head_test`` makes, so the field under a stability lock is the one
+    those rows lock. Stepper knobs (``dt_max`` / ``max_head_change_frac`` /
+    ``theta``) ride the tag either way."""
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             import_transient_solution, run_transient_seepage)
+
+    if str(test.get('march', '')).strip().lower() == 'file':
+        mesh = slope_data.get('mesh')
+        if mesh is None:
+            return None, None, (f"march=file needs the solved model's companion mesh "
+                                f"({os.path.basename(test['file'])} ships none)")
+        seep_data = build_seep_data(mesh, slope_data)
+        base = os.path.splitext(test['file'])[0]
+        return seep_data, import_transient_solution(seep_data, base), None
+
+    tseep_data = build_tseep_data(slope_data)
+    if tseep_data is None:
+        return None, None, "file carries no tseep sheet (not a transient model)"
+    mesh = _tag_mesh(slope_data, test)
+    seep_data = build_seep_data(mesh, slope_data)
+    kw = {'verbose': False}
+    for key in ('dt_max', 'max_head_change_frac', 'theta'):
+        if key in test and str(test[key]).strip() != '':
+            kw[key] = float(test[key])
+    solution = run_transient_seepage(seep_data, tseep_data, **kw)
+    if not solution.get('converged', True):
+        return None, None, "transient seepage solution did not converge"
+    return seep_data, solution, None
+
+
+def _stage_seep_fields(slope_data, test):
+    """Run this model's own seepage and put the resulting pore pressures into it,
+    the way Studio does, so a stability tag can lock a page whose route is *mesh,
+    solve the seepage, then run the stability analysis*. Returns an error message,
+    or None when the model is staged (or the tag asked for no staging).
+
+    Every lock in this suite up to here read its field off a solved sidecar shipped
+    beside the workbook (``{base}_seep.csv`` / ``_seep2.csv``, picked up by
+    ``load_slope_data``). A tutorial's model ships no sidecar — the page's own
+    instructions are what produce the field, and a reader who follows them starts
+    from the workbook alone — so the route has to be run, not loaded. The tag key
+    is ``seep=``:
+
+    ``seep=steady``
+        Solve boundary set 1 into ``seep_u``, and set 2 (when the file declares
+        one) into ``seep_u2``, which is the pair a rapid drawdown's stages 1 and
+        2 read. One steady run of the seepage dialog on a two-set file solves
+        both, and this is that run.
+    ``seep=transient``
+        March the file's own schedule (or read the shipped frames, see
+        ``_tag_transient_solution``) and stage the instant(s) the run needs
+        through ``xslope.seep.apply_transient_stability_frame`` — the stage_1 /
+        stage_2 frames when the tag is ``rapid=true``, otherwise the single
+        instant named by ``seep_time`` (default: the file's ``stability_time``,
+        else the last saved frame). This is the call Studio's run path makes,
+        so a staged drawdown lock runs the route the page ran and not a
+        reconstruction of it.
+
+    Mesh keys (``element_type``, ``target_size`` / ``size_divisions``) describe the
+    Build Mesh step and are read by ``_tag_mesh``."""
+    route = str(test.get('seep', '')).strip().lower()
+    if not route:
+        return None
+    from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                             apply_transient_stability_frame, run_seepage_analysis)
+
+    if route == 'steady':
+        mesh = _tag_mesh(slope_data, test)
+        for bc in (1, 2):
+            if bc == 2 and not slope_data.get('has_seepage_bc2'):
+                continue
+            seep_data = build_seep_data(mesh, slope_data, seep_bc=bc)
+            solution = run_seepage_analysis(seep_data, tol=1e-4,
+                                            max_iter=int(test.get('max_iter', 400)))
+            if not solution.get('converged', True):
+                return f"steady seepage on BC set {bc} did not converge"
+            apply_steady_stability_field(slope_data, solution, bc=bc, verbose=False)
+        return None
+
+    if route == 'transient':
+        _seep_data, solution, err = _tag_transient_solution(slope_data, test)
+        if err:
+            return err
+        rapid = str(test.get('rapid', 'false')).strip().lower() in ('true', '1', 'yes')
+        t = test.get('seep_time')
+        try:
+            apply_transient_stability_frame(
+                slope_data, solution, rapid=rapid, verbose=False,
+                time=(float(t) if t is not None and str(t).strip() != '' else None))
+        except ValueError as e:
+            return f"transient staging refused the run: {e}"
+        return None
+
+    return (f"seep={route!r} is not a route; use 'steady' (solve the file's "
+            f"boundary set(s)) or 'transient' (march and stage the frames)")
+
+
 def run_lem_test(test):
     """Run a single LEM test (single_circle, circular_search, or noncircular_search)."""
     from xslope.fileio import load_slope_data
@@ -542,6 +701,22 @@ def run_lem_test(test):
                       "the suction-strength angle)")
 
     slope_data = load_slope_data(file_path)
+
+    # `u_option=none|piezo|seep|ru` overrides the materials table's pore-pressure
+    # column on every row. It exists for the one published comparison that cannot be
+    # made from a file — what the SAME model answers when a solved field is left
+    # unread (COMBO-1's u = none against u = seep) — and it is the whole edit: the
+    # geometry, the strengths and the water are the file's.
+    u_option = str(test.get('u_option', '')).strip()
+    if u_option:
+        for m in slope_data.get('materials', []):
+            m['u'] = u_option
+
+    # `seep=steady|transient` runs the model's own seepage first and stages the
+    # field(s) a u = 'seep' run reads (see _stage_seep_fields).
+    err = _stage_seep_fields(slope_data, test)
+    if err:
+        return None, err
 
     if test_type == 'single_circle':
         # circle_index picks one of several specified surfaces stored in the same
@@ -894,6 +1069,15 @@ def build_fem_ssrm_case(test):
 
     slope_data = load_slope_data(file_path)
 
+    # `seep=steady|transient` runs the model's own seepage first (see
+    # _stage_seep_fields) — the route of a page that meshes, solves the flow and
+    # then reduces the strengths on that same mesh, with no solved field shipped
+    # beside the workbook. It leaves the mesh on the model, which the branch below
+    # then keeps for exactly the reason stated there.
+    err = _stage_seep_fields(slope_data, test)
+    if err:
+        raise ValueError(err)
+
     # Seepage-coupled models (material u option = 'seep') must run on the SAME
     # mesh as the stored seepage solution: seep_u is nodal, and build_fem_data
     # silently zeroes the pore pressures if the node count differs.
@@ -1194,10 +1378,7 @@ def run_seep_test(test):
 
     polygons = get_material_polygons(slope_data)
     element_type = test.get('element_type', 'tri3')
-    target_size = test.get('target_size')
-    if target_size is None:
-        x_coords = [x for x, _ in slope_data['ground_surface'].coords]
-        target_size = (max(x_coords) - min(x_coords)) / 120
+    target_size = _tag_target_size(test, slope_data)
     mesh = build_mesh_from_polygons(polygons, target_size, element_type,
                                     size_regions=extract_size_regions(slope_data),
                                     **_refine_kwargs(test))
@@ -1226,10 +1407,7 @@ def run_seep_head_test(test):
 
     slope_data = load_slope_data(test['file'])
     polygons = get_material_polygons(slope_data)
-    target_size = test.get('target_size')
-    if target_size is None:
-        xs = [x for x, _ in slope_data['ground_surface'].coords]
-        target_size = (max(xs) - min(xs)) / 120
+    target_size = _tag_target_size(test, slope_data)
     mesh = build_mesh_from_polygons(polygons, float(target_size),
                                     test.get('element_type', 'tri3'),
                                     size_regions=extract_size_regions(slope_data),
@@ -1294,10 +1472,7 @@ def run_tseep_head_test(test):
         return None, "file carries no tseep sheet (not a transient model)"
 
     polygons = get_material_polygons(slope_data)
-    target_size = test.get('target_size')
-    if target_size is None:
-        xs = [x for x, _ in slope_data['ground_surface'].coords]
-        target_size = (max(xs) - min(xs)) / 120
+    target_size = _tag_target_size(test, slope_data)
     mesh = build_mesh_from_polygons(polygons, float(target_size),
                                     test.get('element_type', 'tri3'),
                                     size_regions=extract_size_regions(slope_data),
@@ -1359,53 +1534,60 @@ def run_fs_vs_time_test(test):
     tag -- the runner never computes a reference), tolerance (default 0.005),
     optional critical_time / min_fs (the curve's own minimum, locked as such),
     num_slices, and the mesh/stepper knobs run_tseep_head_test takes
-    (target_size, element_type, dt_max, max_head_change_frac, theta).
+    (target_size or size_divisions, element_type, dt_max, max_head_change_frac,
+    theta).
 
-    A frame that produced no result is a failure of this row and is reported with
-    the reason the mode recorded, never skipped: a curve missing its critical
-    instant reads as a healthier slope than the model describes.
+    ``times`` and ``expected`` are OPTIONAL, and omitting them sweeps EVERY saved
+    frame -- which is what a published curve is, and the only footing on which its
+    minimum can be locked as the minimum. On that sweep ``expected_first`` locks
+    the curve's opening instant (the full-pool figure a page states beside its
+    minimum) and ``critical_time`` / ``min_fs`` lock where and how low it falls.
+    Naming a subset of instants instead re-scopes the whole row: the minimum then
+    means the lowest of THOSE, which is a weaker statement than the page makes.
+
+    ``rapid=true`` makes every instant a three-stage Duncan-Wright-Wong drawdown
+    whose stage 1 is the march's initial state, rather than a single-stage
+    analysis of that instant's water -- the drawdown-versus-time curve, and the
+    same switch the Parametric dialog offers.
+
+    ``march=file`` reads the frames shipped beside the workbook instead of
+    re-marching (see ``_tag_transient_solution``).
+
+    A NAMED instant that produced no result is a failure of this row and is
+    reported with the reason the mode recorded, never skipped: a curve missing an
+    instant it was asked for reads as a healthier slope than the model describes.
+    On a rapid curve the march's initial instant is the one exception the mode
+    itself raises -- stage 2 there would be a fall from the pool to itself -- so
+    ``expected_first`` locks the first instant that HAS an answer.
 
     Pass/fail: returns 0.0 on success. One row is one march plus one search per
-    instant -- around a minute -- so it is dispatched like a tseep_head row."""
+    instant -- around a minute, and longer on a rapid curve, whose every instant
+    is three analyses -- so it is dispatched like a tseep_head row."""
     from xslope.fileio import load_slope_data
-    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_size_regions)
-    from xslope.seep import build_seep_data, build_tseep_data, run_transient_seepage
     from xslope.sensitivity import fs_vs_time
 
     slope_data = load_slope_data(test['file'])
-    tseep_data = build_tseep_data(slope_data)
-    if tseep_data is None:
-        return None, "file carries no tseep sheet (not a transient model)"
+    _seep_data, solution, err = _tag_transient_solution(slope_data, test)
+    if err:
+        return None, err
 
-    polygons = get_material_polygons(slope_data)
-    target_size = test.get('target_size')
-    if target_size is None:
-        xs = [x for x, _ in slope_data['ground_surface'].coords]
-        target_size = (max(xs) - min(xs)) / 120
-    mesh = build_mesh_from_polygons(polygons, float(target_size),
-                                    test.get('element_type', 'tri3'),
-                                    size_regions=extract_size_regions(slope_data),
-                                    **_refine_kwargs(test))
-    slope_data['mesh'] = mesh                  # the u = 'seep' interpolation reads it
-    seep_data = build_seep_data(mesh, slope_data)
-
-    kw = {'verbose': False}
-    for key in ('dt_max', 'max_head_change_frac', 'theta'):
-        if key in test and str(test[key]).strip() != '':
-            kw[key] = float(test[key])
-    solution = run_transient_seepage(seep_data, tseep_data, **kw)
-    if not solution.get('converged', True):
-        return None, "transient seepage solution did not converge"
-
-    times = [float(v) for v in str(test['times']).split(';')]
-    expected = [float(v) for v in str(test['expected']).split(';')]
-    if len(times) != len(expected):
+    # No times named: the whole curve, every saved frame (fs_vs_time's own default).
+    if 'times' in test and str(test['times']).strip() != '':
+        times = [float(v) for v in str(test['times']).split(';')]
+    else:
+        times = None
+    if 'expected' in test and str(test['expected']).strip() != '':
+        expected = [float(v) for v in str(test['expected']).split(';')]
+    else:
+        expected = []
+    if times is not None and len(times) != len(expected):
         return None, (f"tag lists {len(times)} times but {len(expected)} expected "
                       f"factors of safety")
 
     ok, res = fs_vs_time(slope_data, solution, times=times,
                          methods=(test.get('method', 'spencer'),),
+                         rapid=str(test.get('rapid', 'false')).strip().lower()
+                         in ('true', '1', 'yes'),
                          num_slices=int(test.get('num_slices', 40)))
     if not ok:
         return None, f"fs_vs_time refused the run: {res}"
@@ -1413,7 +1595,17 @@ def run_fs_vs_time_test(test):
 
     errs = []
     tol = float(test.get('tolerance', 0.005))
-    for t, want in zip(times, expected):
+    if 'expected_first' in test:
+        first = df.loc[df['success']].sort_values('value')
+        if first.empty:
+            errs.append("first instant: no instant of the curve produced a result")
+        else:
+            got = float(first.iloc[0]['fs'])
+            want = float(test['expected_first'])
+            if abs(got - want) > tol:
+                errs.append(f"t={float(first.iloc[0]['value']):g} (first): expected "
+                            f"{want:.4f}, got {got:.4f}")
+    for t, want in zip(times or [], expected):
         row = df.loc[(df['value'] - t).abs() < 1e-6]
         if row.empty:
             errs.append(f"t={t:g}: no row in the returned table")
@@ -4797,14 +4989,22 @@ def run_preflight_corpus_test(test):
         # would have no corpus regression at all.
         if analysis == 'lem' and str(t.get('rapid', '')).strip().lower() == 'true':
             analysis = 'rapid'
-        cases.setdefault((f, analysis, tuple(sorted(sel.items()))), (analysis, sel))
+        # A tag that builds its own seepage field at run time (`seep=steady`,
+        # `seep=transient`, `march=file`) is checked as the run that follows it:
+        # the field the shipped file lacks is exactly what the route produces.
+        field_at_run = bool(t.get('seep') or t.get('march'))
+        key = (f, analysis, tuple(sorted(sel.items())))
+        if key in cases:
+            cases[key] = (analysis, sel, cases[key][2] or field_at_run)
+        else:
+            cases[key] = (analysis, sel, field_at_run)
 
     problems = []
     checked = 0
     loaded = {}
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
-        for (path, _a, _s), (analysis, sel) in sorted(cases.items()):
+        for (path, _a, _s), (analysis, sel, field_at_run) in sorted(cases.items()):
             if not os.path.exists(path):
                 continue
             if path not in loaded:
@@ -4820,6 +5020,9 @@ def run_preflight_corpus_test(test):
             checked += 1
             report = preflight(sd, analysis, sel)
             for f in report.errors:
+                if field_at_run and (f.rule_id.startswith('seep_field.')
+                                     or f.rule_id == 'rapid.stage2_water_missing'):
+                    continue
                 problems.append(f"{os.path.basename(path)} [{analysis}]: "
                                 f"{f.rule_id}: {f.message[:100]}")
             for f in report.infos:
@@ -12300,6 +12503,32 @@ def main():
             elif run_lem:
                 tests.append(t)
 
+    # The tutorial pages (docs/tutorials/*.md). A tutorial states the numbers a
+    # reader will see on their own screen after following its steps, at the
+    # settings its own dialogs were left on, and those numbers were checked by
+    # nothing until they were tagged: the verification and sample locks stand on
+    # other files, or on the same file at other settings. Scanned in sorted order
+    # (discovery must not depend on directory order) and routed by type exactly as
+    # the verification pages are, so one page can lock a seepage discharge, an LEM
+    # search and a strength reduction and each rides its own group.
+    for tutorial_md in sorted(Path(_repo('docs/tutorials')).glob('*.md')):
+        for t in parse_test_tags(tutorial_md):
+            ttype = t.get('type', '')
+            if ttype in ('fem_ssrm', 'fem_elements', 'fem_reliability'):
+                if run_fem:
+                    tests.append(t)
+            elif ttype == 'mesh_elements':
+                if run_mesh:
+                    tests.append(t)
+            elif ttype in ('tseep_head', 'fs_vs_time'):
+                if run_tseep:
+                    tests.append(t)
+            elif ttype in ('seep', 'seep_elements', 'seep_head'):
+                if run_seep:
+                    tests.append(t)
+            elif run_lem:
+                tests.append(t)
+
     # Private test problems (CE 544 homework/exam keys, plus synthetic variants)
     # live in a separate repo kept out of the public xslope tree. Look for it as a
     # sibling directory or at $XSLOPE_PRIVATE_TESTS; scan its markdown files for
@@ -12449,7 +12678,8 @@ def main():
             _repo('docs/parametric/sensitivity.md'), _repo('docs/parametric/reliability.md'),
             _repo('docs/fem/samples.md'), _repo('docs/seep/samples.md'),
             _repo('docs/seep/seep_slope.md'),
-        ] + sorted(glob.glob(_repo('docs/verification/*.md'))))
+        ] + sorted(glob.glob(_repo('docs/verification/*.md')))
+          + sorted(glob.glob(_repo('docs/tutorials/*.md'))))
         # The private fixtures are corpus too: they carry the same tags and the same
         # standing locks, so a rule that refuses one of them is equally miscalibrated.
         _pf_priv = _private_dir()

@@ -571,12 +571,13 @@ sheds pore water about as fast as the pool falls. A compacted clay core does not
 and the Part 1 model carries no $d$ / $\psi$ pair, so we cannot ask it the rapid
 drawdown question at all.
 
-[COMBO-2](combo02_rapid_drawdown.md)'s Johnson Reservoir dam can be. Its core
+The Johnson Reservoir dam from [COMBO-2](combo02_rapid_drawdown.md) can be
+asked. Its core
 carries a $K_c = 1$ envelope, and in COMBO-2 we ran the three-stage procedure on
 it three times, once per statement of where the water is, reading 1.181, 1.195
 and 1.016 — the last from a transient march, stage 1 at t = 0 and stage 2 at
-t = 50. Here we run it at **every** saved instant, then run Part 1's kind of
-curve on the same twenty-one frames.
+t = 50. Here we will run it at **every** saved instant, and then run Part 1's
+kind of curve on the same twenty-one frames for comparison.
 
 ### Opening the model
 

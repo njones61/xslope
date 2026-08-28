@@ -466,6 +466,17 @@ def _locks():
     return index
 
 
+def tags_for(path):
+    """Every published ``<!-- test: ... -->`` tag that names ``path``.
+
+    The tags ARE the corpus sweep's ground truth: each one is a run the tag
+    runner already knows how to make, on a file the documentation publishes an
+    answer for. Returned in the order they were read, so a caller that wants one
+    of several picks by type rather than by luck.
+    """
+    return list(_locks().get(os.path.normpath(str(path)), []))
+
+
 def lock(path, kind="circular_search", method=None):
     """The published value for ``path``, or ``None``.
 

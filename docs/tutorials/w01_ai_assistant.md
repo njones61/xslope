@@ -121,7 +121,7 @@ The eight conversations below cost this much between them, measured as they ran:
 
 | Session | Turns | Model calls | Tokens in (cached) | Tokens out | Wall |
 | --- | :---: | :---: | :---: | :---: | :---: |
-| Building from a drawing | 1 | 5 | 91,314 (75,730) | 15,102 | 219 s |
+| Building from a drawing | 1 | 5 | 99,169 (60,584) | 8,648 | 140 s |
 | Modifying the model | 3 | 12 | 215,159 (163,848) | 7,243 | 187 s |
 | A sweep with a helper | 1 | 2 | 26,868 (25,044) | 1,577 | 104 s |
 | A sweep without one | 1 | 3 | 49,548 (45,438) | 3,724 | 101 s |
@@ -129,10 +129,10 @@ The eight conversations below cost this much between them, measured as they ran:
 | Two questions | 2 | 3 | 52,009 (45,438) | 4,075 | 61 s |
 | A broken file | 1 | 9 | 191,949 (136,314) | 11,209 | 784 s |
 | The report | 2 | 4 | 65,001 (45,438) | 998 | 43 s |
-| **Total** | **13** | **43** | **762,952 (599,860)** | **46,582** | **1,674 s** |
+| **Total** | **13** | **43** | **770,807 (584,714)** | **40,128** | **1,595 s** |
 
-Thirteen turns, 43 calls to the model and about 763,000 input tokens, of which
-some 600,000 came from the prompt cache, come to about **$2.28** at Claude Opus 5
+Thirteen turns, 43 calls to the model and about 771,000 input tokens, of which
+some 585,000 came from the prompt cache, come to about **$2.23** at Claude Opus 5
 list rates — $5.00 per million input tokens, $0.50 per million cache reads and
 $25.00 per million output tokens. One session is a quarter of that on its own:
 the diagnosis, which answers by measuring rather than by reading.
@@ -175,82 +175,81 @@ Build this model. Use the dimensions and properties on the drawing. Unit system:
 ```
 </div>
 
-![The whole build conversation in the dock: the attached drawing, the code blocks the assistant ran, the thirteen model-check errors it answered, and its closing summary of the geometry, materials, loads, reinforcement and search result](images/w1_build_from_image_1.png){width=560}
+![The whole build conversation in the dock: the attached drawing, the four code blocks the assistant ran, the model-check errors that sent it back twice over the reinforcement fields, and its closing summary of the geometry, materials, loads, reinforcement and search result](images/w1_build_from_image_1.png){width=560}
 
-The first snippet came back empty — one call to the model that ran nothing and
-printed nothing.
+The first snippet builds the model, and every dimension in it comes off the
+drawing. The rigid base sits at y = 0, the toe at (30, 10), the crest break at
+(60, 34) up a 1.25:1 face, and the crest runs out to x = 130: 130 ft overall,
+which is the width the drawing gives, with 30 ft of ground in front of the toe.
+That is LEM-8's own section moved 30 ft to the right and 10 ft up. Both materials
+carry γ = 130 pcf and φ′ = 37°, with c′ = 300 psf on the shell and 0 on the base.
+A 240 psf `dloads` block crosses the 70 ft crest, and six geosynthetic lines at
+Tmax = 800 lb/ft sit at el. 10, 14, 18, 22, 26 and 30, each starting on the face,
+each 20 ft long, each with 4 ft of pullout at both ends. Three starting circles
+come from `generate_starting_circles` at a center of (45, 58).
 
-The second builds the model, and every dimension in it comes off the drawing. The
-rigid base sits at y = 0, the toe at (30, 10), the crest break at (60, 34) up a
-1.25:1 face, and the crest runs out to x = 130: 130 ft overall, which is the width
-the drawing gives, with 30 ft of ground in front of the toe. That is LEM-8's own
-section moved 30 ft to the right and 10 ft up. The cohesive face band was measured
-2 ft horizontally, giving the shell polygon (30,10)–(60,34)–(62,34)–(32,10) —
-LEM-8's band exactly. Both materials carry γ = 130 pcf and φ′ = 37°, with
-c′ = 300 psf on the shell and 0 on the base. A 240 psf `dloads` block crosses the
-70 ft crest, and six geosynthetic lines at Tmax = 800 lb/ft sit at el. 10, 14, 18,
-22, 26 and 30, each starting on the face, each 20 ft long, each with 4 ft of
-pullout at both ends.
+The one dimension it read differently from LEM-8 is the cohesive band. The drawing
+calls it 2 ft wide, and the assistant took that perpendicular to a 38.66° face,
+which is 3.20 ft measured horizontally; LEM-8 measures the same band 2 ft
+horizontally. Everything below rests on that one choice, and the last check in this
+section prices it.
 
-The input checks came back with 13 errors: no failure surface yet, a support type
-of `geotextile` on all six reinforcement lines, and a pullout delta out of range on
-all six. The assistant read them, set the type to `geosynthetic`, cleared
-`adhesion` and `delta` to blank so the drawing's stated pullout length governs,
-generated three starting circles from a center at (45, 58), and the checks came
-back clean. Spencer with a search then returned **FS = 1.471** on the circle
-Xo = 24.24, Yo = 55.91, R = 46.27, bottoming at el. 9.64 — a third of a foot below
-the toe. It passed on the note the run printed: 6 of 887 trial surfaces with no
-Spencer solution, none of them ranking below the reported minimum.
+**It took three tries to get the reinforcement fields right, and the input checks
+are what turned it around each time.** The first pass left `Type` blank and wrote
+`adhesion` and `delta` as zeros: seven errors, six of them saying a pullout Delta
+of 0 degrees is not an interface friction angle. It answered with a Type of
+`Geotextile`, a Dir of `Horizontal` and an Appl of `Nominal`, and blanked the two
+pullout fields: eighteen errors, and each one names the vocabulary it wanted —
+support types are `geosynthetic`, `nail`, `tieback`, `anchor`; `Dir` is `tangent`
+or `axial`; `Appl` is `active` or `passive`. The third pass wrote those three words,
+and the checks came back clean. None of the three words the second pass invented
+survives into the saved file, which is the point: the fields that refuse a value
+they do not recognize are the fields that never reach the solver wrong.
+
+Spencer with a search then returned **FS = 1.628** on the circle Xo = 27.88,
+Yo = 52.75, R = 42.97, bottoming at el. 9.78, entering at x = 66.54 behind the
+crest and leaving at x = 23.50 out in the foundation. It passed on both notes the
+run printed: 7 of 872 trial surfaces admitted no Spencer solution, none of them
+ranking below the reported minimum, and the line of thrust falls outside the slice
+on 21% of the interslice boundaries.
 
 The session saved
 [w1_build_from_image_after.xlsx](files/w1_build_from_image_after.xlsx), and that
-file will not reopen. Studio refuses it — *Reinforcement line 'Line 1' (reinforce
-sheet, Excel row 3) has an unrecognized Dir='0.0'. Expected: tangent or axial.*
-Beside every reinforcement line sit two fields, **Dir** and **Appl**, that the
-template fills in for itself with a lookup on the support type; the assistant wrote
-a number into the first and a blank into the second, replacing both lookups. `Dir`
-takes only the two words the message names, so the file no longer loads, and
-clearing that one cell on all six rows is the whole repair.
+file reopens. Reload it, run Spencer with a search, and 1.6281 comes back — the
+1.628 the session reported, from a model read off disk with no session behind it.
 
-Both values are also read while the model is open, which is where the reported
-factor of safety went. A `Dir` other than `tangent` applies the six lines along the
-bar axis rather than tangent to the failure surface, and an `Appl` other than
-`active` applies their capacity as passive, divided by the factor of safety. Set
-one at a time on the repaired file:
-
-| Dir | Appl | FS |
-| :--- | :--- | :---: |
-| tangent | active — the template's own | **1.5881** |
-| 0.0 | active | 1.6058 |
-| tangent | blank | 1.4533 |
-| 0.0 | blank — what the session ran | **1.4710** |
-
-LEM-8 publishes 1.5867 for this slope, from a search that starts on different
-circles. So the model built off the drawing reproduces the published one to three
-figures, and the 0.117 between 1.5881 and the reported 1.471 comes entirely from
-two fields the drawing never mentions.
+Substitute LEM-8's own band — 2 ft measured horizontally, the shell polygon
+(30,10)–(60,34)–(62,34)–(32,10) — and change nothing else, and the same search
+gives **1.5881**, against LEM-8's published **1.5867** from a search that starts on
+different circles. So the model built off the drawing reproduces the published one
+to three figures, and the 0.040 between 1.628 and 1.588 is the width of the
+cohesive band and nothing else.
 
 ### Check its work
 
-- **Open the saved workbook, clear the six `Dir` cells, and run Spencer with a
-  search: 1.5881**, against the 1.471 the session reported and LEM-8's own 1.5867.
-- **Do not wait for the model checks to raise it.** Set `Dir = 'sideways'` on the
-  same model and the checks return six errors; leave it at `0.0` and they come back
-  clean. Reloading the file is what finds this one.
+- **Reopen the saved workbook and run Spencer with a search: 1.6281**, the 1.628
+  the session reported.
+- **Price the band.** Redraw the shell 2 ft horizontally instead of 3.20 and rerun:
+  **1.5881**, against LEM-8's own 1.5867. A word on a drawing — 2 ft *wide* — is
+  worth 0.040 here, and it is the kind of reading to settle before accepting the
+  number.
+- **Open the Reinforcement editor.** All six lines read `geosynthetic`, `tangent`,
+  `active`, with `adhesion` and `delta` blank so the drawing's stated 4 ft pullout
+  length governs. Six layers sit 4 ft apart from the toe elevation up, each
+  starting on the face, each 20 ft long, each at 800 lb/ft. The surcharge reads
+  240 psf across the 70 ft crest.
 - **Open the Materials editor.** Both materials read γ = 130 pcf and φ′ = 37°,
   with c′ = 300 psf on the shell and 0 on the base — what the drawing states.
-- **Open the Reinforcement editor.** Six layers sit 4 ft apart from the toe
-  elevation up, each starting on the face, each 20 ft long, each at 800 lb/ft,
-  with the pullout envelope breakpoints 4 ft in from each tip. The surcharge reads
-  240 psf across the 70 ft crest.
-- **Measure the section against the drawing.** It runs 130 ft overall with the 2 ft
-  cohesive band measured horizontally, which is what the drawing dimensions.
+- **Measure the section against the drawing.** It runs 130 ft overall, with the toe
+  at (30, 10) and 30 ft of ground in front of it.
 - **The geometry landed on the `polygon` sheet, not the `profile` sheet.** Open
-  the repaired file in Studio and Profile lines is empty. Max depth reads blank in
+  the file in Studio and Profile lines is empty. Max depth reads blank in
   consequence, which is correct — max depth has no meaning for polygon input — so
   the `max_depth = 0.0` the assistant wrote is inert.
-- **Both materials carry E = 0 and ν = 0.** Harmless for a limit equilibrium run,
-  and a singular stiffness matrix for any finite element run later.
+- **Both materials carry E = 0 and ν = 0**, and a saturated unit weight of none:
+  the snippet wrote `gsat`, which is not a field the template reads. Harmless for a
+  dry limit equilibrium run, and all three matter the moment water or a finite
+  element run enters.
 
 ---
 
@@ -658,11 +657,13 @@ the checks below reproduce each of these numbers rather than read them.
 
 One claim does not survive, and it is the one that says "I measured that". The
 assistant reports that the six geogrid layers contribute nothing, identical to
-three decimals with and without them. Its test set `reinforcement_lines` to an
-empty list, and the slicer falls back to the derived `reinforce_lines` when that
-list is empty, so all six lines were still in the model both times. Clear both and
-the broken model goes from 0.0709 to **0.0312**, and the repaired case from 1.2218
-to **0.9358**.
+three decimals with and without them. Its test emptied `reinforcement_lines` and
+solved again, and both solves ran with all six lines in place: the derived point
+list built from that sheet was left behind, and the slicer read that instead.
+Emptying `reinforcement_lines` now removes the reinforcement everywhere the model
+is read, and the measurement the test was reaching for is 0.0709 to **0.0312** on
+the broken model, and 1.2218 to **0.9358** on the case with the friction angle at
+30° and the surcharge back at 240 psf.
 
 It changed nothing, said so, and no workbook was written. The answer ends with a
 section headed **What I did not test**.
@@ -676,11 +677,10 @@ section headed **What I did not test**.
   broken model the surcharge alone moves 0.0709 to 0.0964.
 - **Put the maximum depth back to −10.** Nothing changes: 0.0709 either way, which
   is what the table says.
-- **Remove the reinforcement properly before believing it does nothing.** Clearing
-  `reinforcement_lines` alone leaves the derived list in place and changes nothing;
-  clearing both takes the broken model to 0.0312 and the repaired case to 0.9358.
-  The same removal on the LEM-8 model gives 1.1674, which is that tutorial's own
-  no-reinforcement answer.
+- **Remove the reinforcement and watch it move.** Clearing `reinforcement_lines`
+  takes the broken model from 0.0709 to **0.0312**, and the 1.2218 case to
+  **0.9358**. The same removal on the LEM-8 model gives 1.1674, which is that
+  tutorial's own no-reinforcement answer.
 - **Read the run behind the 0.129 row.** Spencer could not solve 147 of its 528
   trial surfaces there, and 68 of those rank below the reported minimum, so 0.129
   is not a number to carry anywhere. The assistant quoted the baseline's
@@ -770,25 +770,25 @@ lands on a crest that already carries 240 psf from x = 48 to 100, so the assista
 reported that the strip from x = 60 to 90 now carries 740 psf and asked whether
 the 500 psf was meant to replace the 240 psf instead of adding to it.
 
-**It can misread a dimension, and it can invent one nobody drew.** Reading a
-number off a drawing leaves room for error — a dimension line that points at two
-places at once, a label sitting nearer the wrong feature, a decimal point lost to
-image resolution. Nothing downstream will catch it: the model checks test whether
-a model is consistent, not whether it matches the picture. In the build above
-every dimension came off the drawing correctly, and the error landed instead on
-two fields no drawing mentions, Dir and Appl on the reinforcement lines, which the
-template fills in for itself. That cost 0.117 of factor of safety and left a
-workbook that will not reopen. Check the built model against the picture, then
-open the file it saved.
+**It can misread a dimension.** Reading a number off a drawing leaves room for
+error — a dimension line that points at two places at once, a label sitting nearer
+the wrong feature, a decimal point lost to image resolution, a word that carries
+two readings. Nothing downstream will catch it: the model checks test whether a
+model is consistent, not whether it matches the picture. In the build above every
+dimension came off the drawing except one, and that one was a word rather than a
+number: the 2 ft band along the face, measured perpendicular to the face where
+LEM-8 measures it horizontally. It is worth 0.040 of factor of safety, the model
+checks are silent on it, and only measuring the built section against the picture
+finds it.
 
 **It can be confidently wrong, including about its own measurements.** Asked to
 diagnose a model broken on purpose, the assistant found all three planted errors
 and ranked them by what restoring each one did. In the same reply it wrote that
 the six reinforcement layers contribute nothing, and added "I measured that" — but
-the removal it ran cleared one of the two lists the solver reads, so nothing was
-removed either time. Done properly, removing them takes that model from 0.071 to
-0.031. Nothing in the reply reads as a guess, and no model check catches it. Only
-running it again finds it.
+the removal it ran left the derived point list behind and the slicer read that, so
+nothing was removed either time. The removal it was reaching for takes that model
+from 0.071 to 0.031. Nothing in the reply reads as a guess, and no model check
+catches it. Only running it again finds it.
 
 ---
 
@@ -797,10 +797,11 @@ running it again finds it.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about $2.28.
+  13 turns of work for about $2.23.
 - Building a model from a drawing: materials, geometry, a load, six reinforcement
-  lines and a search from one request, every dimension right, and two fields
-  filled in that the template fills for itself.
+  lines and a search from one request, three passes over the reinforcement fields
+  before the input checks let it through, and one word on the drawing read two
+  ways.
 - Editing a built model: three plain-language edits, each rerun, and a warning the
   assistant read and repaired for itself.
 - A sweep the engine ran for it: six searched steps, right to four figures, with a

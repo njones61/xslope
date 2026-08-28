@@ -40,84 +40,74 @@ method of its own, so `run_lem` called without one runs Spencer.
 > system: US customary (ft, psf, pcf). Add a starting circle and run Spencer with
 > a search.
 
-**Files:** `images/w1_build_from_image_1.png` (560 × 2912),
+**Files:** `images/w1_build_from_image_1.png` (560 × 3782),
 `w1_build_from_image_transcript.txt`, `w1_build_from_image_after.xlsx`.
-**Cost:** 5 completions, 91,314 in (75,730 cached) / 15,102 out, 218.9 s.
+**Cost:** 5 completions, 99,169 in (60,584 cached) / 8,648 out, 140.1 s.
 
-**The geometry is the drawing, dimension for dimension.** It put the rigid base
-at y = 0, the toe at (30, 10), the crest break at (60, 34) up a 1.25:1 face, and
-the crest out to x = 130 — 130 ft overall, which is what the drawing states, and
-30 ft of ground in front of the toe. That is LEM-8's own section translated 30 ft
-right and 10 ft up. The cohesive face band was measured **2 ft horizontally**:
-the shell polygon is (30,10)–(60,34)–(62,34)–(32,10), which is LEM-8's band
-exactly. Both materials carry γ = 130 pcf and φ′ = 37°, with c′ = 300 psf on the
-shell and 0 on the base. The 240 psf surcharge runs across the 70 ft crest from
-x = 60 to 130. The six geosynthetic layers sit at y = 10, 14, 18, 22, 26 and 30,
-each starting on the face, each 20 ft long, each at Tmax = 800 lb/ft with 4 ft of
-pullout at both ends.
+**The section is the drawing, with one dimension read two ways.** It put the
+rigid base at y = 0, the toe at (30, 10), the crest break at (60, 34) up a 1.25:1
+face, and the crest out to x = 130 — 130 ft overall, which is what the drawing
+states, and 30 ft of ground in front of the toe. That is LEM-8's own section
+translated 30 ft right and 10 ft up. The cohesive face band it took **normal to
+the face**: 2 ft perpendicular to a 38.66° face is 3.2016 ft horizontally, so the
+shell polygon is (30,10)–(60,34)–(63.2016,34)–(33.2016,10) where LEM-8's is
+(30,10)–(60,34)–(62,34)–(32,10). Both materials carry γ = 130 pcf and φ′ = 37°,
+with c′ = 300 psf on the shell and 0 on the base. The 240 psf surcharge runs
+across the 70 ft crest from x = 60 to 130. The six geosynthetic layers sit at
+y = 10, 14, 18, 22, 26 and 30, each starting on the face, each 20 ft long, each
+at Tmax = 800 lb/ft with 4 ft of pullout at both ends. Three starting circles
+come from `generate_starting_circles` at a center of (45, 58).
 
-**It read the model checks and repaired what they found.** The first pass came
-back with 13 errors — no failure surface, `Type = 'geotextile'` on all six
-reinforcement lines, and a pullout delta out of range on all six. It set Type to
-`geosynthetic`, cleared `adhesion` and `delta` to blank, called
-`generate_starting_circles` for three circles from a center at (45, 58), and the
-checks came back clean.
+**The reinforcement fields took three passes, and the input checks drove every
+one of them.** Pass 1 left `Type` blank and wrote `adhesion = 0.0`,
+`delta = 0.0`: 7 errors, six of them `reinforce.pullout_delta_range` on a Delta
+of 0 degrees, one `reinforce.type_blank`. Pass 2 answered with
+`Type = 'Geotextile'`, `Dir = 'Horizontal'`, `Appl = 'Nominal'` and blanked
+`adhesion` and `delta`: 18 errors, all `reinforce.dir_vocabulary`, three per line,
+each naming the vocabulary it wanted — support types `geosynthetic`, `nail`,
+`tieback`, `anchor`; `Dir` `tangent` or `axial`; `Appl` `active` or `passive`.
+Pass 3 wrote `geosynthetic` / `tangent` / `active` and the checks came back clean.
 
-**Wrong: it invented values for two fields the template computes for itself.**
-The reinforcement dicts it wrote carry `'dir': 0.0` and `'appl': ''`. In the
-open template those two cells hold a VLOOKUP on Type, so neither is a value the
-user supplies. Both invented values are read:
+That is the previous recording's defect closed. `Dir` and `Appl` no longer accept
+a value they do not recognize, so the invented `'dir': 0.0` / `'appl': ''` of the
+last run cannot reach the solver or the file: the model the reader is handed
+carries `tangent` and `active` on all six lines, and the workbook reopens.
 
-- `slice.py:1934` asks `rl.get("dir", "tangent") == "tangent"`, and `0.0` is not
-  `"tangent"`, so all six lines were applied **along the bar axis** rather than
-  tangent to the failure surface;
-- a blank `appl` is not `'active'`, so the capacity was applied as **passive** —
-  divided by the factor of safety.
+**Spencer with a search: FS = 1.628** on Xo = 27.88, Yo = 52.75, R = 42.97,
+Depth = 9.78, entering at x = 66.54 and leaving at x = 23.50. Reloaded from disk
+and re-solved independently, the saved workbook gives **1.6281** — the number the
+answer reports. It passed on both notes the run printed: 7 of 872 trial surfaces
+admitted no Spencer solution with none ranking below the reported minimum, and
+the line of thrust falls outside the slice on 21% of the interslice boundaries.
 
-Measured on the saved model, one field at a time:
-
-| Dir | Appl | FS |
-| :--- | :--- | ---: |
-| tangent | active (the template's own) | **1.5881** |
-| 0.0 | active | 1.6058 |
-| tangent | blank | 1.4533 |
-| 0.0 | blank (what the session ran) | **1.4710** |
-
-So the pair costs 0.117, almost all of it the blank `appl`. And 1.5881 is the
-answer LEM-8 publishes as 1.5867 — the two searches start from different circles
-and settle 0.0014 apart. The model the assistant built is right; the two fields
-it filled in are what moved the number.
-
-**Wrong: the workbook it saved does not reopen.** `load_slope_data` refuses it —
-`Reinforcement line 'Line 1' (reinforce sheet, Excel row 3) has an unrecognized
-Dir='0.0'. Expected: tangent or axial.` The writer put the literal `0.0` into
-the Dir cell (`fileio.py:3562`), replacing the lookup formula the template
-carries there. Clearing that one cell on all six rows is the whole repair, and
-the file then loads and solves at 1.5881.
-
-**The input checks do not catch it.** `preflight`'s `reinforce.dir_vocabulary`
-rule reads `str(r.get("dir") or "")`, and `0.0` is falsy, so a numeric Dir reads
-as blank and passes. A string does not: setting `dir = 'sideways'` on the same
-model raises six errors. The rule catches the wrong vocabulary and misses the
-wrong type.
+**What the band reading is worth.** Substitute LEM-8's shell polygon — the same
+band measured 2 ft horizontally — and change nothing else, and the same search
+gives **1.5881**, against the **1.5867** LEM-8 publishes; the two searches start
+from different circles and settle 0.0014 apart. So 1.628 − 1.588 = 0.040 is the
+band width and nothing else, and no input check can see it: the model is
+internally consistent either way.
 
 **Also worth a reader's eye.**
 
-- **One of the five completions ran an empty snippet** and printed nothing.
+- **No empty snippet this time.** All four snippets did work, against the
+  previous run's one that ran nothing.
 - **It wrote E = 0 and ν = 0 on both materials.** Harmless for a limit
   equilibrium run, a singular stiffness matrix for any finite element run.
+- **It wrote `gsat` where the field is `gamma_sat`.** The key is ignored, so both
+  materials reload with no saturated unit weight. Inert on a dry model, and wrong
+  the moment water enters.
 - **The geometry landed on the `polygon` sheet.** Profile lines is empty, and
   `max_depth` reads blank on reload — correct for polygon input, so the
   `max_depth = 0.0` it wrote is inert.
 
-**What changed vs. the previous run.** The two readings the previous recording
-got wrong are both right now: the face band is measured 2 ft horizontally rather
-than 2 ft normal to the face, and the section is 130 ft as dimensioned rather
-than the 150 ft the extent rule produced. The two engine-source dumps that opened
-the previous turn are gone — 5 completions against 6, 91k input tokens against
-106k — though one completion still ran an empty snippet. In their place is a new
-failure of a different kind: two invented field values, worth 0.117 of factor of
-safety, that also leave a workbook the reader cannot open.
+**What changed vs. the previous run.** The reinforcement failure is gone, and the
+refusal is what removed it: `Dir` and `Appl` now reject an unrecognized value, the
+assistant read the refusal, and the third pass wrote the two words the checks
+name. The saved workbook loads, and the reported 1.628 reproduces exactly on a
+reload. The empty snippet is gone too — 5 completions and 99k input tokens against
+5 and 91k, with 8.6k output against 15.1k. What is left is a reading of the
+drawing rather than a defect: the 2 ft band taken perpendicular to the face rather
+than horizontally, worth 0.040.
 
 ---
 
@@ -561,11 +551,14 @@ What is left divides into two kinds. The first is a claim about the tool that th
 tool was not asked — what a zero-σ reliability run returns (session 6), a
 mechanism offered for a curve (session 3). The second is newer and harder to
 catch: **a measurement that measured nothing**. The diagnosis removed the
-reinforcement by clearing one of the two lists the slicer reads, saw no change,
-and reported it as measured (session 7); the build session filled two fields the
-template computes for itself, which cost 0.117 of factor of safety and left a
-workbook that will not reopen (session 1). Neither reads as a guess. Both are
-caught the same way — by reloading the file and running it.
+reinforcement by clearing the list the slicer no longer reads on its own, saw no
+change, and reported it as measured (session 7). Its sibling in session 1 is
+closed: the two fields that recording invented are now refused by name, and the
+build session's third pass wrote the words the checks asked for. What session 1
+leaves is a reading rather than a defect — the 2 ft face band measured
+perpendicular rather than horizontally, worth 0.040. Neither reads as a guess.
+Both are caught the same way — by reloading the file, running it, and measuring
+the section against the picture.
 
 That is the lesson the page has to teach: the assistant computes correctly, and
 what it computed is not always what it said it measured. Check the model, check

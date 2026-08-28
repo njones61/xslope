@@ -18,6 +18,16 @@ Three modes::
     python3 tools/assistant_suite.py --live --budget-usd 15   # the real thing
     python3 tools/assistant_suite.py --replay <dir>           # re-score a run
 
+and a fourth axis across them. ``--corpus`` replaces the thirty hand-written
+scenarios with EVERY WORKBOOK the repository ships — one session and one prompt
+per file, scored against the same tag runner ``run_tests.py`` drives, and
+reported by the input columns each file exercises rather than by scenario. Where
+the scenarios cover the kinds of thing a person asks for, the sweep covers the
+kinds of MODEL they ask about; see :mod:`tools.assistant_scenarios.corpus`::
+
+    python3 tools/assistant_suite.py --corpus --live --budget-usd 10
+    python3 tools/assistant_suite.py --corpus --replay <dir>
+
 ``--dry-run`` answers every turn with a stub and calls no provider at all; it is
 what ``run_tests.py`` runs (through ``test/assistant_suite_check.py``) so the
 harness itself stays regression-tested without spending anything. ``--replay``
@@ -261,8 +271,14 @@ def select(names=None, families=None):
 
 
 def run(scenarios, outdir, provider="anthropic", model="claude-opus-5",
-        dry_run=False, budget=None, do_score=True):
-    """Play and score ``scenarios``, stopping at ``budget``."""
+        dry_run=False, budget=None, do_score=True, renderer=None,
+        meta_extra=None):
+    """Play and score ``scenarios``, stopping at ``budget``.
+
+    ``renderer`` writes ``scorecard.md`` — the corpus sweep groups its files by
+    input class rather than listing scenarios, and everything else about a run is
+    the same. ``meta_extra`` rides into the meta the renderer reads.
+    """
     os.makedirs(outdir, exist_ok=True)
     use_solve_cache(os.path.join(os.path.dirname(outdir), "solve_cache.json"))
     results, spend, stopped = [], 0.0, False
@@ -302,7 +318,8 @@ def run(scenarios, outdir, provider="anthropic", model="claude-opus-5",
             "model": model, "outdir": outdir, "spend": spend, "budget": budget,
             "stopped": stopped,
             "recorded": datetime.datetime.now().isoformat(timespec="seconds")}
-    write(results, meta, outdir)
+    meta.update(meta_extra or {})
+    write(results, meta, outdir, renderer)
     return results, meta
 
 
@@ -318,9 +335,25 @@ def _scored(scenario, session, here):
                                        % (type(exc).__name__, exc)}
 
 
-def replay(outdir, do_score=True):
-    """Re-score sessions already recorded under ``outdir``. No provider, no cost."""
+def replay(outdir, do_score=True, corpus=False):
+    """Re-score sessions already recorded under ``outdir``. No provider, no cost.
+
+    ``corpus`` re-scores a sweep instead of the registry: a sweep's scenarios are
+    not written down anywhere, so each one is rebuilt from the workbook its
+    session recorded opening — which is the whole of what defines it.
+    """
     from tools.assistant_scenarios import by_name
+
+    resolve, renderer, cases = by_name, None, []
+    if corpus:
+        from tools.assistant_scenarios import corpus as sweep
+
+        renderer = sweep.render
+
+        def resolve(_name, session=None):
+            case = sweep.Case(session["lock_model"])
+            cases.append(case)
+            return sweep.scenario_for(case)
 
     use_solve_cache(os.path.join(os.path.dirname(outdir.rstrip("/")),
                                  "solve_cache.json"))
@@ -332,7 +365,8 @@ def replay(outdir, do_score=True):
             continue
         with open(record, encoding="utf-8") as fh:
             session = json.load(fh)
-        scenario = by_name(session.get("scenario") or name)
+        scenario = (resolve(session.get("scenario") or name, session) if corpus
+                    else resolve(session.get("scenario") or name))
         if scenario is None:
             print("! no scenario named %r in the registry — skipped" % name)
             continue
@@ -343,15 +377,69 @@ def replay(outdir, do_score=True):
                                          row["total"]))
     meta = {"mode": "replay", "provider": "-", "model": "-", "outdir": outdir,
             "recorded": datetime.datetime.now().isoformat(timespec="seconds")}
-    write(results, meta, outdir)
+    if corpus:
+        meta["cases"] = cases
+    write(results, meta, outdir, renderer)
     return results, meta
 
 
-def write(results, meta, outdir):
+# --------------------------------------------------------------------------- #
+# The corpus sweep
+# --------------------------------------------------------------------------- #
+def recorded(outdir):
+    """The cases ``outdir`` already holds a finished session for.
+
+    A sweep is stopped by a budget rather than by finishing, so the normal way
+    to run the rest of it is to point a second run at the same directory. A
+    directory with a ``session.json`` in it is a session that was played and
+    paid for; a directory without one is a session that was interrupted, and it
+    is run again.
+    """
+    if not os.path.isdir(outdir):
+        return set()
+    return {name for name in os.listdir(outdir)
+            if os.path.exists(os.path.join(outdir, name, "session.json"))}
+
+
+def sweep(outdir, provider="anthropic", model="claude-opus-5", dry_run=False,
+          budget=None, limit=None, only=None, skip=None, resume=False):
+    """Every shipped workbook, one session each, scored by input class."""
+    from tools.assistant_scenarios import corpus
+
+    every = corpus.cases()
+    if only:
+        wanted = {n.strip() for n in only}
+        every = [c for c in every if c.name in wanted]
+    runnable = [c for c in every if c.loads]
+    unloadable = [c.name for c in every if not c.loads]
+    done = recorded(outdir) if resume else set()
+    passed_over = {n.strip() for n in (skip or [])}
+    if done or passed_over:
+        runnable = [c for c in runnable
+                    if c.name not in done and c.name not in passed_over]
+        print("   %d already recorded here, %d named on --corpus-skip; %d left"
+              % (len(done), len(passed_over), len(runnable)))
+    if limit:
+        runnable = runnable[:int(limit)]
+    scenarios = [corpus.scenario_for(c) for c in runnable]
+    print("corpus sweep: %d workbook(s), %d runnable -> %s"
+          % (len(every), len(runnable), outdir))
+    if unloadable:
+        print("  %d do not load and were not run: %s"
+              % (len(unloadable), ", ".join(sorted(unloadable)[:6])))
+    return run(scenarios, outdir, provider=provider, model=model,
+               dry_run=dry_run, budget=budget, renderer=corpus.render,
+               meta_extra={"cases": runnable, "corpus_size": len(every),
+                           "unloadable": unloadable})
+
+
+def write(results, meta, outdir, renderer=None):
     with open(os.path.join(outdir, "scorecard.md"), "w", encoding="utf-8") as fh:
-        fh.write(render(results, meta))
+        fh.write((renderer or render)(results, meta))
+    # ``cases`` carries loaded models the renderer needs and JSON cannot hold.
+    stored = {k: v for k, v in meta.items() if k != "cases"}
     with open(os.path.join(outdir, "scorecard.json"), "w", encoding="utf-8") as fh:
-        json.dump({"meta": meta, "results": results}, fh, indent=1, default=str)
+        json.dump({"meta": stored, "results": results}, fh, indent=1, default=str)
 
 
 def main(argv=None):
@@ -372,6 +460,19 @@ def main(argv=None):
     parser.add_argument("--family", default=None,
                         help="comma-separated families")
     parser.add_argument("--out", default=None, help="where to write this run")
+    parser.add_argument("--corpus", action="store_true",
+                        help="sweep every shipped workbook instead of the "
+                             "registry: one session and one prompt per file, "
+                             "scored by input class")
+    parser.add_argument("--corpus-limit", type=int, default=None,
+                        help="with --corpus, sweep only the first N files")
+    parser.add_argument("--corpus-skip", default=None,
+                        help="with --corpus, comma-separated case names not to "
+                             "run at all")
+    parser.add_argument("--resume", action="store_true",
+                        help="with --corpus and --out, skip the files this "
+                             "directory already holds a session for — how the "
+                             "rest of a budget-stopped sweep is run")
     parser.add_argument("--no-score", action="store_true",
                         help="record only; score later with --replay")
     parser.add_argument("--list", action="store_true",
@@ -379,6 +480,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.list:
+        if args.corpus:
+            from tools.assistant_scenarios import corpus
+            for case in corpus.cases():
+                print("%-52s %-5s %-22s %s"
+                      % (case.name, case.kind if case.loads else "-",
+                         case.primary, ", ".join(case.classes)))
+            return 0
         for scenario in SCENARIOS:
             print("%-24s %-12s %d turn(s) %2d criteria  %s"
                   % (scenario.name, scenario.family, len(scenario.turns),
@@ -386,12 +494,25 @@ def main(argv=None):
         return 0
 
     if args.replay:
-        results, meta = replay(args.replay, do_score=not args.no_score)
+        results, meta = replay(args.replay, do_score=not args.no_score,
+                               corpus=args.corpus)
         print(summarize(results, meta))
         return 0 if all(r["pass"] for r in results) else 1
 
     if not args.dry_run and not args.live:
         parser.error("choose --dry-run, --live or --replay")
+
+    if args.corpus:
+        outdir = args.out or stamped_dir(os.path.join(default_root(), "corpus"))
+        results, meta = sweep(outdir, provider=args.provider, model=args.model,
+                              dry_run=args.dry_run, budget=args.budget_usd,
+                              limit=args.corpus_limit, resume=args.resume,
+                              only=args.only.split(",") if args.only else None,
+                              skip=(args.corpus_skip.split(",")
+                                    if args.corpus_skip else None))
+        print(summarize(results, meta))
+        print("scorecard: %s" % os.path.join(outdir, "scorecard.md"))
+        return 0 if all(r["pass"] for r in results) else 1
 
     scenarios = select(args.only.split(",") if args.only else None,
                        args.family.split(",") if args.family else None)

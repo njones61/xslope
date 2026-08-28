@@ -243,7 +243,15 @@ def resolve_param(slope_data, ref):
         return canonical, setter, float(base)
 
     if kind == 'reinforce':
-        lines = slope_data.get('reinforcement_lines') or slope_data.get('reinforce_lines')
+        # An explicit 'reinforcement_lines' list is the model's own statement about
+        # its reinforcement, the EMPTY list included -- the same rule slice.py
+        # follows. 'reinforce_lines' is derived from it and carries point dicts
+        # with no 'label', so falling back to it on an emptied source both
+        # resurrected reinforcement the user had deleted and looked the sweep's
+        # target up in a list that cannot name it. The derived list is read only
+        # where the source key is absent altogether (slope_data built by hand).
+        source = slope_data.get('reinforcement_lines')
+        lines = source if source is not None else slope_data.get('reinforce_lines')
         if not lines:
             raise ValueError("The model has no reinforcement lines.")
         idx, line = _find_by_name(lines, name, 'reinforcement line', name_key='label')

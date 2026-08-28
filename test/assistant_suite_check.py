@@ -34,11 +34,22 @@ What is asserted, all offscreen, no provider contacted and no network at all:
   H. THE PRICE TABLE — one table, dated, complete (every model has both rates),
      and the cost arithmetic matches a hand computation including the cache-read
      discount.
+  I. THE CORPUS SWEEP — the file list is complete and deduplicated the way the
+     rule says, each file's input classes and engine are read off the loaded
+     model, its criteria tell a broken snippet from a solver with no solution and
+     read a factor of safety out of a table column as well as an equation, and a
+     dry sweep of two files writes a scorecard grouped by input class without
+     contacting a provider.
+  J. AN EMPTY REINFORCEMENT LIST MEANS NONE — a sensitivity sweep addressed at
+     reinforcement on a model whose ``reinforcement_lines`` was explicitly
+     cleared says so, rather than falling through to the derived point lists,
+     which carry no label for it to find the line by.
 
 Skips cleanly (exit 0) when PySide6 is not installed (engine-only install — there
 is no Studio layer to drive).
 """
 
+import glob
 import json
 import os
 import re
@@ -419,6 +430,307 @@ def check_prices():
 
 
 # --------------------------------------------------------------------------- #
+# I. the corpus sweep
+# --------------------------------------------------------------------------- #
+#: The two workbooks the dry sweep plays. Both are small, both are plain LEM, and
+#: neither costs a solve to score: the stub reply states no number, so the value
+#: criterion answers before it reaches the engine.
+DRY_CORPUS = (os.path.join("docs", "lem", "files", "xslope_simple_embankment.xlsx"),
+              os.path.join("docs", "inputs", "slope", "xslope_simple1.xlsx"))
+
+
+def check_corpus_files():
+    """The sweep's file list: complete, unique, and deduplicated by the rule."""
+    from tools.assistant_scenarios import corpus
+
+    out = []
+    paths = corpus.discover()
+    if len(paths) < 300:
+        out.append("discover() found only %d workbooks; the shipped corpus is "
+                   "several hundred" % len(paths))
+    missing = [p for p in paths if not os.path.exists(p)]
+    if missing:
+        out.append("discover() named %d file(s) that do not exist: %s"
+                   % (len(missing), missing[0]))
+    names = [corpus._case_name(p) for p in paths]
+    if len(set(names)) != len(names):
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        out.append("two workbooks map to one scenario name: %s" % ", ".join(dupes[:4]))
+    for folder in corpus.CORPUS_DIRS + corpus.CORPUS_TREES:
+        on_disk = glob.glob(os.path.join(REPO_ROOT, folder, "**", "*.xlsx"),
+                            recursive=True)
+        if on_disk and not any(p.startswith(os.path.join(REPO_ROOT, folder))
+                               for p in paths):
+            out.append("%s holds workbooks but none were swept" % folder)
+
+    # The dedup rule, both ways round, on files written for the purpose.
+    tmp = tempfile.mkdtemp(prefix="corpus_dedup_")
+    try:
+        base = os.path.join(tmp, "model.xlsx")
+        same = os.path.join(tmp, "model_start.xlsx")
+        other = os.path.join(tmp, "other_start.xlsx")
+        with open(base, "wb") as fh:
+            fh.write(b"identical bytes")
+        shutil.copy2(base, same)
+        with open(other, "wb") as fh:
+            fh.write(b"different bytes entirely")
+        if not corpus.duplicate_of_sibling(same):
+            out.append("a _start copy identical to its sibling was not skipped")
+        if corpus.duplicate_of_sibling(other):
+            out.append("a _start file with no sibling was skipped as a duplicate")
+        if corpus.duplicate_of_sibling(base):
+            out.append("a plain workbook was treated as a companion copy")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
+
+def check_corpus_classes():
+    """Input classes and engine come off the loaded model, not off the name."""
+    from tools.assistant_scenarios import corpus
+
+    out = []
+    wanted = {
+        os.path.join("docs", "tutorials", "files",
+                     "xslope_reinforced_slope.xlsx"):
+            ("lem", {"reinforcement", "distributed loads"}),
+        os.path.join("docs", "seep", "files", "xslope_earth_dam1.xlsx"):
+            ("seep", {"seepage BCs"}),
+        os.path.join("docs", "lem", "files", "xslope_noncircular.xlsx"):
+            ("lem", {"non-circular"}),
+    }
+    for rel, (kind, classes) in wanted.items():
+        case = corpus.Case(os.path.join(REPO_ROOT, rel))
+        if not case.loads:
+            out.append("%s does not load" % rel)
+            continue
+        if case.kind != kind:
+            out.append("%s reads as a %s model, expected %s"
+                       % (os.path.basename(rel), case.kind, kind))
+        missing = classes - set(case.classes)
+        if missing:
+            out.append("%s: input class(es) not detected: %s"
+                       % (os.path.basename(rel), ", ".join(sorted(missing))))
+        if case.primary not in case.classes:
+            out.append("%s: primary class %r is not one of its classes"
+                       % (os.path.basename(rel), case.primary))
+    # A file that publishes an SSRM value and also defines a failure surface is a
+    # stability case: reading the kind off whichever tag came first filed the
+    # LEM-8 tutorial model as FEM and scored its Spencer answer against SSRM.
+    lem8 = corpus.Case(os.path.join(REPO_ROOT, "docs", "tutorials", "files",
+                                    "xslope_reinforced_slope.xlsx"))
+    if lem8.loads and lem8.kind != "lem":
+        out.append("a model with circles and an fem_ssrm tag reads as %s"
+                   % lem8.kind)
+    # And every case is orderable into a bucket the scorecard can group by.
+    order = set(corpus.CLASS_ORDER)
+    for case in (lem8,):
+        stray = [c for c in case.classes if c not in order]
+        if stray:
+            out.append("input class(es) outside CLASS_ORDER: %s" % ", ".join(stray))
+    return out
+
+
+def check_corpus_scorers():
+    """The sweep's own criteria discriminate, on synthetic sessions only."""
+    from tools.assistant_scenarios import corpus
+
+    out = []
+    engine_said_no = _session(
+        prose="Spencer has no admissible solution on this circle.",
+        code="run_lem(search=False)",
+        output="RuntimeError: No solution: Spencer's method: only solutions "
+               "with anomalous base tension found (96.0x cohesive capacity)")
+    snippet_broke = _session(
+        prose="Here is the surface.",
+        code="xslope.solve.generate_failure_surface(sd)",
+        output="Traceback (most recent call last):\n"
+               "AttributeError: module 'xslope.solve' has no attribute "
+               "'generate_failure_surface'")
+    if not _ask(corpus.no_snippet_errors(), engine_said_no):
+        out.append("a solver reporting no solution was counted as a broken snippet")
+    if _ask(corpus.no_snippet_errors(), snippet_broke):
+        out.append("a snippet calling a name that does not exist passed")
+
+    # A factor of safety in a table COLUMN is an answer, the same as one after an
+    # equals sign; reading only the second scored a correct method-by-method
+    # answer as reporting no number at all.
+    table = ("| Method | FS | Notes |\n|:--|--:|:--|\n"
+             "| OMS | 1.398 | — |\n| Bishop | 1.237 | — |")
+    if corpus._table_fs(table) != [1.398, 1.237]:
+        out.append("an FS column was not read as stated values: %r"
+                   % (corpus._table_fs(table),))
+    if corpus._table_fs("no table at all"):
+        out.append("prose with no table produced stated values")
+
+    # Which engine ran is read off the snippets, so an SSRM answer is compared
+    # with an SSRM run rather than with a limit-equilibrium one.
+    from tools.assistant_scenarios import Scenario, ScoreCtx
+    scenario = Scenario("t", "test", None, ["p"], [])
+    for code, want in (("res = run_fem(analysis='ssrm')", "fem"),
+                       ("sol = run_seep(bc=1)", "seep"),
+                       ("res = run_lem(search=True)", "lem"),
+                       ("print(slope_data['materials'])", None)):
+        got = corpus.engine_ran(ScoreCtx(scenario, _session(code=code),
+                                         tempfile.gettempdir()))
+        if got != want:
+            out.append("engine_ran(%r) = %r, expected %r" % (code, got, want))
+    return out
+
+
+def check_corpus_dry_run():
+    """A dry sweep of two files: a class-grouped scorecard, and no provider."""
+    import tools.assistant_suite as suite
+    from tools.assistant_scenarios import corpus
+
+    out = []
+    calls = {"n": 0}
+    try:
+        import litellm
+        real = litellm.completion
+
+        def counted(*args, **kwargs):
+            calls["n"] += 1
+            return real(*args, **kwargs)
+        litellm.completion = counted
+    except Exception:
+        litellm = real = None
+
+    docs_files = os.path.join(REPO_ROOT, "docs", "tutorials", "files")
+    before_docs = set(os.listdir(docs_files)) if os.path.isdir(docs_files) else set()
+    tmp = tempfile.mkdtemp(prefix="corpus_dry_")
+    try:
+        cases = corpus.cases([os.path.join(REPO_ROOT, p) for p in DRY_CORPUS])
+        scenarios = [corpus.scenario_for(c) for c in cases]
+        if len(scenarios) != len(DRY_CORPUS):
+            out.append("%d of %d corpus scenarios built"
+                       % (len(scenarios), len(DRY_CORPUS)))
+        results, meta = suite.run(scenarios, tmp, dry_run=True,
+                                  renderer=corpus.render,
+                                  meta_extra={"cases": cases,
+                                              "corpus_size": len(cases),
+                                              "unloadable": []})
+        if calls["n"]:
+            out.append("a dry sweep entered litellm.completion %d time(s)"
+                       % calls["n"])
+        card = os.path.join(tmp, "scorecard.md")
+        if not os.path.exists(card):
+            out.append("the sweep wrote no scorecard")
+            return out
+        text = open(card, encoding="utf-8").read()
+        if "## By input class" not in text:
+            out.append("the scorecard is not grouped by input class")
+        for case in cases:
+            if case.primary not in text:
+                out.append("the scorecard never names the %r class"
+                           % case.primary)
+        if "## By criterion" not in text:
+            out.append("the scorecard does not tally the criteria")
+        # Every scenario carries the six questions the sweep asks.
+        for row in results:
+            names = [c["name"] for c in row["criteria"]]
+            for wanted in ("reported value matches an independent run",
+                           "ran the method the file declares",
+                           "no exceptions in snippets",
+                           "a saved workbook still holds its locks"):
+                if wanted not in names:
+                    out.append("%s: %r was not scored" % (row["scenario"], wanted))
+        # The stub reply states no number, so the value criterion must FAIL —
+        # a sweep whose truth check passes on an empty answer measures nothing.
+        for row in results:
+            value = next((c for c in row["criteria"]
+                          if c["name"] == "reported value matches an independent run"),
+                         None)
+            if value and value["pass"]:
+                out.append("%s: the value criterion passed on a stub reply"
+                           % row["scenario"])
+        # Replay re-scores a sweep by rebuilding each case from its session.
+        again, _meta = suite.replay(tmp, corpus=True)
+        if len(again) != len(results):
+            out.append("corpus replay re-scored %d of %d sessions"
+                       % (len(again), len(results)))
+        before = {r["scenario"]: [(c["name"], c["pass"]) for c in r["criteria"]]
+                  for r in results}
+        after = {r["scenario"]: [(c["name"], c["pass"]) for c in r["criteria"]]
+                 for r in again}
+        if before != after:
+            out.append("corpus replay did not reproduce the scoring of the run "
+                       "it re-scored")
+    finally:
+        if litellm is not None and real is not None:
+            litellm.completion = real
+        shutil.rmtree(tmp, ignore_errors=True)
+    after_docs = set(os.listdir(docs_files)) if os.path.isdir(docs_files) else set()
+    if after_docs - before_docs:
+        out.append("the sweep wrote into docs/tutorials/files: %s"
+                   % ", ".join(sorted(after_docs - before_docs)))
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# J. an empty reinforcement list means none
+# --------------------------------------------------------------------------- #
+def check_empty_reinforcement():
+    """Clearing ``reinforcement_lines`` removes the reinforcement everywhere.
+
+    ``slice.py`` has read an explicit empty list as "no reinforcement" since the
+    delete bug; the sensitivity sweep did not, and fell through to the derived
+    ``reinforce_lines``. Those are point dicts with no ``label``, so a sweep
+    addressed at a line by name looked for it in a list that cannot name it —
+    reporting a missing line rather than a model with no reinforcement.
+    """
+    from xslope.sensitivity import resolve_param
+    from tools.assistant_scenarios import load_model, repo
+
+    out = []
+    sd = load_model(repo("docs/tutorials/files/xslope_reinforced_slope.xlsx"))
+    if sd is None:
+        return ["the reinforced-slope model does not load"]
+    if not sd.get("reinforcement_lines") or not sd.get("reinforce_lines"):
+        return ["the fixture carries no reinforcement to clear"]
+    label = sd["reinforcement_lines"][0].get("label")
+
+    # Sound model: the line resolves.
+    try:
+        canonical, _setter, base = resolve_param(sd, "reinforce:%s:t_max" % label)
+    except Exception as exc:
+        out.append("a sound model's reinforcement line does not resolve: %s: %s"
+                   % (type(exc).__name__, exc))
+    else:
+        if not canonical.startswith("reinforce:"):
+            out.append("resolved to %r rather than a reinforcement line" % canonical)
+        if base is None:
+            out.append("the resolved line has no base value")
+
+    # Source cleared, derived list left behind — what a delete leaves in memory.
+    cleared = dict(sd)
+    cleared["reinforcement_lines"] = []
+    try:
+        resolve_param(cleared, "reinforce:%s:t_max" % label)
+    except ValueError as exc:
+        if "no reinforcement lines" not in str(exc).lower():
+            out.append("an emptied model raised the wrong message: %s" % exc)
+    except Exception as exc:
+        out.append("an emptied model raised %s: %s" % (type(exc).__name__, exc))
+    else:
+        out.append("an emptied 'reinforcement_lines' still resolved a line — the "
+                   "derived point lists were used as the source")
+
+    # No source key at all is a model assembled by hand, and the derived list is
+    # still the only thing there is to read.
+    legacy = {k: v for k, v in sd.items() if k != "reinforcement_lines"}
+    try:
+        resolve_param(legacy, "reinforce:%s:t_max" % label)
+    except ValueError as exc:
+        if "no reinforcement lines" in str(exc).lower():
+            out.append("a model with no 'reinforcement_lines' key was told it has "
+                       "no reinforcement, though 'reinforce_lines' carries it")
+    except Exception:
+        pass
+    return out
+
+
+# --------------------------------------------------------------------------- #
 def run():
     try:
         import PySide6                                          # noqa: F401
@@ -431,7 +743,12 @@ def run():
                         ("scorers", check_scorers),
                         ("parser", check_parser),
                         ("prices", check_prices),
-                        ("dry run", check_dry_run)):
+                        ("corpus files", check_corpus_files),
+                        ("corpus classes", check_corpus_classes),
+                        ("corpus scorers", check_corpus_scorers),
+                        ("empty reinforcement", check_empty_reinforcement),
+                        ("dry run", check_dry_run),
+                        ("corpus dry run", check_corpus_dry_run)):
         try:
             failures += ["%s: %s" % (name, msg) for msg in check()]
         except Exception as exc:

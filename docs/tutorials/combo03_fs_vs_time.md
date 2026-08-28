@@ -373,25 +373,6 @@ its reason rather than as a gap in the curve.
 
 <!-- test: file=files/xslope_earth_dam_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, expected_first=1.5311, critical_time=35, min_fs=1.3313, tolerance=0.005, benchmark=COMBO-3-drained -->
 
-From a script we make the same run with `xslope.sensitivity.fs_vs_time`, reading
-the transient solution off the companion files the workbook ships with:
-
-```python
-from xslope.seep import build_seep_data, import_transient_solution
-from xslope.sensitivity import fs_vs_time
-
-seep_data = build_seep_data(slope_data["mesh"], slope_data, seep_bc=1)
-solution = import_transient_solution(seep_data, "xslope_earth_dam_fs_time")
-
-ok, res = fs_vs_time(slope_data, solution, methods=("spencer",), search=True)
-print(f"minimum FS = {res['min_fs']:.3f} at t = {res['critical_time']:g}")
-```
-
-It returns `critical_time` and `min_fs` alongside a per-instant table whose rows
-carry the `Xo`, `Yo` and `R` of the circle each instant settled on.
-[Factor of safety versus time](../parametric/sensitivity.md#factor-of-safety-versus-time)
-documents the mode in full.
-
 ### The factor of safety vs time curve
 
 | t (day) | pool (m) | FS | center | R (m) | face |

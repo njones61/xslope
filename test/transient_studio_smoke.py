@@ -126,8 +126,8 @@ def test_dialog():
         fails.append(f"transient options wrong: {o}")
     if set(o) != {"mode", "bc", "tol"}:
         fails.append(f"transient options carry stage keys (should not): {o}")
-    if dlg.seep_bc.isEnabled():
-        fails.append("BC selector should be disabled in transient mode")
+    if hasattr(dlg, "seep_bc"):
+        fails.append("run dialog exposes a BC selector; a steady run solves every set")
     # No stage widgets anywhere on the dialog.
     for attr in ("stage_1", "stage_2", "stage_enable", "transient_group"):
         if hasattr(dlg, attr):
@@ -138,8 +138,8 @@ def test_dialog():
     dlg.run_type.setCurrentIndex(dlg.run_type.findData("steady"))
     if dlg.options().get("mode") != "steady":
         fails.append("switching Run type to Steady did not change the mode")
-    if not dlg.seep_bc.isEnabled():
-        fails.append("BC selector should re-enable in steady mode")
+    if dlg.options().get("bc") not in (1, "both"):
+        fails.append(f"steady options carry an unexpected bc: {dlg.options()}")
     return fails
 
 

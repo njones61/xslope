@@ -128,6 +128,12 @@ TOE = (0.0, 5.0)
 GROUND = [(0.0, 5.0), (30.0, 20.0), (90.0, 20.0)]
 DEEP_BASE = -20.0
 CENTER = (15.0, 50.0)
+#: The deep circle of the sound build: it bottoms below the toe (so raising the
+#: base to the toe elevation strands it) and still daylights on the slope and on
+#: the crest. A circle reaching the -20 base from CENTER would swallow the toe
+#: and produce no failure surface at all.
+DEEP_CENTER = (30.0, 50.0)
+DEEP_DEPTH = 0.0
 
 _R_TOE = math.hypot(CENTER[0] - TOE[0], CENTER[1] - TOE[1])
 
@@ -144,8 +150,8 @@ slope_data['profile_lines'] = [{{'mat_id': 0, 'coords': {GROUND!r}}}]
 slope_data['max_depth'] = {DEEP_BASE!r}
 slope_data['circular'] = True
 slope_data['circles'] = [
-    {{'Xo': {CENTER[0]!r}, 'Yo': {CENTER[1]!r}, 'Depth': {DEEP_BASE!r},
-      'R': {CENTER[1] - DEEP_BASE!r}}},
+    {{'Xo': {DEEP_CENTER[0]!r}, 'Yo': {DEEP_CENTER[1]!r}, 'Depth': {DEEP_DEPTH!r},
+      'R': {DEEP_CENTER[1] - DEEP_DEPTH!r}}},
     {{'Xo': {CENTER[0]!r}, 'Yo': {CENTER[1]!r}, 'Depth': {CENTER[1] - _R_TOE!r},
       'R': {_R_TOE!r}}},
 ]
@@ -154,9 +160,14 @@ print('geometry and circles added')
 
 #: The cascade: the base is corrected up to the toe elevation the problem states,
 #: and NOTHING in the snippet touches the circles that were tangent to the old one.
-SNIPPET_RAISE_BASE = """
-slope_data['max_depth'] = 5.0
-print('max_depth set to the stated rigid base at the toe elevation')
+#: The cascade edit: the crest is raised to el. 60 behind the slope, so both
+#: circles now meet the ground ABOVE their own centers and neither can be built
+#: as a failure surface. (Raising the base instead is not a cascade at all -- a
+#: circle whose nadir falls below a raised floor is truncated along it and still
+#: slices.)
+SNIPPET_RAISE_CREST = """
+slope_data['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 5.0), (30.0, 20.0), (60.0, 60.0), (90.0, 60.0)]}]
+print('crest raised to el. 60 behind the slope')
 """
 
 #: The other cure the sessions reached for: keep the base where it is and run the
@@ -456,7 +467,7 @@ def check_clean_build():
 
 
 def check_edit_cascade():
-    """The cascade: a snippet that touches ONLY max_depth must surface the circles
+    """The cascade: a snippet that touches ONLY the profile must surface the circles
     it just stranded under the new base — the finding no one asked for, on the
     edit that caused it."""
     out = []
@@ -464,13 +475,13 @@ def check_edit_cascade():
     _run(asst, SNIPPET_MATERIALS)
     _run(asst, SNIPPET_GEOMETRY)
 
-    text = _run(asst, SNIPPET_RAISE_BASE)
+    text = _run(asst, SNIPPET_RAISE_CREST)
     blk = _block(text)
     if blk is None:
-        out.append("raising max_depth produced no MODEL CHECKS block")
+        out.append("raising the crest produced no MODEL CHECKS block")
         mw.deleteLater()
         return out
-    if "surface.circle_below_domain_floor" not in blk:
+    if "surface.circle_daylights_above_center" not in blk:
         out.append(f"the stranded circle was not reported: {blk[:200]!r}")
     if "ERROR" not in blk:
         out.append(f"the stranded first circle was not an ERROR: {blk[:200]!r}")
@@ -478,7 +489,7 @@ def check_edit_cascade():
         out.append(f"the finding does not name the circle: {blk[:200]!r}")
     # The snippet's own output is still there — the block is appended, not a
     # replacement for the result the model asked for.
-    if "max_depth set to the stated rigid base" not in text:
+    if "crest raised to el. 60" not in text:
         out.append("the block displaced the snippet's own stdout")
     if not text.rstrip().endswith("=== END MODEL CHECKS ==="):
         out.append("the block is not the last thing in the tool result")
@@ -656,7 +667,7 @@ def check_followup_command_carries_the_selection():
     # A deck carrying BOTH families (so the selection is what keeps
     # surface.family_ambiguous off the block) and one real fault (so there is
     # something for the overflow line to be counting).
-    _run(asst, SNIPPET_RAISE_BASE)
+    _run(asst, SNIPPET_RAISE_CREST)
     _run(asst, """
 slope_data['non_circ'] = [{'X': -10.0, 'Y': 5.0, 'Movement': 'Free'},
                           {'X': 20.0, 'Y': -2.0, 'Movement': 'Free'},
@@ -764,7 +775,8 @@ print('piezo line added')
 
 #: A fragment of each standing finding's own paragraph. Present = quoted in full.
 PIEZO_FULL = "the points run right to left"
-CIRCLE_FULL = "below the bottom of the model domain"
+CIRCLE_FULL = "above its own center"          # the cascade ERROR (crest raised)
+DEAD_CIRCLE_FULL = "below the bottom of the model domain"   # a dead circle added by hand
 SEEP_FULL = "takes pore pressure from a seepage solution"
 
 
@@ -840,7 +852,7 @@ def check_new_finding_is_reported_in_full():
         out.append("adding a dead circle produced no block")
         mw.deleteLater()
         return out
-    if CIRCLE_FULL not in blk:
+    if DEAD_CIRCLE_FULL not in blk:
         out.append(f"the new finding was not quoted in full: {blk[:200]!r}")
     if "surface.circle_below_domain_floor" not in blk:
         out.append("the new finding is not named by its rule key either")
@@ -895,7 +907,7 @@ def check_error_never_collapses():
     mw, asst = _session()
     _run(asst, SNIPPET_MATERIALS)
     _run(asst, SNIPPET_GEOMETRY)
-    blk = _block(_run(asst, SNIPPET_RAISE_BASE))
+    blk = _block(_run(asst, SNIPPET_RAISE_CREST))
     if blk is None or "ERROR" not in blk:
         out.append(f"the stranded circle did not arrive as an error: {blk!r}")
 
@@ -905,7 +917,7 @@ def check_error_never_collapses():
         if blk is None:
             out.append(f"edit {i + 2} produced no block")
             continue
-        if "ERROR [surface.circle_below_domain_floor]" not in blk:
+        if "ERROR [surface.circle_daylights_above_center]" not in blk:
             out.append(f"edit {i + 2}: the error stopped being quoted: {blk[:200]!r}")
         elif CIRCLE_FULL not in blk:
             out.append(f"edit {i + 2}: the error lost its message: {blk[:200]!r}")
@@ -928,8 +940,8 @@ def check_error_survives_the_quote_cap():
     mw, asst = _session()
     _run(asst, SNIPPET_MATERIALS)
     _run(asst, SNIPPET_GEOMETRY)
-    blk = _block(_run(asst, SNIPPET_RAISE_BASE))
-    if blk is None or "ERROR [surface.circle_below_domain_floor]" not in blk:
+    blk = _block(_run(asst, SNIPPET_RAISE_CREST))
+    if blk is None or "ERROR [surface.circle_daylights_above_center]" not in blk:
         out.append(f"the stranded circle did not arrive as an error: {blk!r}")
 
     # Now bury it: more never-quoted warnings arrive at once than a block quotes.
@@ -940,7 +952,7 @@ def check_error_survives_the_quote_cap():
                    "nothing")
     for n, blk in enumerate(blocks, 2):
         quoted = [ln for ln in (blk or "").splitlines()
-                  if ln.startswith("  ERROR [surface.circle_below_domain_floor]")]
+                  if ln.startswith("  ERROR [surface.circle_daylights_above_center]")]
         if not quoted:
             out.append(f"block {n}: the error is not quoted at all: "
                        f"{(blk or '')[:300]!r}")
@@ -967,7 +979,7 @@ def check_changed_finding_uncollapses():
         out.append("moving the dead circle produced no block")
         mw.deleteLater()
         return out
-    if "Circle 2" not in blk or CIRCLE_FULL not in blk:
+    if "Circle 2" not in blk or DEAD_CIRCLE_FULL not in blk:
         out.append(f"the fault's new row was not quoted in full: {blk[:200]!r}")
     if _collapsed(blk) is not None:
         out.append(f"the moved fault was written off as unchanged: "

@@ -334,6 +334,33 @@ Modeling rules (slope-stability physics):
 """
 
 
+#: Appended to the system prompt for a model with NO tool calling (a local Ollama
+#: tag), where a message written in chat is the only channel there is. It states
+#: the one convention that separates code to RUN from code to READ; the fallback
+#: honours exactly this marker (:data:`RUN_FENCE_RE`).
+RUN_FENCE_NOTE = """\
+
+RUNNING CODE. Your model has no tool-call protocol, so you run a snippet by \
+writing it in your reply — and Studio has to be able to tell a snippet you want \
+RUN from one you wrote for the user to READ.
+
+To RUN a snippet, mark the fence `run`:
+
+```python run
+print(slope_data['max_depth'])
+```
+
+That block is executed and its output comes back to you. One per message; write \
+the whole snippet in it.
+
+Anything else is prose and is only shown to the user: a plain ```python fence, a \
+signature quoted to explain a call, an example of how something is used. Studio \
+will NOT run it — so a block you meant to run and left unmarked simply never \
+runs, and a block you wrote to illustrate something can never fail with an error \
+you then have to explain.
+"""
+
+
 TOOL_NAMES = {"run_python"}
 MAX_STEPS = 25                  # safety cap on agentic iterations per turn
 
@@ -385,20 +412,49 @@ def _is_runnable(code):
     return False
 
 
+#: A fenced block MARKED for execution: ```python run — the info string carries
+#: the word ``run``. This is the only fence the text fallback will execute.
+#:
+#: An unmarked ```python fence is PROSE. A recorded session lost a turn to the
+#: other reading: the model wrote a documentation signature into its answer to
+#: show the user the shape of a call (``sigma_from_range(hcv, lcv, n=None)``),
+#: the fallback scraped that fence out of the prose and ran it, and the NameError
+#: that came back was explained to the user as their mistake. Code written to be
+#: read is not code to run, and nothing but an explicit marker can tell the two
+#: apart — so the marker is required.
+RUN_FENCE_RE = re.compile(r"```(?:python|py)[ \t]+run[ \t]*\r?\n(.*?)```", re.S)
+
+
+def text_fallback_enabled(caps):
+    """Whether to recover code from an assistant message that made no structured
+    tool call, given :meth:`AssistantConfig.capabilities`.
+
+    Only where the provider does NOT do tool calling — a local Ollama model, whose
+    ``tools`` capability is False or None (depends on the tag the user pulled).
+    A provider with tool calling has a protocol for saying "run this", so anything
+    it writes in prose is prose, and scraping it is a bug rather than a fallback.
+    """
+    return caps.get("tools") is not True
+
+
 def _extract_code(content):
     """Recover ``run_python`` code from an assistant turn that made no structured
-    tool call — a JSON tool-call, a fenced ```python block, or whole-content
-    Python (weaker models often just *write* the code in chat). Returns
-    ``(code, pure)`` where ``pure`` means the message is only the code (so it is
-    suppressed from the transcript); ``(None, False)`` if nothing runnable."""
-    import re
+    tool call — a JSON tool-call, a ```python run fence, or whole-content Python
+    (weaker models often just *write* the code in chat). Returns ``(code, pure)``
+    where ``pure`` means the message is only the code (so it is suppressed from
+    the transcript); ``(None, False)`` if nothing runnable.
+
+    Only reached for a provider without tool calling (:func:`text_fallback_enabled`),
+    and even there a fenced block runs only when it is marked ```python run — see
+    :data:`RUN_FENCE_RE`.
+    """
     if not content:
         return None, False
     s = content.strip()
     call = _parse_text_tool_call(s, TOOL_NAMES)
     if call:
         return call[1].get("code", ""), True
-    fence = re.search(r"```(?:python|py)?\s*\n?(.*?)```", s, re.S)
+    fence = RUN_FENCE_RE.search(s)
     if fence and _is_runnable(fence.group(1).strip()):
         return fence.group(1).strip(), False        # keep any surrounding prose
     if _is_runnable(s) and re.search(
@@ -1173,13 +1229,18 @@ class _AgentWorker(QThread):
     failed = Signal(str)
     done = Signal()
 
-    def __init__(self, kwargs, system, messages, tools, cache_system=False, parent=None):
+    def __init__(self, kwargs, system, messages, tools, cache_system=False,
+                 text_fallback=False, parent=None):
         super().__init__(parent)
         self._kwargs = kwargs       # provider/model kwargs for litellm.completion
         self._system = system
         self._messages = messages   # shared list (OpenAI format), mutated in place
         self._tools = tools
         self._cache_system = cache_system   # Anthropic prompt caching of the system
+        # Recover code from an assistant message that made no structured tool call
+        # (:func:`_extract_code`). Providers WITHOUT tool calling only — see
+        # :func:`text_fallback_enabled`.
+        self._text_fallback = text_fallback
         self._cancel = threading.Event()
 
     def _system_message(self):
@@ -1219,8 +1280,10 @@ class _AgentWorker(QThread):
                 tool_calls = getattr(msg, "tool_calls", None) or []
 
                 # Fallback for models that don't make a structured tool call but
-                # write the code (as JSON, a fenced block, or bare Python).
-                code_call, pure = ((None, False) if tool_calls
+                # write the code (as JSON, a ```python run fence, or bare Python).
+                # Off for a provider that HAS tool calling: there, prose is prose.
+                code_call, pure = ((None, False)
+                                   if tool_calls or not self._text_fallback
                                    else _extract_code(msg.content))
 
                 assistant_msg = {"role": "assistant", "content": msg.content or ""}
@@ -1352,12 +1415,18 @@ class Assistant(QObject):
         # record schemas are appended after it (LAST, so they win on recency — no
         # .xlsx diving to learn the schema) and MODELING_BRIEF is left out, since
         # it would only duplicate them.
+        #
+        # The fence convention is appended only where it is the protocol in force —
+        # a model with no tool calling. A model that HAS tool calling would only be
+        # told about a channel it never uses, on a turn it pays for.
+        extra = (RUN_FENCE_NOTE
+                 if text_fallback_enabled(self.config.capabilities()) else "")
         if self.config.wants_skill():
             brief = _load_brief_text()
             if brief:
-                return STUDIO_SYSTEM + _BRIEF_HEADER + brief + SCHEMA_BRIEF
+                return STUDIO_SYSTEM + _BRIEF_HEADER + brief + SCHEMA_BRIEF + extra
         # No brief loaded (local/other model): the modeling rules live only here.
-        return STUDIO_SYSTEM + SCHEMA_BRIEF + MODELING_BRIEF
+        return STUDIO_SYSTEM + SCHEMA_BRIEF + MODELING_BRIEF + extra
 
     def pending_model_summary(self):
         """The MODEL SUMMARY block this turn owes the model, or ``""``.
@@ -1418,6 +1487,8 @@ class Assistant(QObject):
         self._worker = _AgentWorker(self.config.completion_kwargs(), self._system(),
                                     self._messages, [RUN_PYTHON_TOOL],
                                     cache_system=self.config.supports_prompt_cache(),
+                                    text_fallback=text_fallback_enabled(
+                                        self.config.capabilities()),
                                     parent=self)
         self._worker.text.connect(self.assistant_text)
         self._worker.tool_call.connect(self._on_tool_call)   # queued -> GUI thread

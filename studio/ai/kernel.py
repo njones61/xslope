@@ -372,7 +372,8 @@ class PythonKernel:
           nu for a material that carries none, with the classification it came
           from. A LAST-RESORT fill, never a preference over a stated value.
         - ``generate_report(path=None, **options)`` — the Analysis Report the
-          Report dialog builds, written and finished; returns the path.
+          Report dialog builds, written and finished; lands in ``OUTPUT_DIR``
+          unless a path says otherwise, and returns the path.
         - ``resync_geometry(slope_data=None)`` — rebuild derived geometry after an
           in-snippet geometry edit (call inside sweep loops).
         - ``sensitivity(values, apply, param=..., ...)`` — callback-driven FS-vs-
@@ -823,12 +824,14 @@ class PythonKernel:
             session never ran is RUN by the builder, which is the longest thing in
             such a build: warn the user before asking for one.
 
-            `path` defaults to `<model>_report.docx` beside the project (the home
-            directory for a project never saved). `finalize=False` skips the page-
-            number pass. Every other keyword is a report option, exactly as the
-            Report dialog's checkboxes set them — `title`, `analyst`, and the section
-            switches (`lem_slices`, `fem_piles`, …); `xslope.report.DEFAULT_OPTIONS`
-            names them all. Returns the output path.
+            `path` defaults to `<model>_report.docx` in `OUTPUT_DIR`, so the user
+            opens it from the chat and the dock's Files button like every other file
+            this session produces; pass an explicit `path` to write it anywhere
+            else. `finalize=False` skips the page-number pass. Every other keyword
+            is a report option, exactly as the Report dialog's checkboxes set them —
+            `title`, `analyst`, and the section switches (`lem_slices`, `fem_piles`,
+            …); `xslope.report.DEFAULT_OPTIONS` names them all. Returns the output
+            path.
             """
             from xslope.report import generate_report as _generate
             from ..report_dialog import (default_output_path, document_finish,
@@ -836,7 +839,14 @@ class PythonKernel:
             sd = doc.slope_data
             solutions = _report_solutions()
             model_path = getattr(doc, "path", None)
-            out_path = path or default_output_path(model_path)
+            # Default INTO the assistant's output folder, keeping the dialog's
+            # `<model stem>_report.docx` name. Written beside the project (the
+            # dialog's default) the file is real but invisible to the chat: the
+            # transcript lists what a snippet leaves in `outdir`, and the dock's
+            # Files button opens that folder — so a report written elsewhere came
+            # with a sentence about opening it from Files that was not true.
+            out_path = path or os.path.join(
+                self.outdir, os.path.basename(default_output_path(model_path)))
             opts = dict(options)
             # The traceability stamp names the input file and its SHA-256; without
             # this it reads "not saved to a file" even for a project opened from

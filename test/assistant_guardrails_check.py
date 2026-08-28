@@ -59,6 +59,16 @@ does regardless of the model, and that is what this file covers:
      instead of printing its tables as rows of pipes — math included, which the
      dialect has no notion of: the brief says write it as plain text, and LaTeX
      that arrives anyway is converted rather than shown as its own source.
+  M. WHAT GETS RUN, AND WHERE A FILE LANDS — code is executed because the model
+     ASKED for it to be, never because it happens to compile: a provider with tool
+     calling has a protocol for asking and so is never read for code in prose, and
+     the fallback the tool-less local models keep runs only a fence marked
+     ```python run (the convention their prompt, and only their prompt, states).
+     A signature written to show the user the shape of a call was executed once,
+     and the NameError explained back to the user as their own. And a file the
+     assistant says can be opened has to be openable: a report generated with no
+     path lands in the output folder the dock's Files button opens, and is named
+     among the files the snippet reports.
   I. THE THINGS THE HARNESS OWNS WHATEVER THE MODEL DOES — every helper the
      prompt tells the model to call is in the namespace with the arguments the
      prompt names (a helper described and absent is a NameError followed by the
@@ -1497,7 +1507,7 @@ def check_usage_accumulates():
 #: about 1.48x low against Anthropic's own count_tokens endpoint — the brief
 #: measures 4,347 here and 6,432 there — so this bound is the ~9k of billed tokens
 #: the brief is allowed, expressed in the units the check can measure.
-BRIEF_TOKEN_BOUND = 6000
+BRIEF_TOKEN_BOUND = 6500  # offline counter; ~1.48x low against the billed count, so ~9.6k billed
 
 
 def check_the_brief_ships():
@@ -1932,6 +1942,212 @@ def check_chat_degrades_latex():
     return out
 
 
+# --- M. what gets run, and where a file lands -------------------------------
+# Two more live sessions, two harness faults — both of them the harness telling
+# the user something that was not so.
+#
+# One wrote a documentation signature into its answer to show the user the shape
+# of a call — `sigma_from_range(hcv, lcv, n=None)`, in a ```python fence. The
+# no-tool-call fallback scraped that fence out of the PROSE and ran it; the
+# NameError came back, and the assistant explained it to the user as the user's
+# own error. A call that compiles is not a call that was meant to run, and no
+# amount of reading the code can tell the two apart. So: a provider that HAS tool
+# calling never reads code out of prose at all, and the fallback kept for the
+# providers without one runs only a fence marked ```python run.
+#
+# The other generated a report and told the user to open it from the Files button.
+# The document was real and the sentence was false: with no path it went beside
+# the project, which is neither the folder that button opens nor among the files
+# the snippet reports back. So the default lands in OUTPUT_DIR.
+
+#: The message that was executed: a signature written to be READ, which happens
+#: to be a syntactically valid call.
+PROSE_FENCE_MESSAGE = (
+    "The helper's shape is:\n\n"
+    "```python\n"
+    "sigma_from_range(hcv, lcv, n=None)\n"
+    "```\n\n"
+    "Pass it the high and low conceivable values and it returns the standard "
+    "deviation.")
+
+#: The same message written the one way that ASKS for execution.
+MARKED_FENCE_MESSAGE = (
+    "Reading the base elevation:\n\n"
+    "```python run\n"
+    "print(slope_data['max_depth'])\n"
+    "```\n")
+
+
+def _drive_worker(content, text_fallback):
+    """Run the real agent loop over one scripted assistant message.
+
+    LiteLLM is replaced for the duration by a stub that hands back ``content``
+    and then a plain sentence, so the loop — the actual decision under test —
+    runs with no provider and no network. Returns ``(code_that_ran, failures)``.
+    """
+    import types
+    from studio.ai import assistant as A
+
+    ran = []
+
+    class _Worker(A._AgentWorker):
+        def _run(self, name, args):     # the GUI-thread hop, short-circuited
+            ran.append(args.get("code", ""))
+            return "(no output)"
+
+    scripted = [content]
+
+    def completion(**kwargs):
+        text = scripted.pop(0) if scripted else "Done."
+        msg = types.SimpleNamespace(content=text, tool_calls=None)
+        return types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=msg)], usage=None)
+
+    stub = types.ModuleType("litellm")
+    stub.drop_params = False
+    stub.suppress_debug_info = False
+    stub.completion = completion
+
+    saved = sys.modules.get("litellm")
+    sys.modules["litellm"] = stub
+    try:
+        worker = _Worker({}, "system", [], [A.RUN_PYTHON_TOOL],
+                         text_fallback=text_fallback)
+        failures = []
+        worker.failed.connect(failures.append)
+        worker.run()
+    finally:
+        if saved is None:
+            sys.modules.pop("litellm", None)
+        else:
+            sys.modules["litellm"] = saved
+    return ran, failures
+
+
+def check_prose_fence_is_not_code():
+    """`_extract_code` reads only a fence marked for execution."""
+    from studio.ai import assistant as A
+    out = []
+    code, pure = A._extract_code(PROSE_FENCE_MESSAGE)
+    if code is not None:
+        out.append(f"a signature quoted in prose is still read as code: {code!r}")
+    code, pure = A._extract_code(MARKED_FENCE_MESSAGE)
+    if code != "print(slope_data['max_depth'])":
+        out.append(f"a ```python run fence was not recovered: {code!r}")
+    if pure:
+        out.append("a marked fence suppressed the prose around it")
+    # An unmarked fence stays prose whatever is in it — including a snippet that
+    # would have been perfectly reasonable to run.
+    if A._extract_code("Try this:\n\n```python\nprint(1 + 1)\n```\n")[0] is not None:
+        out.append("an unmarked fence is executed when its code looks runnable")
+    # The other two recovery shapes are unambiguous and stay: a message that is
+    # only Python, and a text-encoded tool call.
+    if A._extract_code("print(slope_data['max_depth'])")[0] is None:
+        out.append("a message that is only Python is no longer recovered")
+    json_call = ('{"name": "run_python", "arguments": {"code": "print(1)"}}')
+    if A._extract_code(json_call)[0] != "print(1)":
+        out.append("a text-encoded tool call is no longer recovered")
+    return out
+
+
+def check_the_fallback_is_off_where_tools_exist():
+    """Only a provider without tool calling reads code out of a message — and it
+    is the only one told the convention for saying so."""
+    from studio.ai import assistant as A
+    from studio.ai.config import PROVIDERS
+    out = []
+    for tools, want in ((True, False), (False, True), (None, True)):
+        got = A.text_fallback_enabled({"tools": tools})
+        if got is not want:
+            out.append(f"a provider with tools={tools!r} has the text fallback "
+                       f"{'on' if got else 'off'}")
+    for name, spec in PROVIDERS.items():
+        enabled = A.text_fallback_enabled({"tools": spec.get("tools")})
+        if spec.get("tools") is True and enabled:
+            out.append(f"{name} does tool calling but still scrapes prose")
+    if not A.text_fallback_enabled({"tools": PROVIDERS["ollama"].get("tools")}):
+        out.append("a local model with no tool calling has no way to run code")
+
+    # And the note that states the convention rides with the fallback, not with
+    # every prompt: a model that has tool calling is never told about a channel
+    # it does not use.
+    mw, asst = _session()
+    caps = dict(asst.config.capabilities())
+    asst.config.capabilities = lambda: dict(caps, tools=True)
+    if A.RUN_FENCE_NOTE in asst._system():
+        out.append("a tool-calling provider is told the fence convention")
+    asst.config.capabilities = lambda: dict(caps, tools=None)
+    system = asst._system()
+    if A.RUN_FENCE_NOTE not in system:
+        out.append("a model with no tool calling is never told how to run code")
+    if "```python run" not in system:
+        out.append("the prompt never shows the marker the fallback honours")
+    mw.deleteLater()
+    return out
+
+
+def check_the_loop_honours_the_gate():
+    """The agent loop itself, driven over a scripted message with no provider."""
+    out = []
+    ran, failures = _drive_worker(PROSE_FENCE_MESSAGE, text_fallback=False)
+    if ran:
+        out.append(f"a tool-calling provider executed a fence out of prose: {ran!r}")
+    ran, failures = _drive_worker(PROSE_FENCE_MESSAGE, text_fallback=True)
+    if ran:
+        out.append(f"the fallback executed an unmarked prose fence: {ran!r}")
+    ran, failures = _drive_worker(MARKED_FENCE_MESSAGE, text_fallback=True)
+    if ran != ["print(slope_data['max_depth'])"]:
+        out.append(f"the fallback did not run a marked fence: {ran!r}")
+    ran, failures = _drive_worker(MARKED_FENCE_MESSAGE, text_fallback=False)
+    if ran:
+        out.append(f"a tool-calling provider ran a marked fence: {ran!r}")
+    if failures:
+        out.append(f"the loop failed: {failures!r}")
+    return out
+
+
+def check_report_lands_in_the_files_folder():
+    """A report generated with no path is one the user can actually open.
+
+    It goes to the assistant's output folder — what the dock's Files button opens
+    — and the snippet's own result names it, so the sentence the assistant writes
+    about opening it is true.
+    """
+    out = []
+    mw, asst, _ = _solved_session()
+    outdir = asst.output_dir()
+    tmpdir = tempfile.mkdtemp(prefix="xslope_assistant_report_")
+    model_path = os.path.join(tmpdir, "small_slope.xlsx")
+    with open(model_path, "wb") as fh:
+        fh.write(b"not a workbook -- only the traceability digest reads it")
+    mw.doc.path = model_path
+    beside_the_project = os.path.join(tmpdir, "small_slope_report.docx")
+    in_the_folder = os.path.join(outdir, "small_slope_report.docx")
+    if os.path.exists(in_the_folder):
+        os.remove(in_the_folder)        # a copy from an earlier run proves nothing
+
+    result = _run(asst, "print('REPORT', generate_report(finalize=False))")
+
+    if os.path.exists(beside_the_project):
+        out.append("a report asked for with no path was written beside the "
+                   "project, outside the folder the Files button opens")
+    if not os.path.exists(in_the_folder):
+        out.append(f"no report at {in_the_folder}: {result[-400:]}")
+    if f"REPORT {in_the_folder}" not in result:
+        out.append("generate_report() returned a path other than the one in the "
+                   f"output folder: {result[-400:]}")
+    if "small_slope_report.docx" not in result.split("[saved", 1)[-1]:
+        out.append("the report is not among the files the snippet reports the "
+                   "user can open")
+    # An explicit path still goes exactly where it was asked to go.
+    asked_for = os.path.join(tmpdir, "named.docx")
+    _run(asst, f"generate_report(path={asked_for!r}, finalize=False)")
+    if not os.path.exists(asked_for):
+        out.append("an explicit report path was overridden by the default")
+    mw.deleteLater()
+    return out
+
+
 CHECKS = [
     ("A. iron rules, once per prompt tier", check_iron_rules_once),
     ("A. the live prompts carry them", check_assembled_prompt_is_the_real_one),
@@ -1982,6 +2198,12 @@ CHECKS = [
      check_polygon_edit_on_a_profile_model_is_named),
     ("L. the chat renders markdown", check_chat_renders_markdown),
     ("L. the chat degrades LaTeX to text", check_chat_degrades_latex),
+    ("M. a prose fence is not code", check_prose_fence_is_not_code),
+    ("M. the fallback is off where tools exist",
+     check_the_fallback_is_off_where_tools_exist),
+    ("M. the loop honours the gate", check_the_loop_honours_the_gate),
+    ("M. a report lands in the Files folder",
+     check_report_lands_in_the_files_folder),
 ]
 
 

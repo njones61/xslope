@@ -144,7 +144,7 @@ one rather than reassembling the engine by hand:
 | `run_lem(search=True)` | One limit-equilibrium solve. `search=True` searches for the critical surface for that method, exactly as [Run LEM](analysis.md) does; `search=False` solves the surface already on the project. The method defaults to the one the **model** declares (the `main` sheet's LEM method, which is what the Run LEM dialog opens on), so the assistant and the dialog run the same method unless you name another. The result carries the surface it was solved on — `Xo`, `Yo`, `R`, `Depth`, and the `x_entry`/`x_exit` ends of the trace — and the run is stored where a dialog run is stored, so the results tabs show it and the report documents it. |
 | `run_seep(bc=1)` | One steady seepage solve. The solved pore pressures are attached to the model, so a later stability run with `u = seep` reads them. |
 | `run_fem(analysis='ssrm')` | One finite element run — the SSRM factor of safety, or a single trial. Minutes, not seconds. |
-| `generate_report(path=None)` | The [Analysis Report](reports.md), built and finished exactly as the Report dialog builds it — over every engine the session has solved, and stamped with the project file and its SHA-256 where the project has been saved. |
+| `generate_report(path=None)` | The [Analysis Report](reports.md), built and finished exactly as the Report dialog builds it — over every engine the session has solved, and stamped with the project file and its SHA-256 where the project has been saved. With no path it is written to the assistant's output folder as `<project>_report.docx`, so it opens from **Files…** with everything else the conversation produced. |
 | `suggest_elastic('Clay')` | Soil-type `E` and `ν` for a material that carries none, classified from its strength. A last resort, never a substitute for a stated value. |
 | `sensitivity()`, `design_sweep()`, `parametric_sweep()`, `reliability_*()` | The parameter-study and probabilistic families. |
 | `corpus_index('rapid drawdown')` | Worked examples from the [verification corpus](../verification/index.md) matching a topic, with their page URLs. |
@@ -224,6 +224,23 @@ API keys are stored in the **OS keychain** (not in plaintext), and the base URL 
 configurable for Kimi, Z.ai and Ollama. The dock shows the active provider · model,
 and a caption warns when the selected model can't (or may not) run code or accept
 images, so the UI degrades gracefully.
+
+**A local model with no tool calling** — many Ollama tags have none — has no
+separate channel for asking Studio to run something, so it asks in its reply, by
+marking the fence `run`:
+
+````text
+```python run
+print(slope_data['max_depth'])
+```
+````
+
+That block is executed and its output goes back to the model. A plain
+`` ```python `` fence is prose and is only displayed: a signature quoted to
+explain a call, or a snippet written for you to read, is never run. Every other
+provider on the list uses tool calling, where the request to run a snippet is a
+message of its own — so on those, code that appears in a reply is text, whatever
+it looks like.
 
 ### Models
 
@@ -324,6 +341,11 @@ your guardrails.
 - **Images** — paste or drop an image into the chat (e.g. a hand sketch or a screen
   capture). Every model the dialog lists can read one.
 - **Inline figures** — plots the assistant produces appear inline in the transcript.
+- **Files** — everything else a snippet writes (a CSV, an exported drawing, a
+  generated report) goes to one output folder for the session, is listed in the
+  transcript as a link that opens it, and the **Files…** button opens the folder
+  itself. A snippet's own working directory is that folder, so a plain
+  `savefig('face.png')` lands there too.
 - **New chat** — starts a fresh conversation and resets the kernel.
 - **What it cost** — a line under the input reports the tokens the provider read and
   wrote: `this turn: 26,292 in (12,522 cached) / 443 out · session: 26,292 in / 443 out`.

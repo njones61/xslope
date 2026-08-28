@@ -645,7 +645,12 @@ _NEGATED = re.compile(r"\b(no|not|none|never|without|neither|nor|absent|"
 def invents_nothing(case):
     """No feature the file lacks is described as present."""
     def check(ctx):
-        prose = strip_code(ctx.prose)
+        # A markdown heading is a LABEL for the section under it, not a claim
+        # about the model: "### Loads, reinforcement, piles" over a paragraph
+        # saying there are none is a correct answer, and reading the heading as
+        # an assertion failed every well-organized description in the round.
+        prose = re.sub(r"^[ \t]{0,3}#{1,6}[^\n]*$", "", strip_code(ctx.prose),
+                       flags=re.M)
         invented = []
         for label, pattern, present in _FEATURES:
             if present(case.model or {}):
@@ -963,17 +968,36 @@ def sweep_reproduced(case, spec, at_least=2):
             return False, "the answer tabulates nothing"
         rows, matched = [], 0
         for value in spec.values:
-            run = solve_variant(case.path,
-                                lambda model, v=value: spec.apply(model, v),
-                                "%s=%s" % (spec.name, value),
-                                method=case.method, search=True)
-            if run.get("FS") is None:
-                rows.append("%s: no run (%s)" % (value, run.get("error")))
-                continue
-            best = min(stated, key=lambda v: abs(v - run["FS"]))
-            rows.append("%s -> %s (stated %s)" % (value, round(run["FS"], 4), best))
-            if abs(best - run["FS"]) <= 0.01:
-                matched += 1
+            # The prompt asks for "the analysis the file declares, once per
+            # value", and the file declares a surface but not whether to search
+            # it. Both readings are made here, and a row counts as reproduced
+            # when it matches either — scoring the declared surface against a
+            # search measured the ambiguity rather than the table.
+            got = None
+            for search in (False, True):
+                run = solve_variant(case.path,
+                                    lambda model, v=value: spec.apply(model, v),
+                                    "%s=%s" % (spec.name, value),
+                                    method=case.method, search=search)
+                if run.get("FS") is None:
+                    got = got or run
+                    continue
+                best = min(stated, key=lambda v: abs(v - run["FS"]))
+                got = run
+                if abs(best - run["FS"]) <= 0.01:
+                    matched += 1
+                    rows.append("%s -> %s (stated %s, %s)" % (
+                        value, round(run["FS"], 4), best,
+                        "as declared" if not search else "searched"))
+                    break
+            else:
+                if got is None or got.get("FS") is None:
+                    rows.append("%s: no run (%s)"
+                                % (value, (got or {}).get("error")))
+                else:
+                    best = min(stated, key=lambda v: abs(v - got["FS"]))
+                    rows.append("%s -> %s (stated %s)"
+                                % (value, round(got["FS"], 4), best))
         if matched < at_least:
             return False, "%d of %d rows reproduced: %s" % (
                 matched, len(spec.values), "; ".join(rows[:3]))
@@ -1387,6 +1411,54 @@ def _sketch_for(page):
     return path if os.path.exists(path) else None
 
 
+#: The answer key for a drawing on a page whose glance box names SEVERAL completed
+#: models. ``_completed_model`` cannot choose between them and the page's prose
+#: states more than one problem, but the DRAWING is of one slope; these pairings
+#: say which. Keyed by the drawing, so a page showing two of them (FEM-3 draws a
+#: pile row and then a wall) contributes a build case for each.
+DRAWING_KEYS = {
+    "lem07_problem_sketch.png":
+        ("docs", "lem", "files", "xslope_baker_clay.xlsx"),
+    "lem10_problem_sketch.png":
+        ("docs", "lem", "files", "xslope_mult_min_KEY.xlsx"),
+    "fem03_piles_problem_sketch.png":
+        ("docs", "lem", "files", "xslope_piles.xlsx"),
+    "fem03_wall_problem_sketch.png":
+        ("docs", "tutorials", "files", "xslope_pile_wall.xlsx"),
+}
+
+
+def _sketches_on(page):
+    """Every problem drawing a page shows, in the order it shows them."""
+    text = open(page, encoding="utf-8").read()
+    out = []
+    for name in re.findall(r"([a-z0-9_]*_problem_sketch\.png)", text):
+        path = repo(SKETCH_DIR, name)
+        if os.path.exists(path) and path not in out:
+            out.append(path)
+    return out
+
+
+def _keyed_drawings(page):
+    """``[(drawing, answer key)]`` for this page, from :data:`DRAWING_KEYS`."""
+    out = []
+    for sketch in _sketches_on(page):
+        parts = DRAWING_KEYS.get(os.path.basename(sketch))
+        if not parts:
+            continue
+        truth = repo(*parts)
+        if os.path.exists(truth):
+            out.append((sketch, truth))
+    return out
+
+
+def _drawing_key(page_key, sketch, count):
+    """The case name for one drawing — the page, unless the page shows several."""
+    if count < 2:
+        return page_key
+    return re.sub(r"_problem_sketch\.png$", "", os.path.basename(sketch))
+
+
 def _unit_words(sd):
     return ("SI (m, kN/m3, kPa)" if _units(sd) == "si"
             else "US customary (ft, psf, pcf)")
@@ -1395,35 +1467,45 @@ def _unit_words(sd):
 def builds():
     """Every build case the tutorials support — drawings first, then descriptions.
 
-    A page contributes a drawing case when it shows a problem sketch and names a
-    completed model, and a description case when it states its problem in prose
-    long enough to build from and names a completed model. Most pages give both,
-    and they are two different questions about the same slope.
+    A page contributes a drawing case when it shows a problem sketch and an answer
+    key can be named for it, and a description case when it states its problem in
+    prose long enough to build from and names a single completed model. Most pages
+    give both, and they are two different questions about the same slope. A page
+    naming several completed models has no single answer for its prose, so it
+    contributes drawings only — one per :data:`DRAWING_KEYS` pairing.
     """
     out, drawn = [], set()
     for page in _pages():
+        key = os.path.splitext(os.path.basename(page))[0]
+        pairs = _keyed_drawings(page)
         truth = _completed_model(page)
+        if truth and not pairs:
+            sketch = _sketch_for(page)
+            if sketch:
+                pairs = [(sketch, truth)]
+        for sketch, answer in pairs:
+            # Two pages can show one drawing of one model — COMBO-1 opens on
+            # SEEP-2's dam. Building it twice would buy the same measurement twice.
+            if (sketch, answer) in drawn:
+                continue
+            model = load_model(answer)
+            if model is None:
+                continue
+            drawn.add((sketch, answer))
+            method = (str(model.get("lem_method") or "") or "spencer").lower()
+            out.append(Build(
+                _drawing_key(key, sketch, len(pairs)), "drawing", page,
+                "Build this model from the drawing. Use the dimensions and "
+                "properties shown. Unit system: %s. Add a starting circle where "
+                "the drawing suggests one and run %s with a search."
+                % (_unit_words(model), method.upper()),
+                answer, image=sketch))
         if not truth:
             continue
         model = load_model(truth)
         if model is None:
             continue
-        key = os.path.splitext(os.path.basename(page))[0]
         method = (str(model.get("lem_method") or "") or "spencer").lower()
-        sketch = _sketch_for(page)
-        # Two pages can show one drawing of one model — COMBO-1 opens on SEEP-2's
-        # dam. Building it twice would buy the same measurement twice.
-        if sketch and (sketch, truth) in drawn:
-            sketch = None
-        if sketch:
-            drawn.add((sketch, truth))
-            out.append(Build(
-                key, "drawing", page,
-                "Build this model from the drawing. Use the dimensions and "
-                "properties shown. Unit system: %s. Add a starting circle where "
-                "the drawing suggests one and run %s with a search."
-                % (_unit_words(model), method.upper()),
-                truth, image=sketch))
         problem = _problem_text(page)
         if problem:
             out.append(Build(
@@ -1456,16 +1538,23 @@ def _zone_areas(sd):
     surface trace are the same section however it was entered.
     """
     out = []
-    for poly in (sd or {}).get("polygons") or []:
+    for entry in (sd or {}).get("polygons") or []:
+        # The loader hands each zone back as {"polygon": <Polygon>, "mat_id": …},
+        # not as the polygon itself. Reading .area off the dict raised, the
+        # fallback then iterated the dict's KEYS, and every model measured zero
+        # zones — so the zone half of the section check passed on everything.
+        poly = entry.get("polygon") if isinstance(entry, dict) else entry
         try:
             out.append(abs(float(poly.area)))
+            continue
         except Exception:
-            try:
-                pts = [(float(x), float(y)) for x, y in poly]
-                out.append(abs(sum(pts[i][0] * pts[i - 1][1] - pts[i - 1][0] * pts[i][1]
-                                   for i in range(len(pts)))) / 2.0)
-            except Exception:
-                pass
+            pass
+        try:
+            pts = [(float(x), float(y)) for x, y in poly]
+            out.append(abs(sum(pts[i][0] * pts[i - 1][1] - pts[i - 1][0] * pts[i][1]
+                               for i in range(len(pts)))) / 2.0)
+        except Exception:
+            pass
     return sorted(out, reverse=True)
 
 
@@ -1515,10 +1604,18 @@ def geometry_like(build, rel=0.05):
         if len(want_trace) != len(got_trace) or not want_trace:
             return False, "the ground surface could not be compared"
         height = max(want_trace) - min(want_trace) or 1.0
-        worst = max(abs(a - b) for a, b in zip(want_trace, got_trace))
+        # A drawing gives dimensions, not an elevation datum, and neither does a
+        # description: a section entered with its toe at el 10 rather than el 0 is
+        # the same section. The best constant offset is removed before the residual
+        # is measured, so a translation costs nothing and a shape error still shows.
+        # Without this the check reported the datum — every "off by 10.00" was a
+        # section that matched the shipped one exactly, ten feet higher.
+        offset = sum(a - b for a, b in zip(want_trace, got_trace)) / len(want_trace)
+        worst = max(abs(a - b - offset) for a, b in zip(want_trace, got_trace))
         if worst > rel * height:
-            return False, "the ground surface is off by %.2f (%.0f%% of the rise)" \
-                          % (worst, 100 * worst / height)
+            return False, "the ground surface is off by %.2f (%.0f%% of the rise) " \
+                          "after the %.2f datum shift is removed" \
+                          % (worst, 100 * worst / height, offset)
         return True, "%d zone(s) within %.0f%%, surface within %.2f" % (
             len(made), 100 * (max(off) if off else 0), worst)
     return Criterion("the section matches the shipped model", check, kind="truth")
@@ -1549,7 +1646,27 @@ def materials_like(build, rel=0.05):
 
 
 def _same_material(got, want, rel):
-    for field, absolute in (("gamma", None), ("c", 1.0), ("phi", 0.6)):
+    """Whether one built material is the one the answer key states.
+
+    Two things the plain c/phi comparison got wrong. A key whose strength model is
+    NOT Mohr-Coulomb states its envelope in fields c and phi do not carry — a
+    Hoek-Brown row reads c = 0, phi = 0 whatever the rock is — so the model itself
+    is what is compared there. And a key that states no strength at all (a
+    seepage-only row: no option, gamma, c and phi all blank) says nothing to match
+    against, so anything sound matches it.
+    """
+    want_option = str(want.get("option") or "").strip().lower()
+    if want_option not in ("", "mc"):
+        if str(got.get("option") or "").strip().lower() != want_option:
+            return False
+        fields = (("gamma", None),)
+    else:
+        stated = [f for f in ("gamma", "c", "phi")
+                  if _number(want.get(f)) not in (None, 0.0)]
+        if not stated:
+            return True
+        fields = (("gamma", None), ("c", 1.0), ("phi", 0.6))
+    for field, absolute in fields:
         a, b = _number(got.get(field)), _number(want.get(field))
         if a is None and b is None:
             continue

@@ -527,8 +527,13 @@ def lock(path, kind="circular_search", method=None):
 #: and "FS moves +0.111" are statements about a change, and scoring them as
 #: asserted factors of safety was the single biggest source of false failures the
 #: first live run produced.
+#: The emphasis an answer puts the number itself in — ``the new factor of safety
+#: is **0.995**``. Markdown between the connector and the digits made the claim
+#: invisible, and the session was then scored as having stated no answer at all.
+_EMPHASIS = r"[*_`]{0,3}\s*"
 _FS_EQ = re.compile(r"(?:\bFS\b|\bF\.S\.|factor of safety)"
                     r"\s*(?:=|:|≈|is|of|was|at|comes back at)?\s*"
+                    + _EMPHASIS +
                     r"(-?\d+\.\d+)", re.I)
 #: A markdown table row whose first cell names the factor of safety: every number
 #: on it is a value being reported. Assistants lay a before/after pair out this
@@ -540,7 +545,12 @@ _FS_ROW = re.compile(r"^[ \t]*\|[^|\n]*(?:\bFS\b|factor of safety)[^|\n]*\|(.*)$
 #: sentence leads with the change.
 _FS_PAIR = re.compile(r"(?:\bFS\b|\bF\.S\.|factor of safety)[^\n]{0,80}?"
                       r"(\d+\.\d+)\s*(?:->|→|to)\s*(\d+\.\d+)", re.I)
-_ANY_NUMBER = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
+#: A number as an answer writes one — ``35,843`` is one number, not 35 and 843.
+#: Reading the grouped form as two split every thousands-separated figure an
+#: answer quoted into halves that no snippet had printed, and the halves were
+#: then reported as invented.
+_ANY_NUMBER = re.compile(r"-?\d{1,3}(?:,\d{3})+(?:\.\d+)?"
+                         r"|-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
 
 
 def claimed_fs(text):
@@ -585,14 +595,39 @@ def strip_code(text):
 
 
 def numbers_in(text):
-    return [float(m.group(0)) for m in _ANY_NUMBER.finditer(text or "")]
+    return [float(m.group(0).replace(",", ""))
+            for m in _ANY_NUMBER.finditer(text or "")]
+
+
+#: Above this, the trailing zeros of a whole number are read as place-holders
+#: rather than as digits somebody wrote. Below it they are taken literally, so a
+#: quoted 100 still has to be a 100 and not a 137.
+_ROUNDED_ABOVE = 10_000.0
 
 
 def rounds_to(value, target):
     """Whether ``target`` rounds to ``value`` at the precision ``value`` is written
-    to — so a reported 1.628 matches a measured 1.62813, and 1.63 does not."""
-    text = ("%r" % value)
-    decimals = len(text.split(".")[1]) if "." in text else 0
+    to — so a reported 1.628 matches a measured 1.62813, and 1.63 does not.
+
+    The precision comes from the digits, and ``repr`` of a whole number carries a
+    ``.0`` that is not one of them: 534 was read as "534.0" and held to a
+    hundredth, so a table rounding 533.62 to 534 was reported as a number no
+    snippet printed. A large round number is read the way it is written — a
+    moment quoted as 11,700,000 is three significant figures, and matches
+    11,665,417.
+    """
+    text = ("%r" % float(value))
+    if "e" in text or "E" in text:
+        mantissa, _sep, exponent = text.partition("e")
+        decimals = (len(mantissa.split(".")[1]) if "." in mantissa else 0) \
+            - int(exponent)
+    elif "." in text and not text.endswith(".0"):
+        decimals = len(text.split(".")[1])
+    else:
+        whole = (text[:-2] if text.endswith(".0") else text).lstrip("-")
+        kept = whole.rstrip("0")
+        decimals = (-(len(whole) - len(kept))
+                    if kept and abs(float(value)) >= _ROUNDED_ABOVE else 0)
     return abs(float(target) - float(value)) <= 0.5 * 10 ** (-decimals) + 1e-9
 
 

@@ -74,10 +74,10 @@ as you type and stored in your operating system's keychain, not in a settings
 file and not in plain text. Ollama needs no key, and the field is disabled when
 Ollama is selected.
 
-**Base URL** — the address the provider is reached at. It is enabled for Kimi,
-Z.ai and Ollama, whose endpoints move — a Z.ai coding-plan key uses a different
-base from a standard one, and a local Ollama may be on another port — and
-disabled for Claude and OpenAI, whose addresses are fixed.
+**Base URL** — the address the provider is reached at, filled in for you.
+Leave it alone unless your provider gave you a different endpoint — a Z.ai
+coding-plan key, or an Ollama running on another port or another machine. It
+is disabled for Claude and OpenAI, whose addresses are fixed.
 
 **Confirm before running code** — unchecked by default. The assistant works by
 writing small Python snippets and running them in Studio's own process; with

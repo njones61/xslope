@@ -160,7 +160,7 @@ of steps to arrive at the same place. Treat the transcripts as an illustration
 of what the requests look like and what comes back, not as a script to match
 line for line.
 
-The assistant is good at this work, and everything it produces should still be
+The assistant is good at this work, but everything it produces should still be
 checked. Checking is usually easy, and it is the same checking a model built by
 hand deserves: read the model checks Studio runs after every edit, look at the
 section on the canvas, and do one hand calculation against the number that came

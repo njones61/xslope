@@ -10,9 +10,14 @@ hand. It can build a model from a drawing or from a description in words, edit
 any part of one afterwards, run every analysis XSLOPE offers, sweep a parameter
 across a range, answer a question out of the built-in documentation, and write
 the analysis report — all in the open project, on the same undo stack the
-editors use. This tutorial takes one slope and asks for each of those in turn,
-and after every request it shows what to look at to decide whether the answer is
-right.
+editors use.
+
+In this tutorial we first set the assistant up — choosing a provider and a
+model, entering a key, and seeing what a conversation costs to run. Then we work
+through a series of sample use cases on one slope: building the model from a
+drawing and from a description, modifying it, running sweeps, asking questions,
+diagnosing a broken file, and writing the report. After every request we show
+what to look at to decide whether the answer is right.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

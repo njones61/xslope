@@ -11,15 +11,14 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 ```text
 You: Run Spencer with a search.
 
-Assistant: I'll run Spencer with the automated critical-surface search.
+Assistant: I'll run Spencer with the automated search for the critical circle.
 
 Ran code:
     res = run_lem(method='spencer', search=True)
     print('FS =', res['FS'])
-    print('Xo =', res['Xo'], 'Yo =', res['Yo'], 'R =', res['R'], 'Depth =', res['Depth'])
-    print('x_entry =', res.get('x_entry'), 'x_exit =', res.get('x_exit'))
-    w = res.get('warnings')
-    print('warnings:', w if w else 'none')
+    print('Xo, Yo, R, Depth =', res['Xo'], res['Yo'], res['R'], res['Depth'])
+    print('x_entry, x_exit =', res.get('x_entry'), res.get('x_exit'))
+    print('warnings:', res.get('warnings'))
 
 Output:
     spencer (auto search, circular): FS = 1.587 on the circle Xo=-5.13, Yo=46.98, R=47.26
@@ -28,59 +27,62 @@ Output:
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     FS = 1.5867431037630753
-    Xo = -5.130908203125 Yo = 46.977728271484374 R = 47.25672500133514 Depth = -0.27899672985076907
-    x_entry = 36.163426291253785 x_exit = 0.0005410444923035453
-    warnings: none
+    Xo, Yo, R, Depth = -5.130908203125 46.977728271484374 47.25672500133514 -0.27899672985076907
+    x_entry, x_exit = 36.163426291253785 0.0005410444923035453
+    warnings: []
 
-Assistant: ## Spencer, automated search — FS = 1.59
+Assistant: ## Spencer, automated search
 
 | Quantity | Value |
-|:--|--:|
-| **FS (Spencer)** | **1.587** |
-| Center Xo, Yo | −5.13, 46.98 |
+|:---|:---|
+| **FS (critical)** | **1.587** |
+| Center Xo, Yo | -5.13, 46.98 |
 | Radius R | 47.26 |
-| Depth (lowest point) | −0.28 |
+| Lowest point (Depth) | -0.28 (well above the base at -10) |
 | Entry / exit x | 36.16 / 0.00 |
 
-The critical circle is essentially a **toe circle** — it exits right at x ≈ 0 and bottoms at el. −0.28, well above the rigid base at `max_depth = −10`, so the base is not controlling. The reinforcement (6 lines) and the distributed load block are included in this solution.
+The critical circle is essentially a toe circle — it exits right at x = 0 and bottoms out just below the toe elevation, so the reinforcement (6 layers) is being crossed by the surface rather than undercut by a deep base slide.
 
-Search notes: 838 trial surfaces evaluated; Spencer failed to find an admissible (force + moment) solution on 13 of them, and none of those ranked below the reported minimum on the moment measure — so the critical FS is not being hidden by a non-convergent trial. No admissibility warnings (interslice tension / thrust line) were flagged on the reported surface.
+**Search note to pass on:** Spencer could not find an admissible solution on 13 of the 838 trial surfaces. None of those 13 rank below the reported minimum on the moment measure, so the critical FS is not being hidden by them. The admissibility screen on the reported surface returned no warnings.
 
-Want me to cross-check with Bishop and Janbu, or run the non-circular search?
+Want me to cross-check with Bishop or Morgenstern-Price, or look at how FS varies with the reinforcement capacity?
 ```
 
-Tokens: input 28,749 · cached_input 13,654 · output 633 · calls 2 · 27.6s
+Tokens: input 31,709 · cached_input 15,146 · output 610 · calls 2 · 25.2s
 
 ## Turn 2 — Generate the analysis report for this model.
 
 ```text
 You: Generate the analysis report for this model.
 
-Assistant: Generating the report now — it documents the model plus the Spencer run from this session.
+Assistant: I'll generate the Analysis Report over the model and the Spencer run.
 
 Ran code:
-    p = generate_report(title='Reinforced Slope — Spencer Analysis')
-    print('Report written to:', p)
+    path = generate_report()
+    print(path)
 
 Output:
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
     Ignoring fixed y limits to fulfill fixed data aspect with adjustable data limits.
-    Report written to /Users/njones/python_projects/xslope/.claude/worktrees/agent-a0973c2a5a7ca6dff/docs/tutorials/files/xslope_reinforced_slope_report.docx (6 figures).
-    Report written to: /Users/njones/python_projects/xslope/.claude/worktrees/agent-a0973c2a5a7ca6dff/docs/tutorials/files/xslope_reinforced_slope_report.docx
+    Report written to /var/folders/j7/sx_j3nrn5f57_9tj1lv9l51r0000gn/T/xslope_studio_assistant/xslope_reinforced_slope_report.docx (6 figures).
+    /var/folders/j7/sx_j3nrn5f57_9tj1lv9l51r0000gn/T/xslope_studio_assistant/xslope_reinforced_slope_report.docx
+    [saved 1 file(s) the user can open: xslope_reinforced_slope_report.docx]
+
+[file: xslope_reinforced_slope_report.docx]
 
 Assistant: ## Report generated
 
-**`xslope_reinforced_slope_report.docx`** — 6 figures, contents page paginated. Open it from the chat or the dock's Files button.
+**`xslope_reinforced_slope_report.docx`** — 6 figures, contents page paginated. You can open it from the chat or the dock's Files button.
 
-It covers the model as built (2 polygon zones, shell/base materials, the distributed load, the 6 reinforcement lines) and the one analysis solved this session: **Spencer with automated search, FS = 1.587** on the toe circle at Xo = −5.13, Yo = 46.98, R = 47.26.
+It documents the model as it stands (2-zone polygon geometry, the two Mohr-Coulomb materials, the distributed load, the 6 reinforcement lines) plus the Spencer search from the previous run — FS = 1.587 on the toe circle at Xo = -5.13, Yo = 46.98, R = 47.26.
 
-Note it documents only what has been run — no Bishop, Janbu, or OMS comparison is in there. If you want a multi-method table in the report, say the word and I'll run those methods first and regenerate.
+No additional method was run to build it, so the report covers Spencer only. If you want Bishop or Morgenstern-Price columns in it, say so and I'll run those first and regenerate — each added method costs a full search.
 ```
 
-Tokens: input 30,421 · cached_input 27,308 · output 426 · calls 2 · 14.4s
+Tokens: input 33,292 · cached_input 30,292 · output 388 · calls 2 · 11.0s
 
 ## Session total
 
-- Tokens: input 59,170 · cached_input 40,962 · output 1,059 · calls 4
-- Wall time: 50.1s
+- Tokens: input 65,001 · cached_input 45,438 · output 998 · calls 4
+- Wall time: 42.9s

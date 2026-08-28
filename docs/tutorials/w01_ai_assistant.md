@@ -98,11 +98,11 @@ read an image, and whether the provider caches the prompt.
 
 A hosted provider bills per token, and both the tokens read and the tokens
 written count. A routine question — one asked of a built model, answered with a
-run — costs about **26,000 input tokens** on Claude Opus 5, roughly half of them
+run — costs about **32,000 input tokens** on Claude Opus 5, roughly half of them
 served from the provider's prompt cache at a fraction of the price of fresh
-input, for a few hundred tokens of reply. Building
-a model from a drawing costs more, because it takes more turns. In writing this
-documentation, $20 of API credit covered weeks of use.
+input, for a few hundred tokens of reply. A request that has to measure something
+costs far more, because it is many runs: the diagnosis below spends 192,000. In
+writing this documentation, $20 of API credit covered weeks of use.
 
 Models differ in both price and capability, and the two do not track each other
 perfectly: a cheaper model may answer a question about the documentation as well
@@ -111,7 +111,7 @@ the input box reports the tokens each turn spent and the running total for the
 conversation:
 
 ```
-this turn: 26,292 in (12,522 cached) / 443 out · session: 26,292 in / 443 out
+this turn: 31,709 in (15,146 cached) / 610 out · session: 31,709 in (15,146 cached) / 610 out
 ```
 
 One request is usually several calls to the model, so that first number climbs
@@ -121,20 +121,21 @@ The eight conversations below cost this much between them, measured as they ran:
 
 | Session | Turns | Model calls | Tokens in (cached) | Tokens out | Wall |
 | --- | :---: | :---: | :---: | :---: | :---: |
-| Building from a drawing | 1 | 6 | 105,747 (62,610) | 17,181 | 254 s |
+| Building from a drawing | 1 | 5 | 91,314 (75,730) | 15,102 | 219 s |
 | Modifying the model | 3 | 12 | 215,159 (163,848) | 7,243 | 187 s |
 | A sweep with a helper | 1 | 2 | 26,868 (25,044) | 1,577 | 104 s |
-| A sweep without one | 1 | 7 | 114,999 (95,578) | 5,603 | 140 s |
+| A sweep without one | 1 | 3 | 49,548 (45,438) | 3,724 | 101 s |
 | Stiffnesses and strength reduction | 2 | 5 | 71,104 (62,610) | 2,654 | 175 s |
-| Two questions | 2 | 3 | 44,084 (40,962) | 3,315 | 58 s |
-| A broken file | 1 | 3 | 47,432 (40,962) | 5,764 | 129 s |
-| The report | 2 | 4 | 59,170 (40,962) | 1,059 | 50 s |
-| **Total** | **13** | **42** | **684,563 (532,576)** | **44,396** | **1,097 s** |
+| Two questions | 2 | 3 | 52,009 (45,438) | 4,075 | 61 s |
+| A broken file | 1 | 9 | 191,949 (136,314) | 11,209 | 784 s |
+| The report | 2 | 4 | 65,001 (45,438) | 998 | 43 s |
+| **Total** | **13** | **43** | **762,952 (599,860)** | **46,582** | **1,674 s** |
 
-Thirteen turns, 42 calls to the model and about 685,000 input tokens, of which
-some 533,000 came from the prompt cache, come to about **$2.14** at Claude Opus 5
+Thirteen turns, 43 calls to the model and about 763,000 input tokens, of which
+some 600,000 came from the prompt cache, come to about **$2.28** at Claude Opus 5
 list rates — $5.00 per million input tokens, $0.50 per million cache reads and
-$25.00 per million output tokens.
+$25.00 per million output tokens. One session is a quarter of that on its own:
+the diagnosis, which answers by measuring rather than by reading.
 
 ---
 
@@ -174,53 +175,80 @@ Build this model. Use the dimensions and properties on the drawing. Unit system:
 ```
 </div>
 
-![The whole build conversation in the dock: the attached drawing, the four code blocks the assistant ran, the six model-check errors it answered, and its closing summary of the geometry, materials, loads, reinforcement and search result](images/w1_build_from_image_1.png){width=560}
+![The whole build conversation in the dock: the attached drawing, the code blocks the assistant ran, the thirteen model-check errors it answered, and its closing summary of the geometry, materials, loads, reinforcement and search result](images/w1_build_from_image_1.png){width=560}
 
-The first two snippets read engine source — `inspect.getsource` on `xslope.solve`,
-then 4,000 characters of `xslope.fileio` — looking for the reinforcement schema the
-assistant already carries in its instructions. The first of the two printed
-nothing at all, and roughly a third of the turn's cost bought nothing.
+The first snippet came back empty — one call to the model that ran nothing and
+printed nothing.
 
-The third snippet builds the model: two materials at γ = 130 pcf and φ′ = 37°, with
-c′ = 300 psf on the shell and 0 on the base; two polygons; a 240 psf `dloads`
-block across the crest; six geosynthetic lines at Tmax = Tres = 800 lb/ft with
-4 ft of pullout at each end; and three starting circles from a center at (45, 58).
-The input checks came back with six errors — `Delta = 0 degrees` on every
-reinforcement line, which selects the overburden pullout law with a zero friction
-angle — and the assistant read them, cleared `adhesion` and `delta` to blank so
-the drawing's stated pullout length governs, and got `MODEL CHECKS: clean`.
-Spencer with a search then returned **FS = 1.628** on the circle Xo = 27.88,
-Yo = 52.75, R = 42.97. It passed on both notes the run printed: a line of thrust
-outside the slice on 21% of boundaries, and 7 of 872 trial surfaces with no
-admissible Spencer solution, none of them ranking below the reported minimum.
+The second builds the model, and every dimension in it comes off the drawing. The
+rigid base sits at y = 0, the toe at (30, 10), the crest break at (60, 34) up a
+1.25:1 face, and the crest runs out to x = 130: 130 ft overall, which is the width
+the drawing gives, with 30 ft of ground in front of the toe. That is LEM-8's own
+section moved 30 ft to the right and 10 ft up. The cohesive face band was measured
+2 ft horizontally, giving the shell polygon (30,10)–(60,34)–(62,34)–(32,10) —
+LEM-8's band exactly. Both materials carry γ = 130 pcf and φ′ = 37°, with
+c′ = 300 psf on the shell and 0 on the base. A 240 psf `dloads` block crosses the
+70 ft crest, and six geosynthetic lines at Tmax = 800 lb/ft sit at el. 10, 14, 18,
+22, 26 and 30, each starting on the face, each 20 ft long, each with 4 ft of
+pullout at both ends.
+
+The input checks came back with 13 errors: no failure surface yet, a support type
+of `geotextile` on all six reinforcement lines, and a pullout delta out of range on
+all six. The assistant read them, set the type to `geosynthetic`, cleared
+`adhesion` and `delta` to blank so the drawing's stated pullout length governs,
+generated three starting circles from a center at (45, 58), and the checks came
+back clean. Spencer with a search then returned **FS = 1.471** on the circle
+Xo = 24.24, Yo = 55.91, R = 46.27, bottoming at el. 9.64 — a third of a foot below
+the toe. It passed on the note the run printed: 6 of 887 trial surfaces with no
+Spencer solution, none of them ranking below the reported minimum.
 
 The session saved
-[w1_build_from_image_after.xlsx](files/w1_build_from_image_after.xlsx).
+[w1_build_from_image_after.xlsx](files/w1_build_from_image_after.xlsx), and that
+file will not reopen. Studio refuses it — *Reinforcement line 'Line 1' (reinforce
+sheet, Excel row 3) has an unrecognized Dir='0.0'. Expected: tangent or axial.*
+Beside every reinforcement line sit two fields, **Dir** and **Appl**, that the
+template fills in for itself with a lookup on the support type; the assistant wrote
+a number into the first and a blank into the second, replacing both lookups. `Dir`
+takes only the two words the message names, so the file no longer loads, and
+clearing that one cell on all six rows is the whole repair.
+
+Both values are also read while the model is open, which is where the reported
+factor of safety went. A `Dir` other than `tangent` applies the six lines along the
+bar axis rather than tangent to the failure surface, and an `Appl` other than
+`active` applies their capacity as passive, divided by the factor of safety. Set
+one at a time on the repaired file:
+
+| Dir | Appl | FS |
+| :--- | :--- | :---: |
+| tangent | active — the template's own | **1.5881** |
+| 0.0 | active | 1.6058 |
+| tangent | blank | 1.4533 |
+| 0.0 | blank — what the session ran | **1.4710** |
+
+LEM-8 publishes 1.5867 for this slope, from a search that starts on different
+circles. So the model built off the drawing reproduces the published one to three
+figures, and the 0.117 between 1.5881 and the reported 1.471 comes entirely from
+two fields the drawing never mentions.
 
 ### Check its work
 
-- **Reload the saved workbook and run Spencer with a search yourself: 1.6281**,
-  the number it reported.
+- **Open the saved workbook, clear the six `Dir` cells, and run Spencer with a
+  search: 1.5881**, against the 1.471 the session reported and LEM-8's own 1.5867.
+- **Do not wait for the model checks to raise it.** Set `Dir = 'sideways'` on the
+  same model and the checks return six errors; leave it at `0.0` and they come back
+  clean. Reloading the file is what finds this one.
 - **Open the Materials editor.** Both materials read γ = 130 pcf and φ′ = 37°,
   with c′ = 300 psf on the shell and 0 on the base — what the drawing states.
-- **Open the Reinforcement editor.** Six layers sit at 0, 4, 8, 12, 16 and 20 ft
-  above the toe, each starting on the face, each 20 ft long, each at 800 lb/ft;
-  the pullout envelope breakpoints in the saved file sit 4 ft in from each tip.
-  The surcharge reads 240 psf across the 70 ft crest.
-- **The face band was read 2 ft normal to the face, not 2 ft horizontally.**
-  LEM-8 draws it horizontal. Measured 2 ft along the normal, the cohesive band
-  widens to 3.2 ft measured horizontally; rebuilding the saved model with a
-  2 ft horizontal band and changing nothing else gives 1.5881 against the
-  assistant's 1.6281 — LEM-8's own 1.587. That is the whole 0.04 between the two
-  answers. Both readings are defensible from the drawing; one of them matches the
-  published model.
-- **The section came out 150 ft wide against the drawing's 130 ft**, the toe flat
-  extended from 30 ft to 50 ft on the extent rule. Measured, it changes nothing:
-  1.6281 either way. It still overrode a dimension the drawing states.
+- **Open the Reinforcement editor.** Six layers sit 4 ft apart from the toe
+  elevation up, each starting on the face, each 20 ft long, each at 800 lb/ft,
+  with the pullout envelope breakpoints 4 ft in from each tip. The surcharge reads
+  240 psf across the 70 ft crest.
+- **Measure the section against the drawing.** It runs 130 ft overall with the 2 ft
+  cohesive band measured horizontally, which is what the drawing dimensions.
 - **The geometry landed on the `polygon` sheet, not the `profile` sheet.** Open
-  the saved file in Studio and Profile lines is empty. Max depth reads blank in
+  the repaired file in Studio and Profile lines is empty. Max depth reads blank in
   consequence, which is correct — max depth has no meaning for polygon input — so
-  the `max_depth = 0.0` the assistant wrote was inert.
+  the `max_depth = 0.0` the assistant wrote is inert.
 - **Both materials carry E = 0 and ν = 0.** Harmless for a limit equilibrium run,
   and a singular stiffness matrix for any finite element run later.
 
@@ -383,38 +411,32 @@ Run the analysis with 2, 3, 4, 5 and 6 geogrid layers (removing the top layers f
 ```
 </div>
 
-![The ad-hoc sweep in the dock: four code blocks reading the package before any analysis runs, then the loop with its five searches, and the finished table of factor of safety against layer count](images/w1_sweep_adhoc_1.png){width=560}
+![The ad-hoc sweep in the dock: one code block reading the six reinforcement rows, then the loop with its five searches, and the finished table of factor of safety against layer count](images/w1_sweep_adhoc_1.png){width=560}
 
-The loop it wrote restores the model in a `try/finally`, passes `plot=False`
-inside, searches once per row, and calls `ensure_reinforce_pullout` and
-`build_reinforce_lines` after each edit so the pullout envelopes are rebuilt for
-the layers that remain. Two layers means the two lowest grids, at y = 0 and 4 ft.
+It opens straight on the study. One snippet prints the six reinforcement rows;
+the second is the loop, which keeps the bottom n rows, resyncs the geometry,
+searches once per row, and puts all six back at the end. Two layers means the two
+lowest grids, at y = 0 and 4 ft. Three calls to the model and 49,548 input tokens
+covered it, against the 26,868 the previous sweep spent on a study of the same
+size.
 
 | Layers | 2 | 3 | 4 | 5 | 6 |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | FS (Spencer, searched) | 1.210 | 1.272 | 1.433 | 1.512 | 1.587 |
 
-Four of its seven model calls went before any analysis ran, spent on
-`inspect.getsource`, `dir()`, `pkgutil.iter_modules` and `inspect.signature`,
-including one snippet that raised
-`AttributeError: module 'xslope' has no attribute 'solve'`. That is 114,999 input
-tokens against the 26,868 the previous sweep spent on a study of the same size.
-
 Its reading of the table survives testing. It takes the step from three layers to
 four as the point where the critical surface changes character: with two and three
 layers the minimum bottoms at el. +2.7 and +7.3, above the reinforcement, so the
 grids are bypassed. Deleting the reinforcement and re-solving on those same circles
-returns the same factor of safety to four figures, with the reinforcement force
-summed over the slices at exactly zero. What the grids buy at two and three layers
-is the mechanism itself: with every layer removed the search drops to **1.1674**,
-so the reinforcement holds the deeper surface shut and forces the minimum up above
-itself.
+returns the same factor of safety — 1.2096 against 1.2099, and 1.2724 either way —
+with the reinforcement force summed over the slices at 1.4 lb/ft and exactly zero.
+What the grids do at two and three layers is set the mechanism: with every layer
+removed the search drops to **1.1674**, so the reinforcement holds the deeper
+surface shut and forces the minimum up above itself.
 
-One sentence in the same reply does not survive it. "Each added layer buys
-progressively less," it wrote, and then listed increments of 0.062, 0.161, 0.079
-and 0.075. The fourth layer adds the largest step of the four, and its own next
-paragraph explains why. The claim and the evidence against it sit in adjacent
-sentences.
+It also reads its own increments before summarizing them. "The gain per layer is
+**not** uniform," it wrote, and named the fourth layer's +0.161 as the largest
+step of the four rather than the smallest.
 
 ### Check its work
 
@@ -424,10 +446,11 @@ sentences.
 - **Read the six-layer row against the published answer.** It returns 1.5867,
   which is [LEM-8](lem08_reinforced_slope.md)'s Spencer result for this model, so
   the loop's last row reproduces a number computed elsewhere.
-- **Subtract the column before believing the sentence above it.** The steps run
-  0.062, 0.161, 0.079, 0.075 — they do not shrink.
+- **Test the bypass before repeating it.** Delete the reinforcement and re-solve
+  on the two- and three-layer circles: 1.2096 and 1.2724, against 1.2099 and
+  1.2724 with the grids in place.
 - **Open the Reinforcement editor when it finishes.** All six layers are back;
-  the `try/finally` restored them, and no workbook was written.
+  the loop restored them, and no workbook was written.
 
 ---
 
@@ -522,54 +545,56 @@ How do I decide standard deviations for a reliability analysis if I only have a 
 ```
 </div>
 
-![Both answers in the dock: the three-engine table, a worked micro-example and a read of the open model's standard deviations, then the second answer's COV table, three-sigma rule and bracketing recipe](images/w1_conceptual_2.png){width=560}
+![Both answers in the dock: the corpus lookup and the read of the model's standard deviations, the three-engine table and the worked examples it cites, then the second answer's three-sigma rule, COV table and bracketing recipe](images/w1_conceptual_2.png){width=560}
 
-The first answer opens on the open model: one snippet printed the `sigma_*` fields
-on both materials, and the assistant reported that every one of them is zero
-before saying anything general. Its three-engine table matches the implementation,
-including the distinction that decides how the engines compare —
-`reliability_taylor` re-searches the critical surface on every one of its 1 + 2N
-solves, while `reliability_mc` and `reliability_rs` hold one surface fixed. Every
-helper it names is real and spelled correctly: `reliability_taylor`,
-`reliability_mc`, `reliability_rs`, the `reliability(engine=…)` front door, and
-`parametric_sweep(plot='tornado')` in the second answer. The second answer holds up
-as practice — Duncan's three-sigma rule with the caution to divide by 4 rather than 6,
-published coefficient-of-variation bands, the sample standard deviation as a lower
-bound when there are few tests, spatial averaging along the surface, and the
-negative c′–φ′ correlation the Taylor engine does not model. The three pages it
-links, `reliability/`, `reliability/taylor/` and `reliability/monte_carlo/`, are
-real and correct.
+The first snippet does two things: it calls `corpus_index('reliability')`, which
+returns ten verification pages on the topic, and it prints the `sigma_*` fields on
+both materials. The answer opens on the second of those — every standard deviation
+on this model is zero — before saying anything general, and closes on the first,
+citing four worked examples by name: LEM sample 15, VP29 (Duncan's LASH terminal,
+Taylor against Monte Carlo), VP33 (the five-material dike) and FEM sample 4. The
+three theory pages it links, `reliability/`, `reliability/taylor/` and
+`reliability/monte_carlo/`, are real and correct.
 
-Two numbers in it were not run. The reliability index it defines, β = (E[FS] − 1)/σ_FS,
-worked to β = 2.50 and P_f ≈ 0.6% for E[FS] = 1.45 and σ_FS = 0.18, comes from a
-normal fit; `reliability_taylor` reports the **lognormal** index `beta_ln`, which
-for those same two numbers prints **β = 2.943 and P_f = 0.16%**. And its prediction
-that a model with every σ at zero "would return σ_FS = 0 and an infinite β" is not
-what happens: run on this model, `reliability_taylor` returns no result at all —
-it refuses, naming the blank σ columns and the sheet they live on.
+Its three-engine table matches the implementation, including the distinction that
+decides how the engines compare — `reliability_taylor` re-searches the critical
+surface on every one of its 1 + 2N solves, while `reliability_mc` and
+`reliability_rs` hold one surface fixed. Every helper it names is real and spelled
+correctly, with the right keyword arguments. And it takes the reliability index
+from the engine rather than from the textbook: "XSLOPE reports the **lognormal**
+reliability index, `beta_ln` … Do not compute it as `(E[FS] − 1)/σ_FS` — that is
+the normal-variate form and gives a different number than the run returns."
 
-It also never called `corpus_index`, so it named no worked example, though the
-verification corpus carries several on this topic — VP28, VP29, VP33, VP34 and
-RS2-25 among them — and it mentioned neither `reliability/fem/` nor
-[LEM-11](lem11_reliability.md).
+The second answer holds up as practice — Duncan's three-sigma rule with the caution
+to divide by 4 rather than 6, published coefficient-of-variation bands, the sample
+standard deviation as a lower bound when there are few tests, spatial averaging
+along the surface, and the advice to run the analysis at a low and a high σ instead
+of arguing about the estimate. It adds "I have not run that here", which is what a
+suggestion the assistant has not tested should say.
+
+Two things in the pair were not run. Its prediction that a model with every σ at
+zero "would return σ_FS = 0 and no meaningful β" is not what happens: run on this
+model, `reliability_taylor` returns no result at all — it refuses, naming the σ
+columns and the sheet they live on. And the one conversion it worked by hand comes
+out short: for φ′ = 37° and a 10% coefficient of variation on tan φ′, it gives
+σ_tanφ = 0.075, which is right, and then 37° ± 2.4°, which is not — 0.075 on
+tan 37° works out to 2.75° of friction angle.
 
 ### Check its work
 
 - **Check that nothing moved.** Neither turn edited the model or ran an analysis,
   and no workbook was written; the questions were answered out of the
-  documentation and one read of the open file.
-- **Follow the three links.** They land on real pages, and the reading there is
-  what the answer summarizes.
-- **Work the index the engine reports, not the one in the answer.** For
-  E[FS] = 1.45 and σ_FS = 0.18 the lognormal index is 2.943 and the probability of
-  failure 0.16%, against the 2.50 and 0.6% in the reply — a reader who follows the
-  answer and then runs the tool gets a different number from the same two inputs.
+  documentation, the verification corpus and one read of the open file.
+- **Follow the four worked examples and the three theory links.** They land on
+  real pages, and the reading there is what the answer summarizes.
 - **Run `reliability_taylor` on the model as it stands.** It refuses and names the
-  blank σ columns, rather than returning the zero standard deviation and infinite
-  index the answer predicts.
-- **Ask for the worked examples by name.** They exist and the answer did not reach
-  for them; [LEM-11](lem11_reliability.md) runs the same three engines on a
-  worked slope.
+  σ columns, rather than returning the zero standard deviation the answer predicts.
+- **Redo the conversion in section 2 of the second answer.** σ_tanφ = 0.075 on
+  tan 37° = 0.754 puts the friction angle between 34.15° and 39.66°, so
+  `sigma_phi` is about 2.75, not the 2.4 the answer gives.
+- **Ask for more worked examples if the four are not enough.**
+  [LEM-11](lem11_reliability.md) runs the same three engines on a worked slope,
+  and neither answer mentions it.
 
 ---
 
@@ -592,56 +617,74 @@ This model gives a factor of safety below 1. Can you find what is wrong?
 ```
 </div>
 
-![The diagnosis in the dock: one snippet printing the whole model, a second running the search and computing zone areas, then the answer headed "Found it — the embankment is built out of the foundation clay"](images/w1_diagnose_1.png){width=560}
+![The diagnosis in the dock: the model read once, the baseline search, then four snippets that vary one input at a time and re-search, and the ranked table the answer leads with](images/w1_diagnose_1.png){width=560}
 
-The display equation in its answer arrives as literal LaTeX, since the dock
-renders GitHub-dialect markdown and no math, and a fix is in progress. Everything
-it measured is exact. The search reproduces to four figures — FS = 0.0709 on the
-circle (−3.09, 49.09) with R = 45.93 — as do the zone areas it quotes, 48 ft² of
-shell against 14,992 ft² of base, and the face angle at 38.66°.
+It answers by changing things rather than by reading them. After one read of the
+model and the baseline search, six more snippets set the base friction angle to 10,
+20, 30 and 37 degrees; the surcharge to 240 psf and then to nothing; the maximum
+depth to 0; the reinforcement to none; and the material zoning to two alternatives
+— each followed by its own search, and the model put back afterwards. That takes
+nine calls to the model, 192,000 input tokens and thirteen minutes, the most any
+single request in this tutorial costs, and the answer opens with what each change
+did:
 
-The conclusion it drew from them is wrong. It read the base as c = 0 and φ = 3°,
-computed the infinite-slope ratio tan 3° / tan 38.7° = 0.066, matched that against
-the factor of safety it had just measured, and wrote: "That is not a numerical
-problem; the model really is that weak." The planted dropped digit was printed on
-screen and accepted as the design. That one fault carries the failure: restoring
-φ′ = 37 alone takes Spencer from **0.0709 to 1.1805**.
+| Change (from the baseline 0.071) | FS |
+| :--- | ---: |
+| base φ′: 3° → 30° | 0.914 |
+| base φ′: 3° → 37° | 1.181 |
+| base φ′: 3° → 20° | 0.582 |
+| base φ′: 3° → 10° | 0.287 |
+| surcharge 2400 → 240 psf | 0.096 |
+| surcharge removed entirely | 0.103 |
+| maximum depth −100 → 0 | 0.070 (no effect) |
+| φ′ = 30° and 240 psf together | 1.222 |
 
-Having accepted φ = 3°, it needed something to blame, and named the geometry. The
-shell zone is "a degenerate sliver", it wrote, the embankment body is therefore
-built out of foundation clay, and the shell polygon "should be" the whole fill
-above the toe — (0,0) → (30,24) → (100,24) → (100,0). It offered to redraw it.
-[LEM-8](lem08_reinforced_slope.md) draws that 2 ft cohesive band on purpose, and
-the redraw would replace the published problem with a different one.
+All three planted errors are in that table, and the diagnosis under it ranks them.
+The friction angle comes first, on the grounds that it is the only input moving the
+factor of safety by more than a hundredth; the assistant reads it as a dropped
+digit and recommends 30°, where the file was broken from 37°, and its own table
+carries both. The surcharge comes second, named as the same kind of typo, with the
+0.914 → 1.222 it adds once the strength is fixed. The maximum depth comes last,
+de-ranked by the measurement rather than by an argument about it, with the note
+that a base 100 ft below a 24 ft section is invented depth whatever the factor of
+safety does.
 
-It did better on the other two errors without settling either. It called the
-2,400 psf crest load "large — the equivalent of 38.5 ft of water" and asked,
-"Intentional surcharge, or a units slip?", which offers the right reading as a
-question rather than measuring it. And it de-ranked the maximum depth on the
-argument that the critical circle bottoms at el. +3.2 and so cannot be reaching a
-base at −100 — right, but an argument rather than a measurement. It changed
-nothing and said so, and no workbook was written.
+The 2 ft cohesive face band gets measured too, and hedged: regrouping the zones so
+the shell becomes the whole embankment gives 0.129 on its own and 1.353 with the
+friction angle restored, and the assistant writes that it "could not tell from the
+model which was intended". An earlier recording of this same request invented that
+regrouping as the cause and offered to redraw the published problem, which is why
+the checks below reproduce each of these numbers rather than read them.
 
-A confident wrong diagnosis reads exactly like a right one. Vary one input at a
-time and they come apart.
+One claim does not survive, and it is the one that says "I measured that". The
+assistant reports that the six geogrid layers contribute nothing, identical to
+three decimals with and without them. Its test set `reinforcement_lines` to an
+empty list, and the slicer falls back to the derived `reinforce_lines` when that
+list is empty, so all six lines were still in the model both times. Clear both and
+the broken model goes from 0.0709 to **0.0312**, and the repaired case from 1.2218
+to **0.9358**.
+
+It changed nothing, said so, and no workbook was written. The answer ends with a
+section headed **What I did not test**.
 
 ### Check its work
 
 - **Restore φ′ = 37 on the base and change nothing else.** Spencer goes from
-  0.0709 to **1.1805**. The answer never names that error.
+  0.0709 to **1.1805**, the 1.181 in its table.
 - **Restore the 240 psf surcharge as well.** **1.5867** — LEM-8's published
-  Spencer answer to four figures, the model this file was broken from. On
-  the broken model the surcharge alone moves 0.0709 to 0.0964, which is why
-  measuring it in place would not have found it either.
-- **Put the maximum depth back to −10.** Nothing changes: 1.5867 either way. The
-  de-ranking was right, and the argument behind it can be replaced with the
-  measurement in one run.
-- **Test the sliver claim before redrawing anything.** The 2 ft face band is what
-  LEM-8 draws, and the model carrying it answers 1.5867 once the other two errors
-  are fixed.
-- **One claim it made does hold**, and holds up when tested: the six geogrid
-  layers "do essentially nothing" in a φ = 3° soil. On its own critical circle the
-  factor of safety is 0.0709 with the reinforcement and 0.0605 without.
+  Spencer answer to four figures, the model this file was broken from. On the
+  broken model the surcharge alone moves 0.0709 to 0.0964.
+- **Put the maximum depth back to −10.** Nothing changes: 0.0709 either way, which
+  is what the table says.
+- **Remove the reinforcement properly before believing it does nothing.** Clearing
+  `reinforcement_lines` alone leaves the derived list in place and changes nothing;
+  clearing both takes the broken model to 0.0312 and the repaired case to 0.9358.
+  The same removal on the LEM-8 model gives 1.1674, which is that tutorial's own
+  no-reinforcement answer.
+- **Read the run behind the 0.129 row.** Spencer could not solve 147 of its 528
+  trial surfaces there, and 68 of those rank below the reported minimum, so 0.129
+  is not a number to carry anywhere. The assistant quoted the baseline's
+  admissibility notes and not this one's.
 
 ---
 
@@ -674,14 +717,17 @@ The first turn returns **FS = 1.587** on the circle (−5.13, 46.98) with R = 47
 — [LEM-8](lem08_reinforced_slope.md)'s published answer to four figures. It read
 the surface straight off the result — `Xo`, `Yo`, `R`, `Depth`, `x_entry` and
 `x_exit` — and laid the six numbers out in a small table, reading the circle as a
-toe circle bottoming at el. −0.28, well above the rigid base at −10.
+toe circle bottoming at el. −0.28, well above the rigid base at −10. It passed on
+the search note as well: Spencer could not solve 13 of the 838 trial surfaces, and
+none of the 13 rank below the reported minimum.
 
 The second turn makes one call to `generate_report`. The document runs 12 pages with
 six figures: *1 Traceability*, *2 Project Definition* and *3 Limit Equilibrium
 Analysis*, the last carrying 3.1 Analysis Inputs, 3.2 Materials, 3.3 Loads,
 3.4 Reinforcement and 3.5 Spencer's Method, itself split into the search, the
-results, the slice table and the calculations. Its summary of the document matches
-the document.
+results, the slice table and the calculations. It lands in the folder **Files…**
+opens, and the dock shows it as an attachment with a *show in folder* link beside
+it.
 
 The session saved [w1_report_after.docx](files/w1_report_after.docx).
 
@@ -700,13 +746,13 @@ xslope_reinforced_slope.xlsx
 
   Hashing `docs/tutorials/files/xslope_reinforced_slope.xlsx` returns the same 64
   characters, so the document names the model it was written from.
-- **Two rough edges, neither of them the assistant's.** The report is written to
-  `<model>_report.docx` beside the project, so it lands in the workbook's folder
-  under the workbook's name and was renamed by hand for this page. And the search
-  summary reports "Trial surfaces evaluated 96" where the same run's console line
-  says 838; both counts are real and count different things — 96 grid centers held
-  in the search's cache, 838 trial surfaces solved across all depths at those
-  centers — and the report's label names the wrong one.
+- **Read §3.5.1 against the console.** The search summary reports 838 trial
+  surfaces evaluated and 96 grid centers refined, on two rows, which is what the
+  run printed.
+- **One line of its summary does not match the document.** The assistant describes
+  what it generated as covering "2-zone polygon geometry"; the geometry is on
+  profile lines, and the report's own Project Definition says so — "2 material
+  zones described with profile lines".
 
 ---
 
@@ -724,23 +770,25 @@ lands on a crest that already carries 240 psf from x = 48 to 100, so the assista
 reported that the strip from x = 60 to 90 now carries 740 psf and asked whether
 the 500 psf was meant to replace the 240 psf instead of adding to it.
 
-**It can misread a dimension.** Reading a number off a drawing leaves more room
-for error than anything else in this tutorial — a dimension line that points at
-two places at once, a label sitting nearer the wrong feature, a decimal point
-lost to image resolution. Nothing downstream will catch it: the model checks
-test whether a model is consistent, not whether it matches the picture. That is
-why every use case ends with a check, and why the first one checks the built
-model against the drawing line by line. It happened here: the 2 ft cohesive face
-band was read 2 ft normal to the face rather than 2 ft horizontally, which returns
-1.628 where LEM-8 returns 1.587.
+**It can misread a dimension, and it can invent one nobody drew.** Reading a
+number off a drawing leaves room for error — a dimension line that points at two
+places at once, a label sitting nearer the wrong feature, a decimal point lost to
+image resolution. Nothing downstream will catch it: the model checks test whether
+a model is consistent, not whether it matches the picture. In the build above
+every dimension came off the drawing correctly, and the error landed instead on
+two fields no drawing mentions, Dir and Appl on the reinforcement lines, which the
+template fills in for itself. That cost 0.117 of factor of safety and left a
+workbook that will not reopen. Check the built model against the picture, then
+open the file it saved.
 
-**It can be confidently wrong.** Given a model broken on purpose, the assistant
-measured everything correctly and concluded the wrong thing — it accepted a
-friction angle typed as 3° as the design, and named a fault in the 2 ft face band
-that is not a fault. Nothing in the reply reads as a guess, and no model check
-catches it, because the broken model is internally consistent. Only measurement
-tells a confident wrong answer from a right one: restoring φ′ = 37 alone takes
-that model from 0.071 to 1.181.
+**It can be confidently wrong, including about its own measurements.** Asked to
+diagnose a model broken on purpose, the assistant found all three planted errors
+and ranked them by what restoring each one did. In the same reply it wrote that
+the six reinforcement layers contribute nothing, and added "I measured that" — but
+the removal it ran cleared one of the two lists the solver reads, so nothing was
+removed either time. Done properly, removing them takes that model from 0.071 to
+0.031. Nothing in the reply reads as a guess, and no model check catches it. Only
+running it again finds it.
 
 ---
 
@@ -749,19 +797,21 @@ that model from 0.071 to 1.181.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about $2.14.
+  13 turns of work for about $2.28.
 - Building a model from a drawing: materials, geometry, a load, six reinforcement
-  lines and a search from one request, with a face band read 2 ft the wrong way.
+  lines and a search from one request, every dimension right, and two fields
+  filled in that the template fills for itself.
 - Editing a built model: three plain-language edits, each rerun, and a warning the
   assistant read and repaired for itself.
 - A sweep the engine ran for it: six searched steps, right to four figures, with a
   mechanism offered for the plateau that a measurement contradicts.
-- A sweep it wrote itself: five layer counts, a mechanism reading that holds, and a
-  summary sentence its own increments contradict.
+- A sweep it wrote itself: five layer counts, and a mechanism reading that holds
+  when the grids are deleted and the same circles re-solved.
 - Crossing to the finite element engine: stiffnesses classified from strength,
   argued over, entered, meshed at 2 ft and reduced to 1.473.
-- Two questions that changed nothing, a diagnosis that measured exactly and
-  concluded wrongly, and a 12-page report carrying the run it names.
+- Two questions answered out of the documentation and the verification corpus, a
+  diagnosis that found all three planted faults by varying one input at a time,
+  and a 12-page report carrying the run it names.
 
 **Where to go next:** The [AI Assistant reference](../studio/assistant.md)
 documents the helpers the assistant calls, the checks that run after every edit it

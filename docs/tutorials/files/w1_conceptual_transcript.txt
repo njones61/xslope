@@ -8,129 +8,161 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 
 ## Turn 1 — How does a reliability analysis work in XSLOPE?
 
-````text
+```text
 You: How does a reliability analysis work in XSLOPE?
 
 Ran code:
-    for i,m in enumerate(slope_data['materials'],1):
-        print(i, m['name'], {k:m.get(k) for k in ('sigma_gamma','sigma_c','sigma_phi','sigma_cp','sigma_d','sigma_psi')})
+    rows = corpus_index('reliability')
+    for r in rows:
+        print(r)
+    print()
+    for m in slope_data['materials']:
+        print(m['name'], {k: m.get(k) for k in ('sigma_gamma','sigma_c','sigma_phi','sigma_cp','sigma_d','sigma_psi')})
 
 Output:
-    1 shell {'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0}
-    2 base {'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0}
+    - 4. Reliability Analysis: Two-Layer c–φ Slope  [probabilistic]
+      https://xslope.readthedocs.io/en/latest/fem/samples/#4-reliability-analysis-two-layer-c-slope
+    - Worked sample  [probabilistic]
+      https://xslope.readthedocs.io/en/latest/parametric/sensitivity/#worked-sample
+    - VP1: Slope, homogeneous (ACADS 1(a))  [probabilistic]
+      https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp1
+    - RS2-1: Simple slope stability assessment  [probabilistic]
+      https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-1
+    - 15. Reliability Analysis (Submerged Slope)  [probabilistic]
+      https://xslope.readthedocs.io/en/latest/lem/samples/#15-reliability-analysis-submerged-slope
+    - VP28: Excavated slope and embankment, probabilistic analysis  [probabilistic]
+      https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp28
+    - VP29: Duncan's LASH terminal — TSPM reliability vs Monte Carlo  [probabilistic]
+      https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp29
+    - RS2-23: Underwater slope with linearly varying cohesion  [probabilistic]
+      https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-23
+    - VP33: Dike, (5) materials, probabilistic analysis, water table  [probabilistic]
+      https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp33
+    - RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003)  [probabilistic]
+      https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-25
+    {'topic': 'probabilistic', 'title': '4. Reliability Analysis: Two-Layer c–φ Slope', 'url': 'https://xslope.readthedocs.io/en/latest/fem/samples/#4-reliability-analysis-two-layer-c-slope'}
+    {'topic': 'probabilistic', 'title': 'Worked sample', 'url': 'https://xslope.readthedocs.io/en/latest/parametric/sensitivity/#worked-sample'}
+    {'topic': 'probabilistic', 'title': 'VP1: Slope, homogeneous (ACADS 1(a))', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp1'}
+    {'topic': 'probabilistic', 'title': 'RS2-1: Simple slope stability assessment', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-1'}
+    {'topic': 'probabilistic', 'title': '15. Reliability Analysis (Submerged Slope)', 'url': 'https://xslope.readthedocs.io/en/latest/lem/samples/#15-reliability-analysis-submerged-slope'}
+    {'topic': 'probabilistic', 'title': 'VP28: Excavated slope and embankment, probabilistic analysis', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp28'}
+    {'topic': 'probabilistic', 'title': "VP29: Duncan's LASH terminal — TSPM reliability vs Monte Carlo", 'url': 'https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp29'}
+    {'topic': 'probabilistic', 'title': 'RS2-23: Underwater slope with linearly varying cohesion', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-23'}
+    {'topic': 'probabilistic', 'title': 'VP33: Dike, (5) materials, probabilistic analysis, water table', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp33'}
+    {'topic': 'probabilistic', 'title': 'RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003)', 'url': 'https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-25'}
+    
+    shell {'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0}
+    base {'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0}
 
 Assistant: ## The idea
 
-A reliability analysis treats the strength (and unit weight) inputs as **random variables** instead of single numbers, propagates that scatter through the LEM solver, and reports the distribution of FS rather than one value. The outputs are:
+Deterministic LEM gives one FS from one set of "best estimate" strengths. A reliability analysis treats the uncertain inputs as random variables, propagates that scatter through the same LEM solver, and reports:
 
-- **E[FS]**, **σ_FS**
-- **β = (E[FS] − 1) / σ_FS** — the reliability index, how many standard deviations the mean FS sits above failure
-- **P_f** — probability of failure, `P(FS < 1)`, from a normal (or lognormal) fit
+- **E[FS]** — mean factor of safety
+- **σ_FS** — standard deviation of FS
+- **β** — reliability index, the number of standard deviations between the FS distribution and failure
+- **P_f** — probability of failure
 
-Inputs are the **σ columns on each material**: `sigma_gamma`, `sigma_c`, `sigma_phi`, `sigma_cp`, `sigma_d`, `sigma_psi`. A σ of 0 means that property is deterministic.
+XSLOPE reports the **lognormal** reliability index, `beta_ln` (FS is taken as lognormally distributed, so FS can never go negative). Do not compute it as `(E[FS] − 1)/σ_FS` — that is the normal-variate form and gives a different number than the run returns.
+
+## What you supply
+
+The uncertainty lives on the material rows as standard deviations next to each property: `sigma_gamma`, `sigma_c`, `sigma_phi`, `sigma_cp`, `sigma_d`, `sigma_psi`. A σ of 0 means that property is treated as deterministic. A common field way to set one is the "three-sigma rule": σ ≈ (HCV − LCV)/6, from the highest and lowest conceivable values.
+
+**In your open model both materials have every σ = 0**, so a reliability run right now would return σ_FS = 0 and no meaningful β. You'd need to assign σ_c and σ_phi (and γ, if you want it) first.
 
 ## The three engines
 
-| Call | How it samples | Failure surface |
+| Call | How it gets the answer | Failure surface |
 |:--|:--|:--|
-| `reliability_taylor(method='bishop')` | Taylor-series (FOSM): 1 base solve + 2 per random variable, at mean ± σ; σ_FS from the summed partial derivatives | **Re-searched on every one of the 1 + 2N solves** — the critical surface migrates with the parameter values |
-| `reliability_mc(method='bishop', n_samples=…, rng_seed=…)` | Monte Carlo: random draws from each variable's distribution | **Held FIXED** — never re-searched |
-| `reliability_rs(method='bishop')` | Response surface: a fitted polynomial surrogate, then sampled cheaply | **Held FIXED** |
+| `reliability_taylor(method='bishop')` | Taylor series (first-order second-moment): 1 base solve + 2 solves per random variable, perturbing each ±σ to get ∂FS/∂x, then combining variances | **Re-searches on every solve** — the critical surface migrates with the parameter values |
+| `reliability_mc(method='bishop', n_samples=…, rng_seed=…)` | Monte Carlo: samples the input distributions n times and solves each realization | **Held FIXED** — MC never re-searches |
+| `reliability_rs(method='bishop')` | Response surface: fits a surface to a small design of solves, then samples the surrogate cheaply | **Held FIXED** |
 
 Front door: `reliability(method='bishop', engine='taylor'|'mc'|'rs')`. Each renders its own plot.
 
-That surface difference is reportable, not cosmetic: Taylor's β accounts for the critical surface moving as strengths vary; MC and RS give β and P_f **conditional on one surface**, which is cheaper and usually slightly optimistic. Cost runs the other way — Taylor is 1 + 2N solves (cheap), MC is `n_samples` solves (expensive but distribution-free), RS buys MC-like sampling at a handful of real solves.
+The surface distinction is reportable, not a footnote: Taylor's β accounts for the critical surface shifting as strengths vary, while MC and RS give a β and P_f **conditional on one surface**. Taylor is cheap (2N+1 solves) and is the standard Duncan-style TSPM; MC costs n full solves but gives the whole FS histogram.
 
-## Micro-example
+## Worked examples with published comparisons
 
-With `E[FS] = 1.45` and `σ_FS = 0.18`:
+- [LEM sample 15 — Reliability analysis, submerged slope](https://xslope.readthedocs.io/en/latest/lem/samples/#15-reliability-analysis-submerged-slope)
+- [VP29 — Duncan's LASH terminal, TSPM reliability vs Monte Carlo](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp29) — the direct Taylor-vs-MC comparison
+- [VP33 — Dike, 5 materials, probabilistic, with water table](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp33)
+- [FEM sample 4 — Reliability, two-layer c–φ slope](https://xslope.readthedocs.io/en/latest/fem/samples/#4-reliability-analysis-two-layer-c-slope)
 
+Theory pages: [reliability/](https://xslope.readthedocs.io/en/latest/reliability/), [reliability/taylor/](https://xslope.readthedocs.io/en/latest/reliability/taylor/), [reliability/monte_carlo/](https://xslope.readthedocs.io/en/latest/reliability/monte_carlo/).
+
+Want me to put σ values on `shell` and `base` and run a Taylor analysis on this model?
 ```
-β  = (1.45 − 1)/0.18 = 2.50
-P_f = Φ(−2.50) ≈ 0.6%
-```
 
-## Your model right now
-
-Both `shell` and `base` carry **σ = 0 on every property**, so a reliability run has nothing to randomize — it would return σ_FS = 0 and an infinite β. You'd need to fill in at least `sigma_c` and `sigma_phi` (typical COVs: c ≈ 20–40%, φ ≈ 5–15%, γ ≈ 3–7%) before any engine gives a meaningful answer.
-
-Say the word and I'll set the σ values you want and run one — or read the derivations at `reliability/`, `reliability/taylor/`, and `reliability/monte_carlo/`.
-````
-
-Tokens: input 28,581 · cached_input 27,308 · output 1,380 · calls 2 · 19.8s
+Tokens: input 33,114 · cached_input 30,292 · output 1,679 · calls 2 · 21.2s
 
 ## Turn 2 — How do I decide standard deviations for a reliability analy…
 
 ````text
 You: How do I decide standard deviations for a reliability analysis if I only have a few tests?
 
-Assistant: ## Short answer
+Assistant: ## Short answer: don't estimate σ from 3 data points — bracket it
 
-With a handful of tests you don't *estimate* σ statistically — you **bound** it and check that the answer isn't sensitive to which bound you chose. Three ways, in the order you should reach for them.
+With a handful of tests the sample standard deviation is itself wildly uncertain, so the standard practice is to combine three sources and take the widest sensible value.
 
-### 1. Published COV × your mean
+### 1. The three-sigma rule (Dai & Wang / Duncan)
 
-The most defensible default. σ = COV · mean, with COV from the literature (Duncan 2000, *Factors of Safety and Reliability in Geotechnical Engineering*, ASCE JGGE):
+Ask yourself the highest and lowest conceivable values of the property — not the highest and lowest you measured, the values you'd bet against seeing. Then
+
+```
+sigma = (HCV - LCV) / 6
+```
+
+because ±3σ spans ~99.7% of a normal distribution. Engineers systematically bracket too narrowly, so some use /4 (a ±2σ reading, ~95%) as a deliberately conservative variant, which gives a σ 1.5× larger.
+
+Example — you have 3 UU tests at 380, 430, 300 psf and judge the layer could reasonably run 200 to 650 psf:
+
+> sigma_c = (650 − 200)/6 = 75 psf, on a mean of about 370 psf → COV ≈ 20%
+
+### 2. Published COV ranges as a floor
+
+If your computed σ implies a COV far below these, your data is too sparse to justify it — use the literature value instead. Typical ranges compiled in the geotechnical reliability literature (Duncan 2000, ASCE JGGE, is the usual citation):
 
 | Property | Typical COV |
 |:--|:--|
-| γ (total unit weight) | 3–7% |
-| c′ (effective cohesion) | 20–40% |
-| φ′ (friction angle) | 5–15% |
-| S_u (undrained strength) | 20–40% |
-| tan φ′ | 5–15% |
+| Unit weight γ | 3 – 7% |
+| Undrained strength su | 20 – 40% |
+| Effective cohesion c' | 20 – 50% |
+| tan φ' (drained friction) | 5 – 15% |
+| Pore pressure / ru | 10 – 20% |
 
-Use the **high** end when your few tests came from scattered locations or different labs, the low end for a uniform compacted fill with controlled QC.
+Convert a COV to the field XSLOPE wants: `sigma_c = COV × c`. Note that φ is entered in **degrees**, so a COV quoted on tan φ' must be converted — for φ' = 37° and COV(tan φ') = 10%, tan 37° = 0.754, σ_tanφ = 0.075, and the corresponding spread in degrees is about 37° ± 2.4°, so `sigma_phi ≈ 2.4`.
 
-### 2. The three-sigma rule
+### 3. Decide whether you want σ of the property or σ of the mean
 
-Ask yourself the highest and lowest **conceivable** values (not "likely" — conceivable), then
+This matters more than the third decimal of your estimate. A long failure surface averages the soil it cuts, so point-to-point variability partly cancels; what survives is uncertainty in the *average* strength along the surface. Two limiting cases:
 
-```
-σ ≈ (HCV − LCV) / 6
-```
+- **Poor spatial correlation, long surface** → use σ_mean ≈ σ_property / sqrt(n_effective). This is the smaller, less conservative number.
+- **Systematic uncertainty** (bias in the test method, a mean you fit from few samples, a correlation you borrowed) does *not* average out and should be carried at full σ.
 
-because ±3σ spans ~99.7% of a normal distribution. The known failure mode: engineers pick ranges that are **too narrow**, so Duncan recommends dividing by **4** instead of 6 unless you're confident in the extremes. With 3–5 tests, use /4.
+With few tests, the honest position is usually: keep the full property σ, because you cannot demonstrate the averaging.
 
-### 3. Small-sample statistics, inflated
+### 4. Then test whether it even matters — measure, don't argue
 
-If you do compute `s` from n tests with the (n−1) denominator, remember that for n < 10 the sample range badly understates the population range. Treat `s` as a **lower bound** on σ, and carry the larger of `s` and the COV-based estimate.
+σ is an assumption, so treat it like one: run the reliability analysis at your low and high σ estimates and see how far β moves. If β goes from 3.1 to 2.9 you can stop worrying; if it goes from 3.1 to 1.6, the σ estimate *is* your design decision and you should spend money on more tests rather than more judgment.
 
-## Three things that trip people up
+I have not run that here — your model's `sigma_c`, `sigma_phi` and `sigma_gamma` are all still 0.
 
-**Separate the sources of scatter.** Total variability = inherent spatial variability + measurement/test error + statistical uncertainty in the mean. Only the *inherent* part is real strength variation; lab scatter isn't a property of the ground. With few tests you can't decompose it, so using total scatter is conservative — say so.
+### Practical notes for the XSLOPE input
 
-**Spatial averaging reduces the effective σ.** A slip surface 100 ft long mobilizes the *average* strength along it, not a point value. Where the scale of fluctuation is short compared to the surface, the effective σ on the surface is well below the point σ. Ignoring this is conservative, which is usually fine — but it's why a P_f of a few percent from point-scale σ is not a literal failure probability.
+- Every σ is in the **same units as the property it sits beside**: `sigma_c` in psf, `sigma_phi` in degrees, `sigma_gamma` in pcf (this model is imperial).
+- A σ left at 0 makes that property deterministic — a legitimate and common choice for γ, whose COV is small and whose influence on FS is weak.
+- `reliability_taylor` costs 1 + 2N solves for N non-zero σ, so adding a variable you don't believe in costs two full searches and usually moves β very little.
 
-**Correlation matters and the Taylor engine assumes none.** c′ and φ′ from the same tests are typically *negatively* correlated (a steeper envelope gives a lower intercept). Treating them as independent overstates σ_FS — conservative again.
+Worked examples that show σ values chosen for real cases: [VP29, Duncan's LASH terminal](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp29) (Taylor vs Monte Carlo on a published case), [VP33, five-material dike](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp33), and [LEM sample 15](https://xslope.readthedocs.io/en/latest/lem/samples/#15-reliability-analysis-submerged-slope). Theory: [reliability/taylor/](https://xslope.readthedocs.io/en/latest/reliability/taylor/).
 
-## The practical workflow in Studio
-
-Don't agonize over every σ. Find out which one matters first, then bracket only that one:
-
-```python
-# 1. which variable dominates?
-parametric_sweep(plot='tornado')
-
-# 2. bracket the dominant σ: low and high estimates
-for cov in (0.15, 0.40):
-    for m in slope_data['materials']:
-        m['sigma_c'] = cov * m['c']
-    print(cov, reliability_taylor(method='bishop', plot=False))
-```
-
-If β stays on the same side of your target (commonly β ≥ 3, P_f ≤ 0.1% for a permanent slope) across the whole bracket, your σ choice didn't decide the answer and you can report it with the range stated. If β crosses the target inside the bracket, **that is your justification for more testing** — and it tells you exactly which property to test.
-
-Note that `reliability_taylor` needs only the mean and σ, not a distribution shape, which is why it's the right engine when your data are thin. Monte Carlo makes you commit to a distribution you can't support with five tests.
-
-Derivations: `reliability/taylor/` and `reliability/` at `https://xslope.readthedocs.io/en/latest/`.
-
-Want me to put a first-pass set of σ values on your two materials — say COV 30% on c and 10% on φ — and run the bracket above?
+If you give me your HCV/LCV brackets — or just say "use typical COVs" — I'll set the σ fields on `shell` and `base` and run the low/high comparison so you can see how sensitive β is to the choice.
 ````
 
-Tokens: input 15,503 · cached_input 13,654 · output 1,935 · calls 1 · 29.4s
+Tokens: input 18,895 · cached_input 15,146 · output 2,396 · calls 1 · 35.7s
 
 ## Session total
 
-- Tokens: input 44,084 · cached_input 40,962 · output 3,315 · calls 3
-- Wall time: 57.6s
+- Tokens: input 52,009 · cached_input 45,438 · output 4,075 · calls 3
+- Wall time: 60.6s

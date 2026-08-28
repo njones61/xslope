@@ -2980,6 +2980,11 @@ COMBO03_DIALOG_TIME = 0.0
 #: The frame the play bar is parked on: three quarters of the way down the fall,
 #: where the pool has left the upper face and the core still holds its head.
 COMBO03_PLAYBAR_TIME = 35.0
+#: The instants the refinement step adds to the Transient editor's extra-save-times
+#: list: the midpoint of every gap the schedule leaves between day 20 and day 40,
+#: where the curve dips. The rest of what that step asks for — 20, 25, 30, 35 and
+#: 40 — the shipped schedule already saves, so four rows are the whole edit.
+COMBO03_ADDED = (22.5, 27.5, 32.5, 37.5)
 
 _combo03_cache = {}
 
@@ -3228,6 +3233,94 @@ def combo03_rapid_parametric():
     return _grab(dlg, "combo03_rapid_parametric.png")
 
 
+def combo03_transient():
+    """The Transient editor after the refinement step's four save times are typed in.
+
+    The shot that step is read off: the **Extra save times** list beside the series
+    table, holding the schedule's own eighteen instants and the four midpoints across
+    the dip. The four are written into the loaded model before the dialog is built,
+    so the list in the figure is the list the reader has just finished filling — the
+    shipped file carries the eighteen. Everything else on the form is untouched,
+    including the empty stage-time fields: Part 1 is a drained curve.
+
+    The preview is rendered explicitly rather than waited for: the pane's redraw is
+    debounced, so a grab taken straight after ``show()`` catches a blank canvas.
+    """
+    from studio.editors import TransientDialog
+
+    data = _load(COMBO03)
+    tseep = dict(data.get("tseep") or {})
+    tseep["save_times"] = sorted(set(tseep.get("save_times") or [])
+                                 | set(COMBO03_ADDED))
+    dlg = TransientDialog(tseep, data, None)
+    dlg.resize(1220, 640)
+    dlg.show()
+    _settle()
+    # Then grow the form by exactly what the save list is short of showing every
+    # row: this dam saves 22 instants where SEEP-3's schedule saves five, and a
+    # list cut off mid-row hides the rows this step just added.
+    tbl = dlg._save_table
+    short = (sum(tbl.rowHeight(r) for r in range(tbl.rowCount()))
+             - tbl.viewport().height())
+    if short > 0:
+        dlg.resize(dlg.width(), dlg.height() + short)
+        _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    dlg._preview.canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, "combo03_studio_transient.png")
+    dlg.grab().save(out)
+    dlg.close()
+    print("-> combo03_studio_transient.png")
+    return out
+
+
+def combo03_fs_time_refined():
+    """The **FS vs Time** tab after the refinement — the same curve over 23 frames.
+
+    What the reader sees at the end of the refinement step, and it costs what that
+    step costs: the march is run again with the four extra save times on the
+    schedule (``remarch_for_times`` injects exactly what the Transient editor's list
+    would carry), then every frame of it is searched. Same sweep as
+    ``combo03_fs_time_result`` otherwise — Spencer, re-searching at each instant —
+    so the two shots are read against each other.
+    """
+    from xslope.seep import remarch_for_times
+    from studio.main_window import SweepCanvas
+    from studio.runners import SensitivityRunner
+
+    data = _combo03_solved()
+    seep_data = _combo03_cache["seep_data"]
+    with contextlib.redirect_stdout(io.StringIO()):
+        solution = remarch_for_times(seep_data, data, list(COMBO03_ADDED))
+    opts = {"mode": "fs_vs_time", "engine_mode": "lem", "method": COMBO03_METHOD,
+            "num_slices": COMBO03_SLICES, "search": True,
+            "times": [float(t) for t in solution["times"]]}
+    runner = SensitivityRunner(data, opts, transient=solution)
+    bundle, err = {}, {}
+    runner.succeeded.connect(lambda b: bundle.update(b))
+    runner.failed.connect(lambda m: err.setdefault("msg", m))
+    with contextlib.redirect_stdout(io.StringIO()):
+        runner._run_fs_vs_time()
+    if err or not bundle:
+        raise RuntimeError("combo03_fs_time_refined: the sweep failed: %s"
+                           % err.get("msg", "no result"))
+    canvas = SweepCanvas()
+    canvas.resize(1000, 620)
+    canvas.show()
+    _settle()
+    canvas.render_fs_vs_time(bundle, slope_data=data)
+    _settle()
+    canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, "combo03_studio_fs_time_refined.png")
+    canvas.grab().save(out)
+    canvas.close()
+    print("-> combo03_studio_fs_time_refined.png")
+    return out
+
+
 SHOTS.update({
     "combo03_materials": combo03_materials,
     "combo03_materials_blank": combo03_materials_blank,
@@ -3236,6 +3329,8 @@ SHOTS.update({
     "combo03_playbar": combo03_playbar,
     "combo03_parametric": combo03_parametric,
     "combo03_fs_time_result": combo03_fs_time_result,
+    "combo03_transient": combo03_transient,
+    "combo03_fs_time_refined": combo03_fs_time_refined,
     "combo03_rapid_parametric": combo03_rapid_parametric,
 })
 

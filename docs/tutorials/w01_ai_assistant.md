@@ -168,8 +168,11 @@ The assistant is good at this work, but everything it produces should still be
 checked. Checking is usually easy, and it is the same checking a model built by
 hand deserves: read the model checks Studio runs after every edit, look at the
 section on the canvas, and do one hand calculation against the number that came
-back. Each use case below ends with **Check its work** — what to look at, and
-what it should say.
+back. Where it goes wrong most often, measured over a sweep of the sample files:
+the scale of a section read off a drawing, a 0 written where a value was not
+given, and an explanation of a result that names the wrong slices or works a
+number by hand instead of reading it off the run. Each use case below ends with
+**Check its work** — what to look at, and what it should say.
 
 ---
 

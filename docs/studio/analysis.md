@@ -302,8 +302,8 @@ per-instant table (time, factor of safety, the critical circle) is printed to th
 [Log pane](interface.md#the-log-pane), and an instant that produced no result appears there
 with its reason rather than as a gap in the line. A **rapid drawdown** run opens the same tab
 under the name **Drawdown vs Time**: its table carries the three stage factors of safety and
-which of stages 2 and 3 governed each instant, and the plot draws those stages as thin dashed
-lines behind the reported curve:
+which of stages 2 and 3 governed each instant, while the plot draws the reported curve alone —
+the lower of stages 2 and 3:
 
 ![FS vs Time result tab](images/analysis_sensitivity_fs_time.png)
 
@@ -313,6 +313,15 @@ of the engine's
 [never-extrapolate discipline](../parametric/design.md#honest-about-misses):
 
 ![Design honest miss](images/analysis_sensitivity_design_miss.png)
+
+Every result view above carries two sub-tabs: **Plot**, which it opens on, and **Table** — the
+numbers the plot is drawn from, as a grid. Each mode shows its own: the low and high bound of
+each tornado bar, the swept values and factors of safety of a design or back-analysis curve,
+and, for a march, one row per instant with its factor of safety, the critical circle and the
+face that circle sits on (plus the three stage values and the governing stage on a drawdown).
+An instant that produced no result carries its reason in the row rather than leaving a gap.
+**Save CSV…** writes the grid to a comma-separated file, offered as `<model>_<mode>.csv`
+beside the project.
 
 ### Sweeps in FEM and Seepage mode
 
@@ -400,6 +409,11 @@ follows the engine:
 ![LEM Reliability view](images/analysis_lem_reliability.png)
 
 ![Monte Carlo reliability histogram](images/analysis_reliability_mc_histogram.png)
+
+Those views carry the same **Table** sub-tab the Parametric ones do. The Taylor series lists
+each parameter with its most-likely value, its σ, the factor of safety at plus and minus one
+σ, and the swing ΔF the variance is built from; a sampling run lists the statistics its
+histogram is a picture of. **Save CSV…** writes either one to a file beside the model.
 
 The engines are the same ones the library exposes — `reliability` (the front door),
 `reliability_taylor`, `reliability_mc`, `reliability_rs`, and `reliability_fem`; see

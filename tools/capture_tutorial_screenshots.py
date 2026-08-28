@@ -3151,16 +3151,19 @@ def combo03_parametric():
     return _grab(dlg, "combo03_studio_parametric.png")
 
 
-def combo03_fs_time_result():
-    """The **FS vs Time** result tab the run opens.
+def combo03_fs_time_table():
+    """The **Table** sub-tab of the **FS vs Time** result — the run's own rows.
 
-    The tab draws the factors of safety the run computed, so this shot costs the
+    The grid holds the factors of safety the run computed, so this shot costs the
     whole sweep — nineteen searches. The frames are read off the shipped
     ``_tseep.csv`` rather than marched again, which is what the reader's copy does
-    too, and the sweep is the page's own: Spencer, searching at each instant.
+    too, and the sweep is the page's own: Spencer, searching at each instant. The
+    plot half of the same view is the page's ``combo03_curve.png``, produced at
+    figure size by ``make_tutorial_figures.py``, so only the table is grabbed here.
     """
     from studio.main_window import SweepCanvas
     from studio.runners import SensitivityRunner
+    from studio.sweep_table import SweepResultView, parametric_table
 
     data = _combo03_solved()
     solution = _combo03_cache["solution"]
@@ -3174,20 +3177,21 @@ def combo03_fs_time_result():
     with contextlib.redirect_stdout(io.StringIO()):
         runner._run_fs_vs_time()
     if err or not bundle:
-        raise RuntimeError("combo03_fs_time_result: the sweep failed: %s"
+        raise RuntimeError("combo03_fs_time_table: the sweep failed: %s"
                            % err.get("msg", "no result"))
-    canvas = SweepCanvas()
-    canvas.resize(1000, 620)
-    canvas.show()
+    view = SweepResultView(SweepCanvas())
+    view.resize(440, 665)
+    view.show()
     _settle()
-    canvas.render_fs_vs_time(bundle, slope_data=data)
+    view.render_fs_vs_time(bundle, slope_data=data)
+    headers, rows, _stem = parametric_table(bundle, data)
+    view.set_table(headers, rows, "")
+    view.tabs.setCurrentIndex(1)          # the Table sub-tab, beside the plot
     _settle()
-    canvas._render_current()
-    _settle()
-    out = os.path.join(OUT_DIR, "combo03_studio_fs_time.png")
-    canvas.grab().save(out)
-    canvas.close()
-    print("-> combo03_studio_fs_time.png")
+    out = os.path.join(OUT_DIR, "combo03_studio_fs_time_table.png")
+    view.grab().save(out)
+    view.close()
+    print("-> combo03_studio_fs_time_table.png")
     return out
 
 
@@ -3283,7 +3287,7 @@ def combo03_fs_time_refined():
     step costs: the march is run again with the four extra save times on the
     schedule (``remarch_for_times`` injects exactly what the Transient editor's list
     would carry), then every frame of it is searched. Same sweep as
-    ``combo03_fs_time_result`` otherwise — Spencer, re-searching at each instant —
+    ``combo03_fs_time_table`` otherwise — Spencer, re-searching at each instant —
     so the two shots are read against each other.
     """
     from xslope.seep import remarch_for_times
@@ -3328,7 +3332,7 @@ SHOTS.update({
     "combo03_run_lem": combo03_run_lem,
     "combo03_playbar": combo03_playbar,
     "combo03_parametric": combo03_parametric,
-    "combo03_fs_time_result": combo03_fs_time_result,
+    "combo03_fs_time_table": combo03_fs_time_table,
     "combo03_transient": combo03_transient,
     "combo03_fs_time_refined": combo03_fs_time_refined,
     "combo03_rapid_parametric": combo03_rapid_parametric,

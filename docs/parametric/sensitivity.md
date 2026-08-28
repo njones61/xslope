@@ -204,8 +204,9 @@ at *t*, with stage 3 re-checking the drawn-down section against drained strength
 are the lower. The reported value is the drawdown's own, the lower of stages 2 and 3, so the
 curve answers *how safe is this slope if the pool falls to where it stands at t* — asked
 against pore pressures the transient run computed rather than a single assumed drawn-down state. The
-rows carry `stage1_FS`, `stage2_FS`, `stage3_FS`, `stage3_run` and `governs` beside `fs`, and
-`plot_fs_vs_time` draws the three stages as thin dashed lines behind the reported curve.
+rows carry `stage1_FS`, `stage2_FS`, `stage3_FS`, `stage3_run` and `governs` beside `fs`.
+`plot_fs_vs_time` draws the reported curve alone; the stage values are in the run's printed
+table and in `result['df']`.
 
 Two consequences follow from the construction and are worth stating:
 

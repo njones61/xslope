@@ -362,14 +362,18 @@ Lowest factor of safety 1.3313 at t = 35 day (19 instant(s), 0 without a result)
 ```
 
 The run opens an **FS vs Time** tab with the curve, its lowest instant ringed and
-the pool schedule drawn faintly behind:
-
-![The FS vs Time result tab](images/combo03_studio_fs_time.png)
+the pool schedule drawn faintly behind.
 
 **Day 0 and day 5 repeat the two single runs, at 1.5311 and 1.5132** — the
 sweep reads the same minimum slip depth and searches from the same two circles as
 the dialog runs. An instant that produces no result comes back as a row carrying
 its reason rather than as a gap in the curve.
+
+Beside the plot the tab carries a **Table** sub-tab. It lists every instant with
+its factor of safety and the critical circle the search found there, and
+**Save CSV…** writes those rows to a file beside the model:
+
+![The Table sub-tab of the FS vs Time result](images/combo03_studio_fs_time_table.png)
 
 <!-- test: file=files/xslope_earth_dam_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, expected_first=1.5311, critical_time=35, min_fs=1.3313, tolerance=0.005, benchmark=COMBO-3-drained -->
 

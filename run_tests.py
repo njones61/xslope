@@ -7787,6 +7787,40 @@ def run_sweep_window_test(test):
     return 0.0, None
 
 
+def run_sweep_table_test(test):
+    """The Table sub-tab every Parametric result view carries (``studio.sweep_table``).
+
+    A Parametric plot is a picture of a table the run already computed, and the
+    table is the half that gets quoted. Three ways that can go wrong are pinned:
+    a grid with fewer rows than the run produced (the failure with no symptom —
+    nothing on screen says a row went missing), a Save CSV… file that is not the
+    grid it was written from, and a table that disagrees with the figure beside it.
+
+    The check itself lives in test/sweep_table_check.py: the two sub-tabs on every
+    mode's view with the plot first, the row count against each result's own table
+    (march instants, sweep points, tornado bars, reliability parameters), the CSV
+    read back cell for cell, the offered ``<model>_<mode>.csv`` name, and the
+    march's face / stage / reason columns against COMBO-3's published tables. It
+    drives the views offscreen off those published tables and small synthetic
+    sweeps, so it solves nothing and runs in seconds. Skips cleanly without
+    PySide6.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'sweep_table_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('sweep_table_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_water_hoist_test(test):
     """Where the automatic water load is derived, and how often (``xslope.search``).
 
@@ -12566,6 +12600,8 @@ def _dispatch_test(test):
         return run_fs_vs_time_mode_test(test)
     if test_type == 'sweep_window':
         return run_sweep_window_test(test)
+    if test_type == 'sweep_table':
+        return run_sweep_table_test(test)
     if test_type == 'piezo_visibility':
         return run_piezo_visibility_test(test)
     if test_type == 'water_hoist':
@@ -12658,7 +12694,8 @@ def _expected_and_tol(test, default_tolerance):
                        'thread_safety',
                        'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
-                       'fs_vs_time_mode', 'sweep_window', 'water_hoist', 'piezo_visibility',
+                       'fs_vs_time_mode', 'sweep_window', 'sweep_table',
+                       'water_hoist', 'piezo_visibility',
                        'project_package', 'docs_links',
                        'noncircular_generator', 'circles_editor', 'table_paste',
                        'updater', 'fem_1d_details',
@@ -13357,6 +13394,14 @@ def main():
         # tell the reader to paste rather than retype; this is what keeps that true.
         tests.append({'type': 'table_paste', 'file': 'Studio table copy/paste',
                       'method': '-', 'source': 'table_paste'})
+        # Guard the Table sub-tab every Parametric result view carries: one row per
+        # thing the run produced, the face and stage columns that keep a march's
+        # grid saying what its figure says, and a Save CSV… file that is the grid
+        # cell for cell. Drives the views offscreen off published tables and small
+        # synthetic sweeps — it solves nothing.
+        tests.append({'type': 'sweep_table',
+                      'file': 'Parametric result tables (Studio)',
+                      'method': '-', 'source': 'sweep_table'})
         # Guard Studio's in-app updater: the version comparison, the platform
         # artifact key, the minimum_version gate, the checksum refusal, and the
         # command each platform branch would spawn. Touches no network — the

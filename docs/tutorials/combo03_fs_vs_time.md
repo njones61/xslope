@@ -859,41 +859,20 @@ plateau.
 
 In this tutorial we covered:
 
-- What a factor-of-safety-versus-time curve is — one stability analysis per saved
-  frame of a transient seepage solution, with nothing but the water changing
-  between the points.
-- How a frame reaches a stability run — `u = seep` sends every slice base to a
-  solved field, Run LEM's **Seepage time** group names which frame, and
-  **Run → Parametric… → Factor of safety vs time** sweeps all of them at once.
-- Where those frames come from — both models on this page ship with their mesh
-  and their whole transient solution beside the workbook, so every curve here is drawn on
-  fields that were solved once, in [SEEP-3](seep03_reservoir_drawdown.md) and
-  [COMBO-2](combo02_rapid_drawdown.md).
-- Where to put a starting circle when either face may govern — one per face, each
-  on the deep mechanism its slope can make, because a seeded search refines only
-  the best-screening circle.
-- The curve on Part 1's dam — 1.531 at full pool on the **downstream** face, a
-  minimum of **1.331 on day 35** on the **upstream** face, 1.381 at the end of the
-  drawdown on day 47, and a climb to 1.557 by day 300. The minimum falls
-  mid-drawdown, 12 days before the pool stops moving, because the reservoir load
-  tracks the pool exactly while the pore pressure behind the face lags; halving
-  the frame spacing across the dip moved it by 0.0001.
-- How to turn the same sweep into a rapid drawdown curve — **Rapid drawdown at
-  each time** makes every ticked instant stage 2 of a three-stage analysis whose
-  stage 1 is the transient run's initial state.
-- The rapid drawdown curve on COMBO-2's Johnson Reservoir dam — a minimum of
-  **1.0157 on day 50** where the fall ends and a recovery to 1.1912 by day 500;
-  the same frames at drained strengths give 1.5097, 1.0350 and 1.2870.
-- Which curve to read — the rapid drawdown curve through the fall and just after
-  it, the single-stage curve for the long-term condition.
+- Running a stability analysis at one time step of a transient seepage solution,
+  and sweeping every saved time step with **Run → Parametric… → Factor of safety
+  vs time**.
+- Reading the curve: on Part 1's dam the minimum falls mid-drawdown, before the
+  pool stops moving, and the governing face changes as the pool falls.
+- Repeating the sweep as a rapid drawdown at each time step, for a dam whose core
+  carries an undrained envelope.
+- Comparing the two curves: the rapid drawdown curve governs through the fall and
+  just after it, the drained curve the long-term condition.
 
-**Where to go next:** in [SEEP-3](seep03_reservoir_drawdown.md) we build the
-transient seepage model of Part 1's dam; in
-[COMBO-2](combo02_rapid_drawdown.md) we build Part 2's and run the three-stage
-procedure at one instant, on the dam we build in
-[SEEP-2](seep02_johnson_dam.md).
+**Where to go next:** [SEEP-3](seep03_reservoir_drawdown.md) builds Part 1's
+transient seepage model, and [COMBO-2](combo02_rapid_drawdown.md) builds Part 2's
+and runs the three-stage procedure at one instant.
 [Factor of safety versus time](../parametric/sensitivity.md#factor-of-safety-versus-time)
-carries the sweep mode itself, [Transient seepage](../seep/transient.md) the
-formulation and the boundary types, and
-[Rapid drawdown analysis](../lem/rapid.md) the three-stage procedure. The
+covers the sweep mode, [Transient seepage](../seep/transient.md) the formulation,
+and [Rapid drawdown analysis](../lem/rapid.md) the three-stage procedure. The
 [tutorials index](index.md) lists the series.

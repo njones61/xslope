@@ -234,8 +234,13 @@ frame.
 
 ### Stability at one time step
 
-The model is complete — geometry, strengths, pore pressures and a place to start
-searching from — so we can ask it for a factor of safety, at one instant first.
+Before sweeping every time step, we will run the analysis at a single one. This
+shows what one point on the curve is — an ordinary limit equilibrium search,
+with the pore pressures read from one saved time step of the transient
+solution — and it lets us check that the model behaves before we ask for
+nineteen of them. We will start at t = 0, the full reservoir, which is also
+the first point of the curve.
+
 Click **Run → Run LEM…** **Method** opens on **Spencer**, which satisfies both
 force and moment equilibrium and is the method behind every factor of safety on
 this page; **Analysis** opens on **Auto search**, which finds the run its own
@@ -251,7 +256,7 @@ or **Another time (reruns the analysis)** (any time in the run — the transient
 seepage analysis is re-solved with that time added to the saved steps, so the
 pore pressures are always computed, never interpolated between two frames).
 
-Leave the first control on **Saved frame**. The frame list below it opens on
+Leave **Time** on **Saved frame**. The frame list below it opens on
 the last saved time step, t = 300; set it to `t = 0 day`, the full reservoir
 the transient run starts from. Leave **Save as the model's stability time**
 unticked (ticked, it stores the chosen time in the file for later runs):
@@ -311,13 +316,15 @@ Sliding mass = 5,722.8 kN/m over 58.01 m of failure surface
 **1.331, and the circle has moved to the other side of the dam** — center
 (7.00, 56.91) against the full-pool run's (103.00, 56.79). Two thirds of the
 reservoir is gone, and with it the load that made the upstream face the safer
-one. Run LEM answers one instant at a time, so we would need nineteen runs to
-draw the whole curve this way.
+one.
 
 ### Sweeping all time steps
 
-A parametric sweep does that repetition itself. Click **Run → Parametric…** and
-set **Mode** to **Factor of safety vs time**:
+Repeating the last step nineteen times by hand would draw the curve, but the
+Parametric dialog can do it in one run: it steps through every saved time
+step, runs the same search at each one with that step's pore pressures, and
+plots the factors of safety against time. We will run that sweep now. Click
+**Run → Parametric…** and set **Mode** to **Factor of safety vs time**:
 
 ![The Parametric dialog sweeping the transient run's saved frames](images/combo03_studio_parametric.png)
 

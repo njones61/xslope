@@ -1263,6 +1263,12 @@ class RunLemDialog(QDialog):
         self.analysis = self._combo(ANALYSIS_TYPES, defaults.get("analysis", "auto_search"))
         form.addRow("Analysis", self.analysis)
 
+        note = QLabel("Single surface analyzes the first circle / the non-circular "
+                      "surface as entered. Auto-search refines from there to the "
+                      "critical surface.")
+        note.setWordWrap(True)
+        form.addRow(note)
+
         # The surface-family selector appears when the deck carries BOTH families —
         # keyed on what is present, never on the stored selection, because reading the
         # selection as presence would make a run that chose non-circular unable to
@@ -1383,12 +1389,6 @@ class RunLemDialog(QDialog):
         tform.addRow("Max iterations", self.max_iter)
 
         layout.addWidget(self.tol_group)
-
-        note = QLabel("Single surface analyzes the first circle / the non-circular "
-                      "surface as entered. Auto-search refines from there to the "
-                      "critical surface.")
-        note.setWordWrap(True)
-        layout.addWidget(note)
 
         # Transient seepage: which instant a single-time run reads, and — for a rapid
         # drawdown — which two instants the stages read. Both are shown only when the

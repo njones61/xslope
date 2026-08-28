@@ -242,12 +242,14 @@ this page; **Analysis** opens on **Auto search**, which finds the run its own
 critical circle, and **Number of slices** on 40.
 Leave all three as they are, with **Grid search** unticked.
 
-**Seepage time**, the group a loaded transient solution adds, names the instant this
-run reads, three ways. **Saved frame** lists the nineteen the run stored. **Frame shown in
-the results viewer** takes whatever frame the play bar is on, and appears only
-while a transient results tab is open. **Another time (reruns the analysis)**
-accepts any instant in the run duration and re-solves the transient seepage analysis
-with that time added to the save schedule; a field blended between two frames is never invented.
+Because the file carries a transient seepage solution, the dialog shows a
+**Seepage time** group. It picks which time step this run reads its pore
+pressures from, and offers three ways to choose: **Saved frame** (one of the
+nineteen saved time steps), **Frame shown in the results viewer** (whatever the
+play bar is on; this option appears only while a transient results tab is open),
+or **Another time (reruns the analysis)** (any time in the run — the transient
+seepage analysis is re-solved with that time added to the saved steps, so the
+pore pressures are always computed, never interpolated between two frames).
 
 **Save as the model's stability time** writes the choice to the `tseep` sheet, so
 a scripted or headless re-run reads the same frame; left off, it governs this run

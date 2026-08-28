@@ -141,8 +141,11 @@ to:
 
 The diagnosis session is a quarter of the total on its own, because it answers
 by measuring rather than by reading. Whether a cheaper model does the same work
-as well is a separate question; the current prices are on your provider's
-pricing page.
+as well is a separate question. The current prices are on each provider's
+pricing page: [Anthropic](https://www.anthropic.com/pricing),
+[OpenAI](https://openai.com/api/pricing/),
+[Moonshot AI](https://platform.moonshot.ai/docs/pricing) and
+[Z.ai](https://docs.z.ai/guides/overview/pricing); Ollama is free.
 
 ---
 

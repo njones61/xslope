@@ -6449,77 +6449,6 @@ def _combo03_pool(model, t):
     return float(_interp(float(t), list(ts["times"]), list(ts["series"]["pool"])))
 
 
-def _combo03_curve_figure(model, times, fs, crit_t, crit_fs, baseline, faces):
-    """The factor of safety at every saved instant, over the pool that drives it.
-
-    Two axes sharing one time axis rather than two figures: the whole reading is
-    WHEN the dip falls relative to the drawdown, and a dip cannot be placed against
-    a schedule drawn somewhere else. The pool is the driver, so it is the pale gray
-    trace and the factor of safety is the colored one.
-
-    Each point is marked by the face its critical circle came out on. The curve is
-    two mechanisms in sequence rather than one moving surface — the reservoir loads
-    the upstream slope and the downstream slope governs while it stands — and a
-    single-colored line would hide the handover the page reads.
-    """
-    import numpy as np
-
-    duration = float(model["tseep"]["duration"])
-    t0, t1 = model["tseep"]["times"][1], model["tseep"]["times"][-1]
-    _u = declared_unit_labels(model)
-
-    fig, ax = plt.subplots(figsize=(8.6, 5.0))
-    ax.axvspan(t0, t1, color="#eef4f9", zorder=0)
-    # Neutral connector, colored markers: the reported curve is the lower of two
-    # mechanisms, so the line itself belongs to neither face.
-    ax.plot(times, fs, "-", color="#6f7883", lw=2.0, zorder=3,
-            label="factor of safety (Spencer, searched at each instant)")
-    for face, color, label in (("upstream", "#b5460f", "critical on the upstream face"),
-                               ("downstream", "#2b7bb0",
-                                "critical on the downstream face")):
-        pts = [(t, v) for t, v, f in zip(times, fs, faces) if f == face]
-        if pts:
-            ax.plot([t for t, _ in pts], [v for _, v in pts], "o", color=color,
-                    ms=6, zorder=5, label=label)
-    ax.axhline(baseline, color="#8a6d3b", lw=1.0, ls=(0, (4, 3)), zorder=2)
-    ax.annotate("full pool, %.3f" % baseline, xy=(duration, baseline),
-                xytext=(-4, -11), textcoords="offset points", fontsize=8.5,
-                color="#8a6d3b", ha="right", va="top")
-    ax.plot([crit_t], [crit_fs], "o", ms=11, mfc="none", mec="#b5460f", mew=1.8,
-            zorder=4)
-    ax.annotate("lowest of the saved instants:\n%.3f at t = %g %s"
-                % (crit_fs, crit_t, _u["time"]),
-                xy=(crit_t, crit_fs), xytext=(crit_t + 34.0, crit_fs + 0.055),
-                fontsize=9, color="#b5460f", ha="left", va="center",
-                arrowprops=dict(arrowstyle="-|>", color="#b5460f", lw=0.9))
-    ax.annotate("drawdown", xy=(0.5 * (t0 + t1), 0.985),
-                xycoords=("data", "axes fraction"), fontsize=8.5,
-                color="#2b7bb0", ha="center", va="top")
-    ax.set_xlim(-8.0, duration + 8.0)
-    # Headroom over the highest point so the full-pool reference and its label are
-    # inside the frame rather than on it.
-    span = max(fs) - min(fs)
-    ax.set_ylim(min(fs) - 0.10 * span, max(fs) + 0.10 * span)
-    ax.set_xlabel("time (%s)" % _u["time"])
-    ax.set_ylabel("factor of safety")
-    ax.grid(alpha=0.22)
-    ax.set_title("The dam through the drawdown and after it", fontsize=11.5)
-
-    pool = ax.twinx()
-    pool.plot(times, [_combo03_pool(model, t) for t in times], color="#3f4a55",
-              lw=1.6, ls=(0, (5, 3)), zorder=1,
-              label="pool (the reservoir schedule)")
-    pool.set_ylabel("pool elevation (%s)" % _u["length"], color="#3f4a55")
-    pool.tick_params(axis="y", colors="#3f4a55")
-    pool.set_ylim(0.0, 1.35 * max(_combo03_pool(model, t) for t in times))
-
-    handles = ax.get_legend_handles_labels()
-    extra = pool.get_legend_handles_labels()
-    ax.legend(handles[0] + extra[0], handles[1] + extra[1], loc="center right",
-              frameon=False, fontsize=9)
-    fig.tight_layout()
-
-
 def combo03_plots():
     """The FS-versus-time page: the model, the two single-instant runs, the curve
     over the whole march, and the critical instant drawn.
@@ -6532,6 +6461,8 @@ def combo03_plots():
     """
     import time as _time
 
+    from xslope.plot import plot_fs_vs_time
+    from xslope.seep import remarch_for_times
     from xslope.sensitivity import fs_vs_time
 
     model = load_slope_data(COMBO03)
@@ -6611,12 +6542,10 @@ def combo03_plots():
     print("   minimum     %.4f at t = %g %s · full pool %.4f · recovered %.4f"
           % (res["min_fs"], res["critical_time"], _u["time"],
              float(res["df"]["fs"].iloc[0]), float(res["df"]["fs"].iloc[-1])))
-    times = [float(t) for t in res["times"]]
-    fs = [float(v) for v in res["df"]["fs"]]
-    faces = [_combo03_face(model, x) for x in res["df"]["Xo"]]
-    capture("combo03_curve.png", _combo03_curve_figure, model, times, fs,
-            float(res["critical_time"]), float(res["min_fs"]),
-            float(full_crit["FS"]), faces)
+    # The result tab's own figure, not a second drawing of the same numbers: the
+    # page shows what the reader's run puts on screen, so the curve here is
+    # whatever Studio's FS vs Time tab draws.
+    capture("combo03_curve.png", plot_fs_vs_time, res, slope_data=model)
 
     # ---- the critical instant, drawn ---------------------------------------- #
     # Staged and searched again unless the curve's lowest instant happens to be
@@ -6637,16 +6566,29 @@ def combo03_plots():
             _combo03_results(worst_crit))
 
     # ---- what a finer save grid is worth ------------------------------------ #
+    # The page's route is Studio's: the midpoints of the gaps across the dip go on
+    # the Transient editor's extra-save-times list, the transient analysis is run
+    # again, and the sweep is run again over every frame the longer schedule saves.
+    # ``remarch_for_times`` injects exactly what that edited list would carry — the
+    # model's own save times unioned with the requested instants — so this is that
+    # run rather than a shortcut around it, and the second sweep reads its frames
+    # off the re-march the way the first read them off the shipped march.
     t0 = _time.time()
     with contextlib.redirect_stdout(io.StringIO()):
-        ok, fine = fs_vs_time(model, solution, times=list(COMBO03_REFINE),
-                              methods=(COMBO03_METHOD,), search=True,
-                              num_slices=COMBO03_SLICES, seep_data=seep_data,
-                              remarch=True, search_opts=COMBO03_SEED)
+        fine_solution = remarch_for_times(seep_data, model, list(COMBO03_REFINE))
+    print("   re-march    %d frames · %.0f s wall · %s added to the save list"
+          % (len(fine_solution["times"]), _time.time() - t0,
+             ", ".join("%g" % t for t in sorted(
+                 set(COMBO03_REFINE) - set(model["tseep"]["save_times"])))))
+    t0 = _time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, fine = fs_vs_time(model, fine_solution, methods=(COMBO03_METHOD,),
+                              search=True, num_slices=COMBO03_SLICES,
+                              search_opts=COMBO03_SEED)
     if not ok:
         raise RuntimeError(fine)
-    print("   refine      %d instants · re-marched %s · %.0f s wall"
-          % (len(fine["times"]), fine["remarched"], _time.time() - t0))
+    print("   refine      %d instants · %d failed · %.0f s wall"
+          % (len(fine["times"]), fine["n_failed"], _time.time() - t0))
     for _i, row in fine["df"].iterrows():
         print("     t %-5g pool %5.2f  FS %s  center (%.2f, %.2f) R %.2f  %s face"
               % (row["value"], _combo03_pool(model, row["value"]),
@@ -6656,6 +6598,15 @@ def combo03_plots():
     print("   refine      minimum %.4f at t = %g %s · %+.4f against the saved grid"
           % (fine["min_fs"], fine["critical_time"], _u["time"],
              fine["min_fs"] - res["min_fs"]))
+    # A longer save list is a different numerical path through the same physics, so
+    # the instants the shipped schedule already saved move a little too. The page
+    # states how far, so it is measured here rather than assumed.
+    _saved = dict(zip((float(t) for t in res["times"]),
+                      (float(v) for v in res["df"]["fs"])))
+    _moved = max(abs(float(v) - _saved[float(t)])
+                 for t, v in zip(fine["times"], fine["df"]["fs"])
+                 if float(t) in _saved)
+    print("   refine      the shared instants move by at most %.4f" % _moved)
 
 
 # --------------------------------------------------------------------------- #

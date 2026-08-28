@@ -400,7 +400,9 @@ its reason rather than as a gap in the curve.
 Every circle above bottoms at, or within a tenth of a meter of, the rock at
 elevation 0. The **face** column is read off the center: the crest runs from
 x = 51 to x = 59, so a center left of it is an upstream mechanism and a center
-right of it a downstream one.
+right of it a downstream one. The curve below colors each point by that column,
+shades the days the pool is falling, and carries the full-pool 1.531 across as a
+dashed reference.
 
 ![The factor of safety at every saved instant, over the pool that drives it](images/combo03_curve.png){width=1000}
 
@@ -733,8 +735,12 @@ uses:
 One curve is drawn, carrying the rapid drawdown factor of safety at each instant,
 the lower of stages 2 and 3; the three stages stay in the table above, where the
 governing one is named per row. Behind it, on the right axis, runs the pool
-schedule. The lowest instant is ringed and labeled, the red guide marks FS = 1,
-and the legend counts the instant that produced no result.
+schedule, with the forty-five days it falls over shaded and the pre-drawdown
+1.456 carried across as a dashed full-pool reference. The lowest instant is
+ringed and labeled, the red guide marks FS = 1, and the legend counts the instant
+that produced no result. No point is colored by face here: every instant of this
+curve is critical on the upstream slope, and the plot marks faces only where the
+answer moves from one to the other.
 
 **Day 50 reads 1.0157, the answer we got in COMBO-2.** The transient route there
 reports **1.0158** on a circle at (243.93, 244.90) with a radius of 163.64 ft,

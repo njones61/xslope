@@ -173,7 +173,11 @@ Alongside `df` the result carries `critical_time` and `min_fs` — the instant o
 factor of safety and its value — plus `critical` (the same pair per method when several
 ran), `times`, `n_failed`, and `solution`. `xslope.plot.plot_fs_vs_time` draws the result
 directly: the curve, its lowest instant annotated, and the model's drawdown schedule behind
-it. In Studio the same run is the Parametric dialog's
+it. Where that schedule falls, the interval it falls over is shaded and labeled *drawdown*
+and the factor of safety measured before the fall began is carried across the figure as a
+dashed **full pool** reference; where the instants come out on more than one face of the
+embankment, each marker is colored by the face its critical circle sits on and the legend
+names both faces. In Studio the same run is the Parametric dialog's
 [Factor of safety vs time](../studio/analysis.md#factor-of-safety-vs-time) mode, where the
 instants are ticked off the loaded transient solution and the curve opens in an **FS vs Time** tab.
 

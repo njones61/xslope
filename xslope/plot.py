@@ -5177,6 +5177,99 @@ def annotate_design_crossing(ax, target_fs, summary):
     return ax
 
 
+#: The two faces of an embankment, in the colors an FS-versus-time curve marks its
+#: instants with: the reservoir side warm, the dry side cool. Both are clear of the
+#: default line color, so a colored marker never reads as part of the line under it.
+_FACE_COLORS = {'upstream': '#b5460f', 'downstream': '#2b7bb0'}
+
+
+def _crest_span(slope_data):
+    """The x range of a ground surface's crest — its highest run.
+
+    A flat crest has a left and a right edge; a peaked one has both at the same x,
+    so one span answers for either. Returns ``None`` where the model carries no
+    ground surface, or where the surface has no relief at all — a profile with no
+    faces to tell apart.
+    """
+    gs = (slope_data or {}).get('ground_surface')
+    if gs is None:
+        return None
+    try:
+        coords = ([(float(x), float(y)) for x, y in gs.coords]
+                  if hasattr(gs, 'coords')
+                  else [(float(p[0]), float(p[1])) for p in gs])
+    except (TypeError, ValueError):
+        return None
+    if len(coords) < 2:
+        return None
+    ys = [y for _, y in coords]
+    y_max, relief = max(ys), max(ys) - min(ys)
+    if relief <= 0:
+        return None
+    tol = 1e-6 * relief
+    xs = [x for x, y in coords if y_max - y <= tol]
+    return min(xs), max(xs)
+
+
+def _circle_face(slope_data, span, Xo, Yo=None, R=None):
+    """Which face of the embankment a critical circle sits on — ``'upstream'``,
+    ``'downstream'``, or ``None`` where the geometry does not say.
+
+    The center decides it: left of the crest's left edge is the reservoir side,
+    right of its right edge the dry side. A center standing OVER the crest belongs
+    to neither by that test, so the surface itself is asked instead — the ends it
+    daylights at, which is where the mechanism actually is. A surface that
+    daylights on both sides of the crest, or one that cannot be built from the
+    circle the row carries, is left unclassified rather than assigned a face on a
+    guess.
+    """
+    if span is None or Xo is None:
+        return None
+    left, right = span
+    Xo = float(Xo)
+    if not np.isfinite(Xo):
+        return None
+    if Xo < left:
+        return 'upstream'
+    if Xo > right:
+        return 'downstream'
+    if Yo is None or R is None or not (np.isfinite(float(Yo)) and np.isfinite(float(R))):
+        return None
+    try:
+        ok, out = generate_failure_surface(
+            slope_data['ground_surface'], circular=True,
+            circle={'Xo': Xo, 'Yo': float(Yo), 'R': float(R),
+                    'Depth': float(Yo) - float(R)})
+    except Exception:                                      # noqa: BLE001
+        return None
+    if not ok:
+        return None
+    sides = {('upstream' if x < left else 'downstream' if x > right else 'crest')
+             for x in (float(out[0]), float(out[1]))} - {'crest'}
+    return sides.pop() if len(sides) == 1 else None
+
+
+def _drawdown_interval(ts):
+    """The stretch of a ``tseep`` schedule over which the pool is falling — from the
+    breakpoint where it starts down to the one where it stops.
+
+    Read off the series that actually falls, so a schedule that only fills, or one
+    held flat, has no interval and the curve is drawn without a band. Returns
+    ``(t_start, t_end)``, or ``None``.
+    """
+    times = [float(t) for t in (ts.get('times') or [])]
+    if len(times) < 2:
+        return None
+    for vals in (ts.get('series') or {}).values():
+        if vals is None or len(vals) != len(times):
+            continue
+        vv = [float(v) for v in vals]
+        falls = [k for k in range(len(vv) - 1) if vv[k + 1] < vv[k]]
+        if falls:
+            return times[falls[0]], times[falls[-1] + 1]
+    return None
+
+
 def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
                     dpi=300, fig=None, style=None):
     """Plot an :func:`xslope.sensitivity.fs_vs_time` curve: the factor of safety at
@@ -5193,6 +5286,19 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
     Instants that produced no result are not drawn (they are rows carrying a reason
     in ``result['df']``); their absence is stated in the legend as a count, so a
     gap in the line is never silent.
+
+    Where the schedule falls, the interval it falls over is banded and labeled
+    ``drawdown``, and the factor of safety measured before the fall began is
+    carried across the figure as a thin dashed **full pool** reference — the two
+    marks a dip is read against.
+
+    Where the instants come out on MORE THAN ONE face of the embankment, each
+    marker is colored by its own face (the critical circle's center against the
+    crest) and the line between them is drawn neutral: a curve that hands over from
+    one slope to the other is two mechanisms in sequence, not one moving surface,
+    and a single-colored line would hide the handover. A curve that stays on one
+    face is drawn plain, with no face entries in the legend — there is no handover
+    to show.
 
     On a **rapid-drawdown** curve (``rapid=True``) the reported curve is the
     drawdown's own factor of safety — the lower of stages 2 and 3 — and only that
@@ -5221,14 +5327,43 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
         ax = fig.add_subplot(111)
 
     rapid = all(c in df.columns for c in ('stage1_FS', 'stage2_FS', 'stage3_FS'))
+
+    # The face each instant's critical circle came out on, read off the row's own
+    # circle. Colored only where the curve actually changes face: on a single-face
+    # march the colors would carry no information and the legend would claim a
+    # handover the run never made.
+    span = _crest_span(slope_data)
+    face_by_row = {}
+    if span is not None and all(c in df.columns for c in ('Xo', 'Yo', 'R')):
+        for i in df.index[df['success'].astype(bool)]:
+            face_by_row[i] = _circle_face(slope_data, span, df.at[i, 'Xo'],
+                                          df.at[i, 'Yo'], df.at[i, 'R'])
+    color_faces = len({f for f in face_by_row.values() if f}) > 1
+    one_method = int(df['method'].nunique()) <= 1 if len(df) else True
+
     n_failed = 0
     for method, g in df.groupby('method'):
         pts = g.loc[g['success']].sort_values('value')
         n_failed += int((~g['success']).sum())
         if pts.empty:
             continue
-        line, = ax.plot(pts['value'], pts['fs'], marker='o', ms=5, lw=1.8,
-                        label=(f"{method} (drawdown)" if rapid else str(method)))
+        kw = dict(marker='o', ms=5, lw=1.8)
+        if color_faces and one_method:
+            # The reported curve is the lower of two mechanisms, so the line itself
+            # belongs to neither face and is drawn in neither's color. With several
+            # methods on one figure the line keeps its method color instead — that
+            # distinction is the one the reader would lose.
+            kw['color'] = '#6f7883'
+        ax.plot(pts['value'], pts['fs'],
+                label=(f"{method} (drawdown)" if rapid else str(method)), **kw)
+    if color_faces:
+        for face in ('upstream', 'downstream'):
+            sel = [i for i, f in face_by_row.items() if f == face]
+            if not sel:
+                continue
+            ax.plot(df.loc[sel, 'value'], df.loc[sel, 'fs'], 'o',
+                    color=_FACE_COLORS[face], ms=6, zorder=5,
+                    label=f"critical on the {face} face")
     if n_failed:
         ax.plot([], [], ' ', label=f"{n_failed} instant(s) produced no result")
 
@@ -5261,9 +5396,29 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
                  else f"{output} versus time")
     ax.grid(True, alpha=0.3)
 
+    ts = (slope_data or {}).get('tseep') or {}
+    band = _drawdown_interval(ts)
+    # The state the fall started from, carried across the figure: a dip is read as
+    # a distance below the level the slope held at full pool, and that level is a
+    # number on this curve rather than one the reader has to remember. Taken from
+    # the earliest instant AT OR BEFORE the fall begins -- a curve whose first
+    # result is already mid-drawdown never measured the full-pool slope, so it gets
+    # no line rather than a wrong one.
+    if band is not None:
+        ok_rows = df.loc[df['success']].sort_values('value')
+        pre = ok_rows.loc[ok_rows['value'].astype(float)
+                          <= band[0] + 1e-9 * max(1.0, abs(band[0]))]
+        if len(pre):
+            full_pool = float(pre['fs'].iloc[0])
+            ax.axhline(full_pool, color='#8a6d3b', lw=1.0, ls=(0, (4, 3)),
+                       zorder=2)
+            ax.annotate(f"full pool, {full_pool:.3f}", xy=(1.0, full_pool),
+                        xycoords=('axes fraction', 'data'), xytext=(-4, -3),
+                        textcoords='offset points', fontsize=8.5,
+                        color='#8a6d3b', ha='right', va='top')
+
     # The schedule that drives the curve, behind it: pale, dashed, on its own axis.
     handles, labels_ = ax.get_legend_handles_labels()
-    ts = (slope_data or {}).get('tseep') or {}
     series = {k: v for k, v in (ts.get('series') or {}).items()
               if v is not None and len(v) == len(ts.get('times') or [])}
     if series:
@@ -5289,6 +5444,18 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
         ax.patch.set_visible(False)
         h2, l2 = sched.get_legend_handles_labels()
         handles, labels_ = handles + h2, labels_ + l2
+    # The interval the pool is falling over, shaded behind everything. It goes on
+    # the schedule's own axis where there is one -- that axis sits below the curve,
+    # so a band drawn there cannot cover the trace it was read from.
+    if band is not None:
+        t_lo, t_hi = ax.get_xlim()
+        (sched if series else ax).axvspan(band[0], band[1], color='#eef4f9',
+                                          zorder=-1)
+        ax.annotate('drawdown', xy=(0.5 * (band[0] + band[1]), 1.0),
+                    xycoords=('data', 'axes fraction'), xytext=(0, -4),
+                    textcoords='offset points', fontsize=8.5, color='#3f4a55',
+                    ha='center', va='top')
+        ax.set_xlim(t_lo, t_hi)
     ax.legend(handles, labels_, fontsize=9)
     fig.tight_layout()
     if save_png:

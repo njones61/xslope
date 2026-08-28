@@ -293,7 +293,11 @@ same tab, with the target at FS = 1.0):
 **Factor of safety vs time** opens an **FS vs Time** tab: the factor of safety at each
 evaluated instant as a line with a marker per point, the lowest of them ringed and
 annotated with its own time, and the model's `tseep` time series — the drawdown schedule
-that drives the curve — drawn faintly behind it on a second axis. When the sweep is done the
+that drives the curve — drawn faintly behind it on a second axis. Where that schedule falls,
+the interval it falls over is shaded and labeled *drawdown*, the factor of safety measured
+before the fall began is carried across as a dashed **full pool** reference, and — where the
+instants come out on more than one face of the embankment — each marker is colored by the
+face its critical circle sits on, with a legend entry per face. When the sweep is done the
 per-instant table (time, factor of safety, the critical circle) is printed to the
 [Log pane](interface.md#the-log-pane), and an instant that produced no result appears there
 with its reason rather than as a gap in the line. A **rapid drawdown** run opens the same tab

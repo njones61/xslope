@@ -31,6 +31,14 @@ make by hand. The stage columns and the printed table are checked with it: a
 reported value with no stage 2 and stage 3 beside it hides which stage governed,
 which is the reading of a drawdown.
 
+A third section pins the marks the drawn curve carries, which are read the same
+way the rows are. The instants are colored by the face their critical circle came
+out on, so a face read wrong moves the handover between the two slopes and a face
+legend on a march that never left one slope invents a handover; the drawdown band
+and the full-pool reference are the two marks the dip is sized against, so a band
+where the pool never falls, or a reference taken after the fall began, misplaces
+it. That section draws the tutorial's own published tables and needs no march.
+
 Two Studio sections follow the engine ones, because the mode is reached from the
 Parametric dialog and a control that offers a run the model cannot make is its own
 kind of dropped instant:
@@ -547,6 +555,249 @@ COMBO03_MIN_FS, COMBO03_CRITICAL_TIME = 1.3313, 35.0
 COMBO03_METHOD, COMBO03_SLICES, COMBO03_DIVISIONS = 'spencer', 40, 64
 
 
+# ---------------------------------------------------------------------------
+# The curve's marks: the faces, the drawdown band, the full-pool reference
+#
+# A curve that hands over from one slope to the other is two mechanisms in
+# sequence rather than one moving surface, and the plot says so by coloring each
+# instant's marker with the face its critical circle came out on. Both ways that
+# can mislead are pinned here:
+#
+#   * **a face read wrong** puts the handover at the wrong instant, which is the
+#     one thing the coloring exists to place.
+#   * **a face legend on a march that never left one slope** claims a handover
+#     that did not happen — worse than no colors, because it reads as a finding.
+#
+# The drawdown band and the full-pool reference are the two marks the dip is
+# measured against, so they are checked beside them: a band drawn where the pool
+# never falls, or a full-pool line taken from an instant after the fall began,
+# both misplace the dip they exist to size.
+#
+# The circles below are the ones the tutorial's own tables publish, as literals —
+# this section never computes its own reference — so it needs no march and runs in
+# a second. The real march reaches the same plot through the Studio section below.
+# ---------------------------------------------------------------------------
+#: COMBO-3 Part 2's model: the Johnson dam, whose drawdown curve stays on the
+#: upstream face at every instant of the march.
+COMBO03R = Path(__file__).resolve().parent.parent / 'docs' / 'tutorials' / \
+    'files' / 'xslope_johnson_fs_time.xlsx'
+#: Part 1's published curve, row for row: (t, FS, Xo, Yo, R, face). The dam's crest
+#: runs from x = 51 to x = 59, so the face is the center against that span — the
+#: reading the page's own **face** column states.
+COMBO03_CURVE = (
+    (0.0, 1.5311, 103.00, 56.79, 56.79, 'downstream'),
+    (2.0, 1.5311, 103.00, 56.79, 56.79, 'downstream'),
+    (5.0, 1.5132, 5.20, 65.90, 65.88, 'upstream'),
+    (10.0, 1.4572, 5.20, 65.90, 65.88, 'upstream'),
+    (15.0, 1.4128, 5.20, 65.90, 65.88, 'upstream'),
+    (20.0, 1.3773, 6.25, 60.58, 60.58, 'upstream'),
+    (25.0, 1.3509, 7.00, 57.81, 57.75, 'upstream'),
+    (30.0, 1.3344, 7.00, 56.91, 56.91, 'upstream'),
+    (35.0, 1.3313, 7.00, 56.91, 56.91, 'upstream'),
+    (40.0, 1.3436, 7.00, 56.91, 56.91, 'upstream'),
+    (47.0, 1.3813, 7.00, 57.16, 57.16, 'upstream'),
+    (55.0, 1.4386, 7.00, 57.16, 57.16, 'upstream'),
+    (65.0, 1.4828, 7.00, 57.16, 57.16, 'upstream'),
+    (80.0, 1.5187, 7.00, 57.16, 57.16, 'upstream'),
+    (100.0, 1.5482, 103.00, 56.79, 56.79, 'downstream'),
+    (130.0, 1.5516, 103.00, 56.79, 56.79, 'downstream'),
+    (180.0, 1.5550, 103.00, 56.79, 56.79, 'downstream'),
+    (240.0, 1.5566, 103.00, 56.79, 56.79, 'downstream'),
+    (300.0, 1.5572, 103.00, 56.79, 56.79, 'downstream'),
+)
+#: Part 2's published drawdown table, the same way. The Johnson crest runs from
+#: x = 360 to x = 380 and every center lands near x = 245, so the whole curve is
+#: upstream. The t = 0 row produced no result (a drawdown from stage 1 to itself)
+#: and is carried as one, because a failed row must not be colored either.
+COMBO03R_CURVE = (
+    (0.0, None, None, None, None, None),
+    (5.0, 1.4563, 242.74, 256.34, 165.90, 'upstream'),
+    (10.0, 1.3496, 244.06, 253.05, 164.14, 'upstream'),
+    (15.0, 1.2704, 246.78, 250.47, 163.54, 'upstream'),
+    (20.0, 1.2036, 249.59, 244.90, 159.60, 'upstream'),
+    (25.0, 1.1489, 249.59, 243.48, 159.38, 'upstream'),
+    (30.0, 1.1051, 249.59, 243.48, 159.76, 'upstream'),
+    (35.0, 1.0711, 248.17, 244.19, 161.02, 'upstream'),
+    (40.0, 1.0457, 247.47, 244.90, 162.02, 'upstream'),
+    (45.0, 1.0278, 244.64, 244.19, 162.68, 'upstream'),
+    (50.0, 1.0157, 243.93, 244.90, 163.64, 'upstream'),
+    (60.0, 1.0522, 245.35, 242.07, 160.48, 'upstream'),
+    (70.0, 1.0743, 245.31, 246.38, 164.30, 'upstream'),
+    (80.0, 1.0902, 245.31, 244.96, 163.08, 'upstream'),
+    (100.0, 1.1159, 245.31, 243.53, 161.82, 'upstream'),
+    (130.0, 1.1414, 245.31, 243.53, 161.82, 'upstream'),
+    (170.0, 1.1612, 245.31, 243.53, 161.82, 'upstream'),
+    (220.0, 1.1744, 245.31, 243.53, 161.82, 'upstream'),
+    (300.0, 1.1848, 245.31, 243.53, 161.82, 'upstream'),
+    (400.0, 1.1893, 245.31, 243.53, 161.82, 'upstream'),
+    (500.0, 1.1912, 245.31, 243.53, 161.82, 'upstream'),
+)
+#: The face entries the legend carries, and the two marks that go with a falling
+#: schedule, exactly as the plot writes them.
+FACE_LABELS = ('critical on the upstream face', 'critical on the downstream face')
+
+
+def _published_curve(rows, rapid=False):
+    """A ``fs_vs_time`` result built from a published table, so the plot is drawn on
+    the numbers the page states rather than on a march this check re-runs."""
+    import pandas as pd
+
+    recs = []
+    for t, fs, Xo, Yo, R, _face in rows:
+        rec = {'param': 'time', 'value': float(t), 'rel': np.nan,
+               'is_base': False, 'analysis': 'lem', 'method': 'spencer',
+               'fs': np.nan if fs is None else float(fs), 'success': fs is not None,
+               'msg': '' if fs is not None else 'no result',
+               'Xo': np.nan if Xo is None else float(Xo),
+               'Yo': np.nan if Yo is None else float(Yo),
+               'R': np.nan if R is None else float(R),
+               'output': 'FS', 'output_label': 'Factor of Safety'}
+        if rapid:
+            rec.update({'stage1_FS': np.nan, 'stage2_FS': rec['fs'],
+                        'stage3_FS': np.nan, 'stage3_run': False,
+                        'governs': np.nan})
+        recs.append(rec)
+    df = pd.DataFrame(recs)
+    ok = df.loc[df['success']]
+    i = ok['fs'].astype(float).idxmin() if len(ok) else None
+    return {'df': df, 'param': 'time',
+            'times': [float(r[0]) for r in rows],
+            'critical_time': None if i is None else float(df.at[i, 'value']),
+            'min_fs': None if i is None else float(df.at[i, 'fs']),
+            'rapid': bool(rapid), 'mode': 'lem', 'output': 'FS',
+            'output_label': 'Factor of Safety'}
+
+
+def _figure_marks(fig):
+    """What a drawn curve says: its legend labels, its annotation texts, and how
+    many shaded bands it carries.
+
+    The band is the only patch this figure adds to any of its axes -- the curve,
+    the schedule, the guides and the references are all lines -- so counting
+    patches counts bands.
+    """
+    ax = fig.axes[0]
+    leg = ax.get_legend()
+    labels = [t.get_text() for t in leg.get_texts()] if leg else []
+    texts = [t.get_text() for a in fig.axes for t in a.texts]
+    bands = sum(len(a.patches) for a in fig.axes)
+    return labels, texts, bands
+
+
+def check_the_curve_colors_a_two_face_march(failures):
+    """COMBO-3 Part 1's dam hands over from one slope to the other, so every
+    instant is colored by its face and the legend names both."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    from xslope.plot import _circle_face, _crest_span, plot_fs_vs_time
+
+    if not COMBO03.exists():
+        failures.append(f"missing {COMBO03}")
+        return
+    sd = load_slope_data(str(COMBO03))
+    span = _crest_span(sd)
+    if span is None or (round(span[0], 6), round(span[1], 6)) != (51.0, 59.0):
+        failures.append(f"the dam's crest reads as {span}, not x = 51 to x = 59")
+        return
+    for t, _fs, Xo, Yo, R, face in COMBO03_CURVE:
+        got = _circle_face(sd, span, Xo, Yo, R)
+        if got != face:
+            failures.append(f"t = {t:g}: a center at x = {Xo:g} reads as {got}, "
+                            f"not the {face} face the page publishes")
+
+    fig = plot_fs_vs_time(_published_curve(COMBO03_CURVE), slope_data=sd)
+    labels, texts, bands = _figure_marks(fig)
+    for want in FACE_LABELS:
+        if want not in labels:
+            failures.append(f"a two-face curve's legend does not say {want!r}: "
+                            f"{labels}")
+    if bands != 1:
+        failures.append(f"the falling pool gave {bands} shaded band(s), not one")
+    if 'drawdown' not in texts:
+        failures.append(f"the shaded interval is not labeled 'drawdown': {texts}")
+    full_pool = [s for s in texts if s.startswith('full pool,')]
+    if full_pool != [f"full pool, {COMBO03_FULL_POOL_FS:.3f}"]:
+        failures.append(f"the full-pool reference reads {full_pool}, not the "
+                        f"{COMBO03_FULL_POOL_FS:.3f} the curve starts from")
+    plt.close(fig)
+
+
+def check_a_one_face_march_is_not_colored(failures):
+    """COMBO-3 Part 2's dam never leaves the upstream face, so the curve is drawn
+    plain — face colors there would claim a handover the run never made."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    from xslope.plot import _circle_face, _crest_span, plot_fs_vs_time
+
+    if not COMBO03R.exists():
+        failures.append(f"missing {COMBO03R}")
+        return
+    sd = load_slope_data(str(COMBO03R))
+    span = _crest_span(sd)
+    if span is None or (round(span[0], 6), round(span[1], 6)) != (360.0, 380.0):
+        failures.append(f"the Johnson crest reads as {span}, not x = 360 to "
+                        f"x = 380")
+        return
+    for t, _fs, Xo, Yo, R, face in COMBO03R_CURVE:
+        if Xo is None:
+            continue
+        got = _circle_face(sd, span, Xo, Yo, R)
+        if got != face:
+            failures.append(f"t = {t:g}: a center at x = {Xo:g} reads as {got}, "
+                            f"not the {face} face")
+
+    fig = plot_fs_vs_time(_published_curve(COMBO03R_CURVE, rapid=True),
+                          slope_data=sd)
+    labels, texts, bands = _figure_marks(fig)
+    named = [s for s in labels if s in FACE_LABELS]
+    if named:
+        failures.append(f"a curve that stays on one face named a face in its "
+                        f"legend: {named}")
+    # The drawdown's own marks are still there: this dam's pool falls.
+    if bands != 1 or 'drawdown' not in texts:
+        failures.append(f"the drawdown band is missing from the rapid curve: "
+                        f"{bands} band(s), {texts}")
+    if not [s for s in texts if s.startswith('full pool,')]:
+        failures.append(f"the rapid curve carries no full-pool reference: {texts}")
+    plt.close(fig)
+
+
+def check_a_schedule_that_never_falls_has_no_band(failures):
+    """The band and the full-pool reference are read off the schedule, so a pool
+    that only fills — or one held flat — gets neither."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    from xslope.plot import _drawdown_interval, plot_fs_vs_time
+
+    if not COMBO03.exists():
+        failures.append(f"missing {COMBO03}")
+        return
+    sd = load_slope_data(str(COMBO03))
+    if _drawdown_interval(sd['tseep']) != (2.0, 47.0):
+        failures.append(f"the dam's fall reads as "
+                        f"{_drawdown_interval(sd['tseep'])}, not day 2 to day 47")
+    filling = dict(sd)
+    ts = dict(sd['tseep'])
+    ts['series'] = {'pool': [2.0, 2.0, 18.0]}          # the same schedule, rising
+    filling['tseep'] = ts
+    if _drawdown_interval(ts) is not None:
+        failures.append(f"a rising pool reads as a drawdown: "
+                        f"{_drawdown_interval(ts)}")
+    fig = plot_fs_vs_time(_published_curve(COMBO03_CURVE), slope_data=filling)
+    _labels, texts, bands = _figure_marks(fig)
+    if bands:
+        failures.append(f"a pool that never falls drew {bands} drawdown band(s)")
+    if 'drawdown' in texts or [s for s in texts if s.startswith('full pool,')]:
+        failures.append(f"a pool that never falls carried drawdown marks: {texts}")
+    plt.close(fig)
+
+
 def _qt():
     """The QApplication, or None when Studio is not installed."""
     os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -852,6 +1103,20 @@ def check_the_combo03_curve(failures):
     fig = plot_fs_vs_time(got, slope_data=sd)
     if not fig.axes:
         failures.append("plot_fs_vs_time drew no axes")
+    # The marks the page's figure shows, on the real result rather than on the
+    # published table the section above draws: this dam changes face, its pool
+    # falls, and the curve starts at full pool.
+    labels, texts, bands = _figure_marks(fig)
+    for want in FACE_LABELS:
+        if want not in labels:
+            failures.append(f"the searched curve's legend does not say {want!r}: "
+                            f"{labels}")
+    if bands != 1 or 'drawdown' not in texts:
+        failures.append(f"the searched curve lost its drawdown band: {bands} "
+                        f"band(s), {texts}")
+    if f"full pool, {COMBO03_FULL_POOL_FS:.3f}" not in texts:
+        failures.append(f"the searched curve's full-pool reference is not "
+                        f"{COMBO03_FULL_POOL_FS:.3f}: {texts}")
     plt.close(fig)
 
 
@@ -869,6 +1134,9 @@ def run():
                check_a_rapid_row_is_the_drawdown,
                check_the_table_is_printed,
                check_the_refusals,
+               check_the_curve_colors_a_two_face_march,
+               check_a_one_face_march_is_not_colored,
+               check_a_schedule_that_never_falls_has_no_band,
                check_the_dialog_offers_the_mode,
                check_the_dialog_offers_the_drawdown,
                check_the_dialog_offers_grid_seeding,

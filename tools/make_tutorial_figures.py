@@ -6320,11 +6320,12 @@ COMBO03_DIVISIONS = 64
 COMBO03_METHOD = "spencer"
 COMBO03_SLICES = 40
 #: The two instants the page runs one at a time, through the Run LEM dialog's
-#: Seepage time selector: the full reservoir the march starts from, and the frame
-#: three quarters of the way down the fall. The second is also where the curve
-#: turns out to be lowest, so the figure of the critical instant is that run.
+#: Seepage time selector: the full reservoir the march starts from, and the first
+#: saved frame after the pool starts down. The second is the earliest instant on
+#: the upstream face, so the pair shows the handover without naming the minimum —
+#: that is the sweep's to report.
 COMBO03_FULL_POOL = 0.0
-COMBO03_SECOND = 35.0
+COMBO03_SECOND = 5.0
 #: Instants the refinement pass asks for: the saved frames across the dip with the
 #: midpoint of every gap between them added, so the pass halves the resolution the
 #: schedule already has. Four of the nine name no saved frame, so it costs one
@@ -6583,6 +6584,12 @@ def combo03_plots():
     capture("combo03_solution_full.png", plot_solution, full,
             full_crit["slices"], full_crit["failure_surface"],
             _combo03_results(full_crit))
+    # The second single run, drawn the same way. The name carries the instant, so
+    # moving COMBO03_SECOND renames the file rather than relabelling this one.
+    second, second_crit = single[COMBO03_SECOND]
+    capture("combo03_solution_t%g.png" % COMBO03_SECOND, plot_solution, second,
+            second_crit["slices"], second_crit["failure_surface"],
+            _combo03_results(second_crit))
 
     # ---- the curve ---------------------------------------------------------- #
     t0 = _time.time()
@@ -6612,9 +6619,9 @@ def combo03_plots():
             float(full_crit["FS"]), faces)
 
     # ---- the critical instant, drawn ---------------------------------------- #
-    # The lowest instant is one of the two run singly above whenever the curve
-    # turns where the page says it does, and re-searching it would be the same
-    # search twice; it is only staged again if the minimum moves.
+    # Staged and searched again unless the curve's lowest instant happens to be
+    # one of the two run singly above, in which case that search is reused rather
+    # than repeated.
     _ct = float(res["critical_time"])
     if _ct in single:
         worst, worst_crit = single[_ct]

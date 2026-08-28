@@ -300,23 +300,34 @@ load is why the upstream face is not critical here. Under the failure surface th
 pale blue band is the pore pressure on each slice base and the green hatched band
 above it the effective normal stress.
 
-Now ask the same question part way down the fall. Reopen **Run → Run LEM…**, set
-**Saved frame** to `t = 35 day` and click **Run**:
+Now we will ask the same question a few days into the fall, at t = 5 — the pool
+has just started down. Reopen **Run → Run LEM…**, set **Saved frame** to
+`t = 5 day` and click **Run**:
 
 ```text
 Applying the file's search window: min_slip_depth.
 Searching for the critical circular surface with SPENCER…
-[🔁 iteration 1] center=(7.00, 64.40), FS=1.3602, grid=9.5862
-[🔁 iteration 5] center=(7.00, 57.21), FS=1.3319, grid=2.3965
-[✅ converged] Iter=11, FS=1.3313 (ΔFS<0.0005) at (x=7.00, y=56.91, depth=0.00)
-Critical FS = 1.331
-Sliding mass = 5,722.8 kN/m over 58.01 m of failure surface
+[🔁 iteration 9] center=(5.20, 65.90), FS=1.5132, grid=0.2996
+[🔁 iteration 10] center=(5.20, 65.90), FS=1.5132, grid=0.1498
+[✅ converged] Iter=10, FS=1.5132 (ΔFS<0.0005) at (x=5.20, y=65.90, depth=0.02)
+Critical FS = 1.513
+Sliding mass = 6,237.2 kN/m over 60.20 m of failure surface
 ```
 
-**1.331, and the circle has moved to the other side of the dam** — center
-(7.00, 56.91) against the full-pool run's (103.00, 56.79). Two thirds of the
-reservoir is gone, and with it the load that made the upstream face the safer
-one.
+**1.513, and the circle has crossed to the other side of the dam** — center
+(5.20, 65.90) against the full-pool run's (103.00, 56.79). Three days of fall
+have taken the pool from elevation 18 to 16.93, and that one meter of water is
+enough to hand the answer to the upstream slope: the reservoir load that held it
+down is coming off, while the pore pressures inside it have barely begun to
+drain.
+
+![Spencer on day 5, one meter into the fall](images/combo03_solution_t5.png){width=1000}
+
+The blue arrows still reach the heel, at **166.1 kPa** against the full-pool
+**176.6 kPa**, and they now taper out at elevation 16.9 instead of 18. The
+critical surface runs from the crest edge at (54.33, 22.00) down to the heel at
+(0.44, 0.19), bottoming at elevation 0.02 on the rock. The sweep will show where
+the factor of safety goes from here.
 
 ### Sweeping all time steps
 
@@ -355,7 +366,7 @@ the pool schedule drawn faintly behind:
 
 ![The FS vs Time result tab](images/combo03_studio_fs_time.png)
 
-**Day 35 reads 1.3313 here too, and day 0 reads the single run's 1.5311** — the
+**Day 0 and day 5 repeat the two single runs, at 1.5311 and 1.5132** — the
 sweep reads the same minimum slip depth and searches from the same two circles as
 the dialog runs. An instant that produces no result comes back as a row carrying
 its reason rather than as a gap in the curve.

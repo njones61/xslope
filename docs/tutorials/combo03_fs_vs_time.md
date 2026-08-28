@@ -702,10 +702,11 @@ by 0.0019. COMBO-2's **two-steady-solution**
 answer is **1.195**, and the curve is still 0.004 under it at day 500, because by
 then the core has not quite finished draining.
 
-**Stage 1 moves, and the water is not why.** Its column reads 1.5514 on the seven
-rows from day 100 on, 1.5512 on day 80, 1.5545 on day 50, 1.5453 on day 35 and
-1.5109 on day 5, all of them the same physical state. Each row searches for the
-circle that minimizes the *drawdown* and reports stage 1 on that circle.
+**The stage 1 column is not constant, even though stage 1 is the same full-pool
+state on every row.** It ranges from 1.5109 on day 5 to 1.5545 on day 50 because
+each row searches for the circle that gives the lowest *drawdown* factor of
+safety at that time step, and then reports the stage 1 factor of safety on that
+circle. The circle moves from row to row, so the stage 1 value on it moves too.
 
 ### The same time steps with drained strengths
 

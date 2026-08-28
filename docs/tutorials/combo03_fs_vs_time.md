@@ -136,19 +136,18 @@ the file downloaded above arrives past all three.
 
 ### Entering the soil properties
 
-The dam was built for a seepage analysis, and a seepage analysis reads
-conductivity and storage — never a strength. A stability run reads a unit weight
-and a strength envelope from every zone a failure surface can cross, and those
-cells are empty on both rows, which is what we fill in now.
+In the starter file the unit weight γ, the cohesion c′ and the friction angle φ′
+are blank for both zones — the seepage analysis never needed them. (The
+saturated unit weight γsat is already there, because the seepage side uses it.)
+We will enter the three missing values for each zone now.
 
 Switch back to **LEM** (`Ctrl+1`) and click **Materials** in the Inputs tree. Set
-the **Show parameters for:** toggles to **LEM** alone — that hides the
-conductivity and finite element columns and leaves the band a stability run
-reads. Working across the table in the order it lists its columns, type **γ 20**,
-**c 0** and **φ 32** on the `shell` row, then **γ 19**, **c 10** and **φ 25** on
-the `core` row:
+the **Show parameters for:** toggles to **LEM** alone, which hides the
+conductivity and finite element columns. Working across the table in the order
+it lists its columns, type **γ 20**, **c 0** and **φ 32** on the `shell` row,
+then **γ 19**, **c 10** and **φ 25** on the `core` row. The table then reads:
 
-![The two zones with their strength band filled](images/combo03_studio_materials.png)
+![The materials table after the values are entered](images/combo03_studio_materials.png)
 
 | mat | name | γ (kN/m³) | γsat (kN/m³) | option | c′ (kPa) | φ′ (deg) | u |
 | :---: | --- | :---: | :---: | --- | :---: | :---: | --- |

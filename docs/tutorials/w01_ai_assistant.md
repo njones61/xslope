@@ -56,11 +56,13 @@ provider and credentials. To supply them, click **Settings…**.
 
 The dialog has four fields and a checkbox:
 
-**Provider** — the services this version of Studio can talk to, hosted ones
-that bill for what you use and **Ollama**, which runs a model on your own
-machine, free, and sends nothing anywhere. Only models that can read an image
-are listed, because handing the assistant a photograph or a sketch of a cross
-section is the first thing this tutorial does.
+**Provider** — the services Studio can talk to. This release offers
+**Claude (Anthropic)**, **OpenAI**, **Kimi (Moonshot AI)** and **Z.ai (GLM)**,
+which are hosted and bill for what you use, and **Ollama**, which runs a model
+on your own machine, free, and sends nothing anywhere; the list may change from
+release to release. Only models that can read an image are listed, because
+handing the assistant a photograph or a sketch of a cross section is the first
+thing this tutorial does.
 
 **Model** — a list of what the chosen provider currently offers, with one marked
 as recommended. The box also accepts free text, so a model id released after

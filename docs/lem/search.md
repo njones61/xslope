@@ -55,8 +55,8 @@ the sheet's own circles among them.
 A starting circle that cannot be sliced — most often one whose crossing with the
 ground lies above the circle's own center, so the arc would have to rise above
 its center on that side — is not searched from. The search says so in the log
-(`[⚠ starting circle 1] … cannot be built … searching from the launch grid
-around it`) and continues from the grid of centers around the circle; the model
+(`starting circle 1 … cannot be built … searching from the launch grid`) and
+continues from the grid of centers around the circle; the model
 checks report the same circle as `surface.circle_daylights_above_center` before
 the run.
 

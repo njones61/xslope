@@ -240,10 +240,7 @@ Click **Run → Run LEM…** **Method** opens on **Spencer**, which satisfies bo
 force and moment equilibrium and is the method behind every factor of safety on
 this page; **Analysis** opens on **Auto search**, which finds the run its own
 critical circle, and **Number of slices** on 40.
-Leave all three, and leave **Grid search** unticked: the two circles the file
-carries each sit on the mechanism their face can make, so the search reaches
-either face from the circles sheet alone. On a model with one starting circle and
-no idea which face governs, ticking it is the safer choice.
+Leave all three as they are, with **Grid search** unticked.
 
 **Seepage time**, the group a loaded transient solution adds, names the instant this
 run reads, three ways. **Saved frame** lists the nineteen the run stored. **Frame shown in

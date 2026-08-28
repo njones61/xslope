@@ -379,6 +379,19 @@ its factor of safety and the critical circle the search found there, and
 
 ### The factor of safety vs time curve
 
+Every circle above bottoms at, or within a tenth of a meter of, the rock at
+elevation 0. The **face** column is read off the center: the crest runs from
+x = 51 to x = 59, so a center left of it is an upstream mechanism and a center
+right of it a downstream one. The curve below colors each point by that column,
+shades the days the pool is falling, and carries the full-pool 1.531 across as a
+dashed reference.
+
+![The factor of safety at every saved instant, over the pool that drives it](images/combo03_curve.png){width=1000}
+
+This is the plot the **FS vs Time** result tab draws, exactly as Studio shows it.
+The same nineteen instants, with the critical circle the search found at each
+and the face it sits on, read from the tab's **Table** sub-tab:
+
 | t (day) | pool (m) | FS | center | R (m) | face |
 | :---: | :---: | :---: | :---: | :---: | --- |
 | 0 | 18.00 | 1.5311 | (103.00, 56.79) | 56.79 | downstream |
@@ -400,15 +413,6 @@ its factor of safety and the critical circle the search found there, and
 | 180 | 2.00 | 1.5550 | (103.00, 56.79) | 56.79 | downstream |
 | 240 | 2.00 | 1.5566 | (103.00, 56.79) | 56.79 | downstream |
 | 300 | 2.00 | 1.5572 | (103.00, 56.79) | 56.79 | downstream |
-
-Every circle above bottoms at, or within a tenth of a meter of, the rock at
-elevation 0. The **face** column is read off the center: the crest runs from
-x = 51 to x = 59, so a center left of it is an upstream mechanism and a center
-right of it a downstream one. The curve below colors each point by that column,
-shades the days the pool is falling, and carries the full-pool 1.531 across as a
-dashed reference.
-
-![The factor of safety at every saved instant, over the pool that drives it](images/combo03_curve.png){width=1000}
 
 **Day 2 repeats day 0 exactly**, at 1.5311 on the same downstream circle, because
 the pool has not moved and neither has the field.

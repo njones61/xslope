@@ -653,6 +653,16 @@ uses:
 
 ![The rapid drawdown factor of safety at every saved instant, over the pool schedule that drives it](images/combo03_rapid_curve.png){width=1000}
 
+One curve is drawn, carrying the rapid drawdown factor of safety at each instant,
+the lower of stages 2 and 3; the three stages are in the table below, where the
+governing one is named per row. Behind it, on the right axis, runs the pool
+schedule, with the forty-five days it falls over shaded and the pre-drawdown
+1.456 carried across as a dashed full-pool reference. The lowest instant is
+ringed and labeled, and the red guide marks FS = 1. Each point is colored by the stage that governs it —
+orange where stage 2's undrained strength gave the lower factor of safety, green
+where stage 3's drained strength did — so the three drained instants at the
+bottom of the dip stand out on the curve.
+
 The same twenty instants, read from the tab's **Table** sub-tab — the three
 stage factors of safety, the one that governs, and the critical circle at each:
 
@@ -678,16 +688,6 @@ stage factors of safety, the one that governs, and the critical circle at each:
 | 300 | 1.5514 | 1.1848 | — | 1.1848 | 2 | (245.31, 243.53) | 161.82 |
 | 400 | 1.5514 | 1.1893 | — | 1.1893 | 2 | (245.31, 243.53) | 161.82 |
 | 500 | 1.5514 | 1.1912 | — | 1.1912 | 2 | (245.31, 243.53) | 161.82 |
-
-One curve is drawn, carrying the rapid drawdown factor of safety at each instant,
-the lower of stages 2 and 3; the three stages stay in the table above, where the
-governing one is named per row. Behind it, on the right axis, runs the pool
-schedule, with the forty-five days it falls over shaded and the pre-drawdown
-1.456 carried across as a dashed full-pool reference. The lowest instant is
-ringed and labeled, and the red guide marks FS = 1. Each point is colored by the stage that governs it —
-orange where stage 2's undrained strength gave the lower factor of safety, green
-where stage 3's drained strength did — so the three drained instants at the
-bottom of the dip stand out on the curve.
 
 **Day 50 reads 1.0157, the answer we got in COMBO-2.** The transient route there
 reports **1.0158** on a circle at (243.93, 244.90) with a radius of 163.64 ft,

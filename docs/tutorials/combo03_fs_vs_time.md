@@ -655,7 +655,7 @@ the state the other twenty fall from.
 The run opens a **Drawdown vs Time** tab, the same tab a single-stage sweep
 uses:
 
-![The rapid drawdown factor of safety at every saved instant, over the pool schedule that drives it](images/combo03_rapid_curve.png)
+![The rapid drawdown factor of safety at every saved instant, over the pool schedule that drives it](images/combo03_rapid_curve.png){width=1000}
 
 One curve is drawn, carrying the rapid drawdown factor of safety at each instant,
 the lower of stages 2 and 3; the three stages stay in the table above, where the

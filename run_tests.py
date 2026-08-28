@@ -7934,6 +7934,51 @@ def run_assistant_guardrails_test(test):
     return 0.0, None
 
 
+def run_assistant_suite_test(test):
+    """The scored scenario suite that measures the assistant (`tools/assistant_suite.py`).
+
+    The suite is what says whether a change to the assistant's brief helped or
+    hurt: thirty conversations played through the real Studio window, each scored
+    against criteria that re-solve the model here rather than believing what the
+    assistant said about it. A live run costs money, so what runs in the suite is
+    everything provable without one — and the leg that matters most is that a
+    ``--dry-run`` really is free: it plays two scenarios end to end through the
+    window, the dock, the transcript and the whole scoring path while asserting
+    that ``litellm.completion`` is never entered.
+
+    The rest is the suite auditing itself: the registry (every scenario names a
+    model that exists and criteria it can fail), the planted faults (applied to a
+    COPY, with the repository's own workbook byte-identical afterwards), the
+    scorers (each run against a session built to pass it and one built to fail
+    it — a criterion that cannot fail measures nothing), the transcript parser
+    that keeps a claim apart from the measurement behind it, replay determinism,
+    that nothing is written into docs/, and the one dated price table.
+
+    The check itself lives in test/assistant_suite_check.py: offscreen, no
+    provider contacted and no network at all.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'assistant_suite_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its checks
+    spec = importlib.util.spec_from_file_location('assistant_suite_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures[:6])
+    return 0.0, None
+
+
 def run_drawdown_tauff_test(test):
     """The Stage-2 undrained strength pipeline, checked against the worked example in
     Duncan, Wright & Brandon, *Soil Strength and Slope Stability*, 2nd ed., Table 9.2.
@@ -12127,6 +12172,8 @@ def _dispatch_test(test):
         return run_assistant_models_test(test)
     if test_type == 'assistant_guardrails':
         return run_assistant_guardrails_test(test)
+    if test_type == 'assistant_suite':
+        return run_assistant_suite_test(test)
     if test_type == 'quad_mesh':
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
@@ -12252,6 +12299,7 @@ def _expected_and_tol(test, default_tolerance):
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
                        'assistant_models', 'assistant_guardrails',
+                       'assistant_suite',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'seep_cycle',
                        'tseep_exit_cycle',
@@ -12944,6 +12992,15 @@ def main():
         tests.append({'type': 'assistant_guardrails',
                       'file': 'assistant guardrails (rules + input checks)',
                       'method': '-', 'source': 'assistant_guardrails'})
+        # Guard the scored scenario suite that measures the assistant: the
+        # registry, the planted faults (on copies — never the repository's own
+        # models), the scorers themselves (each one run against a session built
+        # to pass it and one built to fail it), replay determinism, and that a
+        # --dry-run reaches no provider. Same reason this rides here as the two
+        # above: offscreen Qt, no network, nothing billed.
+        tests.append({'type': 'assistant_suite',
+                      'file': 'assistant scenario suite (scored)',
+                      'method': '-', 'source': 'assistant_suite'})
         # Guard against the Markdown heading trap: this theme's parser accepts
         # '#word' with no space as a heading, so a wrapped docs line starting
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.

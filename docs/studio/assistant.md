@@ -275,6 +275,23 @@ project, starts the reporting over.
 A read-only question — anything that reads the model without changing it — skips
 the checks entirely.
 
+### How the assistant itself is tested
+
+What a model does with a sentence of instruction cannot be settled by asserting
+it, so the assistant is measured rather than asserted. A scored suite of
+conversations (`tools/assistant_suite.py`) plays thirty tasks against real models
+taken from the sample, tutorial and verification files — building from a written
+description and from a drawing, editing geometry, loads, materials, reinforcement
+and piles, running each engine, the parametric and reliability modes, answering
+questions that change nothing, and diagnosing models broken on purpose — and
+grades each one by reloading the workbook the conversation left behind and
+re-solving it independently: a factor of safety it reported has to match a run
+made without it, an edit has to be present in the saved file, a planted fault has
+to be named while nothing sound is accused, and every number in the answer has to
+be one a snippet actually printed. The suite's own plumbing is a standing check in
+`run_tests.py`, where a dry run exercises the whole path — window, chat dock,
+transcript, scoring — with canned replies and reaches no provider at all.
+
 ---
 
 ## Autonomy: confirm vs. auto

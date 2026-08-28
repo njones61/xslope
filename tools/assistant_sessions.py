@@ -377,7 +377,8 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
                           out_dir=IMAGES_DIR, files_dir=FILES_DIR,
                           timeout_s=600, dry_run=False, dock_width=560,
                           window_size=(1500, 950), max_height=6400,
-                          save_after=None, save_each_turn=False, settings=None):
+                          save_after=None, save_each_turn=False, settings=None,
+                          prefix=None):
     """Record one assistant conversation against a real model, offscreen.
 
     Opens ``model_path`` in an offscreen ``MainWindow``, pins ``provider`` /
@@ -419,6 +420,11 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
         Extra QSettings keys pinned for the length of the run, beside the provider
         pins — anything the session needs the app to be set to (``report/finalize``
         off, say, so an unattended capture never drives Word).
+    prefix : str, optional
+        Overrides :data:`PREFIX` in every filename this session writes. The
+        scenario suite (``tools/assistant_suite.py``) records dozens of sessions
+        into a scratch directory of its own and needs them named for the suite,
+        not for the W-1 tutorial; nothing else passes it.
     save_each_turn : bool
         Also write the workbook AFTER EACH TURN, as ``w1_{name}_after_{i}.xlsx``.
         A conversation that edits the model over several turns is only checkable
@@ -435,7 +441,7 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
 
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(files_dir, exist_ok=True)
-    stem = "%s_%s" % (PREFIX, name)
+    stem = "%s_%s" % (prefix or PREFIX, name)
     transcript_path = os.path.join(files_dir, "%s_transcript.md" % stem)
     workbook_path = os.path.join(files_dir, "%s_after.xlsx" % stem)
 

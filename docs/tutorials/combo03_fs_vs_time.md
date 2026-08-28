@@ -251,12 +251,10 @@ or **Another time (reruns the analysis)** (any time in the run — the transient
 seepage analysis is re-solved with that time added to the saved steps, so the
 pore pressures are always computed, never interpolated between two frames).
 
-**Save as the model's stability time** writes the choice to the `tseep` sheet, so
-a scripted or headless re-run reads the same frame; left off, it governs this run
-only. The dialog opens on the last saved frame, t = 300, which is what any run
-reads while the model's stability time is blank.
-
-Set **Saved frame** to `t = 0 day`, the full reservoir the transient run starts from:
+Leave **Save as the model's stability time** unticked (ticked, it stores the
+chosen time in the file for later runs). The dialog opens on the last saved
+frame, t = 300. Set **Saved frame** to `t = 0 day`, the full reservoir the
+transient run starts from:
 
 ![Run LEM with the Seepage time group set to the first saved frame](images/combo03_studio_run_lem.png)
 

@@ -555,6 +555,12 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
                           prefix=None):
     """Record one assistant conversation against a real model, offscreen.
 
+    Environment overrides, for playing the same sessions against another model
+    without touching the tutorial's own artifacts: ``XSLOPE_SESSIONS_PROVIDER``,
+    ``XSLOPE_SESSIONS_MODEL`` replace ``provider`` / ``model``;
+    ``XSLOPE_SESSIONS_OUT`` is a directory that receives BOTH the images and the
+    saved workbooks / transcripts in place of ``out_dir`` and ``files_dir``.
+
     Opens ``model_path`` in an offscreen ``MainWindow``, pins ``provider`` /
     ``model`` and switches the confirm-before-running gate off for the length of
     the run (there is nobody to click Run), then plays ``turns`` through the chat
@@ -616,6 +622,17 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
         ``{name, images, transcript, workbook, turns, usage, seconds, error}`` —
         ``turns`` is one record per turn (prompt, text, usage, seconds, error).
     """
+    _env_provider = os.environ.get("XSLOPE_SESSIONS_PROVIDER")
+    _env_model = os.environ.get("XSLOPE_SESSIONS_MODEL")
+    _env_out = os.environ.get("XSLOPE_SESSIONS_OUT")
+    if _env_provider:
+        provider = _env_provider
+    if _env_model:
+        model = _env_model
+    if _env_out:
+        os.makedirs(_env_out, exist_ok=True)
+        out_dir = files_dir = _env_out
+
     from studio.main_window import MainWindow
 
     os.makedirs(out_dir, exist_ok=True)

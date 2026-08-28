@@ -136,16 +136,21 @@ the file downloaded above arrives past all three.
 
 ### Entering the soil properties
 
-In the starter file the unit weight γ, the cohesion c′ and the friction angle φ′
-are blank for both zones — the seepage analysis never needed them. (The
-saturated unit weight γsat is already there, because the seepage side uses it.)
-We will enter the three missing values for each zone now.
+In the starter file the unit weight γ, the saturated unit weight γsat, the
+cohesion c′, the friction angle φ′ and the pore-pressure option u are blank for
+both zones — the seepage analysis never needed them. We will enter the five
+missing values for each zone now.
 
 Switch back to **LEM** (`Ctrl+1`) and click **Materials** in the Inputs tree. Set
 the **Show parameters for:** toggles to **LEM** alone, which hides the
-conductivity and finite element columns. Working across the table in the order
-it lists its columns, type **γ 20**, **c 0** and **φ 32** on the `shell` row,
-then **γ 19**, **c 10** and **φ 25** on the `core` row. The table then reads:
+conductivity and finite element columns.
+
+![The materials table as the starter file ships: unit weight, saturated unit weight, cohesion, friction angle and pore-pressure option all blank](images/combo03_studio_materials_blank.png)
+
+Working across the table in the order it lists its columns, type **γ 20**,
+**γsat 21**, **c 0** and **φ 32** on the `shell` row, then set **u** to
+**seep**; then **γ 19**, **γsat 20**, **c 10** and **φ 25** on the `core` row,
+then **u** to **seep** there too. The table then reads:
 
 ![The materials table after the values are entered](images/combo03_studio_materials.png)
 
@@ -157,29 +162,22 @@ then **γ 19**, **c 10** and **φ 25** on the `core` row. The table then reads:
 **These are typical values for a granular shell and a compacted clay core, chosen
 for the exercise rather than measured on this dam.**
 
-Every column in that table is load-bearing, the three we typed and the three that
-came with the file:
+Every column in that table matters — the five we typed, and only the strength
+option `mc` came with the file:
 
-**Two unit weights per row.** γ is the value we typed and applies above the water
-table; γsat, already on both rows, applies below it. The slicer splits each
-slice's weight where the two meet, so the shell gets lighter as the pool drains
-it.
+**Two unit weights per row.** γ applies above the water table and γsat below it;
+the slicer splits each slice's weight where the two meet, so the shell gets
+lighter as the pool drains it.
 
 **Both strengths are drained.** c′ and φ′ are effective-stress parameters under
 `option` `mc`, the Mohr-Coulomb envelope the file already selects, so each slice
 base needs a pore pressure to form an effective normal stress from.
 
-**`u` is `seep` on both rows.** That column decides where a slice base gets its
-pore pressure, and `seep` sends it to a solved seepage field;
+**We set `u` to `seep` on both rows.** That column decides where a slice base
+gets its pore pressure, and `seep` sends it to a solved seepage field;
 [COMBO-1](combo01_seepage_stability.md#the-column-that-connects-the-modes) covers
 its four values. With a transient solution loaded, `seep` means one frame of it,
 chosen at the run rather than here.
-
-**The checks notice an empty cell.** Open a run dialog on the file as it
-downloads and **Model checks** carries an error on each row — *Material 1
-('shell') has no unit weight* — with **Run** disabled, because a zero unit weight
-makes zero slice weights and a factor of safety that means nothing. With the six
-values typed in, the materials raise nothing.
 
 Click **OK**.
 
@@ -193,27 +191,19 @@ from. Click **Circles**. The file carries two, one on each face of the dam:
 | 7 | 56 | `Depth` | 0 |
 | 103 | 59 | `Depth` | 0 |
 
-There is one circle for each face, drawn on the deep mechanism that face can
-make: its center sits beyond the heel or the toe, and **Depth** puts the bottom of the circle at elevation 0 — an
-elevation rather than a distance, and 0 is the rock. The upstream circle runs
-from (0.80, 0.34) to the crest edge at (51.50, 22.00), 57.63 m of surface; the
-downstream one from (57.04, 22.00) to (109.19, 0.33), 58.88 m.
+The file carries one starting circle for each face, because the critical face
+changes with the pool: a drawdown weakens the upstream slope, while a full
+reservoir loads it and leaves the downstream side weaker. Each circle is drawn
+deep — center beyond the heel or the toe, **Depth** = 0 so the bottom of the
+circle sits on the rock — because a search settles near where it starts, and a
+shallow seed would refine into a small mechanism. The upstream circle runs from
+(0.80, 0.34) to the crest edge at (51.50, 22.00); the downstream one from
+(57.04, 22.00) to (109.19, 0.33).
 
-**Two circles because the critical face changes with the pool.** A drawdown
-weakens the upstream slope, but a full reservoir *loads* it, and under 18 m of
-water the downstream side is the weaker of the two. A curve from a full pool to
-an empty one crosses both states.
-
-**Both circles are drawn deep because a shallower seed refines into a smaller
-mechanism.** A search steps away from its starting circle and stops where the
-steps no longer lower the factor of safety, so a seed part way up the slope
-settles near where it started.
-
-Normally the critical circle in a zoned dam passes through the core, and the
-starting circle should be drawn to cut it. This dam is small and its core is
-narrow — 8 m wide at the top, with its crown 4 m below the crest — so the
-critical circles stay mainly in the shell, and neither starting circle here cuts
-the core.
+In most zoned dams the critical circle cuts the core and the starting circle
+should too. This dam is small and its core narrow — 8 m wide at the top, its
+crown 4 m below the crest — so the critical circles stay in the shell, and
+neither starting circle cuts the core.
 
 Under the table, the **Search window** group holds ten limits on where a searched
 surface may run; a blank field is a limit that is not applied, and

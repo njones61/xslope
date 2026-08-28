@@ -2957,12 +2957,12 @@ COMBO03_START = os.path.join(
     REPO_ROOT, "docs/tutorials/files/xslope_earth_dam_fs_time_start.xlsx")
 COMBO03 = os.path.join(REPO_ROOT,
                        "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
-#: The six cells the page's materials step has the reader type, per zone, in the
-#: order the Materials editor lists them. Applied to the START file for the
+#: The ten cells the page's materials step has the reader type, five per zone, in
+#: the order the Materials editor lists them. Applied to the START file for the
 #: materials shot, so the photographed table is the one the reader has just filled
 #: rather than a table that shipped filled.
-COMBO03_TYPED = ({"c": 0.0, "phi": 32.0, "gamma": 20.0},
-                 {"c": 10.0, "phi": 25.0, "gamma": 19.0})
+COMBO03_TYPED = ({"gamma": 20.0, "gamma_sat": 21.0, "c": 0.0, "phi": 32.0, "u": "seep"},
+                 {"gamma": 19.0, "gamma_sat": 20.0, "c": 10.0, "phi": 25.0, "u": "seep"})
 COMBO03_METHOD = "spencer"
 COMBO03_SLICES = 40
 #: The instants the shipped march saves, which the Run LEM and Parametric dialogs
@@ -3017,9 +3017,9 @@ def combo03_materials():
     ``u`` on ``seep`` so every slice base reads its pore pressure from the solved
     field.
 
-    Photographed on the START file with the six cells the page has the reader type
+    Photographed on the START file with the ten cells the page has the reader type
     written in first, so the table in the figure is the table the reader has just
-    finished filling. The completed workbook carries the same six values, and this
+    finished filling. The completed workbook carries the same ten values, and this
     shot must show what the reader's screen shows, not what a second file ships.
     """
     from studio.editors import MaterialsEditor
@@ -3029,6 +3029,22 @@ def combo03_materials():
         mat.update(typed)
     dlg = _lem_only(MaterialsEditor().build(data, None))
     return _grab(_mat_table(dlg, through="u"), "combo03_studio_materials.png")
+
+
+def combo03_materials_blank():
+    """The two zones in table view, before the reader has typed a thing.
+
+    Same dialog, same START file, same **Show parameters for: LEM** toggle as
+    ``combo03_materials`` — but taken before the ten cells are written in, so both
+    unit weights, both strengths and the pore-pressure option read blank or zero
+    as the file ships. Pairs with that shot on the page: this one first, so the
+    reader sees what they are about to fill.
+    """
+    from studio.editors import MaterialsEditor
+
+    data = _load(COMBO03_START)
+    dlg = _lem_only(MaterialsEditor().build(data, None))
+    return _grab(_mat_table(dlg, through="u"), "combo03_studio_materials_blank.png")
 
 
 def combo03_circles():
@@ -3214,6 +3230,7 @@ def combo03_rapid_parametric():
 
 SHOTS.update({
     "combo03_materials": combo03_materials,
+    "combo03_materials_blank": combo03_materials_blank,
     "combo03_circles": combo03_circles,
     "combo03_run_lem": combo03_run_lem,
     "combo03_playbar": combo03_playbar,

@@ -16,16 +16,19 @@ workbook as ``_mesh.json``, ``_tseep.csv`` and ``_tseep_meta.json``, so the read
 opens a dam whose nineteen pore-pressure fields already exist and goes straight to
 the stability runs. Building a transient seepage model is Tutorial SEEP-3's
 subject, and COMBO-3 does not repeat it. The march is the same for both files:
-seepage reads conductivity and storage, and none of the three cells the reader
+seepage reads conductivity and storage, and none of the five cells the reader
 fills changes a pore pressure.
 
-The two workbooks differ in six cells. The start file leaves ``c``, ``f`` and ``g``
-blank on both zones, which is what the page's materials step has the reader type
-in; the completed file carries them, and the page's tagged results are read off it.
-Blank is the honest state for a value nobody has entered — the workbook still loads,
-and ``mat.gamma_nonpositive`` reports the missing unit weight when a run is checked.
-The saturated unit weight ``gsat`` is on both files: it is a property of the same
-zone, and the exercise is the strength band.
+The two workbooks differ in ten cells. The start file leaves ``gamma``,
+``gamma_sat``, ``c``, ``phi`` and ``u`` blank on both zones — the whole strength
+band, unit weights included — which is what the page's materials step has the
+reader type in; the completed file carries them, and the page's tagged results
+are read off it. Only the strength model, ``option = mc``, ships filled on both
+files: it is a property of the material, not a value the exercise measures.
+Blank is the honest state for a value nobody has entered — the workbook still
+loads, and the Model checks panel reports the gap: ``mat.gamma_nonpositive`` on
+the missing unit weight, ``seep_field.no_consumer`` on the pore-pressure option
+left at its default of ``none`` while a solved seepage field sits unread.
 
 The strengths are typical values for a granular shell and a compacted clay core,
 chosen for the exercise rather than measured on this dam; SEEP-3's file carries
@@ -53,10 +56,12 @@ from build_earth_dam_tseep import (REPO_ROOT, TUTORIAL_FILES, _write,  # noqa: E
 OUT = "xslope_earth_dam_fs_time.xlsx"
 OUT_START = "xslope_earth_dam_fs_time_start.xlsx"
 
-#: The three cells per zone the page has the reader type, in the order the
-#: Materials editor lists them. They are left blank on the start file and filled on
-#: the completed one; everything else on the two mat rows is identical.
-TYPED_IN = ("c", "phi", "gamma")
+#: The five cells per zone the page has the reader type, in the order the
+#: Materials editor lists them (``gamma`` and ``gamma_sat`` sit left of ``option``,
+#: ``c`` and ``phi`` right of it, ``u`` further right still). They are left blank
+#: on the start file and filled on the completed one; everything else on the two
+#: mat rows — the name and the strength model, ``option = mc`` — is identical.
+TYPED_IN = ("gamma", "gamma_sat", "c", "phi", "u")
 
 #: The limit equilibrium band the page reads out, indexed to the base file's
 #: material order. Drained effective-stress strengths on both zones, and
@@ -129,7 +134,7 @@ def _model(strengths=True):
     """SEEP-3's completed model with both starting surfaces, the search floor and
     the denser saved-frame schedule.
 
-    ``strengths=False`` returns the same model with the three cells the reader
+    ``strengths=False`` returns the same model with the five cells the reader
     types left unset. They are None rather than 0.0 on purpose: the writer puts a
     blank cell down for None, and a cohesionless material and an unfilled one are
     not the same model.

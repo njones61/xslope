@@ -2423,6 +2423,87 @@ def _circle_below_domain_floor(ctx):
     return out
 
 
+@rule("surface.circle_daylights_above_center", WARNING, ("lem",),
+      summary="A circle that meets the ground above its own center cannot be "
+              "built as a failure surface; where that circle IS the run's "
+              "surface, it is an error.")
+def _circle_daylights_above_center(ctx):
+    # The second way a circle drawn on the section can be dead, and the one that
+    # looks least like a fault: the circle plainly cuts the slope, and the slicer
+    # still reports that it does not reach the ground.
+    #
+    # A failure surface is built as the BOTTOM semicircle (slice.generate_failure_
+    # surface), so the two daylight points have to bound an arc no longer than half
+    # the circle -- both of them at or below the center. A crossing ABOVE the center
+    # bounds a major arc, whose end slices would overhang: a base steeper than
+    # vertical, which no limit-equilibrium formulation here can carry. So
+    # circle_polyline_intersections discards that crossing rather than splicing a
+    # vertical face down to the arc, which would invent a tension crack of arbitrary
+    # depth and lower FS by the depth of the invention.
+    #
+    # The SEVERITY split is the sibling rule's, for the same reason and measured the
+    # same way: a search refines off its seeds and reaches the critical surface
+    # anyway, so a dead seed costs the seed and not the answer (WARNING); a
+    # single-surface run analyses circles[0] and nothing else, so a dead first
+    # circle is the whole analysis (ERROR).
+    #
+    # A tension crack is the one sanctioned escape (slice._recover_ends_via_tcrack:
+    # the arc exits at the crack on the uphill side and on the true ground at the
+    # toe), so a model that states one is not reported -- vp030a/b carry exactly
+    # this geometry and solve.
+    if ctx.surface_supplied:
+        return None
+    if ctx.effective_surface_family == "noncircular":
+        return None
+    if (_num(ctx.sd.get("tcrack_depth")) or 0.0) > 0:
+        return None
+    ground = ctx.sd.get("ground_surface")
+    if ground is None:
+        return None
+    from .slice import crossings_above_center
+    out = []
+    for i, c in enumerate(ctx.sd.get("circles") or []):
+        if not isinstance(c, dict):
+            continue
+        Xo, Yo, R = _num(c.get("Xo")), _num(c.get("Yo")), _num(c.get("R"))
+        if None in (Xo, Yo, R):
+            continue
+        try:
+            above = crossings_above_center(Xo, Yo, R, ground)
+        except Exception:
+            continue
+        if not above:
+            continue
+        # Asked of the slicer itself, exactly as the sibling rule asks it: a circle
+        # with a third crossing above the center and two sound ones below it still
+        # slices, and a rule that fires on a model that runs is miscalibrated.
+        if ctx.circle_slices(c):
+            continue
+        p = max(above, key=lambda q: q.y)
+        fatal = (i == 0 and not ctx.is_search)
+        if fatal:
+            cost = (" This run analyses that circle and no other, so it has no "
+                    "failure surface to work on.")
+        elif ctx.is_search:
+            cost = (" The search's other circles are unaffected; this one is lost, "
+                    "and the answer comes from the grid around it rather than from "
+                    "the circle drawn.")
+        else:
+            cost = (f" This run analyses {ctx.circle_label(0)} only and does not "
+                    f"read this one, so it does not affect the answer -- but a "
+                    f"search seeded from this sheet would lose it.")
+        out.append((
+            ERROR if fatal else WARNING,
+            f"{ctx.circle_label(i)} (Xo = {_fmt(Xo)}, Yo = {_fmt(Yo)}, R = "
+            f"{_fmt(R)}) meets the ground surface at ({_fmt(p.x)}, {_fmt(p.y)}), "
+            f"above its own center at y = {_fmt(Yo)}. The arc would rise above its "
+            f"center on that side -- an arc longer than a semicircle, whose end "
+            f"slices would overhang -- which the slicer cannot build, so no slices "
+            f"can be generated from this circle.{cost} Lower the center or enlarge "
+            f"the radius so both crossings sit below it {_AT_CIRCLES}."))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Family: polyline ordering (the remedy path depends on it)
 # ---------------------------------------------------------------------------

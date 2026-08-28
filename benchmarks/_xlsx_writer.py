@@ -281,6 +281,14 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
     v21 adds the Side BC selector at D22, which ships pre-filled 'rollers' and is
     cleared the same way.
 
+    v25 inserts the 1D element size at D20 and pushes everything under it down one
+    row: SSRM F min/F max to D21/D22, the Side BC selector to D23, the water-load
+    mode to D24. The shift is read from the destination's own version, the same way
+    fileio.load_slope_data reads it, because the alternative is what this writer
+    shipped between the v25 bump and this fix -- 'auto' written into D23, which at
+    v25 is the Side BC cell, so every file any of these builders rebuilt came back
+    from the loader as "declares a Side BC of 'auto'" and could not be read at all.
+
     v22 adds the water-load mode at D23, and it is the one cell here whose default
     is a value rather than a blank: 'auto' means the engine derives the standing
     water from the model's own water definition, which is what a built file should
@@ -292,6 +300,8 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
     """
     ver = _template_version(template)
     if ver >= 18:
+        # v25's 1D element size at D20 pushes every cell below it down one row.
+        shift = 1 if ver >= 25 else 0
         cells = {'D8': _unit_label(unit_system, gamma_w),
                  'D9': str(time_unit) if time_unit else None,
                  'D10': gamma_w, 'D11': tcrack_depth,
@@ -304,20 +314,23 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
                 'D17': None if tension_srf is None else ('YES' if tension_srf else 'NO'),
                 'D18': str(element_type) if element_type else None,
                 'D19': target_size,
-                'D20': ssrm_f_min,
-                'D21': ssrm_f_max,
+                f'D{20 + shift}': ssrm_f_min,
+                f'D{21 + shift}': ssrm_f_max,
             })
+            if shift:
+                # The inserted cell itself: blank, for the leak reason above.
+                cells['D20'] = None
         if ver >= 21:
-            # v21 side BC (D22). Written unconditionally for the leak reason above:
-            # the blank template ships D22 pre-filled 'rollers', so a builder that
-            # declares nothing must still clear it.
-            cells['D22'] = str(side_bc).lower() if side_bc else None
+            # v21 side BC (D22, D23 from v25). Written unconditionally for the leak
+            # reason above: the blank template ships it pre-filled 'rollers', so a
+            # builder that declares nothing must still clear it.
+            cells[f'D{22 + shift}'] = str(side_bc).lower() if side_bc else None
         if ver >= 22:
             wl = str(water_loads or 'auto').strip().lower()
             if wl not in ('auto', 'manual'):
                 raise ValueError(f"water_loads must be 'auto' or 'manual', not "
                                  f"{water_loads!r}")
-            cells['D23'] = wl
+            cells[f'D{23 + shift}'] = wl
         return cells
     return {'D8': gamma_w, 'D9': tcrack_depth, 'D10': tcrack_water, 'D11': seismic}
 

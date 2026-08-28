@@ -3998,6 +3998,23 @@ def _pf_circle_depth(sd, below):
     return sd
 
 
+def _pf_circle_buried(sd, xo=270.0, yo=280.0, depth=220.0):
+    """Sink every circle INTO the slope, so its ground crossings sit above its center.
+
+    The dam's crest runs at y = 317, so a center at (270, 280) is under the ground
+    it is drawn beneath and both daylight points -- (212.7, 297.9) and (317.2, 317)
+    -- lie above it. That is what makes the arc between them a MAJOR arc, which
+    ``generate_failure_surface`` (the bottom semicircle) cannot represent.
+
+    ``R`` follows ``Depth`` for the same reason ``_pf_circle_depth``'s does: the
+    loader collapses every circle to ``R = Yo - Depth``, so the mutated circle is
+    one a user could have typed rather than an inconsistent pair.
+    """
+    for c in sd.get('circles') or []:
+        c.update(Xo=xo, Yo=yo, Depth=depth, R=yo - depth)
+    return sd
+
+
 def _pf_zone_sizes(sd, size=None):
     """Set (or clear, with None) the local element Size on every material zone."""
     for p in sd.get('polygons') or []:
@@ -4228,6 +4245,22 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_circle_depth(sd, 200.0),
          control=lambda sd: _pf_circle_depth(sd, 20.0),
          expect='no slices can be generated from it'),
+    # The sibling defect, and the one that looks least like a fault: an ordinary
+    # circle drawn across the section, with its CENTER in the wrong place -- under
+    # the ground, so both daylight points sit above it and the arc between them is
+    # longer than a semicircle. The control is the file's own circles, which slice.
+    dict(rule='surface.circle_daylights_above_center', base=PREFLIGHT_BASE_LEM,
+         mode='excel',
+         mutation=lambda sd: _pf_circle_buried(sd),
+         expect='above its own center'),
+    # The severity split, on one model read as two runs: a single-surface run has
+    # no other circle to fall back on, and a search refines off the seed and still
+    # answers. Same mutation, same control -- only the selection differs, which is
+    # what proves the severity is decided by the run and not by the file.
+    dict(rule='surface.circle_daylights_above_center', base=PREFLIGHT_BASE_LEM,
+         mode='excel', selection={'surface': 'circular', 'search': True},
+         mutation=lambda sd: _pf_circle_buried(sd),
+         expect='the answer comes from the grid around it'),
 
     # --- polyline ordering -------------------------------------------------
     dict(rule='order.piezo_reversed', base=PREFLIGHT_BASE_LEM, mode='excel',
@@ -6928,6 +6961,39 @@ def run_circle_vertex_test(test):
     if not path.exists():
         return None, f"missing {path}"
     spec = importlib.util.spec_from_file_location('circle_vertex_intersection_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_circle_above_center_test(test):
+    """A circle that meets the ground above its own center.
+
+    The bottom-semicircle surface cannot represent an arc longer than half the
+    circle, so a crossing above the center is discarded — correctly, and at the
+    cost of six locked searches if it were not. What was missing was the wording:
+    the slicer reported a count ("got 1") that reads as a circle missing the
+    ground, the search silently scored its seed's grid instead, and nine shipped
+    sample circles were dead this way with nothing saying so.
+
+    The check itself lives in test/circle_above_center_check.py: the named cause
+    (with the tutorial-quoted opening sentence intact), a genuinely one-crossing
+    circle that must NOT get the diagnosis, the preflight rule's error/warning
+    split and its silence under a stated tension crack, the search's disclosure
+    line, every repaired file's circle building, and a mutation that stubs the
+    helper empty and takes the cause away from both readers.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'circle_above_center_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('circle_above_center_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -12213,6 +12279,8 @@ def _dispatch_test(test):
         return run_spencer_disclosure_test(test)
     if test_type == 'circle_vertex':
         return run_circle_vertex_test(test)
+    if test_type == 'circle_above_center':
+        return run_circle_above_center_test(test)
     if test_type == 'stability_time':
         return run_stability_time_test(test)
     if test_type == 'steady_seep_save':
@@ -12367,7 +12435,7 @@ def _expected_and_tol(test, default_tolerance):
                        'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'piezo_u_guard',
-                       'spencer_disclosure', 'circle_vertex',
+                       'spencer_disclosure', 'circle_vertex', 'circle_above_center',
                        'gsat_pair', 'seep_head',
                        'tseep_head', 'design_callable', 'kernel_xcheck'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
@@ -12386,7 +12454,8 @@ _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'f
               'fs_vs_time_mode': 4,
               'transient_seep': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2,
-              'spencer_disclosure': 3, 'circle_vertex': 2}
+              'spencer_disclosure': 3, 'circle_vertex': 2,
+              'circle_above_center': 2}
 
 
 def _parallel_worker(item):
@@ -12782,6 +12851,14 @@ def main():
         tests.append({'type': 'preflight_contract', 'file': '(rule registry)',
                       'method': '-', 'source': 'preflight'})
         tests.append({'type': 'preflight_rules', 'file': '(one mutation per rule)',
+                      'method': '-', 'source': 'preflight'})
+        # A circle whose center sits under the ground: both daylight points above
+        # it, an arc longer than a semicircle, and no failure surface at all. The
+        # rule that reports it, the slicer refusal that names the cause, and the
+        # search line that says it launched from the grid instead are one story, so
+        # they are pinned together rather than one rule at a time.
+        tests.append({'type': 'circle_above_center',
+                      'file': 'circle daylighting above its own center',
                       'method': '-', 'source': 'preflight'})
         # The two-stage sweep contract: a full base-model preflight once, a
         # per-step re-check of only the rules the substituted value touches, a

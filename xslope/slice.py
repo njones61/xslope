@@ -268,6 +268,18 @@ def circle_polyline_intersections(Xo, Yo, R, polyline):
     return [p for p in _circle_polyline_all(Xo, Yo, R, polyline) if p.y < Yo]
 
 
+def crossings_above_center(Xo, Yo, R, polyline):
+    """The ground crossings ``circle_polyline_intersections`` throws away.
+
+    The complement of that function's filter, and the reason a circle can be
+    reported as "never reaches the ground" while a plot of it plainly shows it
+    cutting the section. Kept here so the slicer's error message, the preflight
+    rule and the search all name the same points from one rule rather than three
+    re-derivations of it.
+    """
+    return [p for p in _circle_polyline_all(Xo, Yo, R, polyline) if p.y >= Yo]
+
+
 def _recover_ends_via_tcrack(ground_surface, circle, tcrack_depth):
     """
     Recover the two daylight points for a reverse-curvature circle whose uphill end
@@ -333,7 +345,24 @@ def get_sorted_intersections(failure_surface, ground_surface, circle_params=None
 
     # need at least two
     if len(points) < 2:
-        return False, f"Expected at least 2 intersection points, but got {len(points)}.", None
+        msg = f"Expected at least 2 intersection points, but got {len(points)}."
+        # A circle can lose a crossing two ways, and only one of them is about the
+        # circle being too small or too shallow. The other is the equator filter in
+        # circle_polyline_intersections: a crossing ABOVE the center is discarded,
+        # because the arc joining it to the toe is longer than a semicircle and the
+        # bottom-semicircle surface built below cannot represent it. Left unnamed,
+        # that arrives as a count and sends the reader to the ground surface, which
+        # is not where the fault is.
+        if circle_params is not None:
+            above = crossings_above_center(Xo, Yo, R, ground_surface)
+            if above:
+                p = max(above, key=lambda q: q.y)
+                msg += (f" The circle (Xo={Xo:g}, Yo={Yo:g}, R={R:g}) meets the "
+                        f"ground at ({p.x:.4g}, {p.y:.4g}), above its own center at "
+                        f"y={Yo:g}: the arc would rise above its center on that "
+                        f"side, which this slicer does not build. Lower the center "
+                        f"or enlarge the radius so both crossings sit below it.")
+        return False, msg, None
 
     # sort by x
     points = sorted(points, key=lambda p: p.x)

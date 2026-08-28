@@ -26,7 +26,7 @@ from .advanced import rapid_drawdown, validate_rapid_drawdown
 from .generators import (generate_noncircular_surface, generate_starting_circles,
                          rank_weak_zones, slope_geometry)
 from .preflight import preflight
-from .slice import generate_slices
+from .slice import crossings_above_center, generate_slices
 
 # A valid limit-equilibrium failure surface must have a meaningful net gravitational
 # driving force. A surface under flat ground (e.g. a circle in a reservoir bottom)
@@ -988,6 +988,31 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         r0 = y0 - depth_guess
         if diagnostic:
             print(f"\n[⏱ starting circle {i+1}] x={x0:.2f}, y={y0:.2f}, r={r0:.2f}")
+        # A seed the slicer cannot build is not an error — the 9-point grid AROUND
+        # it is what the refinement starts from, and the answer that follows is a
+        # real one. It is still a fact about the run: the circle on the sheet is not
+        # the circle being refined. Reported unconditionally, because a search that
+        # says nothing here reads as a search that took the circle it was given.
+        # Wrapped, because this call exists only to say something: a model whose
+        # slicing raises (a missing seepage field, say) must reach that error from
+        # the search's own evaluation, with its own wording, not from the line that
+        # was going to describe it.
+        try:
+            seed_ok, seed_msg = generate_slices(
+                slope_data, circle={'Xo': x0, 'Yo': y0, 'Depth': depth_guess, 'R': r0},
+                num_slices=num_slices, composite=composite, check_inputs=False)
+        except Exception:
+            seed_ok, seed_msg = True, ''
+        if not seed_ok:
+            above = crossings_above_center(x0, y0, r0, slope_data['ground_surface'])
+            if above:
+                p = max(above, key=lambda q: q.y)
+                why = f"crossing above center at ({p.x:.4g}, {p.y:.4g})"
+            else:
+                why = str(seed_msg).rstrip('.')
+            print(f"[⚠ starting circle {i+1}] Starting circle (Xo={x0:.4g}, "
+                  f"Yo={y0:.4g}, R={r0:.4g}) cannot be built ({why}); searching "
+                  f"from the launch grid around it.")
         grid_size = r0 * 0.15
         fs_cache, best_point = evaluate_grid(x0, y0, grid_size, depth_guess, slope_data, diagnostic=diagnostic, fs_cache=fs_cache, circle_cache=circle_cache)
         all_starts.append((start_circle, best_point))

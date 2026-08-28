@@ -754,7 +754,14 @@ def vp020():
     sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
     sd['piezo_line'] = [(0.0,20.0),(55.0,20.0),(75.0,30.0),(95.0,40.0),(100.0,40.0),(190.0,55.0),(240.0,55.0)]
     sd['circular'] = True
-    sd['circles'] = [{'Xo': 90.0, 'Yo': 60.0, 'Depth': 15.0, 'R': 45.0}]
+    # Starting circle for the toe-focus search: center (90, 100), tangent at
+    # y = 15, daylighting at (57.7, 21.4) on the lower bench and (169.5, 70) on the
+    # crest — both crossings below the center, so the slicer can build it. The
+    # earlier (90, 60, tangent y = 15) met the face at (134.9, 63.25), above its own
+    # center: an arc longer than a semicircle, which produces no failure surface,
+    # so the search ran from that circle's launch grid rather than from the circle.
+    # See preflight rule surface.circle_daylights_above_center.
+    sd['circles'] = [{'Xo': 90.0, 'Yo': 100.0, 'Depth': 15.0, 'R': 85.0}]
     # Non-circular seed for the seam-block mechanism: the local search reaches
     # ~1.08 from here (below the circular minimum); Slide's Monte-Carlo block
     # optimization reaches 1.010 - same search-power gap noted on #19.

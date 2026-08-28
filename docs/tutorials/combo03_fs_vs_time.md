@@ -504,6 +504,17 @@ from a transient run, stage 1 at t = 0 and stage 2 at t = 50. Here we will run i
 at **every** saved instant, and then run Part 1's kind of curve on the same
 twenty-one frames for comparison.
 
+### The dam
+
+![The Johnson Reservoir dam](images/seep02_problem_sketch.png){width=1000}
+
+The section is 750 ft long, a 100 ft foundation on rock at elevation 0 with an
+80 ft embankment on it, a sand **shell** on both faces and a compacted-clay
+**core** carried 40 ft into the foundation as a cutoff key. The reservoir stands
+at elevation 160 and the tailwater at 100, and the drawdown lowers the pool 50 ft
+to 110. That geometry is [SEEP-2](seep02_johnson_dam.md)'s, and in COMBO-2 we put
+the seepage boundary sets, the pool schedule and the stage times on it.
+
 ### Opening the model
 
 Download [xslope_johnson_fs_time.xlsx](files/xslope_johnson_fs_time.xlsx) and
@@ -519,15 +530,7 @@ view draws that mesh behind the zones.
 ### What the file carries
 
 Nothing on this dam has to be built, so before running anything we go through
-what came with it.
-
-The section is 750 ft long, a 100 ft foundation on rock at elevation 0 with an
-80 ft embankment on it, a sand **shell** on both faces and a compacted-clay
-**core** carried 40 ft into the foundation as a cutoff key. The reservoir stands
-at elevation 160 and the tailwater at 100, and the drawdown lowers the pool 50 ft
-to 110. That geometry is [SEEP-2](seep02_johnson_dam.md)'s, and in COMBO-2 we put
-the seepage boundary sets, the pool schedule and the stage times on it. Five
-things the file carries decide what the sweep can do.
+what came with it. Five things the file carries decide what the sweep can do.
 
 **The undrained envelope.** Click **Materials** and set the **Show parameters
 for:** toggles to **LEM** alone. Only the core carries a $K_c = 1$ envelope —

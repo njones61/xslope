@@ -462,60 +462,6 @@ reaches only to elevation 6.3 instead of 18. The contours are still crowded over
 the core, which holds head the pool no longer balances. The surface runs from the
 heel at (0.80, 0.34) to the crest edge at (51.94, 22.00), tangent to the rock.
 
-### Choosing the time steps
-
-The minimum sits on a saved frame, which leaves open whether the true minimum
-falls between two of them. Settling that takes three steps: put more instants on
-the save schedule, run the transient seepage analysis again, and sweep the frames
-it stores.
-
-Switch the mode strip to **Seepage** (`Ctrl+2`) and click **Transient** in the
-Inputs dock. The **Extra save times** list beside the series table holds the
-eighteen instants this schedule saves, and the refinement adds the midpoint of
-every gap between day 20 and day 40 — **22.5**, **27.5**, **32.5** and **37.5**.
-The list ends in a blank row: type the first of them there and click **Add** for a
-row per time after it. Days 20, 25, 30, 35 and 40 are on the list already, so
-those four rows halve the frame spacing across the whole dip. Nothing
-else on the form changes: the duration, the save interval and the `pool` series
-stay as they are, and the stage-time fields stay empty, because Part 1 is a
-drained curve. Click **OK**.
-
-![The Transient editor with the four extra save times on the list](images/combo03_studio_transient.png)
-
-Now solve the seepage again. Click **Run → Run Seep…**, set **Run type** to
-**Transient (time-dependent)** — **Convergence tol** and **Max iterations** gray
-out, both belonging to the steady solve — and click **Run**. The march starts from
-the same steady initial condition and follows the same pool schedule, stopping at
-four more instants on the way. It takes well under a minute on this dam and ends
-with `Transient seepage complete — 23 saved frame(s).`
-
-Four instants cost a whole re-march because a saved frame is a state the solver
-landed on. xslope never blends one frame's field with the next one's — an average
-of two nodal fields is a solution of nothing — so an instant the march did not
-stop at is computed rather than interpolated.
-
-Then sweep again. Click **Run → Parametric…** and set **Mode** to **Factor of
-safety vs time**. The **Saved frames** list now offers twenty-three instants
-instead of nineteen, all ticked. Leave **Method** on **Spencer**, **Number of
-slices** at 40 and **Re-search the critical surface at each step** ticked, and
-click **Run**. The Log closes with
-`Lowest factor of safety 1.3312 at t = 35 day (23 instant(s), 0 without a result).`
-
-![The same curve over 23 instants — four more markers across the dip, the lowest still ringed on day 35](images/combo03_studio_fs_time_refined.png)
-
-**The minimum stays on day 35, at 1.3312 against the saved grid's 1.3313** — one
-ten-thousandth, on a curve whose total swing is 0.23, and well inside the
-search's own convergence tolerance of 0.0005. Every instant governs on the
-upstream face. The rest of the curve moves by no more than 0.0002 as well: a
-schedule with more stops on it is a slightly different numerical path through the
-same physics, since the stepper lands on every saved time exactly.
-
-A coarse schedule is what makes that check necessary. SEEP-3's own twelve-frame
-schedule saves nothing between day 30 and day 47, so a curve drawn through it
-would report a minimum of 1.3344 on day 30 and never evaluate the lowest instant.
-Rerun the transient seepage analysis when the minimum falls on the first or last saved frame, or when the
-points either side of it are still falling steeply.
-
 ### Reading the curve
 
 Two things happen to the upstream slope when the pool is lowered, at different

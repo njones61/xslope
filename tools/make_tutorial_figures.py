@@ -6326,12 +6326,6 @@ COMBO03_SLICES = 40
 #: that is the sweep's to report.
 COMBO03_FULL_POOL = 0.0
 COMBO03_SECOND = 5.0
-#: Instants the refinement pass asks for: the saved frames across the dip with the
-#: midpoint of every gap between them added, so the pass halves the resolution the
-#: schedule already has. Four of the nine name no saved frame, so it costs one
-#: re-march — which is what the section measures: whether a schedule already dense
-#: across the fall has anything left to find.
-COMBO03_REFINE = (20.0, 22.5, 25.0, 27.5, 30.0, 32.5, 35.0, 37.5, 40.0)
 #: No grid seeding anywhere on this page: the two circles the file carries are
 #: placed on the mechanisms that govern, so an ordinary seeded search reaches the
 #: lower face at every instant. ``None`` is what ``fs_vs_time`` takes for that.
@@ -6462,7 +6456,6 @@ def combo03_plots():
     import time as _time
 
     from xslope.plot import plot_fs_vs_time
-    from xslope.seep import remarch_for_times
     from xslope.sensitivity import fs_vs_time
 
     model = load_slope_data(COMBO03)
@@ -6564,49 +6557,6 @@ def combo03_plots():
     capture("combo03_solution_min.png", plot_solution, worst,
             worst_crit["slices"], worst_crit["failure_surface"],
             _combo03_results(worst_crit))
-
-    # ---- what a finer save grid is worth ------------------------------------ #
-    # The page's route is Studio's: the midpoints of the gaps across the dip go on
-    # the Transient editor's extra-save-times list, the transient analysis is run
-    # again, and the sweep is run again over every frame the longer schedule saves.
-    # ``remarch_for_times`` injects exactly what that edited list would carry — the
-    # model's own save times unioned with the requested instants — so this is that
-    # run rather than a shortcut around it, and the second sweep reads its frames
-    # off the re-march the way the first read them off the shipped march.
-    t0 = _time.time()
-    with contextlib.redirect_stdout(io.StringIO()):
-        fine_solution = remarch_for_times(seep_data, model, list(COMBO03_REFINE))
-    print("   re-march    %d frames · %.0f s wall · %s added to the save list"
-          % (len(fine_solution["times"]), _time.time() - t0,
-             ", ".join("%g" % t for t in sorted(
-                 set(COMBO03_REFINE) - set(model["tseep"]["save_times"])))))
-    t0 = _time.time()
-    with contextlib.redirect_stdout(io.StringIO()):
-        ok, fine = fs_vs_time(model, fine_solution, methods=(COMBO03_METHOD,),
-                              search=True, num_slices=COMBO03_SLICES,
-                              search_opts=COMBO03_SEED)
-    if not ok:
-        raise RuntimeError(fine)
-    print("   refine      %d instants · %d failed · %.0f s wall"
-          % (len(fine["times"]), fine["n_failed"], _time.time() - t0))
-    for _i, row in fine["df"].iterrows():
-        print("     t %-5g pool %5.2f  FS %s  center (%.2f, %.2f) R %.2f  %s face"
-              % (row["value"], _combo03_pool(model, row["value"]),
-                 ("%.4f" % row["fs"]) if row["success"] else "failed",
-                 row["Xo"], row["Yo"], row["R"],
-                 _combo03_face(model, row["Xo"])))
-    print("   refine      minimum %.4f at t = %g %s · %+.4f against the saved grid"
-          % (fine["min_fs"], fine["critical_time"], _u["time"],
-             fine["min_fs"] - res["min_fs"]))
-    # A longer save list is a different numerical path through the same physics, so
-    # the instants the shipped schedule already saved move a little too. The page
-    # states how far, so it is measured here rather than assumed.
-    _saved = dict(zip((float(t) for t in res["times"]),
-                      (float(v) for v in res["df"]["fs"])))
-    _moved = max(abs(float(v) - _saved[float(t)])
-                 for t, v in zip(fine["times"], fine["df"]["fs"])
-                 if float(t) in _saved)
-    print("   refine      the shared instants move by at most %.4f" % _moved)
 
 
 # --------------------------------------------------------------------------- #

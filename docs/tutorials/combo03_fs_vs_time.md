@@ -783,8 +783,8 @@ because a run of this length leaves the core part drained.
 
 <!-- test: file=files/xslope_johnson_fs_time.xlsx, type=fs_vs_time, method=spencer, march=file, num_slices=40, times=0;50;500, expected=1.5097;1.0350;1.2870, tolerance=0.005, benchmark=COMBO-3-single -->
 
-Studio's result tab holds one curve at a time, so the figure below plots both
-results on one pair of axes:
+Studio's result tab holds one curve at a time, so the figure below adds the
+single-stage curve (blue) to the rapid drawdown figure above, on the same axes:
 
 ![The rapid drawdown curve and the single-stage curve of the same transient run](images/combo03_rapid_compare.png){width=1000}
 

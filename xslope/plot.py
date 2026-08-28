@@ -5272,7 +5272,8 @@ def _drawdown_interval(ts):
 
 
 def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
-                    dpi=300, fig=None, style=None):
+                    dpi=300, fig=None, style=None, compare=None,
+                    compare_label=None):
     """Plot an :func:`xslope.sensitivity.fs_vs_time` curve: the factor of safety at
     every evaluated instant of a transient seepage march.
 
@@ -5388,6 +5389,19 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
                     color=_STAGE_COLORS[stage], ms=6, zorder=5, label=name)
     if n_failed:
         ax.plot([], [], ' ', label=f"{n_failed} instant(s) produced no result")
+
+    # A second sweep of the same instants, drawn on the same axes so the distance
+    # between the two answers is read against one scale, one schedule and one
+    # drawdown band -- the rapid drawdown curve against the single-stage curve of
+    # the same transient run is the case. Only the main result is ringed.
+    if compare is not None and isinstance(compare, dict) and 'df' in compare:
+        cdf = compare['df']
+        cpts = cdf.loc[cdf['success'].astype(bool)].sort_values('value')
+        if len(cpts):
+            ax.plot(cpts['value'], cpts['fs'], '-o', color='#2b7bb0', lw=1.8,
+                    ms=5, zorder=3,
+                    label=compare_label or ("single-stage" if rapid
+                                            else "comparison"))
 
     crit_t = result.get('critical_time') if isinstance(result, dict) else None
     crit_fs = result.get('min_fs') if isinstance(result, dict) else None

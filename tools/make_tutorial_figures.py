@@ -39,6 +39,7 @@ import copy
 import importlib.util
 import io
 import math
+import glob
 import os
 import sys
 
@@ -58,6 +59,31 @@ from xslope.plot import (declared_unit_labels,                       # noqa: E40
                          plot_circular_search_results)
 
 OUT_DIR = os.path.join(REPO_ROOT, "docs", "tutorials", "images")
+
+
+#: Sweep results are cached on disk so a redraw (a color, a label, a layout)
+#: does not re-solve two 21-instant searches. Keyed by the model's files' mtimes
+#: plus a caller-supplied tag; lives outside the tree the docs read.
+_SWEEP_CACHE = os.path.join(REPO_ROOT, ".figure_cache")
+
+
+def _sweep_cached(tag, model_path, compute, **kw):
+    import hashlib
+    import pickle
+    base = os.path.splitext(model_path)[0]
+    stamp = "|".join("%s:%s" % (os.path.basename(f), int(os.path.getmtime(f)))
+                     for f in sorted(glob.glob(base + "*")) if os.path.isfile(f))
+    key = hashlib.sha1(("%s|%s|%s" % (tag, stamp, sorted(kw.items()))).encode()).hexdigest()[:16]
+    path = os.path.join(_SWEEP_CACHE, "%s_%s.pkl" % (tag, key))
+    if os.path.exists(path):
+        with open(path, "rb") as fh:
+            print("   cache       %s read from %s" % (tag, os.path.relpath(path, REPO_ROOT)))
+            return pickle.load(fh)
+    res = compute()
+    os.makedirs(_SWEEP_CACHE, exist_ok=True)
+    with open(path, "wb") as fh:
+        pickle.dump(res, fh)
+    return res
 
 #: The tutorial's model is the sample's model — one file, two pages (the tutorial
 #: builds it, ``docs/lem/samples.md`` catalogues it). Nothing is copied.
@@ -6581,63 +6607,13 @@ COMBO03R_SLICES = 40
 
 
 def _combo03r_compare(model, rapid_res, plain_res):
-    """Both sweeps of one march on one axes: the drawdown answer at every instant
-    and the single-stage answer at the same instants.
-
-    The two curves are the page's measurement, and a measurement of a gap has to be
-    read on one pair of axes — two figures at two y-scales would leave the reader
-    subtracting labels. The pool the two share is drawn behind them, as it is on
-    the Studio figure, so a crossing can be placed against the drawdown that
-    causes it.
-    """
-    import numpy as np
-
-    _u = declared_unit_labels(model)
-    ts = model["tseep"]
-
-    def _pts(res):
-        g = res["df"]
-        g = g.loc[g["success"]].sort_values("value")
-        return [float(v) for v in g["value"]], [float(v) for v in g["fs"]]
-
-    rt, rfs = _pts(rapid_res)
-    pt, pfs = _pts(plain_res)
-
-    fig, ax = plt.subplots(figsize=(8.6, 5.0))
-    ax.plot(pt, pfs, "-o", color="#2b7bb0", lw=1.8, ms=5, zorder=3,
-            label="single-stage, drained (one field per instant)")
-    ax.plot(rt, rfs, "-o", color="#b5460f", lw=2.0, ms=5, zorder=4,
-            label="rapid drawdown (three stages, stage 1 at t = %g %s)"
-                  % (float(ts["stage_1"]), _u["time"]))
-    ax.axhline(1.0, color="r", ls="--", lw=0.8, zorder=2, label="FS = 1")
-    ax.set_xlabel("time (%s)" % _u["time"])
-    ax.set_ylabel("factor of safety")
-    ax.grid(alpha=0.25)
-    ax.set_title("Two analyses of one transient run: the drawdown answer and "
-                 "the single-stage answer", fontsize=11.5)
-
-    pool = ax.twinx()
-    tt = [float(t) for t in ts["times"]]
-    vv = [float(v) for v in ts["series"]["pool"]]
-    lo, hi = ax.get_xlim()
-    if lo < tt[0]:
-        tt, vv = [lo] + tt, [vv[0]] + vv
-    if hi > tt[-1]:
-        tt, vv = tt + [hi], vv + [vv[-1]]
-    pool.plot(tt, vv, color="#3f4a55", lw=1.3, ls=(0, (5, 3)), alpha=0.55,
-              zorder=0, label="pool (schedule)")
-    pool.set_ylabel("pool elevation (%s)" % _u["length"], color="#3f4a55")
-    pool.tick_params(axis="y", colors="#3f4a55")
-    pool.set_ylim(0.0, 1.35 * float(np.max(vv)))
-    pool.set_zorder(ax.get_zorder() - 1)
-    ax.patch.set_visible(False)
-
-    h1, l1 = ax.get_legend_handles_labels()
-    h2, l2 = pool.get_legend_handles_labels()
-    # Lower right: both curves rise to the right, so the top of the frame is where
-    # the single-stage line ends up and a legend there covers the measurement.
-    ax.legend(h1 + h2, l1 + l2, fontsize=9, loc="lower right")
-    fig.tight_layout()
+    """Both sweeps of one transient run on one axes: Studio's own FS vs time
+    figure of the drawdown sweep, with the single-stage sweep of the same
+    instants drawn through it -- same pool axis, drawdown band and full-pool
+    line, so the gap between the two answers is read on one scale."""
+    from xslope.plot import plot_fs_vs_time
+    plot_fs_vs_time(rapid_res, slope_data=model, compare=plain_res,
+                    compare_label="single-stage, drained")
 
 
 def combo03_rapid():
@@ -6697,10 +6673,13 @@ def combo03_rapid():
     # Stage 1 is read at the first frame, so that frame is the state the others
     # fall from and is not swept -- Studio dims it when Rapid drawdown is ticked.
     _s1 = float((model.get("tseep") or {}).get("stage_1") or 0.0)
-    ok, rapid_res = fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
-                               times=[t for t in solution["times"] if t > _s1],
-                               num_slices=COMBO03R_SLICES, rapid=True,
-                               search_opts=COMBO03_SEED, print_table=False)
+    ok, rapid_res = _sweep_cached(
+        "combo03_rapid", COMBO03R,
+        lambda: fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
+                           times=[t for t in solution["times"] if t > _s1],
+                           num_slices=COMBO03R_SLICES, rapid=True,
+                           search_opts=COMBO03_SEED, print_table=False),
+        method=COMBO03R_METHOD, slices=COMBO03R_SLICES, seed=str(COMBO03_SEED))
     if not ok:
         raise RuntimeError(rapid_res)
     print("   drawdown    %d instants · %d failed · lowest %.4f at t = %g %s · "
@@ -6719,9 +6698,12 @@ def combo03_rapid():
 
     # ---- every instant as an ordinary single-stage analysis ----------------- #
     t0 = _time.time()
-    ok, plain_res = fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
-                               num_slices=COMBO03R_SLICES, search=True,
-                               search_opts=COMBO03_SEED, print_table=False)
+    ok, plain_res = _sweep_cached(
+        "combo03_plain", COMBO03R,
+        lambda: fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
+                           num_slices=COMBO03R_SLICES, search=True,
+                           search_opts=COMBO03_SEED, print_table=False),
+        method=COMBO03R_METHOD, slices=COMBO03R_SLICES, seed=str(COMBO03_SEED))
     if not ok:
         raise RuntimeError(plain_res)
     print("   single      %d instants · %d failed · lowest %.4f at t = %g %s · "

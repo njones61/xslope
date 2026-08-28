@@ -663,9 +663,10 @@ governing one is named per row. Behind it, on the right axis, runs the pool
 schedule, with the forty-five days it falls over shaded and the pre-drawdown
 1.456 carried across as a dashed full-pool reference. The lowest instant is
 ringed and labeled, the red guide marks FS = 1, and the legend counts the instant
-that produced no result. No point is colored by face here: every instant of this
-curve is critical on the upstream slope, and the plot marks faces only where the
-answer moves from one to the other.
+that produced no result. Each point is colored by the stage that governs it —
+purple where stage 2's undrained strength gave the lower factor of safety, blue
+where stage 3's drained strength did — so the three drained instants at the
+bottom of the dip stand out on the curve.
 
 **Day 50 reads 1.0157, the answer we got in COMBO-2.** The transient route there
 reports **1.0158** on a circle at (243.93, 244.90) with a radius of 163.64 ft,

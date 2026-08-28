@@ -5181,6 +5181,7 @@ def annotate_design_crossing(ax, target_fs, summary):
 #: instants with: the reservoir side warm, the dry side cool. Both are clear of the
 #: default line color, so a colored marker never reads as part of the line under it.
 _FACE_COLORS = {'upstream': '#b5460f', 'downstream': '#2b7bb0'}
+_STAGE_COLORS = {2: '#8e44ad', 3: '#2b7bb0'}
 
 
 def _crest_span(slope_data):
@@ -5339,6 +5340,19 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
             face_by_row[i] = _circle_face(slope_data, span, df.at[i, 'Xo'],
                                           df.at[i, 'Yo'], df.at[i, 'R'])
     color_faces = len({f for f in face_by_row.values() if f}) > 1
+    # On a rapid drawdown sweep each instant's answer is the lower of stage 2
+    # (undrained) and stage 3 (drained), and which one it was is the reading the
+    # curve otherwise hides; the markers take the governing stage's color instead
+    # of the face's, again only where the sweep actually changes hands.
+    stage_by_row = {}
+    if rapid and 'governs' in df.columns:
+        for i in df.index[df['success'].astype(bool)]:
+            g = df.at[i, 'governs']
+            if g == g:
+                stage_by_row[i] = int(g)
+    color_stages = len(set(stage_by_row.values())) > 1
+    if color_stages:
+        color_faces = False
     one_method = int(df['method'].nunique()) <= 1 if len(df) else True
 
     n_failed = 0
@@ -5348,7 +5362,7 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
         if pts.empty:
             continue
         kw = dict(marker='o', ms=5, lw=1.8)
-        if color_faces and one_method:
+        if (color_faces or color_stages) and one_method:
             # The reported curve is the lower of two mechanisms, so the line itself
             # belongs to neither face and is drawn in neither's color. With several
             # methods on one figure the line keeps its method color instead — that
@@ -5364,6 +5378,14 @@ def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
             ax.plot(df.loc[sel, 'value'], df.loc[sel, 'fs'], 'o',
                     color=_FACE_COLORS[face], ms=6, zorder=5,
                     label=f"critical on the {face} face")
+    if color_stages:
+        for stage, name in ((2, 'stage 2 (undrained) governs'),
+                            (3, 'stage 3 (drained) governs')):
+            sel = [i for i, g in stage_by_row.items() if g == stage]
+            if not sel:
+                continue
+            ax.plot(df.loc[sel, 'value'], df.loc[sel, 'fs'], 'o',
+                    color=_STAGE_COLORS[stage], ms=6, zorder=5, label=name)
     if n_failed:
         ax.plot([], [], ' ', label=f"{n_failed} instant(s) produced no result")
 

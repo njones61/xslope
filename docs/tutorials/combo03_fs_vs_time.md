@@ -505,20 +505,6 @@ click **Run**. The Log closes with
 
 ![The same curve over 23 instants — four more markers across the dip, the lowest still ringed on day 35](images/combo03_studio_fs_time_refined.png)
 
-The nine instants across the dip, four of them new:
-
-| t (day) | pool (m) | FS |
-| :---: | :---: | :---: |
-| 20 | 11.60 | 1.3773 |
-| 22.5 | 10.71 | 1.3620 |
-| 25 | 9.82 | 1.3510 |
-| 27.5 | 8.93 | 1.3409 |
-| 30 | 8.04 | 1.3343 |
-| 32.5 | 7.16 | 1.3323 |
-| 35 | 6.27 | **1.3312** |
-| 37.5 | 5.38 | 1.3360 |
-| 40 | 4.49 | 1.3434 |
-
 **The minimum stays on day 35, at 1.3312 against the saved grid's 1.3313** — one
 ten-thousandth, on a curve whose total swing is 0.23, and well inside the
 search's own convergence tolerance of 0.0005. Every instant governs on the

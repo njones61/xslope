@@ -11,11 +11,70 @@ and triggering a re-render is safe.
 
 from __future__ import annotations
 
+import contextlib
 import os
+import signal
 import tempfile
+import threading
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+
+#: How long ONE snippet may run before it is stopped, in seconds. Generous by
+#: design — a search is seconds, an SSRM run is minutes, and a limit that ends a
+#: real analysis is worse than the runaway it prevents. What it is here for is the
+#: snippet that will never finish: a ``while True`` on the GUI thread takes the
+#: whole application with it, including the per-turn timeout that was supposed to
+#: end the turn (a QTimer cannot fire while the event loop is blocked), and one
+#: measured session sat on such a snippet for forty minutes.
+#:
+#: Override per install with the ``ai/run_timeout`` setting, or per process with
+#: ``XSLOPE_AI_RUN_TIMEOUT``. Zero or negative turns the limit off.
+DEFAULT_RUN_TIMEOUT_S = 600.0
+RUN_TIMEOUT_ENV = "XSLOPE_AI_RUN_TIMEOUT"
+RUN_TIMEOUT_KEY = "ai/run_timeout"
+
+
+@contextlib.contextmanager
+def _time_limit(seconds):
+    """Raise ``TimeoutError`` inside the block after ``seconds``.
+
+    ``signal.setitimer`` with ``SIGALRM``, which on macOS and Linux delivers to
+    the main thread — the thread a snippet runs on, since the assistant marshals
+    tool execution onto the GUI thread. The handler raises where the snippet is,
+    so the exception unwinds the snippet's own stack and lands in ``run``'s
+    ``except``: the snippet's result becomes that error, the document rolls the
+    edit back like any other failed snippet, and the model reads what happened
+    rather than the session dying.
+
+    Two things it deliberately does not do. It does not interrupt a long call
+    inside C code (a solver in numpy, a gmsh mesh): the signal is recorded and
+    raised at the next bytecode boundary, so such a snippet stops when the call
+    returns, and the harness's own watchdog is the backstop for the case it never
+    does. And it does nothing at all off the main thread (the guardrail checks
+    drive the kernel directly, and a worker thread cannot take a signal) — no
+    limit is better than a ``ValueError`` from ``signal`` on every snippet.
+    """
+    if (not seconds or seconds <= 0
+            or threading.current_thread() is not threading.main_thread()
+            or not hasattr(signal, "SIGALRM")):
+        yield
+        return
+
+    def fired(_signum, _frame):
+        raise TimeoutError(
+            "the snippet ran for more than %g seconds and was stopped. Nothing it "
+            "changed was kept. Do not re-run it as it stands: either narrow the "
+            "work (fewer steps, plot=False, a coarser sweep) or say what it needs "
+            "and let the user start it."  % seconds)
+
+    previous = signal.signal(signal.SIGALRM, fired)
+    signal.setitimer(signal.ITIMER_REAL, float(seconds))
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
 
 # Figure formats a snippet might savefig itself — if it did, we don't also
 # auto-save its open figures (which would show the same plot twice).
@@ -235,6 +294,28 @@ class PythonKernel:
             os.makedirs(self._outdir, exist_ok=True)
         return self._outdir
 
+    def run_timeout(self):
+        """Seconds one snippet may run — the environment, then the app's setting,
+        then :data:`DEFAULT_RUN_TIMEOUT_S`. Zero or negative = no limit.
+
+        The environment wins so an unattended producer run can state the limit for
+        its own process without touching anybody's settings.
+        """
+        raw = os.environ.get(RUN_TIMEOUT_ENV)
+        if raw is None:
+            settings = getattr(self._window, "settings", None)
+            if settings is not None:
+                try:
+                    raw = settings.value(RUN_TIMEOUT_KEY, None)
+                except Exception:
+                    raw = None
+        if raw is None or raw == "":
+            return DEFAULT_RUN_TIMEOUT_S
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return DEFAULT_RUN_TIMEOUT_S
+
     def reset(self):
         """Drop all variables; the engine + helpers re-seed on the next run."""
         self._ns = {}
@@ -365,6 +446,12 @@ class PythonKernel:
         - ``run_seep(bc=1, ...)`` — one steady seepage solve; builds the mesh from
           the file's declared settings if there is none, attaches the solved field
           to the model and the bundle to the session, shows the solution plot.
+        - ``run_tseep(times=None, ...)`` — the TRANSIENT march (``run_seep(
+          transient=True)`` is the same call), on the model's own tseep sheet:
+          stores the frame bundle where Studio stores it and opens the
+          Seep · Transient tab. ``run_lem(seep_time=...)`` reads one instant of it;
+          ``fs_vs_time()`` runs the whole curve; ``transient_solution()`` returns
+          the march the session holds.
         - ``run_fem(analysis='ssrm', ...)`` — one finite element run (SSRM factor
           of safety, or a single trial); same mesh handling, attaches the bundle,
           shows the results plot.
@@ -438,7 +525,7 @@ class PythonKernel:
             return sd.get("ground_surface")
 
         def run_lem(method=None, num_slices=40, rapid=False, plot=True,
-                    slope_data=None, search=False):
+                    slope_data=None, search=False, seep_time=None):
             """Run an LEM analysis on the loaded project and return the result dict
             (includes 'FS'). `method` is one of oms, bishop, janbu, spencer, corps,
             lowe, mprice; left out, it is THE METHOD THE MODEL DECLARES (main!D14 —
@@ -459,6 +546,14 @@ class PythonKernel:
             session (`doc.results['lem_solution']`) exactly as a dialog run attaches
             it, so the result tabs show it and the Analysis Report documents it.
 
+            `seep_time` picks ONE instant of a transient seepage march (from
+            `run_tseep()`, or the sidecar an opened file carried) and reads its pore
+            pressures for this run — a number, or `'model'` for the instant the
+            model's own transient sheet names. With `rapid=True` the two drawdown
+            stage times are staged instead, exactly as the Run LEM dialog stages
+            them. It is stated in the log which instant was used; for the whole
+            curve rather than one instant, `fs_vs_time()`.
+
             The returned dict is the solver's, plus the surface it was solved on:
             'Xo', 'Yo', 'R', 'Depth' (the circle, None on a non-circular surface)
             and 'x_entry' / 'x_exit', the crest-side and toe-side ends of the trace.
@@ -469,6 +564,8 @@ class PythonKernel:
 
             sd = doc.slope_data if slope_data is None else slope_data
             method = _declared_lem_method(sd, method)
+            if seep_time is not None:
+                _apply_seep_time(sd, seep_time, rapid)
             resync_geometry(sd)        # reflect any in-snippet geometry edits
             if not (sd.get("circles") or sd.get("non_circ")):
                 raise RuntimeError("No failure surface defined (add a circle or "
@@ -577,7 +674,8 @@ class PythonKernel:
         # and record that this snippet is what made it.
         _store_result = self._store_result
 
-        def run_seep(bc=1, tol=1e-4, max_iter=400, plot=True, slope_data=None):
+        def run_seep(bc=1, tol=1e-4, max_iter=400, plot=True, slope_data=None,
+                     transient=False, **transient_kwargs):
             """Run a STEADY seepage analysis and return the solution dict — the
             seepage counterpart of `run_lem`.
 
@@ -594,10 +692,15 @@ class PythonKernel:
             rapid drawdown reads). `tol` is the relative head-change tolerance and
             `max_iter` the cap on the unconfined iteration. Returns the solution dict
             ('head', 'u', 'velocity', 'gradient', 'phi', 'flowrate', 'converged',
-            'closure_error', …). For a TRANSIENT march, drive
-            `xslope.seep.run_transient_seepage` directly — this helper is the steady
-            solve.
+            'closure_error', …).
+
+            `transient=True` runs the time-dependent march instead, on the model's
+            own transient sheet — the same call as `run_tseep()`, which is where that
+            run is documented.
             """
+            if transient:
+                return run_tseep(plot=plot, slope_data=slope_data,
+                                 **transient_kwargs)
             from xslope.seep import (apply_steady_stability_field, build_seep_data,
                                      run_seepage_analysis)
             sd = doc.slope_data if slope_data is None else slope_data
@@ -623,6 +726,222 @@ class PythonKernel:
                 import matplotlib.pyplot as plt
                 plot_seep_solution(seep_data, solution, fig=plt.figure(figsize=(11, 6)))
             return solution
+
+        def transient_solution(slope_data=None):
+            """The transient seepage march this session holds, or None.
+
+            One of: a march `run_tseep()` ran, or the saved solution Studio
+            restored from the file's `_tseep.csv` sidecar when it was opened. Both
+            live in the same place, `doc.results['transient_seep']`.
+            """
+            bundle = doc.results.get("transient_seep") or {}
+            return bundle.get("transient")
+
+        def run_tseep(times=None, plot=True, slope_data=None, rerun=False,
+                      save=False, verbose=True):
+            """Run a TRANSIENT seepage march and return the frame bundle — what
+            Studio's Run Seep dialog does with its Transient box ticked.
+
+            MINUTES, not seconds, on a real mesh: say so before starting one, and
+            never start one to answer a question the steady solve answers.
+
+            Needs the model's transient sheet (`slope_data['tseep']` — stage times,
+            duration, save interval, the pool-level series); a model without one is
+            a steady problem and `run_seep()` is its solve. The march is BC set 1
+            throughout: the transient boundary condition is the series on that
+            sheet, not the second BC set.
+
+            What it does with the answer is what Studio does: the bundle
+            (`{'mode','seep_data','transient','frames','options'}`) is stored on the
+            session as `doc.results['transient_seep']` and the Seep · Transient tab
+            is opened on it, so the frames are there for a stability run, for the
+            report, and for the play bar. Returns that bundle. `frames` are the
+            plottable per-frame solutions, one per saved instant, each carrying its
+            `time`.
+
+            `times` adds instants to the save schedule for THIS march only, without
+            touching the model — the way to get a frame at an instant the file's
+            save interval does not land on. `rerun=True` marches again even when the
+            session already holds a solution (the default returns the one it holds:
+            an opened file with a `_tseep.csv` sidecar has already paid for it).
+            `save=True` writes that sidecar beside the .xlsx, so the next open is
+            free. `plot=True` shows the LAST saved frame — the end state; use the
+            Seep · Transient tab's play bar, or plot a frame yourself, for the rest.
+
+            To read one instant as pore pressure for a stability run, pass
+            `seep_time=` to `run_lem` (which stages the two drawdown instants for
+            you when `rapid=True`); for the whole curve, `fs_vs_time()`.
+            """
+            from xslope.seep import (build_seep_data, build_tseep_data,
+                                     run_transient_seepage,
+                                     _transient_frame_solution)
+            sd = doc.slope_data if slope_data is None else slope_data
+            if sd.get("tseep") is None:
+                raise RuntimeError(
+                    "This model has no transient sheet (slope_data['tseep']), so "
+                    "there is nothing to march — run_seep() is its steady solve.")
+            extra = sorted({float(t) for t in (times or [])})
+            held = doc.results.get("transient_seep") if sd is doc.slope_data else None
+            if held and not rerun and not extra:
+                if verbose:
+                    print("Using the transient solution the session already holds "
+                          f"({len(held.get('frames') or [])} saved frame(s)); pass "
+                          "rerun=True to march again.")
+                return held
+            mesh = _ensure_mesh(sd)
+            seep_data = build_seep_data(mesh, sd, seep_bc=1)
+            tseep_data = build_tseep_data(sd)
+            if extra:
+                tseep_data = dict(tseep_data)
+                tseep_data["save_times"] = sorted(
+                    set(tseep_data.get("save_times") or []) | set(extra))
+            # The march prints an iteration line per step of the steady solve it
+            # starts from — a hundred lines the model would pay to read back, none
+            # of them the answer. It runs muted, and what it said about ITSELF (a
+            # step that did not converge, a warning) is echoed below, because that
+            # is a finding about the model.
+            import contextlib as _ctx
+            import io as _io
+            chatter = _io.StringIO()
+            with _ctx.redirect_stdout(chatter):
+                solution = run_transient_seepage(seep_data, tseep_data, verbose=False)
+            trouble = [ln for ln in chatter.getvalue().splitlines()
+                       if "warning" in ln.lower() or "not converge" in ln.lower()
+                       or "did not" in ln.lower()]
+            unconfined = bool(solution.get("unconfined", False))
+            # The frames the play bar renders: head/u/phi from the march, velocity
+            # and gradient derived — the same reconstruction the sidecar reload does.
+            frames = [
+                _transient_frame_solution(
+                    seep_data, fr["head"], fr["u"], fr.get("phi"),
+                    fr.get("inflow"), fr.get("outflow"), unconfined, time=fr["time"])
+                for fr in solution["frames"]
+            ]
+            bundle = {"mode": "transient", "seep_data": seep_data,
+                      "transient": solution, "frames": frames,
+                      "options": {"mode": "transient", "bc": 1,
+                                  "extra_save_times": extra}}
+            if sd is doc.slope_data:
+                _store_result("transient_seep", bundle,
+                              show=[("_show_transient_seep", (bundle, False))],
+                              lead="transient_seep_view")
+                if save and getattr(doc, "path", None):
+                    from xslope.seep import export_transient_solution
+                    stem = os.path.splitext(doc.path)[0]
+                    export_transient_solution(
+                        seep_data, solution, stem, input_file=doc.path,
+                        mesh_file=f"{os.path.basename(stem)}_mesh.json")
+                    print(f"Saved the march beside the model as "
+                          f"{os.path.basename(stem)}_tseep.csv.")
+            if verbose:
+                unit = str(sd.get("time_unit") or "").strip()
+                saved = ", ".join(f"{fr['time']:g}" for fr in frames)
+                print(f"transient seepage: {len(frames)} saved frame(s) at t = "
+                      f"{saved}{(' ' + unit) if unit else ''}.")
+                for line in trouble:
+                    print("  " + line.strip())
+            if plot and frames:
+                from xslope.plot_seep import plot_seep_solution
+                import matplotlib.pyplot as plt
+                plot_seep_solution(seep_data, frames[-1],
+                                   fig=plt.figure(figsize=(11, 6)))
+            return bundle
+
+        def _apply_seep_time(sd, seep_time, rapid):
+            """Put one instant of the session's transient march into the model as
+            pore pressure, the way Studio's Run dialogs do before a stability run."""
+            from xslope.seep import apply_transient_stability_frame
+            bundle = doc.results.get("transient_seep") or {}
+            solution = bundle.get("transient")
+            if solution is None:
+                raise RuntimeError(
+                    "seep_time= needs a transient seepage solution; run run_tseep() "
+                    "first (or open a model whose _tseep.csv sidecar carries one).")
+            ts = sd.get("tseep") or {}
+            # Rapid drawdown reads TWO instants, the stage times off the model's own
+            # transient sheet — the single-instant path is for everything else.
+            staged = bool(rapid and ts.get("stage_1") is not None
+                          and ts.get("stage_2") is not None)
+            t = (None if seep_time in (True, "model", "auto")
+                 else float(seep_time))
+            info = apply_transient_stability_frame(
+                sd, solution, time=t, rapid=staged,
+                seep_data=bundle.get("seep_data"), remarch=True, verbose=True)
+            # A re-march (a requested instant the schedule never saved) is a new,
+            # longer solution: keep it, so the next question is not charged for it
+            # a second time.
+            if info.get("remarched") and info.get("solution") is not None:
+                bundle["transient"] = info["solution"]
+            return info
+
+        def fs_vs_time(times=None, method=None, mode="lem", search=True,
+                       num_slices=40, rapid=False, plot=True, slope_data=None,
+                       **kwargs):
+            """Factor of safety at every saved instant of the transient march — the
+            coupled result, and the one plot that shows WHEN the slope is critical.
+
+            Runs the stability analysis once per instant against that instant's pore
+            pressures; no input is changed at any step, the axis is time. Needs a
+            transient solution on the session (`run_tseep()` first). Returns the
+            result dict — `'times'`, `'fs'`, `'min_fs'`, `'critical_time'`,
+            `'n_failed'`, the per-instant table as `'rows'` — stores it as
+            `doc.results['fs_vs_time']` where the FS vs Time tab and the report read
+            it, and plots the curve.
+
+            `times` restricts the instants (default: every saved frame). `method`
+            defaults to the method the MODEL declares, as `run_lem` does; `mode`
+            is `'lem'` (default) or `'fem'` (an SSRM solve per instant — MINUTES
+            each, so name the cost first). `search=True` re-searches the critical
+            surface at each instant, which is right: the critical surface moves as
+            the pore pressures do. `rapid=True` evaluates each instant as a rapid
+            drawdown instead of a single-stage analysis (LEM only).
+            """
+            from xslope.sensitivity import fs_vs_time as _fs_vs_time
+            sd = doc.slope_data if slope_data is None else slope_data
+            bundle = doc.results.get("transient_seep") or {}
+            solution = bundle.get("transient")
+            if solution is None:
+                raise RuntimeError(
+                    "fs_vs_time needs a transient seepage solution; run run_tseep() "
+                    "first (or open a model whose _tseep.csv sidecar carries one).")
+            method = _declared_lem_method(sd, method)
+            # One solver echo per instant per method is a dozen lines saying what
+            # the run's own table says in one; the table itself is kept, and so is
+            # anything that is not that echo.
+            import contextlib as _ctx
+            import io as _io
+            import re as _re
+            sweep_out = _io.StringIO()
+            with _ctx.redirect_stdout(sweep_out):
+                ok, res = _fs_vs_time(sd, solution, times=times, mode=mode,
+                                      methods=(method,), search=search,
+                                      num_slices=num_slices, rapid=rapid,
+                                      seep_data=bundle.get("seep_data"), **kwargs)
+            echo = _re.compile(r"^\s*(oms|bishop|janbu|spencer|corps|lowe|mprice)"
+                               r"\b.*FS\s*=", _re.I)
+            for line in sweep_out.getvalue().splitlines():
+                if not echo.match(line):
+                    print(line)
+            if not ok:
+                raise RuntimeError(str(res))
+            res.pop("solution", None)      # the session already holds the march
+            result = {"kind": "fs_vs_time",
+                      "method": method if mode == "lem" else "SSRM", **res}
+            if sd is doc.slope_data:
+                _store_result("fs_vs_time", result,
+                              show=[("_show_fs_vs_time", ())],
+                              lead="fs_time_canvas")
+            unit = str(sd.get("time_unit") or "").strip()
+            if res.get("min_fs") is not None:
+                print(f"lowest FS = {res['min_fs']:.3f} at t = "
+                      f"{res['critical_time']:g}{(' ' + unit) if unit else ''} "
+                      f"({res.get('n_failed', 0)} instant(s) without a result).")
+            if plot:
+                from xslope.plot import plot_fs_vs_time
+                import matplotlib.pyplot as plt
+                plot_fs_vs_time(result, slope_data=sd,
+                                fig=plt.figure(figsize=(9, 5.5)))
+            return result
 
         def run_fem(analysis="ssrm", F=1.0, F_min=None, F_max=None, tolerance=0.01,
                     failure_criterion="non_convergence", min_slip_depth=None,
@@ -1382,6 +1701,8 @@ class PythonKernel:
             return rows
 
         return {"run_lem": run_lem, "run_seep": run_seep, "run_fem": run_fem,
+                "run_tseep": run_tseep, "fs_vs_time": fs_vs_time,
+                "transient_solution": transient_solution,
                 "corpus_index": corpus_index,
                 "suggest_elastic": suggest_elastic,
                 "generate_report": generate_report,
@@ -1451,7 +1772,8 @@ class PythonKernel:
         try:
             os.chdir(self.outdir)        # relative saves (savefig('x.png')) land here
             with redirect_stdout(buf), redirect_stderr(buf):
-                exec(code, self._ns)
+                with _time_limit(self.run_timeout()):
+                    exec(code, self._ns)
         except Exception:
             error = traceback.format_exc()
         finally:

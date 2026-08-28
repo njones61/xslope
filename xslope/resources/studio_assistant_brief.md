@@ -41,16 +41,23 @@ Rules of the namespace:
 ## 2. Preloaded helpers
 
 These are **already in the namespace, already documented here**. Call them
-directly. Do not call `help()` on them, do not `inspect` them, and do not
-reconstruct their pipelines by hand — that is the single most expensive mistake
-available to you.
+directly: no `help()`, no `inspect`, no rebuilding their pipelines by hand — that
+is the single most expensive mistake available to you.
+
+**When a helper refuses, the error is the instruction** — it names either a wrong
+argument or a step the model is not ready for, and the next call fixes it. Reading
+the package instead (`getsource`, `pkgutil`, a signature copied out of
+`xslope.seep`) spends the turn rather than saving it. Outside these helpers, say
+what you need rather than exploring for it.
 
 ### Running an engine
 
 | Call | What it does |
 |:-----|:-------------|
-| `run_lem(method=None, search=False, num_slices=40, rapid=False, plot=True)` | One LEM run. **`method` defaults to the method the MODEL declares** (`slope_data['lem_method']`, the main sheet's LEM method — what Studio's Run LEM dialog opens on), or `spencer` where the model declares none; pass one only when the user names a method. `search=True` runs the automated search for the **critical** surface for that method (what Studio's Run LEM does by default); `search=False` solves the surface the model already defines. Returns the result dict — `'FS'`, `'warnings'`, and the surface it was solved on: `'Xo'`, `'Yo'`, `'R'`, `'Depth'` (all `None` on a non-circular surface) and `'x_entry'`/`'x_exit'`, the crest-side and toe-side ends of the trace — and plots the solution. The run is stored on the session as `doc.results['lem_solution']`, which is what the result tabs show and what `generate_report` documents. |
+| `run_lem(method=None, search=False, num_slices=40, rapid=False, plot=True, seep_time=None)` | One LEM run. **`method` defaults to the method the MODEL declares** (`slope_data['lem_method']`, the main sheet's LEM method — what Studio's Run LEM dialog opens on), or `spencer` where the model declares none; pass one only when the user names a method. `search=True` runs the automated search for the **critical** surface for that method (what Studio's Run LEM does by default); `search=False` solves the surface the model already defines. Returns the result dict — `'FS'`, `'warnings'`, and the surface it was solved on: `'Xo'`, `'Yo'`, `'R'`, `'Depth'` (all `None` on a non-circular surface) and `'x_entry'`/`'x_exit'`, the crest-side and toe-side ends of the trace — and plots the solution. The run is stored on the session as `doc.results['lem_solution']`, which is what the result tabs show and what `generate_report` documents. `seep_time=` reads one instant of a transient march as this run's pore pressure (a number, or `'model'` for the instant the `tseep` sheet names); with `rapid=True` it stages that sheet's two drawdown instants. |
 | `run_seep(bc=1, tol=1e-4, max_iter=400, plot=True)` | One steady-state seepage solve. Builds the mesh from the model's own declared element type/size if `slope_data['mesh']` is None, puts nodal pore pressures on `slope_data['seep_u']` (`'seep_u2'` for `bc=2`) so a later `u='seep'` stability run reads that field, stores the bundle on `doc.results`, plots. |
+| `run_tseep(times=None, plot=True, rerun=False, save=False)` | The **transient** march on the model's `tseep` sheet (`run_seep(transient=True)` is the same call). Returns the frame bundle — `'frames'`, one per saved instant with its `time` — stored as `doc.results['transient_seep']`. **Costs minutes**, so it hands back the march the session already holds (`transient_solution()`) unless `rerun=True`. `times` adds instants to the schedule. |
+| `fs_vs_time(times=None, method=None, mode='lem', search=True, rapid=False)` | Factor of safety at every saved instant — the answer to *when* the slope is critical. Returns `'min_fs'`, `'critical_time'`, `'n_failed'` and the per-instant table; stores and plots it. |
 | `run_fem(analysis='ssrm', F=1.0, …)` | One finite element run. `analysis='ssrm'` returns `{'FS', 'solution', 'fem_data', …}`; `'single'` returns `FS=None`. Same mesh handling as `run_seep`. **Costs MINUTES** — say so before starting one, and never start one to answer a question LEM already answers. |
 | `resync_geometry(slope_data=None)` | Rebuild derived geometry (`ground_surface`, `polygons`, `domain_polygon`, tension crack) from the current `profile_lines`/`polygons`. Needed only **inside** a snippet that edits geometry in a loop — the automatic resync runs once, after the snippet returns. `run_lem` calls it for you. |
 
@@ -180,6 +187,17 @@ circular-only; the rest take non-circular surfaces too.
 Reading a raw search yourself (`xslope.search.circular_search`): `fs_cache[0]` is a
 flat dict with `FS`, `Xo`, `Yo`, `Depth` (tangent elevation), `slices`,
 `failure_surface`, `solver_result`. There is no `R` key — `R = Yo - Depth`.
+
+### Transient seepage
+
+A model with a `tseep` sheet is transient: its pore pressures are a sequence of
+fields, so its factor of safety has to name an instant. March once with
+`run_tseep()`, then read one instant with `run_lem(seep_time=t, search=True)` — it
+logs which instant it used — or the whole curve with `fs_vs_time()`. Instants are
+never interpolated, and one the march never saved costs a second march, so ask for
+them together. Rapid drawdown is `run_lem(rapid=True, seep_time='model')`, which
+stages the sheet's two drawdown times; `run_seep()` here answers the steady,
+long-term question instead.
 
 ---
 

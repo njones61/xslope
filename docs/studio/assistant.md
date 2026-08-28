@@ -143,16 +143,19 @@ one rather than reassembling the engine by hand:
 | --- | --- |
 | `run_lem(search=True)` | One limit-equilibrium solve. `search=True` searches for the critical surface for that method, exactly as [Run LEM](analysis.md) does; `search=False` solves the surface already on the project. The method defaults to the one the **model** declares (the `main` sheet's LEM method, which is what the Run LEM dialog opens on), so the assistant and the dialog run the same method unless you name another. The result carries the surface it was solved on — `Xo`, `Yo`, `R`, `Depth`, and the `x_entry`/`x_exit` ends of the trace — and the run is stored where a dialog run is stored, so the results tabs show it and the report documents it. |
 | `run_seep(bc=1)` | One steady seepage solve. The solved pore pressures are attached to the model, so a later stability run with `u = seep` reads them. |
+| `run_tseep()` | The transient march, on the project's own transient sheet — the same run as [Run Seep](analysis.md) with **Transient** ticked. Its frames are stored where Studio stores them, so the **Seep · Transient** tab plays them and a stability run can read one. It hands back a march already loaded (a project opened with its `_tseep.csv` sidecar has one) rather than repeating it. |
+| `run_lem(seep_time=t)` | One instant of that march as the run's pore pressure; with `rapid=True`, the transient sheet's two drawdown stages. Which instant was used is stated in the log. |
+| `fs_vs_time()` | The factor of safety at every saved instant — the curve the **FS vs Time** tab shows, with its lowest point and the time it falls at. |
 | `run_fem(analysis='ssrm')` | One finite element run — the SSRM factor of safety, or a single trial. Minutes, not seconds. |
 | `generate_report(path=None)` | The [Analysis Report](reports.md), built and finished exactly as the Report dialog builds it — over every engine the session has solved, and stamped with the project file and its SHA-256 where the project has been saved. With no path it is written to the assistant's output folder as `<project>_report.docx`, so it opens from **Files…** with everything else the conversation produced. |
 | `suggest_elastic('Clay')` | Soil-type `E` and `ν` for a material that carries none, classified from its strength. A last resort, never a substitute for a stated value. |
 | `sensitivity()`, `design_sweep()`, `parametric_sweep()`, `reliability_*()` | The parameter-study and probabilistic families. |
 | `corpus_index('rapid drawdown')` | Worked examples from the [verification corpus](../verification/index.md) matching a topic, with their page URLs. |
 
-`run_seep` and `run_fem` build the mesh from the file's own declared settings
-(`main!D18`, `main!D19`) when the project has none, so neither needs a mesh built
-first, and both attach their results where Studio attaches them — the results tab
-opens as it would after a Run.
+`run_seep`, `run_tseep` and `run_fem` build the mesh from the file's own declared
+settings (`main!D18`, `main!D19`) when the project has none, so none of them needs a
+mesh built first, and all attach their results where Studio attaches them — the
+results tab opens as it would after a Run.
 
 Because edits go through the same path as the editors, anything the assistant changes:
 
@@ -312,7 +315,10 @@ input columns that file uses — piles, reinforcement, a tension crack, seepage
 boundary conditions — so a weakness that shows on one kind of input reads as a
 pattern rather than an anecdote. The suite's own plumbing is a standing check in
 `run_tests.py`, where a dry run exercises the whole path — window, chat dock,
-transcript, scoring — with canned replies and reaches no provider at all.
+transcript, scoring — with canned replies and reaches no provider at all. A
+recording run states its provider, model and autonomy in a store of its own rather
+than in Studio's, so two runs at once neither collide nor leave anything of yours
+changed.
 
 ---
 
@@ -328,9 +334,12 @@ an **autonomy mode**, switchable in the dock:
 ![Confirm-before-run](images/assistant_confirm.png)
 
 Every action is visible in the transcript as a collapsible "ran code" block, and a
-**Stop** button halts the agent at any time. Because the kernel runs in Studio's own
-process, a bad snippet could hang the app — the confirm mode and Stop button are
-your guardrails.
+**Stop** button halts the agent at any time. The kernel runs in Studio's own process,
+so a snippet that never returns would otherwise take the window with it: one snippet
+may run for **ten minutes** before it is stopped, and the assistant is told what
+happened and left to try something narrower. The limit is generous because a real
+SSRM run or a long sweep is minutes of honest work; raise or lower it with the
+`ai/run_timeout` setting, or switch it off with a zero.
 
 !!! warning "Network egress"
     Hosted models (Claude, OpenAI, Kimi, Z.ai) send your prompts and any

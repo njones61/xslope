@@ -183,31 +183,205 @@ def _usage_probe():
 # --------------------------------------------------------------------------- #
 # Settings pinning
 # --------------------------------------------------------------------------- #
+#: The organization / application pair Studio's own store is opened under —
+#: ``QSettings("XSlope", "XSlope Studio")``, constructed in a dozen places across
+#: the GUI. A call carrying this pair is the machine-wide store, and is what the
+#: redirector below sends to the session's own ini instead.
+ORG_NAME = "XSlope"
+SETTINGS_APP = "XSlope Studio"
+
+#: Environment override for the session store's path. The suite sets it so every
+#: session of one run shares a store; unset, each PROCESS gets its own file.
+SETTINGS_ENV = "XSLOPE_SESSION_SETTINGS"
+
+#: Settings copied from the machine store into the session's own, so a session
+#: still runs against the endpoint the person configured (a custom Ollama base,
+#: a Z.ai coding-plan URL, the model list the dialog last fetched). Prefix match.
+#: API KEYS ARE NOT COPIED: they live in the OS keychain, which the session reads
+#: directly and unchanged, and the QSettings fallback copy of one would be a
+#: secret written into a temp file for no gain.
+_CARRIED_PREFIXES = ("ai/",)
+_NEVER_CARRIED = ("ai/key_fallback/",)
+
+
+def _session_settings_path():
+    """The ini this process's sessions read and write — never the user's store.
+
+    One file per process, named for the pid, so two harness processes recording
+    at the same time cannot see or overwrite each other's pins. The old failure
+    was exactly that: the pins went into the machine-wide store and were restored
+    at the end of each session, so a second session starting mid-first one read
+    (or restored) the first one's values — and a run whose ``ai/confirm`` had been
+    put back to True stopped dead on the "Run code?" modal with nobody to click it.
+    """
+    override = os.environ.get(SETTINGS_ENV)
+    if override:
+        os.makedirs(os.path.dirname(os.path.abspath(override)) or ".",
+                    exist_ok=True)
+        return os.path.abspath(override)
+    import tempfile
+    root = os.path.join(tempfile.gettempdir(), "xslope_assistant_sessions")
+    os.makedirs(root, exist_ok=True)
+    return os.path.join(root, "settings_%d.ini" % os.getpid())
+
+
+class _StoreRedirector:
+    """Stands in for ``QSettings`` and hands out the session's store instead.
+
+    Studio opens its store as ``QSettings("XSlope", "XSlope Studio")`` from a
+    dozen call sites, none of which take a path, and on macOS that store CANNOT be
+    redirected by ``setDefaultFormat``/``setPath`` (measured — see
+    ``test/welcome_window_check.py``): the two-argument form comes back
+    NativeFormat at the real plist whatever those say. A store that cannot be
+    redirected has to be REPLACED, so the *class* is what this replaces, for the
+    length of the session and inside this process only.
+
+    Every other construction — a scratch ini, a path with an explicit format —
+    is passed through untouched, and so is every attribute (``IniFormat``,
+    ``UserScope``, …), so the name behaves as the class everywhere else.
+    """
+
+    def __init__(self, real, path):
+        self._real = real
+        self._path = path
+
+    def __call__(self, *args, **kwargs):
+        if self._is_machine_store(args):
+            return self._real(self._path, self._real.IniFormat)
+        return self._real(*args, **kwargs)
+
+    @staticmethod
+    def _is_machine_store(args):
+        """Whether this construction asks for Studio's own machine-wide store."""
+        if not args:
+            return True          # QSettings() — the application-wide default store
+        return any(a == ORG_NAME for a in args if isinstance(a, str))
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+def _patch_targets():
+    """Every already-imported module holding its own reference to ``QSettings``.
+
+    Studio's modules bind the class at import time (``from PySide6.QtCore import
+    QSettings``), so patching ``PySide6.QtCore`` alone reaches only the modules
+    imported afterwards. Both are done: this sweep catches the ones already in,
+    and the QtCore patch catches every later import (``studio.editors`` and
+    ``studio.welcome`` are loaded lazily, mid-session).
+    """
+    import PySide6.QtCore
+    real = PySide6.QtCore.QSettings
+    targets = [(PySide6.QtCore, real)]
+    for name, mod in list(sys.modules.items()):
+        if mod is None or not (name == "studio" or name.startswith("studio.")):
+            continue
+        if getattr(mod, "QSettings", None) is real:
+            targets.append((mod, real))
+    return targets
+
+
 @contextlib.contextmanager
 def _pinned_settings(values):
-    """Write ``values`` into the app's real QSettings for the length of the run.
+    """Run the session against a store of its own, carrying ``values``.
 
-    Same reason ``t0_studio_window`` pins the provider and model: the dock's
-    caption and the completion call both read the machine's stored selection, so
-    an unpinned session would be recorded against whatever the person running it
-    last had selected. ``None`` records "this key was not set", which is restored
-    by removing it again rather than by writing an empty string.
+    The dock's caption and the completion call both read the stored provider /
+    model selection, and the confirm-before-running gate decides whether an
+    unattended turn stops on a modal — so a session has to state all three. It
+    used to state them by writing the machine-wide store and putting it back
+    afterwards, which made two concurrent sessions incompatible (see
+    :func:`_session_settings_path`) and put the person's own preferences one
+    crashed run away from being left on a recording's values.
+
+    Now nothing of theirs is written or restored: the session gets a private ini,
+    the class Studio constructs its store from is replaced for the length of the
+    run so every part of the app lands in that ini, and the machine store is only
+    ever READ — once, to carry the non-secret ``ai/`` settings across so the
+    session still talks to the endpoint the person configured. API keys are not
+    copied; they come from the OS keychain, which is untouched by any of this.
     """
-    settings = QSettings("XSlope", "XSlope Studio")
-    stashed = {k: (settings.value(k) if settings.contains(k) else None)
-               for k in values}
+    path = _session_settings_path()
+    store = QSettings(path, QSettings.IniFormat)
+    machine = QSettings(ORG_NAME, SETTINGS_APP)
+    for key in machine.allKeys():
+        if (key.startswith(_CARRIED_PREFIXES)
+                and not key.startswith(_NEVER_CARRIED)
+                and key not in values):
+            store.setValue(key, machine.value(key))
+    for key, value in values.items():
+        store.setValue(key, value)
+    store.sync()
+
+    targets = _patch_targets()
+    real_class = targets[0][1]
+    for module, real in targets:
+        setattr(module, "QSettings", _StoreRedirector(real, path))
     try:
-        for key, value in values.items():
-            settings.setValue(key, value)
-        settings.sync()
-        yield settings
+        yield store
     finally:
-        for key, value in stashed.items():
-            if value is None:
-                settings.remove(key)
-            else:
-                settings.setValue(key, value)
-        settings.sync()
+        for module, real in targets:
+            setattr(module, "QSettings", real)
+        # A module imported DURING the session bound the redirector as its own
+        # ``QSettings`` and is not in the list above; left alone it would keep
+        # sending the machine store to this session's ini for the rest of the
+        # process. The sweep is repeated on the way out for exactly that set.
+        for name, mod in list(sys.modules.items()):
+            if mod is None or not (name == "studio" or name.startswith("studio.")):
+                continue
+            if isinstance(getattr(mod, "QSettings", None), _StoreRedirector):
+                setattr(mod, "QSettings", real_class)
+        store.sync()
+
+
+# --------------------------------------------------------------------------- #
+# The watchdog
+# --------------------------------------------------------------------------- #
+#: Seconds a turn is allowed to overrun its own timeout before the watchdog
+#: stops the process. The per-turn timeout is a QTimer, and a QTimer is a message
+#: on the event loop — so it cannot fire while the event loop is the thing that is
+#: stuck, which is exactly what a runaway snippet does: ``run_python`` executes on
+#: the GUI thread, and a snippet that never returns takes the timer with it. The
+#: kernel's own snippet limit (``ai/run_timeout``, pinned below) is what normally
+#: ends such a run; this is the backstop for the case that limit cannot reach — a
+#: C-level call between two bytecodes, where no Python-level interrupt lands.
+WATCHDOG_GRACE_S = 120.0
+
+
+@contextlib.contextmanager
+def _watchdog(seconds, message, note=None):
+    """Kill the process if the block has not finished ``seconds`` from now.
+
+    Runs on its own thread, which keeps running while the GUI thread is blocked
+    (a busy Python loop yields the GIL; a C call releases it), so it is the one
+    part of the harness that still works when the event loop is gone. It writes
+    the reason where the run's record is — the transcript, through ``note`` — and
+    then ends the process hard, because there is nothing left to unwind through:
+    the stack it would have to return along is the one that is stuck.
+    """
+    if not seconds or seconds <= 0:
+        yield
+        return
+    done = threading.Event()
+
+    def watch():
+        if done.wait(seconds):
+            return
+        try:
+            if note is not None:
+                note(message)
+        except Exception:
+            pass
+        sys.stderr.write("  ! %s\n" % message)
+        sys.stderr.flush()
+        os._exit(3)
+
+    thread = threading.Thread(target=watch, daemon=True,
+                              name="assistant-session-watchdog")
+    thread.start()
+    try:
+        yield
+    finally:
+        done.set()
 
 
 # --------------------------------------------------------------------------- #
@@ -403,7 +577,12 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
         one-item tuple list would be noise. A turn's own images win.
     timeout_s : float
         Per turn. A turn that overruns is recorded as an error and the session
-        stops there rather than hanging a producer run.
+        stops there rather than hanging a producer run. It is also the limit the
+        kernel is pinned to for ONE SNIPPET (``ai/run_timeout``), because the
+        per-turn timeout is a QTimer and a snippet runs on the GUI thread: a
+        runaway snippet stops the timer that was supposed to end it. Past that
+        limit and a grace period, the watchdog thread notes the turn in the
+        transcript and stops the process (:data:`WATCHDOG_GRACE_S`).
     dry_run : bool
         Do everything except call the provider: the reply is a stub "…", so the
         whole path — window, dock sizing, grab, transcript, workbook — is
@@ -446,7 +625,12 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
     workbook_path = os.path.join(files_dir, "%s_after.xlsx" % stem)
 
     pins = {"ai/provider": provider, "ai/model/%s" % provider: model,
-            "ai/confirm": False}
+            "ai/confirm": False,
+            # One snippet may not outlast the turn it belongs to. The kernel reads
+            # this and stops a snippet that overruns it, which is what makes the
+            # per-turn timeout reachable at all: the timeout is a QTimer, and a
+            # snippet running on the GUI thread is what stops timers firing.
+            "ai/run_timeout": float(timeout_s)}
     pins.update(settings or {})
     result = {"name": name, "images": [], "transcript": transcript_path,
               "workbook": None, "turns": [], "usage": {}, "seconds": 0.0,
@@ -492,8 +676,26 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
             for i, turn in enumerate(turns, start=1):
                 text, turn_images = _turn_parts(turn, images if i == 1 else None)
                 print("  turn %d: %s" % (i, _one_line(text)))
-                record = _play_turn(win, chat, assistant, text, turn_images,
-                                    timeout_s, probe)
+                # The watchdog's own transcript note, written from its thread
+                # while this one is stuck, so a killed run still reads as a
+                # record of a turn rather than a file that stops mid-session.
+                def stopped(message, _i=i, _text=text, _imgs=turn_images):
+                    _append_turn(transcript_path, _i,
+                                 {"prompt": _text, "images": list(_imgs),
+                                  "body": "Error: " + message, "usage": {},
+                                  "seconds": timeout_s + WATCHDOG_GRACE_S,
+                                  "error": message})
+                    _append_footer(transcript_path,
+                                   dict(result, error=message,
+                                        seconds=time.time() - started))
+
+                with _watchdog(timeout_s + WATCHDOG_GRACE_S,
+                               "turn %d did not return within %gs of its %gs "
+                               "timeout — the run is stuck on the GUI thread, so "
+                               "the harness stopped the process."
+                               % (i, WATCHDOG_GRACE_S, timeout_s), stopped):
+                    record = _play_turn(win, chat, assistant, text, turn_images,
+                                        timeout_s, probe)
                 png = _grab_dock(win, os.path.join(out_dir, "%s_%d.png"
                                                    % (stem, i)), max_height)
                 record["image"] = png

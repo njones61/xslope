@@ -69,6 +69,16 @@ does regardless of the model, and that is what this file covers:
      assistant says can be opened has to be openable: a report generated with no
      path lands in the output folder the dock's Files button opens, and is named
      among the files the snippet reports.
+  N. TRANSIENT SEEPAGE, AND THE SNIPPET THAT NEVER RETURNS — a corpus sweep met a
+     transient model with no helper for it, and the assistant spent the turn
+     reverse-engineering engine signatures instead of answering; another sweep sat
+     forty minutes on a snippet that never returned, because the snippet runs on
+     the GUI thread and so does the timer that was supposed to end the turn. So:
+     the transient march is a helper, it marches a real sample into stored frames
+     and hands the second caller the march it already has, the route to one instant
+     is in the brief the model reads, and a snippet that overruns its limit is
+     stopped, rolled back and reported to the model as its own result — with the
+     limit off, the same snippet finishes.
   I. THE THINGS THE HARNESS OWNS WHATEVER THE MODEL DOES — every helper the
      prompt tells the model to call is in the namespace with the arguments the
      prompt names (a helper described and absent is a NameError followed by the
@@ -1302,9 +1312,13 @@ def check_mutation_disables_the_checks():
 #: the prompt taught it, gets a NameError, and reconstructs the pipeline by hand
 #: — which is the failure the helpers exist to prevent.
 HELPERS = {
-    "run_lem": ("method", "num_slices", "plot", "slope_data", "search"),
+    "run_lem": ("method", "num_slices", "plot", "slope_data", "search",
+                "seep_time"),
     "corpus_index": ("query",),
-    "run_seep": ("bc", "tol", "max_iter", "plot", "slope_data"),
+    "run_seep": ("bc", "tol", "max_iter", "plot", "slope_data", "transient"),
+    "run_tseep": ("times", "plot", "slope_data", "rerun", "save"),
+    "fs_vs_time": ("times", "method", "mode", "search", "rapid", "plot"),
+    "transient_solution": ("slope_data",),
     "run_fem": ("analysis", "F", "F_min", "F_max", "tolerance", "plot",
                 "slope_data"),
     "suggest_elastic": ("material_or_soil_type", "unit_system", "slope_data"),
@@ -2148,6 +2162,156 @@ def check_report_lands_in_the_files_folder():
     return out
 
 
+# --- N. transient seepage, and the snippet that never returns ---------------
+# Two failures measured in the same corpus sweep. A transient model had no helper
+# at all, so the assistant went looking for one — `inspect`, `getsource`, a
+# reverse-engineered `build_seep_data()` call missing its first argument — and
+# spent the turn's whole completion budget on the search. And a snippet that never
+# returned took the GUI thread with it, which is also the thread the per-turn
+# timeout runs on, so nothing ended it: one measured run sat there for forty
+# minutes. What is asserted: the transient helper exists, is named where the model
+# reads, and marches a real sample into frames; and a snippet that overruns the
+# limit is stopped, rolled back, and reported to the model as its own result.
+
+#: A real transient model — the earth dam, whose march is a few seconds once the
+#: duration is cut to two saved steps. Cutting it keeps the leg about the helper
+#: (the pipeline, the frames, where they are stored) rather than about the solver,
+#: which has its own verification.
+TSEEP_MODEL = os.path.join(_REPO, "docs", "seep", "files",
+                           "xslope_earth_dam_tseep.xlsx")
+
+
+def check_transient_helper_marches():
+    """`run_seep(transient=True)` / `run_tseep()` runs a real transient model and
+    leaves its frames where Studio leaves them."""
+    if not os.path.exists(TSEEP_MODEL):
+        return ["the transient sample is missing: %s" % TSEEP_MODEL]
+    out = []
+    mw, asst = _session()
+    _quiet(mw.doc.load, TSEEP_MODEL)
+    sd = mw.doc.slope_data
+    if not sd.get("tseep"):
+        mw.deleteLater()
+        return ["the transient sample carries no tseep sheet"]
+    # Two saved steps is a march; the file's own 360-day schedule is a minute of
+    # solver time this check has no reason to spend.
+    sd["tseep"]["duration"] = 20.0
+    sd["tseep"]["save_interval"] = 10.0
+
+    result = _run(asst, "b = run_seep(transient=True, plot=False)\n"
+                        "print('MODE', b['mode'])\n"
+                        "print('FRAMES', [round(f['time'], 3) for f in b['frames']])")
+    if "Traceback" in result:
+        mw.deleteLater()
+        return ["the transient run raised:\n" + result[-600:]]
+    if "MODE transient" not in result:
+        out.append("the bundle is not a transient bundle: %s" % result[:200])
+    if "FRAMES [" not in result or "FRAMES []" in result:
+        out.append("the march produced no frames: %s" % result[:200])
+    bundle = mw.doc.results.get("transient_seep")
+    if not isinstance(bundle, dict):
+        out.append("the march left nothing on doc.results['transient_seep'] — "
+                   "the Seep · Transient tab and the report both read it there")
+    else:
+        frames = bundle.get("frames") or []
+        if len(frames) < 2:
+            out.append("the stored bundle carries %d frame(s)" % len(frames))
+        elif any("u" not in fr or "head" not in fr for fr in frames):
+            out.append("a stored frame carries no head/u field")
+        if bundle.get("transient") is None:
+            out.append("the stored bundle carries no march to read an instant from")
+    # The march is not paid for twice: a second call hands back what the session
+    # already holds (which is also what an opened file's sidecar leaves there).
+    again = _run(asst, "print('SAME', run_tseep(plot=False) is "
+                       "results['transient_seep'])")
+    if "SAME True" not in again:
+        out.append("a second run_tseep() re-marched instead of returning the "
+                   "solution the session holds: %s" % again[:200])
+    # And one instant of it reaches a stability run as pore pressure.
+    staged = _run(asst, "info = xslope.seep.apply_transient_stability_frame("
+                        "slope_data, transient_solution(), time=10.0)\n"
+                        "print('U', slope_data.get('seep_u') is not None)")
+    if "U True" not in staged:
+        out.append("an instant of the march does not reach slope_data['seep_u']: "
+                   "%s" % staged[:300])
+    mw.deleteLater()
+    return out
+
+
+def check_transient_helper_is_told_to_the_model():
+    """The transient route is in the brief the model reads — the helper, the way
+    to pick an instant, and the rule that a refused helper is a call to fix."""
+    from studio.ai.assistant import SCHEMA_BRIEF, STUDIO_SYSTEM, _load_brief_text
+    out = []
+    prompt = STUDIO_SYSTEM + SCHEMA_BRIEF + (_load_brief_text() or "")
+    for anchor in ("run_tseep(", "run_seep(transient=True)", "seep_time",
+                   "fs_vs_time("):
+        if anchor not in prompt:
+            out.append(f"the prompt never mentions {anchor!r}")
+    brief = _load_brief_text() or ""
+    if "tseep" not in brief:
+        out.append("the brief never names the tseep sheet, so a transient model "
+                   "is not recognizable from it")
+    # The rule the reverse-engineering failure needs: read the error, fix the
+    # call — do not go reading the package.
+    lowered = brief.lower()
+    if not any(w in lowered for w in ("getsource", "inspect")):
+        out.append("the brief never rules out reading the package when a helper "
+                   "refuses, which is what the measured failure did")
+    return out
+
+
+def check_a_runaway_snippet_is_stopped():
+    """A snippet that overruns the limit is stopped, and stopped where the model
+    can read it: as its own tool result, with the edit rolled back."""
+    import time
+    from studio.ai import kernel as K
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)          # something for the stopped edit to touch
+    mw.settings.setValue(K.RUN_TIMEOUT_KEY, 0.5)
+    if abs(asst._kernel.run_timeout() - 0.5) > 1e-9:
+        out.append("the kernel does not read the ai/run_timeout setting "
+                   "(got %r)" % asst._kernel.run_timeout())
+    started = time.time()
+    result = _run(asst, "import time\n"
+                        "slope_data['materials'][0]['c'] = 999.0\n"
+                        "time.sleep(30)")
+    elapsed = time.time() - started
+    if elapsed > 20:
+        out.append("the snippet ran %.1fs against a 0.5s limit" % elapsed)
+    if "TimeoutError" not in result:
+        out.append("the model is not told the snippet was stopped: %s"
+                   % result[-300:])
+    if float(mw.doc.slope_data["materials"][0].get("c") or 0) == 999.0:
+        out.append("the stopped snippet's edit was kept; a snippet that raises "
+                   "is rolled back whole")
+
+    # The other direction: with the limit off, the same shape of snippet runs to
+    # the end. A limit that fires on everything measures nothing.
+    mw.settings.setValue(K.RUN_TIMEOUT_KEY, 0)
+    ran = _run(asst, "import time\n"
+                     "time.sleep(1.2)\n"
+                     "print('FINISHED')")
+    if "FINISHED" not in ran:
+        out.append("with the limit off, a 1.2s snippet did not finish: %s"
+                   % ran[-200:])
+    mw.settings.remove(K.RUN_TIMEOUT_KEY)
+
+    # The default, and the per-process override the producer harness uses.
+    if asst._kernel.run_timeout() != K.DEFAULT_RUN_TIMEOUT_S:
+        out.append("with nothing set, the limit is %r rather than the %gs default"
+                   % (asst._kernel.run_timeout(), K.DEFAULT_RUN_TIMEOUT_S))
+    os.environ[K.RUN_TIMEOUT_ENV] = "12"
+    try:
+        if asst._kernel.run_timeout() != 12.0:
+            out.append("%s does not override the setting" % K.RUN_TIMEOUT_ENV)
+    finally:
+        os.environ.pop(K.RUN_TIMEOUT_ENV, None)
+    mw.deleteLater()
+    return out
+
+
 CHECKS = [
     ("A. iron rules, once per prompt tier", check_iron_rules_once),
     ("A. the live prompts carry them", check_assembled_prompt_is_the_real_one),
@@ -2204,6 +2368,10 @@ CHECKS = [
     ("M. the loop honours the gate", check_the_loop_honours_the_gate),
     ("M. a report lands in the Files folder",
      check_report_lands_in_the_files_folder),
+    ("N. the transient march is a helper", check_transient_helper_marches),
+    ("N. the transient route is in the brief",
+     check_transient_helper_is_told_to_the_model),
+    ("N. a runaway snippet is stopped", check_a_runaway_snippet_is_stopped),
 ]
 
 

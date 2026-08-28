@@ -17,12 +17,19 @@ What is asserted, all offscreen, all against the real ``MainWindow``, the real
   B. NOTHING IS CALLED — ``litellm.completion`` is not entered by a dry run. This
      is the leg that keeps ``--dry-run`` free: it is asserted by counting calls
      through the same wrapper the harness itself uses for token accounting.
-  C. THE SETTINGS COME BACK — provider, model and the confirm-before-running gate
-     are pinned for the length of the session and restored afterwards, including
-     the case of a key that was not set at all (restored by removal, not by an
-     empty string). The store cannot be redirected on macOS (see
-     ``test/welcome_window_check.py``), so this is asserted against the real one,
-     which is precisely the store a leak would damage.
+  C. THE MACHINE'S SETTINGS ARE NEVER TOUCHED — provider, model and the
+     confirm-before-running gate are stated for the length of the session in a
+     store of the session's OWN, and the user's is only read. It used to be
+     written and restored, which cost a measured corpus run: two sessions running
+     at once pinned the same machine-wide store, the second restored the first's
+     ``ai/confirm``, and the first stopped dead on the "Run code?" modal with
+     nobody to click it. So what is asserted is the whole store, key by key,
+     unchanged across a session — and the pins present in the session's own file.
+  H. TWO SESSIONS AT ONCE DO NOT COLLIDE — two dry sessions in separate processes,
+     held inside their pinned region at the same time by a file handshake, each
+     read back the provider and model THEY asked for, out of two different stores,
+     and the user's store is unchanged by both. Under the restore-the-machine-store
+     design this is the leg that fails.
   D. A SWEEP CANNOT SPEND — the sessions registry is disjoint from the screenshot
      producer's ``SHOTS``, and an argument-less ``main`` selects no session. A
      session that leaked into ``SHOTS`` would be run, and billed, by every routine
@@ -69,28 +76,29 @@ def _ok(name, detail=""):
     print("  ok    %s%s" % (name, ("  (%s)" % detail) if detail else ""))
 
 
-@contextlib.contextmanager
-def _recent_files_preserved():
-    """Keep the user's recent-files list out of this run.
+def _machine_settings():
+    """Every key and value in Studio's own machine-wide store, as a dict.
 
-    The harness opens its project through ``MainWindow.open_path``, the real path,
-    which records the file in ``recent_files``. That store is the user's own (it
-    cannot be redirected on macOS), so the list is stashed and put back — the check
-    exercises the real open path without reordering anybody's File menu.
+    The comparison this check is built on. A session must leave it identical —
+    including ``recent_files``, which the real open path would otherwise reorder,
+    and which is now written to the session's own store like everything else.
     """
     from PySide6.QtCore import QSettings
 
     settings = QSettings("XSlope", "XSlope Studio")
-    had = settings.contains("recent_files")
-    stashed = settings.value("recent_files") if had else None
-    try:
-        yield
-    finally:
-        if had:
-            settings.setValue("recent_files", stashed)
-        else:
-            settings.remove("recent_files")
-        settings.sync()
+    settings.sync()
+    return {key: settings.value(key) for key in settings.allKeys()}
+
+
+def _machine_settings_unchanged(before, failures, name, what):
+    after = _machine_settings()
+    drift = {k: (before.get(k), after.get(k))
+             for k in set(before) | set(after) if before.get(k) != after.get(k)}
+    if drift:
+        _fail(failures, name, "%s changed the user's own settings: %s"
+              % (what, drift))
+        return False
+    return True
 
 
 @contextlib.contextmanager
@@ -198,35 +206,166 @@ def check_dry_session(sessions, failures):
 
 
 # --------------------------------------------------------------------------- #
-# C — the pinned settings come back
+# C — the session states its settings in a store of its own
 # --------------------------------------------------------------------------- #
-def check_settings_restored(sessions, failures):
+def check_settings_are_the_sessions_own(sessions, failures):
     from PySide6.QtCore import QSettings
 
-    settings = QSettings("XSlope", "XSlope Studio")
-    keys = ["ai/provider", "ai/model/anthropic", "ai/confirm",
-            "ai/model/openai"]                     # the last one is the unset case
-    settings.remove("ai/model/openai")
-    settings.sync()
-    before = {k: (settings.value(k) if settings.contains(k) else None) for k in keys}
-
+    before = _machine_settings()
     tmp = tempfile.mkdtemp(prefix="xslope_assistant_capture_")
+    seen = {}
+    real_stub = sessions._install_stub
+
+    def stub(assistant, reply="…"):
+        # Read what the running window actually resolved, from inside it.
+        seen.update(provider=assistant.config.provider(),
+                    model=assistant.config.model(),
+                    confirm=assistant.config.confirm_before_run(),
+                    store=assistant.config._s.fileName())
+        real_stub(assistant, reply)
+
+    sessions._install_stub = stub
     try:
         _run(sessions, tmp, "settings", [PROMPT], provider="anthropic",
              model="claude-haiku-4-5")
     finally:
+        sessions._install_stub = real_stub
         shutil.rmtree(tmp, ignore_errors=True)
 
-    fresh = QSettings("XSlope", "XSlope Studio")
-    after = {k: (fresh.value(k) if fresh.contains(k) else None) for k in keys}
-    name = "C. the pinned settings are restored"
-    drift = {k: (before[k], after[k]) for k in keys if before[k] != after[k]}
-    if drift:
-        _fail(failures, name, "left behind %s" % drift)
-    elif after["ai/model/openai"] is not None:
-        _fail(failures, name, "an unset key came back set")
+    name = "C. the user's own settings are untouched"
+    if _machine_settings_unchanged(before, failures, name, "a dry session"):
+        _ok(name, "%d key(s) identical" % len(before))
+
+    name = "C. the session reads its own store"
+    machine = QSettings("XSlope", "XSlope Studio").fileName()
+    if (seen.get("model") != "claude-haiku-4-5"
+            or seen.get("provider") != "anthropic"):
+        _fail(failures, name, "the window resolved %s/%s, not the session's pins"
+              % (seen.get("provider"), seen.get("model")))
+    elif seen.get("confirm") is not False:
+        _fail(failures, name, "confirm-before-running is %r, so an unattended "
+              "turn would stop on the modal" % seen.get("confirm"))
+    elif (not seen.get("store")
+            or os.path.abspath(seen["store"]) == os.path.abspath(machine)):
+        _fail(failures, name, "the window is reading the machine store (%s)"
+              % seen.get("store"))
+    elif str(os.getpid()) not in os.path.basename(seen["store"]):
+        _fail(failures, name, "the session's store is not per-process: %s"
+              % seen["store"])
     else:
-        _ok(name, "provider/model/confirm unchanged, unset key still unset")
+        _ok(name, os.path.basename(seen["store"]))
+
+
+# --------------------------------------------------------------------------- #
+# H — two sessions at once
+# --------------------------------------------------------------------------- #
+#: Driver for one session in a process of its own. It holds the session inside its
+#: pinned region until the other process is in there too (the handshake through
+#: ``sync``), and only then reads back what the running window resolved — so a
+#: store shared between the two is read AFTER the other one has written it, which
+#: is the collision this leg exists to catch.
+_PARALLEL_DRIVER = '''
+import json, os, sys, time
+
+sys.path.insert(0, %(repo)r)
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+import matplotlib
+matplotlib.use("Agg")
+from PySide6.QtWidgets import QApplication
+_app = QApplication.instance() or QApplication([])
+
+import tools.assistant_sessions as sessions
+
+model, tag, other, sync, out_dir = sys.argv[1:6]
+seen = {}
+real = sessions._install_stub
+
+
+def stub(assistant, reply="."):
+    open(os.path.join(sync, tag), "w").close()
+    deadline = time.time() + 120
+    while not os.path.exists(os.path.join(sync, other)) and time.time() < deadline:
+        time.sleep(0.05)
+    seen.update(provider=assistant.config.provider(),
+                model=assistant.config.model(),
+                confirm=assistant.config.confirm_before_run(),
+                store=assistant.config._s.fileName(),
+                both_in=os.path.exists(os.path.join(sync, other)))
+    real(assistant, reply)
+
+
+sessions._install_stub = stub
+result = sessions.run_assistant_session(
+    tag, %(model_path)r, ["ping"], dry_run=True, model=model,
+    out_dir=os.path.join(out_dir, "images"),
+    files_dir=os.path.join(out_dir, "files"))
+seen["error"] = result["error"]
+sys.stderr.write("RESULT " + json.dumps(seen) + "\\n")
+'''
+
+
+def check_parallel_sessions_do_not_collide(sessions, failures):
+    import json
+    import subprocess
+    import threading
+
+    name = "H. two sessions at once do not collide"
+    before = _machine_settings()
+    tmp = tempfile.mkdtemp(prefix="xslope_assistant_parallel_")
+    sync = os.path.join(tmp, "sync")
+    os.makedirs(sync)
+    driver = os.path.join(tmp, "driver.py")
+    with open(driver, "w", encoding="utf-8") as fh:
+        fh.write(_PARALLEL_DRIVER % {"repo": REPO_ROOT, "model_path": MODEL})
+    runs = {}
+
+    def go(tag, model, other):
+        proc = subprocess.run(
+            [sys.executable, driver, model, tag, other, sync,
+             os.path.join(tmp, tag)],
+            capture_output=True, text=True, timeout=900)
+        line = [ln for ln in proc.stderr.splitlines() if ln.startswith("RESULT ")]
+        runs[tag] = (json.loads(line[-1][len("RESULT "):]) if line
+                     else {"error": "no result line; stderr tail: %s"
+                                    % proc.stderr[-400:]})
+
+    threads = [threading.Thread(target=go, args=a) for a in
+               (("alpha", "claude-haiku-4-5", "beta"),
+                ("beta", "claude-sonnet-5", "alpha"))]
+    try:
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    wanted = {"alpha": "claude-haiku-4-5", "beta": "claude-sonnet-5"}
+    problems = []
+    for tag, want in wanted.items():
+        got = runs.get(tag) or {}
+        if got.get("error"):
+            problems.append("%s failed: %s" % (tag, got["error"]))
+            continue
+        if not got.get("both_in"):
+            problems.append("%s never overlapped the other session, so nothing "
+                            "about concurrency was measured" % tag)
+        if got.get("model") != want:
+            problems.append("%s ran as %r, not %r — the two sessions share a store"
+                            % (tag, got.get("model"), want))
+        if got.get("confirm") is not False:
+            problems.append("%s had confirm-before-running back on, so it would "
+                            "hang on the modal" % tag)
+    stores = {tag: (runs.get(tag) or {}).get("store") for tag in wanted}
+    if len(set(stores.values())) != len(stores):
+        problems.append("both sessions used the same store: %s" % stores)
+    if problems:
+        for problem in problems:
+            _fail(failures, name, problem)
+    else:
+        _ok(name, ", ".join("%s=%s" % (t, os.path.basename(s or ""))
+                            for t, s in stores.items()))
+    _machine_settings_unchanged(before, failures, name, "two parallel sessions")
 
 
 # --------------------------------------------------------------------------- #
@@ -381,13 +520,13 @@ def run():
     if not os.path.exists(MODEL):
         return ["the check's project is missing: %s" % MODEL]
 
-    with _recent_files_preserved():
-        check_dry_session(sessions, failures)
-        check_settings_restored(sessions, failures)
-        check_sweep_cannot_spend(sessions, failures)
-        check_workbook_written(sessions, failures)
-        check_no_workbook_when_unchanged(sessions, failures)
-        check_timeout(sessions, failures)
+    check_dry_session(sessions, failures)
+    check_settings_are_the_sessions_own(sessions, failures)
+    check_parallel_sessions_do_not_collide(sessions, failures)
+    check_sweep_cannot_spend(sessions, failures)
+    check_workbook_written(sessions, failures)
+    check_no_workbook_when_unchanged(sessions, failures)
+    check_timeout(sessions, failures)
     return failures
 
 

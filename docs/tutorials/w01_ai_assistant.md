@@ -52,19 +52,15 @@ the figure. The transcript fills the middle, the input box is below it, and
 You bring your own model: the assistant does nothing at all until it has a
 provider and credentials. To supply them, click **Settings…**.
 
-![The Assistant settings dialog on a fresh install: Provider set to Claude (Anthropic), Model to claude-opus-5, an empty API key field, a disabled Base URL field, and Confirm before running code checked](images/w01_settings.png){width=460}
+![The Assistant settings dialog on a fresh install: Provider set to Claude (Anthropic), Model to claude-opus-5, an empty API key field, a disabled Base URL field, and Confirm before running code unchecked](images/w01_settings.png){width=460}
 
 The dialog has four fields and a checkbox:
 
-**Provider** — one of five: **Claude (Anthropic)**, **OpenAI**, **Kimi
-(Moonshot AI)**, **Z.ai (GLM)**, and **Ollama (local, free)**. Every one of them
-can read an image, which is a requirement rather than a coincidence: handing the
-assistant a photograph or a sketch of a cross section is the first thing this
-tutorial does, and a model that cannot see turns that request into a
-conversation about what the picture shows. Where a provider sells text-only
-models alongside models that can see, only the second kind is listed. The first
-four are hosted services that bill for what you use; Ollama runs a model on your
-own machine, free, and sends nothing anywhere.
+**Provider** — the services this version of Studio can talk to, hosted ones
+that bill for what you use and **Ollama**, which runs a model on your own
+machine, free, and sends nothing anywhere. Only models that can read an image
+are listed, because handing the assistant a photograph or a sketch of a cross
+section is the first thing this tutorial does.
 
 **Model** — a list of what the chosen provider currently offers, with one marked
 as recommended. The box also accepts free text, so a model id released after
@@ -83,12 +79,12 @@ Z.ai and Ollama, whose endpoints move — a Z.ai coding-plan key uses a differen
 base from a standard one, and a local Ollama may be on another port — and
 disabled for Claude and OpenAI, whose addresses are fixed.
 
-**Confirm before running code** — checked by default. The assistant works by
-writing small Python snippets and running them in Studio's own process, so with
-this box checked every snippet is shown to you and waits for your approval
-before it executes. Unchecked, the assistant runs code without asking, which
-goes faster on a long build. Read what that means before you uncheck it: the
-code runs as you, with your file access.
+**Confirm before running code** — unchecked by default. The assistant works by
+writing small Python snippets and running them in Studio's own process; with
+this box checked, every snippet is shown to you and waits for your approval
+before it executes. Leaving it unchecked is fine for ordinary use: the
+assistant's edits change the model in memory, and **Edit → Undo** or closing
+without saving takes them back.
 
 Below the fields, two captions report where the model list came from and what
 the selected model can do — whether it supports running code, whether it can

@@ -4662,6 +4662,28 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
          load_error="unrecognized Dir"),
+    # A NUMBER in a word column. The rule used to read its cells with
+    # str(value or ""), which calls every falsy value blank, so Dir = 0.0 was
+    # taken for an empty cell and passed the one check whose job is to refuse
+    # anything that is not a direction -- while Dir = 'sideways' was caught. The
+    # engine then applied the line axially. Each of the three vocabulary columns
+    # carries the mutation, since they were all read the same way.
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir=0.0),
+         expect='is not a direction'),
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir=0.0),
+         load_error="unrecognized Dir"),
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', appl=0.0),
+         expect='is not an application'),
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', type=0.0),
+         expect='is not a support type'),
     dict(rule='reinforce.tmax_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_max=0.0),
@@ -6674,6 +6696,43 @@ def run_docs_heading_trap_test(test):
                 offenders.append(f"{md.relative_to(docs.parent)}:{i}: {line[:60]}")
     if offenders:
         return None, "line-initial '#' renders as a heading: " + "; ".join(offenders[:5])
+    return 0.0, None
+
+
+def run_reinforcement_edits_test(test):
+    """What an EDIT to the reinforcement does to the model (test/reinforcement_edits_check.py).
+
+    Three ways an edit was absorbed instead of applied. A ``Dir`` or ``Appl``
+    outside the vocabulary: the slicer tested them with ``== "tangent"`` and
+    ``== "active"`` and took the other branch for everything else, so ``Dir =
+    0.0`` was applied AXIALLY and a nonsense ``Appl`` as passive capacity, and
+    the answer came back as if that were the model asked for. Clearing the
+    lines: ``reinforce_lines`` is derived from ``reinforcement_lines``, and the
+    slicer fell back to the derived list whenever the source was empty, so
+    deleting every row left the analysis reinforced by the point lists built
+    before the deletion. Saving the file: the sheet fills Dir and Appl with a
+    VLOOKUP on Type and holds each column as one shared-formula group, so
+    writing a literal into the master at H3/I3 deleted the only copy of the
+    formula and Dir rows 9-22 read back as a bare '='.
+
+    Each leg pins the behavior the fix must not have disturbed as well: a blank
+    still takes the documented default, a model carrying no source key still
+    runs the legacy point-list path, and a row whose Dir/Appl are exactly what
+    its Type derives is saved as the Type alone with the formula left in place.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'reinforcement_edits_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('reinforcement_edits_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures[:6])
     return 0.0, None
 
 
@@ -12140,6 +12199,8 @@ def _dispatch_test(test):
         return run_dload_direction_test(test)
     if test_type == 'dload_sign':
         return run_dload_sign_test(test)
+    if test_type == 'reinforcement_edits':
+        return run_reinforcement_edits_test(test)
     if test_type == 'k0_level_ground':
         return run_k0_level_ground_test(test)
     if test_type == 'beam_element':
@@ -12287,7 +12348,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'beam_element', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -12784,6 +12845,13 @@ def main():
         # The editor's Pullout switch, driven offscreen: which law a line reads as,
         # and that neither pair's values are lost switching between them.
         tests.append({'type': 'pullout_switch', 'file': 'reinforcement pullout switch',
+                      'method': '-', 'source': 'reinforce'})
+        # What an edit to the reinforcement does to the model: a Dir/Appl outside
+        # the vocabulary must stop the run rather than be applied as a different
+        # (valid) model, an emptied line list must mean no reinforcement rather
+        # than fall back to the derived point lists, and a saved file must keep
+        # the Dir/Appl formulas the sheet derives from Type.
+        tests.append({'type': 'reinforcement_edits', 'file': 'reinforcement edits',
                       'method': '-', 'source': 'reinforce'})
         # Same guard for the slice force diagrams the Analysis Report prints:
         # the documentation's drawings are the masters, and the report embeds

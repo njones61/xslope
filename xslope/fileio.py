@@ -228,6 +228,20 @@ REINFORCE_TYPE_PRESETS = {
 REINFORCE_TYPE_DEFAULT = ('tangent', 'active')
 
 
+def _reinf_word(value, default):
+    """A reinforcement vocabulary cell's word, or ``default`` when it is blank.
+
+    Blank is None, NaN or an empty string -- never a falsy NUMBER. The obvious
+    ``value or default`` reads ``0.0`` as an empty cell, which is how a nonsense
+    ``Dir`` got written back to the sheet as the Type's preset instead of as
+    itself, hiding from the loader the value that had actually been entered.
+    """
+    if value is None or (isinstance(value, float) and value != value):
+        return default
+    text = str(value).strip().lower()
+    return text if text else default
+
+
 def _opt_size_cell(df, row_idx, col_idx, where):
     """Optional local mesh size cell. Blank -> None; a non-numeric or non-positive
     entry is a loud error naming the block, never a silently ignored refinement."""
@@ -877,6 +891,16 @@ def ensure_reinforce_pullout(slope_data):
     constant-rate law cost one tuple comparison per line.
     """
     lines = slope_data.get('reinforcement_lines') or []
+    if not lines and 'reinforcement_lines' in slope_data:
+        # The source list is the model's own statement about its reinforcement,
+        # the empty list included. 'reinforce_lines' is derived from it, and a
+        # derived list that outlives the row it came from is reinforcement the
+        # model no longer has -- still drawn by plot.plot_reinforcement_lines,
+        # and (before the slicer stopped falling back to it) still carried into
+        # the factor of safety.
+        if slope_data.get('reinforce_lines'):
+            slope_data['reinforce_lines'] = []
+        return slope_data
     for r in lines:
         if r.get('_pullout_key') != _pullout_key(r):
             attach_reinforce_pullout(slope_data)
@@ -3554,14 +3578,29 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             if col is not None:
                 reinf[cell_ref(row, col)] = (None if _isnan(r.get(key))
                                              else _f(r.get(key)))
-        rtype = str(r.get('type', '') or '')
+        # Type is the INPUT; Dir and Appl are derived from it in the sheet by a
+        # VLOOKUP against the type table. A row whose direction and application
+        # are exactly what its Type derives is written as the Type alone, so the
+        # formula stays in the cell and keeps answering after the next edit —
+        # writing the preset back as a literal would replace a live default with
+        # a frozen one. A row that OVERRIDES the preset has to state the
+        # override, which is what typing over the cell means in the sheet; the
+        # cell writer expands the column's shared-formula group first so the
+        # rows below keep a formula (_expand_shared_formulas).
+        #
+        # Each column is written only where the target template actually carries
+        # it. v11 has no Type/Dir/Appl at all, and the positional fallbacks these
+        # lookups used to carry would have put the words into whatever that
+        # template keeps in columns G, H and I.
+        rtype = _reinf_word(r.get('type'), '')
         d_def, a_def = _REINF_PRESETS.get(rtype, REINFORCE_TYPE_DEFAULT)
-        if rtype:
-            reinf[cell_ref(row, _rcol.get('type', 7))] = rtype.capitalize()
-        if str(r.get('dir', d_def)) != d_def:
-            reinf[cell_ref(row, _rcol.get('dir', 8))] = str(r['dir']).capitalize()
-        if str(r.get('appl', a_def)) != a_def:
-            reinf[cell_ref(row, _rcol.get('appl', 9))] = str(r['appl']).capitalize()
+        for hdr, value, derived in (
+                ('type', rtype, ''),
+                ('dir', _reinf_word(r.get('dir'), d_def), d_def),
+                ('appl', _reinf_word(r.get('appl'), a_def), a_def)):
+            col = _rcol.get(hdr)
+            if col is not None and value and value != derived:
+                reinf[cell_ref(row, col)] = value.capitalize()
     if reinf:
         updates['reinforce'] = reinf
 
@@ -3773,7 +3812,11 @@ def print_dictionary(dictionary):
 #     the edits. We force fullCalcOnLoad and delete calcChain.xml so Excel
 #     rebuilds it. (See the xlsx calcChain/recalc note in project memory.)
 #   * Never write a plain value into a cell that itself holds a formula — that
-#     breaks calcChain.xml. Callers must target precedent/value cells only.
+#     breaks calcChain.xml. Callers must target precedent/value cells only. The
+#     one place a value legitimately replaces a formula is a DERIVED column the
+#     sheet lets a user type over (reinforce Dir/Appl); those columns are shared
+#     formula groups, so _expand_shared_formulas gives the rest of the column its
+#     own copy of the formula before the cell is overwritten.
 #
 # Requires the `zip` CLI (used to replace single entries inside the archive in
 # place; Python's zipfile cannot update an existing member without rewriting
@@ -3856,6 +3899,79 @@ def _build_new_cell(ref, value):
         return f'<c r="{ref}" t="inlineStr"><is><t>{xml_escape(value)}</t></is></c>'
     else:
         return f'<c r="{ref}"><v>{value}</v></c>'
+
+
+_SHARED_CELL_RE = re.compile(
+    r'<c\s+r="([A-Z]+\d+)"(?:\s[^>]*)?>(?:(?!</c>).)*?<f\b[^>]*?\bt="shared"'
+    r'[^>]*?(?:/>|>.*?</f>).*?</c>', re.DOTALL)
+_SHARED_F_RE = re.compile(r'<f\b([^>]*?)(?:/>|>(.*?)</f>)', re.DOTALL)
+
+
+def _shared_group_of(cell_xml):
+    """(si, formula_text_or_None) for a shared-formula cell, else (None, None).
+
+    The master of a group carries the formula text; every other member carries a
+    bare ``<f t="shared" si="N"/>`` that points back at it.
+    """
+    m = _SHARED_F_RE.search(cell_xml)
+    if not m or 't="shared"' not in m.group(1):
+        return None, None
+    si = re.search(r'\bsi="(\d+)"', m.group(1))
+    if not si:
+        return None, None
+    text = m.group(2)
+    return si.group(1), (text if text else None)
+
+
+def _expand_shared_formulas(xml_bytes, refs):
+    """Give every member of a touched shared-formula group its own formula.
+
+    A shared group stores its formula ONCE, on the master cell; the other members
+    hold a bare back-reference. Overwriting the master with a value therefore
+    deletes the only copy of the formula and leaves the rest of the group
+    pointing at nothing. Measured on the reinforce sheet, whose Dir and Appl
+    columns are one shared group each (master at H3/I3, ``ref="H3:H22"``):
+    saving a model whose Dir overrides the Type preset wrote a literal into H3
+    and left Dir rows 9-22 reading back as a bare ``'='``. Excel handles an edit
+    inside a shared group by expanding it first, and so does this: each member
+    gets the master's formula translated to its own address, after which the
+    cell about to be written is an ordinary cell.
+
+    Only groups a written cell actually belongs to are expanded; every other
+    sheet in the workbook is untouched.
+    """
+    from openpyxl.formula.translate import Translator
+
+    xml_text = xml_bytes.decode('utf-8')
+    if 't="shared"' not in xml_text:
+        return xml_bytes
+    cells = {}                       # ref -> (si, formula text or None)
+    masters = {}                     # si -> (ref, formula text)
+    for m in _SHARED_CELL_RE.finditer(xml_text):
+        si, text = _shared_group_of(m.group(0))
+        if si is None:
+            continue
+        cells[m.group(1)] = (si, text)
+        if text:
+            masters[si] = (m.group(1), text)
+    touched = {cells[ref][0] for ref in refs if ref in cells}
+    touched &= set(masters)
+    if not touched:
+        return xml_bytes
+
+    def _expand(match):
+        ref = match.group(1)
+        entry = cells.get(ref)
+        if entry is None or entry[0] not in touched:
+            return match.group(0)
+        origin, text = masters[entry[0]]
+        formula = (text if ref == origin else
+                   Translator('=' + text, origin=origin)
+                   .translate_formula(ref)[1:])
+        return _SHARED_F_RE.sub(lambda _m: f'<f>{formula}</f>',
+                                match.group(0), count=1)
+
+    return _SHARED_CELL_RE.sub(_expand, xml_text).encode('utf-8')
 
 
 def _modify_sheet_xml(xml_bytes, cells):
@@ -4027,7 +4143,8 @@ def write_cells_to_xlsx(filepath, updates):
     with zipfile.ZipFile(filepath) as zf:
         for sheet_name, cells in updates.items():
             path = sheet_paths[sheet_name]
-            parts[path] = _reset_view(_modify_sheet_xml(zf.read(path), cells))
+            parts[path] = _reset_view(_modify_sheet_xml(
+                _expand_shared_formulas(zf.read(path), cells), cells))
         wb_text = zf.read('xl/workbook.xml').decode('utf-8')
         parts['xl/workbook.xml'] = _force_full_recalc(wb_text).encode('utf-8')
         drop_cc = _drop_calcchain(parts, zf.read)

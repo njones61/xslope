@@ -26,6 +26,39 @@ from .hoekbrown import hb_tangent
 
 _ito_matsui_warned = False  # module-level flag: warn once about large H
 
+
+def _support_choice(row, key, vocabulary, default, index, what):
+    """One structural-row vocabulary field (Dir, Appl), or a loud refusal.
+
+    A blank field -- absent, None, NaN or empty -- takes the documented default,
+    which is what a blank cell means on the sheet. Anything else must be a word
+    from the vocabulary.
+
+    The engine used to test these with ``== "tangent"`` and ``== "active"`` and
+    take the other branch for everything else, so an entry that is not a
+    direction at all was applied AXIALLY and an entry that is not an application
+    was applied as PASSIVE capacity. A ``Dir = 0.0`` written into the sheet came
+    back as a different, entirely valid model -- a different force, at a
+    different inclination, with no sign anywhere that the input had been
+    reinterpreted. The loader and the preflight both refuse these values; when
+    they are bypassed (a model assembled in memory, an importer, a sweep) the
+    engine states the problem rather than guessing at it.
+    """
+    raw = row.get(key, None)
+    if raw is None or (isinstance(raw, float) and raw != raw):
+        return default
+    value = str(raw).strip().lower()
+    if not value:
+        return default
+    if value not in vocabulary:
+        label = row.get("label") or f"{what} {index + 1}"
+        raise ValueError(
+            f"{what} '{label}' (row {index + 1}) has {key.capitalize()} = "
+            f"{raw!r}, which is not one of: {', '.join(vocabulary)}. Fix the "
+            f"value on the sheet; the engine will not guess which one was meant.")
+    return value
+
+
 def get_circular_y_coordinates(x_coords, Xo, Yo, R):
     """
     Calculate y-coordinates on a circular failure surface for given x-coordinates.
@@ -1177,13 +1210,23 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Prepare reinforcement lines data. Preferred source is the raw
     # 'reinforcement_lines' dicts, which carry the full capacity envelope
     # (t_max/lp/tend) plus the v12 Dir/Appl settings; the available tension at a
-    # crossing is evaluated exactly via fileio.reinforce_available_tension. The
-    # legacy 'reinforce_lines' point-list path is kept for callers that build
-    # slope_data by hand (treated as tangent/active, interpolated on X as before).
+    # crossing is evaluated exactly via fileio.reinforce_available_tension.
+    #
+    # An EXPLICIT 'reinforcement_lines' list is the model's own statement about
+    # its reinforcement, the empty list included: a model that says it has no
+    # reinforcement lines has none. 'reinforce_lines' is DERIVED from that list
+    # (fileio.build_reinforce_lines), so falling back to it whenever the source
+    # was empty resurrected the reinforcement a user had just deleted -- "remove
+    # the reinforcement" silently did nothing, because the point lists built
+    # before the edit were still there and still crossed the surface. The legacy
+    # point-list path (tangent/active, interpolated on X) is therefore reached
+    # only when the model carries no 'reinforcement_lines' key at all --
+    # slope_data assembled by hand.
     reinf_lines_data = []
-    if slope_data.get("reinforcement_lines"):
+    _reinf_source = slope_data.get("reinforcement_lines")
+    if _reinf_source:
         from .fileio import reinforce_available_tension  # shared envelope
-        for r in slope_data["reinforcement_lines"]:
+        for _ri, r in enumerate(_reinf_source):
             dxl = r["x2"] - r["x1"]
             dyl = r["y2"] - r["y1"]
             length = np.hypot(dxl, dyl)
@@ -1202,13 +1245,15 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                              r.get("tend1", 0.0), r.get("tend2", 0.0)),
                 "pullout": r.get("_pullout_profile"),
                 "length": length,
-                "dir": r.get("dir", "tangent"),
-                "appl": r.get("appl", "active"),
+                "dir": _support_choice(r, "dir", ("tangent", "axial"),
+                                       "tangent", _ri, "Reinforcement line"),
+                "appl": _support_choice(r, "appl", ("active", "passive"),
+                                        "active", _ri, "Reinforcement line"),
                 "psi": psi_line,
                 "avail": reinforce_available_tension,
                 "claimed": set(),
             })
-    elif slope_data.get("reinforce_lines"):
+    elif _reinf_source is None and slope_data.get("reinforce_lines"):
         for line in slope_data["reinforce_lines"]:
             xs = [pt["X"] for pt in line]
             ts = [pt["T"] for pt in line]
@@ -1220,7 +1265,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Prepare pile lines data
     pile_lines_data = []
     if slope_data.get("pile_lines"):
-        for pile in slope_data["pile_lines"]:
+        for _pi, pile in enumerate(slope_data["pile_lines"]):
             geom = LineString([(pile["x1"], pile["y1"]), (pile["x2"], pile["y2"])])
             pile_lines_data.append({
                 "geom": geom,
@@ -1230,7 +1275,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 "S": pile.get("S"),
                 "V_cap": pile.get("V_cap"),
                 "M_cap": pile.get("M_cap"),
-                "appl": pile.get("appl", "active"),
+                # Same guard as the reinforcement Dir/Appl above: a value that is
+                # not an application was applied as PASSIVE capacity.
+                "appl": _support_choice(pile, "appl", ("active", "passive"),
+                                        "active", _pi, "Pile"),
                 "label": pile.get("label", ""),
                 "claimed": set(),
             })
@@ -1931,8 +1979,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if t_i <= 0.0:
                 continue
 
-            if rl.get("dir", "tangent") == "tangent":
-                if rl.get("appl", "active") == "active":
+            if rl["dir"] == "tangent":
+                if rl["appl"] == "active":
                     p_sum += t_i
                 else:
                     p_pt_sum += t_i
@@ -1943,7 +1991,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 # right-facing flip, exactly as it does for the tangent force.
                 psi_i = rl["psi"]
                 ci, si = cos(psi_i), sin(psi_i)
-                if rl.get("appl", "active") == "active":
+                if rl["appl"] == "active":
                     pa_cx += t_i * ci
                     pa_cy += t_i * si
                     pa_mx += t_i * si * intersec.x
@@ -2044,7 +2092,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 # names which bound produced the applied force.
                 _rec = {"label": pl["label"], "x": float(intersec.x),
                         "y": float(intersec.y), "computed": bool(pile_H_was_auto),
-                        "S": pl.get("S"), "appl": pl.get("appl", "active"),
+                        "S": pl.get("S"), "appl": pl["appl"],
                         "H_width": float(pile_H), "F_soil": None, "F_used": None,
                         "governed": None, "L_m": None, "depth": None}
                 try:
@@ -2075,7 +2123,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 pile_report.append(_rec)
 
                 h_pile += pile_H
-                if pl.get("appl", "active") == "passive":
+                if pl["appl"] == "passive":
                     h_pile_pas += pile_H
                 theta_p_val = pl["theta_p"]  # last pile's angle if multiple (unusual)
                 x_pile = intersec.x

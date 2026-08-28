@@ -4323,24 +4323,43 @@ def _reinf_line_length(r):
         return None
 
 
+def _vocab(value):
+    """The word a vocabulary cell holds, or None when the cell is genuinely blank.
+
+    Blank means None or an empty string, and nothing else. The obvious
+    ``str(value or "")`` idiom reads every FALSY value as blank, so a number in a
+    word column -- ``Dir = 0.0`` -- was let through as "the cell is empty, take
+    the default" by the one rule whose whole job is to refuse words that are not
+    in the vocabulary. ``Dir = 'sideways'`` was caught and ``Dir = 0.0`` was not.
+    A number is not a word: it is checked like any other entry, and 0 is checked
+    like any other number.
+    """
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    text = str(value).strip()
+    return text.lower() if text else None
+
+
 @rule("reinforce.dir_vocabulary", ERROR, ("*",),
       "Type, Dir and Appl each speak a fixed vocabulary.")
 def _reinf_vocabulary(ctx):
-    types = ("", "geosynthetic", "nail", "tieback", "anchor")
+    types = ("geosynthetic", "nail", "tieback", "anchor")
     for i, r in enumerate(ctx.reinforcement):
-        t = str(r.get("type") or "").strip().lower()
-        if t not in types:
+        t = _vocab(r.get("type"))
+        if t is not None and t not in types:
             yield (f"{ctx.reinf_label(i)} sets Type = {r.get('type')!r}, which is "
                    f"not a support type. Expected one of: geosynthetic, nail, "
                    f"tieback, anchor (or blank for a generic tensile line) "
                    f"{_AT_REINF}.")
-        d = str(r.get("dir") or "").strip().lower()
-        if d and d not in ("tangent", "axial"):
+        d = _vocab(r.get("dir"))
+        if d is not None and d not in ("tangent", "axial"):
             yield (f"{ctx.reinf_label(i)} sets Dir = {r.get('dir')!r}, which is "
                    f"not a direction. Expected: tangent (along the failure surface) "
                    f"or axial (along the bar) {_AT_REINF}.")
-        a = str(r.get("appl") or "").strip().lower()
-        if a and a not in ("active", "passive"):
+        a = _vocab(r.get("appl"))
+        if a is not None and a not in ("active", "passive"):
             yield (f"{ctx.reinf_label(i)} sets Appl = {r.get('appl')!r}, which is "
                    f"not an application. Expected: active (allowable force) or "
                    f"passive (ultimate capacity, divided by the factor of safety) "
@@ -4407,7 +4426,7 @@ def _reinf_incomplete_cross(ctx):
       "A blank Type defaults to tangent/active -- 13% off a soil nail.")
 def _reinf_type_blank(ctx):
     rows = [i for i, r in enumerate(ctx.reinforcement)
-            if not str(r.get("type") or "").strip()]
+            if _vocab(r.get("type")) is None]
     if not rows:
         return None
     return (f"{len(rows)} reinforcement line(s) leave Type blank, starting at "

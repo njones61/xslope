@@ -486,18 +486,14 @@ shell keeps draining, and the strength recovers faster than the load falls —
 
 #### Relationship to a rapid drawdown analysis
 
-In [COMBO-2](combo02_rapid_drawdown.md) we analyze the same phenomenon with the
-three-stage Duncan, Wright and Wong procedure, on a dam whose core carries an
-undrained $K_c = 1$ envelope. That analysis names **two** instants, the slope
-before the drawdown and the slope after it, and computes one factor of safety for
-the second from consolidation stresses read at the first — two frames of a
-transient run, named by `stage_1` and `stage_2` on the `tseep` sheet.
-
-A curve cannot replace that check, and this model carries no $d$ / $\psi$ pair to
-run one, but it says *which* instant the second stage should be read at. A check
-staged at the end of the drawdown would read day 47, at **1.3813**, already 0.05
-into the recovery; the worst of the nineteen saved instants is day 35, at
-**1.3313**.
+Every point on this curve is a drained analysis: the strength at each time step
+is the effective-stress strength of the shell and the core, with the pore
+pressures from the seepage solution at that step. That is right when the soil
+drains as fast as the pool drops. Over a short drawdown period, a low-permeability
+zone does not, and undrained strengths govern instead. For that case the drawdown
+should be analyzed as a rapid drawdown, with the three-stage Duncan, Wright and
+Wong procedure of [COMBO-2](combo02_rapid_drawdown.md), and Part 2 repeats the
+sweep with that analysis at every time step.
 
 ---
 

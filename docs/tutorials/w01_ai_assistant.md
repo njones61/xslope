@@ -97,8 +97,7 @@ written count. A routine question — one asked of a built model, answered with 
 run — costs about **32,000 input tokens** on Claude Opus 5, roughly half of them
 served from the provider's prompt cache at a fraction of the price of fresh
 input, for a few hundred tokens of reply. A request that has to measure something
-costs far more, because it is many runs: the diagnosis below spends 192,000. In
-writing this documentation, $20 of API credit covered weeks of use.
+costs far more, because it is many runs: the diagnosis below spends 192,000.
 
 Models differ in both price and capability, and the two do not track each other
 perfectly: a cheaper model may answer a question about the documentation as well
@@ -127,11 +126,23 @@ The eight conversations below cost this much between them, measured as they ran:
 | The report | 2 | 4 | 65,001 (45,438) | 998 | 43 s |
 | **Total** | **13** | **43** | **770,807 (584,714)** | **40,128** | **1,595 s** |
 
-Thirteen turns, 43 calls to the model and about 771,000 input tokens, of which
-some 585,000 came from the prompt cache, come to about **$2.23** at Claude Opus 5
-list rates — $5.00 per million input tokens, $0.50 per million cache reads and
-$25.00 per million output tokens. One session is a quarter of that on its own:
-the diagnosis, which answers by measuring rather than by reading.
+Thirteen turns, 43 calls to the model, about 771,000 input tokens of which some
+585,000 came from the prompt cache, and 40,000 output tokens. The token counts
+are the durable measure; what they cost depends on the model and on the
+provider's prices, which change. At Anthropic's list prices on 2026-08-27, with
+a cache read billed at a tenth of an input token, the same thirteen turns come
+to:
+
+| Model | Input, per million | Output, per million | The thirteen turns |
+| --- | :---: | :---: | :---: |
+| Claude Opus 5 | $5.00 | $25.00 | **$2.23** |
+| Claude Sonnet 5 | $2.00 | $10.00 | **$0.89** |
+| Claude Haiku 4.5 | $1.00 | $5.00 | **$0.45** |
+
+The diagnosis session is a quarter of the total on its own, because it answers
+by measuring rather than by reading. Whether a cheaper model does the same work
+as well is a separate question; the current prices are on your provider's
+pricing page.
 
 ---
 

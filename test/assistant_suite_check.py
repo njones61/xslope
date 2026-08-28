@@ -44,6 +44,16 @@ What is asserted, all offscreen, no provider contacted and no network at all:
      reinforcement on a model whose ``reinforcement_lines`` was explicitly
      cleared says so, rather than falling through to the derived point lists,
      which carry no label for it to find the line by.
+  K. THE SAMPLED SWEEP — the stratified draw fills every input class the corpus
+     can fill twice, repeats on a seed and differs on another, honours the files
+     an earlier round already swept, and never asks a file a task it cannot
+     support; the round-two criteria discriminate; each edit, made here and saved
+     through the real workbook path, lands in exactly the facet it is allowed to
+     move and no other; every build case pairs a real drawing or a real
+     description with a finished workbook to be scored against, and every problem
+     drawing on a page with one finished model is built; and a dry sampled sweep
+     writes a scorecard grouped by task as well as by input class, contacts no
+     provider, and replays to the same answers.
 
 Skips cleanly (exit 0) when PySide6 is not installed (engine-only install — there
 is no Studio layer to drive).
@@ -731,6 +741,505 @@ def check_empty_reinforcement():
 
 
 # --------------------------------------------------------------------------- #
+# K. the sampled sweep — the draw, the task menu, and the build family
+# --------------------------------------------------------------------------- #
+#: The two workbooks the sampled dry leg plays, and the one build it plays beside
+#: them. Small, plain, and chosen so no criterion the stub reply reaches has to
+#: solve anything: the leg is about the plumbing, not about the engine.
+DRY_SAMPLE = (os.path.join("docs", "lem", "files", "xslope_simple_embankment.xlsx"),
+              os.path.join("docs", "lem", "files", "xslope_sloping_bottom.xlsx"))
+
+_CORPUS = []
+
+
+def _every_case():
+    """``corpus.cases()``, loaded once — it opens 390 workbooks."""
+    from tools.assistant_scenarios import corpus
+
+    if not _CORPUS:
+        _CORPUS.extend(corpus.cases())
+    return list(_CORPUS)
+
+
+def check_sample_draw():
+    """The stratified draw: every class filled, reproducible, and nothing else."""
+    from tools.assistant_scenarios import tasks as menu
+
+    out = []
+    every = _every_case()
+    chosen, draw = menu.sample(every, 12, 1, min_per_class=2)
+    names = [c.name for c in chosen]
+    if len(set(names)) != len(names):
+        out.append("the draw named a file twice")
+
+    # Stratified: every class with two or more ELIGIBLE files is in the sample
+    # twice. A class the corpus cannot fill twice is not held against the draw.
+    eligible = [c for c in every if c.loads]
+    counts, available = {}, {}
+    for case in eligible:
+        for label in case.classes:
+            available[label] = available.get(label, 0) + 1
+    for case in chosen:
+        for label in case.classes:
+            counts[label] = counts.get(label, 0) + 1
+    thin = sorted(label for label, have in available.items()
+                  if have >= 2 and counts.get(label, 0) < 2)
+    if thin:
+        out.append("input class(es) the corpus can fill twice and the draw did "
+                   "not: %s" % ", ".join(thin))
+    if draw["drawn"] < draw["quota"]:
+        out.append("the draw is smaller than its own class quota")
+
+    # Reproducible on a seed, and a different seed is a different draw.
+    again, _d = menu.sample(every, 12, 1, min_per_class=2)
+    if [c.name for c in again] != names:
+        out.append("the same seed drew a different set of files")
+    other, _d = menu.sample(every, 12, 7, min_per_class=2)
+    if [c.name for c in other] == names:
+        out.append("two different seeds drew the same set of files")
+
+    # Excluded files never appear — how a second round skips the first round's.
+    skip = set(names[:5])
+    kept, _d = menu.sample(every, 12, 1, exclude=skip, min_per_class=2)
+    landed = skip & {c.name for c in kept}
+    if landed:
+        out.append("an excluded file was drawn anyway: %s" % sorted(landed)[0])
+
+    # The task draw: reproducible, run_declared always in it, and never a task
+    # the file cannot support.
+    plan = menu.plan(chosen, 2, 1)
+    if [(c.name, t.name) for c, t in plan] != [
+            (c.name, t.name) for c, t in menu.plan(chosen, 2, 1)]:
+        out.append("the same seed drew different tasks")
+    ineligible = [(c.name, t.name) for c, t in plan if not t.eligible(c)]
+    if ineligible:
+        out.append("%d (file, task) pair(s) the file cannot support: %s"
+                   % (len(ineligible), ineligible[0]))
+    by_file = {}
+    for case, task in plan:
+        by_file.setdefault(case.name, []).append(task.name)
+    missing = [n for n, asked in by_file.items() if menu.ALWAYS not in asked]
+    if missing:
+        out.append("%d file(s) drawn without %s: %s"
+                   % (len(missing), menu.ALWAYS, missing[0]))
+    over = [n for n, asked in by_file.items() if len(asked) > 2]
+    if over:
+        out.append("%s was asked %d tasks, the draw was for 2"
+                   % (over[0], len(by_file[over[0]])))
+    # And every scenario the plan builds carries the task in its name, or a
+    # replay could not read the task back off a recorded session.
+    for case, task in plan[:12]:
+        built = menu.scenario_for(case, task)
+        if built is None:
+            out.append("%s/%s built no scenario though it was drawn"
+                       % (case.name, task.name))
+        elif not built.name.endswith("__" + task.name):
+            out.append("%s built a scenario named %r, which does not carry the "
+                       "task" % (task.name, built.name))
+    return out
+
+
+def check_task_scorers():
+    """The round-two criteria discriminate, on synthetic sessions only."""
+    from tools.assistant_scenarios import corpus
+    from tools.assistant_scenarios import scorers as S
+    from tools.assistant_scenarios import tasks as menu
+
+    out = []
+    case = corpus.Case(os.path.join(REPO_ROOT, *DRY_SAMPLE[0].split(os.sep)))
+    if not case.loads:
+        return ["the sample workbook does not load"]
+
+    def leg(label, criterion, good, bad, scenario=None):
+        if not _ask(criterion, good, scenario):
+            out.append("%s: a session that should pass it does not" % label)
+        if _ask(criterion, bad, scenario):
+            out.append("%s: a session that should fail it passes" % label)
+
+    # describe — the file's own numbers, and no feature it does not carry.
+    mat = (case.model.get("materials") or [{}])[0]
+    told = ("The model has 1 material, %s, at %s with c = %s and phi = %s, and "
+            "%d starting circle(s)."
+            % (mat.get("name"), mat.get("gamma"), mat.get("c"), mat.get("phi"),
+               len(case.model.get("circles") or [])))
+    leg("describes_the_facts", menu.describes_the_facts(case),
+        _session(prose=told),
+        _session(prose="It is a slope with some soil in it."))
+    leg("invents_nothing", menu.invents_nothing(case),
+        _session(prose="There is no reinforcement and no tension crack here."),
+        _session(prose="Six geogrid reinforcement layers run through the fill."))
+
+    # nothing_else_changed — measured on models, not on words.
+    import copy
+    before = case.model
+    edited = copy.deepcopy(before)
+    edited["materials"][0]["phi"] = float(edited["materials"][0].get("phi") or 0) + 3
+    also = copy.deepcopy(edited)
+    also["max_depth"] = float(also.get("max_depth") or 0.0) - 25.0
+    moved = S.changed_facets(before, edited)
+    if moved != ["materials"]:
+        out.append("a change to one material read as %s" % moved)
+    if "max_depth" not in S.changed_facets(before, also):
+        out.append("a change to max_depth was not seen")
+
+    # no_geometry_warning — the kernel's own words, in a snippet's output.
+    leg("no_geometry_warning", S.no_geometry_warning(),
+        _session(output="spencer: FS = 1.276"),
+        _session(output="WARNING: polygons were edited on a profile-line model "
+                        "and have been rebuilt from profile_lines"))
+
+    # numbers_grounded_near — a number about the moments has to be a measured one.
+    leg("numbers_grounded_near",
+        S.numbers_grounded_near(r"driving|resisting|moment", "the moments"),
+        _session(prose="Slice 14 carries the largest driving moment, 812.5.",
+                 output="slice 14 driving 812.5"),
+        _session(prose="Slice 14 carries the largest driving moment, 812.5.",
+                 output="FS = 1.276"))
+
+    # explains_the_slices — the numbers named have to be the leading ones. The
+    # ranking is made from the file's own slice table, so this one solves.
+    order_d, order_r, count = menu._moment_ranking(case)
+    if order_d is None:
+        out.append("no slice ranking could be made for %s: %s" % (case.name, count))
+    else:
+        leg("explains_the_slices", menu.explains_the_slices(case),
+            _session(prose="Slice %d carries the most driving moment." % order_d[0]),
+            _session(prose="Slice %d carries the most driving moment."
+                           % order_d[-1]))
+
+    # methods_tabulated — read against the values the docs publish for this file.
+    methods = menu.compare_methods_of(case)
+    rows = []
+    for method in methods:
+        known = menu._published(case, method)
+        if known is None:
+            rows = []
+            break
+        rows.append("| %s | %.3f |" % (method.upper(), known[0]))
+    if rows:
+        table = "| Method | FS |\n|:--|--:|\n" + "\n".join(rows)
+        wrong = table.replace("|:--|--:|", "|:--|--:|").replace(
+            "%.3f" % menu._published(case, methods[0])[0], "9.999")
+        leg("methods_tabulated", menu.methods_tabulated(case, methods),
+            _session(prose=table),
+            _session(prose="| Method | FS |\n|:--|--:|\n"
+                           + "\n".join("| %s | 9.999 |" % m.upper()
+                                       for m in methods)))
+        del wrong
+
+    # preflight_clean — a model that loads and one that does not.
+    leg("preflight_clean", S.preflight_clean(),
+        _session(start_model=case.path),
+        _session(start_model=os.path.join(REPO_ROOT, "no_such_model.xlsx")))
+
+    # accuses_little_else — one further concern is engineering; five is a spray.
+    fault = menu.fault_for(case)
+    if fault is None:
+        out.append("%s supports no planted fault" % case.name)
+    else:
+        leg("accuses_little_else", menu.accuses_little_else(fault),
+            _session(prose="The unit weight on 'soil' is wrong — 12.5 where the "
+                           "section needs 125."),
+            _session(prose="The friction angle is wrong. The unit weight is "
+                           "wrong. The piezometric line is missing. The starting "
+                           "circle is off the slope. The max_depth should be -10."))
+
+    # edit_answer_independent — the same edit made here, and the answer read
+    # against it. The spec is built directly rather than drawn, so the leg does
+    # not depend on which edit the seeded draw happens to offer this file.
+    import random as _random
+    from tools.assistant_scenarios import core
+    spec_edit = menu._edit_material_phi(case.model, _random.Random(0))
+    if spec_edit is None or spec_edit.apply is None:
+        spec_edit = menu._edit_material_c(case.model, _random.Random(0))
+    if spec_edit is None or spec_edit.apply is None:
+        out.append("%s supports no edit with an independent form" % case.name)
+    else:
+        edited_run = core.solve_variant(case.path, spec_edit.apply,
+                                        "edit:%s" % spec_edit.name,
+                                        method=case.method, search=True)
+        plain = core.solve(case.path, method=case.method, search=True)
+        if edited_run.get("FS") is None or plain.get("FS") is None:
+            out.append("the edit or the base model would not solve on %s"
+                       % case.name)
+        elif abs(edited_run["FS"] - plain["FS"]) < 0.02:
+            out.append("the %s edit barely moves %s, so the criterion cannot "
+                       "discriminate on it" % (spec_edit.name, case.name))
+        else:
+            leg("edit_answer_independent",
+                menu.edit_answer_independent(case, spec_edit),
+                _session(prose="FS = %.4f" % edited_run["FS"]),
+                _session(prose="FS = %.4f" % plain["FS"]))
+
+    # sweep_reproduced — the tabulated values have to be the computed ones. Both
+    # halves are read against runs made here, which is what makes it a test.
+    spec_sweep = menu.sweep_for(case)
+    if spec_sweep is None:
+        out.append("%s supports no sweep" % case.name)
+    else:
+        from tools.assistant_scenarios import core
+        truth = []
+        for value in spec_sweep.values:
+            run = core.solve_variant(
+                case.path, lambda m, v=value: spec_sweep.apply(m, v),
+                "%s=%s" % (spec_sweep.name, value), method=case.method,
+                search=True)
+            truth.append(run.get("FS"))
+        if any(v is None for v in truth):
+            out.append("a swept value would not solve on %s" % case.name)
+        else:
+            good = ("| value | FS |\n|--:|--:|\n"
+                    + "\n".join("| %s | %.4f |" % (v, f)
+                                for v, f in zip(spec_sweep.values, truth)))
+            leg("sweep_reproduced", menu.sweep_reproduced(case, spec_sweep),
+                _session(prose=good),
+                _session(prose="| value | FS |\n|--:|--:|\n| 1 | 9.111 |\n"
+                               "| 2 | 9.222 |\n| 3 | 9.333 |"))
+    return out
+
+
+def check_edit_round_trip():
+    """Each edit, made here and saved through the real workbook path, lands in
+    exactly one facet.
+
+    This is what stops ``nothing_else_changed`` from failing a session that did
+    the right thing. The save path rewrites every sheet, and a change there that
+    quietly moved something else would show here as an edit to one field that
+    reads as an edit to two — a green criterion turning red for a reason that has
+    nothing to do with the assistant.
+    """
+    import contextlib
+    import io as _io
+    import random as _random
+
+    from tools.assistant_scenarios import scorers as S
+    from tools.assistant_scenarios import tasks as menu
+    from tools.assistant_scenarios.core import load_model
+    from xslope.fileio import save_slope_data_to_xlsx
+
+    wanted = {
+        os.path.join("docs", "lem", "files", "xslope_reinforce.xlsx"):
+            (menu._edit_material_phi, menu._edit_reinforcement),
+        os.path.join("docs", "lem", "files", "xslope_piles.xlsx"):
+            (menu._edit_pile_spacing,),
+        os.path.join("docs", "inputs", "slope", "xslope_dam.xlsx"):
+            (menu._edit_piezo,),
+    }
+    out = []
+    tmp = tempfile.mkdtemp(prefix="edit_round_trip_")
+    try:
+        for rel, makers in wanted.items():
+            source = os.path.join(REPO_ROOT, rel)
+            before = load_model(source)
+            if before is None:
+                out.append("%s does not load" % rel)
+                continue
+            for maker in makers:
+                edited = load_model(source)
+                spec = maker(edited, _random.Random(0))
+                if spec is None or spec.apply is None:
+                    out.append("%s offers no %s edit" % (rel, maker.__name__))
+                    continue
+                spec.apply(edited)
+                dest = os.path.join(tmp, "%s_%s" % (spec.name,
+                                                    os.path.basename(rel)))
+                shutil.copy2(source, dest)
+                with contextlib.redirect_stdout(_io.StringIO()):
+                    save_slope_data_to_xlsx(edited, dest)
+                after = load_model(dest)
+                if after is None:
+                    out.append("%s: the edited workbook does not reload"
+                               % spec.name)
+                    continue
+                moved = S.changed_facets(before, after)
+                if moved != sorted(spec.facets):
+                    out.append("%s on %s moved %s, and is allowed %s"
+                               % (spec.name, os.path.basename(rel), moved,
+                                  sorted(spec.facets)))
+                ok, why = spec.expect(before, after)
+                if not ok:
+                    out.append("%s on %s did not read as made: %s"
+                               % (spec.name, os.path.basename(rel), why))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
+
+def check_build_scorers():
+    """A build scored against the workbook it should have produced.
+
+    The passing session is one that "built" the shipped model exactly — the saved
+    workbook IS the answer key — and the failing one built a different slope
+    entirely. Both are synthetic; nothing here plays a session.
+    """
+    from tools.assistant_scenarios import tasks as menu
+
+    out = []
+    builds = {b.key + "/" + b.kind: b for b in menu.builds()}
+    dry = builds.get("lem02_loads_on_the_crest/drawing")
+    wet = builds.get("lem04_water_in_the_slope/description")
+    if dry is None or wet is None:
+        return ["the tutorial build cases the check reads are not being built"]
+    other = os.path.join(REPO_ROOT, "docs", "lem", "files",
+                         "xslope_eight_layers.xlsx")
+
+    def leg(label, criterion, build, right, wrong):
+        scenario = menu.build_scenario(build)
+        if not _ask(criterion, _session(workbook=right, start_model=right),
+                    scenario):
+            out.append("%s: the shipped model itself did not pass" % label)
+        if _ask(criterion, _session(workbook=wrong, start_model=wrong), scenario):
+            out.append("%s: a different slope entirely passed" % label)
+
+    leg("geometry_like", menu.geometry_like(dry), dry, dry.path, other)
+    leg("materials_like", menu.materials_like(dry), dry, dry.path, other)
+    leg("features_like", menu.features_like(dry), dry, dry.path, other)
+    leg("build_fs_close", menu.build_fs_close(dry), dry, dry.path, other)
+    # Water is only a question where the answer key defines water, so it is asked
+    # of a build whose shipped model has a piezometric line.
+    leg("water_like", menu.water_like(wet), wet, wet.path,
+        os.path.join(REPO_ROOT, "docs", "lem", "files",
+                     "xslope_simple_embankment.xlsx"))
+    return out
+
+
+def check_build_family():
+    """Every build case pairs a real drawing or description with a real answer key."""
+    from tools.assistant_scenarios import tasks as menu
+
+    out = []
+    builds = menu.builds()
+    if len(builds) < 20:
+        out.append("only %d build case(s); the tutorials ship many more" % len(builds))
+    names = [b.name for b in builds]
+    if len(set(names)) != len(names):
+        out.append("two build cases share a name")
+    for build in builds:
+        if not os.path.exists(build.path):
+            out.append("%s names a model that does not exist" % build.name)
+        if build.model is None:
+            out.append("%s names a model that does not load" % build.name)
+        if build.kind == "drawing" and not (build.image
+                                            and os.path.exists(build.image)):
+            out.append("%s carries no drawing" % build.name)
+        if build.kind == "description" and len(build.prompt) < 400:
+            out.append("%s describes the problem in %d characters"
+                       % (build.name, len(build.prompt)))
+        if os.path.basename(build.path).endswith("_start.xlsx"):
+            out.append("%s is scored against a STARTER file, not a finished one"
+                       % build.name)
+    # Every problem drawing the tutorials ship is either built here, or belongs to
+    # a page that names more than one finished model and has no single answer key.
+    paired = {b.image for b in builds if b.image}
+    for sketch in sorted(glob.glob(os.path.join(REPO_ROOT, menu.SKETCH_DIR,
+                                                menu.SKETCH_GLOB))):
+        if sketch in paired:
+            continue
+        pages = [p for p in menu._pages()
+                 if os.path.basename(sketch) in open(p, encoding="utf-8").read()]
+        if any(menu._completed_model(p) for p in pages):
+            out.append("%s is shown on a page with one finished model and is not "
+                       "built" % os.path.basename(sketch))
+    # And a build scenario is a scenario: no model to open, the drawing attached.
+    for build in builds[:4]:
+        scenario = menu.build_scenario(build)
+        if scenario.model is not None:
+            out.append("%s opens a workbook; a build starts from nothing"
+                       % build.name)
+        if len(scenario.criteria) < 6:
+            out.append("%s is scored on %d criteria" % (build.name,
+                                                        len(scenario.criteria)))
+        if build.image and scenario.turns[0][1] != build.image:
+            out.append("%s does not attach its drawing to the turn" % build.name)
+    return out
+
+
+def check_sample_dry_run():
+    """Two files, two tasks each and one build, end to end — and no provider."""
+    import tools.assistant_suite as suite
+    from tools.assistant_scenarios import corpus
+    from tools.assistant_scenarios import tasks as menu
+
+    out = []
+    calls = {"n": 0}
+    try:
+        import litellm
+        real = litellm.completion
+
+        def counted(*args, **kwargs):
+            calls["n"] += 1
+            return real(*args, **kwargs)
+        litellm.completion = counted
+    except Exception:
+        litellm = real = None
+
+    tmp = tempfile.mkdtemp(prefix="sample_dry_")
+    try:
+        cases = [corpus.Case(os.path.join(REPO_ROOT, *p.split(os.sep)))
+                 for p in DRY_SAMPLE]
+        scenarios, rows = [], []
+        for case in cases:
+            for task in (menu.TASKS_BY_NAME["run_declared"],
+                         menu.TASKS_BY_NAME["describe"]):
+                built = menu.scenario_for(case, task)
+                built.estimate_usd = suite.estimate_usd(task.cost)
+                scenarios.append(built)
+                rows.append(menu.Row(built.name, case.classes, case.primary,
+                                      case.kind, case.path, task.name))
+        build = next((b for b in menu.builds() if b.kind == "drawing"), None)
+        if build is not None:
+            built = menu.build_scenario(build)
+            built.estimate_usd = suite.estimate_usd(5)
+            scenarios.append(built)
+            rows.append(menu.Row(built.name, build.classes, build.primary,
+                                  "build", build.path, "build_drawing"))
+        draw = {"pool": len(cases), "quota": len(cases), "asked": len(cases),
+                "drawn": len(cases), "min_per_class": 2}
+        results, meta = suite.run(scenarios, tmp, dry_run=True,
+                                  renderer=menu.render,
+                                  meta_extra={"cases": rows, "seed": 1,
+                                              "draw": draw,
+                                              "corpus_size": len(cases),
+                                              "unloadable": []})
+        if calls["n"]:
+            out.append("a dry sampled sweep entered litellm.completion %d time(s)"
+                       % calls["n"])
+        card = os.path.join(tmp, "scorecard.md")
+        if not os.path.exists(card):
+            out.append("the sampled sweep wrote no scorecard")
+            return out
+        text = open(card, encoding="utf-8").read()
+        for heading in ("## By input class", "## By task", "## By criterion"):
+            if heading not in text:
+                out.append("the scorecard has no %r section" % heading)
+        for task in ("run_declared", "describe"):
+            if "`%s`" % task not in text:
+                out.append("the scorecard never names the %r task" % task)
+        # The estimate is printed against the run, not invented at the end.
+        if not any(r.get("estimate") for r in results):
+            out.append("no scenario carried a cost estimate")
+        # A replay rebuilds every scenario from its name alone and scores it the
+        # same — the whole reason the spec inside a task is seeded on the file.
+        again, _meta = suite.replay(tmp, sampled=True)
+        if len(again) != len(results):
+            out.append("the sampled replay re-scored %d of %d sessions"
+                       % (len(again), len(results)))
+        before = {r["scenario"]: [(c["name"], c["pass"]) for c in r["criteria"]]
+                  for r in results}
+        after = {r["scenario"]: [(c["name"], c["pass"]) for c in r["criteria"]]
+                 for r in again}
+        if before != after:
+            moved = sorted(k for k in before if before[k] != after.get(k))
+            out.append("the sampled replay did not reproduce the scoring of the "
+                       "run it re-scored: %s" % ", ".join(moved[:3]))
+    finally:
+        if litellm is not None and real is not None:
+            litellm.completion = real
+        shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
+
+# --------------------------------------------------------------------------- #
 def run():
     try:
         import PySide6                                          # noqa: F401
@@ -748,7 +1257,13 @@ def run():
                         ("corpus scorers", check_corpus_scorers),
                         ("empty reinforcement", check_empty_reinforcement),
                         ("dry run", check_dry_run),
-                        ("corpus dry run", check_corpus_dry_run)):
+                        ("corpus dry run", check_corpus_dry_run),
+                        ("sample draw", check_sample_draw),
+                        ("task scorers", check_task_scorers),
+                        ("edit round trip", check_edit_round_trip),
+                        ("build family", check_build_family),
+                        ("build scorers", check_build_scorers),
+                        ("sampled dry run", check_sample_dry_run)):
         try:
             failures += ["%s: %s" % (name, msg) for msg in check()]
         except Exception as exc:

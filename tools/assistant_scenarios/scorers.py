@@ -693,3 +693,160 @@ def crossing_verified(pattern, apply, target_fs, tol=0.03, label=None):
             value, round(run["FS"], 4), target_fs)
     return Criterion(label or "the reported value hits the target", check,
                      kind="truth")
+
+
+# --------------------------------------------------------------------------- #
+# The model, facet by facet
+# --------------------------------------------------------------------------- #
+#: The input facets an edit can land in, each read off the loaded model. Derived
+#: geometry is deliberately absent: ``ground_surface`` and the polygons a
+#: profile-line model rebuilds are computed from the source, so comparing them
+#: would report every edit twice and would call a legitimate resync a change.
+_FACETS = ("materials", "circles", "non_circ", "profile_lines", "polygons",
+           "dloads", "dloads2", "line_loads", "reinforcement_lines",
+           "pile_lines", "piezo_line", "piezo_line2", "seepage_bc", "max_depth",
+           "k_seismic", "tcrack_depth", "unit_system", "lem_method",
+           "element_type", "target_size")
+
+
+def _canon(value, depth=0):
+    """A comparable, JSON-ish rendering of one model field.
+
+    Floats are rounded, because a value that goes through the workbook and back
+    is not bit-identical to the one that went in and a scorer that called that a
+    change would fail every saved model.
+    """
+    if depth > 6:
+        return "…"
+    if isinstance(value, float):
+        # A blank cell loads as NaN, and NaN is not equal to itself — comparing it
+        # raw reported every model as changed in every facet that has one.
+        return "nan" if value != value else round(value, 6)
+    if isinstance(value, (int, str, bool)) or value is None:
+        return value
+    if isinstance(value, dict):
+        # Underscore keys are the loader's own caches (a pullout profile, a key it
+        # memoized); they are rebuilt on load and are not inputs.
+        return {str(k): _canon(v, depth + 1)
+                for k, v in sorted(value.items(), key=lambda kv: str(kv[0]))
+                if not str(k).startswith("_")}
+    if isinstance(value, (list, tuple)):
+        return [_canon(v, depth + 1) for v in value]
+    try:                                   # numpy scalars and the like
+        return round(float(value), 6)
+    except Exception:
+        return str(value)[:200]
+
+
+def facets(sd):
+    """``{facet: canonical value}`` for the fields an edit can land in."""
+    sd = sd or {}
+    out = {}
+    for name in _FACETS:
+        if name == "polygons" and sd.get("profile_lines"):
+            continue                       # derived here, not a source
+        out[name] = _canon(sd.get(name))
+    return out
+
+
+def changed_facets(before, after):
+    """The facets that differ between two loaded models."""
+    a, b = facets(before), facets(after)
+    return sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
+
+
+def nothing_else_changed(*allowed):
+    """The saved model differs from the one opened in the named facets and no
+    others — the half of "make this one edit" a factor of safety cannot show."""
+    permitted = set(allowed)
+    def check(ctx):
+        after = ctx.after()
+        if after is None:
+            return False, "the session saved no workbook"
+        stray = [f for f in changed_facets(ctx.before(), after)
+                 if f not in permitted]
+        if stray:
+            return False, "also changed: %s" % ", ".join(stray)
+        return True, "only %s changed" % (", ".join(sorted(permitted)) or "nothing")
+    return Criterion("nothing but the asked-for edit changed", check, kind="edit")
+
+
+#: The kernel's two geometry-source warnings, by the words they open on.
+_GEOM_WARNING = re.compile(
+    r"polygons were edited on a profile-line model|"
+    r"profile_lines were added on a polygon-native model", re.I)
+
+
+def no_geometry_warning():
+    """No snippet edited the geometry source the model is not built from.
+
+    The kernel says so itself — it prints a warning and reverts the edit — so the
+    measurement is simply whether that warning was ever printed. A profile-line
+    model edited through its polygons is the failure this catches.
+    """
+    def check(ctx):
+        found = _GEOM_WARNING.search(ctx.output)
+        if found:
+            return False, "the kernel warned: %r" % found.group(0)
+        return True, "no geometry-source warning was printed"
+    return Criterion("no geometry-source warning", check, kind="edit")
+
+
+def numbers_grounded_near(pattern, label, window=200):
+    """Every number written near ``pattern`` appears in the printed output.
+
+    The rule the brief states for a discussion of results: an answer may only put
+    forward numbers that a snippet computed. Applied in a WINDOW around the words
+    being discussed, so an answer is free to restate an input in the same
+    paragraph without that counting as a claim.
+    """
+    rx = re.compile(pattern, re.I)
+    def check(ctx):
+        prose = strip_code(ctx.prose)
+        pool = numbers_in(ctx.output)
+        stated, loose = [], []
+        for hit in rx.finditer(prose):
+            near_by = prose[hit.start():hit.start() + window]
+            for value in numbers_in(near_by):
+                stated.append(value)
+                if not grounded(value, pool):
+                    loose.append(value)
+        if not stated:
+            return False, "the answer says nothing about %s" % label
+        if loose:
+            return False, "%d number(s) near %s that no snippet printed: %s" % (
+                len(loose), label, ", ".join(str(v) for v in loose[:5]))
+        return True, "%d number(s) about %s, all printed by a snippet" % (
+            len(stated), label)
+    return Criterion("%s numbers were computed" % label, check, kind="truth")
+
+
+def preflight_clean(on="saved"):
+    """The model the session leaves behind raises no input-check ERRORS.
+
+    Warnings are left alone: a preflight warning is often the right state for a
+    model (a starting circle that daylights once is a warning, and a real one).
+    An ERROR is a model the engine will refuse.
+    """
+    def check(ctx):
+        from xslope.preflight import preflight
+
+        path = (ctx.saved() or ctx.start_model) if on == "saved" \
+            else ctx.start_model
+        if not path:
+            return False, "the session saved no workbook"
+        sd = load_model(path)
+        if sd is None:
+            return False, "%s does not load" % os.path.basename(path)
+        mode = "lem" if (sd.get("circles") or sd.get("non_circ")) else "seep"
+        try:
+            report = preflight(sd, mode)
+        except Exception as exc:
+            return False, "preflight raised %s: %s" % (type(exc).__name__, exc)
+        errors = list(report.errors)
+        if errors:
+            return False, "%d preflight error(s): %s" % (
+                len(errors), "; ".join(str(e)[:70] for e in errors[:2]))
+        return True, "the saved model raises no preflight errors (%d warning(s))" \
+                     % len(report.warnings)
+    return Criterion("the model passes the input checks", check, kind="edit")

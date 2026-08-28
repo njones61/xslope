@@ -337,19 +337,39 @@ def solve(path, method=None, search=True, num_slices=40, rapid=False):
     dialog and the assistant's ``run_lem`` both use — with nothing carried over
     from the session.
     """
+    return solve_variant(path, None, "", method=method, search=search,
+                         num_slices=num_slices, rapid=rapid)
+
+
+def solve_variant(path, apply=None, key="", method=None, search=True,
+                  num_slices=40, rapid=False, want_slices=False):
+    """:func:`solve`, with ``apply(slope_data)`` made to the model first.
+
+    This is how an EDIT or a SWEEP is checked. The assistant is asked to change one
+    input and re-run; the independent answer to that is the same file, reloaded
+    from disk, changed the same way here, and re-solved — with nothing of the
+    session's carried over. ``key`` names the change and rides in the cache key
+    beside the file's own digest, so two variants of one file never collide and a
+    cached answer can never be served for a workbook that moved.
+
+    ``want_slices`` returns the solved slice table as well; it is not cached,
+    because a DataFrame is not JSON.
+    """
     from xslope.search import run_lem_analysis
 
     sd = load_model(path)
     if sd is None:
         return {"FS": None, "error": "the workbook does not load"}
     method = (method or declared_method(sd)).lower()
-    key = "|".join(["lem", digest(path), method, str(bool(search)),
-                    str(num_slices), str(bool(rapid))])
-    if key in _solve_cache:
-        return dict(_solve_cache[key])
+    cache_key = "|".join(["lem", digest(path), key, method, str(bool(search)),
+                          str(num_slices), str(bool(rapid))])
+    if cache_key in _solve_cache and not want_slices:
+        return dict(_solve_cache[cache_key])
     out = {"FS": None, "Xo": None, "Yo": None, "R": None,
            "method": method, "error": None}
     try:
+        if apply is not None:
+            apply(sd)
         with _quiet():
             bundle = run_lem_analysis(
                 sd, method,
@@ -366,9 +386,13 @@ def solve(path, method=None, search=True, num_slices=40, rapid=False):
                 out["R"] = cache["Yo"] - cache["Depth"]
         if out["FS"] is None:
             out["error"] = str(results.get("failure") or "no solution")
+        if want_slices:
+            out["slice_df"] = bundle.get("slice_df")
     except Exception as exc:
         out["error"] = "%s: %s" % (type(exc).__name__, exc)
-    _cache_put(key, out)
+    if want_slices:
+        return out
+    _cache_put(cache_key, out)
     return dict(out)
 
 

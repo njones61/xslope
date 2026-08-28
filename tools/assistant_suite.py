@@ -28,6 +28,25 @@ kinds of MODEL they ask about; see :mod:`tools.assistant_scenarios.corpus`::
     python3 tools/assistant_suite.py --corpus --live --budget-usd 10
     python3 tools/assistant_suite.py --corpus --replay <dir>
 
+Sweeping every file with one prompt measures one verb. ``--sample`` narrows the
+files and widens the questions: a stratified draw of the corpus — every input
+class filled where the corpus can fill it — with a MENU of tasks asked of each
+file, drawn at random from the ones that file can support. Describing a model,
+editing it, explaining which slices carry the surface, comparing methods,
+sweeping a parameter, finding a planted fault, writing the report; and, with
+``--builds``, building a model from a tutorial's problem drawing or from the
+prose it is described in, scored against the workbook that tutorial ships. See
+:mod:`tools.assistant_scenarios.tasks`::
+
+    python3 tools/assistant_suite.py --corpus --sample 60 --tasks 2 --seed 1 \\
+        --live --budget-usd 25
+    python3 tools/assistant_suite.py --corpus --sample 12 --tasks 2 --seed 1 --dry-run
+    python3 tools/assistant_suite.py --corpus --sample 60 --builds --list
+
+The draw is seeded, so a seed names a run and ``--replay`` re-scores exactly the
+set that was played. Files the first live round already swept are skipped by
+default (``--include-swept`` puts them back).
+
 ``--dry-run`` answers every turn with a stub and calls no provider at all; it is
 what ``run_tests.py`` runs (through ``test/assistant_suite_check.py``) so the
 harness itself stays regression-tested without spending anything. ``--replay``
@@ -76,6 +95,26 @@ PRICES = {
 #: 1.25x. The assistant's accumulator does not separate cache writes from ordinary
 #: input, so a total here is a floor: it prices the writes as plain input.
 CACHE_READ_FACTOR = 0.10
+
+#: What one completion has actually cost, measured over the 82 sessions of the
+#: first live corpus sweep rather than guessed: 17,887 input tokens of which 83%
+#: were cache reads, and 681 output tokens. An ESTIMATE printed before a run is
+#: built from these, so the number a budget is set against is the number the last
+#: run produced. Re-measure them when the brief grows.
+TOKENS_PER_COMPLETION = {"input": 17_887, "output": 681, "cached_fraction": 0.83}
+
+
+def estimate_usd(completions, model="claude-opus-5"):
+    """What ``completions`` turns of work costs, at the measured token rates."""
+    rates = PRICES.get(model)
+    if not rates or not completions:
+        return 0.0
+    per = TOKENS_PER_COMPLETION
+    cached = per["input"] * per["cached_fraction"]
+    fresh = per["input"] - cached
+    return completions * (fresh * rates["input"]
+                          + cached * rates["input"] * CACHE_READ_FACTOR
+                          + per["output"] * rates["output"]) / 1e6
 
 
 def cost_of(usage, model):
@@ -282,6 +321,11 @@ def run(scenarios, outdir, provider="anthropic", model="claude-opus-5",
     os.makedirs(outdir, exist_ok=True)
     use_solve_cache(os.path.join(os.path.dirname(outdir), "solve_cache.json"))
     results, spend, stopped = [], 0.0, False
+    estimated_total = sum(getattr(s, "estimate_usd", 0.0) or 0.0
+                          for s in scenarios)
+    if estimated_total:
+        print("   estimated %.2f USD for %d scenario(s) at %s list prices (%s)"
+              % (estimated_total, len(scenarios), model, PRICE_DATE))
     for scenario in scenarios:
         if budget is not None and spend >= budget:
             stopped = True
@@ -311,9 +355,13 @@ def run(scenarios, outdir, provider="anthropic", model="claude-opus-5",
                      "seconds": session.get("seconds"),
                      "error": session.get("error"), "faults": []})
         row["cost"] = cost
+        row["estimate"] = getattr(scenario, "estimate_usd", None)
         results.append(row)
-        print("   %s: %d/%d criteria, $%.3f"
-              % (scenario.name, row["passed"], row["total"], cost))
+        print("   %s: %d/%d criteria, $%.3f%s"
+              % (scenario.name, row["passed"], row["total"], cost,
+                 " (estimated $%.3f; run so far $%.2f of $%.2f estimated)"
+                 % (row["estimate"], spend, estimated_total)
+                 if row["estimate"] else ""))
     meta = {"mode": "dry run" if dry_run else "live", "provider": provider,
             "model": model, "outdir": outdir, "spend": spend, "budget": budget,
             "stopped": stopped,
@@ -335,17 +383,30 @@ def _scored(scenario, session, here):
                                        % (type(exc).__name__, exc)}
 
 
-def replay(outdir, do_score=True, corpus=False):
+def replay(outdir, do_score=True, corpus=False, sampled=False):
     """Re-score sessions already recorded under ``outdir``. No provider, no cost.
 
     ``corpus`` re-scores a sweep instead of the registry: a sweep's scenarios are
     not written down anywhere, so each one is rebuilt from the workbook its
-    session recorded opening — which is the whole of what defines it.
+    session recorded opening — which is the whole of what defines it. ``sampled``
+    does the same for a round-two run, where the scenario's name also carries the
+    TASK that was asked, and the spec inside that task is seeded on the file and
+    the task alone so it rebuilds identically with nothing stored.
     """
     from tools.assistant_scenarios import by_name
 
     resolve, renderer, cases = by_name, None, []
-    if corpus:
+    if sampled:
+        from tools.assistant_scenarios import tasks as menu
+
+        renderer = menu.render
+
+        def resolve(name, session=None):
+            row = menu.row_for(name, session)
+            if row is not None:
+                cases.append(row)
+            return menu.resolve(name, session or {})
+    elif corpus:
         from tools.assistant_scenarios import corpus as sweep
 
         renderer = sweep.render
@@ -365,7 +426,8 @@ def replay(outdir, do_score=True, corpus=False):
             continue
         with open(record, encoding="utf-8") as fh:
             session = json.load(fh)
-        scenario = (resolve(session.get("scenario") or name, session) if corpus
+        scenario = (resolve(session.get("scenario") or name, session)
+                    if (corpus or sampled)
                     else resolve(session.get("scenario") or name))
         if scenario is None:
             print("! no scenario named %r in the registry — skipped" % name)
@@ -377,8 +439,10 @@ def replay(outdir, do_score=True, corpus=False):
                                          row["total"]))
     meta = {"mode": "replay", "provider": "-", "model": "-", "outdir": outdir,
             "recorded": datetime.datetime.now().isoformat(timespec="seconds")}
-    if corpus:
+    if corpus or sampled:
         meta["cases"] = cases
+    if sampled:
+        meta.update(_stored_draw(outdir))
     write(results, meta, outdir, renderer)
     return results, meta
 
@@ -433,6 +497,114 @@ def sweep(outdir, provider="anthropic", model="claude-opus-5", dry_run=False,
                            "unloadable": unloadable})
 
 
+# --------------------------------------------------------------------------- #
+# The sampled sweep — a stratified draw, and a menu of tasks
+# --------------------------------------------------------------------------- #
+#: The run whose files a second round skips by default: sweeping a file the first
+#: round already answered measures the same thing twice. ``--include-swept`` puts
+#: them back, and ``--swept-from`` points at a different first round.
+FIRST_ROUND = "live1"
+
+
+def first_round():
+    """Where the first live corpus round wrote its sessions."""
+    return os.path.join(default_root(), "corpus", FIRST_ROUND)
+
+
+def sampled_sweep(outdir, provider="anthropic", model="claude-opus-5",
+                  dry_run=False, budget=None, n=60, per_file=2, seed=1,
+                  swept_from=None, include_swept=False, resume=False,
+                  builds=None, min_per_class=2):
+    """A stratified sample of the corpus, with a menu of tasks asked of each file.
+
+    The draw is written to the run directory before anything is played, so a run
+    stopped at its budget can be finished from the same directory and a replay
+    re-scores the same set.
+    """
+    from tools.assistant_scenarios import corpus
+    from tools.assistant_scenarios import tasks as menu
+
+    # ``--builds`` on its own is the build family and nothing else: there is no
+    # sample to draw, and drawing one anyway would buy a sweep nobody asked for.
+    every = corpus.cases() if n else []
+    exclude = set()
+    if n and not include_swept:
+        source = swept_from or first_round()
+        exclude = menu.swept_in(source)
+        print("   %d file(s) already swept in %s are excluded"
+              % (len(exclude), os.path.basename(source.rstrip("/")) or source))
+    chosen, draw = (menu.sample(every, n, seed, exclude=exclude,
+                                min_per_class=min_per_class) if n
+                    else ([], {"pool": 0, "quota": 0, "asked": 0, "drawn": 0,
+                               "min_per_class": min_per_class}))
+    pairs = menu.plan(chosen, per_file, seed)
+    scenarios, rows, skipped = [], [], []
+    for case, task in pairs:
+        built = menu.scenario_for(case, task)
+        if built is None:
+            skipped.append("%s/%s" % (case.name, task.name))
+            continue
+        built.estimate_usd = estimate_usd(task.cost, model)
+        scenarios.append(built)
+        rows.append(menu.Row(built.name, case.classes, case.primary, case.kind,
+                              case.path, task.name))
+    for build in _build_cases(builds, seed, menu):
+        built = menu.build_scenario(build)
+        built.estimate_usd = estimate_usd(5, model)
+        scenarios.append(built)
+        rows.append(menu.Row(built.name, build.classes, build.primary, "build",
+                              build.path, "build_%s" % build.kind))
+    done = recorded(outdir) if resume else set()
+    if done:
+        keep = [(s, r) for s, r in zip(scenarios, rows) if s.name not in done]
+        scenarios = [s for s, _r in keep]
+        print("   %d already recorded here; %d left" % (len(done), len(scenarios)))
+    draw["seed"] = seed
+    draw["tasks_per_file"] = per_file
+    print("sampled sweep: %d file(s) drawn from %d eligible (%d filled the class "
+          "quota), %d scenario(s) -> %s"
+          % (draw["drawn"], draw["pool"], draw["quota"], len(scenarios), outdir))
+    if skipped:
+        print("   %d (file, task) pair(s) the file could not support: %s"
+              % (len(skipped), ", ".join(skipped[:4])))
+    os.makedirs(outdir, exist_ok=True)
+    with open(os.path.join(outdir, "sample.json"), "w", encoding="utf-8") as fh:
+        json.dump({"draw": draw, "seed": seed,
+                   "files": [c.name for c in chosen],
+                   "scenarios": [s.name for s in scenarios]}, fh, indent=1)
+    return run(scenarios, outdir, provider=provider, model=model,
+               dry_run=dry_run, budget=budget, renderer=menu.render,
+               meta_extra={"cases": rows, "corpus_size": len(every),
+                           "unloadable": [c.name for c in every if not c.loads],
+                           "draw": draw, "seed": seed})
+
+
+def _build_cases(builds, seed, menu):
+    """The build-from-nothing cases this run plays: none, ``all``, or ``N`` drawn."""
+    if builds in (None, "", 0, "0"):
+        return []
+    every = menu.builds()
+    if str(builds).lower() in ("all", "-1"):
+        return every
+    import random
+
+    rng = random.Random("%s|builds" % seed)
+    return rng.sample(every, min(int(builds), len(every)))
+
+
+def _stored_draw(outdir):
+    """The draw a sampled run wrote, for a replay's scorecard."""
+    path = os.path.join(outdir, "sample.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            stored = json.load(fh)
+    except Exception:
+        return {}
+    return {"draw": stored.get("draw"), "seed": stored.get("seed")}
+
+
 def write(results, meta, outdir, renderer=None):
     with open(os.path.join(outdir, "scorecard.md"), "w", encoding="utf-8") as fh:
         fh.write((renderer or render)(results, meta))
@@ -473,6 +645,30 @@ def main(argv=None):
                         help="with --corpus and --out, skip the files this "
                              "directory already holds a session for — how the "
                              "rest of a budget-stopped sweep is run")
+    parser.add_argument("--sample", type=int, default=None,
+                        help="with --corpus, draw this many files rather than "
+                             "sweeping all of them — stratified, so every input "
+                             "class the corpus can fill is filled; a floor, not "
+                             "a cap, since a sample too small to be stratified "
+                             "comes back larger than asked")
+    parser.add_argument("--tasks", type=int, default=2,
+                        help="with --sample, how many tasks to ask of each file "
+                             "(run_declared is always one of them)")
+    parser.add_argument("--seed", type=int, default=1,
+                        help="with --sample, the seed the draw is made from")
+    parser.add_argument("--min-per-class", type=int, default=2,
+                        help="with --sample, how many files each input class is "
+                             "represented by where the corpus allows")
+    parser.add_argument("--include-swept", action="store_true",
+                        help="with --sample, do not skip the files the first "
+                             "live round already swept")
+    parser.add_argument("--swept-from", default=None,
+                        help="with --sample, the finished run whose files are "
+                             "skipped (default: the first live corpus round)")
+    parser.add_argument("--builds", nargs="?", const="all", default=None,
+                        help="with --sample, also play the build-from-nothing "
+                             "family: `--builds` for every tutorial drawing and "
+                             "description, `--builds N` for N of them")
     parser.add_argument("--no-score", action="store_true",
                         help="record only; score later with --replay")
     parser.add_argument("--list", action="store_true",
@@ -480,6 +676,32 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.list:
+        if args.corpus and args.builds is not None:
+            from tools.assistant_scenarios import tasks as menu
+            for build in menu.builds():
+                print("%-40s %-12s %s" % (build.name, build.kind,
+                                          os.path.basename(build.path)))
+            return 0
+        if args.corpus and args.sample:
+            from tools.assistant_scenarios import corpus
+            from tools.assistant_scenarios import tasks as menu
+            exclude = (set() if args.include_swept
+                       else menu.swept_in(args.swept_from or first_round()))
+            chosen, draw = menu.sample(corpus.cases(), args.sample, args.seed,
+                                       exclude=exclude,
+                                       min_per_class=args.min_per_class)
+            total = 0
+            for case, task in menu.plan(chosen, args.tasks, args.seed):
+                total += task.cost
+                print("%-52s %-16s %-22s %s"
+                      % (case.name, task.name, case.primary,
+                         ", ".join(case.classes)))
+            print("%d file(s) of %d eligible, %d scenario(s), about %d "
+                  "completion(s) — an estimated $%.2f at %s list prices (%s)"
+                  % (draw["drawn"], draw["pool"],
+                     len(menu.plan(chosen, args.tasks, args.seed)), total,
+                     estimate_usd(total, args.model), args.model, PRICE_DATE))
+            return 0
         if args.corpus:
             from tools.assistant_scenarios import corpus
             for case in corpus.cases():
@@ -494,13 +716,29 @@ def main(argv=None):
         return 0
 
     if args.replay:
+        sampled = bool(args.sample or args.builds is not None
+                       or os.path.exists(os.path.join(args.replay,
+                                                      "sample.json")))
         results, meta = replay(args.replay, do_score=not args.no_score,
-                               corpus=args.corpus)
+                               corpus=args.corpus and not sampled,
+                               sampled=args.corpus and sampled)
         print(summarize(results, meta))
         return 0 if all(r["pass"] for r in results) else 1
 
     if not args.dry_run and not args.live:
         parser.error("choose --dry-run, --live or --replay")
+
+    if args.corpus and (args.sample or args.builds is not None):
+        outdir = args.out or stamped_dir(os.path.join(default_root(), "corpus"))
+        results, meta = sampled_sweep(
+            outdir, provider=args.provider, model=args.model,
+            dry_run=args.dry_run, budget=args.budget_usd, n=args.sample or 0,
+            per_file=args.tasks, seed=args.seed, swept_from=args.swept_from,
+            include_swept=args.include_swept, resume=args.resume,
+            builds=args.builds, min_per_class=args.min_per_class)
+        print(summarize(results, meta))
+        print("scorecard: %s" % os.path.join(outdir, "scorecard.md"))
+        return 0 if all(r["pass"] for r in results) else 1
 
     if args.corpus:
         outdir = args.out or stamped_dir(os.path.join(default_root(), "corpus"))

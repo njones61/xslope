@@ -9,12 +9,13 @@ purpose that the diagnosis scenarios open.
 
 from .core import (Criterion, Fault, Scenario, ScoreCtx, Turn, digest,  # noqa: F401
                    load_model, lock, parse_body, repo, seep_flow, solve,
-                   ssrm_fs, use_solve_cache)
+                   solve_variant, ssrm_fs, use_solve_cache)
 from .definitions import SCENARIOS                                       # noqa: F401
 
 __all__ = ["Criterion", "Fault", "Scenario", "ScoreCtx", "Turn", "SCENARIOS",
            "by_name", "families", "digest", "load_model", "lock", "parse_body",
-           "repo", "seep_flow", "solve", "ssrm_fs", "use_solve_cache"]
+           "repo", "seep_flow", "solve", "solve_variant", "ssrm_fs",
+           "use_solve_cache"]
 
 
 def by_name(name):

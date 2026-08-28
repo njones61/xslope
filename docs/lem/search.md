@@ -52,6 +52,14 @@ turn on grid seeding, described next, when it is meant to find the critical surf
 anywhere in the model, since that mode refines up to four competing families with
 the sheet's own circles among them.
 
+A starting circle that cannot be sliced — most often one whose crossing with the
+ground lies above the circle's own center, so the arc would have to rise above
+its center on that side — is not searched from. The search says so in the log
+(`[⚠ starting circle 1] … cannot be built … searching from the launch grid
+around it`) and continues from the grid of centers around the circle; the model
+checks report the same circle as `surface.circle_daylights_above_center` before
+the run.
+
 ### Grid Seeding (Global Search)
 
 The adaptive search described above is a **local** optimizer: it refines whatever neighborhood its starting circles put it in, and it will do so even when a far better minimum exists elsewhere. This matters more than it might appear. On an embankment over a layered foundation, a shallow circle in the fill and a deep circle riding the base of the foundation are two *competing families* of failure surface, separated by a ridge of higher factors of safety that the local search will not cross. Started from a single circle in the wrong family, the search converges cleanly — reporting convergence, a stable factor of safety, and a plausible-looking surface — at a value that can be 20% or more too high. Nothing in the output warns you.

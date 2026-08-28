@@ -6694,7 +6694,11 @@ def combo03_rapid():
 
     # ---- every instant as a three-stage drawdown ---------------------------- #
     t0 = _time.time()
+    # Stage 1 is read at the first frame, so that frame is the state the others
+    # fall from and is not swept -- Studio dims it when Rapid drawdown is ticked.
+    _s1 = float((model.get("tseep") or {}).get("stage_1") or 0.0)
     ok, rapid_res = fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
+                               times=[t for t in solution["times"] if t > _s1],
                                num_slices=COMBO03R_SLICES, rapid=True,
                                search_opts=COMBO03_SEED, print_table=False)
     if not ok:

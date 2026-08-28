@@ -7787,6 +7787,32 @@ def run_sweep_window_test(test):
     return 0.0, None
 
 
+def run_rapid_stage1_frames_test(test):
+    """The Parametric dialog under Rapid drawdown at each time: the frames at or
+    before stage 1 cannot be a stage 2, so they are unticked and dimmed instead of
+    returning as failed rows. See test/rapid_stage1_frames_check.py. Skips cleanly
+    without PySide6. Returns (0.0, None) on success, else (None, message)."""
+    import importlib.util
+    import os
+
+    try:
+        import PySide6  # noqa: F401
+    except ImportError:
+        return 0.0, None
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    path = Path(__file__).parent / 'test' / 'rapid_stage1_frames_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('rapid_stage1_frames_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    try:
+        mod.main()
+    except AssertionError as e:
+        return None, str(e) or "assertion failed"
+    return 0.0, None
+
+
 def run_sweep_table_test(test):
     """The Table sub-tab every Parametric result view carries (``studio.sweep_table``).
 
@@ -12602,6 +12628,8 @@ def _dispatch_test(test):
         return run_sweep_window_test(test)
     if test_type == 'sweep_table':
         return run_sweep_table_test(test)
+    if test_type == 'rapid_stage1_frames':
+        return run_rapid_stage1_frames_test(test)
     if test_type == 'piezo_visibility':
         return run_piezo_visibility_test(test)
     if test_type == 'water_hoist':
@@ -13402,6 +13430,13 @@ def main():
         tests.append({'type': 'sweep_table',
                       'file': 'Parametric result tables (Studio)',
                       'method': '-', 'source': 'sweep_table'})
+        # Guard the Parametric dialog's frame list under Rapid drawdown: the frames
+        # at or before stage 1 are unticked and dimmed (they are the state the
+        # others fall from), All/None leave them alone, and unticking Rapid
+        # drawdown gives them back. Offscreen, no solve.
+        tests.append({'type': 'rapid_stage1_frames',
+                      'file': 'Parametric frames under Rapid drawdown (Studio)',
+                      'method': '-', 'source': 'rapid_stage1_frames'})
         # Guard Studio's in-app updater: the version comparison, the platform
         # artifact key, the minimum_version gate, the checksum refusal, and the
         # command each platform branch would spawn. Touches no network — the

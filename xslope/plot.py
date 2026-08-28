@@ -5181,7 +5181,7 @@ def annotate_design_crossing(ax, target_fs, summary):
 #: instants with: the reservoir side warm, the dry side cool. Both are clear of the
 #: default line color, so a colored marker never reads as part of the line under it.
 _FACE_COLORS = {'upstream': '#b5460f', 'downstream': '#2b7bb0'}
-_STAGE_COLORS = {2: '#8e44ad', 3: '#2b7bb0'}
+_STAGE_COLORS = {2: '#e07b00', 3: '#1f8a4c'}
 
 
 def _crest_span(slope_data):

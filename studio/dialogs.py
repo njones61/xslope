@@ -2106,14 +2106,42 @@ class SensitivityDialog(QDialog):
             else:
                 self.search.setEnabled(True)
                 self.search.setToolTip(self._search_tip)
+        self._sync_stage_1_frames(on)
         self._sync_grid_seed()
         if self.mode.currentData() == "fs_vs_time":
             self._on_mode_changed()
             self.preflight.refresh()
 
+    def _sync_stage_1_frames(self, rapid_on):
+        """With every instant a drawdown, the frames at or before stage 1 are the
+        state the others fall from and cannot be a stage 2 themselves; they are
+        unticked and dimmed rather than left to come back as failed rows."""
+        stage_1 = getattr(self, "_stage_1", None)
+        if stage_1 is None:
+            return
+        unit = f" {self._time_unit}" if self._time_unit else ""
+        for i in range(self.times.count()):
+            item = self.times.item(i)
+            if float(item.data(Qt.UserRole)) > stage_1:
+                continue
+            if rapid_on:
+                item.setCheckState(Qt.Unchecked)
+                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+                item.setToolTip(f"Stage 1 of every drawdown is read at "
+                                f"t = {_fmt_time(stage_1)}{unit}; this frame is "
+                                f"the state the others fall from, not a "
+                                f"drawdown of its own.")
+            else:
+                item.setFlags(item.flags() | Qt.ItemIsEnabled)
+                item.setCheckState(Qt.Checked)
+                item.setToolTip("")
+
     def _set_all_times(self, on):
         for i in range(self.times.count()):
-            self.times.item(i).setCheckState(Qt.Checked if on else Qt.Unchecked)
+            item = self.times.item(i)
+            if not (item.flags() & Qt.ItemIsEnabled):
+                continue
+            item.setCheckState(Qt.Checked if on else Qt.Unchecked)
 
     def selected_times(self):
         """The ticked instants, in saved order."""

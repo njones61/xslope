@@ -595,8 +595,10 @@ to **LEM** (`Ctrl+1`) and click **Run → Parametric…**
 
 Set **Mode** to **Factor of safety vs time**. **Method** opens on **Spencer** and
 **Number of slices** on 40; leave both. **Saved frames** lists the twenty-one this
-run stored, all ticked — leave them, because the comparison at the end of this
-part needs all of them.
+run stored. Tick **Rapid drawdown at each time**, and t = 0 unticks and dims:
+stage 1 of every drawdown is read there, so that frame is the state the others
+fall from and cannot be a drawdown of its own. Leave the other twenty ticked,
+because the comparison at the end of this part needs all of them.
 
 **Rapid drawdown at each time → ticked.** Left off, each instant is one
 single-stage analysis of that instant's water. Ticked, each instant becomes stage
@@ -614,14 +616,13 @@ drawdown. Boundary set 2 raises nothing, because
 [we cleared it in COMBO-2](combo02_rapid_drawdown.md#clearing-boundary-set-2)
 before that run; a transient run solves boundary set 1 only.
 
-Click **Run**. Twenty of the twenty-one instants are drawdowns, each searched in
-full, so the table lands when the last search finishes:
+Click **Run**. Each of the twenty instants is a drawdown searched in full, so the
+table lands when the last search finishes:
 
 ```text
-Rapid drawdown vs time (lem): 21 instant(s) of the transient solution, spencer, re-searching at each…
+Rapid drawdown vs time (lem): 20 instant(s) of the transient solution, spencer, re-searching at each…
 Rapid drawdown versus time (stage 1 at t = 0)
 t (day)  stage 1  stage 2       stage 3      FS  governs      Xo      Yo       R
-      0        —        —             —       —        —       —       —       —   a drawdown from t = 0 to t = 0 is not a drawdown …
       5   1.5109   1.4563  not required  1.4563        2  242.74  256.34  165.90
      10   1.5142   1.3496  not required  1.3496        2  244.06  253.05  164.14
      15   1.5248   1.2704  not required  1.2704        2  246.78  250.47  163.54
@@ -642,13 +643,8 @@ t (day)  stage 1  stage 2       stage 3      FS  governs      Xo      Yo       R
     300   1.5514   1.1848  not required  1.1848        2  245.31  243.53  161.82
     400   1.5514   1.1893  not required  1.1893        2  245.31  243.53  161.82
     500   1.5514   1.1912  not required  1.1912        2  245.31  243.53  161.82
-Lowest factor of safety 1.0157 at t = 50 day (21 instant(s), 1 without a result).
+Lowest factor of safety 1.0157 at t = 50 day (20 instant(s), 0 without a result).
 ```
-
-The t = 0 row's message is cut at the ellipsis to fit the page. In the Log it
-runs on: *"a drawdown from t = 0 to t = 0 is not a drawdown -- the pool has not
-fallen yet; stage 2 must be a later instant than stage 1."* The first frame is
-the state the other twenty fall from.
 
 ### The rapid drawdown curve
 
@@ -662,9 +658,8 @@ the lower of stages 2 and 3; the three stages stay in the table above, where the
 governing one is named per row. Behind it, on the right axis, runs the pool
 schedule, with the forty-five days it falls over shaded and the pre-drawdown
 1.456 carried across as a dashed full-pool reference. The lowest instant is
-ringed and labeled, the red guide marks FS = 1, and the legend counts the instant
-that produced no result. Each point is colored by the stage that governs it —
-purple where stage 2's undrained strength gave the lower factor of safety, blue
+ringed and labeled, and the red guide marks FS = 1. Each point is colored by the stage that governs it —
+orange where stage 2's undrained strength gave the lower factor of safety, green
 where stage 3's drained strength did — so the three drained instants at the
 bottom of the dip stand out on the curve.
 

@@ -145,25 +145,17 @@ Switch back to **LEM** (`Ctrl+1`) and click **Materials** in the Inputs tree. Se
 the **Show parameters for:** toggles to **LEM** alone, which hides the
 conductivity and finite element columns.
 
-![The materials table as the starter file ships: unit weight, saturated unit weight, cohesion, friction angle and pore-pressure option all blank](images/combo03_studio_materials_blank.png)
+![The materials table as the starter file ships: unit weight, saturated unit weight, cohesion and friction angle blank, and u still at none](images/combo03_studio_materials_blank.png)
 
-Working across the table in the order it lists its columns, type **γ 20**,
-**γsat 21**, **c 0** and **φ 32** on the `shell` row, then set **u** to
-**seep**; then **γ 19**, **γsat 20**, **c 10** and **φ 25** on the `core` row,
-then **u** to **seep** there too. The table then reads:
+Working across each row in the order the table lists its columns, enter
+**γ 20**, **γsat 21**, **c 0**, **φ 32** and **u = seep** for the `shell`, and
+**γ 19**, **γsat 20**, **c 10**, **φ 25** and **u = seep** for the `core`:
 
 ![The materials table after the values are entered](images/combo03_studio_materials.png)
 
-| mat | name | γ (kN/m³) | γsat (kN/m³) | option | c′ (kPa) | φ′ (deg) | u |
-| :---: | --- | :---: | :---: | --- | :---: | :---: | --- |
-| 1 | `shell` | 20 | 21 | `mc` | 0 | 32 | `seep` |
-| 2 | `core` | 19 | 20 | `mc` | 10 | 25 | `seep` |
-
-**These are typical values for a granular shell and a compacted clay core, chosen
-for the exercise rather than measured on this dam.**
-
-Every column in that table matters — the five we typed, and only the strength
-option `mc` came with the file:
+These are typical values for a granular shell and a compacted clay core, chosen
+for the exercise rather than measured on this dam. Three things about them
+matter for the runs below:
 
 **Two unit weights per row.** γ applies above the water table and γsat below it;
 the slicer splits each slice's weight where the two meet, so the shell gets

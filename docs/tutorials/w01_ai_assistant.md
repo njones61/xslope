@@ -176,11 +176,13 @@ what it should say.
 
 ## Building a model from a drawing
 
-We will paste the problem drawing from [LEM-8](lem08_reinforced_slope.md) into
-an empty project and ask for the model it describes, with nothing else to go on
-but the units. One request exercises everything at once here: reading dimensions
-off a picture, entering materials, geometry, a load and six reinforcement lines,
-and then searching for the critical circle.
+One of the most powerful uses of the assistant is building a model straight
+from a drawing. We will paste the problem drawing from
+[LEM-8](lem08_reinforced_slope.md) into an empty project and ask for the model
+it describes, with nothing else to go on but the units. One request exercises
+everything at once: reading dimensions off a picture, entering materials,
+geometry, a load and six reinforcement lines, and then searching for the
+critical circle.
 
 We start from **File → New**. Right-clicking the drawing at the top of that page
 and choosing **Copy image** puts it on the clipboard; from there we click in the

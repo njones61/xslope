@@ -111,7 +111,7 @@ def test_dialog():
     fails = []
     dlg0 = RunSeepDialog(has_bc2=False, has_tseep=False)
     o0 = dlg0.options()
-    if o0.get("mode") != "steady" or set(o0) != {"mode", "bc", "tol"}:
+    if o0.get("mode") != "steady" or set(o0) != {"mode", "bc", "tol", "max_iter"}:
         fails.append(f"steady (no tseep) options wrong: {o0}")
     if dlg0.run_type.findData("transient") != -1:
         fails.append("Transient choice offered when the file has no tseep sheet")

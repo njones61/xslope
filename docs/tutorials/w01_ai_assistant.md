@@ -146,8 +146,7 @@ to:
 | Claude Sonnet 5 | $2.00 | $10.00 | **$0.89** |
 | Claude Haiku 4.5 | $1.00 | $5.00 | **$0.45** |
 
-The diagnosis session is a quarter of the total on its own, because it answers
-by measuring rather than by reading. Whether a cheaper model does the same work
+Whether a cheaper model does the same work
 as well is a separate question. The current prices are on each provider's
 pricing page: [Anthropic](https://www.anthropic.com/pricing),
 [OpenAI](https://openai.com/api/pricing/),

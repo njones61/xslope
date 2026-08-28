@@ -484,33 +484,25 @@ the drawdown. Over the next 12 days the pool gives up its last 4.3 m while the
 shell keeps draining, and the strength recovers faster than the load falls —
 1.3436 by day 40, 1.3813 by day 47, 1.5187 by day 80.
 
-#### Relationship to a rapid drawdown analysis
-
-Every point on this curve is a drained analysis: the strength at each time step
-is the effective-stress strength of the shell and the core, with the pore
-pressures from the seepage solution at that step. That is right when the soil
-drains as fast as the pool drops. Over a short drawdown period, a low-permeability
-zone does not, and undrained strengths govern instead. For that case the drawdown
-should be analyzed as a rapid drawdown, with the three-stage Duncan, Wright and
-Wong procedure of [COMBO-2](combo02_rapid_drawdown.md), and Part 2 repeats the
-sweep with that analysis at every time step.
-
 ---
 
 ## Part 2 — Rapid drawdown analysis at each time step
 
-The curve in Part 1 is a sequence of drained analyses, which suits a slope that
-sheds pore water about as fast as the pool falls. A compacted clay core does not,
-and the Part 1 model carries no $d$ / $\psi$ pair, so we cannot ask it the rapid
-drawdown question at all.
+Every point on the Part 1 curve is a drained analysis: the strength at each time
+step is the effective-stress strength of the shell and the core, with the pore
+pressures from the seepage solution at that step. That is right when the soil
+drains as fast as the pool drops. Over a short drawdown period, a low-permeability
+zone does not, and undrained strengths govern instead. For that case the drawdown
+should be analyzed as a rapid drawdown, with the three-stage Duncan, Wright and
+Wong procedure of [COMBO-2](combo02_rapid_drawdown.md). The Part 1 model carries
+no $d$ / $\psi$ pair, so it cannot be used for that.
 
-The Johnson Reservoir dam from [COMBO-2](combo02_rapid_drawdown.md) can be
-asked. Its core
-carries a $K_c = 1$ envelope, and in COMBO-2 we ran the three-stage procedure on
-it three times, once per statement of where the water is, reading 1.181, 1.195
-and 1.016 — the last from a transient run, stage 1 at t = 0 and stage 2 at
-t = 50. Here we will run it at **every** saved instant, and then run Part 1's
-kind of curve on the same twenty-one frames for comparison.
+The Johnson Reservoir dam from COMBO-2 can. Its core carries a $K_c = 1$
+envelope, and in COMBO-2 we ran the three-stage procedure on it three times, once
+per statement of where the water is, reading 1.181, 1.195 and 1.016 — the last
+from a transient run, stage 1 at t = 0 and stage 2 at t = 50. Here we will run it
+at **every** saved instant, and then run Part 1's kind of curve on the same
+twenty-one frames for comparison.
 
 ### Opening the model
 

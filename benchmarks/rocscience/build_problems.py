@@ -1914,7 +1914,14 @@ def vp036():
         {'mat_id': 0, 'coords': [(0.0, 5.0), (5.0, 5.0), (15.0, 15.0), (20.0, 15.0)]},
     ]
     sd['max_depth'] = 0.0
-    sd['circles'] = [{'Xo': 10.0, 'Yo': 20.0, 'Depth': 4.0, 'R': 16.0}]
+    # A toe circle: it daylights at the toe (5, 5) exactly and enters the crest
+    # at x = 19.1.  The textbook placement (Xo halfway between toe and crest,
+    # Yo = toe + 2H, so Xo=10, Yo=25) cannot be used here -- this section is only
+    # as wide as the slope itself, with no flat ground beyond the toe or the
+    # crest, so a circle centered mid-slope runs out through the vertical edges
+    # of the section instead of daylighting on the ground.  Xo is pulled back
+    # over the toe until both ends exit on the ground surface.
+    sd['circles'] = [{'Xo': 5.0, 'Yo': 20.0, 'Depth': 5.0, 'R': 15.0}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp036.xlsx'))
     return 'vp036.xlsx'
 

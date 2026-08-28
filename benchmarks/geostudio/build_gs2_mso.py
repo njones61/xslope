@@ -127,7 +127,17 @@ def _base_sd():
              (_WIDTH, _Y_TOP), (0.0, _Y_TOP)])},
         {'mat_id': 1, 'polygon': Polygon(  # porous plate
             [(0.0, 0.0), (_WIDTH, 0.0), (_WIDTH, _Y_PLATE), (0.0, _Y_PLATE)])}]
-    sd['circles'] = [{'Xo': _WIDTH / 2.0, 'Yo': 1.0, 'Depth': 0.0, 'R': 1.0}]
+    # Starting circle: the 'circles' sheet is unused by this deck's locked
+    # analysis (type=tseep_head reads only the transient seepage field), but
+    # xslope requires circles[0] to actually slice. This is a 1-D column
+    # (ground is the two points (0,H)-(W,H), no slope): a circle here can only
+    # daylight twice on that short top segment if its half-span stays well
+    # inside the 0.006 m column width, which in turn bounds how deep it can
+    # reach (past roughly half the width the arc bulges out past the vertical
+    # side walls and the domain-containment check rejects it). Half-span
+    # 0.0024 m, nadir 0.00192 m below the surface -- comfortably inside that
+    # bound, with margin from the ~0.003 m limit.
+    sd['circles'] = [{'Xo': 0.003, 'Yo': 0.12394, 'Depth': 0.12148, 'R': 0.00246}]
     return sd
 
 

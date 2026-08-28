@@ -106,7 +106,14 @@ def _base_sd():
     sd['materials'] = [m]
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
         [(0.0, 0.0), (_WIDTH, 0.0), (_WIDTH, _HEIGHT), (0.0, _HEIGHT)])}]
-    sd['circles'] = [{'Xo': _WIDTH / 2.0, 'Yo': 2.0, 'Depth': 0.0, 'R': 2.0}]
+    # Starting circle: the 'circles' sheet is unused by this deck's locked
+    # analysis (type=tseep_head reads only the transient seepage field), but
+    # xslope requires circles[0] to actually slice. This is a 1-D column
+    # (ground is the two points (0,H)-(W,H), no slope): the deepest circle
+    # whose chord still fits within the column width and daylights twice on
+    # the top -- a shallow sliver near the crest (chord half-span 0.0045 m
+    # against a 0.01 m column, depth 0.0025 m below the surface).
+    sd['circles'] = [{'Xo': 0.005, 'Yo': 0.05195, 'Depth': 0.0475, 'R': 0.00445}]
     return sd
 
 

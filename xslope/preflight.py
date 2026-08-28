@@ -948,6 +948,74 @@ class _Ctx:
                 return True
         return False
 
+    def circle_slice_failure(self, circle):
+        """The slicer's own reason a circle yields no slices, or ``None``.
+
+        The same question as :meth:`circle_slices`, asked so the answer can be
+        QUOTED. A rule that refuses a circle has to say what the slicer said,
+        because the failure modes here are geometric and various -- an arc that
+        never reaches the ground, one that leaves through a vertical edge of the
+        section, one that wanders outside the domain polygon -- and a paraphrase
+        covering all of them says nothing a user can act on.
+
+        Asked on a copy whose pore pressure is neutralized, which is what makes
+        this a question about the CIRCLE. A deck that reads pore pressure from a
+        seepage solution built at run time carries no field on disk, so slicing it
+        as it sits fails for a reason that has nothing to do with the geometry --
+        two dozen of the groundwater and transient decks are exactly this, and
+        blaming their circles would report a fault on models whose circles are
+        sound. A missing field is the ``seep_field.`` family's business; this asks
+        only whether the arc reaches the ground and stays inside the domain.
+
+        Both ways a run can consume a circle are tried, exactly as
+        :meth:`circle_slices` tries them: a plain arc, and a composite surface
+        truncated at the domain floor. Either one succeeding means the circle is
+        usable, so a rule built on this cannot fire on a model that runs.
+        """
+        from .slice import generate_slices
+        sd = dict(self.sd)
+        sd["materials"] = [dict(m, u="none") if isinstance(m, dict) else m
+                           for m in (self.sd.get("materials") or [])]
+        first = None
+        for composite in (False, True):
+            try:
+                ok, res = generate_slices(sd, circle=dict(circle),
+                                          composite=composite, debug=False,
+                                          check_inputs=False)
+            except Exception as exc:
+                ok, res = False, f"{type(exc).__name__}: {exc}"
+            if ok:
+                # "It ran" is not "it produced a failure surface". generate_slices
+                # trims slices narrower than an ABSOLUTE 1e-2 (slice.py, "Remove
+                # thin slices"), so on a section only centimetres wide every slice
+                # is trimmed and the call returns success with an EMPTY table. A
+                # circle that yields no slices is dead whichever way it got there,
+                # so the emptiness is reported rather than passed on as success.
+                try:
+                    n = len(res[0])
+                except (TypeError, IndexError, KeyError):
+                    n = None
+                if n:
+                    return None
+                if first is None:
+                    first = ("the slicer accepted the circle but produced no "
+                             "slices from it: every slice was narrower than the "
+                             "minimum slice width, which is an absolute length, so "
+                             "a section this small has no room for one")
+                continue
+            if first is None:
+                first = str(res).strip()
+        if not first:
+            return "the slicer produced no slices from it"
+        # Drop the slicer's own "Failed to generate surface:" lead-in. The sentence
+        # quoting this already says the circle produces no failure surface, and
+        # repeating it swallows the part that actually identifies the geometry.
+        for lead in ("Failed to generate surface:", "Failed to generate surface"):
+            if first.startswith(lead):
+                first = first[len(lead):].lstrip(": ").strip()
+                break
+        return first or "the slicer produced no slices from it"
+
     @property
     def has_non_circ(self):
         return bool(self.sd.get("non_circ"))
@@ -2502,6 +2570,103 @@ def _circle_daylights_above_center(ctx):
             f"can be generated from this circle.{cost} Lower the center or enlarge "
             f"the radius so both crossings sit below it {_AT_CIRCLES}."))
     return out
+
+
+#: The standing repair for a first circle that cannot be sliced, in one sentence.
+#: Named once because three severities share it and they must not drift apart.
+_CIRCLE_RULE = ("A workable circle enters near the crest, runs tangent near the "
+                "base of the zone that governs, and daylights near the toe")
+
+
+@rule("surface.circle_cannot_be_sliced", WARNING, ("*",),
+      summary="The first circle must produce slices; where that circle IS the "
+              "run's surface, one that cannot is an error.",
+      remedy="generate_starting_circles")
+def _circle_cannot_be_sliced(ctx):
+    # The catch-all beneath the two rules above. Those name the two causes that can
+    # be diagnosed by INSPECTION -- a tangent depth below the domain floor, and a
+    # crossing above the circle's own center -- and each names the field to change.
+    # Every OTHER way a circle can be dead reaches the user as a slicing failure
+    # naming no field, several layers below the sheet they would fix: a section too
+    # narrow for the arc to daylight twice, so it leaves through a vertical edge; an
+    # arc that misses the ground entirely; a surface that wanders outside the domain
+    # polygon. From the run's point of view those are one condition -- there is no
+    # failure surface -- so they are reported as one, quoting the slicer's own
+    # reason rather than paraphrasing it into something too general to act on.
+    #
+    # WHY circles[0] ONLY. That is the circle a single-surface run analyses, and the
+    # one a shipped file is judged on. A search reads the whole sheet and refines
+    # off the survivors, so a dead seed costs the seed and not the answer (measured
+    # in the sibling rule above); reporting every dead circle in a large starting
+    # set would bury the one that decides whether the run has a surface at all.
+    #
+    # THE SEVERITY LADDER, and what each step costs:
+    #   single-surface LEM -- ERROR. run_lem_analysis takes circles[0] and nothing
+    #     else, so a dead first circle is the whole analysis.
+    #   seeded search -- WARNING. The grid moves off the seeds, so the run still
+    #     reaches a critical surface; what is lost is the circle the user drew.
+    #   no stability analysis selected -- INFO. A seepage, transient or
+    #     finite-element run never reads the circles sheet, so nothing about this
+    #     run is wrong. It is still worth saying: the file carries a circle no
+    #     limit-equilibrium run could use, and the moment someone selects one it
+    #     becomes the error above.
+    if ctx.surface_supplied:
+        return None
+    if ctx.effective_surface_family == "noncircular":
+        return None
+    circles = ctx.sd.get("circles") or []
+    if not circles or not isinstance(circles[0], dict):
+        return None
+    c = circles[0]
+
+    # Defer where a specific rule already explains THIS circle. Both of those fire
+    # on circles[0] under the same conditions this rule would, and each names the
+    # single field to change; saying the same thing twice, the second time in less
+    # detail, is worse than saying it once.
+    floor = ctx.domain_floor
+    depth = _num(c.get("Depth"))
+    if floor is not None and depth is not None and depth < floor:
+        return None
+    if (_num(ctx.sd.get("tcrack_depth")) or 0.0) <= 0:
+        ground = ctx.sd.get("ground_surface")
+        Xo, Yo, R = _num(c.get("Xo")), _num(c.get("Yo")), _num(c.get("R"))
+        if ground is not None and None not in (Xo, Yo, R):
+            from .slice import crossings_above_center
+            try:
+                if crossings_above_center(Xo, Yo, R, ground):
+                    return None
+            except Exception:
+                pass
+
+    reason = ctx.circle_slice_failure(c)
+    if reason is None:
+        return None
+
+    Xo, Yo, R = _num(c.get("Xo")), _num(c.get("Yo")), _num(c.get("R"))
+    where = ""
+    if None not in (Xo, Yo, R):
+        where = f" (Xo = {_fmt(Xo)}, Yo = {_fmt(Yo)}, R = {_fmt(R)})"
+
+    if "lem" not in ctx.analyses:
+        severity = INFO
+        cost = (f" This run does not read the circles sheet, so its own answer is "
+                f"unaffected -- but the file carries a starting circle that no "
+                f"limit-equilibrium run could use.")
+    elif ctx.is_search:
+        severity = WARNING
+        cost = (" The search's other circles are unaffected; this one is lost, and "
+                "the answer comes from the grid around it rather than from the "
+                "circle drawn.")
+    else:
+        severity = ERROR
+        cost = (" This run analyses that circle and no other, so it has no failure "
+                "surface to work on.")
+
+    return [(severity,
+             f"{ctx.circle_label(0)}{where} produces no failure surface. The "
+             f"slicer's own reason: {reason}{cost} {_CIRCLE_RULE} -- replace the "
+             f"circle with one placed that way {_AT_CIRCLES}, or generate a "
+             f"starting set from the model's geometry.")]
 
 
 # ---------------------------------------------------------------------------

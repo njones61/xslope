@@ -4015,6 +4015,41 @@ def _pf_circle_buried(sd, xo=270.0, yo=280.0, depth=220.0):
     return sd
 
 
+def _pf_circle_stranded(sd, xo=270.0, yo=280.0, r=5.0):
+    """Shrink circle 1 to a small arc buried inside the slope, touching nothing.
+
+    The third way a circle can be dead, and the one NEITHER sibling rule can name:
+    its nadir sits well above the domain floor, so the depth rule is silent, and it
+    has no ground crossing above its center because it has no ground crossing at
+    all. It is simply an arc that never reaches the ground. That is what makes it
+    this rule's case -- the catch-all quotes the slicer's own reason instead of
+    diagnosing a cause, precisely because the remaining causes have no shared shape.
+
+    Only circle 1 is moved. The rule reads circles[0] and nothing else, so leaving
+    the rest of the set sound is also what proves that.
+    """
+    cs = sd.get('circles') or []
+    if cs:
+        cs[0].update(Xo=xo, Yo=yo, R=r, Depth=yo - r)
+    return sd
+
+
+def _pf_seep_no_field(sd):
+    """Point every material at a seepage solution the model does not carry.
+
+    The control condition for the circle catch-all: slicing this model as it sits
+    fails, but for a reason that is not the circle's -- the pore-pressure field is
+    built by a run that has not happened yet. Two dozen groundwater and transient
+    decks ship exactly like this, so a rule that blamed their circles would refuse
+    models whose circles are sound.
+    """
+    for m in sd.get('materials') or []:
+        m['u'] = 'seep'
+    sd.pop('mesh', None)
+    sd.pop('seep_u', None)
+    return sd
+
+
 def _pf_zone_sizes(sd, size=None):
     """Set (or clear, with None) the local element Size on every material zone."""
     for p in sd.get('polygons') or []:
@@ -4261,6 +4296,36 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', selection={'surface': 'circular', 'search': True},
          mutation=lambda sd: _pf_circle_buried(sd),
          expect='the answer comes from the grid around it'),
+    # The catch-all under those two. Neither of them can name this circle -- its
+    # nadir is above the floor and it has no crossing to sit above its center --
+    # so without this rule it reaches the user as a slicing failure naming no
+    # field. The control is the file's own circle 1, which slices.
+    dict(rule='surface.circle_cannot_be_sliced', base=PREFLIGHT_BASE_LEM,
+         mode='excel',
+         mutation=lambda sd: _pf_circle_stranded(sd),
+         expect='produces no failure surface'),
+    # The severity ladder, one model read as three runs. Same mutation every time:
+    # what changes is only who is asking, which is what proves the severity is
+    # decided by the run rather than by the file.
+    dict(rule='surface.circle_cannot_be_sliced', base=PREFLIGHT_BASE_LEM,
+         mode='excel', selection={'surface': 'circular', 'search': True},
+         mutation=lambda sd: _pf_circle_stranded(sd),
+         expect='the answer comes from the grid around it'),
+    dict(rule='surface.circle_cannot_be_sliced', base=PREFLIGHT_BASE_LEM,
+         mode='excel', analysis='seep', selection={},
+         mutation=lambda sd: _pf_circle_stranded(sd),
+         expect='does not read the circles sheet'),
+    # The miscalibration this rule is one step away from: a model whose pore
+    # pressure comes from a seepage solution built at RUN time carries no field on
+    # disk, so slicing it as it sits fails -- for a reason that is not the circle's.
+    # Mutation and control differ in the circle alone, both with the field missing,
+    # so the only thing that can make the mutation report and the control stay
+    # silent is that the rule neutralizes pore pressure before it asks.
+    dict(rule='surface.circle_cannot_be_sliced', base=PREFLIGHT_BASE_LEM,
+         mode='excel',
+         mutation=lambda sd: _pf_circle_stranded(_pf_seep_no_field(sd)),
+         control=lambda sd: _pf_seep_no_field(sd),
+         expect='produces no failure surface'),
 
     # --- polyline ordering -------------------------------------------------
     dict(rule='order.piezo_reversed', base=PREFLIGHT_BASE_LEM, mode='excel',
@@ -6227,6 +6292,174 @@ GENERATOR_CASES = [
     (_repo('docs/inputs/slope/xslope_dam.xlsx'), 2, True),
     (_repo('docs/verification/files/rocscience/vp005.xlsx'), 2, True),
 ]
+
+
+#: Directories under ``docs/`` whose workbooks are SHIPPED models -- the corpus a
+#: user opens, plus the samples the documentation links. ``archive`` subtrees are
+#: excluded wherever they appear: those are superseded template revisions kept for
+#: reference, not files anybody runs.
+CORPUS_CIRCLE_ROOTS = ('docs/inputs', 'docs/lem', 'docs/fem', 'docs/seep',
+                       'docs/verification', 'docs/tutorials', 'docs/parametric',
+                       'docs/usage')
+
+
+#: The slicer's absolute minimum slice width (xslope/slice.py, "Remove thin
+#: slices"). Mirrored rather than imported because it is a local in that function;
+#: if the two drift apart the waiver below simply stops matching, which is the
+#: safe direction -- a file stops being waived and has to be looked at.
+SLICE_MIN_WIDTH = 1e-2
+
+
+def _corpus_section_below_slice_floor(sd):
+    """True when the section is too small for the slicer to build ANY slice.
+
+    The trim threshold is an absolute length, so on a section whose whole width is
+    a couple of slice widths across there is no circle at all that survives it --
+    the defect is one of scale, not of the circle, and no edit to the Circles sheet
+    can answer it. Measured from the model so this waiver lapses on its own if the
+    trim is ever made relative to the span.
+    """
+    try:
+        xs = [p[0] for p in sd['ground_surface'].coords]
+    except (KeyError, TypeError, AttributeError):
+        return False
+    if not xs:
+        return False
+    return (max(xs) - min(xs)) < 2 * SLICE_MIN_WIDTH
+
+
+def _corpus_circle_files():
+    """Every shipped workbook, newest-first by directory, as absolute paths."""
+    out = []
+    for root in CORPUS_CIRCLE_ROOTS:
+        base = _repo(root)
+        if not os.path.isdir(base):
+            continue
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = [d for d in dirnames if d != 'archive']
+            for fn in filenames:
+                if fn.endswith('.xlsx') and not fn.startswith('~$'):
+                    out.append(os.path.join(dirpath, fn))
+    return sorted(set(out))
+
+
+def run_corpus_circles_test(test):
+    """Every shipped workbook's FIRST circle must produce slices.
+
+    The regression guard for a defect that shipped 46 times: a starting circle
+    written as a placeholder -- one generic circle stamped onto decks of every size
+    -- which the slicer refuses because the arc never reaches the ground, or leaves
+    through a vertical edge of a section too narrow to hold it. Nothing caught it,
+    because most of those decks are locked by seepage or finite-element rows that
+    never read the circles sheet: the circle was dead and the file was green.
+
+    ``circles[0]`` specifically, because that is the circle a single-surface run
+    analyses and the one a reader of the file meets first. A search reads the whole
+    sheet and refines off whichever seeds survive, so the rest of a starting set is
+    not load-bearing in the same way.
+
+    Cheap on purpose -- a load and one slice generation per file, no solve -- so it
+    can ride with the preflight scope rather than waiting for a full suite.
+    """
+    import warnings as _warnings
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+
+    def _blank_strength(sd):
+        """True when no material carries any strength at all.
+
+        A tutorial's ``_start`` workbook ships with the materials table empty for
+        the reader to fill in, and ``generate_slices`` refuses it on that ground
+        before it ever looks at the circle. Its circle is not judged here because
+        it cannot be: this is the slicer's own precondition (slice.py), tested
+        structurally rather than by matching its message.
+        """
+        def _val(v):
+            try:
+                return abs(float(v))
+            except (TypeError, ValueError):
+                return 0.0
+        mats = [m for m in (sd.get('materials') or []) if isinstance(m, dict)]
+        if not mats:
+            return True
+        return all(not any(_val(m.get(k)) for k in ('c', 'phi', 'gamma'))
+                   for m in mats)
+
+    problems, checked, skipped = [], 0, 0
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        for path in _corpus_circle_files():
+            name = os.path.relpath(path, _repo('.'))
+            try:
+                sd = load_slope_data(path)
+            except Exception:
+                # Not a slope model at all (a seepage-only deck, a sheet sample, a
+                # bare template). It has no circle to check.
+                skipped += 1
+                continue
+            circles = sd.get('circles') or []
+            if not circles or not isinstance(circles[0], dict):
+                skipped += 1
+                continue
+            if _blank_strength(sd):
+                skipped += 1
+                continue
+            # Pore pressure neutralized, and both consumption paths tried, exactly
+            # as preflight's own probe does it -- see _Ctx.circle_slice_failure for
+            # why a deck whose seepage field is built at run time must not be
+            # blamed for a circle that is sound.
+            probe = dict(sd)
+            probe['materials'] = [dict(m, u='none') if isinstance(m, dict) else m
+                                  for m in (sd.get('materials') or [])]
+            reason = None
+            ok = False
+            for composite in (False, True):
+                try:
+                    ok, res = generate_slices(probe, circle=dict(circles[0]),
+                                              composite=composite, debug=False,
+                                              check_inputs=False)
+                except Exception as exc:
+                    ok, res = False, f"{type(exc).__name__}: {exc}"
+                if ok:
+                    # Success is not enough: generate_slices trims slices narrower
+                    # than an ABSOLUTE 1e-2 and can return an EMPTY table while
+                    # reporting success, which is a dead circle wearing a pass.
+                    try:
+                        if len(res[0]):
+                            break
+                    except (TypeError, IndexError, KeyError):
+                        pass
+                    ok = False
+                    if reason is None:
+                        reason = 'accepted but produced no slices (all trimmed as too thin)'
+                    continue
+                if reason is None:
+                    reason = str(res).strip()
+            # A section narrower than two minimum slice widths has no room for a
+            # single slice, whatever circle is drawn on it: the trim threshold is an
+            # absolute length (slice.py, `min_width = 1e-2`), not a fraction of the
+            # span. The two GeoStudio 1-D columns that hit this are centimetre-scale
+            # laboratory sections; their circles are geometrically sound (they
+            # daylight twice inside the domain) and their locks are transient-seepage
+            # rows that never read a circle. Waived here, measured rather than named,
+            # so the day the trim is made relative this stops applying by itself.
+            if not ok and _corpus_section_below_slice_floor(sd):
+                skipped += 1
+                continue
+            checked += 1
+            if not ok:
+                c = circles[0]
+                problems.append(
+                    f"{name}: circle 1 (Xo={c.get('Xo')}, Yo={c.get('Yo')}, "
+                    f"R={c.get('R')}) produces no slices -- {reason[:110]}")
+
+    if problems:
+        return None, (f"{len(problems)} of {checked} shipped workbook(s) carry a "
+                      f"first circle that cannot be sliced (fix the BUILDER, never "
+                      f"the .xlsx): " + "; ".join(problems[:5]))
+    if checked == 0:
+        return None, 'no shipped workbooks with circles were found'
+    return 0.0, None
 
 
 def run_generator_circles_test(test):
@@ -12245,6 +12478,8 @@ def _dispatch_test(test):
         return run_preflight_remedies_test(test)
     if test_type == 'generator_circles':
         return run_generator_circles_test(test)
+    if test_type == 'corpus_circles':
+        return run_corpus_circles_test(test)
     if test_type == 'auto_water':
         return run_auto_water_test(test)
     if test_type == 'template_sync':
@@ -12414,7 +12649,8 @@ def _expected_and_tol(test, default_tolerance):
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
-                       'preflight_remedies', 'generator_circles', 'auto_water',
+                       'preflight_remedies', 'generator_circles', 'corpus_circles',
+                       'auto_water',
                        'sweep_gate', 'steady_seep_save',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'beam_element', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
@@ -12449,7 +12685,7 @@ def _expected_and_tol(test, default_tolerance):
 # Rough per-type cost ranks so the parallel scheduler starts the slow tests
 # first (wall time is otherwise dominated by an FEM case landing last).
 _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_elements': 5,
-              'preflight_corpus': 5, 'preflight_rules': 4,
+              'preflight_corpus': 5, 'preflight_rules': 4, 'corpus_circles': 5,
               'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'fs_vs_time': 5,
               'fs_vs_time_mode': 4,
               'transient_seep': 4, 'seep_elements': 3, 'seep': 3,
@@ -12870,6 +13106,13 @@ def main():
         tests.append({'type': 'preflight_remedies', 'file': '(the remedy contract)',
                       'method': '-', 'source': 'preflight'})
         tests.append({'type': 'generator_circles', 'file': '(starting circles)',
+                      'method': '-', 'source': 'preflight'})
+        # The corpus counterpart of the rule: the generator must produce usable
+        # circles, and every workbook already SHIPPED must carry one. Rides with
+        # preflight because it is the same question the rule asks, asked of the
+        # files instead of of a mutation.
+        tests.append({'type': 'corpus_circles',
+                      'file': '(shipped workbooks: circle 1 slices)',
                       'method': '-', 'source': 'preflight'})
         # Automatic water loads ride with preflight too: the mode is a preflight
         # concern (which rules apply), and the remedy that flips it is one of these.

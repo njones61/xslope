@@ -313,7 +313,13 @@ sweeps every workbook the project ships instead of thirty chosen tasks, asking
 each one to run the analysis its file declares and grouping what comes back by the
 input columns that file uses — piles, reinforcement, a tension crack, seepage
 boundary conditions — so a weakness that shows on one kind of input reads as a
-pattern rather than an anecdote. The suite's own plumbing is a standing check in
+pattern rather than an anecdote. Adding `--sample` narrows that sweep to a
+stratified draw of the corpus and widens what is asked of each file to a menu of
+tasks — describing the model, making one named edit and re-solving, explaining
+which slices carry the surface, comparing methods, sweeping a parameter, finding
+a planted fault, writing the report, and building a model from a tutorial's
+problem drawing or its written description — so the measurement covers the kinds
+of question as well as the kinds of model. The suite's own plumbing is a standing check in
 `run_tests.py`, where a dry run exercises the whole path — window, chat dock,
 transcript, scoring — with canned replies and reaches no provider at all. A
 recording run states its provider, model and autonomy in a store of its own rather

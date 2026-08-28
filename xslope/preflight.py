@@ -4437,6 +4437,21 @@ def _pile_spacing_invalid(ctx):
                f"pile keeps contributing it in full {_AT_PILES}.")
 
 
+@rule("pile.capacity_nonpositive", ERROR, ("lem", "fem"),
+      "A pile's H, Vcap and Mcap must be positive where they are given; a "
+      "number you do not have is left blank, never 0.",
+      fields=("H", "V_cap", "M_cap"))
+def _pile_capacity_nonpositive(ctx):
+    for i, p in enumerate(ctx.piles):
+        for key, name in (("H", "H"), ("V_cap", "Vcap"), ("M_cap", "Mcap")):
+            v = _num(p.get(key))
+            if v is None or v > 0:
+                continue
+            yield (f"{ctx.pile_label(i)} has {name} = {v:g}. {name} is a capacity "
+                   f"and must be positive; leave it blank if it is not known "
+                   f"{_AT_PILES}.")
+
+
 @rule("pile.spacing_not_greater_than_diameter", ERROR, ("lem",),
       "Ito & Matsui needs a clear gap between piles: S must exceed D.",
       fields=("S", "D"))

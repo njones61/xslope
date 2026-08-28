@@ -4719,6 +4719,12 @@ PREFLIGHT_RULE_SPECS = [
          expect='does not include'),
 
     # --- piles -------------------------------------------------------------
+    dict(rule='pile.capacity_nonpositive', base=PREFLIGHT_BASE_PILES, mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=0.0),
+         expect='has H = 0'),
+    dict(rule='pile.capacity_nonpositive', base=PREFLIGHT_BASE_PILES, mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', V_cap=-5.0),
+         expect='has Vcap = -5'),
     dict(rule='pile.spacing_invalid', base=PREFLIGHT_BASE_PILES, mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', S=0.0),
          expect='has a spacing of 0'),

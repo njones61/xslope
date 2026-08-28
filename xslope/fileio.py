@@ -2533,14 +2533,9 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 line_length = ((x2 - x1)**2 + (y2 - y1)**2)**0.5
                 if line_length == 0:
                     continue
-                if H is not None and H <= 0:
-                    raise ValueError(f"H must be positive, got {H}")
-                if V_cap is not None and V_cap <= 0:
-                    raise ValueError(f"Vcap must be positive, got {V_cap}")
-                if M_cap is not None and M_cap <= 0:
-                    raise ValueError(f"Mcap must be positive, got {M_cap}")
-                if (V_cap is not None or M_cap is not None) and S is None:
-                    raise ValueError(f"S (pile spacing) is required when Vcap or Mcap are specified")
+                # H / Vcap / Mcap positivity and the spacing-required rule are
+                # value checks and live in preflight (pile.capacity_nonpositive,
+                # pile.spacing_invalid); the loader stays structural.
 
                 pile_lines.append({
                     "x1": x1, "y1": y1,

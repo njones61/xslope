@@ -166,7 +166,7 @@ sentence that is not, and the face-slope sweep below is that case in full.
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | Claude Opus 5 | 42 | 752,162 (616,965) | 29,000 | $1.71 | 8 of 8 | 7 of 8 |
-| Kimi K3 (Moonshot AI) | 54 | 727,011 (603,482) | 72,502 | $1.64 | 7 of 8 | 4 of 8 |
+| Kimi K3 (Moonshot AI) | 54 | 727,011 (603,482) | 72,502 | $1.64 | 7 of 8 | 5 of 8 |
 | OpenAI gpt-5.5 | 33 | 414,968 (350,592) | 23,237 | $1.19 | 6 of 8 | 6 of 8 |
 | Claude Sonnet 5 | 51 | 1,004,052 (763,043) | 53,449 | $1.17 | 7 of 8 | 7 of 8 |
 | GLM-5V-Turbo (Z.ai) | 46 | 564,440 (536,661) | 16,563 | ~$0.23 | 6 of 8 | 3 of 8 |

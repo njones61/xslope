@@ -152,11 +152,17 @@ gets done:
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Sessions right |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Claude Opus 5 | 43 | 770,807 (584,714) | 40,128 | $2.23 | 8 of 8 |
+| OpenAI gpt-5.5 | 34 | 443,784 (389,120) | 21,748 | $1.12 | 5 of 8 |
 | Claude Sonnet 5 | 55 | 1,124,356 (857,736) | 60,692 | $1.31 | 5 of 8 |
 | Claude Haiku 4.5 | 57 | 1,001,181 (669,536) | 25,969 | $0.53 | 2 of 8 |
 | GLM-5V-Turbo (Z.ai) | 42 | 530,695 (511,763) | 22,719 | ~$0.24 | 4 of 8 |
 
-Sonnet 5 matched Opus on both sweeps, the finite element run, the documentation
+gpt-5.5 was the leanest of the five — 34 calls, half of Opus's output — and
+matched Opus on both sweeps, the finite element run, the documentation
+questions and the report; its build read the drawing correctly, to FS 1.627
+against 1.628, but left two reinforcement fields empty so the saved workbook
+would not reopen, and in the diagnosis it measured the surcharge's effect and
+then never named it as the fault. Sonnet 5 matched Opus on both sweeps, the finite element run, the documentation
 questions and the report, to the same factors of safety and circles; it left one
 load in the wrong place after the three edits, found only one of the three
 planted faults in the diagnosis, and on the build from the drawing it read the

@@ -153,32 +153,46 @@ are cut or restructured every few months, so treat the numbers as an example of
 how to compare models, not as a standing verdict on any of them — the sessions
 are easy to repeat on whatever is current.
 
-| Model | Calls | Tokens in (cached) | Tokens out | Cost | Sessions right |
-| --- | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5 | 42 | 752,162 (616,965) | 29,000 | $1.71 | 7 of 8 |
-| Kimi K3 (Moonshot AI) | 54 | 727,011 (603,482) | 72,502 | $1.64 | 6 of 8 |
-| OpenAI gpt-5.5 | 33 | 414,968 (350,592) | 23,237 | $1.19 | 5 of 8 |
-| Claude Sonnet 5 | 51 | 1,004,052 (763,043) | 53,449 | $1.17 | 6 of 8 |
-| GLM-5V-Turbo (Z.ai) | 46 | 564,440 (536,661) | 16,563 | ~$0.23 | 3 of 8 |
+Each session is scored twice, because the two ways an answer goes wrong are
+worth counting apart. **Model and numbers** asks whether the work was done: the
+model it built or edited is the one the request describes, and every factor of
+safety it reported is right — for the broken file, whether it found the faults
+and its repair returns the published answer. **Explanation** asks whether what
+it said about the mechanism, the finding or the reason is right; an answer
+counted wrong there is usually mostly right with one sentence that is not, and
+the face-slope sweep below is that case in full.
 
-Opus's one miss is the face-slope sweep below, where the table is right and
-the sentence explaining it is not. Kimi K3 built and edited the model exactly
-as Opus did and was the only one of the other four to test its answer to the
-water-table question by running the model, but took three times as long and
-judged the 100 ft base depth in the broken file to be legitimate. gpt-5.5 was
-the leanest run and exact on every number it computed; it built the model and
-then stopped to ask permission before running the search, and in the broken
-file it fixed the wrong thing — it deleted the foundation by moving the base
-to elevation 0 and reported 2.396, nearly twice the answer. Sonnet 5 failed
-nothing and matched Opus on every number it computed, including all three
-edits; what it left out is what separates the two — it read the seven methods
-off the file's circle without saying that is what they are, and it printed the
-100 ft base depth in the broken file without ever coming back to it.
-GLM-5V-Turbo, a fifth of the cost of the next cheapest, put the top of the
-foundation at the rock instead of the ground and never noticed the model had
-lost a layer, and in the broken file it invented a unit weight rather than
-reading the one the tutorial gives. Z.ai publishes no price for that model;
-its cost here is at the rate a reseller lists for it.
+| Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Claude Opus 5 | 42 | 752,162 (616,965) | 29,000 | $1.71 | 8 of 8 | 6 of 8 |
+| Kimi K3 (Moonshot AI) | 54 | 727,011 (603,482) | 72,502 | $1.64 | 7 of 8 | 3 of 8 |
+| OpenAI gpt-5.5 | 33 | 414,968 (350,592) | 23,237 | $1.19 | 6 of 8 | 6 of 8 |
+| Claude Sonnet 5 | 51 | 1,004,052 (763,043) | 53,449 | $1.17 | 7 of 8 | 6 of 8 |
+| GLM-5V-Turbo (Z.ai) | 46 | 564,440 (536,661) | 16,563 | ~$0.23 | 6 of 8 | 2 of 8 |
+
+Opus 5 is the only one right on every model and every number, and both of its
+misses are in the second column: the face-slope sweep below, where the table is
+right and the sentence explaining it is not, and the report, whose summary
+describes a document it did not write. Kimi K3 built and edited the model
+exactly as Opus did and was the only one of the other four to test its answer
+to the water-table question by running the model, but took three times as long
+and loses the second column five times over — mechanisms named that its own
+output contradicts, and the 100 ft base depth in the broken file examined and
+pronounced legitimate. gpt-5.5 was the leanest run and exact on every number it
+computed, which is what makes its two misses in the first column stand out: it
+built the model and then stopped to ask permission before running the search,
+and in the broken file it fixed the wrong thing — it deleted the foundation by
+moving the base to elevation 0 and reported 2.396, nearly twice the answer.
+Sonnet 5 matched Opus on every number it computed, including all three edits;
+the 100 ft base depth is the one thing it printed and never came back to, and
+its one wrong sentence puts the rise under submergence down to pore-pressure
+relief, which at φ = 0 reaches nothing. GLM-5V-Turbo, a fifth of the cost of
+the next cheapest, put the top of the foundation at the rock instead of the
+ground and never noticed the model had lost a layer, and in the broken file it
+invented a unit weight rather than reading the one the tutorial gives; it calls
+the same contact circle deep in three separate sessions, which is what leaves
+it at 2. Z.ai publishes no price for that model; its cost here is at the rate a
+reseller lists for it.
 
 Prices change; the current ones are on each provider's pricing page:
 [Anthropic](https://www.anthropic.com/pricing),
@@ -510,14 +524,26 @@ The restoration is printed rather than promised: the closing snippet prints the
 profile lines, the circles and the polygons back at their original values, and no
 workbook was written.
 
-**The sentence it ends on is wrong.** The rise is "essentially linear here," it
-wrote, "as expected for a φ = 0 two-layer section where the critical circle stays
-deep-seated in the foundation clay." Not one of the three critical circles enters
+Its closing account of the study is right about everything it ran, and wrong
+about the one thing it did not:
+
+> - Each case used the same wide extents (ground from x = −50 to x = 110, ~2.5 H
+>   beyond toe and crest) so every trial circle daylights on real ground, and the
+>   hard base stayed at the model's own `max_depth = −10`.
+> - Starting circles were regenerated for each geometry with
+>   `generate_starting_circles` (toe circle plus one tangent to the foundation
+>   base at −10), then Spencer ran its own automated search each time.
+> - FS rises about 0.15 per half-unit of flattening over this range — essentially
+>   linear here, as expected for a φ = 0 two-layer section where the critical
+>   circle stays deep-seated in the foundation clay.
+
+The first two bullets are the run exactly, and the rise really is about 0.15 per
+half-unit of flattening. Not one of the three critical circles is deep-seated in
 the foundation: all three bottom out at elevation 0, tangent to the contact and
-contained in the embankment. That is the same fact LEM-3 makes its result out of,
-and the run had the surfaces to check it against — the session never extracted
-them. The three factors of safety are right; the mechanism offered for them is
-the opposite of what the model did.
+contained in the embankment, which is the fact LEM-3 makes its own result out
+of. The sweep reported factors of safety and no surfaces, so what settles the
+sentence is one re-run — the second check below extracts the three circles, and
+every one comes back at elevation 0.
 
 ### Check its work
 
@@ -918,19 +944,21 @@ it.
 As the slope and the prompts get more complicated, the opportunity for error
 rises. The same eight tasks were also run on the reinforced slope of [LEM-8](lem08_reinforced_slope.md) — a
 2 ft cohesive band along the face, six geogrid layers with pullout at both ends,
-and a surcharge across the crest — where only Claude Opus 5 got every task
-right, at $2.23 against the $1.71 the layered slope cost it. The five models
-above score 4 to 8 of 8 there, and a sixth and smaller one, Claude Haiku 4.5,
-gets 2. Late August 2026, on the same list prices as the table above:
+and a surcharge across the crest — scored the same two ways. Claude Opus 5 is
+again right on every model and every number, at $2.23 against the $1.71 the
+layered slope cost it, and again loses half the second column. The five models
+above score 5 to 8 of 8 on model and numbers there and 3 to 6 of 8 on
+explanation, and a sixth and smaller one, Claude Haiku 4.5, gets 2 and 3. Late
+August 2026, on the same list prices as the table above:
 
-| Model | Cost | Sessions right |
-| :--- | :---: | :---: |
-| Claude Opus 5 | $2.23 | 8 of 8 |
-| OpenAI gpt-5.5 | $1.12 | 5 of 8 |
-| Kimi K3 | $1.20 | 5 of 8 |
-| Claude Sonnet 5 | $1.31 | 5 of 8 |
-| Claude Haiku 4.5 | $0.53 | 2 of 8 |
-| GLM-5V-Turbo | ~$0.24 | 4 of 8 |
+| Model | Cost | Model and numbers | Explanation |
+| :--- | :---: | :---: | :---: |
+| Claude Opus 5 | $2.23 | 8 of 8 | 4 of 8 |
+| OpenAI gpt-5.5 | $1.12 | 5 of 8 | 5 of 8 |
+| Kimi K3 | $1.20 | 5 of 8 | 3 of 8 |
+| Claude Sonnet 5 | $1.31 | 5 of 8 | 6 of 8 |
+| Claude Haiku 4.5 | $0.53 | 2 of 8 | 3 of 8 |
+| GLM-5V-Turbo | ~$0.24 | 5 of 8 | 4 of 8 |
 
 Three things did most of the damage. The 2 ft cohesive band along the face is a
 thin zone read off a drawing — the reference build measures it perpendicular to

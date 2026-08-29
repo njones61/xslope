@@ -45,7 +45,7 @@ PROVIDERS = {
     },
     "openai": {
         "label": "OpenAI", "prefix": "openai/", "needs_key": True,
-        "models": ["gpt-4o", "gpt-4o-mini", "o4-mini"],
+        "models": ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"],
         # Gets the Studio brief; OpenAI caches the prompt prefix server-side
         # automatically, so repeat turns are cheap.
         "tools": True, "vision": True, "skill": True,

@@ -19,7 +19,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from .config import AssistantConfig
 
-MAX_TOKENS = 8000
+MAX_TOKENS = 32000
 
 # OpenAI/LiteLLM function-tool format (works across providers).
 RUN_PYTHON_TOOL = {

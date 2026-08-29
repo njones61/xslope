@@ -146,14 +146,15 @@ comes with a loss in what gets done:
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Sessions right |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Claude Opus 5 | 43 | 770,807 (584,714) | 40,128 | $2.23 | 8 of 8 |
-| Claude Sonnet 5 | 54 | 1,106,239 (841,852) | 46,129 | $1.16 | 5 of 8 |
+| Claude Sonnet 5 | 55 | 1,124,356 (857,736) | 60,692 | $1.31 | 5 of 8 |
 | Claude Haiku 4.5 | 57 | 1,001,181 (669,536) | 25,969 | $0.53 | 2 of 8 |
 
 Sonnet 5 matched Opus on both sweeps, the finite element run, the documentation
 questions and the report, to the same factors of safety and circles; it left one
 load in the wrong place after the three edits, found only one of the three
-planted faults in the diagnosis, and returned nothing at all for the build from
-the drawing. Haiku 4.5 got the finite element run and the report right and the
+planted faults in the diagnosis, and on the build from the drawing it read the
+section correctly but stopped to ask whether the five undimensioned layers
+should be 20 ft like the bottom one instead of building. Haiku 4.5 got the finite element run and the report right and the
 rest wrong: a mirrored section off the drawing, layers removed from the wrong
 end of the sweep, a diagnosis that named none of the faults, and edits made to
 the model that were never asked for. Prices change; the current ones are on

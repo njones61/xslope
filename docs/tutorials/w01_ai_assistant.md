@@ -1,6 +1,6 @@
 ---
 title: "Tutorial W-1 — The AI Assistant"
-description: "Studio's built-in assistant put through eight requests on one layered slope: building the model from a drawing, editing its face, its water and its strengths, two kinds of parameter study, stiffnesses for a finite element run, two questions that change nothing, a diagnosis of a broken file, and the analysis report — with what to check after each one."
+description: "Studio's built-in assistant put through eight conversations on one layered slope: building the model from a drawing, editing its face, its water and its strengths, two kinds of parameter study, stiffnesses for a finite element run, two questions about the analysis, a diagnosis of a broken file, and the analysis report — with what to check after each one."
 ---
 
 # Tutorial W-1 — The AI Assistant
@@ -15,10 +15,10 @@ editors use.
 In this tutorial we first set the assistant up — choosing a provider and a
 model, entering a key, and seeing what a conversation costs to run. Then we work
 through a series of sample use cases on one slope: building the model from a
-drawing, modifying it, running two kinds of sweep, asking two questions,
-crossing to the finite element engine, diagnosing a broken file, and writing the
-report. After every request we show what to look at to decide whether the answer
-is right.
+drawing, modifying it, running two kinds of sweep, crossing to the finite
+element engine, asking two questions, diagnosing a broken file, and writing the
+report. Each one closes on the checking it deserves — what to look at, and what
+it should say.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -66,9 +66,11 @@ The dialog has four fields and a checkbox:
 **Claude (Anthropic)**, **OpenAI**, **Kimi (Moonshot AI)** and **Z.ai (GLM)**,
 which are hosted and bill for what you use, and **Ollama**, which runs a model
 on your own machine, free, and sends nothing anywhere; the list may change from
-release to release. Only models that can read an image are listed, because
-handing the assistant a photograph or a sketch of a cross section is the first
-thing this tutorial does.
+release to release. Where a provider's catalogue mixes models that read images
+with text-only ones — OpenAI, Kimi, Z.ai and Ollama — only the models that can
+read an image are listed, and the caption under the box says so; every Claude
+model on the list reads images already. Handing the assistant a photograph or a
+sketch of a cross section is the first thing this tutorial does.
 
 **Model** — a list of what the chosen provider currently offers, with one marked
 as recommended. The box also accepts free text, so a model id released after
@@ -125,18 +127,18 @@ The eight conversations below cost this much between them, measured as they ran:
 
 | Session | Turns | Model calls | Tokens in (cached) | Tokens out | Wall |
 | --- | :---: | :---: | :---: | :---: | :---: |
-| Building from a drawing | 1 | 3 | 52,241 (47,448) | 2,750 | 47 s |
+| Building a model from a drawing | 1 | 3 | 52,241 (47,448) | 2,750 | 47 s |
 | Modifying the model | 3 | 13 | 245,907 (205,608) | 7,160 | 137 s |
 | A sweep with the helper | 1 | 2 | 33,157 (31,632) | 1,308 | 65 s |
 | A sweep written ad hoc | 1 | 4 | 68,299 (63,264) | 2,587 | 55 s |
-| Stiffnesses and strength reduction | 2 | 6 | 104,870 (63,264) | 2,182 | 576 s |
-| Two questions | 2 | 4 | 72,091 (63,264) | 4,380 | 70 s |
+| Stiffnesses and a strength reduction run | 2 | 6 | 104,870 (63,264) | 2,182 | 576 s |
+| Two documentation questions | 2 | 4 | 71,849 (47,589) | 5,065 | 86 s |
 | A broken file | 1 | 6 | 108,379 (94,896) | 6,994 | 133 s |
-| The report | 2 | 4 | 67,460 (63,264) | 954 | 32 s |
-| **Total** | **13** | **42** | **752,404 (632,640)** | **28,315** | **1,115 s** |
+| Generating the report | 2 | 4 | 67,460 (63,264) | 954 | 32 s |
+| **Total** | **13** | **42** | **752,162 (616,965)** | **29,000** | **1,130 s** |
 
 Thirteen turns, 42 calls to the model, about 752,000 input tokens of which some
-633,000 came from the prompt cache, and 28,000 output tokens: **$1.62** at
+617,000 came from the prompt cache, and 29,000 output tokens: **$1.71** at
 Anthropic's list prices on 2026-08-29 ($5.00 per million input tokens, a cache
 read at a tenth of that, $25.00 per million output tokens). Wall time and price
 do not track each other: the strength reduction run takes half the total time for
@@ -153,28 +155,30 @@ are easy to repeat on whatever is current.
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Sessions right |
 | --- | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5 | 42 | 752,404 (632,640) | 28,315 | $1.62 | 7 of 8 |
+| Claude Opus 5 | 42 | 752,162 (616,965) | 29,000 | $1.71 | 7 of 8 |
 | Kimi K3 (Moonshot AI) | 54 | 727,011 (603,482) | 72,502 | $1.64 | 6 of 8 |
 | OpenAI gpt-5.5 | 33 | 414,968 (350,592) | 23,237 | $1.19 | 5 of 8 |
-| Claude Sonnet 5 | 48 | 938,571 (730,664) | 53,761 | $1.10 | 5 of 8 |
+| Claude Sonnet 5 | 51 | 1,004,052 (763,043) | 53,449 | $1.17 | 6 of 8 |
 | GLM-5V-Turbo (Z.ai) | 46 | 564,440 (536,661) | 16,563 | ~$0.23 | 3 of 8 |
 
-Opus's one miss is the face-slope sweep below, where the table is right and the
-sentence explaining it is not. Kimi K3 built and edited the model exactly as
-Opus did and was the only model to test its answer to the water-table question
-by running the model, but took three times as long and judged the 100 ft base
-depth in the broken file to be legitimate. gpt-5.5 was the leanest run and exact
-on every number it computed; it built the model and then stopped to ask
-permission before running the search, and in the broken file it fixed the wrong
-thing — it deleted the foundation by moving the base to elevation 0 and
-reported 2.396, nearly twice the answer. Sonnet 5 failed nothing, but wrote the
-saturated unit weight under a field name the model does not have, so the
-submerged and weakened cases came back 7 percent high with nothing in the
-session noticing. GLM-5V-Turbo, a quarter of the cost of the next cheapest, put
-the top of the foundation at the rock instead of the ground and never noticed
-the model had lost a layer, and in the broken file it invented a unit weight
-rather than reading the one the tutorial gives. Z.ai publishes no price for
-that model; its cost here is at the rate a reseller lists for it.
+Opus's one miss is the face-slope sweep below, where the table is right and
+the sentence explaining it is not. Kimi K3 built and edited the model exactly
+as Opus did and was the only one of the other four to test its answer to the
+water-table question by running the model, but took three times as long and
+judged the 100 ft base depth in the broken file to be legitimate. gpt-5.5 was
+the leanest run and exact on every number it computed; it built the model and
+then stopped to ask permission before running the search, and in the broken
+file it fixed the wrong thing — it deleted the foundation by moving the base
+to elevation 0 and reported 2.396, nearly twice the answer. Sonnet 5 failed
+nothing and matched Opus on every number it computed, including all three
+edits; what it left out is what separates the two — it read the seven methods
+off the file's circle without saying that is what they are, and it printed the
+100 ft base depth in the broken file without ever coming back to it.
+GLM-5V-Turbo, a fifth of the cost of the next cheapest, put the top of the
+foundation at the rock instead of the ground and never noticed the model had
+lost a layer, and in the broken file it invented a unit weight rather than
+reading the one the tutorial gives. Z.ai publishes no price for that model;
+its cost here is at the rate a reseller lists for it.
 
 Prices change; the current ones are on each provider's pricing page:
 [Anthropic](https://www.anthropic.com/pricing),
@@ -199,13 +203,11 @@ The assistant is good at this work, but everything it produces should still be
 checked. Checking is usually easy, and it is the same checking a model built by
 hand deserves: read the model checks Studio runs after every edit, look at the
 section on the canvas, and do one hand calculation against the number that came
-back. Where it went wrong most often, measured over the runs above: a layer
-boundary read off the drawing at the wrong elevation, a value written under a
-field name the model does not have and silently ignored, and a broken file
-"repaired" by changing the wrong input — the model checks stay clean through all
-three, because none of them makes a model inconsistent, only wrong.
-Each use case below ends with **Check its work** — what to look at, and what it
-should say.
+back. Where the five models went wrong most often: a layer boundary read off the
+drawing at the wrong elevation, a mechanism described without the surface ever
+being extracted, and a broken file "repaired" by changing the wrong input — the
+model checks stay clean through all three, because none of them makes a model
+inconsistent, only wrong.
 
 ---
 
@@ -249,12 +251,13 @@ documents. The model checks came back clean on the first pass.
 
 Spencer with a search then returned **FS = 1.244** on the circle Xo = 18.27,
 Yo = 43.84, R = 43.84, bottoming at elevation 0, entering at x = 55.07 behind the
-crest break and leaving at x = 4.46 just above the toe. It passed on both notes
+crest break and leaving at x = 4.46 just above the toe. It reported both notes
 the run printed: interslice tension (a most tensile −1,434 lb/ft against a
 largest compression of 7,313) and a line of thrust outside the slice on 18% of
 the interslice boundaries. It read the surface correctly as one that stays in the
 embankment and skims the top of the foundation rather than cutting into the
-stronger clay below it, and it offered a Bishop or OMS cross-check.
+stronger clay below it, and it offered a Bishop or Ordinary Method of Slices
+cross-check.
 
 The session saved
 [w1_build_from_image_after.xlsx](files/w1_build_from_image_after.xlsx), and the
@@ -287,10 +290,13 @@ whole exchange is in
 - **Open the Circles editor.** Three circles at (20, 40) with Depth −4.72, −10
   and 0 — one through the toe and one at the base of each layer, which is what a
   layered section needs before a search can compare the two mechanisms.
-- **Both materials carry E = 0 and ν = 0**, and no saturated unit weight. The
-  snippet wrote the stiffness fields as zeros. Harmless for a dry limit
-  equilibrium run, and all of them matter the moment water or a finite element
-  run enters — the two sections below enter both.
+- **Both materials carry E = 0 and ν = 0.** The snippet wrote the stiffness
+  fields as zeros, which is harmless for a limit equilibrium run and matters the
+  moment a finite element run enters, as the strength reduction section below
+  does.
+- **Read the units on the admissibility note.** The reply labels the interslice
+  force in psf; it is a force per foot of thickness, lb/ft, as the report's own
+  `Z (lb/ft)` column and [LEM-3](lem03_layered_slope.md) both write it.
 
 ---
 
@@ -397,7 +403,10 @@ in [w1_modify_transcript.md](files/w1_modify_transcript.md).
 - **Open the second workbook's Materials editor.** Both materials read
   `u = piezo`, with γsat = 135 and 140 pcf beside their total unit weights of 130
   and 135 — the water is explicit and the unit weights are total, which is how
-  XSLOPE wants a submerged section stated.
+  XSLOPE wants a submerged section stated. A saturated weight that lands under
+  some other name is caught rather than ignored: the model checks flag a material
+  field no analysis reads and name the nearest real one — *"Did you mean
+  'gamma_sat'?"*
 - **Check the method.** The file names no method, so each run took XSLOPE's
   default of Spencer; the first turn's heading calls Spencer "the method the
   model declares", which is the one loose phrase in the three turns.
@@ -407,10 +416,11 @@ in [w1_modify_transcript.md](files/w1_modify_transcript.md).
 ## A sweep with the helper
 
 We will ask for the foundation's cohesion swept from 200 to 800 psf in steps of
-100, with a search at every step. `sensitivity()` — the same engine behind
-Studio's **Parametric…** dialog — is preloaded in the assistant's kernel, so the
-request tests whether the assistant reaches for the machinery already there
-rather than rebuilding it.
+100, with a search at every step. `sensitivity()` — a sweep helper preloaded in
+the assistant's kernel, the counterpart of Studio's **Parametric…** dialog — runs
+a value list through a callback and searches at each step, so the request tests
+whether the assistant reaches for the machinery already there rather than
+rebuilding it.
 
 <div class="prompt-block" markdown>
 ```text
@@ -443,8 +453,8 @@ interpolation between the 400 and 500 psf rows; and the model as it stands, at
 flat factor of safety but did not extract the critical surfaces, so it could not
 say from this run where the governing surface sits.
 
-Finishing that last point by hand takes one more solve per step, and the
-surfaces are what the plateau is made of.
+Finishing that last point by hand takes one more solve per step, and it is what
+turns the flat tail of the table into a statement about the slope.
 
 ### Check its work
 
@@ -521,8 +531,9 @@ the opposite of what the model did.
   searched its own 3:1 geometry and returned 1.5460 on the same circle, so two
   conversations agree on that face.
 - **Read the 2:1 row against the published answer.** It returns 1.244146 against
-  LEM-3's 1.244108 on the file's own narrower extents — the same mechanism, with
-  the wider ground moving the last digit.
+  LEM-3's 1.244108 — the same mechanism, and the difference is the starting
+  circles the sweep regenerates at each step, not the wider ground: the file's
+  own two circles return 1.244108 on either set of extents.
 - **Open the Profile lines and Circles editors when it finishes.** The section is
   back at (0, 0)–(40, 20)–(90, 20) over (−30, 0)–(90, 0) with the original two
   circles, and no workbook was written.
@@ -566,9 +577,10 @@ offering to start one.
 
 The second turn runs both engines. Spencer with a search comes back at
 **FS = 1.244** on (18.50, 43.75) with R = 43.75, and `run_fem(analysis='ssrm')`
-builds its own mesh first — tri6 at a target size of 1.2 ft, giving 8,849 nodes
-and 4,304 elements — then bisects from [1.00, 2.00] in seven steps to
-**SSRM FS = 1.254**, 0.010 above Spencer, about 0.8%. The run took 528 s.
+builds its own mesh first — tri6, six-node triangles, at a target size of 1.2 ft,
+giving 8,849 nodes and 4,304 elements — then bisects from [1.00, 2.00] in seven
+steps to a shear strength reduction factor of safety of **1.254**, 0.010 above
+Spencer, about 0.8%. The run took 528 s.
 
 It reported three things about those numbers without being asked. **The bracket
 did not close:** the trials at F = 1.2656 and F = 1.2578 hit the
@@ -579,8 +591,8 @@ final interval of [1.2500, 1.2578] whose upper edge is undecided, and raising
 notes carry into the comparison** — interslice tension and a line of thrust
 outside the slice on 15% of boundaries — which it read as a reason to want the
 finite element cross-check rather than as a reason to distrust it. And **the
-stiffnesses are estimates**: it named the sensitivity of the SSRM number to E and
-ν as untested and priced the test at several minutes per point.
+stiffnesses are estimates**: it named the sensitivity of the strength reduction
+answer to E and ν as untested and priced the test at several minutes per point.
 
 The session saved
 [w1_elastic_fem_after.xlsx](files/w1_elastic_fem_after.xlsx), and the exchange is
@@ -610,10 +622,10 @@ in [w1_elastic_fem_transcript.md](files/w1_elastic_fem_transcript.md).
 
 ## Two documentation questions
 
-We will ask two questions that call for no edit and no analysis of their own:
-why every limit equilibrium method returns the same factor of safety on this
-model, and what pore pressure option two undrained soils should carry. The first
-question's premise is false, which makes it the more useful of the two.
+We will ask two questions about the analysis rather than for a change to the
+model: why every limit equilibrium method returns the same factor of safety on
+this slope, and what pore pressure option two undrained soils should carry. The
+first question's premise is false, which makes it the more useful of the two.
 
 <div class="prompt-block" markdown>
 ```text
@@ -629,69 +641,88 @@ Both soils are undrained. What should the pore-pressure option be, and what woul
 ```
 </div>
 
-![Both answers in the dock: the seven methods run on the file's own circle and tabulated by equilibrium type, the phi = 0 moment argument with its documentation link, then the pore-pressure answer with its three measured configurations and the restored model](images/w1_conceptual_2.png){width=560}
+![Both answers in the dock: the seven methods solved on the circle the file defines and tabulated by the equilibrium each satisfies, the moment argument for the tie at phi = 0, then the pore-pressure answer with its two measured Bishop runs, the restored model, and the three effects a water table would have](images/w1_conceptual_2.png){width=560}
 
-**It refused the premise.** One snippet ran all seven methods on the circle the
-file already carries — a single surface, no search — and the answer opens "they
-don't all agree — the moment-equilibrium family does":
+**It refused the premise.** One snippet ran all seven methods on the first of the
+two circles the file carries, and the answer opens "Not all of them do — the ones
+that satisfy **moment** equilibrium agree exactly, and the force-equilibrium
+methods don't". It named the basis in the same breath: solved on the surface the
+model already defines, Xo = 20, Yo = 40, R = 40, 40 slices, no search.
 
-| Method | Equilibrium | FS on the file's circle |
+| Method | Equilibrium satisfied | FS |
 | :--- | :--- | :---: |
-| OMS | moment | 1.247 |
-| Bishop | moment | 1.247 |
-| Spencer | moment and force | 1.247 |
-| Morgenstern-Price | moment and force | 1.247 |
-| Lowe & Karafiath | force | 1.299 |
-| Janbu (corrected, f₀ = 1.09) | force | 1.321 |
-| Corps of Engineers (θ = 18.48°) | force | 1.363 |
+| Ordinary Method of Slices (OMS) | moment only | 1.247 |
+| Bishop | moment, and vertical force | 1.247 |
+| Spencer | force and moment | 1.247 |
+| Morgenstern-Price | force and moment | 1.247 |
+| Lowe & Karafiath | force only | 1.299 |
+| Janbu (corrected, f₀ = 1.09) | force only | 1.321 |
+| Corps of Engineers | force only | 1.363 |
 
-The argument under it is the right one. With φ = 0 on a circular surface, moments
-about the center give FS = c·L·R / ΣW·x, in which no normal stress appears, so
-the interslice assumption each method makes cannot enter — none for OMS,
-horizontal for Bishop, a constant inclination for Spencer, a half-sine function
-for Morgenstern-Price. Force equilibrium needs the base normal, which does depend
-on that assumption, so the three force methods spread. It linked the LEM overview
-page for the derivation, and it named the basis of its own table in the last
-line: this was a solve on the circle already in the file, not a search, so
-FS = 1.247 belongs to that surface and not to the critical one.
+The argument under it is the right one. With φ = 0 on a circular arc, the
+resisting moment about the center is the cohesion times the arc length times the
+radius, so "the base normal force N drops out entirely"; the only thing an
+interslice assumption changes is how N is distributed, and every method that
+takes moments about the center therefore returns the same number whatever it
+assumes. It added the two constants that make the point concrete — Spencer
+settles at θ = 7.91° and Morgenstern-Price at λ = 0.151, satisfying force
+equilibrium without moving the moment answer. The force-only methods never write
+the moment equation, so their assumptions reach N and they spread from 1.299 to
+1.363. Three documentation pages are cited for the reading behind that:
+`lem/overview/`, `lem/bishop/` and `lem/spencer/`.
 
 The second answer keeps `u = none`, which is what the model already carries and
 what a total-stress undrained analysis takes: the undrained strength already
 contains the pore water, so subtracting a pore pressure would count it twice.
-Then it measured the claim instead of asserting it — a piezometric line at
-elevation 8, below ground everywhere so nothing ponds, both materials switched to
-`piezo`, re-solved, and re-solved again with γsat = γ + 5:
+Then it measured that rather than asserting it — a piezometric line 3 ft below
+the ground surface everywhere, so nothing ponds, and Bishop on the first of the
+file's two circles with the option off and then on:
 
-| Configuration | FS on the file's circle |
+| Configuration | FS (Bishop, the file's first circle) |
 | :--- | :---: |
-| `u = none`, as built | 1.2471 |
-| `u = piezo`, table at elevation 8 | 1.2472 |
-| `u = piezo` with γsat = γ + 5 | 1.2472 |
+| `u = none`, piezometric line present | 1.2472 |
+| `u = piezo`, same line | 1.2472 |
 
-It called the +0.0001 discretization noise, gave the φ = 0 reason, named the γsat
-row untested rather than proven, and separated the case that does move the
-answer: water standing above the ground is a load, taken from the water
-definition with `water_loads = 'auto'` and never also entered as a `dloads` row.
-It printed the model restored — `restored u: ['none', 'none'] piezo pts: 0` —
-and the transcript is
-[w1_conceptual_transcript.md](files/w1_conceptual_transcript.md).
+"Identical to four decimals," it wrote, with the reason in the strength equation:
+the base strength is c + (N/L − u)·tan φ, and at φ = 0 the term the pore pressure
+sits in is multiplied by zero. It printed the model restored — both materials
+back at `u = none`, the piezometric line empty.
+
+It then separated the three things a water table would do, which is the part of
+the answer that goes past the question. The base pore pressure does nothing at
+φ = 0, as measured. The slice weight changes only if a saturated unit weight is
+entered, and it read both materials to check — `gamma_sat` is empty on this model
+— with the caution to give the total saturated unit weight and never a buoyant
+one, since a buoyant weight beside an explicit water definition counts buoyancy
+twice. And water standing above the ground is a real effect: a hydrostatic load
+on the toe-side ground, derived from the water definition itself because
+`water_loads` ships on `auto`, and never also entered as a `dloads` row.
 
 ### Check its work
 
-- **Check that nothing moved.** Neither turn edited the model or left an
-  analysis behind, and no workbook was written; the pore pressure option is back
-  at `none` on both materials and the piezometric line is empty again.
+- **Check that nothing moved.** Neither turn edited the model, and no workbook
+  was written; the pore pressure option is back at `none` on both materials and
+  the piezometric line is empty again.
+- **Reproduce the two rows.** Both configurations return 1.247168 on the file's
+  first circle, against 1.247119 with no piezometric line at all — the line's
+  presence moves the fifth decimal, and switching the option on moves nothing.
+- **Measure the effect it named but did not run.** Enter γsat = γ + 5 on both
+  materials, leave `u = piezo` and re-solve the same circle: **1.2127** against
+  1.2472. The weight split is worth 0.034 here; only the pore pressure is inert
+  at φ = 0.
 - **Read the seven methods against the published table.**
   [LEM-3](lem03_layered_slope.md) searches each method its own critical circle
   and reports OMS, Bishop, Spencer and Morgenstern-Price at 1.244 with Lowe at
   1.285, Janbu at 1.313 and Corps at 1.326. The four-way tie and the force
   methods sitting above it are the same finding; the numbers differ because these
   seven are one fixed circle.
-- **Solve the file's own circle with Analysis = Single surface**: 1.247, not the
-  1.244 a search returns. The answer says which of the two it computed, which is
-  the part that makes the table readable at all.
-- **Follow the documentation link.** It lands on the LEM overview page, and the
-  derivation there is what the answer summarizes.
+- **Solve that circle with Analysis = Single surface**: 1.247, not the 1.244 a
+  search returns. The answer states which of the two it computed, which is what
+  makes the table readable at all.
+- **Follow the three documentation pages.** `lem/overview/`, `lem/bishop/` and
+  `lem/spencer/` are real pages, and the derivation there is what the answer
+  summarizes. The transcript is
+  [w1_conceptual_transcript.md](files/w1_conceptual_transcript.md).
 
 ---
 
@@ -734,10 +765,12 @@ change and putting the model back at the end:
 
 Both of those faults are named precisely. Profile line 1 is the embankment
 surface and carried the foundation's Mat ID while the base line carried the
-embankment's — "the strong clay in the fill and the weak clay in the foundation,
-exactly backwards" — and the 13 pcf is read as a dropped digit, with the absurd
-12.441 of the swap-only run used to explain why the two faults had been partly
-cancelling each other. It then applied both fixes and reran: **FS = 1.244** on
+embankment's: "The strong clay was in the fill and the weak clay in the
+foundation, exactly backwards." The 13 pcf is read as a dropped digit, and the
+absurd 12.441 of the swap-only run is explained by it — "at 13 pcf the fill was
+essentially weightless" — so the two faults had been pulling the answer in
+opposite directions, which is why the file arrived at a plausible-looking
+1.004. It then applied both fixes and reran: **FS = 1.244** on
 (18.50, 43.75) with R = 43.75, bottoming at elevation 0.
 
 The third fault gets a section of its own, headed *"One thing I did not
@@ -784,9 +817,9 @@ table top down.
 ## Generating the report
 
 We will run Spencer with a search and then ask for the analysis report in one
-sentence. What comes back is the same document the Report dialog writes, built
-from the same run, so this request shortcuts the dialog rather than making a
-second kind of report.
+sentence. What comes back is the same document **File → Generate Report…**
+writes, built from the same run, so this request shortcuts the dialog rather
+than making a second kind of report.
 
 The report documents what the session has solved, so the run comes first:
 
@@ -811,10 +844,11 @@ The first turn returns **FS = 1.244** on the circle (18.50, 43.75) with R = 43.7
 the surface straight off the result, laid `Xo`, `Yo`, `R`, `Depth` and the entry
 and exit stations out in a small table, and read the lowest point at elevation 0
 as sitting well above the rigid base at −10, so the floor is not controlling the
-answer. It passed on both admissibility notes.
+answer. It reported both admissibility notes.
 
 The second turn makes one call to `generate_report`. The document carries six
-figures and seven tables across *1 Traceability*, *2 Project Definition* and
+numbered figures and three numbered tables across *1 Traceability*,
+*2 Project Definition* and
 *3 Limit Equilibrium Analysis*, the last holding 3.1 Analysis Inputs,
 3.2 Materials, 3.3 Loads and 3.4 Spencer's Method, itself split into the search,
 the results, the slice table and the calculations. It lands in the folder
@@ -842,26 +876,32 @@ d0307449074ab1094764c075b45ec241a098fbe10731a5cf497b1846581da1bb
   loads, which is this section as built.
 - **Read §3.4.4 against the run.** The calculations section reports the iteration
   converging at F = 1.244 with θ = 8.48°, the pair Spencer solves for.
-- **One line of the summary does not match the document.** The assistant
+- **Two lines of the summary do not match the document.** The assistant
   describes what it generated as covering "the two-zone polygon geometry"; the
   geometry is on profile lines and the report's own §2 says so — "2 material
-  zones described with profile lines".
+  zones described with profile lines". It also reports the document as arriving
+  "with the contents page finished and page-numbered", where the third paragraph
+  of the document reads "Page numbers appear when the table is updated in Word
+  (right-click → Update Field, or select all and press F9)".
 
 ---
 
 ## What it will not do
 
-**It does not convert units.** A model is in one unit system throughout, and the
-assistant works in whatever the project already uses. Give it feet and pounds
-and it enters feet and pounds; give it a drawing in meters and kilonewtons for a
-project in feet and it will say so rather than convert on its own. Convert the
-numbers yourself before you hand them over.
+**It does not convert units.** A model is in one unit system throughout, and
+nothing in XSLOPE converts one into another: the numbers entered are the numbers
+the engine reads, under whatever system the project declares. Convert a drawing
+in meters and kilonewtons yourself before handing it to a project in feet, and
+check the entered values against the drawing afterwards.
 
-**It will not invent a value the model does not state.** The diagnosis above
-found a maximum depth of −100 under a 20 ft section, said what was wrong with it,
-measured that the repaired answer does not depend on it, and then left it alone
-and asked for the firm-layer elevation rather than guessing one. An input that
-comes back unchanged with a question attached is usually this, not an oversight.
+**Asked for a value the model does not state, it named the gap rather than
+filling it.** The diagnosis above found a maximum depth of −100 under a 20 ft
+section, said what was wrong with it, measured that the repaired answer does not
+depend on it, and then left it alone and asked for the firm-layer elevation. An
+input that comes back unchanged with a question attached is usually this, not an
+oversight. Treat it as behavior to check rather than as a guarantee: asked the
+same thing, another of the models above invented a unit weight instead of
+reading the one the tutorial gives.
 
 **It can explain a result it never measured.** The face-slope sweep returned
 three correct factors of safety and closed by attributing them to a circle
@@ -876,12 +916,12 @@ it.
 ## A harder problem
 
 As the slope and the prompts get more complicated, the opportunity for error
-rises and so does the cost. The same eight tasks were also run on the reinforced
-slope of [LEM-8](lem08_reinforced_slope.md) — a 2 ft cohesive band along the
-face, six geogrid layers with pullout at both ends, and a surcharge across the
-crest — where the results spread much more widely and only Claude Opus 5
-completed every task. Late August 2026, on the same list prices as the table
-above:
+rises. The same eight tasks were also run on the reinforced slope of [LEM-8](lem08_reinforced_slope.md) — a
+2 ft cohesive band along the face, six geogrid layers with pullout at both ends,
+and a surcharge across the crest — where only Claude Opus 5 got every task
+right, at $2.23 against the $1.71 the layered slope cost it. The five models
+above score 4 to 8 of 8 there, and a sixth and smaller one, Claude Haiku 4.5,
+gets 2. Late August 2026, on the same list prices as the table above:
 
 | Model | Cost | Sessions right |
 | :--- | :---: | :---: |
@@ -892,14 +932,15 @@ above:
 | Claude Haiku 4.5 | $0.53 | 2 of 8 |
 | GLM-5V-Turbo | ~$0.24 | 4 of 8 |
 
-Three things did most of the damage. The 2 ft band along the face is a thin zone
-read off a drawing, and a model that missed it or measured it perpendicular to
-the face instead of horizontally carried that error into every number afterwards.
-Moving the crest break for a flatter face left the crest surcharge behind on the
-old geometry in more than one session. And in the diagnosis, several models
-measured the effect of a planted fault and then filed it under something other
-than a fault — which is why the checks in this tutorial re-run the measurements
-rather than read the conclusions.
+Three things did most of the damage. The 2 ft cohesive band along the face is a
+thin zone read off a drawing — the reference build measures it perpendicular to
+the face — and a model that missed it entirely gave the whole embankment one
+strength and carried that into every number afterwards. Moving the crest break
+for a flatter face left the crest surcharge behind on the old geometry in more
+than one session. And in the diagnosis, several models measured the effect of a
+planted fault and then filed it under something other than a fault — which is
+why the checks in this tutorial re-run the measurements rather than read the
+conclusions.
 
 ---
 
@@ -908,7 +949,7 @@ rather than read the conclusions.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about $1.62.
+  13 turns of work for about $1.71.
 - Building a layered model from a drawing and editing it three ways — face,
   water and strength — with every reported factor of safety reproducing from the
   workbook the session saved.

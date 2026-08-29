@@ -154,10 +154,27 @@ are easy to repeat on whatever is current.
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Sessions right |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Claude Opus 5 | 42 | 752,404 (632,640) | 28,315 | $1.62 | 7 of 8 |
-<!-- MODEL ROWS: filled by the coordinator from models/REPORT.md -->
+| Kimi K3 (Moonshot AI) | 54 | 727,011 (603,482) | 72,502 | $1.64 | 6 of 8 |
+| OpenAI gpt-5.5 | 33 | 414,968 (350,592) | 23,237 | $1.19 | 5 of 8 |
+| Claude Sonnet 5 | 48 | 938,571 (730,664) | 53,761 | $1.10 | 5 of 8 |
+| GLM-5V-Turbo (Z.ai) | 46 | 564,440 (536,661) | 16,563 | ~$0.23 | 3 of 8 |
 
 Opus's one miss is the face-slope sweep below, where the table is right and the
-sentence explaining it is not.
+sentence explaining it is not. Kimi K3 built and edited the model exactly as
+Opus did and was the only model to test its answer to the water-table question
+by running the model, but took three times as long and judged the 100 ft base
+depth in the broken file to be legitimate. gpt-5.5 was the leanest run and exact
+on every number it computed; it built the model and then stopped to ask
+permission before running the search, and in the broken file it fixed the wrong
+thing — it deleted the foundation by moving the base to elevation 0 and
+reported 2.396, nearly twice the answer. Sonnet 5 failed nothing, but wrote the
+saturated unit weight under a field name the model does not have, so the
+submerged and weakened cases came back 7 percent high with nothing in the
+session noticing. GLM-5V-Turbo, a quarter of the cost of the next cheapest, put
+the top of the foundation at the rock instead of the ground and never noticed
+the model had lost a layer, and in the broken file it invented a unit weight
+rather than reading the one the tutorial gives. Z.ai publishes no price for
+that model; its cost here is at the rate a reseller lists for it.
 
 Prices change; the current ones are on each provider's pricing page:
 [Anthropic](https://www.anthropic.com/pricing),
@@ -182,8 +199,11 @@ The assistant is good at this work, but everything it produces should still be
 checked. Checking is usually easy, and it is the same checking a model built by
 hand deserves: read the model checks Studio runs after every edit, look at the
 section on the canvas, and do one hand calculation against the number that came
-back.
-<!-- WEAK SPOTS: coordinator -->
+back. Where it went wrong most often, measured over the runs above: a layer
+boundary read off the drawing at the wrong elevation, a value written under a
+field name the model does not have and silently ignored, and a broken file
+"repaired" by changing the wrong input — the model checks stay clean through all
+three, because none of them makes a model inconsistent, only wrong.
 Each use case below ends with **Check its work** — what to look at, and what it
 should say.
 

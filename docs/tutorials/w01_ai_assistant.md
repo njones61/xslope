@@ -139,9 +139,15 @@ Anthropic's list prices on 2026-08-27 ($5.00 per million input tokens, a cache
 read at a tenth of that, $25.00 per million output tokens).
 
 The same eight sessions were then played, unchanged, on three cheaper models,
-and scored against the answers above. A cheaper model does not necessarily
-spend fewer tokens — the two smaller Claude models spent more, taking more calls
-to do the same work — and the cost saving comes with a loss in what gets done:
+and scored against the answers above. **Everything in this table is a snapshot:
+the models as they behaved and the list prices as they stood in late August
+2026, when this tutorial was written.** Models are replaced and retrained and
+prices are cut or restructured every few months, so treat the numbers as an
+example of how to compare models, not as a standing verdict on any of them — the
+sessions are easy to repeat on whatever is current. A cheaper model does not
+necessarily spend fewer tokens — the two smaller Claude models spent more, taking
+more calls to do the same work — and the cost saving comes with a loss in what
+gets done:
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Sessions right |
 | --- | :---: | :---: | :---: | :---: | :---: |

@@ -48,7 +48,14 @@ PROVIDERS = {
         "models": ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"],
         # Gets the Studio brief; OpenAI caches the prompt prefix server-side
         # automatically, so repeat turns are cheap.
-        "tools": True, "vision": True, "skill": True,
+        "tools": True, "vision": None, "skill": True,
+        # OpenAI's catalogue mixes vision chat models with text-only ones
+        # (gpt-3.5, the dated gpt-4 snapshots, o1-mini / o3-mini, the search
+        # previews, bare chat-latest). Image input: every gpt-4o / gpt-4.1 /
+        # gpt-4-turbo / gpt-5.x model, and the o1 / o3 / o4-mini reasoners.
+        "vision_only": True,
+        "vision_match": r"^(gpt-4o(?!.*search)|gpt-4\.1|gpt-4-turbo|gpt-5(?!.*search)|"
+                        r"o1(?!-mini)|o3(?!-mini)|o4-mini|chatgpt-4o)",
     },
     "kimi": {
         # Moonshot AI's OpenAI-compatible endpoint. litellm routes it natively

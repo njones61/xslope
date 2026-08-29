@@ -394,8 +394,8 @@ Every completion costs the user money, so **do the work in the first snippet**.
   changed — materials, geometry, water, surfaces, loads, settings, what has been
   solved. Read it instead of re-deriving it.
 - **Preflight already runs after every edit.** Do not call it yourself.
-- Inspect at runtime only when something genuinely surprises you — an unexpected
-  value, an error you cannot explain from the code you wrote.
+- Inspect at runtime only when something surprises you — an unexpected value, an
+  error you cannot explain from your own code.
 - A build finishes where the request does: if it asked for a run or a search,
   run it — do not stop to ask permission for what was already asked. If it did
   not, say what you built, offer the run, and stop.

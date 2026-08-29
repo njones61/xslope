@@ -954,10 +954,10 @@ def w1_build_from_image(dry_run=False):
     """
     return run_assistant_session(
         "build_from_image", None,
-        [("Build this model. Unit system: US customary (ft, psf, pcf). Both "
-          "soils are undrained. Put the toe at x = 0, run the ground 30 ft past "
-          "the toe and 50 ft behind the crest break, and treat the rock as "
-          "rigid. Add starting circles and run Spencer with a search.",
+        [("Build this model: a 20 ft embankment on a 10 ft foundation layer over "
+          "rigid rock. Both soils are undrained. Put the toe at x = 0, run the "
+          "ground 30 ft past the toe and 50 ft behind the crest break. Add "
+          "starting circles and run Spencer with a search.",
           W1_SKETCH)],
         timeout_s=900, max_height=20000, dry_run=dry_run)
 
@@ -1055,7 +1055,10 @@ def w1_diagnose(dry_run=False):
     return run_assistant_session(
         "diagnose", W1_BROKEN,
         ["This model was built from the LEM-3 tutorial, but the factor of safety "
-         "looks wrong. Find what is wrong, fix it, and rerun."],
+         "looks wrong. The tutorial's inputs are: embankment 130 pcf, c = 400 psf; "
+         "foundation 135 pcf, c = 800 psf; both undrained; rigid rock 10 ft below "
+         "the top of the foundation. Check the file against them, fix anything "
+         "that does not match, and rerun."],
         timeout_s=900, max_height=20000, dry_run=dry_run)
 
 

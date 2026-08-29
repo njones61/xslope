@@ -2119,6 +2119,41 @@ def _mat_option_missing(ctx):
                    f"or elastic) {_AT_MAT}.")
 
 
+#: Every field a material row carries when it comes off the mat sheet. A key
+#: outside this set on an in-memory material (an assistant snippet, a script) is
+#: one nothing reads -- the value it holds silently does not exist to the run.
+MATERIAL_FIELDS = frozenset((
+    "name", "gamma", "gamma_sat", "option", "c", "phi", "cp", "r_elev", "d",
+    "psi", "t_cut", "phi_b", "s_cap", "Ss", "Sy", "pow_a", "pow_b", "pow_c",
+    "pow_d", "hb_sci", "hb_gsi", "hb_mi", "hb_d", "u", "ru", "sigma_gamma",
+    "sigma_c", "sigma_phi", "sigma_cp", "sigma_d", "sigma_psi", "k1", "k2",
+    "alpha", "kr0", "h0", "unsat", "vg_a", "vg_n", "E", "nu",
+))
+
+
+@rule("mat.unknown_field", WARNING, ("lem", "fem", "seep"),
+      "A material carries a field the model does not read; the value it holds "
+      "is silently ignored.")
+def _mat_unknown_field(ctx):
+    # Measured case: an assistant asked for saturated unit weights wrote
+    # m['gsat'] = 135 -- valid Python, no error anywhere, and the saved workbook
+    # carried gamma_sat = None, so two answers came back 7% high with nothing in
+    # the session noticing. The right name is one edit away; say it.
+    import difflib
+    for i, m in enumerate(ctx.materials):
+        if not isinstance(m, dict):
+            continue
+        for key in m:
+            if not isinstance(key, str) or key.startswith("_") or key in MATERIAL_FIELDS:
+                continue
+            near = difflib.get_close_matches(key, MATERIAL_FIELDS, n=1, cutoff=0.5)
+            hint = f" Did you mean '{near[0]}'?" if near else ""
+            yield (f"{ctx.mat_label(i)} carries a field named '{key}'.{hint} No "
+                   f"analysis reads it, so whatever it holds ({m[key]!r}) is not "
+                   f"part of the model. The material fields are those of the mat "
+                   f"sheet: {', '.join(sorted(MATERIAL_FIELDS))}.")
+
+
 @rule("mat.gamma_nonpositive", ERROR, ("lem", "fem"),
       "A material a stability run weighs needs a positive unit weight.",
       fields=("gamma", "gamma_sat"))

@@ -67,7 +67,7 @@ PROVIDERS = {
         # moonshot-v1 vision previews. The text-only ids Moonshot also lists
         # (moonshot-v1-8k, kimi-k2-0711-preview, kimi-k2-thinking) are filtered
         # out by `vision_only` wherever the list comes from.
-        "models": ["kimi-k2.6", "kimi-k2.5", "kimi-k3", "kimi-latest",
+        "models": ["kimi-k3", "kimi-k2.6", "kimi-k2.5", "kimi-latest",
                    "kimi-latest-128k", "moonshot-v1-128k-vision-preview",
                    "moonshot-v1-32k-vision-preview"],
         # Moonshot prices a cache-hit input token separately, i.e. it caches the

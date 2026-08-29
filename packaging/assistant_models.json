@@ -67,27 +67,17 @@
       ]
     },
     "kimi": {
-      "recommended": "kimi-k2.6",
+      "recommended": "kimi-k3",
       "good_choices": [
         {
-          "id": "kimi-k2.6",
-          "label": "flagship",
-          "note": "Current K2 flagship: tool use, images, and server-side caching of the prompt prefix."
-        },
-        {
-          "id": "kimi-k2.5",
-          "label": "stable",
-          "note": "The previous K2 generation, still widely available and cheaper per token."
-        },
-        {
           "id": "kimi-k3",
-          "label": "long context",
-          "note": "Newest generation with the largest context window; check your account has access."
+          "label": "flagship",
+          "note": "Moonshot's newest; reads images, tool use, 1M-token context."
         },
         {
-          "id": "kimi-latest",
-          "label": "always current",
-          "note": "Moonshot's rolling alias — it moves to their newest vision model without a settings change."
+          "id": "kimi-k2.6",
+          "label": "economical",
+          "note": "A fifth of K3's price per token; images and tool use."
         }
       ],
       "deprecated": [

@@ -138,7 +138,7 @@ Thirteen turns, 43 calls to the model, about 771,000 input tokens of which some
 Anthropic's list prices on 2026-08-27 ($5.00 per million input tokens, a cache
 read at a tenth of that, $25.00 per million output tokens).
 
-The same eight sessions were then played, unchanged, on three cheaper models,
+The same eight sessions were then played, unchanged, on four other models,
 and scored against the answers above. **Everything in this table is a snapshot:
 the models as they behaved and the list prices as they stood in late August
 2026, when this tutorial was written.** Models are replaced and retrained and
@@ -153,6 +153,7 @@ gets done:
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Claude Opus 5 | 43 | 770,807 (584,714) | 40,128 | $2.23 | 8 of 8 |
 | OpenAI gpt-5.5 | 34 | 443,784 (389,120) | 21,748 | $1.12 | 5 of 8 |
+| Kimi K3 (Moonshot AI) | 35 | 443,670 (334,366) | 51,702 | $1.20 | 5 of 8 |
 | Claude Sonnet 5 | 55 | 1,124,356 (857,736) | 60,692 | $1.31 | 5 of 8 |
 | Claude Haiku 4.5 | 57 | 1,001,181 (669,536) | 25,969 | $0.53 | 2 of 8 |
 | GLM-5V-Turbo (Z.ai) | 42 | 530,695 (511,763) | 22,719 | ~$0.24 | 4 of 8 |
@@ -162,7 +163,13 @@ matched Opus on both sweeps, the finite element run, the documentation
 questions and the report; its build read the drawing correctly, to FS 1.627
 against 1.628, but left two reinforcement fields empty so the saved workbook
 would not reopen, and in the diagnosis it measured the surcharge's effect and
-then never named it as the fault. Sonnet 5 matched Opus on both sweeps, the finite element run, the documentation
+then never named it as the fault. Kimi K3 read the drawing as well as Opus
+did, band included, and reopened at FS 1.491 only because it set every layer's
+application to passive instead of active; it matched Opus on both sweeps, the
+finite element run, the documentation questions and the report, left the crest
+load in the wrong place after the first edit, and in the diagnosis measured the
+deep base's effect and then filed it under "what is not wrong". Sonnet 5
+matched Opus on both sweeps, the finite element run, the documentation
 questions and the report, to the same factors of safety and circles; it left one
 load in the wrong place after the three edits, found only one of the three
 planted faults in the diagnosis, and on the build from the drawing it read the

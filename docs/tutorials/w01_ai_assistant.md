@@ -158,16 +158,17 @@ ways and they are counted apart. **Model and numbers** asks whether the work was
 model it built or edited is the one the request describes, and every factor of
 safety it reported is right — for the broken file, whether it found the faults
 and its repair returns the published answer. **Explanation** asks whether what
-it said about the mechanism, the finding or the reason is right; an answer
-counted wrong there is usually mostly right with one sentence that is not, and
-the face-slope sweep below is that case in full.
+it said about the mechanism, the finding or the reason is right — engineering
+content only; a remark about a document's layout is noted where it occurs and
+not scored. An answer counted wrong there is usually mostly right with one
+sentence that is not, and the face-slope sweep below is that case in full.
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5 | 42 | 752,162 (616,965) | 29,000 | $1.71 | 8 of 8 | 6 of 8 |
+| Claude Opus 5 | 42 | 752,162 (616,965) | 29,000 | $1.71 | 8 of 8 | 7 of 8 |
 | Kimi K3 (Moonshot AI) | 54 | 727,011 (603,482) | 72,502 | $1.64 | 7 of 8 | 3 of 8 |
 | OpenAI gpt-5.5 | 33 | 414,968 (350,592) | 23,237 | $1.19 | 6 of 8 | 6 of 8 |
-| Claude Sonnet 5 | 51 | 1,004,052 (763,043) | 53,449 | $1.17 | 7 of 8 | 6 of 8 |
+| Claude Sonnet 5 | 51 | 1,004,052 (763,043) | 53,449 | $1.17 | 7 of 8 | 7 of 8 |
 | GLM-5V-Turbo (Z.ai) | 46 | 564,440 (536,661) | 16,563 | ~$0.23 | 6 of 8 | 2 of 8 |
 
 Opus 5 is the only one right on every model and every number, and both of its
@@ -902,7 +903,8 @@ d0307449074ab1094764c075b45ec241a098fbe10731a5cf497b1846581da1bb
   loads, which is this section as built.
 - **Read §3.4.4 against the run.** The calculations section reports the iteration
   converging at F = 1.244 with θ = 8.48°, the pair Spencer solves for.
-- **Two lines of the summary do not match the document.** The assistant
+- **Two lines of the summary do not match the document** (neither is scored: both
+  are about the document, not the analysis). The assistant
   describes what it generated as covering "the two-zone polygon geometry"; the
   geometry is on profile lines and the report's own §2 says so — "2 material
   zones described with profile lines". It also reports the document as arriving
@@ -946,14 +948,14 @@ rises. The same eight tasks were also run on the reinforced slope of [LEM-8](lem
 2 ft cohesive band along the face, six geogrid layers with pullout at both ends,
 and a surcharge across the crest — scored the same two ways. Claude Opus 5 is
 again right on every model and every number, at $2.23 against the $1.71 the
-layered slope cost it, and again loses half the second column. The five models
+layered slope cost it, and again loses three of the second column. The five models
 above score 5 to 8 of 8 on model and numbers there and 3 to 6 of 8 on
 explanation, and a sixth and smaller one, Claude Haiku 4.5, gets 2 and 3. Late
 August 2026, on the same list prices as the table above:
 
 | Model | Cost | Model and numbers | Explanation |
 | :--- | :---: | :---: | :---: |
-| Claude Opus 5 | $2.23 | 8 of 8 | 4 of 8 |
+| Claude Opus 5 | $2.23 | 8 of 8 | 5 of 8 |
 | OpenAI gpt-5.5 | $1.12 | 5 of 8 | 5 of 8 |
 | Kimi K3 | $1.20 | 5 of 8 | 3 of 8 |
 | Claude Sonnet 5 | $1.31 | 5 of 8 | 6 of 8 |

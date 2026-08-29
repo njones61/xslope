@@ -128,7 +128,7 @@ The eight conversations below cost this much between them, measured as they ran:
 | Building from a drawing | 1 | 3 | 52,241 (47,448) | 2,750 | 47 s |
 | Modifying the model | 3 | 13 | 245,907 (205,608) | 7,160 | 137 s |
 | A sweep with the helper | 1 | 2 | 33,157 (31,632) | 1,308 | 65 s |
-| A sweep no dialog offers | 1 | 4 | 68,299 (63,264) | 2,587 | 55 s |
+| A sweep written ad hoc | 1 | 4 | 68,299 (63,264) | 2,587 | 55 s |
 | Stiffnesses and strength reduction | 2 | 6 | 104,870 (63,264) | 2,182 | 576 s |
 | Two questions | 2 | 4 | 72,091 (63,264) | 4,380 | 70 s |
 | A broken file | 1 | 6 | 108,379 (94,896) | 6,994 | 133 s |
@@ -447,7 +447,7 @@ surfaces are what the plateau is made of.
 
 ---
 
-## A sweep no dialog offers
+## A sweep written ad hoc
 
 We will ask for the factor of safety at face slopes of 2:1, 2.5:1 and 3:1, with
 the toe and the crest elevation held and a search each time. What varies here is
@@ -588,7 +588,7 @@ in [w1_elastic_fem_transcript.md](files/w1_elastic_fem_transcript.md).
 
 ---
 
-## Two questions that change nothing
+## Two documentation questions
 
 We will ask two questions that call for no edit and no analysis of their own:
 why every limit equilibrium method returns the same factor of safety on this
@@ -675,7 +675,7 @@ and the transcript is
 
 ---
 
-## Finding what is wrong with a model
+## A broken file
 
 We will open a copy of the slope with three transcription errors written into it
 and say only that the factor of safety looks wrong. No request in this tutorial

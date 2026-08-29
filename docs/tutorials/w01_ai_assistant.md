@@ -903,14 +903,13 @@ d0307449074ab1094764c075b45ec241a098fbe10731a5cf497b1846581da1bb
   loads, which is this section as built.
 - **Read §3.4.4 against the run.** The calculations section reports the iteration
   converging at F = 1.244 with θ = 8.48°, the pair Spencer solves for.
-- **Two lines of the summary do not match the document** (neither is scored: both
-  are about the document, not the analysis). The assistant
-  describes what it generated as covering "the two-zone polygon geometry"; the
-  geometry is on profile lines and the report's own §2 says so — "2 material
-  zones described with profile lines". It also reports the document as arriving
-  "with the contents page finished and page-numbered", where the third paragraph
-  of the document reads "Page numbers appear when the table is updated in Word
-  (right-click → Update Field, or select all and press F9)".
+- **One line of the summary is about the document, not the analysis.** The
+  assistant reports the document as arriving "with the contents page finished
+  and page-numbered", where the third paragraph of the document reads "Page
+  numbers appear when the table is updated in Word (right-click → Update Field,
+  or select all and press F9)". (Its "two-zone polygon geometry" is right: the
+  two profile lines are converted to two material polygons when the model is
+  built.)
 
 ---
 

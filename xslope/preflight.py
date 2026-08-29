@@ -4919,12 +4919,22 @@ def _mat_E_band(ctx):
 
 
 @rule("mat.nu_implausible", WARNING, ("fem",),
-      "A Poisson's ratio below 0.1 is outside the range of any soil or rock.")
+      "A Poisson's ratio below 0.1 is outside the range of any soil or rock; one "
+      "above 0.45 is near the incompressible limit and conditions the stiffness "
+      "matrix badly.")
 def _mat_nu_band(ctx):
     for i, m in ctx.fem_materials():
         nu = _num(m.get("nu"))
         if nu is None or nu <= 0 or nu >= 0.5:
             continue           # blank / out of range is the ERROR above
+        if nu > 0.45:
+            yield (f"{ctx.mat_label(i)} has nu = {nu:g}, close to the incompressible "
+                   f"limit of 0.5. The plane-strain stiffness scales with "
+                   f"1 / (1 - 2 nu), so the element matrices are poorly conditioned "
+                   f"and the strength reduction converges slowly or not at all. Use "
+                   f"0.45 or less; an undrained clay is modelled at 0.45, not 0.49 "
+                   f"{_AT_MAT}.")
+            continue
         if nu >= 0.1:
             continue
         yield (f"{ctx.mat_label(i)} has nu = {nu:g}. Soils sit at 0.2-0.45 and "

@@ -8282,23 +8282,10 @@ def compute_triangle_strains_manual(coords, displacements):
     return strains
 
 
-#: Poisson's ratios already warned about (rounded), so the near-incompressible
-#: note prints once per value per process rather than once per element -- an
-#: assembly over thousands of elements was printing it thousands of times.
-_NU_WARNED = set()
-
-
 def build_constitutive_matrix(E, nu):
     """Build constitutive matrix for plane strain - standard tension-positive convention."""
-    # Numerical stability note for near-incompressible materials. 0.45 is the
-    # classifier's own choice for a soft clay and is not flagged; above it the
-    # (1 - 2 nu) factor starts to dominate the conditioning.
-    if nu > 0.45:
-        key = round(float(nu), 3)
-        if key not in _NU_WARNED:
-            _NU_WARNED.add(key)
-            print(f"Warning: Poisson's ratio {nu:.3f} is close to the incompressible "
-                  f"limit (0.5); consider nu <= 0.45 for better numerical stability")
+    # A near-incompressible nu (> 0.45) is reported by preflight
+    # (mat.nu_implausible) before any run; nothing is printed per element here.
 
     factor = E / ((1 + nu) * (1 - 2*nu))
     D = factor * np.array([

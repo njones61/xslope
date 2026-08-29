@@ -166,24 +166,22 @@ sentence that is not, and the face-slope sweep below is that case in full.
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
 | Claude Opus 5 | 42 | 752,162 (616,965) | 29,000 | $1.71 | 8 of 8 | 7 of 8 |
-| Kimi K3 (Moonshot AI) | 54 | 727,011 (603,482) | 72,502 | $1.64 | 7 of 8 | 5 of 8 |
+| Kimi K3 (Moonshot AI) | 54 | 727,011 (603,482) | 72,502 | $1.64 | 7 of 8 | 6 of 8 |
 | OpenAI gpt-5.5 | 33 | 414,968 (350,592) | 23,237 | $1.19 | 7 of 8 | 6 of 8 |
 | Claude Sonnet 5 | 51 | 1,004,052 (763,043) | 53,449 | $1.17 | 7 of 8 | 7 of 8 |
 | GLM-5V-Turbo (Z.ai) | 46 | 564,440 (536,661) | 16,563 | ~$0.23 | 6 of 8 | 4 of 8 |
 
-Opus 5 is the only one right on every model and every number, and both of its
-misses are in the second column: the face-slope sweep below, where the table is
-right and the sentence explaining it is not, and the report, whose summary
-describes a document it did not write. Kimi K3 built and edited the model
+Opus 5 is the only one right on every model and every number, and its one miss
+is in the second column: the face-slope sweep below, where the table is right
+and the sentence explaining it is not. Kimi K3 built and edited the model
 exactly as Opus did and was the only one of the other four to test its answer
 to the water-table question by running the model, but took three times as long
-and loses the second column five times over — mechanisms named that its own
-output contradicts, and the 100 ft base depth in the broken file examined and
-pronounced legitimate. gpt-5.5 was the leanest run and exact on every number it
-computed, which is what makes its two misses in the first column stand out: it
-built the model and then stopped to ask permission before running the search,
-and in the broken file it fixed the wrong thing — it deleted the foundation by
-moving the base to elevation 0 and reported 2.396, nearly twice the answer.
+and loses the second column twice — a restored cohesion called the as-built
+value, and the 100 ft base depth in the broken file examined and pronounced
+legitimate. gpt-5.5 was the leanest run and exact on every number it computed,
+which is what makes its one miss in the first column stand out: in the broken
+file it fixed the wrong thing — it deleted the foundation by moving the base to
+elevation 0 and reported 2.396, nearly twice the answer.
 Sonnet 5 matched Opus on every number it computed, including all three edits;
 the 100 ft base depth is the one thing it printed and never came back to, and
 its one wrong sentence puts the rise under submergence down to pore-pressure
@@ -948,15 +946,15 @@ rises. The same eight tasks were also run on the reinforced slope of [LEM-8](lem
 and a surcharge across the crest — scored the same two ways. Claude Opus 5 is
 again right on every model and every number, at $2.23 against the $1.71 the
 layered slope cost it, and again loses three of the second column. The five models
-above score 5 to 8 of 8 on model and numbers there and 3 to 6 of 8 on
+above score 5 to 8 of 8 on model and numbers there and 4 to 7 of 8 on
 explanation, and a sixth and smaller one, Claude Haiku 4.5, gets 2 and 3. Late
 August 2026, on the same list prices as the table above:
 
 | Model | Cost | Model and numbers | Explanation |
 | :--- | :---: | :---: | :---: |
 | Claude Opus 5 | $2.23 | 8 of 8 | 5 of 8 |
-| OpenAI gpt-5.5 | $1.12 | 5 of 8 | 5 of 8 |
-| Kimi K3 | $1.20 | 5 of 8 | 3 of 8 |
+| OpenAI gpt-5.5 | $1.12 | 5 of 8 | 7 of 8 |
+| Kimi K3 | $1.20 | 5 of 8 | 5 of 8 |
 | Claude Sonnet 5 | $1.31 | 5 of 8 | 6 of 8 |
 | Claude Haiku 4.5 | $0.53 | 2 of 8 | 3 of 8 |
 | GLM-5V-Turbo | ~$0.24 | 5 of 8 | 4 of 8 |

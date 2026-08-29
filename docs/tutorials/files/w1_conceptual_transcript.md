@@ -8,19 +8,17 @@ Captured by `tools/assistant_sessions.py` against the live Studio assistant, off
 
 ## Turn 1 — Why do all of the limit equilibrium methods give the same f…
 
-```text
+````text
 You: Why do all of the limit equilibrium methods give the same factor of safety on this model?
 
 Ran code:
-    
     rows=[]
     for m in ['oms','bishop','janbu','corps','lowe','spencer','mprice']:
         r = run_lem(method=m, search=False, plot=False)
         rows.append((m, r['FS'], r.get('warnings')))
     for m,fs,w in rows:
         print(f"{m:8s} FS={fs:.6f}  warn={w if w else ''}")
-    print("phi:", [(mm['name'], mm['c'], mm['phi']) for mm in slope_data['materials']])
-    print("surface:", {k:slope_data['circles'][0][k] for k in ('Xo','Yo','R','Depth')})
+    print("phi values:", [(mat['name'], mat['c'], mat['phi']) for mat in slope_data['materials']])
 
 Output:
     OMS: FS=1.247
@@ -56,46 +54,46 @@ Output:
     lowe     FS=1.298788  warn=['interslice tension (min Z = -994.4 vs max compression 7816.8)']
     spencer  FS=1.247119  warn=['interslice tension (min Z = -1504.0 vs max compression 7773.3)', 'line of thrust outside the slice on 15% of boundaries']
     mprice   FS=1.247119  warn=['interslice tension (min Z = -1724.1 vs max compression 7698.9)', 'line of thrust outside the slice on 21% of boundaries']
-    phi: [('embankment', 400.0, 0.0), ('foundation', 800.0, 0.0)]
-    surface: {'Xo': 20.0, 'Yo': 40.0, 'R': 40.0, 'Depth': 0.0}
+    phi values: [('embankment', 400.0, 0.0), ('foundation', 800.0, 0.0)]
 
-Assistant: They don't all agree — the **moment-equilibrium** family does, and the force-equilibrium methods differ. Here is what your model actually gives on the defined circle (Xo=20, Yo=40, R=40):
+Assistant: Not all of them do — the ones that satisfy **moment** equilibrium agree exactly, and the force-equilibrium methods don't. Solved on the surface the model already defines (Xo=20, Yo=40, R=40, 40 slices, no search):
 
-| Method | FS | Type |
-|:--|:--|:--|
-| OMS | 1.247 | moment |
-| Bishop | 1.247 | moment |
-| Spencer | 1.247 | moment + force |
-| Morgenstern-Price | 1.247 | moment + force |
+| Method | FS | Equilibrium satisfied |
+|:---|---:|:---|
+| OMS | 1.247 | moment only |
+| Bishop | 1.247 | moment (+ vertical) |
+| Spencer | 1.247 | force + moment |
+| Morgenstern-Price | 1.247 | force + moment |
 | Lowe & Karafiath | 1.299 | force only |
-| Janbu (corrected) | 1.321 | force only |
+| Janbu (corrected, fo=1.09) | 1.321 | force only (+ empirical correction) |
 | Corps of Engineers | 1.363 | force only |
 
-## Why the moment methods coincide
+## Why the moment methods collapse onto one number
 
-Both materials are φ = 0 (c = 400 psf embankment, c = 800 psf foundation). On a **circular** surface with φ = 0, take moments about the center:
+Both materials are **φ = 0** (c = 400 psf embankment, c = 800 psf foundation). On a circular arc with φ = 0 the moment equation degenerates:
 
-> FS = (c · L_arc · R) / (Σ W·x) 
+```
+FS = (sum of c * L_base * R) / (sum of W * x_arm)
+```
 
-The resisting moment is `c · L · R` — it depends only on the arc length and cohesion, **not on the normal stress**. Interslice forces are internal to the free body and cancel in the moment equation about the center, so whatever assumption a method makes about them (none for OMS, horizontal for Bishop, constant inclination for Spencer, a half-sine function for Morgenstern-Price) never enters the answer. All four must return the identical number. This is expected behavior, not a bug — see `https://xslope.readthedocs.io/en/latest/lem/overview/`.
+The resisting moment depends only on cohesion and arc length — the **base normal force N drops out entirely**. Since the only thing the interslice force assumption ever changes is how N is distributed among the slices, every method that takes moments about the circle center gets the identical answer no matter what it assumes about the side forces. That is why OMS = Bishop exactly, and why Spencer and Morgenstern-Price converge to that same 1.247 (their λ/θ just satisfies force equilibrium without moving the moment answer: Spencer θ = 7.91°, MP λ = 0.151).
 
-## Why the force methods don't
+This is expected behavior, not a bug.
 
-Janbu, Corps and Lowe satisfy **force** equilibrium instead, which requires the base normal N on each slice, and N *does* depend on the assumed interslice force inclination. Those assumptions differ (Janbu: horizontal + fo correction, here fo = 1.09; Corps: a single θ = 18.48° from the surface geometry; Lowe: average of base and surface slopes), so they spread over 1.25–1.36.
+## Why the force-only methods differ
+
+Janbu, Corps and Lowe never write the moment equation, so N is set by horizontal/vertical force balance on each slice, and there the interslice-force assumption *does* change N — and with φ = 0, N changes the driving side of the ratio. Their spread (1.299–1.363) is the assumption spread, and none of them is enforcing overall moment balance, so on a circular φ = 0 problem the 1.247 from Spencer/Bishop is the one to trust.
 
 ## Warnings you should know about
 
-Every non-OMS/Bishop run flagged the Duncan & Wright admissibility screen:
+Every complete- and force-equilibrium run flagged **interslice tension** (e.g. Spencer min Z = −1504 vs max compression 7773), and Spencer and Morgenstern-Price also report the **line of thrust falling outside the slice** on 15% and 21% of boundaries. These are report-only admissibility screens (Duncan & Wright) — they don't change FS, but they say the internal force distribution is not fully admissible on this surface. With a φ = 0 clay and no tension crack modeled, that usually points at tension near the crest; adding `tcrack_depth` would be the normal fix.
 
-- **Interslice tension** on all four (Spencer min Z = −1504 vs max compression 7773; Corps −1498; Lowe −994; M-P −1724).
-- **Line of thrust outside the slice** on 15% of boundaries (Spencer) and 21% (Morgenstern-Price).
+Background: `lem/overview/` for the method comparison, `lem/bishop/` and `lem/spencer/` for the individual formulations.
 
-These don't change FS, but they say the converged solution is not fully statically admissible — typical of a steep crest-side entry with no tension crack modeled. Adding `tcrack_depth` usually clears it.
+Want me to run the automated search (`search=True`) to find the actual critical circle, or add a tension crack and re-check?
+````
 
-Also note: **this was a solve on the circle already in the file, not a search.** FS = 1.247 is that surface, not the critical one. Want me to run `run_lem(search=True)` to find the critical circle?
-```
-
-Tokens: input 33,813 · cached_input 31,632 · output 1,455 · calls 2 · 21.5s
+Tokens: input 33,819 · cached_input 15,863 · output 1,672 · calls 2 · 25.5s
 
 ## Turn 2 — Both soils are undrained. What should the pore-pressure opt…
 
@@ -103,95 +101,85 @@ Tokens: input 33,813 · cached_input 31,632 · output 1,455 · calls 2 · 21.5s
 You: Both soils are undrained. What should the pore-pressure option be, and what would change in the analysis if I added a water table?
 
 Ran code:
-    
     import copy
-    from shapely.geometry import LineString
-    gs = list(slope_data['ground_surface'].coords)
-    print("ground:", gs)
-    base = run_lem(search=False, plot=False)['FS']
+    base_mats = copy.deepcopy(slope_data['materials'])
+    base_piezo = copy.deepcopy(slope_data.get('piezo_line', []))
+    gs = np.array(slope_data['ground_surface'].coords) if hasattr(slope_data.get('ground_surface'), 'coords') else None
+    print("ground surface pts:", gs[:, :2].tolist() if gs is not None else None)
+    print("gamma_sat:", [(m['name'], m.get('gamma'), m.get('gamma_sat')) for m in slope_data['materials']])
     
-    saved = copy.deepcopy({k: slope_data[k] for k in ('materials','piezo_line')})
-    # piezo line that never rises above ground -> pore pressure only, no ponded load
-    pz = [(x, min(y, 8.0)) for (x, y) in gs]
-    slope_data['piezo_line'] = pz
-    for m in slope_data['materials']:
-        m['u'] = 'piezo'
-    resync_geometry()
-    fs_piezo = run_lem(search=False, plot=False)['FS']
-    
-    # same, but give the soils a saturated unit weight (heavier below the table)
-    for m in slope_data['materials']:
-        m['gsat'] = m['gamma'] + 5.0
-    resync_geometry()
-    fs_gsat = run_lem(search=False, plot=False)['FS']
-    
-    for k, v in saved.items():
-        slope_data[k] = v
-    resync_geometry()
-    print(f"\nu='none'  FS = {base:.4f}")
-    print(f"u='piezo' FS = {fs_piezo:.4f}   (delta {fs_piezo-base:+.4f})")
-    print(f"u='piezo' + gsat FS = {fs_gsat:.4f}   (delta {fs_gsat-base:+.4f})")
-    print("restored u:", [m['u'] for m in slope_data['materials']], "piezo pts:", len(slope_data['piezo_line']))
+    try:
+        # water table 3 ft below ground everywhere -> no ponded water anywhere
+        wt = [(float(x), float(y) - 3.0) for x, y in gs[:, :2]]
+        slope_data['piezo_line'] = wt
+        for m in slope_data['materials']:
+            m['u'] = 'none'
+        r_none = run_lem(method='bishop', search=False, plot=False)
+        for m in slope_data['materials']:
+            m['u'] = 'piezo'
+        r_piezo = run_lem(method='bishop', search=False, plot=False)
+        print(f"\nFS bishop, u='none'  + piezo line present: {r_none['FS']:.4f}")
+        print(f"FS bishop, u='piezo' + same piezo line   : {r_piezo['FS']:.4f}")
+    finally:
+        slope_data['materials'] = base_mats
+        slope_data['piezo_line'] = base_piezo
+        print("\nrestored ->", [(m['name'], m['u']) for m in slope_data['materials']], "piezo pts:", len(slope_data['piezo_line']))
 
 Output:
-    ground: [(-30.0, 0.0), (0.0, 0.0), (40.0, 20.0), (90.0, 20.0)]
-    Spencer: FS=1.247, theta=7.91
-      Spencer admissibility warning: interslice tension (min Z = -1504.0 vs max compression 7773.3)
-      Spencer admissibility warning: line of thrust outside the slice on 15% of boundaries
-    spencer: FS = 1.247
-      admissibility: interslice tension (min Z = -1504.0 vs max compression 7773.3)
-      admissibility: line of thrust outside the slice on 15% of boundaries
-    Spencer: FS=1.247, theta=7.90
-      Spencer admissibility warning: interslice tension (min Z = -1508.5 vs max compression 7772.2)
-      Spencer admissibility warning: line of thrust outside the slice on 15% of boundaries
-    spencer: FS = 1.247
-      admissibility: interslice tension (min Z = -1508.5 vs max compression 7772.2)
-      admissibility: line of thrust outside the slice on 15% of boundaries
-    Spencer: FS=1.247, theta=7.90
-      Spencer admissibility warning: interslice tension (min Z = -1508.5 vs max compression 7772.2)
-      Spencer admissibility warning: line of thrust outside the slice on 15% of boundaries
-    spencer: FS = 1.247
-      admissibility: interslice tension (min Z = -1508.5 vs max compression 7772.2)
-      admissibility: line of thrust outside the slice on 15% of boundaries
+    ground surface pts: [[-30.0, 0.0], [0.0, 0.0], [40.0, 20.0], [90.0, 20.0]]
+    gamma_sat: [('embankment', 130.0, None), ('foundation', 135.0, None)]
+    Bishop: FS=1.247
+    bishop: FS = 1.247
+    Bishop: FS=1.247
+    bishop: FS = 1.247
     
-    u='none'  FS = 1.2471
-    u='piezo' FS = 1.2472   (delta +0.0001)
-    u='piezo' + gsat FS = 1.2472   (delta +0.0001)
-    restored u: ['none', 'none'] piezo pts: 0
+    FS bishop, u='none'  + piezo line present: 1.2472
+    FS bishop, u='piezo' + same piezo line   : 1.2472
+    
+    restored -> [('embankment', 'none'), ('foundation', 'none')] piezo pts: 0
 
-Assistant: **Keep `u = 'none'`.** That is the correct option for an undrained, total-stress (φ = 0, c = Su) analysis — and it is what the model already has.
+Assistant: `u = 'none'` is the correct option, and it should stay that way. Here is why, and what a water table would and would not do.
 
-## Why
+## The pore-pressure option for undrained soils
 
-In a total-stress analysis the shear strength is `s = Su`, full stop. The undrained strength already contains the effect of the pore water that will exist at failure; you are not computing `c' + (σ − u)·tan φ'`. So there is no `u` to subtract, and supplying one would be double-counting the water. `u = 'piezo'` or `u = 'seep'` belong to **effective-stress** runs, where the materials carry `c'` and `φ' > 0`.
+Both materials are total-stress undrained: c = Su (400 and 800 psf) with **φ = 0**. In a total-stress analysis the strength is already the undrained strength at the in-situ effective stress — the pore pressure is *inside* Su, not applied on top of it. So:
 
-## What a water table would actually do — measured
+- `u = 'none'` — correct for φ = 0 undrained (short-term / end-of-construction).
+- `u = 'piezo'` or `'seep'` — for **effective**-stress runs, where you give c' and φ' and the solver subtracts u from the base normal.
 
-I temporarily added a piezometric line at elevation 8 (below ground everywhere, so no ponding), switched both materials to `u = 'piezo'`, and re-solved the file's circle with Spencer:
+Setting `u = 'piezo'` on a φ = 0 material is not just unnecessary, it is inert. I tested it: adding a piezometric line 3 ft below the ground surface and switching both materials to `u = 'piezo'`, Bishop gave
 
-| Configuration | FS |
-|:--|:--|
-| `u = 'none'` (as-built) | 1.2471 |
-| `u = 'piezo'`, table at el. 8 | 1.2472 |
-| `u = 'piezo'` + `gsat = γ + 5` | 1.2472 |
+| Case | FS (Bishop, model's circle) |
+|:---|---:|
+| `u = 'none'`, piezo line present | 1.2472 |
+| `u = 'piezo'`, same piezo line | 1.2472 |
 
-Essentially nothing — the +0.0001 is slice-discretization noise. With φ = 0 the resisting term is `c · L · R` about the circle center, which contains no normal stress, so subtracting pore pressure from N cannot change FS. The `gsat` case also came back unchanged at four decimals; I did not chase that further, so treat it as untested rather than as proof that the weight split does nothing.
+Identical to four decimals. The Mohr-Coulomb base strength is `c + (N/L - u) tan φ`; with φ = 0 the `tan φ` term is zero, so u multiplies out of the equation entirely. **I restored the model afterwards** — both materials are back to `u = 'none'` and the piezo line is empty, unchanged from what you started with.
 
-**I restored the model** — `u` is back to `'none'` on both materials and the piezo line is empty again. Nothing was left changed.
+## What adding a water table *would* change
 
-## The one case where water *would* matter
+Three separate effects, only two of which apply here:
 
-A **ponded / reservoir** water surface above the ground is a different thing entirely: it applies a hydrostatic **load** on the slope face, and that changes the driving moment even at φ = 0. In xslope that comes from the water definition with `water_loads = 'auto'` (do not also add a `dloads` row). So:
+1. **Base pore pressure — no effect.** As measured above, φ = 0 kills it. This is the whole reason total-stress undrained analyses are run without a water definition.
 
-- water table **below** ground, undrained → no effect, leave `u = 'none'`
-- water **above** ground (submerged toe, reservoir) → define it, and FS will change
+2. **Slice weight — an effect, but only if you fill in `gamma_sat`.** Both materials currently have `gamma_sat = None`, so the solver uses γ = 130 / 135 everywhere and the weights are unchanged by a water table. If you set `gamma_sat`, the slice weight is split at the water table and the driving moment changes. Note the rule: give the **total** saturated unit weight, never a buoyant one — mixing a buoyant γ with an explicit water definition double-counts buoyancy.
 
-If you plan to run a long-term/drained case as well, that is the analysis where you switch the materials to `c'`, `φ'` and `u = 'piezo'`, with a real phreatic surface. Want me to set up either the ponded case or a drained companion model?
+3. **Ponded water above the ground — a real effect.** The toe here sits at (0, 0) with flat ground running out to x = −30 at elevation 0. Any water table above elevation 0 on that side stands *on* the ground, and standing water carries a hydrostatic load. `water_loads` ships on **auto**, so xslope derives that load from the water definition itself — you add no `dloads` row (one on top of auto counts the pool twice). That load stabilizes the toe and would raise FS. This applies even in a φ = 0 total-stress run: the water load is external, not a pore pressure.
+
+So: below the ground surface, a water table does nothing to this model as configured; above it, it does, via the surface load.
+
+## If you want the long-term case instead
+
+That is a different analysis, not a different `u` setting on this one: give the materials effective-stress parameters c' and φ', set `u = 'piezo'` (or run `run_seep()` and use `u = 'seep'`), and define the water table. Then the pore pressure bites, the methods will no longer agree the way they did (the φ = 0 degeneracy in the moment equation disappears), and Spencer vs Bishop becomes a meaningful comparison.
+
+Reference: `seep/seep_slope/` for how a seepage solution becomes slice pore pressure, `lem/overview/` for where u enters the slice equations.
+
+Want me to add a reservoir at a level you name and re-run, or set up the effective-stress version alongside this one?
 ```
 
-Tokens: input 38,278 · cached_input 31,632 · output 2,925 · calls 2 · 41.9s
+Tokens: input 38,030 · cached_input 31,726 · output 3,393 · calls 2 · 48.1s
 
 ## Session total
 
-- Tokens: input 72,091 · cached_input 63,264 · output 4,380 · calls 4
-- Wall time: 70.4s
+- Tokens: input 71,849 · cached_input 47,589 · output 5,065 · calls 4
+- Wall time: 85.6s

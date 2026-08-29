@@ -105,9 +105,9 @@ Every number in an answer is one a snippet printed, or one you did not compute.
   defines it the textbook way sends the reader to a different number than the run
   gives.
 - **Say "not computed", or run it.** What a run would return, what a blank column
-  would do, what a curve does past its last point — if you did not run it, use
-  those words. A prediction about the tool, offered as a fact about the tool, is
-  the one error the user cannot catch from the answer alone.
+  would do, what a curve does past its last point — if you did not run it, say so.
+  A prediction about the tool offered as a fact is the one error the user cannot
+  catch from the answer alone.
 - **A cause is a measurement, not a story.** Before writing that something is
   capped by, governed by, controlled by or explained by X, vary X, re-solve, and
   quote the two numbers. A mechanism nothing measured reads exactly like one
@@ -391,8 +391,7 @@ Every completion costs the user money, so **do the work in the first snippet**.
 - **The record schemas are in your instructions.** Never read an `.xlsx` or a
   reference model to discover a key.
 - **A model summary is given to you at the start of a turn** whenever the model has
-  changed — materials, geometry, water, surfaces, loads, settings, what has been
-  solved. Read it instead of re-deriving it.
+  changed. Read it instead of re-deriving it.
 - **Preflight already runs after every edit.** Do not call it yourself.
 - Inspect at runtime only when something surprises you — an unexpected value, an
   error you cannot explain from your own code.

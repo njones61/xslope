@@ -2151,6 +2151,34 @@ def _nearest_material_field(key):
     return near[0] if near else None
 
 
+@rule("mat.gamma_sat_without_water", INFO, ("lem",),
+      "A saturated unit weight is set but the model has no water table, so it "
+      "never applies.", fields=("gamma_sat",))
+def _mat_gamma_sat_without_water(ctx):
+    sd = ctx.sd
+    def _present(v):
+        if v is None:
+            return False
+        try:
+            return len(v) > 0
+        except TypeError:
+            return True
+    has_water = any(_present(sd.get(k)) for k in
+                    ("piezo_line", "piezo_line2", "seep_u", "seep_u2")) or \
+        any(str(m.get("u") or "").strip().lower() in ("seep", "piezo")
+            for m in ctx.materials if isinstance(m, dict))
+    if has_water:
+        return None
+    rows = [ctx.mat_label(i) for i, m in enumerate(ctx.materials)
+            if isinstance(m, dict) and _num(m.get("gamma_sat")) is not None]
+    if not rows:
+        return None
+    yield (f"{', '.join(rows)} carr{'ies' if len(rows) == 1 else 'y'} a saturated "
+           f"unit weight, but the model has no water table (no piezometric line "
+           f"and no seepage solution), so gamma_sat never applies and gamma is "
+           f"used throughout. Add the water, or leave gamma_sat blank {_AT_MAT}.")
+
+
 @rule("mat.unknown_field", WARNING, ("lem", "fem", "seep"),
       "A material carries a field the model does not read; the value it holds "
       "is silently ignored.")

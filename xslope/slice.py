@@ -1711,11 +1711,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             water_table_y_all = np.interp(slice_centers, xs_grid, wt)
         elif piezo_line:
             water_table_y_all = np.asarray(piezo_y_all, dtype=float)
-        else:
-            warnings.warn(
-                "One or more materials specify gamma_sat, but the model has no "
-                "water table (no piezometric line or seepage solution) — the "
-                "saturated unit weight can never apply and gamma is used throughout.")
+        # gamma_sat with no water table is reported once, before the run, by
+        # preflight (mat.gamma_sat_without_water); a warning here would repeat
+        # per trial surface of a search.
 
     # Interpolation functions for distributed loads. np.interp requires the
     # sample points to be in ascending-X order; sort each load line so a load

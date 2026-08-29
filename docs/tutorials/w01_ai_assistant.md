@@ -153,8 +153,8 @@ are cut or restructured every few months, so treat the numbers as an example of
 how to compare models, not as a standing verdict on any of them — the sessions
 are easy to repeat on whatever is current.
 
-Each session is scored twice, because the two ways an answer goes wrong are
-worth counting apart. **Model and numbers** asks whether the work was done: the
+Each session is scored twice, because an answer goes wrong in two different
+ways and they are counted apart. **Model and numbers** asks whether the work was done: the
 model it built or edited is the one the request describes, and every factor of
 safety it reported is right — for the broken file, whether it found the faults
 and its repair returns the published answer. **Explanation** asks whether what
@@ -734,7 +734,7 @@ on the toe-side ground, derived from the water definition itself because
   presence moves the fifth decimal, and switching the option on moves nothing.
 - **Measure the effect it named but did not run.** Enter γsat = γ + 5 on both
   materials, leave `u = piezo` and re-solve the same circle: **1.2127** against
-  1.2472. The weight split is worth 0.034 here; only the pore pressure is inert
+  1.2472. The weight split accounts for 0.034 here; only the pore pressure is inert
   at φ = 0.
 - **Read the seven methods against the published table.**
   [LEM-3](lem03_layered_slope.md) searches each method its own critical circle

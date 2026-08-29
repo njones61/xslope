@@ -897,6 +897,192 @@ def _append_footer(path, result):
 
 
 # --------------------------------------------------------------------------- #
+# W-1 — the LEM-3 layered slope
+#
+# The tutorial's own recording. Eight conversations on the layered slope of
+# LEM-3 — a 20 ft embankment at 2:1 on a 10 ft foundation over rigid rock, both
+# soils undrained, the fill the weaker of them — plus a one-question smoke test.
+# A build from the drawing, three edits, two sweeps, a finite element run, two
+# questions that change nothing, a diagnosis of a copy with three faults written
+# into it, and a report. The page quotes these transcripts and shows these dock
+# grabs, so the session names ARE the figure names: a re-run overwrites its own
+# files and nothing else.
+#
+# LEM-3 is the model to record on because its answer is published and checkable
+# (Spencer FS = 1.244 on a circle tangent to the contact) and because every
+# limit equilibrium method agrees on it at phi = 0 — so a session that reports a
+# different number is wrong rather than merely different.
+# --------------------------------------------------------------------------- #
+#: LEM-3's completed model, on the LEM sample page as Sample Problem 3 and linked
+#: from the tutorial. Every session but the build and the diagnosis opens it.
+W1_MODEL = os.path.join(
+    REPO_ROOT, "docs/lem/files/xslope_simple_mult_layers.xlsx")
+#: The same slope with three faults written into it — the materials in the wrong
+#: order (so the section is upside down), the embankment unit weight 13 instead
+#: of 130, and the maximum depth -100 instead of -10. Built by
+#: ``tools/build_w1_lem3.py``, which asserts that undoing exactly those three
+#: gives LEM-3's 1.244 back; Spencer returns 1.004 on it.
+W1_BROKEN = os.path.join(REPO_ROOT, "docs/tutorials/files/w1_diagnose_start.xlsx")
+#: The drawing of the problem, the figure LEM-3 opens on. It carries the layer
+#: thicknesses, the 2:1 face and both soils' unit weight and cohesion, and NOT
+#: the horizontal extents — which is why the build session states those in words.
+W1_SKETCH = os.path.join(REPO_ROOT, "docs/lem/sample_images/simple_mult_layers.png")
+
+
+def w1_smoke(dry_run=False):
+    """One cheap question against a model that is already built.
+
+    The end-to-end proof for the harness: a real provider call, a real
+    ``run_python`` solve inside the live document, a dock grab and a transcript.
+    Its answer is LEM-3's published 1.244, and it changes nothing, so the session
+    writes no workbook.
+    """
+    return run_assistant_session("smoke", W1_MODEL,
+                                 ["What is the factor of safety of this model "
+                                  "with Spencer?"],
+                                 dry_run=dry_run)
+
+
+def w1_build_from_image(dry_run=False):
+    """From an empty project and a drawing, to a solved model.
+
+    The drawing gives heights, the face inclination and both soils, but no
+    horizontal extents — a section is not determined by it. The turn supplies
+    the three things it cannot: where the toe is, how far the ground runs past
+    the toe and behind the crest break, and that the base is rigid. Those make
+    the section LEM-3's, so the answer is comparable to its published 1.244.
+    """
+    return run_assistant_session(
+        "build_from_image", None,
+        [("Build this model. Unit system: US customary (ft, psf, pcf). Both "
+          "soils are undrained. Put the toe at x = 0, run the ground 30 ft past "
+          "the toe and 50 ft behind the crest break, and treat the rock as "
+          "rigid. Add starting circles and run Spencer with a search.",
+          W1_SKETCH)],
+        timeout_s=900, max_height=20000, dry_run=dry_run)
+
+
+def w1_modify(dry_run=False):
+    """Three edits to a finished model, in one conversation, each rerun.
+
+    Each turn changes a different KIND of input — the geometry, then the water
+    and the strengths' pore-pressure option together, then one strength — and
+    the third asks which circle governs, which on a layered section is the whole
+    question. The workbook is written after every turn: the end state cannot
+    show what the second of three edits did.
+    """
+    return run_assistant_session(
+        "modify", W1_MODEL,
+        ["Change the face to 3:1 and rerun the search.",
+         "Add a piezometric line at elevation 30 across the whole section so the "
+         "slope is fully submerged. Use the piezo pore-pressure option on both "
+         "soils and enter saturated unit weights of 135 pcf for the embankment "
+         "and 140 pcf for the foundation. Rerun the search.",
+         "Reduce the foundation cohesion to 250 psf and rerun the search. Which "
+         "circle governs now, and why?"],
+        timeout_s=900, max_height=20000, save_each_turn=True, dry_run=dry_run)
+
+
+def w1_sweep_builtin(dry_run=False):
+    """A sweep the kernel already has a mode for.
+
+    The foundation's cohesion is the input LEM-3 turns on: above the fill's 400
+    psf the critical surface rides the contact, below it the mechanism moves down
+    to the rock. The sweep crosses that threshold, and the session has to put the
+    model back the way it found it.
+    """
+    return run_assistant_session(
+        "sweep_builtin", W1_MODEL,
+        ["Use the sensitivity helper to sweep the foundation cohesion from 200 "
+         "to 800 psf in steps of 100 psf, Spencer with a search at each step, "
+         "and give me the factor of safety at each. Leave the model as it was."],
+        timeout_s=900, max_height=20000, dry_run=dry_run)
+
+
+def w1_sweep_adhoc(dry_run=False):
+    """A study with no mode behind it — a loop the assistant has to write.
+
+    Nothing sweeps a slope angle, so the geometry has to be rebuilt at each step:
+    the crest elevation and the toe are pinned, so it is the crest break that
+    moves, and getting that wrong is what separates a right table from a
+    plausible one.
+    """
+    return run_assistant_session(
+        "sweep_adhoc", W1_MODEL,
+        ["Compute the factor of safety for face slopes of 2:1, 2.5:1 and 3:1, "
+         "keeping the crest elevation and the toe where they are, Spencer with a "
+         "search each time. Give me a table. Leave the model as it was."],
+        timeout_s=900, max_height=20000, dry_run=dry_run)
+
+
+def w1_elastic_fem(dry_run=False):
+    """Asking for stiffnesses, then running the finite element analysis on them.
+
+    Neither soil carries E or nu — LEM never asks for them — so the finite
+    element run needs values that come from the soils' description rather than
+    from the file.
+    """
+    return run_assistant_session(
+        "elastic_fem", W1_MODEL,
+        ["Suggest elastic properties for both soils and enter them.",
+         "Run a strength reduction analysis and compare the result with "
+         "Spencer."],
+        timeout_s=1200, max_height=20000, dry_run=dry_run)
+
+
+def w1_conceptual(dry_run=False):
+    """Two questions that change nothing — what the assistant knows, not runs.
+
+    Both are LEM-3's own: why every method lands on the same number at phi = 0,
+    and what an undrained strength implies about the pore-pressure option.
+    """
+    return run_assistant_session(
+        "conceptual", W1_MODEL,
+        ["Why do all of the limit equilibrium methods give the same factor of "
+         "safety on this model?",
+         "Both soils are undrained. What should the pore-pressure option be, and "
+         "what would change in the analysis if I added a water table?"],
+        timeout_s=600, max_height=20000, save_after=False, dry_run=dry_run)
+
+
+def w1_diagnose(dry_run=False):
+    """A broken model, and no hint about where the breakage is.
+
+    Three faults, none of them stopping the model solving: it answers 1.004 on a
+    circle 24 ft below the toe. The turn names the tutorial the model came from,
+    which is the one thing a reader in this position actually has.
+    """
+    return run_assistant_session(
+        "diagnose", W1_BROKEN,
+        ["This model was built from the LEM-3 tutorial, but the factor of safety "
+         "looks wrong. Find what is wrong, fix it, and rerun."],
+        timeout_s=900, max_height=20000, dry_run=dry_run)
+
+
+def w1_report(dry_run=False):
+    """The analysis report, asked for in a sentence.
+
+    Two turns because the report documents what the session solved: the first
+    turn is the search whose result the second writes up. ``report/finalize`` is
+    pinned off for the length of the run — the finish drives Word, and an
+    unattended capture must never take over the machine's copy.
+    """
+    return run_assistant_session(
+        "report", W1_MODEL,
+        ["Run Spencer with a search.",
+         "Write the analysis report."],
+        timeout_s=900, max_height=20000, settings={"report/finalize": False},
+        dry_run=dry_run)
+
+
+for _fn in (w1_smoke, w1_build_from_image, w1_modify, w1_sweep_builtin,
+            w1_sweep_adhoc, w1_elastic_fem, w1_conceptual, w1_diagnose,
+            w1_report):
+    SESSIONS[_fn.__name__] = _fn
+del _fn
+
+
+# --------------------------------------------------------------------------- #
 # w1x — the LEM-8 reinforced-slope assistant benchmark
 #
 # Eight sessions on one model, the reinforced embankment of LEM-8: a build from
@@ -906,6 +1092,11 @@ def _append_footer(path, result):
 # answers. The set is a model benchmark, not a tutorial — the recordings, the
 # reference answers, the pass/partial/fail rubric and the scoreboard live in
 # xslope_private at ``assistant_benchmarks/lem08_reinforced_slope/``.
+#
+# Every session here names itself ``w1x`` (``prefix=``) so a benchmark re-run
+# writes beside the tutorial's recording above rather than over it: the two sets
+# share the harness, the output directories and eight session names, and only
+# the prefix keeps their files apart.
 # --------------------------------------------------------------------------- #
 W1X_SMOKE_MODEL = os.path.join(
     REPO_ROOT, "docs/tutorials/files/xslope_reinforced_slope_start.xlsx")
@@ -922,7 +1113,7 @@ def w1x_smoke(dry_run=False):
     return run_assistant_session("smoke", W1X_SMOKE_MODEL,
                                  ["What is the factor of safety of this model "
                                   "with Spencer?"],
-                                 dry_run=dry_run)
+                                 dry_run=dry_run, prefix="w1x")
 
 
 SESSIONS["w1x_smoke"] = w1x_smoke
@@ -951,7 +1142,7 @@ def w1x_build_from_image(dry_run=False):
         [("Build this model. Use the dimensions and properties on the drawing. "
           "Unit system: US customary (ft, psf, pcf). Add a starting circle and "
           "run Spencer with a search.", W1X_SKETCH)],
-        timeout_s=900, max_height=20000, dry_run=dry_run)
+        timeout_s=900, max_height=20000, dry_run=dry_run, prefix="w1x")
 
 
 def w1x_modify(dry_run=False):
@@ -962,7 +1153,8 @@ def w1x_modify(dry_run=False):
          "Add a distributed load of 500 psf on the crest from x = 60 to x = 90 "
          "and rerun.",
          "Extend all the reinforcement lines 5 ft to the right and rerun."],
-        timeout_s=900, max_height=20000, save_each_turn=True, dry_run=dry_run)
+        timeout_s=900, max_height=20000, save_each_turn=True,
+        dry_run=dry_run, prefix="w1x")
 
 
 def w1x_sweep_builtin(dry_run=False):
@@ -971,7 +1163,7 @@ def w1x_sweep_builtin(dry_run=False):
         "sweep_builtin", W1X_MODEL,
         ["Sweep the geogrid Tmax from 500 to 3000 lb/ft in 6 steps with a search "
          "at each step and plot FS against Tmax."],
-        timeout_s=900, max_height=20000, dry_run=dry_run)
+        timeout_s=900, max_height=20000, dry_run=dry_run, prefix="w1x")
 
 
 def w1x_sweep_adhoc(dry_run=False):
@@ -981,7 +1173,7 @@ def w1x_sweep_adhoc(dry_run=False):
         ["Run the analysis with 2, 3, 4, 5 and 6 geogrid layers (removing the top "
          "layers first), searching each time, and tabulate FS against the number "
          "of layers."],
-        timeout_s=900, max_height=20000, dry_run=dry_run)
+        timeout_s=900, max_height=20000, dry_run=dry_run, prefix="w1x")
 
 
 def w1x_elastic_fem(dry_run=False):
@@ -993,7 +1185,7 @@ def w1x_elastic_fem(dry_run=False):
          "choice.",
          "Enter them, build a quadratic mesh at 2 ft, and run the strength "
          "reduction analysis."],
-        timeout_s=1200, max_height=20000, dry_run=dry_run)
+        timeout_s=1200, max_height=20000, dry_run=dry_run, prefix="w1x")
 
 
 def w1x_conceptual(dry_run=False):
@@ -1003,7 +1195,8 @@ def w1x_conceptual(dry_run=False):
         ["How does a reliability analysis work in XSLOPE?",
          "How do I decide standard deviations for a reliability analysis if I "
          "only have a few tests?"],
-        timeout_s=600, max_height=20000, save_after=False, dry_run=dry_run)
+        timeout_s=600, max_height=20000, save_after=False,
+        dry_run=dry_run, prefix="w1x")
 
 
 def w1x_diagnose(dry_run=False):
@@ -1012,7 +1205,7 @@ def w1x_diagnose(dry_run=False):
         "diagnose", W1X_BROKEN,
         ["This model gives a factor of safety below 1. Can you find what is "
          "wrong?"],
-        timeout_s=900, max_height=20000, dry_run=dry_run)
+        timeout_s=900, max_height=20000, dry_run=dry_run, prefix="w1x")
 
 
 def w1x_report(dry_run=False):
@@ -1028,7 +1221,7 @@ def w1x_report(dry_run=False):
         ["Run Spencer with a search.",
          "Generate the analysis report for this model."],
         timeout_s=900, max_height=20000, settings={"report/finalize": False},
-        dry_run=dry_run)
+        dry_run=dry_run, prefix="w1x")
 
 
 for _fn in (w1x_build_from_image, w1x_modify, w1x_sweep_builtin, w1x_sweep_adhoc,

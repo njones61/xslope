@@ -138,16 +138,17 @@ Thirteen turns, 43 calls to the model, about 771,000 input tokens of which some
 Anthropic's list prices on 2026-08-27 ($5.00 per million input tokens, a cache
 read at a tenth of that, $25.00 per million output tokens).
 
-The same eight sessions were then played, unchanged, on two cheaper models, and
-scored against the answers above. A cheaper model does not spend fewer tokens —
-both spent more, taking more calls to do the same work — and the cost saving
-comes with a loss in what gets done:
+The same eight sessions were then played, unchanged, on three cheaper models,
+and scored against the answers above. A cheaper model does not necessarily
+spend fewer tokens — the two smaller Claude models spent more, taking more calls
+to do the same work — and the cost saving comes with a loss in what gets done:
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Sessions right |
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Claude Opus 5 | 43 | 770,807 (584,714) | 40,128 | $2.23 | 8 of 8 |
 | Claude Sonnet 5 | 55 | 1,124,356 (857,736) | 60,692 | $1.31 | 5 of 8 |
 | Claude Haiku 4.5 | 57 | 1,001,181 (669,536) | 25,969 | $0.53 | 2 of 8 |
+| GLM-5V-Turbo (Z.ai) | 42 | 530,695 (511,763) | 22,719 | ~$0.24 | 4 of 8 |
 
 Sonnet 5 matched Opus on both sweeps, the finite element run, the documentation
 questions and the report, to the same factors of safety and circles; it left one
@@ -157,7 +158,14 @@ section correctly but stopped to ask whether the five undimensioned layers
 should be 20 ft like the bottom one instead of building. Haiku 4.5 got the finite element run and the report right and the
 rest wrong: a mirrored section off the drawing, layers removed from the wrong
 end of the sweep, a diagnosis that named none of the faults, and edits made to
-the model that were never asked for. Prices change; the current ones are on
+the model that were never asked for. GLM-5V-Turbo, Z.ai's largest vision
+model, was exact on both sweeps, the finite element run and the report, found
+the main fault in the diagnosis, and failed both geometry tasks: off the drawing
+it missed the 2 ft cohesive band and gave the shell's c′ to the whole
+embankment (FS 2.170 against 1.628), and when asked to extend the reinforcement
+it slid the lines off the face instead. Z.ai publishes no price for that model;
+its cost here is at the rate a reseller lists for it on 2026-08-28. Prices
+change; the current ones are on
 each provider's pricing page: [Anthropic](https://www.anthropic.com/pricing),
 [OpenAI](https://openai.com/api/pricing/),
 [Moonshot AI](https://platform.moonshot.ai/docs/pricing) and

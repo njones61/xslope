@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-08-27",
+  "updated": "2026-08-29",
   "note": "Curated model recommendations for the XSLOPE Studio assistant. Published as a release asset beside latest.json and read at most once a day, so the advice can be corrected between app releases. It only MARKS and ORDERS what the dialog lists - nothing here hides a model, and any model id can still be typed into the dialog by hand. 'recommended' is what a fresh install selects; 'good_choices' sort to the top with the labels below; 'deprecated' ids stay selectable and are marked as superseded. Only models that can read an image are offered, since the assistant is regularly shown a sketch or a photograph of a cross section - so every id named here is a vision model. Ollama is deliberately absent: its list is whatever the user has pulled locally.",
   "providers": {
     "anthropic": {
@@ -33,30 +33,34 @@
       ]
     },
     "openai": {
-      "recommended": "gpt-5.1",
+      "recommended": "gpt-5.5",
       "good_choices": [
         {
-          "id": "gpt-5.1",
+          "id": "gpt-5.5",
           "label": "flagship",
           "note": "Current general-purpose flagship: tool use and vision, with server-side caching of the prompt prefix."
         },
         {
-          "id": "gpt-5-mini",
-          "label": "economical",
-          "note": "Much cheaper per turn; enough for routine edits and questions."
+          "id": "gpt-5.4",
+          "label": "previous flagship",
+          "note": "Half the price of gpt-5.5 per token; tool use and vision."
         },
         {
-          "id": "gpt-4.1",
-          "label": "widely available",
-          "note": "A stable earlier generation, useful when an account has no access to the current flagship."
+          "id": "gpt-5.4-mini",
+          "label": "economical",
+          "note": "Much cheaper per turn; enough for routine edits and questions."
         }
       ],
       "deprecated": [
+        "gpt-3.5-turbo",
+        "gpt-4",
+        "gpt-4-turbo",
+        "gpt-4.1",
         "gpt-4o",
         "gpt-4o-mini",
-        "gpt-4-turbo",
-        "gpt-4",
-        "gpt-3.5-turbo",
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-5.1",
         "o1",
         "o1-mini",
         "o3-mini"
@@ -93,22 +97,22 @@
       ]
     },
     "zai": {
-      "recommended": "glm-4.6v",
+      "recommended": "glm-5v-turbo",
       "good_choices": [
         {
-          "id": "glm-4.6v",
-          "label": "flagship vision",
-          "note": "The current GLM-V model: tool use and images both."
+          "id": "glm-5v-turbo",
+          "label": "flagship",
+          "note": "Z.ai's largest vision model; exact on sweeps, finite element runs and reports in XSLOPE's own tests."
         },
         {
-          "id": "glm-5v-turbo",
-          "label": "faster",
-          "note": "Quicker and cheaper per turn than the flagship V model."
+          "id": "glm-4.6v",
+          "label": "economical",
+          "note": "Cheaper per token; tool use and vision."
         },
         {
           "id": "glm-4.6v-flash",
-          "label": "economical",
-          "note": "The cheapest GLM-V tier; fine for short edits and questions."
+          "label": "free tier",
+          "note": "Free at Z.ai's list; the least capable of the three."
         }
       ],
       "deprecated": [

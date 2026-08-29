@@ -176,6 +176,13 @@ def parse_models(provider, payload):
         key_order = ("id",)
     if not isinstance(rows, list):
         return []
+    # OpenAI-style listings arrive oldest first (OpenAI's own runs gpt-3.5 to
+    # gpt-5.x over 80+ rows); where the rows carry a created stamp the list
+    # is turned newest first so the current models sit at the top of the combo.
+    if style != "ollama" and any(isinstance(r, dict) and isinstance(r.get("created"), (int, float))
+                                 for r in rows):
+        rows = sorted(rows, key=lambda r: (r.get("created") or 0)
+                      if isinstance(r, dict) else 0, reverse=True)
     for row in rows:
         value = None
         if isinstance(row, dict):

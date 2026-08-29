@@ -12,27 +12,27 @@ the last column are in this folder.
 Model:  Claude Opus 5 (anthropic / claude-opus-5) for every session
 Date:   2026-08-29
 
-Session                                  Turns Calls   Tokens in (cached)   Out    Wall    Transcript
+Session                                  Turns Calls    Tokens in (cached)    Out    Wall Transcript
 ---------------------------------------- ----- ----- --------------------- ------ ------- ----------------------------------
-Building a model from a drawing              1     3    52,241 ( 47,448)     2,750   47.2s w1_build_from_image_transcript.md
-Modifying the model                          3    13   245,907 (205,608)     7,160  136.8s w1_modify_transcript.md
-A sweep with the helper                      1     2    33,157 ( 31,632)     1,308   65.1s w1_sweep_builtin_transcript.md
-A sweep written ad hoc                       1     4    68,299 ( 63,264)     2,587   55.0s w1_sweep_adhoc_transcript.md
-Stiffnesses and a strength reduction run     2     6   104,870 ( 63,264)     2,182  575.7s w1_elastic_fem_transcript.md
-Two documentation questions                  2     4    71,849 ( 47,589)     5,065   85.6s w1_conceptual_transcript.md
-A broken file                                1     6   108,379 ( 94,896)     6,994  133.0s w1_diagnose_transcript.md
-Generating the report                        2     4    67,460 ( 63,264)       954   31.6s w1_report_transcript.md
+Building a model from a drawing              1     3      52,505 ( 31,702)  2,715   47.1s w1_build_from_image_transcript.md
+Modifying the model                          3    12     230,865 (190,212)  6,198  121.6s w1_modify_transcript.md
+A sweep with the helper                      1     2      33,236 ( 31,702)    860   55.6s w1_sweep_builtin_transcript.md
+A sweep written ad hoc                       1     5      87,126 ( 79,255)  2,759   54.0s w1_sweep_adhoc_transcript.md
+Stiffnesses and a strength reduction run     2     4      69,743 ( 47,553)  1,485  555.7s w1_elastic_fem_transcript.md
+Two documentation questions                  2     5      92,550 ( 79,255)  5,250   87.9s w1_conceptual_transcript.md
+A broken file                                1     9     176,923 (142,659)  8,544  173.0s w1_diagnose_transcript.md
+Generating the report                        2     4      67,664 ( 63,404)    839   30.2s w1_report_transcript.md
 ---------------------------------------- ----- ----- --------------------- ------ ------- ----------------------------------
-Total                                       13    42   752,162 (616,965)    29,000 1130.0s
+Total                                       13    44     810,612 (665,742) 28,650 1125.1s
 
 Cost at Anthropic's list prices on 2026-08-29 — $5.00 per million input tokens,
 $0.50 per million cached-read input tokens, $25.00 per million output tokens:
 
-  fresh input   135,197 tokens   $0.676
-  cached input  616,965 tokens   $0.308
-  output         29,000 tokens   $0.725
+  fresh input   144,870 tokens   $0.724
+  cached input  665,742 tokens   $0.333
+  output         28,650 tokens   $0.716
                                  ------
-  total                          $1.71
+  total                          $1.77
 
 Wall time is the whole session, including the analyses. The strength reduction
-session spent 528.1 s of its 575.7 s inside the finite element solver.
+session spent 520.8 s of its 555.7 s inside the finite element solver.

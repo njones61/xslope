@@ -2131,6 +2131,26 @@ MATERIAL_FIELDS = frozenset((
 ))
 
 
+def _nearest_material_field(key):
+    """The real field a stray key most likely meant. An abbreviation is the
+    common case (gsat for gamma_sat, sigc for sigma_c), so a field that contains
+    the key's letters in order wins, shortest first; failing that, the closest
+    spelling by edit similarity."""
+    import difflib
+    k = key.lower()
+
+    def _subseq(short, long):
+        it = iter(long.lower())
+        return all(ch in it for ch in short)
+
+    ordered = sorted((f for f in MATERIAL_FIELDS if len(f) > len(k) and _subseq(k, f)),
+                     key=len)
+    if ordered:
+        return ordered[0]
+    near = difflib.get_close_matches(key, MATERIAL_FIELDS, n=1, cutoff=0.6)
+    return near[0] if near else None
+
+
 @rule("mat.unknown_field", WARNING, ("lem", "fem", "seep"),
       "A material carries a field the model does not read; the value it holds "
       "is silently ignored.")
@@ -2146,8 +2166,8 @@ def _mat_unknown_field(ctx):
         for key in m:
             if not isinstance(key, str) or key.startswith("_") or key in MATERIAL_FIELDS:
                 continue
-            near = difflib.get_close_matches(key, MATERIAL_FIELDS, n=1, cutoff=0.5)
-            hint = f" Did you mean '{near[0]}'?" if near else ""
+            near = _nearest_material_field(key)
+            hint = f" Did you mean '{near}'?" if near else ""
             yield (f"{ctx.mat_label(i)} carries a field named '{key}'.{hint} No "
                    f"analysis reads it, so whatever it holds ({m[key]!r}) is not "
                    f"part of the model. The material fields are those of the mat "

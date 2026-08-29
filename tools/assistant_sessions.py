@@ -20,8 +20,8 @@ by accident: sessions live in their own registry, are never swept by an unnamed
 capture run, and ``--dry-run`` exercises the whole path — window, dock, grab,
 transcript, workbook — with a stub reply and no provider call at all.
 
-Run:  python3 tools/capture_tutorial_screenshots.py w1 --dry-run   # plumbing only
-      python3 tools/capture_tutorial_screenshots.py w1             # real turns
+Run:  python3 tools/capture_tutorial_screenshots.py w1x --dry-run   # plumbing only
+      python3 tools/capture_tutorial_screenshots.py w1x             # real turns
 """
 
 from __future__ import annotations
@@ -897,13 +897,21 @@ def _append_footer(path, result):
 
 
 # --------------------------------------------------------------------------- #
-# W-1 — Working with the assistant
+# w1x — the LEM-8 reinforced-slope assistant benchmark
+#
+# Eight sessions on one model, the reinforced embankment of LEM-8: a build from
+# the drawing, three edits, two sweeps, a finite element run, two documentation
+# questions, a diagnosis of a broken copy, and a report. Recorded on Claude
+# Opus 5 and replayed unchanged on five other models; scored against the Opus
+# answers. The set is a model benchmark, not a tutorial — the recordings, the
+# reference answers, the pass/partial/fail rubric and the scoreboard live in
+# xslope_private at ``assistant_benchmarks/lem08_reinforced_slope/``.
 # --------------------------------------------------------------------------- #
-W1_SMOKE_MODEL = os.path.join(REPO_ROOT,
-                              "docs/tutorials/files/xslope_reinforced_slope_start.xlsx")
+W1X_SMOKE_MODEL = os.path.join(
+    REPO_ROOT, "docs/tutorials/files/xslope_reinforced_slope_start.xlsx")
 
 
-def w1_smoke(dry_run=False):
+def w1x_smoke(dry_run=False):
     """One cheap question against a model that is already built.
 
     The end-to-end proof for everything above: a real provider call, a real
@@ -911,44 +919,45 @@ def w1_smoke(dry_run=False):
     Its prompt asks for a number the reader can check against the tutorial's own
     figures, and it changes nothing, so the session writes no workbook.
     """
-    return run_assistant_session("smoke", W1_SMOKE_MODEL,
+    return run_assistant_session("smoke", W1X_SMOKE_MODEL,
                                  ["What is the factor of safety of this model "
                                   "with Spencer?"],
                                  dry_run=dry_run)
 
 
-SESSIONS["w1_smoke"] = w1_smoke
+SESSIONS["w1x_smoke"] = w1x_smoke
 
 
-# --- the recorded conversations the tutorial is built from ------------------ #
+# --- the eight benchmark conversations -------------------------------------- #
 #: The reinforced slope of LEM-8, finished — the project every session but the
-#: first and the seventh opens.
-W1_MODEL = os.path.join(REPO_ROOT,
-                        "docs/tutorials/files/xslope_reinforced_slope.xlsx")
+#: first and the seventh opens. It stays under ``docs/tutorials/files`` because
+#: FEM-2 offers it for download and pins two test tags to it.
+W1X_MODEL = os.path.join(
+    REPO_ROOT, "docs/tutorials/files/xslope_reinforced_slope.xlsx")
 #: The same slope with three transcription errors written into it (material 2's
 #: friction angle 3 instead of 37, the crest surcharge 2400 instead of 240, and
 #: the bottom of the model at -100 instead of -10). Built by hand for the
 #: diagnosis session; Spencer returns 0.07 on it.
-W1_BROKEN = os.path.join(REPO_ROOT, "docs/tutorials/files/w1_diagnose_start.xlsx")
+W1X_BROKEN = os.path.join(REPO_ROOT, "test/fixtures/w1x/w1_diagnose_start.xlsx")
 #: The drawing of the problem, the same figure LEM-8 opens on. The build session
 #: pastes it into the dock and gives the assistant nothing else.
-W1_SKETCH = os.path.join(IMAGES_DIR, "lem08_problem_sketch.png")
+W1X_SKETCH = os.path.join(IMAGES_DIR, "lem08_problem_sketch.png")
 
 
-def w1_build_from_image(dry_run=False):
+def w1x_build_from_image(dry_run=False):
     """From an empty project and a drawing, to a solved model."""
     return run_assistant_session(
         "build_from_image", None,
         [("Build this model. Use the dimensions and properties on the drawing. "
           "Unit system: US customary (ft, psf, pcf). Add a starting circle and "
-          "run Spencer with a search.", W1_SKETCH)],
+          "run Spencer with a search.", W1X_SKETCH)],
         timeout_s=900, max_height=20000, dry_run=dry_run)
 
 
-def w1_modify(dry_run=False):
+def w1x_modify(dry_run=False):
     """Three edits to a finished model, in one conversation, each rerun."""
     return run_assistant_session(
-        "modify", W1_MODEL,
+        "modify", W1X_MODEL,
         ["Change the slope face to 2:1 and rerun the search.",
          "Add a distributed load of 500 psf on the crest from x = 60 to x = 90 "
          "and rerun.",
@@ -956,29 +965,29 @@ def w1_modify(dry_run=False):
         timeout_s=900, max_height=20000, save_each_turn=True, dry_run=dry_run)
 
 
-def w1_sweep_builtin(dry_run=False):
+def w1x_sweep_builtin(dry_run=False):
     """A sweep the kernel already has a mode for."""
     return run_assistant_session(
-        "sweep_builtin", W1_MODEL,
+        "sweep_builtin", W1X_MODEL,
         ["Sweep the geogrid Tmax from 500 to 3000 lb/ft in 6 steps with a search "
          "at each step and plot FS against Tmax."],
         timeout_s=900, max_height=20000, dry_run=dry_run)
 
 
-def w1_sweep_adhoc(dry_run=False):
+def w1x_sweep_adhoc(dry_run=False):
     """A study with no mode behind it — a loop the assistant has to write."""
     return run_assistant_session(
-        "sweep_adhoc", W1_MODEL,
+        "sweep_adhoc", W1X_MODEL,
         ["Run the analysis with 2, 3, 4, 5 and 6 geogrid layers (removing the top "
          "layers first), searching each time, and tabulate FS against the number "
          "of layers."],
         timeout_s=900, max_height=20000, dry_run=dry_run)
 
 
-def w1_elastic_fem(dry_run=False):
+def w1x_elastic_fem(dry_run=False):
     """Asking for stiffnesses, then running the finite element analysis on them."""
     return run_assistant_session(
-        "elastic_fem", W1_MODEL,
+        "elastic_fem", W1X_MODEL,
         ["Suggest values of Young's modulus and Poisson's ratio for these "
          "materials so I can run a finite element analysis, and explain your "
          "choice.",
@@ -987,26 +996,26 @@ def w1_elastic_fem(dry_run=False):
         timeout_s=1200, max_height=20000, dry_run=dry_run)
 
 
-def w1_conceptual(dry_run=False):
+def w1x_conceptual(dry_run=False):
     """Two questions that change nothing — what the assistant knows, not runs."""
     return run_assistant_session(
-        "conceptual", W1_MODEL,
+        "conceptual", W1X_MODEL,
         ["How does a reliability analysis work in XSLOPE?",
          "How do I decide standard deviations for a reliability analysis if I "
          "only have a few tests?"],
         timeout_s=600, max_height=20000, save_after=False, dry_run=dry_run)
 
 
-def w1_diagnose(dry_run=False):
+def w1x_diagnose(dry_run=False):
     """A broken model, and no hint about where the breakage is."""
     return run_assistant_session(
-        "diagnose", W1_BROKEN,
+        "diagnose", W1X_BROKEN,
         ["This model gives a factor of safety below 1. Can you find what is "
          "wrong?"],
         timeout_s=900, max_height=20000, dry_run=dry_run)
 
 
-def w1_report(dry_run=False):
+def w1x_report(dry_run=False):
     """The analysis report, asked for in a sentence.
 
     Two turns because the report documents what the session solved: the first
@@ -1015,16 +1024,16 @@ def w1_report(dry_run=False):
     unattended capture must never take over the machine's copy.
     """
     return run_assistant_session(
-        "report", W1_MODEL,
+        "report", W1X_MODEL,
         ["Run Spencer with a search.",
          "Generate the analysis report for this model."],
         timeout_s=900, max_height=20000, settings={"report/finalize": False},
         dry_run=dry_run)
 
 
-for _fn in (w1_build_from_image, w1_modify, w1_sweep_builtin, w1_sweep_adhoc,
-            w1_elastic_fem, w1_conceptual, w1_diagnose, w1_report):
-    SESSIONS["w1_" + _fn.__name__[3:]] = _fn
+for _fn in (w1x_build_from_image, w1x_modify, w1x_sweep_builtin, w1x_sweep_adhoc,
+            w1x_elastic_fem, w1x_conceptual, w1x_diagnose, w1x_report):
+    SESSIONS[_fn.__name__] = _fn
 del _fn
 
 

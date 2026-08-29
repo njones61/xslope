@@ -155,8 +155,10 @@ live dict (every list is `[]` for a fresh one) — just build the lists directly
 Do NOT call `doc.new()` or reassign `doc.slope_data`; your edits are detected and
 the canvas re-renders automatically.
 
-- materials[i]: name, gamma, option ('mc' Mohr-Coulomb | 'cp' | 'elastic' — infinite strength,
-  cannot fail; ignores every strength key below, uses only gamma/gsat/E/nu (+ seepage); LEM
+- materials[i]: name, gamma, gamma_sat (saturated unit weight, weighed below the water table
+  when set; the key is gamma_sat, never gsat), option ('mc' Mohr-Coulomb | 'cp' | 'elastic' —
+  infinite strength, cannot fail; ignores every strength key below, uses only
+  gamma/gamma_sat/E/nu (+ seepage); LEM
   treats it as impenetrable), c, phi, cp, r_elev, d, psi, t_cut (Rankine tensile-strength
   cutoff, stress units; None/blank = no cutoff (pre-v16 default), 0 = no tension; FEM only,
   LEM ignores it), phi_b, s_cap (v17 matric-suction apparent cohesion, LEM & FEM — Fredlund
@@ -892,8 +894,8 @@ def _material_line(i, m):
     bits = [f"{i}. {m.get('name') or f'material {i}'}"]
     opt = str(m.get("option") or "mc")
     bits.append(f"gamma={_num(m.get('gamma'))}")
-    if m.get("gsat"):
-        bits.append(f"gamma_sat={_num(m.get('gsat'))}")
+    if m.get("gamma_sat"):
+        bits.append(f"gamma_sat={_num(m.get('gamma_sat'))}")
     bits.append(opt)
     if opt in ("mc", "pow", "hb"):
         # c and phi always, even at zero: a blank in a summary reads as "not

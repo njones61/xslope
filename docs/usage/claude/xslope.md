@@ -483,7 +483,7 @@ slope_data['materials'] = [
         'hb_d':   0.0,           # disturbance factor, in [0, 1]
         # --- option='elastic' only (v16): infinite strength, cannot fail. FEM holds it out of
         #     plasticity entirely; LEM treats it as impenetrable (a failure surface may not
-        #     cross it). Uses gamma/gsat/E/nu + seepage columns only — every strength key above
+        #     cross it). Uses gamma/gamma_sat/E/nu + seepage columns only — every strength key above
         #     (c, phi, cp, pow_*, hb_*, d, psi, t_cut, phi_b, s_cap) is ignored (loader warns if
         #     any is set). Vendor precedent: RS2 "Plasticity: None", Slide2 "Infinite Strength",
         #     SLOPE/W "Bedrock (Impenetrable)".
@@ -546,7 +546,7 @@ Common strength setups:
 - **Effective stress with a piezometric line:** `option='mc', c=c', phi=phi', u='piezo'`.
 - **Effective stress with a seepage solution:** `option='mc', c=c', phi=phi', u='seep'`.
 - **Rigid / infinite-strength zone (bedrock, a retaining wall):** `option='elastic'` — only
-  gamma/gsat/E/nu (+ seepage columns, if the zone still conducts water) matter; every strength
+  gamma/gamma_sat/E/nu (+ seepage columns, if the zone still conducts water) matter; every strength
   key is ignored, and the LEM search treats the zone as impenetrable.
 - **Tension-limited slope:** add `t_cut=<stress value>` (or `t_cut=0` for no tension at all) to
   any mc/cp/pow/hb material; leave `t_cut=None` for the pre-v16 unbounded-tension default.

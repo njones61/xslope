@@ -227,6 +227,57 @@ def _saved_file_leg():
     return failures
 
 
+def _unset_fields_leg():
+    """Unset numeric fields (None where a number was never given -- an assistant
+    edit does this) round-trip as blank cells and slice as zero end tension;
+    and a save that fails partway leaves NO file under the model's name."""
+    import glob
+    from xslope import fileio as F
+    failures = []
+    sd = _model()
+    for r in sd['reinforcement_lines']:
+        r['tend1'] = None
+        r['tend2'] = None
+        r['E'] = None
+        r['area'] = None
+    try:
+        reloaded, _ = _round_trip(sd)
+    except Exception as e:                                    # noqa: BLE001
+        return [f"unset: the save/load raised {e.__class__.__name__}: {e}"]
+    if len(reloaded['reinforcement_lines']) != len(sd['reinforcement_lines']):
+        failures.append("unset: reinforcement rows were lost in the round trip")
+    try:
+        _reinforcement_force(sd)
+    except Exception as e:                                    # noqa: BLE001
+        failures.append(f"unset: slicing with None end tension raised "
+                        f"{e.__class__.__name__}: {e}")
+
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+    os.unlink(tmp)
+    real = F.write_cells_to_xlsx
+
+    def _boom(*a, **k):
+        raise RuntimeError("simulated failure mid-write")
+    F.write_cells_to_xlsx = _boom
+    try:
+        try:
+            F.save_slope_data_to_xlsx(sd, tmp, template=TEMPLATE)
+            failures.append("failed save: the simulated failure did not propagate")
+        except RuntimeError:
+            pass
+    finally:
+        F.write_cells_to_xlsx = real
+    if os.path.exists(tmp):
+        failures.append("failed save: a file was left under the model's name")
+        os.unlink(tmp)
+    leftovers = glob.glob(tmp + '.writing-*.xlsx')
+    if leftovers:
+        failures.append(f"failed save: temp file(s) left behind: {leftovers}")
+        for f in leftovers:
+            os.unlink(f)
+    return failures
+
+
 def run():
     warnings.simplefilter('ignore')
     if not os.path.exists(REINF_FILE):
@@ -235,6 +286,7 @@ def run():
     failures += _vocabulary_leg()
     failures += _cleared_lines_leg()
     failures += _saved_file_leg()
+    failures += _unset_fields_leg()
     return failures
 
 

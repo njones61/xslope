@@ -653,7 +653,7 @@ def build_reinforce_lines(reinforcement_lines):
         pts = _reinforce_line_points(
             r["x1"], r["y1"], r["x2"], r["y2"], r["t_max"], r["t_res"],
             r["lp1"], r["lp2"], r["E"], r["area"],
-            r.get("tend1", 0.0), r.get("tend2", 0.0),
+            r.get("tend1") or 0.0, r.get("tend2") or 0.0,
             pullout=r.get("_pullout_profile"))
         if len(pts) >= 2:
             lines.append(pts)
@@ -3138,8 +3138,28 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 f"carrying no water load at all, losing the standing water. Save into "
                 f"the current template, or set the mode to manual and enter the water "
                 f"loads on the dloads sheet.")
+    # The workbook is built in a temporary file beside the destination and moved
+    # into place only once every sheet has been written: a failure partway
+    # (a None where a number was expected, a template mismatch) must not leave a
+    # bare template copy under the model's name, which looks like a saved model
+    # and loads as an empty one.
+    _final_path = filepath
+    # (openpyxl opens files by extension, so the scratch copy keeps .xlsx)
+    filepath = f"{_final_path}.writing-{os.getpid()}.xlsx"
     shutil.copy(template, filepath)
+    try:
+        return _save_slope_data_into(slope_data, filepath, template, _final_path)
+    except BaseException:
+        try:
+            os.remove(filepath)
+        except OSError:
+            pass
+        raise
 
+
+def _save_slope_data_into(slope_data, filepath, template, _final_path):
+    """The body of :func:: fill the template copy at
+    filepath and move it to _final_path when complete."""
     def _f(v):
         return float(v)
 
@@ -3555,13 +3575,16 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                          ('x2', _f(r['x2'])), ('y2', _f(r['y2'])),
                          ('tmax', _f(r['t_max']) * sp),
                          ('lp1', _f(r['lp1'])), ('lp2', _f(r['lp2'])),
-                         ('tend1', _f(r.get('tend1', 0.0)) * sp),
-                         ('tend2', _f(r.get('tend2', 0.0)) * sp),
+                         ('tend1', _f(r.get('tend1') or 0.0) * sp),
+                         ('tend2', _f(r.get('tend2') or 0.0) * sp),
                          ('spacing', sp),
                          # unset Tres round-trips as a BLANK cell, not a literal NaN
                          ('tres', None if _isnan(r.get('t_res'))
                           else _f(r.get('t_res', 0.0)) * sp),
-                         ('e', _f(r['E'])), ('area', _f(r['area']) * sp)):
+                         # E / Area left unset (None) round-trip as blank cells
+                         ('e', None if _isnan(r.get('E')) else _f(r['E'])),
+                         ('area', None if _isnan(r.get('area'))
+                          else _f(r['area']) * sp)):
             col = _rcol.get(hdr)
             if col is not None:
                 reinf[cell_ref(row, col)] = val
@@ -3722,7 +3745,8 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
 
     updates = {k: v for k, v in updates.items() if v}
     write_cells_to_xlsx(filepath, updates)
-    return filepath
+    os.replace(filepath, _final_path)
+    return _final_path
 
 
 def save_data_to_pickle(data, filepath):

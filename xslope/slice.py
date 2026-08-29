@@ -1271,7 +1271,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             reinf_lines_data.append({
                 "geom": LineString([(r["x1"], r["y1"]), (r["x2"], r["y2"])]),
                 "envelope": (r["t_max"], r["lp1"], r["lp2"],
-                             r.get("tend1", 0.0), r.get("tend2", 0.0)),
+                             r.get("tend1") or 0.0, r.get("tend2") or 0.0),
                 "pullout": r.get("_pullout_profile"),
                 "length": length,
                 "dir": _support_choice(r, "dir", ("tangent", "axial"),

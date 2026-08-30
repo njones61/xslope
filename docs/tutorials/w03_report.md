@@ -83,7 +83,8 @@ Three groups sit on the left — Output, Analysis and Title page — and a conte
 tree on the right. Every field opens on a default that works; this report changes
 the methods and the title page, and nothing else.
 
-**Output.** **Format** offers Word (`.docx`); PDF is listed and dimmed. **Save
+**Output.** **Format** stays on Word (`.docx`), the one format reports come in
+today. **Save
 as** defaults to `<model>_report.docx` beside the model. **Template** reads
 *Shipped template*, which gives the layout we want here; the company template
 below changes it. Leave all three.

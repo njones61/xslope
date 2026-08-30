@@ -210,7 +210,8 @@ truncated ranges applied to them.
 
 ## Part 3 — A Slide2 model
 
-A Slide2 model behaves like a `.gsz`: it already knows what its geometry means, so
+Rocscience's Slide2 is the other slope stability program a geotechnical office
+is most likely to have files from. A Slide2 model behaves like a `.gsz`: it already knows what its geometry means, so
 it prompts only for the scenario to take. A `.slmd` bundles several — a base case
 plus variants — the way a GeoStudio file bundles analyses.
 

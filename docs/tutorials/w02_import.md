@@ -1,9 +1,9 @@
 ---
-title: "Tutorial W-2 — Bringing in Models from CAD and Other Programs"
+title: "Tutorial W-2 — Importing Models from CAD and Other Programs"
 description: "The three limit-equilibrium importers walked end to end in XSLOPE Studio — a layered DXF section, a GeoStudio SLOPE/W model that brings its solved circle with it, and a Slide2 scenario that arrives without a failure surface."
 ---
 
-# Tutorial W-2 — Bringing in Models from CAD and Other Programs
+# Tutorial W-2 — Importing Models from CAD and Other Programs
 
 A section that already exists somewhere else does not have to be redrawn. Studio's
 File menu carries four importers, and this tutorial walks the three that bring in

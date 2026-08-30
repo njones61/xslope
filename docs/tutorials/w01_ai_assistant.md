@@ -201,6 +201,13 @@ gives.
 
 ![Studio after the build: the solved model on the LEM · Solution tab, with the conversation in the Assistant dock on the right](images/w1_build_from_image_window.png){width=1000}
 
+The two admissibility warnings above the plot are not the assistant's doing.
+They would appear however this section was built — by hand, from the
+spreadsheet, or here — because they are the crest tension of a φ = 0 slope with
+no tension crack, normal and common for undrained slopes. LEM-3's own solution
+carries the same two, and [LEM-3](lem03_layered_slope.md#the-search-result)
+shows the tension crack that clears them without changing the critical surface.
+
 The dock itself carries the whole exchange:
 
 ![The whole build conversation in the dock: the attached drawing, the snippet that builds the model, the three generated starting circles, the clean model checks, the searched Spencer run, and the closing summary of geometry, materials and result](images/w1_build_from_image_1.png){width=560}
@@ -230,12 +237,6 @@ exchange is in
 - **Materials editor.** 130 pcf / 400 psf and 135 pcf / 800 psf, φ = 0 and
   `u = none` on both, embankment first. The order fixes the Mat IDs the profile
   lines point at, so a foundation entered first is a section built upside down.
-- **The two admissibility warnings are not the assistant's doing.** They would
-  appear however this section was built — by hand, from the spreadsheet, or
-  here — because they are the crest tension of a φ = 0 slope with no tension
-  crack, normal and common for undrained slopes. LEM-3's own solution carries
-  the same two, and [LEM-3](lem03_layered_slope.md#the-search-result) shows the
-  tension crack that clears them without changing the critical surface.
 
 ---
 

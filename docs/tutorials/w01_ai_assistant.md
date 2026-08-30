@@ -280,8 +280,8 @@ The first turn wrote to the polygons, which Studio derives from the profile line
 on this model; Studio rebuilt them and printed *"The polygon edit did not take."*,
 so the session redid the edit on the profile lines and reran: **FS = 1.546**,
 still bottoming at elevation 0. It also widened the flat ground on both sides,
-which nothing asked for — reported rather than hidden, but this 1.546 is not on
-the extents the file was built with.
+which nothing asked for — reported rather than hidden, and harmless: the same
+edit on the file's own extents searches to the same 1.546.
 
 The second turn adds the piezometric line and the saturated unit weights:
 **FS = 2.767**, with no admissibility notes this time. It added no distributed

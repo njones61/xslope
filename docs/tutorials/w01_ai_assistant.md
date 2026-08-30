@@ -178,14 +178,14 @@ checked — the same checking a model built by hand deserves.
 ## Building a model from a drawing
 
 One of the most powerful uses of the assistant is building a model straight
-from a drawing. We paste the problem
-drawing from [LEM-3](lem03_layered_slope.md) into an empty project and ask for
+from a drawing. We paste the problem drawing from the top of the
+[LEM-3 tutorial page](lem03_layered_slope.md) into an empty project and ask for
 the model it describes, naming the two zones and the extents the drawing does not
 carry.
 
-Start from **File → New**. Right-click the drawing at the top of that page,
-choose **Copy image**, click in the chat box, press Ctrl/Cmd+V to attach it, and
-type:
+Start from **File → New**. Open the LEM-3 page in your browser, right-click the
+drawing at the top of it and choose **Copy image**; back in Studio, click in the
+chat box, press Ctrl/Cmd+V to attach it, and type:
 
 <div class="prompt-block" markdown>
 ```text

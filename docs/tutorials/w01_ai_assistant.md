@@ -56,7 +56,8 @@ credentials. To supply them, click **Settings…**.
 **Provider** — the services Studio can talk to. This release offers
 **Claude (Anthropic)**, **OpenAI**, **Kimi (Moonshot AI)** and **Z.ai (GLM)**,
 which are hosted and bill for what you use, and **Ollama**, which runs a model on
-your own machine, free, and sends nothing anywhere. Where a provider's catalog
+your own machine, free, and sends nothing anywhere; the list may change from
+release to release. Where a provider's catalog
 mixes models that read images with text-only ones, only the models that read an
 image are listed, and the caption under the box says so; every Claude model on
 the list reads images already. Handing the assistant a sketch of a cross section
@@ -180,7 +181,8 @@ three, because none of them makes a model inconsistent, only wrong.
 
 ## Building a model from a drawing
 
-The assistant can build a model straight from a drawing. We paste the problem
+One of the most powerful uses of the assistant is building a model straight
+from a drawing. We paste the problem
 drawing from [LEM-3](lem03_layered_slope.md) into an empty project and ask for
 the model it describes, naming the two zones and the extents the drawing does not
 carry.

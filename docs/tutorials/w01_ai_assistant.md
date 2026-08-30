@@ -532,9 +532,12 @@ driving weight without adding strength. The transcript is
 
 ## A broken file
 
-We open a copy of the slope with three transcription errors written into it, give
-the assistant the tutorial's own inputs, and ask it to check the file against
-them. Nothing says where the faults are or how many there are.
+A model is often typed in from a report, a paper or a tutorial, and one wrong
+cell can move the answer without tripping any check. Finding it by hand means
+reading every input against the source — a job the assistant can do. We open a
+copy of the slope with three transcription errors written into it, give the
+assistant the tutorial's own inputs, and ask it to check the file against them.
+Nothing says where the faults are or how many there are.
 
 That copy, [w1_diagnose_start.xlsx](files/w1_diagnose_start.xlsx), carries three
 faults typed into LEM-3's model: the material rows **swapped**, so the strong clay

@@ -9,8 +9,8 @@ A section that already exists somewhere else does not have to be redrawn. Studio
 File menu carries four importers, and this tutorial walks the three that bring in
 a limit-equilibrium model: a **DXF** drawing from any CAD program, a **GeoStudio
 SLOPE/W** project (`.gsz`), and a **Rocscience Slide2** model (`.sli`, `.slim` or
-`.slmd`) — the fourth, **Import RS2 (.fez)…**, reads a finite element model and is
-out of scope here. A DXF carries lines and nothing about what they mean, so its
+`.slmd`) — the fourth, **Import RS2 (.fez)…**, reads a finite element model — not
+covered here, but the process is the same. A DXF carries lines and nothing about what they mean, so its
 import asks; the two program files already know their own regions, materials and
 water, so theirs ask only which analysis or scenario to take. All three end with a
 new unsaved project on the canvas and a list of what did not come across.

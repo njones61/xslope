@@ -1697,16 +1697,18 @@ def _carry_header_furniture(doc, section):
     What is copied is everything in the first header that is not a paragraph:
     the paragraph is the running head, which every section writes for itself.
     Order is kept about that paragraph — a letterhead above it stays above it.
-    The relationship behind every image is remade against the part it is copied
-    into, since an ``r:embed`` identifier means nothing outside the part it was
-    written in.
+
+    Every relationship the copied content carries is remade against the part it
+    lands in, whatever kind it is: a relationship id means nothing outside the
+    part it was written in, so a logo's image and a hyperlink on the firm's name
+    both have to be re-related, and an id that cannot be resolved at all is
+    dropped rather than left dangling — Word reports a file carrying one as
+    unreadable.
 
     A template that leaves its header to the report — the shipped one does —
     carries nothing here, and this does nothing.
     """
     from copy import deepcopy
-
-    from docx.opc.constants import RELATIONSHIP_TYPE as RT
 
     source = doc.sections[0].header
     if not [el for el in source._element if el.tag != qn("w:p")]:
@@ -1725,11 +1727,19 @@ def _carry_header_furniture(doc, section):
         for node in copied.iter():
             for attribute in (qn("r:embed"), qn("r:link"), qn("r:id")):
                 rel_id = node.get(attribute)
-                rel = source.part.rels.get(rel_id) if rel_id else None
-                if rel is None or rel.is_external or rel.reltype != RT.IMAGE:
+                if not rel_id:
                     continue
-                node.set(attribute,
-                         header.part.relate_to(rel.target_part, RT.IMAGE))
+                rel = source.part.rels.get(rel_id)
+                if rel is None:
+                    del node.attrib[attribute]
+                elif rel.is_external:
+                    node.set(attribute,
+                             header.part.relate_to(rel.target_ref, rel.reltype,
+                                                   is_external=True))
+                else:
+                    node.set(attribute,
+                             header.part.relate_to(rel.target_part,
+                                                   rel.reltype))
         if seen_paragraph or anchor is None:
             header._element.append(copied)
         else:

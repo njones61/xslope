@@ -3792,9 +3792,12 @@ def _w03_dialog():
     for item in dlg._method_items():
         if item.data(Qt.UserRole) == "bishop":
             item.setCheckState(Qt.Checked)
-    # The real default is wherever this script was run from, which is nobody's
-    # project folder.
-    dlg.path.setText("/Users/you/projects/johnson/w03_report.docx")
+    # The folder is illustrative — the real default is wherever this script was
+    # run from, which is nobody's project folder — but the FILE NAME is the
+    # dialog's own default for this model, which is what the page describes and
+    # tells the reader to leave alone.
+    dlg.path.setText("/Users/you/projects/johnson/"
+                     "xslope_johnson_res_solved_report.docx")
     dlg.title.setText(W03_META["title"])
     dlg.project_number.setText(W03_META["project_number"])
     dlg.organization.setText(W03_META["organization"])
@@ -3912,9 +3915,13 @@ def w03_page_seep():
 
 
 def w03_page_spencer():
-    """Spencer's calculations page: the converged (F, θ) and both equilibrium
-    sums evaluated to their residuals."""
-    return _report_page(W03_REPORT, "The moment equation weights",
+    """Spencer's calculations, section 4.6.4: the equations the solver evaluated
+    and the nomenclature under them.
+
+    The page picked is the one that carries the calculations and nothing else.
+    The page after it opens the finite element section a third of the way down,
+    so a shot of it is captioned for one section and shows two."""
+    return _report_page(W03_REPORT, "There is no equation for F",
                         "w03_page_spencer.png")
 
 

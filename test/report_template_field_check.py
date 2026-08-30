@@ -67,6 +67,60 @@ def _dialog(settings=None):
                         settings=settings)
 
 
+#: A one-pixel PNG, so a letterhead can carry a real image relationship without
+#: a drawing library or a committed fixture.
+ONE_PIXEL_PNG = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8"
+    "z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+
+
+def _letterhead_template(directory):
+    """The shipped template with a letterhead in the header: a logo and a firm
+    name linking to the firm's site, in a one-row table above the paragraph the
+    report writes its running head into.
+
+    Two relationship kinds in one table on purpose — an internal one to an image
+    part and an external one to a URL — because a relationship id means nothing
+    outside the part it was written in, and both have to be remade when the
+    letterhead is copied into a section's own header.
+    """
+    import base64
+
+    from docx import Document
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Inches
+
+    from xslope.report_docx import DEFAULT_TEMPLATE
+
+    logo = os.path.join(directory, "logo.png")
+    with open(logo, "wb") as fh:
+        fh.write(base64.b64decode(ONE_PIXEL_PNG))
+
+    doc = Document(DEFAULT_TEMPLATE)
+    section = doc.sections[0]
+    header = section.header
+    width = section.page_width - section.left_margin - section.right_margin
+    table = header.add_table(1, 2, width)
+    left, right = table.rows[0].cells
+    left.paragraphs[0].add_run().add_picture(logo, width=Inches(1.0))
+
+    paragraph = right.paragraphs[0]
+    run = paragraph.add_run("ACME Geotechnical")
+    link = OxmlElement("w:hyperlink")
+    link.set(qn("r:id"), header.part.relate_to("https://example.com",
+                                               RT.HYPERLINK, is_external=True))
+    paragraph._p.remove(run._r)
+    link.append(run._r)
+    paragraph._p.append(link)
+
+    header.paragraphs[0]._p.addprevious(table._tbl)
+    path = os.path.join(directory, "letterhead.docx")
+    doc.save(path)
+    return path
+
+
 def _template_without(style_name, directory):
     """A copy of the shipped template with one style deleted."""
     from docx import Document
@@ -361,11 +415,62 @@ def check_the_python_paths_refuse_too(failures):
                             "the Title style")
 
 
+def check_a_letterhead_carries_into_every_header(failures):
+    """A letterhead in the template's header reaches the header of every section
+    the report opens, with every relationship it carries remade there.
+
+    Each section gets a header part of its own — the running head's tab stop is a
+    property of the page it prints on — and a new part starts empty, so a
+    letterhead left behind would print on the front matter and nowhere else. The
+    ids are the point: an ``r:embed`` or an ``r:id`` copied verbatim names a
+    relationship the destination part does not define, and Word calls a file
+    carrying one unreadable.
+    """
+    from docx import Document
+    from docx.enum.section import WD_SECTION
+    from docx.oxml.ns import qn
+
+    from xslope.report_docx import _carry_header_furniture
+
+    with tempfile.TemporaryDirectory() as tmp:
+        doc = Document(_letterhead_template(tmp))
+        section = doc.add_section(WD_SECTION.NEW_PAGE)
+        _carry_header_furniture(doc, section)
+
+        header = section.header
+        tables = [el for el in header._element if el.tag == qn("w:tbl")]
+        if not tables:
+            failures.append("the template's letterhead table did not reach the "
+                            "header of the section the report opened")
+            return
+
+        attributes = (qn("r:embed"), qn("r:link"), qn("r:id"))
+        ids = [node.get(a) for table in tables for node in table.iter()
+               for a in attributes if node.get(a)]
+        if not ids:
+            failures.append("the copied letterhead carries no relationship id, "
+                            "so this check proves nothing about remapping")
+            return
+
+        rels = header.part.rels
+        for rel_id in ids:
+            if rel_id not in rels:
+                failures.append(f"the copied letterhead still names {rel_id}, "
+                                f"which the header part it was copied into does "
+                                f"not define")
+        kinds = {rels[i].reltype for i in ids if i in rels}
+        if len(kinds) < 2:
+            failures.append(f"only {len(kinds)} kind(s) of relationship were "
+                            f"exercised; the image and the hyperlink are both "
+                            f"meant to be carried")
+
+
 CHECKS = [check_opens_on_the_shipped_template, check_browse_and_reset,
           check_remembered, check_generate_refuses_a_bad_template,
           check_every_required_style_is_named,
           check_required_styles_are_the_renderer_s,
-          check_the_python_paths_refuse_too]
+          check_the_python_paths_refuse_too,
+          check_a_letterhead_carries_into_every_header]
 
 
 def run():

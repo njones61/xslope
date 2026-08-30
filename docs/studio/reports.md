@@ -385,21 +385,31 @@ it and to nothing after it.
 A report goes out on the firm's letterhead by being built on the firm's own
 template. Start from the one xslope ships —
 [report_template.docx](files/report_template.docx) — and edit it in Word: the
-page size and margins, the header and footer, a logo in either of them, and the
-fonts and colors of the Title, Heading, Body Text and Caption styles.
+page size and margins, the header and footer, a letterhead in either of them, and
+the fonts and colors of the Title, Heading, Body Text and Caption styles.
 Then pick it in the report dialog's **Template** field, or pass it to
 `generate_report` as the `template` option.
+[W-3](../tutorials/w03_report.md) walks the whole of it on a worked example.
 
-Two things make a template one of these reports can be built on:
+Three things make a template one of these reports can be built on:
 
 - **Keep the style names.** The report is written in *Title*, *Heading 1*,
   *Heading 2*, *Heading 3*, *Body Text* and *Caption*, and it asks the template
   for them by name. Restyle them as far as you like; renaming one is what the
   refusal on Generate is about.
 - **Leave the metadata to the fields.** The title, project number, organization
-  and author reach the document as Word document properties, so a template can
-  place them wherever it likes — a `DOCPROPERTY` field in the header, on a cover
-  page of its own — and they fill in with what the dialog was given.
+  and author reach the document as Word document properties — `Title`, `Subject`,
+  `Category` and `Author`, which are the names a `DOCPROPERTY` field asks for, not
+  the dialog's own labels. A template can place them wherever it likes, in the
+  header or on a cover page of its own, and they fill in with what the dialog was
+  given.
+- **Keep the letterhead out of the header and footer paragraphs.** The report
+  writes its running head into the first paragraph of the header and *page N of
+  M* into the first paragraph of the footer, and deletes every other paragraph in
+  both — so a logo inserted into a header paragraph does not survive the build.
+  Put it in a one-row table above that paragraph instead, which is what the
+  worked example in [W-3](../tutorials/w03_report.md) does, and it prints on
+  every page after the title page.
 
 Body content in the template is not kept: the report replaces it, and takes the
 styles, the page setup and the header and footer frames.

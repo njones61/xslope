@@ -467,8 +467,9 @@ The session saved
 
 ## Two documentation questions
 
-We ask two questions about the analysis rather than for a change to the model.
-The first question's premise is false, which makes it the more useful of the two.
+The assistant can also answer questions. Next, we ask two about the analysis
+rather than for a change to the model; the first question's premise is false,
+which makes it the more useful of the two.
 
 <div class="prompt-block" markdown>
 ```text

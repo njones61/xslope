@@ -233,16 +233,11 @@ choose `Tutorial 28 Seismic.slmd`.
 ![The Slide2 scenario picker: the master scenario and the four the tutorial builds on it](images/w02_slide2_scenarios.png){width=633}
 
 The picker opens on **Master Scenario**, so select **No Seismic** and click
-**OK**. Three notes come back: the model is metric, Slide2 was set to run
-Spencer — so we solve with Spencer too and the comparison stays like-for-like —
-and
-
-> no failure surface was imported — this scenario defines a SEARCH (grid, block,
-> path or metaheuristic), which has no xslope equivalent, and no specified circle
-> or surface to take one from. Define circles or a non-circular surface before
-> solving (an input file with no surface will not re-load).
-
-A search definition does not translate, so a starting circle has to be added. We
+**OK**. Three notes come back: the model is metric; Slide2 was set to run
+Spencer, so we solve with Spencer too and the comparison stays like-for-like;
+and no failure surface was imported — this scenario defines a search (grid,
+block, path or metaheuristic), which does not translate, rather than a single
+surface. So a starting circle has to be added before anything can solve. We
 open the circles editor and add a row: **Xo** = 40, **Yo** = 45, **Option** =
 `Intercept`, **Xi** = 30, **Yi** = 25 — the center two slope heights above the
 toe, on a circle through it, the placement

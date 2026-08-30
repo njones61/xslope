@@ -392,13 +392,12 @@ ground, and regenerates the starting circles.
 | 2.5:1 | (50, 20) | 1.396 |
 | 3:1 | (60, 20) | 1.546 |
 
-Its closing note reads the Depth column its own runs printed: *"All three
-critical circles bottom out at elevation 0.0 — tangent to the top of the
-foundation, not cutting into it."* That is the fact LEM-3 makes its own result
-out of. It then printed the profile lines, circles and ground surface back at
-their original values; a workbook was still written,
-[w1_sweep_adhoc_after.xlsx](files/w1_sweep_adhoc_after.xlsx), because the final
-resync leaves the document dirty. The transcript is
+In its summary it stated, correctly, that all three critical circles stay
+tangent to the top of the foundation and never cut into it — the same
+observation LEM-3 makes about this slope. It finished by putting the geometry
+back the way it found it, and saved a copy of the model,
+[w1_sweep_adhoc_after.xlsx](files/w1_sweep_adhoc_after.xlsx), which reopens
+identical to the original. The transcript is
 [w1_sweep_adhoc_transcript.md](files/w1_sweep_adhoc_transcript.md).
 
 ### Check its work

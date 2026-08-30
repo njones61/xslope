@@ -3735,6 +3735,206 @@ SHOTS.update({
 
 
 # --------------------------------------------------------------------------- #
+# W-3 — Generating the analysis report
+#
+# Two kinds of shot. The dialog pair is captured the way every other dialog here
+# is: the real ReportDialog on W-3's own model, in the state the step before it
+# leaves behind. The page shots are photographs of the DOCUMENTS the page links,
+# not of freshly built ones — ``tools/build_w03_report_files.py`` writes those,
+# and rendering them here is what keeps a figure and the file a reader downloads
+# the same document. They go through LibreOffice and poppler, the same route
+# ``tools/capture_report_pages.py`` takes for the Studio reference page, and each
+# page is found by text that is on it and on no page above it.
+# --------------------------------------------------------------------------- #
+W03_MODEL = os.path.join(REPO_ROOT,
+                         "docs/tutorials/files/xslope_johnson_res_solved.xlsx")
+W03_TEMPLATE = os.path.join(REPO_ROOT,
+                            "docs/tutorials/files/report_template_example.docx")
+W03_REPORT = os.path.join(REPO_ROOT, "docs/tutorials/files/w03_report.docx")
+W03_REPORT_TEMPLATED = os.path.join(
+    REPO_ROOT, "docs/tutorials/files/w03_report_example_template.docx")
+
+#: The title page as W-3 has the reader fill it in, and as the shipped reports
+#: carry it (``tools/build_w03_report_files.py``).
+W03_META = {"title": "Johnson Reservoir Dam — Steady Seepage and Stability",
+            "project_number": "2026-231",
+            "organization": "Example Engineering",
+            "author": "A. Engineer"}
+
+#: Rasterizing resolution for the page shots, in dpi — readable at the width the
+#: page embeds them without shipping a megabyte each.
+W03_PAGE_DPI = 110
+
+
+def _w03_dialog():
+    """The Generate Report dialog on W-3's model, composed as the page composes
+    it: Bishop and Spencer ticked, the title page filled in.
+
+    The seepage and finite element solutions are the model's own, read from the
+    companion files beside it — which is what Studio does when the file is opened
+    and what makes the report a document about solutions rather than a second
+    run. The limit equilibrium bundle is stated at the factor of safety COMBO-1
+    publishes rather than searched for, because what the shot is of is the
+    dialog.
+    """
+    from PySide6.QtCore import Qt
+
+    from xslope.report import solutions_from_sidecars
+    from studio.report_dialog import ReportDialog
+
+    slope_data = _load(W03_MODEL)
+    with contextlib.redirect_stdout(io.StringIO()):
+        solutions = solutions_from_sidecars(W03_MODEL, slope_data)
+    solutions["lem"] = [{"results": {"FS": 1.248, "method": "spencer"},
+                         "method": "spencer"}]
+    dlg = ReportDialog(slope_data=slope_data, solutions=solutions,
+                       model_path=W03_MODEL, default_method="spencer")
+    for item in dlg._method_items():
+        if item.data(Qt.UserRole) == "bishop":
+            item.setCheckState(Qt.Checked)
+    # The real default is wherever this script was run from, which is nobody's
+    # project folder.
+    dlg.path.setText("/Users/you/projects/johnson/w03_report.docx")
+    dlg.title.setText(W03_META["title"])
+    dlg.project_number.setText(W03_META["project_number"])
+    dlg.organization.setText(W03_META["organization"])
+    dlg.author.setText(W03_META["author"])
+    return dlg
+
+
+def w03_report_dialog():
+    """File → Generate Report… on the solved model, with both methods ticked.
+
+    The contents tree is opened to its own height for the reason
+    ``tools/capture_studio_screenshots.py`` gives: sized to the controls beside
+    it, the last engine branch falls below a scrollbar.
+    """
+    from tools.capture_studio_screenshots import _open_tree
+
+    dlg = _w03_dialog()
+    _open_tree(dlg.contents)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "w03_report_dialog.png")
+
+
+def w03_report_template():
+    """The Output group alone, with the example company template chosen.
+
+    Only that group: what the step changes is one field, and a second shot of the
+    whole dialog would photograph three controls the reader has already been
+    shown to say one thing about the fourth.
+
+    Both paths are illustrative, for the reason ``_w03_dialog`` gives about the
+    output path — and the template's more so, since the real one is wherever this
+    checkout happens to sit, elided from the left to a stub of a path.
+    """
+    from PySide6.QtWidgets import QGroupBox
+
+    dlg = _w03_dialog()
+    dlg.set_template("/Users/you/templates/report_template_example.docx")
+    dlg.path.setText("/Users/you/projects/johnson/w03_report_example_template.docx")
+    dlg.resize(dlg.sizeHint())
+    dlg.show()
+    _settle()
+    box = next(b for b in dlg.findChildren(QGroupBox) if b.title() == "Output")
+    out = os.path.join(OUT_DIR, "w03_report_template.png")
+    box.grab().save(out)
+    dlg.close()
+    print("-> w03_report_template.png")
+    return out
+
+
+def _soffice():
+    """LibreOffice, wherever it is on this machine, or None."""
+    import shutil
+
+    for name in (os.environ.get("XSLOPE_SOFFICE"), "soffice",
+                 "/Applications/LibreOffice.app/Contents/MacOS/soffice"):
+        if not name:
+            continue
+        found = name if os.path.isabs(name) and os.path.exists(name) \
+            else shutil.which(name)
+        if found:
+            return found
+    return None
+
+
+def _report_page(docx, marker, name):
+    """Rasterize the page of ``docx`` that carries ``marker``.
+
+    The page is found by its text, never by its number: a sentence added anywhere
+    above moves every page after it, and a figure captioned "the flow net"
+    showing whatever landed on page 7 is worse than no figure.
+    """
+    import glob
+    import shutil
+    import subprocess
+    import tempfile
+
+    soffice = _soffice()
+    poppler = all(shutil.which(t) for t in ("pdftoppm", "pdftotext", "pdfinfo"))
+    if soffice is None or not poppler:
+        return _skip(name, "LibreOffice/poppler", "page rendering")
+    with tempfile.TemporaryDirectory(prefix="xslope_w03_page_") as tmp:
+        subprocess.run([soffice, "--headless", "--convert-to", "pdf",
+                        "--outdir", tmp, docx],
+                       check=True, capture_output=True, timeout=600)
+        pdf = os.path.join(tmp,
+                           os.path.splitext(os.path.basename(docx))[0] + ".pdf")
+        total = int(subprocess.run(["pdfinfo", pdf], capture_output=True,
+                                   text=True).stdout.split("Pages:")[1].split()[0])
+        page = None
+        for n in range(1, total + 1):
+            text = subprocess.run(["pdftotext", "-f", str(n), "-l", str(n),
+                                   pdf, "-"], capture_output=True,
+                                  text=True).stdout
+            if marker in " ".join(text.split()):
+                page = n
+                break
+        if page is None:
+            raise RuntimeError(f"no page of {os.path.basename(docx)} carries "
+                               f"{marker!r}")
+        stem = os.path.join(tmp, "page")
+        subprocess.run(["pdftoppm", "-r", str(W03_PAGE_DPI), "-png",
+                        "-f", str(page), "-l", str(page), "-singlefile",
+                        pdf, stem], check=True)
+        out = os.path.join(OUT_DIR, name)
+        shutil.copyfile(glob.glob(stem + ".png")[0], out)
+    print("-> %s  (page %d of %s)" % (name, page, os.path.basename(docx)))
+    return out
+
+
+def w03_page_seep():
+    """The seepage results page: the flow net, the pore pressure field and the
+    velocity magnitude, under the computed flow through the section."""
+    return _report_page(W03_REPORT, "The flow through the section is",
+                        "w03_page_seep.png")
+
+
+def w03_page_spencer():
+    """Spencer's calculations page: the converged (F, θ) and both equilibrium
+    sums evaluated to their residuals."""
+    return _report_page(W03_REPORT, "The moment equation weights",
+                        "w03_page_spencer.png")
+
+
+def w03_page_template():
+    """The first body page of the report built on the example company template:
+    the letterhead in the head, the firm's line in the foot."""
+    return _report_page(W03_REPORT_TEMPLATED, "digest identifies",
+                        "w03_page_template.png")
+
+
+SHOTS.update({
+    "w03_report_dialog": w03_report_dialog,
+    "w03_report_template": w03_report_template,
+    "w03_page_seep": w03_page_seep,
+    "w03_page_spencer": w03_page_spencer,
+    "w03_page_template": w03_page_template,
+})
+
+
+# --------------------------------------------------------------------------- #
 # W-1 — Working with the assistant
 #
 # Not a dialog capture. The assistant tutorial's figures are recorded CONVERSATIONS

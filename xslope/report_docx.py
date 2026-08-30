@@ -1684,6 +1684,58 @@ def _header_paragraph(section):
     return p
 
 
+def _carry_header_furniture(doc, section):
+    """Copy whatever the template put in the first section's header — a logo, a
+    letterhead table — into ``section``'s own head.
+
+    Every section the report opens gets a header part of its own, because the
+    running head's tab stop is a property of the page it prints on and a
+    landscape section's right margin is three inches further out. A new part
+    starts empty, so a company template's letterhead would print on the front
+    matter and on no other page.
+
+    What is copied is everything in the first header that is not a paragraph:
+    the paragraph is the running head, which every section writes for itself.
+    Order is kept about that paragraph — a letterhead above it stays above it.
+    The relationship behind every image is remade against the part it is copied
+    into, since an ``r:embed`` identifier means nothing outside the part it was
+    written in.
+
+    A template that leaves its header to the report — the shipped one does —
+    carries nothing here, and this does nothing.
+    """
+    from copy import deepcopy
+
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
+
+    source = doc.sections[0].header
+    if not [el for el in source._element if el.tag != qn("w:p")]:
+        return
+    header = section.header
+    header.is_linked_to_previous = False
+    if source.part is header.part:
+        return
+    anchor = header._element.find(qn("w:p"))
+    seen_paragraph = False
+    for element in source._element:
+        if element.tag == qn("w:p"):
+            seen_paragraph = True
+            continue
+        copied = deepcopy(element)
+        for node in copied.iter():
+            for attribute in (qn("r:embed"), qn("r:link"), qn("r:id")):
+                rel_id = node.get(attribute)
+                rel = source.part.rels.get(rel_id) if rel_id else None
+                if rel is None or rel.is_external or rel.reltype != RT.IMAGE:
+                    continue
+                node.set(attribute,
+                         header.part.relate_to(rel.target_part, RT.IMAGE))
+        if seen_paragraph or anchor is None:
+            header._element.append(copied)
+        else:
+            anchor.addprevious(copied)
+
+
 def _write_header(section, title):
     """The front-matter head: the project title, as a live document-property
     field.
@@ -2029,6 +2081,7 @@ def _open_section(doc):
     _collapse_sect_break(doc)
     section.different_first_page_header_footer = False
     section.footer.is_linked_to_previous = True
+    _carry_header_furniture(doc, section)
     return section
 
 

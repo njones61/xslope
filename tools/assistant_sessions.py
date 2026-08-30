@@ -552,7 +552,7 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
                           timeout_s=600, dry_run=False, dock_width=560,
                           window_size=(1500, 950), max_height=6400,
                           save_after=None, save_each_turn=False, settings=None,
-                          prefix=None):
+                          prefix=None, window_grab=False):
     """Record one assistant conversation against a real model, offscreen.
 
     Environment overrides, for playing the same sessions against another model
@@ -731,6 +731,30 @@ def run_assistant_session(name, model_path, turns, *, provider="anthropic",
                     print("  ! %s" % record["error"])
                     break
 
+            if window_grab:
+                # The whole window -- the canvas with the built model and the
+                # chat dock beside it -- at the window's own size, so the reader
+                # sees where the model appears while the conversation runs.
+                win.resize(*window_size)
+                # The reader's view: the solved model on the canvas, the harness
+                # chatter out of the log.
+                sol = getattr(win, "solution_canvas", None)
+                if sol is not None and win.view_tabs.indexOf(sol) >= 0:
+                    win.view_tabs.setCurrentWidget(sol)
+                    QApplication.processEvents()
+                    inner = getattr(sol, "canvas", sol)   # SolutionView wraps it
+                    if hasattr(inner, "render_now"):
+                        inner.render_now()    # the canvas renders lazily offscreen
+                for _ in range(20):
+                    QApplication.processEvents()
+                    time.sleep(0.05)
+                win.log.clear()
+                QApplication.processEvents()
+                wpath = os.path.join(out_dir, "%s_window.png" % stem)
+                wpix = win.grab()
+                wpix.save(wpath)
+                print("   -> %s  (%dx%d)" % (os.path.basename(wpath), wpix.width(), wpix.height()))
+                result["window_image"] = wpath
             totals = _assistant_usage(assistant, "session") or {}
             changed = bool(win.doc.is_open and win.doc.dirty)
             if save_after if save_after is not None else changed:
@@ -959,7 +983,7 @@ def w1_build_from_image(dry_run=False):
           "ground 30 ft past the toe and 50 ft behind the crest break. Add "
           "starting circles and run Spencer with a search.",
           W1_SKETCH)],
-        timeout_s=900, max_height=20000, dry_run=dry_run)
+        timeout_s=900, max_height=20000, dry_run=dry_run, window_grab=True)
 
 
 def w1_modify(dry_run=False):

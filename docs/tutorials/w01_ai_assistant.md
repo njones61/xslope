@@ -110,7 +110,7 @@ The eight conversations below cost this much between them, measured as they ran:
 
 | Session | Turns | Model calls | Tokens in (cached) | Tokens out | Wall |
 | --- | :---: | :---: | :---: | :---: | :---: |
-| Building a model from a drawing | 1 | 3 | 52,505 (31,702) | 2,715 | 47 s |
+| Building a model from a drawing | 1 | 3 | 52,172 (47,553) | 2,211 | 43 s |
 | Modifying the model | 3 | 12 | 230,865 (190,212) | 6,198 | 122 s |
 | A sweep with the helper | 1 | 2 | 33,236 (31,702) | 860 | 56 s |
 | A sweep written ad hoc | 1 | 5 | 87,126 (79,255) | 2,759 | 54 s |
@@ -118,9 +118,9 @@ The eight conversations below cost this much between them, measured as they ran:
 | Two documentation questions | 2 | 5 | 92,550 (79,255) | 5,250 | 88 s |
 | A broken file | 1 | 9 | 176,923 (142,659) | 8,544 | 173 s |
 | Generating the report | 2 | 4 | 67,664 (63,404) | 839 | 30 s |
-| **Total** | **13** | **44** | **810,612 (665,742)** | **28,650** | **1,125 s** |
+| **Total** | **13** | **44** | **810,279 (681,593)** | **28,146** | **1,120 s** |
 
-That comes to **\$1.77** at Anthropic's list prices on 2026-08-29 (\$5.00 per
+That comes to **\$1.69** at Anthropic's list prices on 2026-08-29 (\$5.00 per
 million input tokens, a cache read at a tenth of that, \$25.00 per million output
 tokens). Price and wall time do not track each other: the strength reduction run
 takes half the total time for under a tenth of the cost, because 521 of its 556
@@ -140,7 +140,7 @@ about the mechanism or the finding is right.
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5 | 44 | 810,612 (665,742) | 28,650 | \$1.77 | 8 of 8 | 7 of 8 |
+| Claude Opus 5 | 44 | 810,279 (681,593) | 28,146 | \$1.69 | 8 of 8 | 7 of 8 |
 | Claude Sonnet 5 | 45 | 935,563 (684,517) | 28,060 | \$0.92 | 7 of 8 | 7 of 8 |
 | OpenAI gpt-5.5 | 29 | 364,339 (325,120) | 17,437 | \$0.88 | 7 of 8 | 6 of 8 |
 | Kimi K3 (Moonshot AI) | 37 | 449,769 (343,143) | 44,953 | \$1.10 | 7 of 8 | 4 of 8 |
@@ -193,6 +193,16 @@ Build this model: a 20 ft embankment on a 10 ft foundation layer over rigid rock
 ```
 </div>
 
+While the conversation runs, the model takes shape in the main window: the
+section appears on the canvas as the snippet builds it, the **Inputs** tree
+on the left fills in, and when the search finishes the **LEM · Solution** tab
+shows the critical surface — the same view a run from the **Run LEM** dialog
+gives.
+
+![Studio after the build: the solved model on the LEM · Solution tab, with the conversation in the Assistant dock on the right](images/w1_build_from_image_window.png){width=1000}
+
+The dock itself carries the whole exchange:
+
 ![The whole build conversation in the dock: the attached drawing, the snippet that builds the model, the three generated starting circles, the clean model checks, the searched Spencer run, and the closing summary of geometry, materials and result](images/w1_build_from_image_1.png){width=560}
 
 One snippet builds the whole model. It took the layer thicknesses, the 2:1 face
@@ -200,9 +210,10 @@ and both soils off the drawing — embankment 130 pcf and 400 psf, foundation
 135 pcf and 800 psf, φ = 0 and pore pressure `none` on both — and the toe, the
 extents and the rigid rock out of the request. It generated three starting
 circles, one through the toe and one at the base of each layer, and ran the
-search: **FS = 1.244**, on a surface bottoming at elevation 0. It passed on both
-admissibility notes and read that surface off the Depth its own run printed:
-*"Depth = 0.0, i.e. tangent to the top of the foundation."*
+search: **FS = 1.244**, on a surface bottoming at elevation 0. It reported the
+two admissibility notes and read that surface off the Depth its own run printed:
+*"its lowest point is Depth = 0.0, i.e. tangent to the embankment/foundation
+contact."*
 
 The session saved
 [w1_build_from_image_after.xlsx](files/w1_build_from_image_after.xlsx); the
@@ -219,8 +230,6 @@ exchange is in
 - **Materials editor.** 130 pcf / 400 psf and 135 pcf / 800 psf, φ = 0 and
   `u = none` on both, embankment first. The order fixes the Mat IDs the profile
   lines point at, so a foundation entered first is a section built upside down.
-- **Both materials carry E = 0 and ν = 0.** Harmless here, and the strength
-  reduction section below has to fill them in.
 
 ---
 
@@ -674,7 +683,7 @@ the checks above re-run the measurements rather than read the conclusions.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about \$1.77.
+  13 turns of work for about \$1.69.
 - Building a layered model from a drawing and editing it three ways — face, water
   and strength — with every factor of safety reproducing from the saved workbook.
 - Two sweeps, a strength reduction run, two questions answered without touching

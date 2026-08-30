@@ -114,13 +114,13 @@ The eight conversations below cost this much between them, measured as they ran:
 | Modifying the model | 3 | 12 | 230,865 (190,212) | 6,198 | 122 s |
 | A sweep with the helper | 1 | 3 | 58,106 (31,702) | 1,699 | 73 s |
 | A sweep written ad hoc | 1 | 5 | 87,126 (79,255) | 2,759 | 54 s |
-| Stiffnesses and a strength reduction run | 2 | 4 | 69,743 (47,553) | 1,485 | 556 s |
+| Stiffnesses and a strength reduction run | 2 | 5 | 87,553 (63,404) | 1,613 | 571 s |
 | Two documentation questions | 2 | 5 | 92,550 (79,255) | 5,250 | 88 s |
 | A broken file | 1 | 9 | 176,923 (142,659) | 8,544 | 173 s |
 | Generating the report | 2 | 4 | 67,664 (63,404) | 839 | 30 s |
-| **Total** | **13** | **45** | **835,149 (681,593)** | **28,985** | **1,138 s** |
+| **Total** | **13** | **46** | **852,959 (697,444)** | **29,113** | **1,154 s** |
 
-That comes to **\$1.83** at Anthropic's list prices on 2026-08-29 (\$5.00 per
+That comes to **\$1.85** at Anthropic's list prices on 2026-08-29 (\$5.00 per
 million input tokens, a cache read at a tenth of that, \$25.00 per million output
 tokens). Price and wall time do not track each other: the strength reduction run
 takes half the total time for under a tenth of the cost, because 521 of its 556
@@ -140,7 +140,7 @@ about the mechanism or the finding is right.
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5 | 45 | 835,149 (681,593) | 28,985 | \$1.83 | 8 of 8 | 7 of 8 |
+| Claude Opus 5 | 46 | 852,959 (697,444) | 29,113 | \$1.85 | 8 of 8 | 7 of 8 |
 | Claude Sonnet 5 | 45 | 935,563 (684,517) | 28,060 | \$0.92 | 7 of 8 | 7 of 8 |
 | OpenAI gpt-5.5 | 29 | 364,339 (325,120) | 17,437 | \$0.88 | 7 of 8 | 6 of 8 |
 | Kimi K3 (Moonshot AI) | 37 | 449,769 (343,143) | 44,953 | \$1.10 | 7 of 8 | 4 of 8 |
@@ -148,8 +148,7 @@ about the mechanism or the finding is right.
 
 All five build the model correctly and get the 1.244 that LEM-3 publishes for
 this slope; they part ways on the harder requests, and Opus 5 is the only one
-that gets every number right. Where the others went wrong is summarized under
-[What it will not do](#what-it-will-not-do), after the eight requests. Z.ai
+that gets every number right. Z.ai
 publishes no price for GLM-5V-Turbo; its cost here is at the rate a reseller
 lists for it.
 
@@ -432,21 +431,22 @@ Then, once they are in:
 
 <div class="prompt-block" markdown>
 ```text
-Run a strength reduction analysis and compare the result with Spencer.
+Run a strength reduction analysis and compare it with the limit equilibrium result.
 ```
 </div>
 
 ![Both turns in the dock: the classifier's two suggestions written onto the materials, then the Spencer search, the mesh, the seven bisection steps with their two inconclusive trials, and the comparison table](images/w1_elastic_fem_2.png){width=560}
 
-`suggest_elastic()` classifies each material from its strength — the embankment
-as **Soft Clay** at E = 167,100 psf with ν = 0.45, the foundation as **Medium
-Clay** at E = 668,300 psf with ν = 0.40 — and the assistant wrote both onto the
-materials, calling them what the tool calls them: *"a last-resort fallback, since
-the problem states no stiffnesses."* The second turn ran the Spencer's-method search at
-**FS = 1.244**, built the mesh, and bisected to a strength reduction factor of
-safety of **1.254**, about 0.8% higher. It reported that the bracket did not
-close: the last two trials hit the iteration ceiling and count as inconclusive,
-so 1.254 is the midpoint of an interval whose upper edge is undecided.
+A built-in estimator classifies each soil from its strength and suggests
+values — the embankment as **Soft Clay** at E = 167,100 psf with ν = 0.45, the
+foundation as **Medium Clay** at E = 668,300 psf with ν = 0.40 — and the
+assistant entered both, calling them last-resort suggestions since the model
+states no stiffnesses. The second turn ran the Spencer's-method search at
+**FS = 1.244**, built the mesh, and ran the strength reduction to **1.254**,
+about 0.8% higher — on a φ = 0 section the two mechanisms develop in
+essentially the same place. The two trials just past failure stopped at the
+solver's iteration limit, so 1.254 sits in a narrow interval rather than on a
+single converged value.
 
 The session saved
 [w1_elastic_fem_after.xlsx](files/w1_elastic_fem_after.xlsx); the exchange is in
@@ -456,8 +456,9 @@ The session saved
 
 - **Materials editor.** The classifier's two values, entered unedited, with the
   strengths untouched.
-- **Read 1.254 as a bracket, not a number.** Its upper edge is undecided, so the
-  answer sits somewhere in the interval rather than on the midpoint.
+- **Read 1.254 as a narrow interval.** The two trials just past failure stopped
+  at the iteration limit; the interval is 0.008 wide, so the answer is pinned
+  to about ±0.3%.
 - **The mesh came from defaults.** The summary calls it "built from the model's
   declared settings", but this model declares neither an element type nor a mesh
   size. Rebuilding at another size is how to find out what the answer owes to
@@ -643,35 +644,6 @@ dialog's options are walked through. The session saved
 
 ---
 
-## What it will not do
-
-**It does not convert units.** A model is in one unit system throughout, and
-nothing in XSLOPE converts one into another. Convert a drawing in meters and
-kilonewtons yourself before handing it to a project in feet.
-
-**An edit can go to a copy the model rebuilds.** A section described by profile
-lines carries polygons derived from them, and writing to those polygons is undone
-the moment Studio resyncs. The reply now opens with a line saying the edit was
-discarded and the model checks carry it as an error, so the assistant cannot
-report the model ready over it; re-running the number after an edit is still
-the check that settles it.
-
-**It can name the wrong feature beside a right number.** The diagnosis above
-closed on a circle that "bottoms at the top of the rock" while printing
-`Depth = 0.0` in the same sentence. Nothing reads as a guess, no model check has
-anything to say about it, and reading the elevation the run printed against the
-elevations the model declares is what finds it.
-
-**Other models miss more.** On the same eight requests, every model built the
-slope correctly, and the broken file separated them: Sonnet 5 and Kimi K3
-found all three faults but their repair went to the rebuilt copy described
-above, and gpt-5.5 and GLM-5V-Turbo did not see that the two materials had
-been swapped, so all four finished that request with a wrong factor of safety.
-GLM also read "2:1" as two vertical to one horizontal in the face-slope sweep,
-and Kimi wrote several sentences that its own tables contradicted.
-
----
-
 ## A harder problem
 
 As the slope and the prompts get more complicated, the opportunity for error
@@ -705,7 +677,7 @@ the checks above re-run the measurements rather than read the conclusions.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about \$1.83.
+  13 turns of work for about \$1.85.
 - Building a layered model from a drawing and editing it three ways — face, water
   and strength — with every factor of safety reproducing from the saved workbook.
 - Two sweeps, a strength reduction run, two questions answered without touching

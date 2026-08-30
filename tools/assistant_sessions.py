@@ -1049,8 +1049,8 @@ def w1_elastic_fem(dry_run=False):
     return run_assistant_session(
         "elastic_fem", W1_MODEL,
         ["Suggest elastic properties for both soils and enter them.",
-         "Run a strength reduction analysis and compare the result with "
-         "Spencer."],
+         "Run a strength reduction analysis and compare it with the limit "
+         "equilibrium result."],
         timeout_s=1200, max_height=20000, dry_run=dry_run)
 
 

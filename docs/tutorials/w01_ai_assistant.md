@@ -595,7 +595,7 @@ The transcript is [w1_diagnose_transcript.md](files/w1_diagnose_transcript.md).
 
 ---
 
-## Generating the report
+## Generating a report
 
 Every analysis ends in a document someone else reads, and Studio writes that
 document itself — the same report **File → Generate Report…** produces, which

@@ -334,8 +334,8 @@ Sweep the foundation cohesion from 200 to 800 psf in steps of 100 psf, Spencer w
 ![The sweep in the dock: one code block calling a preloaded sweep helper, the seven searched steps, and the table of results](images/w1_sweep_builtin_1.png)
 
 Nothing in the request names a tool, and the assistant reached for one on its
-own: `design_sweep`, one of the sweep helpers preloaded in its kernel, the
-counterpart of Studio's **Parametric…** dialog. It ran the seven searches,
+own — a sweep helper preloaded in its kernel, the counterpart of Studio's
+**Parametric…** dialog. It ran the seven searches,
 printed the critical circle and its depth at every step, and put the cohesion
 back — `foundation c now = 800.0`.
 

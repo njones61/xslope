@@ -10,9 +10,9 @@ File menu carries four importers, and this tutorial walks the three that bring i
 a limit-equilibrium model: a **DXF** drawing from any CAD program, a **GeoStudio
 SLOPE/W** project (`.gsz`), and a **Rocscience Slide2** model (`.sli`, `.slim` or
 `.slmd`) — the fourth, **Import RS2 (.fez)…**, reads a finite element model — not
-covered here, but the process is the same. A DXF carries lines and nothing about what they mean, so its
-import asks; the two program files already know their own regions, materials and
-water, so theirs ask only which analysis or scenario to take. All three end with a
+covered here, but the process is the same. A DXF is just lines, so Studio asks what each layer means. A
+GeoStudio or Slide2 file already defines its regions, materials and water, so
+the only question is which analysis or scenario to import. All three end with a
 new unsaved project on the canvas and a list of what did not come across.
 
 <div class="tut-glance" markdown>

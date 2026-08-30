@@ -89,7 +89,8 @@ as** defaults to `<model>_report.docx` beside the model. **Template** reads
 *Shipped template*, which gives the layout we want here; the company template
 below changes it. Leave all three.
 
-**Analysis.** **Methods** lists every method XSLOPE offers, ticked on the one the
+**Limit equilibrium analysis.** **Methods** lists every limit equilibrium
+method XSLOPE offers, ticked on the one the
 results view is showing — Spencer, which we just ran. Tick **Bishop's Simplified
 Method** as well. A method that has not been run is run by the report, exactly as
 ticking it in the Run dialog would have run it: its own search for its own
@@ -109,12 +110,11 @@ document every analysis this model carries.
 
 The dialog is composed. Click **Generate**.
 
-The progress bar counts the figures by name, and the window stays live —
-generating runs off the GUI thread, and **Cancel** stops the build at the next
-figure. A labeled stretch at the end builds the contents page's page numbers:
-Word does it where the machine has Word, LibreOffice where it does not, and where
-neither is available the report is complete but its contents page lists the
-headings unnumbered.
+Generating takes a minute or two. The progress bar names each figure as it is
+drawn, and **Cancel** stops the build. When the figures are done, Studio fills
+in the contents page's page numbers — through Word where the machine has it,
+LibreOffice otherwise. With neither installed, the report is still complete;
+its contents page just lists the headings without numbers.
 
 ---
 
@@ -226,7 +226,8 @@ page numbers, nothing else changed. Download it and open the dialog again with
 Under **Output**, click **Browse…** on the **Template** row and choose
 `report_template_example.docx`; the field replaces *Shipped template* with the
 path. Change **Save as** to `w03_report_example_template.docx` so the first report
-survives. Under **Analysis**, untick **Bishop's Simplified Method**, leaving
+survives. Under **Limit equilibrium analysis**, untick **Bishop's Simplified
+Method**, leaving
 Spencer's finished search as the only stability run, and under **Title page** set
 **Organization** to `ACME Geotechnical`. Click **Generate**.
 

@@ -448,7 +448,7 @@ class ReportDialog(QDialog):
         layout.addWidget(out_box)
 
         # --- what is reported ------------------------------------------------
-        run_box = QGroupBox("Analysis")
+        run_box = QGroupBox("Limit equilibrium analysis")
         run_form = QFormLayout(run_box)
         self.methods = QListWidget()
         self.methods.setToolTip(

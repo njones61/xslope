@@ -322,7 +322,7 @@ in [w1_modify_transcript.md](files/w1_modify_transcript.md).
 
 ## A sweep with the helper
 
-We ask for the foundation's cohesion swept from 200 to 800 psf with a search at
+Next, we ask for the foundation's cohesion swept from 200 to 800 psf with a search at
 every step. `sensitivity()` is a sweep helper preloaded in the assistant's
 kernel, the counterpart of Studio's **Parametric…** dialog, so the request tests
 whether the assistant reaches for the machinery already there.

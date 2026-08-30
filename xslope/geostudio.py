@@ -35,9 +35,14 @@ one thing the caller must choose is which analysis to import, because a single
 .gsz commonly holds several (and they can differ in materials as well as in
 slip-surface definition — see ``gsz_to_slope_data``).
 
-Only what SLOPE/W and xslope have in common is imported. Everything else is
-reported as a caveat rather than silently dropped: unsupported strength models,
-unsupported pore-pressure options, reinforcement, and distributed loads.
+Only what SLOPE/W and xslope have in common is imported -- regions, materials
+(Mohr-Coulomb and undrained; bedrock as ``elastic``), the piezometric surface,
+water above ground, a solved SEEP/W field, surcharges and line loads,
+reinforcement, the tension crack, the seismic coefficient and the solved
+critical circle. Everything else is reported as a caveat rather than silently
+dropped: unsupported strength models, unsupported pore-pressure options
+(ru and spatial functions), SLOPE/W's search definition, reinforcement sets,
+inclined tension cracks and the vertical seismic coefficient.
 """
 
 import csv

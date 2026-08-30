@@ -71,7 +71,8 @@ Six layers carry the section:
 This drawing uses the layer names XSLOPE itself writes, so the wizard fills
 the whole mapping in. Any other drawing works the same way: the wizard lists
 its layers, suggests **material zone** for a layer that draws closed shapes and
-**ignore** otherwise, and each suggestion can be changed by hand.
+**ignore** otherwise, and each suggestion can be changed with the **Import as**
+selector shown below.
 
 With the drawing downloaded, we start the import from the File menu. Click
 **File → Import DXF…** and choose `w02_section.dxf`.

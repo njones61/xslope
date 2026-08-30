@@ -116,6 +116,10 @@ headings unnumbered.
 ## What the document carries
 
 The report runs to 28 pages and 24 figures:
+
+(The linked copies below carry their figures at reduced resolution to keep the
+download small; a report you generate yourself carries them at full
+resolution.)
 [w03_report.docx](files/w03_report.docx). Its sections follow the analyses, with
 seepage ahead of the one stability section that consumes its answer. Both methods
 sit inside that section, §4.5 Bishop's Simplified Method and §4.6 Spencer's

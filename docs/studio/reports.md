@@ -465,7 +465,7 @@ the dialog does not offer:
 
 `generate_report` reads one option of its own, `template`: the Word template to
 build the document on, in place of the one shipped with xslope — the same choice
-the dialog's Template field makes (see [A company template](#a-company-template)).
+the dialog's Template field makes (see [A company template](#a-company-template)). A second, `dpi`, sets the figure resolution (default 300).
 A template that does not declare the styles the report is written in is refused
 before anything is built, and the message names the style it lacks.
 

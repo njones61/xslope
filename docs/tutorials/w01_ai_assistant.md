@@ -623,10 +623,11 @@ The first turn returns **FS = 1.244** — [LEM-3](lem03_layered_slope.md)'s
 published answer, on its published circle — and reads the lowest point as sitting
 well above the rigid base, so the floor is not controlling the answer. The
 second
-turn makes one call to `generate_report` and answers in a sentence. The document
-carries six figures and three tables across *1 Traceability*, *2 Project
-Definition* and *3 Limit Equilibrium Analysis*, the last split into the inputs,
-the materials, the loads and Spencer's Method. The session saved
+turn generates the document and answers in a sentence. The report carries six
+figures and three tables across its Traceability, Project Definition and Limit
+Equilibrium Analysis sections — a short version of the full report
+[W-3](w03_report.md) builds, where the model carries all three engines and the
+dialog's options are walked through. The session saved
 [w1_report_after.docx](files/w1_report_after.docx); the transcript is
 [w1_report_transcript.md](files/w1_report_transcript.md).
 

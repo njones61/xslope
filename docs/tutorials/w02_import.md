@@ -92,7 +92,9 @@ and **Material** applies to the two targets that use it:
 | Reinforcement | a reinforcement line, at zero capacity |
 | Failure circles | starting circles for the search |
 
-Two layers sharing a material name merge. Every row here is already right, so the
+Piles and line loads have no target here: their rows are mostly structural
+properties a drawing does not carry, so they are entered in their editors after
+the import. Two layers sharing a material name merge. Every row here is already right, so the
 only edit is cosmetic: the **Material** column defaults to the layer name, and
 these are uppercase because that is how `export_dxf` writes them. Type
 `embankment`, `silty clay` and `dense sand` into the three material rows, then

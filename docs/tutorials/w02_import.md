@@ -196,19 +196,15 @@ already publishes from a hand-built input file.
 
 ### What does not come across
 
-Material zones, strengths, water conditions, surcharge and line loads,
-reinforcement and a surface-defined tension crack all import. A SEEP/W analysis
-is not imported on its own; when the SLOPE/W analysis picked reads its pore
-pressures from a solved SEEP/W analysis in the same file, that solved field
-comes across attached as the model's seepage solution. The SEEP/W model itself
-— its boundary conditions and conductivity functions — does not convert. SLOPE/W's search
-definition does not, so a file saved without a solved surface arrives with no
-failure surface at all; nor do reinforcement sets, an inclined tension crack, or a
-vertical seismic coefficient. Strength and pore-pressure options XSLOPE does not
-carry come in as whatever fits, named in the notes — and where that would make the
-answer wrong, as with SLOPE/W's `Ru` pore pressures, the note says so. A
-probabilistic analysis brings its standard deviations but not the correlations or
-truncated ranges applied to them.
+Zones, strengths, water, loads, reinforcement and the tension crack all
+import, and if the picked analysis reads its pore pressures from a solved
+SEEP/W analysis in the same file, that solved field comes along as the model's
+seepage solution (the SEEP/W model itself does not convert). What stays behind:
+SLOPE/W's search definition — a file saved without a solved surface arrives
+with no failure surface — reinforcement sets, an inclined tension crack, and
+the vertical seismic coefficient. Anything XSLOPE does not carry comes in as
+the nearest fit and is named in the notes, which also say when that would
+change the answer.
 
 ---
 

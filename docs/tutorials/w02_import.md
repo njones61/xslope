@@ -45,9 +45,15 @@ written up under [DXF Import/Export](../usage/dxf.md) and
 
 ## Part 1 — A CAD drawing
 
+A slope usually exists as a CAD drawing long before it exists as an analysis
+model: the project's plans and cross sections are drawn in AutoCAD, Civil 3D,
+MicroStation or a similar program, and every one of them exports DXF, the
+common exchange format for CAD line work. Importing that drawing is faster than
+re-entering the geometry point by point, so we start there.
+
 [w02_section.dxf](files/w02_section.dxf) holds a highway embankment in feet: 30 ft
 of fill on a 2:1 face over 15 ft of silty clay on dense sand, a water table a few
-feet down, and a 600 psf crest surcharge. A DXF says where the lines are and
+feet down, and a 600 psf crest surcharge. A DXF file says where the lines are and
 which layer each sits on, and nothing about unit weights, strengths or load
 pressures.
 

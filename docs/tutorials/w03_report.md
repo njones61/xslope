@@ -234,8 +234,8 @@ Spencer's finished search as the only stability run, and under **Title page** se
 ![The first body page of the report built on the example template: the firm's name in the head, the firm's line in the foot](images/w03_page_template.png){width=620}
 
 The letterhead prints on every page after the title page, with the report's own
-running head under it. **Template** is remembered between sessions, so the next
-report on any model opens on the same letterhead. The 22-page result downloads as
+running head under it. A firm that wants its mark on the title page too can add it to the template's title-page layout; the example leaves the title page as shipped. **Template** is remembered between sessions, so the next
+report on any model opens on the same letterhead. The 21-page result downloads as
 [w03_report_example_template.docx](files/w03_report_example_template.docx).
 
 ### Check its work

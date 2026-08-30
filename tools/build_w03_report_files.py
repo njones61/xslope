@@ -31,8 +31,8 @@ anything is written — 1.248, from the ``<!-- test: -->`` tag on
 must carry this model's answers.
 
 The example template is built rather than committed as a hand-edit so the
-letterhead can be rebuilt when the shipped template changes: the logo is drawn
-here, the header and footer are added with python-docx, and the result has to
+letterhead can be rebuilt when the shipped template changes: the header and
+footer are added with python-docx, and the result has to
 pass :func:`xslope.report_docx.template_problem` or nothing is written. The
 letterhead goes in a header TABLE and a footer TABLE, which is what survives the
 build — the report writes its own running head and its own page numbers into the
@@ -95,35 +95,10 @@ def _quiet(fn, *a, **k):
         return fn(*a, **k)
 
 
-def draw_logo(path):
-    """A placeholder mark for the letterhead: a rounded rectangle with the firm's
-    name in it. Drawn rather than committed, because what it stands for is *a
-    logo*, and a real one belongs to whoever owns it."""
-    from PIL import Image, ImageDraw, ImageFont
-
-    width, height, inset = 1200, 300, 4
-    img = Image.new("RGBA", (width, height), (255, 255, 255, 0))
-    pen = ImageDraw.Draw(img)
-    pen.rounded_rectangle([inset, inset, width - inset, height - inset],
-                          radius=48, fill=(232, 238, 244, 255),
-                          outline=(31, 73, 125, 255), width=6)
-    font = None
-    for candidate in ("/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-                      "/Library/Fonts/Arial Bold.ttf",
-                      "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
-        if os.path.exists(candidate):
-            font = ImageFont.truetype(candidate, 84)
-            break
-    pen.text((width / 2, height / 2), FIRM, font=font,
-             fill=(31, 73, 125, 255), anchor="mm")
-    img.save(path)
-    return path
-
-
-def build_template(logo, path=EXAMPLE_TEMPLATE):
+def build_template(path=EXAMPLE_TEMPLATE):
     """The shipped template with a letterhead on it, and nothing else changed.
 
-    The logo and the firm's name go in a one-row table in the header, and the
+    The firm's name goes in a one-row table in the header, and the
     firm's line in a one-row table in the footer. The report clears the FIRST
     paragraph of each and writes the running head and *page N of M* into it, so
     anything a template wants to keep has to sit outside that paragraph. Each
@@ -140,12 +115,8 @@ def build_template(logo, path=EXAMPLE_TEMPLATE):
     section = doc.sections[0]
     text_width = section.page_width - section.left_margin - section.right_margin
 
-    table = section.header.add_table(1, 2, text_width)
-    table.autofit = False
-    left, right = table.rows[0].cells
-    left.width, right.width = Inches(2.6), Inches(3.9)
-    left.paragraphs[0].add_run().add_picture(logo, width=Inches(1.9))
-    p = right.paragraphs[0]
+    table = section.header.add_table(1, 1, text_width)
+    p = table.rows[0].cells[0].paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     run = p.add_run(f"{FIRM}, Inc.")
     run.font.size = Pt(9)
@@ -242,8 +213,7 @@ def main():
     from xslope.report import solutions_from_sidecars
 
     t0 = time.time()
-    with tempfile.TemporaryDirectory(prefix="xslope_w03_logo_") as tmp:
-        build_template(draw_logo(os.path.join(tmp, "logo.png")))
+    build_template()
     print(f"Wrote {os.path.relpath(EXAMPLE_TEMPLATE, REPO_ROOT)}")
 
     slope_data = _quiet(load_slope_data, MODEL)

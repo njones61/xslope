@@ -68,8 +68,9 @@ Six layers carry the section:
 | `DLOADS` | the strip the surcharge acts over |
 | `PIEZO` | the water table, an open polyline |
 
-Those are XSLOPE's own reserved names, which the wizard recognizes; a drawing
-from outside CAD gets the same table, and every row can be overridden.
+This drawing uses layer names XSLOPE recognizes, so the wizard fills the
+mapping in by itself. A drawing with any other layer names gets the same table
+with every row set to **ignore**, and each one is assigned by hand.
 
 With the drawing downloaded, we start the import from the File menu. Click
 **File → Import DXF…** and choose `w02_section.dxf`.

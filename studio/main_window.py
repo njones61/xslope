@@ -1151,9 +1151,9 @@ class MainWindow(QMainWindow):
         A .gsz needs no mapping wizard — its geometry, materials and water conditions
         are already identified — so the only prompt is which analysis to import, since
         a file usually holds several and they can differ in materials. Whatever xslope
-        cannot represent (reinforcement, loads, SLOPE/W's search definition) comes back
-        as caveats and is shown, not dropped quietly. Left unsaved so the user reviews
-        it and Saves As."""
+        cannot represent (SLOPE/W's search definition, reinforcement sets, unsupported
+        strength or pore-pressure options) comes back as notes and is shown, not
+        dropped quietly. Left unsaved so the user reviews it and Saves As."""
         if not self._confirm_discard():
             return
         start = os.path.dirname(self._recent[0]) if self._recent else ""

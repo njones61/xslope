@@ -3018,8 +3018,8 @@ class GszImportDialog(QDialog):
             "• Material zones, strengths and water conditions import automatically.\n"
             "• Analyses can use different materials over the same geometry, so the "
             "choice matters.\n"
-            "• Reinforcement, loads and SLOPE/W's search are not imported — you will "
-            "get a list of what was left out."))
+            "• SLOPE/W's search definition and reinforcement sets are not imported — "
+            "you will get a list of what was left out."))
 
         self.table = QTableWidget(len(analyses), 3, self)
         self.table.setHorizontalHeaderLabels(["Analysis", "Type", "Method"])

@@ -12,7 +12,7 @@ question out of the built-in documentation, and write the analysis report — al
 in the open project, on the same undo stack the editors use.
 
 We set the assistant up first, then work through eight sample conversations on
-one slope.
+one slope — the two-layer embankment of [LEM-3](lem03_layered_slope.md).
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -145,7 +145,7 @@ about the mechanism or the finding is right.
 | Kimi K3 (Moonshot AI) | 37 | 449,769 (343,143) | 44,953 | \$1.10 | 7 of 8 | 4 of 8 |
 | GLM-5V-Turbo (Z.ai) | 40 | 563,429 (459,660) | 13,480 | ~\$0.29 | 6 of 8 | 4 of 8 |
 
-All five reproduce LEM-3's published 1.244; the differences are everywhere else.
+All five reproduce the 1.244 that LEM-3 publishes for this slope; the differences are everywhere else.
 Opus 5 is the only one right on every number, and its one miss is the diagnosis
 sentence quoted below. Sonnet 5 and Kimi K3 both named all three faults in the
 broken file and then applied the fix to the polygons Studio derives from the

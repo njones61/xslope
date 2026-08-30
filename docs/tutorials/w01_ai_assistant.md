@@ -415,11 +415,11 @@ identical to the original. The transcript is
 
 ## Stiffnesses and a strength reduction run
 
-In our next prompt, we ask what elastic properties these two soils should carry, have the assistant
-enter them, and then run the strength reduction analysis beside Spencer. Limit
-equilibrium needs no stiffnesses and the finite element engine will not start
-without them, so this is the gap every model crossing between the two has to
-close.
+For many problems, we may need assistance in selecting elastic properties:
+limit equilibrium needs no stiffnesses, the finite element engine will not
+start without them, and measured values are rarely on hand. In our next prompt,
+we ask what these two soils should carry, have the assistant enter them, and
+then run the strength reduction analysis beside Spencer.
 
 <div class="prompt-block" markdown>
 ```text

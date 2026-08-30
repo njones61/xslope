@@ -827,6 +827,16 @@ def test_lem04_materials():
                           os.path.join(_MODELS, "xslope_method_slices_problem.xlsx"))
 
 
+def test_w02_materials():
+    """W-2's three soils — the only taught materials table whose model came in
+    through an importer rather than being typed. A DXF carries no properties at
+    all, so this block is the whole of what the reader supplies, and the page is
+    the only place the three rows exist."""
+    return _materials_leg("W-2 materials", "w02_import.md",
+                          os.path.join(_REPO, "docs", "tutorials", "files",
+                                       "w02_section_imported.xlsx"))
+
+
 def test_lem05_materials():
     return _materials_leg("LEM-5 materials", "lem05_weak_layer_noncircular.md",
                           os.path.join(_MODELS, "xslope_noncircular.xlsx"))
@@ -1288,6 +1298,7 @@ CHECKS = [
     ("LEM-3 materials", test_lem03_materials),
     ("LEM-4 materials", test_lem04_materials),
     ("LEM-5 materials", test_lem05_materials),
+    ("W-2 materials", test_w02_materials),
     ("LEM-6 materials", test_lem06_materials),
     ("LEM-7 power -> Mohr-Coulomb", test_lem07_power_to_mohr_coulomb),
     ("LEM-7 c/p -> constant", test_lem07_profile_to_constant),

@@ -1,18 +1,19 @@
 ---
 title: "Tutorial W-2 — Bringing in Models from CAD and Other Programs"
-description: "The three LEM importers walked end to end in XSLOPE Studio — a layered DXF section, a GeoStudio SLOPE/W model that brings its solved circle with it, and a Slide2 scenario that arrives without a failure surface."
+description: "The three limit-equilibrium importers walked end to end in XSLOPE Studio — a layered DXF section, a GeoStudio SLOPE/W model that brings its solved circle with it, and a Slide2 scenario that arrives without a failure surface."
 ---
 
 # Tutorial W-2 — Bringing in Models from CAD and Other Programs
 
-A section that already exists somewhere else does not have to be redrawn. XSLOPE
-Studio reads three outside formats: a **DXF** drawing from any CAD program, a
-**GeoStudio SLOPE/W** project (`.gsz`), and a **Rocscience Slide2** model
-(`.sli`, `.slim` or `.slmd`). A DXF carries lines and nothing about what they
-mean, so its import asks; the two program files already know their own regions,
-materials and water, so theirs ask only which analysis or scenario to take. All
-three end with a new unsaved project on the canvas and a list of what did not come
-across.
+A section that already exists somewhere else does not have to be redrawn. Studio's
+File menu carries four importers, and this tutorial walks the three that bring in
+a limit-equilibrium model: a **DXF** drawing from any CAD program, a **GeoStudio
+SLOPE/W** project (`.gsz`), and a **Rocscience Slide2** model (`.sli`, `.slim` or
+`.slmd`) — the fourth, **Import RS2 (.fez)…**, reads a finite element model and is
+out of scope here. A DXF carries lines and nothing about what they mean, so its
+import asks; the two program files already know their own regions, materials and
+water, so theirs ask only which analysis or scenario to take. All three end with a
+new unsaved project on the canvas and a list of what did not come across.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -45,8 +46,8 @@ written up under [DXF Import/Export](../usage/dxf.md) and
 ## Part 1 — A CAD drawing
 
 [w02_section.dxf](files/w02_section.dxf) holds a highway embankment in feet: 30 ft
-of fill on 2:1 side slopes over 15 ft of silty clay on dense sand, a water table a
-few feet down, and a 600 psf crest surcharge. A DXF says where the lines are and
+of fill on a 2:1 face over 15 ft of silty clay on dense sand, a water table a few
+feet down, and a 600 psf crest surcharge. A DXF says where the lines are and
 which layer each sits on, and nothing about unit weights, strengths or load
 pressures.
 
@@ -57,9 +58,9 @@ Six layers carry the section:
 | `EMBANKMENT` | the fill zone, a closed outline |
 | `SILTY_CLAY` | the upper foundation zone |
 | `DENSE_SAND` | the lower foundation zone |
-| `PIEZO` | the water table, an open polyline |
-| `DLOADS` | the strip the surcharge acts over |
 | `SEARCH_CIRCLES` | two starting circles, each an arc plus a center point |
+| `DLOADS` | the strip the surcharge acts over |
+| `PIEZO` | the water table, an open polyline |
 
 Those are XSLOPE's own reserved names, which the wizard recognizes; a drawing
 from outside CAD gets the same table, and every row can be overridden.
@@ -67,7 +68,7 @@ from outside CAD gets the same table, and every row can be overridden.
 With the drawing downloaded, we start the import from the File menu. Click
 **File → Import DXF…** and choose `w02_section.dxf`.
 
-![The DXF import wizard on w02_section.dxf: six layers, each with its contents, its suggested target and its material name](images/w02_dxf_wizard.png){width=690}
+![The DXF import wizard on w02_section.dxf: six layers, each with its contents, its suggested target and its material name](images/w02_dxf_wizard.png){width=688}
 
 **Layer** and **Contents** come from the file; **Import as** carries the choice,
 and **Material** applies to the two targets that use it:
@@ -83,31 +84,35 @@ and **Material** applies to the two targets that use it:
 | Failure circles | starting circles for the search |
 
 Two layers sharing a material name merge. Every row here is already right, so the
-only edit is cosmetic: the **Material** column defaults to the uppercase layer
-name. Type `embankment`, `silty clay` and `dense sand` into the three material
-rows, then click **OK**.
+only edit is cosmetic: the **Material** column defaults to the layer name, and
+these are uppercase because that is how `export_dxf` writes them. Type
+`embankment`, `silty clay` and `dense sand` into the three material rows, then
+click **OK**.
 
 ![Studio after the DXF import, with the properties filled in: three material zones, the piezometric line, the surcharge and two starting circles](images/w02_dxf_window.png){width=1000}
 
 The Inputs tree counts what arrived — 3 materials, 3 polygons, 2 circles, the
-piezometric line's 3 points and 1 distributed load — and one note comes back: load
-magnitudes import as zero. So two things still have to be typed. We open the
-materials editor and fill in the three rows:
+piezometric line's 3 points and 1 distributed load — and one note comes back:
+*distributed-load magnitudes and reinforcement strengths imported as 0 — set them
+in the editors*. There is no reinforcement here, so two things still have to be
+typed. We open the materials editor and fill in the three rows. Unit weights are
+pcf, cohesions psf and φ′ degrees; the columns none of the three soils use stay
+blank:
 
-| name | γ (pcf) | option | c (psf) | φ (deg) | u |
-| --- | :---: | --- | :---: | :---: | --- |
-| `embankment` | 125 | `mc` | 250 | 28 | `piezo` |
-| `silty clay` | 118 | `mc` | 700 | 0 | `piezo` |
-| `dense sand` | 132 | `mc` | 0 | 36 | `piezo` |
+| name | γ | γsat | option | c | φ | c/p | r-elev | d | psi | t_cut | E | nu | u |
+| --- | :---: | :---: | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | --- |
+| `embankment` | 125 |  | `mc` | 250 | 28 |  |  |  |  |  |  |  | `piezo` |
+| `silty clay` | 118 |  | `mc` | 700 | 0 |  |  |  |  |  |  |  | `piezo` |
+| `dense sand` | 132 |  | `mc` | 0 | 36 |  |  |  |  |  |  |  | `piezo` |
 
 Then we open the distributed loads editor and set the surcharge to 600 psf at both
 of its points. That model ships as
 [w02_section_imported.xlsx](files/w02_section_imported.xlsx).
 
 With the properties in, the model is complete. Click **Run LEM**, choose
-**Spencer** and **Auto search**, leave the slice count at 40, and click **OK**.
-The search returns **FS = 1.185** on a circle tangent to the top of the dense sand
-— through the foundation clay rather than the fill.
+**Spencer** and **Auto search**, leave **Number of slices** at 40, and click
+**OK**. The search returns **FS = 1.185** on a circle tangent to the top of the
+dense sand — through the foundation clay rather than the fill.
 
 <!-- test: file=files/w02_section_imported.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.185, tolerance=0.005, benchmark=W-2-dxf -->
 
@@ -115,7 +120,8 @@ The search returns **FS = 1.185** on a circle tangent to the top of the dense sa
 
 - **The geometry closed** — three zones, no gap and no overlap. A ring that
   failed to close arrives as a missing zone.
-- **The water table sits below the ground surface everywhere.**
+- **The water table sits below the ground surface everywhere** — −4 ft at the left
+  edge, +2 ft under the crest, against ground at 0 and 30.
 - **The surcharge reads 600 psf, not 0.** A load left at zero changes nothing and
   looks like it worked.
 
@@ -140,15 +146,15 @@ redistributed here.
 The import runs from the same menu. Click
 **File → Import GeoStudio (SLOPE/W)…** and choose the `.gsz`.
 
-![The GeoStudio analysis picker: the file's two Spencer analyses, with their type and method](images/w02_gsz_analyses.png){width=640}
+![The GeoStudio analysis picker: the file's two Spencer analyses, with their type and method](images/w02_gsz_analyses.png){width=677}
 
 Take the first, **Spencer**, and click **OK**. (A file holding one analysis skips
 this step.)
 
-![The notes reported by the GeoStudio import: four of them, on the imported circle, the reservoir, the tension crack and the unit system](images/w02_gsz_notes.png){width=740}
+![The notes reported by the GeoStudio import: four of them, on the imported circle, the reservoir, the tension crack and the unit system](images/w02_gsz_notes.png){width=708}
 
-Four notes, each answered by the problem itself. The failure surface came from
-one of SLOPE/W's own trial circles rather than a search, and the note gives
+Four notes come back. The failure surface came from one of SLOPE/W's own trial
+circles rather than a search, and the note gives
 SLOPE/W's factor of safety on it, 1.934 by Spencer. Water stands above the ground
 surface, so XSLOPE derives the reservoir from the piezometric line — adding a load
 block by hand would count it twice. The tension crack imported at depth 5.00, the
@@ -176,14 +182,15 @@ already publishes from a hand-built input file.
 
 ### What does not come across
 
-Material zones, strengths, water conditions, surcharge and line loads, tension
-cracks and reinforcement all import. SLOPE/W's search definition does not, so a
-file saved without a solved surface arrives with no failure surface at all.
-Strength and pore-pressure options XSLOPE does not carry come in as whatever fits,
-named in the notes — and where that would make the answer wrong, as with SLOPE/W's
-`Ru` pore pressures, the note says so. A probabilistic analysis brings its
-standard deviations but not the correlations or truncated ranges applied to
-them.
+Material zones, strengths, water conditions, surcharge and line loads,
+reinforcement and a surface-defined tension crack all import. SLOPE/W's search
+definition does not, so a file saved without a solved surface arrives with no
+failure surface at all; nor do reinforcement sets, an inclined tension crack, or a
+vertical seismic coefficient. Strength and pore-pressure options XSLOPE does not
+carry come in as whatever fits, named in the notes — and where that would make the
+answer wrong, as with SLOPE/W's `Ru` pore pressures, the note says so. A
+probabilistic analysis brings its standard deviations but not the correlations or
+truncated ranges applied to them.
 
 ---
 
@@ -208,15 +215,17 @@ horizontal base.
 With the zip unpacked, we start the import. Click **File → Import Slide2…** and
 choose `Tutorial 28 Seismic.slmd`.
 
-![The Slide2 scenario picker: the master scenario and the four the tutorial builds on it](images/w02_slide2_scenarios.png){width=640}
+![The Slide2 scenario picker: the master scenario and the four the tutorial builds on it](images/w02_slide2_scenarios.png){width=633}
 
-Take **No Seismic** and click **OK**. Three notes come back: the model is metric,
-Slide2 was set to run Spencer — so we solve with Spencer too and the comparison
-stays like-for-like — and
+The picker opens on **Master Scenario**, so select **No Seismic** and click
+**OK**. Three notes come back: the model is metric, Slide2 was set to run
+Spencer — so we solve with Spencer too and the comparison stays like-for-like —
+and
 
 > no failure surface was imported — this scenario defines a SEARCH (grid, block,
 > path or metaheuristic), which has no xslope equivalent, and no specified circle
-> or surface to take one from.
+> or surface to take one from. Define circles or a non-circular surface before
+> solving (an input file with no surface will not re-load).
 
 A search definition does not translate, so a starting circle has to be added. We
 open the circles editor and add a row: **Xo** = 40, **Yo** = 45, **Option** =
@@ -227,7 +236,8 @@ toe, on a circle through it, the placement
 ![Studio after the Slide2 import, with the starting circle added: three soil layers over a horizontal base](images/w02_slide2_window.png){width=1000}
 
 The model now has everything a search needs. Click **Run LEM**, choose
-**Spencer** and **Auto search**, leave the slice count at 40, and click **OK**.
+**Spencer** and **Auto search**, leave **Number of slices** at 40, and click
+**OK**.
 The search returns **FS = 1.372** against Slide2's published 1.360, a difference
 of 0.9% that
 [problem 104 of the Slide2 verification page](../verification/rocscience.md#vp104)
@@ -255,8 +265,8 @@ This tutorial covered:
   surface: 1.939 against 1.934.
 - A Slide2 scenario arriving with no failure surface, because Slide2 stores a
   search: 1.372 against 1.360 once a circle is added.
-- The notes every import reports, which name what would otherwise make an imported
-  answer quietly wrong.
+- The notes every import reports, which name what the import could not carry and
+  what to set before solving.
 
 **Where to go next:** [DXF Import/Export](../usage/dxf.md) and
 [GeoStudio Import/Export](../usage/geostudio.md) carry the full mapping tables and

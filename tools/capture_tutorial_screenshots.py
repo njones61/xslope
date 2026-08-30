@@ -15,10 +15,17 @@ material in it, the Run LEM dialog before the circles exist and after.
 Full main-window captures are the owner's and are not attempted here; the tutorial
 carries a generated placeholder for each (see ``tools/make_tutorial_figures.py``).
 
-Run:  python3 tools/capture_tutorial_screenshots.py           # every shot
-      python3 tools/capture_tutorial_screenshots.py lem01     # by name
+Run:  python3 tools/capture_tutorial_screenshots.py lem01     # by name (substring)
+      python3 tools/capture_tutorial_screenshots.py --all     # every shot
       python3 tools/capture_tutorial_screenshots.py w1        # a recorded session
       python3 tools/capture_tutorial_screenshots.py w1 --dry-run   # no API call
+
+**A bare run writes nothing.** Every shot is regenerated from live Qt, so a sweep
+rewrites every committed PNG whether or not it changed -- which is a diff nobody
+asked for on top of whichever figure was meant. With no shot name on the command
+line the script prints its usage and the shot list and exits; ``--all`` is the
+explicit way to sweep. ``--dry-run`` gates the W-1 provider calls only, so it is
+no protection here.
 
 The W-1 entries are not dialog captures but recorded assistant conversations, each
 of which makes a real (billed) provider call; they run only when named, never in an
@@ -3489,9 +3496,15 @@ def _find_vendor(name):
     return None
 
 
+#: Shots that ran but wrote nothing, so the closing count can report writes rather
+#: than attempts.
+SKIPPED = []
+
+
 def _skip(shot, path, source):
     print("skipped %s — %s not in the vendor archive (%s)"
           % (shot, os.path.basename(path), source))
+    SKIPPED.append(shot)
     return None
 
 
@@ -3567,9 +3580,26 @@ def w02_dxf_wizard():
 
 
 def w02_dxf_window():
-    """The imported section on the canvas, with the properties filled in — the
-    state Part 1 ends in, on the workbook the page ships."""
-    return _main_window(W02_XLSX, "w02_dxf_window.png")
+    """The imported section on the canvas, with the properties filled in.
+
+    Driven through the import rather than by opening the shipped workbook: the two
+    look almost alike, but the status bar does not — an imported project is
+    untitled and unsaved, which is the state Part 1 describes, and a shot that read
+    "Loaded w02_section_imported.xlsx" would photograph the step after the one its
+    caption names. The mapping and the property values come from the page's own
+    builder, so the figure cannot drift from the workbook the page ships.
+    """
+    from xslope.cad import read_dxf_layers
+    from tools.build_w02_import_dxf import default_mapping, fill_properties
+
+    layers, _warnings = read_dxf_layers(W02_DXF)
+
+    def build(win):
+        win.doc.build_from_dxf_mapping(layers, default_mapping(layers))
+        fill_properties(win.doc.slope_data)
+        win._populate_inputs_tree()
+
+    return _main_window(build, "w02_dxf_window.png")
 
 
 def _gsz_import(analysis_name="Spencer"):
@@ -3719,7 +3749,16 @@ from tools.assistant_sessions import SESSIONS  # noqa: E402
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     dry_run = "--dry-run" in argv
+    sweep = "--all" in argv
     argv = [a for a in argv if not a.startswith("-")]
+    # A bare run used to sweep, which rewrote every committed PNG from live Qt and
+    # buried the one figure being worked on. Naming nothing now asks for the list.
+    if not argv and not sweep:
+        print(__doc__.split("Run:")[0].strip())
+        print("\nName a shot (substring match), or --all to sweep.\n")
+        print("shots:    %s" % ", ".join(sorted(SHOTS)))
+        print("sessions: %s" % ", ".join(sorted(SESSIONS)))
+        return 1
     os.makedirs(OUT_DIR, exist_ok=True)
     names = [n for n in SHOTS if not argv or any(a in n for a in argv)]
     # Recorded assistant sessions cost real money against the key in the keychain,
@@ -3735,7 +3774,10 @@ def main(argv=None):
             SHOTS[name]()
         for name in sessions:
             SESSIONS[name](dry_run=dry_run)
-    print("\nwrote %d screenshot(s) to docs/tutorials/images/" % len(names))
+    print("\nwrote %d screenshot(s) to docs/tutorials/images/"
+          % (len(names) - len(SKIPPED)))
+    if SKIPPED:
+        print("skipped %d (vendor file not in the archive)" % len(SKIPPED))
     if sessions:
         print("recorded %d assistant session(s)%s"
               % (len(sessions), " (dry run)" if dry_run else ""))

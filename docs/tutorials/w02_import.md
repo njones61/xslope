@@ -140,7 +140,10 @@ dense sand — through the foundation clay rather than the fill.
 
 ## Part 2 — A GeoStudio SLOPE/W model
 
-A `.gsz` needs no mapping wizard: its regions already know which material they
+SLOPE/W, part of Seequent's GeoStudio suite, is one of the most widely used
+slope stability programs, and years of work live in its `.gsz` files — models
+that a review, a re-analysis or a migration may need to open. A `.gsz` needs
+no mapping wizard: its regions already know which material they
 are, and a file saved after solving carries SLOPE/W's own answer on every trial
 surface. Only one question is left — which analysis to import, since a GeoStudio
 file routinely holds several over one geometry.

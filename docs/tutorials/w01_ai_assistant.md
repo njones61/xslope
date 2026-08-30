@@ -419,7 +419,8 @@ For many problems, we may need assistance in selecting elastic properties:
 limit equilibrium needs no stiffnesses, the finite element engine will not
 start without them, and measured values are rarely on hand. In our next prompt,
 we ask what these two soils should carry, have the assistant enter them, and
-then run the strength reduction analysis beside Spencer.
+then run the strength reduction analysis beside a limit equilibrium analysis
+with Spencer's method.
 
 <div class="prompt-block" markdown>
 ```text
@@ -441,7 +442,7 @@ Run a strength reduction analysis and compare the result with Spencer.
 as **Soft Clay** at E = 167,100 psf with ν = 0.45, the foundation as **Medium
 Clay** at E = 668,300 psf with ν = 0.40 — and the assistant wrote both onto the
 materials, calling them what the tool calls them: *"a last-resort fallback, since
-the problem states no stiffnesses."* The second turn ran Spencer at
+the problem states no stiffnesses."* The second turn ran the Spencer's-method search at
 **FS = 1.244**, built the mesh, and bisected to a strength reduction factor of
 safety of **1.254**, about 0.8% higher. It reported that the bracket did not
 close: the last two trials hit the iteration ceiling and count as inconclusive,
@@ -538,7 +539,8 @@ That copy, [w1_diagnose_start.xlsx](files/w1_diagnose_start.xlsx), carries three
 faults typed into LEM-3's model: the material rows **swapped**, so the strong clay
 sits in the fill and the weak clay in the foundation; the embankment's unit weight
 **13 pcf** instead of 130; and the maximum depth **−100** instead of −10, putting a
-rigid base 100 ft below a 20 ft section. Spencer returns 1.004 on it.
+rigid base 100 ft below a 20 ft section. A Spencer's-method search returns
+1.004 on it.
 
 <div class="prompt-block" markdown>
 ```text

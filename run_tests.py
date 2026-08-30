@@ -12766,6 +12766,7 @@ def _expected_and_tol(test, default_tolerance):
                        'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'sweep_table',
+                       'rapid_stage1_frames',
                        'water_hoist', 'piezo_visibility',
                        'project_package', 'docs_links',
                        'noncircular_generator', 'circles_editor', 'table_paste',

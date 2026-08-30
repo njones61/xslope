@@ -579,7 +579,9 @@ Its closing summary then puts that circle in the wrong place:
 The `Depth = 0.0` in that same sentence is the lowest point, and the rock sits at
 −10: the circle bottoms at the embankment/foundation contact, 10 ft above the
 rock. Every number is right and the feature named beside them is not, which is
-the shape most wrong explanations here take.
+the shape most wrong explanations here take — and this one sentence is the
+single miss behind Opus 5's 7 of 8 in the comparison table's Explanation
+column.
 
 <!-- test: file=files/w1_diagnose_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.004, tolerance=0.005 -->
 <!-- test: file=files/w1_diagnose_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.244, tolerance=0.005 -->

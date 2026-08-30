@@ -147,9 +147,10 @@ about the mechanism or the finding is right.
 
 All five build the model correctly and get the 1.244 that LEM-3 publishes for
 this slope; they part ways on the harder requests, and Opus 5 is the only one
-that gets every number right. Where the others went wrong is noted in the
-sections it happened in. Z.ai publishes no price for GLM-5V-Turbo; its cost
-here is at the rate a reseller lists for it.
+that gets every number right. Where the others went wrong is summarized under
+[What it will not do](#what-it-will-not-do), after the eight requests. Z.ai
+publishes no price for GLM-5V-Turbo; its cost here is at the rate a reseller
+lists for it.
 
 Prices change; the current ones are on each provider's pricing page:
 [Anthropic](https://www.anthropic.com/pricing),
@@ -621,16 +622,24 @@ kilonewtons yourself before handing it to a project in feet.
 
 **An edit can go to a copy the model rebuilds.** A section described by profile
 lines carries polygons derived from them, and writing to those polygons is undone
-the moment Studio resyncs: the kernel prints *"The polygon edit did not take"*.
-The trap is that a snippet printing its own work reads the values back before the
-rebuild, so the printout shows an edit the model does not carry. Re-running the
-number after an edit is what catches it.
+the moment Studio resyncs. The reply now opens with a line saying the edit was
+discarded and the model checks carry it as an error, so the assistant cannot
+report the model ready over it; re-running the number after an edit is still
+the check that settles it.
 
 **It can name the wrong feature beside a right number.** The diagnosis above
 closed on a circle that "bottoms at the top of the rock" while printing
 `Depth = 0.0` in the same sentence. Nothing reads as a guess, no model check has
 anything to say about it, and reading the elevation the run printed against the
 elevations the model declares is what finds it.
+
+**Other models miss more.** On the same eight requests, every model built the
+slope correctly, and the broken file separated them: Sonnet 5 and Kimi K3
+found all three faults but their repair went to the rebuilt copy described
+above, and gpt-5.5 and GLM-5V-Turbo did not see that the two materials had
+been swapped, so all four finished that request with a wrong factor of safety.
+GLM also read "2:1" as two vertical to one horizontal in the face-slope sweep,
+and Kimi wrote several sentences that its own tables contradicted.
 
 ---
 

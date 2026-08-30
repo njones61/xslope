@@ -248,7 +248,9 @@ safety moves in front of us — and on the third, so does the governing circle.
 
 First, we open LEM-3's completed model,
 [xslope_simple_mult_layers.xlsx](../lem/files/xslope_simple_mult_layers.xlsx),
-and send three requests. The first prompt:
+and send three requests, one at a time — each is typed after the previous
+reply has finished, so every edit starts from the model the last one left. The
+first prompt:
 
 <div class="prompt-block" markdown>
 ```text

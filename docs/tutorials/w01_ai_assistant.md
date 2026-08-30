@@ -138,9 +138,9 @@ The eight conversations below cost this much between them, measured as they ran:
 | **Total** | **13** | **44** | **810,612 (665,742)** | **28,650** | **1,125 s** |
 
 Thirteen turns, 44 calls to the model, about 811,000 input tokens of which some
-666,000 came from the prompt cache, and 28,650 output tokens: **$1.77** at
-Anthropic's list prices on 2026-08-29 ($5.00 per million input tokens, a cache
-read at a tenth of that, $25.00 per million output tokens). Wall time and price
+666,000 came from the prompt cache, and 28,650 output tokens: **\$1.77** at
+Anthropic's list prices on 2026-08-29 (\$5.00 per million input tokens, a cache
+read at a tenth of that, \$25.00 per million output tokens). Wall time and price
 do not track each other: the strength reduction run takes half the total time for
 under a tenth of the cost, because 521 of its 556 seconds are spent inside the
 solver, where no tokens are read or written.
@@ -165,11 +165,11 @@ sentence that is not, and the diagnosis below is that case in full.
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5 | 44 | 810,612 (665,742) | 28,650 | $1.77 | 8 of 8 | 7 of 8 |
-| Claude Sonnet 5 | 45 | 935,563 (684,517) | 28,060 | $0.92 | 7 of 8 | 7 of 8 |
-| OpenAI gpt-5.5 | 29 | 364,339 (325,120) | 17,437 | $0.88 | 7 of 8 | 6 of 8 |
-| Kimi K3 (Moonshot AI) | 37 | 449,769 (343,143) | 44,953 | $1.10 | 7 of 8 | 4 of 8 |
-| GLM-5V-Turbo (Z.ai) | 40 | 563,429 (459,660) | 13,480 | ~$0.29 | 6 of 8 | 4 of 8 |
+| Claude Opus 5 | 44 | 810,612 (665,742) | 28,650 | \$1.77 | 8 of 8 | 7 of 8 |
+| Claude Sonnet 5 | 45 | 935,563 (684,517) | 28,060 | \$0.92 | 7 of 8 | 7 of 8 |
+| OpenAI gpt-5.5 | 29 | 364,339 (325,120) | 17,437 | \$0.88 | 7 of 8 | 6 of 8 |
+| Kimi K3 (Moonshot AI) | 37 | 449,769 (343,143) | 44,953 | \$1.10 | 7 of 8 | 4 of 8 |
+| GLM-5V-Turbo (Z.ai) | 40 | 563,429 (459,660) | 13,480 | ~\$0.29 | 6 of 8 | 4 of 8 |
 
 All five reproduce LEM-3's published 1.244 on the contact circle — from a build
 off the drawing, from the file, and inside the report document. The differences
@@ -957,7 +957,7 @@ rises. The same eight tasks were also run on the reinforced slope of [LEM-8](lem
 and a surcharge across the crest — scored the same two ways. Those sessions were
 recorded earlier, under different wording of the same requests, so read the two
 sets as two problems rather than as one model measured twice. Claude Opus 5 is
-again right on every model and every number, at $2.23 against the $1.77 the
+again right on every model and every number, at \$2.23 against the \$1.77 the
 layered slope cost it, and this time loses three of the second column against the
 one it lost on the layered slope. The five models above score 5 to 8 of 8 on
 model and numbers there and 4 to 7 of 8 on explanation, and a sixth and smaller
@@ -966,12 +966,12 @@ the table above:
 
 | Model | Cost | Model and numbers | Explanation |
 | :--- | :---: | :---: | :---: |
-| Claude Opus 5 | $2.23 | 8 of 8 | 5 of 8 |
-| OpenAI gpt-5.5 | $1.12 | 5 of 8 | 7 of 8 |
-| Kimi K3 | $1.20 | 5 of 8 | 5 of 8 |
-| Claude Sonnet 5 | $1.31 | 5 of 8 | 6 of 8 |
-| Claude Haiku 4.5 | $0.53 | 2 of 8 | 3 of 8 |
-| GLM-5V-Turbo | ~$0.24 | 5 of 8 | 4 of 8 |
+| Claude Opus 5 | \$2.23 | 8 of 8 | 5 of 8 |
+| OpenAI gpt-5.5 | \$1.12 | 5 of 8 | 7 of 8 |
+| Kimi K3 | \$1.20 | 5 of 8 | 5 of 8 |
+| Claude Sonnet 5 | \$1.31 | 5 of 8 | 6 of 8 |
+| Claude Haiku 4.5 | \$0.53 | 2 of 8 | 3 of 8 |
+| GLM-5V-Turbo | ~\$0.24 | 5 of 8 | 4 of 8 |
 
 Three things did most of the damage. The 2 ft cohesive band along the face is a
 thin zone read off a drawing — the reference build measures it perpendicular to
@@ -990,7 +990,7 @@ conclusions.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about $1.77.
+  13 turns of work for about \$1.77.
 - Building a layered model from a drawing and editing it three ways — face,
   water and strength — with every reported factor of safety reproducing from the
   workbook the session saved.

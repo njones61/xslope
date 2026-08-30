@@ -171,7 +171,10 @@ transcripts as an illustration of what the requests look like, not as a script t
 match line for line.
 
 The assistant is good at this work, but everything it produces should still be
-checked — the same checking a model built by hand deserves.
+checked — the same checking a model built by hand deserves. Every result quoted
+on this page has had that checking: each factor of safety was re-solved from
+the saved file, and where a session's answer or a sentence in it is wrong, the
+page says so at that point.
 
 ---
 

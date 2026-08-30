@@ -57,8 +57,8 @@ the workbook with **File → Open…**.
 Studio reads those companions on open, so the seepage and finite element
 solutions are attached before anything is run. A report **documents** an
 attached seepage or finite element solution; it never re-solves either, which
-is why this file ships solved — the strength reduction behind it took a quarter
-of an hour, which no report should spend twice. Limit equilibrium is the one
+is why this file ships solved — the strength reduction run behind it is the
+kind of solve no report should spend again. Limit equilibrium is the one
 engine a report runs itself: the slice computations are fast, so any method
 ticked without a result is solved on the fly — which is what lets several
 methods go into one report.

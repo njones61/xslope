@@ -369,10 +369,12 @@ safety at 1.244. The transcript is
 
 ## A sweep written ad hoc
 
-In this test, we ask for the factor of safety at face slopes of 2:1, 2.5:1 and 3:1, with the
-toe and crest elevation held. What varies is the shape of the section rather than
-a value in a cell, so no dialog offers the study: whatever runs it has to rebuild
-the geometry between steps.
+In this test, we ask for the factor of safety at face slopes of 2:1, 2.5:1 and
+3:1, with the toe and crest elevation held. What varies is the shape of the
+section rather than a value in a cell, and no parametric tool sweeps a geometry
+change — neither the **Parametric…** dialog nor the helper the last section
+used covers it. This time the assistant has to write its own loop from scratch,
+rebuilding the geometry between steps.
 
 <div class="prompt-block" markdown>
 ```text

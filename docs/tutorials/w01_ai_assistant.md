@@ -242,7 +242,7 @@ exchange is in
 
 ## Modifying the model
 
-We take the finished slope and change three things in one conversation: the face,
+Next, we take the finished slope and change three things in one conversation: the face,
 the water, and the foundation's strength. Each edit is rerun, so the factor of
 safety moves in front of us — and on the third, so does the governing circle.
 

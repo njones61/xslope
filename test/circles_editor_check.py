@@ -527,6 +527,207 @@ def test_generate_leaves_the_other_editors_alone():
     return out
 
 
+# ---------------------------------------------------------------------------
+# D. The search window
+#
+# The circles sheet carries ten optional limits confining an automated search
+# (J8:K17). Three ways editing them here can be wrong, all of them quiet:
+#
+#   * A LIMIT INVENTED. A blank cell means "not applied", and the loader leaves a
+#     blank block with no ``search_window`` key at all. An editor that wrote ten
+#     zeros — or ten Nones — would hand the search a window nobody entered.
+#   * A LIMIT LOST ON SAVE. The window is written back to K8:K17 by the writer, and
+#     a value the editor stores but the file cannot carry is a limit the reopened
+#     model no longer has.
+#   * THE MESH THROWN AWAY. A window says where a SEARCH may run; it is not
+#     geometry. An edit to it must drop the solution tabs and keep the mesh, which
+#     can take minutes to rebuild.
+# ---------------------------------------------------------------------------
+
+#: A model whose circles sheet fills part of the window block — the COMBO-3 dam,
+#: which confines its search to the upstream face and sets a minimum slip depth.
+WINDOWED = os.path.join(_REPO, "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
+
+
+def test_window_shows_and_round_trips():
+    """The group opens on the file's window and OK gives it back unchanged."""
+    from studio.editors import CATEGORY_EDITORS
+
+    editor = CATEGORY_EDITORS["circles"]
+    model = _load(WINDOWED)
+    stored = dict(model.get("search_window") or {})
+    if not stored:
+        return [f"{os.path.basename(WINDOWED)} declares no search window, so this "
+                f"check has nothing to read back"]
+    dlg = _shown(editor.build(model, None))
+    out = _fail(dlg.extra.result_values() == stored,
+                f"the group opened on {dlg.extra.result_values()}, not the file's "
+                f"{stored}")
+    # Every filled key must be visible in a field of its own, and every blank one
+    # must be blank: a limit the user cannot see is a limit they cannot check.
+    for key, value in stored.items():
+        out += _fail(dlg.extra._edits[key].text().strip() != "",
+                     f"{key} = {value} is stored but its field is empty")
+    for key in dlg.extra._edits:
+        if key not in stored:
+            out += _fail(dlg.extra._edits[key].text().strip() == "",
+                         f"{key} is unset in the file but its field is filled")
+    editor.apply(model, dlg)
+    out += _fail(model.get("search_window") == stored,
+                 f"OK on an untouched group changed the window to "
+                 f"{model.get('search_window')}")
+    dlg.deleteLater()
+    return out
+
+
+def test_window_writes_only_what_is_filled():
+    """A typed limit is stored; an emptied group leaves no key behind."""
+    from studio.editors import CATEGORY_EDITORS
+
+    editor = CATEGORY_EDITORS["circles"]
+    model = _load(LEM01)
+    out = _fail("search_window" not in model,
+                f"{os.path.basename(LEM01)} already carries a window, so this check "
+                f"cannot tell an added one from the file's")
+    dlg = _shown(editor.build(model, None))
+    dlg.extra._edits["min_slip_depth"].setText("8")
+    editor.apply(model, dlg)
+    out += _fail(model.get("search_window") == {"min_slip_depth": 8.0},
+                 f"typing one limit stored {model.get('search_window')}, not the one "
+                 f"limit that was typed")
+    dlg.deleteLater()
+
+    # And back out again: clearing every field removes the key, which is the state
+    # the loader produces for a blank block — not a dict of ten Nones.
+    dlg = _shown(editor.build(model, None))
+    for edit in dlg.extra._edits.values():
+        edit.setText("")
+    editor.apply(model, dlg)
+    out += _fail("search_window" not in model,
+                 f"clearing the group left {model.get('search_window')!r} behind")
+    dlg.deleteLater()
+    return out
+
+
+def test_window_refuses_a_backwards_range():
+    """OK on a range that runs backwards is refused, with the pair named.
+
+    The loader rejects ``min > max`` outright, so a file saved with one does not
+    open again. Caught here, the user can still see which pair they typed."""
+    from PySide6.QtWidgets import QMessageBox
+    from studio.editors import CATEGORY_EDITORS
+
+    dlg = _shown(CATEGORY_EDITORS["circles"].build(_load(LEM01), None))
+    dlg.extra._edits["entry_x_min"].setText("40")
+    dlg.extra._edits["entry_x_max"].setText("10")
+    out = _fail("entry_x_min" in dlg.extra.validate(),
+                f"a backwards entry range validated as {dlg.extra.validate()!r}")
+
+    warned, real = [], QMessageBox.warning
+    QMessageBox.warning = lambda *a, **k: warned.append(a[-1] if a else "")
+    try:
+        dlg.accept()
+    finally:
+        QMessageBox.warning = real
+    out += _fail(bool(warned), "OK on a backwards range said nothing")
+    out += _fail(dlg.isVisible(), "OK on a backwards range closed the dialog anyway, "
+                                  "saving a window the loader will not read back")
+    # And the same fields, put right, close it.
+    dlg.extra._edits["entry_x_max"].setText("60")
+    out += _fail(dlg.extra.validate() == "",
+                 f"an increasing range still fails validation: {dlg.extra.validate()!r}")
+    dlg.deleteLater()
+    return out
+
+
+def test_window_survives_a_save():
+    """A window written to a file comes back the same window."""
+    import tempfile
+    from xslope.fileio import save_slope_data_to_xlsx
+    from studio.editors import CATEGORY_EDITORS
+
+    editor = CATEGORY_EDITORS["circles"]
+    model = _load(LEM01)
+    dlg = _shown(editor.build(model, None))
+    # One of each shape the block carries: both ends of a range, all four corners of
+    # the center box, and the two single limits.
+    typed = {"entry_x_min": 5.0, "entry_x_max": 25.5, "exit_x_min": 0.0,
+             "exit_x_max": 12.0, "center_box_x_min": -5.0, "center_box_x_max": 30.0,
+             "center_box_y_min": 20.0, "center_box_y_max": 55.0,
+             "max_tangent_depth": -3.25, "min_slip_depth": 2.5}
+    for key, value in typed.items():
+        dlg.extra._edits[key].setText(repr(value))
+    editor.apply(model, dlg)
+    dlg.deleteLater()
+    out = _fail(model.get("search_window") == typed,
+                f"the editor stored {model.get('search_window')}, not {typed}")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "window_round_trip.xlsx")
+        with contextlib.redirect_stdout(io.StringIO()):
+            save_slope_data_to_xlsx(model, path)
+        reloaded = _load(path)
+    out += _fail(reloaded.get("search_window") == typed,
+                 f"the file gave back {reloaded.get('search_window')}, not {typed}")
+    return out
+
+
+def test_window_edit_keeps_the_mesh():
+    """A search-window edit drops the solution and keeps the mesh.
+
+    The mesh is rebuilt from the geometry and can take minutes; a limit on where a
+    search may run is not geometry, so throwing it away would cost the user a
+    rebuild for an input the mesh never saw. The check drives the real edit path —
+    the one that decides — rather than restating its rule."""
+    from studio.editors import CATEGORY_EDITORS
+    from studio.main_window import MainWindow
+
+    out = _fail("search_window" not in MainWindow.MESH_KEYS,
+                "search_window is listed as a mesh-affecting input; editing a search "
+                "limit would throw away the mesh")
+
+    window = MainWindow()
+    editor = CATEGORY_EDITORS["circles"]
+    real_build = editor.build
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            window.open_path(LEM01)
+        before = MainWindow.mesh_signature(window.doc.slope_data)
+
+        def build(slope_data, parent, **kwargs):
+            dlg = real_build(slope_data, parent)
+            dlg.extra._edits["min_slip_depth"].setText("8")
+            dlg.exec = lambda: 1          # the user pressing OK
+            return dlg
+
+        editor.build = build
+        cleared = []
+        window.invalidate_results = lambda clear_mesh=False: cleared.append(clear_mesh)
+        with contextlib.redirect_stdout(io.StringIO()):
+            window.edit_category("circles")
+
+        out += _fail(window.doc.slope_data.get("search_window")
+                     == {"min_slip_depth": 8.0},
+                     f"the edit stored {window.doc.slope_data.get('search_window')}")
+        out += _fail(cleared == [False],
+                     f"the edit invalidated results with clear_mesh={cleared}; a "
+                     f"search window is not geometry and must keep the mesh")
+        out += _fail(MainWindow.mesh_signature(window.doc.slope_data) == before,
+                     "a search-window edit changed the mesh signature")
+        out += _fail(window.doc.dirty, "a search-window edit left the file clean, so "
+                                       "closing it would lose the limit")
+        out += _fail(window.doc.can_undo(),
+                     "a search-window edit put nothing on the undo stack")
+        window.doc.undo()
+        out += _fail("search_window" not in window.doc.slope_data,
+                     f"undo left {window.doc.slope_data.get('search_window')!r} behind")
+    finally:
+        editor.build = real_build
+        window.close()
+        window.deleteLater()
+    return out
+
+
 CHECKS = [
     ("every column is visible at the opening size", test_all_columns_visible),
     ("the preview sits below the table", test_preview_is_below_the_table),
@@ -538,6 +739,11 @@ CHECKS = [
     ("generate fills an empty table", test_generate_fills_an_empty_table_without_asking),
     ("generate asks before overwriting", test_generate_asks_before_touching_existing_rows),
     ("button and remedy share a generator", test_generate_is_the_remedys_generator),
+    ("the search window opens on the file's", test_window_shows_and_round_trips),
+    ("the window stores only what is filled", test_window_writes_only_what_is_filled),
+    ("a backwards range is refused", test_window_refuses_a_backwards_range),
+    ("a window survives a save", test_window_survives_a_save),
+    ("a window edit keeps the mesh", test_window_edit_keeps_the_mesh),
 ]
 
 

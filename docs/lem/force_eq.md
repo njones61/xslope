@@ -208,9 +208,9 @@ Once again, care must be taken to ensure that the tension crack water force ($T$
 
 ## Solving for the Factor of Safety
 
-The factor of safety enters the slice equations only through the mobilized strength: a trial value of $F$ fixes $c_m = c/F$ and $\tan\phi_m = \tan\phi/F$, and the side force inclinations $\theta_i$ come from the chosen convention (see [Side Force Inclination Assumptions](#side-force-inclination-assumptions) below). Every coefficient in equations (6) and (7) is then known, and the march runs from left to right. Slice 1 starts with $Z_1 = 0$ — there is no soil to its left to push on it — and each slice contributes the effective normal force $N'$ on its base together with the side force $Z_{i+1}$ it hands to the next, so the side force is carried from slice 1 through to slice $n$ by the recurrence $Z_{i+1} = p_i + q_i Z_i$ set out above.
+The factor of safety enters the slice equations only through the mobilized strength: a trial value of $F$ fixes $c_m = c/F$ and $\tan\phi_m = \tan\phi/F$, and the side force inclinations $\theta_i$ come from the chosen convention (see [Side Force Inclination Assumptions](#side-force-inclination-assumptions) below). Every coefficient in equations (6) and (7) is then known, and the slices are solved from left to right. Slice 1 starts with $Z_1 = 0$ — there is no soil to its left to push on it — and each slice contributes the effective normal force $N'$ on its base together with the side force $Z_{i+1}$ it hands to the next, so the side force is carried from slice 1 through to slice $n$ by the recurrence $Z_{i+1} = p_i + q_i Z_i$ set out above.
 
-The march ends past the last slice, where there is likewise no soil left to push back, so the side force carried out of the far end must vanish. That leftover force, $Z_{n+1}$, is a function of the trial $F$ alone, and it is the residual the solution drives to zero:
+The sweep ends past the last slice, where there is likewise no soil left to push back, so the side force carried out of the far end must vanish. That leftover force, $Z_{n+1}$, is a function of the trial $F$ alone, and it is the residual the solution drives to zero:
 
 >>$Z_{n+1}(F) = 0$
 
@@ -226,7 +226,7 @@ Substituting $c_m = c/F$ and $\tan\phi_m = \tan\phi/F$ and solving for the facto
 
 >>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan\phi \right) \cos\alpha}{\sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + kW + T - P \cos\psi - H \cos\theta_p - L \cos\delta - D \sin\beta \right]}   \qquad (12)$
 
-Equation (12) is not a direct formula for $F$: the factor of safety is already inside the mobilized strength it was derived from, and $N'$ itself comes from the march at the trial $F$. It is the balance the converged solution satisfies — (11) and (12) hold at the root found above, not at an arbitrary trial $F$.
+Equation (12) is not a direct formula for $F$: the factor of safety is already inside the mobilized strength it was derived from, and $N'$ itself comes from the slice-by-slice solution at the trial $F$. It is the balance the converged solution satisfies — (11) and (12) hold at the root found above, not at an arbitrary trial $F$.
 
 ## Side Force Inclination Assumptions
 

@@ -48,49 +48,51 @@ FEM mesh with boundary conditions and reinforcement elements (red lines):
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.49**. The companion LEM analysis
+SSRM results. The computed factor of safety is **FS = 1.50**. The companion LEM analysis
 gives **FS = 1.59** by Spencer's method (see [LEM sample problem 9](../lem/samples.md)),
-and the FEM reads below it — as it should for this model, because this is a *peak-residual*
-run: $T_{res}$ = 600 lb/ft is filled in, so reinforcement elements that yield shed down to
-their residual capacity, while the LEM has no strain compatibility and simply applies the
-full envelope value at each crossing (it ignores $T_{res}$ entirely — see
+and the FEM reads below it. This is a *peak-residual* run: $T_{res}$ = 600 lb/ft is filled
+in, so a reinforcement element that reaches its full tensile capacity sheds to that
+residual, while the LEM has no strain compatibility and simply applies the full envelope
+value at each crossing (it ignores $T_{res}$ entirely — see
 [LEM Reinforcement](../lem/reinforcement.md)).
 
-That gap is the post-peak behavior, not a discrepancy between the methods. Blank out
-$T_{res}$ and the same model runs elastic-perfectly-plastic at **FS = 1.58**, within 1% of
-the LEM — the two engines then agree closely, because they are finally assuming the same
-thing about the reinforcement.
+Blank out $T_{res}$ and the same model runs elastic-perfectly-plastic at **FS = 1.559**, so
+post-peak behavior accounts for 0.062 of the 0.090 that separates the two engines here. The
+rest is the difference between prescribing the reinforcement force at one crossing point and
+letting it emerge from displacement compatibility along the whole line.
 
 The plots below show the solution at the computed factor of safety. The
 top plot shows the deformed mesh with original and deformed reinforcement positions. The
 middle plot shows the viscoplastic shear strain concentration with reinforcement elements
-colored by axial force (blue = low, red = high); green elements are inactive (no tension)
-and black elements at the ends have pulled out. The bottom plot shows the displacement
-vectors. The reinforcement summary table is shown below.
+colored by axial force (blue = low, red = high): the middle of each line carries $T_{max}$,
+the end segments carry the reduced force their embedment can develop, and the magenta
+segments are elements standing at $T_{res}$. The bottom plot
+shows the displacement vectors. The reinforcement summary table is shown below.
 
 ![reinforce_fem_results.png](images/reinforce_fem_results.png){width=1000}
 
 The `print_reinforcement_summary()` function reports the state of each line — how many
 elements are carrying tension, how many sit inside a pullout ramp, how many have yielded,
-and how many have dropped to the residual capacity — together with a status for the line:
+and how many have dropped to the residual capacity — together with the line's state, in the
+vocabulary [The state of a line](reinforcement.md#the-state-of-a-line) sets out and the
+Studio panel and the report use.
 
-| Status | Meaning |
-|--------|---------|
-| OK | All elements below capacity |
-| NEAR CAPACITY | Peak force within 5% of $T_{max}$ |
-| PULLOUT | Elements near the ends have reached their embedment-limited capacity |
-| YIELDED | Elements away from the ends are at $T_{max}$ and holding it (perfectly plastic) |
-| SOFTENED | Elements yielded and then dropped to $T_{res}$ |
-| INACTIVE | No elements carrying tension |
+<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.497, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=16000 -->
 
-<!-- test: file=files/xslope_reinforce_fem.xlsx, type=fem_ssrm, expected_fs=1.491, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.1, f_max=1.9, max_iter=16000 -->
+At the last trial that reaches equilibrium, $F$ = 1.494, the reinforcement is heavily
+mobilized but has not yet lost anything. Every line has one element inside a
+pullout ramp ($L_p$ = 4 ft from each end) sitting at the 200 lb/ft its embedment can develop
+and slipping there, which is what makes all six lines read **pullout**. The greatest force
+anywhere is 783 lb/ft, just short of $T_{max}$, and nothing has softened.
 
-At the factor of safety the reinforcement is heavily mobilized: interior elements have
-reached $T_{max}$ = 800 lb/ft and shed to $T_{res}$ = 600 lb/ft, and elements inside the
-pullout ramps ($L_p$ = 4 ft from each end) are limited by embedment rather than by material
-strength. This is the expected state at incipient failure — the slope fails when the soil's
-reduced strength and the reinforcement's *residual* capacity can no longer balance the
-driving forces together.
+One trial higher, at $F$ = 1.500, the slope never finds equilibrium again: elements reach
+$T_{max}$ = 800 lb/ft and shed to $T_{res}$ = 600 lb/ft, hand their load to their neighbors,
+more of them yield, and the run ends in non-convergence. Six elements make that drop — two
+each on lines 3 and 4, 11 and 13 ft along them, one on line 5 at 11 ft and one on line 6 at
+9 ft — and the at-failure field above carries them, drawn magenta on the residual. That is
+the mechanism the factor of safety brackets — not the pullout
+zones, which go on carrying what they were carrying, but the loss of tensile capacity in the
+middle of lines 3 through 6 where the failure surface crosses them.
 
 ### 2. Slope Stabilized with Drilled Shaft Piles
 
@@ -121,9 +123,10 @@ Two rows of vertical drilled shafts are placed at $x = 5$ ft and $x = 10$ ft alo
 | Cross-sectional area, $A$ | $\pi D^2 / 4$ = 3.14 ft$^2$ (auto-computed from $D$) |
 | Shear capacity, $V_{\text{cap}}$ | 46,000 lb |
 | Moment capacity, $M_{\text{cap}}$ | 60,000 ft·lb |
-| Fixity | free |
+| Head fixity | free |
+| Tip fixity | free |
 
-Each pile is modeled as a chain of 6-DOF Euler-Bernoulli beam elements with rotational DOFs at each node (see [FEM Piles](piles.md) for the formulation). The pile stiffness ($EI$ and $EA$) is scaled by $1/S$ to convert from per-pile to per-unit-width quantities. Unlike the LEM approach where the user provides a single force $H$, the FEM beam elements naturally develop resistance as the soil deforms around the pile. Bending moments are computed directly at each node, and structural capacity limits ($V_{\text{cap}}$, $M_{\text{cap}}$) are enforced through the viscoplastic correction loop.
+Each pile is modeled as a chain of Euler-Bernoulli beam elements with a rotational DOF at each node (see [FEM Piles](piles.md) for the formulation). The pile stiffness ($EI$ and $EA$) is scaled by $1/S$ to convert from per-pile to per-unit-width quantities. Unlike the LEM approach where the user provides a single force $H$, the FEM beam elements naturally develop resistance as the soil deforms around the pile. Bending moments are computed directly at each node, and structural capacity limits ($V_{\text{cap}}$, $M_{\text{cap}}$) are enforced through the viscoplastic correction loop.
 
 FEM mesh with boundary conditions. The piles are shown as green line elements along the pile axes:
 
@@ -133,13 +136,13 @@ The unstabilized slope is the same model with its two pile rows cleared and noth
 differs only by the piles: [xslope_piles_fem_nopile.xlsx](files/xslope_piles_fem_nopile.xlsx). It is solved on the
 same element type and mesh size as the stabilized run.
 
-SSRM results without piles (**FS = 1.155**). The shear strain concentration shows a failure mechanism passing through the toe:
+SSRM results without piles (**FS = 1.164**). The shear strain concentration shows a failure mechanism passing through the toe:
 
 ![piles_fem_no_pile_results.png](images/piles_fem_no_pile_results.png){width=1000}
 
-<!-- test: file=files/xslope_piles_fem_nopile.xlsx, type=fem_ssrm, expected_fs=1.155, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
+<!-- test: file=files/xslope_piles_fem_nopile.xlsx, type=fem_ssrm, expected_fs=1.164, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
 
-SSRM results with two rows of piles (**FS = 1.36**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
+SSRM results with two rows of piles (**FS = 1.380**). The pile elements are colored by lateral (shear) force in the shear strain plot. The piles resist the sliding mass and the failure mechanism is modified by their presence:
 
 ![piles_fem_results.png](images/piles_fem_results.png){width=1000}
 
@@ -149,21 +152,23 @@ Pile summary. `print_pile_summary` reports whichever field it is given; this is 
 === Pile Summary ===
 Pile  Elems   Max |T|   Max |V|   Max |M|     V_cap     M_cap  Yielded  Status
 --------------------------------------------------------------------------------
-   1      8     361.0    1950.5    6186.0    7666.7   10000.0    0/8  OK
-   2     10    1142.4    1940.2    6318.6    7666.7   10000.0    0/10  OK
+   1      8     426.2    2391.2    7357.1    7666.7   10000.0    0/8  OK
+   2     10     966.6    2124.2    5925.0    7666.7   10000.0    0/10  OK
 --------------------------------------------------------------------------------
 ```
 
-The two rows of piles increase the factor of safety from 1.155 to 1.36 — an 18% improvement. In the last converged
-trial the largest bending moment is 6,319 per unit width (Pile 2), about 63% of the moment capacity
-($M_{\text{cap}}/S$ = 10,000), and the largest shear 1,951 (Pile 1), about 25% of $V_{\text{cap}}/S$ = 7,667. In
-the developed mechanism at failure — the state the results figure above draws — both are smaller: 4,429 (44%) and
-1,580 (21%). The structural capacity does not govern for this problem in either state. The soil's ability to
+The two rows of piles increase the factor of safety from 1.164 to 1.380 — a 19% improvement. In the last converged
+trial the largest bending moment is 7,357 per unit width (Pile 1), about 74% of the moment capacity
+($M_{\text{cap}}/S$ = 10,000), and the largest shear 2,391 (Pile 1), about 31% of $V_{\text{cap}}/S$ = 7,667. In
+the developed mechanism at failure — the state the results figure above draws — both are smaller: 4,649 (46%) and
+1,547 (20%). The structural capacity does not govern for this problem in either state. The soil's ability to
 transfer lateral load to the piles is the limiting factor, not the pile strength.
 
-This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
+This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result. Which engine belongs to which pile configuration is a question of
+applicability rather than conservatism — see
+[LEM vs. FEM Pile Modeling](../lem/piles.md#lem-vs-fem-pile-modeling).
 
-<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.36, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
+<!-- test: file=files/xslope_piles_fem.xlsx, type=fem_ssrm, expected_fs=1.380, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.0, f_max=1.6, max_iter=16000 -->
 
 ### 3. Non-Circular Failure Surface with Thin Weak Layer
 
@@ -210,7 +215,7 @@ lateral sliding of the slope mass along the clay layer.
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
-The FEM result of FS = 1.53 is about 12% below the LEM result of FS = 1.74 obtained using
+The FEM result of FS = 1.62 is about 7% below the LEM result of FS = 1.74 obtained using
 Spencer's method — both analyses use the same piezometric surface in the foundation sand.
 Differences of this order between SSRM and LEM are typical: the FEM develops the failure
 mechanism freely through the global stress field, while the LEM evaluates rigid-block
@@ -222,7 +227,7 @@ more sharply the band through the 2-ft layer is resolved.
 <!-- mesh resolution: the 2-ft soft clay layer needs >=2 elements through its thickness;
      target_size=1.0 or finer (ts=2.0 gives 1.634, ts=1.0 gives 1.534, ts=0.75 gives
      1.516 — mild thin-band localization sensitivity) -->
-<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.534, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000 -->
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.616, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000 -->
 
 ### 4. Reliability Analysis: Two-Layer c–φ Slope
 
@@ -299,7 +304,7 @@ contribution directly.
      on a deliberately coarse 253-element mesh (target_size=5): at 2.4 this one test WAS the suite's
      wall clock (~510s; 5.0 runs in ~110s). beta is mesh-dependent but bit-reproducible for a fixed
      mesh, and the test guards the TSPM-over-SSRM pipeline, not mesh convergence. -->
-<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.240, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
+<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.356, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
 
 
 ---

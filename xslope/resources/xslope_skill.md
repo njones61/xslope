@@ -201,8 +201,8 @@ If the user asks to **run an analysis** (and an input file already exists):
 
 Every solver entry point gates on the input checks. If a run is **refused**, read the message —
 it names the sheet and the cell — fix the input, and re-run; do not switch the check off. See
-"Input Checks" below. If the model carries a **transient** seepage march, stage the frame the
-run reads before solving — see "Stability at one instant of a transient march".
+"Input Checks" below. If the model carries a **transient** seepage solution, stage the frame the
+run reads before solving — see "Stability at one instant of a transient run".
 
 **IMPORTANT — Show all plots.** Each analysis produces multiple plots at different stages. You MUST
 display every plot to the user, not just the final result. The full plot sequence for each analysis type is:
@@ -276,7 +276,7 @@ derivation so the user can go deeper than a chat reply. Real pages, all under
 | Reliability (Taylor series, Monte Carlo) | `reliability/`, `reliability/taylor/`, `reliability/monte_carlo/` |
 | Sensitivity, design mode, back-analysis | `parametric/` |
 | Accuracy against vendor programs | `verification/` and the corpus pages under it |
-| Getting started, the template, the input checks | `usage/installation/`, `usage/input_template/`, `usage/preflight/` |
+| Getting started, the template, the input checks | `getting_started/install/`, `usage/input_template/`, `usage/preflight/` |
 | Studio, the desktop app | `studio/`, `studio/editing/`, `studio/analysis/` |
 
 **Implementation questions — "what does xslope's Janbu actually do?"** Where this skill states
@@ -301,13 +301,13 @@ published comparisons against the source or vendor program, not illustrations.
 
 | Topic | Worked examples |
 |:------|:----------------|
-| Reinforcement & geosynthetics | [VP87–VP94 — Geosynthetic multitiered MSE walls (Leshc…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87) · [1. Reinforced Slope with Geogrid Reinforcement](https://xslope.readthedocs.io/en/latest/fem/samples/#1-reinforced-slope-with-geogrid-reinforcement) · [9. Reinforced Slope](https://xslope.readthedocs.io/en/latest/lem/samples/#9-reinforced-slope) · [2.18 — Borges & Cardoso – Geosynthetic Embankmen…](https://xslope.readthedocs.io/en/latest/verification/geostudio/#gs-2-18) · [VP107 — Retaining walls, gabion walls, supports](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp107) |
+| Reinforcement & geosynthetics | [VP87–VP94 — Geosynthetic multitiered MSE walls (Leshc…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp87) · [1. Reinforced Slope with Geogrid Reinforcement](https://xslope.readthedocs.io/en/latest/fem/samples/#1-reinforced-slope-with-geogrid-reinforcement) · [9. Reinforced Slope](https://xslope.readthedocs.io/en/latest/lem/samples/#9-reinforced-slope) · [2.18 — Borges & Cardoso – Geosynthetic Embankmen…](https://xslope.readthedocs.io/en/latest/verification/geostudio/#gs-2-18) · [Opening the starter file](https://xslope.readthedocs.io/en/latest/tutorials/fem02_reinforcement/#opening-the-starter-file) · [FHWA Example E1 — MSE wall with a broken backslope](https://xslope.readthedocs.io/en/latest/verification/published/#fhwa-e1) |
 | Soil nails | [9. Reinforced Slope](https://xslope.readthedocs.io/en/latest/lem/samples/#9-reinforced-slope) · [VP47 — Soil-nailed wall in clay (Amherst test wa…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp47) · [VP48 — Soil-nailed wall in sand (Clouterre test…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp48) · [RS2 Part IV VP60 — Soil-nailed wall (Pockoski & Duncan slope…](https://xslope.readthedocs.io/en/latest/verification/rs2/#p4-vp60) |
 | Anchors & tiebacks | [VP49 — Retaining wall, grouted tiebacks, soldier…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp49) · [VP58 — Tied-back wall in layered soil](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp58) · [VP59 — Tieback wall in sand, drawdown water table](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp59) |
-| Piles & drilled shafts | [17. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997) · [Torggler (2016) §3 — Homogeneous slope with a vertical plate](https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3a) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3b) · [2. Slope Stabilized with Drilled Shaft Piles](https://xslope.readthedocs.io/en/latest/fem/samples/#2-slope-stabilized-with-drilled-shaft-piles) · [10. Slope Stabilized with Piles](https://xslope.readthedocs.io/en/latest/lem/samples/#10-slope-stabilized-with-piles) · [SIGMAW-SRS — Slope stabilization with a sheet pile wall](https://xslope.readthedocs.io/en/latest/verification/geostudio/#sigmaw-wall) |
+| Piles & drilled shafts | [17. Pile-Stabilized Slope (Hassiotis et al. 1997)](https://xslope.readthedocs.io/en/latest/lem/samples/#17-pile-stabilized-slope-hassiotis-et-al-1997) · [Torggler (2016) §3 — Homogeneous slope with a vertical plate](https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3a) · [Torggler (2016) §4 — Slope with a weak layer and a 15 m plate](https://xslope.readthedocs.io/en/latest/verification/ssrm/#verification-torggler3b) · [2. Slope Stabilized with Drilled Shaft Piles](https://xslope.readthedocs.io/en/latest/fem/samples/#2-slope-stabilized-with-drilled-shaft-piles) · [10. Slope Stabilized with Piles](https://xslope.readthedocs.io/en/latest/lem/samples/#10-slope-stabilized-with-piles) · [Opening the model and reading the pile rows](https://xslope.readthedocs.io/en/latest/tutorials/fem03_piles/#opening-the-model-and-reading-the-pile-rows) |
 | Sheet-pile & cutoff walls | [1. Sheetpile with Clay Blanket](https://xslope.readthedocs.io/en/latest/seep/samples/#1-sheetpile-with-clay-blanket) · [2. Sea Trench](https://xslope.readthedocs.io/en/latest/seep/samples/#2-sea-trench) · [Partially Penetrating Sheetpile](https://xslope.readthedocs.io/en/latest/verification/seep/#verification-sheetpile) |
-| Rapid drawdown | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp98) · [VP99 — Pumped-storage project dam rapid drawdown…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp99) · [12. Rapid Drawdown (Johnson Reservoir Dam)](https://xslope.readthedocs.io/en/latest/lem/samples/#12-rapid-drawdown-johnson-reservoir-dam) · [16. Saturated vs. Moist Unit Weight (γ_sat)](https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat) |
-| Transient seepage | [8. Earth Dam — Reservoir Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#8-earth-dam-reservoir-drawdown-transient) · [9. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#9-johnson-reservoir-zoned-drawdown-transient) · [SEEPW-T01 — Simulating consolidation with SEEP/W](https://xslope.readthedocs.io/en/latest/verification/geostudio/#seepw-t01) · [SEEPW-T02 — Verification — infiltration into dry soil](https://xslope.readthedocs.io/en/latest/verification/geostudio/#seepw-t02) · [GW15 — Terzaghi 1-D consolidation](https://xslope.readthedocs.io/en/latest/verification/rocscience_groundwater/#gw15) · [GW16 — Pore-pressure dissipation in stratified s…](https://xslope.readthedocs.io/en/latest/verification/rocscience_groundwater/#gw16) |
+| Rapid drawdown | [VP98 — Walter Bouldin Dam rapid drawdown (Duncan…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp98) · [VP99 — Pumped-storage project dam rapid drawdown…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp99) · [12. Rapid Drawdown (Johnson Reservoir Dam)](https://xslope.readthedocs.io/en/latest/lem/samples/#12-rapid-drawdown-johnson-reservoir-dam) · [16. Saturated vs. Moist Unit Weight (γ_sat)](https://xslope.readthedocs.io/en/latest/lem/samples/#16-saturated-vs-moist-unit-weight-_sat) · [The dam](https://xslope.readthedocs.io/en/latest/tutorials/combo02_rapid_drawdown/#the-dam) |
+| Transient seepage | [8. Earth Dam — Reservoir Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#8-earth-dam-reservoir-drawdown-transient) · [9. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#9-johnson-reservoir-zoned-drawdown-transient) · [Opening the model](https://xslope.readthedocs.io/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model) · [Opening the model](https://xslope.readthedocs.io/en/latest/tutorials/combo03_fs_vs_time/#opening-the-model_1) · [SEEPW-T01 — Simulating consolidation with SEEP/W](https://xslope.readthedocs.io/en/latest/verification/geostudio/#seepw-t01) · [SEEPW-T02 — Verification — infiltration into dry soil](https://xslope.readthedocs.io/en/latest/verification/geostudio/#seepw-t02) |
 | Seepage-coupled stability | [VP102 — Earth dam before rapid drawdown (Huang &…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp102) · [VP46 — Baker (1993) three-stage dam — stages 1-2…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp46) · [RS2 Part IV VP102 — Homogeneous earth dam, dry (Huang & Jia 2…](https://xslope.readthedocs.io/en/latest/verification/rs2/#p4-vp102) · [RS2-28 — Excavated slope with FE groundwater and m…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-28) · [12. Rapid Drawdown (Johnson Reservoir Dam)](https://xslope.readthedocs.io/en/latest/lem/samples/#12-rapid-drawdown-johnson-reservoir-dam) · [9. Johnson Reservoir — Zoned Drawdown (Transient)](https://xslope.readthedocs.io/en/latest/seep/samples/#9-johnson-reservoir-zoned-drawdown-transient) |
 | Probabilistic & reliability | [RS2-25 — Syncrude tailings dyke (El-Ramly et al. 2…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-25) · [RS2-26 — Clarence Cannon dam (Wolff & Harr 1987)](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-26) · [15. Reliability Analysis (Submerged Slope)](https://xslope.readthedocs.io/en/latest/lem/samples/#15-reliability-analysis-submerged-slope) · [4. Reliability Analysis — Two-Layer c–φ Slope](https://xslope.readthedocs.io/en/latest/fem/samples/#4-reliability-analysis-two-layer-c-slope) · [Worked sample](https://xslope.readthedocs.io/en/latest/parametric/sensitivity/#worked-sample) · [VP1 — Slope, homogeneous (ACADS 1(a))](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp1) |
 | Tension cracks | [VP53 — Priest (1993) rigid block on a plane](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp53) · [VP64 — USACE end-of-construction dam (EM 1110-2-…](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp64) · [RS2 Part IV VP51 — Four-material slope, water table, tension…](https://xslope.readthedocs.io/en/latest/verification/rs2/#p4-vp51) · [RS2-29 — Geosynthetic-reinforced embankment on sof…](https://xslope.readthedocs.io/en/latest/verification/rs2/#rs2-29) · [1. Simple Embankment](https://xslope.readthedocs.io/en/latest/lem/samples/#1-simple-embankment) · [14. Tension Crack](https://xslope.readthedocs.io/en/latest/lem/samples/#14-tension-crack) |
@@ -419,12 +419,12 @@ slope_data = {
 
     # --- Run options: how this model is meant to be analyzed, carried in the file instead of
     #     living in a dialog. All optional; None = unspecified and the solver default stands.
-    'water_loads':    'auto',    # v22, main!D23. 'auto' = the engine derives the ponded-water
+    'water_loads':    'auto',    # v22, main!D24 (D23 before v25). 'auto' = the engine derives the ponded-water
                                  #   load from the model's own water definition at EVERY solve,
                                  #   so the dloads sheets carry NON-water loads only; 'manual' =
                                  #   you enter it there yourself. A new file is 'auto'; every
                                  #   pre-v22 file is 'manual'. See guideline 8 (ponded water).
-    'surface_family': None,      # v22, main!D24. 'circular' | 'non-circular'. Only bites on a
+    'surface_family': None,      # v22, main!D25 (D24 before v25). 'circular' | 'non-circular'. Only bites on a
                                  #   file defining BOTH families — it picks which one runs (and
                                  #   sets slope_data['circular'] at load). Leave None otherwise.
     'lem_method':     None,      # v19, main!D14. one of the seven method names, or 'all'
@@ -437,9 +437,12 @@ slope_data = {
     'tension_srf':    None,      # v19, main!D17. reduce t_cut along with c and tan(phi)?
     'element_type':   None,      # v19, main!D18. mesh element type (see Meshing below)
     'target_size':    None,      # v19, main!D19. global target element size
-    'ssrm_f_min':     None,      # v19, main!D20/D21. the SSRM bracket
+    'element_size_1d': None,     # v25, main!D20. target element size ALONG the 1D members (piles
+                                 #   and reinforcement lines). Blank = the mesher subdivides them
+                                 #   on its own, which is what every pre-v25 file does.
+    'ssrm_f_min':     None,      # v19, main!D21/D22 (D20/D21 before v25). the SSRM bracket
     'ssrm_f_max':     None,
-    'side_bc':        None,      # v21, main!D22. 'rollers' (the default — a truncation boundary
+    'side_bc':        None,      # v21, main!D23 (D22 before v25). 'rollers' (the default — a truncation boundary
                                  #   is a cut through ground that continues) | 'fixed'. Use
                                  #   'fixed' only to reproduce a program that clamps its sides.
 }
@@ -480,7 +483,7 @@ slope_data['materials'] = [
         'hb_d':   0.0,           # disturbance factor, in [0, 1]
         # --- option='elastic' only (v16): infinite strength, cannot fail. FEM holds it out of
         #     plasticity entirely; LEM treats it as impenetrable (a failure surface may not
-        #     cross it). Uses gamma/gsat/E/nu + seepage columns only — every strength key above
+        #     cross it). Uses gamma/gamma_sat/E/nu + seepage columns only — every strength key above
         #     (c, phi, cp, pow_*, hb_*, d, psi, t_cut, phi_b, s_cap) is ignored (loader warns if
         #     any is set). Vendor precedent: RS2 "Plasticity: None", Slide2 "Infinite Strength",
         #     SLOPE/W "Bedrock (Impenetrable)".
@@ -543,7 +546,7 @@ Common strength setups:
 - **Effective stress with a piezometric line:** `option='mc', c=c', phi=phi', u='piezo'`.
 - **Effective stress with a seepage solution:** `option='mc', c=c', phi=phi', u='seep'`.
 - **Rigid / infinite-strength zone (bedrock, a retaining wall):** `option='elastic'` — only
-  gamma/gsat/E/nu (+ seepage columns, if the zone still conducts water) matter; every strength
+  gamma/gamma_sat/E/nu (+ seepage columns, if the zone still conducts water) matter; every strength
   key is ignored, and the LEM search treats the zone as impenetrable.
 - **Tension-limited slope:** add `t_cut=<stress value>` (or `t_cut=0` for no tension at all) to
   any mc/cp/pow/hb material; leave `t_cut=None` for the pre-v16 unbounded-tension default.
@@ -820,7 +823,7 @@ and you should decide consciously, not miss it by accident.
 Even a **FEM-only** run needs at least one nominal circle here so `load_slope_data` validates;
 the FEM solver does not use it, but the loader requires a failure surface to exist.
 
-**A file that defines both families.** `slope_data['surface_family']` (main!D24) — `'circular'`
+**A file that defines both families.** `slope_data['surface_family']` (main!D25) — `'circular'`
 or `'non-circular'` — decides which one runs, and the loader uses it to set
 `slope_data['circular']`, so the run, the plots and the next session all read the same surface.
 Blank is normal and means "whichever family the model defines"; on a file carrying both, the
@@ -937,7 +940,10 @@ A list of line dicts with explicit endpoints and capacities.
 slope_data['reinforcement_lines'] = [
     {'x1': 0, 'y1': 0, 'x2': 20, 'y2': 0,      # start -> end
      't_max': 5000,    # max tension  (LEM & FEM), per unit width
-     't_res': 0,       # residual tension (FEM)
+     't_res': float('nan'),  # residual tension after rupture (FEM). NaN = blank = no
+                             # post-peak drop; an explicit 0 is brittle rupture. Capped
+                             # by the pullout envelope: bond slip holds the ramped
+                             # capacity, so an element never drops below it.
      'lp1': 0, 'lp2': 0,   # pullout lengths at start / end
      'E': 0, 'area': 0,    # Young's modulus / cross-section area (FEM)
      # v12 support-type fields (defaults shown = the classic generic line):
@@ -946,9 +952,22 @@ slope_data['reinforcement_lines'] = [
      'dir': 'tangent',      # 'tangent' (flexible, force along slip surface) | 'axial' (rigid, along the line)
      'appl': 'active',      # 'active' (allowable force, not /FS) | 'passive' (ultimate, /FS)
      'tend1': 0.0, 'tend2': 0.0,  # end anchorage/plate/connection capacity (per unit width)
-     'spacing': 1.0},       # out-of-plane spacing already divided out at load time
+     'spacing': 1.0,        # out-of-plane spacing already divided out at load time
+     # v24 overburden-dependent pullout, the alternative to lp1/lp2. NaN = blank =
+     # use the pullout lengths. Fill BOTH or neither (preflight refuses one of two).
+     'adhesion': float('nan'),   # interface adhesion, stress units
+     'delta': float('nan')},     # interface friction angle, degrees, in (0, 90)
 ]
 ```
+
+Two pullout laws, one envelope. With `lp1`/`lp2` the capacity develops at a constant rate
+`t_max/lp` from each end. With `adhesion` and `delta` both set it develops at
+`2*(adhesion + sigma'_v*tan(delta))` per unit length, integrated along the line — `sigma'_v`
+being the weight of the soil column above each point (gamma_sat below the water table where a
+material declares one) less the pore pressure that point's material declares. `lp1`/`lp2` are
+then not read. The FHWA form is `adhesion = 0`, `delta = atan(F* * alpha)`. Both engines apply
+the same envelope, `xslope.fileio.reinforce_available_tension`. A `slope_data` you assemble in
+memory resolves the law on the way into either engine, so nothing extra has to be called.
 
 Support-type recipes: geosynthetics -> `type='geosynthetic'` (tangent, active); soil nails ->
 `type='nail'` (axial, passive, `tend1` = plate capacity at the face end); tiebacks ->
@@ -978,7 +997,8 @@ slope_data['pile_lines'] = [
      'E': None, 'I': None, 'area': None,        # FEM section props (None -> auto from D)
      'V_cap': None, 'M_cap': None,              # shear / moment capacity per pile
      'appl': 'active',                          # 'active' (H not /FS) | 'passive' (H /FS; LEM only)
-     'fixity': 'free'},                         # 'free' or 'fixed' (FEM head condition)
+     'head_fixity': 'free',                     # see tip_fixity: the same four settings at the head
+     'tip_fixity': 'free'},                     # head_fixity / tip_fixity: 'free', 'pinned' (translation held), 'unrotated' (rotation held), 'fixed' (both); FEM only
 ]
 ```
 
@@ -1113,7 +1133,7 @@ print(report.format())                 # report.ok / .errors / .warnings / .info
 `selection` dict states what the run chose where the model does not say: `method`, `surface`
 (`"circular"` / `"noncircular"`), `search`, `base` (for a sweep), and `seep_frame`.
 
-**Transient models:** with `u = 'seep'` against a transient march the pore pressures are not in
+**Transient models:** with `u = 'seep'` against a transient solution the pore pressures are not in
 the file, so stage the frame BEFORE the check (`apply_transient_stability_frame`) and the gate
 sees the field. To check first instead, declare the frame that is coming —
 `selection={"seep_frame": {"times": [30.0]}}` (two instants for a rapid drawdown). A staged frame
@@ -1150,7 +1170,7 @@ generate_slices(report.model, circle=report.model['circles'][0])   # the copy, n
 ```
 
 The five: `reverse_polyline` (a piezo line or load block entered right to left),
-`add_ponded_water_load`, `switch_to_auto_water` (set **Water loads** to `auto`, main D23, and
+`add_ponded_water_load`, `switch_to_auto_water` (set **Water loads** to `auto`, the main sheet's Water loads row, and
 drop the transcribed water blocks — the better of the two water fixes, since a mode is recomputed at every solve
 while a written block goes stale), `generate_starting_circles`, `generate_noncircular_surface`.
 
@@ -1163,8 +1183,10 @@ a reason instead of half-applying.
 
 ## Meshing
 
-`build_mesh_from_polygons(polygons, target_size, element_type=..., ...)` — `element_type`
-defaults to **`tri6`**.
+`build_mesh_from_polygons(polygons, target_size, element_type=..., element_size_1d=None, ...)` — `element_type`
+defaults to **`tri6`**. `element_size_1d` is the main sheet's **1D element size** cell (`slope_data['element_size_1d']`):
+the target element size along every reinforcement and pile line, refining the bar/beam elements and the soil they share
+nodes with; pass `slope_data.get('element_size_1d')` through so a stated cell is honored, blank = the target size.
 
 **Never use linear elements for a FEM or SSRM run.** `tri3` and `quad4` lock volumetrically:
 Mohr-Coulomb plastic flow is nearly incompressible, a linear element cannot shear at constant
@@ -1475,14 +1497,13 @@ ok, res = design(slope_data, {"seep_bc": {"set": 1, "head_index": 0}},
                  low=3.0, high=8.0, steps=11, target_fs=6e-6, mode="seep")
 ```
 
-#### FS vs time: the factor of safety across a transient march
+#### FS vs time: the factor of safety across a transient run
 
 The coupled-analysis curve the vendors publish. `fs_vs_time` runs a stability analysis against
 **every saved frame** of a transient seepage solution and tabulates the result. No input is
 modified at any step — the axis is time, and each point solves the same model against a
-different computed pore-pressure field. **Recommend it whenever a model has a transient march
-and the user asks when the slope is most at risk**, rather than reporting the FS at one instant
-(and never instead of a rapid drawdown, which is one three-stage analysis, not a sequence).
+different computed pore-pressure field. **Recommend it whenever a model has a transient solution
+and the user asks when the slope is most at risk**, rather than reporting the FS at one instant.
 
 ```python
 from xslope.sensitivity import fs_vs_time
@@ -1494,15 +1515,25 @@ plot_sensitivity(res["df"], save_png=True)      # x-axis is time; param == 'time
 ```
 
 - `times=` restricts (or extends) the set; the default is every saved frame. An instant with no
-  saved frame is served by ONE re-march with all of them injected (`seep_data=seep_data`,
-  `remarch=True`) — otherwise it is a `success=False` row saying so. Never interpolated.
+  saved frame is served by ONE rerun of the transient seepage analysis with all of them injected
+  (`seep_data=seep_data`, `remarch=True`) — otherwise it is a `success=False` row saying so. Never interpolated.
 - `search=True` is the right default here: the critical surface MOVES as the pore pressures
   change, and that is the phenomenon. Use `search_opts` (or the file's window) to hold the curve
   on one mechanism.
 - `mode='fem'` runs a full SSRM per frame — minutes each, so restrict `times`. `mode='seep'` is
   refused: the seepage solution is this run's input.
+- `rapid=True` makes every instant a three-stage rapid drawdown instead: stage 1 the transient
+  run's initial state (`tseep` `stage_1`, normally t = 0 at full pool), stage 2 the frame at t, and the
+  reported value the drawdown's own — the lower of stages 2 and 3. Rows gain `stage1_FS`,
+  `stage2_FS`, `stage3_FS`, `stage3_run` and `governs`. LEM only; every point is an auto search
+  from the starting circle, so `search` is not consulted. Use it when the question is "how safe
+  is the slope if the pool falls to where it stands at t"; leave it off for "how safe is the
+  slope in the state it is in at t".
+- The run prints an aligned per-instant table when the sweep is done (t, FS, the critical
+  circle; the three stages and the governing one in rapid mode). The same rows come back on
+  `res['table']` and the printed block on `res['table_text']`; `print_table=False` silences it.
 - `res` also carries `'times'`, `'critical'` (per method), `'n_failed'`, `'remarched'` and
-  `'solution'` — keep the returned solution if it re-marched, rather than paying twice.
+  `'solution'` — keep the returned solution if the analysis was re-run, rather than paying twice.
 
 #### Tornado: rank several parameters
 
@@ -1664,16 +1695,31 @@ i = transient_frame_index(solution, 47.0)          # plot ONE saved frame
 plot_seep_solution(seep_data, solution["frames"][i], variable="u",
                    flowlines=False, vectors=True, phreatic=True, save_png=True)
 export_transient_solution(seep_data, solution, "earth_dam", input_file=input_file)
-# import_transient_solution(seep_data, "earth_dam") reads it back — a march is expensive,
+# import_transient_solution(seep_data, "earth_dam") reads it back — a transient run is expensive,
 # so export it once and reuse it rather than re-solving for each stability question.
 ```
 
 Use `vectors=True, flowlines=False` on a transient frame: a storage-release state has no flow
 net, so no stream function is stored.
 
-### Stability at one instant of a transient march
+**Time-history plots at a point** (a common ask — Studio has no display option for this, so
+users are sent to you): each frame carries nodal arrays, so pick the nearest node and stack a
+quantity over `frames`. Overlay the driving series from `slope_data["tseep"]` so the response
+reads against its cause. For the standard station overview (reservoir level, water table at an
+x-station, boundary in/outflow), `plot_transient_history(seep_data, solution, station=x)` is
+already built.
 
-A stability run reads **one frame**, never a blend — the march is never interpolated. Stage it
+```python
+nodes = np.asarray(seep_data["nodes"], float)
+i = int(np.argmin((nodes[:, 0] - 54.5)**2 + (nodes[:, 1] - 8.9)**2))   # nearest node
+t = [f["time"] for f in solution["frames"]]
+h = [f["head"][i] for f in solution["frames"]]                          # or f["u"][i]
+ax.plot(t, h); ax.plot(ts["times"], ts["series"]["pool"], "k--")        # ts = slope_data["tseep"]
+```
+
+### Stability at one instant of a transient run
+
+A stability run reads **one frame**, never a blend — the transient solution is never interpolated. Stage it
 before the solver:
 
 ```python
@@ -1689,8 +1735,9 @@ Which instant, in order of precedence:
 3. neither, and it reads the **LAST saved frame** (`source='default'`) — usually the drained end
    state, which is often but not always the critical one. Say so when you report the FS.
 
-A requested time that names no saved frame is served by re-marching with it injected
-(`seep_data=seep_data, remarch=True`), which is a full re-solve — never by interpolation.
+A requested time that names no saved frame is served by rerunning the transient seepage analysis
+with it injected (`seep_data=seep_data, remarch=True`), which is a full re-solve — never by
+interpolation.
 
 **Rapid drawdown** uses two instants instead: set `tseep!stage_1` and `stage_2` (both, with
 `stage_1 < stage_2`) and call `apply_transient_stability_frame(slope_data, solution, rapid=True)`
@@ -1698,8 +1745,10 @@ A requested time that names no saved frame is served by re-marching with it inje
 method with `rapid=True`. A transient solution with stage times takes precedence over the
 classic `{base}_seep.csv` / `_seep2.csv` files.
 
-To chart FS across the whole march instead of picking one instant, use `fs_vs_time` — see
-Parametric studies.
+To chart FS across the whole transient solution instead of picking one instant, use `fs_vs_time`
+— see Parametric studies. To chart the DRAWDOWN factor of safety instead, with stage 2 walked
+across the saved frames, use `fs_vs_time(..., rapid=True)`; it stages each point itself, so no
+`apply_transient_stability_frame` call is needed.
 
 ---
 
@@ -1765,6 +1814,8 @@ result = solve_ssrm(fem_data, F_min=F_min, F_max=F_max, tolerance=0.05,
 
 if result.get("converged", False):
     print(f"\nFactor of Safety: {result['FS']:.2f}")
+    if result.get("note"):          # a trial the iteration ceiling could not decide
+        print(result["note"])
     print_reinforcement_summary(fem_data, result['last_solution'])
     print_pile_summary(fem_data, result['last_solution'])
     plot_fem_results(fem_data, result['last_solution'],
@@ -1772,6 +1823,20 @@ if result.get("converged", False):
 else:
     print(f"SSRM failed: {result.get('error', 'Unknown error')}")
 ```
+
+**The iteration budget extends itself.** `max_iterations` (default 12000) is the budget each
+trial *starts* with. A trial that uses it up with the out-of-balance force still falling is
+granted another budget's worth, repeatedly, up to `max_iterations_ceiling` (default 50000), so
+the factor of safety does not depend on the budget you pass. A trial that reaches the ceiling
+still improving is reported `inconclusive` and is NOT counted as a failure: `solve_ssrm` carries
+on below it and reports `result['FS']` as the midpoint of `final_interval`, exactly as on any
+other run. The difference is that the bracket's upper edge is an undecided trial rather than a
+measured failure, which `result['inconclusive']` lists and `result['note']` states in a sentence.
+Raise the ceiling or loosen `tolerance` if you see one. At the other end, a trial whose movement is
+clearly running away — past 8 times its own elastic displacement and still growing, or a flat
+residual over 2000 iterations while the field gains a whole elastic displacement — is declared
+failed at that point rather than spending the rest of its budget (`exit_reason = 'diverging'`;
+`early_failure=False` turns it off).
 
 **FEM-only models still need one starting circle.** `load_slope_data()` requires a failure
 surface definition unless the file has seepage BCs or a pre-built mesh; a pure FEM input with
@@ -1806,9 +1871,9 @@ Rules:
   u="piezo") or from a seepage pair (u="seep"): run the seepage analysis for BOTH BC sets on
   the SAME mesh and export `<name>_mesh.json`, `<name>_seep.csv` (full pool), and
   `<name>_seep2.csv` (drawn down) — `load_slope_data()` then imports all three automatically.
-- Or from a **transient** march: set `stage_1` and `stage_2` on the tseep sheet (both, with
+- Or from a **transient** run: set `stage_1` and `stage_2` on the tseep sheet (both, with
   `stage_1 < stage_2`) and call `apply_transient_stability_frame(slope_data, solution, rapid=True)` — it stages `seep_u`/`seep_u2` from those two instants, and takes precedence
-  over the `_seep.csv` / `_seep2.csv` files. See "Stability at one instant of a transient march".
+  over the `_seep.csv` / `_seep2.csv` files. See "Stability at one instant of a transient run".
 - dloads set 1 = full-pool reservoir load; dloads (2) = drawn-down load (recompute the
   water-line intercept on the slope face for the lower pool) — **in `manual` water-load mode
   only**. On a v22 `auto` file the engine derives BOTH stages' loads from the stage-1 and
@@ -1898,7 +1963,7 @@ results = solve_selected("spencer", slice_df, rapid=True)
      envelope usually drawn). If elevations or lengths are genuinely unclear, state your
      reading and ask — a 2-ft shift in grid elevations changes FS by ~2-3%.
    - **Water table identification**: A water table is indicated by an **inverted triangle symbol** (▽) on the diagram. Do NOT assume a dashed line is a water table unless it is accompanied by this symbol or is explicitly labeled. Dashed lines may represent other features (e.g., material boundaries, construction lines).
-   - **Ponded / standing / reservoir water**: If the water table (▽) is shown ABOVE the ground surface, there is external water whose weight MUST be carried by the analysis. **In a v22 file — the template's default, `Water loads: auto` in main!D23 — do NOT enter it on the dloads sheets.** The engine derives it at solve time from the water definition you have already entered (the piezometric line, or the seepage head boundaries where a seepage analysis is defined), and a block entered on top of that counts the reservoir twice — preflight warns about exactly this. Your job is to make sure the water definition is right and reaches across the whole submerged stretch; the load follows from it. Set `Water loads: manual` only when the point is to reproduce another program's input exactly, and then enter the load yourself: normal stress = γ_w × (water_elevation - ground_elevation) at each point. **Apply it over the ENTIRE submerged ground surface** — every ground segment below the water level, including flat foundation/bench areas AND sloping faces — as a continuous load that follows the ground profile from where the water meets the ground on one side to where it meets it on the other. Do NOT apply it to the slope face only. This applies even for phi=0 total stress: the water definition drives the surface load for every material unconditionally, and `mat!u` decides only who samples that water as pore pressure — a submerged total-stress slope carries the reservoir's weight with zero pore pressure. The load and the pore pressure are two separate consequences of the same water: a reservoir impounded against a dam presses on the flooded foundation AND the submerged upstream face, and also raises the phreatic surface inside the embankment. The water load is part of the problem definition, not an optional refinement. Never skip it — and in auto mode, never enter it twice. Leave a water load's direction `'normal'` — water pressure IS perpendicular to the surface; `'vertical'` is for dead weight.
+   - **Ponded / standing / reservoir water**: If the water table (▽) is shown ABOVE the ground surface, there is external water whose weight MUST be carried by the analysis. **In a v22 file — the template's default, `Water loads: auto` in main!D24 — do NOT enter it on the dloads sheets.** The engine derives it at solve time from the water definition you have already entered (the piezometric line, or the seepage head boundaries where a seepage analysis is defined), and a block entered on top of that counts the reservoir twice — preflight warns about exactly this. Your job is to make sure the water definition is right and reaches across the whole submerged stretch; the load follows from it. Set `Water loads: manual` only when the point is to reproduce another program's input exactly, and then enter the load yourself: normal stress = γ_w × (water_elevation - ground_elevation) at each point. **Apply it over the ENTIRE submerged ground surface** — every ground segment below the water level, including flat foundation/bench areas AND sloping faces — as a continuous load that follows the ground profile from where the water meets the ground on one side to where it meets it on the other. Do NOT apply it to the slope face only. This applies even for phi=0 total stress: the water definition drives the surface load for every material unconditionally, and `mat!u` decides only who samples that water as pore pressure — a submerged total-stress slope carries the reservoir's weight with zero pore pressure. The load and the pore pressure are two separate consequences of the same water: a reservoir impounded against a dam presses on the flooded foundation AND the submerged upstream face, and also raises the phreatic surface inside the embankment. The water load is part of the problem definition, not an optional refinement. Never skip it — and in auto mode, never enter it twice. Leave a water load's direction `'normal'` — water pressure IS perpendicular to the surface; `'vertical'` is for dead weight.
    - Piezometric surfaces: typically shown as dashed/blue lines with explicit labels
    - Material boundaries shown as solid lines between differently hatched/colored zones
    - Property tables typically shown in the diagram legend

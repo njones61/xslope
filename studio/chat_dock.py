@@ -1,8 +1,10 @@
 """ChatDock — the AI assistant panel.
 
-A narrow right-side dock: a transcript (markdown-ish HTML with inline figures and
-"ran code" blocks), a multi-line input (Ctrl/Cmd+Enter sends), Send/Stop, and a
-Settings button (provider/model, key, confirm-before-running). It wires to
+A narrow right-side dock: a transcript (the assistant's markdown rendered — tables,
+headings, fenced code, and math reduced to plain text since the dialect renders
+none — with inline figures and "ran code" blocks), a multi-line
+input (Ctrl/Cmd+Enter sends), Send/Stop, and a Settings button (provider/model,
+key, confirm-before-running). It wires to
 ``studio.ai.assistant.Assistant`` and renders its signals. The header is kept
 minimal (a wrapping model label + Settings) so the dock can be made narrow.
 """
@@ -11,17 +13,211 @@ from __future__ import annotations
 
 import html
 import os
+import re
 import subprocess
 import sys
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QImage, QTextDocument
+from PySide6.QtGui import (
+    QDesktopServices, QImage, QTextDocument, QTextOption,
+)
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QTextBrowser,
     QVBoxLayout, QWidget,
 )
 
 _IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
+
+#: Fenced blocks and inline code spans, kept whole so their contents are never
+#: HTML-escaped — inside a code span ``&lt;`` is four characters, not a ``<``.
+#: The unterminated fence is matched too, so a reply cut off mid-block still
+#: renders as code rather than as a wall of entities.
+_CODE_SPANS = re.compile(r"(```.*?```|```[\s\S]*$|``.*?``|`[^`\n]*`)", re.S)
+
+#: Greek letters a slope-stability answer actually uses, as the letters
+#: themselves. ``\phi`` renders as the same phi the rest of the program shows
+#: (φ, not the variant glyph) so a reply and the material table agree.
+_LATEX_LETTERS = {
+    "alpha": "α", "beta": "β", "gamma": "γ", "Gamma": "Γ", "delta": "δ",
+    "Delta": "Δ", "epsilon": "ε", "varepsilon": "ε", "eta": "η", "theta": "θ",
+    "Theta": "Θ", "kappa": "κ", "lambda": "λ", "Lambda": "Λ", "mu": "μ",
+    "nu": "ν", "xi": "ξ", "pi": "π", "rho": "ρ", "sigma": "σ", "Sigma": "Σ",
+    "tau": "τ", "phi": "φ", "varphi": "φ", "Phi": "Φ", "chi": "χ", "psi": "ψ",
+    "Psi": "Ψ", "omega": "ω", "Omega": "Ω",
+}
+
+#: Operators and relations, as the Unicode character.
+_LATEX_SYMBOLS = {
+    "times": "×", "cdot": "·", "div": "÷", "pm": "±", "mp": "∓",
+    "le": "≤", "leq": "≤", "ge": "≥", "geq": "≥", "ne": "≠", "neq": "≠",
+    "approx": "≈", "sim": "~", "equiv": "≡", "propto": "∝", "infty": "∞",
+    "partial": "∂", "nabla": "∇", "int": "∫", "sum": "Σ", "prod": "Π",
+    "rightarrow": "→", "to": "→", "leftarrow": "←", "Rightarrow": "⇒",
+    "circ": "°", "degree": "°", "deg": "°", "ldots": "…", "dots": "…",
+    "quad": " ", "qquad": " ", "%": "%", "$": "$", "&": "&", "#": "#",
+    "{": "{", "}": "}", "_": "_", "^": "^",
+}
+
+#: Functions, kept as their plain names with the space LaTeX implies.
+_LATEX_FUNCS = ("arctan", "arcsin", "arccos", "tan", "sin", "cos", "tanh",
+                "sinh", "cosh", "ln", "log", "exp", "sec", "csc", "cot",
+                "max", "min")
+
+#: Macros handled structurally (they take arguments), so the letter/symbol pass
+#: must leave them alone.
+_LATEX_STRUCTURAL = {"frac", "dfrac", "tfrac", "sqrt", "text", "textrm",
+                     "mathrm", "mathit", "mathbf", "operatorname",
+                     "left", "right", "big", "Big", "bigg", "Bigg"}
+
+_SUP_OK = "0123456789+-()ni"
+_SUB_OK = "0123456789+-()aehijklmnoprstuvx"
+_SUPERSCRIPTS = str.maketrans(_SUP_OK, "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁽⁾ⁿⁱ")
+_SUBSCRIPTS = str.maketrans(_SUB_OK, "₀₁₂₃₄₅₆₇₈₉₊₋₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ")
+_SUP_OK, _SUB_OK = set(_SUP_OK), set(_SUB_OK)
+
+#: ``$$…$$`` and ``\[…\]`` are always math; so is ``\(…\)``.
+_MATH_DISPLAY = re.compile(r"\$\$(.+?)\$\$", re.S)
+_MATH_BRACKET = re.compile(r"\\\[(.+?)\\\]", re.S)
+_MATH_PAREN = re.compile(r"\\\((.+?)\\\)", re.S)
+#: ``$…$`` is the ambiguous one — a reply that quotes a price ("$5.00 input,
+#: $0.50 cached") has the same shape — so it is math only where it carries a
+#: LaTeX signal (a macro, a brace, a script) or reads as a stated equation whose
+#: first character is not a digit.
+_MATH_INLINE = re.compile(r"(?<![\\$])\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\$)")
+_MATH_SIGNAL = re.compile(r"[\\{^_]")
+
+
+def _latex_body_to_text(body):
+    """One math expression, rendered as the plain text a reader can read.
+
+    Qt's markdown is the GitHub dialect and has no math, so an equation arriving
+    as LaTeX reaches the transcript as its own source. Every command this
+    converts is one seen in a real reply; anything else loses its backslash and
+    keeps its name, which is still readable, where the raw macro is not.
+    """
+    text = body
+
+    # Functions first, and letters with them: the fraction pass below decides
+    # its spacing from whether the converted numerator reads as one token
+    # ("1/2") or as words ("tan φ / tan β").
+    for name in _LATEX_FUNCS:
+        text = re.sub(r"\\" + name + r"(?![A-Za-z])", name + " ", text)
+
+    def _one(m):
+        name = m.group(1)
+        if name in _LATEX_STRUCTURAL:
+            return m.group(0)
+        return _LATEX_LETTERS.get(name, _LATEX_SYMBOLS.get(name, name))
+
+    text = re.sub(r"\\([A-Za-z]+|[%${}&#_^])", _one, text)
+    text = re.sub(r"\\[ ,;:!]", " ", text)               # spacing macros
+
+    # A script is lifted only when EVERY character of it has a Unicode form —
+    # "sigma_{n}" becomes σₙ, while "x^{a+b}" keeps its caret rather than
+    # becoming half-raised nonsense. It runs before the argument-taking macros
+    # so their braces are the only ones left for those to match.
+    def _script(table, allowed):
+        def sub(m):
+            group = m.group(1) if m.group(1) is not None else m.group(2)
+            if group and set(group) <= allowed:
+                return group.translate(table)
+            return m.group(0)
+        return sub
+
+    text = re.sub(r"\^\{([^{}]*)\}|\^(\w)", _script(_SUPERSCRIPTS, _SUP_OK), text)
+    text = re.sub(r"_\{([^{}]*)\}|_(\w)", _script(_SUBSCRIPTS, _SUB_OK), text)
+
+    def _fraction(m):
+        # Parenthesized where the operand is a sum, since a fraction bar groups
+        # what a slash does not: (c' + σ' tan φ') / τ, never c' + σ' tan φ' / τ.
+        def side(s):
+            s = s.strip()
+            return (f"({s})" if re.search(r"(?<=\S)\s*[+\-±]\s*(?=\S)", s)
+                    else s)
+        top, bottom = side(m.group(1)), side(m.group(2))
+        joint = " / " if " " in top or " " in bottom else "/"
+        return f"{top}{joint}{bottom}"
+
+    # Argument-taking macros, innermost group first so nesting resolves.
+    for _ in range(6):
+        before = text
+        text = re.sub(r"\\(?:text|textrm|mathrm|mathit|mathbf|operatorname)"
+                      r"\s*\{([^{}]*)\}", r"\1", text)
+        text = re.sub(r"\\sqrt\s*\{([^{}]*)\}", r"sqrt(\1)", text)
+        text = re.sub(r"\\(?:d|t)?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}",
+                      _fraction, text)
+        if text == before:
+            break
+    text = re.sub(r"\\(?:left|right|[Bb]igg?)(?![A-Za-z])", "", text)
+
+    text = text.replace("\\\\", " ").replace("{", "").replace("}", "")
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
+
+
+def strip_latex(text):
+    """A reply's LaTeX math as plain text, leaving code and prose alone.
+
+    The assistant is told to write math as plain text; this is what happens when
+    it writes LaTeX anyway. Delimiters (``$$…$$``, ``$…$``, ``\\[…\\]``,
+    ``\\(…\\)``) are removed and the expression inside converted, so the reader
+    gets ``tan φ / tan β = 0.066`` rather than the macro that produced it. Code
+    spans are untouched: a snippet that contains a dollar sign or a backslash
+    means them literally.
+    """
+    def inline(m):
+        body = m.group(1)
+        if _MATH_SIGNAL.search(body) or ("=" in body and not body[:1].isdigit()):
+            return _latex_body_to_text(body)
+        return m.group(0)
+
+    def convert(part):
+        for pattern in (_MATH_DISPLAY, _MATH_BRACKET, _MATH_PAREN):
+            part = pattern.sub(lambda m: _latex_body_to_text(m.group(1)), part)
+        return _MATH_INLINE.sub(inline, part)
+
+    return "".join(part if part.startswith("`") else convert(part)
+                   for part in _CODE_SPANS.split(text or ""))
+
+
+def _escape_outside_code(text):
+    """HTML-escape prose while leaving code spans alone.
+
+    The assistant writes markdown, and markdown passes raw HTML through: an
+    unescaped ``<not html>`` in a sentence is swallowed by the parser and the
+    reader never sees it. Escaping first fixes that everywhere the escape is
+    decoded again — which is everywhere except inside code, where markdown is
+    literal by definition.
+    """
+    return "".join(part if part.startswith("`") else html.escape(part, quote=False)
+                   for part in _CODE_SPANS.split(text or ""))
+
+
+def markdown_to_html(text):
+    """One markdown message as an HTML fragment for the transcript.
+
+    Qt's own parser (GitHub dialect: tables, headings, lists, fenced code) does
+    the work, and the fragment is the body of what it produces — the document
+    wrapper and its font declaration are dropped so the appended block inherits
+    the transcript's. A parse that fails falls back to escaped plain text, since
+    an unrendered reply must still be a readable one.
+
+    The dialect has no math, so any LaTeX the reply carries is converted to plain
+    text first (:func:`strip_latex`) rather than shown as its own source.
+    """
+    try:
+        doc = QTextDocument()
+        doc.setMarkdown(_escape_outside_code(strip_latex(text)),
+                        QTextDocument.MarkdownDialectGitHub)
+        rendered = doc.toHtml()
+        open_tag = rendered.find("<body")
+        start = rendered.find(">", open_tag)
+        end = rendered.rfind("</body>")
+        if open_tag != -1 and start != -1 and end > start:
+            return rendered[start + 1:end]
+        return rendered
+    except Exception:
+        return html.escape(text or "").replace("\n", "<br>")
 
 
 def qimage_to_data_url(img):
@@ -90,6 +286,13 @@ class ChatDock(QWidget):
         self._paths = {}          # link-id -> output file path (open / reveal)
 
         self.transcript = QTextBrowser()
+        # A long unbroken token (a URL, a path, a JSON blob) wraps rather than
+        # widening the dock — what the per-block ``word-wrap`` style used to do,
+        # set once here because the markdown blocks carry Qt's own styles.
+        self.transcript.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        # A fenced code block in a reply reads as the "Ran code" blocks do.
+        self.transcript.document().setDefaultStyleSheet(
+            "pre { background-color: #f4f4f4; }")
         self.transcript.setOpenExternalLinks(False)
         self.transcript.setOpenLinks(False)            # we handle clicks ourselves
         self.transcript.anchorClicked.connect(self._on_anchor)
@@ -144,6 +347,19 @@ class ChatDock(QWidget):
         row.addWidget(self.send_btn)
         row.addWidget(self.stop_btn)
 
+        # What the conversation has cost, in tokens: this turn, and the session
+        # behind it. Tokens only — a price would need a per-model rate table, and
+        # those change faster than a release, so a stale one quoting dollars would
+        # be worse than no dollars at all. It sits under the input, where the user
+        # decides whether to send the next one.
+        self.usage_label = QLabel()
+        self.usage_label.setObjectName("assistant_usage")
+        self.usage_label.setWordWrap(True)
+        self.usage_label.setStyleSheet("color:#777; font-size:11px;")
+        self.usage_label.setToolTip(
+            "Tokens read and written by the model. 'cached' is the part of the "
+            "input the provider served from its prompt cache.")
+
         layout = QVBoxLayout(self)
         layout.addLayout(top)
         layout.addWidget(self.transcript, 1)
@@ -151,6 +367,7 @@ class ChatDock(QWidget):
         layout.addWidget(self.attach_row)
         layout.addWidget(self.input)
         layout.addLayout(row)
+        layout.addWidget(self.usage_label)
         self.setMinimumWidth(220)
 
         self.input.image_added.connect(self._add_attachment)
@@ -162,6 +379,7 @@ class ChatDock(QWidget):
         self.settings_btn.clicked.connect(self._open_settings)
 
         self._assistant.assistant_text.connect(self._on_assistant_text)
+        self._assistant.usage_changed.connect(self._on_usage)
         self._assistant.tool_ran.connect(self._on_tool_ran)
         self._assistant.tool_declined.connect(self._on_tool_declined)
         self._assistant.failed.connect(self._on_failed)
@@ -200,8 +418,8 @@ class ChatDock(QWidget):
         if not self._assistant.config.capabilities().get("vision", True):
             self.transcript.append(
                 '<div style="color:#9a6700;margin-top:8px;">The current model '
-                'has no vision support — switch to a Claude/OpenAI (or vision-'
-                'capable Ollama) model in Settings to send images.</div>')
+                'cannot read images. Every model the Settings dialog lists can — '
+                'pick one from the list rather than a typed-in id.</div>')
             return
         self._pending.append(img)
         self._refresh_attachments()
@@ -235,8 +453,18 @@ class ChatDock(QWidget):
         self._assistant.send(text, images=[qimage_to_data_url(i) for i in images])
 
     # --- assistant signals ----------------------------------------------
+    def _on_usage(self, usage):
+        """Show the running token count. Blank until the first completion, so a
+        fresh dock (and a new chat) carries no line at all rather than zeros."""
+        from .ai.assistant import format_usage
+        session = (usage or {}).get("session") or {}
+        if not any(session.get(k) for k in ("input", "cached_input", "output")):
+            self.usage_label.clear()
+            return
+        self.usage_label.setText(format_usage(usage["turn"], session))
+
     def _on_assistant_text(self, text):
-        self._add_block("Assistant", text, "#2e7d32")
+        self._add_markdown_block("Assistant", text, "#2e7d32")
 
     def _on_tool_ran(self, code, output, outputs):
         pre = ("background:#f4f4f4;padding:6px;border-radius:4px;"
@@ -273,11 +501,25 @@ class ChatDock(QWidget):
         self.status_label.clear()
 
     def _add_block(self, who, text, color):
+        """A block of VERBATIM text (what the user typed), escaped and line-broken
+        as written."""
         body = html.escape(text).replace("\n", "<br>")
-        # word-wrap so a long unbroken token (URL/JSON) still wraps in the box.
         self.transcript.append(
-            f'<div style="margin-top:8px;word-wrap:break-word;">'
+            f'<div style="margin-top:8px;">'
             f'<b style="color:{color};">{who}:</b> {body}</div>')
+
+    def _add_markdown_block(self, who, text, color):
+        """A block of MARKDOWN (what the assistant wrote), rendered: tables as
+        tables, ``##`` as headings, fenced code as monospaced blocks.
+
+        The speaker's label leads on its own line rather than inline, because a
+        reply that opens on a heading or a table has no first line to sit in.
+        """
+        self.transcript.append(f'<div style="margin-top:8px;">'
+                               f'<b style="color:{color};">{who}:</b></div>')
+        body = markdown_to_html(text)
+        if body.strip():
+            self.transcript.append(body)
 
     # --- generated outputs (clickable to open / reveal) -----------------
     def _register(self, path):

@@ -1929,7 +1929,7 @@ def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0,
 MEMBER_FORCE_LEGEND_LABELS = (
     'Inactive (no tension)',
     'At residual (Tres)',
-    'Pulled out',
+    'Ruptured',
 )
 
 #: What a member drawn as geometry alone is called in the legend: the kind of
@@ -1979,7 +1979,7 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     Color scheme:
     - Blue to green to yellow to red: 0 to Tmax (tension force ramp)
     - Magenta: element has softened to its residual capacity Tres
-    - Black: element has pulled out — softened with no residual left, carrying
+    - Black: element has ruptured — softened with no residual left, carrying
       nothing
     - Green: element carrying no tension (inactive or in compression)
 
@@ -2069,10 +2069,13 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
 
         force = forces_1d[i]
         # Softened: the element dropped off its peak onto whatever residual it
-        # was given. With no residual left and no force in it, that drop was a
-        # pullout — the same three-part definition
-        # :func:`xslope.fem_details.reinforcement_profile` marks a pullout by,
-        # so the overlay and the member detail figure mark the same elements.
+        # was given. With no residual left and no force in it, it has lost
+        # everything — the line's own Tres is zero, or the envelope develops
+        # nothing where it sits. Bond slip alone never puts an element here: it
+        # is perfectly plastic and leaves the ramped capacity standing (see
+        # build_fem_data's t_res assignment). This is the same three-part
+        # definition :func:`xslope.fem_details.reinforcement_profile` uses, so
+        # the overlay and the member detail figure mark the same elements.
         is_softened = softened_1d[i]
 
         if is_softened and t_res[i] < 1e-6 and force < 1e-6:
@@ -2142,7 +2145,7 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
         ax.add_collection(lc_outline)
         lc = LineCollection(pullout_lines, colors='black', linewidths=3, alpha=0.9, zorder=6)
         ax.add_collection(lc)
-        ax.plot([], [], '-', color='black', linewidth=3, alpha=0.9, label='Pulled out')
+        ax.plot([], [], '-', color='black', linewidth=3, alpha=0.9, label='Ruptured')
 
     # Draw pile elements colored by lateral (shear) force
     if pile_force_lines:

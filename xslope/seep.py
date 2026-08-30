@@ -325,9 +325,27 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     # run_transient_seepage resolves them per time step (by the head binding's kind:
     # submerged-only reservoir Dirichlet, or plain time-varying head; scaled unit
     # flux loads for fluxes). Empty on every steady file, so the steady solve is
-    # bit-identical.
+    # bit-identical — and run_seepage_analysis refuses to solve while bindings
+    # exist, so a series-bound node can never be silently left free in a steady
+    # solution.
     head_series_bindings = []   # [{"mask": bool(n_nodes), "series": name, "kind": str}]
     flux_series_bindings = []   # [{"unit_flux_nodal": (n_nodes,), "series": name}]
+
+    # Each binding also carries the series' value AT t = 0 ("value_t0"), computed
+    # here where the tseep sheet is in reach. A STEADY solve on a series-bound
+    # model reads every series at t = 0 — the same values the transient march's
+    # own initial condition uses — so the steady run is the initial-condition
+    # snapshot, cheap, without the march behind it.
+    _series_t0 = {}
+    _ts = (slope_data or {}).get("tseep") or {}
+    for _name, _vals in (_ts.get("series") or {}).items():
+        _pairs = [(float(t), float(v)) for t, v in zip(_ts.get("times") or [], _vals)
+                  if v is not None]
+        if _pairs:
+            _ta, _va = zip(*_pairs)
+            # np.interp clamps to the first value before the first breakpoint,
+            # matching the march's held-before-first rule.
+            _series_t0[_name] = float(np.interp(0.0, _ta, _va))
 
     # Process specified head boundary conditions
     # Vectorized: compute distance from all nodes to each BC line at once
@@ -356,7 +374,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
             # applies the submerged-only reservoir rule or the plain head rule by
             # the binding's kind. It stays OUT of the baked scalar arrays here.
             head_series_bindings.append({"mask": mask, "series": head_value,
-                                         "kind": kind})
+                                         "kind": kind,
+                                         "value_t0": _series_t0.get(head_value)})
             continue
         if kind == "reservoir":
             # Submerged-only against the constant level: hold submerged nodes,
@@ -404,7 +423,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
                 nodes, elements, element_types,
                 [{"coords": _b["coords"], "flux": 1.0}], tolerance)
             flux_series_bindings.append({"unit_flux_nodal": unit_fn,
-                                         "series": _b["flux"]})
+                                         "series": _b["flux"],
+                                         "value_t0": _series_t0.get(_b["flux"])})
     flux_nodal = assemble_flux_nodal(nodes, elements, element_types,
                                      _numeric_fluxes, tolerance)
     # A series-bound head resolves to a Dirichlet (or exit-face) node at runtime, so
@@ -843,6 +863,11 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     y = nodes[:, 1]
     f_ext = (np.zeros(n_nodes) if flux_nodal is None
              else np.asarray(flux_nodal, dtype=float))
+    # Water OFFERED at each node by its boundary condition: the threshold the
+    # exit-face switch measures an apparent inflow against (see the switch below).
+    # Zero wherever no inflow is prescribed, which is every node of a model with no
+    # flux BC, so the switch is then the strict-sign rule bit-for-bit.
+    q_offered = np.maximum(f_ext, 0.0)
 
     # Initialize heads
     fixed_heads = bc_values[bc_type == 1]
@@ -988,10 +1013,36 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
         # compare the applied load against ITSELF, read "inflow" for any q > 0, and
         # pin the node out of the seepage face forever, however high its pressure
         # climbed. Subtracting f_eff restores the residual the term is meant to test.
+        #
+        # THE THRESHOLD IS THE WATER OFFERED AT THE NODE, NOT ZERO. Subtracting f_eff
+        # is necessary but not sufficient: on a converged free row the residual it
+        # leaves is identically zero, so at a flux-loaded exit candidate the SIGN of q
+        # is round-off. Measured on the dam-infiltration model at the rate where its
+        # surface first ponds: q = +2.4e-22 against a nodal rain load of +2.2e-08 (a
+        # ratio of 1e-14) at a node standing at psi = +0.055 m, which therefore never
+        # joined the seepage face; a rate higher still and that noise changes sign from
+        # sweep to sweep and the active set cycles instead of converging.
+        #
+        # So the tests compare q against `q_offered` = max(f_ext, 0), which states one
+        # physical thing in both directions of the switch: THE BOUNDARY MAY NOT SUPPLY
+        # MORE WATER THAN IS PRESCRIBED THERE. A node held at psi = 0 that takes in no
+        # more than the rain falling on it is infiltrating that rain and shedding the
+        # rest as runoff — precisely what an active exit node over a flux boundary
+        # means. Only a reaction ABOVE the offered flux is water the boundary invented,
+        # and only that may veto activation or shed an active node. The threshold is
+        # thus scaled by the node's own assembled load, in the model's own flow units,
+        # as `hyst` is scaled by the domain height and `eps` by height x tol; nothing
+        # here is a fixed number.
+        #
+        # Both sides use the SAME threshold, and that symmetry is what keeps the set
+        # from chattering: a node that activates on a near-zero residual cannot then be
+        # shed by a reaction the rain it already carries accounts for. And it is f_ext,
+        # not f_eff: the offered water is a property of the boundary condition, so the
+        # threshold must not move when the node's own row turns Dirichlet.
         corner_candidate = np.zeros(n_nodes, dtype=bool)
         is_corner = (bc_type == 2) & _exit_is_corner
-        stay = is_corner & exit_face_active & ~((h_new < y - hyst) | (q > 0))
-        turn_on = is_corner & ~exit_face_active & (h_new >= y + hyst) & (q <= 0)
+        stay = is_corner & exit_face_active & ~((h_new < y - hyst) | (q > q_offered))
+        turn_on = is_corner & ~exit_face_active & (h_new >= y + hyst) & (q <= q_offered)
         corner_candidate[stay | turn_on] = True
 
         new_exit_face_active = np.zeros(n_nodes, dtype=bool)
@@ -999,9 +1050,11 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
 
         for c1, mid, c2 in _exit_quadratic_edges:
             if exit_face_active[mid]:
-                mid_candidate = not (h_new[mid] < y[mid] - hyst or q[mid] > 0)
+                mid_candidate = not (h_new[mid] < y[mid] - hyst
+                                     or q[mid] > q_offered[mid])
             else:
-                mid_candidate = (h_new[mid] >= y[mid] + hyst and q[mid] <= 0)
+                mid_candidate = (h_new[mid] >= y[mid] + hyst
+                                 and q[mid] <= q_offered[mid])
 
             if (c1, mid, c2) in _free_edges:
                 # This edge, and only this edge, is updated per node: it was carrying
@@ -1200,17 +1253,34 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     h_new = spsolve(A_final, b_final)
     q_final = _coo_matvec(asm, data, h_new)
 
-    # Flowrate: the reaction at the specified-head boundaries, plus the flux
-    # delivered on the free rows. "Free" is the runtime Dirichlet complement, so it
-    # includes the INACTIVE exit-face nodes — their rows stay free, so their loads
-    # do enter the solve and are real inflow (rain landing on the unsaturated part
-    # of a seepage face infiltrates). Loads on ACTIVE exit nodes were dropped by the
-    # solve, so f_eff zeroes them and they are counted nowhere: rain falling on a
-    # saturated, free-draining face simply runs off.
+    # Flowrate: the water crossing INTO the domain, which conservation makes equal to
+    # the water crossing out of it (the conduction operator has zero row sums, so the
+    # reactions and the delivered loads sum to zero). Two entries, and the enumeration
+    # has to be complete or the number is not the throughput.
+    #
+    #   1. THE REACTION AT EVERY DIRICHLET-HELD ROW THAT IS POSITIVE — the specified
+    #      heads AND the active exit-face nodes, not the specified heads alone. An
+    #      active exit node over a flux boundary is held at p = 0 with its own load
+    #      discarded, and what it then draws is the share of that load the soil can
+    #      still accept; the rest runs off. That is water entering the domain at the
+    #      boundary and it is counted nowhere else. Without a flux load on the exit
+    #      face the term is empty: an exit node is active because the switch measured
+    #      it draining. (This is the enumeration `_frame_flows` already uses per frame
+    #      on the transient side.)
+    #   2. THE FLUX DELIVERED ON THE FREE ROWS. "Free" is the runtime Dirichlet
+    #      complement, so it includes the INACTIVE exit-face nodes — their rows stay
+    #      free, so their loads do enter the solve and are real inflow (rain landing on
+    #      the unsaturated part of a seepage face infiltrates).
+    #
+    # Nothing is counted twice. `_dirichlet_system` seeds the RHS with the loads and
+    # then OVERWRITES the held rows, so a load sitting on a held node never entered the
+    # solve: `f_eff` zeroes it here and `_flux_inflow` masks it out there. The only
+    # water crossing the boundary at a held node is its reaction, and the only water
+    # crossing at a free node is its delivered load.
     free_final = ~dir_mask
     f_eff = np.where(dir_mask, 0.0, f_ext)
     react_final = q_final - f_eff
-    total_inflow = float(np.sum(react_final[(bc_type == 1) & (react_final > 0)]))
+    total_inflow = float(np.sum(react_final[dir_mask & (react_final > 0)]))
     total_inflow += _flux_inflow(f_ext, free_final)
 
     # Closure report: kr-consistent imbalance at the converged state
@@ -3832,6 +3902,62 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     if report is not None:
         report.raise_for_errors()
 
+    # A boundary value bound to a tseep time series has no meaning in a steady
+    # solve — there is no time axis to read the series at, and silently leaving
+    # those nodes free would solve a different problem than the file describes.
+    # Refuse loudly instead. The steady solution at the initial pool level is the
+    # transient run's own first frame (t = 0), so nothing is lost by refusing.
+    # A boundary value bound to a tseep series is read AT ITS t = 0 VALUE for a
+    # steady solve — the same values the transient march's own initial condition
+    # uses, so the steady run is the initial-condition snapshot without the march
+    # behind it. Never silent: each reading is announced on the log. The overlay
+    # works on copies, so the caller's seep_data stays untouched (its arrays keep
+    # the binding nodes free, as the transient path expects).
+    _hb = seep_data.get("head_series_bindings") or []
+    _fb = seep_data.get("flux_series_bindings") or []
+    _bc_overlay = None
+    if _hb or _fb:
+        _unresolved = [b["series"] for b in (_hb + _fb)
+                       if b.get("value_t0") is None]
+        if _unresolved:
+            _names = ", ".join(f"'{s}'" for s in dict.fromkeys(_unresolved))
+            raise SeepInputError(
+                f"Cannot run a STEADY seepage analysis: boundary values are bound "
+                f"to time series ({_names}) whose t = 0 values are not carried on "
+                f"this seep_data. Rebuild it with build_seep_data from the loaded "
+                f"model (so the tseep sheet is in reach), or replace the series "
+                f"name with a number in the seep bc sheet.")
+        _nodes_y = np.asarray(seep_data["nodes"], dtype=float)[:, 1]
+        _bt = np.asarray(seep_data["bc_type"]).copy()
+        _bv = np.asarray(seep_data["bc_values"], dtype=float).copy()
+        _fn = seep_data.get("flux_nodal")
+        _fn = (np.zeros(len(_bt)) if _fn is None
+               else np.asarray(_fn, dtype=float).copy())
+        for _b in _hb:
+            _v = float(_b["value_t0"])
+            _mask = _b["mask"]
+            print(f"Series '{_b['series']}' read at t = 0 for the steady solve: "
+                  f"{_b.get('kind', 'head')} value {_v:g}")
+            if str(_b.get("kind", "head")).strip().lower() == "reservoir":
+                # Submerged-only at the t = 0 level, exactly as a constant
+                # reservoir bakes: hold submerged nodes, let above-level nodes
+                # seep (Dirichlet from another boundary still wins there).
+                _sub = _mask & (_nodes_y <= _v)
+                _bt[_sub] = 1
+                _bv[_sub] = _v
+                _above = _mask & (_nodes_y > _v) & (_bt != 1)
+                _bt[_above] = 2
+                _bv[_above] = _nodes_y[_above]
+            else:
+                _bt[_mask] = 1
+                _bv[_mask] = _v
+        for _b in _fb:
+            _v = float(_b["value_t0"])
+            print(f"Series '{_b['series']}' read at t = 0 for the steady solve: "
+                  f"flux value {_v:g}")
+            _fn = _fn + np.asarray(_b["unit_flux_nodal"], dtype=float) * _v
+        _bc_overlay = (_bt, _bv, _fn)
+
     start_time = time.time()
 
     # Missing unsaturated parameters: raise rather than return None. Returning None
@@ -3853,15 +3979,19 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     # Extract data from seep_data
     nodes = seep_data["nodes"]
     elements = seep_data["elements"]
-    bc_type = seep_data["bc_type"]
-    bc_values = seep_data["bc_values"]
-    # Consistent nodal loads from specified-flux BCs (absent on seep_data built by
-    # import_seep2d or older callers -> no flux).
-    flux_nodal = seep_data.get("flux_nodal")
-    if flux_nodal is None:
-        flux_nodal = np.zeros(len(bc_type))
+    if _bc_overlay is not None:
+        # Series-bound model: the t = 0 overlay computed above.
+        bc_type, bc_values, flux_nodal = _bc_overlay
     else:
-        flux_nodal = np.asarray(flux_nodal, dtype=float)
+        bc_type = seep_data["bc_type"]
+        bc_values = seep_data["bc_values"]
+        # Consistent nodal loads from specified-flux BCs (absent on seep_data
+        # built by import_seep2d or older callers -> no flux).
+        flux_nodal = seep_data.get("flux_nodal")
+        if flux_nodal is None:
+            flux_nodal = np.zeros(len(bc_type))
+        else:
+            flux_nodal = np.asarray(flux_nodal, dtype=float)
     has_flux = bool(np.any(flux_nodal != 0.0))
     if has_flux and not np.any(bc_type > 0):
         raise SeepInputError(
@@ -4581,9 +4711,17 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 f_eff = np.where(dir_mask, 0.0, flux)
                 q = _coo_matvec(asm, kd, h_new) - f_eff
                 hyst = 1e-3 * char_h
+                # An apparent inflow is measured against the water OFFERED at the
+                # node, max(flux, 0), not against zero: on a settled free row the
+                # residual left after f_eff is round-off, so a strict sign test hands
+                # a flux-loaded exit candidate to noise. Same threshold on both tests,
+                # same reasoning as the steady switch (see solve_unsaturated); exactly
+                # zero, hence bit-for-bit the strict rule, wherever no inflow is
+                # prescribed.
+                q_offered = np.maximum(flux, 0.0)
                 is_c = (bt == 2) & exit_is_corner
-                stay = is_c & act & ~((h_new < y - hyst) | (q > 0))
-                turn_on = is_c & ~act & (h_new >= y + hyst) & (q <= 0)
+                stay = is_c & act & ~((h_new < y - hyst) | (q > q_offered))
+                turn_on = is_c & ~act & (h_new >= y + hyst) & (q <= q_offered)
                 corner_candidate = np.zeros(n_nodes, dtype=bool)
                 corner_candidate[stay | turn_on] = True
 
@@ -4595,10 +4733,10 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 for _c1, _mid, _c2 in exit_quadratic_edges:
                     if act[_mid]:
                         mid_candidate = not (h_new[_mid] < y[_mid] - hyst
-                                             or q[_mid] > 0)
+                                             or q[_mid] > q_offered[_mid])
                     else:
                         mid_candidate = (h_new[_mid] >= y[_mid] + hyst
-                                         and q[_mid] <= 0)
+                                         and q[_mid] <= q_offered[_mid])
                     mid_cands.append(bool(mid_candidate))
                     if corner_candidate[_c1] and mid_candidate and corner_candidate[_c2]:
                         new_act[_c1] = True
@@ -5291,7 +5429,7 @@ def transient_frame_index(transient_solution, t, tol=None):
             f"No saved transient frame at time {t}; nearest is {times[i]} "
             f"(available: {', '.join(f'{x:g}' for x in times)}). Add it to "
             f"save_times / stage_1 / stage_2 / stability_time so the stepper lands "
-            f"on it, or re-march with remarch_for_times().")
+            f"on it, or re-run the analysis with remarch_for_times().")
     return i
 
 
@@ -5384,10 +5522,14 @@ def stage_transient_for_drawdown(slope_data, transient_solution):
     slope_data["seep_u"] = _frame_u(transient_solution, i1)
     slope_data["seep_u2"] = _frame_u(transient_solution, i2)
     # The moments the two staged fields belong to, for the same reason as in
-    # select_transient_frame_u: an automatic stage-1 water load is derived from the
-    # pool at the stage-1 time, not at t = 0. (Stage 2 already reads the tseep
-    # sheet's own stage_2 time, which is where i2 came from.)
+    # select_transient_frame_u: an automatic water load is derived from the pool as
+    # it stood at the instant the field was read, not at t = 0. Stage 2's instant
+    # does a second job -- it is the only mark that says this drawdown is running
+    # the transient-staged route, and the water derivation reads it to take the
+    # drawn-down pool from boundary set 1 at that instant instead of from boundary
+    # set 2, which belongs to the other route (xslope.water.stage_water_source).
     slope_data["seep_u_time"] = float(transient_solution["times"][i1])
+    slope_data["seep_u2_time"] = float(transient_solution["times"][i2])
     return slope_data
 
 
@@ -5413,7 +5555,7 @@ def remarch_for_times(seep_data, slope_data, times, progress_callback=None, **ma
     tseep_data = build_tseep_data(slope_data)
     if tseep_data is None:
         raise SeepInputError("remarch_for_times: this model has no 'tseep' sheet, so "
-                             "there is no transient march to re-run.")
+                             "there is no transient seepage analysis to re-run.")
     duration = tseep_data.get("duration")
     if duration is None or duration <= 0:
         raise SeepInputError("remarch_for_times: the tseep controls set no positive "
@@ -5474,12 +5616,14 @@ def apply_steady_stability_field(slope_data, solution, bc=1, verbose=True):
             f"Re-run the seepage analysis on this mesh.")
     key = "seep_u" if bc == 1 else "seep_u2"
     slope_data[key] = u
-    if bc == 1:
-        # A steady field belongs to no instant. Leaving a stale ``seep_u_time``
-        # behind would date these pressures to a moment of a march they did not
-        # come from -- and under automatic water loads that moment is what the
-        # surface load is derived from, so the pool would be read at the wrong time.
-        slope_data.pop("seep_u_time", None)
+    # A steady field belongs to no instant. Leaving a stale time behind would date
+    # these pressures to a moment of a march they did not come from -- and under
+    # automatic water loads that moment is what the surface load is derived from, so
+    # the pool would be read at the wrong time. For set 2 it would do worse: the
+    # stage-2 instant is also the mark of the transient-staged route, so a stale one
+    # would send the drawn-down water load back to boundary set 1 on a run that has
+    # just been given set 2's own solved field.
+    slope_data.pop("seep_u_time" if bc == 1 else "seep_u2_time", None)
     if verbose:
         print(f"Analysis uses the steady seepage solution (BC set {bc}), "
               f"{len(u)} nodal pore pressures.")
@@ -5525,7 +5669,7 @@ def apply_transient_stability_frame(slope_data, transient_solution, time=None,
     """
     if transient_solution is None:
         raise ValueError("apply_transient_stability_frame needs a transient solution; "
-                         "run or import the march first.")
+                         "run or import the transient seepage analysis first.")
     remarched = False
     if rapid:
         ts = slope_data.get("tseep") or {}
@@ -5541,7 +5685,7 @@ def apply_transient_stability_frame(slope_data, transient_solution, time=None,
         source = "stages"
         if verbose:
             print(f"Rapid drawdown uses transient stages {used[0]:g} / {used[1]:g}"
-                  + (" (re-marched)." if remarched else "."))
+                  + (" (re-run)." if remarched else "."))
     else:
         t, source = resolve_stability_time(slope_data, transient_solution, time)
         if remarch and seep_data is not None and not has_transient_frame(
@@ -5556,7 +5700,7 @@ def apply_transient_stability_frame(slope_data, transient_solution, time=None,
                      "file": "from the file's stability_time",
                      "default": "the last saved frame (no stability_time set)"}[source]
             print(f"Analysis uses transient seepage frame t = {used[0]:g} — {where}"
-                  + (", re-marched." if remarched else "."))
+                  + (", re-run." if remarched else "."))
     return {"times": used, "source": source, "remarched": remarched,
             "solution": transient_solution}
 

@@ -129,7 +129,7 @@ def test_endpoints():
     want = {
         "anthropic": "https://api.anthropic.com/v1/models",
         "openai": "https://api.openai.com/v1/models",
-        "deepseek": "https://api.deepseek.com/models",
+        "kimi": "https://api.moonshot.ai/v1/models",
         "ollama": "http://localhost:11434/api/tags",
     }
     for provider, url in want.items():
@@ -162,7 +162,7 @@ def test_endpoints():
         fails.append("the Anthropic version header is missing")
     if "Authorization" in h:
         fails.append("Anthropic must not send a bearer token")
-    for provider in ("openai", "deepseek", "zai"):
+    for provider in ("openai", "kimi", "zai"):
         h = ml.auth_headers(provider, "sk-test")
         if h.get("Authorization") != "Bearer sk-test":
             fails.append(f"{provider} must authenticate with a bearer token")
@@ -229,13 +229,14 @@ def test_filter():
         ("openai", "gpt-image-1"), ("openai", "omni-moderation-latest"),
         ("openai", "davinci-002"), ("openai", "gpt-4o-transcribe"),
         ("zai", "embedding-3"), ("zai", "glm-ocr"), ("zai", "cogview-4"),
+        ("kimi", "kimi-thinking-preview"),
         ("ollama", "nomic-embed-text"), ("ollama", "mxbai-embed-large"),
     ]
     keep = [
         ("openai", "gpt-5.1"), ("openai", "gpt-5-mini"), ("openai", "o4-mini"),
         ("openai", "some-model-invented-next-year"),
         ("anthropic", "claude-opus-5"), ("anthropic", "claude-anything-at-all"),
-        ("deepseek", "deepseek-chat"), ("deepseek", "deepseek-reasoner"),
+        ("kimi", "kimi-k2.6"), ("kimi", "some-kimi-published-tomorrow"),
         ("zai", "glm-5.2"), ("zai", "glm-4.6v"),
         ("ollama", "llama3.1:8b"), ("ollama", "qwen2.5-coder:7b"),
     ]
@@ -266,11 +267,23 @@ def test_enumeration():
         if models != ["gpt-5.1", "gpt-5-mini"]:
             fails.append(f"the OpenAI enumeration did not filter: {models!r}")
 
+        # A local library is mostly text models; only the ones that can read an
+        # image are offered, since that is what the assistant is shown.
         url = fx.write("ollama.json", {"models": [
-            {"name": "llama3.1:8b"}, {"name": "nomic-embed-text:latest"}]})
+            {"name": "llava:13b"}, {"name": "llama3.1:8b"},
+            {"name": "nomic-embed-text:latest"}]})
         models, _ = ml.fetch_models("ollama", url=url)
-        if models != ["llama3.1:8b"]:
+        if models != ["llava:13b"]:
             fails.append(f"the Ollama enumeration gave {models!r}")
+
+        # Moonshot lists its text K2 models beside the vision ones; the text ones
+        # do not reach the box.
+        url = fx.write("kimi.json", {"data": [
+            {"id": "kimi-k2.6"}, {"id": "moonshot-v1-8k"},
+            {"id": "kimi-k2-thinking"}, {"id": "moonshot-v1-32k-vision-preview"}]})
+        models, _ = ml.fetch_models("kimi", api_key="sk-x", url=url)
+        if models != ["kimi-k2.6", "moonshot-v1-32k-vision-preview"]:
+            fails.append(f"the Kimi enumeration gave {models!r}")
 
         # Failures are answers, not exceptions.
         models, error = ml.fetch_models(

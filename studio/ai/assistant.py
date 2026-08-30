@@ -19,7 +19,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from .config import AssistantConfig
 
-MAX_TOKENS = 8000
+MAX_TOKENS = 32000
 
 # OpenAI/LiteLLM function-tool format (works across providers).
 RUN_PYTHON_TOOL = {
@@ -99,56 +99,48 @@ own snippet, separate from analysis. NEVER re-run a mutating snippet — re-runn
 `x += 5` doubles the effect. A relative change (`+=`, append, scale) must run \
 exactly once. If a snippet fails, fix that snippet; do not repeat an edit that \
 already ran. If unsure whether an edit applied, print the current value first.
-- When unsure of a key or signature, inspect at runtime instead of guessing: \
-`print(sorted(slope_data))`, `print(slope_data['materials'][0])`, \
-`import xslope; print([n for n in dir(xslope.solve)])`, `help(fn)`.
+- **One snippet, then the answer.** Every completion costs the user money, so a \
+question about the current model is normally ONE `run_python` call: compute, \
+print, answer. The record schemas and every preloaded helper's signature are in \
+your instructions, and a summary of the open model is given to you whenever it \
+changes — so do NOT open a turn by dumping `slope_data`, printing \
+`sorted(slope_data)`, or calling `help()` / `dir()` on a helper. Inspect at \
+runtime only when something genuinely surprises you.
 - To run a limit-equilibrium analysis, prefer the preloaded helper \
-`run_lem(method='bishop')` (methods: oms, bishop, janbu, spencer, corps, lowe, \
-mprice). It handles the loaded project's failure surface, returns the result \
-dict (with 'FS'), and shows the solution plot — don't rebuild that pipeline by \
-hand.
+`run_lem(search=False)` (methods: oms, bishop, janbu, spencer, corps, lowe, \
+mprice). **Name a method only when the user does** — left out, it runs the \
+method the MODEL declares, which is what Studio's Run LEM dialog opens on. It \
+returns the result dict — 'FS', 'warnings', and the surface it was solved on \
+('Xo', 'Yo', 'R', 'Depth', and 'x_entry'/'x_exit') — shows the solution plot, \
+and stores the run where the results tabs and the report read it. Don't rebuild \
+that pipeline by hand. **A question about THE \
+factor of safety of a model means the critical one: pass `search=True`**, which \
+runs the automated search for that method the way Studio's Run LEM does. \
+`search=False` solves only the surface the model already defines. `run_seep(bc=1)` and `run_fem(analysis='ssrm')` are its seepage and finite \
+element counterparts, with the same shape: they build the mesh from the file's \
+declared settings if the model has none, attach the answer where Studio attaches \
+it, and plot. An SSRM run takes MINUTES — tell the user before you start one.
 
 For slope-stability modeling rules (geometry extents, starting circles, ponded \
-water, diagram reading, etc.) FOLLOW the xslope skill reference — it is the \
-authoritative source. The compact reminders below restate its key rules; the \
-skill has the full detail.
+water, diagram reading, etc.) FOLLOW the Studio reference below — it is the \
+authoritative source. The compact reminders here restate its key rules; the \
+reference has the full detail.
 """
 
-# Appended only for Anthropic, where prompt caching makes the large skill body
-# cheap. Local/other models get the compact prompt above and introspect at
-# runtime (the skill body measures ~33k tokens today; sending that every turn
-# makes a local model crawl).
-_SKILL_HEADER = ("\n\n---\n\nReference — the `slope_data` schema and engine API "
-                 "(ground truth for keys and signatures; it builds the same "
-                 "in-memory `slope_data` dict you edit here, so reuse its schema "
-                 "and geometry knowledge — only skip its final file-save step):\n\n")
-
-# Appended AFTER the skill body so it is the last thing the model reads. The
-# standalone skill builds the in-memory `slope_data` dict (exactly what we want)
-# and then persists it with save_slope_data_to_xlsx. Inside Studio the project is
-# already open and the user saves via Save As, so we override only that final
-# file-save — the dict-building core carries over unchanged.
-_SKILL_TRAILER = """\
-
----
-
-CRITICAL — you are inside XSLOPE Studio, NOT the standalone file-based skill. The \
-reference above builds the in-memory `slope_data` dict (which is exactly right) and \
-then SAVES it to an .xlsx. Reuse everything about constructing the dict; override \
-only the save:
-- There is ALREADY an open project. Build and edit it by mutating the in-memory \
-`slope_data` dict in `run_python`. The canvas re-renders automatically.
-- NEVER create, open, write, or save an .xlsx (or any) file. Do not call \
-`save_slope_data_to_xlsx`, `pd.ExcelWriter`, `openpyxl`, `load_slope_data`, or \
-read/write the filesystem. The user persists the model themselves via Save As.
-- When the reference (or your own narration) says "build the input file," that \
-means populate `slope_data` in memory — say "I'll build the model" and mutate the \
-dict, never a file.
-- Construct geometry as the in-memory schema expects (e.g. `profile_lines` are \
-dicts with `mat_id` + shapely-ready coords, `materials` are dicts). Inspect an \
-existing record first when one is present; for an empty project, print \
-`sorted(slope_data)` and build the lists directly.
-"""
+# Header for the Studio brief (xslope/resources/studio_assistant_brief.md), the
+# body that replaces what used to be the whole Claude Code skill.
+#
+# The skill is written for a different job: build an .xlsx from a terminal. Inside
+# Studio a project is already open, the schema is a dict, and the corpus tables and
+# template layout it carries answer nothing — yet it billed ~34k tokens on EVERY
+# completion of every turn, and an agentic turn is half a dozen of them. The brief
+# says only what Studio's model needs: the kernel and its preloaded helpers, the
+# modeling rules, the docs links, and the round-trip discipline that keeps a
+# question to one snippet. The skill itself is unchanged; it is simply not what
+# this assistant reads.
+_BRIEF_HEADER = ("\n\n---\n\nReference — XSLOPE Studio: the kernel, its preloaded "
+                 "helpers, the modeling rules, and how to answer in one round "
+                 "trip:\n\n")
 
 # Authoritative in-memory record schemas. These ARE the ground truth for field
 # names, so the model never loads reference .xlsx files to reverse-engineer them
@@ -163,8 +155,10 @@ live dict (every list is `[]` for a fresh one) — just build the lists directly
 Do NOT call `doc.new()` or reassign `doc.slope_data`; your edits are detected and
 the canvas re-renders automatically.
 
-- materials[i]: name, gamma, option ('mc' Mohr-Coulomb | 'cp' | 'elastic' — infinite strength,
-  cannot fail; ignores every strength key below, uses only gamma/gsat/E/nu (+ seepage); LEM
+- materials[i]: name, gamma, gamma_sat (saturated unit weight, weighed below the water table
+  when set; the key is gamma_sat, never gsat), option ('mc' Mohr-Coulomb | 'cp' | 'elastic' —
+  infinite strength, cannot fail; ignores every strength key below, uses only
+  gamma/gamma_sat/E/nu (+ seepage); LEM
   treats it as impenetrable), c, phi, cp, r_elev, d, psi, t_cut (Rankine tensile-strength
   cutoff, stress units; None/blank = no cutoff (pre-v16 default), 0 = no tension; FEM only,
   LEM ignores it), phi_b, s_cap (v17 matric-suction apparent cohesion, LEM & FEM — Fredlund
@@ -189,6 +183,12 @@ the canvas re-renders automatically.
   (`from shapely.geometry import Polygon`). The canvas rebuilds ground_surface and
   domain_polygon from the polygons automatically — do NOT call plot_inputs,
   build_ground_surface_*, or set ground_surface/domain_polygon yourself.
+  ONE of the two is the model's geometry SOURCE and the other is rebuilt from it:
+  a NON-EMPTY profile_lines means the polygons are rebuilt from the profile lines
+  after every snippet, so writing polygons there is silently undone (the checks
+  still read clean — the rebuilt geometry is valid, just not yours). Edit
+  profile_lines on such a model, polygons on one that has none, and print the
+  vertices back before reporting a geometry edit done.
 - circles[i]: {'Xo':20.0,'Yo':40.0,'Depth':-10.0,'R':50.0}  # Depth = elevation of
   the circle's lowest point, R = Yo - Depth. In-memory there is no intercept key,
   so a TOE circle (one passing THROUGH the toe point) is R = distance(center, toe),
@@ -200,10 +200,12 @@ the canvas re-renders automatically.
 - non_circ[i]: {'X':-10.0,'Y':0.0,'Movement':'Free'}
 - piezo_line / piezo_line2: list of (x, y) tuples.
 - dloads / dloads2: list of blocks; each block is a list of {'X','Y','Normal'} pts.
-- reinforcement_lines[i]: {'x1','y1','x2','y2','t_max','t_res','lp1','lp2','area','E'}
+- reinforcement_lines[i]: {'x1','y1','x2','y2','t_max','t_res','lp1','lp2','area','E',
+  'tend1','tend2','spacing','type','dir','appl','adhesion','delta'}
+  ('adhesion'+'delta' both set = overburden pullout law; 'lp1'/'lp2' then unused)
   # EDIT THIS one; reinforce_lines (capitalized X/Y/T/Tres) is derived from it.
 - pile_lines[i]: {'x1','y1','x2','y2','D_pile','S','E','I','area','M_cap','V_cap',
-  'theta_p','fixity','label','H'}
+  'theta_p','head_fixity','tip_fixity','label','H'}
 - scalars: gamma_water, max_depth (elevation of the hard base — the lowest
   elevation the PROBLEM describes, never one you chose; see iron rule 1),
   k_seismic, tcrack_depth, tcrack_water, circular (bool).
@@ -246,10 +248,43 @@ head boundary (`seep_bc:<set>:<head_index>`, or the dict
 `{'seep_bc': {'set': 1, 'head_index': 0}}`) and finds the value giving the
 target q — the classic "reservoir level vs seepage discharge" study. Both mesh
 modes error with "build a mesh first" if none is present.
+
+To RUN the seepage or finite element engine (rather than sweep it), use
+`run_seep(bc=1)` and `run_fem(analysis='ssrm')`. Each builds the mesh from the
+model's own declared settings (main!D18 element type, main!D19 target size) when
+`slope_data['mesh']` is None, so neither needs a mesh built first, and each
+attaches its answer the way Studio does: `run_seep` puts the nodal pore pressures
+on the model (`slope_data['seep_u']`, or `['seep_u2']` for bc=2) so a later
+stability run with `u = 'seep'` reads THAT field, and both store their bundle on
+`doc.results`, where the report and the results tabs find it. `run_fem` returns
+{'FS', 'solution', 'fem_data', …} — 'FS' is the SSRM factor of safety, None for
+`analysis='single'`. An SSRM run costs MINUTES: say so before starting one, and
+never start one to answer a question limit equilibrium already answers.
+
+When asked what Young's modulus and Poisson's ratio to use for a material that
+has none, call `suggest_elastic('Clay')` (a material name, its 1-based row
+number, the dict itself, a soil-type name like 'stiff clay', or nothing at all
+for every material). It classifies the material from its STRENGTH and returns
+{'soil_type', 'E', 'nu', 'unit_system', 'reason'} with E in the model's own
+stress unit. Do NOT invent an elastic pair, and do not carry one over from
+another model. It is a LAST RESORT: where the problem states E or nu, that value
+is an input and you transcribe it. When you do fall back to this, SAY so and name
+the soil type it classified as — a blank E is a singular stiffness matrix, and an
+E of the wrong system's magnitude leaves FS untouched while corrupting every
+displacement the FEM reports.
+
+For a written report, call `generate_report()` — the same Analysis Report the
+Report dialog builds, over the model and everything this session has solved,
+finished so its contents page carries page numbers. It returns the path, which
+the user can open from the chat. `path=` names the file (default:
+`<model>_report.docx` beside the project); every other keyword is a report option
+as the dialog's checkboxes set them (`title`, `analyst`, the section switches).
+A report asked for a method this session never ran RUNS it first, which is the
+longest thing in such a build — tell the user to expect the wait.
 """
 
-# Compact modeling rules — appended ONLY when the full skill is NOT loaded (i.e.
-# for local/non-Anthropic models). On the Anthropic path the skill already carries
+# Compact modeling rules — appended ONLY when the Studio brief is NOT loaded (i.e.
+# for local/non-Anthropic models). On the brief path the brief already carries
 # these in full, so mirroring them here would just duplicate cached tokens.
 MODELING_BRIEF = """\
 
@@ -298,6 +333,33 @@ Modeling rules (slope-stability physics):
   most prone to a different search minimum — trust Spencer/Bishop there.
 - FEM/SSRM domains follow the same extent rule as LEM (flats >= ~2x slope height,
   plus foundation depth below the toe); a domain cropped at the toe inflates FS.
+"""
+
+
+#: Appended to the system prompt for a model with NO tool calling (a local Ollama
+#: tag), where a message written in chat is the only channel there is. It states
+#: the one convention that separates code to RUN from code to READ; the fallback
+#: honours exactly this marker (:data:`RUN_FENCE_RE`).
+RUN_FENCE_NOTE = """\
+
+RUNNING CODE. Your model has no tool-call protocol, so you run a snippet by \
+writing it in your reply — and Studio has to be able to tell a snippet you want \
+RUN from one you wrote for the user to READ.
+
+To RUN a snippet, mark the fence `run`:
+
+```python run
+print(slope_data['max_depth'])
+```
+
+That block is executed and its output comes back to you. One per message; write \
+the whole snippet in it.
+
+Anything else is prose and is only shown to the user: a plain ```python fence, a \
+signature quoted to explain a call, an example of how something is used. Studio \
+will NOT run it — so a block you meant to run and left unmarked simply never \
+runs, and a block you wrote to illustrate something can never fail with an error \
+you then have to explain.
 """
 
 
@@ -352,20 +414,49 @@ def _is_runnable(code):
     return False
 
 
+#: A fenced block MARKED for execution: ```python run — the info string carries
+#: the word ``run``. This is the only fence the text fallback will execute.
+#:
+#: An unmarked ```python fence is PROSE. A recorded session lost a turn to the
+#: other reading: the model wrote a documentation signature into its answer to
+#: show the user the shape of a call (``sigma_from_range(hcv, lcv, n=None)``),
+#: the fallback scraped that fence out of the prose and ran it, and the NameError
+#: that came back was explained to the user as their mistake. Code written to be
+#: read is not code to run, and nothing but an explicit marker can tell the two
+#: apart — so the marker is required.
+RUN_FENCE_RE = re.compile(r"```(?:python|py)[ \t]+run[ \t]*\r?\n(.*?)```", re.S)
+
+
+def text_fallback_enabled(caps):
+    """Whether to recover code from an assistant message that made no structured
+    tool call, given :meth:`AssistantConfig.capabilities`.
+
+    Only where the provider does NOT do tool calling — a local Ollama model, whose
+    ``tools`` capability is False or None (depends on the tag the user pulled).
+    A provider with tool calling has a protocol for saying "run this", so anything
+    it writes in prose is prose, and scraping it is a bug rather than a fallback.
+    """
+    return caps.get("tools") is not True
+
+
 def _extract_code(content):
     """Recover ``run_python`` code from an assistant turn that made no structured
-    tool call — a JSON tool-call, a fenced ```python block, or whole-content
-    Python (weaker models often just *write* the code in chat). Returns
-    ``(code, pure)`` where ``pure`` means the message is only the code (so it is
-    suppressed from the transcript); ``(None, False)`` if nothing runnable."""
-    import re
+    tool call — a JSON tool-call, a ```python run fence, or whole-content Python
+    (weaker models often just *write* the code in chat). Returns ``(code, pure)``
+    where ``pure`` means the message is only the code (so it is suppressed from
+    the transcript); ``(None, False)`` if nothing runnable.
+
+    Only reached for a provider without tool calling (:func:`text_fallback_enabled`),
+    and even there a fenced block runs only when it is marked ```python run — see
+    :data:`RUN_FENCE_RE`.
+    """
     if not content:
         return None, False
     s = content.strip()
     call = _parse_text_tool_call(s, TOOL_NAMES)
     if call:
         return call[1].get("code", ""), True
-    fence = re.search(r"```(?:python|py)?\s*\n?(.*?)```", s, re.S)
+    fence = RUN_FENCE_RE.search(s)
     if fence and _is_runnable(fence.group(1).strip()):
         return fence.group(1).strip(), False        # keep any surrounding prose
     if _is_runnable(s) and re.search(
@@ -632,8 +723,39 @@ def _checks_selection(sd):
     return {}
 
 
-def model_checks_text(slope_data, memo=None):
+def model_checks_text(slope_data, memo=None, extra_errors=()):
     """The MODEL CHECKS block for a model that a snippet just changed.
+
+    ``extra_errors`` are ``(rule_id, message)`` pairs the input checks cannot
+    derive — today, a polygon edit the geometry resync discarded, which leaves a
+    model that is VALID and simply is not the one the snippet wrote. They lead the
+    block as ERRORs, and they turn a clean block into one, because this is the
+    block iron rule 5 says a model may not be reported ready over.
+    """
+    return _with_extra_errors(_preflight_checks_text(slope_data, memo),
+                              extra_errors)
+
+
+def _with_extra_errors(block, extra_errors):
+    """``block``, with findings the input checks cannot see put at its head."""
+    rows = list(extra_errors or ())
+    if not rows:
+        return block
+    lead = ("The input checks cannot see the following, and nothing they report "
+            "answers it. Do not report this model ready over it.")
+    lines = [lead] + [f"  ERROR [{rule}] {msg}" for rule, msg in rows]
+    if block and block != MODEL_CHECKS_CLEAN:
+        head, _, rest = block.partition("\n")        # head is MODEL_CHECKS_OPEN
+        return "\n".join([head] + lines + ([rest] if rest else []))
+    if block == MODEL_CHECKS_CLEAN:
+        # Say so — the block that would have read "clean" is now an open one, and
+        # what the input checks found is still worth one line.
+        lines.append("The input checks themselves found nothing else.")
+    return "\n".join([MODEL_CHECKS_OPEN] + lines + [MODEL_CHECKS_END])
+
+
+def _preflight_checks_text(slope_data, memo=None):
+    """The input checks' own part of the MODEL CHECKS block.
 
     Rebuilds the derived geometry first (so the checks read the domain the edit
     actually produced, not the one before it) and then runs :func:`xslope.preflight
@@ -763,6 +885,217 @@ def model_checks_text(slope_data, memo=None):
     return "\n".join(parts)
 
 
+# --- what the model IS -------------------------------------------------------
+# The checks above say what is wrong with the model. This says what it is — and it
+# exists because the model was spending whole completions finding that out: a turn
+# opened with a snippet that printed `sorted(slope_data)`, another that dumped the
+# materials, a third that called help() on a helper, and only then the one that did
+# the work. Four completions of a six-completion turn, every one of them re-reading
+# a system prompt, to learn what fits in a few hundred tokens.
+#
+# So the few hundred tokens are given instead, once, at the start of the first turn
+# and again after any edit that changed the model (the same per-key signature that
+# decides whether a run was an edit decides whether the summary is stale). It goes
+# in the conversation rather than the system prompt: the system prompt is cached
+# whole, and rewriting it on every edit would throw that cache away for a paragraph.
+
+MODEL_SUMMARY_OPEN = "=== MODEL SUMMARY ==="
+MODEL_SUMMARY_END = "=== END MODEL SUMMARY ==="
+
+#: "no model has been described to this conversation yet" — distinct from "the
+#: model described was an unreadable one", which is a real state a signature can
+#: legitimately be None in, and which must not re-send the same block every turn.
+_UNDESCRIBED = object()
+
+
+def _num(v, nd=4):
+    """A number the way a summary should carry it: no trailing zeros, no noise."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    if f != f:                                  # NaN
+        return "—"
+    text = f"{f:.{nd}f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def _material_line(i, m):
+    """One material as one line: only the fields that are actually set."""
+    bits = [f"{i}. {m.get('name') or f'material {i}'}"]
+    opt = str(m.get("option") or "mc")
+    bits.append(f"gamma={_num(m.get('gamma'))}")
+    if m.get("gamma_sat"):
+        bits.append(f"gamma_sat={_num(m.get('gamma_sat'))}")
+    bits.append(opt)
+    if opt in ("mc", "pow", "hb"):
+        # c and phi always, even at zero: a blank in a summary reads as "not
+        # stated", and phi = 0 (undrained) is a fact about the model, not an
+        # omission from it.
+        bits.append(f"c={_num(m.get('c') or 0)}")
+        bits.append(f"phi={_num(m.get('phi') or 0)}")
+        for key in ("cp", "d", "r_elev"):
+            if m.get(key):
+                bits.append(f"{key}={_num(m.get(key))}")
+    if opt == "elastic":
+        bits.append("(infinite strength)")
+    bits.append(f"u={m.get('u') or 'none'}")
+    for key in ("t_cut", "phi_b", "s_cap", "E", "nu", "k1", "kr0"):
+        if m.get(key):
+            bits.append(f"{key}={_num(m.get(key))}")
+    if any(m.get(k) for k in ("sigma_gamma", "sigma_c", "sigma_phi", "sigma_cp",
+                              "sigma_d", "sigma_psi")):
+        bits.append("has sigmas")
+    return " ".join(bits)
+
+
+def _extent_line(sd):
+    """Ground-surface extents and the base, read off the derived geometry when it
+    is there and off the source lines when it is not (a half-built model)."""
+    xs, ys = [], []
+    gs = sd.get("ground_surface")
+    coords = list(getattr(gs, "coords", []) or [])
+    if not coords:
+        for line in sd.get("profile_lines") or []:
+            coords += list(line.get("coords") or [])
+        for poly in sd.get("polygons") or []:
+            p = poly.get("polygon") if isinstance(poly, dict) else poly
+            coords += list(getattr(getattr(p, "exterior", None), "coords", []) or [])
+    for pt in coords:
+        try:
+            xs.append(float(pt[0]))
+            ys.append(float(pt[1]))
+        except (TypeError, ValueError, IndexError):
+            pass
+    if not xs:
+        return "Geometry: none yet"
+    kind = ("polygons (%d zones)" % len(sd["polygons"])) if sd.get("polygons") \
+        else ("profile lines (%d)" % len(sd.get("profile_lines") or []))
+    return (f"Geometry: {kind}; x {_num(min(xs))}..{_num(max(xs))}, "
+            f"y {_num(min(ys))}..{_num(max(ys))}; "
+            f"max_depth={_num(sd.get('max_depth'))}")
+
+
+def _water_line(sd):
+    bits = [f"gamma_water={_num(sd.get('gamma_water'))}"]
+    for key, label in (("piezo_line", "piezo line"), ("piezo_line2", "piezo line 2")):
+        pts = sd.get(key) or []
+        if pts:
+            bits.append(f"{label} ({len(pts)} pts)")
+    for key, label in (("dloads", "distributed-load block"),
+                       ("dloads2", "stage-2 distributed-load block")):
+        blocks = sd.get(key) or []
+        if blocks:
+            bits.append(f"{len(blocks)} {label}" + ("s" if len(blocks) > 1 else ""))
+    for key, label in (("seepage_bc", "seepage BC"), ("seepage_bc2", "seepage BC 2")):
+        bc = sd.get(key) or {}
+        n = sum(len(bc.get(k) or []) for k in
+                ("specified_heads", "specified_fluxes", "exit_face"))
+        if n:
+            bits.append(f"{label} ({n} entries)")
+    if sd.get("seep_u") is not None:
+        bits.append("solved seepage field on the model (seep_u)")
+    if len(bits) == 1:
+        bits.append("no piezo line, no water load, no seepage BC")
+    return "Water: " + "; ".join(bits)
+
+
+def _surface_line(sd):
+    circles, non_circ = sd.get("circles") or [], sd.get("non_circ") or []
+    family = "circular" if sd.get("circular", True) else "non-circular"
+    bits = [f"family={family}"]
+    bits.append(f"{len(circles)} circle(s)")
+    if circles:
+        c = circles[0]
+        r = c.get("R")
+        if r is None and c.get("Yo") is not None and c.get("Depth") is not None:
+            r = float(c["Yo"]) - float(c["Depth"])
+        bits.append(f"first Xo={_num(c.get('Xo'))} Yo={_num(c.get('Yo'))} "
+                    f"R={_num(r)}")
+    bits.append(f"{len(non_circ)} non-circular point(s)")
+    return "Failure surfaces: " + "; ".join(bits)
+
+
+def _settings_line(sd):
+    bits = []
+    for key, label in (("k_seismic", "k_seismic"), ("tcrack_depth", "tcrack_depth"),
+                       ("tcrack_water", "tcrack_water")):
+        if sd.get(key):
+            bits.append(f"{label}={_num(sd.get(key))}")
+    for key, label in (("lem_method", "declared LEM method"),
+                       ("num_slices", "num_slices"),
+                       ("element_type", "element type"),
+                       ("target_size", "target element size"),
+                       ("k0", "K0")):
+        if sd.get(key) not in (None, ""):
+            bits.append(f"{label}={sd.get(key)}")
+    bits.append("mesh built" if sd.get("mesh") is not None else "no mesh")
+    if sd.get("ssr_zones"):
+        bits.append(f"{len(sd['ssr_zones'])} SSR zone(s)")
+    if sd.get("refine_zones"):
+        bits.append(f"{len(sd['refine_zones'])} refine zone(s)")
+    return "Settings: " + "; ".join(bits or ["defaults"])
+
+
+#: What ``doc.results`` may hold, and what to call each one to the model.
+_RESULT_LABELS = (("lem_solution", "an LEM solution"),
+                  ("fem_solution", "an FEM/SSRM solution"),
+                  ("mesh", "a mesh"),
+                  ("transient_seep", "a transient seepage solution"),
+                  ("fs_vs_time", "an FS-vs-time series"),
+                  ("sensitivity", "a sensitivity study"),
+                  ("design", "a design study"),
+                  ("reliability", "a reliability study"))
+
+
+def model_summary_text(slope_data, results=None, name=None):
+    """A few hundred tokens saying what the open model IS.
+
+    Materials, geometry extents, the water definition, the failure surfaces, the
+    load/reinforcement/pile counts, the analysis settings, and which results the
+    session already holds — so the model answers from this instead of spending
+    completions dumping ``slope_data`` and calling ``help()``.
+
+    Never raises: a summary that could fail a turn would be worse than no summary.
+    """
+    sd = slope_data
+    if not isinstance(sd, dict) or not sd:
+        return (f"{MODEL_SUMMARY_OPEN}\nNo project is open yet. An empty project "
+                f"starts on your first snippet, and every list in `slope_data` is "
+                f"[].\n{MODEL_SUMMARY_END}")
+    lines = [MODEL_SUMMARY_OPEN]
+    try:
+        head = []
+        if name:
+            head.append(str(name))
+        head.append("units: %s" % (sd.get("unit_system") or "not declared"))
+        if sd.get("template_version"):
+            head.append("template v%s" % sd["template_version"])
+        lines.append("Model: " + " · ".join(head))
+        lines.append(_extent_line(sd))
+        mats = sd.get("materials") or []
+        lines.append("Materials (%d):" % len(mats))
+        lines += ["  " + _material_line(i, m) for i, m in enumerate(mats, start=1)]
+        lines.append(_water_line(sd))
+        lines.append(_surface_line(sd))
+        counts = [f"{len(sd.get('reinforcement_lines') or [])} reinforcement line(s)",
+                  f"{len(sd.get('pile_lines') or [])} pile(s)",
+                  f"{len(sd.get('line_loads') or [])} line load(s)"]
+        lines.append("Loads & structures: " + ", ".join(counts))
+        lines.append(_settings_line(sd))
+        held = [label for key, label in _RESULT_LABELS if (results or {}).get(key)]
+        lines.append("Solved this session: "
+                     + (", ".join(held) if held else "nothing yet"))
+    except Exception:
+        lines.append("(the summary could not be completed; inspect `slope_data` "
+                     "if you need a field it does not name)")
+    lines.append("The helpers named in your instructions are already loaded in the "
+                 "kernel and documented there — call them; do not call help() and "
+                 "do not re-derive this summary.")
+    lines.append(MODEL_SUMMARY_END)
+    return "\n".join(lines)
+
+
 def _clean(o):
     if hasattr(o, "wkt"):
         return o.wkt
@@ -805,25 +1138,119 @@ def _assistant_edit_label(changed_keys):
     return f"Assistant: {shown}"
 
 
-def _load_skill_text():
-    """The /xslope skill body (schema + API knowledge), best-effort. The docs file
-    is the editable master (fresh in a repo checkout); the copy shipped as package
-    data (xslope/resources/xslope_skill.md) covers pip installs where docs/ is
-    absent. A run_tests.py sync check keeps the two identical."""
-    import os
-    here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    path = os.path.join(here, "docs", "usage", "claude", "xslope.md")
-    try:
-        with open(path, encoding="utf-8") as f:
-            return f.read()
-    except Exception:
-        pass
+#: The Studio brief's filename inside the xslope package's resources.
+BRIEF_RESOURCE = "studio_assistant_brief.md"
+
+
+def _load_brief_text():
+    """The Studio brief (:data:`BRIEF_RESOURCE`), best-effort.
+
+    One file, shipped as package data, so a pip install and a repo checkout read
+    the same text — unlike the Claude Code skill, whose editable master lives under
+    docs/ and is mirrored into the wheel. There is nothing to keep in sync here
+    because there is only one copy.
+    """
     try:
         from importlib import resources
-        return (resources.files("xslope") / "resources" / "xslope_skill.md").read_text(
+        return (resources.files("xslope") / "resources" / BRIEF_RESOURCE).read_text(
             encoding="utf-8")
     except Exception:
+        pass
+    # Source tree without the package importable (a bare checkout on sys.path).
+    import os
+    here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    try:
+        with open(os.path.join(here, "xslope", "resources", BRIEF_RESOURCE),
+                  encoding="utf-8") as f:
+            return f.read()
+    except Exception:
         return ""
+
+
+#: The model the token counter is calibrated against. Any Claude tokenizer gives
+#: the same answer to within a percent, and the number is a budget, not a bill.
+_COUNTER_MODEL = "claude-3-5-sonnet-20241022"
+
+
+def count_tokens(text):
+    """Tokens in ``text``, by litellm's counter; ``None`` when it is unavailable.
+
+    The one counter the brief's budget, the guardrail check and any measurement
+    run all read, so a number quoted in one place means the same thing in the
+    others.
+    """
+    try:
+        from litellm import token_counter
+        return int(token_counter(model=_COUNTER_MODEL, text=text or ""))
+    except Exception:
+        return None
+
+
+# --- what a turn cost --------------------------------------------------------
+# Tokens, and only tokens. A price would have to be a table of per-model rates,
+# and those move faster than a release: a stale table quoting dollars is worse
+# than no dollars at all. The counts are exact, come from the provider's own
+# response, and are the number a user checks a long agentic turn against.
+
+def _usage_value(usage, *names):
+    """One usage field, wherever this provider's response object keeps it.
+
+    LiteLLM normalizes most of the shape but not all of it — an object here, a
+    dict there, and the cached-prompt count under a different name per provider —
+    so each field is asked for by every name it goes by, and anything missing or
+    unreadable counts as zero. A usage readout must never be able to fail a turn.
+    """
+    for name in names:
+        value = None
+        if isinstance(usage, dict):
+            value = usage.get(name)
+        else:
+            value = getattr(usage, name, None)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return 0
+
+
+def usage_from_response(response):
+    """``{"input", "cached_input", "output"}`` for one completion. Never raises.
+
+    ``cached_input`` is the part of ``input`` the provider served from its prompt
+    cache (Anthropic's cache reads, or the automatic prefix caching OpenAI, Kimi
+    and Z.ai do) — it is a SUBSET of the input count, not an addition to it, which
+    is why the readout prints it in parentheses.
+    """
+    usage = getattr(response, "usage", None)
+    if usage is None and isinstance(response, dict):
+        usage = response.get("usage")
+    if usage is None:
+        return {"input": 0, "cached_input": 0, "output": 0}
+    details = getattr(usage, "prompt_tokens_details", None)
+    if details is None and isinstance(usage, dict):
+        details = usage.get("prompt_tokens_details")
+    cached = _usage_value(details, "cached_tokens") if details is not None else 0
+    if not cached:
+        cached = _usage_value(usage, "cache_read_input_tokens")
+    return {"input": _usage_value(usage, "prompt_tokens", "input_tokens"),
+            "cached_input": cached,
+            "output": _usage_value(usage, "completion_tokens", "output_tokens")}
+
+
+def _zero_usage():
+    return {"input": 0, "cached_input": 0, "output": 0}
+
+
+def format_usage(turn, session):
+    """The dock's one-line readout: this turn, then the session behind it."""
+    def part(u):
+        text = f"{u['input']:,} in"
+        if u.get("cached_input"):
+            text += f" ({u['cached_input']:,} cached)"
+        return text + f" / {u['output']:,} out"
+    return f"this turn: {part(turn)} · session: {part(session)}"
 
 
 class _AgentWorker(QThread):
@@ -831,16 +1258,22 @@ class _AgentWorker(QThread):
 
     text = Signal(str)              # an assistant text block
     tool_call = Signal(object)      # {id, name, input, holder} — handled on GUI thread
+    usage = Signal(object)          # {input, cached_input, output} for one completion
     failed = Signal(str)
     done = Signal()
 
-    def __init__(self, kwargs, system, messages, tools, cache_system=False, parent=None):
+    def __init__(self, kwargs, system, messages, tools, cache_system=False,
+                 text_fallback=False, parent=None):
         super().__init__(parent)
         self._kwargs = kwargs       # provider/model kwargs for litellm.completion
         self._system = system
         self._messages = messages   # shared list (OpenAI format), mutated in place
         self._tools = tools
         self._cache_system = cache_system   # Anthropic prompt caching of the system
+        # Recover code from an assistant message that made no structured tool call
+        # (:func:`_extract_code`). Providers WITHOUT tool calling only — see
+        # :func:`text_fallback_enabled`.
+        self._text_fallback = text_fallback
         self._cancel = threading.Event()
 
     def _system_message(self):
@@ -872,12 +1305,18 @@ class _AgentWorker(QThread):
                 resp = litellm.completion(
                     messages=[self._system_message()] + self._messages,
                     tools=self._tools, max_tokens=MAX_TOKENS, **self._kwargs)
+                # Every completion in the turn counts, not just the last: an
+                # agentic turn is a dozen of these, and the tool results between
+                # them are what the input count grows by.
+                self.usage.emit(usage_from_response(resp))
                 msg = resp.choices[0].message
                 tool_calls = getattr(msg, "tool_calls", None) or []
 
                 # Fallback for models that don't make a structured tool call but
-                # write the code (as JSON, a fenced block, or bare Python).
-                code_call, pure = ((None, False) if tool_calls
+                # write the code (as JSON, a ```python run fence, or bare Python).
+                # Off for a provider that HAS tool calling: there, prose is prose.
+                code_call, pure = ((None, False)
+                                   if tool_calls or not self._text_fallback
                                    else _extract_code(msg.content))
 
                 assistant_msg = {"role": "assistant", "content": msg.content or ""}
@@ -935,6 +1374,7 @@ class Assistant(QObject):
     assistant_text = Signal(str)
     tool_ran = Signal(str, str, object)   # code, output_text, [figure_paths]
     tool_declined = Signal(str)           # code
+    usage_changed = Signal(object)        # {"turn": {...}, "session": {...}}
     failed = Signal(str)
     finished = Signal()
 
@@ -942,44 +1382,129 @@ class Assistant(QObject):
         super().__init__(main_window)
         from .kernel import PythonKernel
         self._mw = main_window
-        self._kernel = PythonKernel(main_window.doc)
+        self._kernel = PythonKernel(main_window.doc, window=main_window)
         self.config = AssistantConfig(getattr(main_window, "settings", None))
         self._messages = []
         self._worker = None
+        # Tokens this turn and this session. Accumulated from every completion the
+        # worker makes (an agentic turn is many), so the dock can show what a long
+        # autonomous run is actually costing while it is still running.
+        self._usage = {"turn": _zero_usage(), "session": _zero_usage()}
         # What the MODEL CHECKS blocks have already said, so a later block reports
         # the delta. A new or reopened project is a different model, and its
         # findings are different findings, so the document clears it too.
         self._checks_memo = ChecksMemo()
+        # The model state the summary last described, as the same per-key
+        # signature an edit is detected by. _UNDESCRIBED = the model has not been
+        # described to this conversation yet, which makes the first turn carry it.
+        self._summary_sig = _UNDESCRIBED
         try:
             main_window.doc.loaded.connect(self._checks_memo.reset)
+            main_window.doc.loaded.connect(self._forget_summary)
         except AttributeError:
             pass
+
+    def _forget_summary(self, *args):
+        """A different project is a different model: describe it again."""
+        self._summary_sig = _UNDESCRIBED
 
     # --- lifecycle -------------------------------------------------------
     def is_busy(self):
         return self._worker is not None and self._worker.isRunning()
 
+    # --- tokens ----------------------------------------------------------
+    @property
+    def usage(self):
+        """``{"turn": {...}, "session": {...}}`` — tokens read and written, each
+        ``{input, cached_input, output}``. ``turn`` covers every completion since
+        the last :meth:`send`; ``session`` every completion since the conversation
+        began. ``cached_input`` is the part of ``input`` the provider served from
+        its prompt cache, so it is inside that count rather than beside it."""
+        return {"turn": dict(self._usage["turn"]),
+                "session": dict(self._usage["session"])}
+
+    def add_usage(self, delta):
+        """Add one completion's tokens (:func:`usage_from_response`'s dict) to the
+        turn and the session, and announce the new totals."""
+        for scope in ("turn", "session"):
+            for key in ("input", "cached_input", "output"):
+                self._usage[scope][key] += int((delta or {}).get(key) or 0)
+        self.usage_changed.emit(self.usage)
+
     def reset(self):
         self._messages = []
         self._kernel.reset()          # fresh kernel — variables cleared, re-seeds
         self._checks_memo.reset()     # nothing has been reported to this session
+        self._summary_sig = _UNDESCRIBED   # nor has the model been described to it
+        # A new conversation is a new session: its cost starts at zero, like the
+        # transcript and the history it is the cost of.
+        self._usage = {"turn": _zero_usage(), "session": _zero_usage()}
+        self.usage_changed.emit(self.usage)
 
     def _system(self):
-        # Full skill body only for Anthropic (prompt-cached, so cheap). Local /
-        # other models get the compact prompt and introspect at runtime — the skill
-        # body measures ~33k tokens today, and sending that every turn makes a
-        # local model crawl.
+        # The Studio brief for the providers that can carry a reference body
+        # (prompt-cached, or with server-side prefix caching); the compact rulebook
+        # for the rest. The brief carries the modeling rules in full, so only the
+        # record schemas are appended after it (LAST, so they win on recency — no
+        # .xlsx diving to learn the schema) and MODELING_BRIEF is left out, since
+        # it would only duplicate them.
+        #
+        # The fence convention is appended only where it is the protocol in force —
+        # a model with no tool calling. A model that HAS tool calling would only be
+        # told about a channel it never uses, on a turn it pays for.
+        extra = (RUN_FENCE_NOTE
+                 if text_fallback_enabled(self.config.capabilities()) else "")
         if self.config.wants_skill():
-            skill = _load_skill_text()
-            if skill:
-                # The skill already carries the modeling rules in full, so only the
-                # record schemas are appended (LAST, so they win on recency — no
-                # .xlsx diving to learn the schema). No MODELING_BRIEF here: it would
-                # just duplicate the skill.
-                return (STUDIO_SYSTEM + _SKILL_HEADER + skill + _SKILL_TRAILER
-                        + SCHEMA_BRIEF)
-        # No skill loaded (local/other model): the modeling rules live only here.
-        return STUDIO_SYSTEM + SCHEMA_BRIEF + MODELING_BRIEF
+            brief = _load_brief_text()
+            if brief:
+                return STUDIO_SYSTEM + _BRIEF_HEADER + brief + SCHEMA_BRIEF + extra
+        # No brief loaded (local/other model): the modeling rules live only here.
+        return STUDIO_SYSTEM + SCHEMA_BRIEF + MODELING_BRIEF + extra
+
+    def pending_model_summary(self):
+        """The MODEL SUMMARY block this turn owes the model, or ``""``.
+
+        Owed on the first turn of a conversation, on the first turn after a
+        different project is opened, and on the first turn after an edit changed
+        the model — decided by the same per-key signature that decides whether a
+        snippet was an edit, so nothing has to remember to invalidate it.
+
+        Calling this MARKS the summary delivered, so it is called once per turn,
+        by :meth:`send`.
+        """
+        doc = getattr(self._mw, "doc", None)
+        sd = getattr(doc, "slope_data", None)
+        sig = _source_key_sigs(sd) if isinstance(sd, dict) else None
+        if self._summary_sig is not _UNDESCRIBED and sig == self._summary_sig:
+            return ""
+        self._summary_sig = sig
+        name = None
+        path = getattr(doc, "path", None)
+        if path:
+            name = os.path.basename(str(path))
+        return model_summary_text(sd, getattr(doc, "results", None), name=name)
+
+    def _user_content(self, user_text, images=None):
+        """The content of the user message for one turn, in OpenAI/LiteLLM format.
+
+        The turn's MODEL SUMMARY (when one is owed) rides in FRONT of the user's
+        words, inside the same message, rather than as a message of its own: a
+        second consecutive user turn is a shape some providers reject, and a system
+        message would rewrite the cached prefix. The block is labelled as Studio's,
+        not the user's, so it is never answered as if the user had typed it.
+        """
+        summary = self.pending_model_summary()
+        text = user_text or ("(see image)" if images else "")
+        if summary:
+            text = (summary.replace(MODEL_SUMMARY_OPEN,
+                                    MODEL_SUMMARY_OPEN + " (from Studio, not the "
+                                    "user's words)", 1) + "\n\n" + text)
+        if not images:
+            return text
+        # Multimodal user turn (OpenAI/LiteLLM format; translated to the Anthropic
+        # image format for Claude). ``images`` are data: URLs.
+        return ([{"type": "text", "text": text}]
+                + [{"type": "image_url", "image_url": {"url": u}} for u in images])
 
     def send(self, user_text, images=None):
         if self.is_busy():
@@ -989,20 +1514,18 @@ class Assistant(QObject):
                              f"{self.config.display_name()}. Open the assistant "
                              "Settings to add one (or switch to a local Ollama model).")
             return
-        if images:
-            # Multimodal user turn (OpenAI/LiteLLM format; translated to the
-            # Anthropic image format for Claude). ``images`` are data: URLs.
-            content = [{"type": "text", "text": user_text or "(see image)"}]
-            content += [{"type": "image_url", "image_url": {"url": u}} for u in images]
-            self._messages.append({"role": "user", "content": content})
-        else:
-            self._messages.append({"role": "user", "content": user_text})
+        self._messages.append({"role": "user",
+                               "content": self._user_content(user_text, images)})
+        self._usage["turn"] = _zero_usage()      # a new turn, counted from zero
         self._worker = _AgentWorker(self.config.completion_kwargs(), self._system(),
                                     self._messages, [RUN_PYTHON_TOOL],
                                     cache_system=self.config.supports_prompt_cache(),
+                                    text_fallback=text_fallback_enabled(
+                                        self.config.capabilities()),
                                     parent=self)
         self._worker.text.connect(self.assistant_text)
         self._worker.tool_call.connect(self._on_tool_call)   # queued -> GUI thread
+        self._worker.usage.connect(self.add_usage)
         self._worker.failed.connect(self._on_failed)
         self._worker.done.connect(self._on_done)
         self._worker.start()
@@ -1026,8 +1549,18 @@ class Assistant(QObject):
             holder["event"].set()
             return
 
-        stdout, outputs, error, checks = self._run_python(code)
+        stdout, outputs, error, checks, warnings = self._run_python(code)
+        from .kernel import POLYGON_EDIT_DISCARDED, POLYGON_EDIT_WARNING
+
         parts = []
+        # A discarded polygon edit leads the result, ahead of the snippet's own
+        # output: the snippet PRINTED the polygons it wrote — before the rebuild
+        # threw them away — so its stdout reads as the edit applied. Said
+        # underneath that read-back, it lost to it twice in one benchmark. Said
+        # first, the printed values are labelled before any of them is read.
+        led = POLYGON_EDIT_WARNING in warnings
+        if led:
+            parts.append(POLYGON_EDIT_DISCARDED)
         if stdout.strip():
             parts.append(stdout.rstrip())
         if outputs:
@@ -1037,6 +1570,11 @@ class Assistant(QObject):
             parts.append("ERROR:\n" + error)
         if not parts:
             parts.append("(no output)")
+        # A geometry edit made on the source the resync overwrites: the snippet
+        # succeeded, the model did not change, and nothing else would say so.
+        # (The polygon one already led the result; it is not said twice.)
+        parts += [w for w in warnings
+                  if not (led and w == POLYGON_EDIT_WARNING)]
         if checks:
             parts.append(checks)        # LAST: the final thing the model reads
         result_text = "\n".join(parts)
@@ -1046,14 +1584,22 @@ class Assistant(QObject):
         self.tool_ran.emit(code, result_text, outputs)
 
     def _run_python(self, code):
-        """Run one snippet and return ``(stdout, outputs, error, checks)``.
+        """Run one snippet and return
+        ``(stdout, outputs, error, checks, warnings)``.
 
-        ``checks`` is the MODEL CHECKS block, and it is produced ONLY when the
-        snippet actually changed the model — the same per-key signature comparison
-        that decides whether the run becomes an undo step. A read-only query costs
-        nothing extra, and an edit pays one preflight pass. The session's
-        :class:`ChecksMemo` carries what earlier blocks already said, so a repeat
-        of a standing finding costs one line instead of its paragraph.
+        ``checks`` is the MODEL CHECKS block, and it is produced when the snippet
+        actually changed the model — the same per-key signature comparison that
+        decides whether the run becomes an undo step — or when a geometry edit was
+        discarded, which is a change the snippet MEANT to make and the signature
+        cannot see. A read-only query costs nothing extra, and an edit pays one
+        preflight pass. The session's :class:`ChecksMemo` carries what earlier
+        blocks already said, so a repeat of a standing finding costs one line
+        instead of its paragraph.
+
+        ``warnings`` is the kernel's own account of a geometry edit made on the
+        source the resync rebuilds FROM — polygons on a profile-line model — which
+        the input checks cannot see, because after the rebuild the geometry is
+        valid and merely not the one the snippet wrote.
         """
         doc = self._mw.doc
         if doc.slope_data is None:
@@ -1089,12 +1635,29 @@ class Assistant(QObject):
                 # Inputs changed: any cached solution is now stale (and the mesh
                 # too, if the geometry changed).
                 self._mw.invalidate_results(clear_mesh=geom_changed)
+                # …except a solution THIS snippet made, which was solved on the
+                # edited model. "Change the face and rerun" is one snippet, and
+                # the sweep above runs after it: without this the run the user
+                # was just shown is not the session's run, and the report that
+                # documents the session finds nothing to document.
+                self._kernel.restore_fresh_results()
             self._mw.refresh_inputs_view()
         except Exception:
             pass
-        checks = (model_checks_text(doc.slope_data, self._checks_memo)
-                  if edited else "")
-        return stdout, outputs, error, checks
+        warnings = self._kernel.geometry_warnings()
+        # The discarded polygon edit is business for the block as well as the lead
+        # line: the checks read the model AFTER the rebuild, where the geometry is
+        # valid and merely not the one the snippet wrote, so they would report it
+        # clean. Forced even when nothing counted as an edit — a snippet that
+        # resynced its own discarded edit changed the model not at all, which is
+        # precisely the case that must not come back silent.
+        from .kernel import POLYGON_EDIT_DISCARDED_FINDING, POLYGON_EDIT_WARNING
+        extra = ([POLYGON_EDIT_DISCARDED_FINDING]
+                 if POLYGON_EDIT_WARNING in warnings else [])
+        checks = (model_checks_text(doc.slope_data, self._checks_memo,
+                                    extra_errors=extra)
+                  if (edited or extra) else "")
+        return stdout, outputs, error, checks, warnings
 
     def output_dir(self):
         """Folder where the assistant writes generated files (plots, CSVs, …)."""

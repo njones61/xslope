@@ -75,7 +75,7 @@ reinforcement, and boundary conditions to scale.
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks the template format for compatibility. The current version is **23**. xslope refuses a file whose version is newer than it understands, so an older install cannot silently mis-read a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
+- **Template version**: Tracks the template format for compatibility. The current version is **25**. xslope refuses a file whose version is newer than it understands, so an older install cannot silently mis-read a newer template — and older files load unchanged, with anything a previous template lacked simply staying at its default.
 - **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial), so existing files behave exactly as before.
 - **Time** (`sec`, `min`, `hr`, `day`, or `yr`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
 - **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type wins (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
@@ -96,6 +96,7 @@ A choice you make in a Studio dialog always wins over the value in the file.
 - **Tension SRF (FEM)** (`YES` or `NO`) — **[–]**: whether the tensile-strength cap (`t_cut`) is reduced along with c and tan φ during a strength reduction. `YES` (what the template ships with) makes the factor of safety the factor on the whole strength envelope, shear and tensile. `NO` holds each cap at its authored value through the bisection. On a model that sets no `t_cut` there is no cap to reduce and the setting changes nothing.
 - **Mesh element type** (`tri3`, `tri6`, `quad4`, `quad8`, or `quad9`) — **[–]**: the element type the Build Mesh dialog opens on. Quadratic elements (`tri6`, `quad8`, `quad9`) are strongly preferred for FEM/SSRM; the linear ones lock volumetrically and overestimate the factor of safety.
 - **Mesh target size** — **[L]**: the target element size the Build Mesh dialog opens on. Setting it also turns auto-sizing off, since a size in the file means the file meant that size.
+- **1D element size** — **[L]**: the target element size along the model's 1D members — the pile and reinforcement lines — where it should differ from the mesh target size above. Blank means the members follow the mesh target size; a value here must be positive.
 - **SSRM F min** / **SSRM F max** — **[–]**: the strength-reduction bracket the SSRM search starts from. F min must be less than F max.
 - **Water loads** (`auto` or `manual`) — **[–]**: who supplies the weight of water standing on the slope. `auto` — what a new file carries — hands it to the engine, which derives the ponded-water load at solve time from the model's own water definition: the seepage boundary conditions wherever a seepage analysis is defined, otherwise the piezometric line. The two dloads sheets then carry **non-water** loads only — a surcharge, a footing, traffic — and the derived load is drawn on every plot in its own color, since a load you did not type is the kind that needs to be more visible rather than less. `manual` leaves the water load to you on the dloads sheets. In Studio the same selector sits in the **Global parameters** dialog. A blank cell means `auto` in a version-22-or-newer file and `manual` in every older one, and that is a correctness requirement rather than a preference: an older file already carries its water load typed in, and deriving a second one under it would count the reservoir twice. Use `manual` for a deliberate exception, and for a vendor-faithful transcription whose point is to reproduce another program's input exactly. See [Automatic water loads](preflight.md#automatic-water-loads).
 - **Surface family** (`circular` or `non-circular`) — **[–]**: which failure-surface family a model that defines **both** a circular surface (the [circles](#worksheet-circles) sheet) and a non-circular one (the [non-circ](#worksheet-non-circ) sheet) actually means. Blank — what the template ships, and the normal state — means "whichever family the model defines", which is unambiguous for all but the rare file carrying both; there the circular surface is used and the non-circular one is ignored, and the [model checks](preflight.md) say so. Fill the cell (or answer the **Surface** selector in Studio's Run LEM dialog, which writes your choice here) and that answer travels with the file: the run, the plots and the next session all read the same one. A family named here is only honoured when the model actually defines it, so a value left behind by a surface you later deleted can never claim a surface that is not there.
@@ -206,7 +207,10 @@ Corkum, 2002), written in principal stresses:
 The four inputs are the ones a geologist actually records; the rock-mass constants $m_b$, $s$ and $a$ are
 *derived* from them and are never entered directly:
 
-- **hb_sci** — $\sigma_{ci}$, the uniaxial compressive strength of the **intact** rock, **[F/L²]**.
+- **hb_sci** — $\sigma_{ci}$, the uniaxial compressive strength of the **intact** rock, **[F/L²]**. Enter it in
+  the model's own stress units, not the MPa the rock-mechanics literature quotes: 30 MPa is 30,000 kPa or
+  626,000 psf. A $\sigma_{ci}$ small enough to have been carried over in MPa is [reported before a
+  run](preflight.md#what-is-checked).
 - **hb_gsi** — GSI, the Geological Strength Index, from 0 (completely broken) to 100 (intact). Must be in (0, 100].
 - **hb_mi** — $m_i$, the intact Hoek-Brown constant, a rock-type property (≈ 4 for claystone, ≈ 10 for sandstone,
   ≈ 25 for granite).
@@ -683,6 +687,10 @@ described above.
 | **Max tangent depth** — **[L]** | The lowest **elevation** the circle's bottom (its tangent point) may reach. |
 | **Min slip depth** — **[L]** | Minimum depth below the ground surface a surface must reach. Rejects shallow surficial "skin" mechanisms, whose factor of safety is depth-independent on a cohesionless face and would otherwise win. |
 
+The same ten cells are edited in XSLOPE Studio by the **Search window** group under the
+circles table (see [Editing inputs](../studio/editing.md)), which draws the entry and exit
+ranges and the center box on its preview.
+
 A range is applied only when **both** of its ends are filled — half a range is not a
 window, and XSLOPE will not invent the missing end. Entry and exit ranges and the
 tangent-depth limit **reject** a trial surface that violates them rather than clamping it,
@@ -824,15 +832,19 @@ resisting side and divided by FS, i.e. it mobilizes with the soil. Filled by Typ
 tiebacks) enter the per-element capacity and provide **Spacing**, and xslope divides for you.<br>
 >>Lp1 **[L]**: Pullout bond length at end 1<br>
 >>Lp2 **[L]**: Pullout bond length at end 2<br>
+>>Adhesion **[F/L²]**: Soil-reinforcement interface adhesion. Leave blank to use Lp1/Lp2.<br>
+>>Delta **[degrees]**: Soil-reinforcement interface friction angle. Leave blank to use Lp1/Lp2.<br>
 >>Tend1 — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Anchorage/plate/connection capacity at end 1 (0 = friction only)<br>
 >>Tend2 — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Anchorage/plate/connection capacity at end 2 (0 = friction only)<br>
 >>Spacing **[L]**: Out-of-plane spacing for discrete supports. Leave blank (or 1) for geosynthetics, whose properties are
 already per unit width.<br>
 - **Stiffness / Residual** (FEM only):<br>
->>Tres — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Residual tensile force *after* the element yields — its post-peak strength. **Leave it blank** for the
+>>Tres — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Residual tensile force the reinforcement retains *after* it ruptures — its post-peak strength. **Leave it blank** for the
 usual elastic-perfectly-plastic bar, which simply holds its capacity once it yields; a blank is not the same as a
 zero. Entering **0** means brittle rupture: the element drops to carrying nothing at all. Anything in between models
-a bar that sheds part of its load and retains the rest.<br>
+a bar that sheds part of its load and retains the rest. Near the ends the capacity envelope may develop less than
+`Tres`, and the element then retains only what the envelope gives it — bond slip is perfectly plastic and does not
+take a bar below the force its embedment can hold.<br>
 >>E **[F/L²]**: Elastic modulus of reinforcement<br>
 >>Area — **[L²] per element (÷ Spacing)** (or [L²/L] per unit width when Spacing is blank): Cross-sectional area<br>
 
@@ -843,6 +855,13 @@ FEM. The envelope, the end-condition cases, and how to convert a bond strength i
 **[Soil Reinforcement in LEM](../lem/reinforcement.md#capacity-envelope)** — the figures there are the quickest way
 to see what a given combination of columns actually produces.
 
+`Adhesion` and `Delta` are the alternative to `Lp1`/`Lp2`: instead of a fixed development length they state the
+interface strength, and the pullout resistance then follows the effective overburden along the line —
+$2(a + \sigma'_v\tan\delta)$ per unit length, with $\sigma'_v$ the weight of the soil column above each point less
+the pore pressure the model declares there. Fill **both** to use it, in which case `Lp1` and `Lp2` are not read;
+leave **both** blank for the development-length law. One filled and one blank is refused. See
+[Pullout from the effective overburden](../lem/reinforcement.md#pullout-from-the-effective-overburden).
+
 How the force is then *used* differs by analysis:
 
 - **LEM** applies the envelope force at the point where the line crosses the slip surface, in the direction set by
@@ -851,7 +870,8 @@ How the force is then *used* differs by analysis:
   [Force Application](../lem/reinforcement.md#force-application-appl).
 - **FEM** models the line as a 1D truss element with stiffness `E`·`Area`, so the force is an *output* of the
   analysis rather than an input — the bar carries whatever the deforming soil pushes into it, capped by the
-  envelope, and dropping to `Tres` once it yields. **Dir** and **Appl** have no effect. See
+  envelope, and dropping to `Tres` once it yields, or to the envelope value where that is the lower of the two.
+  **Dir** and **Appl** have no effect. See
   [Soil Reinforcement in FEM](../fem/reinforcement.md#force-behavior-and-failure-modes).
 
 ---
@@ -885,7 +905,8 @@ Each pile is defined by:
 - **Structural Capacity** (optional, LEM &amp; FEM):<br>
 >>V_cap — **[F]** (per single pile; requires S so it can be checked against the per-pile force F = H &times; S): Shear capacity of the pile. This is the maximum lateral shear force that the pile cross-section can resist. If provided, the per-pile force $F_{\text{pile}}$ is capped at this value. Requires S to be specified.<br>
 >>M_cap — **[F·L]** (per single pile; requires S): Moment capacity of the pile. This is the maximum bending moment the pile can resist. In LEM, the per-pile force is capped at $M_{\text{cap}} / L_m$, where $L_m$ is the moment arm from the pressure centroid to the failure surface. In FEM, a plastic hinge forms when the bending moment at any point along the pile reaches $M_{\text{cap}}$. Requires S to be specified.<br>
->>Fixity: Pile head rotational boundary condition for FEM analysis. **free** (default) = pile head can rotate freely; **fixed** = zero rotation at pile top (e.g., pile connected to a pile cap or retaining wall). Blank or omitted = free. This parameter has no effect on LEM analysis.<br>
+>>Head: Rotational boundary condition at the pile head (top node) for FEM analysis. **free** (default) = the head rotates freely, the usual condition for a stabilizing pile with no structural connection at the top; **fixed** = zero rotation at the head, modeling a pile cap, a retaining wall, or another structure that prevents rotation. Blank or omitted = free. Named Fixity in template v24 and earlier, and a file that carries the older header still loads.<br>
+>>Head and Tip: the boundary condition at the top node and at the bottom node of the pile for FEM analysis, the same four settings at either end. **free** (default) = nothing held — the soil, or the model boundary the node sits on, decides; **pinned** = translations held, rotation free (tie-rods or anchors at a head; a tip bearing on a hard stratum inside the mesh); **unrotated** = rotation held, translations free (a cap beam tying the heads); **fixed** = translations and rotation held (cap beam and anchors at a head; a tip socketed into rock). Blank or omitted = free. Neither column has any effect on LEM analysis.<br>
 
 Both V_cap and M_cap are properties of a **single pile**, not per unit width. When either is specified, xslope computes the per-pile force $F_{\text{pile}} = H \times S$ and checks it against the structural limits. If the structural capacity governs, the pile force is reduced accordingly before entering the equilibrium equations. If both V_cap and M_cap are blank, the full soil-computed (or user-specified) force is used with no structural limit.
 
@@ -1069,8 +1090,8 @@ repeating a time on two consecutive rows with different values.
   drawdown; if you set one you must set the other, with `stage_1` earlier than `stage_2`.
 - **stability_time** — **[t]**: the optional instant that a single-time
   [LEM or FEM stability analysis](../seep/transient.md#stability-time) with `u = seep` reads its
-  pore pressures from. Like the stage times it selects a frame out of the march rather than
-  changing the march, and the stepper is forced to land on it. **Leave it blank and a stability
+  pore pressures from. Like the stage times it selects a frame out of the transient solution rather than
+  changing it, and the stepper is forced to land on it. **Leave it blank and a stability
   run reads the LAST saved frame** — usually the drained end state. A run started from Studio can
   name a different instant for that run alone; storing it here is what makes a scripted or
   headless re-run read the same frame. (Version 22 and later.)

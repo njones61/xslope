@@ -151,7 +151,10 @@ def band_state(solution, failure_solution=None):
     :func:`_mechanism_field`), so on a strength reduction run it always marks the
     mechanism. On a run that reached no failure there is no mechanism to mark,
     and what the band shows is where the CONVERGED shear strain concentrates —
-    a real reading, and not the one the words "failure band" describe.
+    a real reading, and not a collapse. The figures name the mark the same way
+    either way (:data:`xslope.plot_fem_details.BAND_LABEL`), because the mark is
+    where the band crosses the member and not the verdict on the run; what this
+    state selects is the sentence the report writes about it.
     """
     return ("failure" if has_failure_state(solution, failure_solution)
             else "converged")
@@ -247,9 +250,18 @@ def _member_nodes(fem_data, kind, index):
         by_line = np.asarray(fem_data.get("pile_line_idx_by_pile_elem", []),
                              dtype=int)
         pairs = list(fem_data.get("pile_node_pairs", []))
+        # Every node the element stands on, which on a quadratic mesh includes
+        # the midside node of the soil edge; pile_elem_nodes carries all three,
+        # with -1 where the element has no midside node.
+        triples = np.asarray(fem_data.get("pile_elem_nodes", np.zeros((0, 3))),
+                             dtype=int)
         if len(by_line) != n_pile or len(pairs) != n_pile:
             return np.zeros((0, 2))
-        ids = [n for p in np.where(by_line == index)[0] for n in pairs[p]]
+        if len(triples) == n_pile:
+            ids = [n for p in np.where(by_line == index)[0]
+                   for n in triples[p] if n >= 0]
+        else:
+            ids = [n for p in np.where(by_line == index)[0] for n in pairs[p]]
     else:
         elements_1d = np.asarray(fem_data.get("elements_1d", np.zeros((0, 3))),
                                  dtype=int)
@@ -258,9 +270,15 @@ def _member_nodes(fem_data, kind, index):
                           dtype=int)
         mask = np.asarray(fem_data.get("pile_elem_mask", np.zeros(n_1d, bool)),
                           dtype=bool)
+        types = np.asarray(fem_data.get("element_types_1d", np.full(n_1d, 2)),
+                           dtype=int)
         if len(mats) != n_1d or len(mask) != n_1d:
             return np.zeros((0, 2))
-        ids = [n for e in elements_1d[(mats == index) & (~mask)] for n in e[:2]]
+        keep = (mats == index) & (~mask)
+        if len(types) != n_1d:
+            types = np.full(n_1d, 2, dtype=int)
+        ids = [n for e, t in zip(elements_1d[keep], types[keep])
+               for n in e[:max(2, min(int(t), len(e)))]]
     ids = [i for i in dict.fromkeys(int(n) for n in ids) if 0 <= i < len(nodes)]
     return nodes[ids] if ids else np.zeros((0, 2))
 
@@ -312,6 +330,7 @@ def list_lines(fem_data, solution, slope_data=None, field_state="converged",
     ``index`` (the 1-based reinforcement line id, or the 0-based pile line
     index), ``label``, ``n_elements``, ``utilization`` (peak, or None when the
     model supplies no capacity to measure against), ``badge`` and ``status``.
+    A reinforcement row carries its ``status_key`` as well.
 
     ``field_state`` selects the field the utilizations are measured on, exactly
     as it does for the profiles themselves, so the badges and the plotted
@@ -335,6 +354,7 @@ def list_lines(fem_data, solution, slope_data=None, field_state="converged",
             "utilization": prof["peak_utilization"],
             "badge": prof["badge"],
             "status": prof["status"],
+            "status_key": prof["status_key"],
         })
     for pidx in _pile_line_indices(fem_data):
         prof = pile_profile(fem_data, solution, pidx, slope_data,
@@ -418,10 +438,49 @@ def _mechanism_peak(fem_data, solution, failure_solution=None):
     return peak if np.isfinite(peak) and peak > 0 else None
 
 
-def _band_span(positions, mech, global_peak=None):
+#: How finely a member is walked when the band crossing it is measured, as a
+#: fraction of the member's length and as a floor in the model's length unit.
+#: The walk is what makes the band a reading of the SOIL field rather than of
+#: the member's own meshing: sampled at the 1D elements instead, the crossing
+#: was reported at the nearest element center, and one confined to a single
+#: element came back with no width at all — Norm, on a bar element two feet
+#: long: "the shear band crossing is a single thin line? shouldn't it be a
+#: band?" The step is the coarser of the two so a long member is not walked in
+#: thousands of steps and a short one is not walked in a handful.
+BAND_SAMPLE_FRACTION = 1.0 / 400.0
+BAND_SAMPLE_MIN = 0.05
+
+
+def _band_walk(p1, p2, length):
+    """``(positions, points)`` — a dense walk from one end of a straight member
+    to the other: the along-member coordinate of each step, and its ``(x, y)``.
+
+    The step is :data:`BAND_SAMPLE_FRACTION` of the length or
+    :data:`BAND_SAMPLE_MIN`, whichever is coarser, and never so coarse that the
+    walk is fewer than three steps.
+    """
+    p1 = np.asarray(p1, dtype=float)
+    p2 = np.asarray(p2, dtype=float)
+    if not np.isfinite(length) or length <= 0:
+        return np.zeros(0), np.zeros((0, 2))
+    step = min(max(length * BAND_SAMPLE_FRACTION, BAND_SAMPLE_MIN), length / 3.0)
+    n = max(int(np.ceil(length / step)) + 1, 4)
+    t = np.linspace(0.0, length, n)
+    return t, p1 + (p2 - p1) * (t / length)[:, None]
+
+
+def _band_span(positions, mech, global_peak=None, step=None):
     """Contiguous run of ``positions`` around the mechanism peak whose field
     reaches ``BAND_FRACTION`` of that peak — the failure band as this member
     sees it. Returns ``(lo, hi, peak_position)`` or ``(None, None, None)``.
+
+    ``positions`` are the along-member coordinates the mechanism field was
+    sampled at, and the band is returned as the ends of the run in those
+    coordinates — so a walk fine enough resolves where the band crosses the
+    member rather than which of the member's elements it crosses. ``step`` is
+    the walk's spacing, and is what a run that comes down to a single sample is
+    widened to: the field was read there and nowhere either side of it, which is
+    a crossing one step wide and not a crossing of no width.
 
     ``global_peak`` is the mechanism's peak over the whole section
     (:func:`_mechanism_peak`), and it is what decides whether this member is in
@@ -460,12 +519,39 @@ def _band_span(positions, mech, global_peak=None):
     hi = k
     while hi + 1 < len(mech) and mech[hi + 1] >= thresh:
         hi += 1
-    return float(positions[lo]), float(positions[hi]), float(positions[k])
+    p_lo, p_hi = float(positions[lo]), float(positions[hi])
+    if step and p_hi - p_lo < step:
+        pad = 0.5 * (step - (p_hi - p_lo))
+        p_lo = max(p_lo - pad, float(positions[0]))
+        p_hi = min(p_hi + pad, float(positions[-1]))
+    return p_lo, p_hi, float(positions[k])
 
 
 # --------------------------------------------------------------------------
 # reinforcement
 # --------------------------------------------------------------------------
+
+def _line_ends(inputs, pts, s, length):
+    """The two ends of one reinforcement line in ``(x, y)``, end 1 first.
+
+    From the model's own endpoints where the line is in ``slope_data``, and
+    otherwise from the element centers the profile was built on: they lie on
+    the line, so the direction they run in and the arc length of the first of
+    them place both ends without inventing any geometry. ``(None, None)`` where
+    there are too few centers for that.
+    """
+    if inputs is not None:
+        return ((float(inputs["x1"]), float(inputs["y1"])),
+                (float(inputs["x2"]), float(inputs["y2"])))
+    if len(pts) < 2 or not np.isfinite(length) or length <= 0:
+        return None, None
+    ds = float(s[-1] - s[0])
+    if ds <= 0:
+        return None, None
+    unit = (np.asarray(pts[-1], float) - np.asarray(pts[0], float)) / ds
+    end1 = np.asarray(pts[0], float) - unit * float(s[0])
+    return tuple(end1), tuple(end1 + unit * length)
+
 
 def _reinforcement_line_inputs(fem_data, slope_data, line_id):
     """The capacity-envelope inputs for one reinforcement line, or None.
@@ -493,6 +579,7 @@ def _reinforcement_line_inputs(fem_data, slope_data, line_id):
         "lp2": float(ln.get("lp2", 0.0) or 0.0),
         "tend1": float(ln.get("tend1", 0.0) or 0.0),
         "tend2": float(ln.get("tend2", 0.0) or 0.0),
+        "pullout": ln.get("_pullout_profile"),
     }
 
 
@@ -506,24 +593,31 @@ def capacity_envelope(inputs, n=241):
     ``Tmax`` in the middle, and the step to the connection capacity ``Tend`` at
     an anchored end. The sample grid always includes the envelope's own kinks,
     so the polyline drawn through it is exact rather than merely dense.
+
+    Under the overburden-dependent pullout law the ramps are curves rather than
+    straight lines — the resistance follows the depth of burial along the line —
+    and the curve has no kinks to solve for, so the even grid carries it.
     """
     L = inputs["length"]
     t_max, lp1, lp2 = inputs["t_max"], inputs["lp1"], inputs["lp2"]
     tend1, tend2 = inputs["tend1"], inputs["tend2"]
+    pullout = inputs.get("pullout")
 
     kinks = {0.0, L}
-    if lp1 > 0 and tend1 < t_max and t_max > 0:
-        kinks.add(min(L, (t_max - tend1) * lp1 / t_max))
-    if lp2 > 0 and tend2 < t_max and t_max > 0:
-        kinks.add(max(0.0, L - (t_max - tend2) * lp2 / t_max))
-    if lp1 > 0 and lp2 > 0 and t_max > 0:
-        m1, m2 = t_max / lp1, t_max / lp2
-        s_x = (tend2 + m2 * L - tend1) / (m1 + m2)
-        if 0.0 < s_x < L and (tend1 + m1 * s_x) < t_max:
-            kinks.add(s_x)
+    if pullout is None:
+        if lp1 > 0 and tend1 < t_max and t_max > 0:
+            kinks.add(min(L, (t_max - tend1) * lp1 / t_max))
+        if lp2 > 0 and tend2 < t_max and t_max > 0:
+            kinks.add(max(0.0, L - (t_max - tend2) * lp2 / t_max))
+        if lp1 > 0 and lp2 > 0 and t_max > 0:
+            m1, m2 = t_max / lp1, t_max / lp2
+            s_x = (tend2 + m2 * L - tend1) / (m1 + m2)
+            if 0.0 < s_x < L and (tend1 + m1 * s_x) < t_max:
+                kinks.add(s_x)
     s = np.unique(np.concatenate([np.linspace(0.0, L, n), np.array(sorted(kinks))]))
     T = np.array([reinforce_available_tension(float(v), L - float(v), t_max,
-                                              lp1, lp2, tend1, tend2) for v in s])
+                                              lp1, lp2, tend1, tend2,
+                                              pullout=pullout) for v in s])
     return s, T
 
 
@@ -545,19 +639,23 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     ``x``, ``y`` : centroid coordinates
     ``T`` : mobilized axial force at each centroid
     ``t_allow`` : the solver's capacity at each centroid (``t_allow_by_1d_elem``)
-    ``t_cap`` : the capacity the solve actually enforced — identical to
-        ``t_allow`` unless the optional bond-slip model re-capped the line
     ``t_res`` : residual (post-peak) capacity, NaN where the line never softens
     ``failed``, ``softened`` : per-element state flags
     ``field_state`` : the state the series above were read at
     ``env_s``, ``env_T`` : the analytic capacity envelope (None without model
-        inputs, in which case the per-element ``t_cap`` is the capacity to draw)
+        inputs, in which case the per-element ``t_allow`` is the capacity to draw)
     ``bond_s``, ``bond_q`` : mobilized bond force per unit length, dT/ds, at the
         boundaries between consecutive elements
     ``slip_modelled`` : False — see note below
-    ``band_lo``, ``band_hi``, ``band_peak`` : band extents in ``s``
+    ``mechanism``, ``mechanism_s`` : the mechanism field sampled along the line,
+        on the dense walk the band below was measured from (:func:`_band_walk`)
+    ``band_lo``, ``band_hi`` : the ``s`` the band crosses the line between,
+        read off that walk and so independent of where the bar elements fall
+    ``band_peak`` : the ``s`` the mechanism peaks at on the line
     ``band_state`` : the field that band was read from (:func:`band_state`)
-    ``peak_s``, ``peak_T``, ``peak_utilization``, ``badge``, ``status``
+    ``peak_s``, ``peak_T``, ``peak_utilization``, ``badge``, ``status``,
+    ``status_key`` : the line's verdict (:func:`reinforcement_status`) as the
+        phrase it is displayed as and as its key
     ``peak_indices`` : every sample standing at the greatest utilization
     ``peak_span``, ``peak_T_span`` : the stretch of ``s``, and the range of
         force over it, when more than one sample stands there — None when the
@@ -565,9 +663,9 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         :func:`_peak_utilization`)
     ``peak_gap_s`` : the ``s`` of any sample INSIDE that stretch which does not
         stand with the rest — empty where the stretch is unbroken
-    ``pullout_s``, ``softened_s`` : the ``s`` of elements in each state — an
-        element that softened with no residual left and no force in it is a
-        pullout and appears in the first alone
+    ``ruptured_s``, ``softened_s`` : the ``s`` of elements in each state — an
+        element that softened with no residual left and no force in it is
+        ruptured and appears in the first alone
     ``units`` : the model's display unit strings
 
     Relative slip has no entry because the model has no slip degree of freedom:
@@ -595,9 +693,6 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     forces = _sol_array(field, "forces_1d", n_1d)
     failed = _sol_array(field, "failed_1d_elements", n_1d, dtype=bool)
     softened = _sol_array(field, "softened_1d_elements", n_1d, dtype=bool)
-    t_cap_all = _sol_array(field, "t_cap_1d", n_1d, fill=np.nan)
-    if not np.any(np.isfinite(t_cap_all)):
-        t_cap_all = t_allow
 
     idx = idx[elen[idx] > 0] if len(idx) else idx
     order = np.argsort(d1[idx], kind="stable") if len(idx) else np.array([], int)
@@ -621,7 +716,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         env_s = env_T = None
 
     T = forces[idx]
-    cap = t_cap_all[idx]
+    cap = t_allow[idx]
     with np.errstate(divide="ignore", invalid="ignore"):
         util = np.where(cap > 1e-12, T / cap, np.nan)
 
@@ -635,10 +730,21 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         bond_s = np.zeros(0)
         bond_q = np.zeros(0)
 
-    mech = _sample_mechanism(fem_data, solution, pts, failure_solution)
+    # Where the shear band crosses this line, measured on a dense walk of the
+    # line itself rather than on its bar elements: the band is a feature of the
+    # soil field, and sampling it at element centers reported the crossing at
+    # the nearest center and gave one confined to a single element no width.
+    end1, end2 = _line_ends(inputs, pts, s, length)
+    mech_s, mech_pts = (_band_walk(end1, end2, length)
+                        if end1 is not None else (np.zeros(0), np.zeros((0, 2))))
+    if not len(mech_s):                       # nothing to walk: the centers
+        mech_s, mech_pts = s, pts
+    mech = _sample_mechanism(fem_data, solution, mech_pts, failure_solution)
     band_lo, band_hi, band_peak = (
-        _band_span(s, mech, _mechanism_peak(fem_data, solution, failure_solution))
-        if len(idx) else (None, None, None))
+        _band_span(mech_s, mech,
+                   _mechanism_peak(fem_data, solution, failure_solution),
+                   step=float(mech_s[1] - mech_s[0]) if len(mech_s) > 1 else None)
+        if len(mech_s) else (None, None, None))
 
     peak_i, tied = _peak_utilization(util)
     peak_util = float(util[peak_i]) if peak_i is not None else None
@@ -654,22 +760,28 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     peak_gap_s = (s[np.setdiff1d(np.arange(tied[0], tied[-1] + 1), tied)]
                   if len(tied) > 1 else np.zeros(0))
 
-    # Pulled out: the element SOFTENED — dropped off the capacity it was
-    # holding — its residual capacity is (finitely) zero, and it now carries no
-    # force. A NaN residual means the line never softens at all, which is not
-    # pullout. Softening is the latch, not the yield flag: an element that has
+    # Ruptured elements, marked one by one on the figure: the element SOFTENED —
+    # dropped off the capacity it was holding — its residual capacity is
+    # (finitely) zero, and it now carries no force. That happens where the
+    # line's Tres is zero, or where the envelope develops nothing; bond slip
+    # alone never leaves an element here, being perfectly plastic (see
+    # build_fem_data's t_res assignment). A NaN residual means the line never
+    # softens at all, which is neither state.
+    # Softening is the latch, not the yield flag: an element that has
     # merely reached its capacity is holding it, and the overlay
     # (:func:`xslope.plot_fem.plot_reinforcement_forces`) reads the same three
-    # parts, so a bar marked pulled out on the section figure is the bar marked
-    # pulled out here.
+    # parts, so a bar marked ruptured on the section figure is the bar marked
+    # ruptured here.
     tr = t_res[idx]
     soft = softened[idx] if len(idx) else np.zeros(0, dtype=bool)
-    pulled = (soft & np.isfinite(tr) & (tr < 1e-6) & (T < 1e-6)) if len(idx) \
+    burst = (soft & np.isfinite(tr) & (tr < 1e-6) & (T < 1e-6)) if len(idx) \
         else np.zeros(0, dtype=bool)
-    pulled_out = bool(np.any(pulled))
 
-    status = _reinforcement_status(peak_util, pulled_out, bool(np.any(soft)))
-    badge = "red" if pulled_out else _badge(peak_util)
+    # The LINE's verdict, from the one function that decides it.
+    status_key, status = reinforcement_status(
+        T, t_allow[idx], t_res=tr, failed=failed[idx], softened=soft,
+        utilization=util)
+    badge = reinforcement_badge(status_key, peak_util)
 
     return {
         "kind": "reinforcement",
@@ -682,7 +794,6 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "y": pts[:, 1] if len(pts) else np.zeros(0),
         "T": T,
         "t_allow": t_allow[idx],
-        "t_cap": cap,
         "t_res": t_res[idx],
         "utilization": util,
         "failed": failed[idx],
@@ -690,7 +801,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "env_s": env_s, "env_T": env_T,
         "bond_s": bond_s, "bond_q": bond_q,
         "slip_modelled": False,
-        "mechanism": mech,
+        "mechanism": mech, "mechanism_s": mech_s,
         "band_lo": band_lo, "band_hi": band_hi, "band_peak": band_peak,
         "band_state": band_state(solution, failure_solution),
         "peak_s": float(s[peak_i]) if peak_i is not None else None,
@@ -700,13 +811,15 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "peak_span": peak_span,
         "peak_T_span": peak_T_span,
         "peak_gap_s": peak_gap_s,
-        "pullout_s": s[pulled] if len(idx) else np.zeros(0),
-        # Softened but not pulled out — the two are drawn with different marks
-        # and an element is in one state, so a pullout is not also a plain
-        # softened element with a second mark on top of it.
-        "softened_s": s[soft & ~pulled] if len(idx) else np.zeros(0),
+        "peak_tied_s": s[tied] if len(tied) else np.zeros(0),
+        "ruptured_s": s[burst] if len(idx) else np.zeros(0),
+        # Softened but not ruptured — the two are drawn with different marks
+        # and an element is in one state, so a ruptured element is not also a
+        # plain softened one with a second mark on top of it.
+        "softened_s": s[soft & ~burst] if len(idx) else np.zeros(0),
         "badge": badge,
         "status": status,
+        "status_key": status_key,
         "units": unit_labels(fem_data),
     }
 
@@ -736,18 +849,162 @@ def _peak_utilization(util):
     return int(tied[0]), tied
 
 
-def _reinforcement_status(util, pulled_out, softened):
-    if pulled_out:
-        return "pulled out"
-    if softened:
-        return "softened to residual"
-    if util is None or not np.isfinite(util):
-        return "no capacity declared"
-    if util >= UTIL_AT_CAPACITY:
-        return "at capacity"
-    if util >= UTIL_WATCH:
-        return "near capacity"
-    return "within capacity"
+#: The states a reinforcement line is reported in, most serious first, each with
+#: the display phrase it is written as and the one sentence that says what it
+#: means. Everything that reports a line's state reads this table — the Studio
+#: list and its detail panel, :func:`xslope.fem.print_reinforcement_summary`,
+#: the figure titles, and the report — so a reader who learns the word in one
+#: place has learned it in all of them.
+#: Each meaning is written to follow the line it describes — "a line reported
+#: yielded IS at its full tensile capacity ..." — so one sentence serves the
+#: printed summary's notes and the report's prose without either rewording it.
+REINFORCEMENT_STATES = {
+    "ruptured": (
+        "ruptured",
+        "has softened with no residual capacity left and now carries nothing"),
+    "softened": (
+        "softened",
+        "has dropped off its peak capacity onto its residual"),
+    "yielded": (
+        "yielded",
+        "is at its full tensile capacity away from the ends and holding it"),
+    "pullout": (
+        "pullout",
+        "is slipping near an end at the capacity its embedment can develop "
+        "there"),
+    "near capacity": (
+        "near capacity",
+        "is below capacity everywhere, but close to it where it is most "
+        "utilized"),
+    "within capacity": (
+        "within capacity",
+        "is below the capacity available to it everywhere along its length"),
+    "inactive": (
+        "inactive",
+        "carries no tension anywhere and is not engaged"),
+    "no capacity declared": (
+        "no capacity declared",
+        "declares no capacity for its force to be measured against"),
+}
+
+#: The order :func:`reinforcement_status` resolves the states in. A line in two
+#: of them at once is reported in the first: having shed capacity outranks
+#: standing at it, and standing at full capacity away from the ends outranks
+#: slipping at an embedment-limited one near them, which is the precedence the
+#: printed summary has always used.
+REINFORCEMENT_STATE_ORDER = ("ruptured", "softened", "yielded", "pullout",
+                             "near capacity", "within capacity", "inactive",
+                             "no capacity declared")
+
+
+def reinforcement_state_phrase(key):
+    """The display phrase for a state key (the key itself if it is unknown)."""
+    return REINFORCEMENT_STATES.get(key, (str(key), ""))[0]
+
+
+def reinforcement_state_meaning(key):
+    """The one-sentence meaning of a state key, for a page that defines it."""
+    return REINFORCEMENT_STATES.get(key, ("", ""))[1]
+
+
+def _line_array(value, n, fill=0.0, dtype=float):
+    """``value`` as a length-``n`` array of ``dtype``, or ``fill`` throughout."""
+    if value is None:
+        return np.full(n, fill, dtype=dtype)
+    arr = np.asarray(value, dtype=dtype).ravel()
+    return arr if len(arr) == n else np.full(n, fill, dtype=dtype)
+
+
+def reinforcement_status(force, t_allow, t_res=None, failed=None, softened=None,
+                         utilization=None):
+    """The verdict for ONE reinforcement line, from its per-element arrays.
+
+    Returns ``(key, phrase)`` — a key from :data:`REINFORCEMENT_STATES` and the
+    lowercase phrase it is displayed as. This is the only place a line's state
+    is decided.
+
+    Parameters
+    ----------
+    force : mobilized axial force in each of the line's elements
+    t_allow : the capacity envelope at each element (``t_allow_by_1d_elem``),
+        which is what says where the line's pullout ramps are: an element
+        carrying less than the line's own maximum is inside one
+    t_res : residual capacity at each element, NaN where the line never softens
+    failed, softened : the solver's two latches — reached the capacity it was
+        given, and dropped off it onto the residual
+    utilization : force over capacity, computed here when not supplied
+
+    Precedence, in :data:`REINFORCEMENT_STATE_ORDER`: an element that softened
+    with nothing left to hold and no force in it makes the line **ruptured**;
+    any softened element makes it **softened**; an element AT capacity at the
+    line's full Tmax makes it **yielded**; one at capacity inside a pullout ramp
+    makes it **pullout**. A line in none of those is read off its greatest
+    utilization — **near capacity** at or above :data:`UTIL_WATCH`, **within
+    capacity** below it — and one carrying no tension at all is **inactive**.
+    """
+    force = np.asarray(force, dtype=float).ravel()
+    n = len(force)
+    if n == 0:
+        return "no capacity declared", REINFORCEMENT_STATES["no capacity declared"][0]
+
+    t_allow = _line_array(t_allow, n, 0.0)
+    t_res = _line_array(t_res, n, np.nan)
+    failed = _line_array(failed, n, False, bool)
+    softened = _line_array(softened, n, False, bool)
+    if utilization is None:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            util = np.where(t_allow > 1e-12, force / t_allow, np.nan)
+    else:
+        util = _line_array(utilization, n, np.nan)
+
+    def _verdict(key):
+        return key, REINFORCEMENT_STATES[key][0]
+
+    # Ruptured: the element SOFTENED — dropped off the capacity it was holding —
+    # its residual capacity is (finitely) zero, and it now carries no force. A
+    # NaN residual means the line never softens at all, which is neither state.
+    if np.any(softened & np.isfinite(t_res) & (t_res < 1e-6) & (force < 1e-6)):
+        return _verdict("ruptured")
+    if np.any(softened):
+        return _verdict("softened")
+
+    # At capacity, by either reading of it: the solver latched the element when
+    # it reached the capacity it was given, and the force stands at that
+    # capacity. WHERE those elements sit is the whole distinction.
+    # An element inside a pullout ramp carries less than the line's Tmax because
+    # there is less embedment to develop it; the zero-capacity elements at the
+    # very ends belong to the ramps too.
+    t_max = float(np.max(t_allow))
+    at_cap = failed | (np.isfinite(util) & (util >= UTIL_AT_CAPACITY))
+    if t_max > 1e-6:
+        in_ramp = t_allow < t_max - 1e-6
+        if np.any(at_cap & ~in_ramp):
+            return _verdict("yielded")
+        if np.any(at_cap & in_ramp):
+            return _verdict("pullout")
+
+    if not np.any(np.isfinite(util)):
+        return _verdict("no capacity declared")
+    if not np.any(force > 0):
+        return _verdict("inactive")
+    if float(np.nanmax(util)) >= UTIL_WATCH:
+        return _verdict("near capacity")
+    return _verdict("within capacity")
+
+
+def reinforcement_badge(key, utilization=None):
+    """The list badge color for a state key.
+
+    Both of the at-capacity states carry the at-capacity color, and so does a
+    ruptured line. A softened one is amber: it has shed capacity, and what it
+    is holding now is a capacity it can hold. Anything below capacity is
+    colored by how far it has been worked.
+    """
+    if key in ("ruptured", "yielded", "pullout"):
+        return "red"
+    if key == "softened":
+        return "amber"
+    return _badge(utilization)
 
 
 # --------------------------------------------------------------------------
@@ -800,6 +1057,90 @@ def _ito_matsui_limit(slope_data, props, depths, y_head, S):
     return p
 
 
+def _reaction_at_mesh_scale(depth, p):
+    """The per-element reaction reported at the scale the mesh supports.
+
+    Each element's reaction is EI times the FOURTH derivative of its deflected
+    shape, and a fourth derivative amplifies whatever element-scale unevenness
+    the soil nodes handed the member: on a 0.5 ft wall the raw series wobbles by
+    a fifth of its value from one element to the next, with no physical content
+    at that scale. Each value is replaced by a least-squares straight line
+    fitted through it and its two neighbors (one at either end), evaluated at
+    its own depth -- a three-element window, about one and a half elements'
+    worth of length either side. Shape and magnitude survive; the element-scale
+    wobble does not. Fewer than three elements are returned as they are.
+    """
+    n = len(p)
+    if n < 3:
+        return p
+    out = np.empty(n)
+    for k in range(n):
+        lo, hi = max(0, k - 1), min(n, k + 2)
+        x, y = depth[lo:hi], p[lo:hi]
+        if hi - lo < 2 or np.ptp(x) < 1e-12:
+            out[k] = y.mean()
+            continue
+        a, b = np.polyfit(x, y, 1)
+        out[k] = a * depth[k] + b
+    return out
+
+
+def _pile_reaction(fem_data, field, sel, node_ids, node_depth, elem_depth):
+    """``(depth, p)`` -- the lateral soil reaction per unit length along one
+    pile, and the depths it is reported at.
+
+    On three-node elements each element reports its own: EI times the fourth
+    derivative of its deflected shape, read at its midpoint, which is the
+    distributed load that shape is carrying. Every element then answers from its
+    own kinematics, at the station its shear is already reported at.
+
+    On two-node elements the deflection is a cubic and that quantity is zero
+    everywhere, so the reaction is the shear discontinuity between consecutive
+    elements, spread over the tributary length of the node between them -- the
+    only thing a chain of cubics can say, and what a linear mesh has always
+    reported.
+    """
+    empty = (np.zeros(0), np.zeros(0))
+    if len(sel) == 0:
+        return empty
+
+    disp = np.asarray((field or {}).get("displacements", np.zeros(0)), dtype=float)
+    n_dof_by = np.asarray(fem_data.get("n_dof_by_pile_elem", []), dtype=int)
+    dof_idx_all = np.asarray(fem_data.get("dof_indices_pile", np.zeros((0, 9))),
+                             dtype=int)
+    n_pile = int(fem_data.get("n_pile_elements", 0) or 0)
+    elem_len = _pile_array(fem_data, "elem_length_by_pile_elem", n_pile)[sel]
+
+    three_node = (len(n_dof_by) == n_pile
+                  and all(int(n_dof_by[p]) == 9 for p in sel))
+    if three_node and len(disp):
+        from .fem import pile_element_reaction
+        cos_t = np.asarray(fem_data.get("cos_theta_pile", np.zeros(n_pile)),
+                           dtype=float)
+        sin_t = np.asarray(fem_data.get("sin_theta_pile", np.zeros(n_pile)),
+                           dtype=float)
+        EI = _pile_array(fem_data, "EI_by_pile_elem", n_pile)
+        out = np.zeros(len(sel))
+        for k, p in enumerate(sel):
+            p = int(p)
+            idx = dof_idx_all[p][:9]
+            if int(idx.max()) >= len(disp):
+                return empty
+            value = pile_element_reaction(disp[idx], cos_t[p], sin_t[p],
+                                          float(elem_len[k]), float(EI[p]), 3)
+            out[k] = 0.0 if value is None else value
+        return elem_depth, _reaction_at_mesh_scale(np.asarray(elem_depth, dtype=float), out)
+
+    shear = _sol_array(field, "forces_pile_lateral", n_pile)[sel]
+    if len(sel) < 2:
+        return empty
+    trib = 0.5 * (elem_len[:-1] + elem_len[1:])
+    return (node_depth[1:-1],
+            np.where(trib > 1e-12,
+                     (shear[:-1] - shear[1:]) / np.where(trib > 1e-12, trib, 1.0),
+                     0.0))
+
+
 def pile_profile(fem_data, solution, pile_index, slope_data=None,
                  field_state="converged", failure_solution=None):
     """Everything the detail view draws for one pile, ordered head to toe.
@@ -814,19 +1155,25 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
     Keys
     ----
     ``kind``, ``index``, ``label``, ``length``, ``n_elements``
-    ``node_depth`` : depth below the pile head at each pile node
+    ``node_depth`` : depth below the pile head at each pile node, midside nodes
+        included, so a chain of n three-node elements reports 2n+1 stations
     ``u_lateral`` : displacement normal to the pile axis at each node
-    ``elem_depth`` : depth at each beam element's midpoint
+    ``elem_depth`` : depth at each beam element's midpoint, which is where its
+        shear is read
     ``shear`` : element shear force, ``V_cap`` : its capacity where declared
     ``moment_depth``, ``moment`` : the continuous bending-moment profile,
         assembled from the beam elements' end moments; ``M_cap`` where declared
-    ``reaction_depth``, ``reaction`` : lateral soil reaction per unit length,
-        from the shear discontinuity the soil imposes at each interior node
+    ``reaction_depth``, ``reaction`` : lateral soil reaction per unit length
+        (:func:`_pile_reaction`) -- at each element's midpoint where the elements
+        carry a midside node, and at the node between consecutive elements where
+        they do not
     ``limit_depth``, ``limit_p`` : the Ito & Matsui limiting resistance
         envelope (None when the model does not supply pile diameter and spacing)
     ``max_moment``, ``max_moment_depth``
     ``max_shear``, ``max_shear_depth`` : the largest shear and the depth of it
-    ``band_lo``, ``band_hi`` : the depths the mechanism crosses the pile between
+    ``band_lo``, ``band_hi`` : the depths the mechanism crosses the pile
+        between, read off a dense walk from head to toe (:func:`_band_walk`)
+        and so independent of where the beam elements fall
     ``band_depth`` : the depth of the mechanism's peak on the pile
     ``band_state`` : the field that band was read from (:func:`band_state`)
     ``peak_utilization``, ``badge``, ``status``, ``utilization_basis``
@@ -882,19 +1229,33 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         return max(nodes[n0][1], nodes[n1][1])
     sel = sel[np.argsort([-_elem_top(p) for p in sel], kind="stable")]
 
-    # Chain the node list head to toe.
+    # Chain the node list head to toe, through the midside node of each element
+    # where the mesh gave it one. Those nodes carry the beam's deflection and
+    # slope like any other node it stands on, so the profiles are read at every
+    # station the element actually has rather than at every second one.
+    triples = np.asarray(fem_data.get("pile_elem_nodes", np.zeros((0, 3))),
+                         dtype=int)
+    has_mid = len(triples) == n_pile
     node_ids = []
+    end_pos = []          # positions in node_ids of the element boundaries
     for p in sel:
         n0, n1 = pairs[p]
+        n_m = int(triples[p][2]) if has_mid else -1
         if nodes[n0][1] < nodes[n1][1]:
             n0, n1 = n1, n0
         if not node_ids:
             node_ids.append(int(n0))
+            end_pos.append(0)
+        if n_m >= 0:
+            node_ids.append(int(n_m))
         node_ids.append(int(n1))
+        end_pos.append(len(node_ids) - 1)
     node_ids = np.array(node_ids, dtype=int)
+    end_pos = np.array(end_pos, dtype=int)
     xy = nodes[node_ids]
     y_head = float(xy[0][1])
     node_depth = y_head - xy[:, 1]
+    end_depth = node_depth[end_pos]      # depth of each element boundary
     length = float(node_depth[-1])
 
     # Lateral displacement: the component of nodal displacement normal to the
@@ -919,28 +1280,24 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
     if fm.shape != (n_pile, 2):
         fm = np.zeros((n_pile, 2))
     fm = fm[sel]
-    elem_len = _pile_array(fem_data, "elem_length_by_pile_elem", n_pile)[sel]
-    elem_depth = 0.5 * (node_depth[:-1] + node_depth[1:])
+    elem_depth = 0.5 * (end_depth[:-1] + end_depth[1:])
 
     # Continuous bending-moment profile: M1 of each element at its upper node,
     # and -M2 at its lower node (which equals the next element's M1).
     moment_depth = np.empty(2 * len(sel))
     moment = np.empty(2 * len(sel))
     for k in range(len(sel)):
-        moment_depth[2 * k] = node_depth[k]
-        moment_depth[2 * k + 1] = node_depth[k + 1]
+        moment_depth[2 * k] = end_depth[k]
+        moment_depth[2 * k + 1] = end_depth[k + 1]
         moment[2 * k] = fm[k, 0]
         moment[2 * k + 1] = -fm[k, 1]
 
-    # Lateral soil reaction per unit length: the shear discontinuity the soil
-    # imposes at each interior node, spread over that node's tributary length.
-    if len(sel) >= 2:
-        trib = 0.5 * (elem_len[:-1] + elem_len[1:])
-        reaction_depth = node_depth[1:-1]
-        reaction = np.where(trib > 1e-12, (shear[:-1] - shear[1:]) / np.where(trib > 1e-12, trib, 1.0), 0.0)
-    else:
-        reaction_depth = np.zeros(0)
-        reaction = np.zeros(0)
+    # Lateral soil reaction per unit length. Where the elements carry a midside
+    # node each one reports its own, from the distributed load its deflected
+    # shape is carrying; where they do not, it is the shear step between
+    # consecutive elements.
+    reaction_depth, reaction = _pile_reaction(
+        fem_data, field, sel, node_ids, end_depth, elem_depth)
 
     S = float(props.get("S")) if props.get("S") else (
         float(_pile_array(fem_data, "S_by_pile_elem", n_pile)[sel[0]]) or None)
@@ -964,19 +1321,19 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
     max_shear = float(shear[k_shear]) if k_shear is not None else None
     max_shear_depth = float(elem_depth[k_shear]) if k_shear is not None else None
 
-    mech_pts = np.column_stack([np.full(len(elem_depth), xy[0][0]),
-                                y_head - elem_depth]) if len(elem_depth) else np.zeros((0, 2))
-    if len(elem_depth):
-        mech_pts[:, 0] = 0.5 * (xy[:-1, 0] + xy[1:, 0])
+    # The depths the mechanism crosses this pile between, and the depth of its
+    # peak. Measured on a dense walk from head to toe rather than on the pile's
+    # own beam elements: the span is where the shear band meets the pile, which
+    # is a feature of the soil field and not of how finely the pile is meshed.
+    # The walk's positions are depths below the head, the axis the profiles are
+    # read down, so the mark and the profiles are on one scale.
+    mech_s, mech_pts = _band_walk(xy[0], xy[-1], length)
     mech = _sample_mechanism(fem_data, solution, mech_pts, failure_solution)
-    # The span the mechanism crosses this pile over, and the depth of its peak.
-    # The span is kept, not thrown away for its midpoint: where the mechanism
-    # meets a pile it meets a length of it, and the figure that drew one dashed
-    # line described a crossing at a point that the measurement never claimed.
     band_lo, band_hi, band_depth = (
-        _band_span(elem_depth, mech,
-                   _mechanism_peak(fem_data, solution, failure_solution))
-        if len(elem_depth) else (None, None, None))
+        _band_span(mech_s, mech,
+                   _mechanism_peak(fem_data, solution, failure_solution),
+                   step=float(mech_s[1] - mech_s[0]) if len(mech_s) > 1 else None)
+        if len(mech_s) else (None, None, None))
 
     reaction_ratio = _reaction_ratio(reaction, reaction_depth, limit_depth, limit_p)
     util, basis = _pile_utilization(shear, moment, V_cap, M_cap, reaction_ratio)
@@ -1008,7 +1365,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         "max_moment_depth": max_moment_depth,
         "max_shear": max_shear,
         "max_shear_depth": max_shear_depth,
-        "mechanism": mech,
+        "mechanism": mech, "mechanism_s": mech_s,
         "band_lo": band_lo,
         "band_hi": band_hi,
         "band_depth": band_depth,
@@ -1144,7 +1501,7 @@ def profile_table(profile):
         series = [
             (f"position{ln}", profile["s"]),
             (f"axial_force{fo}", profile["T"]),
-            (f"capacity{fo}", profile["t_cap"]),
+            (f"capacity{fo}", profile["t_allow"]),
             (f"residual_capacity{fo}", profile["t_res"]),
             ("utilization", profile["utilization"]),
             ("failed", profile["failed"].astype(int)),

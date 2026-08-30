@@ -22,8 +22,10 @@ import sys
 
 import openpyxl
 
-#: The sheet's own preset block (reinforce!Z8:AB11) — Type, Dir, Appl per row.
-PRESET_RANGE = ((8, 11), (26, 28))
+#: The sheet's own preset block — Type, Dir, Appl per row. It sits at AB8:AD11
+#: from template v24, at Z8:AB11 before that (Adhesion/Delta pushed the sheet two
+#: columns right), so both are tried and whichever holds the block wins.
+PRESET_RANGES = (((8, 11), (28, 30)), ((8, 11), (26, 28)))
 TYPE_COL, DIR_COL, APPL_COL = 7, 8, 9
 LABEL_COL = 2
 HEADERS = {TYPE_COL: "Type", DIR_COL: "Dir", APPL_COL: "Appl"}
@@ -31,7 +33,15 @@ HEADERS = {TYPE_COL: "Type", DIR_COL: "Dir", APPL_COL: "Appl"}
 
 def presets(ws):
     """{type: (dir, appl)} read from the sheet's lookup block."""
-    (r0, r1), (c0, c1) = PRESET_RANGE
+    for rng in PRESET_RANGES:
+        out = _presets_at(ws, rng)
+        if out:
+            return out
+    return {}
+
+
+def _presets_at(ws, rng):
+    (r0, r1), (c0, c1) = rng
     out = {}
     for r in range(r0, r1 + 1):
         row = [ws.cell(row=r, column=c).value for c in range(c0, c1 + 1)]

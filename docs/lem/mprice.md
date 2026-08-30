@@ -72,7 +72,7 @@ The computed factor of safety is famously *insensitive* to the choice of $f(x)$;
 $\lambda$, on the other hand, does depend on it (see
 [Insensitivity to f(x)](#insensitivity-to-fx) below).
 
-## Force Equilibrium — the Per-Slice March
+## Force Equilibrium — the Per-Slice Sweep
 
 For a trial factor of safety $F$ and trial scale $\lambda$, the per-boundary
 inclinations follow from the assumption (2),
@@ -90,7 +90,7 @@ normal they return:
 
 >>$S_i = \dfrac{c'_i \Delta\ell_i + N'_i \tan\phi'_i}{F}   \qquad (6)$
 
-The march starts from $Z_0 = 0$ (no force outside the first slice) and ends with a
+The sweep starts from $Z_0 = 0$ (no force outside the first slice) and ends with a
 leftover interslice resultant $Z_n$ at the downhill end. Global **force
 equilibrium** requires that this leftover vanish, which is the first of the two
 conditions the solution closes on — the force residual $R_f$:
@@ -170,10 +170,10 @@ redistributes the base normals and moves the moment sum.
 ## Solving for F and λ
 
 Conditions (7) and (9) are two equations in the two unknowns $F$ and $\lambda$. Both
-residuals come from one march over the slices, so a single pass at a trial
+residuals come from one sweep over the slices, so a single pass at a trial
 $(F, \lambda)$ returns them together.
 
-Define the two factor-of-safety curves obtained from the march at a fixed $\lambda$
+Define the two factor-of-safety curves obtained from that sweep at a fixed $\lambda$
 — $F_f(\lambda)$, the $F$ that drives the **force** residual to zero, and
 $F_m(\lambda)$, the $F$ that drives the **moment** residual to zero:
 
@@ -235,7 +235,7 @@ with the Jacobian of the scaled residuals with respect to the two unknowns:
 
 >>$\mathbf{J} = \begin{bmatrix} \left( \partial R_f / \partial F \right) / s_f & \left( \partial R_f / \partial \lambda \right) / s_f \\ \left( \partial R_m / \partial F \right) / s_m & \left( \partial R_m / \partial \lambda \right) / s_m \end{bmatrix}   \qquad (17)$
 
-The march is a recursion over the slices rather than a closed form in
+The sweep is a recursion over the slices rather than a closed form in
 $(F, \lambda)$, and XSLOPE forms **no analytical derivatives** of it. The Jacobian
 is built numerically instead, by forward differences,
 
@@ -255,7 +255,7 @@ A converged step is accepted only where both scaled residuals have vanished,
 
 and the pair is physical: $F > 0.05$, with $\lambda$ inside the search bracket
 widened by 0.5. A step that fails either test is discarded and the solve falls back
-to Approach A's bracketed crossing. Each evaluation of (16) costs one march, which
+to Approach A's bracketed crossing. Each evaluation of (16) costs one sweep, which
 is why the Newton path runs about three times faster than root-finding $h(\lambda)$,
 where a full $F_f$ solve is nested inside every step.
 

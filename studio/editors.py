@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog,
-    QDialogButtonBox, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QHeaderView,
+    QDialogButtonBox, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
     QScrollArea, QSplitter, QStackedWidget, QTableWidget, QTableWidgetItem,
     QTabWidget, QVBoxLayout, QWidget,
@@ -31,7 +31,7 @@ from .picking import _line_dist
 # can never drift. Same for the reinforcement support-type presets: the table the
 # Type column fills Dir/Appl from is the loader's, which is the sheet's.
 from xslope.fileio import (POLYGON_TYPE_WORDS, REINFORCE_TYPE_PRESETS,
-                           SSR_ZONE_LABELS, SSR_ZONE_SENTINELS)
+                           SEARCH_WINDOW_KEYS, SSR_ZONE_LABELS, SSR_ZONE_SENTINELS)
 
 # Column "usage" tags: which analysis a field applies to. Header text is colored
 # to mirror the input template's header coloring (red = LEM-specific inputs,
@@ -458,7 +458,7 @@ class _EditableTable(QWidget):
 
     def __init__(self, fields, rows, new_row, parent=None, swatch_state=None,
                  on_change=None, on_select=None, dim_rule=None, unit_labels=None,
-                 preset_spec=None):
+                 preset_spec=None, dim_on_edit=False):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
@@ -478,6 +478,11 @@ class _EditableTable(QWidget):
         # (kept read-only, value retained). The Materials editor uses it to mirror
         # the mat-sheet conditional formatting for an option=elastic row.
         self._dim_rule = dim_rule
+        # Whether a TYPED cell can change which cells apply. The materials rule is
+        # driven by combos, which re-derive on their own; the reinforcement rule is
+        # driven by whether Adhesion and Delta carry values, so it has to re-derive
+        # when one is typed or cleared.
+        self._dim_on_edit = bool(dim_on_edit)
         self._suppress_notify = True
         self._bases = [dict(r) for r in rows]  # keep originals to preserve extra keys
         # Optional leading display-color swatch column (Materials editor). It is a
@@ -530,7 +535,7 @@ class _EditableTable(QWidget):
         self._apply_dim_all()      # gray inapplicable cells (e.g. an elastic row)
         # Notifications are wired only AFTER the initial population, and item edits
         # go through a suppress flag, so building the table fires nothing.
-        self.table.itemChanged.connect(lambda *_: self._emit_change())
+        self.table.itemChanged.connect(self._on_item_changed)
         self.table.itemSelectionChanged.connect(self._emit_select)
         self._suppress_notify = False
 
@@ -554,6 +559,45 @@ class _EditableTable(QWidget):
         self.paste_summary.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.paste_summary.setVisible(False)
         layout.addWidget(self.paste_summary)
+        # Every table is fitted to its own content the moment it is populated, so no
+        # editor opens on Qt's default section width — which is the same number for
+        # an x-coordinate and a support-type combo, and therefore both too wide for
+        # one and too narrow for the other.
+        self.fit_columns()
+
+    # ---------------------------------------------------------------- #
+    # Column fit
+    # ---------------------------------------------------------------- #
+    def fit_columns(self):
+        """Size every column to its own widest content; returns the width the
+        VISIBLE columns need in the table's viewport.
+
+        The field kinds are what tell a numeric column (floored at the widest
+        ordinary number, so an empty table is as wide as a full one) from a text or
+        choice column (floored at its header). A display column that is not a field
+        — the Materials swatch — is not numeric either, and floors on its own
+        header glyph."""
+        numeric = {j for j, f in enumerate(self._fields)
+                   if f.kind in Field.NUMERIC_KINDS}
+        return _fit_columns(self.table, numeric)
+
+    def columns_width(self):
+        """The width this pane needs to show every visible column: the fitted
+        columns plus everything they sit inside — the row-number gutter, the frame,
+        and the scroll bar the table reserves.
+
+        Measured from the widgets' metrics rather than read off the current
+        geometry, so it is the same answer before the pane is ever shown as after.
+        sizeHint(), not width(), for the gutter: it is only as wide as the row count
+        needs, and before layout its width() has not caught up with the rows in it —
+        a 40-row table's gutter is wider than a 1-row table's, and measuring the
+        stale one puts a column back over the edge."""
+        from PySide6.QtWidgets import QStyle
+
+        return (self.fit_columns()
+                + self.table.verticalHeader().sizeHint().width()
+                + 2 * self.table.frameWidth()
+                + self.style().pixelMetric(QStyle.PM_ScrollBarExtent))
 
     # ---------------------------------------------------------------- #
     # Clipboard
@@ -866,6 +910,21 @@ class _EditableTable(QWidget):
                 it = self.table.item(i, j)
                 vals[f.key] = it.text() if it is not None else ""
         return vals
+
+    def _on_item_changed(self, item):
+        """A typed cell may change which cells apply — the reinforcement pullout
+        law is chosen by whether Adhesion and Delta carry values, not by a combo
+        — so the row's graying is re-derived from the edit before the change is
+        announced. (The materials rule is combo-driven and re-derives there.)"""
+        if (self._dim_rule is not None and self._dim_on_edit
+                and not self._suppress_notify):
+            prev = self._suppress_notify
+            self._suppress_notify = True
+            try:
+                self._apply_dim_row(item.row())
+            finally:
+                self._suppress_notify = prev
+        self._emit_change()
 
     def _apply_dim_all(self):
         if self._dim_rule is None:
@@ -1271,13 +1330,74 @@ def _circle_arc(slope_data, Xo, Yo, R, depth):
         return None
 
 
-def _draw_circles_preview(ax, circles, selected, slope_data, style):
+#: Color for the search-window overlay in the circles preview — a limit on WHERE a
+#: search may run is neither a trial surface (red) nor the selected circle (orange),
+#: so it gets its own hue rather than borrowing one of theirs.
+_WINDOW_COLOR = "#00838f"
+
+
+def _ground_band(slope_data, x_lo, x_hi, n=48):
+    """The ground surface between ``x_lo`` and ``x_hi`` as (xs, ys), clipped to the
+    section's own x range, or None when the range falls outside it entirely."""
+    import numpy as np
+    gs = slope_data.get("ground_surface")
+    if gs is None or getattr(gs, "is_empty", False):
+        return None
+    coords = list(gs.coords)
+    gx = [p[0] for p in coords]
+    gy = [p[1] for p in coords]
+    if gx[0] > gx[-1]:
+        gx, gy = gx[::-1], gy[::-1]
+    lo = max(min(x_lo, x_hi), min(gx))
+    hi = min(max(x_lo, x_hi), max(gx))
+    if not hi > lo:
+        return None
+    xs = np.linspace(lo, hi, n)
+    return xs, np.interp(xs, gx, gy)
+
+
+def _draw_search_window(ax, slope_data, window, annot_line):
+    """The search window over the section: the entry and exit ranges as bars lying on
+    the ground surface, the center box as a dashed rectangle.
+
+    Only a limit the search will actually apply is drawn — a range with one end filled
+    is not a window and the engine ignores it, so drawing it would show a constraint
+    that is not there. The center box is an annotation artist (like the circle centers
+    it confines) because it usually sits well above the section and must not inflate
+    the framed view."""
+    for lo, hi, label in (("entry_x_min", "entry_x_max", "entry"),
+                          ("exit_x_min", "exit_x_max", "exit")):
+        if window.get(lo) is None or window.get(hi) is None:
+            continue
+        band = _ground_band(slope_data, window[lo], window[hi])
+        if band is None:
+            continue
+        xs, ys = band
+        ax.plot(xs, ys, color=_WINDOW_COLOR, linewidth=4.0, alpha=0.75,
+                solid_capstyle="butt", zorder=8)
+        text = ax.annotate(label, (xs[len(xs) // 2], ys[len(ys) // 2]),
+                           textcoords="offset points", xytext=(0, 6), ha="center",
+                           fontsize=7, color=_WINDOW_COLOR, zorder=9)
+        text.set_in_layout(False)
+    box = ("center_box_x_min", "center_box_x_max",
+           "center_box_y_min", "center_box_y_max")
+    if all(window.get(k) is not None for k in box):
+        x0, x1, y0, y1 = (window[k] for k in box)
+        annot_line([x0, x1, x1, x0, x0], [y0, y0, y1, y1, y0],
+                   color=_WINDOW_COLOR, linewidth=1.2, linestyle="--")
+
+
+def _draw_circles_preview(ax, circles, selected, slope_data, style, window=None):
     """Preview for the starting-circles editor: the full cross-section (base geometry
     + overlays) with the PENDING circles over it. Each circle's clipped failure arc is
     drawn as the engine does; the selected one is bold (emphasis color) with a center
     marker, a radius line and a depth line, the others faint. The center/radius are
     annotation-layer artists (in_layout=False, clipped) so a center far above the
-    section can't inflate the framed view — matching plot_circles."""
+    section can't inflate the framed view — matching plot_circles.
+
+    ``window`` is the pending search window (the editor's group, live as it is typed),
+    drawn under the circles: the entry/exit ranges as bars on the ground surface, the
+    center box dashed."""
     from matplotlib.lines import Line2D
     from xslope.plot import plot_base_geometry
     from xslope.style import resolve_style
@@ -1290,6 +1410,9 @@ def _draw_circles_preview(ax, circles, selected, slope_data, style):
         ln.set_clip_box(ax.bbox)         # tight-bbox layout + view autoscale
         ln.set_clip_on(True)
         ax.add_artist(ln)
+
+    if window:
+        _draw_search_window(ax, slope_data, window, _annot_line)
 
     for i, c in enumerate(circles):
         Xo, Yo, R, depth = _circle_radius_depth(c)
@@ -1870,11 +1993,17 @@ def _pick_dloads(set_blocks, x, y, tol):
 # Fitting a table to its own content
 #
 # A table dialog that opens with a column past its right edge is a table dialog with
-# a hidden input. Rather than guess a width per column, the two helpers below measure
-# one: the widest thing any column has to show (header text, cell text, and the cell
-# WIDGETS a combo column is made of, whose width no item hint knows about), squared
-# off so every column is that wide. Uniform columns read as a sheet, and a dialog
-# opened at their total can not be hiding one.
+# a hidden input, and one that gives every column the width of its widest is a dialog
+# most of whose width is blank: an x-coordinate does not need the room a
+# "geosynthetic" combo does, and seventeen columns sized for that combo is a
+# seventeen-hundred pixel dialog. So each column is measured on ITS OWN widest thing
+# — header text, cell text, and the cell WIDGETS a combo column is made of, whose
+# width no item hint knows about — and given that, plus a cushion.
+#
+# A numeric column is floored at the widest ordinary number instead of at its header,
+# so a table opened EMPTY is as wide as the same table opened full and typing the
+# first row never moves a column; a text column floors on its header, which is the
+# widest thing it is guaranteed to hold.
 #
 # Everything is measured in the widget's own font, so the fit follows the font, the
 # display and the platform instead of a pixel guess made on one of them.
@@ -1887,44 +2016,127 @@ _TABLE_SPARE_ROWS = 3
 #: cross-section in; it scales with the font rather than fixing a pixel height.
 _PREVIEW_MIN_LINES = 16
 #: A negative number written to the display precision — the widest ordinary thing a
-#: numeric cell holds. It floors a column's width, so a table opened EMPTY is as wide
-#: as the same table opened full, and typing the first row does not need a resize.
+#: numeric cell holds. It floors a NUMERIC column's width, so a table opened EMPTY is
+#: as wide as the same table opened full, and typing the first row does not need a
+#: resize.
 _NUMBER_SAMPLE = "-" + "0" * _DISPLAY_SIG_DIGITS + "."
+#: A free-text column's floor — room for a name a little longer than "Line 10".
+_TEXT_SAMPLE = "0" * 12
 
 
-def _uniform_column_width(table):
-    """The width every column needs to show its widest content, header included."""
+def _column_widths(table, numeric):
+    """The width each column needs to show its own widest content, header included.
+
+    ``numeric`` is the set of column indexes holding numbers; those are the ones
+    floored at :data:`_NUMBER_SAMPLE`."""
+    from PySide6.QtWidgets import QComboBox, QStyle
+
     header = table.horizontalHeader()
     fm = table.fontMetrics()
     cushion = fm.horizontalAdvance("00")                    # one em-ish, both sides
-    widest = max(header.minimumSectionSize(),
-                 fm.horizontalAdvance(_NUMBER_SAMPLE) + cushion)
+    number = fm.horizontalAdvance(_NUMBER_SAMPLE) + cushion
+    # A free-text column (a label, a name) floors on a sample wider than its
+    # header so a short entry does not leave it cramped.
+    text_floor = fm.horizontalAdvance(_TEXT_SAMPLE) + cushion
+    widths = []
     for c in range(table.columnCount()):
         w = max(table.sizeHintForColumn(c), header.sectionSizeHint(c))
+        free_text = combo = False
         for r in range(table.rowCount()):
             cell = table.cellWidget(r, c)
-            if cell is not None:
+            if isinstance(cell, QComboBox):
+                # Just wide enough for the longest choice it offers plus the
+                # arrow: a combo's own sizeHint pads well beyond that.
+                longest = max((fm.horizontalAdvance(cell.itemText(i))
+                               for i in range(cell.count())), default=0)
+                arrow = cell.style().pixelMetric(QStyle.PM_ScrollBarExtent)
+                w = max(w, longest + arrow + cushion)
+                combo = True
+            elif cell is not None:
                 w = max(w, cell.sizeHint().width())
-        widest = max(widest, w + cushion)
-    return widest
+            else:
+                # Measured row by row rather than left to sizeHintForColumn, which
+                # only looks at the rows currently in the viewport: the longest
+                # label in a forty-row table is usually not one of the first
+                # twenty, and a fit that had not seen it would cut it off.
+                item = table.item(r, c)
+                if item is not None and item.text():
+                    w = max(w, fm.horizontalAdvance(item.text()))
+                    if c not in numeric:
+                        free_text = True
+        if not combo:                # a combo column's cushion is already in
+            w += cushion
+        if c in numeric:
+            w = max(w, number)
+        elif free_text:
+            w = max(w, text_floor)
+        widths.append(max(w, header.minimumSectionSize()))
+    return widths
 
 
-def _fit_columns(table):
-    """Size every column to :func:`_uniform_column_width` and let them share any
-    extra width the dialog is given. Returns the viewport width they need.
+def _fit_columns(table, numeric):
+    """Size each column to its own content (:func:`_column_widths`). Returns the
+    viewport width the VISIBLE columns need.
 
-    Stretch (rather than a one-off resize) is what keeps the fit true after the user
-    drags the dialog wider or narrower; the minimum section size is what stops the
-    stretch from squeezing a column back out of legibility."""
+    The sections stay Interactive at the fitted width rather than stretching to fill
+    the viewport: a fitted column is already as wide as the widest thing in it, so
+    sharing out spare width only pads it, and a dialog dragged narrower would take
+    that width back out of every column at once. Left alone, the fit survives a
+    resize in both directions — the spare width is blank space on the right, and a
+    dialog dragged narrower than its columns scrolls, which is the one direction a
+    table has a scroll bar for. The user keeps the column drag Interactive means."""
     header = table.horizontalHeader()
     # Forget the previous fit before measuring: a minimum section size left standing
     # is reported back as the sections' own hint, so re-fitting would ratchet the
     # columns wider every time it ran.
     header.setMinimumSectionSize(-1)
-    width = _uniform_column_width(table)
-    header.setMinimumSectionSize(width)
-    header.setSectionResizeMode(QHeaderView.Stretch)
-    return width * max(table.columnCount(), 1)
+    header.setSectionResizeMode(QHeaderView.Interactive)
+    header.setStretchLastSection(False)
+    widths = _column_widths(table, numeric)
+    for c, w in enumerate(widths):
+        header.resizeSection(c, w)
+    return sum(w for c, w in enumerate(widths) if not table.isColumnHidden(c))
+
+
+def _dialog_width_for(dialog, editable):
+    """The width ``dialog`` needs to show every visible column of the table pane
+    ``editable``: the pane's fitted width plus the dialog's own margins, and never
+    narrower than the rest of the dialog already needs — the view toggle and usage
+    checkboxes above the table, the buttons below it. A four-column table does not
+    get to fold the toggle bar."""
+    margins = dialog.layout().contentsMargins()
+    return max(editable.columns_width() + margins.left() + margins.right(),
+               dialog.layout().minimumSize().width())
+
+
+def _set_dialog_width(dialog, want, cap=None, grow_only=False):
+    """Take ``dialog`` to ``want`` pixels wide, never past ``cap`` or the screen.
+
+    ``grow_only`` for a dialog already on screen: showing a hidden column (a usage
+    toggle ticked back on) or switching to a wider view must not leave a column past
+    the right edge, but neither may it take back width the user gave the dialog
+    themselves. It is applied after the caps, so a dialog someone has already made
+    wider than the screen (a headless capture does exactly that) is left alone."""
+    if cap is not None:
+        want = min(want, cap)
+    screen = dialog.screen() or QApplication.primaryScreen()
+    if screen is not None:
+        want = min(want, screen.availableGeometry().width())
+    if grow_only:
+        want = max(want, dialog.width())
+    if want != dialog.width():
+        dialog.resize(want, dialog.height())
+
+
+def _fit_dialog_to_columns(dialog, editable, cap=None, grow_only=False):
+    """Set ``dialog``'s width to what the fitted columns of ``editable`` need."""
+    _set_dialog_width(dialog, _dialog_width_for(dialog, editable),
+                      cap=cap, grow_only=grow_only)
+
+
+def _grow_dialog_to(dialog, want):
+    """Widen ``dialog`` to ``want`` if it is narrower than that; never shrink it."""
+    _set_dialog_width(dialog, want, grow_only=True)
 
 
 class TableEditorDialog(QDialog):
@@ -1947,6 +2159,13 @@ class TableEditorDialog(QDialog):
     so a table with more columns than a pane's width can hold takes the full width
     and the section, which is wide and short anyway, takes the space below it.
 
+    ``extra_widget`` is a widget of settings that belong to the table as a whole
+    rather than to any row of it (the circles editor's search window), placed under
+    the table and above the buttons. It is reached back as ``dlg.extra``. Two optional
+    hooks on it are honoured: ``set_on_change(cb)`` wires it to the live preview, and
+    ``validate() -> message`` refuses OK with that message rather than letting the
+    dialog save something the loader would reject.
+
     ``generate`` (a hook ``propose() -> (rows, message, reason)``) adds a button that
     derives the whole table from the model. It follows the same contract as a
     preflight remedy: a button that cannot run is DIMMED with the reason in its
@@ -1957,7 +2176,7 @@ class TableEditorDialog(QDialog):
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
                  usage_toggles=None, preview_draw=None, preview_caption=None,
                  pick_resolve=None, field_help=None, unit_labels=None,
-                 generate=None, preview_below=False):
+                 generate=None, preview_below=False, extra_widget=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -2013,6 +2232,11 @@ class TableEditorDialog(QDialog):
             layout.addWidget(self._editable)
         if generate is not None:
             layout.addLayout(self._build_generate_bar(generate))
+        self.extra = extra_widget
+        if extra_widget is not None:
+            layout.addWidget(extra_widget)
+            if self._preview is not None and hasattr(extra_widget, "set_on_change"):
+                extra_widget.set_on_change(self._schedule_preview)
         _ok_cancel(self, layout)
         if usage_toggles:
             self._apply_toggles()      # set initial column visibility
@@ -2022,10 +2246,25 @@ class TableEditorDialog(QDialog):
             attach_help(self, self._field_help,
                        _table_help_resolver(lambda: self._editable, lambda: self._fields))
             _wire_cell_help(self._help_strip, self._editable, self._fields, self._field_help)
+        # Sized from its own table where the table IS the dialog's width — the
+        # preview stacked below it. A preview BESIDE the table splits the width with
+        # it, so there the table's fit is not the dialog's width and the opening
+        # size stays the split one.
         self._content_sized = bool(preview_below)
         if preview_below:
             # Last, so the measurement sees every strip the dialog ended up with.
             self._size_to_content()
+
+    def accept(self):
+        """OK, unless the extra widget says what it holds cannot be saved — a window
+        the loader would refuse to read back is stopped here, with the pair named,
+        rather than at the next open of the file."""
+        extra = getattr(self, "extra", None)
+        problem = extra.validate() if hasattr(extra, "validate") else ""
+        if problem:
+            QMessageBox.warning(self, self._title, problem)
+            return
+        super().accept()
 
     def _table_pane_height(self, rows_shown=None):
         """The height the table half needs for ``rows_shown`` rows (its own row count
@@ -2043,23 +2282,11 @@ class TableEditorDialog(QDialog):
         return table.horizontalHeader().height() + rows + spare + chrome + bar
 
     def _content_width(self):
-        """Dialog width that fits every column: the fitted columns themselves plus
-        everything they sit inside — row-number gutter, frame, the scroll bar the
-        table reserves, and the dialog's own margins. Computed from the widgets'
-        metrics rather than read off the current geometry, so it is the same answer
-        before the dialog is ever shown as after."""
-        from PySide6.QtWidgets import QStyle
-
-        table = self._editable.table
-        margins = self.layout().contentsMargins()
-        # sizeHint(), not width(): the row-number gutter is only as wide as the row
-        # count needs, and before the table has been laid out its width() has not
-        # caught up with the rows in it -- a 40-row table's gutter is wider than a
-        # 1-row table's, and measuring the stale one puts a column back over the edge.
-        return (_fit_columns(table)
-                + table.verticalHeader().sizeHint().width() + 2 * table.frameWidth()
-                + self.style().pixelMetric(QStyle.PM_ScrollBarExtent)
-                + margins.left() + margins.right())
+        """Dialog width that fits every column: the table pane's own fitted width
+        (:meth:`_EditableTable.columns_width`) plus the dialog's margins, and never
+        narrower than the rows above and below the table — the toggle bar, the
+        buttons — already need."""
+        return _dialog_width_for(self, self._editable)
 
     def _size_to_content(self):
         """Open at the size the content asks for, capped by the screen.
@@ -2079,10 +2306,22 @@ class TableEditorDialog(QDialog):
         table scrolls, which is the pane that has a scroll bar for the purpose."""
         width = self._content_width()
         pane = self._table_pane_height()
+        # The caption wraps at the width it is GIVEN, which is the dialog's width less
+        # the layout margins -- reserving at the full width buys one line too few and
+        # cuts the last line off along the bottom edge.
+        margins = self.layout().contentsMargins()
+        caption_width = width - margins.left() - margins.right()
         preview = (_PREVIEW_MIN_LINES * self.fontMetrics().height()
-                   + self._preview.reserve_caption(width))
+                   + self._preview.reserve_caption(caption_width))
         self._preview.setMinimumHeight(preview)
         self._editable.setMinimumHeight(self._table_pane_height(rows_shown=0))
+        # A QSplitter does not carry its children's minimums into its own, so a strip
+        # that appears later (the generator's summary) is free to squeeze the split
+        # rather than grow the dialog -- and what gets cut is the bottom of the
+        # preview's caption. Stating the minimum here puts the panes into the layout's
+        # own minimum, so the dialog grows for the new strip instead.
+        self._split.setMinimumHeight(self._editable.minimumHeight() + preview
+                                     + self._split.handleWidth())
         # Everything that is not the splitter: help text, legend, generate bar,
         # buttons, help strip. sizeHint() knows them all; the splitter's own hint is
         # replaced by the two pane heights measured above.
@@ -2107,16 +2346,44 @@ class TableEditorDialog(QDialog):
         would be taking room away from them to save room they did not ask to save.
 
         Only for a dialog that was sized from its content in the first place. The
-        fit takes the columns off Interactive and onto Stretch, which costs the user
-        the ability to drag a column width; that is a fair trade in a dialog whose
-        whole width was measured to fit its columns, and no trade at all in one that
-        was not -- there it would take the drag away and give nothing back."""
+        fit resets the columns to the new content's widths, which discards any width
+        the user dragged a column to; in a dialog whose whole width was measured to
+        fit its columns that is the fit doing its job, while in one sized some other
+        way it would only be overwriting the user's own arrangement."""
         if not getattr(self, "_content_sized", False):
             return
+        self._grow_to_layout_minimum()
         needed = self._content_width()
         if needed > self.width():
             self._grow(needed)
         self._grow_to_fit_columns()
+
+    def _grow_to_layout_minimum(self):
+        """Grow tall enough for everything the layout now holds, measured at the
+        width the dialog actually has.
+
+        A strip that appears after the dialog was sized — the generator's summary
+        line — needs room that nothing gave it, and what pays for it is the bottom of
+        the preview's caption. ``minimumSizeHint`` is no help: it measures every
+        wrapped label at the dialog's own MINIMUM width, where the same text takes
+        more lines than it does at the width on screen, so it answers a question
+        nobody asked. Summing the rows at the real width is the measurement that
+        matches what is drawn."""
+        layout = self.layout()
+        margins = layout.contentsMargins()
+        width = self.width() - margins.left() - margins.right()
+        want = margins.top() + margins.bottom()
+        want += layout.spacing() * max(0, layout.count() - 1)
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            if item.hasHeightForWidth():
+                want += item.heightForWidth(width)
+                continue
+            widget = item.widget()
+            want += (max(widget.sizeHint().height(), widget.minimumHeight())
+                     if widget is not None else item.sizeHint().height())
+        if want > self.height():
+            self.resize(self.width(), want)
 
     def _grow(self, width):
         """Widen to ``width``, never past the screen."""
@@ -2127,6 +2394,7 @@ class TableEditorDialog(QDialog):
     def showEvent(self, event):
         super().showEvent(event)
         if getattr(self, "_content_sized", False):
+            self._grow_to_layout_minimum()
             self._grow_to_fit_columns()
 
     def _grow_to_fit_columns(self):
@@ -2849,6 +3117,7 @@ def _new_material():
             "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
             "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
             "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
+            "Ss": None, "Sy": None,
             "t_cut": None, "phi_b": None, "s_cap": None,
             "E": 0.0, "nu": 0.0}
 
@@ -3314,7 +3583,12 @@ class _MaterialListView(QWidget):
     # underlying keys/headers are untouched.
     _FRIENDLY = {"f": "φ", "psi": "ψ", "s(f)": "σ(φ)", "s(g)": "σ(γ)",
                  "s(c)": "σ(c)", "s(c/p)": "σ(c/p)", "s(d)": "σ(d)",
-                 "s(psi)": "σ(ψ)"}
+                 "s(psi)": "σ(ψ)",
+                 # The Hoek-Brown four, in the notation the criterion is published
+                 # in: σci, GSI, mi, D. The hb_ prefix disambiguates the sheet
+                 # columns from the power-curve ones; on a labeled field it only
+                 # gets in the way of recognizing the parameter.
+                 "hb_sci": "σci", "hb_gsi": "GSI", "hb_mi": "mi", "hb_d": "D"}
 
     def _label_for(self, key):
         f = self._field_by_key.get(key)
@@ -3629,7 +3903,8 @@ MATERIALS_HELP = {
     "pow_b": "Power-curve exponent b; b = 1 collapses to Mohr-Coulomb (pow option).",
     "pow_c": "Power-curve additive strength term c (pow option).",
     "pow_d": "Power-curve normal-stress offset d (pow option).",
-    "hb_sci": "σci — uniaxial compressive strength of the intact rock (hb option).",
+    "hb_sci": "σci — uniaxial compressive strength of the intact rock, in the model's "
+              "stress units: 30 MPa is 30,000 kPa (hb option).",
     "hb_gsi": "GSI — Geological Strength Index, (0, 100] (hb option).",
     "hb_mi": "mi — intact Hoek-Brown constant, a rock-type property (hb option).",
     "hb_d": "D — disturbance factor, 0 (undisturbed) to 1 (blast-damaged) (hb option).",
@@ -3647,6 +3922,12 @@ MATERIALS_HELP = {
     "h0": "Suction head at which k = kr0 (linear-front, unsat = lf).",
     "vg_a": "Curve parameter a (vg: α in 1/length; gard: power-form a).",
     "vg_n": "Curve parameter n (van Genuchten / Gardner, unsat = vg or gard).",
+    "Ss": "Specific storage — water released per unit volume of saturated soil per "
+          "unit head drop (1/length). Read by a transient seepage run only; "
+          "required on every material then, blank otherwise.",
+    "Sy": "Specific yield — the drainable porosity: the volume fraction released "
+          "as the water table falls (dimensionless). Read by a transient seepage "
+          "run only; required on every material then, blank otherwise.",
     "_swatch": "Display color on the Inputs plot — a style override, not a 'mat' property.",
 }
 
@@ -3677,7 +3958,11 @@ class MaterialsDialog(QDialog):
         self._doc = doc
         self._orig_style = copy.deepcopy(style or {})
         self._color = _MaterialColorState(self._orig_style)
-        self.resize(1180, 640)
+        # The width the LIST view was laid out for, and the height both views open
+        # at. The table view sizes itself from its own fitted columns instead (see
+        # _fit_table_width), which on a filtered material sheet is narrower.
+        self._designed_width = 1180
+        self.resize(self._designed_width, 640)
 
         layout = QVBoxLayout(self)
         if help_text:
@@ -3801,6 +4086,9 @@ class MaterialsDialog(QDialog):
         self._sync_rel_enabled()
         if self._mode == "table" and self._table is not None:
             self._table.apply_usage_filter(self._enabled_usage())
+            # Columns that were just shown belong on the dialog, not past its right
+            # edge — so the width follows the filter (wider only).
+            self._fit_table_width()
         if self._mode == "list" and self._list_view is not None:
             self._list_view.apply_usage_filter(self._enabled_usage())
 
@@ -3853,13 +4141,27 @@ class MaterialsDialog(QDialog):
         if mode == "table":
             self._build_table()
             self._stack.setCurrentIndex(0)
+            self._fit_table_width()
         else:
             self._ensure_list()
             self._stack.setCurrentIndex(1)
+            if self.isVisible():
+                _grow_dialog_to(self, self._designed_width)
         self._mode = mode
         self._seg[mode].setChecked(True)
         global _LAST_MATERIALS_VIEW
         _LAST_MATERIALS_VIEW = mode
+
+    def _fit_table_width(self):
+        """Take the dialog to the width the table view's fitted columns need, up to
+        the width the list view was laid out for — the two views share one dialog,
+        and the material sheet has more columns than any screen has room for, so the
+        table view's fit is a floor to open at rather than a width to insist on.
+        Only ever wider once the dialog is on screen (see _fit_dialog_to_columns)."""
+        if self._table is None:
+            return
+        _fit_dialog_to_columns(self, self._table, cap=self._designed_width,
+                               grow_only=self.isVisible())
 
     def set_view_mode(self, mode):
         """Programmatic view switch (used by the round-trip guard)."""
@@ -3977,6 +4279,13 @@ class MaterialsEditor(CategoryEditor):
         Field("unsat", "unsat", "choice", choices=["lf", "vg", "gard"], usage="seep"),
         Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep", unit="length"),
         Field("vg_a", "vg_a", usage="seep"), Field("vg_n", "vg_n", usage="seep"),
+        # v18: transient storage (mat sheet seepage block, after the unsat curve
+        # pair). optfloat so a blank stays None — the loader never defaults these
+        # to 0 (a silent zero would drop the storage term), and preflight demands
+        # them only when a tseep sheet is in use.
+        Field("Ss", "Ss", "optfloat", usage="seep", unit="inv_length",
+              tooltip=MATERIALS_HELP["Ss"]),
+        Field("Sy", "Sy", "optfloat", usage="seep", tooltip=MATERIALS_HELP["Sy"]),
     ]
 
     def build(self, slope_data, parent):
@@ -4045,9 +4354,17 @@ class _LineListView(QWidget):
 
     def __init__(self, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, preview_caption=None, parent=None,
-                 unit_labels=None, dynamic_spec=None, preset_spec=None):
+                 unit_labels=None, dynamic_spec=None, preset_spec=None,
+                 switch_spec=None):
         super().__init__(parent)
         self._field_by_key = {f.key: f for f in fields}
+        # Optional per-line either/or switch inside one group (reinforcement's
+        # Pullout: development length OR overburden). It is a VIEW of the row —
+        # which pair carries values decides where it opens — not a stored field,
+        # so nothing new reaches the file. See _build_switch.
+        self._switch = switch_spec or None
+        self._switch_combo = None
+        self._switch_stash = {}   # row index -> {key: text} parked by a switch
         # Same preset rule the table view carries (reinforcement's Type -> Dir/Appl),
         # so the two views fill identically — see _apply_preset.
         self._preset = preset_spec or None
@@ -4200,6 +4517,8 @@ class _LineListView(QWidget):
         for title, group_rows in self._groups:
             g = QGroupBox(title)
             gv = QVBoxLayout(g)
+            if self._switch is not None and title == self._switch.get("group"):
+                gv.addWidget(self._build_switch())
             for keys in group_rows:
                 # A spacing-scaled field carries a long "per element / per unit width"
                 # label, so a pair containing one is broken onto full-width single rows
@@ -4220,6 +4539,86 @@ class _LineListView(QWidget):
         if driver is not None and hasattr(driver, "textChanged"):
             driver.textChanged.connect(lambda *_: self._relabel_dynamic())
         return scroll
+
+    # --- either/or switch -------------------------------------------------
+    def _build_switch(self):
+        """The group's law selector: one combo naming each option and the pair of
+        fields it governs.
+
+        Nothing about it is stored. The row itself says which law is in force —
+        for reinforcement, a filled Adhesion/Delta pair IS the overburden law —
+        so the combo opens where ``resolve`` puts it and the fields it does not
+        govern are grayed, values intact.
+        """
+        spec = self._switch
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 2, 0, 2)
+        h.setSpacing(4)
+        lab = QLabel(spec.get("label", "Mode"))
+        lab.setMinimumWidth(58)
+        combo = QComboBox()
+        for opt in spec["options"]:
+            combo.addItem(opt[1])
+        tip = spec.get("tooltip")
+        if tip:
+            lab.setToolTip(tip)
+            combo.setToolTip(tip)
+        combo.currentIndexChanged.connect(self._on_switch_changed)
+        h.addWidget(lab)
+        h.addWidget(combo, 1)
+        self._switch_combo = combo
+        return w
+
+    def _switch_index(self, row):
+        want = self._switch["resolve"](row)
+        for j, opt in enumerate(self._switch["options"]):
+            if opt[0] == want:
+                return j
+        return 0
+
+    def _apply_switch_state(self):
+        """Enable the governing pair, gray the rest — labels and edits alike, so a
+        dimmed field reads as inactive rather than merely unfocused."""
+        if self._switch_combo is None:
+            return
+        active = self._switch_combo.currentIndex()
+        for j, opt in enumerate(self._switch["options"]):
+            for key in opt[2]:
+                cell = self._cells.get(key)
+                if cell is not None:
+                    cell.setEnabled(j == active)
+
+    def _on_switch_changed(self, *_):
+        """Move the row onto the law the combo now names.
+
+        Only a SELF-ASSERTING pair is cleared, and it is parked rather than
+        dropped: values left in Adhesion and Delta would keep the overburden law
+        in force whatever the combo said, so leaving that option stashes them and
+        entering it again brings them back. The development lengths assert
+        nothing while the other law runs, so they merely dim — their values stay
+        in the cells, which is what the switch promises.
+        """
+        if self._switch_combo is None or self._cur < 0:
+            return
+        active = self._switch_combo.currentIndex()
+        stash = self._switch_stash.setdefault(self._cur, {})
+        for j, opt in enumerate(self._switch["options"]):
+            keys, asserting = opt[2], opt[3]
+            for key in keys:
+                w = self._edits.get(key)
+                if w is None or isinstance(w, QComboBox):
+                    continue
+                if j == active:
+                    if not w.text().strip() and stash.get(key):
+                        w.setText(stash.pop(key))
+                elif asserting:
+                    if w.text().strip():
+                        stash[key] = w.text()
+                    w.clear()
+        self._apply_switch_state()
+        self._commit()
+        self._preview.schedule()
 
     def apply_usage_filter(self, enabled):
         """Hide the form cells of fields whose usage tag is not enabled — the
@@ -4281,6 +4680,14 @@ class _LineListView(QWidget):
         # Loading blocks the driver's textChanged, so re-word the scaled labels from
         # the freshly-loaded Spacing/S here.
         self._relabel_dynamic()
+        # The either/or switch reads the freshly-loaded row, silently: seeding it
+        # is not the user choosing a law, so it must not move any value.
+        if self._switch_combo is not None:
+            self._switch_combo.blockSignals(True)
+            self._switch_combo.setCurrentIndex(
+                self._switch_index(self._rows[idx]) if ok else 0)
+            self._switch_combo.blockSignals(False)
+            self._apply_switch_state()
         self._form_scroll.setEnabled(ok)
         if ok:
             self._cur = idx
@@ -4391,7 +4798,7 @@ class _LineEditorDialog(QDialog):
                  preview_draw, pick_resolve, view_state, parent=None,
                  help_text=None, usage_toggles=None, preview_caption=None,
                  field_help=None, unit_labels=None, dynamic_spec=None,
-                 preset_spec=None):
+                 preset_spec=None, dim_rule=None, switch_spec=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -4403,6 +4810,12 @@ class _LineEditorDialog(QDialog):
         # Preset rule handed to BOTH views, so a Type picked in either fills the same
         # two columns from the same table (reinforcement; None elsewhere).
         self._preset_spec = preset_spec
+        # Per-row graying rule (row dict -> keys to gray) and the list view's
+        # either/or switch. Both express the SAME fact — which of two mutually
+        # exclusive parameter sets a row is using — so the table's grayed pair and
+        # the list's dimmed pair always agree.
+        self._dim_rule = dim_rule
+        self._switch_spec = switch_spec
         self._new_row = new_row
         self._groups = groups
         self._item_label = item_label
@@ -4419,7 +4832,12 @@ class _LineEditorDialog(QDialog):
         self._table_split = None
         self._table_preview = None
         self._list_view = None
-        self.resize(1200, 620)
+        # The width the LIST view was laid out for, and the height both views open
+        # at. The table view sizes itself from its own fitted columns instead (see
+        # _set_mode) — narrower here, since a line's fields are a dozen numbers —
+        # but never wider than the view it shares the dialog with.
+        self._designed_width = 1200
+        self.resize(self._designed_width, 620)
 
         layout = QVBoxLayout(self)
         if help_text:
@@ -4512,6 +4930,10 @@ class _LineEditorDialog(QDialog):
             s.setValue(f"editor_toggles/{self._title}/{t}", cb.isChecked())
         if self._table is not None:
             self._table.apply_usage_filter(self._enabled_usage())
+            if self._mode == "table":
+                # Columns that were just shown belong on the dialog, not past its
+                # right edge — so the width follows the filter (wider only).
+                self._fit_table_width()
         if self._list_view is not None:
             self._list_view.apply_usage_filter(self._enabled_usage())
 
@@ -4540,7 +4962,9 @@ class _LineEditorDialog(QDialog):
                                      on_change=self._schedule_table_preview,
                                      on_select=self._schedule_table_preview,
                                      unit_labels=self._unit_labels,
-                                     preset_spec=self._preset_spec)
+                                     preset_spec=self._preset_spec,
+                                     dim_rule=self._dim_rule,
+                                     dim_on_edit=self._dim_rule is not None)
         self._table_preview = PreviewPane(
             lambda ax: self._preview_draw(ax, self._table.result_rows(),
                                           self._table.selected_row()),
@@ -4576,7 +5000,8 @@ class _LineEditorDialog(QDialog):
                 self._fields, self._rows, self._new_row, self._groups,
                 self._item_label, self._preview_draw, self._pick_resolve,
                 preview_caption=self._preview_caption, unit_labels=self._unit_labels,
-                dynamic_spec=self._dynamic_spec, preset_spec=self._preset_spec)
+                dynamic_spec=self._dynamic_spec, preset_spec=self._preset_spec,
+                switch_spec=self._switch_spec)
             self._list_lay.addWidget(self._list_view)
             # A lazily built list view starts under whatever the toggle bar
             # already says — the same filter the table is showing.
@@ -4598,12 +5023,31 @@ class _LineEditorDialog(QDialog):
         if mode == "table":
             self._build_table()
             self._stack.setCurrentIndex(0)
+            self._fit_table_width()
         else:
             self._ensure_list()
             self._stack.setCurrentIndex(1)
+            if self.isVisible():
+                _grow_dialog_to(self, self._designed_width)
         self._mode = mode
         self._seg[mode].setChecked(True)
         _set_last_line_view(self._view_state, mode)
+
+    def _fit_table_width(self):
+        """Take the dialog to the width the table view's fitted columns need.
+
+        Bounded above by the width the list view was laid out for: the two views
+        share one dialog, and a table that wanted more than that would be sizing the
+        other view's form off the screen. Bounded below by nothing but the dialog's
+        own controls — a table of a dozen number columns is a narrow dialog, and it
+        should open as one.
+
+        Only ever wider once the dialog is on screen: a switch back to the table is
+        not a reason to take back width the user gave it."""
+        if self._table is None:
+            return
+        _fit_dialog_to_columns(self, self._table, cap=self._designed_width,
+                               grow_only=self.isVisible())
 
     def set_view_mode(self, mode):
         """Programmatic view switch (used by the round-trip guard)."""
@@ -4629,6 +5073,121 @@ CIRCLES_HELP = {
     "Yi": "Y-coordinate of a point the circle passes through. Option = Intercept.",
     "R": "Circle radius, specified directly. Option = Radius.",
 }
+
+
+SEARCH_WINDOW_HELP = {
+    "entry_x_min": "X range the failure surface's crest-side (higher-ground) endpoint "
+                   "must fall in. A trial surface breaking outside it is rejected.",
+    "exit_x_min": "X range the toe-side (lower-ground) endpoint must fall in. A trial "
+                  "surface daylighting outside it is rejected.",
+    "center_box_x_min": "Rectangle the circle centers are confined to. The refining "
+                        "grid stays inside it, so the search cannot walk out. Applies "
+                        "only when all four cells are filled.",
+    "center_box_y_min": "Rectangle the circle centers are confined to. The refining "
+                        "grid stays inside it, so the search cannot walk out. Applies "
+                        "only when all four cells are filled.",
+    "max_tangent_depth": "The lowest ELEVATION the circle's bottom (its tangent point) "
+                         "may reach. A deeper trial surface is rejected.",
+    "min_slip_depth": "Minimum depth below the ground surface a surface must reach. "
+                      "Rejects shallow surficial “skin” mechanisms, whose factor "
+                      "of safety is depth-independent on a cohesionless face and would "
+                      "otherwise win.",
+}
+# Each grid row of the group: (label, key or None, key or None). The four ranges pair
+# their two ends on one row; the two single limits fill the min column alone.
+_SEARCH_WINDOW_ROWS = (
+    ("Entry x", "entry_x_min", "entry_x_max"),
+    ("Exit x", "exit_x_min", "exit_x_max"),
+    ("Center box x", "center_box_x_min", "center_box_x_max"),
+    ("Center box y", "center_box_y_min", "center_box_y_max"),
+    ("Max tangent depth", "max_tangent_depth", None),
+    ("Min slip depth", "min_slip_depth", None),
+)
+#: The four ranges, as (low key, high key) — what has to be increasing, and what has
+#: to be filled at both ends to apply at all.
+_SEARCH_WINDOW_PAIRS = tuple((lo, hi) for _lbl, lo, hi in _SEARCH_WINDOW_ROWS
+                             if hi is not None)
+
+
+class _SearchWindowGroup(QGroupBox):
+    """The circles sheet's optional search window (J8:K17), edited as a group.
+
+    Ten independent limits confining an automated circular search, every one of them
+    optional: a blank field is a limit that is not applied, and an all-blank group is
+    the unconstrained search. That is exactly what the loader produces for a blank
+    block — no ``search_window`` key at all — so :meth:`result_values` returns only
+    the filled keys and an empty dict for a group nobody filled in, and the editor
+    drops the key rather than storing ten Nones.
+
+    Each field is an ``optfloat`` :class:`Field`, so a value shown rounded for reading
+    is written back at full precision unless it was actually typed over."""
+
+    CAPTION = ("Optional limits confining an automated circular search. A blank field "
+               "is a limit that is not applied; a range applies only when BOTH of its "
+               "ends are filled.")
+
+    def __init__(self, window, unit_labels=None, parent=None):
+        super().__init__("Search window", parent)
+        self._stored = dict(window or {})
+        self._on_change = None
+        self._fields, self._edits = {}, {}
+        outer = QVBoxLayout(self)
+        outer.addWidget(_help_label(self.CAPTION))
+        grid = QGridLayout()
+        grid.addWidget(QLabel("min"), 0, 1)
+        grid.addWidget(QLabel("max"), 0, 2)
+        for r, (label, lo, hi) in enumerate(_SEARCH_WINDOW_ROWS, start=1):
+            tip = SEARCH_WINDOW_HELP[lo]
+            name = QLabel(_with_unit(label, Field(lo, label, unit="length"), unit_labels))
+            name.setToolTip(tip)
+            grid.addWidget(name, r, 0)
+            for col, key in ((1, lo), (2, hi)):
+                if key is None:
+                    continue
+                field = Field(key, label, "optfloat", unit="length", tooltip=tip)
+                edit = QLineEdit(field.to_text(self._stored.get(key)))
+                edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                edit.setToolTip(tip)
+                edit.textChanged.connect(self._changed)
+                self._fields[key] = field
+                self._edits[key] = edit
+                grid.addWidget(edit, r, col)
+        grid.setColumnStretch(3, 1)
+        outer.addLayout(grid)
+
+    def set_on_change(self, callback):
+        """Call ``callback`` whenever a field is typed in — how the dialog's live
+        preview follows the window being edited."""
+        self._on_change = callback
+
+    def _changed(self, _text=None):
+        if self._on_change is not None:
+            self._on_change()
+
+    def result_values(self):
+        """The window as the loader would produce it: only the filled keys, in sheet
+        order, each a float."""
+        out = {}
+        for key in SEARCH_WINDOW_KEYS:
+            field = self._fields[key]
+            value = field.read_text(self._edits[key].text(), self._stored.get(key))
+            if value is not None:
+                out[key] = float(value)
+        return out
+
+    def validate(self):
+        """The message to refuse OK with, or "" when the window is savable.
+
+        The one thing the loader rejects outright is a range that runs backwards, and
+        a file saved with one would not open again — so it is caught here, where the
+        user can still see which pair they typed."""
+        window = self.result_values()
+        for lo, hi in _SEARCH_WINDOW_PAIRS:
+            if lo in window and hi in window and window[lo] > window[hi]:
+                return (f"The search window has {lo} = {window[lo]:g} greater than "
+                        f"{hi} = {window[hi]:g}. Every range must be increasing "
+                        f"(min ≤ max).")
+        return ""
 
 
 def _circles_generate_spec(slope_data):
@@ -4690,9 +5249,12 @@ class CirclesEditor(CategoryEditor):
 
     def build(self, slope_data, parent):
         style = _doc_style(parent)
+        window = _SearchWindowGroup(slope_data.get("search_window"),
+                                    _unit_labels_for(slope_data))
 
         def preview(ax, rows, selected):
-            _draw_circles_preview(ax, rows, selected, slope_data, style)
+            _draw_circles_preview(ax, rows, selected, slope_data, style,
+                                  window=window.result_values())
 
         return TableEditorDialog(
             "Circles", self.FIELDS, slope_data.get("circles", []), _new_circle, parent,
@@ -4704,7 +5266,9 @@ class CirclesEditor(CategoryEditor):
             preview_draw=preview,
             preview_caption="Preview shows the starting circles on the section "
                             "(selected circle bold with center, radius and depth "
-                            "lines; others faint). Click a circle to select it.",
+                            "lines; others faint). Click a circle to select it. Any "
+                            "search window is drawn with it: entry and exit ranges as "
+                            "bars on the ground surface, the center box dashed.",
             pick_resolve=lambda x, y, tol, rows: _pick_circles(rows, x, y, tol, slope_data),
             field_help=CIRCLES_HELP,
             generate=_circles_generate_spec(slope_data),
@@ -4712,7 +5276,10 @@ class CirclesEditor(CategoryEditor):
             # side by side, the table loses R off its right edge. Stacked, the table
             # gets the full width for its columns and the section — wide and short —
             # gets the room below.
-            preview_below=True)
+            preview_below=True,
+            # The search window limits where a SEARCH may run, so it belongs to the
+            # circle table as a whole rather than to any one starting circle.
+            extra_widget=window)
 
     def apply(self, slope_data, dlg):
         rows = dlg.result_rows()
@@ -4727,6 +5294,14 @@ class CirclesEditor(CategoryEditor):
                 c["R"] = c["Yo"] - c["Depth"]
         slope_data["circles"] = rows
         slope_data["circular"] = len(rows) > 0
+        # Only the filled limits are stored, and a window nobody filled in leaves no
+        # key behind at all — the state the loader produces for a blank J8:K17 block,
+        # so an untouched model round-trips through this editor unchanged.
+        window = dlg.extra.result_values()
+        if window:
+            slope_data["search_window"] = window
+        else:
+            slope_data.pop("search_window", None)
 
 
 def _new_ncpt():
@@ -5476,8 +6051,8 @@ class SeepBcEditor(CategoryEditor):
 def _new_pile():
     return {"label": "Pile", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 0.0, "H": None,
             "theta_p": 0.0, "D_pile": None, "S": None, "E": None, "I": None,
-            "area": None, "V_cap": None, "M_cap": None, "fixity": "free",
-            "appl": "active"}
+            "area": None, "V_cap": None, "M_cap": None, "head_fixity": "free",
+            "tip_fixity": "free", "appl": "active"}
 
 
 # List-view form layout for a pile: every PilesEditor.FIELDS key grouped (Identity /
@@ -5488,7 +6063,7 @@ _PILE_FORM_GROUPS = [
     ("Geometry", [["x1", "y1"], ["x2", "y2"]]),
     ("Capacity / design", [["H"], ["D_pile", "S"], ["V_cap", "M_cap"],
                            ["E", "I"], ["area"]]),
-    ("Behavior", [["appl", "fixity"]]),
+    ("Behavior", [["appl"], ["head_fixity", "tip_fixity"]]),
 ]
 
 
@@ -5502,8 +6077,9 @@ def _pile_item_label(i, row):
 
 # Wording mirrors the 'piles' worksheet section of input_template.md. Where a field
 # is genuinely single-analysis (matching its column's usage tag / header color) the
-# text says so explicitly; D and S feed both (LEM force auto-computation AND FEM
-# I/Area defaults), so neither is tagged "LEM only" despite the red header.
+# text says so explicitly; D and S feed both engines — the LEM force auto-computation
+# AND the FEM section and its per-unit-width smear — so neither is tagged "LEM only"
+# and each tooltip names both readers.
 PILES_HELP = {
     "label": "Name used in error messages, summaries, and plots (optional).",
     "x1": "Pile top X-coordinate.",
@@ -5511,11 +6087,17 @@ PILES_HELP = {
     "x2": "Pile tip (bottom) X-coordinate.",
     "y2": "Pile tip (bottom) Y-coordinate.",
     "H": "Pile force per unit width of slope (force/length). Blank = auto-computed "
-        "via Ito & Matsui from D and S (vertical piles only).",
-    "D_pile": "Pile diameter. Required for the Ito & Matsui auto-computation of H; "
-             "also derives I and Area for FEM when those are left blank.",
-    "S": "Center-to-center pile spacing. Required for Ito & Matsui and for "
-        "Vcap/Mcap (both per-pile); lets xslope report per-pile forces.",
+        "via Ito & Matsui from D and S (vertical piles only). LEM only; the FEM "
+        "never reads a stated pile force.",
+    "D_pile": "Pile diameter. Read by both engines: LEM needs it for the Ito & "
+             "Matsui auto-computation of H, and FEM derives the section from it "
+             "when I and Area are blank — I = pi·D^4/64 and Area = pi·D^2/4 for a "
+             "solid circular pile.",
+    "S": "Center-to-center pile spacing. In the LEM, spacing is physics: it sets "
+        "the arching between piles (Ito & Matsui) and makes Vcap/Mcap per-pile. "
+        "In the FEM, S converts per-pile properties to per-unit-width (EA/S, "
+        "EI/S) — the correct plane-strain stiffness of the smeared row; what it "
+        "cannot model is the soil arching between piles.",
     "E": "Young's modulus of the pile material; with I and Area gives the flexural "
         "(EI) and axial (EA) stiffness, each divided by S for the per-unit-width "
         "2D beam. FEM only.",
@@ -5523,16 +6105,25 @@ PILES_HELP = {
         "auto-computed from D for a solid circular section when left blank.",
     "area": "Cross-sectional area of a single pile (÷ S for per unit width). FEM "
            "only; auto-computed from D for a solid circular section when left blank.",
-    "V_cap": "Shear capacity of a single pile — per element (force units); requires "
-            "S. xslope reports forces per unit width (= per pile ÷ S) and checks the "
-            "per-pile force against this. LEM only.",
-    "M_cap": "Moment capacity of a single pile — per element (force×length); "
-            "requires S. Checked against the per-pile force (per unit width × S). "
-            "LEM only.",
+    "V_cap": "Shear capacity of a single pile (force units); requires S. Read by "
+            "both engines: the LEM checks the per-pile shear against it; the FEM "
+            "clips the beam shear at Vcap ÷ S per unit width.",
+    "M_cap": "Moment capacity of a single pile (force×length); requires S. Read by "
+            "both engines: the LEM checks the per-pile moment against it; the FEM "
+            "releases a plastic hinge where the beam moment reaches Mcap ÷ S per "
+            "unit width.",
     "appl": "Force application — Active: H is an allowable force, not divided by "
            "FS (default). Passive: H is an ultimate capacity divided by FS. LEM only.",
-    "fixity": "Pile head rotation boundary condition — free (default, can rotate) "
-             "or fixed (zero rotation). FEM only.",
+    "head_fixity": "Restraint at the top of the pile: free (default; no connection "
+                   "at the head), pinned (translation held, rotation free — tie-rods "
+                   "or anchors), unrotated (rotation held, translation free — a cap "
+                   "beam tying the heads), or fixed (both held — cap beam and "
+                   "anchors). FEM only.",
+    "tip_fixity": "Restraint at the bottom of the pile: free (default; the tip "
+                  "moves with the soil around it, or sits on the model boundary), "
+                  "pinned (translation held, rotation free — bearing on a hard "
+                  "stratum inside the mesh), unrotated (rotation held, translation "
+                  "free), or fixed (both held — socketed into rock). FEM only.",
 }
 
 
@@ -5541,29 +6132,36 @@ class PilesEditor(CategoryEditor):
     # tooltip=PILES_HELP[key] gives the table-header hover and the list-view
     # label/edit hover; the same dict feeds the context-sensitive help strip.
     # Field order mirrors the piles sheet's columns (Label, the endpoints, H, Appl,
-    # D, S, Vcap, Mcap, then the FEM tail E, I, Area, Fixity) so a block copied from
+    # D, S, Vcap, Mcap, then the FEM tail E, I, Area, Head, Tip) so a block copied from
     # the sheet or the docs' tables pastes straight in. The sheet's qp (θ) sits
     # between H and Appl and has no column here: θ is derived from the pile axis on
     # save, so a block spanning it goes in as two — the endpoints through H, then D
     # onward, which is how the tutorials print it.
+    LF = {"lem", "fem"}
     FIELDS = [
         Field("label", "Label", "str", tooltip=PILES_HELP["label"]),
         Field("x1", "x1", tooltip=PILES_HELP["x1"]), Field("y1", "y1", tooltip=PILES_HELP["y1"]),
         Field("x2", "x2", tooltip=PILES_HELP["x2"]), Field("y2", "y2", tooltip=PILES_HELP["y2"]),
-        Field("H", "H", "optfloat", tooltip=PILES_HELP["H"]),
+        Field("H", "H", "optfloat", usage="lem", tooltip=PILES_HELP["H"]),
         # Force application (v12, LEM only): active = allowable force applied as-is;
         # passive = ultimate capacity divided by FS (loader default 'active').
         Field("appl", "Appl", "choice", choices=["active", "passive"], usage="lem",
               tooltip=PILES_HELP["appl"]),
-        Field("D_pile", "D", "optfloat", usage="lem", tooltip=PILES_HELP["D_pile"]),
-        Field("S", "S", "optfloat", usage="lem", tooltip=PILES_HELP["S"]),
-        Field("V_cap", "Vcap", "optfloat", usage="lem", tooltip=PILES_HELP["V_cap"]),
-        Field("M_cap", "Mcap", "optfloat", usage="lem", tooltip=PILES_HELP["M_cap"]),
+        # D and S are applies=LF, like the reinforcement editor's Spacing: the FEM
+        # beam assembly derives I and Area from D when they are blank and divides
+        # EA and EI by S, so neither usage toggle may hide them and neither header
+        # is colored for a single engine.
+        Field("D_pile", "D", "optfloat", applies=LF, tooltip=PILES_HELP["D_pile"]),
+        Field("S", "S", "optfloat", applies=LF, tooltip=PILES_HELP["S"]),
+        Field("V_cap", "Vcap", "optfloat", applies=LF, tooltip=PILES_HELP["V_cap"]),
+        Field("M_cap", "Mcap", "optfloat", applies=LF, tooltip=PILES_HELP["M_cap"]),
         Field("E", "E", "optfloat", usage="fem", tooltip=PILES_HELP["E"]),
         Field("I", "I", "optfloat", usage="fem", tooltip=PILES_HELP["I"]),
         Field("area", "Area", "optfloat", usage="fem", tooltip=PILES_HELP["area"]),
-        Field("fixity", "Fixity", "choice", choices=["free", "fixed"], usage="fem",
-              tooltip=PILES_HELP["fixity"]),
+        Field("head_fixity", "Head", "choice", choices=["free", "pinned", "unrotated", "fixed"], usage="fem",
+              tooltip=PILES_HELP["head_fixity"]),
+        Field("tip_fixity", "Tip", "choice", choices=["free", "pinned", "unrotated", "fixed"], usage="fem",
+              tooltip=PILES_HELP["tip_fixity"]),
     ]
 
     def build(self, slope_data, parent):
@@ -6263,7 +6861,11 @@ def _new_reinf():
             "t_max": 0.0, "t_res": 0.0,
             "lp1": 0.0, "lp2": 0.0, "E": 0.0, "area": 0.0,
             "type": "", "dir": "tangent", "appl": "active",
-            "tend1": 0.0, "tend2": 0.0, "spacing": 1.0}
+            "tend1": 0.0, "tend2": 0.0, "spacing": 1.0,
+            # Blank, not zero: a new line uses the development-length law, and a
+            # zero Adhesion with a zero Delta would be a real (and useless)
+            # overburden law rather than the absence of one.
+            "adhesion": float("nan"), "delta": float("nan")}
 
 
 # List-view form layout for a reinforcement line: every ReinforcementEditor.FIELDS
@@ -6274,7 +6876,8 @@ _REINF_FORM_GROUPS = [
     ("Identity", [["label"]]),
     ("Geometry", [["x1", "y1"], ["x2", "y2"]]),
     ("Capacity", [["t_max", "t_res"], ["E", "area"]]),
-    ("Anchorage", [["lp1", "lp2"], ["tend1", "tend2"], ["spacing"]]),
+    ("Anchorage", [["lp1", "lp2"], ["adhesion", "delta"],
+                   ["tend1", "tend2"], ["spacing"]]),
     ("Type", [["type"], ["dir", "appl"]]),
 ]
 
@@ -6289,9 +6892,12 @@ def _reinf_item_label(i, row):
 
 
 # Wording mirrors the 'reinforce' worksheet section of input_template.md. Tmax,
-# Lp1/Lp2, Tend1/Tend2 and Spacing form the capacity envelope used by BOTH LEM and
-# FEM (fem.py caps the truss yield force at the same envelope) even though their
-# header color is "LEM only" red — so they aren't tagged that way here. Type/Dir/
+# Lp1/Lp2, Adhesion/Delta, Tend1/Tend2 and Spacing form the capacity envelope used
+# by BOTH LEM and FEM (fem.py caps the truss yield force at the same envelope) even
+# though their header color is "LEM only" red — so they aren't tagged that way here.
+# Lp1/Lp2 and Adhesion/Delta are two ways to state ONE thing, the pullout law: a
+# filled Adhesion/Delta pair takes over and Lp1/Lp2 stop being read, which is what
+# the list view's Pullout switch and the grayed pair in either view say. Type/Dir/
 # Appl are truly LEM only (FEM ignores them); Tres/E/Area are truly FEM only.
 REINFORCE_HELP = {
     "label": "Name used in error messages, summaries, and plots (optional).",
@@ -6310,8 +6916,10 @@ REINFORCE_HELP = {
     "t_max": "Maximum tensile force the line can mobilize, per unit width (discrete "
             "supports: enter the per-element capacity with Spacing). Caps both the "
             "LEM force and the FEM yield force.",
-    "t_res": "Residual tensile force after yield (post-peak), per unit width (÷ "
-            "Spacing for discrete supports). FEM only; blank = elastic-perfectly-"
+    "t_res": "Residual tensile force the line retains after it ruptures (post-peak), "
+            "per unit width (÷ Spacing for discrete supports). Capped by the pullout "
+            "envelope: bond slip is perfectly plastic, so an element keeps carrying "
+            "whatever its embedment develops. FEM only; blank = elastic-perfectly-"
             "plastic (holds capacity), 0 = brittle rupture (carries nothing).",
     "tend1": "End anchorage/connection capacity at end 1, per unit width (0 = "
             "friction only; ÷ Spacing for discrete supports).",
@@ -6319,6 +6927,8 @@ REINFORCE_HELP = {
             "friction only; ÷ Spacing for discrete supports).",
     "lp1": "Pullout bond length at end 1 — tapers the mobilized force toward that end.",
     "lp2": "Pullout bond length at end 2 — tapers the mobilized force toward that end.",
+    "adhesion": "Adhesion = soil-reinforcement interface adhesion (blank = use Lp).",
+    "delta": "Delta = soil-reinforcement interface friction angle (blank = use Lp).",
     "spacing": "Out-of-plane spacing for discrete supports (nails, tiebacks); leave "
               "blank or 1 for geosynthetics (already per unit width). All capacity "
               "terms and Area are divided by it, once, for both engines.",
@@ -6360,6 +6970,17 @@ class ReinforcementEditor(CategoryEditor):
         Field("t_max", "Tmax", usage="lem", tooltip=REINFORCE_HELP["t_max"]),
         Field("lp1", "Lp1", usage="lem", tooltip=REINFORCE_HELP["lp1"]),
         Field("lp2", "Lp2", usage="lem", tooltip=REINFORCE_HELP["lp2"]),
+        # The overburden pullout law. applies=LF, like Spacing: both engines read
+        # it, so neither usage toggle may hide it. The sheet colors the whole
+        # envelope block one red; the editor leaves the both-engines members of
+        # that block uncolored, as it already does for Spacing.
+        # kind="optfloat", not "float": a cleared cell must come back BLANK, and a
+        # blank pair is what selects the development-length law. A plain float
+        # would read a cleared cell as 0.0 — a real, and refused, overburden law.
+        Field("adhesion", "Adhesion", "optfloat", applies=LF, unit="stress",
+              tooltip=REINFORCE_HELP["adhesion"]),
+        Field("delta", "Delta", "optfloat", applies=LF,
+              tooltip=REINFORCE_HELP["delta"]),
         Field("tend1", "Tend1", usage="lem", tooltip=REINFORCE_HELP["tend1"]),
         Field("tend2", "Tend2", usage="lem", tooltip=REINFORCE_HELP["tend2"]),
         Field("spacing", "Spacing", applies=LF, tooltip=REINFORCE_HELP["spacing"]),
@@ -6372,6 +6993,56 @@ class ReinforcementEditor(CategoryEditor):
         Field("E", "E", usage="fem", unit="stress", tooltip=REINFORCE_HELP["E"]),
         Field("area", "Area", usage="fem", tooltip=REINFORCE_HELP["area"]),
     ]
+    # Which pullout law a line uses is not a stored field — the row says it. A
+    # filled Adhesion/Delta pair IS the overburden law, and the development lengths
+    # stop being read; anything else is the development-length law, with Adhesion
+    # and Delta blank and free to be typed. One function answers that question for
+    # the table's graying, the list view's switch, and the preflight note, so the
+    # three cannot disagree.
+    @staticmethod
+    def pullout_mode(row):
+        """'overburden' when this row carries both Adhesion and Delta, else 'lp'."""
+        def _filled(v):
+            if v is None or (isinstance(v, str) and not v.strip()):
+                return False
+            try:
+                return float(v) == float(v)          # NaN is blank
+            except (TypeError, ValueError):
+                return False
+        return ("overburden" if _filled(row.get("adhesion")) and _filled(row.get("delta"))
+                else "lp")
+
+    @classmethod
+    def dim_keys(cls, row):
+        """Field keys to gray for a reinforcement row.
+
+        Only the pair the row is NOT using is grayed, and only when the other pair
+        is actually in force: a line on the development-length law leaves Adhesion
+        and Delta live, because graying an empty cell is graying out the only way
+        to fill it.
+        """
+        if cls.pullout_mode(row) == "overburden":
+            return frozenset(("lp1", "lp2"))
+        return frozenset()
+
+    SWITCH_SPEC = {
+        "group": "Anchorage",
+        "label": "Pullout",
+        # (id, label, fields, self-asserting). Adhesion/Delta are self-asserting:
+        # values left in them WOULD keep the overburden law in force, so leaving
+        # that option parks them. Lp1/Lp2 are inert while the other law runs, so
+        # they simply dim -- their values stay on screen and in the file.
+        "options": [("lp", "Development length (Lp1, Lp2)", ("lp1", "lp2"), False),
+                    ("overburden", "Overburden (Adhesion, Delta)",
+                     ("adhesion", "delta"), True)],
+        "resolve": lambda row: ReinforcementEditor.pullout_mode(row),
+        "tooltip": "Which pullout law this line uses. Development length develops "
+                   "the full capacity over Lp1/Lp2. Overburden develops it at "
+                   "2·(Adhesion + σ′v·tan Delta) per unit "
+                   "length, from the effective overburden at each point of the "
+                   "line.",
+    }
+
     # The sheet's Dir/Appl formulas, in the editor: picking a Type fills both from
     # the loader's own table; typing over either keeps it until a Type is picked
     # again. Handed to BOTH views (and used by a pasted Type), so the three ways a
@@ -6395,12 +7066,18 @@ class ReinforcementEditor(CategoryEditor):
                                      "tend1": "force", "tend2": "force",
                                      "area": "area"}},
             preset_spec=self.PRESET_SPEC,
+            dim_rule=self.dim_keys,
+            switch_spec=self.SWITCH_SPEC,
             help_text="List view edits one line at a time as a grouped form beside a "
                       "live section preview; the table view is available for bulk entry "
                       "of the many lines of a tiered wall. Both views edit the same rows, "
-                      "so switching is lossless. Lp1/Lp2 are the pullout lengths at each "
-                      "end (0 = fully anchored); the LEM tension distribution on the "
-                      "preview is derived from these. Picking a Type fills Dir and Appl "
+                      "so switching is lossless. A line develops its pullout capacity one "
+                      "of two ways, chosen per line by the Pullout switch: over the "
+                      "development lengths Lp1/Lp2 (0 = fully anchored), or from the "
+                      "effective overburden through Adhesion and Delta. The pair not in "
+                      "use is grayed, values intact. The LEM tension distribution on the "
+                      "preview is derived from whichever is in force. Picking a Type "
+                      "fills Dir and Appl "
                       "— change either afterwards to override it — and a blank Type is a "
                       "generic tensile line. Tend1/Tend2 are the "
                       "end-anchorage capacities; capacities and E/Area are per-unit-width "
@@ -6412,11 +7089,15 @@ class ReinforcementEditor(CategoryEditor):
             field_help=REINFORCE_HELP)
 
     def apply(self, slope_data, dlg):
-        from xslope.fileio import build_reinforce_lines
+        from xslope.fileio import build_reinforce_lines, attach_reinforce_pullout
         rows = dlg.result_rows()
         slope_data["reinforcement_lines"] = rows
         # Rebuild the LEM display/analysis format so the canvas reflects the edit.
         slope_data["reinforce_lines"] = build_reinforce_lines(rows)
+        # An edited Adhesion/Delta changes the envelope's shape, not just its
+        # numbers, so the pullout profiles are rebuilt here rather than waiting
+        # for a solve — the canvas draws the curve the analysis will use.
+        attach_reinforce_pullout(slope_data)
 
 
 # --- line loads ------------------------------------------------------------- #
@@ -6518,7 +7199,7 @@ def _tseep_fmt(v):
 
 TSEEP_HELP = {
     "duration": "Total simulated time of the run, in the model's declared Time unit. "
-                "The march ends here — scheduled times beyond the duration are never "
+                "The run ends here — scheduled times beyond the duration are never "
                 "reached.",
     "save_interval": "Spacing of the regularly-saved frames (one every interval, up to "
                      "the duration). The saved set is the UNION of this grid, the extra "
@@ -6529,8 +7210,8 @@ TSEEP_HELP = {
     "stage_2": "Rapid-drawdown STAGE 2 time — must be later than Stage 1. Set BOTH "
                "stage times, or neither.",
     "stability_time": "Which instant an LEM or FEM run with u = seep reads its pore "
-                      "pressures from. It selects a frame out of the march; it does "
-                      "not change the march. Leave it blank and a run reads the LAST "
+                      "pressures from. It selects a frame out of the transient solution; it "
+                      "does not change it. Leave it blank and a run reads the LAST "
                       "saved frame. The Run LEM and Run FEM dialogs set it too — this "
                       "is the same value.",
     "time": "The shared time axis for every series (ascending, in the Time unit). A "
@@ -6585,8 +7266,8 @@ class TransientDialog(QDialog):
             "schedule, the optional rapid-drawdown stage times, and one or more named "
             "time series (a shared time axis with a value per series). A seep BC value "
             "cell that names a series is driven by it — a time-varying boundary "
-            "condition. Leave everything blank for a steady model. The plot previews "
-            "the series as you edit."))
+            "condition. With no times or values entered the model stays steady. The "
+            "plot previews the series as you edit."))
 
         # --- run controls (built here; placed at the TOP of the right column) ---
         controls_widget = QWidget()
@@ -6625,9 +7306,17 @@ class TransientDialog(QDialog):
         self._name_edits = []
         existing = list((tseep.get("series") or {}).keys())
         for i in range(_TSEEP_N_SERIES):
-            e = QLineEdit(existing[i] if i < len(existing) else "")
+            if i < len(existing):
+                name = existing[i]
+            else:
+                # Empty slots carry the input template's default header names
+                # (tseep sheet row 2: t1..t5); a default that collides with a
+                # loaded series name stays blank instead.
+                default = f"t{i + 1}"
+                name = default if default not in existing else ""
+            e = QLineEdit(name)
             e.setToolTip(TSEEP_HELP["series_name"])
-            e.setPlaceholderText(f"series {i + 1}")
+            e.setPlaceholderText(f"t{i + 1}")
             self._name_edits.append(e)
             names_row.addWidget(e)
         sgl.addLayout(names_row)
@@ -6731,7 +7420,7 @@ class TransientDialog(QDialog):
         labels = ["time"]
         for i, e in enumerate(self._name_edits):
             nm = e.text().strip()
-            labels.append(nm if nm else f"(series {i + 1})")
+            labels.append(nm if nm else f"(t{i + 1})")
         self._series_table.setHorizontalHeaderLabels(labels)
         h0 = self._series_table.horizontalHeaderItem(0)
         if h0 is not None:
@@ -6823,7 +7512,7 @@ class TransientDialog(QDialog):
         if any_series:
             ax.legend(fontsize=8, loc="best")
         else:
-            ax.text(0.5, 0.5, "Name a series and enter values to plot it",
+            ax.text(0.5, 0.5, "Enter time/value rows under a named series to plot it",
                     transform=ax.transAxes, ha="center", va="center", color="gray")
 
     # --- result --------------------------------------------------------
@@ -6890,7 +7579,7 @@ class TransientDialog(QDialog):
                 QMessageBox.warning(
                     self, "Transient seepage",
                     "The stability time must be greater than 0 and no later than the "
-                    "run duration — the march never reaches an instant outside it.")
+                    "run duration — the run never reaches an instant outside it.")
                 return
         super().accept()
 

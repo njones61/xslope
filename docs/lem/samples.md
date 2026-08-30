@@ -573,11 +573,15 @@ unconservatively high factor of safety.
 
 #### LEM vs. FEM Comparison
 
-The corresponding FEM analysis of this problem (see [FEM Samples](../fem/samples.md), Problem 3) gives
-FS = 1.32 with piles — significantly lower than the LEM result of 1.85. This difference arises because
-the LEM applies the Ito & Matsui force (even after capping) as a concentrated load at the failure surface,
-while the FEM beam elements only develop as much resistance as the global deformation pattern naturally
-produces. The FEM result is generally considered more realistic for pile-stabilized slopes.
+The same model solved with the finite element engine (see
+[FEM Samples](../fem/samples.md#2-slope-stabilized-with-drilled-shaft-piles)) reads FS = 1.380 with the
+piles and 1.164 without them, where Spencer reads 1.842 with them and 1.149 without. The two engines
+credit the same row by factors of 1.19 and 1.60. That gap is an idealization, not a numerical difference:
+a plane-strain finite element model has no space between the piles, so it represents the row as a
+continuous wall carrying one pile's stiffness smeared over the spacing, while the Ito & Matsui force is
+a theory of the soil flowing between them. For a discrete row at spacing the limit equilibrium result is the applicable one,
+and the finite element run is read for the pile's internal forces rather than for its factor of safety —
+see [LEM vs. FEM Pile Modeling](piles.md#lem-vs-fem-pile-modeling).
 
 One more caution this problem teaches: the tabulated values are the deep-surface results the Ito & Matsui
 walkthrough analyzes, found by the search seeded from the circles sheet. A grid-seeded global search
@@ -644,23 +648,30 @@ automated regression suite. See also the [Verification](../verification/index.md
 ### 12. Rapid Drawdown (Johnson Reservoir Dam)
 
 This sample exercises XSLOPE's **rapid drawdown** capability — the three-stage
-procedure (Duncan, Wright & Brandon) for the *upstream* slope of an earth dam
+procedure (Duncan, Wright and Wong (1990)) for the *upstream* slope of an earth dam
 after the reservoir is lowered faster than the low-permeability zones can drain.
 The Johnson Reservoir dam is analyzed on its upstream design circle:
 
 - **Stage 1** — pre-drawdown stability with drained strengths and full-pool
   (El. 160 ft) pore pressures.
 - **Stage 2** — post-drawdown stability with the interpolated undrained
-  strengths (the bilinear $d$, $\psi$ envelope on the core and foundation; the
-  shell is free-draining).
-- **Stage 3** — post-drawdown check with drained strengths and the lowered-pool
+  strengths. Only the compacted-clay core carries the bilinear $d$, $\psi$
+  envelope ($d = 250$ psf, $\psi = 14°$); the sand shell and the silty-sand
+  foundation drain freely and stay drained through the drawdown.
+- **Stage 3** — post-drawdown check with drained strengths and the residual-pool
   (El. 110 ft) pore pressures.
 
-The governing factor of safety is the **minimum of Stage 2 and Stage 3**. Pore
-pressures for both pool levels come from finite-element seepage solutions
-(`u = seep`), and the two reservoir levels are carried as the two distributed-load
-and seepage-boundary-condition sets that the rapid-drawdown wrapper swaps in per
-stage. See [Rapid Drawdown Analysis](rapid.md) for the methodology.
+The governing factor of safety is the **minimum of Stage 2 and Stage 3**. Each
+pool is stated as its own **steady seepage problem** — boundary set 1 holds the
+reservoir at El. 160, set 2 the residual pool at El. 110 — and every material reads
+its pore pressure from the solved fields (`u = seep`), which ship beside the
+workbook as `_seep.csv` and `_seep2.csv` on the committed `_mesh.json`. Water loads
+are left on `auto`, so the reservoir's weight on the upstream face follows whichever
+pool the stage is standing at. The two other ways of supplying the same drawdown's
+pore pressures are worked on this same dam elsewhere: a **piezometric pair** in
+Part 1 of [Tutorial COMBO-2](../tutorials/combo02_rapid_drawdown.md), and a
+**transient** solution the stages are cut from in
+[Rapid Drawdown Analysis](rapid.md), which also carries the methodology.
 
 Excel input file: [xslope_johnson_rapid_KEY.xlsx](files/xslope_johnson_rapid_KEY.xlsx)
 (the seepage mesh and the two seep solutions are bundled alongside it).
@@ -674,24 +685,25 @@ Solution (governing rapid-drawdown surface and factor of safety, Spencer's metho
 ![johnson_rapid_results1.png](sample_images/johnson_rapid_results1.png){width=900}
 
 The table reports the governing rapid-drawdown FS on the upstream circle by
-method. The two complete-equilibrium methods agree (Spencer 1.646,
-Morgenstern-Price 1.649), with Bishop — which satisfies moment but not full force
-equilibrium — close behind at 1.649. The Corps of Engineers (2.119) and
-Lowe-Karafiath (1.804) force-equilibrium methods read **substantially higher**
-here: as noted in the introduction, they are sensitive to the assumed
-interslice-force inclination, and the large pore pressures carried through the
-post-drawdown stages amplify that sensitivity, pushing the factor of safety well
-above the rigorous Spencer value.
+method. The two complete-equilibrium methods agree to within 1% (Spencer 1.498,
+Morgenstern-Price 1.510). Bishop reads 1.439 and Janbu 1.366, both below the
+rigorous value, and the Ordinary Method of Slices reads 1.247 — 17% below Spencer,
+the conservative margin the most approximate of the methods carries on a surface
+this deep beneath pore pressures this large. The two force-equilibrium methods
+land above Spencer, Lowe-Karafiath at 1.548 and the Corps of Engineers at 1.719,
+for the reason given in the introduction: each assumes an interslice-force
+inclination rather than solving for it, and the pore pressures retained through
+the post-drawdown stages amplify what that assumption costs.
 
 <!-- fs-table -->
 **Factor of safety by method** (each method's own critical surface):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.355 | 1.649 | 1.644 | 2.119 | 1.804 | 1.646 | 1.649 |
+| 1.247 | 1.439 | 1.366 | 1.719 | 1.548 | 1.498 | 1.510 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.355, fs_bishop=1.649, fs_janbu=1.644, fs_corps=2.119, fs_lowe=1.804, fs_spencer=1.646, fs_mprice=1.649 -->
+<!-- test: file=files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.247, fs_bishop=1.439, fs_janbu=1.366, fs_corps=1.719, fs_lowe=1.548, fs_spencer=1.498, fs_mprice=1.510 -->
 
 ### 13. Multiple Local Minima
 

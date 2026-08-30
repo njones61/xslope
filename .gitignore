@@ -57,3 +57,4 @@ ref_docs/
 
 # Design and planning notes live in the private sibling repo, ../xslope_private/plans/.
 plans/
+.figure_cache/

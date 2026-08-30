@@ -331,6 +331,7 @@ def _build(tag):
         mesh = build_mesh_from_polygons(
             polys, target_size=target,
             element_type=tag.get('element_type', 'tri6'), lines=lines,
+            element_size_1d=sd.get('element_size_1d'),
             point_constraints=extract_point_constraints(sd),
             size_regions=extract_size_regions(sd), **refine_kw)
     # `sd` (unmodified) is what the inputs panel draws; the FEM build gets the

@@ -16,8 +16,8 @@ The same knowledge is available inside the desktop app.
 **[AI assistant](../../studio/assistant.md)** that builds on this skill but works
 *inside* the app: instead of writing an `.xlsx`, it populates the live project — which
 renders immediately on the canvas — and can run analyses and script parameter studies
-against the `xslope` API. It also supports models beyond Claude (OpenAI, local Ollama,
-DeepSeek, Z.ai/GLM). This file-first skill and the document-first Studio assistant
+against the `xslope` API. It also supports models beyond Claude (OpenAI, Kimi/Moonshot,
+Z.ai/GLM, local Ollama). This file-first skill and the document-first Studio assistant
 coexist as two front ends to the same engine.
 
 ## Quick Start

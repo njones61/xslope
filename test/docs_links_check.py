@@ -26,9 +26,13 @@ Studio answers the link. Both halves have failure modes nobody would see by look
      NUL is a name ``open()`` refuses, which is a crash arriving from a web page.
   E. THE DOCS BUILD PACKAGES AND PAIRS. A real MkDocs build over a scratch docs tree
      has to produce a ``.xslz`` per sample workbook, holding its sidecars, and a
-     Download · Open in Studio pair per link whose two hrefs name the SAME package —
-     the one property the whole "emit both from one URL" design exists for. The
-     escape hatch (``.raw-file``) and non-sample links must come through untouched,
+     Download · Open in Studio pair per link. Open in Studio names the package on
+     every pair; Download names it too, and names the same URL, for a sample with
+     sidecars — but a sample whose project is the workbook alone is downloaded as
+     that ``.xlsx``, since a page telling the reader to open the file in Excel has
+     to hand them a file Excel opens. The split follows what the packer finds beside
+     the workbook, so a sample that gains a sidecar goes back to a package Download.
+     The escape hatch (``.raw-file``) and non-sample links must come through untouched,
      and the build must refuse to finish if a page ever links a package nobody built.
      A sample link the hook does NOT pair — an href that needs decoding, one carrying
      a fragment, one whose file has moved — is warned about rather than passed over
@@ -483,26 +487,65 @@ def test_docs_build():
     if len(pairs) != 3:
         fails.append(f"the page rendered {len(pairs)} pairs, not 3 (one per "
                      f"non-escaped sample link)")
+    from urllib.parse import urljoin
+    PAGE = "https://xslope.readthedocs.io/en/latest/lem/samples/"
+    seen = {}
     for href, scheme_arg in pairs:
         _verb, url = urlscheme.parse_request("xslope://open?url=" + scheme_arg)
-        # THE property: both halves of a pair name the same package. Resolved
-        # against the page's own URL, the relative href IS the absolute one.
-        from urllib.parse import urljoin
-        want = urljoin("https://xslope.readthedocs.io/en/latest/lem/samples/", href)
-        if url != want:
-            fails.append(f"a pair disagrees: Download is {want}, Open in Studio is {url}")
+        stem = os.path.splitext(href.rsplit("/", 1)[-1])[0]
+        seen[stem] = seen.get(stem, 0) + 1
+        # Resolved against the page's own URL, the relative href IS the absolute one.
+        dl_url = urljoin(PAGE, href)
         local = os.path.normpath(os.path.join(site, "lem", "samples", href))
         if not os.path.isfile(local):
             fails.append(f"a Download link points at {href}, which the build did not "
                          f"write")
-        if not href.endswith(PACKAGE_EXT):
-            fails.append(f"a Download link points at {href}, not a package")
+        # Open in Studio names the package on EVERY pair: the deep link unpacks one,
+        # and a workbook-only package is a package.
+        if url != urljoin(PAGE, os.path.splitext(href)[0] + PACKAGE_EXT):
+            fails.append(f"Open in Studio for {stem} carries {url}, not the sample's "
+                         f"package")
+        if stem == with_sidecars:
+            # Sidecars to carry: Download IS the package, the same URL as the pair's
+            # other half. Handing this reader the bare workbook would drop the mesh
+            # and the solved field on the floor.
+            if not href.endswith(PACKAGE_EXT):
+                fails.append(f"a sample with sidecars is downloaded as {href}, not as "
+                             f"its package")
+            elif dl_url != url:
+                fails.append(f"a pair disagrees: Download is {dl_url}, Open in Studio "
+                             f"is {url}")
+        elif stem == single:
+            # Nothing beside the workbook, so the package would hold the workbook
+            # alone: Download hands over the .xlsx the page tells the reader to open.
+            if not href.endswith(".xlsx"):
+                fails.append(f"a sidecar-free sample is downloaded as {href}, not as "
+                             f"the workbook the page says to open in Excel")
+            elif dl_url == url:
+                fails.append(f"a sidecar-free sample's Download and Open in Studio are "
+                             f"both {url}; Studio's half is the package")
+        else:
+            fails.append(f"the page paired an unexpected sample, {stem}")
+    if seen != {with_sidecars: 1, single: 2}:
+        fails.append(f"the page paired {seen}, not one sidecar-carrying sample and two "
+                     f"links to the sidecar-free one")
 
     # --- the escape hatch, and everything that is not a sample link -----------
-    if f'href="../files/{single}.xlsx"' not in html:
+    # The workbook's own href now has two legitimate uses on this page — the escape
+    # hatch, and the Download half of a sidecar-free sample's pair — so the check is
+    # which anchors carry it, not how many.
+    tags = [t for t in re.findall(r"<a\b[^>]*>", html)
+            if f'href="../files/{single}.xlsx"' in t]
+    hatch = [t for t in tags if "raw-file" in t]
+    downloads = [t for t in tags if "xslz-download" in t]
+    if len(hatch) != 1:
         fails.append("the .raw-file escape hatch link did not survive the build")
-    if html.count(f'href="../files/{single}.xlsx"') != 1:
-        fails.append("a link that is not marked .raw-file kept its .xlsx href")
+    if len(downloads) != 2:
+        fails.append(f"{len(downloads)} of the sidecar-free sample's 2 pairs download "
+                     f"the workbook")
+    if len(tags) != len(hatch) + len(downloads):
+        fails.append("a link that is neither the escape hatch nor a Download kept its "
+                     ".xlsx href, so it was never paired")
     if 'href="../../usage/input_template.xlsx"' not in html:
         fails.append("a workbook outside files/ was rewritten anyway")
 
@@ -565,6 +608,20 @@ def test_docs_build():
     spec.loader.exec_module(hook)
     scratch_config = {"docs_dir": docs, "site_dir": site}
 
+    # --- a sidecar-free sample's package is still built and still linked ------
+    # Download hands over the workbook, but Studio's half of the pair still needs the
+    # package, so it has to go on the list the build checks. Dropping it there is the
+    # failure nobody sees: the package stops being written and the deep link 404s.
+    one = f'<p><a href="../files/{single}.xlsx">x</a></p>'
+    _h, linked_one, _w = hook.rewrite_links(
+        one, "lem/samples/", docs, "https://xslope.readthedocs.io/en/latest/")
+    if f"lem/files/{single}{PACKAGE_EXT}" not in linked_one:
+        fails.append("a sidecar-free sample's package is not registered as linked, so "
+                     "the build never checks that it was built")
+    if f'class="xslz-download" href="../files/{single}.xlsx"' not in _h:
+        fails.append(f"a sidecar-free sample downloads as something other than its "
+                     f"workbook: {_h}")
+
     # --- a sample that gains a sidecar gains it in its package ----------------
     # Rebuilding leaves an up-to-date package alone (mkdocs serve would otherwise
     # repack the whole corpus on every save), so the property that matters is that a
@@ -580,6 +637,14 @@ def test_docs_build():
     _quiet(hook.on_post_build, scratch_config)
     if single + "_mesh.json" not in package_contents(pkg):
         fails.append("a sample that gained a sidecar kept its old package")
+    # And its link goes back to the package: the split is read off the project, not
+    # off a list of names, so the same workbook that downloaded bare a moment ago
+    # now downloads as the package that carries its new mesh.
+    _h, _linked, _w = hook.rewrite_links(
+        one, "lem/samples/", docs, "https://xslope.readthedocs.io/en/latest/")
+    if f'class="xslz-download" href="../files/{single}{PACKAGE_EXT}"' not in _h:
+        fails.append(f"a sample that gained a sidecar still downloads as the bare "
+                     f"workbook, leaving the sidecar behind: {_h}")
 
     # --- a link that is NOT turned into a pair is said out loud ---------------
     # Silence is the expensive answer here: the page keeps a bare .xlsx link and
@@ -1066,11 +1131,12 @@ LEM08_REINF_GROUPS = ("Identity", "Geometry", "Capacity", "Anchorage", "Type")
 #: The capacity fields the page names, as label *prefixes*: the list view appends
 #: the units the model implies ("Tmax (per unit width, lb/ft)"), which the page
 #: quotes for Tmax and which must therefore stay attached to it.
-LEM08_REINF_FIELDS = ("Tmax", "Lp1", "Lp2", "Tend1", "Tend2", "Spacing")
+LEM08_REINF_FIELDS = ("Tmax", "Lp1", "Lp2", "Adhesion", "Delta",
+                      "Tend1", "Tend2", "Spacing")
 LEM08_REINF_TMAX_LABEL = "Tmax (per unit width, lb/ft)"
 
 #: The support-type preset table the page reproduces, as the template's own
-#: lookup block (reinforce!Z8:AB11) — the values the Type drop-down offers and
+#: lookup block (reinforce!AB8:AD11) — the values the Type drop-down offers and
 #: the Dir/Appl its formula fills for each. The page's table is this table.
 LEM08_TYPE_PRESETS = (("Geosynthetic", "Tangent", "Active"),
                       ("Nail", "Axial", "Passive"),
@@ -2335,7 +2401,7 @@ def _lem08_editor_labels(mw):
     # The Type preset table, read from the template's own lookup block.
     sheet = openpyxl.load_workbook(TEMPLATE_FILE)["reinforce"]
     presets = tuple(tuple(str(sheet.cell(row=r, column=c).value)
-                          for c in (26, 27, 28))          # Z, AA, AB
+                          for c in (28, 29, 30))          # AB, AC, AD
                     for r in range(8, 12))
     if presets != LEM08_TYPE_PRESETS:
         fails.append(f"the template's support-type presets read {presets}, not "

@@ -1,51 +1,76 @@
-"""Build the rapid-drawdown LEM worked-example workbook for
-``docs/lem/rapid.md`` (the "Rapid Drawdown from a Transient Solution" section).
+"""Build the Johnson Reservoir rapid-drawdown workbooks from one parameter block.
 
-This is the *stability* companion to the Johnson Reservoir transient **seepage**
-sample (``docs/seep/files/xslope_johnson_res_tseep.xlsx``, samples §9). It is built
-deterministically from that committed seepage file so the cross-section, zones,
-storage, reservoir schedule and ``stage_1``/``stage_2`` times never diverge from the
-seepage sample — the two files are the same dam seen from the seepage side and the
-stability side. The seepage sample is left untouched (kept clean); the rapid-drawdown
-LEM inputs live here in a ``_rapid`` variant.
+Five files come out of the single set of constants below, so the rapid-drawdown
+family cannot drift apart:
 
-Two additions turn the seepage sample into a rapid-drawdown model:
+  ``docs/lem/files/xslope_johnson_rapid_KEY.xlsx``
+      The rapid-drawdown sample of ``docs/lem/samples.md``, and the locked anchor for
+      the **two-steady** route: the two pools stated as the two steady seepage
+      boundary sets, ``u = seep`` on every material, and the fixed circle. The mesh
+      and the two solved fields ship beside it as ``_mesh.json``, ``_seep.csv`` and
+      ``_seep2.csv``, so the sample reads its stage pore pressures off committed
+      answers rather than re-solving. No piezometric lines: the boundary sets state
+      where the water stands for the loads and ``u = seep`` states every pore
+      pressure, so a line on this file would feed nothing.
 
-  * **Undrained core.** The compacted-clay core (material 2) is given the Duncan
-    d/psi pair of its ``Kc = 1`` (isotropically consolidated, undrained) envelope,
-    ``d = 250`` psf, ``psi = 14`` deg — below the drained ``c' = 400`` psf,
-    ``phi' = 18`` deg. The free-draining sand shell and the more permeable silty-sand
-    foundation are analysed drained (no d/psi), the textbook shell-versus-core
-    dichotomy the rapid.md page sets out: the low-permeability core is the zone that
-    cannot drain over a 45-day drawdown, so only it is carried undrained into Stage 2.
-  * **The critical upstream circle.** A single circle on the upstream (reservoir) face
-    — the slope the drawdown destabilises — located as the critical surface by a
-    rapid-drawdown circular search over the transient-staged fields. It toes near the
-    upstream base (x ~ 192), daylights just past the crest (x ~ 415) and cuts twelve
-    slices of core, so the undrained zone governs Stage 2.
+  ``docs/lem/files/xslope_johnson_res_rapid.xlsx``
+      The worked example of ``docs/lem/rapid.md`` ("Rapid Drawdown from a Transient
+      Solution"): the transient route alone, no second boundary set, no piezometric
+      lines.
 
-Everything else is inherited from the seepage sample and needs no change:
+  ``docs/tutorials/files/xslope_johnson_rapid_start.xlsx``
+      The starter file of tutorial COMBO-2. Strengths, the undrained core's d/psi,
+      ``Water loads: auto`` and the coarse **piezometric pair** — and nothing else:
+      no seepage boundary sets and no transient schedule, because building those is
+      what the tutorial does. Every material takes ``u = piezo``.
 
-  * The **Stage 1 water load** is the full-pool distributed load already on the
-    seepage file (the reservoir standing against the upstream face, 3744 psf at the
-    toe tapering to 0 at the el-160 pool line). The **Stage 2 water load is empty**:
-    the schedule draws the pool all the way down to the el-100 tailwater datum, so at
-    ``stage_2`` no water remains on the upstream slope — the removal of that load is
-    the destabilising essence of rapid drawdown.
-  * ``u = seep`` on every material: the two stage pore-pressure fields are supplied at
-    run time by ``stage_transient_for_drawdown`` from the transient frames at
-    ``stage_1`` (t = 0, full pool) and ``stage_2`` (t = 50, end of drawdown). No
-    ``_seep.csv`` / ``_seep2.csv`` companions are shipped — the transient staging path
-    builds both fields in memory.
-  * Declared imperial units and a ``day`` time base, and the tseep sheet
-    (schedule + storage + ``stage_1 = 0`` / ``stage_2 = 50``), all carried over verbatim.
+  ``docs/tutorials/files/xslope_johnson_rapid.xlsx``
+      The completed COMBO-2 model: the same section with **both** seepage boundary
+      sets (full pool and drawn down), the transient pool schedule with its
+      ``stage_1`` / ``stage_2`` times, and ``u = seep`` on every material. The
+      piezometric pair is deleted: the boundary sets outrank it for water loads and
+      ``u = seep`` outranks it for pore pressure, so it would feed nothing. No
+      ``_seep.csv`` / ``_seep2.csv`` companions ship with it: a steady run writes
+      them, and a transient run stages its two frames in memory.
 
-Run:  PYTHONPATH=. python3 tools/build_johnson_rapid.py
+  ``docs/tutorials/files/xslope_johnson_fs_time.xlsx`` (+ companions)
+      The model tutorial COMBO-3's Part 2 opens: the completed model with boundary
+      set 2 removed, shipped with the mesh and the march already on it as
+      ``_mesh.json``, ``_tseep.csv`` and ``_tseep_meta.json``. Part 2 sweeps the
+      march rather than producing it, so the reader opens a dam that is already
+      meshed and marched and goes straight to the sweep. It carries a base name of
+      its own because a companion mesh and march sitting next to
+      ``xslope_johnson_rapid.xlsx`` would load themselves when COMBO-2 opens that
+      file, and COMBO-2 has the reader build both. Set 2 is dropped because a
+      transient march reads neither of its stages from it, and left on the file it
+      raises ``rapid.stage2_bc_ignored`` on every run of the sweep.
+
+Everything is built deterministically from the committed transient **seepage**
+sample ``docs/seep/files/xslope_johnson_res_tseep.xlsx``, so the cross-section,
+zones, conductivities, storage properties, saved-frame schedule and stage times
+can never diverge from the seepage side of the same dam. That file is never
+modified. The one value the tutorial pair overrides is the level the reservoir is
+lowered to: the tutorial's drawdown stops at a residual pool 10 ft deep, while the
+worked example of ``docs/lem/rapid.md`` keeps the base file's total drawdown to
+the tailwater datum. The docs sample additionally pins the unsaturated and elastic
+block it was solved under (``SAMPLE_KR0`` / ``SAMPLE_E``), because it ships solved
+fields and a locked sweep count that were produced with those values.
+
+Run:  PYTHONPATH=. python3 tools/build_johnson_rapid.py           # all five
+      PYTHONPATH=. python3 tools/build_johnson_rapid.py sample    # the docs sample
+      PYTHONPATH=. python3 tools/build_johnson_rapid.py fs_time   # the solved set
+
+The solved set carries the transient march, so it takes a few minutes; the other
+four are written in seconds.
 """
 
 from __future__ import annotations
 
+import contextlib
+import copy
+import io
 import os
+import sys
 
 from xslope.fileio import (load_slope_data, save_slope_data_to_xlsx,
                            default_template_path)
@@ -53,36 +78,317 @@ from xslope.fileio import (load_slope_data, save_slope_data_to_xlsx,
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEEP_FILES = os.path.join(REPO_ROOT, "docs", "seep", "files")
 LEM_FILES = os.path.join(REPO_ROOT, "docs", "lem", "files")
+TUT_FILES = os.path.join(REPO_ROOT, "docs", "tutorials", "files")
 
 BASE = os.path.join(SEEP_FILES, "xslope_johnson_res_tseep.xlsx")
-OUT = os.path.join(LEM_FILES, "xslope_johnson_res_rapid.xlsx")
 
-# Undrained core Kc=1 (CU) envelope, below the drained c'=400/phi'=18.
+# --- the one parameter block ------------------------------------------------
+
+#: Undrained core, Kc = 1 (CU) envelope, below the drained c' = 400 / phi' = 18.
+#: The free-draining sand shell and the silty-sand foundation carry no d/psi and
+#: are analyzed drained through the drawdown.
 CORE_D, CORE_PSI = 250.0, 14.0
 
-# Critical upstream circle (located by a rapid-drawdown circular search over the
-# transient-staged fields). Yo - Depth = R keeps the tangent elevation consistent.
+#: The critical upstream circle, located by a rapid-drawdown circular search over
+#: the transient-staged fields. Yo - Depth = R keeps the tangent elevation
+#: consistent. It toes near the upstream base, daylights just past the crest, and
+#: cuts twelve of forty slices through the core.
 CIRCLE = dict(Xo=275.0, Yo=235.0, R=160.0, Depth=75.0)
 
+#: The pool pair. The full pool is the reservoir at elevation 160 that the base
+#: file's `pool` series starts from. The drawdown stops 10 ft above the
+#: elevation-100 tailwater datum: a residual pool at elevation 110 stands against
+#: the upstream toe at the end of it, which is the level the second seepage
+#: boundary set states as a steady problem and the level the tutorial's `pool`
+#: series ramps down to.
+POOL_FULL, POOL_DOWN = 160.0, 110.0
 
-def build():
+#: The drawn-down steady boundary set: the residual pool along the upstream
+#: foreshore and up the face to elevation 110, the tailwater at 100, and the
+#: downstream slope as an exit face. Ten feet of head still cross the section, so
+#: this is an unconfined flow problem with a phreatic surface of its own, stated
+#: exactly the way set 1 states the full-pool one.
+BC2 = {
+    "specified_heads": [
+        {"head": POOL_DOWN,
+         "coords": [(0.0, 100.0), (200.0, 100.0), (220.0, 110.0)], "kind": "head"},
+        {"head": 100.0, "coords": [(550.0, 100.0), (750.0, 100.0)], "kind": "head"},
+    ],
+    "specified_fluxes": [],
+    "exit_face": [(380.0, 180.0), (550.0, 100.0)],
+}
+
+#: The full-pool steady boundary set. It is the base file's set 1 with the
+#: reservoir stated as a fixed head instead of as the `pool` series: a steady
+#: problem has no schedule to read a level from, so the sample states elevation 160
+#: outright along the upstream foreshore and up the face. Set 2 (`BC2` above) is the
+#: drawn-down partner, so the two of them are the two pools of the drawdown.
+BC1 = {
+    "specified_heads": [
+        {"head": POOL_FULL,
+         "coords": [(0.0, 100.0), (200.0, 100.0), (320.0, 160.0)], "kind": "head"},
+        {"head": 100.0, "coords": [(550.0, 100.0), (750.0, 100.0)], "kind": "head"},
+    ],
+    "specified_fluxes": [],
+    "exit_face": [(380.0, 180.0), (550.0, 100.0)],
+}
+
+#: The docs sample's unsaturated and elastic block, which is deliberately NOT the
+#: base file's. The sample ships a committed mesh and the two solved steady fields
+#: (`_mesh.json`, `_seep.csv`, `_seep2.csv`), and test/seep_cycle_check.py locks the
+#: unconfined solver's limit-cycle escape on that exact model — sweep count included.
+#: Those are recorded answers, so the residual relative conductivity that produced
+#: them is a fixed input here rather than a free parameter. Storage properties stay
+#: unset because the sample states no transient problem.
+SAMPLE_KR0 = 1.0e-4
+SAMPLE_E = {"shell": 200000.0, "core": 30000.0, "foundation": 50000.0}
+
+#: The tutorial's reservoir schedule: full pool held for five days, then lowered
+#: to the residual pool over the following 45. Only the last breakpoint differs
+#: from the base seepage sample's series, whose times and stage instants are kept.
+POOL_SCHEDULE = [POOL_FULL, POOL_FULL, POOL_DOWN]
+
+#: The coarse piezometric pair. These are five- and six-point polylines a designer
+#: would sketch from piezometer readings, not traces of a solved field: Line 1
+#: mimics the full-pool phreatic surface of boundary set 1, Line 2 the drawn-down
+#: one of boundary set 2 — the residual pool at 110 upstream, falling through the
+#: core and running out to tailwater at 100. Both were read off the solved fields
+#: and rounded. Line 1 leaves the upstream shell AT the reservoir level and Line 2
+#: at the residual pool level, so the pools they describe are the ones the two
+#: seepage boundary sets state; a line that came off the shell a foot low would put
+#: two different pools on one model. Both tails sit on the ground surface from
+#: x = 550 out, so neither invents a pond on the downstream foreshore.
+PIEZO_1 = [(0.0, 160.0), (360.0, 160.0), (410.0, 120.0), (550.0, 100.0),
+           (750.0, 100.0)]
+PIEZO_2 = [(0.0, 110.0), (220.0, 110.0), (360.0, 107.0), (410.0, 103.0),
+           (550.0, 100.0), (750.0, 100.0)]
+
+#: The mesh the solved file ships, stated the way Studio's Build Mesh dialog states
+#: it: linear triangles, auto-sized from the geometry at 100 divisions across the
+#: 750 ft section. The tutorials quote the 2,080 nodes and 3,923 triangles that come
+#: out of it. Neither refinement path acts on this section — it carries no
+#: constraint line, no size region, and no zone thin enough for the thin-zone pass —
+#: so the dialog's defaults reduce to a plain target size here.
+MESH_ELEMENT_TYPE = "tri3"
+MESH_SIZE_DIVISIONS = 100
+
+
+def _tutorial_schedule(sd):
+    """The base file's transient schedule with the pool ramped to the residual
+    level instead of to the tailwater datum. The saved-frame schedule and both
+    stage times are the base file's own."""
+    ts = copy.deepcopy(sd["tseep"])
+    ts["series"]["pool"] = list(POOL_SCHEDULE)
+    return ts
+
+
+#: COMBO-3 Part 2's saved-frame schedule, which is the one input its file does not
+#: share with COMBO-2's. A sweep asks the stability question once per saved frame,
+#: so the frames decide what the curve can resolve: every five days through the
+#: hold and the fall, which ends on day 50, then widening steps through the
+#: recovery. The march stops at day 500 because the curve is flat well before it —
+#: the pore pressures the reservoir left in the core are what is still draining,
+#: and by day 300 that has stopped moving the answer. COMBO-2's own workbook keeps
+#: its coarser schedule and its 1,000-day run.
+#:
+#: ``save_interval`` is set to the full duration so the interval grid contributes
+#: only the last frame and the list states the schedule outright; the widest gap
+#: between two saved times is 100 days, so it never caps a step.
+FS_TIME_DURATION = 500.0
+FS_TIME_SAVE_TIMES = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0,
+                      60.0, 70.0, 80.0, 100.0, 130.0, 170.0, 220.0, 300.0, 400.0,
+                      500.0]
+
+
+def _fs_time_schedule(sd):
+    """:func:`_tutorial_schedule` with COMBO-3 Part 2's denser frames and its
+    shorter run. Stage 1 and stage 2 are untouched at 0 and 50."""
+    ts = _tutorial_schedule(sd)
+    ts["duration"] = FS_TIME_DURATION
+    ts["save_interval"] = FS_TIME_DURATION
+    ts["save_times"] = list(FS_TIME_SAVE_TIMES)
+    return ts
+
+
+def _base():
+    """The seepage sample with the two rapid-drawdown additions every file shares:
+    the undrained core and the critical upstream circle."""
     sd = load_slope_data(BASE)
-
-    # undrained compacted-clay core (material index 1); shell + foundation stay drained
     sd["materials"][1]["d"] = CORE_D
     sd["materials"][1]["psi"] = CORE_PSI
-
-    # the critical upstream (reservoir-face) circle. max_depth is left at the base
-    # file's value (the full foundation depth) — the fixed circle carries its own
+    # max_depth is left at the base file's value: the fixed circle carries its own
     # tangent Depth, and overriding max_depth would clip the domain through the core.
     sd["circular"] = True
     sd["circles"] = [dict(CIRCLE)]
+    return sd
 
-    out = OUT
-    save_slope_data_to_xlsx(sd, out, template=default_template_path())
-    print(f"wrote {os.path.relpath(out, REPO_ROOT)}")
-    return out
+
+def _save(sd, path):
+    save_slope_data_to_xlsx(sd, path, template=default_template_path())
+    print(f"wrote {os.path.relpath(path, REPO_ROOT)}")
+    return path
+
+
+def build_lem_worked_example():
+    """``docs/lem/rapid.md``'s transient worked example — the base file plus the
+    undrained core and the circle, and nothing else."""
+    return _save(_base(), os.path.join(LEM_FILES, "xslope_johnson_res_rapid.xlsx"))
+
+
+def build_lem_sample():
+    """``docs/lem/samples.md``'s rapid-drawdown sample: the two-steady route.
+
+    The dam of the tutorial family with each pool stated as its own steady seepage
+    problem — set 1 at full pool, set 2 at the residual pool — and ``u = seep`` on
+    every material, so both stages read pore pressures off the committed solved
+    fields. The fixed upstream circle is the family's.
+
+    No piezometric lines. The boundary sets state where the water stands for every
+    load and ``u = seep`` states every pore pressure, so a line here would be read by
+    nothing — the same rule :func:`build_tutorial_completed` follows. The
+    piezometric pair belongs to the starter file, which is where COMBO-2 Part 1
+    works from.
+    """
+    sd = _base()
+    sd["piezo_line"] = []
+    sd["piezo_line2"] = []
+    sd["seepage_bc"] = copy.deepcopy(BC1)
+    sd["seepage_bc2"] = copy.deepcopy(BC2)
+    sd["has_seepage_bc2"] = True
+    sd["tseep"] = None
+    sd["time_unit"] = None
+    for m in sd["materials"]:
+        m["u"] = "seep"
+        m["kr0"] = SAMPLE_KR0
+        m["Ss"] = None
+        m["Sy"] = None
+        m["E"] = SAMPLE_E[m["name"]]
+    return _save(sd, os.path.join(LEM_FILES, "xslope_johnson_rapid_KEY.xlsx"))
+
+
+def build_tutorial_completed():
+    """COMBO-2's completed model: both boundary sets, the schedule, u = seep.
+
+    No piezometric lines. Once the boundary sets exist they state where the water
+    stands for every load, and ``u = seep`` states every pore pressure, so a line
+    left on the file would be read by nothing (``water.water_line_for_stage``:
+    seepage head boundaries wherever a seepage analysis is defined, otherwise the
+    piezometric line). The starter file keeps the pair, which is what the tutorial's
+    first run is made from.
+
+    Boundary set 2 IS kept. Part 2 of the tutorial runs the two-steady route on it,
+    and Part 3 has the reader clear it before the transient march — the same pattern
+    the piezometric pair follows one part earlier, each input deleted at the point
+    the next route stops reading it."""
+    sd = _base()
+    sd["tseep"] = _tutorial_schedule(sd)
+    sd["seepage_bc2"] = copy.deepcopy(BC2)
+    sd["has_seepage_bc2"] = True
+    sd["piezo_line"] = []
+    sd["piezo_line2"] = []
+    for m in sd["materials"]:
+        m["u"] = "seep"
+    return _save(sd, os.path.join(TUT_FILES, "xslope_johnson_rapid.xlsx"))
+
+
+def build_tutorial_starter():
+    """COMBO-2's starter: the piezometric pair only — no boundary sets, no
+    schedule, u = piezo."""
+    sd = _base()
+    sd["piezo_line"] = list(PIEZO_1)
+    sd["piezo_line2"] = list(PIEZO_2)
+    for m in sd["materials"]:
+        m["u"] = "piezo"
+    empty = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
+    sd["seepage_bc"] = copy.deepcopy(empty)
+    sd["seepage_bc2"] = copy.deepcopy(empty)
+    sd["has_seepage_bc2"] = False
+    sd["tseep"] = None
+    return _save(sd, os.path.join(TUT_FILES, "xslope_johnson_rapid_start.xlsx"))
+
+
+def _quiet(fn, *a, **k):
+    with contextlib.redirect_stdout(io.StringIO()):
+        return fn(*a, **k)
+
+
+def build_tutorial_fs_time():
+    """COMBO-3 Part 2's model: the completed model without boundary set 2, meshed
+    and marched.
+
+    Set 2 goes because a transient rapid drawdown reads stage 1 and stage 2 out of
+    the march, so a second boundary set states nothing the run consults and the
+    checks say so on every sweep. COMBO-2's Part 3 has the reader clear it by hand
+    at this same point; the solved file arrives with it already cleared.
+
+    The mesh is the one COMBO-2 builds — tri3, auto-sized at 100 divisions — so the
+    section under Part 2's numbers is exactly the one COMBO-2 leaves behind. The
+    saved-frame schedule is this file's own: a sweep resolves nothing between two
+    frames, so the instants are packed across the fall and spread through the
+    recovery, and the run stops at day 500.
+
+    The circles sheet carries the one upstream circle COMBO-2 searches from. A
+    rapid drawdown is an upstream-face problem -- lowering the pool takes the water
+    off that face and leaves it inside the embankment -- so every instant of the
+    sweep interrogates the same slope, and the curve reports one mechanism moving
+    rather than two trading places."""
+    from xslope.mesh import (build_mesh_from_polygons, export_mesh_to_json,
+                             get_material_polygons)
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             export_transient_solution, run_transient_seepage)
+
+    sd = _base()
+    sd["tseep"] = _fs_time_schedule(sd)
+    sd["seepage_bc2"] = {"specified_heads": [], "specified_fluxes": [],
+                         "exit_face": []}
+    sd["has_seepage_bc2"] = False
+    sd["piezo_line"] = []
+    sd["piezo_line2"] = []
+    for m in sd["materials"]:
+        m["u"] = "seep"
+    path = _save(sd, os.path.join(TUT_FILES, "xslope_johnson_fs_time.xlsx"))
+    stem = os.path.splitext(path)[0]
+
+    # Re-read what was written, so the companions are built on the model as the file
+    # states it rather than on the dict that produced it.
+    sd = load_slope_data(path)
+    xs = [x for x, _ in sd["ground_surface"].coords]
+    target = (max(xs) - min(xs)) / MESH_SIZE_DIVISIONS
+    mesh = _quiet(build_mesh_from_polygons, get_material_polygons(sd), target,
+                  MESH_ELEMENT_TYPE)
+    mesh_path = f"{stem}_mesh.json"
+    export_mesh_to_json(mesh, mesh_path)
+
+    seep_data = _quiet(build_seep_data, mesh, sd)
+    solution = _quiet(run_transient_seepage, seep_data, build_tseep_data(sd),
+                      verbose=False)
+    csv_path, meta_path = _quiet(
+        export_transient_solution, seep_data, solution, stem,
+        input_file=os.path.basename(path),
+        mesh_file=os.path.basename(mesh_path))
+
+    print(f"  mesh: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements "
+          f"(target size {target:g})")
+    print(f"  march: {len(solution['frames'])} frames, "
+          f"converged={solution['converged']}, "
+          f"closure={solution['mass_balance']['final_closure']:.3e}")
+    for written in (mesh_path, csv_path, meta_path):
+        print(f"  wrote {os.path.relpath(written, REPO_ROOT)} "
+              f"({os.path.getsize(written) / 1024:.0f} KB)")
+    return path
+
+
+def build(which=None):
+    if which in ("fs_time", "solved"):
+        return [build_tutorial_fs_time()]
+    if which in ("sample", "key"):
+        return [build_lem_sample()]
+    return [build_lem_sample(),
+            build_lem_worked_example(),
+            build_tutorial_starter(),
+            build_tutorial_completed(),
+            build_tutorial_fs_time()]
 
 
 if __name__ == "__main__":
-    build()
+    build(sys.argv[1] if len(sys.argv) > 1 else None)

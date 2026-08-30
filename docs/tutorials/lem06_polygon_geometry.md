@@ -11,7 +11,7 @@ profile-line model cannot say that. Its bottom boundary is one number, a single
 horizontal elevation — so **the geometry is entered as closed polygons instead**,
 one per material zone, and the base of the model is whatever the polygons draw.
 
-![A slope on a dipping base, entered as two material zones](images/lem06_problem.png){width=700}
+![A slope on a dipping base, entered as two material zones](images/lem06_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -20,11 +20,9 @@ one per material zone, and the base of the model is whatever the polygons draw.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Enter a section as material-zone polygons rather than profile
-lines, on a base that dips too much for a maximum depth to describe; search it
-for the critical circle; and read what the base does to that search — the
-circles it refuses, the option that lets a circle be truncated against it
-instead, and the change in soil that puts the critical surface on it.
+**Objectives** — Learn how to enter geometry as material-zone polygons: when
+polygons beat profile lines, how a dipping base constrains the circular search,
+and how to let circles truncate against the base instead of being refused by it.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">polygons</span><span class="tg-pill">dipping base</span><span class="tg-pill">composite surfaces</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_sloping_bottom.xlsx](../lem/files/xslope_sloping_bottom.xlsx) — the same file used by [LEM Sample Problem 11](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)</div>
@@ -34,8 +32,8 @@ instead, and the change in soil that puts the critical surface on it.
 
 ## The problem
 
-**Geometry** — a section's geometry is entered one of two ways, and this is the
-page for the second. **Profile lines** give the *top* of each material layer and
+**Geometry** — a section's geometry is entered one of two ways, and this model
+uses the second. **Profile lines** give the *top* of each material layer and
 a single maximum depth beneath them all, which is the faster input wherever the
 layers lie flat and span the section — the geometry of
 [LEM-3](lem03_layered_slope.md), [LEM-4](lem04_water_in_the_slope.md) and
@@ -53,7 +51,7 @@ paired columns its worksheet block carries:
 **Polygon 1 — material 1 (`embankment`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | 0 | 0 |
 | 40 | 20 |
 | 120 | 20 |
@@ -62,7 +60,7 @@ paired columns its worksheet block carries:
 **Polygon 2 — material 2 (`foundation`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | -50 | 0 |
 | 120 | 0 |
 | 120 | -5 |
@@ -99,7 +97,7 @@ rings reference, and neither soil carries pore pressures — `u` stays `none` �
 so the table ends at φ:
 
 | name | γ | γsat | option | c | φ |
-|---|:---:|:---:|---|:---:|:---:|
+| --- | :---: | :---: | --- | :---: | :---: |
 | `embankment` | 130 |  | `mc` | 400 | 0 |
 | `foundation` | 135 |  | `mc` | 800 | 0 |
 
@@ -107,7 +105,7 @@ so the table ends at φ:
 twice the slope height:
 
 | Xo | Yo | Option | Depth |
-|:---:|:---:|---|:---:|
+| :---: | :---: | --- | :---: |
 | 20 | 40 | Depth | 0 |
 | 20 | 40 | Depth | -10.7887 |
 
@@ -119,7 +117,7 @@ base touches it at a single point rather than running along it — which is what
 the [last section](#circles-that-will-not-fit) of this page is about.
 
 Every number the model needs is in the tables above, and each is laid out exactly
-as its destination is — the template's worksheets and Studio's editors, same
+as its destination — the template's worksheets and Studio's editors, same
 columns in the same order. Select a table's block of values, copy, and paste it
 straight into the sheet or editor rather than retyping it.
 
@@ -279,7 +277,7 @@ Continue below.
 
 ## Running the analysis
 
-However you built it, you now hold the same model:
+However you built it, the model is now the same:
 
 ![The finished model](images/lem06_inputs.png){width=1000}
 
@@ -336,7 +334,7 @@ with a tension crack.
 Each method gets its own search and its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |
 
 The four that satisfy moment equilibrium — OMS, Bishop, Spencer and
@@ -347,8 +345,8 @@ satisfies both force and moment equilibrium and is the one to report.
 
 ### Circles that will not fit {#circles-that-will-not-fit}
 
-Take the second starting circle, whose lowest point grazes the bedrock, and push
-it 1.2 ft deeper — **Depth** `-12` in place of `-10.7887` — then run it as a
+We take the second starting circle, whose lowest point grazes the bedrock, and
+push it 1.2 ft deeper — **Depth** `-12` in place of `-10.7887` — then run it as a
 **Single surface**. There is no answer:
 
 > **LEM run failed** — Failure surface extends outside the domain polygon
@@ -358,7 +356,7 @@ x = 12 and x = 34, and there is no soil down there to shear.
 
 The alternative to refusing such a circle is to cut it off at the boundary, and
 the Run LEM dialog has a checkbox for exactly that: **Composite surfaces
-(truncate circles at the base)**. Tick it and run the same circle again:
+(truncate circles at the base)**. We tick it and run the same circle again:
 
 ![Spencer on the truncated circle](images/lem06_solution_composite.png){width=1000}
 
@@ -382,9 +380,9 @@ follows.
 
 ### When the base decides
 
-Which layer is weak is a property of the soils, not of the geometry. Give the
-foundation c = 300 psf — below the fill's 400 — with everything else unchanged,
-and search again:
+Which layer is weak is a property of the soils, not of the geometry. Now we give
+the foundation c = 300 psf — below the fill's 400 — with everything else
+unchanged, and search again:
 
 ![Spencer on the same section with a weak foundation](images/lem06_solution_weak.png){width=1000}
 
@@ -393,7 +391,7 @@ bottoms out at elevation −10.85, grazing the bedrock, with 162,210 lb/ft of so
 above it and most of its base in the foundation. This is the surface the second
 starting circle was there to describe, and the search reached it from that seed.
 
-Run this one with composite surfaces on and it returns 0.782 — two tenths of a
+We run this one with composite surfaces on: it returns 0.782 — two tenths of a
 percent. A 3.4° dip is gentle enough that an ordinary circle can hug it for most
 of its length, so there is little left for truncation to add. The gap opens on a
 base that is steep or irregular, or on a soft seam lying directly on rock, where
@@ -420,8 +418,8 @@ This tutorial covered:
 stands because of what is buried in it. The [tutorials index](index.md) lists the
 series, and the sample problems carry each page further.
 [Sample Problem 11](../lem/samples.md#11-polygon-input-with-a-sloping-bottom)
-catalogues this model, [DXF Import/Export](../usage/dxf.md) is the route from a
-CAD drawing to the `polygon` sheet this page filled by hand, and
+catalogs this model, [DXF Import/Export](../usage/dxf.md) is the route from a
+CAD drawing to the `polygon` sheet we filled by hand here, and
 [Composite Failure Surfaces](../lem/overview.md#composite-failure-surfaces)
 derives what the truncated surface does to the moment methods that assumed a
 constant radius.

@@ -55,6 +55,44 @@ The envelope for each of the four end conditions. The force available where a tr
 the envelope value at the crossing point, so a surface that clips a line near a free end mobilizes only a
 fraction of $T_{max}$.
 
+### Pullout from the effective overburden
+
+$L_p$ states the bond as a development length: the capacity grows at a constant rate $T_{max}/L_p$ no matter how
+deep the reinforcement is buried. Interface friction does not work that way — it grows with the normal stress
+pressing the soil onto the reinforcement — so the **Adhesion** and **Delta** columns state the interface strength
+instead and let the resistance follow the depth of burial. Per unit length of a planar reinforcement, with soil
+bearing on both faces:
+
+>$r(s) = 2\left(a + \sigma'_v(s)\tan\delta\right)$
+
+where $a$ is the soil–reinforcement adhesion (stress units), $\delta$ the interface friction angle (degrees), and
+$\sigma'_v(s)$ the **effective** vertical stress at the point $s$ along the line: the weight of the soil column
+standing above that point — every material zone it crosses at that material's unit weight, saturated below the
+water table where the material declares a $\gamma_{sat}$ — less the pore pressure the model declares there
+(piezometric line, $r_u$, or seepage field, exactly as a slice base reads it).
+
+The envelope is then the same three-way minimum, with the ramps integrated rather than assumed linear:
+
+>$T(s) = \min\left(T_{max},\;\; T_{end1} + \displaystyle\int_0^s r,\;\; T_{end2} + \int_s^L r\right)$
+
+A constant $r$ recovers the straight ramps above, so the two laws are one formula. Both columns filled selects
+this law and $L_{p1}$/$L_{p2}$ are then not read; both blank is the default and leaves the development-length law
+exactly as it was. One filled and one blank is refused — half a law is not a law. LEM and FEM read the same
+envelope under either law.
+
+**FHWA pullout capacity.** The FHWA form $F^{*}\alpha\sigma'_v$ per unit area is this law with $a = 0$ and
+$\delta = \arctan(F^{*}\alpha)$. Written out, FHWA's nominal pullout resistance of a layer is
+$P_r = F^{*}\alpha\,\sigma'_v L_e C R_c$, where $C = 2$ counts the two bearing faces of a sheet and $R_c$ is the
+fraction of the wall the reinforcement covers. For a continuous geosynthetic ($R_c = 1$) that is the integral
+above, term for term: the factor of two is already in $r(s)$, and the per-unit-width convention is what $R_c = 1$
+means. In FHWA's Example E1 — a 20 ft geogrid-reinforced wall — the geogrids take $F^{*} = 0.45$ and
+$\alpha = 0.8$ from the manual's Table 3-6 ($\alpha$ is 0.8 for geogrids, 0.6 for geotextiles, 1.0 for metallic
+reinforcement), so the two columns read Adhesion = 0 and
+Delta = $\arctan(0.45 \times 0.8) = 19.80°$, and nothing else about the bond is entered. Reading the envelope
+where the design failure surface crosses each of that wall's eleven layers reproduces the manual's whole pullout
+table; the entry is under
+[published problems](../verification/published.md#fhwa-e1).
+
 **Grouted tiebacks with a bonded length.** A tieback develops pullout resistance only over its grouted (bonded)
 length $L_{bond}$ at the far end, at a bond strength $b$ (force per unit length); the free length carries whatever
 force the bond zone can supply. This is expressed in the envelope by entering an effective
@@ -161,7 +199,9 @@ The same reinforcement lines drive both engines, but the mechanics differ:
 - **FEM** models each line as tension-only truss elements whose force *emerges* from displacement compatibility;
   the same capacity envelope caps each element's allowable force. An element that reaches it yields and holds that
   force (elastic-perfectly-plastic) — unless $T_{res}$ has been filled in, in which case it drops to that residual
-  (bounded by the end anchorage in anchored zones). Dir and Appl have no meaning in the FEM.
+  where the residual is the lower of the two, and holds the envelope value where the envelope is. Both engines
+  therefore treat bond slip the same way; what $T_{res}$ adds in the FEM is rupture of the reinforcement itself.
+  Dir and Appl have no meaning in the FEM.
   See [Soil Reinforcement in FEM](../fem/reinforcement.md).
 
 For typical stiffness values ($E$, $Area$) and guidance on pullout lengths by reinforcement type, see the

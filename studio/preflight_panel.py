@@ -160,7 +160,7 @@ _SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z(\"'])")
 
 #: What identifies one member once the text its group shares has been taken off the
 #: front: a number or a name, with the parenthesized name that may follow it --
-#: ``1 ('Core')`` out of ``Material 1 ('Core') has no tensile strength: ...``.
+#: ``1 ('Core')`` out of ``Material 1 ('Core') has no tensile cutoff: ...``.
 _MEMBER = re.compile(r"[^\s,;:]+(?:\s*\([^)]*\))?")
 
 _SUMMARIES = {}
@@ -198,7 +198,7 @@ def _members(messages):
     """``(noun, [member, ...])`` for a group's messages.
 
     A rule that fires per material opens every message the same way and then names
-    which one: ``Material 1 ('Sand') has no tensile strength: ...``. So the shared
+    which one: ``Material 1 ('Sand') has no tensile cutoff: ...``. So the shared
     opening is what the members have in common, the last word of it is what they ARE
     (``Material`` -> ``4 materials``, lowercased because it is being counted mid-line
     rather than opening a sentence), and each member is the identifier that follows

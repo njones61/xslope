@@ -64,8 +64,8 @@ reliability run inherits whichever base analysis it is sweeping (`{"base": "fem"
 defaulting to `lem`).
 
 One more `selection` key belongs to time-dependent models. With `u = seep` against a
-[transient seepage](../seep/transient.md) march the pore pressures are not in the file
-at all: one frame of the march is written into the model immediately before the solver
+[transient seepage](../seep/transient.md) analysis the pore pressures are not in the file
+at all: one frame of the solution is written into the model immediately before the solver
 starts. A script does that by calling `apply_transient_stability_frame` first, so the
 entry point's own gate already sees a model carrying the field. An interface cannot —
 it has to decide whether the run is startable *before* the frame is staged — so it
@@ -97,7 +97,9 @@ structural checks — the template version, the sheet parsing, the option
 vocabularies — which catch a *corrupt* file rather than an *incomplete* one. A
 half-built model must always open, because that is how a model gets built: you draw
 the geometry, then the materials, then the water, and at no point in between should
-the file refuse to load.
+the file refuse to load. A material with no unit weight yet is the plain case: the
+workbook opens, and `mat.gamma_nonpositive` reports the empty cell when a run is
+checked.
 
 The gate is at the solver entry points instead:
 
@@ -191,20 +193,20 @@ severity and one-line summary.
 | Family | What it looks at |
 |--------|------------------|
 | **Water** | The unit weight of water; a material reading a piezometric line that does not exist or stops short of the section; a line no material reads; standing water above the ground surface with no distributed load carrying its weight; and, on a model with [automatic water loads](#automatic-water-loads), a transcribed block the engine would derive a second time, a pool the derivation could not measure, and two water definitions that disagree |
-| **Materials** | The pore-pressure, unsaturated-model and strength-model vocabularies; a material inside the geometry with no strength model, no unit weight, or no strength at all; `u = ru` with no ratio; `option = cp` with no undrained strength |
+| **Materials** | The pore-pressure, unsaturated-model and strength-model vocabularies; a material inside the geometry with no strength model, no unit weight, or no strength at all; `u = ru` with no ratio; `option = cp` with no undrained strength; a Hoek-Brown material under the Corps of Engineers or Lowe & Karafiath method, which fix the interslice force inclination rather than solving for it and stop converging at the friction angles a curved envelope reaches near a slope face |
 | **Global parameters** | A blank seismic coefficient; a coefficient outside the plausible range, or entered with a sign the limit-equilibrium engine cannot use; water in the crack deeper than the crack that holds it |
-| **Surfaces** | A model with no failure surface at all; a method that cannot use the selected surface family; a model carrying both families where the run did not say which; a circle whose **Depth** sits below the base of the model and that cuts no failure surface inside it — reported against a search, whose refinement moves off its seeds and reaches the critical surface anyway, and raised to an error where that circle *is* the run's surface, so the Run dialog refuses it |
+| **Surfaces** | A model with no failure surface at all; a method that cannot use the selected surface family; a model carrying both families where the run did not say which; a circle whose **Depth** sits below the base of the model and that cuts no failure surface inside it; and a circle that meets the ground surface *above its own center*, whose arc between the two daylight points would be longer than a semicircle and whose end slices would overhang, so no failure surface can be built from it at all — both are reported against a search, whose refinement moves off its seeds and reaches the critical surface anyway, and raised to an error where that circle *is* the run's surface, so the Run dialog refuses it. A model that states a tension crack is not reported for the second: the crack resolves the uphill end, and the arc exits at it. Beneath those two sits a catch-all on the **first** circle: whatever the cause, a circle 1 that yields no slices is reported with the slicer's own reason quoted — an arc that never reaches the ground, or one that leaves through a vertical edge of a section too narrow to hold it. It follows the same ladder (an error where that circle is the run's surface, a warning where a search is only seeded from it) and drops to **INFO** where no stability analysis is selected: a seepage or finite element run never reads the Circles sheet, so nothing about that run is wrong — but the file still carries a circle no limit-equilibrium run could use. The question is asked with pore pressure set aside, so a model whose seepage field is built at run time is never blamed for a circle that is sound |
 | **Model domain** | A domain whose boundary crosses or retraces itself, or encloses no area — the shape every analysis is bounded by, derived from the zones rather than typed, so a defect in it is invisible where you are looking. A **Max depth** left at the elevation of the toe produces one: the base of the model runs back along the ground surface, and slicing, meshing and searching all fail on it with a geometry error naming no field |
 | **Ordering** | A load or piezometric polyline entered right to left, or one whose x values rise and then fall |
 | **Units** | The unit weight of water and the soil unit weights against the declared system, and against each other when nothing is declared |
 | **Mesh** | An element type the seepage solver does not support; a mesh referencing a material the Materials table does not define; a stored pore-pressure field whose node count does not match the mesh it is used with; a zone element size that is not finer than the global target; and, before a finite element run, a material zone too thin to fit three element rows across its width — which cannot develop a shear band, so the run returns a factor of safety that is too high rather than failing. The zone's own **Size** and the Build mesh dialog's **Refine thin zones** both answer it, and where a mesh is attached the check measures that mesh rather than inferring anything. A zone whose material is `option = elastic` is not reported: it cannot yield at any element size, so there is no shear band for a coarse mesh to lose. A thin zone that is merely strong still is |
 | **Seepage** | A conductivity of zero; `k2` greater than `k1`; missing unsaturated parameters on an unconfined model; a boundary set with no boundary conditions, no specified head, or no gradient |
 | **Transient seepage** | A missing time unit; a specific storage or specific yield of zero; a missing or non-positive duration; stage times that are half-set or out of order; a save schedule that reaches past the end of the run; a driving series with no value at t = 0 |
-| **Finite element** | A blank or non-positive Young's modulus or Poisson's ratio; a blank tensile cap; K0 with no zone geometry to integrate the overburden through; a strength-reduction zone that contains no mesh elements |
-| **Rapid drawdown** | The stage-2 water source each pore-pressure option needs; the `d`/`psi` pair; a post-drawdown pool standing higher than the full pool, or above the ground with no stage-2 load; a stage-2 load that repeats stage 1 |
+| **Finite element** | A blank or non-positive Young's modulus, Poisson's ratio or unit weight — on every row of the Materials table, which is what the engine reads; a blank tensile cap; K0 with no zone geometry to integrate the overburden through; a strength-reduction zone that contains no mesh elements |
+| **Rapid drawdown** | The stage-2 water source each pore-pressure option needs; the `d`/`psi` pair; a post-drawdown pool standing higher than the full pool, or above the ground with no stage-2 load; a stage-2 load that repeats stage 1; a boundary set 2 left on a file whose drawdown takes both stages from a transient seepage analysis, where it supplies nothing and editing it changes nothing; and, on that same route, a pool that stands at the same level at both stage times — a reservoir head typed as a fixed number, or bound to a series that does not fall between them — so the run never lowers the water and the drawdown answer is the full-pool state read twice |
 | **Tension cracks** | A crack at or below the base of the slope; a crack that intersects no failure surface while its water thrust still applies; a depth far past the theoretical `2c/γ` |
-| **Reinforcement and piles** | Pile spacing that is blank, zero or negative wherever the run divides by it; a pile or reinforcement line the finite element engine cannot build; a pullout length longer than its own line, or negative; an element that crosses no failure surface |
-| **Plausibility** | A modulus far outside the band for its own soil type; a Poisson's ratio below any real soil; a structural modulus outside the range from geosynthetic to steel |
+| **Reinforcement and piles** | Pile spacing that is blank, zero or negative wherever the run divides by it; a pile or reinforcement line the finite element engine cannot build; a pullout length longer than its own line, or negative; an element that crosses no failure surface; and a **Type**, **Dir** or **Appl** that is not one of the words that column speaks — including a number typed into it, which reaches the engine as neither a direction nor an application |
+| **Plausibility** | A modulus far outside the band for its own soil type; a Poisson's ratio below any real soil; a structural modulus outside the range from geosynthetic to steel; a Hoek-Brown $\sigma_{ci}$ too small, in the declared unit system, to be intact rock — the magnitude a strength quoted in MPa lands at when it is entered into a model whose stress unit is the kPa |
 
 ### The cross-analysis findings
 
@@ -262,6 +264,13 @@ its soil type's midpoint. And a value that *matches* a typical default is never
 evidence of anything — `E = 100,000` with `ν = 0.3` is both a common fallback pair and
 a perfectly ordinary thing to specify deliberately. These rules report an implausible
 magnitude. They never claim a value was left unset.
+
+The Hoek-Brown $\sigma_{ci}$ check is the one that reports correct models as well,
+and deliberately. A normalized study holds $\sigma_{ci}/\gamma H$ at a critical ratio
+and lands in the sub-kPa range on purpose; a strength read off a lab report in MPa
+and typed into a kPa model lands in the same range by mistake. Nothing in the number
+separates them, so the check states what it sees and leaves the judgment where it
+belongs — which is why it is a warning and never a refusal.
 
 ## Remedies
 
@@ -354,13 +363,26 @@ The `add_ponded_water_load` remedy does not invent a load: it derives it from th
 model's own statement of where the water stands, in a fixed order of precedence.
 
 1. **The seepage boundary conditions**, wherever a seepage analysis is defined —
-   `seep bc` for stage 1, `seep bc (2)` for stage 2. A reservoir or head boundary
-   traced along the ground surface states the pool elevation directly, so no
-   seepage solution has to be run first. Where the level is a `tseep` time series,
-   it is evaluated through the transient march's own interpolation, at t = 0 for
-   stage 1 and at the stage-2 time for stage 2 — so a derived load and the seepage
-   field it accompanies cannot disagree about where the pool was.
+   `seep bc` for stage 1, and for stage 2 whichever set the drawdown's own route
+   reads. A reservoir or head boundary traced along the ground surface states the
+   pool elevation directly, so no seepage solution has to be run first. Where the
+   level is a `tseep` time series, it is evaluated through the transient run's
+   own interpolation, at the instant that stage is solved at — so a derived load
+   and the seepage field it accompanies cannot disagree about where the pool was.
 2. **Otherwise the piezometric line** — Line 1, or Line 2 for stage 2.
+
+A rapid drawdown's stage 2 has two possible sources because it has two possible
+routes, and the water follows whichever one is supplying the pore pressures. Run
+as **two steady analyses**, the drawn-down state is `seep bc (2)`, and the load is
+read there. Run as **two instants of a transient seepage analysis** — Stage 1 time and Stage 2
+time set on the `tseep` sheet — the drawn-down state is `seep bc` as the pool
+schedule leaves it at the Stage 2 time, and `seep bc (2)` is not read at all.
+`rapid.stage2_bc_ignored` reports a boundary set 2 left on a file being run that
+way, since editing it would change nothing. `rapid.pool_static_between_stages`
+reports a staged run whose reservoir stands at the same elevation at the two
+stage times — a reservoir head typed as a constant instead of bound to a falling
+series — because the run then never lowers the pool and the drawdown answer is
+the full-pool state read twice.
 
 Only a boundary drawn *on the ground surface* is read as a pool. A head boundary
 along a deep aquifer or a model side is a groundwater condition, and reading its
@@ -434,7 +456,7 @@ It states what it will remove before it removes anything —
 ```
 Set Water loads to auto and remove 1 block from Distributed loads (#1), which the
 derivation from Piezometric Line 1 reproduces to within 0% (resultant 11886.4)
-(main D23).
+(the main sheet's Water loads row).
 ```
 
 — it keeps every block that is *not* water verbatim, and it declines rather than removing

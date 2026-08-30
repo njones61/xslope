@@ -293,6 +293,14 @@ class MeshWorker(QObject):
                 target = options.get("target_size", 1.0)
             extra = (f", {n_reinf} reinforcement + {n_pile} pile line(s)"
                      if (n_reinf + n_pile) else "")
+            # Element size along the constraint lines (main!D20). The dialog carries
+            # the model's value, so fall back to the model for a caller that builds a
+            # mesh without one. Announced only where it can act — a section with no
+            # reinforcement or pile line has no line to size.
+            size_1d = options.get("element_size_1d", sd.get("element_size_1d"))
+            size_1d_msg = ""
+            if size_1d is not None and constraint_lines:
+                size_1d_msg = f", 1D element size {float(size_1d):g}"
             size_regions = extract_size_regions(sd)
             factor = float(options.get("refine_factor", 3.0))
             features = set(_REFINE_FEATURES) if options.get(
@@ -328,7 +336,7 @@ class MeshWorker(QObject):
             style_msg = (f", {quad_style} quads"
                          if element_type.startswith("quad") else "")
             print(f"Building {element_type} mesh, target size {target:.3g}"
-                  f"{style_msg}{extra}{refine_msg}{thin_msg}…")
+                  f"{style_msg}{extra}{size_1d_msg}{refine_msg}{thin_msg}…")
             # Name every zone the toggle refined, the size it got, and the resolution
             # that size buys. Nothing is printed when nothing was refined, so a
             # section with no thin zone reads exactly as it did before the option
@@ -342,6 +350,7 @@ class MeshWorker(QObject):
             mesh = build_mesh_from_polygons(polygons, target_size=target,
                                             element_type=element_type,
                                             lines=constraint_lines or None,
+                                            element_size_1d=size_1d,
                                             refine_factor=refine,
                                             refine_features=refine_features,
                                             size_regions=size_regions,
@@ -459,7 +468,7 @@ class SeepRunner(RunnerThread):
                 tseep_data = dict(tseep_data)
                 tseep_data["save_times"] = sorted(
                     set(tseep_data.get("save_times") or []) | set(extra))
-                print("Re-marching with extra save time(s): "
+                print("Re-running the transient seepage analysis with extra save time(s): "
                       + ", ".join(f"{t:g}" for t in extra))
             print("Running transient seepage analysis…")
             time_unit = sd.get("time_unit")
@@ -550,6 +559,9 @@ class FemRunner(RunnerThread):
                     self.progress.emit(int(frac * 100), 100, str(label))
 
                 solution = solve_fem(fem_data, F=F, debug_level=1,
+                                     max_iterations=opts.get("max_iterations") or 12000,
+                                     max_iterations_ceiling=(
+                                         opts.get("max_iterations_ceiling") or 50000),
                                      k0=opts.get("k0"),
                                      progress_callback=fem_cb)
                 print(f"FEM solve: converged={solution.get('converged')}, "
@@ -565,6 +577,8 @@ class FemRunner(RunnerThread):
                 result = solve_ssrm(
                     fem_data, F_min=opts.get("F_min", 1.0), F_max=opts.get("F_max", 2.0),
                     tolerance=opts.get("tolerance", 0.01), debug_level=1,
+                    max_iterations=opts.get("max_iterations") or 12000,
+                    max_iterations_ceiling=(opts.get("max_iterations_ceiling") or 50000),
                     failure_criterion=opts.get("failure_criterion", "non_convergence"),
                     min_slip_depth=opts.get("min_slip_depth"),
                     ssr_exclude=opts.get("ssr_exclude"),
@@ -583,6 +597,14 @@ class FemRunner(RunnerThread):
                     return
                 fs = result.get("FS")
                 print(f"SSRM factor of safety = {fs:.3f}")
+                # The factor of safety is the bracket midpoint however the bracket
+                # was closed, so an INCONCLUSIVE upper edge is invisible in the
+                # number itself. Restate the note beside the answer, where a reader
+                # looking only at the last lines of the Log will see it.
+                if result.get("note"):
+                    lo, hi = result.get("final_interval", (float("nan"),) * 2)
+                    print(f"  Bracket [{lo:.4f}, {hi:.4f}] — upper edge UNDECIDED")
+                    print(f"  {result['note']}")
                 # What the run chose and what its trials found. solve_ssrm returns
                 # these on the RESULT, and the bundle carried only
                 # result["last_solution"] — the field — so the criterion that
@@ -715,6 +737,9 @@ class SensitivityRunner(RunnerThread):
       * sensitivity, plot_type variance -> ``variance_contribution()``
       * sensitivity, plot_type rank     -> ``mc_rank_correlation()``
         -> bundle {'kind':'sensitivity', 'plot_type': …, <payload>, method}.
+      * fs_vs_time     -> ``fs_vs_time()``     -> bundle {'kind':'fs_vs_time', …},
+                          which sweeps the frames of the transient seepage
+                          solution handed in rather than a parameter.
     """
 
     succeeded = Signal(object)
@@ -722,10 +747,11 @@ class SensitivityRunner(RunnerThread):
     cancelled = Signal()
     progress = Signal(int, int, str)   # done, total, label
 
-    def __init__(self, slope_data, options, parent=None):
+    def __init__(self, slope_data, options, parent=None, transient=None):
         super().__init__(parent)
         self._sd = slope_data
         self._opts = options
+        self._transient = transient
         self._cancel = threading.Event()
 
     def cancel(self):
@@ -734,7 +760,9 @@ class SensitivityRunner(RunnerThread):
     def run(self):
         from xslope.search import AnalysisCancelled
         try:
-            if self._opts.get("mode") in ("design", "back_analysis"):
+            if self._opts.get("mode") == "fs_vs_time":
+                self._run_fs_vs_time()
+            elif self._opts.get("mode") in ("design", "back_analysis"):
                 self._run_design()
             else:
                 self._run_sensitivity()
@@ -786,6 +814,74 @@ class SensitivityRunner(RunnerThread):
         # 'study' field (set by back_analysis) drives the title/status wording.
         self.succeeded.emit({"kind": "design",
                              "study": res.get("study", "design"), **res})
+
+    def _run_fs_vs_time(self):
+        """The factor of safety at every chosen instant of the transient march —
+        each instant a single-stage analysis, or a three-stage rapid drawdown from
+        the march's initial pool when the dialog's drawdown box is ticked.
+
+        The per-instant table reaches the Log as it is the record of the run: a
+        curve is read for where it dips, and an instant that produced no result is a
+        row carrying its reason there rather than a gap nobody can account for.
+        ``fs_vs_time`` prints it, so the drawdown's stage columns appear where the
+        run has them.
+        """
+        from xslope.sensitivity import fs_vs_time
+        o = self._opts
+        emode = o.get("engine_mode", "lem")
+        method = o.get("method", "spencer")
+        times = [float(t) for t in (o.get("times") or [])]
+        if not times:
+            self.failed.emit("Tick at least one saved instant to evaluate.")
+            return
+        if self._transient is None:
+            self.failed.emit("Run a transient seepage analysis first — an "
+                             "FS-versus-time curve reads its saved frames.")
+            return
+        total = len(times)
+
+        def cb(done, _t, label):
+            self.progress.emit(int(done), total, str(label))
+
+        unit = str(self._sd.get("time_unit") or "").strip()
+        engine_tag = method if emode == "lem" else "SSRM"
+        rapid = bool(o.get("rapid", False))
+        # Grid seeding, when the dialog asks for it: every instant's search starts
+        # from a geometry-derived sweep of centers and tangent elevations instead of
+        # the circles sheet alone. A curve crosses states whose critical mechanisms
+        # sit in different parts of the section, so which family a seeded search
+        # lands in can change from instant to instant.
+        grid_seed = bool(o.get("grid_seed", False)) and emode == "lem"
+        search_opts = {"seed": "grid"} if grid_seed else None
+        what = "Rapid drawdown vs time" if rapid else "Factor of safety vs time"
+        print(f"{what} ({emode}): {total} instant(s) of the "
+              f"transient solution, {engine_tag}, "
+              f"{'re-searching' if (rapid or o.get('search', True)) else 'on the entered surface'} "
+              f"at each{', grid-seeded' if grid_seed else ''}…")
+        ok, res = fs_vs_time(self._sd, self._transient, times=times, mode=emode,
+                             methods=(method,), search=o.get("search", True),
+                             num_slices=o.get("num_slices", 40),
+                             fem_opts=o.get("fem_opts"), rapid=rapid,
+                             search_opts=search_opts,
+                             progress_callback=cb,
+                             cancel_check=self._cancel.is_set)
+        if not ok:
+            self.failed.emit(str(res))
+            return
+        # The per-instant table is printed by fs_vs_time itself, which is where the
+        # column set is known -- three stage factors of safety and the governing
+        # stage on a drawdown curve, the reported value alone otherwise.
+        if res.get("min_fs") is not None:
+            print("Lowest factor of safety %.4f at t = %g%s (%d instant(s), "
+                  "%d without a result)."
+                  % (res["min_fs"], res["critical_time"],
+                     (" " + unit) if unit else "", total, res["n_failed"]))
+        # The solution rides back with the result so a caller need not pay twice for
+        # a re-march; nothing re-marches on this path (only saved frames are
+        # offered), and the document already holds the march, so it is dropped
+        # rather than stored a second time.
+        res.pop("solution", None)
+        self.succeeded.emit({"kind": "fs_vs_time", "method": engine_tag, **res})
 
     def _run_sensitivity(self):
         o = self._opts

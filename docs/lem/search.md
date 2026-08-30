@@ -34,6 +34,32 @@ At the end of the process, the search results can be displayed using the **plot_
 
 Note that all circles tested in the search are displayed along with all grid points evaluated using the 9-point search algorithm. Furthermore, the sequence of center points for the moving 9-point grids are connected with a series of arrows showing the "search path".
 
+### Several Starting Circles Are Not Several Searches
+
+The circles sheet may hold any number of starting circles, but a seeded search
+(`seed='circles'`, the default) does not refine them all. Each starting circle is
+screened once — a single nine-point grid at its own launch spacing — the circles are
+ranked by that one coarse score, and the adaptive refinement then runs from the
+best-scoring circle alone. The other circles' families are never explored, and
+nothing in the output says so: the run reports convergence, one factor of safety,
+and one critical surface. Two circles entered to check two mechanisms, such as an
+upstream and a downstream surface on a dam, therefore report one mechanism, and
+which one survives is decided at the coarse resolution the refinement exists to
+improve on — a family screening a few thousandths higher that would refine much
+lower is dropped before refinement begins. Enter a single starting circle, on the
+face known to control, when the run is meant to interrogate one specific mechanism;
+turn on grid seeding, described next, when it is meant to find the critical surface
+anywhere in the model, since that mode refines up to four competing families with
+the sheet's own circles among them.
+
+A starting circle that cannot be sliced — most often one whose crossing with the
+ground lies above the circle's own center, so the arc would have to rise above
+its center on that side — is not searched from. The search says so in the log
+(`starting circle 1 … cannot be built … searching from the launch grid`) and
+continues from the grid of centers around the circle; the model
+checks report the same circle as `surface.circle_daylights_above_center` before
+the run.
+
 ### Grid Seeding (Global Search)
 
 The adaptive search described above is a **local** optimizer: it refines whatever neighborhood its starting circles put it in, and it will do so even when a far better minimum exists elsewhere. This matters more than it might appear. On an embankment over a layered foundation, a shallow circle in the fill and a deep circle riding the base of the foundation are two *competing families* of failure surface, separated by a ridge of higher factors of safety that the local search will not cross. Started from a single circle in the wrong family, the search converges cleanly — reporting convergence, a stable factor of safety, and a plausible-looking surface — at a value that can be 20% or more too high. Nothing in the output warns you.
@@ -144,7 +170,7 @@ A disclosure whose unsolved trials rank below the reported minimum means the rep
 
 The xslope package provides specialized plotting functions that transform the numerical search results into intuitive visual representations of the failure surface exploration process. These functions leverage matplotlib to create publication-quality figures that overlay the discovered failure surfaces onto the slope geometry.
 
-The `plot_circular_search_results()` function (in xslope/plot.py) creates a comprehensive visualization that begins by plotting all the fundamental slope features—the ground surface profile, subsurface stratigraphy boundaries, maximum depth line, piezometric surface, distributed loads, and tension crack geometry. This establishes the physical context within which the failure surfaces were searched. The function then overlays every circular failure surface stored in the `fs_cache`, plotting them as curved lines. The critical surface (with the minimum factor of safety) is rendered in a bold red line with width 2, while all other explored surfaces are shown as semi-transparent gray lines with reduced width. This visual hierarchy immediately draws attention to the most dangerous surface while still revealing the breadth of the search space that was explored.
+The `plot_circular_search_results()` function (in xslope/plot.py) creates a comprehensive visualization that begins by plotting all the fundamental slope features—the ground surface profile, subsurface stratigraphy boundaries, maximum depth line, piezometric surface, distributed loads, and tension crack geometry. This establishes the physical context within which the failure surfaces were searched. A piezometric line is drawn only where the analysis reads it — as a material's pore-pressure source (`u = piezo`), as the water table a `gamma_sat` weight split is measured from, or as the sheet that states the pool loading the slope — so a line the run never consults does not appear on the figure. The function then overlays every circular failure surface stored in the `fs_cache`, plotting them as curved lines. The critical surface (with the minimum factor of safety) is rendered in a bold red line with width 2, while all other explored surfaces are shown as semi-transparent gray lines with reduced width. This visual hierarchy immediately draws attention to the most dangerous surface while still revealing the breadth of the search space that was explored.
 
 The circle centers are marked with small points, and if the `search_path` was provided, the function plots arrows showing how the optimization algorithm moved from one center location to another. These arrows create a visual trace of the search trajectory, making it easy to see whether the algorithm made large jumps early on before converging with small refinements, or whether it struggled with many small steps. The plot title displays the critical factor of safety value, providing immediate quantitative feedback. The resulting figure uses equal aspect ratio to prevent geometric distortion and includes a legend to identify the different surface types.
 

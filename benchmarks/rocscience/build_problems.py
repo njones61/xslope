@@ -754,7 +754,14 @@ def vp020():
     sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
     sd['piezo_line'] = [(0.0,20.0),(55.0,20.0),(75.0,30.0),(95.0,40.0),(100.0,40.0),(190.0,55.0),(240.0,55.0)]
     sd['circular'] = True
-    sd['circles'] = [{'Xo': 90.0, 'Yo': 60.0, 'Depth': 15.0, 'R': 45.0}]
+    # Starting circle for the toe-focus search: center (90, 100), tangent at
+    # y = 15, daylighting at (57.7, 21.4) on the lower bench and (169.5, 70) on the
+    # crest — both crossings below the center, so the slicer can build it. The
+    # earlier (90, 60, tangent y = 15) met the face at (134.9, 63.25), above its own
+    # center: an arc longer than a semicircle, which produces no failure surface,
+    # so the search ran from that circle's launch grid rather than from the circle.
+    # See preflight rule surface.circle_daylights_above_center.
+    sd['circles'] = [{'Xo': 90.0, 'Yo': 100.0, 'Depth': 15.0, 'R': 85.0}]
     # Non-circular seed for the seam-block mechanism: the local search reaches
     # ~1.08 from here (below the circular minimum); Slide's Monte-Carlo block
     # optimization reaches 1.010 - same search-power gap noted on #19.
@@ -1112,7 +1119,7 @@ def _yamagami_pile_slope(with_pile):
             'x1': 9.0, 'y1': 4.0, 'x2': 9.0, 'y2': -2.0,
             'H': None, 'theta_p': 0.0, 'D_pile': 0.3, 'S': 1.0,
             'E': None, 'I': None, 'area': None,
-            'V_cap': 10.7, 'M_cap': 1.0e6, 'fixity': 'free',   # shear governs; Mcap>0 required
+            'V_cap': 10.7, 'M_cap': 1.0e6, 'head_fixity': 'free',   # shear governs; Mcap>0 required
             # Slide applies the micro-pile shear in the ACTIVE sense (added
             # to the resisting sum un-factored): active reproduces its 1.193
             # on the printed circle (1.185); passive-(/F) gives 1.172.
@@ -1907,7 +1914,14 @@ def vp036():
         {'mat_id': 0, 'coords': [(0.0, 5.0), (5.0, 5.0), (15.0, 15.0), (20.0, 15.0)]},
     ]
     sd['max_depth'] = 0.0
-    sd['circles'] = [{'Xo': 10.0, 'Yo': 20.0, 'Depth': 4.0, 'R': 16.0}]
+    # A toe circle: it daylights at the toe (5, 5) exactly and enters the crest
+    # at x = 19.1.  The textbook placement (Xo halfway between toe and crest,
+    # Yo = toe + 2H, so Xo=10, Yo=25) cannot be used here -- this section is only
+    # as wide as the slope itself, with no flat ground beyond the toe or the
+    # crest, so a circle centered mid-slope runs out through the vertical edges
+    # of the section instead of daylighting on the ground.  Xo is pulled back
+    # over the toe until both ends exit on the ground surface.
+    sd['circles'] = [{'Xo': 5.0, 'Yo': 20.0, 'Depth': 5.0, 'R': 15.0}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp036.xlsx'))
     return 'vp036.xlsx'
 
@@ -2532,7 +2546,7 @@ def vp049():
         'x1': 0.5, 'y1': 30.0, 'x2': 0.5, 'y2': -7.0,
         'H': 5900.0, 'theta_p': 0.0, 'D_pile': 0.5, 'S': 1.0,
         'E': None, 'I': None, 'area': None,
-        'V_cap': None, 'M_cap': None, 'fixity': 'free',
+        'V_cap': None, 'M_cap': None, 'head_fixity': 'free',
         'appl': 'active', 'label': 'soldier pile'}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp049.xlsx'))
     return 'vp049.xlsx'
@@ -2994,7 +3008,7 @@ def _vp106_slope_data(sd_ratio, appl='passive'):
             'x1': 17.5, 'y1': 5.0, 'x2': 17.5, 'y2': -10.0,
             'H': None, 'theta_p': 0.0, 'D_pile': 0.8, 'S': sd_ratio * 0.8,
             'E': None, 'I': None, 'area': None,
-            'V_cap': None, 'M_cap': None, 'fixity': 'free',
+            'V_cap': None, 'M_cap': None, 'head_fixity': 'free',
             'appl': appl, 'label': f'pile row D1={sd_ratio}D',
         }]
     return sd

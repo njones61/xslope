@@ -108,7 +108,8 @@ def check_infer_unit_system():
 
 def check_labels():
     fails = []
-    keys = {"length", "stress", "unit_weight", "force_per_len", "k", "flowrate", "time"}
+    keys = {"length", "stress", "unit_weight", "force_per_len", "k", "flowrate",
+            "time", "inv_length"}
 
     # None -> every key present and empty (legacy/undeclared degrades to bare labels).
     none_lbl = labels(None)
@@ -120,7 +121,8 @@ def check_labels():
     # SI, no time unit: length/stress/unit_weight/force_per_len set; time-bearing empty.
     si = labels("si")
     for k, want in (("length", "m"), ("stress", "kPa"),
-                    ("unit_weight", "kN/m³"), ("force_per_len", "kN/m")):
+                    ("unit_weight", "kN/m³"), ("force_per_len", "kN/m"),
+                    ("inv_length", "1/m")):
         if si[k] != want:
             fails.append(f"labels('si')[{k!r}] = {si[k]!r}, expected {want!r}")
     for k in ("k", "flowrate", "time"):
@@ -130,7 +132,8 @@ def check_labels():
     # Imperial, no time unit.
     imp = labels("imperial")
     for k, want in (("length", "ft"), ("stress", "psf"),
-                    ("unit_weight", "pcf"), ("force_per_len", "lb/ft")):
+                    ("unit_weight", "pcf"), ("force_per_len", "lb/ft"),
+                    ("inv_length", "1/ft")):
         if imp[k] != want:
             fails.append(f"labels('imperial')[{k!r}] = {imp[k]!r}, expected {want!r}")
 

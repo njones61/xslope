@@ -39,6 +39,7 @@ import copy
 import importlib.util
 import io
 import math
+import glob
 import os
 import sys
 
@@ -53,10 +54,36 @@ import matplotlib.pyplot as plt                                      # noqa: E40
 from xslope.fileio import load_slope_data                            # noqa: E402
 from xslope.generators import generate_starting_circles              # noqa: E402
 from xslope.search import circular_search, file_search_window        # noqa: E402
-from xslope.plot import (plot_inputs, plot_solution,                 # noqa: E402
+from xslope.plot import (declared_unit_labels,                       # noqa: E402
+                         plot_inputs, plot_solution,
                          plot_circular_search_results)
 
 OUT_DIR = os.path.join(REPO_ROOT, "docs", "tutorials", "images")
+
+
+#: Sweep results are cached on disk so a redraw (a color, a label, a layout)
+#: does not re-solve two 21-instant searches. Keyed by the model's files' mtimes
+#: plus a caller-supplied tag; lives outside the tree the docs read.
+_SWEEP_CACHE = os.path.join(REPO_ROOT, ".figure_cache")
+
+
+def _sweep_cached(tag, model_path, compute, **kw):
+    import hashlib
+    import pickle
+    base = os.path.splitext(model_path)[0]
+    stamp = "|".join("%s:%s" % (os.path.basename(f), int(os.path.getmtime(f)))
+                     for f in sorted(glob.glob(base + "*")) if os.path.isfile(f))
+    key = hashlib.sha1(("%s|%s|%s" % (tag, stamp, sorted(kw.items()))).encode()).hexdigest()[:16]
+    path = os.path.join(_SWEEP_CACHE, "%s_%s.pkl" % (tag, key))
+    if os.path.exists(path):
+        with open(path, "rb") as fh:
+            print("   cache       %s read from %s" % (tag, os.path.relpath(path, REPO_ROOT)))
+            return pickle.load(fh)
+    res = compute()
+    os.makedirs(_SWEEP_CACHE, exist_ok=True)
+    with open(path, "wb") as fh:
+        pickle.dump(res, fh)
+    return res
 
 #: The tutorial's model is the sample's model — one file, two pages (the tutorial
 #: builds it, ``docs/lem/samples.md`` catalogues it). Nothing is copied.
@@ -327,36 +354,6 @@ def _hold_show():
         plt.show = orig
 
 
-def _lem02_problem_sketch(model):
-    """The page's opening sketch: the section, the surcharge, and the numbers.
-
-    ``frame="content"`` crops the panel to the model rather than padding the
-    section out to the figure's aspect. The strength and the load are read off
-    the model rather than written here, so the sketch cannot print a property
-    the file does not carry.
-    """
-    with _hold_show():
-        plot_inputs(model, title="Slope Geometry and Inputs", frame="content")
-    ax = plt.gcf().axes[0]
-    mat = model["materials"][0]
-    ax.text(30.0, 9.0,
-            "γ = %g pcf\nc = %g psf\nφ = %g" % (mat["gamma"], mat["c"],
-                                                          mat["phi"]),
-            ha="center", va="center", fontsize=11)
-    band = model["dloads"][0]
-    x0, x1 = band[0]["X"], band[-1]["X"]
-    q = max(pt["Normal"] for pt in band)
-    crest = max(pt["Y"] for pt in band)
-    top = crest + q / model["gamma_water"]        # how tall plot_dloads draws it
-    # The strip's width is dimensioned BELOW the loaded surface, where nothing
-    # else is drawn: above it the arrows run to the top of the frame.
-    ax.annotate("", xy=(x0, crest - 1.6), xytext=(x1, crest - 1.6),
-                arrowprops=dict(arrowstyle="<->", color="0.25", linewidth=1.0))
-    ax.text(0.5 * (x0 + x1), crest - 2.2, "%g ft" % (x1 - x0),
-            ha="center", va="top", fontsize=10, color="0.25")
-    ax.text(x1 + 1.5, 0.5 * (crest + top), "%g psf" % q,
-            ha="left", va="center", fontsize=11)
-
 
 def _lem02_search(model, method="spencer"):
     with contextlib.redirect_stdout(io.StringIO()):
@@ -403,9 +400,7 @@ def lem02_plots():
     # starting circle dropped. A trial circle is a step toward the answer rather
     # than part of the question, and the figure a reader decides the page by should
     # carry only what they are being asked about.
-    problem = copy.deepcopy(sd)
-    problem["circles"], problem["circular"] = [], False
-    capture("lem02_problem.png", _lem02_problem_sketch, problem)
+    # The problem figure is the hand drawing crest_surcharge.fodg (private repo).
 
     # Where the three paths rejoin: the same model with the circle back.
     capture("lem02_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
@@ -845,35 +840,6 @@ def lem06_sheets():
     render("lem06_sheet_circles.png", LEM06, "circles", rows=(1, 6), cols="A:H")
 
 
-def _lem06_problem_sketch(model):
-    """The page's opening sketch: the two zones, their strengths, and the base.
-
-    The starting circles are dropped from the model the sketch is drawn on — the
-    sketch states the problem, and the circles are an input the reader has not
-    entered yet. The strengths are read off the file rather than written here, so
-    the sketch cannot print a property the model does not carry.
-    """
-    bare = copy.deepcopy(model)
-    bare["circles"], bare["circular"] = [], False
-    with _hold_show():
-        plot_inputs(bare, title="Slope Geometry and Inputs", frame="content")
-    ax = plt.gcf().axes[0]
-    embankment, foundation = model["materials"][0], model["materials"][1]
-    # Each label sits inside the zone it names, where that zone is thickest: the
-    # embankment under its level crest, the foundation at the left edge where the
-    # base has dipped away from it and nothing else is drawn.
-    ax.text(80.0, 10.0, "%s\nγ = %g pcf\nc = %g psf\nφ = %g"
-            % (embankment["name"], embankment["gamma"], embankment["c"],
-               embankment["phi"]),
-            ha="center", va="center", fontsize=10)
-    ax.text(-25.0, -7.5, "%s\nγ = %g pcf\nc = %g psf\nφ = %g"
-            % (foundation["name"], foundation["gamma"], foundation["c"],
-               foundation["phi"]),
-            ha="center", va="center", fontsize=10)
-    # The two ends of the dipping base, called out below the hatching that draws it.
-    ax.text(-49.0, -17.5, "El. −15", ha="left", va="top", fontsize=10, color="0.25")
-    ax.text(119.0, -8.0, "El. −5", ha="right", va="top", fontsize=10, color="0.25")
-
 
 def lem06_plots():
     """The states LEM-6 reads, in the order the page walks them.
@@ -886,7 +852,7 @@ def lem06_plots():
     """
     sd = load_slope_data(LEM06)
 
-    capture("lem06_problem.png", _lem06_problem_sketch, sd)
+    # The problem figure is the hand drawing sloping_bottom.fodg (private repo).
     capture("lem06_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
 
     fs_cache, path, circles = _lem06_search(sd)
@@ -943,9 +909,10 @@ def lem08_sheets():
     """The five worksheets LEM-8's Excel path fills.
 
     ``reinforce`` is the one this page is about. Its window runs from the
-    column-name row (row 2) to column R, the last input column — the six lines
-    plus two blank rows under them, so the block reads as unfilled below the
-    last line. Columns beyond R hold the Type preset's lookup table, which is
+    column-name row (row 2) to column Q, the last column a limit equilibrium run
+    reads — the six lines plus two blank rows under them, so the block reads as
+    unfilled below the last line. Columns R:T (Tres, E, Area) are read only by
+    the finite element engine, and the Type preset's lookup table beyond them is
     the sheet's own machinery rather than an input.
 
     ``mat`` and ``profile`` take LEM-3's frames — the same two-material shape,
@@ -957,7 +924,7 @@ def lem08_sheets():
     render("lem08_sheet_profile.png", LEM08, "profile", rows=(1, 13), cols="A:H")
     render("lem08_sheet_dloads.png", LEM08, "dloads", rows=(4, 10), cols="A:H")
     # LEM problem: the render stops before the FEM-only columns (Tres, E, Area).
-    render("lem08_sheet_reinforce.png", LEM08, "reinforce", rows=(2, 10), cols="A:O")
+    render("lem08_sheet_reinforce.png", LEM08, "reinforce", rows=(2, 10), cols="A:Q")
     render("lem08_sheet_circles.png", LEM08, "circles", rows=(1, 5), cols="A:H")
 
 
@@ -1058,10 +1025,11 @@ def lem08_lengths():
                                                         r.get("tend1", 0.0),
                                                         r.get("tend2", 0.0))))
         print("   %2d ft  FS %.4f  ΣT %5.0f  crossings %d  (Xo %.2f Yo %.2f "
-              "depth %.3f)  nearest end %s"
+              "depth %.3f)  each crossing (x, ft to nearer end, T) %s"
               % (length, crit["FS"], crit["slices"]["p"].sum(), crossed,
                  crit["Xo"], crit["Yo"], crit["Depth"],
-                 " ".join("%.1f" % d for _x, d, _t in tension)))
+                 " ".join("(%.2f, %.1f, %.0f)" % (x, d, t)
+                          for x, d, t in tension)))
         if length == LEM08_LENGTHS[0]:
             capture("lem08_solution_short.png", plot_solution, model,
                     crit["slices"], crit["failure_surface"],
@@ -1117,30 +1085,6 @@ def _lem09_wedge(model, method=LEM09_METHOD):
     return slice_df, surface, result
 
 
-def _lem09_problem_sketch(model):
-    """The page's opening sketch: the wall, the two layers, the two tiebacks.
-
-    The strengths are read off the model, so the sketch cannot print a property
-    the file does not carry, and the wall height is measured from the profile
-    line's own vertical run rather than written here.
-    """
-    with _hold_show():
-        plot_inputs(model, title="Slope Geometry and Inputs", frame="content")
-    ax = plt.gcf().axes[0]
-    for mat, (x, y) in zip(model["materials"], ((135.0, 62.0), (95.0, 20.0))):
-        ax.text(x, y, "%s\nγ = %g pcf\nc = %g psf\nφ = %g" % (
-            mat["name"], mat["gamma"], mat["c"], mat["phi"]),
-            ha="center", va="center", fontsize=10)
-    face = [pt for pt in model["profile_lines"][1]["coords"] if pt[0] == 0.0]
-    top = max(y for _, y in face)
-    ax.annotate("", xy=(-6.0, 0.0), xytext=(-6.0, top),
-                arrowprops=dict(arrowstyle="<->", color="0.25", linewidth=1.0))
-    ax.text(-7.5, 0.5 * top, "%g ft wall" % top, ha="right", va="center",
-            rotation=90, fontsize=10, color="0.25")
-    for line in model["reinforcement_lines"]:
-        ax.text(line["x2"] + 2.0, line["y2"], "%s lb/ft" % f"{line['t_max']:,.0f}",
-                ha="left", va="center", fontsize=10)
-
 
 def lem09_sheets():
     """The five worksheets LEM-9's Excel path fills.
@@ -1155,7 +1099,7 @@ def lem09_sheets():
     render("lem09_sheet_profile.png", LEM09, "profile", rows=(1, 14), cols="A:H")
     render("lem09_sheet_noncirc.png", LEM09, "non-circ", rows=(1, 6), cols="A:F")
     render("lem09_sheet_reinforce.png", LEM09, "reinforce", rows=(2, 6), cols="A:O")
-    # LEM problem: stop before the FEM-only pile columns (E, I, Area, Fixity).
+    # LEM problem: stop before the FEM-only pile columns (E, I, Area, Head, Tip).
     render("lem09_sheet_piles.png", LEM09, "piles", rows=(2, 6), cols="A:M")
 
 
@@ -1177,9 +1121,7 @@ def lem09_plots():
     # The sketch a reader decides the page by carries the question, not a step
     # toward the answer: the entered wedge is dropped from it, as LEM-2 drops its
     # starting circle.
-    problem = copy.deepcopy(sd)
-    problem["non_circ"] = []
-    capture("lem09_problem.png", _lem09_problem_sketch, problem)
+    # The problem figure is the hand drawing tieback_wall.fodg (private repo).
 
     capture("lem09_inputs.png", plot_inputs, sd, title="Slope Geometry and Inputs")
 
@@ -1767,6 +1709,371 @@ def _interp(x, xs, ys):
             t = (x - xs[i]) / (xs[i + 1] - xs[i])
             return ys[i] + t * (ys[i + 1] - ys[i])
     return ys[-1] if x > xs[-1] else ys[0]
+
+
+# --------------------------------------------------------------------------- #
+# LEM-13 — Rock Slope (Hoek-Brown)
+#
+# One section, written by ``tools/build_rock_slope.py`` from the verification
+# corpus: Hammah et al.'s badly broken rock mass (GSI = 5, exponent a = 0.619),
+# the only Hoek-Brown problem locked in both engines. Part A solves it by Spencer's
+# method and then by strength reduction, and runs the page's units trap on it —
+# sigma_ci typed as the 30 the paper prints rather than the 30,000 kPa the model
+# wants. Part B sweeps the two field inputs that decide the answer, GSI and the
+# disturbance factor D, through the same Design sweep Studio's Parametric dialog
+# runs, and draws each with the plotting functions Studio itself calls so the
+# figure and the reader's screen are the same picture.
+#
+# The envelope figure is drawn straight through ``hoekbrown.hb_tangent`` — the same
+# instantaneous tangent the solvers consume — so the curve on the page and the
+# strength in the answer cannot disagree.
+# --------------------------------------------------------------------------- #
+LEM13_A = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope.xlsx")
+LEM13_SLICES = 40
+#: Part B's two sweeps, at the bounds and step counts the page's Parametric dialog
+#: is set to. GSI runs the full field range of the index; D runs its whole range,
+#: undisturbed to heavily blast-damaged, at the file's own GSI.
+#:
+#: GSI is swept to 20 rather than to the index's full 100, for a measured reason.
+#: The factor of safety crosses the 1.5 design target between GSI 5 and 15 (1.152
+#: and 2.185), so everything the sweep has to say happens in the bottom fifth of
+#: the range. Above it the slope simply cannot fail, and a search over a slope that
+#: cannot fail wanders the whole domain before it settles: one search costs 53 s at
+#: GSI 5 and 66 s at GSI 15, but had not finished after five minutes at GSI 25.
+#: Six steps to 20 resolve the knee, bracket the target, and keep the run something
+#: a reader will sit through.
+LEM13_GSI_RANGE = (5.0, 20.0, 6)
+LEM13_D_RANGE = (0.0, 1.0, 5)
+#: The design target both sweeps are read against — the Parametric dialog's own
+#: default, and the factor of safety a permanent rock cut is usually asked for.
+LEM13_TARGET_FS = 1.5
+#: The three rock masses the envelope figure compares: the file's own GSI, a
+#: middling one, and a lightly jointed mass, all at the file's sigma_ci, mi and D
+#: so the only thing separating the curves is the index.
+LEM13_GSI_CURVES = (5.0, 30.0, 70.0)
+#: Part A's deliberate mis-entry — the slip the sigma_ci units check exists to
+#: catch. Hammah's rock is 30 MPa, which this model states as 30,000 kPa; a reader
+#: copying the number off the paper types 30, and the rock mass comes out a thousand
+#: The strength reduction Part A's second half runs, at the settings the completed
+#: file declares and the SSRM lock tag names: tri6 at a 0.9 m target size, the
+#: bracket [0.8, 1.6], a 0.01 tolerance and K0 = 1. The per-trial iteration
+#: budget is the Run FEM dialog's own 12,000 rather than the lock tag's 16,000:
+#: the budget extends itself while a trial is still converging, so the answer is
+#: the same and the figures are drawn at the settings the page's instructions
+#: leave on the dialog.
+LEM13_TOLERANCE = 0.01
+LEM13_MAX_ITERATIONS = 12000
+LEM13_CRITERION = "non_convergence"
+
+
+def _lem13_search(model, method, num_slices=LEM13_SLICES):
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _, _ = circular_search(
+            copy.deepcopy(model), method, num_slices=num_slices, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache[0]
+
+
+def _lem13_ucs(mat):
+    """The rock MASS's unconfined strength, sigma_ci * s**a — what a Hoek-Brown
+    material has left at zero confinement, and the quantity a sigma_ci slip scales
+    straight through."""
+    from xslope.hoekbrown import hb_constants
+
+    _mb, s, a = hb_constants(mat["hb_gsi"], mat["hb_mi"], mat["hb_d"])
+    return float(mat["hb_sci"] * s ** a)
+
+
+def _lem13_reading(crit):
+    """The numbers the page quotes off one search: the factor of safety, the circle,
+    the surface it stands on, and the strength it mobilized.
+
+    The last pair is what a Hoek-Brown page is about. Every slice base carries its
+    own instantaneous tangent, taken at that slice's converged normal stress, so the
+    length-weighted mean of ``c`` and ``phi`` over the slices is the equivalent
+    Mohr-Coulomb pair the criterion supplied along this surface — and the spread
+    between the softest and the steepest slice is the curvature the envelope has.
+    """
+    s = crit["slices"]
+    dl = s["dl"]
+    sig = s["n_eff"] / dl
+    return ("FS %.4f · Xo %.4f Yo %.4f · tangent elev %.4f · R %.4f · L %.2f · "
+            "ΣW %.1f · σn′ %.2f–%.2f (mean %.2f) · c_i %.2f–%.2f (mean %.2f) · "
+            "φ_i %.1f–%.1f° (mean %.1f°)"
+            % (crit["FS"], crit["Xo"], crit["Yo"], crit["Depth"],
+               crit["Yo"] - crit["Depth"], dl.sum(), s["w"].sum(),
+               sig.min(), sig.max(), (sig * dl).sum() / dl.sum(),
+               s["c"].min(), s["c"].max(), (s["c"] * dl).sum() / dl.sum(),
+               s["phi"].min(), s["phi"].max(), (s["phi"] * dl).sum() / dl.sum()))
+
+
+def _lem13_daylight(crit):
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    return "entry (%.2f, %.2f) exit (%.2f, %.2f)" % (xs[0], ys[0], xs[-1], ys[-1])
+
+
+def _lem13_envelopes(crit):
+    """The Hoek-Brown envelope, drawn from the same tangent routine the solvers
+    call, as two figures: Part A's and Part B's.
+
+    The first is the file's own envelope over the stress range its
+    critical surface generates, with the instantaneous tangent at the mean base
+    normal stress drawn across it — the straight line the method of slices actually
+    solves with. The second is the same rock at three values of GSI and nothing else
+    changed, which is the picture behind Part B's sweep: the index moves s and the
+    exponent a together, and the envelope it produces is a different curve rather
+    than the same curve scaled.
+    """
+    import numpy as np
+
+    from xslope.hoekbrown import hb_constants, hb_tangent
+
+    a = load_slope_data(LEM13_A)["materials"][0]
+
+    fig1, ax1 = plt.subplots(figsize=(7.0, 5.0))
+    fig2, ax2 = plt.subplots(figsize=(7.0, 5.0))
+
+    # ---- left: Part A's envelope in its own stress units --------------------- #
+    sig = np.linspace(0.0, 90.0, 400)
+    c_i, phi_i = hb_tangent(sig, a["hb_sci"], a["hb_gsi"], a["hb_mi"], a["hb_d"])
+    tau = c_i + sig * np.tan(np.radians(phi_i))
+    ax1.plot(sig, tau, color="#c0392b", lw=2.2,
+             label="Hoek-Brown envelope, GSI = 5")
+
+    #: The mean effective normal stress on the critical surface, which is where the
+    #: tangent the page quotes is taken. Taken from the search the caller already
+    #: ran rather than restated, so the line on the figure follows the answer on
+    #: the page and the search is not paid for twice.
+    s = crit["slices"]
+    sig_bar = float((s["n_eff"]).sum() / s["dl"].sum())
+    c_bar, phi_bar = hb_tangent(sig_bar, a["hb_sci"], a["hb_gsi"], a["hb_mi"],
+                                a["hb_d"])
+    c_bar, phi_bar = float(c_bar), float(phi_bar)
+    line = c_bar + sig * np.tan(np.radians(phi_bar))
+    ax1.plot(sig, line, color="#2c3e50", lw=1.6, ls="--",
+             label="instantaneous tangent at σn′ = %.0f kPa\n(c_i = %.1f kPa, "
+                   "φ_i = %.1f°)" % (sig_bar, c_bar, phi_bar))
+    ax1.plot([sig_bar], [c_bar + sig_bar * np.tan(np.radians(phi_bar))], "o",
+             color="#2c3e50", ms=6)
+    ax1.axvspan(float((s["n_eff"] / s["dl"]).min()),
+                float((s["n_eff"] / s["dl"]).max()), color="#f1c40f", alpha=0.18,
+                label="σn′ range on the critical surface")
+    ax1.set_xlabel("σn′  effective normal stress  (kPa)")
+    ax1.set_ylabel("τ  shear strength  (kPa)")
+    ax1.set_title("The rock mass as entered\nσci = 30,000 kPa, GSI = 5, "
+                  "mi = 2, a = %.3f" % hb_constants(a["hb_gsi"], a["hb_mi"],
+                                                    a["hb_d"])[2])
+    ax1.set_xlim(0, 90)
+    ax1.set_ylim(bottom=0)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(loc="upper left", fontsize=8.5)
+
+    # ---- right: the same rock at three values of GSI -------------------------- #
+    for gsi, color in zip(LEM13_GSI_CURVES, ("#c0392b", "#e67e22", "#2980b9")):
+        mb, sc, ex = hb_constants(gsi, a["hb_mi"], a["hb_d"])
+        c_i, phi_i = hb_tangent(sig, a["hb_sci"], gsi, a["hb_mi"], a["hb_d"])
+        ax2.plot(sig, c_i + sig * np.tan(np.radians(phi_i)), color=color, lw=2.2,
+                 label="GSI = %g\nmb = %.3f, s = %.2e, a = %.3f"
+                       % (gsi, mb, sc, ex))
+    ax2.set_xlabel("σn′  effective normal stress  (kPa)")
+    ax2.set_ylabel("τ  shear strength  (kPa, log scale)")
+    ax2.set_title("The same rock at three values of GSI\nσci = 30,000 kPa, "
+                  "mi = 2, D = 0 throughout")
+    ax2.set_xlim(0, 90)
+    # A log strength axis, because the three curves span two orders of magnitude:
+    # on a linear axis GSI = 70 flattens the other two onto the floor and the
+    # comparison the panel exists for cannot be read at all.
+    ax2.set_yscale("log")
+    ax2.grid(True, which="both", alpha=0.3)
+    ax2.legend(loc="lower right", fontsize=8.5)
+
+    for fig, name in ((fig1, "lem13_envelope.png"), (fig2, "lem13_gsi_envelopes.png")):
+        fig.tight_layout()
+        fig.savefig(os.path.join(OUT_DIR, name), dpi=200, bbox_inches="tight")
+        plt.close(fig)
+        print("-> " + name)
+    print("   envelope A  σn′ %.2f mean · tangent c_i %.3f kPa φ_i %.2f°"
+          % (sig_bar, c_bar, phi_bar))
+    for gsi in LEM13_GSI_CURVES:
+        mb, sc, ex = hb_constants(gsi, a["hb_mi"], a["hb_d"])
+        print("   constants GSI %-4g mb %.5f · s %.4e · a %.4f · unconfined "
+              "σci·s^a %.4f kPa" % (gsi, mb, sc, ex, a["hb_sci"] * sc ** ex))
+
+
+def lem13_plots():
+    """Part A's limit equilibrium runs — the correct entry — and the
+    envelope figure.
+
+    Printed rather than drawn: every search's factor of safety, its circle, the
+    surface length and sliding mass, and the range of instantaneous cohesion and
+    friction angle the criterion supplied along that surface. The strength-reduction
+    half is ``lem13_ssrm`` and Part B's sweeps are ``lem13_sweeps``; all three run
+    on the same file.
+    """
+    # ---- Part A: Hammah's weak rock mass ------------------------------------- #
+    a = load_slope_data(LEM13_A)
+    capture("lem13_inputs.png", plot_inputs, a, title="Slope Geometry and Inputs")
+
+    crit_b = _lem13_search(a, "bishop")
+    crit_s = _lem13_search(a, "spencer")
+    capture("lem13_spencer.png", plot_solution, a, crit_s["slices"],
+            crit_s["failure_surface"], crit_s["solver_result"])
+    print("   A bishop   %s" % _lem13_reading(crit_b))
+    print("   A spencer  %s" % _lem13_reading(crit_s))
+    print("   A spencer  %s" % _lem13_daylight(crit_s))
+
+
+    # ---- the envelope the answer came off ------------------------------------ #
+    _lem13_envelopes(crit_s)
+
+
+def _lem13_sweep(name, param, low, high, steps):
+    """One Design sweep, drawn the way Studio draws it.
+
+    ``xslope.sensitivity.design`` is the function the Parametric dialog's runner
+    calls, and ``plot_sensitivity`` + ``annotate_design_crossing`` are the two the
+    result canvas calls (``studio/main_window.py``, ``MplCanvas.render_design``), so
+    the figure on the page is the picture on the reader's screen rather than a
+    lookalike of it. Returns the design() result so the caller can print it.
+    """
+    import time
+
+    from xslope.plot import annotate_design_crossing, plot_sensitivity
+    from xslope.sensitivity import design
+
+    model = load_slope_data(LEM13_A)
+    t0 = time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = design(model, param=param, low=low, high=high, steps=steps,
+                         target_fs=LEM13_TARGET_FS, mode="lem", method="spencer",
+                         search=True, num_slices=LEM13_SLICES, debug_level=0)
+    if not ok:
+        raise RuntimeError(res)
+    # No title of our own: plot_sensitivity names the swept reference itself, and
+    # that caption is what Studio's result canvas shows, so overriding it here would
+    # put a figure on the page the reader never sees.
+    fig = plt.figure(figsize=(8.5, 5.0))
+    plot_sensitivity(res["df"], target_fs=LEM13_TARGET_FS, fig=fig)
+    annotate_design_crossing(fig.axes[0], LEM13_TARGET_FS, res)
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT_DIR, name), dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print("-> %s  (%.0f s)" % (name, time.time() - t0))
+    return res
+
+
+def _lem13_sweep_reading(tag, res, mi, d=None, gsi=None):
+    """Every swept point, with the rock-mass constants that produced it.
+
+    The constants are printed beside the factor of safety because they are the
+    mechanism: the page claims GSI has its leverage through s and a, and a reader
+    checking that claim needs the three numbers at each step, not just the curve.
+    """
+    from xslope.hoekbrown import hb_constants
+
+    cross = res.get("crossing")
+    print("   %s target FS %.2f · bracketed %s · crossing %s · FS range %s"
+          % (tag, LEM13_TARGET_FS, res.get("bracketed"),
+             ("%.3f" % cross) if cross is not None else "none",
+             res.get("fs_range")))
+    if res.get("message"):
+        print("      %s" % str(res["message"])[:150])
+    for _i, row in res["df"].iterrows():
+        v = float(row["value"])
+        mb, sc, ex = hb_constants(gsi if gsi is not None else v, mi,
+                                  d if d is not None else v)
+        print("      %-7s %-7g FS %-9s mb %.5f  s %.4e  a %.4f  ucs %.5f kPa"
+              % (row["param"], v,
+                 ("%.4f" % row["fs"]) if row.get("success", True) else "FAILED",
+                 mb, sc, ex, 30000.0 * sc ** ex))
+
+
+def lem13_sweeps():
+    """Part B: which of the four field inputs moves the answer.
+
+    Two Design sweeps on the same file — the Geological Strength Index across its
+    whole field range, and the disturbance factor across its whole range at the
+    file's own GSI — each drawn with the functions Studio's own result canvas
+    calls. Printed: every swept point with the rock-mass constants behind it, and
+    the interpolated value where the curve meets the design target.
+    """
+    gsi_lo, gsi_hi, gsi_n = LEM13_GSI_RANGE
+    res_gsi = _lem13_sweep("lem13_gsi_sweep.png", "mat:rock:hb_gsi",
+                           gsi_lo, gsi_hi, gsi_n)
+    _lem13_sweep_reading("GSI ", res_gsi, mi=2.0, d=0.0)
+
+    d_lo, d_hi, d_n = LEM13_D_RANGE
+    res_d = _lem13_sweep("lem13_d_sweep.png", "mat:rock:hb_d", d_lo, d_hi, d_n)
+    _lem13_sweep_reading("D   ", res_d, mi=2.0, gsi=5.0)
+
+
+def lem13_ssrm():
+    """Part A through the finite element engine: the mesh, the strength reduction,
+    and the result panels at the captured failure state.
+
+    The mesh and the bracket are read from the completed file rather than restated,
+    so the figures cannot be drawn at a discretization the workbook does not
+    declare. Printed: the mesh counts, every bisection trial, and the factor of
+    safety with the bracket it came from.
+    """
+    import time
+
+    import numpy as np
+
+    from xslope.fem import build_fem_data, solve_ssrm
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+    from xslope.plot_fem import plot_fem_data, plot_fem_results
+
+    model = load_slope_data(LEM13_A)
+    with contextlib.redirect_stdout(io.StringIO()):
+        mesh = build_mesh_from_polygons(get_material_polygons(model),
+                                        model["target_size"],
+                                        model["element_type"],
+                                        size_regions=extract_size_regions(model))
+    nodes = np.asarray(mesh["nodes"])
+    fem_data = build_fem_data(model, mesh)
+    print("   mesh        %d nodes · %d elements · every element %s at target "
+          "size %g m" % (len(nodes), len(mesh["elements"]), model["element_type"],
+                         model["target_size"]))
+    capture("lem13_mesh.png", plot_fem_data, fem_data)
+
+    log = io.StringIO()
+    t0 = time.time()
+    with contextlib.redirect_stdout(log):
+        result = solve_ssrm(fem_data, F_min=model["ssrm_f_min"],
+                            F_max=model["ssrm_f_max"], tolerance=LEM13_TOLERANCE,
+                            debug_level=1, failure_criterion=LEM13_CRITERION,
+                            max_iterations=LEM13_MAX_ITERATIONS,
+                            k0=model.get("k0"))
+    print("   SSRM        FS %.4f from the bracket [%.4f, %.4f] (width %.4f) after "
+          "%d bisection steps · %.1f s wall"
+          % (result["FS"], result["final_interval"][0], result["final_interval"][1],
+             result["interval_width"], result["iterations_ssrm"], time.time() - t0))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s iterations"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+
+    last, fail = result["last_solution"], result.get("failure_solution")
+    for label, field in (("last converged", last), ("at failure", fail)):
+        if field is None:
+            print("   %-13s none" % label)
+            continue
+        u = np.asarray(field["displacements"]).reshape(-1, 2)
+        umag = np.hypot(u[:, 0], u[:, 1])
+        i = int(np.argmax(umag))
+        print("   %-13s F %.4f · %s in %s iterations · max|u| %.5f m at (%.2f, %.2f)"
+              % (label, field.get("F", float("nan")),
+                 "equilibrium" if field.get("converged") else "no equilibrium",
+                 field.get("iterations"), umag.max(), nodes[i, 0], nodes[i, 1]))
+
+    # Two panels, not the FEM pages' three: this section is a cross-check of one
+    # number against the limit equilibrium answer, so the mechanism and the
+    # direction it moved in are what the prose reaches for.
+    for name, kind in (("lem13_shear_strain.png", "shear_strain"),
+                       ("lem13_displacement_vectors.png", "displace_vector")):
+        capture(name, plot_fem_results, fem_data, last, plot_type=kind,
+                fs=result["FS"], failure_solution=fail, field_state="failure")
 
 
 # --------------------------------------------------------------------------- #
@@ -2462,14 +2769,15 @@ def _seep02_figsize(mesh):
     return (11.0, max(2.6, 11.0 * 0.80 * (height / width) + 2.05))
 
 
-def _seep02_stack(name, panels, dpi=200):
+def _stack_panels(name, panels, dpi=200):
     """Several already-rendered figures stacked into one image.
 
-    The base-material comparison has to show three flow nets drawn by
+    SEEP-2's base-material comparison has to show three flow nets drawn by
     ``plot_seep_solution`` itself — the point being what that function does with the
     argument — and it draws one figure at a time. So each panel is rendered on its
     own and the three are laid up here, which keeps every panel the tool's own
-    output rather than a redrawing of it.
+    output rather than a redrawing of it. SEEP-3's frame series is the same shape of
+    problem, one instant per panel, and uses the same helper.
     """
     import numpy as np
 
@@ -2716,7 +3024,7 @@ def seep02_plots():
                               fill_contours=False, mesh=False))
     print("   flownet_base_material picks %d"
           % flownet_base_material(seep_data, solution, levels=SEEP02_LEVELS))
-    _seep02_stack("seep02_base_mat.png", panels)
+    _stack_panels("seep02_base_mat.png", panels)
 
     # ---- the three unsaturated models ------------------------------------- #
     from xslope.seep import kr_gardner_vec, kr_vg_vec
@@ -2885,6 +3193,3543 @@ def seep02_plots():
     capture("seep02_core_sweep.png", _seep02_core_figure, core_series)
 
 
+# --------------------------------------------------------------------------- #
+# SEEP-3 — Transient Seepage: Reservoir Drawdown Through a Cored Earth Dam
+#
+# The first page on which the answer is a sequence rather than a field. The model is
+# the cored earth dam of docs/seep/samples.md #8, in the tutorial's own sidecar-free
+# copy: a granular shell around a compacted clay core, a full pool at el 18 held
+# against the upstream face, a tailwater at el 2, and a reservoir drawn down to the
+# tailwater over 45 days.
+#
+# Every figure here is one of two runs. The steady solve at full pool is the initial
+# condition — the state the dam is in before anything moves, and the state the
+# transient march starts from. The march itself produces the frame series and the
+# time histories, and it is run through the same ``run_transient_seepage`` call the
+# Studio runner makes, on the mesh the page's Build Mesh step produces.
+#
+# The lesson the figures have to carry is the LAG: the pool falls in 45 days, the
+# shell follows it within days, and the core does not. The frame series shows it as
+# a shape and the history shows it as numbers, so both are drawn from the same
+# march rather than from two.
+# --------------------------------------------------------------------------- #
+SEEP03 = os.path.join(REPO_ROOT,
+                      "docs/tutorials/files/xslope_earth_dam_drawdown.xlsx")
+#: The mesh, in the Build mesh dialog's own controls: tri3 (the seepage default),
+#: auto-sized at 64 divisions across the 110 m section — the 1.71875 m target the
+#: sample page's own transient figures are computed at.
+SEEP03_DIVISIONS = 64
+SEEP03_ELEMENT = "tri3"
+#: Contour count. Twelve, the count the sample's frame panels use: a transient frame
+#: is not a flow net (see below), so the level count is a readability choice rather
+#: than the flow-channel arithmetic SEEP-1 and SEEP-2 do with it.
+SEEP03_LEVELS = 12
+#: The flow net's base material for the STEADY figure, 1-based into the mat sheet:
+#: 2 is the core, which is what the steady sibling sample (Problem 3) is drawn with.
+SEEP03_BASE_MAT = 2
+#: Per-panel figure size for the stacked frame series, sized to this dam's aspect —
+#: the same panel size the sample's own series figure uses.
+SEEP03_PANEL_SIZE = (8.6, 2.55)
+#: The instants the frame series is drawn at, and what each one is. Full pool is the
+#: initial condition; 15 is mid-drawdown, with the pool already a few metres below the
+#: interior surface; 47 is the end of the drawdown, where the lag is largest; 120 is
+#: the recovery, where the interior mound is draining toward the new steady state.
+SEEP03_FRAMES = ((0.0, "full pool — the initial condition"),
+                 (15.0, "mid drawdown"),
+                 (47.0, "end of drawdown — the largest lag"),
+                 (120.0, "recovery toward the new steady state"))
+#: Vertical stations the phreatic surface is read at, upstream toe to downstream toe.
+#: 46 / 54.5 / 63 straddle the core (its base runs from x = 46 to x = 63), so the
+#: three of them measure what the core is holding against what the shell has let go.
+SEEP03_STATIONS = (10.0, 20.0, 30.0, 40.0, 46.0, 50.0, 54.5, 59.0, 63.0, 70.0,
+                   80.0, 90.0, 100.0)
+#: The three nodes the head history is read at, as target points the mesh is
+#: searched near. One inside the clay core and one in the upstream shell at the SAME
+#: elevation, so the two traces are a like-for-like comparison and their crossing is
+#: the lag itself; the third is in the downstream shell, which the drawdown reaches
+#: last. The producer prints the node ids and the coordinates it actually found.
+SEEP03_NODES = (("clay core", (54.5, 9.0), "#b5460f"),
+                ("upstream shell", (30.0, 9.0), "#1f6fb4"),
+                ("downstream shell", (75.0, 6.0), "#3f8f5a"))
+
+
+def _seep03_mesh(model, divisions=SEEP03_DIVISIONS, element_type=SEEP03_ELEMENT):
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    xs = [x for x, _ in model["ground_surface"].coords]
+    size = (max(xs) - min(xs)) / divisions
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model), size, element_type,
+            size_regions=extract_size_regions(model))
+
+
+def _seep03_steady_model(model):
+    """``model`` with the reservoir boundary pinned at its own t = 0 level, in memory
+    only — the initial condition as a steady problem.
+
+    The transient solver's initial condition IS a steady solve at the t = 0 boundary
+    configuration, and at t = 0 the whole submerged face stands below full pool, so a
+    submerged-only reservoir at el 18 and a fixed head of 18 are the same boundary.
+    Pinning it here is what lets the page run the initial condition as an ordinary
+    steady analysis and read a flowrate off it, which a series-bound value has none of.
+    """
+    bc = {k: (list(v) if isinstance(v, list) else v)
+          for k, v in model["seepage_bc"].items()}
+    heads = [dict(h) for h in bc["specified_heads"]]
+    heads[0] = dict(heads[0], kind="head",
+                    head=float(model["tseep"]["series"]["pool"][0]))
+    bc["specified_heads"] = heads
+    return dict(model, seepage_bc=bc, tseep=None)
+
+
+def _seep03_solve(model, mesh, tol=1e-4, max_iter=400):
+    """One steady seepage solve, returning ``(seep_data, solution, log)`` — the same
+    shape SEEP-2's solver helper returns, and for the same reason: on an unconfined
+    problem the iteration history is half the result."""
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        seep_data = build_seep_data(mesh, model)
+        solution = run_seepage_analysis(seep_data, tol=tol, max_iter=max_iter)
+    return seep_data, solution, buf.getvalue()
+
+
+def _seep03_march(model, mesh):
+    """The transient march, returning ``(seep_data, solution, frames, log)``.
+
+    ``run_transient_seepage`` is the call Studio's ``SeepRunner`` makes, and the
+    per-frame plottable dicts are rebuilt with the same ``_transient_frame_solution``
+    the runner uses, so the frames this producer draws are the frames the reader's
+    play bar shows.
+    """
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             run_transient_seepage, _transient_frame_solution)
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        seep_data = build_seep_data(mesh, model, seep_bc=1)
+        solution = run_transient_seepage(seep_data, build_tseep_data(model),
+                                         verbose=True)
+    unconfined = bool(solution.get("unconfined", False))
+    frames = [_transient_frame_solution(seep_data, fr["head"], fr["u"],
+                                        fr.get("phi"), fr.get("inflow"),
+                                        fr.get("outflow"), unconfined,
+                                        time=fr["time"])
+              for fr in solution["frames"]]
+    return seep_data, solution, frames, buf.getvalue()
+
+
+def _seep03_top(model, x):
+    """Elevation of the top of the section at ``x``, off the model's own outer
+    profile line — so a station's search column cannot run past the ground."""
+    pts = list(model["ground_surface"].coords)
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if x0 <= x <= x1:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    return pts[-1][1]
+
+
+def _seep03_phreatic(model, mesh, solution, stations=SEEP03_STATIONS):
+    """The elevation of the phreatic surface at each station, read off a linear
+    interpolator rather than off the nodes.
+
+    Same construction as SEEP-2's: walk a vertical column and return the elevation
+    where the pressure head crosses zero. A column that is saturated to the ground
+    surface has no crossing inside the domain and returns NaN — on this dam that is
+    the submerged upstream face at full pool, where the p = 0 level is the reservoir
+    standing above the ground.
+    """
+    import matplotlib.tri as mtri
+    import numpy as np
+
+    nodes = np.asarray(mesh["nodes"])
+    tris = [e[:3] for e in np.asarray(mesh["elements"])]
+    triang = mtri.Triangulation(nodes[:, 0], nodes[:, 1], tris)
+    ipsi = mtri.LinearTriInterpolator(triang, np.asarray(solution["u"]) / 62.4)
+    out = []
+    for x in stations:
+        ys = np.linspace(0.02, _seep03_top(model, x) - 0.02, 4000)
+        psi = np.ma.filled(ipsi(np.full(len(ys), x), ys), np.nan)
+        ok = ~np.isnan(psi)
+        ys, psi = ys[ok], psi[ok]
+        wet = np.where(psi >= 0.0)[0]
+        if not len(wet) or wet[-1] + 1 >= len(psi):
+            out.append(float("nan"))
+            continue
+        i = wet[-1]
+        out.append(float(ys[i] + (ys[i + 1] - ys[i]) * psi[i]
+                         / (psi[i] - psi[i + 1])))
+    return out
+
+
+def _seep03_pool(model, t):
+    """The pool level at time ``t``, read off the model's own series with the tseep
+    interpolation rule (linear between breakpoints, held beyond the ends)."""
+    import numpy as np
+
+    return float(np.interp(t, model["tseep"]["times"],
+                           model["tseep"]["series"]["pool"]))
+
+
+def _seep03_pick_nodes(mesh, seep_data):
+    """The nearest mesh node to each target point, with the material it belongs to.
+
+    The targets are written as points rather than as node numbers because the node
+    numbering is the mesher's and changes with the element size; the page quotes the
+    coordinates this returns, which are a property of the dam.
+    """
+    import numpy as np
+
+    nodes = np.asarray(mesh["nodes"])
+    elem_mat = np.asarray(seep_data["element_materials"])
+    node_mat = {}
+    for elem, mat in zip(np.asarray(seep_data["elements"]), elem_mat):
+        for n in elem[:3]:
+            node_mat.setdefault(int(n), set()).add(int(mat))
+    picked = []
+    for label, point, color in SEEP03_NODES:
+        i = int(np.argmin(np.linalg.norm(nodes - np.asarray(point), axis=1)))
+        picked.append((label, i, tuple(float(v) for v in nodes[i]), color,
+                       sorted(node_mat.get(i, set()))))
+    return picked
+
+
+def _seep03_schedule(model):
+    """The pool series the reservoir boundary follows, as the reader enters it —
+    three breakpoints and a duration.
+
+    A figure of its own rather than a panel under the section: the section is a
+    sketch of the dam a reader meets before anything is built, while the schedule
+    belongs with the transient dialog that carries these same three rows.
+    """
+    times = list(model["tseep"]["times"])
+    pool = list(model["tseep"]["series"]["pool"])
+    duration = float(model["tseep"]["duration"])
+
+    fig, ax = plt.subplots(figsize=(8.6, 2.8))
+    ax.axvspan(times[1], times[-1], color="#eef4f9", zorder=0)
+    ax.plot(times + [duration], pool + [pool[-1]], color="#2b7bb0", lw=2.2,
+            zorder=3)
+    ax.plot(times, pool, "o", ms=6, mfc="white", mec="#2b7bb0", mew=1.8,
+            zorder=4, label="schedule breakpoints")
+    ax.annotate("held at full pool", xy=(times[1], pool[1]),
+                xytext=(times[1] + 26.0, pool[1] + 1.6), fontsize=9,
+                color="0.3", ha="left",
+                arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
+    ax.annotate("drawn down over %g days" % (times[-1] - times[1]),
+                xy=(0.5 * (times[1] + times[-1]), 0.5 * (pool[1] + pool[-1])),
+                xytext=(times[-1] + 34.0, 0.66 * pool[0]), fontsize=9,
+                color="#2b7bb0", ha="left",
+                arrowprops=dict(arrowstyle="-|>", color="#2b7bb0", lw=0.9))
+    ax.annotate("held for the rest of the %g-day run,\nwhile the dam relaxes"
+                % duration, xy=(0.80 * duration, pool[-1]),
+                xytext=(0.46 * duration, pool[-1] + 2.6), fontsize=9,
+                color="0.3", ha="left",
+                arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
+    ax.set_xlim(-8.0, duration + 8.0)
+    ax.set_ylim(0.0, pool[0] + 5.0)
+    ax.set_xlabel("time (day)")
+    ax.set_ylabel("pool elevation (%s)" % declared_unit_labels(model)["length"])
+    ax.grid(alpha=0.22)
+    ax.legend(loc="upper right", frameon=False, fontsize=8.5)
+    fig.tight_layout()
+
+
+def _seep03_frame_panel(seep_data, frame, label, vmin, vmax, pool):
+    """One saved instant, drawn through ``plot_seep_solution`` itself.
+
+    Flow lines are off on every panel: a flow net requires divergence-free
+    through-flow, and a transient state's flow comes out of released storage, so no
+    stream function exists to draw equal-drop channels from. What each panel does
+    show is the head field, the phreatic surface, and the instantaneous water levels
+    — so the pool visibly falls through the series while the interior surface lags.
+    The color scale is pinned across the series so the frames read as one story.
+    """
+    from xslope.plot_seep import plot_seep_solution
+
+    with _hold_show():
+        plot_seep_solution(seep_data, frame, figsize=SEEP03_PANEL_SIZE,
+                           levels=SEEP03_LEVELS, phreatic=True, flowlines=False,
+                           vectors=False, mesh=False, pad_frac=0.04,
+                           cmap="Spectral_r", vmin=vmin, vmax=vmax,
+                           show_title=False, show_legend=False,
+                           show_bc_levels=True)
+    _u = declared_unit_labels(seep_data)
+    plt.gcf().axes[0].set_title("t = %g %s   ·   pool el %.1f %s   —   %s"
+                                % (frame["time"], _u["time"], pool, _u["length"],
+                                   label), fontsize=11, pad=5)
+
+
+def _seep03_history_figure(model, times, series, picked):
+    """Total head against time at the three nodes, with the pool schedule over them.
+
+    One axes rather than three: the whole point is that the shell's trace and the
+    core's trace CROSS — the shell starts above the core and ends below it — and a
+    crossing cannot be read off panels side by side.
+    """
+    import numpy as np
+
+    duration = float(model["tseep"]["duration"])
+    t0, t1 = model["tseep"]["times"][1], model["tseep"]["times"][-1]
+    fig, ax = plt.subplots(figsize=(8.6, 5.0))
+    ax.axvspan(t0, t1, color="#eef4f9", zorder=0)
+    # The pool is the driver, not a fourth reading, so it is drawn in neutral gray:
+    # the three colored traces are the dam's response to this one dashed line.
+    ax.plot(times, [_seep03_pool(model, t) for t in times], color="#3f4a55",
+            lw=2.0, ls=(0, (5, 3)), zorder=2, label="pool (the reservoir schedule)")
+    for (label, _i, coords, color, _mats), values in zip(picked, series):
+        ax.plot(times, values, "-o", color=color, lw=1.8, ms=4, zorder=3,
+                label="%s  (%.1f, %.1f)" % (label, coords[0], coords[1]))
+
+    # Where the core's trace passes ABOVE the shell's, interpolated between the two
+    # saved frames that straddle it rather than read off the picture.
+    core, shell = np.asarray(series[0]), np.asarray(series[1])
+    gap = core - shell
+    cross = np.where((gap[:-1] < 0) & (gap[1:] >= 0))[0]
+    if len(cross):
+        j = int(cross[0])
+        tc = (times[j] + (times[j + 1] - times[j]) * (-gap[j])
+              / (gap[j + 1] - gap[j]))
+        ax.axvline(tc, color="0.6", lw=0.9, ls=(0, (2, 3)), zorder=1)
+        ax.annotate("the core's head passes above the shell's\nat t ≈ %.0f day" % tc,
+                    xy=(tc, float(np.interp(tc, times, core))),
+                    xytext=(tc + 55.0, 0.80 * max(core.max(), shell.max())),
+                    fontsize=9, color="0.25", ha="left", va="center",
+                    arrowprops=dict(arrowstyle="-|>", color="0.45", lw=0.9))
+    ax.annotate("drawdown", xy=(0.5 * (t0 + t1), 0.98), xycoords=("data",
+                                                                  "axes fraction"),
+                fontsize=8.5, color="#2b7bb0", ha="center", va="top")
+    ax.set_xlim(-8.0, duration + 8.0)
+    ax.set_xlabel("time (day)")
+    ax.set_ylabel("total head (%s)" % declared_unit_labels(model)["length"])
+    ax.grid(alpha=0.22)
+    ax.legend(loc="upper right", frameon=False, fontsize=9)
+    ax.set_title("The core holds its head after the shell has let go", fontsize=11.5)
+    fig.tight_layout()
+
+
+def seep03_plots():
+    """The transient dam: the problem, the model, the mesh, the initial condition,
+    the frame series, and the histories that put numbers on the lag.
+
+    Printed rather than drawn: the mesh, the steady discharge and where its phreatic
+    surface sits, the saved-frame schedule, the mass-balance ledger the solver
+    reports, the boundary-flow decay, and the head at the three history nodes at
+    every saved instant. Every number the page quotes is on one of these lines.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import plot_seep_data, plot_seep_solution
+
+    sd = load_slope_data(SEEP03)
+    _u = declared_unit_labels(sd)
+    tseep = sd["tseep"]
+    print("   schedule    pool %s at t %s · duration %g · save_interval %g · "
+          "save_times %s"
+          % (tseep["series"]["pool"], tseep["times"], tseep["duration"],
+             tseep["save_interval"], tseep["save_times"]))
+    print("   staging     stage_1 %s · stage_2 %s · stability_time %s  (SEEP-3 is a "
+          "seepage page; the staging belongs to the stability tutorial)"
+          % (tseep.get("stage_1"), tseep.get("stage_2"),
+             tseep.get("stability_time")))
+
+    capture("seep03_schedule.png", _seep03_schedule, sd)
+    capture("seep03_inputs.png", plot_inputs, sd, mode="seep",
+            title="Seepage Model Inputs", frame="content", show_mesh=False)
+
+    mesh = _seep03_mesh(sd)
+    figsize = _seep02_figsize(mesh)
+    nodes = np.asarray(mesh["nodes"])
+    _width = max(nodes[:, 0]) - min(nodes[:, 0])
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.5g %s"
+          % (len(nodes), len(mesh["elements"]), SEEP03_ELEMENT, SEEP03_DIVISIONS,
+             _width / SEEP03_DIVISIONS, _u["length"]))
+
+    # ---- the initial condition, as an ordinary steady run ------------------ #
+    steady_model = _seep03_steady_model(sd)
+    seep_data, steady, log = _seep03_solve(steady_model, mesh)
+    stats = _seep02_log_stats(log)
+    capture("seep03_mesh.png", plot_seep_data, seep_data, figsize=figsize,
+            show_bc=True)
+    capture("seep03_steady.png", plot_seep_solution, seep_data, steady,
+            figsize=figsize, levels=SEEP03_LEVELS, base_mat=SEEP03_BASE_MAT,
+            fill_contours=True, mesh=False)
+    head = np.asarray(steady["head"])
+    psi = np.asarray(steady["u"]) / sd["gamma_water"]
+    print("   steady      q %.6f %s · head %.3f to %.3f %s · u %.1f to %.1f %s"
+          % (steady["flowrate"], _u["flowrate"], head.min(), head.max(),
+             _u["length"], np.min(steady["u"]), np.max(steady["u"]),
+             _u["stress"]))
+    print("   iteration   %s" % stats)
+    face = np.where(np.asarray(seep_data["bc_type"]) == 2)[0]
+    wet = face[psi[face] > -1e-6]
+    print("   exit face   %d nodes from (%.2f, %.2f) to (%.2f, %.2f) · %d wet%s"
+          % (len(face), nodes[face][np.argmin(nodes[face, 1])][0],
+             nodes[face, 1].min(),
+             nodes[face][np.argmax(nodes[face, 1])][0], nodes[face, 1].max(),
+             len(wet),
+             "" if len(wet) else " — no seepage face at full pool; the phreatic "
+             "surface reaches the downstream boundary at the tailwater"))
+    ph0 = _seep03_phreatic(sd, mesh, steady)
+    print("   stations    %s" % " ".join("%6g" % x for x in SEEP03_STATIONS))
+    print("   steady ph   %s" % " ".join("%6.2f" % y for y in ph0))
+
+    # ---- the march ---------------------------------------------------------- #
+    tseep_data, solution, frames, tlog = _seep03_march(sd, mesh)
+    times = [float(f["time"]) for f in frames]
+    print("   march       %d saved frames at t = %s · converged %s · %d steps"
+          % (len(frames), " ".join("%g" % t for t in times),
+             solution["converged"], len(solution["dt_history"])))
+    mb = solution["mass_balance"]
+    print("   mass bal    cumulative inflow %.5g · final stored change %.5g · "
+          "final closure %.3e"
+          % (mb["cumulative_inflow"], mb["final_stored_change"],
+             mb["final_closure"]))
+    for row in mb["per_frame"]:
+        print("   t %-6g    stored change %10.4f · cumulative inflow %10.4f · "
+              "closure %.2e" % (row["time"], row["stored_change"],
+                                row["cumulative_inflow"], row["closure"]))
+    print("   solver log (the lines the page quotes):")
+    for line in tlog.strip().splitlines():
+        if "frame saved" in line or line.startswith("Transient"):
+            print("     %s" % line.strip())
+
+    outflow = [float(f.get("outflow") or 0.0) for f in frames]
+    inflow = [float(f.get("inflow") or 0.0) for f in frames]
+    peak = max(outflow)
+    print("   %-8s %10s %10s %10s"
+          % ("t (%s)" % _u["time"], "pool", "inflow", "outflow"))
+    for t, qi, qo in zip(times, inflow, outflow):
+        print("   %-8g %10.2f %10.5f %10.5f" % (t, _seep03_pool(sd, t), qi, qo))
+    print("   outflow     peaks at %.5f on t = %g, and is %.5f at t = %g "
+          "(%.2f%% of the peak)"
+          % (peak, times[outflow.index(peak)], outflow[-1], times[-1],
+             100.0 * outflow[-1] / peak))
+
+    # ---- the frame series --------------------------------------------------- #
+    all_head = np.concatenate([np.asarray(f["head"], float) for f in frames])
+    vmin, vmax = float(all_head.min()), float(all_head.max())
+    print("   color scale pinned across the series to head %.3f – %.3f %s"
+          % (vmin, vmax, _u["length"]))
+    panels = []
+    for t, label in SEEP03_FRAMES:
+        i = int(np.argmin(np.abs(np.asarray(times) - t)))
+        panels.append(capture("seep03_frame_t%g.png" % times[i],
+                              _seep03_frame_panel, tseep_data, frames[i], label,
+                              vmin, vmax, _seep03_pool(sd, times[i])))
+    _stack_panels("seep03_frames.png", panels)
+
+    # ---- the phreatic surface, frame by frame -------------------------------- #
+    print("   phreatic surface elevation (%s) by station and saved instant"
+          % _u["length"])
+    print("   %-8s %-6s %s" % ("t (%s)" % _u["time"], "pool",
+                               " ".join("%6g" % x for x in SEEP03_STATIONS)))
+    for f in frames:
+        ys = _seep03_phreatic(sd, mesh, f)
+        print("   %-8g %-6.2f %s"
+              % (f["time"], _seep03_pool(sd, f["time"]),
+                 " ".join("%6.2f" % y for y in ys)))
+
+    # ---- the head histories -------------------------------------------------- #
+    picked = _seep03_pick_nodes(mesh, tseep_data)
+    for label, i, coords, _color, mats in picked:
+        print("   node        %-17s -> %d at (%.3f, %.3f), material %s"
+              % (label, i, coords[0], coords[1], mats))
+    series = [[float(np.asarray(f["head"])[i]) for f in frames]
+              for _l, i, _c, _col, _m in picked]
+    pressures = [[float(np.asarray(f["u"])[i]) / sd["gamma_water"] for f in frames]
+                 for _l, i, _c, _col, _m in picked]
+    print("   %-8s %-8s %s" % ("t (%s)" % _u["time"], "pool",
+                               " ".join("%18s" % l for l, *_ in picked)))
+    for j, t in enumerate(times):
+        print("   %-8g %-8.2f %s"
+              % (t, _seep03_pool(sd, t),
+                 " ".join("%18.4f" % s[j] for s in series)))
+    print("   pressure head ψ = u/γw (%s) at the same nodes" % _u["length"])
+    for j, t in enumerate(times):
+        print("   %-8g %-8.2f %s"
+              % (t, _seep03_pool(sd, t),
+                 " ".join("%18.4f" % p[j] for p in pressures)))
+    capture("seep03_history.png", _seep03_history_figure, sd, times, series,
+            picked)
+
+
+# --------------------------------------------------------------------------- #
+# SEEP-4 — infiltration and flux boundaries
+# --------------------------------------------------------------------------- #
+# The Fredlund & Rahardjo (1993) earth dam under steady rainfall: 12 m high, 4 m
+# crest, symmetric 2:1 faces, 52 m base, reservoir at 10 m, a 12 m horizontal
+# drain at the downstream toe.  It is verification case 4 of GW6, and the
+# tutorial's file pair is built from that corpus file by
+# ``tools/build_dam_infiltration.py``.
+#
+# The lesson is a CONTRAST, so every figure and every number here is measured
+# twice on one mesh: once with the rain and once without it.  The dry run is the
+# completed model with its flux boundaries removed, which is bit-for-bit the same
+# model as GW6 case 1 (gw006a) — identical geometry, identical soil — so the
+# comparison is the manual's own pair of cases rather than a variation invented
+# for the page.  Both runs are meshed and solved at the corpus discretization the
+# verification page locks (tri3, 1.0 m, max_iter 2000), so a number printed here
+# is a number that page can be checked against.
+#
+# Head figures are drawn on ONE pinned color scale, computed over both solutions,
+# so the dry and wet panels are readable side by side: a contour that moves has
+# moved, not been rescaled.
+# --------------------------------------------------------------------------- #
+SEEP04 = os.path.join(REPO_ROOT,
+                      "docs/tutorials/files/xslope_dam_infiltration.xlsx")
+#: The mesh, in the Build mesh dialog's own controls, and the solver's iteration
+#: cap — the corpus discretization the GW6 verification tags run at.
+SEEP04_SIZE = 1.0
+SEEP04_ELEMENT = "tri3"
+SEEP04_MAX_ITER = 2000
+#: The manual's line 1-1: the crest centerline, where every GW6 case publishes its
+#: pressure-head profile.  The dam is 24–28 m across the crest, so 26 is its axis.
+SEEP04_LINE_X = 26.0
+#: Elevations the line 1-1 profile is tabulated at — Fig 6.18's own marker spacing,
+#: base to crest.  0.05 rather than 0 because the base node itself sits on the
+#: no-flow boundary; it is the station the verification tag locks.
+SEEP04_LINE_Y = (0.05, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0,
+                 12.0)
+#: Vertical stations the phreatic surface is read at, upstream toe to downstream
+#: toe.  20 is the waterline, 24 and 28 are the crest shoulders, and 40 is the
+#: upstream end of the toe drain, so the set brackets every feature that moves.
+SEEP04_STATIONS = (4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 26.0, 28.0, 32.0, 36.0,
+                   40.0, 44.0, 48.0)
+#: Contour count for the head figures.
+SEEP04_LEVELS = 12
+#: The vendor's rain rate — a VERTICAL Darcy velocity, in m/s — and the 2:1 face
+#: slope it falls on, both restated here so the projection the page teaches is
+#: arithmetic the producer prints rather than a number copied into prose.
+SEEP04_RAIN = 1e-8
+SEEP04_FACE_RUN, SEEP04_FACE_RISE = 2.0, 1.0
+#: The VENDOR's infiltration extents, for the comparison the page closes on. They
+#: stop one vendor mesh edge short of the waterline and one short of the toe, so
+#: they are properties of the vendor's mesh rather than of the dam; the tutorial
+#: file draws the same rain on the geometry instead, waterline (20, 10) to toe
+#: (52, 0). The corpus file gw006d keeps these, exactly as the vendor wrote them.
+SEEP04_VENDOR_VERTICES = ((22.0, 11.0), (24.0, 12.0), (28.0, 12.0), (50.0, 1.0))
+#: A flux block laid entirely inside the reservoir head boundary, used to prove the
+#: collision rule: every node it loads is a specified-head node, so the answer must
+#: not move. Wholly below the waterline at (20, 10), on the submerged upstream face.
+SEEP04_SUBMERGED_BLOCK = ((12.0, 6.0), (20.0, 10.0))
+#: Multiples of the file's rain rate the sweep solves at.  They span an order of
+#: magnitude and a half around the vendor's rate, which is the middle of the set,
+#: so the sweep brackets it rather than extending from it.
+SEEP04_SWEEP_FACTORS = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0)
+#: Stations the swept free surfaces are drawn at: half-metre spacing from just
+#: downstream of the waterline to the drain's upstream lip at x = 40, then tenth-
+#: metre spacing out over the drain.  Denser than the thirteen the tables use,
+#: because these are curves rather than readings, and denser again past the lip
+#: because that is where the surfaces separate — the dry one turns down at the lip
+#: itself while the wet ones stay up over the first metre or two of drain.
+SEEP04_SWEEP_STATIONS = (tuple(20.5 + 0.5 * i for i in range(40))
+                         + tuple(round(40.1 + 0.1 * i, 1) for i in range(25)))
+#: The dam in profile — the ground surface the file carries, closed along the
+#: impermeable base.  Drawn by hand because the sweep figure is a section with
+#: curves on it, not a solution plot.
+SEEP04_SECTION = ((0.0, 0.0), (24.0, 12.0), (28.0, 12.0), (52.0, 0.0))
+#: One color per rain rate, cool to warm as the rate rises, so the six curves read
+#: in order without the legend.  Same family the other seepage figures draw from.
+SEEP04_SWEEP_COLORS = ("#2166ac", "#4393c3", "#3f8f5a", "#c9a227", "#c1663a",
+                       "#96201f")
+
+
+def _seep04_mesh(model, size=SEEP04_SIZE, element_type=SEEP04_ELEMENT):
+    """One mesh of the model's material polygons, quiet — the corpus mesh."""
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model), size, element_type,
+            size_regions=extract_size_regions(model))
+
+
+def _seep04_solve(model, mesh, max_iter=SEEP04_MAX_ITER):
+    """One steady seepage solve on a built mesh, with the solver's log captured.
+
+    ``tol=1e-5`` is the tolerance the page's own verification tags solve at
+    (``run_seep_head_test``), so the heads printed here are the heads those tags
+    compare against.
+    """
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        seep_data = build_seep_data(mesh, model)
+        solution = run_seepage_analysis(seep_data, tol=1e-5, max_iter=max_iter)
+    return seep_data, solution, log.getvalue()
+
+
+def _seep04_dry(model):
+    """The completed model with the rain switched off, in memory.
+
+    Everything else — the reservoir head, the toe-drain exit face, the soil, the
+    section — is untouched, so the difference between this run and the completed
+    file's is the infiltration and nothing else.
+    """
+    bc = dict(model["seepage_bc"])
+    bc["specified_fluxes"] = []
+    return dict(model, seepage_bc=bc)
+
+
+def _seep04_line(mesh, solution, x=SEEP04_LINE_X, elevations=SEEP04_LINE_Y):
+    """Pressure head up the vertical line at ``x``, at the given elevations.
+
+    Read off a linear interpolator over the mesh rather than off the nearest node,
+    because the two runs are compared station by station and the difference at the
+    base is smaller than the 1 m element.
+    """
+    import numpy as np
+
+    ihead = _seep02_interp(mesh, np.asarray(solution["head"], dtype=float))
+    xs = np.full(len(elevations), float(x))
+    heads = np.ma.filled(ihead(xs, np.asarray(elevations, dtype=float)), np.nan)
+    return np.asarray(heads), np.asarray(heads) - np.asarray(elevations)
+
+
+def _seep04_top(x):
+    """The dam's surface elevation at ``x`` — 2:1 faces up to a 4 m crest at 12 m."""
+    if x <= 24.0:
+        return x / 2.0
+    if x <= 28.0:
+        return 12.0
+    return (52.0 - x) / 2.0
+
+
+def _seep04_phreatic(mesh, solution, stations=SEEP04_STATIONS):
+    """The phreatic-surface elevation at each station — the pressure-head zero
+    crossing, walked up a vertical line and interpolated between the samples that
+    straddle it, the same reading SEEP-2's producer takes.
+
+    A column saturated all the way to the dam surface has no crossing inside the
+    domain and returns NaN; on this dam that is the submerged upstream face.
+    """
+    import numpy as np
+
+    ihead = _seep02_interp(mesh, np.asarray(solution["head"], dtype=float))
+    out = []
+    for x in stations:
+        top = _seep04_top(x)
+        ys = np.linspace(0.01, top - 0.01, 4000)
+        psi = np.ma.filled(ihead(np.full(len(ys), float(x)), ys), np.nan) - ys
+        ok = ~np.isnan(psi)
+        ys, psi = ys[ok], psi[ok]
+        wet = np.where(psi >= 0.0)[0]
+        if not len(wet) or wet[-1] + 1 >= len(psi):
+            out.append(float("nan"))
+            continue
+        i = wet[-1]
+        out.append(float(ys[i] + (ys[i + 1] - ys[i]) * psi[i]
+                         / (psi[i] - psi[i + 1])))
+    return out
+
+
+def _seep04_log_line(log, needle):
+    """The last line of a solver log containing ``needle``, stripped."""
+    hits = [ln.strip() for ln in log.splitlines() if needle in ln]
+    return hits[-1] if hits else ""
+
+
+def _seep04_exit_active(log):
+    """The solver's own final report of how much of the exit face is draining.
+
+    The unconfined iteration prints ``n/m exit face active`` on every logged
+    sweep; the last one is the state the converged solution is in.
+    """
+    line = _seep04_log_line(log, "exit face active")
+    if not line:
+        return ""
+    return line.split("relax")[-1].split(",")[-1].strip()
+
+
+def _seep04_vendor_extent(model, vertices=SEEP04_VENDOR_VERTICES):
+    """The completed model with the rain redrawn on the VENDOR's extents.
+
+    The verification file stops one vendor mesh edge short of the waterline and
+    one short of the toe — extents that are properties of the vendor's mesh, not
+    of the dam.  Rebuilt here at the tutorial file's own rates so the only
+    difference between the two runs is where the boundary starts and stops.
+    """
+    rates = {}
+    for f in model["seepage_bc"]["specified_fluxes"]:
+        rates["level" if f["coords"][0][1] == f["coords"][-1][1]
+              else "sloping"] = f["flux"]
+    blocks = [{"flux": rates["level"] if a[1] == b[1] else rates["sloping"],
+               "coords": [a, b]}
+              for a, b in zip(vertices, vertices[1:])]
+    bc = dict(model["seepage_bc"], specified_fluxes=blocks)
+    return dict(model, seepage_bc=bc)
+
+
+def _seep04_submerged_block(model, coords=SEEP04_SUBMERGED_BLOCK):
+    """The completed model with one extra flux block laid ENTIRELY inside the
+    reservoir head boundary.
+
+    Every node it loads is a specified-head node, so if the Dirichlet rows really
+    do discard the flux they carry, this model must solve to exactly the same
+    answer as the one without it.  That is the falsifiable form of the collision
+    rule the page teaches, and the producer prints the comparison.
+    """
+    rate = max(f["flux"] for f in model["seepage_bc"]["specified_fluxes"])
+    bc = dict(model["seepage_bc"])
+    bc["specified_fluxes"] = list(bc["specified_fluxes"]) + [
+        {"flux": rate, "coords": list(coords)}]
+    return dict(model, seepage_bc=bc)
+
+
+def _seep04_scaled_rain(model, factor):
+    """The completed model with every flux block multiplied by ``factor``.
+
+    All three blocks are scaled together, so the projection the file carries — the
+    slope segments at cos(atan 1/2) of the crest rate — survives the scaling and
+    the boundary still represents one vertical rain rate.  The workbook is never
+    touched; ``factor = 0`` is the dry model.
+    """
+    bc = dict(model["seepage_bc"])
+    bc["specified_fluxes"] = [dict(f, flux=f["flux"] * factor)
+                              for f in model["seepage_bc"]["specified_fluxes"]]
+    return dict(model, seepage_bc=bc)
+
+
+def _seep04_free_surface(mesh, solution, stations=SEEP04_SWEEP_STATIONS):
+    """The free surface at each station, and whether the column reached it.
+
+    Returns ``(elevations, saturated)``.  Where the pressure head crosses zero
+    inside the dam the elevation is that crossing — the phreatic surface.  Where
+    the whole column is at or above zero the water has reached the dam surface and
+    there is no crossing to find; the elevation returned is the dam surface itself
+    and the flag is True, because the free surface has emerged rather than
+    vanished.  A column that is dry throughout returns NaN.
+
+    ``_seep04_phreatic`` returns NaN for both of those cases, which is the right
+    answer for a table of phreatic elevations and the wrong one for a curve.
+    """
+    import numpy as np
+
+    ihead = _seep02_interp(mesh, np.asarray(solution["head"], dtype=float))
+    ys_out, sat_out = [], []
+    for x in stations:
+        top = _seep04_top(x)
+        ys = np.linspace(0.01, top - 0.01, 4000)
+        psi = np.ma.filled(ihead(np.full(len(ys), float(x)), ys), np.nan) - ys
+        ok = ~np.isnan(psi)
+        ys, psi = ys[ok], psi[ok]
+        wet = np.where(psi >= 0.0)[0]
+        if not len(wet):
+            ys_out.append(float("nan"))
+            sat_out.append(False)
+        elif wet[-1] + 1 >= len(psi):
+            ys_out.append(top)
+            sat_out.append(True)
+        else:
+            i = wet[-1]
+            ys_out.append(float(ys[i] + (ys[i + 1] - ys[i]) * psi[i]
+                                / (psi[i] - psi[i + 1])))
+            sat_out.append(False)
+    return ys_out, sat_out
+
+
+def _seep04_base_landing(mesh, solution, start=40.0, stop=46.0, step=0.002,
+                         offset=0.01):
+    """The x at which the free surface reaches the base, out along the drain.
+
+    Read as the furthest x whose pressure head is still non-negative a hair above
+    the base.  The hair is needed: the active drain nodes are held at head = y, so
+    ψ is identically zero along the base itself and there is no sign change to find
+    there.  ``offset`` is 1% of the 1 m element, and the answer moves by at most
+    0.05 m as it is varied over 0.005–0.1 m — a tenth of one element, invisible at
+    section scale.
+    """
+    import numpy as np
+
+    ihead = _seep02_interp(mesh, np.asarray(solution["head"], dtype=float))
+    xs = np.arange(start, stop, step)
+    psi = np.ma.filled(ihead(xs, np.full(len(xs), offset)), np.nan) - offset
+    ok = np.where(np.isfinite(psi) & (psi >= 0.0))[0]
+    return float(xs[ok[-1]]) if len(ok) else float(start)
+
+
+def _seep04_section_axes(ax):
+    """One frame for the hand-drawn section: the dam, its impermeable base, the
+    reservoir, and the toe drain, at equal aspect."""
+    xs = [p[0] for p in SEEP04_SECTION]
+    ys = [p[1] for p in SEEP04_SECTION]
+    ax.plot(xs, ys, color="#4a5560", lw=1.6)
+    ax.plot([SEEP04_SECTION[0][0], SEEP04_SECTION[-1][0]], [0.0, 0.0],
+            color="#8a939c", lw=1.0)
+    # The reservoir standing on the upstream face, with the water-table symbol at
+    # its surface, and the toe drain that every free surface below drains into.
+    head = 10.0
+    ax.plot([0.0, 20.0], [head, head], color="#6ba8d6", lw=1.1)
+    ax.plot([10.0], [head], marker="v", ms=7, color="#6ba8d6",
+            markeredgecolor="#6ba8d6")
+    ax.plot([40.0, 52.0], [0.0, 0.0], color="#3f8f5a", lw=3.0,
+            solid_capstyle="butt")
+    ax.annotate("toe drain", xy=(46.0, 0.0), xytext=(46.0, 1.2),
+                color="#3f8f5a", fontsize=8, ha="center")
+    ax.set_xlim(-1.0, 53.0)
+    ax.set_ylim(-0.6, 13.9)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("elevation (m)")
+
+
+def _seep04_sweep_figure(series, entry=(20.0, 10.0)):
+    """The free surface on the dam section at each rain rate, all six on one axes.
+
+    Each curve is anchored at both ends.  Upstream it starts at the reservoir
+    waterline, which pins it whatever the rain does.  Downstream it ends ON the
+    base, at the point where that run's own saturation runs out: the dry dam turns
+    down at the drain's upstream lip, and the wetter the dam the further out over
+    the drain the surface stays up before coming down.  The last stretch is steep
+    because a free surface meeting a horizontal drain meets it at a right angle —
+    the entry condition the Kozeny parabola is built on — and how steep is not
+    resolved by a 1 m mesh, so it is drawn as what the stations report rather than
+    smoothed into something the solution does not say.
+
+    A rate whose curve lies on the dam surface has saturated the dam to its
+    boundary; it is drawn dashed, because there the specified-flux boundary is
+    offering more water than the soil can take and the run has stopped being a
+    model of rain falling on a slope.
+    """
+    import numpy as np
+
+    fig, ax = plt.subplots(figsize=(11.0, 4.4))
+    _seep04_section_axes(ax)
+    emerged = None
+    for (label, ys, sat, land), color in zip(series, SEEP04_SWEEP_COLORS):
+        pts = [entry] + [(x, y) for x, y in zip(SEEP04_SWEEP_STATIONS, ys)
+                         if np.isfinite(y)]
+        # The terminus is on the base, at whichever of the two readings of "the
+        # surface is down" lies further out.  They can differ by up to an element:
+        # over an active drain the base is held at atmospheric pressure and can
+        # finish unsaturated while a saturated body is still draining onto it from
+        # above, so the base scan stops before the column walk does.  Taking the
+        # further of the two ends the curve where the saturation actually runs out
+        # and keeps it from doubling back on itself.
+        pts.append((max(pts[-1][0], land), 0.0))
+        on_surface = any(sat)
+        style = dict(lw=2.4, dashes=(4.5, 2.0)) if on_surface else dict(lw=1.8)
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], "-", color=color,
+                label=label, **style)
+        if on_surface:
+            emerged = color
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.01), ncol=6,
+              frameon=False, fontsize=9, columnspacing=1.6, handlelength=2.2)
+    if emerged is not None:
+        ax.annotate("dashed: the dam is saturated to its surface, so the\n"
+                    "specified-flux boundary would pond in reality",
+                    xy=(22.6, 11.3), xytext=(2.0, 12.7), color=emerged,
+                    fontsize=8, ha="left", va="center",
+                    arrowprops=dict(arrowstyle="->", color=emerged, lw=0.9,
+                                    shrinkA=6, shrinkB=4))
+    fig.tight_layout()
+    plt.show()
+
+
+def seep04_plots():
+    """The infiltrated dam: the model, the mesh, the two solutions and the profile
+    that compares them.
+
+    Printed rather than drawn: the projection arithmetic behind the two flux rates,
+    the mesh, each run's discharge and mass balance, the solver's iteration count
+    and exit-face activity, the line 1-1 profile station by station with the rise
+    the rain causes, and the phreatic surface at thirteen stations for each run.
+    Every number the page quotes is on one of these lines.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import plot_seep_data, plot_seep_solution
+
+    sd = load_slope_data(SEEP04)
+    _u = declared_unit_labels(sd)
+    mat = sd["materials"][0]
+    print("   soil        %s · k %g/%g %s/s · %s α=%g n=%g · units %s"
+          % (mat["name"], mat["k1"], mat["k2"], _u["length"], mat["unsat"],
+             mat["vg_a"], mat["vg_n"], sd["unit_system"]))
+
+    # ---- the boundary set, and the projection behind the two rates ---------- #
+    bc = sd["seepage_bc"]
+    for h in bc["specified_heads"]:
+        print("   head        %g %s over %s" % (h["head"], _u["length"],
+                                                h["coords"]))
+    slope = math.degrees(math.atan2(SEEP04_FACE_RISE, SEEP04_FACE_RUN))
+    projected = SEEP04_RAIN * SEEP04_FACE_RUN / math.hypot(SEEP04_FACE_RUN,
+                                                           SEEP04_FACE_RISE)
+    print("   projection  vertical rain %g %s/s on a %g:%g face (%.4f° from "
+          "horizontal) has normal component %g × %g/√%g = %.8e"
+          % (SEEP04_RAIN, _u["length"], SEEP04_FACE_RUN, SEEP04_FACE_RISE, slope,
+             SEEP04_RAIN, SEEP04_FACE_RUN,
+             SEEP04_FACE_RUN ** 2 + SEEP04_FACE_RISE ** 2, projected))
+    footprint = 0.0
+    for f in bc["specified_fluxes"]:
+        (x0, y0), (x1, y1) = f["coords"][0], f["coords"][-1]
+        length = math.hypot(x1 - x0, y1 - y0)
+        footprint += abs(x1 - x0)
+        print("   flux        %.8e over (%g, %g)→(%g, %g) · length %.4f %s · "
+              "q·L %.6e · horizontal footprint %g %s"
+              % (f["flux"], x0, y0, x1, y1, length, _u["length"],
+                 f["flux"] * length, abs(x1 - x0), _u["length"]))
+    total_in = sum(f["flux"] * math.hypot(f["coords"][-1][0] - f["coords"][0][0],
+                                          f["coords"][-1][1] - f["coords"][0][1])
+                   for f in bc["specified_fluxes"])
+    print("   rain total  Σ q·L %.6e %s³/s per %s over a %g %s horizontal "
+          "footprint = %.6e (rain × footprint %.6e)"
+          % (total_in, _u["length"], _u["length"], footprint, _u["length"],
+             total_in, SEEP04_RAIN * footprint))
+    print("   exit face   %s" % (bc["exit_face"],))
+
+    # ---- one mesh, two runs ------------------------------------------------- #
+    mesh = _seep04_mesh(sd)
+    nodes = np.asarray(mesh["nodes"])
+    print("   mesh        %d nodes · %d elements · %s at %g %s"
+          % (len(nodes), len(mesh["elements"]), SEEP04_ELEMENT, SEEP04_SIZE,
+             _u["length"]))
+
+    # The mesher pins a node at every seepage-BC vertex
+    # (xslope/mesh.py::add_seep_bc_points_to_polygons), so a model whose boundary
+    # polylines end anywhere but a corner of the section gets a mesh of its own.
+    # The dry run's vertices are a subset of the completed model's, so it shares
+    # this mesh; the vendor-extent variant ends at (22, 11) and (50, 1) and does
+    # not, so it is meshed on its own terms — which is what the corpus file
+    # gw006d does, and the comparison has to be model against model, not model
+    # against a mesh built for something else. The collision test deliberately
+    # STAYS on this mesh: it adds one load and nothing else, so the answer moving
+    # would have only one possible cause.
+    runs = {}
+    ven_model = _seep04_vendor_extent(sd)
+    for name, model, on in (("dry", _seep04_dry(sd), mesh),
+                            ("wet", sd, mesh),
+                            ("vendor", ven_model, _seep04_mesh(ven_model)),
+                            ("collide", _seep04_submerged_block(sd), mesh)):
+        seep_data, solution, log = _seep04_solve(model, on)
+        runs[name] = (seep_data, solution, log, on)
+        head = np.asarray(solution["head"], dtype=float)
+        fn = np.asarray(seep_data["flux_nodal"], dtype=float)
+        applied = float(np.sum(fn))
+        # What the Dirichlet rows throw away: the load on specified-head nodes,
+        # and on the exit-face nodes that finished the solve draining.
+        held = np.asarray(seep_data["bc_type"]) == 1
+        drained = ((np.asarray(seep_data["bc_type"]) == 2)
+                   & (head <= np.asarray(seep_data["nodes"])[:, 1] + 1e-9))
+        discarded = float(np.sum(fn[held | drained]))
+        print("   %-7s run %d nodes · q %.6e %s³/s per %s · head %.4f–%.4f %s · "
+              "converged %s · Σ assembled flux load %.6e (of which %.6e lands "
+              "on head / draining nodes and is discarded)"
+              % (name, len(np.asarray(seep_data["nodes"])), solution["flowrate"],
+                 _u["length"], _u["length"], head.min(), head.max(),
+                 _u["length"], solution.get("converged"), applied, discarded))
+        print("        %s" % _seep04_log_line(log, "Converged in"))
+        print("        %s" % _seep04_log_line(log, "Flow closure check"))
+        print("        exit face at closure: %s" % _seep04_exit_active(log))
+        # Where the water crosses the boundary, from the nodal reactions: the
+        # reservoir head boundary and the toe drain, each as a signed total
+        # (+ into the domain).  This is what the rain moves.
+        q_react = np.asarray(solution["q"], dtype=float)
+        print("        boundary flow: reservoir head %+.6e · toe drain %+.6e "
+              "%s³/s per %s"
+              % (float(np.sum(q_react[held])), float(np.sum(q_react[drained])),
+                 _u["length"], _u["length"]))
+
+    dry_data, dry_sol, _dry_log, _ = runs["dry"]
+    wet_data, wet_sol, _wet_log, _ = runs["wet"]
+
+    # The dry run is GW6 case 1 (gw006a) — same section, same soil, no rain. Solved
+    # here rather than asserted, so the page's "this is the manual's case 1" holds.
+    gw006a = os.path.join(REPO_ROOT,
+                          "docs/verification/files/rocscience_gw/gw006a.xlsx")
+    if os.path.exists(gw006a):
+        ref = load_slope_data(gw006a)
+        _rd, ref_sol, _rl = _seep04_solve(ref, _seep04_mesh(ref))
+        print("   dry == gw006a (GW6 case 1): q %.6e vs %.6e, Δ %.3e"
+              % (dry_sol["flowrate"], ref_sol["flowrate"],
+                 dry_sol["flowrate"] - ref_sol["flowrate"]))
+
+    # ---- the collision rule, measured -------------------------------------- #
+    # A flux block laid wholly inside the reservoir head boundary loads only
+    # specified-head nodes.  Those rows are overwritten with the prescribed head
+    # (xslope/seep.py::_dirichlet_system: b is seeded with the flux vector, then
+    # b[dirichlet] = head), so the load is discarded and the answer must not move.
+    col_data, col_sol, _col_log, _ = runs["collide"]
+    col_head = np.asarray(col_sol["head"], dtype=float)
+    wet_head = np.asarray(wet_sol["head"], dtype=float)
+    extra = (float(np.sum(np.asarray(col_data["flux_nodal"], dtype=float)))
+             - float(np.sum(np.asarray(wet_data["flux_nodal"], dtype=float))))
+    print("   collision   an extra flux block over %s (wholly inside the head "
+          "boundary) assembles %.6e of load"
+          % (list(SEEP04_SUBMERGED_BLOCK), extra))
+    print("               q %.6e vs %.6e (Δ %.3e) · max |Δhead| %.3e %s "
+          "→ the load on a specified-head node is discarded"
+          % (col_sol["flowrate"], wet_sol["flowrate"],
+             col_sol["flowrate"] - wet_sol["flowrate"],
+             float(np.max(np.abs(col_head - wet_head))), _u["length"]))
+    shared = int(np.argmin((nodes[:, 0] - 20.0) ** 2 + (nodes[:, 1] - 10.0) ** 2))
+    print("               shared waterline node %d at (%.3f, %.3f): bc_type %d "
+          "(1 = specified head) · assembled load %.6e · solved head %.6f %s "
+          "(prescribed 10)"
+          % (shared, nodes[shared, 0], nodes[shared, 1],
+             int(np.asarray(wet_data["bc_type"])[shared]),
+             float(np.asarray(wet_data["flux_nodal"], dtype=float)[shared]),
+             wet_head[shared], _u["length"]))
+
+    # ---- the extent comparison the page closes on --------------------------- #
+    ven_data, ven_sol, _ven_log, ven_mesh = runs["vendor"]
+    print("   extents     tutorial (geometry: waterline→toe) q %.6e vs vendor "
+          "(mesh-edge-tied) q %.6e · Δ %+.3e (%+.2f%%)"
+          % (wet_sol["flowrate"], ven_sol["flowrate"],
+             wet_sol["flowrate"] - ven_sol["flowrate"],
+             100.0 * (wet_sol["flowrate"] - ven_sol["flowrate"])
+             / ven_sol["flowrate"]))
+    _wl = sum(f["flux"] * math.hypot(f["coords"][-1][0] - f["coords"][0][0],
+                                     f["coords"][-1][1] - f["coords"][0][1])
+              for f in sd["seepage_bc"]["specified_fluxes"])
+    _vl = sum(f["flux"] * math.hypot(f["coords"][-1][0] - f["coords"][0][0],
+                                     f["coords"][-1][1] - f["coords"][0][1])
+              for f in _seep04_vendor_extent(sd)["seepage_bc"]["specified_fluxes"])
+    _wa = float(np.sum(np.asarray(wet_data["flux_nodal"], dtype=float)))
+    _va = float(np.sum(np.asarray(ven_data["flux_nodal"], dtype=float)))
+    print("               rain offered Σq·L %.6e over a 32 m footprint vs %.6e "
+          "over 28 m · Δ %+.3e" % (_wl, _vl, _wl - _vl))
+    print("               rain ASSEMBLED %.6e (%.2f%% of offered) vs %.6e "
+          "(%.2f%%) — each on its own mesh, which pins a node at every BC "
+          "vertex, so neither loses length at its ends"
+          % (_wa, 100.0 * _wa / _wl, _va, 100.0 * _va / _vl))
+    # What the vendor extents cost when they are NOT the extents the mesh was
+    # built around: an edge carries load only when both its corners lie on the
+    # polyline, so endpoints landing part-way along an edge drop it whole.
+    _off_data, _off_sol, _off_log = _seep04_solve(ven_model, mesh)
+    _off_a = float(np.sum(np.asarray(_off_data["flux_nodal"], dtype=float)))
+    print("               the same vendor extents on the tutorial file's mesh "
+          "(no node at (22, 11) or (50, 1)) assemble only %.6e (%.2f%% of "
+          "offered) and give q %.6e — the loss is why a flux boundary is drawn "
+          "on the geometry"
+          % (_off_a, 100.0 * _off_a / _vl, _off_sol["flowrate"]))
+
+    # ---- figures ------------------------------------------------------------ #
+    # frame="content": the section is four times as long as it is deep, and the
+    # default fill frame pads it out to the figure aspect and buries the dam.
+    capture("seep04_inputs.png", plot_inputs, sd, mode="seep",
+            title="Seepage Model Inputs", frame="content", show_mesh=False)
+    figsize = _seep02_figsize(mesh)
+    # The mesh figure shows the reader's OWN state at that point in the build:
+    # head and exit face entered, no rain yet — so it is drawn from the dry
+    # model's seep_data (same mesh; the completed model's flux vertices are all
+    # already-pinned points), and no flux markers appear before the reader has
+    # built a flux boundary.
+    capture("seep04_mesh.png", plot_seep_data, dry_data, figsize=figsize,
+            show_bc=True)
+
+    # One color scale over BOTH solutions, so the two panels compare directly.
+    both = np.concatenate([np.asarray(dry_sol["head"], dtype=float),
+                           np.asarray(wet_sol["head"], dtype=float)])
+    vmin, vmax = float(both.min()), float(both.max())
+    print("   color scale pinned across both runs to head %.4f–%.4f %s"
+          % (vmin, vmax, _u["length"]))
+    for name, (data, sol, _log, _m) in (("dry", runs["dry"]), ("wet", runs["wet"])):
+        capture("seep04_%s.png" % name, plot_seep_solution, data, sol,
+                figsize=figsize, levels=SEEP04_LEVELS, base_mat=1,
+                fill_contours=True, phreatic=True, flowlines=True, mesh=False,
+                vmin=vmin, vmax=vmax)
+
+    # ---- line 1-1, the manual's own comparison ------------------------------ #
+    dry_h, dry_psi = _seep04_line(mesh, dry_sol)
+    wet_h, wet_psi = _seep04_line(mesh, wet_sol)
+    ven_h, ven_psi = _seep04_line(ven_mesh, ven_sol)
+    print("   line 1-1 (x = %g %s): pressure head ψ = h − y"
+          % (SEEP04_LINE_X, _u["length"]))
+    print("   %-8s %10s %10s %10s %10s %10s %10s %10s"
+          % ("y", "h dry", "h wet", "ψ dry", "ψ wet", "Δψ rain",
+             "ψ vendor", "Δψ extent"))
+    for y, hd, hw, pd_, pw, pv in zip(SEEP04_LINE_Y, dry_h, wet_h, dry_psi,
+                                      wet_psi, ven_psi):
+        print("   %-8g %10.4f %10.4f %10.4f %10.4f %+10.4f %10.4f %+10.4f"
+              % (y, hd, hw, pd_, pw, pw - pd_, pv, pw - pv))
+
+    # ---- what the rain does to the interior and to the free surface --------- #
+    rise = (np.asarray(wet_sol["head"], dtype=float)
+            - np.asarray(dry_sol["head"], dtype=float))
+    i_max = int(np.argmax(rise))
+    print("   head rise   mean %+.4f %s · max %+.4f at node %d (%.2f, %.2f)"
+          % (rise.mean(), _u["length"], rise[i_max], i_max,
+             nodes[i_max, 0], nodes[i_max, 1]))
+    dry_ph = _seep04_phreatic(mesh, dry_sol)
+    wet_ph = _seep04_phreatic(mesh, wet_sol)
+    ven_ph = _seep04_phreatic(ven_mesh, ven_sol)
+    print("   phreatic surface elevation (%s) by station" % _u["length"])
+    print("   %-10s %s" % ("station", " ".join("%6g" % x
+                                               for x in SEEP04_STATIONS)))
+    for label, ys in (("dry", dry_ph), ("wet", wet_ph), ("vendor", ven_ph)):
+        print("   %-10s %s" % (label, " ".join("%6.2f" % y for y in ys)))
+    print("   %-10s %s" % ("Δ", " ".join("%+6.2f" % (w - d)
+                                         for d, w in zip(dry_ph, wet_ph))))
+
+    # ---- the rain sweep ----------------------------------------------------- #
+    # The file's rates, scaled in memory, on the one mesh: what more rain does to
+    # the discharge, to the water table under the crest, and to how much of the
+    # dam stays unsaturated.  Every rate is reported as q/k, because that ratio —
+    # not the rate itself — is what decides whether the soil can carry the rain
+    # away, and the sweep runs up to the rate at which it cannot.
+    k = float(sd["materials"][0]["k1"])
+    print("   rain sweep at q/k = q ÷ k = q ÷ %g %s/s (all three flux blocks "
+          "scaled together, in memory)" % (k, _u["length"]))
+    print("   %-8s %-12s %-7s %-14s %-14s %-9s %-9s %-8s %s"
+          % ("factor", "q (m/s)", "q/k", "Q", "reservoir", "WT x=26",
+             "Δ from dry", "lands x", "exit face"))
+    sweep, sweep_q, sweep_wt, sweep_res = [], [], [], []
+    i26 = SEEP04_STATIONS.index(SEEP04_LINE_X)
+    for factor in SEEP04_SWEEP_FACTORS:
+        model = _seep04_scaled_rain(sd, factor)
+        s_data, s_sol, s_log = _seep04_solve(model, mesh)
+        ys, sat = _seep04_free_surface(mesh, s_sol)
+        table_ph = _seep04_phreatic(mesh, s_sol)
+        wt = table_ph[i26]
+        q = float(s_sol["flowrate"])
+        rain = SEEP04_RAIN * factor
+        # How much of the drain's outflow the reservoir is supplying: the nodal
+        # reactions on the specified-head boundary.  The rest is rain.
+        res = float(np.sum(np.asarray(s_sol["q"], dtype=float)[
+            np.asarray(s_data["bc_type"]) == 1]))
+        # Where this run's free surface comes down onto the base, out along the
+        # drain.  The drain's lip is at x = 40, so a landing further out is
+        # saturated drain length: the dam is discharging over that much of it.
+        land = _seep04_base_landing(mesh, s_sol)
+        sweep.append(("q/k = %g" % round(rain / k, 6), ys, sat, land))
+        sweep_q.append(q)
+        sweep_wt.append(wt)
+        sweep_res.append(res)
+        print("   %-8g %-12.4e %-7g %-14.6e %-14.6e %-9s %-9s %-8.3f %s"
+              % (factor, rain, round(rain / k, 6), q, res,
+                 "surface" if np.isnan(wt) else "%.4f" % wt,
+                 "—" if np.isnan(wt) or np.isnan(sweep_wt[0])
+                 else "%+.4f" % (wt - sweep_wt[0]),
+                 land, _seep04_exit_active(s_log)))
+        n_sat = sum(1 for f in sat if f)
+        if n_sat:
+            xs_sat = [x for x, f in zip(SEEP04_SWEEP_STATIONS, sat) if f]
+            print("        saturated to the dam surface over x = %g–%g %s "
+                  "(%d of %d stations) — the flux boundary is offering more "
+                  "than the soil can accept"
+                  % (min(xs_sat), max(xs_sat), _u["length"], n_sat, len(sat)))
+    # Linear in q or not, from the sweep's own numbers: a linear response has the
+    # same rise per unit of rain everywhere, so the per-factor increments are the
+    # test rather than the totals.
+    print("   response per unit factor (a linear response repeats a constant):")
+    for i in range(1, len(SEEP04_SWEEP_FACTORS)):
+        f0, f1 = SEEP04_SWEEP_FACTORS[i - 1], SEEP04_SWEEP_FACTORS[i]
+        dq = (sweep_q[i] - sweep_q[i - 1]) / (f1 - f0)
+        dres = (sweep_res[i] - sweep_res[i - 1]) / (f1 - f0)
+        dwt = (sweep_wt[i] - sweep_wt[i - 1]) / (f1 - f0)
+        print("        factor %-5g → %-5g   ΔQ/Δfactor %.6e   "
+              "Δreservoir/Δfactor %+.6e   ΔWT/Δfactor %s"
+              % (f0, f1, dq, dres, "n/a" if np.isnan(dwt) else "%+.4f" % dwt))
+    # The rain each run offers, against what the drain actually gains: the two
+    # differ because the rising mound throttles the reservoir, so the drain never
+    # gains a full unit of rain per unit of rain applied.
+    offered = sum(f["flux"] * math.hypot(f["coords"][-1][0] - f["coords"][0][0],
+                                         f["coords"][-1][1] - f["coords"][0][1])
+                  for f in sd["seepage_bc"]["specified_fluxes"])
+    i0 = SEEP04_SWEEP_FACTORS.index(0.0)
+    i1 = SEEP04_SWEEP_FACTORS.index(1.0)
+    print("        rain offered at factor 1 is %.6e; the drain gains %.6e of it "
+          "because the reservoir gives up %.6e"
+          % (offered, sweep_q[i1] - sweep_q[i0], sweep_res[i0] - sweep_res[i1]))
+    capture("seep04_rain_sweep.png", _seep04_sweep_figure, sweep)
+
+
+# --------------------------------------------------------------------------- #
+# FEM-1 — Strength Reduction Basics
+# --------------------------------------------------------------------------- #
+#: FEM-1's file pair, written by ``tools/build_ssrm_embankment.py`` from the
+#: Griffiths & Lane Example 1 corpus model.  The starter carries no elastic
+#: constants, which is why the limit-equilibrium figures are drawn on IT — the
+#: page's opening claim is that a factor of safety by slices needs neither E nor
+#: nu, and drawing that state from the file that lacks them is the claim itself.
+FEM01_START = os.path.join(REPO_ROOT,
+                           "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx")
+FEM01_DONE = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_ssrm_embankment.xlsx")
+#: The method the page's limit-equilibrium number is quoted from.  Spencer
+#: because it satisfies both equilibrium conditions, which is the closest
+#: limit-equilibrium statement of the same problem the finite element run solves.
+FEM01_METHOD = "spencer"
+FEM01_SLICES = 40
+#: The strength-reduction run, at the settings the page's final run is made at:
+#: bracket [1.0, 2.0], tolerance 0.01, and 12,000 iterations a trial.
+#: ``non_convergence`` rather than the API default ``hybrid`` because that is what
+#: Studio's Run FEM dialog runs — its Failure criterion list offers no hybrid
+#: entry, and its runner falls back to non-convergence.  On this model the two
+#: criteria return the same factor of safety trial for trial.
+FEM01_CRITERION = "non_convergence"
+FEM01_F_MIN, FEM01_F_MAX = 1.0, 2.0
+FEM01_TOLERANCE = 0.01
+#: 12,000 — now ``solve_ssrm``'s own default, and the budget the page shows in
+#: **Max iterations per trial**.  The figures have to show the state the page's own
+#: instructions produce.  At the former 3,000 default the near-critical trials were
+#: cut off mid-work and the answer read 1.3477; at 12,000 they finish and it
+#: plateaus at 1.3633.  A budget below what the model needs is no longer a verdict
+#: either — the engine extends it while the residual is still falling — so this
+#: number now sets where the extension starts, not where the trial dies.
+FEM01_MAX_ITERATIONS = 12000
+
+
+def _fem01_mesh(model):
+    """The tutorial's mesh, built at the element type and size the COMPLETED FILE
+    declares rather than at numbers restated here — so the picture and the
+    workbook's main sheet cannot disagree."""
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(get_material_polygons(model),
+                                        model["target_size"],
+                                        model["element_type"],
+                                        size_regions=extract_size_regions(model))
+
+
+def _fem01_search(model, method=FEM01_METHOD):
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, path, circles = circular_search(
+            model, method, num_slices=FEM01_SLICES, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache, path, circles
+
+
+def fem01_plots():
+    """The strength-reduction arc: the section, the limit-equilibrium answer, the
+    mesh, and the finite element run's three result panels at failure.
+
+    Printed rather than drawn: the limit-equilibrium search's critical circle, the
+    mesh counts, the whole bisection walk trial by trial with its iteration
+    counts, the factor of safety and the bracket it came from, and the two states
+    the last pair of figures compares — the last trial that reached equilibrium
+    and the captured collapse.  Every number the page quotes is on one of these
+    lines.
+
+    Every results panel is drawn autoscaled, exactly as Studio draws it — the
+    converged state's figure matches the reader's screen, and the comparison
+    between the states is carried by the color bar ranges, not a shared scale.
+    """
+    import time
+
+    import numpy as np
+
+    from xslope.fem import build_fem_data, solve_ssrm
+    from xslope.plot_fem import (plot_fem_data, plot_fem_results,
+                                 shared_panel_scales)
+
+    # ---- the section, and the answer that needs no elastic constants -------- #
+    start = load_slope_data(FEM01_START)
+    _u = declared_unit_labels(start)
+    mat = start["materials"][0]
+    print("   starter     %s · γ %g %s · c %g %s · φ %g° · option %s · E %r · ν %r"
+          % (mat["name"], mat["gamma"], _u["unit_weight"], mat["c"], _u["stress"],
+             mat["phi"], mat["option"], mat["E"], mat["nu"]))
+    print("   geometry    %s · one starting circle %s"
+          % (start["ground_surface"], start["circles"]))
+
+    capture("fem01_inputs.png", plot_inputs, start,
+            title="Slope Geometry and Inputs")
+
+    fs_cache, _path, _circles = _fem01_search(start)
+    crit = fs_cache[0]
+    capture("fem01_lem_solution.png", plot_solution, start, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    print("   LEM         %s FS %.4f on Xo %.4f Yo %.4f R %.4f (tangent depth "
+          "%.4f) · entry (%.3f, %.3f) exit (%.3f, %.3f) · %d candidates"
+          % (FEM01_METHOD, crit["FS"], crit["Xo"], crit["Yo"],
+             crit["Yo"] - crit["Depth"], crit["Depth"], xs[0], ys[0], xs[-1],
+             ys[-1], len(fs_cache)))
+
+    # ---- the mesh the strength reduction runs on ---------------------------- #
+    done = load_slope_data(FEM01_DONE)
+    dmat = done["materials"][0]
+    print("   completed   same soil with E %g %s · ν %g · declares %s at target "
+          "size %g %s" % (dmat["E"], _u["stress"], dmat["nu"],
+                          done["element_type"], done["target_size"], _u["length"]))
+    mesh = _fem01_mesh(done)
+    nodes = np.asarray(mesh["nodes"])
+    fem_data = build_fem_data(done, mesh)
+    print("   mesh        %d nodes · %d elements · every element %s · side BC %s"
+          % (len(nodes), len(mesh["elements"]), done["element_type"],
+             done.get("side_bc") or "rollers (the shipped default; the file "
+             "declares none)"))
+    capture("fem01_mesh.png", plot_fem_data, fem_data)
+
+    # ---- the strength reduction --------------------------------------------- #
+    log = io.StringIO()
+    t0 = time.time()
+    with contextlib.redirect_stdout(log):
+        result = solve_ssrm(fem_data, F_min=FEM01_F_MIN, F_max=FEM01_F_MAX,
+                            tolerance=FEM01_TOLERANCE, debug_level=1,
+                            failure_criterion=FEM01_CRITERION,
+                            max_iterations=FEM01_MAX_ITERATIONS)
+    wall = time.time() - t0
+    print("   SSRM        FS %.4f from the bracket [%.4f, %.4f] (width %.4f) "
+          "after %d bisection steps · %.1f s wall"
+          % (result["FS"], result["final_interval"][0], result["final_interval"][1],
+             result["interval_width"], result["iterations_ssrm"], wall))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s iterations"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+
+    last, fail = result["last_solution"], result.get("failure_solution")
+    for label, field in (("last converged", last), ("at failure", fail)):
+        if field is None:
+            print("   %-12s none" % label)
+            continue
+        u = np.asarray(field["displacements"]).reshape(-1, 2)
+        umag = np.hypot(u[:, 0], u[:, 1])
+        i = int(np.argmax(umag))
+        ue = np.asarray(field["displacements_elastic"]).reshape(-1, 2)
+        print("   %-11s F %.4f · %s in %d iterations (%s) · max|u| %.6f %s at "
+              "(%.2f, %.2f), %.2f× the elastic %.6f"
+              % (label, field.get("F", float("nan")),
+                 "equilibrium" if field.get("converged") else "no equilibrium",
+                 field.get("iterations"), field.get("exit_reason"), umag.max(),
+                 _u["length"], nodes[i, 0], nodes[i, 1],
+                 umag.max() / np.hypot(ue[:, 0], ue[:, 1]).max(),
+                 np.hypot(ue[:, 0], ue[:, 1]).max()))
+
+    # The three panels the FEM Results view offers, each drawn on its own so the
+    # page can place them where its prose reaches them. Every one is at the
+    # captured at-failure field, which is the state the mechanism is visible in.
+    for name, kind in (("fem01_shear_strain.png", "shear_strain"),
+                       ("fem01_deformed.png", "deformation"),
+                       ("fem01_displacement_vectors.png", "displace_vector")):
+        capture(name, plot_fem_results, fem_data, last, plot_type=kind,
+                fs=result["FS"], failure_solution=fail, field_state="failure")
+
+    # The comparison the page's failure definition rests on: the same section at
+    # the last trial that reached equilibrium. Autoscaled to its own range, the
+    # way Studio draws every field state — the reader's screen and this figure
+    # agree, and the eightyfold gap between the two states' color bar maxima is
+    # the comparison the page teaches.
+    own = shared_panel_scales(fem_data, [last])
+    both = shared_panel_scales(fem_data, [last, fail])
+    print("   ranges      converged shear strain %s–%s · at failure %s–%s"
+          % (own["vmin"], own["vmax"], both["vmin"], both["vmax"]))
+    capture("fem01_shear_strain_converged.png", plot_fem_results, fem_data, last,
+            plot_type="shear_strain", fs=result["FS"], failure_solution=fail,
+            field_state="converged")
+
+
+# --------------------------------------------------------------------------- #
+# FEM-2 — Reinforcement: LEM against FEM
+# --------------------------------------------------------------------------- #
+#: FEM-2's file pair, written by ``tools/build_reinforced_slope_tutorial.py`` from
+#: the LEM reinforced-slope model (docs/lem/samples.md problem 9, the model
+#: Tutorial LEM-8 builds) and its finite element counterpart
+#: (docs/fem/samples.md problem 1).  The starter carries the limit-equilibrium
+#: model only — the six geogrid lines, but no elastic constants, no mesh and no
+#: FEM reinforcement data; the completed file adds the soils' E and nu, Tres, the
+#: bar modulus and the bar area, and declares the mesh.  Nothing here runs the FEM
+#: on the starter: its three uses below are the inputs plot and the Spencer search.
+FEM02_START = os.path.join(REPO_ROOT,
+                           "docs/tutorials/files/xslope_reinforced_slope_start.xlsx")
+FEM02_DONE = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_reinforced_slope.xlsx")
+#: The method the page's limit-equilibrium number is quoted from, and the slice
+#: count the sample page's own locked search uses.
+FEM02_METHOD = "spencer"
+FEM02_SLICES = 40
+#: The strength-reduction run, at the settings the page's final runs are made at.
+#: ``non_convergence`` rather than the API default ``hybrid`` because that is what
+#: Studio's Run FEM dialog runs.
+FEM02_CRITERION = "non_convergence"
+FEM02_F_MIN, FEM02_F_MAX = 1.0, 2.0
+FEM02_TOLERANCE = 0.01
+#: 12,000, which is also ``solve_ssrm``'s default budget.  On this model the
+#: number no longer decides the answer: a trial that spends its budget while still
+#: making progress is extended rather than failed, so both runs return the same
+#: factors of safety (1.5586 elastic-perfectly-plastic, 1.5117 peak-residual) from
+#: a 3,000 budget and from 12,000, with the same brackets and the same converged
+#: field.  What the budget still decides is how far the captured failure state has
+#: developed, which is why the producers ask for the larger one.
+FEM02_MAX_ITERATIONS = 12000
+#: The line the bar-force profiles are drawn for: the most heavily loaded of the
+#: six in both runs (peak 800 lb/ft elastic-perfectly-plastic, 798 lb/ft
+#: peak-residual, both at the last converged trial).
+FEM02_PROFILE_LINE = 5
+#: The residual capacities the sweep asks for, highest first.  ``None`` is the
+#: blank cell — no post-peak drop at all.  The sweep runs down to zero because
+#: that is where the answer moves: Tres = Tmax is the same run as a blank cell,
+#: 600 and 400 give one lower factor of safety, and only Tres = 0 — the bar
+#: tearing and carrying nothing — gives a third.
+FEM02_TRES_SWEEP = (None, 800.0, 600.0, 400.0, 0.0)
+
+
+def _fem02_mesh(model):
+    """The tutorial's mesh, at the element type and target size the COMPLETED FILE
+    declares, built the way Studio's Build Mesh dialog builds it — the
+    reinforcement lines carried in as constraint lines so the bars land on mesh
+    edges — with **Refine thin zones unticked**.
+
+    The dialog's own default for that box is ticked, and on this section it is not
+    inert: the shell is a 1.19 ft facing band, thinner than one element at the
+    target size, so the refinement drives the local size there to 0.33 ft and the
+    mesh from 2,101 elements to 5,096.  That mesh is a different model's worth of
+    answer (peak-residual 1.4414 against 1.5117, elastic-perfectly-plastic 1.5117
+    against 1.5586), so the page has to tell the reader which box to clear, and
+    this producer draws the mesh the page's own numbers come from.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_size_regions, get_material_polygons)
+
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(model)
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model, reinf_lines=lines),
+            model["target_size"], model["element_type"], lines=lines or None,
+            element_size_1d=model.get("element_size_1d"),
+            size_regions=extract_size_regions(model))
+
+
+def _fem02_solve(model, mesh, t_res, max_iterations=FEM02_MAX_ITERATIONS):
+    """One strength-reduction run on this model with the six lines' residual
+    capacity set to ``t_res`` (``None`` leaves the cells blank, which the loader
+    reads as "no post-peak drop").  Returns ``(fem_data, result, log)``."""
+    import copy as _copy
+
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    sd = _copy.deepcopy(model)
+    for line in sd["reinforcement_lines"]:
+        line["t_res"] = float("nan") if t_res is None else float(t_res)
+    fem_data = build_fem_data(sd, mesh)
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        result = solve_ssrm(fem_data, F_min=FEM02_F_MIN, F_max=FEM02_F_MAX,
+                            tolerance=FEM02_TOLERANCE, debug_level=1,
+                            failure_criterion=FEM02_CRITERION,
+                            max_iterations=max_iterations)
+    return fem_data, result, log.getvalue()
+
+
+def _fem02_report(label, fem_data, result):
+    """Print everything the page can quote from one run: the bracket walk, the two
+    states, and what each of the six lines is doing at the last converged one."""
+    import numpy as np
+
+    from xslope import fem_details
+
+    print("   %-14s FS %.4f from [%.6f, %.6f] (width %.6f) after %d bisection "
+          "steps" % (label, result["FS"], result["final_interval"][0],
+                     result["final_interval"][1], result["interval_width"],
+                     result["iterations_ssrm"]))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s iterations"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+    nodes = np.asarray(fem_data["nodes"])
+    last, fail = result["last_solution"], result.get("failure_solution")
+    for state, field in (("last converged", last), ("at failure", fail)):
+        if field is None:
+            print("        %-14s none" % state)
+            continue
+        u = np.asarray(field["displacements"]).reshape(-1, 2)
+        umag = np.hypot(u[:, 0], u[:, 1])
+        ue = np.asarray(field["displacements_elastic"]).reshape(-1, 2)
+        i = int(np.argmax(umag))
+        print("        %-14s F %.4f · %s in %s iterations (%s) · max|u| %.6f at "
+              "(%.2f, %.2f), %.2f× elastic"
+              % (state, field.get("F", float("nan")),
+                 "equilibrium" if field.get("converged") else "no equilibrium",
+                 field.get("iterations"), field.get("exit_reason"), umag.max(),
+                 nodes[i, 0], nodes[i, 1],
+                 umag.max() / np.hypot(ue[:, 0], ue[:, 1]).max()))
+    mats_1d = np.asarray(fem_data.get("element_materials_1d", []), dtype=int)
+    piles = np.asarray(fem_data.get("pile_elem_mask", np.zeros(len(mats_1d))),
+                       dtype=bool)
+    for line_id in sorted(set(mats_1d[~piles].tolist())):
+        prof = fem_details.reinforcement_profile(
+            fem_data, last, int(line_id), field_state="converged",
+            failure_solution=fail)
+        if not len(prof["s"]):
+            continue
+        # Two different "peaks", and the page needs both: the greatest force
+        # anywhere on the bar, and the force at the point working hardest against
+        # its own capacity — which on a bar with pullout ramps is usually an end
+        # element carrying a fraction of Tmax against a fraction of the capacity.
+        print("        line %d  max force %.1f · hardest-worked %.1f at s %.2f "
+              "(utilization %.3f) · %s · %d element(s) at capacity, %d softened"
+              % (line_id, float(prof["T"].max()), prof["peak_T"], prof["peak_s"],
+                 prof["peak_utilization"], prof["status"],
+                 int(prof["failed"].sum()), int(prof["softened"].sum())))
+
+
+def fem02_plots():
+    """The reinforcement arc: the section, the limit-equilibrium answer on the
+    same six lines, the mesh the bars are meshed into, and the two strength
+    reduction runs the page compares — elastic-perfectly-plastic (Tres blank) and
+    peak-residual (Tres = 600 lb/ft).
+
+    Printed rather than drawn: the critical circle, the mesh counts, both bracket
+    walks trial by trial, the two states of each run, and every line's peak force
+    and state at the last converged trial.
+    """
+    import time
+
+    import numpy as np
+
+    from xslope.plot_fem import plot_fem_data, plot_fem_results
+
+    # ---- the section, and the answer the slices already gave ---------------- #
+    start = load_slope_data(FEM02_START)
+    _u = declared_unit_labels(start)
+    for mat in start["materials"]:
+        print("   starter     %-6s γ %g %s · c %g %s · φ %g° · E %r · ν %r"
+              % (mat["name"], mat["gamma"], _u["unit_weight"], mat["c"],
+                 _u["stress"], mat["phi"], mat["E"], mat["nu"]))
+    r0 = start["reinforcement_lines"][0]
+    print("   starter     %d reinforcement lines · Tmax %g · Lp %g/%g · "
+          "Tres %r · E %r · Area %r"
+          % (len(start["reinforcement_lines"]), r0["t_max"], r0["lp1"], r0["lp2"],
+             r0["t_res"], r0["E"], r0["area"]))
+
+    capture("fem02_inputs.png", plot_inputs, start,
+            title="Slope Geometry and Inputs")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _path, _circles = circular_search(
+            start, FEM02_METHOD, num_slices=FEM02_SLICES, diagnostic=False,
+            **file_search_window(start))
+    crit = fs_cache[0]
+    capture("fem02_lem_solution.png", plot_solution, start, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    print("   LEM         %s FS %.4f on Xo %.4f Yo %.4f R %.4f · entry "
+          "(%.3f, %.3f) exit (%.3f, %.3f) · %d candidates"
+          % (FEM02_METHOD, crit["FS"], crit["Xo"], crit["Yo"],
+             crit["Yo"] - crit["Depth"], xs[0], ys[0], xs[-1], ys[-1],
+             len(fs_cache)))
+
+    # ---- the mesh the bars are meshed into ---------------------------------- #
+    done = load_slope_data(FEM02_DONE)
+    d0 = done["reinforcement_lines"][0]
+    print("   completed   Tres %g · bar E %g %s · Area %g %s²/%s · declares %s at "
+          "target size %g %s"
+          % (d0["t_res"], d0["E"], _u["stress"], d0["area"], _u["length"],
+             _u["length"], done["element_type"], done["target_size"],
+             _u["length"]))
+    mesh = _fem02_mesh(done)
+    print("   mesh        %d nodes · %d elements · %d bar elements · every "
+          "element %s"
+          % (len(mesh["nodes"]), len(mesh["elements"]),
+             len(mesh.get("elements_1d", [])), done["element_type"]))
+    from xslope.fem import build_fem_data
+    capture("fem02_mesh.png", plot_fem_data, build_fem_data(done, mesh))
+
+    # ---- the two runs -------------------------------------------------------- #
+    runs = {}
+    for tag, t_res in (("epp", None), ("pr", d0["t_res"])):
+        t0 = time.time()
+        fem_data, result, _log = _fem02_solve(done, mesh, t_res)
+        print("   %s run · Tres %s · %.1f s wall (capture included)"
+              % ("elastic-perfectly-plastic" if t_res is None else "peak-residual",
+                 "blank" if t_res is None else "%g" % t_res, time.time() - t0))
+        _fem02_report(tag, fem_data, result)
+        runs[tag] = (fem_data, result)
+
+    for tag, name in (("epp", "fem02_shear_strain_epp.png"),
+                      ("pr", "fem02_shear_strain_pr.png")):
+        fem_data, result = runs[tag]
+        capture(name, plot_fem_results, fem_data, result["last_solution"],
+                plot_type="shear_strain", fs=result["FS"],
+                failure_solution=result.get("failure_solution"),
+                field_state="failure")
+    fem_data, result = runs["pr"]
+    for name, kind in (("fem02_deformed_pr.png", "deformation"),
+                       ("fem02_displacement_vectors_pr.png", "displace_vector")):
+        capture(name, plot_fem_results, fem_data, result["last_solution"],
+                plot_type=kind, fs=result["FS"],
+                failure_solution=result.get("failure_solution"),
+                field_state="failure")
+
+    # ---- the bar the page reads along --------------------------------------- #
+    # Studio's own 1D Details drawing, one figure per run: the two cannot share a
+    # figure because ``plot_reinforcement_detail`` lays its panels out with
+    # ``tight_layout``, which a matplotlib SubFigure does not carry.
+    from xslope import fem_details
+    from xslope.plot_fem_details import plot_reinforcement_detail
+
+    for tag, name in (("epp", "fem02_bar_profile_epp.png"),
+                      ("pr", "fem02_bar_profile_pr.png")):
+        fem_data, result = runs[tag]
+        prof = fem_details.reinforcement_profile(
+            fem_data, result["last_solution"], FEM02_PROFILE_LINE,
+            slope_data=done, field_state="converged",
+            failure_solution=result.get("failure_solution"))
+        print("   %-4s line %d · max force %.1f %s · hardest-worked %.1f at "
+              "s %.2f %s (utilization %.3f) · %s · %d at capacity, %d softened"
+              % (tag, FEM02_PROFILE_LINE, float(prof["T"].max()),
+                 _u["force_per_len"], prof["peak_T"], prof["peak_s"],
+                 _u["length"], prof["peak_utilization"], prof["status"],
+                 int(prof["failed"].sum()), int(prof["softened"].sum())))
+        capture(name, plot_reinforcement_detail, prof)
+
+    # Where each engine puts the mechanism, measured rather than described: the
+    # limit-equilibrium circle's entry and exit against the centroid of the
+    # elements carrying the most viscoplastic shear strain.
+    fem_data, result = runs["pr"]
+    fail = result.get("failure_solution") or result["last_solution"]
+    strain = np.asarray(fem_details._mechanism_field(
+        fem_data, result["last_solution"], fail))
+    cent = np.asarray(fem_details._element_centroids(fem_data))
+    hot = strain >= 0.5 * np.nanmax(strain)
+    w = strain[hot]
+    top = int(np.argmax(cent[hot, 1]))              # where the band reaches the crest
+    print("   mechanism   %d of %d elements above half the peak shear strain "
+          "(%.4f); strain-weighted centroid (%.2f, %.2f); x %.2f–%.2f, "
+          "y %.2f–%.2f; highest band element at (%.2f, %.2f)"
+          % (int(hot.sum()), len(strain), float(np.nanmax(strain)),
+             float((cent[hot, 0] * w).sum() / w.sum()),
+             float((cent[hot, 1] * w).sum() / w.sum()),
+             float(cent[hot, 0].min()), float(cent[hot, 0].max()),
+             float(cent[hot, 1].min()), float(cent[hot, 1].max()),
+             float(cent[hot][top, 0]), float(cent[hot][top, 1])))
+    print("   LEM circle  entry (%.3f, %.3f) exit (%.3f, %.3f) · center "
+          "(%.3f, %.3f) R %.3f — the surface the slices found, for comparison"
+          % (xs[0], ys[0], xs[-1], ys[-1], crit["Xo"], crit["Yo"],
+             crit["Yo"] - crit["Depth"]))
+
+
+#: The overburden-dependent pullout law entered on FEM-2's alternative run:
+#: adhesion zero, and the interface angle FHWA-NHI-10-024's default pullout
+#: friction factor gives for a geogrid in sand — δ = arctan(F*·α) with
+#: F* = (2/3)·tan φ′ and the geogrid scale-effect correction α = 0.8.  At
+#: φ′ = 37° that is arctan(0.404) = 22.0°.
+FEM02_LAW_ADHESION = 0.0
+FEM02_LAW_DELTA = 22.0
+#: The line the law's envelope is drawn along.  Line 2 rather than line 5: it is
+#: the line whose hardest-worked point moves from the buried end to the face when
+#: the law replaces the constant ramps, so its profile shows both the curve and
+#: what the curve costs.
+FEM02_LAW_PROFILE_LINE = 2
+
+
+def fem02_pullout_law():
+    """The same model with pullout resistance read from the overburden instead of
+    from a stated development length: Adhesion 0, Delta 22°.
+
+    One elastic-perfectly-plastic strength-reduction run and one Spencer search
+    under the law, against the constant-law search on the same file, plus the
+    bar-force profile that shows the curved capacity envelope.
+    """
+    import copy as _copy
+    import time
+
+    from xslope.fem import build_fem_data
+    from xslope.fileio import ensure_reinforce_pullout
+    from xslope import fem_details
+    from xslope.plot_fem_details import plot_reinforcement_detail
+
+    done = load_slope_data(FEM02_DONE)
+    start = load_slope_data(FEM02_START)
+    _u = declared_unit_labels(done)
+
+    # ---- the limit-equilibrium half: the same search under each law ---------- #
+    def _search(model):
+        with contextlib.redirect_stdout(io.StringIO()):
+            fs_cache, _, _p, _c = circular_search(
+                model, FEM02_METHOD, num_slices=FEM02_SLICES, diagnostic=False,
+                **file_search_window(model))
+        return fs_cache[0]
+
+    law_start = _copy.deepcopy(start)
+    for line in law_start["reinforcement_lines"]:
+        line["adhesion"] = FEM02_LAW_ADHESION
+        line["delta"] = FEM02_LAW_DELTA
+    ensure_reinforce_pullout(law_start)
+
+    for tag, model in (("constant", start), ("law", law_start)):
+        crit = _search(model)
+        xs, ys = zip(*list(crit["failure_surface"].coords))
+        if tag == "law":
+            # The circle the law makes critical, beside the stated-length one
+            # the page drew first: the page says it daylights beyond the toe
+            # and clips line 1 near the face, and the reader should see it.
+            capture("fem02_lem_solution_law.png", plot_solution, model,
+                    crit["slices"], crit["failure_surface"], crit["solver_result"])
+        print("   LEM %-9s %s FS %.4f on Xo %.4f Yo %.4f R %.4f · entry "
+              "(%.3f, %.3f) exit (%.3f, %.3f) · ΣP %.0f %s"
+              % (tag, FEM02_METHOD, crit["FS"], crit["Xo"], crit["Yo"],
+                 crit["Yo"] - crit["Depth"], xs[0], ys[0], xs[-1], ys[-1],
+                 crit["slices"]["p"].sum(), _u["force_per_len"]))
+
+    # ---- the finite element half: one run, blank Tres ------------------------ #
+    # The mesh is built from the model as the page meshes it, and the law is
+    # applied to the copy that goes into ``build_fem_data``. Meshing the law's
+    # own model instead would put a node at every one of its 41 stored tension
+    # points per line — 240 bar elements against 60 — and the comparison would
+    # be between two meshes rather than between two capacity laws.
+    mesh = _fem02_mesh(done)
+    law_done = _copy.deepcopy(done)
+    for line in law_done["reinforcement_lines"]:
+        line["adhesion"] = FEM02_LAW_ADHESION
+        line["delta"] = FEM02_LAW_DELTA
+    ensure_reinforce_pullout(law_done)
+    print("   mesh        %d nodes · %d elements · %d bar elements"
+          % (len(mesh["nodes"]), len(mesh["elements"]),
+             len(mesh.get("elements_1d", []))))
+    t0 = time.time()
+    fem_data, result, _log = _fem02_solve(law_done, mesh, None)
+    print("   law run · Tres blank · %.1f s wall" % (time.time() - t0))
+    _fem02_report("law-epp", fem_data, result)
+
+    prof = fem_details.reinforcement_profile(
+        fem_data, result["last_solution"], FEM02_LAW_PROFILE_LINE,
+        slope_data=law_done, field_state="converged",
+        failure_solution=result.get("failure_solution"))
+    print("   law  line %d · max force %.1f %s · hardest-worked %.1f at s %.2f "
+          "%s (utilization %.3f) · %s"
+          % (FEM02_LAW_PROFILE_LINE, float(prof["T"].max()), _u["force_per_len"],
+             prof["peak_T"], prof["peak_s"], _u["length"],
+             prof["peak_utilization"], prof["status"]))
+    capture("fem02_bar_profile_law.png", plot_reinforcement_detail, prof)
+
+    # The mechanism under the law, drawn and measured against the stated-length
+    # run on the same mesh: where the band crosses each line, and where it
+    # reaches the face. A capacity law that is weakest at the face can move the
+    # band there even when the factor of safety barely moves.
+    from xslope.plot_fem import plot_fem_results
+    capture("fem02_shear_strain_law.png", plot_fem_results, fem_data, result,
+            plot_type="shear_strain", fs=result["FS"],
+            failure_solution=result.get("failure_solution"),
+            field_state="failure")
+    import numpy as np
+    fem_con, res_con, _log = _fem02_solve(done, mesh, None)
+    print("   constant-law run for comparison · FS %.4f" % res_con["FS"])
+    for tag, fd, res, model in (("constant", fem_con, res_con, done),
+                                ("law", fem_data, result, law_done)):
+        fail = res.get("failure_solution") or res["last_solution"]
+        strain = np.asarray(fem_details._mechanism_field(fd, res["last_solution"], fail))
+        cent = np.asarray(fem_details._element_centroids(fd))
+        hot = strain >= 0.5 * np.nanmax(strain)
+        w = strain[hot]
+        print("   %-8s mechanism · %d elements above half the peak (%.3f) · "
+              "centroid (%.2f, %.2f) · x %.1f–%.1f, y %.1f–%.1f"
+              % (tag, int(hot.sum()), float(np.nanmax(strain)),
+                 float((cent[hot, 0] * w).sum() / w.sum()),
+                 float((cent[hot, 1] * w).sum() / w.sum()),
+                 cent[hot, 0].min(), cent[hot, 0].max(),
+                 cent[hot, 1].min(), cent[hot, 1].max()))
+        for ln in range(1, len(model["reinforcement_lines"]) + 1):
+            pr = fem_details.reinforcement_profile(
+                fd, res["last_solution"], ln, slope_data=model,
+                field_state="converged", failure_solution=res.get("failure_solution"))
+            print("        line %d · band %s–%s · hardest-worked at s %.2f (%.3f) · %s"
+                  % (ln, pr.get("band_lo"), pr.get("band_hi"), pr["peak_s"],
+                     pr["peak_utilization"], pr["status"]))
+
+    # What the two laws allow along that line, so the page's claim about WHERE the
+    # bond is critical is a measurement rather than a reading of the figure.
+    from xslope.fileio import reinforce_available_tension
+    r_law = law_done["reinforcement_lines"][FEM02_LAW_PROFILE_LINE - 1]
+    r_con = done["reinforcement_lines"][FEM02_LAW_PROFILE_LINE - 1]
+    L = math.hypot(r_con["x2"] - r_con["x1"], r_con["y2"] - r_con["y1"])
+    print("   envelope along line %d (s from the face end, %s):"
+          % (FEM02_LAW_PROFILE_LINE, _u["length"]))
+    for s in (1.0, 2.0, 3.0, 4.0, 5.0, 10.0, L - 3.0, L - 2.0, L - 1.0):
+        con = reinforce_available_tension(s, L - s, r_con["t_max"], r_con["lp1"],
+                                          r_con["lp2"], r_con.get("tend1", 0.0),
+                                          r_con.get("tend2", 0.0))
+        law = reinforce_available_tension(s, L - s, r_law["t_max"], r_law["lp1"],
+                                          r_law["lp2"], r_law.get("tend1", 0.0),
+                                          r_law.get("tend2", 0.0),
+                                          pullout=r_law.get("_pullout_profile"))
+        print("        s %5.1f   constant %6.1f   law %6.1f" % (s, con, law))
+
+
+def fem02_tres_sweep():
+    """FS against the residual capacity typed into Tres, with the
+    limit-equilibrium answer drawn across it.
+
+    Its own group because it is five strength-reduction runs — about ten
+    minutes — and nothing else on the page needs them.
+    """
+    import numpy as np
+
+    done = load_slope_data(FEM02_DONE)
+    mesh = _fem02_mesh(done)
+    start = load_slope_data(FEM02_START)
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _p, _c = circular_search(
+            start, FEM02_METHOD, num_slices=FEM02_SLICES, diagnostic=False,
+            **file_search_window(start))
+    lem_fs = fs_cache[0]["FS"]
+
+    values, factors = [], []
+    for t_res in FEM02_TRES_SWEEP:
+        fem_data, result, _log = _fem02_solve(done, mesh, t_res)
+        values.append(t_res)
+        factors.append(result["FS"])
+        print("   Tres %-6s FS %.4f  interval [%.6f, %.6f]"
+              % ("blank" if t_res is None else "%g" % t_res, result["FS"],
+                 result["final_interval"][0], result["final_interval"][1]))
+
+    def _draw():
+        _u = declared_unit_labels(done)
+        numeric = sorted((v, f) for v, f in zip(values, factors) if v is not None)
+        blank = [f for v, f in zip(values, factors) if v is None]
+        fig, ax = plt.subplots(figsize=(7.2, 4.4))
+        # The measured answer lands on three tiers, not on a curve: sloped
+        # connectors between the points would draw a gradient the runs do not
+        # have.  Steps hold each measured factor of safety flat between its
+        # neighbors and put the change where the answer actually changes.
+        ax.plot([v for v, _ in numeric], [f for _, f in numeric],
+                drawstyle="steps-mid", marker="o", color="#1f4e79",
+                linewidth=1.8, label="Tres entered")
+        if blank:
+            ax.axhline(blank[0], color="#7a5195", linestyle="--", linewidth=1.5,
+                       label="Tres blank (elastic-perfectly-plastic)")
+        ax.axhline(lem_fs, color="#c0392b", linestyle=":", linewidth=1.5,
+                   label="Spencer (limit equilibrium)")
+        ax.set_xlabel("Residual capacity Tres (%s)" % _u["force_per_len"])
+        ax.set_ylabel("Factor of safety")
+        ax.grid(True, alpha=0.3)
+        # The measured curve steps twice and leaves a clear corner, so the legend
+        # goes inside where matplotlib finds room for it rather than eating a
+        # third of the figure width in a reserved column beside the axes.
+        ax.legend(loc="best", fontsize=9, framealpha=0.9)
+        fig.tight_layout()
+
+    capture("fem02_tres_sweep.png", _draw)
+
+
+# --------------------------------------------------------------------------- #
+# FEM-3 — Piles: LEM against FEM
+# --------------------------------------------------------------------------- #
+#: FEM-3's two models, both on the same slope.  The discrete row is the pile
+#: sample problem — one model, two sample pages: docs/lem/samples.md problem 10
+#: locks Spencer's search on it and docs/fem/samples.md problem 2 locks a
+#: strength-reduction run on it.  The sample's locked run is made over its own
+#: bracket on the mesh committed beside its finite element copy; the tutorial
+#: runs below are made at the settings the page has the reader enter, so they
+#: build their own mesh from the limit-equilibrium copy the page links.
+FEM03_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
+#: The continuous wall: the pair written by ``tools/build_pile_wall_tutorial.py``
+#: from that same slope — the starter with no structural line in it, and the same
+#: file with one PZ-27 sheet pile row.  Neither carries a mesh; the page builds
+#: one, and so does every run here.
+FEM03_WALL_START = os.path.join(REPO_ROOT,
+                                "docs/tutorials/files/xslope_pile_wall_start.xlsx")
+FEM03_WALL_DONE = os.path.join(REPO_ROOT,
+                               "docs/tutorials/files/xslope_pile_wall.xlsx")
+#: The limit-equilibrium method and slice count the piles model's own locked
+#: search runs at (docs/lem/samples.md's circular_search tag).
+FEM03_METHOD = "spencer"
+FEM03_SLICES = 40
+#: The mesh every figure on the page is drawn on: quadratic triangles at 2 ft,
+#: with the thin-zone refinement off, which is what the page has the reader set
+#: in Build Mesh.
+FEM03_ELEMENT_TYPE = "tri6"
+FEM03_TARGET_SIZE = 2.0
+#: The optional refinement step of the wall half: a 0.5 ft 1D element size, which
+#: also refines the soil the beam is embedded in.
+FEM03_REFINED_1D = 0.5
+#: The strength-reduction settings the page runs every trial at, which are
+#: Studio's Run FEM dialog as it opens except for the bracket: ``non_convergence``
+#: rather than the API default ``hybrid``, a 12,000-iteration budget, and a
+#: 1.0–2.0 bracket, which has to reach 2.0 because the socketed runs stand at 1.6
+#: and above.
+FEM03_CRITERION = "non_convergence"
+FEM03_F_MIN, FEM03_F_MAX = 1.0, 2.0
+FEM03_TOLERANCE = 0.01
+FEM03_MAX_ITERATIONS = 12000
+#: The spacings the sweep runs, spanning S/D = 1.5 to 6 on the model's 2 ft
+#: shafts.  6 ft is the file's own value and the locked case; 3 and 12 ft halve
+#: and double it, which quarters and quadruples what the finite element model
+#: sees, since spacing reaches it only as the divisor on EA and EI.
+FEM03_SPACINGS = (3.0, 6.0, 12.0)
+
+
+def _fem03_search(model):
+    """One Spencer search on the piles model at the sample's own slice count."""
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _conv, _path, _cache = circular_search(
+            model, FEM03_METHOD, num_slices=FEM03_SLICES, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache[0]
+
+
+def _fem03_reading(crit):
+    """The one-line reading of a search: factor of safety, circle, and the pile
+    force that reached the slices."""
+    piles = (crit["slices"].attrs.get("pile_report") or []
+             if crit.get("slices") is not None else [])
+    total = sum(r["H_width"] for r in piles)
+    return ("FS %.4f on Xo %.3f Yo %.3f R %.3f (deepest y %.3f) · ΣH %.1f "
+            "per unit width from %d row(s)"
+            % (crit["FS"], crit["Xo"], crit["Yo"], crit["Yo"] - crit["Depth"],
+               crit["Depth"], total, len(piles)))
+
+
+def _fem03_piles_model(spacing=None, head=None, tip=None, pile_E=None,
+                       caps=True, path=FEM03_PILES):
+    """The piles model with one thing changed on both rows.
+
+    Every argument left ``None`` leaves the file's own cell alone, so a call with
+    no arguments is the model as it is shipped: 2 ft shafts at 6 ft centers, both
+    ends free to rotate, 46,000 lb of shear capacity and 60,000 lb·ft of moment
+    capacity each.
+    """
+    sd = load_slope_data(path)
+    for pile in sd["pile_lines"]:
+        if spacing is not None:
+            pile["S"] = float(spacing)
+        if head is not None:
+            pile["head_fixity"] = head
+        if tip is not None:
+            pile["tip_fixity"] = tip
+        if pile_E is not None:
+            pile["E"] = float(pile_E)
+        if not caps:
+            pile["V_cap"] = None
+            pile["M_cap"] = None
+    return sd
+
+
+def _fem03_mesh(model, element_size_1d=None):
+    """The mesh Studio's Build Mesh dialog builds for this model at the page's
+    settings: quadratic triangles at 2 ft with the pile or wall lines carried in
+    as constraint lines, so the beam elements lie on element edges and share
+    their nodes with the soil on both sides.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_point_constraints,
+                             extract_size_regions, get_material_polygons)
+
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(model)
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(
+            get_material_polygons(model, reinf_lines=lines),
+            FEM03_TARGET_SIZE, FEM03_ELEMENT_TYPE, lines=lines or None,
+            element_size_1d=element_size_1d,
+            point_constraints=extract_point_constraints(model),
+            size_regions=extract_size_regions(model))
+
+
+def _fem03_solve(model, mesh):
+    """One strength-reduction run at the page's settings.  Returns
+    ``(fem_data, result, solution, seconds)``, where ``solution`` is the last
+    converged field with the captured mechanism attached — the pair the results
+    plots and the detail profiles are both read from."""
+    import time
+
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    fem_data = build_fem_data(model, mesh)
+    t0 = time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        result = solve_ssrm(fem_data, F_min=FEM03_F_MIN, F_max=FEM03_F_MAX,
+                            tolerance=FEM03_TOLERANCE, debug_level=0,
+                            capture_failure_state=True,
+                            failure_criterion=FEM03_CRITERION,
+                            max_iterations=FEM03_MAX_ITERATIONS)
+    seconds = time.time() - t0
+    solution = dict(result["last_solution"])
+    solution["failure_solution"] = result.get("failure_solution")
+    return fem_data, result, solution, seconds
+
+
+def _fem03_mechanism(fem_data, solution):
+    """Where the shear strain concentrates at the captured mechanism: the peak,
+    how many elements stand above half of it, and where they are."""
+    import numpy as np
+
+    from xslope import fem_details
+
+    fail = solution.get("failure_solution") or solution
+    strain = np.asarray(fem_details._mechanism_field(fem_data, solution, fail))
+    cent = np.asarray(fem_details._element_centroids(fem_data))
+    peak = float(np.nanmax(strain))
+    hot = strain >= 0.5 * peak
+    w = strain[hot]
+    j = int(np.nanargmax(strain))
+    return ("peak shear strain %.3f at element centroid (%.1f, %.1f) · %d of %d "
+            "elements above half the peak · strain-weighted centroid (%.2f, %.2f) "
+            "· x %.2f–%.2f, y %.2f–%.2f"
+            % (peak, cent[j, 0], cent[j, 1], int(hot.sum()), len(strain),
+               float((cent[hot, 0] * w).sum() / w.sum()),
+               float((cent[hot, 1] * w).sum() / w.sum()),
+               float(cent[hot, 0].min()), float(cent[hot, 0].max()),
+               float(cent[hot, 1].min()), float(cent[hot, 1].max())))
+
+
+def _fem03_beam(field, spacing, m_cap, v_cap):
+    """What the beam elements carry in one field: the peaks per unit width of
+    section, what those are per member, and how many elements have yielded."""
+    import numpy as np
+
+    mom = np.asarray(field.get("forces_pile_moment", []), dtype=float)
+    shear = np.asarray(field.get("forces_pile_lateral", []), dtype=float)
+    y_m = np.asarray(field.get("yielded_pile_M", []), dtype=bool)
+    y_v = np.asarray(field.get("yielded_pile_V", []), dtype=bool)
+    m_peak = float(np.abs(mom).max()) if mom.size else float("nan")
+    v_peak = float(np.abs(shear).max()) if shear.size else float("nan")
+    return ("peak moment %.0f per unit width (%.0f per member, %s) · "
+            "peak shear %.0f per unit width (%.0f per member, %s) · "
+            "%d element(s) yielded in bending, %d in shear"
+            % (m_peak, m_peak * spacing,
+               ("%.0f%% of Mcap" % (100.0 * m_peak * spacing / m_cap)) if m_cap
+               else "Mcap blank",
+               v_peak, v_peak * spacing,
+               ("%.0f%% of Vcap" % (100.0 * v_peak * spacing / v_cap)) if v_cap
+               else "Vcap blank",
+               int(y_m.sum()) if y_m.size else 0,
+               int(y_v.sum()) if y_v.size else 0))
+
+
+def _fem03_report(label, model, mesh, fem_data, result, solution, seconds,
+                  beam=True):
+    """Everything the page can quote from one run."""
+    row = model["pile_lines"][0] if model["pile_lines"] else None
+    spacing = float(row["S"]) if row else 1.0
+    print("   %-22s FS %.4f from [%.6f, %.6f] in %d trials · %d nodes, %d "
+          "elements, %d beam elements · %.0f s"
+          % (label, result["FS"], result["final_interval"][0],
+             result["final_interval"][1], len(result["trials"]),
+             len(mesh["nodes"]), len(mesh["elements"]),
+             len(mesh.get("elements_1d", [])), seconds))
+    if not (beam and row):
+        return
+    fail = solution.get("failure_solution") or solution
+    print("      converged  %s"
+          % _fem03_beam(solution, spacing, row["M_cap"], row["V_cap"]))
+    print("      at failure %s"
+          % _fem03_beam(fail, spacing, row["M_cap"], row["V_cap"]))
+    print("      mechanism  %s" % _fem03_mechanism(fem_data, solution))
+
+
+def _fem03_profiles(model, fem_data, solution, state="converged"):
+    """The per-member profile Studio's 1D Details panel draws, read as numbers."""
+    from xslope import fem_details
+
+    out = []
+    fail = solution.get("failure_solution")
+    for i, row in enumerate(model["pile_lines"]):
+        prof = fem_details.pile_profile(fem_data, solution, i, slope_data=model,
+                                        field_state=state, failure_solution=fail)
+        head_y = row["y1"]
+        print("      %-16s %d beam elements · peak moment %.0f per unit width at "
+              "depth %.2f (el. %.2f) · moment %.0f at the head and %.0f at the "
+              "toe · peak shear %.0f at depth %.2f · head deflection %.4f · %s"
+              % (row["label"], prof["n_elements"], prof["max_moment"],
+                 prof["max_moment_depth"], head_y - prof["max_moment_depth"],
+                 float(prof["moment"][0]), float(prof["moment"][-1]),
+                 prof["max_shear"], prof["max_shear_depth"],
+                 float(prof["u_lateral"][0]), prof["status"]))
+        out.append(prof)
+    return out
+
+
+def fem03_piles():
+    """The discrete row: the section both engines are given, the limit
+    equilibrium answer with the two rows crossing the critical circle, the mesh
+    the page builds, and the strength-reduction mechanism the finite element
+    model produces on the file as it is shipped — both rows free to rotate at
+    head and tip.
+    """
+    from xslope.plot_fem import plot_fem_data, plot_fem_results
+
+    sd = _fem03_piles_model()
+    _u = declared_unit_labels(sd)
+    mat = sd["materials"][0]
+    print("   model       %s: γ %g %s · c %g %s · φ %g° · E %g %s · ν %g · u %s"
+          % (mat["name"], mat["gamma"], _u["unit_weight"], mat["c"], _u["stress"],
+             mat["phi"], mat["E"], _u["stress"], mat["nu"], mat["u"]))
+    for pile in sd["pile_lines"]:
+        print("   pile row    %-9s (%g, %g) to (%g, %g) · D %g %s · S %g %s · "
+              "E %g %s · Vcap %g · Mcap %g · head %s · tip %s · %s"
+              % (pile["label"], pile["x1"], pile["y1"], pile["x2"], pile["y2"],
+                 pile["D_pile"], _u["length"], pile["S"], _u["length"],
+                 pile["E"], _u["stress"], pile["V_cap"], pile["M_cap"],
+                 pile["head_fixity"], pile["tip_fixity"], pile["appl"]))
+
+    capture("fem03_inputs_piles.png", plot_inputs, sd,
+            title="Slope Geometry and Inputs")
+
+    crit = _fem03_search(sd)
+    capture("fem03_lem_solution_piles.png", plot_solution, sd, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    print("   LEM         %s" % _fem03_reading(crit))
+    for rec in (crit["slices"].attrs.get("pile_report") or []):
+        print("      row %-9s crosses at y %.3f · Ito & Matsui %.0f per pile · "
+              "%s → %.0f per pile = %.1f %s applied"
+              % (rec["label"], rec["y"], rec["F_soil"], rec["governed"],
+                 rec["F_used"], rec["H_width"], _u["force_per_len"]))
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    print("   LEM circle  entry (%.3f, %.3f) exit (%.3f, %.3f)"
+          % (xs[0], ys[0], xs[-1], ys[-1]))
+
+    mesh = _fem03_mesh(sd)
+    fem_data, result, solution, seconds = _fem03_solve(sd, mesh)
+    capture("fem03_mesh_piles.png", plot_fem_data, fem_data)
+    capture("fem03_fem_shear_piles.png", plot_fem_results, fem_data, solution,
+            plot_type="shear_strain", fs=result["FS"],
+            failure_solution=solution.get("failure_solution"),
+            field_state="failure")
+    _fem03_report("FEM as shipped", sd, mesh, fem_data, result, solution, seconds)
+    _fem03_profiles(sd, fem_data, solution)
+
+
+def fem03_tip():
+    """What the flat spacing line is actually measuring: the shafts' toe.
+
+    Five runs on the pile model, each changing one thing from the file as it is
+    shipped, and all of them at the page's own settings on the page's own mesh.
+    The first four are the diagnostic — stiffness up, stiffness down, the
+    structural capacities cleared, the heads restrained — and the fifth is the
+    answer they point at: the shafts end on the rigid base with a free toe, so
+    they swing about it, and fixing that toe is what moves the factor of safety.
+    The tip-fixed run also draws the mechanism figure, which is a different
+    failure from the one the shipped file produces.
+    """
+    from xslope.plot_fem import plot_fem_results
+
+    E0 = load_slope_data(FEM03_PILES)["pile_lines"][0]["E"]
+    from xslope import fem_details
+    from xslope.plot_fem_details import plot_pile_detail
+
+    #: (label, model change, shear-strain figure, upper-row profile figure)
+    cases = [
+        ("tips pinned (as entered)", dict(tip="pinned"), None,
+         "fem03_piles_profile_pinned.png"),
+        ("pile E ×100", dict(pile_E=E0 * 100.0), None, None),
+        ("pile E ÷100", dict(pile_E=E0 / 100.0), None, None),
+        ("Vcap and Mcap cleared", dict(caps=False), None, None),
+        ("heads fixed, tips pinned", dict(head="fixed"), None, None),
+        ("tips fixed", dict(tip="fixed"), "fem03_fem_shear_piles_fixed.png",
+         "fem03_piles_profile_fixed.png"),
+    ]
+    for label, kwargs, figure, prof_fig in cases:
+        sd = _fem03_piles_model(**kwargs)
+        mesh = _fem03_mesh(sd)
+        fem_data, result, solution, seconds = _fem03_solve(sd, mesh)
+        if figure:
+            capture(figure, plot_fem_results, fem_data, solution,
+                    plot_type="shear_strain", fs=result["FS"],
+                    failure_solution=solution.get("failure_solution"),
+                    field_state="failure")
+        if prof_fig:
+            # The upper row's 1D Details, at failure — the field the panel opens
+            # on, and the one the page's 44% / at-capacity readings come from.
+            prof = fem_details.pile_profile(
+                fem_data, solution, 1, slope_data=sd, field_state="failure",
+                failure_solution=solution.get("failure_solution"))
+            capture(prof_fig, plot_pile_detail, prof)
+        _fem03_report(label, sd, mesh, fem_data, result, solution, seconds)
+        _fem03_profiles(sd, fem_data, solution)
+
+
+def fem03_spacing():
+    """The page's falsifiable test: the same two pile rows at 3, 6 and 12 ft
+    spacing, put through both engines, and through the finite element engine
+    twice — once with the shafts' toes free, as the file ships, and once with
+    them fixed.
+
+    The limit equilibrium runs are full searches, because spacing changes which
+    surface governs and a held circle would hide half the effect.  The
+    strength-reduction runs change nothing but the S cell, which reaches the
+    model only as the divisor on EA and EI.
+    """
+    sd = load_slope_data(FEM03_PILES)
+    _u = declared_unit_labels(sd)
+    row = sd["pile_lines"][0]
+    D, E = row["D_pile"], row["E"]
+    area, inertia = math.pi * D ** 2 / 4.0, math.pi * D ** 4 / 64.0
+    print("   section     D %g %s → A %.4f %s² · I %.4f %s⁴ · E %g %s"
+          % (D, _u["length"], area, _u["length"], inertia, _u["length"], E,
+             _u["stress"]))
+
+    lem, free, fixed = {}, {}, {}
+    for spacing in FEM03_SPACINGS:
+        model = _fem03_piles_model(spacing=spacing)
+        crit = _fem03_search(model)
+        lem[spacing] = crit["FS"]
+        print("   LEM  S %-5g %s" % (spacing, _fem03_reading(crit)))
+
+    for tip, store in (("free", free), ("fixed", fixed)):
+        for spacing in FEM03_SPACINGS:
+            model = _fem03_piles_model(spacing=spacing, tip=tip)
+            mesh = _fem03_mesh(model)
+            fem_data, result, solution, seconds = _fem03_solve(model, mesh)
+            store[spacing] = result["FS"]
+            print("   FEM  tips %s, S %-5g EA/S %.4g · EI/S %.4g"
+                  % (tip, spacing, E * area / spacing, E * inertia / spacing))
+            _fem03_report("     ", model, mesh, fem_data, result, solution,
+                          seconds)
+
+    _fem03_spacing_figure(lem, fixed, free, _u)
+
+
+def _fem03_spacing_figure(lem, fixed, free, _u):
+    """The sweep on one axis: the limit equilibrium curve and the two
+    strength-reduction lines (tips pinned by the base, tips fixed), each point
+    labeled with its own answer.
+
+    The labels sit above the limit equilibrium curve and below both flat lines,
+    which is what keeps the 6 ft column readable: the limit equilibrium point and
+    the tip-fixed point are 0.05 apart there, and a label above each would print
+    one over the other.
+    """
+    def _draw(with_fixed=True):
+        fig, ax = plt.subplots(figsize=(7.0, 4.6))
+        xs = list(FEM03_SPACINGS)
+        series = [
+            (lem, "LEM (Spencer, Ito & Matsui)", "#1f77b4", "o-", 9),
+            (fixed, "FEM (SSRM, pile tips fixed)", "#9467bd", "^-", -16),
+            (free, "FEM (SSRM, pile tips pinned)", "#d62728", "s-", -16),
+        ]
+        if not with_fixed:
+            series = [series[0], series[2]]
+        for data, label, color, style, dy in series:
+            ax.plot(xs, [data[s] for s in xs], style, color=color,
+                    linewidth=2.0, markersize=7, label=label)
+            for s in xs:
+                ax.annotate("%.3f" % data[s], (s, data[s]),
+                            textcoords="offset points", xytext=(0, dy),
+                            ha="center", fontsize=9, color=color)
+        ax.set_xlabel("Pile spacing S (%s)" % _u["length"])
+        ax.set_ylabel("Factor of safety")
+        ax.set_title("Two rows of 2 ft shafts: what each engine does with spacing")
+        ax.set_xticks(xs)
+        ax.set_xlim(min(xs) - 1.0, max(xs) + 1.0)
+        # Room for the annotation rows, measured off the data rather than padded
+        # by a guess: the lower labels sit under the two flat lines and would
+        # otherwise print on the axis.
+        lo = min(min(d.values()) for d, *_ in series)
+        hi = max(max(d.values()) for d, *_ in series)
+        ax.set_ylim(lo - 0.12 * (hi - lo), hi + 0.10 * (hi - lo))
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="upper right", frameon=False, fontsize=9)
+        fig.tight_layout()
+
+    capture("fem03_spacing_sweep.png", _draw)
+
+
+def fem03_wall():
+    """The continuous wall: the slope the reader starts from, the mesh the wall
+    line forces, the two mechanisms its toe condition produces, and the internal
+    actions only the finite element engine can give.
+
+    Four runs, all at the page's settings: the starter with no wall in it, the
+    wall with its tip free, the wall with its tip fixed, and the tip-fixed wall
+    again on a 0.5 ft 1D element size.  A fifth run clears Mcap on the tip-free
+    wall, which is the page's check that the cap never binds there.
+    """
+    from xslope.plot_fem import plot_fem_data, plot_fem_results
+    from xslope.plot_fem_details import plot_pile_detail
+
+    start = load_slope_data(FEM03_WALL_START)
+    _u = declared_unit_labels(start)
+    mat = start["materials"][0]
+    print("   model       %s: γ %g %s · c %g %s · φ %g° · E %g %s · ν %g"
+          % (mat["name"], mat["gamma"], _u["unit_weight"], mat["c"], _u["stress"],
+             mat["phi"], mat["E"], _u["stress"], mat["nu"]))
+    print("   starter     %d pile row(s) · %s at target size %g %s · SSRM "
+          "bracket [%g, %g]"
+          % (len(start["pile_lines"]), start["element_type"],
+             start["target_size"], _u["length"], start["ssrm_f_min"],
+             start["ssrm_f_max"]))
+    wall = load_slope_data(FEM03_WALL_DONE)["pile_lines"][0]
+    print("   wall row    %s: (%g, %g) to (%g, %g) · E %g %s · Area %g %s²/%s · "
+          "I %g %s⁴/%s · S %g · D %r · Vcap %r · Mcap %g · head %s · tip %s"
+          % (wall["label"], wall["x1"], wall["y1"], wall["x2"], wall["y2"],
+             wall["E"], _u["stress"], wall["area"], _u["length"], _u["length"],
+             wall["I"], _u["length"], _u["length"], wall["S"], wall["D_pile"],
+             wall["V_cap"], wall["M_cap"], wall["head_fixity"],
+             wall["tip_fixity"]))
+    print("   wall EA %.4g · EI %.4g" % (wall["E"] * wall["area"],
+                                         wall["E"] * wall["I"]))
+
+    capture("fem03_inputs_wall.png", plot_inputs, start,
+            title="Slope Geometry and Inputs")
+
+    # The bare slope, both ways — the baseline both halves of the page measure
+    # against, drawn so the reader sees the two mechanisms before any member.
+    crit = _fem03_search(start)
+    capture("fem03_lem_solution_bare.png", plot_solution, start, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    print("   LEM (bare)  %s" % _fem03_reading(crit))
+    mesh = _fem03_mesh(start)
+    fem_data, result, solution, seconds = _fem03_solve(start, mesh)
+    _fem03_report("no wall", start, mesh, fem_data, result, solution, seconds)
+    capture("fem03_fem_shear_bare.png", plot_fem_results, fem_data, solution,
+            plot_type="shear_strain", fs=result["FS"],
+            failure_solution=result.get("failure_solution"),
+            field_state="failure")
+
+    #: (label, tip, 1D element size, keep Mcap, mesh figure, shear-strain figure,
+    #: profile figure)
+    runs = [
+        ("wall, tip fixed", "fixed", None, True, "fem03_mesh_wall.png",
+         "fem03_wall_shear_fixed.png", "fem03_wall_profiles_fixed.png"),
+        ("wall, tip fixed, 1D 0.5", "fixed", FEM03_REFINED_1D, True, None, None,
+         "fem03_wall_profiles_refined.png"),
+    ]
+    for label, tip, size_1d, keep_cap, mesh_fig, shear_fig, prof_fig in runs:
+        sd = load_slope_data(FEM03_WALL_DONE)
+        sd["pile_lines"][0]["tip_fixity"] = tip
+        if not keep_cap:
+            sd["pile_lines"][0]["M_cap"] = None
+        mesh = _fem03_mesh(sd, element_size_1d=size_1d)
+        fem_data, result, solution, seconds = _fem03_solve(sd, mesh)
+        if mesh_fig:
+            capture(mesh_fig, plot_fem_data, fem_data)
+        if shear_fig:
+            capture(shear_fig, plot_fem_results, fem_data, solution,
+                    plot_type="shear_strain", fs=result["FS"],
+                    failure_solution=solution.get("failure_solution"),
+                    field_state="failure")
+        _fem03_report(label, sd, mesh, fem_data, result, solution, seconds)
+        profs = _fem03_profiles(sd, fem_data, solution)
+        if prof_fig:
+            capture(prof_fig, plot_pile_detail, profs[0])
+            if prof_fig == "fem03_wall_profiles_fixed.png":
+                # The same wall at the captured mechanism: the moment at the
+                # toe on its capacity, which the page reads next.
+                from xslope import fem_details
+                prof_f = fem_details.pile_profile(
+                    fem_data, solution, 0, slope_data=sd, field_state="failure",
+                    failure_solution=solution.get("failure_solution"))
+                capture("fem03_wall_profiles_fixed_failure.png", plot_pile_detail, prof_f)
+
+
+# --------------------------------------------------------------------------- #
+# COMBO-1 — Seepage into Stability
+#
+# One file, three engines, one mesh. The group runs the page's whole sequence in
+# order — build the mesh at Studio's own Build Mesh defaults, solve the seepage on
+# it, hand the solved field to a Spencer search, then to a strength reduction on
+# the same mesh — because that order IS the tutorial, and a figure produced out of
+# it would be a figure of a different model.
+#
+# Everything is at the settings the reader is told to use: the dialogs' own
+# defaults, except the one control the page changes (Method → Spencer). Nothing is
+# read from a companion sidecar; the tutorial copy of the workbook ships none, and
+# building the mesh is the step the page teaches.
+# --------------------------------------------------------------------------- #
+COMBO01 = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_johnson_res.xlsx")
+#: Build Mesh, at the dialog's own defaults: quadratic triangles, auto-sizing on,
+#: 100 divisions across the 750 ft section for a 7.5 ft target. Quadratic is the
+#: default AND the requirement — the same mesh carries the strength reduction.
+COMBO01_ELEMENT = "tri6"
+COMBO01_DIVISIONS = 100
+#: Run Seepage, at its defaults.
+COMBO01_TOL, COMBO01_MAX_ITER = 1e-4, 400
+#: Run LEM. Spencer is the one field the page changes from the dialog's default,
+#: because it satisfies both equilibrium conditions and is therefore the closest
+#: limit-equilibrium statement of what the strength reduction solves. The slice
+#: count is the dialog's own.
+COMBO01_METHOD = "spencer"
+COMBO01_SLICES = 40
+#: Run FEM, at its defaults: bracket [1.0, 2.0], 0.01 bisection tolerance, 12,000
+#: iterations a trial. ``non_convergence`` because that is the criterion Studio's
+#: Failure criterion list opens on.
+COMBO01_F_MIN, COMBO01_F_MAX = 1.0, 2.0
+COMBO01_TOLERANCE = 0.01
+COMBO01_CRITERION = "non_convergence"
+COMBO01_MAX_ITERATIONS = 12000
+#: The pore-pressure options the hinge section measures the workbook's own `seep`
+#: against — the two a reader could plausibly leave a material on.
+COMBO01_U_OPTIONS = ("none", "piezo")
+
+
+def _combo01_mesh(model):
+    """The mesh Build Mesh produces on this file with nothing changed."""
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    xs = [x for x, _ in model["ground_surface"].coords]
+    size = (max(xs) - min(xs)) / COMBO01_DIVISIONS
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(get_material_polygons(model), size,
+                                        COMBO01_ELEMENT,
+                                        size_regions=extract_size_regions(model))
+
+
+def _combo01_seep(model, mesh):
+    """One steady seepage solve, with the solved field attached to the model the
+    way Studio attaches it after a run — so the LEM and FEM steps below read the
+    field through the same path a reader's session does."""
+    from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                             run_seepage_analysis)
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        seep_data = build_seep_data(mesh, model)
+        solution = run_seepage_analysis(seep_data, tol=COMBO01_TOL,
+                                        max_iter=COMBO01_MAX_ITER)
+        model["mesh"] = mesh
+        apply_steady_stability_field(model, solution, bc=1)
+    return seep_data, solution, log.getvalue()
+
+
+def _combo01_search(model, method=COMBO01_METHOD):
+    with contextlib.redirect_stdout(io.StringIO()):
+        fs_cache, _, _path, _circles = circular_search(
+            model, method, num_slices=COMBO01_SLICES, diagnostic=False,
+            **file_search_window(model))
+    return fs_cache
+
+
+def _combo01_reading(crit):
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    return ("FS %.4f on Xo %.3f Yo %.3f tangent elevation %.3f (R %.3f) · "
+            "entry (%.2f, %.2f) exit (%.2f, %.2f)"
+            % (crit["FS"], crit["Xo"], crit["Yo"], crit["Depth"],
+               crit["Yo"] - crit["Depth"], xs[0], ys[0], xs[-1], ys[-1]))
+
+
+def combo01_plots():
+    """The three runs of the combined page, in the order the reader makes them.
+
+    Printed rather than drawn: the mesh counts, the seepage discharge and the
+    iteration that produced it, the Spencer search and the pore pressures it picked
+    up off the field, the same search with each material's pore-pressure option
+    turned away from `seep`, and the strength reduction's whole bisection walk.
+    Every number the page quotes is on one of these lines.
+    """
+    import time
+
+    import numpy as np
+
+    from xslope.fem import build_fem_data, solve_ssrm
+    from xslope.plot_fem import plot_fem_results
+    from xslope.plot_seep import plot_seep_data, plot_seep_solution
+
+    model = load_slope_data(COMBO01)
+    _u = declared_unit_labels(model)
+    for m in model["materials"]:
+        print("   material    %-11s γ %g %s · c %g %s · φ %g° · k1 %g %s/%s · "
+              "u %s · E %g %s · ν %g"
+              % (m["name"], m["gamma"], _u["unit_weight"], m["c"], _u["stress"],
+                 m["phi"], m["k1"], _u["length"], model["time_unit"], m["u"],
+                 m["E"], _u["stress"], m["nu"]))
+    capture("combo01_inputs.png", plot_inputs, model, mode="seep",
+            title="Seepage Model Inputs", frame="content", show_mesh=False)
+
+    # ---- one mesh ----------------------------------------------------------- #
+    mesh = _combo01_mesh(model)
+    figsize = _seep02_figsize(mesh)
+    xs = [x for x, _ in model["ground_surface"].coords]
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g %s"
+          % (len(mesh["nodes"]), len(mesh["elements"]), COMBO01_ELEMENT,
+             COMBO01_DIVISIONS, (max(xs) - min(xs)) / COMBO01_DIVISIONS,
+             _u["length"]))
+
+    # ---- the seepage run ---------------------------------------------------- #
+    seep_data, solution, log = _combo01_seep(model, mesh)
+    stats = _seep02_log_stats(log)
+    capture("combo01_mesh.png", plot_seep_data, seep_data, figsize=figsize,
+            show_bc=True)
+    capture("combo01_seepage.png", plot_seep_solution, seep_data, solution,
+            figsize=figsize, levels=SEEP02_LEVELS, base_mat=SEEP02_BASE_MAT,
+            fill_contours=True, mesh=False)
+    head = np.asarray(solution["head"])
+    print("   seepage     q %.4f %s³/%s per %s · head %.3f to %.3f %s · "
+          "u %.1f to %.1f %s"
+          % (solution["flowrate"], _u["length"], model["time_unit"], _u["length"],
+             head.min(), head.max(), _u["length"], np.min(solution["u"]),
+             np.max(solution["u"]), _u["stress"]))
+    print("   iteration   %s" % stats)
+    print("   field       %d nodal pore pressures attached as seep_u"
+          % len(np.asarray(model["seep_u"])))
+
+    # ---- the hinge: each material's own pore-pressure option ---------------- #
+    # The workbook's three materials all read `seep`. What a reader who leaves one
+    # of them on something else gets is measured rather than asserted: the same
+    # search, the same mesh, the same solved field, with only the u column changed.
+    crit = _combo01_search(model)[0]
+    capture("combo01_lem_solution.png", plot_solution, model, crit["slices"],
+            crit["failure_surface"], crit["solver_result"])
+    sl = crit["slices"]
+    print("   LEM         %s %s · %d candidates"
+          % (COMBO01_METHOD, _combo01_reading(crit), len(_combo01_search(model))))
+    print("   slice u     %d slices · u %.1f to %.1f %s · %d slices with u > 0"
+          % (len(sl), sl["u"].min(), sl["u"].max(), _u["stress"],
+             int((sl["u"] > 0).sum())))
+
+    for option in COMBO01_U_OPTIONS:
+        alt = load_slope_data(COMBO01)
+        for m in alt["materials"]:
+            m["u"] = option
+        alt["mesh"] = mesh
+        alt["seep_u"] = model["seep_u"]
+        try:
+            other = _combo01_search(alt)[0]
+        except Exception as e:                  # a option the model cannot supply
+            print("   u = %-6s  refused: %s" % (option, e))
+            continue
+        print("   u = %-6s  %s %s (%+.1f%% of the seep run)"
+              % (option, COMBO01_METHOD, _combo01_reading(other),
+                 100.0 * (other["FS"] - crit["FS"]) / crit["FS"]))
+
+    # ---- the strength reduction, on the same mesh and the same field -------- #
+    fem_data = build_fem_data(model, mesh)
+    log = io.StringIO()
+    t0 = time.time()
+    with contextlib.redirect_stdout(log):
+        result = solve_ssrm(fem_data, F_min=COMBO01_F_MIN, F_max=COMBO01_F_MAX,
+                            tolerance=COMBO01_TOLERANCE, debug_level=1,
+                            failure_criterion=COMBO01_CRITERION,
+                            max_iterations=COMBO01_MAX_ITERATIONS)
+    print("   SSRM        FS %.4f from the bracket [%.4f, %.4f] (width %.4f) "
+          "after %d bisection steps · %.1f s wall"
+          % (result["FS"], result["final_interval"][0], result["final_interval"][1],
+             result["interval_width"], result["iterations_ssrm"], time.time() - t0))
+    for tr in result["trials"]:
+        print("        F %.4f  %-6s  %-13s  %s iterations"
+              % (tr["F"], tr.get("role"), tr.get("verdict"), tr.get("iterations")))
+    last, fail = result["last_solution"], result.get("failure_solution")
+    nodes = np.asarray(mesh["nodes"])
+    for label, field in (("last converged", last), ("at failure", fail)):
+        if field is None:
+            print("   %-12s none" % label)
+            continue
+        d = np.asarray(field["displacements"]).reshape(-1, 2)
+        umag = np.hypot(d[:, 0], d[:, 1])
+        i = int(np.argmax(umag))
+        print("   %-12s F %.4f · %s in %s iterations · max|u| %.4f %s at "
+              "(%.1f, %.1f)"
+              % (label, field.get("F", float("nan")),
+                 "equilibrium" if field.get("converged") else "no equilibrium",
+                 field.get("iterations"), umag.max(), _u["length"],
+                 nodes[i, 0], nodes[i, 1]))
+    capture("combo01_fem_shear.png", plot_fem_results, fem_data, last,
+            plot_type="shear_strain", fs=result["FS"], failure_solution=fail,
+            field_state="failure")
+    print("   two answers Spencer %.4f · SSRM %.4f · difference %.1f%%"
+          % (crit["FS"], result["FS"],
+             100.0 * abs(result["FS"] - crit["FS"]) / crit["FS"]))
+
+
+# --------------------------------------------------------------------------- #
+# COMBO-2 — Rapid Drawdown
+# --------------------------------------------------------------------------- #
+# The same Johnson Reservoir dam COMBO-1 runs, drawn down. Two workbooks: the
+# starter carries the coarse piezometric pair and `u = piezo`; the completed model
+# carries both seepage boundary sets, the pool schedule and `u = seep`. Every run
+# below is made at the Run dialogs' own defaults except Method → Spencer.
+# Analysis stays on Auto search, so every limit equilibrium run on the page —
+# the three drawdown routes, the drained runs that bracket them and every point
+# of the d sweep — starts from the circle the two workbooks carry and reports
+# the critical surface it found for itself.
+# --------------------------------------------------------------------------- #
+COMBO02_START = os.path.join(REPO_ROOT,
+                             "docs/tutorials/files/xslope_johnson_rapid_start.xlsx")
+COMBO02 = os.path.join(REPO_ROOT,
+                       "docs/tutorials/files/xslope_johnson_rapid.xlsx")
+#: Build Mesh: linear triangles, auto-sizing on, 100 divisions across the 750 ft
+#: section for a 7.5 ft target. Linear because head is a scalar field and no
+#: strength reduction runs on this page — the transient march is thousands of
+#: steps, and the element order it is solved at is the whole of its cost.
+COMBO02_ELEMENT = "tri3"
+COMBO02_DIVISIONS = 100
+#: Run Seepage, at its defaults.
+COMBO02_TOL, COMBO02_MAX_ITER = 1e-4, 400
+#: Run LEM. Spencer, the drawdown checkbox, and Auto search from the file's own
+#: starting circle at the dialog's slice count.
+COMBO02_METHOD = "spencer"
+COMBO02_SLICES = 40
+# The head figures are drawn at SEEP-2's contour count and flow-net base
+# material: the same dam, and the values Studio's Display panel carries for it
+# (20 levels, and the nearest-to-squares base material the panel adopts).
+
+#: The undrained core's Kc = 1 cohesion intercept, swept at the file's own
+#: psi = 14 deg. Below the crossover every core slice is stronger undrained than
+#: drained and stage 2 governs; above it, slice by slice, stage 3 takes over. The
+#: sweep starts well below the file's own 250 psf because on the critical surface
+#: the handover has already happened there.
+COMBO02_D_SWEEP = (100.0, 150.0, 200.0, 225.0, 250.0, 275.0, 300.0, 350.0,
+                   400.0, 500.0, 600.0, 800.0, 1000.0, 1200.0)
+#: Bisection steps for the handover value. Each step is a full search plus a
+#: re-slice of what it found, and eight of them place the handover inside a tenth
+#: of a psf — finer than the page quotes it.
+COMBO02_BISECT = 8
+
+
+#: Two alternative Piezometric Line 2 sketches the page quotes, run on the starter
+#: file's own Line 1. The first puts the day-50 core pocket into the sketch; the
+#: second flattens the line onto the residual pool. They measure what the pair's
+#: answer is actually sensitive to.
+COMBO02_LINE2_VARIANTS = (
+    ("core at 150", [(0.0, 110.0), (220.0, 110.0), (360.0, 150.0), (410.0, 120.0),
+                     (550.0, 100.0), (750.0, 100.0)]),
+    ("flat at 110", [(0.0, 110.0), (220.0, 110.0), (550.0, 100.0), (750.0, 100.0)]),
+)
+
+
+def _combo02_mesh(model):
+    """The mesh Build Mesh produces on this file with only the element type changed."""
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    xs = [x for x, _ in model["ground_surface"].coords]
+    size = (max(xs) - min(xs)) / COMBO02_DIVISIONS
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_mesh_from_polygons(get_material_polygons(model), size,
+                                        COMBO02_ELEMENT,
+                                        size_regions=extract_size_regions(model))
+
+
+def _combo02_pinned(model):
+    """``model`` with the upstream boundary entered as a plain head at full pool.
+
+    This is boundary set 1 as the page builds it — a fixed head of 160 ft — before
+    the transient section rebinds it to the `pool` series. A steady solve reads a
+    series-bound value at t = 0 and would give the same field either way, but the
+    boundary is a runtime Dirichlet set while it is bound, so the fixed head is
+    what the mesh view marks and what the reader has in front of them at this step.
+    """
+    bc = {k: (list(v) if isinstance(v, list) else v)
+          for k, v in model["seepage_bc"].items()}
+    heads = [dict(h) for h in bc["specified_heads"]]
+    heads[0] = dict(heads[0], kind="head",
+                    head=float(model["tseep"]["series"]["pool"][0]))
+    bc["specified_heads"] = heads
+    return dict(model, seepage_bc=bc, tseep=None)
+
+
+def _combo02_steady(model, mesh, bc):
+    """One steady solve of one boundary set."""
+    from xslope.seep import build_seep_data, run_seepage_analysis
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        seep_data = build_seep_data(mesh, model, seep_bc=bc)
+        solution = run_seepage_analysis(seep_data, tol=COMBO02_TOL,
+                                        max_iter=COMBO02_MAX_ITER)
+    return seep_data, solution, log.getvalue()
+
+
+def _combo02_search(model, rapid=True):
+    """One Run LEM run at the page's settings: Spencer, **Auto search** from the
+    model's own starting circle, the dialog's slice count, and the drawdown
+    checkbox where the run is a drawdown run.
+
+    This is :func:`xslope.search.run_lem_analysis` — the call Studio's Run LEM
+    button makes — so every factor of safety printed below is one the reader gets
+    from the dialog. Returns ``(critical, results, log)``, the winning cache entry
+    beside the solver's own return and the search's console output.
+    """
+    from xslope.search import run_lem_analysis
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        bundle = run_lem_analysis(model, COMBO02_METHOD, analysis="auto_search",
+                                  num_slices=COMBO02_SLICES, rapid=rapid)
+    return bundle["search"]["fs_cache"][0], bundle["results"], log.getvalue()
+
+
+def _combo02_circle(crit):
+    """A search cache entry's circle, in the form the slicer takes one."""
+    return dict(Xo=crit["Xo"], Yo=crit["Yo"], R=crit["Yo"] - crit["Depth"],
+                Depth=crit["Depth"])
+
+
+def _combo02_detail(model, crit):
+    """The critical surface re-sliced, and the drawdown re-run on it in full debug.
+
+    A search keeps the slice table ``rapid_drawdown`` wrote the governing stage
+    back into, so the stage-1 pore pressures and the stage-1 water load are no
+    longer in it. Re-slicing the winning circle recovers them, and a second run on
+    that same surface reports which core slices took their drained strength.
+    Returns ``(as_built, results, n_drained)``.
+    """
+    import re
+
+    from xslope.advanced import rapid_drawdown
+    from xslope.slice import generate_slices
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, out = generate_slices(model, circle=_combo02_circle(crit),
+                                  num_slices=COMBO02_SLICES)
+    if not ok:
+        raise RuntimeError(out)
+    as_built = out[0]
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        ok, res = rapid_drawdown(as_built.copy(), COMBO02_METHOD, debug_level=2)
+    if not ok:
+        raise RuntimeError(res)
+    return as_built, res, len(re.findall("Using drained strength for slice",
+                                         log.getvalue()))
+
+
+def _combo02_drawn_down(model, u2=None, line2=None):
+    """``model`` restated as an ordinary problem at the drawn-down water.
+
+    The drawdown's stage-2 water becomes the model's only water: boundary set 2
+    becomes the model's boundary set and its solved field the model's field, or
+    Piezometric Line 2 becomes Line 1. What comes back runs as a plain
+    effective-stress analysis at the pool the drawdown left, which is one end of
+    the bracket the three drawdown answers sit inside.
+    """
+    if line2 is not None:
+        out = dict(model, piezo_line=list(line2))
+        out.pop("piezo_line2", None)
+        return out
+    empty = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
+    out = dict(model, seepage_bc=copy.deepcopy(model["seepage_bc2"]),
+               seepage_bc2=copy.deepcopy(empty), tseep=None, seep_u=u2)
+    out.pop("seep_u2", None)
+    out.pop("seep_u_time", None)
+    return out
+
+
+def _combo02_cleared_bc2(model):
+    """``model`` with boundary set 2 emptied, which is the file Part 3 runs on.
+
+    A drawdown staged from a transient march takes both of its states from boundary
+    set 1 and the pool schedule driving it — stage 2 from the schedule at the
+    stage-2 time — so boundary set 2 states a drawn-down analysis nothing on that
+    route solves or reads. Part 3 has the reader clear it, and the runs below start
+    from the same file, so the checks they report and the loads they derive are the
+    reader's.
+    """
+    empty = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
+    return dict(model, seepage_bc2=copy.deepcopy(empty))
+
+
+def _combo02_stage_line(label, results, n_drained):
+    lower = 2 if results["stage2_FS"] <= results["stage3_FS"] else 3
+    return ("   %-12s stage 1 %.4f · stage 2 %.4f · stage 3 %.4f · FS %.4f "
+            "(stage %d governs, %d core slice(s) on drained strength)"
+            % (label, results["stage1_FS"], results["stage2_FS"],
+               results["stage3_FS"], results["FS"], lower, n_drained))
+
+
+def _combo02_reading(label, crit):
+    """The critical circle a run settled on, for the page to quote."""
+    xs, ys = zip(*list(crit["failure_surface"].coords))
+    return ("   %-12s critical circle center (%.2f, %.2f) · R %.2f · tangent "
+            "elevation %.2f · entry (%.1f, %.1f) exit (%.1f, %.1f)"
+            % (label, crit["Xo"], crit["Yo"], crit["Yo"] - crit["Depth"],
+               crit["Depth"], xs[-1], ys[-1], xs[0], ys[0]))
+
+
+def _combo02_steady_figures(sd1, sol1, sd2, sol2, figsize):
+    """The two steady solutions, one figure each, as the two **Seep · Solution**
+    tabs draw them.
+
+    The call is the one Studio's result canvas makes at the Display panel's
+    defaults for a steady view: flow lines on, the phreatic surface on, water
+    levels off, the flow-net base material at the nearest-to-squares pick, and the
+    plot's own title. The one tick added on top is **Filled contours**, the same
+    one COMBO-1's flow net is drawn with, so the sibling pages read alike. Nothing
+    else is imposed — no shared color scale, no replacement title — so each figure
+    carries its own head range and its own discharge line, which is what a reader
+    has on screen.
+    """
+    from xslope.plot_seep import plot_seep_solution
+
+    return [capture(name, plot_seep_solution, sd, sol, figsize=figsize,
+                    levels=SEEP02_LEVELS, base_mat=SEEP02_BASE_MAT,
+                    fill_contours=True, mesh=False)
+            for name, sd, sol in (("combo02_seep_set1.png", sd1, sol1),
+                                  ("combo02_seep_set2.png", sd2, sol2))]
+
+
+def _combo02_frame_figures(seep_data, frames, ts, figsize):
+    """The two staged transient frames, one figure each, as **Seep · Transient**
+    draws them.
+
+    The transient viewer renders every frame through the same result canvas, with
+    two differences the Display panel makes for a frame series: water levels are on
+    (the pool drops through a playback) and flow lines are never requested, because
+    a flow net needs divergence-free through-flow and a draining frame has none.
+    The title is the plot's own, which carries the frame time and the frame's
+    boundary inflow and outflow.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import plot_seep_solution
+
+    out = []
+    for stage, name in ((ts["stage_1"], "combo02_frame_stage1.png"),
+                        (ts["stage_2"], "combo02_frame_stage2.png")):
+        i = int(np.argmin([abs(f["time"] - float(stage)) for f in frames]))
+        out.append(capture(name, plot_seep_solution, seep_data, frames[i],
+                           figsize=figsize, levels=SEEP02_LEVELS,
+                           fill_contours=True, mesh=False, flowlines=False,
+                           show_bc_levels=True))
+    return out
+
+
+def _combo02_sweep_figure(rows, crossing, file_d):
+    """Stage 2, stage 3 and the reported factor of safety against the core's
+    undrained cohesion intercept.
+
+    The two stage curves are the whole content: stage 2 climbs with d because the
+    undrained strength IS d plus a friction term, while stage 3 flattens onto the
+    drained answer — it can only ever substitute the drained strength, and once
+    every core slice has taken it there is nothing left for more d to buy. Where
+    the curves separate is where the governing stage changes hands, and the
+    reported factor of safety is the lower of the two throughout. The file's own
+    d is marked because it sits above the handover.
+
+    The vertical span is opened downward rather than fitted to the data, so the two
+    region labels sit in clear space under curves that otherwise run along the
+    bottom of the axes; the labels themselves are anchored to the two ends of the
+    axes, which keeps them inside it wherever the handover falls.
+    """
+    ds = [r["d"] for r in rows]
+    lo = min(r["stage3_FS"] for r in rows)
+    hi = max(r["stage2_FS"] for r in rows)
+    span = hi - lo
+    fig, ax = plt.subplots(figsize=(9, 5.4))
+    ax.set_xlim(min(ds) - 0.02 * (max(ds) - min(ds)),
+                max(ds) + 0.02 * (max(ds) - min(ds)))
+    ax.set_ylim(lo - 0.28 * span, hi + 0.08 * span)
+    ax.axvspan(ax.get_xlim()[0], crossing, color="#eef4f9", zorder=0)
+    ax.plot(ds, [r["FS"] for r in rows], "-", color="#3f4a55", lw=5.0,
+            alpha=0.28, solid_capstyle="butt",
+            label="reported factor of safety — the lower of the two")
+    ax.plot(ds, [r["stage2_FS"] for r in rows], "o-", color="#1f6fb4", lw=1.4,
+            ms=5, label="Stage 2 — drawn down, undrained core")
+    # Stage 3 is drawn only where it ran. Left of the handover no core slice is
+    # weaker drained than undrained, the stage is not run, and the engine reports
+    # stage 2 — drawing a stage-3 marker there would say the drained strength was
+    # the lower one on every slice, which is the opposite of what happened.
+    ran = [r for r in rows if r["n_drained"] > 0]
+    ax.plot([r["d"] for r in ran], [r["stage3_FS"] for r in ran], "s-",
+            color="#c1663a", lw=1.4, ms=5,
+            label="Stage 3 — drawn down, drained strength on the core slices "
+                  "where it is lower")
+    ax.axvline(crossing, color="#7a8592", lw=0.9, ls="--")
+    ax.axvline(file_d, color="#8a5a3b", lw=0.9, ls=":")
+    x0, x1 = ax.get_xlim()
+    ymin = ax.get_ylim()[0]
+    # Ticks off the swept values themselves, so the grid follows the sweep
+    # wherever it is set rather than a hand-picked list.
+    ax.set_xticks(sorted({min(ds), max(ds)} | {d for d in ds if d % 200 == 0}))
+    ax.text(x0 + 0.01 * (x1 - x0), ymin + 0.03 * span,
+            "stage 2 governs:\nundrained lower on\nevery core slice",
+            ha="left", color="#5b646f", fontsize=9)
+    ax.text(x1 - 0.01 * (x1 - x0), ymin + 0.03 * span, "stage 3 governs",
+            ha="right", color="#5b646f", fontsize=9)
+    ax.annotate("d = %.0f psf — the first core slice\ntakes its drained strength"
+                % crossing, (crossing, ymin + 0.12 * span), xytext=(8, 0),
+                textcoords="offset points", color="#5b646f", fontsize=9,
+                va="bottom")
+    # Turned along its own line and set in the clear band above the curves, which
+    # is the only place a second vertical marker this close to the first can go.
+    ax.annotate("the core's own d = %.0f psf" % file_d, (file_d, lo + 0.5 * span),
+                xytext=(7, 0), textcoords="offset points", rotation=90,
+                ha="center", va="center", color="#8a5a3b", fontsize=9)
+    ax.set_xlabel("core undrained cohesion intercept d (psf), at ψ = 14°")
+    ax.set_ylabel("factor of safety")
+    ax.set_title("Which stage governs, against the core's Kc = 1 envelope")
+    ax.grid(True, color="#e3e7eb", lw=0.6)
+    ax.legend(loc="upper left", frameon=False)
+    fig.tight_layout()
+
+
+def combo02_plots():
+    """The drawdown page: one dam, three sources for the two staged pore-pressure
+    fields, and the strength sweep that moves the governing stage.
+
+    Every limit equilibrium run here is Run LEM's own **Auto search** from the
+    starting circle the two workbooks carry, so each route reports the surface it
+    found for itself rather than one borrowed from a neighbour.
+
+    Printed rather than drawn: the coarse piezometric pair against the solved
+    surfaces it approximates, the mesh, both steady solves, the transient march's
+    saved-frame log, the critical circle and the three-stage table for each of the
+    three sources, the drained runs that bracket them, and the whole d sweep.
+    Every number the page quotes is on one of these lines.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import plot_seep_data, plot_seep_solution
+    from xslope.seep import (apply_transient_stability_frame, build_seep_data,
+                             build_tseep_data, run_transient_seepage,
+                             stage_transient_for_drawdown)
+    from xslope.water import with_water_loads
+
+    def drained(label, model):
+        """One ordinary effective-stress search — Rapid drawdown unticked."""
+        crit, res, _log = _combo02_search(model, rapid=False)
+        print("   drained     %-24s FS %.4f · circle (%.2f, %.2f) R %.2f · "
+              "%d slices"
+              % (label, res["FS"], crit["Xo"], crit["Yo"],
+                 crit["Yo"] - crit["Depth"], len(crit["slices"])))
+        return res["FS"]
+
+    # ---- the starter, and the piezometric route ----------------------------- #
+    start = load_slope_data(COMBO02_START)
+    _u = declared_unit_labels(start)
+    for m in start["materials"]:
+        print("   material    %-11s γ %g %s · c %g %s · φ %g° · d %s · ψ %s · "
+              "k1 %g %s/%s · u %s"
+              % (m["name"], m["gamma"], _u["unit_weight"], m["c"], _u["stress"],
+                 m["phi"], m["d"] or "—", m["psi"] or "—", m["k1"], _u["length"],
+                 start["time_unit"], m["u"]))
+    print("   piezo 1     %s" % (start["piezo_line"],))
+    print("   piezo 2     %s" % (start["piezo_line2"],))
+    _c0 = start["circles"][0]
+    print("   start       starting circle center (%g, %g) · R %g · tangent "
+          "elevation %g %s" % (_c0["Xo"], _c0["Yo"], _c0["R"], _c0["Depth"],
+                               _u["length"]))
+    derived = with_water_loads(start)
+    _peak2 = max((float(p["Normal"]) for b in derived["dloads2_derived"] for p in b),
+                 default=0.0)
+    print("   water load  stage 1 peak %.1f %s from %s · stage 2 %d block(s), peak "
+          "%.1f %s, from %s"
+          % (max(float(p["Normal"]) for b in derived["dloads_derived"] for p in b),
+             _u["stress"], derived["water_derived"][1]["source"],
+             len(derived["dloads2_derived"]), _peak2, _u["stress"],
+             derived["water_derived"][2]["source"] or "nothing above ground"))
+    capture("combo02_inputs.png", plot_inputs, start, mode="lem",
+            title="Rapid Drawdown Model Inputs", frame="content", show_mesh=False)
+
+    piezo_crit, piezo_res, piezo_log = _combo02_search(start)
+    piezo_raw, _pres, piezo_n = _combo02_detail(start, piezo_crit)
+    print(_combo02_stage_line("piezo", piezo_res, piezo_n))
+    print(_combo02_reading("piezo", piezo_crit))
+    print("   piezo       %d slices · %d cut the core · u %.0f max at stage 1, "
+          "%.0f at stage 2 %s"
+          % (len(piezo_crit["slices"]), int((piezo_raw["d"] > 0).sum()),
+             piezo_raw["u"].max(), piezo_raw["u2"].max(), _u["stress"]))
+    for _line in piezo_log.splitlines():
+        if _line.startswith(("Searching", "[✅", "[⚠️", "Critical FS", "Sliding mass",
+                             "[WARNING]", "Applying")):
+            print("     %s" % _line.strip())
+    capture("combo02_solution_piezo.png", plot_solution, start,
+            piezo_crit["slices"], piezo_crit["failure_surface"],
+            piezo_crit["solver_result"])
+    piezo_full = drained("piezo, full pool", start)
+    piezo_down = drained("piezo, drawn down",
+                         _combo02_drawn_down(start, line2=start["piezo_line2"]))
+    for _label, _line in COMBO02_LINE2_VARIANTS:
+        _crit, _res, _log = _combo02_search(dict(start, piezo_line2=list(_line)))
+        _raw, _r2, _n = _combo02_detail(dict(start, piezo_line2=list(_line)), _crit)
+        print("   line 2 %-11s FS %.4f · circle (%.2f, %.2f) R %.2f · %d slices · "
+              "u %.0f max at stage 2 %s"
+              % (_label, _res["FS"], _crit["Xo"], _crit["Yo"],
+                 _crit["Yo"] - _crit["Depth"], len(_crit["slices"]),
+                 _raw["u2"].max(), _u["stress"]))
+
+    # ---- the completed model: mesh and the two steady solves ---------------- #
+    model = load_slope_data(COMBO02)
+    mesh = _combo02_mesh(model)
+    model["mesh"] = mesh
+    figsize = _seep02_figsize(mesh)
+    xs = [x for x, _ in model["ground_surface"].coords]
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g %s"
+          % (len(mesh["nodes"]), len(mesh["elements"]), COMBO02_ELEMENT,
+             COMBO02_DIVISIONS, (max(xs) - min(xs)) / COMBO02_DIVISIONS,
+             _u["length"]))
+
+    pinned = _combo02_pinned(model)
+    sd1, sol1, log1 = _combo02_steady(pinned, mesh, 1)
+    sd2, sol2, log2 = _combo02_steady(pinned, mesh, 2)
+    for label, sol, log in (("set 1", sol1, log1), ("set 2", sol2, log2)):
+        head = np.asarray(sol["head"])
+        print("   %s       q %.4g %s³/%s per %s · head %.3f to %.3f %s · "
+              "u %.1f to %.1f %s · converged %s"
+              % (label, sol["flowrate"], _u["length"], model["time_unit"],
+                 _u["length"], head.min(), head.max(), _u["length"],
+                 np.min(sol["u"]), np.max(sol["u"]), _u["stress"],
+                 sol["converged"]))
+        # Both sets carry an exit face, so both are unconfined solves with a
+        # sweep count to report; the fallback covers a set that has none.
+        if "Converged in" in log:
+            print("   %s       %s" % (label, _seep02_log_stats(log)))
+        else:
+            print("   %s       confined solve, no unconfined iteration" % label)
+    _as_shipped = _combo02_steady(model, mesh, 1)
+    for line in _as_shipped[2].splitlines():
+        if "read at t = 0" in line:
+            print("   series      %s (as shipped, with the boundary bound to the "
+                  "series: q %.4f)" % (line.strip(), _as_shipped[1]["flowrate"]))
+
+    capture("combo02_mesh.png", plot_seep_data, sd1, figsize=figsize,
+            show_bc=True)
+
+    model["seep_u"], model["seep_u2"] = sol1["u"], sol2["u"]
+    steady_crit, steady_res, _slog = _combo02_search(model)
+    steady_raw, _sres, steady_n = _combo02_detail(model, steady_crit)
+    print(_combo02_stage_line("two steady", steady_res, steady_n))
+    print(_combo02_reading("two steady", steady_crit))
+    print("   two steady  %d slices · %d cut the core · u %.0f max at stage 1, "
+          "%.0f at stage 2 %s"
+          % (len(steady_crit["slices"]), int((steady_raw["d"] > 0).sum()),
+             steady_raw["u"].max(), steady_raw["u2"].max(), _u["stress"]))
+    capture("combo02_solution_steady.png", plot_solution, model,
+            steady_crit["slices"], steady_crit["failure_surface"],
+            steady_crit["solver_result"])
+    steady_full = drained("set 1, full pool", model)
+    steady_down = drained("set 2, drawn down",
+                          _combo02_drawn_down(model, u2=sol2["u"]))
+
+    _combo02_steady_figures(sd1, sol1, sd2, sol2, figsize)
+
+    # ---- the transient march ------------------------------------------------ #
+    import time as _time
+
+    tlog = io.StringIO()
+    t0 = _time.time()
+    with contextlib.redirect_stdout(tlog):
+        solution = run_transient_seepage(_as_shipped[0], build_tseep_data(model),
+                                         verbose=True)
+    wall = _time.time() - t0
+    frames = solution["frames"]
+    print("   march       %d saved frames at t = %s · %.0f s wall"
+          % (len(frames), " ".join("%g" % f["time"] for f in frames), wall))
+    for line in tlog.getvalue().splitlines():
+        if "frame saved" in line or line.startswith("Transient"):
+            print("     %s" % line.strip())
+
+    staged = stage_transient_for_drawdown(
+        _combo02_cleared_bc2(load_slope_data(COMBO02)), solution)
+    staged["mesh"] = mesh
+    _tderived = with_water_loads(staged)
+    for _stage, _key in ((1, "dloads_derived"), (2, "dloads2_derived")):
+        print("   transient   stage %d water load peak %.1f %s, from %s"
+              % (_stage, max((float(p["Normal"])
+                              for b in _tderived[_key] for p in b), default=0.0),
+                 _u["stress"], _tderived["water_derived"][_stage]["source"]
+                 or "nothing above ground"))
+    trans_crit, trans_res, _tlog2 = _combo02_search(staged)
+    trans_raw, _tres, trans_n = _combo02_detail(staged, trans_crit)
+    print(_combo02_stage_line("transient", trans_res, trans_n))
+    print(_combo02_reading("transient", trans_crit))
+    print("   transient   %d slices · %d cut the core · u %.0f max at stage 1, "
+          "%.0f at stage 2 %s"
+          % (len(trans_crit["slices"]), int((trans_raw["d"] > 0).sum()),
+             trans_raw["u"].max(), trans_raw["u2"].max(), _u["stress"]))
+    capture("combo02_solution_transient.png", plot_solution, staged,
+            trans_crit["slices"], trans_crit["failure_surface"],
+            trans_crit["solver_result"])
+
+    ts = model["tseep"]
+    day50 = _combo02_cleared_bc2(load_slope_data(COMBO02))
+    day50["mesh"] = mesh
+    with contextlib.redirect_stdout(io.StringIO()):
+        apply_transient_stability_frame(day50, solution,
+                                        time=float(ts["stage_2"]))
+    trans_down = drained("transient, day %g" % ts["stage_2"], day50)
+    print("   bracket     full pool %.4f → drawn down %.4f → day %g %.4f "
+          "(all drained, each its own search)"
+          % (steady_full, steady_down, ts["stage_2"], trans_down))
+    print("   bracket     piezo full pool %.4f · piezo drawn down %.4f"
+          % (piezo_full, piezo_down))
+
+    _combo02_frame_figures(_as_shipped[0], frames, ts, figsize)
+
+    # ---- the sweep that moves the governing stage --------------------------- #
+    file_d = float(staged["materials"][1]["d"])
+    rows = []
+    for d in COMBO02_D_SWEEP:
+        trial = dict(staged)
+        trial["materials"] = copy.deepcopy(staged["materials"])
+        trial["materials"][1]["d"] = float(d)
+        crit, res, _log = _combo02_search(trial)
+        df, _r2, n = _combo02_detail(trial, crit)
+        rows.append(dict(d=d, stage1_FS=res["stage1_FS"], stage2_FS=res["stage2_FS"],
+                         stage3_FS=res["stage3_FS"], FS=res["FS"], n_drained=n))
+        print("   d %-6g    stage 2 %.4f · stage 3 %.4f · FS %.4f · %2d of %d core "
+              "slices drained · stage %d governs · circle (%.2f, %.2f) R %.2f"
+              % (d, res["stage2_FS"], res["stage3_FS"], res["FS"], n,
+                 int((df["d"] > 0).sum()), 3 if n else 2, crit["Xo"], crit["Yo"],
+                 crit["Yo"] - crit["Depth"]))
+    # Where the first core slice crosses over, bisected with a search of its own
+    # at every step, on the same staged fields.
+    lo = max(r["d"] for r in rows if r["n_drained"] == 0)
+    hi = min(r["d"] for r in rows if r["n_drained"] > 0)
+    for _ in range(COMBO02_BISECT):
+        mid = 0.5 * (lo + hi)
+        trial = dict(staged)
+        trial["materials"] = copy.deepcopy(staged["materials"])
+        trial["materials"][1]["d"] = mid
+        crit, _res, _log = _combo02_search(trial)
+        _df, _r2, n = _combo02_detail(trial, crit)
+        if n:
+            hi = mid
+        else:
+            lo = mid
+    crossing = 0.5 * (lo + hi)
+    print("   crossover   the first core slice takes its drained strength at "
+          "d = %.1f psf (ψ = 14°), against the file's own %.0f" % (crossing, file_d))
+    capture("combo02_sweep.png", _combo02_sweep_figure, rows, crossing, file_d)
+
+    print("   three answers  piezometric %.4f · two steady %.4f · transient %.4f "
+          "· spread %.4f (%.1f%% of the lowest)"
+          % (piezo_res["FS"], steady_res["FS"], trans_res["FS"],
+             max(piezo_res["FS"], steady_res["FS"]) - trans_res["FS"],
+             100.0 * (max(piezo_res["FS"], steady_res["FS"]) - trans_res["FS"])
+             / trans_res["FS"]))
+
+
+def combo02_seep():
+    """The drawdown page's four seepage result figures on their own.
+
+    ``combo02_plots`` runs seven limit equilibrium searches, a fourteen-point
+    strength sweep and an eight-step bisection, each a full auto search — minutes
+    of work that none of the seepage figures depend on. This group runs the mesh,
+    the two steady solves and the transient march, and redraws the two
+    **Seep · Solution** tabs and the two staged **Seep · Transient** frames through
+    the same helpers the full group uses, so the four files come out identical
+    either way.
+
+    Printed: each steady solve's discharge, head range and sweep count, the
+    nearest-to-squares base material the figures are drawn at, and the march's
+    saved-frame times.
+    """
+    import numpy as np
+
+    from xslope.plot_seep import flownet_base_material
+    from xslope.seep import build_tseep_data, run_transient_seepage
+
+    model = load_slope_data(COMBO02)
+    _u = declared_unit_labels(model)
+    mesh = _combo02_mesh(model)
+    model["mesh"] = mesh
+    figsize = _seep02_figsize(mesh)
+    print("   mesh        %d nodes · %d elements"
+          % (len(mesh["nodes"]), len(mesh["elements"])))
+
+    pinned = _combo02_pinned(model)
+    sd1, sol1, log1 = _combo02_steady(pinned, mesh, 1)
+    sd2, sol2, log2 = _combo02_steady(pinned, mesh, 2)
+    for label, sd, sol, log in (("set 1", sd1, sol1, log1),
+                                ("set 2", sd2, sol2, log2)):
+        head = np.asarray(sol["head"])
+        print("   %s       q %.4g %s³/%s per %s · head %.3f to %.3f %s · "
+              "base material %d (nearest to squares) · %s"
+              % (label, sol["flowrate"], _u["length"], model["time_unit"],
+                 _u["length"], head.min(), head.max(), _u["length"],
+                 flownet_base_material(sd, sol, levels=SEEP02_LEVELS),
+                 _seep02_log_stats(log) if "Converged in" in log
+                 else "confined solve"))
+    _combo02_steady_figures(sd1, sol1, sd2, sol2, figsize)
+
+    as_shipped = _combo02_steady(model, mesh, 1)
+    with contextlib.redirect_stdout(io.StringIO()):
+        solution = run_transient_seepage(as_shipped[0], build_tseep_data(model),
+                                         verbose=True)
+    frames = solution["frames"]
+    print("   march       %d saved frames at t = %s"
+          % (len(frames), " ".join("%g" % f["time"] for f in frames)))
+    _combo02_frame_figures(as_shipped[0], frames, model["tseep"], figsize)
+
+
+# --------------------------------------------------------------------------- #
+#  COMBO-3 — factor of safety versus time on SEEP-3's earth dam
+#
+#  The page runs SEEP-3's drawdown a second time and asks a stability question of
+#  every saved instant, so every seepage number here is produced at SEEP-3's own
+#  settings — same mesh, same solver defaults, same schedule — and the stability
+#  numbers are produced at the Run LEM dialog's defaults except Method (Spencer).
+#  The search reads the model's own window, which is what keeps one mechanism
+#  under the curve.
+# --------------------------------------------------------------------------- #
+COMBO03 = os.path.join(REPO_ROOT,
+                       "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
+#: The mesh the file ships, stated the way Studio's Build Mesh dialog states it:
+#: linear triangles, auto-sized at 64 divisions across the 110 m section. It is
+#: SEEP-3's mesh, because this page reads SEEP-3's fields. Named here so the line
+#: the page quotes is produced rather than transcribed.
+COMBO03_ELEMENT = "tri3"
+COMBO03_DIVISIONS = 64
+#: Run LEM: Spencer at the dialog's slice count, searching at every instant.
+COMBO03_METHOD = "spencer"
+COMBO03_SLICES = 40
+#: The two instants the page runs one at a time, through the Run LEM dialog's
+#: Seepage time selector: the full reservoir the march starts from, and the first
+#: saved frame after the pool starts down. The second is the earliest instant on
+#: the upstream face, so the pair shows the handover without naming the minimum —
+#: that is the sweep's to report.
+COMBO03_FULL_POOL = 0.0
+COMBO03_SECOND = 5.0
+#: No grid seeding anywhere on this page: the two circles the file carries are
+#: placed on the mechanisms that govern, so an ordinary seeded search reaches the
+#: lower face at every instant. ``None`` is what ``fs_vs_time`` takes for that.
+COMBO03_SEED = None
+
+
+def _combo03_march(model):
+    """The mesh and the march the file ships, returning ``(seep_data, solution)``.
+
+    Read off the companions rather than solved again: the workbook arrives with
+    ``_mesh.json`` and ``_tseep.csv`` beside it and Studio attaches both on open,
+    so this is the state the reader's copy is in before the first stability run.
+    """
+    from xslope.seep import build_seep_data, import_transient_solution
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        seep_data = build_seep_data(model["mesh"], model, seep_bc=1)
+        solution = import_transient_solution(seep_data,
+                                             os.path.splitext(COMBO03)[0])
+    return seep_data, solution
+
+
+def _combo03_at(model, solution, t):
+    """``model`` carrying one instant's pore pressures and that instant's water load.
+
+    The same three steps ``fs_vs_time`` takes per point, in the same order: copy,
+    drop any load derived for an earlier moment, place the frame, derive the load
+    from the pool as it stood AT that moment. A model that kept t = 0's reservoir
+    while reading day 30's pore pressures would load a draining slope with a full
+    pool, so the copy and the drop are not housekeeping.
+    """
+    from xslope.seep import select_transient_frame_u
+    from xslope.water import with_water_loads
+
+    sd = dict(model)
+    for key in ("dloads_derived", "dloads2_derived", "water_derived"):
+        sd.pop(key, None)
+    select_transient_frame_u(sd, solution, time=float(t))
+    return with_water_loads(sd)
+
+
+def _combo03_search(model):
+    """A Spencer search from the file's own circles, as Run LEM makes it at its
+    defaults — no grid seeding.
+
+    The file carries one circle per face, each placed on the deep mechanism its
+    slope can make, so the search reaches either face from the sheet alone.
+    """
+    from xslope.search import run_lem_analysis
+
+    log = io.StringIO()
+    with contextlib.redirect_stdout(log):
+        bundle = run_lem_analysis(model, COMBO03_METHOD, analysis="auto_search",
+                                  num_slices=COMBO03_SLICES)
+    crit = bundle["search"]["fs_cache"][0]
+    return crit, log.getvalue()
+
+
+def _combo03_results(crit):
+    """The results dict ``plot_solution`` reads, from a search's cache entry.
+
+    A cache entry carries the geometry and the winning solver's own return under
+    ``solver_result``; the plot reads the method name off the top level (it draws a
+    thrust line for the two methods that compute one), so the two are merged here
+    rather than at four call sites.
+    """
+    return dict(crit, **crit["solver_result"])
+
+
+def _combo03_face(model, x):
+    """Which face of the dam an x coordinate falls on — 'upstream', 'crest' or
+    'downstream'.
+
+    The crest is the flat top of the ground surface, so its two ends are the
+    highest points of the profile and everything left of them is the reservoir
+    side. Reading the face off a reported circle center this way is what lets a
+    curve say which mechanism it is on at each instant, with no window declaring
+    the answer in advance.
+    """
+    coords = list(model["ground_surface"].coords)
+    y_max = max(y for _, y in coords)
+    crest = [px for px, py in coords if py == y_max]
+    if x < min(crest):
+        return "upstream"
+    if x > max(crest):
+        return "downstream"
+    return "crest"
+
+
+def _combo03_reading(crit, model=None):
+    """One line describing a searched critical surface.
+
+    Entry is the crest-side end of the trace and exit the toe-side end, whichever
+    way the slope faces, so the two are picked by ELEVATION rather than by the
+    order the coordinates happen to run in — a downstream surface traces the other
+    way round from an upstream one.
+    """
+    pts = list(crit["failure_surface"].coords)
+    entry, exit_ = (pts[0], pts[-1]) if pts[0][1] >= pts[-1][1] else (pts[-1], pts[0])
+    face = "" if model is None else (" · %s face"
+                                     % _combo03_face(model, crit["Xo"]))
+    df = crit["slices"]
+    return ("FS %.4f · center (%.2f, %.2f) · R %.2f · tangent elevation %.2f · "
+            "entry (%.2f, %.2f) exit (%.2f, %.2f) · %d slices · "
+            "W %.1f over %.2f%s"
+            % (crit["FS"], crit["Xo"], crit["Yo"], crit["Yo"] - crit["Depth"],
+               crit["Depth"], entry[0], entry[1], exit_[0], exit_[1], len(df),
+               float(df["w"].sum()), float(df["dl"].sum()), face))
+
+
+def _combo03_pool(model, t):
+    """The pool elevation the schedule puts at time ``t`` — linear between the
+    breakpoints, held flat outside them, which is the series' own rule."""
+    ts = model["tseep"]
+    return float(_interp(float(t), list(ts["times"]), list(ts["series"]["pool"])))
+
+
+def combo03_plots():
+    """The FS-versus-time page: the model, the two single-instant runs, the curve
+    over the whole march, and the critical instant drawn.
+
+    Printed rather than drawn: the strengths and the search window the file
+    carries, the mesh and the march it ships, the two Run LEM logs, the factor of
+    safety and the critical circle at every saved instant, and the refinement pass
+    that measures what a finer save grid is worth. Every number the page quotes is
+    on one of these lines.
+    """
+    import time as _time
+
+    from xslope.plot import plot_fs_vs_time
+    from xslope.sensitivity import fs_vs_time
+
+    model = load_slope_data(COMBO03)
+    _u = declared_unit_labels(model)
+    for m in model["materials"]:
+        print("   material    %-7s γ %g / γsat %g %s · c′ %g %s · φ′ %g° · u %s · "
+              "k1 %g k2 %g %s/%s · Ss %g Sy %g"
+              % (m["name"], m["gamma"], m["gamma_sat"], _u["unit_weight"],
+                 m["c"], _u["stress"], m["phi"], m["u"], m["k1"], m["k2"],
+                 _u["length"], model["time_unit"], m["Ss"], m["Sy"]))
+    for _i, _c in enumerate(model["circles"]):
+        print("   circle %d    center (%g, %g) · tangent elevation %g · R %g %s · "
+              "%s face"
+              % (_i + 1, _c["Xo"], _c["Yo"], _c["Depth"], _c["R"], _u["length"],
+                 _combo03_face(model, _c["Xo"])))
+    print("   window      %s" % ("  ".join("%s %g" % (k, v) for k, v in
+                                           model["search_window"].items())))
+    capture("combo03_inputs.png", plot_inputs, model, mode="lem",
+            title="Stability Model Inputs", frame="content", show_mesh=False)
+
+    # ---- the mesh and the march the file ships ------------------------------ #
+    mesh = model["mesh"]                        # {stem}_mesh.json, read by the loader
+    xs = [x for x, _ in model["ground_surface"].coords]
+    print("   mesh        %d nodes · %d elements · %s at width/%d = %.4g %s "
+          "(from the shipped %s_mesh.json)"
+          % (len(mesh["nodes"]), len(mesh["elements"]), COMBO03_ELEMENT,
+             COMBO03_DIVISIONS, (max(xs) - min(xs)) / COMBO03_DIVISIONS,
+             _u["length"], os.path.basename(os.path.splitext(COMBO03)[0])))
+    seep_data, solution = _combo03_march(model)
+    print("   march       %d saved frames at t = %s (from the shipped _tseep.csv)"
+          % (len(solution["times"]),
+             " ".join("%g" % t for t in solution["times"])))
+
+    # ---- one instant at a time, the way Run LEM asks for one ---------------- #
+    single = {}
+    for _t in (COMBO03_FULL_POOL, COMBO03_SECOND):
+        staged = _combo03_at(model, solution, _t)
+        t0 = _time.time()
+        crit, log = _combo03_search(staged)
+        single[_t] = (staged, crit)
+        print("   instant     t = %g %s · %s · %.0f s"
+              % (_t, _u["time"], _combo03_reading(crit, model), _time.time() - t0))
+        print("   --- Run LEM's log at t = %g, as Studio prints it ---" % _t)
+        for line in log.splitlines():
+            print("     %s" % line.rstrip())
+        print("   water load  t = %g peak %.1f %s"
+              % (_t, max((float(p["Normal"]) for b in staged["dloads_derived"]
+                          for p in b), default=0.0), _u["stress"]))
+    full, full_crit = single[COMBO03_FULL_POOL]
+    capture("combo03_solution_full.png", plot_solution, full,
+            full_crit["slices"], full_crit["failure_surface"],
+            _combo03_results(full_crit))
+    # The second single run, drawn the same way. The name carries the instant, so
+    # moving COMBO03_SECOND renames the file rather than relabelling this one.
+    second, second_crit = single[COMBO03_SECOND]
+    capture("combo03_solution_t%g.png" % COMBO03_SECOND, plot_solution, second,
+            second_crit["slices"], second_crit["failure_surface"],
+            _combo03_results(second_crit))
+
+    # ---- the curve ---------------------------------------------------------- #
+    t0 = _time.time()
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, res = fs_vs_time(model, solution, methods=(COMBO03_METHOD,),
+                             search=True, num_slices=COMBO03_SLICES,
+                             search_opts=COMBO03_SEED)
+    if not ok:
+        raise RuntimeError(res)
+    print("   curve       %d instants · %d failed · %.0f s wall"
+          % (len(res["times"]), res["n_failed"], _time.time() - t0))
+    for _i, row in res["df"].iterrows():
+        print("     t %-5g pool %5.2f  FS %s  center (%.2f, %.2f) R %.2f  "
+              "%s face"
+              % (row["value"], _combo03_pool(model, row["value"]),
+                 ("%.4f" % row["fs"]) if row["success"] else "failed",
+                 row["Xo"], row["Yo"], row["R"],
+                 _combo03_face(model, row["Xo"])))
+    print("   minimum     %.4f at t = %g %s · full pool %.4f · recovered %.4f"
+          % (res["min_fs"], res["critical_time"], _u["time"],
+             float(res["df"]["fs"].iloc[0]), float(res["df"]["fs"].iloc[-1])))
+    # The result tab's own figure, not a second drawing of the same numbers: the
+    # page shows what the reader's run puts on screen, so the curve here is
+    # whatever Studio's FS vs Time tab draws.
+    capture("combo03_curve.png", plot_fs_vs_time, res, slope_data=model)
+
+    # ---- the critical instant, drawn ---------------------------------------- #
+    # Staged and searched again unless the curve's lowest instant happens to be
+    # one of the two run singly above, in which case that search is reused rather
+    # than repeated.
+    _ct = float(res["critical_time"])
+    if _ct in single:
+        worst, worst_crit = single[_ct]
+    else:
+        worst = _combo03_at(model, solution, _ct)
+        worst_crit, worst_log = _combo03_search(worst)
+        print("   worst       t = %g %s · %s"
+              % (_ct, _u["time"], _combo03_reading(worst_crit, model)))
+        for line in worst_log.splitlines():
+            print("     %s" % line.rstrip())
+    capture("combo03_solution_min.png", plot_solution, worst,
+            worst_crit["slices"], worst_crit["failure_surface"],
+            _combo03_results(worst_crit))
+
+
+# --------------------------------------------------------------------------- #
+#  COMBO-3 Part 2 — a rapid drawdown at every instant of COMBO-2's march
+#
+#  Same march COMBO-2 Part 3 solves, on COMBO-2's own mesh and schedule, so the
+#  drawdown curve passes through COMBO-2's transient-route answer at the stage-2
+#  time. It is read off the companions the model ships rather than solved again.
+#  Two sweeps are run on that one march — every instant as a three-stage drawdown,
+#  and every instant as an ordinary single-stage analysis — because the page's
+#  whole reading is the distance between the two curves.
+# --------------------------------------------------------------------------- #
+#: Part 2's shipped model: COMBO-2's completed dam without boundary set 2, with the
+#: mesh and the march beside it as ``_mesh.json`` / ``_tseep.csv`` /
+#: ``_tseep_meta.json``. ``tools/build_johnson_rapid.py`` writes the whole set. The
+#: figures read those companions rather than meshing and marching again, so what the
+#: page shows is the state the reader's copy opens in.
+COMBO03R = os.path.join(REPO_ROOT,
+                        "docs/tutorials/files/xslope_johnson_fs_time.xlsx")
+COMBO03R_METHOD = "spencer"
+COMBO03R_SLICES = 40
+
+
+def _combo03r_compare(model, rapid_res, plain_res):
+    """Both sweeps of one transient run on one axes: Studio's own FS vs time
+    figure of the drawdown sweep, with the single-stage sweep of the same
+    instants drawn through it -- same pool axis, drawdown band and full-pool
+    line, so the gap between the two answers is read on one scale."""
+    from xslope.plot import plot_fs_vs_time
+    plot_fs_vs_time(rapid_res, slope_data=model, compare=plain_res,
+                    compare_label="single-stage, drained")
+
+
+def combo03_rapid():
+    """COMBO-3 Part 2: the drawdown curve on COMBO-2's dam, and the single-stage
+    curve on the same march.
+
+    Printed rather than drawn: the undrained envelope and the stage times the file
+    carries, the mesh and the march it ships, and both sweeps' own tables — the
+    text ``fs_vs_time`` prints, which is what the page quotes.
+    """
+    import time as _time
+
+    from xslope.plot import plot_fs_vs_time
+    from xslope.seep import build_seep_data, import_transient_solution
+    from xslope.sensitivity import fs_vs_time
+
+    model = load_slope_data(COMBO03R)
+    _u = declared_unit_labels(model)
+    for m in model["materials"]:
+        print("   material    %-11s γ %g %s · c′ %g %s · φ′ %g° · d %s ψ %s · u %s"
+              % (m["name"], m["gamma"], _u["unit_weight"], m["c"], _u["stress"],
+                 m["phi"], m["d"] or "—", m["psi"] or "—", m["u"]))
+    ts = model["tseep"]
+    print("   schedule    breakpoints %s · pool %s · duration %g · save every %g"
+          % (" ".join("%g" % t for t in ts["times"]),
+             " ".join("%g" % v for v in ts["series"]["pool"]),
+             ts["duration"], ts["save_interval"]))
+    print("   stages      stage 1 t = %g %s · stage 2 t = %g %s"
+          % (ts["stage_1"], _u["time"], ts["stage_2"], _u["time"]))
+    for _i, _c in enumerate(model["circles"]):
+        print("   circle %d    center (%g, %g) · R %g %s · %s face"
+              % (_i + 1, _c["Xo"], _c["Yo"], _c["R"], _u["length"],
+                 _combo03_face(model, _c["Xo"])))
+
+    # The mesh rides behind the model, because a file opened with a companion mesh
+    # beside it draws that way in Studio: the LEM inputs view leaves show_mesh to
+    # the mode, and every engine mode draws it.
+    capture("combo03_rapid_inputs.png", plot_inputs, model, mode="lem",
+            title="Stability Model Inputs", frame="content")
+
+    # ---- the mesh and the march the file ships ------------------------------ #
+    mesh = model["mesh"]                       # {stem}_mesh.json, read by the loader
+    print("   mesh        %d nodes · %d elements (from the shipped %s_mesh.json)"
+          % (len(mesh["nodes"]), len(mesh["elements"]),
+             os.path.basename(os.path.splitext(COMBO03R)[0])))
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        seep_data = build_seep_data(mesh, model, seep_bc=1)
+        solution = import_transient_solution(seep_data,
+                                             os.path.splitext(COMBO03R)[0])
+    print("   march       %d saved frames at t = %s (from the shipped _tseep.csv)"
+          % (len(solution["times"]),
+             " ".join("%g" % t for t in solution["times"])))
+
+    # ---- every instant as a three-stage drawdown ---------------------------- #
+    t0 = _time.time()
+    # Stage 1 is read at the first frame, so that frame is the state the others
+    # fall from and is not swept -- Studio dims it when Rapid drawdown is ticked.
+    _s1 = float((model.get("tseep") or {}).get("stage_1") or 0.0)
+    ok, rapid_res = _sweep_cached(
+        "combo03_rapid", COMBO03R,
+        lambda: fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
+                           times=[t for t in solution["times"] if t > _s1],
+                           num_slices=COMBO03R_SLICES, rapid=True,
+                           search_opts=COMBO03_SEED, print_table=False),
+        method=COMBO03R_METHOD, slices=COMBO03R_SLICES, seed=str(COMBO03_SEED))
+    if not ok:
+        raise RuntimeError(rapid_res)
+    print("   drawdown    %d instants · %d failed · lowest %.4f at t = %g %s · "
+          "%.0f s wall"
+          % (len(rapid_res["times"]), rapid_res["n_failed"], rapid_res["min_fs"],
+             rapid_res["critical_time"], _u["time"], _time.time() - t0))
+    print("   --- the drawdown table, as fs_vs_time prints it ---")
+    for line in rapid_res["table_text"].splitlines():
+        print("     %s" % line)
+    for row in rapid_res["table"]:
+        if row["success"]:
+            print("   face        t %-6g %s" % (row["time"],
+                                                _combo03_face(model, row["Xo"])))
+    capture("combo03_rapid_curve.png", plot_fs_vs_time, rapid_res,
+            slope_data=model)
+
+    # ---- every instant as an ordinary single-stage analysis ----------------- #
+    t0 = _time.time()
+    ok, plain_res = _sweep_cached(
+        "combo03_plain", COMBO03R,
+        lambda: fs_vs_time(model, solution, methods=(COMBO03R_METHOD,),
+                           num_slices=COMBO03R_SLICES, search=True,
+                           search_opts=COMBO03_SEED, print_table=False),
+        method=COMBO03R_METHOD, slices=COMBO03R_SLICES, seed=str(COMBO03_SEED))
+    if not ok:
+        raise RuntimeError(plain_res)
+    print("   single      %d instants · %d failed · lowest %.4f at t = %g %s · "
+          "%.0f s wall"
+          % (len(plain_res["times"]), plain_res["n_failed"], plain_res["min_fs"],
+             plain_res["critical_time"], _u["time"], _time.time() - t0))
+    print("   --- the single-stage table, as fs_vs_time prints it ---")
+    for line in plain_res["table_text"].splitlines():
+        print("     %s" % line)
+    for row in plain_res["table"]:
+        if row["success"]:
+            print("   face        t %-6g %s" % (row["time"],
+                                                _combo03_face(model, row["Xo"])))
+
+    # ---- the two curves against each other ---------------------------------- #
+    _r = {float(r["time"]): r["fs"] for r in rapid_res["table"] if r["success"]}
+    _p = {float(r["time"]): r["fs"] for r in plain_res["table"] if r["success"]}
+    for t in sorted(set(_r) & set(_p)):
+        print("   gap         t %-6g drawdown %.4f  single-stage %.4f  "
+              "single-stage %s by %.4f"
+              % (t, _r[t], _p[t], "above" if _p[t] > _r[t] else "below",
+                 abs(_p[t] - _r[t])))
+    capture("combo03_rapid_compare.png", _combo03r_compare, model, rapid_res,
+            plain_res)
+
+
 GROUPS = {
     "t0_template": t0_template,
     "lem01_sheets": lem01_sheets,
@@ -2909,9 +6754,27 @@ GROUPS = {
     "lem10_plots": lem10_plots,
     "lem11_plots": lem11_plots,
     "lem12_plots": lem12_plots,
+    "lem13_plots": lem13_plots,
+    "lem13_ssrm": lem13_ssrm,
+    "lem13_sweeps": lem13_sweeps,
     "seep01_sheets": seep01_sheets,
     "seep01_plots": seep01_plots,
     "seep02_plots": seep02_plots,
+    "seep03_plots": seep03_plots,
+    "seep04_plots": seep04_plots,
+    "fem01_plots": fem01_plots,
+    "fem02_plots": fem02_plots,
+    "fem02_pullout_law": fem02_pullout_law,
+    "fem02_tres_sweep": fem02_tres_sweep,
+    "fem03_piles": fem03_piles,
+    "fem03_tip": fem03_tip,
+    "fem03_spacing": fem03_spacing,
+    "fem03_wall": fem03_wall,
+    "combo01_plots": combo01_plots,
+    "combo02_plots": combo02_plots,
+    "combo02_seep": combo02_seep,
+    "combo03_plots": combo03_plots,
+    "combo03_rapid": combo03_rapid,
 }
 
 

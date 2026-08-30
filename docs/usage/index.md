@@ -22,7 +22,7 @@ paths.
 **The Python package** — `pip install xslope` for scripting, automation, and
 anything the interfaces don't expose: batch runs, custom plots, parameter
 studies, integration into your own tools. The
-[package install page](installation.md) covers setup and the
+[Installation page](../getting_started/install.md#python-package) covers setup and the
 [API reference](../api/fileio.md) documents the modules.
 
 **Colab notebooks** — run analyses in the browser with nothing installed.

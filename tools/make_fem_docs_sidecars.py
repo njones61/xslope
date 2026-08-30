@@ -131,6 +131,7 @@ def _mesh_for(tag, path):
     mesh = _quiet(build_mesh_from_polygons, polys,
                   target_size=tag.get("target_size"),
                   element_type=tag["element_type"], lines=lines,
+                  element_size_1d=slope_data.get("element_size_1d"),
                   point_constraints=extract_point_constraints(slope_data),
                   size_regions=extract_size_regions(slope_data),
                   **RT._refine_kwargs(tag))

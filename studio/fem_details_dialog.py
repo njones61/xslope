@@ -69,10 +69,26 @@ def _badge_icon(band, px=12):
 
 
 def _row_text(entry):
+    """``label   utilization   verdict`` — the row a member is read off.
+
+    The verdict is on the row because the list is where the members are
+    COMPARED, and the distinction that matters between two lines both standing
+    at 100% is which of them is yielding at its full tensile capacity and which
+    is slipping at what its embedment can develop. A colored dot and a
+    percentage cannot carry that; the word can, and it is the same word
+    :func:`xslope.fem.print_reinforcement_summary` prints.
+    """
     util = entry.get("utilization")
-    if util is None or util != util:                 # None / NaN
-        return f"{entry['label']}"
-    return f"{entry['label']}   {util:.0%}"
+    bits = [entry["label"]]
+    if util is not None and util == util:            # not None / NaN
+        bits.append(f"{util:.0%}")
+    # Reinforcement only. A pile's state names the capacity it was measured
+    # against ("at capacity (moment vs Mcap)"), which is longer than the list is
+    # wide and would be read truncated; it stays on the row's tooltip, where the
+    # reinforcement meanings are too.
+    if entry.get("kind") == "reinforcement" and entry.get("status"):
+        bits.append(entry["status"])
+    return "   ".join(bits)
 
 
 class FemDetailsDialog(QDialog):
@@ -140,9 +156,9 @@ class FemDetailsDialog(QDialog):
         # The results view's Field state switch, on the panel that reads the same
         # solution: same two states, same names, same default. It selects the
         # field the member forces and displacements are read from; the capacity
-        # envelopes are the model's and the failure-band marks are the captured
-        # mechanism's, so neither moves with it. Dimmed — and held on the field
-        # there is — when no at-failure snapshot was captured.
+        # envelopes are the model's and the shear band's crossing marks are the
+        # captured mechanism's, so neither moves with it. Dimmed — and held on
+        # the field there is — when no at-failure snapshot was captured.
         self.field_state = QComboBox()
         for key, label in (("failure", "At failure"), ("converged", "Last converged")):
             self.field_state.addItem(label, key)
@@ -152,8 +168,8 @@ class FemDetailsDialog(QDialog):
             "At failure — the member forces in the developed collapse mechanism "
             "(default).\n"
             "Last converged — the sub-critical converged solution instead.\n"
-            "The capacity envelopes and the failure-band marks are the same in "
-            "both.")
+            "The capacity envelopes and the marks are the "
+            "same in both.")
         if self._failure_solution is None:
             self.field_state.setCurrentIndex(self.field_state.findData("converged"))
         self.field_state.setEnabled(self._failure_solution is not None)
@@ -314,7 +330,14 @@ class FemDetailsDialog(QDialog):
                 plot_detail(prof, fig=fig)
 
         self.canvas.render_figure(_draw)
+        # The verdict, with what it means one hover away: the panel is where a
+        # reader meets these words, and a word with no gloss beside it is a
+        # word they have to go and look up.
+        from xslope.fem_details import reinforcement_state_meaning
         self.status.setText(prof.get("status", ""))
+        meaning = reinforcement_state_meaning(prof.get("status_key"))
+        self.status.setToolTip(f"This {prof['kind']} line {meaning}."
+                               if meaning else "")
 
     # --- export ----------------------------------------------------------
     def default_export_stem(self):

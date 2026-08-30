@@ -30,7 +30,7 @@ collects beside its workbook, and how to send a whole project to somebody else.
 ## One model, three ways in
 
 | Path | You work in | Reach for it when |
-|---|---|---|
+| --- | --- | --- |
 | **The Excel template** | a spreadsheet, cell by cell | you want to see exactly what the file holds |
 | **Studio's editors** | forms and tables, beside a redrawing section | you are drawing geometry, or auditing a model |
 | **The AI assistant** | a chat box, inside Studio | you have a sketch or a description to start from |
@@ -60,7 +60,7 @@ with `c = 0` are different models, and only the second one is claiming anything.
 The same goes for the run options on `main` — a blank **LEM method** means *use the
 default*, chosen when you run.
 
-Every cell of every sheet is catalogued in the
+Every cell of every sheet is cataloged in the
 [Input Template reference](../usage/input_template.md).
 
 ---
@@ -74,7 +74,7 @@ opens its editor.
 
 ![Studio on a model, with the Inputs tree, the section and the Assistant dock](images/t0_studio_window.png)
 
-Three behaviors are worth knowing before your first build:
+Three behaviors to know before your first build:
 
 - **The canvas is always current.** An edit is validated, applied to the model and
   redrawn immediately, so a mistyped vertex shows up as a wrong-looking section
@@ -122,8 +122,9 @@ What matters for building models is where its work lands:
 - **Nothing is saved until you use Save As.** The assistant writes no file.
 
 An assistant draft is a draft. Read what it built against what you gave it, and
-correct it in the same conversation — [LEM-1](lem01_simple_embankment.md) walks that
-audit on a real model, and the checking is most of what that path teaches.
+correct it in the same conversation — in [LEM-1](lem01_simple_embankment.md) we
+walk that audit on a real model, and the checking is most of what that path
+teaches.
 
 ---
 
@@ -140,7 +141,7 @@ That workbook is the model. Everything an analysis *produces* is written beside 
 in files named after it:
 
 | File | Written by |
-|---|---|
+| --- | --- |
 | `{base}.xlsx` | you, or Studio — the model itself |
 | `{base}_mesh.json` | Build Mesh |
 | `{base}_seep.csv` | a steady seepage run |
@@ -193,8 +194,8 @@ The next tutorial's completed model is published as a package:
 
 ## Your first real build
 
-[**Tutorial LEM-1 — Simple Embankment**](lem01_simple_embankment.md) builds the
-smallest complete XSLOPE model down all three of these paths, searches it for a
-critical failure surface, and reads what the result says about the model. Pick one
+In [**Tutorial LEM-1 — Simple Embankment**](lem01_simple_embankment.md) we build
+the smallest complete XSLOPE model down all three of these paths, search it for a
+critical failure surface, and read what the result says about the model. Pick one
 path; the other two are there when you want to see what the same model looks like
 from the other side.

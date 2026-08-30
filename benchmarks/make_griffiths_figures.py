@@ -139,6 +139,7 @@ def render(tag):
         mesh = build_mesh_from_polygons(
             polys, target_size=tag.get('target_size'),
             element_type=tag['element_type'], lines=lines,
+            element_size_1d=sd.get('element_size_1d'),
             point_constraints=extract_point_constraints(sd),
             size_regions=extract_size_regions(sd), **RT._refine_kwargs(tag))
         fem_data = build_fem_data(sd, mesh)
@@ -274,6 +275,7 @@ def _solve_tri6(name, f_min, f_max, tolerance=0.01):
         mesh = build_mesh_from_polygons(
             polys, target_size=TRI6_COARSE['target_size'],
             element_type=TRI6_COARSE['element_type'], lines=lines,
+            element_size_1d=sd.get('element_size_1d'),
             point_constraints=extract_point_constraints(sd),
             size_regions=extract_size_regions(sd))
         fem_data = build_fem_data(sd, mesh)
@@ -297,7 +299,8 @@ def render_mesh_only():
         with contextlib.redirect_stdout(io.StringIO()):
             mesh = build_mesh_from_polygons(
                 polys, target_size=target_size, element_type=element_type,
-                lines=lines, point_constraints=extract_point_constraints(sd),
+                lines=lines, element_size_1d=sd.get('element_size_1d'),
+                point_constraints=extract_point_constraints(sd),
                 size_regions=extract_size_regions(sd))
             fem_data = build_fem_data(sd, mesh)
             plot_fem_data(fem_data)
@@ -401,7 +404,8 @@ def sweep_griffiths1():
     with contextlib.redirect_stdout(io.StringIO()):
         mesh = build_mesh_from_polygons(
             polys, target_size=tag.get('target_size'), element_type=tag['element_type'],
-            lines=lines, point_constraints=extract_point_constraints(sd),
+            lines=lines, element_size_1d=sd.get('element_size_1d'),
+            point_constraints=extract_point_constraints(sd),
             size_regions=extract_size_regions(sd))
         fem_data = build_fem_data(sd, mesh)
     fs = None
@@ -414,8 +418,10 @@ def sweep_griffiths1():
     dmax = []
     for f in SWEEP1_F:
         with contextlib.redirect_stdout(io.StringIO()):
+            # early_failure off: the sweep plots the displacement each trial
+            # REACHES, so a failing trial has to run its budget to reach it.
             sol = solve_fem(fem_data, F=f, max_iterations=int(tag['max_iter']),
-                            debug_level=0, fast_kernel=False)
+                            debug_level=0, fast_kernel=False, early_failure=False)
         disp = np.asarray(sol['displacements']).reshape(-1, 2)
         d = float(np.max(np.hypot(disp[:, 0], disp[:, 1])))
         dmax.append(d)

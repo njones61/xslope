@@ -3,7 +3,7 @@ title: "Download XSLOPE Studio for macOS and Windows"
 description: "Download and install XSLOPE Studio, the free slope stability and seepage analysis application for macOS and Windows — system requirements, first launch, updates, and the pip alternative for Python users."
 ---
 
-# Install
+# Installation
 
 **XSLOPE Studio** is a desktop application for slope stability and seepage
 analysis. Download it, open it, and start working — there is nothing else to
@@ -125,16 +125,18 @@ Uninstalling leaves your projects alone, and it leaves the settings and keychain
 entries listed above in place, so a later reinstall starts where you left off.
 Remove them by hand if you want a clean slate.
 
-## For Python users
+## Python package
 
-XSLOPE is also a Python package. The engine that Studio runs is the `xslope`
-package documented under [API](../api/solve.md), and it reads and writes the same
-Excel format, so files move freely between Studio, scripts, and notebooks.
+XSLOPE is also a Python package. The engine Studio runs is the `xslope` package
+documented under [API](../api/solve.md), and it reads and writes the same Excel
+format, so files move freely between Studio, scripts, and notebooks. It installs
+from PyPI:
 
 ```bash
-pip install "xslope[gui]"        # Studio plus the analysis library
-pip install "xslope[gui,fem]"    # add gmsh, for seepage and FEM
-pip install "xslope[gui,fem,ai]" # add the AI assistant
+pip install xslope                # limit equilibrium only
+pip install "xslope[fem]"         # add gmsh, for seepage and FEM
+pip install "xslope[gui]"         # add Studio itself
+pip install "xslope[gui,fem,ai]"  # everything, including the AI assistant
 ```
 
 The `gui` extra registers a console command that opens the same window the
@@ -146,14 +148,47 @@ xslope-studio
 
 Installed this way, Studio reports updates but never changes your environment:
 the update dialog shows the `pip install -U "xslope[gui]"` line for you to run
-yourself.
+yourself. This is also how Studio runs on Linux and on Intel Macs, which the
+installers do not cover.
 
-This is also how Studio runs on Linux and on Intel Macs, which the installers do
-not cover.
+**Linux and Google Colab.** On Debian/Ubuntu (including Colab), gmsh needs system
+OpenGL libraries that are not installed by default. Run this once before
+installing the `fem` extra:
 
-For scripting and notebooks without the GUI, `pip install xslope` (add the `fem`
-extra for seepage and FEM) is enough — see
-[Python Package Install](../usage/installation.md) for the full set of
-extras, the Linux OpenGL prerequisite, and installing from source, and
-[Colab Notebooks](../usage/notebooks.md) to run XSLOPE in a browser with nothing
-installed at all.
+```bash
+apt-get update && apt-get install -y libgl1 libglu1-mesa
+```
+
+macOS and Windows need no extra step — gmsh ships its own libraries. To run XSLOPE
+in a browser with nothing installed at all, see
+[Colab Notebooks](../usage/notebooks.md).
+
+**Accessing the functions.** After installing, the package's functions are
+imported as follows:
+
+```python
+import xslope as xslope
+
+from xslope.fileio import load_slope_data, print_dictionary
+from xslope.mesh import build_polygons, build_mesh_from_polygons, export_mesh_to_json, import_mesh_from_json
+from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_separately
+from xslope.plot_seep import plot_seep_data, plot_seep_solution
+from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
+```
+
+See [XSLOPE Studio → Installation](../studio/index.md#installation) for the full
+set of extras (`gui`, `fem`, `ai`) and for how to launch Studio from the package.
+
+**Installing from source.** To access all of the underlying code, bypass PyPI and
+install directly from the repository:
+
+[https://github.com/njones61/xslope/tree/main](https://github.com/njones61/xslope/tree/main)
+
+In a terminal, navigate to the directory where the repository should live and
+run:
+
+```bash
+git clone https://github.com/njones61/xslope.git
+```
+
+The repository can also be cloned directly into an IDE.

@@ -21,9 +21,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView, QButtonGroup, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox,
-    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton,
-    QRadioButton, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget,
+    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QMessageBox, QPushButton, QRadioButton, QSpinBox, QStackedWidget,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .preflight_panel import (
@@ -82,6 +82,12 @@ REFINE_THIN_ZONES_TIP = (
     "is too high — so this is on by default. A section with no thin zone meshes "
     "exactly as it would with this off.")
 
+# "1D element size" — the model's main!D20 cell, edited where the mesh is built.
+ELEMENT_SIZE_1D_TIP = (
+    "Target element size along reinforcement and pile lines. Blank = the mesh "
+    "element size. Refines the beam/bar elements and the soil they share nodes "
+    "with.")
+
 
 FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)")]
 # v21 main!D22. 'rollers' first — it is the template's shipped value, what every
@@ -90,6 +96,7 @@ FEM_SIDE_BC = [("rollers", "Rollers (vertical movement free)"),
                ("fixed", "Fixed (both components clamped)")]
 FEM_FAILURE_CRITERIA = [
     ("non_convergence", "Non-convergence"),
+    ("hybrid", "Hybrid (non-convergence + displacement)"),
     ("displacement_limit", "Displacement limit"),
     ("displacement_increase", "Displacement increase"),
 ]
@@ -176,11 +183,11 @@ class SeepageTimeSelector(QGroupBox):
         self.mode.addItem("Saved frame", "saved")
         if self._current_time is not None:
             self.mode.addItem("Frame shown in the results viewer", "current")
-        self.mode.addItem("Another time (re-marches the solution)", "other")
+        self.mode.addItem("Another time (reruns the analysis)", "other")
         self.mode.setToolTip(
             "A saved frame and the viewer's frame are instant — the pore pressures "
-            "already exist. Another time re-runs the transient march with that "
-            "instant added to the save schedule, because a field between two frames "
+            "already exist. Another time re-runs the transient seepage analysis with "
+            "that instant added to the save schedule, because a field between two frames "
             "is not a solution of anything and is never interpolated.")
         form.addRow("Time", self.mode)
 
@@ -264,17 +271,17 @@ class SeepageTimeSelector(QGroupBox):
             if self._duration is not None and not (0 < raw <= float(self._duration)):
                 self.note.setText(
                     f"t = {_fmt_time(raw)}{self._unit} is outside the run "
-                    f"(0 to {_fmt_time(self._duration)}{self._unit}); the march "
+                    f"(0 to {_fmt_time(self._duration)}{self._unit}); the run "
                     f"cannot land on it.")
                 return
             if self._nearest_index(raw) is not None:
                 self.note.setText(f"t = {_fmt_time(raw)}{self._unit} is already a "
-                                  f"saved frame — no re-march needed.")
+                                  f"saved frame — nothing to re-solve.")
                 return
             self.note.setText(
                 f"t = {_fmt_time(raw)}{self._unit} is not a saved frame. The run "
-                f"re-marches the transient solution with this instant added to the "
-                f"save schedule — a full re-solve, which on a long march takes "
+                f"re-runs the transient seepage analysis with this instant added to "
+                f"the save schedule — a full re-solve, which on a long run takes "
                 f"minutes. It reports progress and can be cancelled.")
             return
         if mode == "current":
@@ -404,8 +411,8 @@ class StageTimeFields(QGroupBox):
             return
         self.note.setText(
             "Stored on the tseep sheet, so a scripted run reads the same two "
-            "instants. A stage time the loaded solution never saved re-marches the "
-            "transient march with it added to the save schedule.")
+            "instants. A stage time the loaded solution never saved re-runs the "
+            "transient seepage analysis with it added to the save schedule.")
 
     def values(self):
         """``(stage_1, stage_2)`` as floats or ``None``; ``'bad'`` for a typo."""
@@ -551,7 +558,51 @@ class RunFemDialog(QDialog):
         self.tolerance.setDecimals(4)
         self.tolerance.setRange(0.0001, 1.0)
         self.tolerance.setValue(float(defaults.get("tolerance", 0.01)))
+        self.tolerance.setToolTip(
+            "How narrow the F bracket must get before the search stops — the "
+            "width of [F min, F max] after bisection, not a solver convergence "
+            "tolerance.")
         form.addRow("Tolerance (SSRM)", self.tolerance)
+
+        # Per-trial viscoplastic iteration budget. Trials just below the true FS
+        # need far more iterations to reach equilibrium than trials far from it;
+        # too small a budget makes near-failure trials read as failed and biases
+        # the reported FS low. Previously only the API exposed this
+        # (solve_fem/solve_ssrm max_iterations); a Studio run was pinned at the
+        # engine default with no way to reach the converged plateau.
+        self.max_iterations = QSpinBox()
+        self.max_iterations.setRange(500, 100000)
+        self.max_iterations.setSingleStep(500)
+        self.max_iterations.setValue(int(defaults.get("max_iterations") or 12000))
+        self.max_iterations.setToolTip(
+            "Viscoplastic iteration budget for EACH trial F (and single-F runs). "
+            "It is a budget, not a hard stop: a trial that reaches it with the "
+            "out-of-balance force still falling is given another budget's worth, "
+            "again and again, up to the iteration ceiling below. A residual that "
+            "stops improving is reported but never ends a trial on its own; a "
+            "trial whose movement is clearly running away is declared failed "
+            "early and does not spend the rest of its budget. "
+            "Raise it if the reported FS keeps climbing when you do; it has "
+            "plateaued when raising it further changes nothing.")
+        form.addRow("Max iterations per trial", self.max_iterations)
+
+        # Hard stop on the automatic budget extension. A trial that reaches THIS
+        # while still improving is inconclusive - it did not fail, and it did not
+        # settle - so the bisection does not count it as a failure and says so.
+        self.max_iterations_ceiling = QSpinBox()
+        self.max_iterations_ceiling.setRange(500, 500000)
+        self.max_iterations_ceiling.setSingleStep(1000)
+        self.max_iterations_ceiling.setValue(
+            int(defaults.get("max_iterations_ceiling") or 50000))
+        self.max_iterations_ceiling.setToolTip(
+            "Hard stop on the automatic budget extension above. A trial that "
+            "reaches this ceiling with its out-of-balance force still falling is "
+            "reported INCONCLUSIVE - neither settled nor failed - and is not "
+            "counted as a failure. The factor of safety is still the final "
+            "bracket's midpoint, as on any other run; what changes is that the "
+            "bracket's upper edge is an undecided trial rather than a measured "
+            "failure, and the Log says so.")
+        form.addRow("Iteration ceiling", self.max_iterations_ceiling)
 
         # Side boundary condition (v21 main!D22). Applies to both a single trial and
         # the SSRM — it is part of how the model is restrained, not part of the
@@ -821,6 +872,8 @@ class RunFemDialog(QDialog):
             "F_min": self.F_min.value(),
             "F_max": self.F_max.value(),
             "tolerance": self.tolerance.value(),
+            "max_iterations": self.max_iterations.value(),
+            "max_iterations_ceiling": self.max_iterations_ceiling.value(),
             "failure_criterion": self.failure_criterion.currentData(),
             "min_slip_depth": (self.min_slip_depth.value()
                                if self.min_slip_on.isChecked()
@@ -966,6 +1019,12 @@ class RunSeepDialog(QDialog):
         # Transient adds its own requirements (a declared time base, storage per
         # material) on top of every steady rule, so the findings follow the mode.
         self.preflight.refresh()
+        # Both solve-parameter fields belong to the STEADY unconfined iteration;
+        # the transient march runs its own step and iteration controls. Dim them
+        # rather than leave live controls the run ignores.
+        steady = not self._transient()
+        self.tol.setEnabled(steady)
+        self.max_iter.setEnabled(steady)
 
     def options(self):
         if self._transient():
@@ -983,6 +1042,12 @@ class BuildMeshDialog(QDialog):
     Target element size is either entered directly or auto-sized as
     ``(x_max - x_min) / size_divisions`` over the ground surface (see the
     main_seep / main_fem drivers).
+
+    The 1D element size is the size along the reinforcement and pile lines. It IS a
+    model input — ``main!D20``, ``slope_data['element_size_1d']`` — so the box opens
+    on whatever the file states and an entry is written back to the model, where it
+    is saved and undone like any other edit. Blank means the file states nothing and
+    the lines follow the mesh element size.
 
     The quadrilateral style (free / structured-where-possible) is a per-run
     choice: it rides on the returned options dict to ``build_mesh_from_polygons``
@@ -1023,6 +1088,19 @@ class BuildMeshDialog(QDialog):
         self.target_size.setDecimals(3)
         self.target_size.setValue(float(defaults.get("target_size", 1.0)))
         form.addRow("Target element size", self.target_size)
+
+        # Element size along the constraint lines — the model's own cell, so a
+        # blank box means the model states nothing and the lines follow the target
+        # size. A line edit rather than a spin box for exactly that reason: a spin
+        # box has no empty state, and "no value" is the default here. Same idiom as
+        # the local Size field on a material zone or profile line.
+        self.element_size_1d = QLineEdit()
+        _e1d = defaults.get("element_size_1d")
+        if _e1d is not None:
+            self.element_size_1d.setText(f"{float(_e1d):g}")
+        self.element_size_1d.setPlaceholderText("follows the mesh element size")
+        self.element_size_1d.setToolTip(ELEMENT_SIZE_1D_TIP)
+        form.addRow("1D element size", self.element_size_1d)
 
         # Quadrilateral style — two mutually exclusive choices, so radios rather
         # than a combo: both options and the difference between them are readable
@@ -1109,12 +1187,42 @@ class BuildMeshDialog(QDialog):
         for key, label, own_tip in QUAD_STYLES:
             self._quad_style_radios[key].setToolTip(own_tip if quads else tip)
 
+    def size_1d(self):
+        """The entered 1D element size as a float, or None when the box is blank
+        (the lines follow the mesh element size). Raises ``ValueError`` on text
+        that is not a positive number — ``accept`` reports that to the user rather
+        than building a mesh at a size nobody asked for."""
+        text = self.element_size_1d.text().strip()
+        if not text:
+            return None
+        value = float(text)
+        if value <= 0:
+            raise ValueError(text)
+        return value
+
+    def accept(self):
+        # A typo in the 1D size must not fall through to "blank": that would build a
+        # mesh at the target size and look like the entry had been accepted.
+        try:
+            self.size_1d()
+        except ValueError:
+            QMessageBox.warning(
+                self, "Build mesh",
+                f"'{self.element_size_1d.text().strip()}' is not a valid 1D element "
+                "size. Enter a positive number, or leave the box blank to mesh the "
+                "reinforcement and pile lines at the mesh element size.")
+            self.element_size_1d.setFocus()
+            self.element_size_1d.selectAll()
+            return
+        super().accept()
+
     def options(self):
         return {
             "element_type": self.element_type.currentData(),
             "auto_size": self.auto_size.isChecked(),
             "size_divisions": self.size_divisions.value(),
             "target_size": self.target_size.value(),
+            "element_size_1d": self.size_1d(),
             "quad_style": self.quad_style(),
             "refine_near_features": self.refine_near_features.isChecked(),
             "refine_factor": self.refine_factor.value(),
@@ -1149,11 +1257,17 @@ class RunLemDialog(QDialog):
         layout = QVBoxLayout()                  # the left column; see two_pane
         form = QFormLayout()
 
-        self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
+        self.method = self._combo(LEM_METHODS, defaults.get("method", "spencer"))
         form.addRow("Method", self.method)
 
         self.analysis = self._combo(ANALYSIS_TYPES, defaults.get("analysis", "auto_search"))
         form.addRow("Analysis", self.analysis)
+
+        note = QLabel("Single surface analyzes the first circle / the non-circular "
+                      "surface as entered. Auto-search refines from there to the "
+                      "critical surface.")
+        note.setWordWrap(True)
+        form.addRow(note)
 
         # The surface-family selector appears when the deck carries BOTH families —
         # keyed on what is present, never on the stored selection, because reading the
@@ -1211,6 +1325,8 @@ class RunLemDialog(QDialog):
             "starting circles, and a single seed in the wrong place can converge to a "
             "local minimum that reads 20% or more too high, with no warning.\n\n"
             "Leave it off to interrogate a specific mechanism with your own circles.")
+        # Toggling it changes the run the checks are describing, so re-ask them.
+        self.grid_seed.toggled.connect(lambda *_: self._recheck())
         form.addRow("", self.grid_seed)
 
         self.diagnostic = QCheckBox("Diagnostic output (verbose log)")
@@ -1273,12 +1389,6 @@ class RunLemDialog(QDialog):
         tform.addRow("Max iterations", self.max_iter)
 
         layout.addWidget(self.tol_group)
-
-        note = QLabel("Single surface analyzes the first circle / the non-circular "
-                      "surface as entered. Auto-search refines from there to the "
-                      "critical surface.")
-        note.setWordWrap(True)
-        layout.addWidget(note)
 
         # Transient seepage: which instant a single-time run reads, and — for a rapid
         # drawdown — which two instants the stages read. Both are shown only when the
@@ -1350,6 +1460,10 @@ class RunLemDialog(QDialog):
         return {"method": self.method.currentData(),
                 "surface": self._surface_value(),
                 "search": self.analysis.currentData() == "auto_search",
+                # Grid seeding changes which mechanisms a search reaches, so the
+                # checks are handed the whole run description, seeding included.
+                "grid_seed": (self.grid_seed.isChecked()
+                              if hasattr(self, "grid_seed") else False),
                 "seep_frame": self._seep_frame()}
 
     def _seep_frame(self):
@@ -1483,6 +1597,11 @@ class SensitivityDialog(QDialog):
     - **Back-Analysis** is the same single-parameter sweep framed as a failure
       investigation: FS = 1.0 is known, so it back-calculates the parameter value
       consistent with the observed slide.
+    - **Factor of safety vs time** sweeps the saved instants of a transient
+      seepage march instead of a parameter: no input changes, and each point
+      solves the same model against that instant's pore pressures. It needs a
+      transient solution in hand and a material reading ``u = seep``, and says so
+      when either is missing.
 
     The sweepable set is any numeric material property plus the global k_seismic;
     geometry design stays in main_design.py. A thin caller of ``xslope.sensitivity``:
@@ -1500,7 +1619,7 @@ class SensitivityDialog(QDialog):
     }
 
     def __init__(self, parent=None, defaults=None, slope_data=None, app_mode="lem",
-                 document=None):
+                 document=None, transient=None):
         super().__init__(parent)
         self.app_mode = app_mode if app_mode in self._OUTPUT else "lem"
         out_short, out_long, target_label = self._OUTPUT[self.app_mode]
@@ -1542,17 +1661,41 @@ class SensitivityDialog(QDialog):
         layout = QVBoxLayout()                  # the left column; see two_pane
         form = QFormLayout()
 
+        # FS-versus-time sweeps the frames of a transient march. Two things have to
+        # be true for it to mean anything, and each has its own plain sentence: a
+        # march to read, and a material that reads it.
+        self._times = [float(t) for t in (transient or {}).get("times", [])]
+        self._time_unit = str(slope_data.get("time_unit") or "").strip()
+        # Grid seeding sweeps circle centers, so it has nothing to offer a model
+        # whose surface is non-circular.
+        self._circular = bool(slope_data.get("circular", True))
+        self._fs_time_reason = self._fs_time_unavailable(slope_data)
+        # The instant a drawdown curve reads stage 1 at: the file's own stage_1
+        # (normally 0, full pool), or the earliest saved frame where it names none.
+        s1 = (slope_data.get("tseep") or {}).get("stage_1")
+        self._stage_1 = (float(s1) if s1 is not None
+                         else (min(self._times) if self._times else 0.0))
+        self._rapid_time_reason = self._rapid_time_unavailable(slope_data)
+
         ba_label = ("Back-Analysis (FS = 1)" if self.app_mode != "seep"
                     else f"Back-Analysis (target {out_short})")
         self.mode = self._combo([("sensitivity", "Sensitivity (tornado + plots)"),
                                  ("design", f"Design ({out_short} target)"),
-                                 ("back_analysis", ba_label)],
+                                 ("back_analysis", ba_label),
+                                 ("fs_vs_time", "Factor of safety vs time")],
                                 defaults.get("mode", "sensitivity"))
+        if self._fs_time_reason:
+            item = self.mode.model().item(self.mode.count() - 1)
+            if item is not None:
+                item.setEnabled(False)
+                item.setToolTip(self._fs_time_reason)
+            if self.mode.currentData() == "fs_vs_time":
+                self.mode.setCurrentIndex(0)
         form.addRow("Mode", self.mode)
 
         # Engine-specific solver row(s). LEM keeps method + slices; FEM swaps in the
         # SSRM knobs (each step is a full SSRM solve); Seep takes a BC set + tol.
-        self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
+        self.method = self._combo(LEM_METHODS, defaults.get("method", "spencer"))
         self.num_slices = QSpinBox()
         self.num_slices.setRange(5, 500)
         self.num_slices.setValue(int(defaults.get("num_slices", 40)))
@@ -1566,8 +1709,8 @@ class SensitivityDialog(QDialog):
         layout.addLayout(form)
 
         # --- parameter picker (shared by both modes) ------------------------
-        picker = QGroupBox("Parameter")
-        pform = QFormLayout(picker)
+        self.picker = QGroupBox("Parameter")
+        pform = QFormLayout(self.picker)
         self.material = QComboBox()
         for disp, key in self._groups:
             self.material.addItem(disp, key)
@@ -1577,25 +1720,28 @@ class SensitivityDialog(QDialog):
         pform.addRow("Property", self.prop)
         self.material.currentIndexChanged.connect(self._on_material_changed)
         self.prop.currentIndexChanged.connect(self._on_prop_changed)
-        layout.addWidget(picker)
+        layout.addWidget(self.picker)
 
         # --- mode pages -----------------------------------------------------
         self.stack = QStackedWidget()
         self.stack.addWidget(self._build_sens_page(defaults))
         self.stack.addWidget(self._build_design_page(defaults, target_label))
+        self.stack.addWidget(self._build_time_page(defaults))
         layout.addWidget(self.stack)
 
         # Re-search toggle is an LEM concept (FEM finds its own mechanism, seepage
         # has no failure surface) — only shown in LEM mode.
         self.search = QCheckBox("Re-search the critical surface at each step")
         self.search.setChecked(bool(defaults.get("search", True)))
-        self.search.setToolTip(
+        self._search_tip = (
             "On (recommended): re-run the search at every swept value, because the "
             "critical surface moves as the parameter changes — a fixed surface "
             "silently understates the sensitivity.\n\n"
             "Off: re-solve the entered surface only (much faster, but the answer is "
             "only right for that prescribed surface).")
+        self.search.setToolTip(self._search_tip)
         self.search.setVisible(self.app_mode == "lem")
+        self.search.toggled.connect(lambda *_: self._sync_grid_seed())
         layout.addWidget(self.search)
 
         self.note = QLabel()
@@ -1607,9 +1753,7 @@ class SensitivityDialog(QDialog):
         # per step (a swept value is a deliberate perturbation, not a mistake).
         self.preflight = PreflightPanel(
             analysis="sensitivity", slope_data=slope_data, document=document,
-            selection_fn=lambda: {"base": self.app_mode,
-                                  "method": self.method.currentData(),
-                                  "search": self.search.isChecked()},
+            selection_fn=self._selection,
             notes=(SEISMIC_NOTE_LEM if self.app_mode == "lem" else SEISMIC_NOTE_FEM,),
             parent=self)
 
@@ -1627,6 +1771,9 @@ class SensitivityDialog(QDialog):
         self._sync_run()
 
         self.mode.currentIndexChanged.connect(self._on_mode_changed)
+        # FS-versus-time names a frame the checks have to be told about, so a mode
+        # switch re-evaluates them rather than leaving the previous mode's answer.
+        self.mode.currentIndexChanged.connect(self.preflight.refresh)
         self.plot_type.currentIndexChanged.connect(self._on_plot_type_changed)
         self._on_material_changed()                 # populate property combo
         # Restore a remembered sensitivity table (from the previous run this session).
@@ -1636,6 +1783,7 @@ class SensitivityDialog(QDialog):
                 self._add_row(e, pct=spec.get("pct", self.pct.value()),
                               use_sigma=spec.get("use_sigma", False))
         self._on_plot_type_changed()
+        self._on_rapid_toggled()            # a remembered drawdown holds Re-search
         self._on_mode_changed()
         self.resize(1000, 620)              # two columns: controls | model checks
 
@@ -1811,6 +1959,201 @@ class SensitivityDialog(QDialog):
         self._design_seeded = "low" in defaults      # don't re-seed a remembered range
         return page
 
+    def _fs_time_unavailable(self, slope_data):
+        """Why an FS-versus-time run cannot be made on this model, or ``""``.
+
+        Three conditions, each with the sentence a user can act on. The engine mode
+        comes first because it is the one the mode strip decides: a seepage sweep
+        reports discharge, and the seepage solution is this run's INPUT.
+        """
+        if self.app_mode == "seep":
+            return ("A factor-of-safety curve needs a stability engine. Switch the "
+                    "mode strip to LEM or FEM — the seepage solution is this run's "
+                    "input, not its output.")
+        if not self._times:
+            return "Run a transient seepage analysis first."
+        uses_seep = any(str(m.get("u", "")).strip().lower() == "seep"
+                        for m in (slope_data.get("materials") or []))
+        if not uses_seep:
+            return ("No material takes its pore pressure from the seepage solution. "
+                    "Set u = seep on the materials table, or the curve would be flat.")
+        return ""
+
+    @staticmethod
+    def _rapid_time_unavailable(slope_data):
+        """Why the instants cannot be evaluated as rapid drawdowns, or ``""``.
+
+        The three-stage procedure is a comparison between undrained and drained
+        strengths on the drawn-down section, and both come from the d / psi columns.
+        With neither set anywhere, every stage reads the same strengths and the
+        drawdown is a single-stage analysis wearing three names — so the option is
+        offered only on a model that carries them.
+        """
+        for m in (slope_data.get("materials") or []):
+            for field in ("d", "psi"):
+                try:
+                    if float(m.get(field) or 0.0) > 0.0:
+                        return ""
+                except (TypeError, ValueError):
+                    continue
+        return ("No material carries the rapid-drawdown strengths d and "
+                "\N{GREEK SMALL LETTER PSI}, so all three stages would read the "
+                "same strengths. Set them on the low-permeability material(s) in "
+                "the materials table.")
+
+    def _build_time_page(self, defaults):
+        """The instants to evaluate: every saved frame of the march, all ticked.
+
+        A checklist rather than a range, because the times are not a continuum — a
+        curve can only be drawn through instants the march SAVED, and a time between
+        two frames is never interpolated. Unticking is how a long march is sampled
+        (each instant is a full stability run) or how a leading frame is dropped.
+        """
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(0, 0, 0, 0)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Saved frames"))
+        row.addStretch(1)
+        self.times_all = QPushButton("All")
+        self.times_all.setToolTip("Tick every saved instant.")
+        self.times_all.clicked.connect(lambda: self._set_all_times(True))
+        self.times_none = QPushButton("None")
+        self.times_none.setToolTip("Untick every saved instant.")
+        self.times_none.clicked.connect(lambda: self._set_all_times(False))
+        row.addWidget(self.times_all)
+        row.addWidget(self.times_none)
+        v.addLayout(row)
+
+        self.times = QListWidget(page)
+        self.times.setToolTip("The instants the transient run saved. Each ticked "
+                              "one is a full stability run.")
+        unit = f" {self._time_unit}" if self._time_unit else ""
+        remembered = defaults.get("times")
+        for t in self._times:
+            item = QListWidgetItem(f"t = {_fmt_time(t)}{unit}")
+            item.setData(Qt.UserRole, float(t))
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            ticked = (True if remembered is None
+                      else any(abs(float(r) - t) < 1e-9 for r in remembered))
+            item.setCheckState(Qt.Checked if ticked else Qt.Unchecked)
+            self.times.addItem(item)
+        self.times.itemChanged.connect(lambda *_: self._on_times_changed())
+        v.addWidget(self.times, 1)
+
+        # Each instant as a drawdown rather than a single state. It sits with the
+        # frames because it changes what a ticked instant MEANS: stage 2 of a fall
+        # that started at the march's initial pool, not a state on its own.
+        unit_txt = f" {self._time_unit}" if self._time_unit else ""
+        self.rapid = QCheckBox("Rapid drawdown at each time")
+        self.rapid.setToolTip(self._rapid_time_reason or (
+            f"On: every ticked instant is a three-stage Duncan-Wright-Brandon "
+            f"rapid drawdown — stage 1 the transient run's initial state at "
+            f"t = {_fmt_time(self._stage_1)}{unit_txt} (full pool), stage 2 that "
+            f"instant's drawn-down state, stage 3 the same section re-checked with "
+            f"drained strengths. The curve reports the drawdown's own factor of "
+            f"safety, the lower of stages 2 and 3.\n\n"
+            f"Off: every instant is a single-stage analysis against that instant's "
+            f"pore pressures."))
+        if self._rapid_time_reason:
+            self.rapid.setEnabled(False)
+        else:
+            self.rapid.setChecked(bool(defaults.get("rapid", False)))
+        self.rapid.toggled.connect(self._on_rapid_toggled)
+        v.addWidget(self.rapid)
+
+        # Grid seeding, the same option Run LEM offers, and the one this mode most
+        # often needs: a curve spans states whose critical mechanisms are in
+        # different places, and a search refined from one starting circle stays in
+        # that circle's neighborhood at every instant. Same label and tooltip as Run
+        # LEM's, so the two dialogs name one option once.
+        self.grid_seed = QCheckBox("Grid search (auto-seed the circular search)")
+        self.grid_seed.setChecked(bool(defaults.get("grid_seed", False)))
+        self.grid_seed.setToolTip(
+            "Sweep a grid of circle centers against a range of tangent elevations, "
+            "derived from the slope geometry, and refine from the best circle of every "
+            "competing family — plus your entered circles, if any.\n\n"
+            "This is a GLOBAL search: it reports the most critical surface anywhere in "
+            "the model. Without it the search only refines the neighborhood of your "
+            "starting circles, and a single seed in the wrong place can converge to a "
+            "local minimum that reads 20% or more too high, with no warning.\n\n"
+            "Leave it off to interrogate a specific mechanism with your own circles.")
+        self.grid_seed.toggled.connect(lambda *_: self._on_grid_seed_toggled())
+        v.addWidget(self.grid_seed)
+        return page
+
+    def _on_grid_seed_toggled(self, *_):
+        """The note says how each point is searched and the checks read the same
+        flag out of ``_selection()``, so both are re-asked when the box moves."""
+        self._on_mode_changed()
+        if hasattr(self, "preflight"):
+            self.preflight.refresh()
+
+    def _on_rapid_toggled(self, *_):
+        """A drawdown point is always searched, so the Re-search toggle has nothing
+        left to decide: it is held on and greyed with the reason, rather than
+        offering a run this mode does not make."""
+        on = self.rapid.isChecked()
+        if hasattr(self, "search"):
+            if on:
+                self.search.setChecked(True)
+                self.search.setEnabled(False)
+                self.search.setToolTip(
+                    "Held on: a rapid drawdown's critical surface is not the "
+                    "drained one and moves as the drawn-down field changes, so "
+                    "every instant is searched from the starting circle.")
+            else:
+                self.search.setEnabled(True)
+                self.search.setToolTip(self._search_tip)
+        self._sync_stage_1_frames(on)
+        self._sync_grid_seed()
+        if self.mode.currentData() == "fs_vs_time":
+            self._on_mode_changed()
+            self.preflight.refresh()
+
+    def _sync_stage_1_frames(self, rapid_on):
+        """With every instant a drawdown, the frames at or before stage 1 are the
+        state the others fall from and cannot be a stage 2 themselves; they are
+        unticked and dimmed rather than left to come back as failed rows."""
+        stage_1 = getattr(self, "_stage_1", None)
+        if stage_1 is None:
+            return
+        unit = f" {self._time_unit}" if self._time_unit else ""
+        for i in range(self.times.count()):
+            item = self.times.item(i)
+            if float(item.data(Qt.UserRole)) > stage_1:
+                continue
+            if rapid_on:
+                item.setCheckState(Qt.Unchecked)
+                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+                item.setToolTip(f"Stage 1 of every drawdown is read at "
+                                f"t = {_fmt_time(stage_1)}{unit}; this frame is "
+                                f"the state the others fall from, not a "
+                                f"drawdown of its own.")
+            else:
+                item.setFlags(item.flags() | Qt.ItemIsEnabled)
+                item.setCheckState(Qt.Checked)
+                item.setToolTip("")
+
+    def _set_all_times(self, on):
+        for i in range(self.times.count()):
+            item = self.times.item(i)
+            if not (item.flags() & Qt.ItemIsEnabled):
+                continue
+            item.setCheckState(Qt.Checked if on else Qt.Unchecked)
+
+    def selected_times(self):
+        """The ticked instants, in saved order."""
+        return [float(self.times.item(i).data(Qt.UserRole))
+                for i in range(self.times.count())
+                if self.times.item(i).checkState() == Qt.Checked]
+
+    def _on_times_changed(self):
+        if self.mode.currentData() == "fs_vs_time":
+            self._on_mode_changed()
+            self.preflight.refresh()
+
     # --- picker / mode logic ------------------------------------------------
     @staticmethod
     def _dspin(lo, hi, val, decimals=3, step=None):
@@ -1852,6 +2195,39 @@ class SensitivityDialog(QDialog):
         self.d_from.setValue(lo)
         self.d_to.setValue(hi)
 
+    def _selection(self):
+        """What preflight and capabilities() are asked about — read live.
+
+        In FS-versus-time mode the selection also names the frame that WILL be
+        staged: ``fs_vs_time`` gates the base model with its first instant already
+        placed, so a model whose materials read ``u = seep`` is not missing a
+        pore-pressure field here, and the checks must not refuse the one run the
+        transient controls exist to start.
+        """
+        sel = {"base": self.app_mode,
+               "method": self.method.currentData(),
+               "search": self.search.isChecked()}
+        if self.mode.currentData() == "fs_vs_time":
+            picked = self.selected_times()
+            # Same key Run LEM passes, so both dialogs describe the run the
+            # checks are asked about the same way.
+            sel["grid_seed"] = (self.grid_seed.isChecked()
+                                if hasattr(self, "grid_seed") else False)
+            if self.rapid.isChecked():
+                # Every point is a drawdown, so the checks are the drawdown's:
+                # base = 'rapid' brings that family in on top of the LEM rules, and
+                # the two instants say which route it runs (both from the march).
+                sel["base"] = "rapid"
+                sel["rapid"] = True
+                later = [t for t in picked if t > self._stage_1]
+                sel["seep_frame"] = {"times": [self._stage_1,
+                                               (later[-1] if later
+                                                else (picked[-1] if picked
+                                                      else self._stage_1))]}
+            else:
+                sel["seep_frame"] = {"times": picked[:1]}
+        return sel
+
     def _sync_run(self):
         """Run refuses on an ERROR in the base model; a warning never blocks."""
         if self.app_mode == "lem":
@@ -1861,14 +2237,51 @@ class SensitivityDialog(QDialog):
                                             {"method": self.method.currentData(),
                                              "search": self.search.isChecked()}
                                             ).get("lem_method", {}))
-        blocked = self.preflight.blocked
-        self._ok.setEnabled(not blocked)
-        self._ok.setToolTip(self.preflight.block_reason() if blocked else "")
+        reason = self.preflight.block_reason() if self.preflight.blocked else None
+        if reason is None and self.mode.currentData() == "fs_vs_time":
+            if not self.selected_times():
+                reason = "Tick at least one saved instant to evaluate."
+        self._ok.setEnabled(reason is None)
+        self._ok.setToolTip(reason or "")
 
     def _on_mode_changed(self):
         m = self.mode.currentData()
         single = m in ("design", "back_analysis")
-        self.stack.setCurrentIndex(1 if single else 0)
+        is_time = m == "fs_vs_time"
+        self.stack.setCurrentIndex(2 if is_time else (1 if single else 0))
+        # No input is substituted at any point of an FS-versus-time run — the axis
+        # is time — so the parameter picker has nothing to say and steps aside.
+        self.picker.setVisible(not is_time)
+        if is_time:
+            n = len(self.selected_times())
+            unit = f" {self._time_unit}" if self._time_unit else ""
+            seed_txt = ("over a grid of centers and tangent elevations"
+                        if getattr(self, "grid_seed", None)
+                        and self.grid_seed.isChecked()
+                        else "from the starting circles")
+            if self.rapid.isChecked():
+                self.note.setText(
+                    f"Rapid drawdown vs time: one three-stage drawdown per ticked "
+                    f"instant of the transient seepage run — {n} of "
+                    f"{len(self._times)} saved frames. Stage 1 is that run's "
+                    f"initial state at t = {_fmt_time(self._stage_1)}{unit} and "
+                    f"stage 2 is that instant, so the curve answers how safe the "
+                    f"slope is if the pool falls to where it stands then. Each "
+                    f"point is searched {seed_txt}, and the reported "
+                    f"value is the lower of stages 2 and 3.")
+            else:
+                self.note.setText(
+                    f"Factor of safety vs time: one stability run per ticked instant "
+                    f"of the transient seepage run — {n} of {len(self._times)} "
+                    f"saved frames. No input changes between the points; each "
+                    f"solves the same model against that instant's pore pressures, "
+                    f"and the reservoir load is re-derived from the pool as it stood "
+                    f"then. Each point is searched {seed_txt}, and the circles "
+                    f"sheet's search window is applied.")
+            self._prev_mode = m
+            self._sync_grid_seed()
+            self._sync_run()
+            return
         # Seed the target on an actual transition into a mode; FS = 1.0 is the
         # convention for a back-analysis, the design default otherwise. Seep sweeps
         # target a discharge q, so leave their target alone.
@@ -1892,6 +2305,19 @@ class SensitivityDialog(QDialog):
                 f"crosses, the plot says which way to widen the range.")
         else:
             self._on_plot_type_changed()
+
+    def _sync_grid_seed(self):
+        """Grid seeding drives a circular SEARCH, so it is live only when this run
+        makes one — LEM, a circular model, and either the re-search toggle on or a
+        rapid drawdown, which holds it on. Mirrors Run LEM's own rule."""
+        if not hasattr(self, "grid_seed"):
+            return
+        searching = self.rapid.isChecked() or self.search.isChecked()
+        live = (self.app_mode == "lem" and self._circular and searching
+                and self.mode.currentData() == "fs_vs_time")
+        self.grid_seed.setEnabled(live)
+        if not live:
+            self.grid_seed.setChecked(False)
 
     def _on_plot_type_changed(self):
         """Toggle the scaling / MC-sample controls and the sensitivity note to match
@@ -2019,7 +2445,13 @@ class SensitivityDialog(QDialog):
         elif self.app_mode == "seep":
             common["seep_opts"] = {"bc": self.seep_bc.currentData(),
                                    "tol": self.seep_tol.value()}
-        if common["mode"] in ("design", "back_analysis"):
+        if common["mode"] == "fs_vs_time":
+            common["times"] = self.selected_times()
+            common["rapid"] = self.rapid.isChecked()
+            common["grid_seed"] = self.grid_seed.isChecked()
+            if common["rapid"]:
+                common["search"] = True
+        elif common["mode"] in ("design", "back_analysis"):
             common.update({
                 "param": self.prop.currentData(),
                 "low": self.d_from.value(),
@@ -2176,7 +2608,7 @@ class ReliabilityDialog(QDialog):
         self._mc_disabled_note.setVisible(self.app_mode == "fem")
 
         # --- LEM solver + surface (LEM mode only) --------------------------
-        self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
+        self.method = self._combo(LEM_METHODS, defaults.get("method", "spencer"))
         if self.app_mode == "lem":
             form.addRow("LEM method", self.method)
 
@@ -2586,8 +3018,8 @@ class GszImportDialog(QDialog):
             "• Material zones, strengths and water conditions import automatically.\n"
             "• Analyses can use different materials over the same geometry, so the "
             "choice matters.\n"
-            "• Reinforcement, loads and SLOPE/W's search are not imported — you will "
-            "get a list of what was left out."))
+            "• SLOPE/W's search definition and reinforcement sets are not imported — "
+            "you will get a list of what was left out."))
 
         self.table = QTableWidget(len(analyses), 3, self)
         self.table.setHorizontalHeaderLabels(["Analysis", "Type", "Method"])

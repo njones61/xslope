@@ -15,8 +15,21 @@ material in it, the Run LEM dialog before the circles exist and after.
 Full main-window captures are the owner's and are not attempted here; the tutorial
 carries a generated placeholder for each (see ``tools/make_tutorial_figures.py``).
 
-Run:  python3 tools/capture_tutorial_screenshots.py           # every shot
-      python3 tools/capture_tutorial_screenshots.py lem01     # by name
+Run:  python3 tools/capture_tutorial_screenshots.py lem01     # by name (substring)
+      python3 tools/capture_tutorial_screenshots.py --all     # every shot
+      python3 tools/capture_tutorial_screenshots.py w1        # a recorded session
+      python3 tools/capture_tutorial_screenshots.py w1 --dry-run   # no API call
+
+**A bare run writes nothing.** Every shot is regenerated from live Qt, so a sweep
+rewrites every committed PNG whether or not it changed -- which is a diff nobody
+asked for on top of whichever figure was meant. With no shot name on the command
+line the script prints its usage and the shot list and exits; ``--all`` is the
+explicit way to sweep. ``--dry-run`` gates the W-1 provider calls only, so it is
+no protection here.
+
+The W-1 entries are not dialog captures but recorded assistant conversations, each
+of which makes a real (billed) provider call; they run only when named, never in an
+argument-less sweep. See ``tools/assistant_sessions.py``.
 
 Exits 0 with a note if PySide6 is not installed (engine-only install — no Studio
 layer to capture), mirroring the Studio capture pipeline.
@@ -121,6 +134,45 @@ def _mat_table(dlg, through="u"):
         w = (hh.sectionPosition(col) + hh.sectionSize(col)
              + (dlg.width() - tbl.viewport().width()))
         dlg.resize(w, rows + (dlg.height() - tbl.viewport().height()))
+        _settle()
+    return dlg
+
+
+def _line_table(dlg, through):
+    """Put a two-view line editor in its TABLE view, sized to reach ``through``.
+
+    The line editors' own default is the LIST view and the last view used is a
+    session setting, so the mode is set explicitly — the same reason ``_mat_table``
+    gives. Width and height are measured off the built table for the same reason
+    too: a reinforcement table cut off before its last column photographs a row
+    whose columns the page is telling the reader to fill.
+    """
+    dlg._set_mode("table")
+    dlg.show()
+    _settle()
+    tbl = dlg._table.table
+    hh = tbl.horizontalHeader()
+    keys = [f.key for f in dlg._fields]
+    col = keys.index(through)
+    rows = sum(tbl.rowHeight(r) for r in range(tbl.rowCount()))
+    want = rows + tbl.horizontalHeader().height()
+    # Height is grown by the measured deficit rather than computed once: the table
+    # shares a splitter with the section preview, so a taller dialog does not hand
+    # the table all of the extra — and a table one row short photographs a file
+    # whose last line the reader cannot see.
+    from PySide6.QtWidgets import QSplitter
+
+    for _ in range(4):
+        w = (hh.sectionPosition(col) + hh.sectionSize(col)
+             + (dlg.width() - tbl.viewport().width()))
+        deficit = max(0, want - tbl.viewport().height())
+        dlg.resize(w, dlg.height() + deficit)
+        # The splitter keeps its own proportions through a resize, so the extra
+        # height lands on the preview unless the table's pane is asked for it.
+        for sp in dlg.findChildren(QSplitter):
+            sizes = sp.sizes()
+            if len(sizes) == 2 and sp.isAncestorOf(tbl) and deficit:
+                sp.setSizes([sizes[0] + deficit, max(1, sizes[1])])
         _settle()
     return dlg
 
@@ -711,11 +763,10 @@ def lem08_reinforcement_table():
 
     dlg = ReinforcementEditor().build(_load(LEM08), None)
     _lem_only(dlg)
-    dlg._set_mode("table")
     # The preview stacks below the table, so the width is just the columns:
-    # wide enough that every LEM column (Label through Spacing) shows.
-    dlg.resize(1460, 760)
-    return _grab(dlg, "lem08_studio_reinforcement_table.png")
+    # measured out to Spacing, the last LEM column.
+    return _grab(_line_table(dlg, through="spacing"),
+                 "lem08_studio_reinforcement_table.png")
 
 
 SHOTS["lem08_reinforcement_table"] = lem08_reinforcement_table
@@ -737,9 +788,8 @@ def lem09_reinforcement_table():
 
     dlg = ReinforcementEditor().build(_load(LEM09), None)
     _lem_only(dlg)
-    dlg._set_mode("table")
-    dlg.resize(1460, 760)
-    return _grab(dlg, "lem09_studio_reinforcement_table.png")
+    return _grab(_line_table(dlg, through="spacing"),
+                 "lem09_studio_reinforcement_table.png")
 
 
 SHOTS["lem09_reinforcement_table"] = lem09_reinforcement_table
@@ -770,9 +820,8 @@ def lem09_piles_table():
 
     dlg = PilesEditor().build(_load(LEM09), None)
     _lem_only(dlg)
-    dlg._set_mode("table")
-    dlg.resize(1460, 700)
-    return _grab(dlg, "lem09_studio_piles_table.png")
+    return _grab(_line_table(dlg, through="M_cap"),
+                 "lem09_studio_piles_table.png")
 
 
 SHOTS["lem09_piles_table"] = lem09_piles_table
@@ -1395,7 +1444,7 @@ SHOTS.update({
 #
 # The subject is a column that is EMPTY in the shipped file: H is blank on both
 # pile rows, which is what puts the run on the Ito & Matsui path. Every piles shot
-# here pins LEM only, so the FEM tail (E, I, Area, Fixity) is out of the way and
+# here pins LEM only, so the FEM tail (E, I, Area, Head, Tip) is out of the way and
 # the blank H sits among the columns that feed it — D, S, Vcap and Mcap.
 # --------------------------------------------------------------------------- #
 LEM12 = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
@@ -1424,9 +1473,7 @@ def _lem12_piles_table(name, **edit):
 
     dlg = PilesEditor().build(_lem12_model(**edit), None)
     _lem_only(dlg)
-    dlg._set_mode("table")
-    dlg.resize(1180, 620)
-    return _grab(dlg, name)
+    return _grab(_line_table(dlg, through="M_cap"), name)
 
 
 def lem12_piles_table():
@@ -1780,17 +1827,2167 @@ SHOTS.update({
 })
 
 
+# --------------------------------------------------------------------------- #
+# SEEP-3 — Transient Seepage: Reservoir Drawdown Through a Cored Earth Dam
+#
+# The page's build has two halves, and the captures follow them in order. The
+# reader first builds an ordinary STEADY seepage model — three boundary entries on
+# one set — and solves it at full pool; the BC shot photographs that set. Then the
+# model is made transient, and the last three shots are the three controls that do
+# it: the Transient editor where the schedule and the pool series are entered, the
+# Run Seepage dialog with the Run type selector that only a file with a tseep sheet
+# has, and the results view a transient run lands in, which is a canvas with a play
+# bar under it rather than a single picture.
+# --------------------------------------------------------------------------- #
+SEEP03 = os.path.join(REPO_ROOT,
+                      "docs/tutorials/files/xslope_earth_dam_drawdown.xlsx")
+#: The mesh the page builds, in the Build Mesh dialog's own controls: tri3,
+#: auto-sized at 64 divisions across the 110 m section — the 1.71875 m target
+#: every SEEP-3 figure is computed at.
+SEEP03_DIVISIONS = 64
+#: The instant the play bar is parked on for its shot: the pool is a third of the
+#: way through its fall and the interior surface is visibly above it, which is what
+#: the page is pointing at when it tells the reader to scrub.
+SEEP03_PLAYBAR_TIME = 30.0
+
+
+def seep03_seep_bc():
+    """The boundary set as the page's STEADY half leaves it: the upstream face held
+    at full pool, the tailwater, and the exit face on the downstream slope, with the
+    upstream entry selected.
+
+    The head is shown as the number 18, not as the ``pool`` series the finished file
+    binds there. That binding is the next section's work — the reader types a series
+    name into this same cell after the schedule exists — so the value is set back to
+    the number here, on the loaded dict only. The file on disk is untouched.
+    """
+    from studio.editors import SeepBcEditor
+
+    data = _load(SEEP03)
+    head = data["seepage_bc"]["specified_heads"][0]
+    head["kind"] = "head"
+    head["head"] = float(data["tseep"]["series"]["pool"][0])
+    dlg = SeepBcEditor().build(data, None, select=(0, 0))
+    dlg.resize(1080, 560)
+    return _grab(dlg, "seep03_studio_seep_bc.png")
+
+
+def seep03_transient_editor():
+    """The Transient editor holding this model's whole schedule.
+
+    Everything the page's transient half asks for is on this one form: the run
+    duration and the save interval, the extra save times, and the series table with
+    its first column renamed from the template's default ``t1`` to ``pool`` — the
+    name the upstream boundary's value cell refers to. The stage-time fields are
+    deliberately EMPTY: they flag the rapid-drawdown states a stability analysis
+    reads, and SEEP-3 stops at the pore-pressure field.
+
+    The preview is rendered explicitly rather than waited for: the pane's redraw is
+    debounced, so a grab taken straight after ``show()`` catches a blank canvas.
+    """
+    from studio.editors import TransientDialog
+
+    data = _load(SEEP03)
+    dlg = TransientDialog(data.get("tseep"), data, None)
+    dlg.resize(1220, 640)
+    dlg.show()
+    _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    dlg._preview.canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, "seep03_studio_transient.png")
+    dlg.grab().save(out)
+    dlg.close()
+    print("-> seep03_studio_transient.png")
+    return out
+
+
+def seep03_run_transient():
+    """Run Seepage in **Transient** mode — the Run type selector the file's tseep
+    sheet adds, and the model checks a transient run is held to.
+
+    Transient checks are stricter than steady ones (a declared time base, storage on
+    every material), so the panel beside the controls is reporting on the transient
+    rules here, not the steady ones.
+    """
+    from studio.dialogs import RunSeepDialog
+
+    data = _load(SEEP03)
+    dlg = RunSeepDialog(defaults={"mode": "transient", "tol": 1e-4},
+                        slope_data=data,
+                        has_bc2=bool((data.get("seepage_bc2") or {})
+                                     .get("specified_heads")),
+                        has_tseep=bool(data.get("tseep")))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "seep03_studio_run_seep.png")
+
+
+def seep03_playbar():
+    """The **Seep · Transient** results tab, parked mid-drawdown.
+
+    The run is the page's own: the tutorial's file on the page's own mesh, marched
+    through ``SeepRunner`` — the same call the Run button makes — so the frame under
+    the play bar is a frame the reader will have. The display options are the
+    transient panel's defaults: no flow lines (a storage-release state has no flow
+    net), the instantaneous water levels on, and velocity vectors, which is how a
+    transient frame's flow direction is read.
+    """
+    from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+    from studio.runners import SeepRunner
+    from studio.transient import TransientSeepView
+
+    data = _load(SEEP03)
+    xs = [x for x, _ in data["ground_surface"].coords]
+    with contextlib.redirect_stdout(io.StringIO()):
+        mesh = build_mesh_from_polygons(get_material_polygons(data),
+                                        (max(xs) - min(xs)) / SEEP03_DIVISIONS,
+                                        "tri3")
+    data["mesh"] = mesh
+    runner = SeepRunner(data, {"mode": "transient"})
+    bundle, err = {}, {}
+    runner.succeeded.connect(lambda b: bundle.update(b))
+    runner.failed.connect(lambda m: err.setdefault("msg", m))
+    with contextlib.redirect_stdout(io.StringIO()):
+        runner._run_transient(data, mesh)
+    if err:
+        raise RuntimeError("seep03_playbar: transient run failed: %s" % err["msg"])
+
+    opts = {"variable": "head", "levels": 12, "flowlines": False,
+            "vectors": True, "phreatic": True, "show_bc_levels": True}
+    view = TransientSeepView()
+    # The canvas sizes its figure to the viewport, and this dam is five times as
+    # wide as it is tall, so a tall view leaves the frame stranded in white space.
+    view.resize(1000, 540)
+    view.set_frames(bundle["seep_data"], bundle["frames"],
+                    opts_getter=lambda: opts, style_getter=lambda: None,
+                    keep_index=False)
+    view.show()
+    _settle()
+    times = [float(f["time"]) for f in bundle["frames"]]
+    view.set_index(min(range(len(times)),
+                       key=lambda i: abs(times[i] - SEEP03_PLAYBAR_TIME)))
+    _settle()
+    view.canvas._render_current()          # force the raster into the scene
+    _settle()
+    out = os.path.join(OUT_DIR, "seep03_studio_playbar.png")
+    view.grab().save(out)
+    view.close()
+    print("-> seep03_studio_playbar.png")
+    return out
+
+
+SHOTS.update({
+    "seep03_seep_bc": seep03_seep_bc,
+    "seep03_transient_editor": seep03_transient_editor,
+    "seep03_run_transient": seep03_run_transient,
+    "seep03_playbar": seep03_playbar,
+})
+
+
+# --------------------------------------------------------------------------- #
+# SEEP-4 — Infiltration & Flux Boundaries
+#
+# The page's whole subject is one editor: the boundary set, with three flux
+# entries in it beside the reservoir head and the toe drain. So the first shot is
+# the Seep BC dialog with a flux entry open — the one on the upstream face, whose
+# first point is the same (20, 10) the head boundary ends on, which is the shared
+# node the page's collision rule is about. The second is the Run Seepage dialog in
+# steady mode, the state the reader solves from.
+#
+# There is no results-view shot: the two solved fields are drawn by
+# ``tools/make_tutorial_figures.py`` (seep04_dry.png / seep04_wet.png) on one
+# pinned color scale so the pair compares, and a Studio grab of the same plot in
+# its panel chrome adds nothing the earlier seepage tutorials have not already
+# shown of that view.
+# --------------------------------------------------------------------------- #
+SEEP04 = os.path.join(REPO_ROOT,
+                      "docs/tutorials/files/xslope_dam_infiltration.xlsx")
+#: The boundary-list row the BC shot opens: 0 is the reservoir head, 1-3 the three
+#: infiltration blocks, 4 the toe drain. Row 1 is the upstream-face block, which
+#: starts at the waterline the head boundary ends on.
+SEEP04_BC_ROW = 1
+
+
+def seep04_seep_bc():
+    """The boundary set complete: the reservoir head, the three infiltration
+    blocks and the toe drain, with the upstream-face block open.
+
+    Its points table reads (20, 10) → (24, 12): the block starts exactly where the
+    reservoir head boundary stops, so the two share a node, and its value is the
+    projected 8.94427191e-09 rather than the vertical rain rate.
+    """
+    from studio.editors import SeepBcEditor
+
+    data = _load(SEEP04)
+    dlg = SeepBcEditor().build(data, None, select=(0, SEEP04_BC_ROW))
+    dlg.resize(1080, 560)
+    return _grab(dlg, "seep04_studio_seep_bc.png")
+
+
+def seep04_run_seep():
+    """Run Seepage in **Steady** mode — the model checks a steady unconfined run is
+    held to, on a model whose boundary set is a head, three fluxes and an exit face.
+    """
+    from studio.dialogs import RunSeepDialog
+
+    data = _load(SEEP04)
+    dlg = RunSeepDialog(defaults={"mode": "steady", "tol": 1e-4},
+                        slope_data=data,
+                        has_bc2=bool((data.get("seepage_bc2") or {})
+                                     .get("specified_heads")),
+                        has_tseep=bool(data.get("tseep")))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "seep04_studio_run_seep.png")
+
+
+SHOTS.update({
+    "seep04_seep_bc": seep04_seep_bc,
+    "seep04_run_seep": seep04_run_seep,
+})
+
+
+# --------------------------------------------------------------------------- #
+# FEM-1 — Strength Reduction Basics
+# --------------------------------------------------------------------------- #
+FEM01_START = os.path.join(REPO_ROOT,
+                           "docs/tutorials/files/xslope_ssrm_embankment_start.xlsx")
+FEM01_DONE = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_ssrm_embankment.xlsx")
+
+
+def _fem_only(dlg):
+    """Untick every usage toggle but FEM, the mirror of ``_lem_only``.
+
+    The FEM band is not a band of its own: unit weight, the strength option and
+    c/φ are shared with the limit-equilibrium set, so ticking FEM alone still
+    shows the whole material — with E and ν, which is what the page's step adds,
+    at the right of the row instead of forty columns away.
+    """
+    toggles = getattr(dlg, "_toggles", None) or {}
+    for tag, cb in toggles.items():
+        cb.setChecked(tag == "fem")
+    return dlg
+
+
+def _fem01_meshed(path=FEM01_DONE):
+    """The completed model with the tutorial's own mesh attached.
+
+    The mesh is BUILT here rather than read from a sidecar: neither tutorial file
+    ships one, because building it is a step the page teaches. Studio's Run FEM
+    action is unreachable without a mesh, so the dialog is photographed in the
+    state the Build Mesh step leaves behind.
+
+    The element type and size are the COMPLETED file's, whichever model is being
+    meshed: the starter declares neither (the reader types them into Build Mesh),
+    and photographing its Run FEM dialog on a different discretization would put
+    two meshes in one tutorial.
+    """
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    done = _load(FEM01_DONE)
+    data = done if path == FEM01_DONE else _load(path)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data), done["target_size"], done["element_type"],
+            size_regions=extract_size_regions(data))
+    return data
+
+
+def fem01_materials():
+    """The materials editor, table view, FEM columns: the row the page's second
+    step completes.
+
+    Photographed on the COMPLETED file, so the figure is the state the reader is
+    working toward — E = 2,088,500 psf and ν = 0.3 filled in beside the strength
+    the limit-equilibrium run already used. The window reaches through ``nu``,
+    the last column this problem fills.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _fem_only(MaterialsEditor().build(_load(FEM01_DONE), None))
+    return _grab(_mat_table(dlg, through="nu"), "fem01_studio_materials.png")
+
+
+def fem01_run_lem():
+    """Run LEM on the STARTER — the model with no elastic constants at all.
+
+    The page opens on a factor of safety by slices, and this is the figure that
+    says why it can: the checks column beside the controls is clean and **Run** is
+    enabled on a material whose E and ν cells are empty, because neither is a
+    limit-equilibrium input. The same file will not run the finite element engine
+    until they are filled, which is the next shot's subject.
+    """
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(FEM01_START))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem01_studio_run_lem.png")
+
+
+def fem01_build_mesh():
+    """Build Mesh set to the tutorial's mesh: tri6, auto-sizing off, 3.5 ft.
+
+    Auto-size is unticked so the target size box is live — the completed file
+    declares 3.5, and a declared size is what turns auto-sizing off (see
+    ``MainWindow._file_defaults``), so this is the dialog the reader's own file
+    opens. tri6 is the element type the dialog already defaults to; the page's
+    point is that the default is quadratic and must stay that way.
+    """
+    from studio.dialogs import BuildMeshDialog
+
+    data = _load(FEM01_DONE)
+    dlg = BuildMeshDialog(defaults={"element_type": data["element_type"],
+                                    "target_size": float(data["target_size"]),
+                                    "auto_size": False})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem01_studio_build_mesh.png")
+
+
+def fem01_run_fem():
+    """The Run FEM dialog on the meshed model, as the reader presses **Run**.
+
+    SSRM with the bracket the page walks — F min 1.0, F max 2.0 — the 0.01
+    bisection tolerance, and the rest at the dialog's own defaults: rollers on the
+    sides, no K0 initialization, non-convergence as the failure criterion, and the
+    at-failure capture on with its 0.15 margin, which is what produces the
+    mechanism the results figures draw.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _fem01_meshed()
+    dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
+                                 "tolerance": 0.01},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem01_studio_run_fem.png")
+
+
+def fem01_run_fem_no_elastic():
+    """The same dialog on the STARTER, meshed but with E and ν still blank.
+
+    **Run** is disabled and the checks column names both missing constants. This
+    is the page's transition figure: the limit-equilibrium run above needed
+    neither, and the finite element run refuses without them.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _fem01_meshed(FEM01_START)
+    dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
+                                 "tolerance": 0.01},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem01_studio_run_fem_no_elastic.png")
+
+
+SHOTS.update({
+    "fem01_materials": fem01_materials,
+    "fem01_run_lem": fem01_run_lem,
+    "fem01_build_mesh": fem01_build_mesh,
+    "fem01_run_fem": fem01_run_fem,
+    "fem01_run_fem_no_elastic": fem01_run_fem_no_elastic,
+})
+
+
+# --------------------------------------------------------------------------- #
+# FEM-2 — Reinforcement: LEM against FEM
+# --------------------------------------------------------------------------- #
+FEM02_START = os.path.join(REPO_ROOT,
+                           "docs/tutorials/files/xslope_reinforced_slope_start.xlsx")
+FEM02_DONE = os.path.join(REPO_ROOT,
+                          "docs/tutorials/files/xslope_reinforced_slope.xlsx")
+#: The line whose detail panel is photographed: the most heavily loaded of the six.
+FEM02_DETAIL_LINE = "Line 5"
+
+
+def _fem02_meshed(path=FEM02_DONE):
+    """The model with the tutorial's own mesh attached — the state the Build Mesh
+    step leaves behind, and the only state Studio's Run FEM action is reachable in.
+
+    The element type and target size are the COMPLETED file's whichever model is
+    meshed, and the reinforcement lines go in as constraint lines so the bars land
+    on mesh edges, exactly as ``studio.runners.MeshWorker`` does it. **Refine thin
+    zones is off**, which is what the page instructs: the dialog's own default is
+    on, and on this section it moves the mesh from 2,101 elements to 5,096 and the
+    peak-residual factor of safety from 1.5117 to 1.4414.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_size_regions, get_material_polygons)
+
+    done = _load(FEM02_DONE)
+    data = done if path == FEM02_DONE else _load(path)
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(data)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data, reinf_lines=lines), done["target_size"],
+            done["element_type"], lines=lines or None,
+            element_size_1d=done.get("element_size_1d"),
+            size_regions=extract_size_regions(data))
+    return data
+
+
+def fem02_materials():
+    """The materials editor, table view, FEM columns, AFTER the elastic pair is
+    entered — the state the page's Materials step leaves behind.
+
+    The starter delivers both soils with E and nu blank, so this is the filled
+    state the reader is working toward, photographed on the COMPLETED file the
+    way FEM-1's ``fem01_studio_materials`` is. The blank state is not shot: the
+    Run FEM refusal above it is what shows the reader the cells are empty.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _fem_only(MaterialsEditor().build(_load(FEM02_DONE), None))
+    return _grab(_mat_table(dlg, through="nu"), "fem02_studio_materials.png")
+
+
+def fem02_reinforce_blank():
+    """The reinforcement table as the STARTER delivers it: six lines with their
+    geometry, tensile capacity and pullout lengths, and Tres, E and Area empty.
+
+    Only the FEM toggle is ticked: the LEM inputs are complete, so the table
+    shows just the geometry and the three columns the reader is about to fill.
+    """
+    from studio.editors import ReinforcementEditor
+
+    dlg = ReinforcementEditor().build(_load(FEM02_START), None)
+    for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(tag == "fem")
+    return _grab(_line_table(dlg, through="area"),
+                 "fem02_studio_reinforce_blank.png")
+
+
+def fem02_reinforce_filled():
+    """The same table on the COMPLETED file — Tres, E and Area entered on all six
+    lines. The state the reader is working toward, beside the blank one."""
+    from studio.editors import ReinforcementEditor
+
+    dlg = ReinforcementEditor().build(_load(FEM02_DONE), None)
+    for tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(tag == "fem")
+    return _grab(_line_table(dlg, through="area"),
+                 "fem02_studio_reinforce_filled.png")
+
+
+def fem02_build_mesh():
+    """Build Mesh set to the tutorial's mesh: tri6, auto-sizing off, 2 ft, and
+    **Refine thin zones unticked**.
+
+    The last of those is the only box on this dialog the page asks the reader to
+    change from its default. The shell is a 1.19 ft facing band, thinner than one
+    element at 2 ft, so the refinement fires on it — and the mesh it produces is a
+    different answer, not a better-resolved version of this one.
+    """
+    from studio.dialogs import BuildMeshDialog
+
+    data = _load(FEM02_DONE)
+    dlg = BuildMeshDialog(defaults={"element_type": data["element_type"],
+                                    "target_size": float(data["target_size"]),
+                                    "auto_size": False,
+                                    "refine_thin_zones": False})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem02_studio_build_mesh.png")
+
+
+def fem02_run_fem():
+    """Run FEM on the meshed completed model, with the checks column beside it.
+
+    SSRM over the dialog's own bracket, and everything else at the dialog's own
+    defaults — including **Max iterations per trial**, which opens at 12,000. The
+    budget is where the automatic extension starts rather than where a trial dies,
+    so the reader changes nothing here.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _fem02_meshed()
+    dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": 1.0, "F_max": 2.0,
+                                 "tolerance": 0.01},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem02_studio_run_fem.png")
+
+
+
+def fem02_details():
+    """The 1D Details panel on the most heavily loaded line of the peak-residual
+    run — the axial force along the bar over its capacity envelope, and the bond
+    transfer rate under it.
+
+    The run is made HERE rather than read from a sidecar: neither tutorial file
+    ships companions, so the panel is photographed on a solve at the page's own
+    settings (tri6 at 2 ft with the thin-zone refinement off, the dialog's
+    bracket, 12,000 iterations a trial). That costs about two minutes.
+    """
+    from studio.fem_details_dialog import FemDetailsDialog
+    from PySide6.QtCore import Qt
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    data = _fem02_meshed()
+    fem_data = build_fem_data(data, data["mesh"])
+    with contextlib.redirect_stdout(io.StringIO()):
+        result = solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01,
+                            debug_level=0, failure_criterion="non_convergence",
+                            max_iterations=12000)
+    dlg = FemDetailsDialog(fem_data, result["last_solution"], data,
+                           model_path=FEM02_DONE,
+                           failure_solution=result.get("failure_solution"))
+    dlg.resize(1140, 660)
+    for row in range(dlg.list.count()):
+        entry = dlg.list.item(row).data(Qt.UserRole)
+        if entry and entry["label"] == FEM02_DETAIL_LINE:
+            dlg.list.setCurrentRow(row)
+            break
+    return _grab(dlg, "fem02_studio_1d_details.png")
+
+
+SHOTS.update({
+    "fem02_materials": fem02_materials,
+    "fem02_reinforce_blank": fem02_reinforce_blank,
+    "fem02_reinforce_filled": fem02_reinforce_filled,
+    "fem02_build_mesh": fem02_build_mesh,
+    "fem02_run_fem": fem02_run_fem,
+    "fem02_details": fem02_details,
+})
+
+
+# --------------------------------------------------------------------------- #
+# FEM-3 — Piles: LEM against FEM
+# --------------------------------------------------------------------------- #
+#: The discrete row: one model, two sample pages.  The page links the
+#: limit-equilibrium copy and enters the mesh and the bracket by hand, so every
+#: dialog below is photographed on a mesh built here at the page's own settings
+#: rather than on a committed companion.
+FEM03_PILES = os.path.join(REPO_ROOT, "docs/lem/files/xslope_piles.xlsx")
+#: The continuous wall: the completed file of the page's second half, written by
+#: ``tools/build_pile_wall_tutorial.py`` on the same slope.
+FEM03_WALL_DONE = os.path.join(REPO_ROOT,
+                               "docs/tutorials/files/xslope_pile_wall.xlsx")
+#: The mesh the page builds for both models, and the finer 1D element size its
+#: optional refinement step enters.
+FEM03_ELEMENT_TYPE = "tri6"
+FEM03_TARGET_SIZE = 2.0
+FEM03_REFINED_1D = 0.5
+#: The strength-reduction settings the page runs every trial at.  The bracket
+#: reaches 2.0 because the socketed runs stand at 1.6 and above; everything else
+#: is the dialog as it opens.
+FEM03_BRACKET = (1.0, 2.0)
+FEM03_TOLERANCE = 0.01
+FEM03_MAX_ITERATIONS = 12000
+FEM03_CRITERION = "non_convergence"
+
+
+def _fem03_meshed(path, element_size_1d=None):
+    """The model with a mesh attached — the state Build Mesh leaves behind, and
+    the only state Studio's Run FEM action is reachable in.
+
+    The mesh is built at the page's own settings, tri6 at 2 ft, with the pile or
+    wall lines carried in as constraint lines.
+    """
+    from xslope.mesh import (build_mesh_from_polygons,
+                             extract_constraint_line_geometry,
+                             extract_point_constraints,
+                             extract_size_regions, get_material_polygons)
+
+    data = _load(path)
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(data)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data, reinf_lines=lines),
+            FEM03_TARGET_SIZE, FEM03_ELEMENT_TYPE, lines=lines or None,
+            element_size_1d=element_size_1d,
+            point_constraints=extract_point_constraints(data),
+            size_regions=extract_size_regions(data))
+    return data
+
+
+def fem03_piles_table():
+    """The two pile rows with BOTH usage bands shown — every column the two
+    engines read, side by side.
+
+    E is given on both rows and I and Area are blank: the beam formulation
+    computes the section constants from the diameter when those cells are empty,
+    and then divides EA and EI by the spacing.  So the pair of cells the finite
+    element engine ultimately reads its stiffness from is D and S, which the
+    editor shows in both bands, uncolored, the way it shows the reinforcement
+    editor's Spacing.  Both bands are photographed rather than FEM alone because
+    the subject is one row read two ways: the same D and S feed the Ito & Matsui
+    force on the left and the smeared beam section on the right.
+
+    The table is taken out to Tip, the last column, because the page's spacing
+    section turns on what Head and Tip are set to.
+    """
+    from studio.editors import PilesEditor
+
+    dlg = PilesEditor().build(_load(FEM03_PILES), None)
+    for _tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(True)
+    return _grab(_line_table(dlg, through="tip_fixity"),
+                 "fem03_studio_piles_table.png")
+
+
+def fem03_run_fem_piles():
+    """Run FEM on the meshed pile model: strength reduction over the page's
+    bracket, with the checks column beside it."""
+    from studio.dialogs import RunFemDialog
+
+    data = _fem03_meshed(FEM03_PILES)
+    dlg = RunFemDialog(defaults={"analysis": "ssrm",
+                                 "F_min": FEM03_BRACKET[0],
+                                 "F_max": FEM03_BRACKET[1],
+                                 "tolerance": FEM03_TOLERANCE},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem03_studio_run_fem_piles.png")
+
+
+def fem03_wall_row():
+    """The one row the reader adds, in the editor's table view: the wall's two
+    endpoints, its axial and bending section constants entered directly, spacing
+    1, a moment capacity, and D and Vcap left empty.
+
+    Both usage bands are shown rather than the FEM band alone, because the row's
+    subject is which cells a continuous member fills and which it leaves blank,
+    and those cells sit in both bands.  The table reaches Tip, which is the cell
+    the page's second run changes.
+    """
+    from studio.editors import PilesEditor
+
+    dlg = PilesEditor().build(_load(FEM03_WALL_DONE), None)
+    # Both bands ticked, explicitly: which band is shown is a session setting, so
+    # a shot that does not set it photographs whatever the last dialog left.
+    for _tag, cb in (getattr(dlg, "_toggles", None) or {}).items():
+        cb.setChecked(True)
+    return _grab(_line_table(dlg, through="tip_fixity"),
+                 "fem03_studio_wall_row.png")
+
+
+def fem03_build_mesh_1d():
+    """Build Mesh with the page's optional refinement entered: tri6 at 2 ft, and
+    a 1D element size of 0.5 ft.
+
+    The 1D size box is the only one the refinement step changes.  Left blank it
+    follows the mesh element size, which is what every other run on the page
+    uses.  Every other control is left at the dialog's own default, Refine thin
+    zones included: this section carries one material, so the thin-zone plan is
+    empty and the box changes nothing.
+    """
+    from studio.dialogs import BuildMeshDialog
+
+    dlg = BuildMeshDialog(defaults={"element_type": FEM03_ELEMENT_TYPE,
+                                    "target_size": FEM03_TARGET_SIZE,
+                                    "auto_size": False,
+                                    "element_size_1d": FEM03_REFINED_1D})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem03_studio_build_mesh_1d.png")
+
+
+def fem03_run_fem_wall():
+    """Run FEM on the meshed wall model, at the bracket the page's numbers are
+    measured over."""
+    from studio.dialogs import RunFemDialog
+
+    data = _fem03_meshed(FEM03_WALL_DONE)
+    dlg = RunFemDialog(defaults={"analysis": "ssrm",
+                                 "F_min": FEM03_BRACKET[0],
+                                 "F_max": FEM03_BRACKET[1],
+                                 "tolerance": FEM03_TOLERANCE},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "fem03_studio_run_fem_wall.png")
+
+
+def fem03_wall_details():
+    """The 1D Details panel on the wall with its tip fixed: lateral displacement,
+    shear, bending moment and soil reaction down its length.
+
+    The moment capacity the row declares draws a dashed line on the moment panel;
+    no Ito & Matsui envelope is drawn, because the row declares no diameter — which
+    is correct for a member with no gaps for soil to arch across, and is the point
+    the page reads off this shot.
+
+    The run is made HERE rather than read from a sidecar: the tutorial files ship
+    no companions, so the panel is photographed on a solve at the page's own
+    settings, which takes about a minute.
+    """
+    from studio.fem_details_dialog import FemDetailsDialog
+    from xslope.fem import build_fem_data, solve_ssrm
+
+    data = _fem03_meshed(FEM03_WALL_DONE)
+    data["pile_lines"][0]["tip_fixity"] = "fixed"
+    with contextlib.redirect_stdout(io.StringIO()):
+        fem_data = build_fem_data(data, data["mesh"])
+        result = solve_ssrm(fem_data, F_min=FEM03_BRACKET[0],
+                            F_max=FEM03_BRACKET[1], tolerance=FEM03_TOLERANCE,
+                            debug_level=0, failure_criterion=FEM03_CRITERION,
+                            max_iterations=FEM03_MAX_ITERATIONS)
+    dlg = FemDetailsDialog(fem_data, result["last_solution"], data,
+                           model_path=FEM03_WALL_DONE,
+                           failure_solution=result.get("failure_solution"))
+    dlg.resize(1140, 660)
+    dlg.list.setCurrentRow(dlg.list.count() - 1)
+    return _grab(dlg, "fem03_studio_wall_1d_details.png")
+
+
+SHOTS.update({
+    "fem03_piles_table": fem03_piles_table,
+    "fem03_run_fem_piles": fem03_run_fem_piles,
+    "fem03_wall_row": fem03_wall_row,
+    "fem03_build_mesh_1d": fem03_build_mesh_1d,
+    "fem03_run_fem_wall": fem03_run_fem_wall,
+    "fem03_wall_details": fem03_wall_details,
+})
+
+
+# --------------------------------------------------------------------------- #
+# COMBO-1 — Seepage into Stability
+#
+# The reader opens a finished file and runs it three ways, so these shots
+# photograph the three run dialogs and the one table that connects them: the
+# materials sheet's pore-pressure column, which is what makes a seepage solution
+# reach a stability run at all.
+#
+# Every dialog is photographed on a model that has been meshed AND solved for
+# seepage, because that is the state the reader is in when each one is opened —
+# and because the checks column is the subject of half of them: a material set to
+# u = seep with no solved field is an error that blocks the run.
+# --------------------------------------------------------------------------- #
+COMBO01 = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_johnson_res.xlsx")
+#: Build Mesh at the dialog's own defaults — quadratic triangles, auto-sizing on,
+#: 100 divisions across the 750 ft section.
+COMBO01_MESH = {"element_type": "tri6", "auto_size": True, "size_divisions": 100,
+                "target_size": 7.5}
+COMBO01_METHOD = "spencer"
+COMBO01_SLICES = 40
+COMBO01_BRACKET = (1.0, 2.0)
+COMBO01_TOLERANCE = 0.01
+
+_combo01_cache = {}
+
+
+def _combo01_solved():
+    """The workbook with the tutorial's mesh built on it and the seepage solution
+    attached, exactly as the reader's session carries it after the seepage run.
+
+    Built here rather than read from a companion file: the tutorial copy of the
+    workbook ships no sidecars, because building the mesh and solving the seepage
+    are the first two steps the page teaches. Cached, because three dialogs are
+    photographed on the same state and the solve is not free.
+    """
+    if "data" not in _combo01_cache:
+        from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                                 get_material_polygons)
+        from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                                 run_seepage_analysis)
+
+        data = _load(COMBO01)
+        with contextlib.redirect_stdout(io.StringIO()):
+            data["mesh"] = build_mesh_from_polygons(
+                get_material_polygons(data), COMBO01_MESH["target_size"],
+                COMBO01_MESH["element_type"],
+                size_regions=extract_size_regions(data))
+            seep_data = build_seep_data(data["mesh"], data)
+            solution = run_seepage_analysis(seep_data, tol=1e-4, max_iter=400)
+            apply_steady_stability_field(data, solution, bc=1)
+        _combo01_cache["data"] = data
+    return _combo01_cache["data"]
+
+
+def combo01_build_mesh():
+    """Build Mesh with nothing changed: quadratic triangles, auto-sizing on, 100
+    divisions.
+
+    The element type is the shot's subject. It is the dialog's own default, and on
+    this file it is also a requirement rather than a preference — the same mesh
+    goes on to carry the strength reduction, which linear elements cannot run
+    honestly.
+    """
+    from studio.dialogs import BuildMeshDialog
+
+    dlg = BuildMeshDialog(defaults=dict(COMBO01_MESH))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo01_studio_build_mesh.png")
+
+
+def combo01_run_seep():
+    """Run Seepage on the meshed dam, at the dialog's own two defaults."""
+    from studio.dialogs import RunSeepDialog
+
+    data = _load(COMBO01)
+    dlg = RunSeepDialog(defaults={"tol": 1e-4, "max_iter": 400}, slope_data=data,
+                        has_bc2=bool((data.get("seepage_bc2") or {})
+                                     .get("specified_heads")),
+                        has_tseep=bool(data.get("tseep")))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo01_studio_run_seep.png")
+
+
+def combo01_materials():
+    """The three zones in table view with the LEM columns showing — the shot the
+    page's hinge is read off.
+
+    The **u** column is the subject: all three rows read `seep`, which is what
+    sends the solved seepage field to every slice base and every Gauss point.
+    The LEM band rather than the seepage band, because u is a stability input —
+    it says what the stability engines do with a field the seepage run produced,
+    and a row left on `none` runs the same seepage solve and then ignores it.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _lem_only(MaterialsEditor().build(_load(COMBO01), None))
+    return _grab(_mat_table(dlg, through="u"), "combo01_studio_materials.png")
+
+
+def combo01_run_lem():
+    """Run LEM on the solved model, with Method set to Spencer — the one field
+    the page changes from the dialog's defaults.
+
+    Photographed with the seepage solution attached, so the checks column is
+    clean. The same dialog on the same file before the seepage run carries an
+    error instead: three materials read u = seep and there is no field for them
+    to read.
+    """
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": COMBO01_METHOD,
+                                 "analysis": "auto_search",
+                                 "num_slices": COMBO01_SLICES},
+                       slope_data=_combo01_solved())
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo01_studio_run_lem.png")
+
+
+def combo01_run_fem():
+    """Run FEM on the same solved model, at the dialog's own defaults: strength
+    reduction over [1.0, 2.0], a 0.01 bisection tolerance, 12,000 iterations a
+    trial, rollers on the sides and non-convergence as the failure criterion.
+
+    Nothing here names the seepage solution, which is the point: the pore
+    pressures reach the Gauss points through the materials' own u column, and the
+    run dialog has no water control of its own.
+    """
+    from studio.dialogs import RunFemDialog
+
+    data = _combo01_solved()
+    dlg = RunFemDialog(defaults={"analysis": "ssrm", "F_min": COMBO01_BRACKET[0],
+                                 "F_max": COMBO01_BRACKET[1],
+                                 "tolerance": COMBO01_TOLERANCE},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo01_studio_run_fem.png")
+
+
+SHOTS.update({
+    "combo01_build_mesh": combo01_build_mesh,
+    "combo01_run_seep": combo01_run_seep,
+    "combo01_materials": combo01_materials,
+    "combo01_run_lem": combo01_run_lem,
+    "combo01_run_fem": combo01_run_fem,
+})
+
+
+# --------------------------------------------------------------------------- #
+# COMBO-2 — Rapid Drawdown
+#
+# Two workbooks, photographed at the point in the page where each dialog is
+# opened. The starter's shots carry the piezometric pair and u = piezo; the
+# completed model's carry the second boundary set, the schedule and the Run LEM
+# dialog with the drawdown checkbox on, where the two stage-time fields appear.
+# --------------------------------------------------------------------------- #
+COMBO02_START = os.path.join(REPO_ROOT,
+                             "docs/tutorials/files/xslope_johnson_rapid_start.xlsx")
+COMBO02 = os.path.join(REPO_ROOT,
+                       "docs/tutorials/files/xslope_johnson_rapid.xlsx")
+#: The mesh the page builds: linear triangles, auto-sizing on, 100 divisions
+#: across the 750 ft section.
+COMBO02_MESH = {"element_type": "tri3", "auto_size": True, "size_divisions": 100,
+                "target_size": 7.5}
+COMBO02_METHOD = "spencer"
+COMBO02_SLICES = 40
+
+_combo02_cache = {}
+
+
+def _combo02_solved():
+    """The completed workbook with the page's mesh built and BOTH steady fields
+    attached — the state the reader is in when Run LEM is opened for the
+    two-steady run, and the state the drawdown checks are reported against.
+
+    Cached: two solves and a mesh for one dialog is not free, and the shipped file
+    carries no sidecars because solving is what the page teaches.
+    """
+    if "data" not in _combo02_cache:
+        from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                                 get_material_polygons)
+        from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                                 run_seepage_analysis)
+
+        data = _load(COMBO02)
+        with contextlib.redirect_stdout(io.StringIO()):
+            data["mesh"] = build_mesh_from_polygons(
+                get_material_polygons(data), COMBO02_MESH["target_size"],
+                COMBO02_MESH["element_type"],
+                size_regions=extract_size_regions(data))
+            for bc in (1, 2):
+                seep_data = build_seep_data(data["mesh"], data, seep_bc=bc)
+                solution = run_seepage_analysis(seep_data, tol=1e-4, max_iter=400)
+                apply_steady_stability_field(data, solution, bc=bc)
+        _combo02_cache["data"] = data
+    return _combo02_cache["data"]
+
+
+#: Widest a preview-bearing editor is photographed at. A docs figure is rendered
+#: at 1000 px, so a dialog wider than this is downscaled past the point where its
+#: field labels stay legible.
+_PREVIEW_MAX_WIDTH = 1400
+
+
+def _size_preview(dlg, slope_data, width=_PREVIEW_MAX_WIDTH):
+    """Size a preview-bearing editor so its canvas carries the section's own aspect.
+
+    The preview figure is drawn to the canvas viewport, so a tall pane on a section
+    four times as wide as it is high strands the drawing in white space with the
+    padding all in y. Both dimensions are measured off the built dialog rather than
+    guessed: the height is the form's own ``sizeHint`` — the table is then never
+    clipped and the preview is no taller than it has to be — and the width is
+    solved for from two measurements of how much of it the layout gives the
+    canvas, so the viewport comes out as close to the section's width-to-height
+    ratio as the cap allows.
+    """
+    dlg.show()
+    _settle()
+    dlg.resize(dlg.width(), dlg.sizeHint().height())
+    _settle()
+    samples = []
+    for w in (900, width):
+        dlg.resize(w, dlg.height())
+        _settle()
+        samples.append((w, dlg._preview.canvas.view.viewport().width()))
+    (w0, v0), (w1, v1) = samples
+    xs = [x for x, _ in slope_data["ground_surface"].coords]
+    ys = [y for _, y in slope_data["ground_surface"].coords]
+    aspect = (max(xs) - min(xs)) / max(1e-9, max(ys) - min(ys))
+    want = aspect * dlg._preview.canvas.view.viewport().height()
+    slope = (v1 - v0) / float(w1 - w0) if w1 != w0 else 0.0
+    target = w1 if slope <= 0 else w0 + (want - v0) / slope
+    dlg.resize(int(min(max(target, w0), width)), dlg.height())
+    _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    dlg._preview.canvas._render_current()
+    _settle()
+    return dlg
+
+
+def combo02_materials():
+    """The three zones in table view with the LEM columns showing.
+
+    The **d** and **psi** columns are the subject: only the core carries the pair,
+    which is what makes it the one material the drawdown procedure treats as
+    undrained. The LEM band, because both columns are read by the limit
+    equilibrium engine alone.
+    """
+    from studio.editors import MaterialsEditor
+
+    dlg = _lem_only(MaterialsEditor().build(_load(COMBO02_START), None))
+    return _grab(_mat_table(dlg, through="u"), "combo02_studio_materials.png")
+
+
+def combo02_piezo():
+    """The piezometric editor with **Line 2** active.
+
+    Both lines are on the preview — the active one bold with its vertices, the
+    other dimmed — so the pair reads as what it is: one surface at full pool and
+    one at the end of the drawdown, six points and five, meeting again downstream
+    of the core where the drawdown has not reached.
+    """
+    from studio.editors import PiezoEditor
+
+    data = _load(COMBO02_START)
+    dlg = PiezoEditor().build(data, None)
+    dlg._tabs.setCurrentIndex(1)
+    _size_preview(dlg, data)
+    return _grab(dlg, "combo02_studio_piezo.png", settle=False)
+
+
+def combo02_seep_bc2():
+    """The boundary editor on its **Set 2 (rapid drawdown)** tab, with the
+    upstream entry selected.
+
+    Set 2 is the drawn-down steady problem: two heads at the elevation-100
+    tailwater datum and nothing else. It takes plain heads only — a reservoir
+    boundary and a series-bound value both belong on Set 1 — which is what the
+    help line above the tabs says.
+    """
+    from studio.editors import SeepBcEditor
+
+    dlg = SeepBcEditor().build(_load(COMBO02), None, select=(1, 0))
+    dlg.resize(1080, 560)
+    return _grab(dlg, "combo02_studio_seep_bc2.png")
+
+
+def combo02_transient():
+    """The Transient editor with the pool schedule and BOTH stage times filled.
+
+    The stage fields are the difference between this shot and SEEP-3's, where they
+    are deliberately blank: they name the two saved frames the drawdown analysis
+    reads, stage 1 at t = 0 with the reservoir still full and stage 2 at t = 50
+    with it down. Both are forced into the saved-frame schedule, so each is a
+    computed frame.
+
+    The preview is rendered explicitly rather than waited for: the pane's redraw
+    is debounced, so a grab taken straight after ``show()`` catches a blank canvas.
+    """
+    from studio.editors import TransientDialog
+
+    data = _load(COMBO02)
+    dlg = TransientDialog(data.get("tseep"), data, None)
+    dlg.resize(1220, 640)
+    dlg.show()
+    _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    dlg._preview.canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, "combo02_studio_run_transient.png")
+    dlg.grab().save(out)
+    dlg.close()
+    print("-> combo02_studio_run_transient.png")
+    return out
+
+
+def _combo02_march():
+    """The solved transient march, as the Run LEM dialog receives it from the
+    results document once Part 3's seepage run has finished.
+
+    The dialog needs it for two things the drawdown page photographs: the stage
+    fields offer instants out of a solved march, and the model checks read the two
+    stage times as the statement that this run takes both of its states from the
+    march rather than from boundary set 2. Cached beside the mesh, since the march
+    is the long run of the page.
+    """
+    if "march" not in _combo02_cache:
+        from xslope.seep import (build_seep_data, build_tseep_data,
+                                 run_seepage_analysis, run_transient_seepage)
+
+        data = _combo02_solved()
+        with contextlib.redirect_stdout(io.StringIO()):
+            seep_data = build_seep_data(data["mesh"], data, seep_bc=1)
+            run_seepage_analysis(seep_data, tol=1e-4, max_iter=400)
+            _combo02_cache["march"] = run_transient_seepage(
+                seep_data, build_tseep_data(data))
+    return _combo02_cache["march"]
+
+
+def _combo02_cleared_bc2(slope_data):
+    """``slope_data`` with boundary set 2 emptied, as Part 3 has the reader clear it."""
+    return dict(slope_data,
+                seepage_bc2={"specified_heads": [], "specified_fluxes": [],
+                             "exit_face": []})
+
+
+def _combo02_run_lem(slope_data, name, transient=None):
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": COMBO02_METHOD,
+                                 "analysis": "auto_search",
+                                 "num_slices": COMBO02_SLICES, "rapid": True},
+                       slope_data=slope_data, transient=transient)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, name)
+
+
+def combo02_run_lem():
+    """Run LEM with **Rapid drawdown** ticked, on the starter file.
+
+    Two fields differ from the dialog's defaults: Method (Spencer) and the
+    drawdown checkbox itself, which runs the three-stage procedure and puts the
+    run through the drawdown checks as well as the ordinary limit equilibrium
+    ones. Analysis stays on Auto search, so the run finds its own critical circle
+    from the starting circle the file carries. The starter carries no transient
+    schedule, so no stage-time fields are on the form yet.
+    """
+    return _combo02_run_lem(_load(COMBO02_START), "combo02_studio_run_lem.png")
+
+
+def combo02_run_lem_staged():
+    """The same dialog on the completed model, which carries the schedule.
+
+    The **Rapid-drawdown stage times** group is what the schedule adds: two
+    instants rather than the single seepage time an ordinary run on a transient
+    model selects, holding the tseep sheet's own stage_1 and stage_2.
+
+    The model is Part 3's: the march solved, and boundary set 2 cleared, which is
+    what leaves the checks column carrying the page's one standing warning.
+    """
+    return _combo02_run_lem(_combo02_cleared_bc2(_combo02_solved()),
+                            "combo02_studio_run_lem_staged.png",
+                            transient=_combo02_march())
+
+
+def combo02_run_lem_staged_bc2():
+    """The same dialog with boundary set 2 still on the file.
+
+    Two stage times and a solved march say the drawn-down state comes from the
+    march, so the second boundary set states an analysis this run neither solves
+    nor reads, and the checks say so rather than letting it look consulted.
+    """
+    return _combo02_run_lem(_combo02_solved(),
+                            "combo02_studio_run_lem_staged_bc2.png",
+                            transient=_combo02_march())
+
+
+SHOTS.update({
+    "combo02_materials": combo02_materials,
+    "combo02_piezo": combo02_piezo,
+    "combo02_seep_bc2": combo02_seep_bc2,
+    "combo02_transient": combo02_transient,
+    "combo02_run_lem": combo02_run_lem,
+    "combo02_run_lem_staged": combo02_run_lem_staged,
+    "combo02_run_lem_staged_bc2": combo02_run_lem_staged_bc2,
+})
+
+
+# --------------------------------------------------------------------------- #
+#  COMBO-3 — factor of safety versus time
+# --------------------------------------------------------------------------- #
+COMBO03_START = os.path.join(
+    REPO_ROOT, "docs/tutorials/files/xslope_earth_dam_fs_time_start.xlsx")
+COMBO03 = os.path.join(REPO_ROOT,
+                       "docs/tutorials/files/xslope_earth_dam_fs_time.xlsx")
+#: The ten cells the page's materials step has the reader type, five per zone, in
+#: the order the Materials editor lists them. Applied to the START file for the
+#: materials shot, so the photographed table is the one the reader has just filled
+#: rather than a table that shipped filled.
+COMBO03_TYPED = ({"gamma": 20.0, "gamma_sat": 21.0, "c": 0.0, "phi": 32.0, "u": "seep"},
+                 {"gamma": 19.0, "gamma_sat": 20.0, "c": 10.0, "phi": 25.0, "u": "seep"})
+COMBO03_METHOD = "spencer"
+COMBO03_SLICES = 40
+#: The instants the shipped march saves, which the Run LEM and Parametric dialogs
+#: offer as a list. Named here rather than read off the march: both selectors read
+#: the times off the solution and nothing else, and importing nineteen frames of
+#: nodal head for a dialog shot is work the shot does not need. The producer in
+#: ``make_tutorial_figures.py`` reads the real march and prints the same nineteen.
+COMBO03_TIMES = (0.0, 2.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 47.0,
+                 55.0, 65.0, 80.0, 100.0, 130.0, 180.0, 240.0, 300.0)
+#: The frame the Run LEM shot is set to: the page's first single-instant run, the
+#: full reservoir the march starts from. The dialog opens on the LAST saved frame,
+#: so a shot on this one is the reader having changed it, which is what the page is
+#: showing.
+COMBO03_DIALOG_TIME = 0.0
+#: The frame the play bar is parked on: three quarters of the way down the fall,
+#: where the pool has left the upper face and the core still holds its head.
+COMBO03_PLAYBAR_TIME = 35.0
+#: The instants the refinement step adds to the Transient editor's extra-save-times
+#: list: the midpoint of every gap the schedule leaves between day 20 and day 40,
+#: where the curve dips. The rest of what that step asks for — 20, 25, 30, 35 and
+
+_combo03_cache = {}
+
+
+def _combo03_solved():
+    """The shipped model with the mesh and the march it carries, one frame staged.
+
+    The state the reader is in at the first stability run: the loader attaches the
+    companion mesh, the march is read off ``_tseep.csv``, and one instant of it is
+    placed on the model — which a file whose materials read ``u = seep`` needs
+    before Run LEM will report anything but an error panel. Cached, because the
+    import is the same work for every shot.
+    """
+    if "data" not in _combo03_cache:
+        from xslope.seep import (build_seep_data, import_transient_solution,
+                                 select_transient_frame_u)
+
+        data = _load(COMBO03)
+        with contextlib.redirect_stdout(io.StringIO()):
+            seep_data = build_seep_data(data["mesh"], data, seep_bc=1)
+            solution = import_transient_solution(seep_data,
+                                                 os.path.splitext(COMBO03)[0])
+            select_transient_frame_u(data, solution, time=COMBO03_DIALOG_TIME)
+        _combo03_cache["data"] = data
+        _combo03_cache["solution"] = solution
+        _combo03_cache["seep_data"] = seep_data
+    return _combo03_cache["data"]
+
+
+def combo03_materials():
+    """The two zones in table view with the LEM columns showing, the strengths in.
+
+    The band this page reads out: a unit weight above the water table and a
+    saturated one below it, a drained effective-stress envelope on each zone, and
+    ``u`` on ``seep`` so every slice base reads its pore pressure from the solved
+    field.
+
+    Photographed on the START file with the ten cells the page has the reader type
+    written in first, so the table in the figure is the table the reader has just
+    finished filling. The completed workbook carries the same ten values, and this
+    shot must show what the reader's screen shows, not what a second file ships.
+    """
+    from studio.editors import MaterialsEditor
+
+    data = _load(COMBO03_START)
+    for mat, typed in zip(data["materials"], COMBO03_TYPED):
+        mat.update(typed)
+    dlg = _lem_only(MaterialsEditor().build(data, None))
+    return _grab(_mat_table(dlg, through="u"), "combo03_studio_materials.png")
+
+
+def combo03_materials_blank():
+    """The two zones in table view, before the reader has typed a thing.
+
+    Same dialog, same START file, same **Show parameters for: LEM** toggle as
+    ``combo03_materials`` — but taken before the ten cells are written in, so both
+    unit weights, both strengths and the pore-pressure option read blank or zero
+    as the file ships. Pairs with that shot on the page: this one first, so the
+    reader sees what they are about to fill.
+    """
+    from studio.editors import MaterialsEditor
+
+    data = _load(COMBO03_START)
+    dlg = _lem_only(MaterialsEditor().build(data, None))
+    return _grab(_mat_table(dlg, through="u"), "combo03_studio_materials_blank.png")
+
+
+def combo03_circles():
+    """The circles editor on the dam: a starting circle on each face.
+
+    The page's starting-circle step is read off this shot — two rows in the table,
+    the two arcs the preview draws over the two slopes, and a **Search window**
+    group holding one value, the minimum slip depth. Which face governs is what the
+    curve measures, so the entry and exit ranges that would confine the search to
+    one of them are left blank.
+    """
+    from studio.editors import CirclesEditor
+
+    return _grab(CirclesEditor().build(_load(COMBO03), None),
+                 "combo03_studio_circles.png")
+
+
+def combo03_run_lem():
+    """Run LEM on the shipped model, with the **Seepage time** group set to the
+    instant the page runs.
+
+    The group is what a march adds: an ordinary run reads ONE instant, and this is
+    where that instant is named. Its **Saved frame** list holds the nineteen the
+    march stored, the note under it restates which field the run will read, and
+    the checkbox writes the choice to the model so a scripted re-run reads the
+    same frame. The shot is taken on the frame the page's first run uses rather
+    than on the dialog's opening one, because the page is showing the reader how to
+    change it.
+    """
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": COMBO03_METHOD,
+                                 "analysis": "auto_search",
+                                 "num_slices": COMBO03_SLICES},
+                       slope_data=_combo03_solved(),
+                       transient={"times": list(COMBO03_TIMES)})
+    dlg.seep_time.frame.setCurrentIndex(COMBO03_TIMES.index(COMBO03_DIALOG_TIME))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo03_studio_run_lem.png")
+
+
+def combo03_playbar():
+    """The **Seep · Transient** results tab on the march the file ships.
+
+    Every pore pressure the page reads comes from one of the frames under this play
+    bar, and the reader gets them without solving anything: the workbook arrives
+    with ``_tseep.csv`` beside it. Parked mid-drawdown, at the instant the page
+    runs singly, where the pool has left the upper face and the core still holds
+    its head. The display options are the transient panel's defaults — no flow
+    lines, since a storage-release state has no flow net.
+    """
+    from studio.transient import TransientSeepView
+
+    data = _combo03_solved()
+    seep_data = _combo03_cache["seep_data"]
+    solution = _combo03_cache["solution"]
+
+    opts = {"variable": "head", "levels": 12, "flowlines": False,
+            "vectors": True, "phreatic": True, "show_bc_levels": True}
+    view = TransientSeepView()
+    # The canvas sizes its figure to the viewport, and this dam is five times as
+    # wide as it is tall, so a tall view leaves the frame stranded in white space.
+    view.resize(1000, 540)
+    view.set_frames(seep_data, solution["frames"],
+                    opts_getter=lambda: opts, style_getter=lambda: None,
+                    keep_index=False)
+    view.show()
+    _settle()
+    times = [float(f["time"]) for f in solution["frames"]]
+    view.set_index(min(range(len(times)),
+                       key=lambda i: abs(times[i] - COMBO03_PLAYBAR_TIME)))
+    _settle()
+    view.canvas._render_current()          # force the raster into the scene
+    _settle()
+    out = os.path.join(OUT_DIR, "combo03_studio_playbar.png")
+    view.grab().save(out)
+    view.close()
+    print("-> combo03_studio_playbar.png")
+    return out
+
+
+def combo03_parametric():
+    """Run → Parametric… in Factor-of-safety-vs-time mode.
+
+    The whole curve in one run: the parameter picker steps aside (no input is
+    substituted at any point) and the march's nineteen saved frames take its place,
+    every one ticked. Method and slice count are the single-instant run's, and
+    every solver control is at its default — the two circles the file carries reach
+    both faces of the dam, so nothing here has to be turned on.
+    """
+    from studio.dialogs import SensitivityDialog
+
+    dlg = SensitivityDialog(defaults={"method": COMBO03_METHOD,
+                                      "num_slices": COMBO03_SLICES},
+                            slope_data=_combo03_solved(), app_mode="lem",
+                            transient={"times": list(COMBO03_TIMES)})
+    dlg.mode.setCurrentIndex(dlg.mode.findData("fs_vs_time"))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo03_studio_parametric.png")
+
+
+#: Part 2's shipped model. It carries the mesh and the march as companions, so
+#: loading it is the whole of the state the reader opens the dialog in, and the
+#: loader attaches the mesh without a build.
+COMBO03R_FILE = os.path.join(REPO_ROOT,
+                             "docs/tutorials/files/xslope_johnson_fs_time.xlsx")
+
+#: The instants the shipped march saves, which the Parametric dialog offers as a
+#: checklist. Named here rather than read off the march: the frames list reads the
+#: times off the solution and nothing else, and importing 12 frames of nodal head
+#: for one dialog shot is work the shot does not need. The producer in
+#: ``make_tutorial_figures.py`` reads the real march and prints the same twelve.
+COMBO03R_TIMES = (0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0,
+                  60.0, 70.0, 80.0, 100.0, 130.0, 170.0, 220.0, 300.0, 400.0, 500.0)
+
+
+def combo03_rapid_parametric():
+    """Run → Parametric… in Factor-of-safety-vs-time mode with **Rapid
+    drawdown at each time** ticked, on Part 2's shipped model.
+
+    The checkbox is Part 2's whole control: it sits under the frames list because
+    it changes what a ticked instant means — stage 2 of a fall that began at the
+    march's initial pool rather than a state on its own — and ticking it holds
+    **Re-search the critical surface at each step** on and greys it, which the shot
+    has to show along with the note the dialog rewrites underneath.
+
+    Shot on the shipped model rather than on COMBO-2's, because the Model checks
+    panel beside the controls is part of what the page reads: that file carries no
+    boundary set 2, so the drawdown's one remaining warning is the free-draining
+    one.
+    """
+    from studio.dialogs import SensitivityDialog
+
+    dlg = SensitivityDialog(defaults={"method": COMBO03_METHOD,
+                                      "num_slices": COMBO03_SLICES},
+                            slope_data=_load(COMBO03R_FILE), app_mode="lem",
+                            transient={"times": list(COMBO03R_TIMES)})
+    dlg.mode.setCurrentIndex(dlg.mode.findData("fs_vs_time"))
+    dlg.rapid.setChecked(True)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "combo03_rapid_parametric.png")
+
+
+SHOTS.update({
+    "combo03_materials": combo03_materials,
+    "combo03_materials_blank": combo03_materials_blank,
+    "combo03_circles": combo03_circles,
+    "combo03_run_lem": combo03_run_lem,
+    "combo03_playbar": combo03_playbar,
+    "combo03_parametric": combo03_parametric,
+    "combo03_rapid_parametric": combo03_rapid_parametric,
+})
+
+
+# --------------------------------------------------------------------------- #
+# LEM-13 — Rock Slope (Hoek-Brown)
+#
+# The materials shot is LIST view: only the list view puts the four Hoek-Brown
+# field inputs beside the derived mb/s/a readout and the envelope those constants
+# draw, which is the whole subject of Part A. Part B photographs the Parametric
+# dialog in its Design mode, set to the GSI sweep the page runs.
+# --------------------------------------------------------------------------- #
+LEM13_A = os.path.join(REPO_ROOT, "docs/tutorials/files/xslope_rock_slope.xlsx")
+
+
+def _lem13_material(model, name, edit=None, width=1180, height=780):
+    """The materials editor in list view, on the one rock material.
+
+    ``edit`` is applied before the editor is built, so the shot carries the state
+    the step ends in rather than a pre-edit row described in prose.
+    """
+    from studio.editors import MaterialsEditor
+
+    d = _load(model)
+    if edit:
+        d = dict(d, materials=[dict(d["materials"][0], **edit)])
+    dlg = _lem_only(MaterialsEditor().build(d, None))
+    dlg.set_view_mode("list")
+    dlg._list_view.list.setCurrentRow(0)
+    dlg.resize(width, height)
+    return _grab(dlg, name)
+
+
+def lem13_materials():
+    """Part A's rock as the file carries it: option `hb`, the four field inputs, and
+    the mb / s / a the editor derives from them beside the envelope they define."""
+    return _lem13_material(LEM13_A, "lem13_studio_materials.png")
+
+
+def lem13_run_lem():
+    """Part A's run: Spencer, auto search, the dialog's own 40 slices."""
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "spencer", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM13_A))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_run_lem.png")
+
+
+def lem13_run_fem():
+    """Part A's strength reduction, on the meshed model, at the bracket the
+    completed file declares.
+
+    The mesh is built here because the file ships no sidecar — Studio's Run FEM
+    action is unreachable without one, so the dialog is photographed in the state
+    the Build Mesh step leaves behind.
+    """
+    from studio.dialogs import RunFemDialog
+    from xslope.mesh import (build_mesh_from_polygons, extract_size_regions,
+                             get_material_polygons)
+
+    data = _load(LEM13_A)
+    with contextlib.redirect_stdout(io.StringIO()):
+        data["mesh"] = build_mesh_from_polygons(
+            get_material_polygons(data), data["target_size"], data["element_type"],
+            size_regions=extract_size_regions(data))
+    dlg = RunFemDialog(defaults={"analysis": "ssrm",
+                                 "F_min": float(data["ssrm_f_min"]),
+                                 "F_max": float(data["ssrm_f_max"]),
+                                 "tolerance": 0.01,
+                                 "k0": float(data["k0"])},
+                       material_names=[m.get("name") for m in data["materials"]],
+                       slope_data=data)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_run_fem.png")
+
+
+def lem13_build_mesh():
+    """Build Mesh on the size the completed file declares: tri6 at 0.9 m, with
+    auto-sizing off because a declared size is what turns it off."""
+    from studio.dialogs import BuildMeshDialog
+
+    data = _load(LEM13_A)
+    dlg = BuildMeshDialog(defaults={"element_type": data["element_type"],
+                                    "target_size": float(data["target_size"]),
+                                    "auto_size": False})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_build_mesh.png")
+
+
+def lem13_run_lem_corps():
+    """Run LEM with the Corps of Engineers method selected on the Hoek-Brown rock.
+
+    The method-and-material pairing raises its own check: a fixed-inclination
+    force-equilibrium method against an envelope whose instantaneous friction angle
+    can pass 55 degrees at low confinement. Nothing else on the dialog changes.
+    """
+    from studio.dialogs import RunLemDialog
+
+    dlg = RunLemDialog(defaults={"method": "corps", "analysis": "auto_search",
+                                 "num_slices": 40},
+                       slope_data=_load(LEM13_A))
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_run_lem_corps.png")
+
+
+def lem13_parametric():
+    """The Parametric dialog set up for Part B's GSI sweep.
+
+    Design mode rather than Sensitivity: the page wants the whole curve across an
+    explicit range, not a percentage band about the current value. The parameter
+    picker is driven to ``mat:rock:hb_gsi`` the same way a reader drives it — pick
+    the material, then the property — so the shot carries the reference the run
+    actually sweeps, echoed on the **Sweeping** row.
+    """
+    from studio.dialogs import SensitivityDialog
+
+    data = _load(LEM13_A)
+    dlg = SensitivityDialog(defaults={"mode": "design", "method": "spencer",
+                                     "num_slices": 40, "low": 5.0, "high": 20.0,
+                                     "steps": 6, "target_fs": 1.5,
+                                     "search": True},
+                           slope_data=data, app_mode="lem")
+    i = dlg.prop.findData("mat:rock:hb_gsi")
+    if i < 0:
+        raise SystemExit("the Parametric dialog cannot reference mat:rock:hb_gsi")
+    dlg.prop.setCurrentIndex(i)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "lem13_studio_parametric.png")
+
+
+SHOTS.update({
+    "lem13_materials": lem13_materials,
+    "lem13_run_lem": lem13_run_lem,
+    "lem13_build_mesh": lem13_build_mesh,
+    "lem13_run_fem": lem13_run_fem,
+    "lem13_run_lem_corps": lem13_run_lem_corps,
+    "lem13_parametric": lem13_parametric,
+})
+
+
+# --------------------------------------------------------------------------- #
+# W-1 — The AI Assistant: the setup shots
+#
+# The two figures the tutorial's "Setting it up" section needs, and the only W-1
+# figures that are ordinary offscreen grabs: the settings dialog and the dock, both
+# in the state a first open leaves them in. Everything else on that page is a
+# recorded conversation and lives in the session registry below.
+# --------------------------------------------------------------------------- #
+def w01_settings():
+    """The Assistant settings dialog as a first open finds it.
+
+    A throwaway settings file and a config whose stored key is empty, for the reason
+    ``tools/capture_studio_screenshots.py`` gives: the shot must not depend on which
+    provider the person running it uses, and it must never read the keychain. Empty
+    rather than a dummy key, because this figure's subject is the setup a reader has
+    not done yet — the field shows its ``sk-…`` placeholder, and the caption under
+    the model box says the list is the offline fallback until a key is entered.
+
+    ``auto_refresh=False`` keeps the grab off the network. The provider and model are
+    the shipped defaults, read from the provider table rather than spelled here, so
+    the figure follows the default if it changes.
+    """
+    import tempfile
+
+    from PySide6.QtCore import QSettings
+
+    from studio.ai.config import PROVIDERS, AssistantConfig
+    from studio.ai.settings_dialog import AssistantSettingsDialog
+
+    class _EmptyKeyConfig(AssistantConfig):
+        def api_key(self, provider):
+            return ""
+
+    with tempfile.TemporaryDirectory() as tmp:
+        settings = QSettings(os.path.join(tmp, "w01.ini"), QSettings.IniFormat)
+        settings.setValue("ai/provider", "anthropic")
+        settings.setValue("ai/model/anthropic", PROVIDERS["anthropic"]["models"][0])
+        dlg = AssistantSettingsDialog(_EmptyKeyConfig(settings), auto_refresh=False)
+        dlg.resize(dlg.sizeHint())
+        return _grab(dlg, "w01_settings.png")
+
+
+def w01_chat_dock():
+    """The Assistant dock, empty, on an open project.
+
+    Grabbed off a real ``MainWindow`` rather than a bare ``ChatDock`` so the shot
+    carries the dock's own title bar and the width Studio gives it, and on LEM-1's
+    model so the dock is the one a reader would be looking at with a project open.
+
+    The provider and model caption is read from the machine's stored settings, so the
+    selection is pinned to the shipped default for the length of the grab and put
+    back afterwards — the same reason and the same technique as ``t0_studio_window``.
+
+    The transcript is empty and so is the usage line: that line is written when a
+    turn reports its tokens, and this dock has not run one. The page's session
+    figures show it filled.
+    """
+    from PySide6.QtCore import QSettings, Qt
+
+    from studio.ai.config import PROVIDERS
+    from studio.main_window import MainWindow
+
+    settings = QSettings("XSlope", "XSlope Studio")
+    pinned = {"ai/provider": "anthropic",
+              "ai/model/anthropic": PROVIDERS["anthropic"]["models"][0]}
+    stashed = {k: (settings.value(k) if settings.contains(k) else None)
+               for k in pinned}
+    win = None
+    try:
+        for key, value in pinned.items():
+            settings.setValue(key, value)
+        settings.sync()
+
+        # Short on purpose: the dock's own height is the main window's, and an
+        # empty transcript stretched to 1000 px is a figure that is mostly blank
+        # paper. This is tall enough for the controls above and below it.
+        win = MainWindow()
+        win.resize(1400, 560)
+        win.open_path(LEM01)
+        win.show()
+        _settle()
+        win.resizeDocks([win.chat_dock], [430], Qt.Horizontal)
+        _settle()
+        pix = win.chat_dock.grab()
+        out = os.path.join(OUT_DIR, "w01_chat_dock.png")
+        pix.save(out)
+        print("-> w01_chat_dock.png  (%dx%d, %s)"
+              % (pix.width(), pix.height(), pinned["ai/model/anthropic"]))
+        return out
+    finally:
+        for key, value in stashed.items():
+            if value is None:
+                settings.remove(key)
+            else:
+                settings.setValue(key, value)
+        settings.sync()
+        if win is not None:
+            win.close()
+
+
+SHOTS.update({
+    "w01_settings": w01_settings,
+    "w01_chat_dock": w01_chat_dock,
+})
+
+
+# --------------------------------------------------------------------------- #
+# W-2 — Bringing in models from CAD and other programs
+#
+# Three importers, and only the first of them runs on a file this repository ships.
+# The DXF shots use ``docs/tutorials/files/w02_section.dxf``, built by
+# ``tools/build_w02_import_dxf.py``. The GeoStudio and Slide2 shots need the
+# vendors' own model files, which are theirs and are never committed here: they are
+# read from a local archive whose root is ``$XSLOPE_VENDOR_FILES`` (default
+# ``~/python_projects/vendor_files``), and each shot SKIPS with a message when its
+# file is not there, so an argument-less sweep runs clean on a machine without the
+# archive. Both files are public downloads, and the tutorial says where each comes
+# from.
+# --------------------------------------------------------------------------- #
+W02_DXF = os.path.join(REPO_ROOT, "docs/tutorials/files/w02_section.dxf")
+W02_XLSX = os.path.join(REPO_ROOT, "docs/tutorials/files/w02_section_imported.xlsx")
+
+VENDOR_FILES = os.environ.get(
+    "XSLOPE_VENDOR_FILES", os.path.expanduser("~/python_projects/vendor_files"))
+
+#: Seequent's SLOPE/W verification example for manual §2.25 — files.seequent.com.
+W02_GSZ = os.path.join(VENDOR_FILES, "gsz_corpus",
+                       "Baker and Leschinsky - Earth Dam.gsz")
+
+#: Rocscience's Slide2 Tutorial 28 model, from the public deprecated-tutorials zip.
+W02_SLMD_NAME = "Tutorial 28 Seismic.slmd"
+
+
+def _find_vendor(name):
+    """The first copy of ``name`` under the vendor archive, or None.
+
+    The Slide2 tutorial models arrive as one zip that unpacks into nested folders
+    whose names carry the release, so the file is located by search rather than by
+    a path spelled here — which would break on the next release.
+    """
+    import glob
+
+    for depth in range(1, 7):
+        hits = glob.glob(os.path.join(VENDOR_FILES, *(["*"] * depth), name))
+        if hits:
+            return sorted(hits)[0]
+    return None
+
+
+#: Shots that ran but wrote nothing, so the closing count can report writes rather
+#: than attempts.
+SKIPPED = []
+
+
+def _skip(shot, path, source):
+    print("skipped %s — %s not in the vendor archive (%s)"
+          % (shot, os.path.basename(path), source))
+    SKIPPED.append(shot)
+    return None
+
+
+def _main_window(model_or_builder, name, width=1500, height=950):
+    """The whole Studio window on a model, offscreen.
+
+    Same technique as ``lem01_canvas``: the canvas render is deferred and there are
+    no paint events without a screen, so it is kicked synchronously; the assistant
+    dock is hidden (W-2 does not use it) and the log cleared, because what the log
+    holds at this point is the capture's own doing rather than the reader's.
+
+    ``model_or_builder`` is either a path to open or a callable taking the window,
+    which is how the vendor shots put an *imported* model on the canvas: they run
+    the same ``ProjectDocument`` call File → Import … makes.
+    """
+    from studio.main_window import MainWindow
+
+    win = MainWindow()
+    win.resize(width, height)
+    if callable(model_or_builder):
+        model_or_builder(win)
+    else:
+        win.open_path(model_or_builder)
+    for dock in ("assistant_dock", "chat_dock", "ai_dock"):
+        d = getattr(win, dock, None)
+        if d is not None:
+            d.hide()
+    win.show()
+    _settle()
+    win.canvas.render_inputs(win.doc.slope_data)
+    _settle()
+    win.canvas._render_timer.stop()
+    win.canvas._render_current()
+    win.log.clear()
+    _settle()
+    pix = win.grab()
+    out = os.path.join(OUT_DIR, name)
+    pix.save(out)
+    print("-> %s  (%dx%d, offscreen main window)" % (name, pix.width(), pix.height()))
+    # An imported project is unsaved by design, and closing one puts up the modal
+    # "Save changes before closing?" question — which the capture harness does not
+    # stub (it replaces only the static warning/information/critical helpers) and
+    # which would hang a headless run. The document is marked clean first; nothing
+    # here is meant to be kept.
+    win.doc._dirty = False
+    win.close()
+    return out
+
+
+def w02_dxf_wizard():
+    """The DXF import wizard on W-2's own drawing.
+
+    Read with the reader the importer uses and mapped with the wizard's own
+    suggestion function, so the six rows, their Contents summaries and every
+    suggested target are the ones the reader sees — three material zones, the
+    search circles, the load and the piezometric line.
+    """
+    from xslope.cad import read_dxf_layers, suggest_dxf_target
+    from studio.dialogs import DxfImportDialog
+
+    layers, _warnings = read_dxf_layers(W02_DXF)
+    dlg = DxfImportDialog(layers, suggest_dxf_target)
+    # Trimmed to its own six rows: the wizard opens at a height sized for a drawing
+    # with far more layers than this one, and the blank half of it is not the shot's
+    # subject. Measured off the built table rather than guessed.
+    dlg.show()
+    _settle()
+    table = dlg.table
+    rows = sum(table.rowHeight(r) for r in range(table.rowCount()))
+    chrome = dlg.height() - table.viewport().height()
+    dlg.resize(dlg.width(), rows + chrome + 2 * table.frameWidth())
+    return _grab(dlg, "w02_dxf_wizard.png")
+
+
+def w02_dxf_window():
+    """The imported section on the canvas, with the properties filled in.
+
+    Driven through the import rather than by opening the shipped workbook: the two
+    look almost alike, but the status bar does not — an imported project is
+    untitled and unsaved, which is the state Part 1 describes, and a shot that read
+    "Loaded w02_section_imported.xlsx" would photograph the step after the one its
+    caption names. The mapping and the property values come from the page's own
+    builder, so the figure cannot drift from the workbook the page ships.
+    """
+    from xslope.cad import read_dxf_layers
+    from tools.build_w02_import_dxf import default_mapping, fill_properties
+
+    layers, _warnings = read_dxf_layers(W02_DXF)
+
+    def build(win):
+        win.doc.build_from_dxf_mapping(layers, default_mapping(layers))
+        fill_properties(win.doc.slope_data)
+        win._populate_inputs_tree()
+
+    return _main_window(build, "w02_dxf_window.png")
+
+
+def _gsz_import(analysis_name="Spencer"):
+    """Read W-2's GeoStudio file and return ``(gsz, analysis_id, analyses)``."""
+    from xslope.geostudio import read_gsz, list_analyses
+
+    gsz = read_gsz(W02_GSZ)
+    analyses = list_analyses(gsz)
+    chosen = next(a for a in analyses if a["name"] == analysis_name)
+    return gsz, chosen["id"], analyses
+
+
+def w02_gsz_analyses():
+    """The analysis picker on the Baker & Leshchinsky dam: the two Spencer
+    analyses the file holds, which is the choice the import asks for."""
+    from studio.dialogs import GszImportDialog
+
+    if not os.path.exists(W02_GSZ):
+        return _skip("w02_gsz_analyses", W02_GSZ, "Seequent verification examples")
+    _gsz, _id, analyses = _gsz_import()
+    dlg = GszImportDialog(analyses)
+    return _grab(dlg, "w02_gsz_analyses.png")
+
+
+def w02_gsz_notes():
+    """The notes the GeoStudio import reports, in the box Studio shows them in.
+
+    The box is built here rather than driven out of ``MainWindow`` because the
+    capture harness replaces the static ``QMessageBox`` helpers so that nothing
+    blocks a headless run. The title, the wording and the caveats are the real
+    ones — ``build_from_gsz`` produces the list.
+    """
+    from PySide6.QtWidgets import QMessageBox
+    from studio.document import ProjectDocument
+
+    if not os.path.exists(W02_GSZ):
+        return _skip("w02_gsz_notes", W02_GSZ, "Seequent verification examples")
+    gsz, analysis_id, _analyses = _gsz_import()
+    doc = ProjectDocument()
+    caveats = doc.build_from_gsz(gsz, analysis_id)
+
+    box = QMessageBox()
+    box.setIcon(QMessageBox.Information)
+    box.setWindowTitle("GeoStudio imported")
+    box.setText("Imported with notes:\n\n• " + "\n• ".join(caveats)
+                + "\n\nSee the Log pane for details.")
+    box.setStandardButtons(QMessageBox.Ok)
+    # A QMessageBox sizes itself to its text and wraps hard; four caveats of full
+    # sentences come out a column two words wide. The width is forced through the
+    # layout's own spacer row, which is the only handle the class offers.
+    from PySide6.QtWidgets import QSpacerItem, QSizePolicy
+    layout = box.layout()
+    layout.addItem(QSpacerItem(660, 0, QSizePolicy.Minimum, QSizePolicy.Expanding),
+                   layout.rowCount(), 0, 1, layout.columnCount())
+    return _grab(box, "w02_gsz_notes.png")
+
+
+def w02_gsz_window():
+    """The imported dam on the canvas: three zones, the piezometric line through
+    the core, and SLOPE/W's own solved circle."""
+    if not os.path.exists(W02_GSZ):
+        return _skip("w02_gsz_window", W02_GSZ, "Seequent verification examples")
+    gsz, analysis_id, _analyses = _gsz_import()
+
+    def build(win):
+        win.doc.build_from_gsz(gsz, analysis_id)
+
+    return _main_window(build, "w02_gsz_window.png")
+
+
+def _slmd_import(scenario_name="No Seismic"):
+    """Read W-2's Slide2 file and return ``(d, scenario_index, scenarios, path)``."""
+    from xslope.slide2 import read_slmd, list_scenarios
+
+    path = _find_vendor(W02_SLMD_NAME)
+    if path is None:
+        return None
+    d = read_slmd(path)
+    scenarios = list_scenarios(d)
+    chosen = next(s for s in scenarios if s["name"] == scenario_name)
+    return d, chosen["index"], scenarios, path
+
+
+def w02_slide2_scenarios():
+    """The scenario picker on Slide2's Tutorial 28 model: the master scenario and
+    the four the tutorial builds on it."""
+    from studio.dialogs import Slide2ImportDialog
+
+    found = _slmd_import()
+    if found is None:
+        return _skip("w02_slide2_scenarios", W02_SLMD_NAME,
+                     "Slide2 deprecated tutorials")
+    _d, _index, scenarios, _path = found
+    dlg = Slide2ImportDialog(scenarios)
+    return _grab(dlg, "w02_slide2_scenarios.png")
+
+
+def w02_slide2_window():
+    """The imported three-layer slope on the canvas, with the starting circle
+    Part 3 has the reader add — a Slide2 scenario defines a search, so the import
+    arrives with no surface."""
+    import math
+
+    found = _slmd_import()
+    if found is None:
+        return _skip("w02_slide2_window", W02_SLMD_NAME,
+                     "Slide2 deprecated tutorials")
+    d, index, _scenarios, _path = found
+
+    def build(win):
+        win.doc.build_from_slide2(d, index)
+        sd = win.doc.slope_data
+        # Part 3's starting circle: centered over the middle of the face, two slope
+        # heights above the toe, through the toe itself.
+        Xo, Yo, toe = 40.0, 45.0, (30.0, 25.0)
+        R = math.hypot(Xo - toe[0], Yo - toe[1])
+        sd["circles"] = [{"Xo": Xo, "Yo": Yo, "R": R, "Depth": Yo - R}]
+        sd["circular"] = True
+        win._populate_inputs_tree()
+
+    return _main_window(build, "w02_slide2_window.png")
+
+
+SHOTS.update({
+    "w02_dxf_wizard": w02_dxf_wizard,
+    "w02_dxf_window": w02_dxf_window,
+    "w02_gsz_analyses": w02_gsz_analyses,
+    "w02_gsz_notes": w02_gsz_notes,
+    "w02_gsz_window": w02_gsz_window,
+    "w02_slide2_scenarios": w02_slide2_scenarios,
+    "w02_slide2_window": w02_slide2_window,
+})
+
+
+# --------------------------------------------------------------------------- #
+# W-3 — Generating the analysis report
+#
+# Two kinds of shot. The dialog pair is captured the way every other dialog here
+# is: the real ReportDialog on W-3's own model, in the state the step before it
+# leaves behind. The page shots are photographs of the DOCUMENTS the page links,
+# not of freshly built ones — ``tools/build_w03_report_files.py`` writes those,
+# and rendering them here is what keeps a figure and the file a reader downloads
+# the same document. They go through LibreOffice and poppler, the same route
+# ``tools/capture_report_pages.py`` takes for the Studio reference page, and each
+# page is found by text that is on it and on no page above it.
+# --------------------------------------------------------------------------- #
+W03_MODEL = os.path.join(REPO_ROOT,
+                         "docs/tutorials/files/xslope_johnson_res_solved.xlsx")
+W03_TEMPLATE = os.path.join(REPO_ROOT,
+                            "docs/tutorials/files/report_template_example.docx")
+W03_REPORT = os.path.join(REPO_ROOT, "docs/tutorials/files/w03_report.docx")
+W03_REPORT_TEMPLATED = os.path.join(
+    REPO_ROOT, "docs/tutorials/files/w03_report_example_template.docx")
+
+#: The title page as W-3 has the reader fill it in, and as the shipped reports
+#: carry it (``tools/build_w03_report_files.py``).
+W03_META = {"title": "Johnson Reservoir Dam — Steady Seepage and Stability",
+            "project_number": "2026-231",
+            "organization": "Example Engineering",
+            "author": "A. Engineer"}
+
+#: Rasterizing resolution for the page shots, in dpi — readable at the width the
+#: page embeds them without shipping a megabyte each.
+W03_PAGE_DPI = 110
+
+
+def _w03_dialog():
+    """The Generate Report dialog on W-3's model, composed as the page composes
+    it: Bishop and Spencer ticked, the title page filled in.
+
+    The seepage and finite element solutions are the model's own, read from the
+    companion files beside it — which is what Studio does when the file is opened
+    and what makes the report a document about solutions rather than a second
+    run. The limit equilibrium bundle is stated at the factor of safety COMBO-1
+    publishes rather than searched for, because what the shot is of is the
+    dialog.
+    """
+    from PySide6.QtCore import Qt
+
+    from xslope.report import solutions_from_sidecars
+    from studio.report_dialog import ReportDialog
+
+    slope_data = _load(W03_MODEL)
+    with contextlib.redirect_stdout(io.StringIO()):
+        solutions = solutions_from_sidecars(W03_MODEL, slope_data)
+    solutions["lem"] = [{"results": {"FS": 1.248, "method": "spencer"},
+                         "method": "spencer"}]
+    dlg = ReportDialog(slope_data=slope_data, solutions=solutions,
+                       model_path=W03_MODEL, default_method="spencer")
+    for item in dlg._method_items():
+        if item.data(Qt.UserRole) == "bishop":
+            item.setCheckState(Qt.Checked)
+    # The folder is illustrative — the real default is wherever this script was
+    # run from, which is nobody's project folder — but the FILE NAME is the
+    # dialog's own default for this model, which is what the page describes and
+    # tells the reader to leave alone.
+    dlg.path.setText("/Users/you/projects/johnson/"
+                     "xslope_johnson_res_solved_report.docx")
+    dlg.title.setText(W03_META["title"])
+    dlg.project_number.setText(W03_META["project_number"])
+    dlg.organization.setText(W03_META["organization"])
+    dlg.author.setText(W03_META["author"])
+    return dlg
+
+
+def w03_report_dialog():
+    """File → Generate Report… on the solved model, with both methods ticked.
+
+    The contents tree is opened to its own height for the reason
+    ``tools/capture_studio_screenshots.py`` gives: sized to the controls beside
+    it, the last engine branch falls below a scrollbar.
+    """
+    from tools.capture_studio_screenshots import _open_tree
+
+    dlg = _w03_dialog()
+    _open_tree(dlg.contents)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "w03_report_dialog.png")
+
+
+def w03_report_template():
+    """The Output group alone, with the example company template chosen.
+
+    Only that group: what the step changes is one field, and a second shot of the
+    whole dialog would photograph three controls the reader has already been
+    shown to say one thing about the fourth.
+
+    Both paths are illustrative, for the reason ``_w03_dialog`` gives about the
+    output path — and the template's more so, since the real one is wherever this
+    checkout happens to sit, elided from the left to a stub of a path.
+    """
+    from PySide6.QtWidgets import QGroupBox
+
+    dlg = _w03_dialog()
+    dlg.set_template("/Users/you/templates/report_template_example.docx")
+    dlg.path.setText("/Users/you/projects/johnson/w03_report_example_template.docx")
+    dlg.resize(dlg.sizeHint())
+    dlg.show()
+    _settle()
+    box = next(b for b in dlg.findChildren(QGroupBox) if b.title() == "Output")
+    out = os.path.join(OUT_DIR, "w03_report_template.png")
+    box.grab().save(out)
+    dlg.close()
+    print("-> w03_report_template.png")
+    return out
+
+
+def _soffice():
+    """LibreOffice, wherever it is on this machine, or None."""
+    import shutil
+
+    for name in (os.environ.get("XSLOPE_SOFFICE"), "soffice",
+                 "/Applications/LibreOffice.app/Contents/MacOS/soffice"):
+        if not name:
+            continue
+        found = name if os.path.isabs(name) and os.path.exists(name) \
+            else shutil.which(name)
+        if found:
+            return found
+    return None
+
+
+def _report_page(docx, marker, name):
+    """Rasterize the page of ``docx`` that carries ``marker``.
+
+    The page is found by its text, never by its number: a sentence added anywhere
+    above moves every page after it, and a figure captioned "the flow net"
+    showing whatever landed on page 7 is worse than no figure.
+    """
+    import glob
+    import shutil
+    import subprocess
+    import tempfile
+
+    soffice = _soffice()
+    poppler = all(shutil.which(t) for t in ("pdftoppm", "pdftotext", "pdfinfo"))
+    if soffice is None or not poppler:
+        return _skip(name, "LibreOffice/poppler", "page rendering")
+    with tempfile.TemporaryDirectory(prefix="xslope_w03_page_") as tmp:
+        subprocess.run([soffice, "--headless", "--convert-to", "pdf",
+                        "--outdir", tmp, docx],
+                       check=True, capture_output=True, timeout=600)
+        pdf = os.path.join(tmp,
+                           os.path.splitext(os.path.basename(docx))[0] + ".pdf")
+        total = int(subprocess.run(["pdfinfo", pdf], capture_output=True,
+                                   text=True).stdout.split("Pages:")[1].split()[0])
+        page = None
+        for n in range(1, total + 1):
+            text = subprocess.run(["pdftotext", "-f", str(n), "-l", str(n),
+                                   pdf, "-"], capture_output=True,
+                                  text=True).stdout
+            if marker in " ".join(text.split()):
+                page = n
+                break
+        if page is None:
+            raise RuntimeError(f"no page of {os.path.basename(docx)} carries "
+                               f"{marker!r}")
+        stem = os.path.join(tmp, "page")
+        subprocess.run(["pdftoppm", "-r", str(W03_PAGE_DPI), "-png",
+                        "-f", str(page), "-l", str(page), "-singlefile",
+                        pdf, stem], check=True)
+        out = os.path.join(OUT_DIR, name)
+        shutil.copyfile(glob.glob(stem + ".png")[0], out)
+    print("-> %s  (page %d of %s)" % (name, page, os.path.basename(docx)))
+    return out
+
+
+def w03_page_seep():
+    """The seepage results page: the flow net, the pore pressure field and the
+    velocity magnitude, under the computed flow through the section."""
+    return _report_page(W03_REPORT, "The flow through the section is",
+                        "w03_page_seep.png")
+
+
+def w03_page_spencer():
+    """Spencer's calculations, section 4.6.4: the equations the solver evaluated
+    and the nomenclature under them.
+
+    The page picked is the one that carries the calculations and nothing else.
+    The page after it opens the finite element section a third of the way down,
+    so a shot of it is captioned for one section and shows two."""
+    return _report_page(W03_REPORT, "There is no equation for F",
+                        "w03_page_spencer.png")
+
+
+def w03_page_template():
+    """The first body page of the report built on the example company template:
+    the letterhead in the head, the firm's line in the foot."""
+    return _report_page(W03_REPORT_TEMPLATED, "digest identifies",
+                        "w03_page_template.png")
+
+
+SHOTS.update({
+    "w03_report_dialog": w03_report_dialog,
+    "w03_report_template": w03_report_template,
+    "w03_page_seep": w03_page_seep,
+    "w03_page_spencer": w03_page_spencer,
+    "w03_page_template": w03_page_template,
+})
+
+
+# --------------------------------------------------------------------------- #
+# W-1 — Working with the assistant
+#
+# Not a dialog capture. The assistant tutorial's figures are recorded CONVERSATIONS
+# — a real provider call, a real run_python in the live document — so they come
+# from their own harness, and from their own registry: a session is run only when
+# it is named on the command line, never by an argument-less sweep, because each
+# one spends API credit. See tools/assistant_sessions.py.
+# --------------------------------------------------------------------------- #
+from tools.assistant_sessions import SESSIONS  # noqa: E402
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    dry_run = "--dry-run" in argv
+    sweep = "--all" in argv
+    argv = [a for a in argv if not a.startswith("-")]
+    # A bare run used to sweep, which rewrote every committed PNG from live Qt and
+    # buried the one figure being worked on. Naming nothing now asks for the list.
+    if not argv and not sweep:
+        print(__doc__.split("Run:")[0].strip())
+        print("\nName a shot (substring match), or --all to sweep.\n")
+        print("shots:    %s" % ", ".join(sorted(SHOTS)))
+        print("sessions: %s" % ", ".join(sorted(SESSIONS)))
+        return 1
     os.makedirs(OUT_DIR, exist_ok=True)
     names = [n for n in SHOTS if not argv or any(a in n for a in argv)]
-    if not names:
-        print("no shot matching %s; known shots: %s" % (argv, ", ".join(sorted(SHOTS))))
+    # Recorded assistant sessions cost real money against the key in the keychain,
+    # so they are NEVER swept: an argument-less run captures every dialog and no
+    # session. They run only when named.
+    sessions = [n for n in SESSIONS if argv and any(a in n for a in argv)]
+    if not names and not sessions:
+        print("no shot matching %s; known shots: %s\nknown sessions: %s"
+              % (argv, ", ".join(sorted(SHOTS)), ", ".join(sorted(SESSIONS))))
         return 1
     with _app_defaults():
         for name in names:
             SHOTS[name]()
-    print("\nwrote %d screenshot(s) to docs/tutorials/images/" % len(names))
+        for name in sessions:
+            SESSIONS[name](dry_run=dry_run)
+    print("\nwrote %d screenshot(s) to docs/tutorials/images/"
+          % (len(names) - len(SKIPPED)))
+    if SKIPPED:
+        print("skipped %d (vendor file not in the archive)" % len(SKIPPED))
+    if sessions:
+        print("recorded %d assistant session(s)%s"
+              % (len(sessions), " (dry run)" if dry_run else ""))
     return 0
 
 

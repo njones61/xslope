@@ -34,6 +34,7 @@ else:
         print(f"Auto-calculated target element size: {target_size:.3f}")
 
     mesh = build_mesh_from_polygons(polygons, target_size=target_size, element_type=element_type, lines=constraint_lines,
+                                    element_size_1d=slope_data.get('element_size_1d'),
                                     size_regions=extract_size_regions(slope_data))
     mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
     export_mesh_to_json(mesh, mesh_file)

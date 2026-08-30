@@ -791,7 +791,7 @@ def _feature_size_fields(gmsh, target_size, refine_factor, refine_set,
     base_min = target_size / refine_factor
     floor = base_min / _REFINE_CRACK_TIP_MULT     # finest size any feature may request
 
-    # A caller-stated element size along the constraint lines (target_size_1d). Same
+    # A caller-stated element size along the constraint lines (element_size_1d). Same
     # band as every other feature, so a stated 1D size grades back to the global
     # target instead of stepping at the line — and so it cannot pin a curve the way
     # the transfinite node count it replaced did.
@@ -1063,8 +1063,17 @@ def _has_orphan_1d_nodes(mesh):
     if elems is None or len(elems) == 0:
         return True
     used = set(int(n) for n in np.unique(np.asarray(elems)))
-    for e in e1d:
-        for nd in e[:2]:                      # corner nodes of the 1D element
+    types = mesh.get("element_types_1d")
+    for i, e in enumerate(e1d):
+        # Every node the element actually records -- two on a linear element,
+        # three once the midside node of the 2D edge is attached. The trailing
+        # column is a padding zero on a two-node element, and node 0 is a real
+        # node, so the count comes from element_types_1d rather than from the
+        # array width.
+        n_nod = 2
+        if types is not None and i < len(types):
+            n_nod = max(2, min(int(types[i]), len(e)))
+        for nd in e[:n_nod]:
             if int(nd) not in used:
                 return True
     return False
@@ -1480,7 +1489,7 @@ def detect_sweepable_regions(polygon_coords, target_size, polygon_sizes=None,
     return accepted, edge_divisions
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None, quad_style='free'):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=None, debug=False, mesh_params=None, element_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None, quad_style='free'):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -1503,13 +1512,19 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
         lines        : Optional list of lines, each defined by list of (x, y) tuples for 1D elements
         debug        : Enable debug output
         mesh_params  : Optional dictionary of GMSH meshing parameters to override defaults
-        target_size_1d : Optional element size along the constraint (reinforcement /
-                      pile) lines. None (the default) meshes them at whatever the
-                      size field asks for there — the global target away from a
-                      refined feature. A value finer than target_size adds a graded
-                      band around the lines; a coarser one is ignored, because the
-                      size field composes by taking the minimum and a coarser request
-                      could never bind.
+        element_size_1d : Optional element size along the constraint (reinforcement /
+                      pile) lines — the model's main!D20 cell, carried in slope_data
+                      as 'element_size_1d'. None (the default) meshes them at whatever
+                      the size field asks for there — the global target away from a
+                      refined feature or a local Size. A value finer than target_size
+                      adds a graded band around the lines, so the beam/bar elements AND
+                      the soil elements sharing their nodes come back at that size and
+                      grow smoothly out to the global target. A coarser one is ignored,
+                      because the size field composes by taking the minimum and a
+                      coarser request could never bind. Composing by minimum also means
+                      a zone that already declares a finer local Size keeps it: the
+                      stated 1D size refines the parts of a line that are coarser than
+                      it and leaves the rest alone.
         profile_lines: Optional list of profile line dicts with 'mat_id' keys for material assignment
         refine_factor: Optional feature-aware auto-refinement. None (default) = OFF, and
                       the element size is the requested one everywhere. A value > 1 drives the
@@ -1567,13 +1582,13 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     # from any feature. A value at or above the global target could only coarsen, and
     # the size field composes by taking the minimum, so it is dropped rather than
     # silently ignored deeper down.
-    if target_size_1d is not None:
-        target_size_1d = float(target_size_1d)
-        if not (target_size_1d > 0) or target_size_1d >= target_size:
+    if element_size_1d is not None:
+        element_size_1d = float(element_size_1d)
+        if not (element_size_1d > 0) or element_size_1d >= target_size:
             if debug:
-                print(f"target_size_1d = {target_size_1d} is not finer than the "
+                print(f"element_size_1d = {element_size_1d} is not finer than the "
                       f"target element size {target_size} — ignored")
-            target_size_1d = None
+            element_size_1d = None
 
     # Validate / normalize feature-aware refinement. refine_factor is None => no
     # feature bands, and the background size field is the requested size everywhere.
@@ -1896,7 +1911,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             # NOT pinned here.
             #
             # It used to be: every segment got a setTransfiniteCurve node count
-            # derived from target_size_1d, which defaults to target_size. That hard-
+            # derived from element_size_1d, which defaults to target_size. That hard-
             # pinned the constraint lines at the GLOBAL element size — on both
             # element families, since the block was never guarded by wants_quads —
             # and a curve carrying a hard node count is discretised before any
@@ -2047,7 +2062,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             line_pts = line_info['point_coords']
             
             # Set transfinite constraints to force mesh edges along each line segment
-            # REMOVED: This was conflicting with the target_size_1d calculations above
+            # REMOVED: This was conflicting with the element_size_1d calculations above
             # for i, line_tag in enumerate(line_tags):
             #     try:
             #         # Force exactly 2 nodes (start and end) to prevent subdivision
@@ -2189,13 +2204,13 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             polygon_coords, all_line_curve_tags, point_map,
             surface_tags_by_polygon, debug=debug,
             region_ids=region_ids, material_k=material_k,
-            edge_map=edge_map, size_1d=target_size_1d)
-    elif target_size_1d is not None:
+            edge_map=edge_map, size_1d=element_size_1d)
+    elif element_size_1d is not None:
         all_line_curve_tags = [t for info in line_data for t in info['line_tags']]
         _feature_fields = _feature_size_fields(
             gmsh, target_size, 2.0, set(), polygon_coords, all_line_curve_tags,
             point_map, surface_tags_by_polygon, debug=debug,
-            region_ids=region_ids, size_1d=target_size_1d)
+            region_ids=region_ids, size_1d=element_size_1d)
 
     # ONE background size field decides the element size, for both element families,
     # refined or not. Nothing else is allowed to: point sizes and boundary extension
@@ -2555,6 +2570,12 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             "inserted into the zone boundaries (get_material_polygons(slope_data, "
             "reinf_lines=...) does this automatically).")
 
+    # Embedded 1D elements stand on every node of the 2D edge they lie on. On a
+    # quadratic mesh that includes the edge's midside node, whichever path built
+    # the mesh -- gmsh's own quadratic elements, the linear-to-quadratic
+    # conversion above, or the OCC-fragment fallback.
+    attach_1d_midside_nodes(mesh, debug=debug)
+
     return mesh
 
 
@@ -2695,9 +2716,10 @@ def convert_linear_to_quadratic_mesh(mesh, target_element_type, debug=False):
             new_elements.append(element.tolist())
             new_element_types.append(elem_type)
     
-    # Keep 1D elements as linear (2-node). Truss stiffness uses only end nodes,
-    # so midside nodes add no physical fidelity and can cause singular K if they
-    # are not shared with a 2D element edge.
+    # Carry the 1D elements across unchanged here. Their midside node is the one
+    # the 2D edge they lie on just gained, and it is attached below by
+    # attach_1d_midside_nodes() once the converted 2D topology exists -- one
+    # implementation, shared with the gmsh-quadratic and mesh-JSON paths.
     new_elements_1d = []
     new_element_types_1d = []
 
@@ -2705,7 +2727,7 @@ def convert_linear_to_quadratic_mesh(mesh, target_element_type, debug=False):
         for elem_idx, element in enumerate(elements_1d):
             new_elements_1d.append(element.tolist())
             new_element_types_1d.append(element_types_1d[elem_idx])
-    
+
     # Append all new midside node coordinates at once
     if new_node_coords:
         nodes = np.vstack([nodes, np.array(new_node_coords)])
@@ -2726,8 +2748,99 @@ def convert_linear_to_quadratic_mesh(mesh, target_element_type, debug=False):
         updated_mesh["elements_1d"] = np.array(new_elements_1d, dtype=int)
         updated_mesh["element_types_1d"] = np.array(new_element_types_1d, dtype=int)
         updated_mesh["element_materials_1d"] = element_materials_1d
-    
+        attach_1d_midside_nodes(updated_mesh, debug=debug)
+
     return updated_mesh
+
+
+#: Which corner-node pair each edge of a quadratic 2D element spans, and where
+#: that edge's midside node sits in the element's node list. Keyed by node count.
+_QUADRATIC_EDGE_MIDSIDE = {
+    6: (((0, 1), 3), ((1, 2), 4), ((2, 0), 5)),                 # tri6
+    8: (((0, 1), 4), ((1, 2), 5), ((2, 3), 6), ((3, 0), 7)),    # quad8
+    9: (((0, 1), 4), ((1, 2), 5), ((2, 3), 6), ((3, 0), 7)),    # quad9
+}
+
+
+def attach_1d_midside_nodes(mesh, debug=False):
+    """Give every embedded 1D element the midside node of the 2D edge it lies on.
+
+    A bar or beam element laid on a quadratic soil edge must stand on all three
+    of that edge's nodes. Standing on the two corners alone leaves the midside
+    node free to move independently of the member, so the member and the soil
+    displace together only at the corners: the soil edge can bow away from a
+    straight bar between them, and the member's own bending is sampled at half
+    the stations the soil field carries.
+
+    The midside node already exists -- it is a node of the adjacent tri6, quad8
+    or quad9 -- so attaching it adds no node and moves none. The element record
+    already has room for it: ``elements_1d`` is (n, 3) with the third column a
+    padding zero on a two-node element, and ``element_types_1d`` records 2 or 3.
+
+    Modifies ``mesh`` in place and returns it. Idempotent: an element already
+    recorded with three nodes is left alone, so this is safe to call on the mesh
+    generator's output, on a mesh read back from JSON, and on both in turn.
+    Elements on an edge no quadratic 2D element carries -- a linear mesh, or a
+    constraint line the mesher could not make conform -- keep their two nodes.
+    """
+    e1d = mesh.get("elements_1d")
+    if e1d is None or len(e1d) == 0:
+        return mesh
+    elements = mesh.get("elements")
+    element_types = mesh.get("element_types")
+    if elements is None or element_types is None or len(elements) == 0:
+        return mesh
+
+    # Edge (lower corner, upper corner) -> midside node, over every quadratic
+    # 2D element in the mesh.
+    edge_midside = {}
+    for element, elem_type in zip(np.asarray(elements), np.asarray(element_types)):
+        spec = _QUADRATIC_EDGE_MIDSIDE.get(int(elem_type))
+        if spec is None:
+            continue
+        for (a, b), m in spec:
+            if m >= len(element):
+                continue
+            n_a, n_b = int(element[a]), int(element[b])
+            edge_midside[(min(n_a, n_b), max(n_a, n_b))] = int(element[m])
+    if not edge_midside:
+        return mesh
+
+    e1d = np.asarray(e1d, dtype=int)
+    if e1d.ndim != 2 or e1d.shape[1] < 2:
+        return mesh
+    if e1d.shape[1] < 3:
+        e1d = np.column_stack([e1d, np.zeros(len(e1d), dtype=int)])
+    else:
+        e1d = e1d.copy()
+
+    types_1d = mesh.get("element_types_1d")
+    if types_1d is None:
+        types_1d = np.full(len(e1d), 2, dtype=int)
+    else:
+        types_1d = np.asarray(types_1d, dtype=int).copy()
+
+    n_attached = 0
+    n_missed = 0
+    for i in range(len(e1d)):
+        if int(types_1d[i]) >= 3:
+            continue
+        n_0, n_1 = int(e1d[i, 0]), int(e1d[i, 1])
+        mid = edge_midside.get((min(n_0, n_1), max(n_0, n_1)))
+        if mid is None:
+            n_missed += 1
+            continue
+        e1d[i, 2] = mid
+        types_1d[i] = 3
+        n_attached += 1
+
+    mesh["elements_1d"] = e1d
+    mesh["element_types_1d"] = types_1d
+
+    if debug and (n_attached or n_missed):
+        print(f"  1D elements: {n_attached} given the midside node of their 2D "
+              f"edge, {n_missed} left two-node (no quadratic edge)")
+    return mesh
 
 
 def line_segment_parameter(point, line_start, line_end):
@@ -3690,6 +3803,11 @@ def import_mesh_from_json(filename):
     # was added to build_mesh_from_polygons (or edited externally).
     if 'elements' in mesh and 'element_types' in mesh and 'nodes' in mesh:
         ensure_ccw_elements(mesh['nodes'], mesh['elements'], mesh['element_types'])
+
+    # Defensive in the same way: a mesh file written before 1D elements carried
+    # the midside node of their 2D edge is repaired on the way in, so a stored
+    # mesh and a freshly generated one give the same elements.
+    attach_1d_midside_nodes(mesh)
 
     return mesh
 
@@ -4858,7 +4976,30 @@ def test_1d_element_alignment(mesh, reinforcement_lines, tolerance=1e-6, debug=T
         
         if debug and success:
             print(f"  ✓ Line {line_idx} passes all alignment tests")
-    
+
+    # Test 5: On a quadratic mesh every 1D element carries the midside node of
+    # the 2D edge it lies on, and that node is the midpoint of its two corners.
+    # A three-node element whose third node sits anywhere else is on a different
+    # edge than the one it was assembled against.
+    element_types_1d = mesh.get('element_types_1d')
+    if element_types_1d is not None and len(element_types_1d) == len(elements_1d):
+        for elem_idx, (element, elem_type) in enumerate(zip(elements_1d,
+                                                            element_types_1d)):
+            if int(elem_type) < 3 or len(element) < 3:
+                continue
+            n_0, n_1, n_m = int(element[0]), int(element[1]), int(element[2])
+            if max(n_0, n_1, n_m) >= len(nodes):
+                print(f"ERROR: 1D element {elem_idx} indexes a node outside the mesh")
+                success = False
+                continue
+            expected = 0.5 * (np.asarray(nodes[n_0]) + np.asarray(nodes[n_1]))
+            offset = float(np.linalg.norm(np.asarray(nodes[n_m]) - expected))
+            scale = float(np.linalg.norm(np.asarray(nodes[n_1]) - np.asarray(nodes[n_0])))
+            if offset > max(tolerance, 1e-9 * max(scale, 1.0)):
+                print(f"ERROR: 1D element {elem_idx} mid node {n_m} is {offset:.2e} "
+                      f"from the midpoint of its end nodes")
+                success = False
+
     if debug:
         if success:
             print("\n=== All 1D Element Alignment Tests PASSED ===")

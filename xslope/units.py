@@ -467,7 +467,7 @@ def units_comment_line(unit_system, time_unit=None):
 
 #: The keys every :func:`labels` result carries, in a stable order.
 _LABEL_KEYS = ("length", "stress", "unit_weight", "force_per_len",
-               "k", "flowrate", "time")
+               "k", "flowrate", "time", "inv_length")
 
 
 def labels(unit_system, time_unit=None):
@@ -491,6 +491,7 @@ def labels(unit_system, time_unit=None):
         key           SI                Imperial
         ============= ================= =========================
         length        ``"m"``           ``"ft"``
+        inv_length    ``"1/m"``         ``"1/ft"``
         stress        ``"kPa"``         ``"psf"``
         unit_weight   ``"kN/m³"``       ``"pcf"``
         force_per_len ``"kN/m"``        ``"lb/ft"``
@@ -526,6 +527,7 @@ def labels(unit_system, time_unit=None):
         length, out["stress"], out["unit_weight"], out["force_per_len"] = (
             "ft", "psf", "pcf", "lb/ft")
     out["length"] = length
+    out["inv_length"] = f"1/{length}"
     if time_unit:
         t = str(time_unit).strip()
         out["time"] = t

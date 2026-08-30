@@ -2,10 +2,10 @@
   "failure_criterion": "hybrid",
   "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
   "final_interval": [
-    1.35625,
-    1.365625
+    1.375,
+    1.384375
   ],
-  "interval_width": 0.009375000000000133,
+  "interval_width": 0.009374999999999911,
   "iterations_ssrm": 6,
   "trials": [
     {
@@ -17,8 +17,11 @@
       "u_ratio": null,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 275
+      "iterations": 273
     },
     {
       "F": 1.6,
@@ -26,11 +29,14 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 73.49487237767428,
-      "growth": 17.802723317650248,
-      "exit_reason": "no_progress",
+      "u_ratio": 8.171286678854857,
+      "growth": 1.4942851421497407,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 220,
       "ee_suppressed": false,
-      "iterations": 2452
+      "iterations": 221
     },
     {
       "F": 1.3,
@@ -41,8 +47,11 @@
       "u_ratio": null,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 1649
+      "iterations": 1364
     },
     {
       "F": 1.4500000000000002,
@@ -50,74 +59,89 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 49.380137444735446,
-      "growth": 11.421204268307417,
-      "exit_reason": "no_progress",
+      "u_ratio": 8.045057984531724,
+      "growth": 1.282116936556105,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 540,
       "ee_suppressed": false,
-      "iterations": 4665
+      "iterations": 541
     },
     {
       "F": 1.375,
       "role": "bisect",
-      "converged": false,
-      "stable": false,
-      "verdict": "FAILED",
-      "u_ratio": 18.70560783279485,
-      "growth": 2.5585186907029476,
-      "exit_reason": "iteration_cap",
-      "ee_suppressed": false,
-      "iterations": 16000
-    },
-    {
-      "F": 1.3375,
-      "role": "bisect",
       "converged": true,
       "stable": true,
       "verdict": "CONVERGED",
       "u_ratio": null,
       "growth": null,
       "exit_reason": "converged",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": null,
       "ee_suppressed": false,
-      "iterations": 3844
+      "iterations": 12612
     },
     {
-      "F": 1.35625,
-      "role": "bisect",
-      "converged": true,
-      "stable": true,
-      "verdict": "CONVERGED",
-      "u_ratio": null,
-      "growth": null,
-      "exit_reason": "converged",
-      "ee_suppressed": false,
-      "iterations": 7571
-    },
-    {
-      "F": 1.365625,
+      "F": 1.4125,
       "role": "bisect",
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 8.829907919392772,
-      "growth": 0.1467226541113704,
-      "exit_reason": "iteration_cap",
+      "u_ratio": 8.024646806505162,
+      "growth": 1.109394775342089,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 930,
       "ee_suppressed": false,
-      "iterations": 16000
+      "iterations": 931
+    },
+    {
+      "F": 1.39375,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 8.021307271975024,
+      "growth": 0.8826725323716013,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 1560,
+      "ee_suppressed": false,
+      "iterations": 1561
+    },
+    {
+      "F": 1.384375,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 8.006217086250592,
+      "growth": 0.6809421467017165,
+      "exit_reason": "diverging",
+      "plateau_iteration": null,
+      "budget_extensions": 0,
+      "diverging_iteration": 2550,
+      "ee_suppressed": false,
+      "iterations": 2551
     }
   ],
   "tolerance": 0.01,
   "F_min": 1.0,
   "F_max": 1.6,
   "analysis_type": "ssrm",
-  "FS": 1.3609375,
+  "FS": 1.3796875,
   "element_type": "tri6",
   "target_size": 2.0,
   "max_iter": 16000,
-  "expected_fs": 1.36,
-  "F": 1.35625,
+  "expected_fs": 1.38,
+  "F": 1.375,
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 7571,
-  "residual": 1.4294889193709326e-06,
-  "max_displacement": 0.1238178907620024
+  "iterations": 12612,
+  "residual": 2.3247423769521056e-06,
+  "max_displacement": 0.15001637190529932
 }

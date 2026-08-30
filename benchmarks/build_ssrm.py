@@ -260,9 +260,16 @@ def build_griffiths4(ratio, tag):
     poly.update(polygon_cells(2, 2, [(0.0, 50.0), (300.0, 50.0), (300.0, 0.0),
                                      (0.0, 0.0), (0.0, 50.0)]))
     u['polygon'] = poly
-    # placeholder circle (loader requires one; FEM/SSRM ignores it, and the LEM
-    # companion runs seed='grid'). A base circle over the slope, tangent to y = 0.
-    u['circles'] = circle_cells(1, 150.0, 90.0, option="Depth", depth=0.0)
+    # Starting circle (FEM/SSRM ignores it; the LEM companion runs seed='grid',
+    # which still carries it in as an extra seed). A deep base circle over the
+    # slope: center (180, 165), tangent at y = 20, so it daylights at (50.4, 100)
+    # on the crest and (268.3, 50) on the runout — BOTH crossings below the center,
+    # which is what makes it a circle the slicer can build. The earlier (150, 90,
+    # tangent y = 0) met the crest at (60.6, 100), ten feet ABOVE its own center;
+    # that arc is longer than a semicircle, so it produced no failure surface at
+    # all and a search seeded with it started from its launch grid instead. See
+    # preflight rule surface.circle_daylights_above_center.
+    u['circles'] = circle_cells(1, 180.0, 165.0, option="Depth", depth=20.0)
     write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
     print("built", dst)
     return dst
@@ -396,8 +403,11 @@ def build_griffiths3(ratio, tag, thick=1.0):
     poly.update(polygon_cells(3, 1, inner))
     u['polygon'] = poly
 
-    # placeholder circle (loader requires one; FEM/SSRM ignores it) — base circle
-    u['circles'] = circle_cells(1, 150.0, 90.0, option="Depth", depth=0.0)
+    # Starting circle (FEM/SSRM ignores it) — the same deep base circle Example 4
+    # carries, on the same outer profile: center (180, 165), tangent at y = 20,
+    # daylighting at (50.4, 100) and (268.3, 50), both below the center. See
+    # build_griffiths4 for what the earlier (150, 90, tangent y = 0) did.
+    u['circles'] = circle_cells(1, 180.0, 165.0, option="Depth", depth=20.0)
 
     # Limit-equilibrium companion for the weak-ratio station: the paper's own
     # three-line wedge (Griffiths & Lane's Janbu comparison, ~0.47) as a starting

@@ -10,6 +10,7 @@ copyright: Copyright &copy; 2025 Norman L. Jones. Licensed under Apache 2.0.
 extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js
   - js/mathjax-config.js
+  - js/nav_collapse.js
 markdown_extensions:
     - attr_list
     - sane_lists
@@ -20,6 +21,8 @@ markdown_extensions:
 theme:
   name: readthedocs
   custom_dir: overrides
+  navigation_depth: 2
+  titles_only: true
 extra_css:
   - css/custom.css
 plugins:
@@ -36,10 +39,9 @@ hooks:
   - hooks/docs_packages.py
 nav:
   - Home: index.md
-  - Install: getting_started/install.md
+  - Installation: getting_started/install.md
   - Usage Guide:
     - Ways to Use XSLOPE: usage/index.md
-    - Python Package Install: usage/installation.md
     - Input Template: usage/input_template.md
     - Project Packaging: usage/packaging.md
     - Preflight Input Checks: usage/preflight.md
@@ -59,21 +61,36 @@ nav:
     - Overview: tutorials/index.md
     - Building Models Three Ways: tutorials/building_models.md
     - Limit Equilibrium:
-      - Simple Embankment: tutorials/lem01_simple_embankment.md
-      - Loads on the Crest: tutorials/lem02_loads_on_the_crest.md
-      - A Layered Slope: tutorials/lem03_layered_slope.md
-      - Water in the Slope: tutorials/lem04_water_in_the_slope.md
-      - A Weak Layer, Non-Circular: tutorials/lem05_weak_layer_noncircular.md
-      - Polygon Geometry: tutorials/lem06_polygon_geometry.md
-      - Strength Options Beyond Mohr-Coulomb: tutorials/lem07_strength_envelopes.md
-      - A Reinforced Slope (Geogrids): tutorials/lem08_reinforced_slope.md
-      - A Tieback Wall: tutorials/lem09_tieback_wall.md
-      - Finding the Global Minimum: tutorials/lem10_global_minimum.md
-      - Reliability: tutorials/lem11_reliability.md
-      - Piles: tutorials/lem12_piles.md
+      - 1. Simple Embankment: tutorials/lem01_simple_embankment.md
+      - 2. Loads on the Crest: tutorials/lem02_loads_on_the_crest.md
+      - 3. A Layered Slope: tutorials/lem03_layered_slope.md
+      - 4. Water in the Slope: tutorials/lem04_water_in_the_slope.md
+      - 5. A Weak Layer, Non-Circular: tutorials/lem05_weak_layer_noncircular.md
+      - 6. Polygon Geometry: tutorials/lem06_polygon_geometry.md
+      - 7. Strength Options Beyond Mohr-Coulomb: tutorials/lem07_strength_envelopes.md
+      - 8. A Reinforced Slope (Geogrids): tutorials/lem08_reinforced_slope.md
+      - 9. A Tieback Wall: tutorials/lem09_tieback_wall.md
+      - 10. Finding the Global Minimum: tutorials/lem10_global_minimum.md
+      - 11. Reliability: tutorials/lem11_reliability.md
+      - 12. Piles: tutorials/lem12_piles.md
+      - "13. A Rock Slope: Hoek-Brown": tutorials/lem13_rock_slope.md
     - Seepage:
-      - Seepage Under a Sheetpile: tutorials/seep01_sheetpile.md
-      - Unconfined Seepage Through a Zoned Dam: tutorials/seep02_johnson_dam.md
+      - 1. Confined Seepage Under a Sheetpile: tutorials/seep01_sheetpile.md
+      - 2. Unconfined Seepage Through a Zoned Dam: tutorials/seep02_johnson_dam.md
+      - "3. Transient Seepage: Reservoir Drawdown": tutorials/seep03_reservoir_drawdown.md
+      - 4. Infiltration and Flux Boundaries: tutorials/seep04_dam_infiltration.md
+    - Finite Element:
+      - 1. Strength Reduction Basics: tutorials/fem01_strength_reduction.md
+      - "2. Reinforcement: LEM vs FEM": tutorials/fem02_reinforcement.md
+      - "3. Piles: LEM vs FEM": tutorials/fem03_piles.md
+    - Combined:
+      - 1. Seepage → LEM → FEM: tutorials/combo01_seepage_stability.md
+      - 2. Rapid Drawdown: tutorials/combo02_rapid_drawdown.md
+      - 3. Factor of Safety vs Time: tutorials/combo03_fs_vs_time.md
+    - Workflow:
+      - 1. The AI Assistant: tutorials/w01_ai_assistant.md
+      - 2. Importing Models from CAD and Other Programs: tutorials/w02_import.md
+      - 3. Generating the Analysis Report: tutorials/w03_report.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md
@@ -116,6 +133,7 @@ nav:
     - Rocscience Groundwater Corpus: verification/rocscience_groundwater.md
     - Rocscience RS2 (SSRM) Corpus: verification/rs2.md
     - GeoStudio (SLOPE/W) Corpus: verification/geostudio.md
+    - Published Problems: verification/published.md
     - References: verification/references.md
   - API:
     - Advanced: api/advanced.md

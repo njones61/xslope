@@ -11,24 +11,309 @@ and triggering a re-render is safe.
 
 from __future__ import annotations
 
+import contextlib
 import os
+import signal
 import tempfile
+import threading
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+
+#: How long ONE snippet may run before it is stopped, in seconds. Generous by
+#: design — a search is seconds, an SSRM run is minutes, and a limit that ends a
+#: real analysis is worse than the runaway it prevents. What it is here for is the
+#: snippet that will never finish: a ``while True`` on the GUI thread takes the
+#: whole application with it, including the per-turn timeout that was supposed to
+#: end the turn (a QTimer cannot fire while the event loop is blocked), and one
+#: measured session sat on such a snippet for forty minutes.
+#:
+#: Override per install with the ``ai/run_timeout`` setting, or per process with
+#: ``XSLOPE_AI_RUN_TIMEOUT``. Zero or negative turns the limit off.
+DEFAULT_RUN_TIMEOUT_S = 600.0
+RUN_TIMEOUT_ENV = "XSLOPE_AI_RUN_TIMEOUT"
+RUN_TIMEOUT_KEY = "ai/run_timeout"
+
+
+@contextlib.contextmanager
+def _time_limit(seconds):
+    """Raise ``TimeoutError`` inside the block after ``seconds``.
+
+    ``signal.setitimer`` with ``SIGALRM``, which on macOS and Linux delivers to
+    the main thread — the thread a snippet runs on, since the assistant marshals
+    tool execution onto the GUI thread. The handler raises where the snippet is,
+    so the exception unwinds the snippet's own stack and lands in ``run``'s
+    ``except``: the snippet's result becomes that error, the document rolls the
+    edit back like any other failed snippet, and the model reads what happened
+    rather than the session dying.
+
+    Two things it deliberately does not do. It does not interrupt a long call
+    inside C code (a solver in numpy, a gmsh mesh): the signal is recorded and
+    raised at the next bytecode boundary, so such a snippet stops when the call
+    returns, and the harness's own watchdog is the backstop for the case it never
+    does. And it does nothing at all off the main thread (the guardrail checks
+    drive the kernel directly, and a worker thread cannot take a signal) — no
+    limit is better than a ``ValueError`` from ``signal`` on every snippet.
+    """
+    if (not seconds or seconds <= 0
+            or threading.current_thread() is not threading.main_thread()
+            or not hasattr(signal, "SIGALRM")):
+        yield
+        return
+
+    def fired(_signum, _frame):
+        raise TimeoutError(
+            "the snippet ran for more than %g seconds and was stopped. Nothing it "
+            "changed was kept. Do not re-run it as it stands: either narrow the "
+            "work (fewer steps, plot=False, a coarser sweep) or say what it needs "
+            "and let the user start it."  % seconds)
+
+    previous = signal.signal(signal.SIGALRM, fired)
+    signal.setitimer(signal.ITIMER_REAL, float(seconds))
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
 
 # Figure formats a snippet might savefig itself — if it did, we don't also
 # auto-save its open figures (which would show the same plot twice).
 _FIG_EXTS = (".png", ".pdf", ".svg", ".jpg", ".jpeg")
 
+#: Parsed corpus index, built once per process (the JSON is ~650 KB).
+_CORPUS_CACHE = None
+
+#: The inputs a geometry resync reads. Compared before and after a snippet to
+#: tell an edit made on the model's OWN geometry source from one made on the
+#: derived copy, which the resync silently overwrites.
+_GEOM_KEYS = ("profile_lines", "polygons", "max_depth")
+
+#: What the resync says when a geometry edit was made on the wrong source. The
+#: model reads these on its own tool result, so they name the fix, not the fault.
+POLYGON_EDIT_WARNING = (
+    "WARNING: polygons were edited on a profile-line model and have been rebuilt "
+    "from profile_lines; edit profile_lines instead (and the ground surface if it "
+    "is separate), then call resync_geometry(). The polygon edit did not take.")
+PROFILE_EDIT_WARNING = (
+    "WARNING: profile_lines were added on a polygon-native model; the polygons are "
+    "now rebuilt from those profile lines, so the model's own polygons no longer "
+    "apply. Edit polygons instead on this model.")
+
+#: The same discard, said BEFORE the snippet's own output rather than after it —
+#: because the snippet's prints ran before the rebuild. A snippet that swaps two
+#: zones' mat_id and prints the polygons back reads its edit as applied, in its own
+#: stdout, and a warning underneath that read-back loses to it: two benchmark
+#: sessions printed the swap, read the warning, and still reported the model
+#: repaired. So the first thing on the tool result says what the printed values
+#: are — the discarded version — before any of them is read.
+POLYGON_EDIT_DISCARDED = (
+    "READ THIS FIRST — THE POLYGON EDIT WAS DISCARDED. This model is defined by "
+    "profile lines, so its polygons are rebuilt from profile_lines after the "
+    "snippet returns, and the model still carries the polygons it had. Every "
+    "polygon value printed below is the DISCARDED version, not the model's: a "
+    "read-back showing the edit is showing what was thrown away, so do not report "
+    "the change as made. Edit slope_data['profile_lines'] instead — the line's "
+    "'coords' and its 'mat_id' are what set a layer's shape and the material that "
+    "fills it — then call resync_geometry() and read the model back.\n"
+    + POLYGON_EDIT_WARNING)
+
+#: The same fact as an input-check finding, so the block the model must clear
+#: before reporting a model ready carries it too (see
+#: :func:`studio.ai.assistant.model_checks_text`). The checks cannot derive it:
+#: after the rebuild the geometry is valid, and merely not the geometry the
+#: snippet wrote.
+POLYGON_EDIT_DISCARDED_FINDING = (
+    "geom.polygon_edit_discarded",
+    "The polygons this snippet edited were rebuilt from profile_lines and the "
+    "edit was discarded — the model's geometry is unchanged. Nothing the snippet "
+    "printed for polygons describes the model as it now stands. Make the change "
+    "on profile_lines (coords / mat_id) and resync_geometry(), then read the "
+    "model back before reporting anything about it.")
+
+
+def _geometry_native(slope_data):
+    """Which geometry source this model is built on — ``"profile"`` when it has
+    profile lines (:func:`studio.editors._resync_geometry` rebuilds the polygons
+    from them), ``"polygon"`` when the polygons are the source, None for a model
+    that has neither yet."""
+    if (slope_data or {}).get("profile_lines"):
+        return "profile"
+    if (slope_data or {}).get("polygons"):
+        return "polygon"
+    return None
+
+
+def _geometry_sigs(slope_data):
+    """Per-key JSON signatures of the geometry inputs (shapely objects fall back
+    to their WKT via ``str``), so a snippet's geometry edits can be located."""
+    import json
+    out = {}
+    for key in _GEOM_KEYS:
+        try:
+            out[key] = json.dumps((slope_data or {}).get(key), sort_keys=True,
+                                  default=str)
+        except Exception:
+            out[key] = None
+    return out
+
+
+def _declared_lem_method(slope_data, method=None):
+    """The method a run made without one uses: the method the MODEL declares
+    (main!D14 — what Studio's Run LEM dialog opens on), else spencer.
+
+    ``'all'`` is the batch-report sweep and names no single method, so it seeds
+    nothing and the fallback stands.
+    """
+    if method:
+        return str(method).lower()
+    declared = str((slope_data or {}).get("lem_method") or "").lower()
+    return declared if declared and declared != "all" else "spencer"
+
+
+def _surface_keys(bundle, slope_data):
+    """The failure surface this run settled on, as plain numbers on the result
+    dict: ``Xo``, ``Yo``, ``R``, ``Depth`` (the tangent elevation) and the trace's
+    ``x_entry`` / ``x_exit``.
+
+    Every key is always present — None on a non-circular surface — so reading the
+    critical circle off a result never depends on which branch produced it. Entry
+    and exit follow the search's own convention (:func:`xslope.search
+    ._endpoints_in_ranges`): the ENTRY point is the crest-side (higher ground) end
+    of the trace and the EXIT the toe-side one, whichever way the slope faces.
+    """
+    keys = {"Xo": None, "Yo": None, "R": None, "Depth": None,
+            "x_entry": None, "x_exit": None}
+    search = bundle.get("search") or {}
+    circle = None
+    if search.get("kind") == "circular":
+        cache = search.get("fs_cache") or []
+        if cache:
+            circle = cache[0]
+    elif search:
+        circle = None                       # a non-circular search: no circle
+    elif slope_data.get("circular", True) and slope_data.get("circles"):
+        circle = slope_data["circles"][0]
+    if circle is not None:
+        xo, yo = circle.get("Xo"), circle.get("Yo")
+        depth, r = circle.get("Depth"), circle.get("R")
+        if r is None and yo is not None and depth is not None:
+            r = float(yo) - float(depth)
+        if depth is None and yo is not None and r is not None:
+            depth = float(yo) - float(r)
+        keys.update({"Xo": None if xo is None else float(xo),
+                     "Yo": None if yo is None else float(yo),
+                     "R": None if r is None else float(r),
+                     "Depth": None if depth is None else float(depth)})
+    surf = bundle.get("failure_surface")
+    try:
+        coords = list(surf.coords)
+    except Exception:
+        coords = []
+    if len(coords) >= 2:
+        (xl, yl), (xr, yr) = coords[0], coords[-1]
+        entry, exit_ = ((xl, xr) if yl >= yr else (xr, xl))
+        keys["x_entry"], keys["x_exit"] = float(entry), float(exit_)
+    return keys
+
+
+def _repo_root():
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _corpus_rows():
+    """``(topics, rows)`` for the verification corpus.
+
+    ``topics`` maps a topic key to its display label; ``rows`` is one dict per
+    cited page — ``{topic, label, title, url}``.
+
+    Two sources, because two installs. A repo checkout has the generated index
+    (``docs/verification/corpus_index.json``, the authoritative one). A pip install
+    has no docs/ tree, but it does ship the Claude Code skill, whose corpus-index
+    block is the same table already rendered — so the same rows are recovered from
+    it rather than shipping a second 650 KB copy of the JSON that would then need a
+    sync check to stay honest.
+    """
+    global _CORPUS_CACHE
+    if _CORPUS_CACHE is None:
+        _CORPUS_CACHE = _corpus_from_json() or _corpus_from_skill() or ({}, [])
+    return _CORPUS_CACHE
+
+
+def _corpus_from_json():
+    import json
+    path = os.path.join(_repo_root(), "docs", "verification", "corpus_index.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception:
+        return None
+    labels = data.get("topic_labels") or {}
+    counts = (data.get("stats") or {}).get("topics") or {}
+    topics = {k: f"{labels.get(k, k)} ({counts.get(k, 0)} models)" for k in labels}
+    rows = []
+    for entry in data.get("models") or []:
+        for topic in entry.get("topics") or []:
+            for ref in entry.get("references") or []:
+                if ref.get("url"):
+                    rows.append({"topic": topic, "label": labels.get(topic, topic),
+                                 "title": ref.get("title", ""), "url": ref["url"]})
+    return (topics, rows) if rows else None
+
+
+def _corpus_from_skill():
+    """The same rows out of the rendered table in the shipped skill (pip install)."""
+    import re
+    text = ""
+    try:
+        from importlib import resources
+        text = (resources.files("xslope") / "resources" / "xslope_skill.md").read_text(
+            encoding="utf-8")
+    except Exception:
+        return None
+    block = re.search(r"<!-- corpus-index:begin -->(.*?)<!-- corpus-index:end -->",
+                      text, re.S)
+    if not block:
+        return None
+    topics, rows = {}, []
+    for line in block.group(1).splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) != 2 or not cells[0] or set(cells[0]) <= set(":-"):
+            continue
+        label = cells[0]
+        if label.lower() == "topic":
+            continue
+        key = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
+        links = re.findall(r"\[([^\]]+)\]\((https?://[^)]+)\)", cells[1])
+        if not links:
+            continue
+        topics[key] = label
+        rows += [{"topic": key, "label": label, "title": t, "url": u}
+                 for t, u in links]
+    return (topics, rows) if rows else None
+
 
 class PythonKernel:
-    def __init__(self, doc):
+    def __init__(self, doc, window=None):
         self._doc = doc
+        # The main window, where there is one. Only ever asked for what Studio
+        # itself knows and the document does not — which solutions a report may
+        # document, and the app's settings — and always through ``getattr``, so
+        # the kernel runs unchanged against a document with no window (the
+        # guardrail checks).
+        self._window = window
         self._ns = {}
         self._seeded = False
         self._outdir = None
         self._fig_seq = 0
+        #: Solutions THIS snippet computed, keyed as the document stores them,
+        #: with the views that put each in front of the user. Studio's
+        #: stale-result sweep runs after the snippet, so a snippet that edited
+        #: the model AND then ran it would otherwise lose the run it just made.
+        self._fresh_results = {}
+        #: Geometry warnings raised during the snippet (see
+        #: :meth:`geometry_warnings`), and the state it started from.
+        self._geom_warnings = []
+        self._geom_watch = None
 
     @property
     def outdir(self):
@@ -40,10 +325,127 @@ class PythonKernel:
             os.makedirs(self._outdir, exist_ok=True)
         return self._outdir
 
+    def run_timeout(self):
+        """Seconds one snippet may run — the environment, then the app's setting,
+        then :data:`DEFAULT_RUN_TIMEOUT_S`. Zero or negative = no limit.
+
+        The environment wins so an unattended producer run can state the limit for
+        its own process without touching anybody's settings.
+        """
+        raw = os.environ.get(RUN_TIMEOUT_ENV)
+        if raw is None:
+            settings = getattr(self._window, "settings", None)
+            if settings is not None:
+                try:
+                    raw = settings.value(RUN_TIMEOUT_KEY, None)
+                except Exception:
+                    raw = None
+        if raw is None or raw == "":
+            return DEFAULT_RUN_TIMEOUT_S
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return DEFAULT_RUN_TIMEOUT_S
+
     def reset(self):
         """Drop all variables; the engine + helpers re-seed on the next run."""
         self._ns = {}
         self._seeded = False
+        self._fresh_results = {}
+        self._geom_warnings = []
+
+    # --- what a snippet produced, for the caller that has to survive it ------
+    def _show_views(self, *calls):
+        """Put a solved run in front of the user the way a Run does — the
+        results tab for that engine — where there is a window to put it in.
+
+        Best effort by construction: the answer is already attached to the
+        model and the session, and the chat carries its plot, so a view that
+        cannot be built (no window, a panel that objects) must not turn a
+        successful analysis into a failed snippet.
+        """
+        for name, args in calls:
+            try:
+                method = getattr(self._window, name, None)
+                if callable(method):
+                    method(*args)
+            except Exception:
+                pass
+
+    def _store_result(self, key, value, show=(), lead=None):
+        """Attach a solved bundle where Studio attaches it, show it, and record
+        that THIS snippet made it.
+
+        ``show`` is the (method name, args) list that raises the engine's result
+        tabs and ``lead`` the attribute naming the canvas the run leads with, both
+        replayed by :meth:`restore_fresh_results`.
+        """
+        self._doc.results[key] = value
+        self._fresh_results[key] = (value, tuple(show), lead)
+        self._show_views(*show)
+        self._lead_tab(lead)
+
+    def _lead_tab(self, attr):
+        """Bring the tab a run leads with to the front, as the dialog run does."""
+        if not attr:
+            return
+        try:
+            canvas = getattr(self._window, attr, None)
+            if canvas is not None:
+                self._window.view_tabs.setCurrentWidget(canvas)
+        except Exception:
+            pass
+
+    def restore_fresh_results(self):
+        """Re-attach (and re-show) the solutions this snippet computed.
+
+        Studio drops every cached result when the inputs change, which is right
+        for a solution that predates the edit and wrong for one made after it: a
+        snippet that lays the face back and reruns computes its answer on the model
+        as it now stands. That sweep runs after the snippet returns, so the run is
+        put back here rather than never stored.
+        """
+        for key, (value, show, lead) in list(self._fresh_results.items()):
+            self._doc.results[key] = value
+            self._show_views(*show)
+            self._lead_tab(lead)
+
+    def geometry_warnings(self):
+        """Warnings about geometry the last snippet edited on the wrong source —
+        polygons on a profile-line model, or the reverse. Empty for every snippet
+        whose geometry edit reached the model's own source."""
+        return list(self._geom_warnings)
+
+    def _note_geometry_source(self, slope_data=None):
+        """Check, at the moment before a resync would discard it, whether the
+        snippet edited the geometry the model is NOT built from.
+
+        The resync rebuilds polygons from profile_lines on a profile-line model,
+        so a snippet that rebuilt ``polygons`` there has its edit reverted with
+        nothing said — the failure this exists to name. Called before every resync
+        and once more when the snippet ends, since a snippet that never ran
+        anything has its polygons overwritten later, by the checks' own resync.
+        """
+        watch = self._geom_watch
+        if not watch:
+            return
+        native, before = watch
+        sd = self._doc.slope_data if slope_data is None else slope_data
+        if native is None or sd is not self._doc.slope_data:
+            return                      # a copy (a sweep's own model): not the doc
+        now = _geometry_sigs(sd)
+        if now["max_depth"] != before["max_depth"]:
+            return                      # the polygons legitimately rebuild
+        if (native == "profile" and now["polygons"] != before["polygons"]
+                and now["profile_lines"] == before["profile_lines"]):
+            self._warn_geometry(POLYGON_EDIT_WARNING)
+        elif (native == "polygon"
+                and now["profile_lines"] != before["profile_lines"]):
+            self._warn_geometry(PROFILE_EDIT_WARNING)
+
+    def _warn_geometry(self, text):
+        if text not in self._geom_warnings:
+            self._geom_warnings.append(text)
 
     def _seed(self):
         import matplotlib
@@ -61,8 +463,35 @@ class PythonKernel:
         """Convenience functions seeded into the namespace so the model doesn't
         have to reconstruct the engine pipeline (a common failure mode). Seeded:
 
-        - ``run_lem(method='bishop', ...)`` — one single-surface LEM solve on the
-          loaded surface; returns the result dict, shows the solution plot.
+        - ``run_lem(method=None, search=False, ...)`` — one LEM solve; returns
+          the result dict (with the surface it was solved on: Xo/Yo/R/Depth and
+          the trace's x_entry/x_exit) and shows the solution plot. ``method``
+          defaults to the one the MODEL declares, else spencer. ``search=True``
+          searches for the CRITICAL surface for that method (Studio's Run LEM
+          default, and what "the factor of safety of this model" means);
+          ``search=False`` solves the surface the model already defines. The
+          bundle is attached to the session as ``doc.results['lem_solution']``,
+          which is what the report and the result tabs read.
+        - ``corpus_index(query=None)`` — verification-corpus rows matching a topic
+          or phrase, so a citation is looked up rather than remembered.
+        - ``run_seep(bc=1, ...)`` — one steady seepage solve; builds the mesh from
+          the file's declared settings if there is none, attaches the solved field
+          to the model and the bundle to the session, shows the solution plot.
+        - ``run_tseep(times=None, ...)`` — the TRANSIENT march (``run_seep(
+          transient=True)`` is the same call), on the model's own tseep sheet:
+          stores the frame bundle where Studio stores it and opens the
+          Seep · Transient tab. ``run_lem(seep_time=...)`` reads one instant of it;
+          ``fs_vs_time()`` runs the whole curve; ``transient_solution()`` returns
+          the march the session holds.
+        - ``run_fem(analysis='ssrm', ...)`` — one finite element run (SSRM factor
+          of safety, or a single trial); same mesh handling, attaches the bundle,
+          shows the results plot.
+        - ``suggest_elastic(material_or_soil_type=None, ...)`` — soil-type E and
+          nu for a material that carries none, with the classification it came
+          from. A LAST-RESORT fill, never a preference over a stated value.
+        - ``generate_report(path=None, **options)`` — the Analysis Report the
+          Report dialog builds, written and finished; lands in ``OUTPUT_DIR``
+          unless a path says otherwise, and returns the path.
         - ``resync_geometry(slope_data=None)`` — rebuild derived geometry after an
           in-snippet geometry edit (call inside sweep loops).
         - ``sensitivity(values, apply, param=..., ...)`` — callback-driven FS-vs-
@@ -107,6 +536,7 @@ class PythonKernel:
           door (kept under the plain name for back-compat).
         """
         doc = self._doc
+        window = self._window
 
         def resync_geometry(slope_data=None):
             """Rebuild the derived geometry (ground_surface, polygons,
@@ -121,42 +551,692 @@ class PythonKernel:
             `circular_search` / `solve_*` if you drive the pipeline directly."""
             from studio.editors import _resync_geometry
             sd = doc.slope_data if slope_data is None else slope_data
+            self._note_geometry_source(sd)   # before the rebuild discards an edit
             _resync_geometry(sd)
             return sd.get("ground_surface")
 
-        def run_lem(method="bishop", num_slices=40, rapid=False, plot=True,
-                    slope_data=None):
-            """Run a single-surface LEM analysis on the loaded project's failure
-            surface and return the result dict (includes 'FS'). `method` is one of
-            oms, bishop, janbu, spencer, corps, lowe, mprice. Shows the solution
-            plot when plot=True (pass plot=False in sweeps to avoid many figures).
-            Rebuilds derived geometry first, so edits to profile_lines/polygons
-            this snippet made are reflected."""
-            from xslope.slice import generate_slices
-            from xslope.solve import solve_selected
+        def run_lem(method=None, num_slices=40, rapid=False, plot=True,
+                    slope_data=None, search=False, seep_time=None):
+            """Run an LEM analysis on the loaded project and return the result dict
+            (includes 'FS'). `method` is one of oms, bishop, janbu, spencer, corps,
+            lowe, mprice; left out, it is THE METHOD THE MODEL DECLARES (main!D14 —
+            what Studio's Run LEM dialog opens on), or spencer where it declares
+            none. Shows the solution plot when plot=True (pass plot=False in sweeps
+            to avoid many figures). Rebuilds derived geometry first, so edits to
+            profile_lines/polygons this snippet made are reflected.
+
+            `search=True` runs the automated search for the CRITICAL surface for
+            this method — what Studio's Run LEM does by default, and what "the
+            factor of safety of this model" means. Each method searches for itself,
+            so two methods legitimately settle on two surfaces. `search=False`
+            (default) solves only the surface the model already defines, which is
+            the right call inside a sweep or when the user named that surface.
+
+            The run is :func:`xslope.search.run_lem_analysis` — the entry point
+            Studio's Run LEM dialog drives — and its bundle is attached to the
+            session (`doc.results['lem_solution']`) exactly as a dialog run attaches
+            it, so the result tabs show it and the Analysis Report documents it.
+
+            `seep_time` picks ONE instant of a transient seepage march (from
+            `run_tseep()`, or the sidecar an opened file carried) and reads its pore
+            pressures for this run — a number, or `'model'` for the instant the
+            model's own transient sheet names. With `rapid=True` the two drawdown
+            stage times are staged instead, exactly as the Run LEM dialog stages
+            them. It is stated in the log which instant was used; for the whole
+            curve rather than one instant, `fs_vs_time()`.
+
+            The returned dict is the solver's, plus the surface it was solved on:
+            'Xo', 'Yo', 'R', 'Depth' (the circle, None on a non-circular surface)
+            and 'x_entry' / 'x_exit', the crest-side and toe-side ends of the trace.
+            """
+            import contextlib
+            import io as _io
+            from xslope.search import AnalysisError, run_lem_analysis
+
             sd = doc.slope_data if slope_data is None else slope_data
+            method = _declared_lem_method(sd, method)
+            if seep_time is not None:
+                _apply_seep_time(sd, seep_time, rapid)
             resync_geometry(sd)        # reflect any in-snippet geometry edits
-            circle = (sd["circles"][0] if sd.get("circular") and sd.get("circles")
-                      else None)
-            non_circ = sd.get("non_circ") or None
-            if circle is None and not non_circ:
+            if not (sd.get("circles") or sd.get("non_circ")):
                 raise RuntimeError("No failure surface defined (add a circle or "
                                    "non-circular surface first).")
-            ok, res = generate_slices(sd, circle=circle, non_circ=non_circ,
-                                      num_slices=num_slices)
-            if not ok:
-                raise RuntimeError(res)
-            slice_df, surface = res
-            result = solve_selected(method, slice_df, rapid=rapid)
+            family = ("circular" if (sd.get("circular", True) and sd.get("circles"))
+                      else "noncircular")
+            # A converging search writes a dozen progress lines the model would
+            # have to read back as tokens, and only the last of them is the answer,
+            # so a SEARCH runs muted. What the search reports about ITSELF —
+            # unsolved trials, admissibility notes — is kept below, because those
+            # are findings about the model. A single solve prints little and what
+            # it prints is the solver's, so it is left alone.
+            muted = (contextlib.redirect_stdout(_io.StringIO()) if search
+                     else contextlib.nullcontext())
+            try:
+                with muted:
+                    bundle = run_lem_analysis(
+                        sd, method,
+                        analysis="auto_search" if search else "single_surface",
+                        surface=family, num_slices=num_slices, rapid=rapid,
+                        announce=False)
+            except AnalysisError as exc:
+                raise RuntimeError(str(exc)) from None
+            result = bundle.get("results")
             if not isinstance(result, dict):
-                raise RuntimeError(f"No solution: {result}")
-            print(f"{method}: FS = {result['FS']:.3f}")
+                raise RuntimeError(
+                    ("The search found no solvable surface: %s" if search
+                     else "No solution: %s") % (bundle.get("failure")
+                                                or "no solution"))
+            surface = _surface_keys(bundle, sd)
+            where = ""
+            if search and surface["Xo"] is not None:
+                where = (f" on the circle Xo={surface['Xo']:.2f}, "
+                         f"Yo={surface['Yo']:.2f}, R={surface['R']:.2f}")
+            head = f"{method} (auto search, {family})" if search else method
+            print(f"{head}: FS = {result['FS']:.3f}{where}")
+            info = bundle.get("search") or {}
+            unsolved = (info.get("unsolved") or {}) if info else {}
+            if unsolved.get("sentence"):
+                print("  " + unsolved["sentence"])
+            for note in (result.get("warnings") or []):
+                print(f"  admissibility: {note}")
+            # Only a run on the OPEN model is the session's run: a sweep hands in
+            # its own copy, and those answers are the sweep's, not the project's.
+            if sd is doc.slope_data:
+                # The options this run was made under are the session's last LEM
+                # options, exactly as the dialog's are: they are what the report
+                # labels the run with, and what the Run LEM dialog next opens on.
+                if window is not None and hasattr(window, "_last_lem_opts"):
+                    try:
+                        window._last_lem_opts = dict(bundle.get("options") or {},
+                                                     method=method)
+                    except Exception:
+                        pass
+                _store_result("lem_solution", bundle,
+                              show=([("_show_search", (bundle["search"],))]
+                                    if bundle.get("search") else [])
+                                   + [("_show_solution", (bundle,))],
+                              lead=("search_canvas" if bundle.get("search")
+                                    else "solution_canvas"))
             if plot:
                 from xslope.plot import plot_solution
                 import matplotlib.pyplot as plt
-                plot_solution(sd, slice_df, surface, result,
-                              fig=plt.figure(figsize=(11, 6)))
+                plot_solution(sd, bundle["slice_df"], bundle["failure_surface"],
+                              result, fig=plt.figure(figsize=(11, 6)))
+            return dict(result, **surface)
+
+        def _ensure_mesh(sd, quiet=False):
+            """The model's finite-element mesh, building one from the FILE'S OWN
+            declared settings if it carries none.
+
+            A mesh is a computed artifact, not an input, so it is attached to the
+            model directly (no undo step, no dirty flag) exactly as Studio's own
+            mesh build attaches it. The element type and target size come from the
+            model (main!D18 / main!D19); with no declared size the automatic one is
+            used — the ground-surface width over 100 — which is the Build mesh
+            dialog's own default. Reinforcement and pile lines become constraint
+            lines and per-polygon Size overrides are honoured, so the mesh a run
+            gets here is the mesh the dialog would have built.
+            """
+            if sd.get("mesh") is not None:
+                return sd["mesh"]
+            from xslope.mesh import (build_mesh_from_polygons,
+                                     extract_constraint_line_geometry,
+                                     extract_size_regions, get_material_polygons)
+            resync_geometry(sd)
+            lines, _n_reinf, _n_pile = extract_constraint_line_geometry(sd)
+            polygons = get_material_polygons(sd, reinf_lines=lines)
+            element_type = sd.get("element_type") or "tri6"
+            target = sd.get("target_size")
+            if not target:
+                xs = [x for x, _y in sd["ground_surface"].coords]
+                target = (max(xs) - min(xs)) / 100.0
+            mesh = build_mesh_from_polygons(
+                polygons, target_size=float(target), element_type=element_type,
+                lines=lines or None,
+                element_size_1d=sd.get("element_size_1d"),
+                size_regions=extract_size_regions(sd))
+            sd["mesh"] = mesh
+            if not quiet:
+                print(f"Built a {element_type} mesh (target size {float(target):.4g}): "
+                      f"{len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements.")
+            return mesh
+
+        # Attach a solved bundle where a Run attaches it, raise its result tabs,
+        # and record that this snippet is what made it.
+        _store_result = self._store_result
+
+        def run_seep(bc=1, tol=1e-4, max_iter=400, plot=True, slope_data=None,
+                     transient=False, **transient_kwargs):
+            """Run a STEADY seepage analysis and return the solution dict — the
+            seepage counterpart of `run_lem`.
+
+            Builds the seepage data from the model's mesh (building the mesh from the
+            file's declared settings when there is none), solves, and does what
+            Studio does with the answer: the nodal pore pressures are attached to the
+            model (`slope_data['seep_u']` for BC set 1, `['seep_u2']` for set 2), so a
+            later stability run with a material set to `u = 'seep'` reads THIS field,
+            and the bundle is stored on the session (`doc.results['seep_solutions']`)
+            so the report and the results tabs can find it. Shows the head/flow-net
+            plot when plot=True (pass plot=False in a sweep).
+
+            `bc` picks the boundary-condition set (1, or 2 for the drawn-down state
+            rapid drawdown reads). `tol` is the relative head-change tolerance and
+            `max_iter` the cap on the unconfined iteration. Returns the solution dict
+            ('head', 'u', 'velocity', 'gradient', 'phi', 'flowrate', 'converged',
+            'closure_error', …).
+
+            `transient=True` runs the time-dependent march instead, on the model's
+            own transient sheet — the same call as `run_tseep()`, which is where that
+            run is documented.
+            """
+            if transient:
+                return run_tseep(plot=plot, slope_data=slope_data,
+                                 **transient_kwargs)
+            from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                                     run_seepage_analysis)
+            sd = doc.slope_data if slope_data is None else slope_data
+            mesh = _ensure_mesh(sd)
+            seep_data = build_seep_data(mesh, sd, seep_bc=bc)
+            solution = run_seepage_analysis(seep_data, tol=tol, max_iter=int(max_iter))
+            if solution is None:
+                raise RuntimeError("Seepage analysis returned no solution.")
+            bundle = {"seep_data": seep_data, "solution": solution,
+                      "options": {"bc": bc, "tol": tol, "max_iter": int(max_iter)}}
+            doc.results.setdefault("seep_solutions", {})[bc] = bundle
+            # The solved field belongs to the MODEL, not only to a results tab —
+            # this is what a u='seep' stability run reads.
+            apply_steady_stability_field(sd, solution, bc=bc, verbose=False)
+            _store_result("seep_solutions", doc.results["seep_solutions"],
+                          show=[("_show_seep_data", (seep_data, bc)),
+                                ("_show_seep_solution", (bc,))])
+            q = solution.get("flowrate")
+            print(f"seepage (BC set {bc}): converged={solution.get('converged')}"
+                  + (f", total flow q = {q:.4g}" if q is not None else ""))
+            if plot:
+                from xslope.plot_seep import plot_seep_solution
+                import matplotlib.pyplot as plt
+                plot_seep_solution(seep_data, solution, fig=plt.figure(figsize=(11, 6)))
+            return solution
+
+        def transient_solution(slope_data=None):
+            """The transient seepage march this session holds, or None.
+
+            One of: a march `run_tseep()` ran, or the saved solution Studio
+            restored from the file's `_tseep.csv` sidecar when it was opened. Both
+            live in the same place, `doc.results['transient_seep']`.
+            """
+            bundle = doc.results.get("transient_seep") or {}
+            return bundle.get("transient")
+
+        def run_tseep(times=None, plot=True, slope_data=None, rerun=False,
+                      save=False, verbose=True):
+            """Run a TRANSIENT seepage march and return the frame bundle — what
+            Studio's Run Seep dialog does with its Transient box ticked.
+
+            MINUTES, not seconds, on a real mesh: say so before starting one, and
+            never start one to answer a question the steady solve answers.
+
+            Needs the model's transient sheet (`slope_data['tseep']` — stage times,
+            duration, save interval, the pool-level series); a model without one is
+            a steady problem and `run_seep()` is its solve. The march is BC set 1
+            throughout: the transient boundary condition is the series on that
+            sheet, not the second BC set.
+
+            What it does with the answer is what Studio does: the bundle
+            (`{'mode','seep_data','transient','frames','options'}`) is stored on the
+            session as `doc.results['transient_seep']` and the Seep · Transient tab
+            is opened on it, so the frames are there for a stability run, for the
+            report, and for the play bar. Returns that bundle. `frames` are the
+            plottable per-frame solutions, one per saved instant, each carrying its
+            `time`.
+
+            `times` adds instants to the save schedule for THIS march only, without
+            touching the model — the way to get a frame at an instant the file's
+            save interval does not land on. `rerun=True` marches again even when the
+            session already holds a solution (the default returns the one it holds:
+            an opened file with a `_tseep.csv` sidecar has already paid for it).
+            `save=True` writes that sidecar beside the .xlsx, so the next open is
+            free. `plot=True` shows the LAST saved frame — the end state; use the
+            Seep · Transient tab's play bar, or plot a frame yourself, for the rest.
+
+            To read one instant as pore pressure for a stability run, pass
+            `seep_time=` to `run_lem` (which stages the two drawdown instants for
+            you when `rapid=True`); for the whole curve, `fs_vs_time()`.
+            """
+            from xslope.seep import (build_seep_data, build_tseep_data,
+                                     run_transient_seepage,
+                                     _transient_frame_solution)
+            sd = doc.slope_data if slope_data is None else slope_data
+            if sd.get("tseep") is None:
+                raise RuntimeError(
+                    "This model has no transient sheet (slope_data['tseep']), so "
+                    "there is nothing to march — run_seep() is its steady solve.")
+            extra = sorted({float(t) for t in (times or [])})
+            held = doc.results.get("transient_seep") if sd is doc.slope_data else None
+            if held and not rerun and not extra:
+                if verbose:
+                    print("Using the transient solution the session already holds "
+                          f"({len(held.get('frames') or [])} saved frame(s)); pass "
+                          "rerun=True to march again.")
+                return held
+            mesh = _ensure_mesh(sd)
+            seep_data = build_seep_data(mesh, sd, seep_bc=1)
+            tseep_data = build_tseep_data(sd)
+            if extra:
+                tseep_data = dict(tseep_data)
+                tseep_data["save_times"] = sorted(
+                    set(tseep_data.get("save_times") or []) | set(extra))
+            # The march prints an iteration line per step of the steady solve it
+            # starts from — a hundred lines the model would pay to read back, none
+            # of them the answer. It runs muted, and what it said about ITSELF (a
+            # step that did not converge, a warning) is echoed below, because that
+            # is a finding about the model.
+            import contextlib as _ctx
+            import io as _io
+            chatter = _io.StringIO()
+            with _ctx.redirect_stdout(chatter):
+                solution = run_transient_seepage(seep_data, tseep_data, verbose=False)
+            trouble = [ln for ln in chatter.getvalue().splitlines()
+                       if "warning" in ln.lower() or "not converge" in ln.lower()
+                       or "did not" in ln.lower()]
+            unconfined = bool(solution.get("unconfined", False))
+            # The frames the play bar renders: head/u/phi from the march, velocity
+            # and gradient derived — the same reconstruction the sidecar reload does.
+            frames = [
+                _transient_frame_solution(
+                    seep_data, fr["head"], fr["u"], fr.get("phi"),
+                    fr.get("inflow"), fr.get("outflow"), unconfined, time=fr["time"])
+                for fr in solution["frames"]
+            ]
+            bundle = {"mode": "transient", "seep_data": seep_data,
+                      "transient": solution, "frames": frames,
+                      "options": {"mode": "transient", "bc": 1,
+                                  "extra_save_times": extra}}
+            if sd is doc.slope_data:
+                _store_result("transient_seep", bundle,
+                              show=[("_show_transient_seep", (bundle, False))],
+                              lead="transient_seep_view")
+                if save and getattr(doc, "path", None):
+                    from xslope.seep import export_transient_solution
+                    stem = os.path.splitext(doc.path)[0]
+                    export_transient_solution(
+                        seep_data, solution, stem, input_file=doc.path,
+                        mesh_file=f"{os.path.basename(stem)}_mesh.json")
+                    print(f"Saved the march beside the model as "
+                          f"{os.path.basename(stem)}_tseep.csv.")
+            if verbose:
+                unit = str(sd.get("time_unit") or "").strip()
+                saved = ", ".join(f"{fr['time']:g}" for fr in frames)
+                print(f"transient seepage: {len(frames)} saved frame(s) at t = "
+                      f"{saved}{(' ' + unit) if unit else ''}.")
+                for line in trouble:
+                    print("  " + line.strip())
+            if plot and frames:
+                from xslope.plot_seep import plot_seep_solution
+                import matplotlib.pyplot as plt
+                plot_seep_solution(seep_data, frames[-1],
+                                   fig=plt.figure(figsize=(11, 6)))
+            return bundle
+
+        def _apply_seep_time(sd, seep_time, rapid):
+            """Put one instant of the session's transient march into the model as
+            pore pressure, the way Studio's Run dialogs do before a stability run."""
+            from xslope.seep import apply_transient_stability_frame
+            bundle = doc.results.get("transient_seep") or {}
+            solution = bundle.get("transient")
+            if solution is None:
+                raise RuntimeError(
+                    "seep_time= needs a transient seepage solution; run run_tseep() "
+                    "first (or open a model whose _tseep.csv sidecar carries one).")
+            ts = sd.get("tseep") or {}
+            # Rapid drawdown reads TWO instants, the stage times off the model's own
+            # transient sheet — the single-instant path is for everything else.
+            staged = bool(rapid and ts.get("stage_1") is not None
+                          and ts.get("stage_2") is not None)
+            t = (None if seep_time in (True, "model", "auto")
+                 else float(seep_time))
+            info = apply_transient_stability_frame(
+                sd, solution, time=t, rapid=staged,
+                seep_data=bundle.get("seep_data"), remarch=True, verbose=True)
+            # A re-march (a requested instant the schedule never saved) is a new,
+            # longer solution: keep it, so the next question is not charged for it
+            # a second time.
+            if info.get("remarched") and info.get("solution") is not None:
+                bundle["transient"] = info["solution"]
+            return info
+
+        def fs_vs_time(times=None, method=None, mode="lem", search=True,
+                       num_slices=40, rapid=False, plot=True, slope_data=None,
+                       **kwargs):
+            """Factor of safety at every saved instant of the transient march — the
+            coupled result, and the one plot that shows WHEN the slope is critical.
+
+            Runs the stability analysis once per instant against that instant's pore
+            pressures; no input is changed at any step, the axis is time. Needs a
+            transient solution on the session (`run_tseep()` first). Returns the
+            result dict — `'times'`, `'fs'`, `'min_fs'`, `'critical_time'`,
+            `'n_failed'`, the per-instant table as `'rows'` — stores it as
+            `doc.results['fs_vs_time']` where the FS vs Time tab and the report read
+            it, and plots the curve.
+
+            `times` restricts the instants (default: every saved frame). `method`
+            defaults to the method the MODEL declares, as `run_lem` does; `mode`
+            is `'lem'` (default) or `'fem'` (an SSRM solve per instant — MINUTES
+            each, so name the cost first). `search=True` re-searches the critical
+            surface at each instant, which is right: the critical surface moves as
+            the pore pressures do. `rapid=True` evaluates each instant as a rapid
+            drawdown instead of a single-stage analysis (LEM only).
+            """
+            from xslope.sensitivity import fs_vs_time as _fs_vs_time
+            sd = doc.slope_data if slope_data is None else slope_data
+            bundle = doc.results.get("transient_seep") or {}
+            solution = bundle.get("transient")
+            if solution is None:
+                raise RuntimeError(
+                    "fs_vs_time needs a transient seepage solution; run run_tseep() "
+                    "first (or open a model whose _tseep.csv sidecar carries one).")
+            method = _declared_lem_method(sd, method)
+            # One solver echo per instant per method is a dozen lines saying what
+            # the run's own table says in one; the table itself is kept, and so is
+            # anything that is not that echo.
+            import contextlib as _ctx
+            import io as _io
+            import re as _re
+            sweep_out = _io.StringIO()
+            with _ctx.redirect_stdout(sweep_out):
+                ok, res = _fs_vs_time(sd, solution, times=times, mode=mode,
+                                      methods=(method,), search=search,
+                                      num_slices=num_slices, rapid=rapid,
+                                      seep_data=bundle.get("seep_data"), **kwargs)
+            echo = _re.compile(r"^\s*(oms|bishop|janbu|spencer|corps|lowe|mprice)"
+                               r"\b.*FS\s*=", _re.I)
+            for line in sweep_out.getvalue().splitlines():
+                if not echo.match(line):
+                    print(line)
+            if not ok:
+                raise RuntimeError(str(res))
+            res.pop("solution", None)      # the session already holds the march
+            result = {"kind": "fs_vs_time",
+                      "method": method if mode == "lem" else "SSRM", **res}
+            if sd is doc.slope_data:
+                _store_result("fs_vs_time", result,
+                              show=[("_show_fs_vs_time", ())],
+                              lead="fs_time_canvas")
+            unit = str(sd.get("time_unit") or "").strip()
+            if res.get("min_fs") is not None:
+                print(f"lowest FS = {res['min_fs']:.3f} at t = "
+                      f"{res['critical_time']:g}{(' ' + unit) if unit else ''} "
+                      f"({res.get('n_failed', 0)} instant(s) without a result).")
+            if plot:
+                from xslope.plot import plot_fs_vs_time
+                import matplotlib.pyplot as plt
+                plot_fs_vs_time(result, slope_data=sd,
+                                fig=plt.figure(figsize=(9, 5.5)))
             return result
+
+        def run_fem(analysis="ssrm", F=1.0, F_min=None, F_max=None, tolerance=0.01,
+                    failure_criterion="non_convergence", min_slip_depth=None,
+                    k0=None, tension_srf=None, plot=True, slope_data=None, **kwargs):
+            """Run a finite element analysis and return the result bundle — the FEM
+            counterpart of `run_lem`. MINUTES, not seconds: say so before starting one.
+
+            `analysis='ssrm'` (default) runs the shear-strength reduction search and
+            returns a bundle whose 'FS' is the factor of safety; `analysis='single'`
+            runs ONE trial at strength factor `F` and returns the stress/displacement
+            field with 'FS' None. Builds the mesh from the file's declared settings if
+            the model carries none, attaches the bundle to the session
+            (`doc.results['fem_solution']`) the way Studio does, and shows the standard
+            results plot when plot=True.
+
+            `F_min`/`F_max` bracket the SSRM search (default: the model's own
+            main!D21/D22 values, else 1.0-2.0); `tolerance` closes it. `k0` and
+            `tension_srf` default to the model's declared values. `failure_criterion`
+            and `min_slip_depth` are the SSRM failure test. Extra keyword arguments
+            pass through to `solve_ssrm` / `solve_fem`.
+
+            Returns {'fem_data', 'solution', 'failure_solution', 'FS', 'analysis'}.
+            A non-converged SSRM raises with the solver's own reason rather than
+            returning a number that is not a factor of safety.
+            """
+            from xslope.fem import build_fem_data, solve_fem, solve_ssrm
+            import matplotlib.pyplot as plt
+            sd = doc.slope_data if slope_data is None else slope_data
+            mesh = _ensure_mesh(sd)
+            fem_data = build_fem_data(sd, mesh)
+            if k0 is None:
+                k0 = sd.get("k0")
+            if analysis == "single":
+                solution = solve_fem(fem_data, F=float(F), debug_level=1, k0=k0,
+                                     **kwargs)
+                bundle = {"fem_data": fem_data, "solution": solution,
+                          "failure_solution": None, "FS": None, "analysis": "single"}
+                print(f"FEM single trial (F = {float(F):g}): "
+                      f"converged={solution.get('converged')}, "
+                      f"iterations={solution.get('iterations')}")
+            else:
+                lo = sd.get("ssrm_f_min") if F_min is None else F_min
+                hi = sd.get("ssrm_f_max") if F_max is None else F_max
+                lo = 1.0 if lo is None else float(lo)
+                hi = 2.0 if hi is None else float(hi)
+                if tension_srf is None:
+                    tension_srf = sd.get("tension_srf")
+                result = solve_ssrm(fem_data, F_min=lo, F_max=hi,
+                                    tolerance=float(tolerance), debug_level=1,
+                                    failure_criterion=failure_criterion,
+                                    min_slip_depth=min_slip_depth, k0=k0,
+                                    tension_srf=tension_srf, **kwargs)
+                if not result.get("converged", False):
+                    raise RuntimeError(f"SSRM did not converge: "
+                                       f"{result.get('error', 'unknown error')}")
+                from xslope.fem import ssrm_run_record
+                bundle = {"fem_data": fem_data, "solution": result["last_solution"],
+                          "failure_solution": result.get("failure_solution"),
+                          "FS": result.get("FS"), "analysis": "ssrm",
+                          "meta": ssrm_run_record(result, fem_data, {})}
+                print(f"SSRM: FS = {result['FS']:.3f}")
+                if result.get("note"):
+                    # The factor of safety is the bracket midpoint however the
+                    # bracket closed, so an undecided upper edge is invisible in
+                    # the number itself.
+                    print(f"  {result['note']}")
+            _store_result("fem_solution", bundle,
+                          show=[("_show_fem_data", (fem_data,)),
+                                ("_show_fem_results", ())])
+            if plot:
+                from xslope.plot_fem import plot_fem_results
+                plot_fem_results(fem_data, bundle["solution"], fs=bundle["FS"],
+                                 failure_solution=bundle.get("failure_solution"),
+                                 fig=plt.figure(figsize=(11, 7)))
+            return bundle
+
+        def suggest_elastic(material_or_soil_type=None, unit_system=None,
+                            slope_data=None):
+            """Soil-type Young's modulus and Poisson's ratio for a material that
+            carries none — the answer to "what E and nu should I use for this clay?".
+
+            Thin wrapper over `xslope.units.classify_elastic`. Give it a material
+            (its name, its 1-based row number, or the dict itself) and it classifies
+            the material FROM ITS STRENGTH — a Hoek-Brown material is rock, a
+            frictional material grades by phi, a phi = 0 material by its undrained
+            shear strength, a c-phi soil on its cohesive component — and returns E in
+            the MODEL'S OWN stress unit with the soil type it decided on. A soil-type
+            name ('stiff clay', 'dense sand', 'soft rock') is also accepted, for a
+            material that does not exist yet. With no argument it does every material
+            in the model and prints the table.
+
+            `unit_system` ('si' / 'metric' / 'imperial') overrides the model's
+            declared system; without either, the unit system is inferred from the
+            material unit weights.
+
+            Returns a dict (or a list of them) with 'material', 'soil_type', 'E',
+            'nu', 'unit_system' and 'reason'.
+
+            THIS IS A LAST RESORT, never a preference. A value the problem states is
+            an input: transcribe it. Use this only to fill a genuine blank — and SAY
+            that you did, and which soil type it came from, because a blank E is a
+            singular stiffness matrix while a wrong-magnitude E leaves the factor of
+            safety untouched and corrupts every displacement the FEM reports.
+            """
+            from xslope import units as _units
+            from xslope.units import (KPA_TO_PSF, classify_elastic,
+                                      infer_unit_system, normalize_unit_system)
+            sd = doc.slope_data if slope_data is None else slope_data
+            materials = list(sd.get("materials") or [])
+
+            system = normalize_unit_system(unit_system)
+            if system is None:
+                system = normalize_unit_system(sd.get("unit_system"))
+            if system is None:
+                system = infer_unit_system(sd.get("materials")) or "si"
+            imperial = (system == "imperial")
+
+            # The published per-soil-type table lives in xslope.units as one
+            # constant per type; read it by value rather than restating it here, so
+            # a revision to the table reaches this helper with no second edit.
+            table = {}
+            for name, value in vars(_units).items():
+                if (name.isupper() and isinstance(value, tuple) and len(value) == 3
+                        and isinstance(value[0], str)):
+                    table[value[0].lower()] = value
+
+            def _one(mat, label):
+                soil, E, nu = classify_elastic(mat, imperial=imperial,
+                                               declared_system=system)
+                opt = str(mat.get("option", "mc") or "mc").lower()
+                if opt in ("hb", "hoek", "hoek-brown"):
+                    why = "a Hoek-Brown strength model means rock"
+                else:
+                    why = (f"c = {float(mat.get('c') or 0):g}, "
+                           f"phi = {float(mat.get('phi') or 0):g}")
+                return {"material": label, "soil_type": soil, "E": E, "nu": nu,
+                        "unit_system": system,
+                        "reason": (f"{label} classified as {soil} from {why}; E is the "
+                                   f"midpoint of the published range for that soil "
+                                   f"type and nu its typical value, in "
+                                   f"{'psf' if imperial else 'kPa'}. Last-resort fill "
+                                   f"— a stated value outranks it.")}
+
+            if material_or_soil_type is None:
+                rows = [_one(m, m.get("name") or f"Material {i + 1}")
+                        for i, m in enumerate(materials)]
+                for r in rows:
+                    print(f"  {r['material']:<20} {r['soil_type']:<12} "
+                          f"E = {r['E']:,.0f}   nu = {r['nu']:g}")
+                return rows
+
+            mat = None
+            label = str(material_or_soil_type)
+            if isinstance(material_or_soil_type, dict):
+                mat = material_or_soil_type
+                label = mat.get("name") or "material"
+            elif isinstance(material_or_soil_type, int):
+                mat = materials[material_or_soil_type - 1]      # 1-based, as the sheet
+                label = mat.get("name") or f"Material {material_or_soil_type}"
+            else:
+                key = label.strip().lower()
+                for m in materials:
+                    if str(m.get("name", "")).strip().lower() == key:
+                        mat = m
+                        label = m.get("name")
+                        break
+                if mat is None:
+                    row = table.get(key)
+                    if row is None:
+                        raise ValueError(
+                            f"{material_or_soil_type!r} is neither a material in this "
+                            f"model ({', '.join(str(m.get('name')) for m in materials) or 'none'}) "
+                            f"nor a soil type ({', '.join(sorted(table))}).")
+                    soil, e_kpa, nu = row
+                    E = round(e_kpa * KPA_TO_PSF if imperial else e_kpa, -2)
+                    out = {"material": None, "soil_type": soil, "E": E, "nu": nu,
+                           "unit_system": system,
+                           "reason": (f"Published range for {soil}: E is its midpoint "
+                                      f"and nu its typical value, in "
+                                      f"{'psf' if imperial else 'kPa'}. Last-resort "
+                                      f"fill — a stated value outranks it.")}
+                    print(f"  {soil}: E = {E:,.0f}, nu = {nu:g} ({system})")
+                    return out
+            out = _one(mat, label)
+            print(f"  {out['material']}: {out['soil_type']} — E = {out['E']:,.0f}, "
+                  f"nu = {out['nu']:g} ({system})")
+            return out
+
+        def generate_report(path=None, finalize=True, **options):
+            """Build the Analysis Report — the same document File → Generate Report
+            produces — and return the path it was written to.
+
+            Runs `xslope.report.generate_report` over the model and everything this
+            session has solved (the LEM run with the method it was run under, the
+            seepage solutions in boundary-condition order, a transient march, the
+            finite element run), then hands the finished .docx to whatever lays pages
+            out (Word, or LibreOffice) so its contents page carries real page numbers
+            — the dialog's own last step. A method the report is asked for that this
+            session never ran is RUN by the builder, which is the longest thing in
+            such a build: warn the user before asking for one.
+
+            `path` defaults to `<model>_report.docx` in `OUTPUT_DIR`, so the user
+            opens it from the chat and the dock's Files button like every other file
+            this session produces; pass an explicit `path` to write it anywhere
+            else. `finalize=False` skips the page-number pass. Every other keyword
+            is a report option, exactly as the Report dialog's checkboxes set them —
+            `title`, `analyst`, and the section switches (`lem_slices`, `fem_piles`,
+            …); `xslope.report.DEFAULT_OPTIONS` names them all. Returns the output
+            path.
+            """
+            from xslope.report import generate_report as _generate
+            from ..report_dialog import (default_output_path, document_finish,
+                                         finalization_enabled)
+            sd = doc.slope_data
+            solutions = _report_solutions()
+            model_path = getattr(doc, "path", None)
+            # Default INTO the assistant's output folder, keeping the dialog's
+            # `<model stem>_report.docx` name. Written beside the project (the
+            # dialog's default) the file is real but invisible to the chat: the
+            # transcript lists what a snippet leaves in `outdir`, and the dock's
+            # Files button opens that folder — so a report written elsewhere came
+            # with a sentence about opening it from Files that was not true.
+            out_path = path or os.path.join(
+                self.outdir, os.path.basename(default_output_path(model_path)))
+            opts = dict(options)
+            # The traceability stamp names the input file and its SHA-256; without
+            # this it reads "not saved to a file" even for a project opened from
+            # disk. The Report dialog passes the same value.
+            if model_path:
+                opts.setdefault("input_path", model_path)
+            style = getattr(doc, "style", None)
+            if style is not None:
+                opts.setdefault("style", style)
+            ok, res = _generate(sd, solutions, opts, out_path)
+            if not ok:
+                raise RuntimeError(res)
+            if finalize:
+                settings = getattr(window, "settings", None)
+                document_finish(out_path, finalization_enabled(settings))
+            print(f"Report written to {res['path']} "
+                  f"({len(res.get('figures') or ())} figures).")
+            return res["path"]
+
+        def _report_solutions():
+            """What the report can document, in `xslope.report`'s shape. Studio's own
+            assembly where there is a window (it also carries the method the LEM run
+            was made under), and the same thing off `doc.results` where there is
+            not."""
+            builder = getattr(window, "report_solutions", None)
+            if callable(builder):
+                return builder()
+            results = doc.results or {}
+            out = {}
+            lem = results.get("lem_solution")
+            if lem:
+                out["lem"] = [dict(lem, method=lem.get("method"))]
+            seep = results.get("seep_solutions") or {}
+            if seep:
+                out["seep"] = [seep[bc] for bc in sorted(seep)]
+            if results.get("transient_seep"):
+                out["tseep"] = [results["transient_seep"]]
+            if results.get("fem_solution"):
+                out["fem"] = [results["fem_solution"]]
+            return out
 
         def sensitivity(values, apply, param="value", method="spencer", search=True,
                         num_slices=40, rapid=False, name="sensitivity", plot=True,
@@ -604,7 +1684,60 @@ class PythonKernel:
                 return reliability_rs(method=method, **kwargs)
             return reliability_taylor(method=method, **kwargs)
 
-        return {"run_lem": run_lem, "resync_geometry": resync_geometry,
+        def corpus_index(query=None, limit=10):
+            """Worked examples from the verification corpus, matching `query`.
+
+            The corpus is 300-odd solved models, each carrying a published
+            comparison against the source or the vendor program — the pages to cite
+            when a question matches a topic. The whole table is far too big to sit
+            in a system prompt on every completion, so it is asked for instead:
+            `corpus_index('rapid drawdown')` returns the matching rows as
+            `[{'topic', 'title', 'url'}]` (also printed), and `corpus_index()` with
+            no query lists the topics.
+
+            Matching is on topic key, topic label, and title, so a plain-English
+            phrase works. `limit` caps the rows so a broad query cannot flood the
+            conversation.
+            """
+            topics, all_rows = _corpus_rows()
+            if not all_rows:
+                print("The verification corpus index is not available in this "
+                      "install; the pages are at "
+                      "https://xslope.readthedocs.io/en/latest/verification/")
+                return []
+            if not query:
+                print("Corpus topics (pass one to corpus_index):")
+                for key in sorted(topics):
+                    print(f"  {key:22s} {topics[key]}")
+                return sorted(topics)
+            words = [w for w in str(query).lower().split() if len(w) > 2]
+            rows, seen = [], set()
+            for row in all_rows:
+                text = f"{row['topic']} {row['label']} {row['title']}".lower()
+                if not all(w in text for w in words):
+                    continue
+                if row["url"] in seen:
+                    continue
+                seen.add(row["url"])
+                rows.append({"topic": row["topic"], "title": row["title"],
+                             "url": row["url"]})
+                if len(rows) >= int(limit):
+                    break
+            if not rows:
+                print(f"No corpus entry matches {query!r}. Try a topic from "
+                      "corpus_index().")
+                return []
+            for r in rows:
+                print(f"- {r['title']}  [{r['topic']}]\n  {r['url']}")
+            return rows
+
+        return {"run_lem": run_lem, "run_seep": run_seep, "run_fem": run_fem,
+                "run_tseep": run_tseep, "fs_vs_time": fs_vs_time,
+                "transient_solution": transient_solution,
+                "corpus_index": corpus_index,
+                "suggest_elastic": suggest_elastic,
+                "generate_report": generate_report,
+                "resync_geometry": resync_geometry,
                 "sensitivity": sensitivity, "list_params": list_params,
                 "design_sweep": design_sweep,
                 "parametric_sweep": parametric_sweep,
@@ -652,6 +1785,15 @@ class PythonKernel:
         self._ns["OUTPUT_DIR"] = self.outdir
 
         code = self._normalize(code)
+        # This snippet's own bookkeeping: what it solves (so Studio's stale-result
+        # sweep cannot take a run made after the edit that triggered it) and the
+        # geometry it starts from (so an edit made on the source the resync
+        # overwrites is named rather than silently reverted).
+        self._fresh_results = {}
+        self._geom_warnings = []
+        sd = self._doc.slope_data
+        self._geom_watch = ((_geometry_native(sd), _geometry_sigs(sd))
+                            if isinstance(sd, dict) else None)
         os.makedirs(self.outdir, exist_ok=True)     # may have been cleared by the OS
         before_figs = set(plt.get_fignums())
         existing = set(os.listdir(self.outdir))     # to detect files the snippet writes
@@ -661,7 +1803,8 @@ class PythonKernel:
         try:
             os.chdir(self.outdir)        # relative saves (savefig('x.png')) land here
             with redirect_stdout(buf), redirect_stderr(buf):
-                exec(code, self._ns)
+                with _time_limit(self.run_timeout()):
+                    exec(code, self._ns)
         except Exception:
             error = traceback.format_exc()
         finally:
@@ -669,6 +1812,17 @@ class PythonKernel:
                 os.chdir(prev_cwd)
             except Exception:
                 pass
+        if error:
+            # A snippet that raised is rolled back whole, so its geometry edit is
+            # not the model's problem and its results were never the session's.
+            self._geom_warnings = []
+            self._fresh_results = {}
+        else:
+            # A snippet that ran nothing still has its polygons rebuilt — by the
+            # checks' own resync, after this returns — so the last word on the
+            # source of a geometry edit is said here.
+            self._note_geometry_source()
+        self._geom_watch = None
 
         # Auto-save figures the snippet left open — but only if it didn't already
         # save a figure itself (e.g. savefig('plot.png') without closing), so a

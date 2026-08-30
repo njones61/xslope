@@ -50,8 +50,10 @@ Phase-3 locks (plan §4 / §6 — outputs + drawdown):
 
   5. DRAWDOWN STAGING — the in-memory §6 path (stage_transient_for_drawdown)
      reproduces the classic two-steady-file rapid-drawdown FS to machine zero when
-     the two staged frames carry the same pore-pressure fields — proving the
-     frame -> seep_u/seep_u2 plumbing is exact (physics consistency against a real
+     the two staged frames carry the same pore-pressure fields AND the pool schedule
+     leaves the reservoir at the same level boundary set 2 states — proving the
+     frame -> seep_u/seep_u2 plumbing is exact, and that the staged stage-2 water
+     load follows the schedule to the same pool (physics consistency against a real
      transient model is the phase-5 corpus lock).
 
 Phase-5 lock (plan §8.4 — the feature's headline integration test):
@@ -749,7 +751,24 @@ def check_drawdown_staging():
     FS_A = resA["FS"]
 
     # synthetic transient solution: stage_1 frame == steady u1, stage_2 == u2.
-    d["tseep"] = {"stage_1": 0.0, "stage_2": 10.0}
+    #
+    # The pool schedule is part of the fixture, not decoration. Staging a drawdown
+    # moves BOTH of its stage-2 inputs onto the march: the pore pressures come from
+    # the stage-2 frame, and the water standing on the slope comes from boundary set
+    # 1 at that same instant rather than from boundary set 2, which states a separate
+    # steady drawn-down analysis. A march whose upstream head never moves cannot
+    # produce a drawn-down field at all, so the schedule here falls from set 1's own
+    # full pool to set 2's level over the same interval the synthetic frames span.
+    # That is what makes the two routes comparable: same fields, same water, and any
+    # difference left in the factor of safety is the plumbing.
+    import copy
+    hi = float(d["seepage_bc"]["specified_heads"][0]["head"])
+    lo = float(d["seepage_bc2"]["specified_heads"][0]["head"])
+    d["tseep"] = {"stage_1": 0.0, "stage_2": 10.0, "times": [0.0, 5.0, 10.0],
+                  "series": {"pool": [hi, 0.5 * (hi + lo), lo]}}
+    bc1 = copy.deepcopy(d["seepage_bc"])
+    bc1["specified_heads"][0]["head"] = "pool"
+    d["seepage_bc"] = bc1
     ts_sol = {"times": [0.0, 5.0, 10.0],
               "frames": [{"time": 0.0, "u": u1},
                          {"time": 5.0, "u": 0.5 * (u1 + u2)},

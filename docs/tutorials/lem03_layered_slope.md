@@ -20,11 +20,9 @@ model has to be built so the search can ask about both sides of it.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Build a section with two material zones, put a profile line on
-the boundary between them and a starting circle at the base of each, and read the
-search result at depth: which layer the critical surface runs in, why it stops
-where it does, and what would have to change for the deeper circle to be the
-answer.
+**Objectives** — Learn how to model a layered slope: how to carve a section into
+zones with stacked profile lines, where starting circles belong when each layer
+could fail, and how to read which layer the critical surface runs in and why.
 </div>
 <p><span class="tg-pill">two materials</span><span class="tg-pill">profile lines</span><span class="tg-pill">per-layer starting circles</span><span class="tg-pill">generated circles</span><span class="tg-pill">circular search</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_simple_mult_layers.xlsx](../lem/files/xslope_simple_mult_layers.xlsx) — the same file used by [LEM Sample Problem 3](../lem/samples.md#3-simple-slope-with-multiple-layers)</div>
@@ -40,7 +38,7 @@ and neither soil carries pore pressures — `u` stays `none` — so the table en
 at φ:
 
 | name | γ | γsat | option | c | φ |
-|---|:---:|:---:|---|:---:|:---:|
+| --- | :---: | :---: | --- | :---: | :---: |
 | `embankment` | 130 |  | `mc` | 400 | 0 |
 | `foundation` | 135 |  | `mc` | 800 | 0 |
 
@@ -55,7 +53,7 @@ vertex per row in the paired `x` / `y` columns its worksheet block carries.
 **Profile Line 1 — material 1 (`embankment`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | 0 | 0 |
 | 40 | 20 |
 | 90 | 20 |
@@ -63,7 +61,7 @@ vertex per row in the paired `x` / `y` columns its worksheet block carries.
 **Profile Line 2 — material 2 (`foundation`):**
 
 | x (ft) | y (ft) |
-|:---:|:---:|
+| :---: | :---: |
 | -30 | 0 |
 | 90 | 0 |
 
@@ -85,14 +83,14 @@ toe would have nowhere to put the deep mechanism this problem is about.
 twice the slope height, one tangent to the base of each layer:
 
 | Xo | Yo | Option | Depth |
-|:---:|:---:|---|:---:|
+| :---: | :---: | --- | :---: |
 | 20 | 40 | Depth | 0 |
 | 20 | 40 | Depth | -10 |
 
-The tables are the model, and each is laid out exactly as its destination is —
-the template's worksheets and Studio's editors, same columns in the same order.
-Select a table's block of values, copy, and paste it straight into the sheet or
-editor rather than retyping it.
+Each table above is laid out exactly as its destination — the template's
+worksheets and Studio's editors, same columns in the same order. Select a
+table's block of values, copy, and paste it straight into the sheet or editor
+rather than retyping it.
 
 ---
 
@@ -201,7 +199,7 @@ Save the file and continue at [Running the analysis](#running-the-analysis).
 
 ## C — Building it in Studio {#c-building-it-in-studio}
 
-Start with **File → New** and work down the **Inputs** tree.
+We start with **File → New** and work down the **Inputs** tree.
 
 ### 1. Materials
 
@@ -253,20 +251,20 @@ says so: *"Generated 3 circles: 3 on the left-facing face (toe at x = 0, height
 20)."* Read the **Depth** column, which is the elevation each one reaches:
 
 | # | Depth | What it is |
-|---|:---:|---|
+| :---: | :---: | --- |
 | 1 | −4.72136 | the toe circle — from this center, the arc through the toe bottoms out 4.7 ft inside the foundation |
 | 2 | −10 | tangent to the rigid rock, the base of the foundation |
 | 3 | 0 | tangent to the top of the foundation, the base of the embankment |
 
-The summary reports all three candidates kept — on a section where a circle
-cannot daylight — come back up to the ground surface — inside the model, it
-says so instead. Click **OK**.
+The summary reports all three candidates kept. On a section where a circle cannot
+daylight — come back up to the ground surface — inside the model, the summary says
+so instead. Click **OK**.
 
 Continue below.
 
 ## Running the analysis
 
-However you built it, you now hold the same model:
+However you built it, the model is now the same:
 
 ![The finished model](images/lem03_inputs.png){width=1000}
 
@@ -288,16 +286,16 @@ Click **Run LEM…** and choose **Method** = `Spencer` and **Analysis** =
 
 ### What the starting circles say before anything is searched
 
-Each starting circle is a complete failure surface in its own right, and solving
+Each starting circle is a complete failure surface in its own right, so we solve
 the three of them — the two the file carries, plus the generator's toe circle —
-is the fastest read on which mechanism this section has. **The table below is
-this page's own comparison, not something the program prints.** Each row is a
-run you can repeat: solve that circle alone with **Run LEM…** and **Analysis** =
+for the fastest read on which mechanism this section has. **The table below
+collects three separate runs; the program does not print it.** Each row is a run
+you can repeat: solve that circle alone with **Run LEM…** and **Analysis** =
 `Single surface`; the factor of safety is the number on that run's solution
 plot, and the weight is ΣW summed over the run's slices:
 
 | Circle | Depth | Factor of safety | Weight of the sliding mass (lb/ft) |
-|---|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: |
 | Base of the embankment | 0 | **1.247** | 61,224 |
 | Through the toe | −4.72 | 1.646 | 100,872 |
 | Base of the foundation | −10 | 1.656 | 157,486 |
@@ -332,18 +330,18 @@ outside the slice on 15% of the boundaries. This is the crest tension of a φ = 
 slope that [LEM-1](lem01_simple_embankment.md) diagnoses and fixes with a tension
 crack; adding one here at z<sub>c</sub> = 2c/γ = 6.15 ft gives a clean solution at
 **FS = 1.175**, on a circle still tangent to the contact. It changes nothing
-about which surface is critical, and unlike LEM-1's uncracked embankment it never
-prevented one from being solved: Spencer answered on all 529 trial surfaces the
-search tried.
+about which surface is critical, and unlike in the uncracked embankment of LEM-1
+the tension never prevented a surface from being solved: Spencer answered on all
+529 trial surfaces the search tried.
 
 ### Guarding against local minima
 
 A search walks downhill from its starting circle, so what it returns is the best
 surface in the neighborhood it started in — not necessarily the model's minimum.
 The guard is simple: **try several starting circle locations and confirm they
-agree.** That is what the per-layer set is for. Run the search from the shallow
-circle, the deep circle, or the generator's toe circle and every one returns the
-same surface here — tangent to the contact, FS = 1.244.
+agree.** That is what the per-layer set is for. We run the search from the shallow
+circle, the deep circle and the generator's toe circle: every one returns the same
+surface here — tangent to the contact, FS = 1.244.
 
 The failure this guards against looks like success. Seed the search with an arc
 wildly out of scale with the section — a center 220 ft above the slope, R = 269
@@ -363,8 +361,8 @@ you left out costs the answer.
 ### When the deep circle is the answer
 
 Which layer is weak is a property of the soils, not of the geometry, and it is
-the whole question. Take the same section and give the foundation c = 300 psf —
-below the fill's 400 — with everything else unchanged:
+the whole question. Now we take the same section and give the foundation
+c = 300 psf — below the fill's 400 — with everything else unchanged:
 
 ![Spencer on the same section with a weak foundation](images/lem03_solution_weak.png){width=1000}
 
@@ -388,7 +386,7 @@ and what it ran through.
 The search finds each method its own critical circle:
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 1.244 | 1.244 | 1.313 | 1.326 | 1.285 | 1.244 | 1.244 |
 
 The four methods that satisfy moment equilibrium — the Ordinary Method of
@@ -419,7 +417,7 @@ This tutorial covered:
 
 **Where to go next:** [Tutorial LEM-4](lem04_water_in_the_slope.md) adds the
 input every layer here went without — a piezometric line through a three-layer
-section, and a measure of what the pore pressure it produces is worth on the
+section, and a measure of what the pore pressure it produces costs on the
 critical circle. The sample problems carry the layering further —
 [three layers with a piezometric line](../lem/samples.md#5-slope-with-multiple-materials-and-piezometric-line)
 through them, a section whose

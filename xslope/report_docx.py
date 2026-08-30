@@ -18,7 +18,13 @@ The document is built ON a template — ``xslope/resources/report_template.docx`
 by default — and inherits everything the template declares: the page size and
 margins, the Title / Heading / Body / Caption styles, and the header and footer
 frames. Nothing here sets a font or a margin; a company template dropped in its
-place restyles the whole report (S4 makes that a dialog setting).
+place restyles the whole report — from Python as ``generate_report``'s
+``template`` option, and in Studio as the report dialog's Template field.
+
+A template is only a template of this report if it declares the styles the
+report is written in (:data:`REQUIRED_STYLES`). One that does not is refused by
+name (:func:`template_problem`) before a figure is drawn, rather than producing
+a document whose headings and captions are all body text.
 
 What this module does own is the document's *structure*: the title page, the
 table-of-contents field, the header and footer content, the landscape section the
@@ -83,6 +89,23 @@ STYLE = {
     # cell margins from.
     "plain_table": "Normal Table",
 }
+
+#: The styles a template has to define before the report can be built on it.
+#:
+#: The renderer asks the template for a good many styles and falls back to Normal
+#: for any it does not find, which is the right treatment of a missing List
+#: Bullet or Table Grid. It is the wrong treatment of these: a document whose
+#: title, headings, body and captions all print as Normal is not a report anyone
+#: asked for, and the fault — a template written for something else — is
+#: invisible in the result. So these are checked before anything is written, and
+#: a template missing one is refused by name (:func:`template_problem`).
+#:
+#: Built from :data:`STYLE`, so the list cannot name a style the renderer no
+#: longer uses; the heading depth is ``report.HEADING_LEVELS``, which the report
+#: never writes past, and the two are checked against each other.
+REQUIRED_STYLES = ((STYLE["title"],)
+                   + tuple(STYLE["heading"] % level for level in (1, 2, 3))
+                   + (STYLE["body"], STYLE["caption"]))
 
 #: The style whose paragraphs the running head names — the top-level sections.
 #: A STYLEREF field is given a style's UI name, which is what Word's own field
@@ -1661,6 +1684,68 @@ def _header_paragraph(section):
     return p
 
 
+def _carry_header_furniture(doc, section):
+    """Copy whatever the template put in the first section's header — a logo, a
+    letterhead table — into ``section``'s own head.
+
+    Every section the report opens gets a header part of its own, because the
+    running head's tab stop is a property of the page it prints on and a
+    landscape section's right margin is three inches further out. A new part
+    starts empty, so a company template's letterhead would print on the front
+    matter and on no other page.
+
+    What is copied is everything in the first header that is not a paragraph:
+    the paragraph is the running head, which every section writes for itself.
+    Order is kept about that paragraph — a letterhead above it stays above it.
+
+    Every relationship the copied content carries is remade against the part it
+    lands in, whatever kind it is: a relationship id means nothing outside the
+    part it was written in, so a logo's image and a hyperlink on the firm's name
+    both have to be re-related, and an id that cannot be resolved at all is
+    dropped rather than left dangling — Word reports a file carrying one as
+    unreadable.
+
+    A template that leaves its header to the report — the shipped one does —
+    carries nothing here, and this does nothing.
+    """
+    from copy import deepcopy
+
+    source = doc.sections[0].header
+    if not [el for el in source._element if el.tag != qn("w:p")]:
+        return
+    header = section.header
+    header.is_linked_to_previous = False
+    if source.part is header.part:
+        return
+    anchor = header._element.find(qn("w:p"))
+    seen_paragraph = False
+    for element in source._element:
+        if element.tag == qn("w:p"):
+            seen_paragraph = True
+            continue
+        copied = deepcopy(element)
+        for node in copied.iter():
+            for attribute in (qn("r:embed"), qn("r:link"), qn("r:id")):
+                rel_id = node.get(attribute)
+                if not rel_id:
+                    continue
+                rel = source.part.rels.get(rel_id)
+                if rel is None:
+                    del node.attrib[attribute]
+                elif rel.is_external:
+                    node.set(attribute,
+                             header.part.relate_to(rel.target_ref, rel.reltype,
+                                                   is_external=True))
+                else:
+                    node.set(attribute,
+                             header.part.relate_to(rel.target_part,
+                                                   rel.reltype))
+        if seen_paragraph or anchor is None:
+            header._element.append(copied)
+        else:
+            anchor.addprevious(copied)
+
+
 def _write_header(section, title):
     """The front-matter head: the project title, as a live document-property
     field.
@@ -2006,6 +2091,7 @@ def _open_section(doc):
     _collapse_sect_break(doc)
     section.different_first_page_header_footer = False
     section.footer.is_linked_to_previous = True
+    _carry_header_furniture(doc, section)
     return section
 
 
@@ -2327,12 +2413,62 @@ def _render_section(doc, section_node, level, state):
 # Entry point
 # ---------------------------------------------------------------------------
 
+class TemplateError(Exception):
+    """A template the report cannot be built on. The message is the sentence the
+    user is shown, so it names the file and what is wrong with it."""
+
+
+def template_problem(template):
+    """Why ``template`` cannot be built on, in one sentence, or ``""`` when it
+    can.
+
+    Four ways a chosen template is not one, each said in the terms the user
+    chose it in: the file is not there, it is not a ``.docx``, Word's format
+    reader cannot open it, or it does not declare a style the report is written
+    in (:data:`REQUIRED_STYLES`). The missing style is NAMED — "keep the style
+    names" is the whole instruction for making a company template, so the one
+    that was renamed is the only useful thing to say.
+
+    ``None`` or ``""`` is the shipped template, which is never a problem.
+    """
+    if not template:
+        return ""
+    name = os.path.basename(template)
+    if not os.path.exists(template):
+        return (f"The report template {template} is no longer there. Choose "
+                f"another, or use the shipped template.")
+    if os.path.splitext(template)[1].lower() != ".docx":
+        return (f"{name} is not a Word template: a report is built on a .docx "
+                f"file.")
+    try:
+        doc = Document(template)
+    except Exception as exc:
+        return f"{name} could not be opened as a Word document: {exc}"
+    have = {style.name for style in doc.styles}
+    missing = [name_ for name_ in REQUIRED_STYLES if name_ not in have]
+    if missing:
+        return (f"{name} does not define the "
+                f"{', '.join(repr(m) for m in missing)} "
+                f"style{'' if len(missing) == 1 else 's'}, which the report is "
+                f"written in. A template for xslope keeps the style names "
+                f"{', '.join(REQUIRED_STYLES)}.")
+    return ""
+
+
 def render_docx(report, path, template=None):
     """Write ``report`` (a :class:`xslope.report.Report`) to ``path`` as a
     ``.docx``, built on ``template`` (the shipped default when None).
 
+    A named template that cannot be built on raises :class:`TemplateError` with
+    the sentence :func:`template_problem` states. Studio checks the same thing
+    when the template is chosen, so this is the guard for the Python caller and
+    for a file that has moved since it was picked.
+
     Returns the path written.
     """
+    problem = template_problem(template)
+    if problem:
+        raise TemplateError(problem)
     template = template or DEFAULT_TEMPLATE
     doc = Document(template) if os.path.exists(template) else Document()
 

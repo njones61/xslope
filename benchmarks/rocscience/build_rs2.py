@@ -6,8 +6,11 @@ cross-bearing slopes (RS2 #56-58).
 Run from the repo root:  python benchmarks/rocscience/build_rs2.py
 """
 
+import math
 import os
 import sys
+
+import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -16,9 +19,101 @@ from shapely.geometry import Polygon  # noqa: E402
 
 from xslope.fileio import load_slope_data as _load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
+from xslope.fileio import build_polygons as _build_polygons  # noqa: E402
+from xslope.fileio import build_ground_surface_from_polygons as _ground_from_polys  # noqa: E402
 from benchmarks._xlsx_writer import emit_water_mode  # noqa: E402
 from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
 from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
+
+
+def _circle_through(P1, P2, yn):
+    """The circle through ground points P1 and P2 whose LOWEST point sits at
+    elevation ``yn``. This is the standing starting-circle rule made constructive:
+    choose where the surface enters the ground (P1), where it daylights (P2), and
+    how deep it is tangent (yn) -- the circle is then fully determined, rather than
+    hunted for by trial. Returns {'Xo', 'Yo', 'Depth', 'R'}, or None when no such
+    circle exists (both points must sit above yn, and the roots must be real)."""
+    (x1, y1), (x2, y2) = P1, P2
+    A, B = y1 - yn, y2 - yn
+    if A <= 0 or B <= 0:
+        return None
+    a = B - A
+    b = 2.0 * (A * x2 - B * x1)
+    c = B * x1 * x1 - A * x2 * x2 - A * B * (y2 - y1)
+    roots = []
+    if abs(a) < 1e-14:
+        if abs(b) > 1e-14:
+            roots = [-c / b]
+    else:
+        disc = b * b - 4 * a * c
+        if disc < 0:
+            return None
+        sq = math.sqrt(disc)
+        roots = [(-b + sq) / (2 * a), (-b - sq) / (2 * a)]
+    best = None
+    lo, hi = min(x1, x2), max(x1, x2)
+    for Xo in roots:
+        Yo = ((Xo - x1) ** 2 + y1 * y1 - yn * yn) / (2.0 * A)
+        R = Yo - yn
+        if R <= 0:
+            continue
+        pen = 0.0 if lo <= Xo <= hi else min(abs(Xo - lo), abs(Xo - hi))
+        cand = (pen, {'Xo': Xo, 'Yo': Yo, 'Depth': yn, 'R': R})
+        if best is None or cand[0] < best[0]:
+            best = cand
+    return best[1] if best else None
+
+
+def _entry_exit_tangent_circle(ground_surface, domain_polygon,
+                                entry_frac=0.1, exit_frac=0.9, tangent_frac=0.4):
+    """A first starting circle derived from the section's own geometry, by the
+    standing rule: enter the ground near the crest (``entry_frac`` of the way
+    across the ground surface's x-range), daylight near the toe (``exit_frac``),
+    and bottom out ``tangent_frac`` of the way from the shallower of those two
+    ground points down to the domain floor. Narrow sections need this solved
+    exactly (via ``_circle_through``) rather than picked from a generic ladder of
+    candidates, because the admissible band that actually daylights twice on the
+    ground can be tight."""
+    coords = list(ground_surface.coords)
+    xs = [p[0] for p in coords]
+    ys = [p[1] for p in coords]
+    x0, x1 = min(xs), max(xs)
+    floor = float(domain_polygon.bounds[1])
+    xe = x0 + entry_frac * (x1 - x0)
+    xx = x0 + exit_frac * (x1 - x0)
+    ye = float(np.interp(xe, xs, ys))
+    yx = float(np.interp(xx, xs, ys))
+    yn = floor + tangent_frac * (min(ye, yx) - floor)
+    return _circle_through((xe, ye), (xx, yx), yn)
+
+
+def _circle_from_polygons(polygons, **kwargs):
+    """``_entry_exit_tangent_circle`` starting from the same polygon list a
+    ``_poly_slope_data``-style builder already assembles, in either the
+    ``[(mat_id, [(x, y), ...]), ...]`` or ``[{'mat_id':..., 'polygon': Polygon}, ...]``
+    form."""
+    polys = []
+    for p in polygons:
+        if isinstance(p, dict):
+            polys.append(p)
+        else:
+            mid, coords = p
+            polys.append({'mat_id': mid, 'polygon': Polygon(coords)})
+    ground_surface, domain_polygon = _ground_from_polys(polys)
+    return _entry_exit_tangent_circle(ground_surface, domain_polygon, **kwargs)
+
+
+def _circle_from_profile(profile_lines, max_depth, **kwargs):
+    """``_entry_exit_tangent_circle`` starting from profile lines, mirroring the
+    loader's own profile-lines -> polygons -> ground-surface conversion
+    (``build_polygons`` / ``build_ground_surface_from_polygons``) so the geometry
+    matches what ``generate_slices`` will actually see once the file round-trips
+    through the sheet."""
+    polys = [{'polygon': Polygon(p['coords']), 'mat_id': p['mat_id']}
+             for p in _build_polygons(slope_data={'profile_lines': profile_lines,
+                                                   'max_depth': max_depth})]
+    ground_surface, domain_polygon = _ground_from_polys(polys)
+    return _entry_exit_tangent_circle(ground_surface, domain_polygon, **kwargs)
 
 # Loaded only as a geometry/format donor; its elastic constants are RS2-1's, not the
 # derived problem's, so they are stripped at the door (see build_problems).
@@ -93,13 +188,20 @@ ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
 _PRUSKA_ELASTIC = {5.0: (0.35, 10000.0), 20.0: (0.30, 5000.0)}
 
 
-def _pruska_slope_data(H, gamma, c, phi):
+def _pruska_slope_data(H, gamma, c, phi, problem=None):
     """RS2 #56-58 / Pruska (2003) software-comparison slopes: 15 m toe flat,
     slope rising H over a 10 m run, 15 m crest flat, foundation 8 m below the
     toe (fully dimensioned in each section's Figure 1). Vendor elastic constants
     (see _PRUSKA_ELASTIC) and psi = 0. Each section's lock pair brackets its
     material family (weakest and strongest case); every case in the 17-case
-    tables is built, so each published value is reproducible."""
+    tables is built, so each published value is reproducible.
+
+    The starting circle is inert for these files (SSRM only, see rs2.md) but must
+    still slice. The generic H = 7/10.5 (#56/#57) geometries already do; the
+    steeper H = 14 (#58) section is narrow enough that the same generic circle
+    never daylights twice on the ground, so #58 gets a circle derived from its own
+    ground surface instead (entry near the crest, tangent 40% of the way down to
+    the foundation floor, exit near the toe)."""
     nu, E = _PRUSKA_ELASTIC[float(c)]
     sd = load_slope_data(ACADS_1A)
     m = dict(sd['materials'][0])
@@ -107,17 +209,22 @@ def _pruska_slope_data(H, gamma, c, phi):
              gamma_sat=float(gamma), option='mc', u='none',
              E=E, nu=nu, psi=0.0)
     sd['materials'] = [m]
-    sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 8.0), (15.0, 8.0),
-                                                    (25.0, 8.0 + H),
-                                                    (40.0, 8.0 + H)]}]
+    profile_lines = [{'mat_id': 0, 'coords': [(0.0, 8.0), (15.0, 8.0),
+                                              (25.0, 8.0 + H),
+                                              (40.0, 8.0 + H)]}]
+    sd['profile_lines'] = profile_lines
     sd['max_depth'] = 0.0
     sd['gamma_water'] = 9.81
     sd['dloads'] = []
     sd['piezo_line'] = []
     sd['circular'] = True
     sd['non_circ'] = []
-    sd['circles'] = [{'Xo': 20.0, 'Yo': 8.0 + H + 5.0, 'Depth': 6.0,
-                      'R': H + 7.0}]
+    if problem == 58:
+        sd['circles'] = [_circle_from_profile(profile_lines, sd['max_depth'],
+                                              tangent_frac=0.4)]
+    else:
+        sd['circles'] = [{'Xo': 20.0, 'Yo': 8.0 + H + 5.0, 'Depth': 6.0,
+                          'R': H + 7.0}]
     return sd
 
 
@@ -147,7 +254,7 @@ def _pruska_name(problem, case):
 
 def _pruska_build(problem, case):
     gamma, c, phi = _PRUSKA_CASES[problem][case]
-    sd = _pruska_slope_data(_PRUSKA_H[problem], gamma, c, phi)
+    sd = _pruska_slope_data(_PRUSKA_H[problem], gamma, c, phi, problem=problem)
     name = _pruska_name(problem, case) + '.xlsx'
     save_slope_data_to_xlsx(sd, os.path.join(OUT, name))
     return name
@@ -474,7 +581,30 @@ def rs2_61a():
 
     A grid seed traps on a steeper local circle (FS 1.44) -- exactly the trap the
     paper is about -- so the search is seeded with a toe-to-crest circle that
-    refines onto the global minimum. Geometry from 'slope stability #061_01.fez'."""
+    refines onto the global minimum: entry at the crest, tangent well down in the
+    slope, daylight beyond the toe. Geometry from 'slope stability #061_01.fez'.
+
+    The circle is written out rather than derived, because this deck's circle has
+    to serve TWO locked searches and the generic construction serves only one.
+    Case 1 is unconstrained; case 3 fences the search with entry_range 42-54,
+    exit_range 23-32 and tangent_depth 16-22 (see the rs2.md rows). A search
+    clamps its seed's tangent into that band but NOT its center, and sizes the
+    launch grid as 0.15 * (Yo - tangent), so what a seed can reach is set by its
+    center and its radius after clamping. Both requirements bear on one circle:
+
+      * Case 1 needs a DEEP tangent. The launch grid inherits the seed's tangent
+        elevation, so a shallow seed explores shallow circles and converges on the
+        1.44 local minimum -- the very trap this problem exists to demonstrate.
+      * Case 3 needs the center far enough right, and the clamped radius long
+        enough, that Xo + (Yo - 16) reaches into the 42-54 entry window. A circle
+        centered low and left cannot put a candidate there at any refinement, and
+        the search ends with no valid surface at all.
+
+    Measured on this geometry: Xo=23, Yo=36, tangent 3.5 gives case 1 = 1.3378
+    (published 1.336) and case 3 = 1.4368, while the generic entry/exit/tangent
+    construction lands at Xo=23, Yo=29, tangent 3.0 -- which holds case 1 and
+    leaves case 3 with nothing to refine.
+    """
     poly = [(54.324, 0.073), (-0.057, 0.073), (-0.057, 9.965), (10.118, 9.965),
             (20.011, 14.883), (26.003, 19.858), (31.939, 19.858), (34.878, 22.797),
             (42.905, 26.811), (54.324, 26.811), (54.324, 0.073)]
@@ -482,7 +612,7 @@ def rs2_61a():
         polygons=[(0, poly)],
         materials=[dict(name='soil', c=5.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
                         E=14000.0, nu=0.3)],
-        circle={'Xo': 25.0, 'Yo': 40.0, 'Depth': 0.5, 'R': 39.5},
+        circle={'Xo': 23.0, 'Yo': 36.0, 'Depth': 3.5, 'R': 32.5},
         max_depth=0.073)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_61a.xlsx'))
     return 'rs2_61a.xlsx'
@@ -1092,7 +1222,7 @@ _RS2_62_SOILS = [
 ]
 
 
-def _rs2_62_slope_data(polys):
+def _rs2_62_slope_data(polys, tangent_frac=None):
     """RS2 #62 (Part III) -- Stability of a Three-Layered Slope With a Soft Band, after
 
         Cheng, Y.M., Lansivaara, T. & Wei, W.B. (2007), "Two-dimensional slope stability
@@ -1109,10 +1239,17 @@ def _rs2_62_slope_data(polys):
     ``polys`` are the three zone polygons (mat_id 0 = Soil 1, 1 = soft band, 2 = Soil 3),
     transcribed from the RS2 vendor models 'slope stability #062_0N.fez' via the .fez zone
     polygonizer and hard-coded so the corpus rebuilds without them. SSRM only; the circle is
-    an inert placeholder the loader requires."""
+    an inert placeholder the loader requires, but it still has to slice: Analysis I (28 m
+    domain, rs2_62a) is wide enough for the generic placeholder circle, but the narrower
+    Analysis II/III domains (rs2_62b/c) are not, so those two pass ``tangent_frac`` to get a
+    circle derived from their own (narrower) ground surface instead."""
+    if tangent_frac is None:
+        circle = {'Xo': 10.0, 'Yo': 20.0, 'Depth': 3.0, 'R': 17.0}
+    else:
+        circle = _circle_from_polygons(polys, tangent_frac=tangent_frac)
     sd = _poly_slope_data(
         polygons=polys, materials=[dict(m) for m in _RS2_62_SOILS],
-        circle={'Xo': 10.0, 'Yo': 20.0, 'Depth': 3.0, 'R': 17.0}, max_depth=0.0)
+        circle=circle, max_depth=0.0)
     return sd
 
 
@@ -1138,7 +1275,8 @@ def rs2_62b():
              (8.0, 7.5)]),
         (2, [(20.0, 8.287), (20.0, 0.0), (0.0, 0.0), (0.0, 5.0), (5.0, 4.5), (8.0, 7.1)]),
     ]
-    save_slope_data_to_xlsx(_rs2_62_slope_data(polys), os.path.join(OUT, 'rs2_62b.xlsx'))
+    save_slope_data_to_xlsx(_rs2_62_slope_data(polys, tangent_frac=0.7),
+                            os.path.join(OUT, 'rs2_62b.xlsx'))
     return 'rs2_62b.xlsx'
 
 
@@ -1151,7 +1289,8 @@ def rs2_62c():
              (8.0, 7.5)]),
         (2, [(12.0, 7.496), (12.0, 0.0), (0.0, 0.0), (0.0, 5.0), (5.0, 4.5), (8.0, 7.1)]),
     ]
-    save_slope_data_to_xlsx(_rs2_62_slope_data(polys), os.path.join(OUT, 'rs2_62c.xlsx'))
+    save_slope_data_to_xlsx(_rs2_62_slope_data(polys, tangent_frac=0.8),
+                            os.path.join(OUT, 'rs2_62c.xlsx'))
     return 'rs2_62c.xlsx'
 
 
@@ -1438,13 +1577,19 @@ def rs2_68c():
 def _rs2_64_slope_data(poly, c, phi, gamma, piezo=None, k=0.0):
     """One RS2 #64 case: a single homogeneous Mohr-Coulomb zone. ``poly`` is the
     external boundary; ``piezo`` (long-term cases) a piezometric line -> u='piezo';
-    ``k`` the horizontal seismic coefficient (long-term = 0.03, set by hand)."""
+    ``k`` the horizontal seismic coefficient (long-term = 0.03, set by hand).
+
+    SSRM only; the starting circle is inert but still has to slice. Every one of
+    these twelve boundaries is a narrow single-zone section, so a shared generic
+    circle never daylights twice on the ground -- the circle is derived from each
+    case's own ``poly`` instead (entry near the crest, tangent 30% of the way down
+    to the domain floor, exit near the toe)."""
     u = 'piezo' if piezo else 'none'
     sd = _poly_slope_data(
         polygons=[(0, poly)],
         materials=[dict(name='soil', c=float(c), phi=float(phi), gamma=float(gamma),
                         gamma_sat=float(gamma), E=14000.0, nu=0.3, u=u)],
-        circle={'Xo': 8.0, 'Yo': 16.0, 'Depth': -4.0, 'R': 20.0},
+        circle=_circle_from_polygons([(0, poly)], tangent_frac=0.3),
         max_depth=0.0,
         piezo_line=list(piezo) if piezo else None)
     if k:
@@ -1553,7 +1698,11 @@ def _rs2_64_split_slope_data(ext, mc_poly, c, phi, g_mc, g_el, piezo, k=0.03,
     model's ground surface below the true one and leave the piezometric line standing
     above it. ``min_frac`` therefore only rejects the sub-mesh-scale debris that the
     corridor-to-boundary snap can leave behind, and the total area is asserted.
-    Unit weights are the vendor's per-zone values (rock1 = g_mc, rock2 = g_el)."""
+    Unit weights are the vendor's per-zone values (rock1 = g_mc, rock2 = g_el).
+
+    SSRM only; the starting circle is derived from the whole-domain ``ext`` boundary
+    the same way as the single-material case (_rs2_64_slope_data), so the split file
+    gets an identical, slicing first circle."""
     dom = Polygon(ext)
     corr = Polygon(mc_poly)
     diff = dom.difference(corr)
@@ -1580,7 +1729,7 @@ def _rs2_64_split_slope_data(ext, mc_poly, c, phi, g_mc, g_el, piezo, k=0.03,
         elastic_names.append(nm)
     sd = _poly_slope_data(
         polygons=polygons, materials=mats,
-        circle={'Xo': 8.0, 'Yo': 16.0, 'Depth': -4.0, 'R': 20.0}, max_depth=0.0,
+        circle=_circle_from_polygons([(0, ext)], tangent_frac=0.3), max_depth=0.0,
         piezo_line=list(piezo))
     if k:
         sd['k_seismic'] = float(k)

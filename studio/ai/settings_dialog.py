@@ -15,12 +15,12 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLayout,
     QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
 )
 
 from . import models as model_list
-from .config import PROVIDERS
+from .config import PROVIDERS, model_is_vision
 
 
 class AssistantSettingsDialog(QDialog):
@@ -35,6 +35,10 @@ class AssistantSettingsDialog(QDialog):
         self.setMinimumWidth(460)
 
         layout = QVBoxLayout(self)
+        # The notes under the form are word-wrapped and change length with the
+        # provider; the dialog must grow with them rather than squeeze the form
+        # rows above (the Model row collapsed to a sliver on Kimi's longer note).
+        layout.setSizeConstraint(QLayout.SetMinimumSize)
         form = QFormLayout()
         # Let the field column grow to the dialog width (so the URL isn't clipped)
         # and give the rows breathing room.
@@ -112,6 +116,7 @@ class AssistantSettingsDialog(QDialog):
 
         self.provider.currentIndexChanged.connect(self._sync)
         self.model.currentTextChanged.connect(self._refresh_caps_note)  # vision is per-model
+        self.model.currentTextChanged.connect(self._grow_to_fit)
         self._sync()
 
     # --- the model list --------------------------------------------------
@@ -181,6 +186,19 @@ class AssistantSettingsDialog(QDialog):
         if self._auto_refresh:
             self._start_refresh(manual=False)
 
+    def _grow_to_fit(self):
+        """Re-fit the dialog to its content after a note changes length. The
+        notes are word-wrapped, so their height depends on the dialog width and
+        Qt does not re-apply the minimum on its own; without this the form rows
+        above are squeezed to make room."""
+        lay = self.layout()
+        lay.activate()
+        width = max(self.width(), lay.totalMinimumSize().width())
+        need = (lay.totalHeightForWidth(width) if lay.hasHeightForWidth()
+                else lay.totalMinimumSize().height())
+        if self.width() < width or self.height() < need:
+            self.resize(width, max(self.height(), need))
+
     def _set_models_note(self, error=""):
         label = self._spec()["label"]
         if self._source == "live":
@@ -193,7 +211,15 @@ class AssistantSettingsDialog(QDialog):
             text += f" {error}"
         elif self._source != "live" and self._needs_key_first():
             text += " Enter the API key to list the current models."
+        if self._spec().get("vision_only"):
+            # Say what the list leaves out, and why, right where the list is:
+            # a user looking for a model this provider does have would otherwise
+            # read the omission as a stale list.
+            text += (f" Only the {label} models that can read an image are "
+                     f"listed — the assistant is regularly shown a sketch or a "
+                     f"photograph of a cross section.")
         self.models_note.setText(text + " Any model id can be typed in.")
+        self._grow_to_fit()
 
     def _needs_key_first(self):
         return self._spec()["needs_key"] and not self.api_key.text().strip()
@@ -265,15 +291,12 @@ class AssistantSettingsDialog(QDialog):
         tool_note = ("Tool use (run code): supported." if tools is True else
                      "Tool use (run code): not supported — chat only." if tools is False
                      else "Tool use (run code): depends on the local model you pick.")
-        # Vision can be per-model (GLM-V etc.). The selection isn't saved yet, so
-        # resolve it from the spec + the currently shown model name.
-        vis = spec.get("vision")
-        pat = spec.get("vision_match")
-        if pat is not None:
-            import re
-            vis = bool(re.search(pat, self.current_model().lower()))
+        # Vision can be per-model (Kimi, GLM-V, an Ollama tag). The selection
+        # isn't saved yet, so resolve it from the currently shown model name.
+        vis = model_is_vision(self.provider.currentData(), self.current_model())
         vision_note = ("  Vision (images): supported." if vis is True else
-                       "  Vision (images): not on this model." if vis is False else "")
+                       "  Vision (images): not on this model — it cannot read a "
+                       "sketch." if vis is False else "")
         cache = " Prompt caching reduces repeat-turn cost." if spec.get("prompt_cache") else ""
         self.note.setText(f"{cost}\n{tool_note}{vision_note}{cache}")
 

@@ -21,7 +21,9 @@ What is being defended:
      stays visible and dims, and its tooltip says why.
 
   B. THE LIST — every reinforcement line and pile appears, under its own header,
-     with a utilization badge whose colour follows the reported ratio.
+     with a utilization badge whose colour follows the member's verdict, and a
+     reinforcement row spells that verdict out in the one vocabulary
+     ``xslope.fem_details.REINFORCEMENT_STATES`` holds.
 
   C. THE ENVELOPE IS THE SOLVER'S — the capacity envelope drawn over a
      reinforcement line's force profile is the same curve the solver used to fill
@@ -190,13 +192,14 @@ def test_gate_mutation():
 
 def test_list():
     """Both samples populate the list: a header per kind, one row per member,
-    each row carrying a badge that matches its reported utilization."""
+    each row carrying the member's verdict in words and a badge that matches
+    it."""
     fails = []
     import matplotlib
     matplotlib.use("Agg")
     _app()
     from PySide6.QtCore import Qt
-    from studio.fem_details_dialog import FemDetailsDialog
+    from studio.fem_details_dialog import FemDetailsDialog, _row_text
     from xslope import fem_details as fd
 
     for path, kind, want_n in ((REINF_XLSX, "reinforcement", 6), (PILES_XLSX, "pile", 2)):
@@ -222,19 +225,95 @@ def test_list():
             if dlg.list.count() != len(entries) + len(headers):
                 fails.append(f"{os.path.basename(path)}: list has {dlg.list.count()} rows "
                              f"for {len(entries)} members and {len(headers)} headers")
-            # Badge colour follows the reported ratio.
+            # Badge colour follows the member's verdict, and the row carries
+            # that verdict in words: two lines both standing at 100% are told
+            # apart by the word, not by the dot or the percentage.
             for e in entries:
-                want = ("none" if e["utilization"] is None else
-                        "red" if e["utilization"] >= fd.UTIL_AT_CAPACITY else
-                        "amber" if e["utilization"] >= fd.UTIL_WATCH else "green")
-                if e["badge"] not in (want, "red"):   # pullout forces red
+                want = fd.reinforcement_badge(e.get("status_key"),
+                                              e["utilization"])
+                if e["badge"] != want:
                     fails.append(f"{e['label']}: badge {e['badge']!r} for "
-                                 f"utilization {e['utilization']}")
+                                 f"{e.get('status_key')!r} at utilization "
+                                 f"{e['utilization']}, expected {want!r}")
+                if e["kind"] == "reinforcement":
+                    if e["status_key"] not in fd.REINFORCEMENT_STATES:
+                        fails.append(f"{e['label']}: unknown verdict "
+                                     f"{e.get('status_key')!r}")
+                    if e["status"] != fd.reinforcement_state_phrase(
+                            e["status_key"]):
+                        fails.append(f"{e['label']}: the row's status "
+                                     f"{e['status']!r} is not the phrase for "
+                                     f"{e['status_key']!r}")
+                    row = _row_text(e)
+                    if e["status"] not in row:
+                        fails.append(f"{e['label']}: the list row {row!r} does "
+                                     f"not carry the verdict {e['status']!r}")
             # A member is selected and its detail is drawn.
             if dlg.current_profile() is None:
                 fails.append(f"{os.path.basename(path)}: no member selected on open")
         finally:
             dlg.close()
+    return fails
+
+
+def test_the_verdict_is_the_summary_s():
+    """The word on a list row is the word the printed summary prints.
+
+    The two used to be different vocabularies over the same arrays: the summary
+    told a line slipping at its embedment-limited capacity near an end
+    (PULLOUT) from one standing at its full tensile capacity in the middle
+    (YIELDED), and the panel called both of them "at capacity" — so the panel
+    could not answer the question a reader opens it to ask. One function
+    decides it now, and this check compares what each surface says, line by
+    line, rather than trusting that they call the same one.
+    """
+    fails = []
+    from xslope import fem_details as fd
+    from xslope.fem import print_reinforcement_summary
+
+    slope_data, fem_data, solution = _solved(REINF_XLSX)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        print_reinforcement_summary(fem_data, solution)
+    printed = {}
+    for raw in buf.getvalue().splitlines():
+        bits = raw.split()
+        if len(bits) >= 9 and bits[0].isdigit():
+            printed[int(bits[0])] = " ".join(bits[8:])
+    if not printed:
+        return ["the summary printed no line rows to compare against"]
+
+    rows = {e["index"]: e for e in fd.list_lines(fem_data, solution, slope_data)
+            if e["kind"] == "reinforcement"}
+    for line_id, word in printed.items():
+        row = rows.get(line_id)
+        if row is None:
+            fails.append(f"the summary prints line {line_id} and the list "
+                         f"carries no such row")
+            continue
+        if word != row["status"].upper():
+            fails.append(f"line {line_id}: the summary says {word!r} and the "
+                         f"panel says {row['status']!r}")
+    # The distinction itself is reachable: classify a made-up line whose only
+    # at-capacity element sits inside a pullout ramp, and one whose only
+    # at-capacity element sits at the full Tmax, and the two must differ.
+    ramp = fd.reinforcement_status([100.0, 400.0, 200.0],
+                                   [200.0, 800.0, 200.0],
+                                   failed=[False, False, True])
+    full = fd.reinforcement_status([100.0, 800.0, 100.0],
+                                   [200.0, 800.0, 200.0],
+                                   failed=[False, True, False])
+    if ramp[0] != "pullout" or full[0] != "yielded":
+        fails.append(f"the at-capacity split does not discriminate: a ramp end "
+                     f"reads {ramp[0]!r} and a full-Tmax element {full[0]!r}")
+    # And a line at capacity in BOTH places is reported yielded, which is the
+    # precedence the summary has always used.
+    both = fd.reinforcement_status([100.0, 800.0, 200.0],
+                                   [200.0, 800.0, 200.0],
+                                   failed=[False, True, True])
+    if both[0] != "yielded":
+        fails.append(f"a line at capacity in a ramp AND at full Tmax reads "
+                     f"{both[0]!r}, not yielded")
     return fails
 
 
@@ -302,8 +381,8 @@ def test_envelope_mutation():
 
     real = fileio.reinforce_available_tension
 
-    def mutated(d1, d2, t_max, lp1, lp2, tend1=0.0, tend2=0.0):
-        return 0.5 * real(d1, d2, t_max, lp1, lp2, tend1, tend2)
+    def mutated(d1, d2, t_max, lp1, lp2, tend1=0.0, tend2=0.0, pullout=None):
+        return 0.5 * real(d1, d2, t_max, lp1, lp2, tend1, tend2, pullout=pullout)
 
     fileio.reinforce_available_tension = mutated
     try:
@@ -338,6 +417,18 @@ def test_envelope_mutation():
 _SKIP_KEYS = {"element_ids", "pile_indices", "node_ids", "mechanism"}
 
 
+#: Series compared against the scale of the series rather than against 1e-9
+#: absolute. The soil reaction is a FOURTH derivative of the displacement field:
+#: the pile element reports it as EI times the fourth derivative of its own
+#: deflected shape, so the last digit the node sidecar writes -- a displacement
+#: is written to about sixteen figures, not to the bit -- reaches the reaction
+#: multiplied by EI/L^4, which is of order 1e5 on these models. It therefore
+#: agrees to nine figures of its own peak, and pinning it to 1e-9 absolute would
+#: be measuring the CSV's decimal rather than the profile.
+_SCALE_RELATIVE_KEYS = {"reaction", "reaction_ratio"}
+_SCALE_RTOL = 1e-9
+
+
 def _same_profile(a, b, label, fails):
     keys = sorted(set(a) | set(b))
     for k in keys:
@@ -346,13 +437,17 @@ def _same_profile(a, b, label, fails):
         va, vb = a.get(k), b.get(k)
         if isinstance(va, np.ndarray) or isinstance(vb, np.ndarray):
             va, vb = np.asarray(va, dtype=float), np.asarray(vb, dtype=float)
+            atol = 1e-9
+            if k in _SCALE_RELATIVE_KEYS and va.size:
+                atol = max(atol, _SCALE_RTOL * float(np.nanmax(np.abs(va))))
             if va.shape != vb.shape:
                 fails.append(f"{label}.{k}: shape {va.shape} != {vb.shape} after reload")
-            elif not np.allclose(va, vb, rtol=1e-9, atol=1e-9, equal_nan=True):
+            elif not np.allclose(va, vb, rtol=1e-9, atol=atol, equal_nan=True):
                 worst = float(np.nanmax(np.abs(va - vb)))
                 fails.append(f"{label}.{k}: differs after reload (max |d| = {worst:.3g})")
         elif isinstance(va, float) and isinstance(vb, float):
-            if not (np.isnan(va) and np.isnan(vb)) and abs(va - vb) > 1e-9:
+            tol = _SCALE_RTOL * abs(va) if k in _SCALE_RELATIVE_KEYS else 1e-9
+            if not (np.isnan(va) and np.isnan(vb)) and abs(va - vb) > max(tol, 1e-9):
                 fails.append(f"{label}.{k}: {va} != {vb} after reload")
         elif (isinstance(va, tuple) and isinstance(vb, tuple)
               and len(va) == len(vb)):
@@ -391,30 +486,32 @@ def test_reload():
                     b = fd.pile_profile(fem_data, back, pidx, slope_data)
                     _same_profile(a, b, f"pile {pidx}", fails)
 
-            # The reinforcement sidecar now carries the cap the solve enforced,
-            # and an older file without that column still reads.
+            # The capacity is the model's — build_fem_data rebuilds
+            # t_allow_by_1d_elem on reload — so the sidecar carries no cap
+            # column of its own, and a file that still has one reads anyway.
             if kind == "reinforcement":
                 import pandas as pd
                 csv = stem.parent / f"{stem.name}_fem_reinf.csv"
                 df = pd.read_csv(csv, comment="#")
-                if "t_cap" not in df.columns:
-                    fails.append("the reinforcement sidecar has no t_cap column")
-                old = stem.parent / "old"
-                df.drop(columns=["t_cap"]).to_csv(
-                    stem.parent / "old_fem_reinf.csv", index=False)
+                if "t_cap" in df.columns:
+                    fails.append("the reinforcement sidecar still writes a "
+                                 "t_cap column")
+                stale = stem.parent / "stale"
+                df.assign(t_cap=df["t_allow"]).to_csv(
+                    stem.parent / "stale_fem_reinf.csv", index=False)
                 for suffix in ("nodes", "elements"):
-                    (stem.parent / f"old_fem_{suffix}.csv").write_bytes(
+                    (stem.parent / f"stale_fem_{suffix}.csv").write_bytes(
                         (stem.parent / f"{stem.name}_fem_{suffix}.csv").read_bytes())
                 try:
-                    legacy = import_fem_solution(fem_data, old)
+                    legacy = import_fem_solution(fem_data, stale)
                 except Exception as exc:
-                    fails.append(f"a sidecar without t_cap fails to load: {exc!r}")
+                    fails.append(f"a sidecar carrying t_cap fails to load: {exc!r}")
                 else:
-                    got = np.asarray(legacy.get("t_cap_1d"), dtype=float)
-                    want = np.asarray(fem_data["t_allow_by_1d_elem"], dtype=float)
+                    got = np.asarray(legacy.get("forces_1d"), dtype=float)
+                    want = np.asarray(solution["forces_1d"], dtype=float)
                     if got.shape != want.shape or not np.allclose(got, want):
-                        fails.append("a sidecar without t_cap does not fall back "
-                                     "to t_allow")
+                        fails.append("a sidecar carrying t_cap does not reload "
+                                     "its bar forces")
     return fails
 
 
@@ -606,7 +703,7 @@ def test_field_state_profiles():
         if np.allclose(conv["T"], fail["T"]):
             fails.append(f"line {line_id}: the at-failure axial force equals the "
                          f"converged one — the switch reads the same field twice")
-        if not np.allclose(conv["t_cap"], fail["t_cap"], equal_nan=True):
+        if not np.allclose(conv["t_allow"], fail["t_allow"], equal_nan=True):
             fails.append(f"line {line_id}: the capacity moved with the field state")
         if not np.allclose(conv["env_T"], fail["env_T"]):
             fails.append(f"line {line_id}: the capacity envelope moved with the "
@@ -619,7 +716,7 @@ def test_field_state_profiles():
         if fail["band_lo"] is not None:
             banded.append(line_id)
     # Which lines are banded is the mechanism's business (see
-    # :func:`test_the_band_needs_the_mechanism`); what this check needs is that
+    # :func:``); what this check needs is that
     # the mechanism marked SOMETHING, or the comparison above compares two
     # absences.
     if not banded:
@@ -769,16 +866,71 @@ def test_field_state_export():
 
 
 # --------------------------------------------------------------------------
-# G. the failure band, and the labels around it
+# G. the shear band's mark, and what names it
 # --------------------------------------------------------------------------
 
-def _label_boxes(ax, text):
-    """The drawn box of every annotation on ``ax`` whose text starts with
-    ``text``, in display pixels, with the panel's own frame."""
-    renderer = ax.figure.canvas.get_renderer()
-    boxes = [t.get_window_extent(renderer) for t in ax.texts
-             if str(t.get_text()).strip().startswith(text)]
-    return boxes, ax.get_window_extent(renderer)
+def _legend_labels(fig):
+    """Every entry in every legend the drawn figure carries."""
+    return [t.get_text() for ax in fig.axes if ax.get_legend() is not None
+            for t in ax.get_legend().get_texts()]
+
+
+def _figure_text(fig):
+    """Every annotation standing over a panel of the drawn figure — what the
+    legend entries are NOT."""
+    return " ".join(t.get_text() for ax in fig.axes for t in ax.texts)
+
+
+def _peak_runs(fig):
+    """The x-ranges of the thickened runs the figure draws along the stretch a
+    line stands at its greatest utilization over, read off the artists."""
+    runs = []
+    for ax in fig.axes:
+        for line in ax.lines:
+            if line.get_gid() == "DETAIL_PEAK_SPAN":
+                xs = [float(v) for v in line.get_xdata()]
+                if xs:
+                    runs.append((min(xs), max(xs)))
+    return sorted(runs)
+
+
+def _band_marks(ax):
+    """``(spans, rules)`` — the shaded stretches drawn in the band's colour on
+    one panel, and any line drawn in it, read off the artists rather than off
+    the profile that produced them.
+
+    The mark is a shaded stretch and only that. ``rules`` is kept so a figure
+    that goes back to ruling a crossing — which is what a span measured center
+    to center collapsed to on a single element — is caught rather than passed
+    over."""
+    from matplotlib.colors import to_rgb
+    from xslope.plot_fem_details import C_BAND
+
+    spans = [p for p in ax.patches
+             if p.get_alpha() is not None and 0.0 < p.get_alpha() < 0.5
+             and to_rgb(p.get_facecolor()[:3]) == to_rgb(C_BAND)]
+    # The band's colour is its own: nothing else on a panel is drawn in it.
+    rules = [l for l in ax.lines if to_rgb(l.get_color()) == to_rgb(C_BAND)]
+    return spans, rules
+
+
+def _span_extent(ax, axis="x"):
+    """The data range the shaded band covers on one panel, or None.
+
+    ``axvspan`` and ``axhspan`` each draw a rectangle whose span is in data
+    coordinates along one axis and in axes coordinates along the other, so only
+    the axis asked for is read.
+    """
+    spans = _band_marks(ax)[0]
+    if not spans:
+        return None
+    edges = []
+    for span in spans:
+        if axis == "x":
+            edges += [span.get_x(), span.get_x() + span.get_width()]
+        else:
+            edges += [span.get_y(), span.get_y() + span.get_height()]
+    return float(min(edges)), float(max(edges))
 
 
 def _drawn(profile, figsize=(9.5, 6.0)):
@@ -792,119 +944,6 @@ def _drawn(profile, figsize=(9.5, 6.0)):
     plot_detail(profile, fig=fig)
     fig.canvas.draw()
     return fig
-
-
-def test_the_band_needs_the_mechanism():
-    """A member gets a failure band only where the mechanism reaches it.
-
-    The band's edges are the positions along a member where the mechanism field
-    falls to BAND_FRACTION of its peak ALONG THAT MEMBER. Normalized to the
-    member alone, every member has a peak and so every member has a band: on the
-    reinforcement sample the lines the mechanism misses were given one-sample
-    bands on their last element, drawn as a dashed rule hard against the end of
-    the frame with a label running off the panel.
-
-    The member's own peak is now measured against the mechanism's peak over the
-    whole section, on the same fraction. Pinned on all six lines of the
-    reinforcement sample, which has both cases, and on the drawn figures: a band
-    that is one sample wide still draws inside the frame, and the label that
-    names it is inside the panel in both cases.
-    """
-    fails = []
-    from xslope import fem_details as fd
-
-    slope_data, fem_data, solution = _solved(REINF_XLSX)
-    failure = _failure_field(REINF_XLSX)
-    peak = fd._mechanism_peak(fem_data, solution, failure)
-    if not peak:
-        return ["the sample's snapshot carries no mechanism field to band from"]
-
-    banded, bare = [], []
-    for line_id in range(1, 7):
-        prof = fd.reinforcement_profile(fem_data, solution, line_id, slope_data,
-                                        field_state="failure",
-                                        failure_solution=failure)
-        mech = prof.get("mechanism")
-        if mech is None or not len(mech):
-            fails.append(f"line {line_id}: the mechanism was not sampled at all")
-            continue
-        own = float(np.nanmax(mech))
-        crossed = own >= fd.BAND_FRACTION * peak
-        has_band = prof["band_lo"] is not None
-        if has_band != crossed:
-            fails.append(
-                f"line {line_id} reaches {own / peak:.0%} of the mechanism's "
-                f"peak and {'has' if has_band else 'has no'} failure band")
-        (banded if has_band else bare).append((line_id, prof))
-
-    if not banded:
-        fails.append("no line is banded, so the drawn band is untested")
-    if not bare:
-        fails.append("every line is banded, so the gate is untested — the "
-                     "sample no longer carries a member the mechanism misses")
-    if fails:
-        return fails
-
-    # The drawn figures: a band inside the frame, and its label inside the
-    # panel — including the narrowest band the sample has.
-    narrowest = min(banded, key=lambda b: b[1]["band_hi"] - b[1]["band_lo"])
-    for line_id, prof in (banded[0], narrowest):
-        fig = _drawn(prof)
-        ax = fig.axes[0]
-        lo, hi = ax.get_xlim()
-        if not (lo <= prof["band_lo"] <= hi and lo <= prof["band_hi"] <= hi):
-            fails.append(f"line {line_id}: the band ({prof['band_lo']}, "
-                         f"{prof['band_hi']}) falls outside the drawn frame "
-                         f"({lo}, {hi})")
-        boxes, frame = _label_boxes(ax, "failure band")
-        if not boxes:
-            fails.append(f"line {line_id}: the band is drawn and not named")
-        for box in boxes:
-            if not (frame.x0 <= box.x0 and box.x1 <= frame.x1
-                    and frame.y0 <= box.y0 and box.y1 <= frame.y1):
-                fails.append(f"line {line_id}: the band's label is cut by the "
-                             f"panel edge (label {box.x0:.0f}..{box.x1:.0f}, "
-                             f"panel {frame.x0:.0f}..{frame.x1:.0f})")
-
-    # And the narrowest band there can be, at the place it was worst: one
-    # sample wide, on the last element of the line. That is the band the sample
-    # used to fabricate, and the label naming it ran off the right of the panel.
-    line_id, prof = banded[0]
-    end = float(np.asarray(prof["s"], dtype=float)[-1])
-    ax = _drawn(dict(prof, band_lo=end, band_hi=end, band_peak=end)).axes[0]
-    boxes, frame = _label_boxes(ax, "failure band")
-    if not boxes:
-        fails.append(f"line {line_id}: a band on the last element is not named")
-    for box in boxes:
-        if not (frame.x0 <= box.x0 and box.x1 <= frame.x1
-                and frame.y0 <= box.y0 and box.y1 <= frame.y1):
-            fails.append(f"line {line_id}: a band on the last element puts its "
-                         f"label outside the panel ({box.x0:.0f}..{box.x1:.0f} "
-                         f"against {frame.x0:.0f}..{frame.x1:.0f})")
-
-    # A line the mechanism misses draws no band and names none.
-    line_id, prof = bare[0]
-    ax = _drawn(prof).axes[0]
-    if _label_boxes(ax, "failure band")[0]:
-        fails.append(f"line {line_id}: no band was measured and one is named")
-
-    # Mutation: the gate removed — the member's own peak judged against itself,
-    # which is what fabricated the bands this check exists to refuse.
-    real = fd._band_span
-    fd._band_span = lambda positions, mech, global_peak=None: real(positions, mech)
-    try:
-        still = 0
-        for line_id, _prof in bare:
-            prof = fd.reinforcement_profile(fem_data, solution, line_id,
-                                            slope_data, field_state="failure",
-                                            failure_solution=failure)
-            still += prof["band_lo"] is not None
-        if still != len(bare):
-            fails.append(f"without the gate only {still} of {len(bare)} unbanded "
-                         f"lines gain a band; the gate is not what removed them")
-    finally:
-        fd._band_span = real
-    return fails
 
 
 def test_the_reaction_panel_says_where_its_limit_is():
@@ -978,85 +1017,59 @@ def test_the_reaction_panel_says_where_its_limit_is():
     return fails
 
 
-def test_the_band_is_named_for_the_field_it_was_read_from():
-    """The band across a member is called what it is on the run that drew it.
+def _broken_tie_set(fd, fem_data, bundle, slope_data, tied_lines, fails):
+    """One ``(state, line_id, profile, gaps)`` whose tie set has a hole in it.
 
-    The band is read from the at-failure snapshot whenever there is one, so on a
-    strength reduction run it marks the mechanism and "failure band" is what it
-    is. A run that converged under gravity captured no snapshot and reached no
-    failure; its band is where the computed shear strain concentrates in a
-    section that is standing, and calling that a failure band states a collapse
-    the analysis never found.
+    Takes the first line that stands at its greatest utilization over a stretch,
+    copies the field it was read from, and drops the force in one bar element
+    inside that stretch to half the capacity it was holding. The profile is then
+    re-read through :func:`xslope.fem_details.reinforcement_profile`, so the tie
+    set, the span, the gap positions and the runs the figure thickens are all
+    computed by the shipping code — only the force it reads is arranged.
 
-    Both members, both runs, off the drawn figures.
+    Whether the shipped run produces such a hole of its own depends on the
+    mechanism the model develops, which is not what this is testing.
     """
-    fails = []
-    from xslope import fem_details as fd
-    from xslope.plot_fem_details import band_label
+    state, line_id, prof = tied_lines[0]
+    tied = np.asarray(prof["peak_indices"], dtype=int)
+    element_ids = np.asarray(prof["element_ids"], dtype=int)
+    hole = int(tied[len(tied) // 2])          # an interior sample of the stretch
+    field = (bundle.get("failure_solution") if state == "failure"
+             else bundle["solution"])
+    knocked = dict(field)
+    forces = np.array(field["forces_1d"], dtype=float)
+    forces[element_ids[hole]] = 0.5 * forces[element_ids[hole]]
+    knocked["forces_1d"] = forces
+    solution = bundle["solution"]
+    failure = knocked if state == "failure" else bundle.get("failure_solution")
+    if state != "failure":
+        solution = knocked
+    out = fd.reinforcement_profile(fem_data, solution, line_id, slope_data,
+                                   field_state=state, failure_solution=failure)
+    gaps = [round(float(v), 6) for v in out.get("peak_gap_s", [])]
+    if not gaps:
+        fails.append(f"{state} line {line_id}: a bar element inside the stretch "
+                     f"was dropped to half its force and the profile still "
+                     f"reports an unbroken span")
+    return [(state, line_id, out, gaps)]
 
-    for path, kind, read in ((REINF_XLSX, "reinforcement",
-                              fd.reinforcement_profile),
-                             (PILES_XLSX, "pile", fd.pile_profile)):
-        slope_data, fem_data, solution = _solved(path)
-        failure = _failure_field(path)
-        ids = [m["index"] for m in fd.list_lines(fem_data, solution, slope_data)
-               if m["kind"] == kind]
-        drawn = {}
-        for state, snapshot, want in (("failure", failure, "failure band"),
-                                      ("converged", None, "shear strain band")):
-            banded = None
-            for index in ids:
-                prof = read(fem_data, solution, index, slope_data,
-                            field_state="converged", failure_solution=snapshot)
-                if fd.band_state(solution, snapshot) != state:
-                    fails.append(f"{kind}: a run {'with' if snapshot else 'without'}"
-                                 f" a snapshot reads its band from "
-                                 f"{fd.band_state(solution, snapshot)!r}")
-                    break
-                if band_label(prof) != want:
-                    fails.append(f"{kind} {prof['label']}: the {state} run's "
-                                 f"band is called {band_label(prof)!r}")
-                has_band = (prof.get("band_depth") is not None
-                            if kind == "pile" else prof.get("band_lo") is not None)
-                if has_band and banded is None:
-                    banded = prof
-            drawn[state] = banded
-            if banded is None:
-                fails.append(f"{kind}: the {state} run bands no member, so the "
-                             f"name on the figure is untested")
-                continue
-            said = " ".join(t.get_text()
-                            for ax in _drawn(banded).axes for t in ax.texts)
-            if want not in said:
-                fails.append(f"{kind} {banded['label']}: the {state} run's "
-                             f"figure does not say {want!r}: {said!r}")
-            other = ("shear strain band" if want == "failure band"
-                     else "failure band")
-            if other in said:
-                fails.append(f"{kind} {banded['label']}: the {state} run's "
-                             f"figure says {other!r}")
 
-    # Mutation: the name fixed at "failure band" whatever the run, which is what
-    # the figures said before. The converged run has to catch it.
-    import xslope.plot_fem_details as ppd
-    real = ppd.band_label
-    ppd.band_label = lambda profile: "failure band"
-    try:
-        slope_data, fem_data, solution = _solved(REINF_XLSX)
-        prof = next((p for p in (fd.reinforcement_profile(
-            fem_data, solution, i, slope_data) for i in range(1, 7))
-            if p.get("band_lo") is not None), None)
-        if prof is None:
-            fails.append("the gravity run bands no line, so the mutation has "
-                         "nothing to act on")
-        else:
-            said = " ".join(t.get_text() for t in _drawn(prof).axes[0].texts)
-            if "shear strain band" in said:
-                fails.append("the name was pinned to 'failure band' and the "
-                             "figure still said 'shear strain band'")
-    finally:
-        ppd.band_label = real
-    return fails
+def _gap_breaks(prof, gaps):
+    """How many separate breaks the gap samples make in the thickened stretch.
+
+    ``peak_gap_s`` lists every sample inside the span that stands below it. Two
+    such samples that are neighbours on the line are one break in the drawing,
+    not two, so the samples are mapped back to their indices along ``s`` and
+    consecutive indices are grouped."""
+    s_vals = np.asarray(prof["s"], dtype=float)
+    idx = sorted({int(np.argmin(np.abs(s_vals - g))) for g in gaps})
+    if not idx:
+        return 0
+    breaks = 1
+    for a, b in zip(idx, idx[1:]):
+        if b != a + 1:
+            breaks += 1
+    return breaks
 
 
 def test_the_peak_utilization_is_tie_aware():
@@ -1073,11 +1086,14 @@ def test_the_peak_utilization_is_tie_aware():
     :data:`UTIL_TIE_TOL` of the greatest is in the span, the span's ends are the
     first and last of them, and the figure rings all of them rather than one.
 
-    A tie set can have a HOLE in it — on this sample's mechanism, line 4 stands
-    at capacity from 1.00 to 19.00 except at 5.00 — and the two ends alone
-    describe an unbroken run instead. The samples inside the span that do not
-    stand with the rest are reported as ``peak_gap_s``, and the figure's label
-    names them.
+    A tie set can have a HOLE in it — a sample between two at-capacity ones that
+    stands below them — and the two ends alone describe an unbroken run instead.
+    The samples inside the span that do not stand with the rest are reported as
+    ``peak_gap_s``, and the figure draws the runs it really is, so the break in
+    the thickened curve is where the line comes off capacity. That case is put
+    to the same code path on a field with one interior bar force knocked down
+    (:func:`_broken_tie_set`), since whether the shipped run develops a hole of
+    its own is a property of the mechanism rather than of the reporting.
     """
     fails = []
     from xslope import fem_details as fd
@@ -1147,31 +1163,63 @@ def test_the_peak_utilization_is_tie_aware():
     if not single_lines:
         fails.append("every line reports a span, so the single-point case is "
                      "untested")
-    if not broken_lines:
-        fails.append("no line's tie set has a hole in it, so the broken stretch "
-                     "is untested")
     if fails:
         return fails
 
-    # The figure's label says what its thickened runs draw: a span with a hole
-    # in it excepts the hole by position, and an unbroken one excepts nothing.
+    # A tie set with a HOLE in it. Whether the shipped run leaves an interior
+    # sample below the rest is a property of the mechanism and not of the
+    # reporting, so the broken case is put through the same code path on a field
+    # with one interior bar force knocked off capacity: everything from
+    # _peak_utilization outward is the shipping code, and only the force it
+    # reads is arranged.
+    if not broken_lines:
+        broken_lines = _broken_tie_set(fd, fem_data, bundle, slope_data,
+                                       tied_lines, fails)
+    if fails:
+        return fails
+
+    # The hole is READ OFF THE DRAWING: the thickened curve breaks where the
+    # line comes off capacity, so a span with a hole in it is drawn as the runs
+    # it really is and an unbroken one as one run. Nothing says so in words —
+    # the figure carries no label over its panels at all.
     for state, line_id, prof, gaps in (broken_lines[0],):
-        said = " ".join(t.get_text() for t in _drawn(prof).axes[0].texts)
-        if "except" not in said:
-            fails.append(f"{state} line {line_id}: the label reads {said!r} and "
-                         f"the line stands below capacity at {gaps} inside its "
-                         f"span")
+        fig = _drawn(prof)
+        runs = _peak_runs(fig)
         for gap in gaps:
-            if f"{gap:,.2f}" not in said:
-                fails.append(f"{state} line {line_id}: {gap:,.2f} is excepted "
-                             f"from the span and the label reads {said!r}")
+            spanning = [r for r in runs if r[0] < gap < r[1]]
+            if spanning:
+                fails.append(f"{state} line {line_id}: a thickened run "
+                             f"{spanning} spans {gap:,.2f}, where the line "
+                             f"stands below capacity")
+        # Adjacent samples below capacity are ONE hole in the drawing, not two:
+        # the thickened curve breaks once across a run of them. Count the breaks
+        # the figure can show, not the samples that are down.
+        n_breaks = _gap_breaks(prof, gaps)
+        if len(runs) < n_breaks + 1:
+            fails.append(f"{state} line {line_id}: {len(runs)} thickened run(s) "
+                         f"for a stretch broken at {n_breaks} position(s)")
+        if _figure_text(fig):
+            fails.append(f"{state} line {line_id}: the panel carries a label "
+                         f"over it: {_figure_text(fig)!r}")
     unbroken = next((t for t in tied_lines
                      if not len(t[2].get("peak_gap_s", []))), None)
     if unbroken is not None:
-        said = " ".join(t.get_text() for t in _drawn(unbroken[2]).axes[0].texts)
-        if "except" in said:
-            fails.append(f"{unbroken[0]} line {unbroken[1]}: the span is "
-                         f"unbroken and the label reads {said!r}")
+        runs = _peak_runs(_drawn(unbroken[2]))
+        if len(runs) > 1:
+            fails.append(f"{unbroken[0]} line {unbroken[1]}: the stretch is "
+                         f"unbroken and the figure draws {len(runs)} separate "
+                         f"runs: {runs}")
+
+    # Mutation: the contiguous claim restored — the highlight drawn from the two
+    # ends of the span alone, which is a chord across the dip. The break has to
+    # be what the measurement is reading.
+    state, line_id, prof, gaps = broken_lines[0]
+    tied = np.asarray(prof.get("peak_indices", []), dtype=int)
+    chord = dict(prof, peak_indices=np.arange(int(tied.min()), int(tied.max()) + 1))
+    runs = _peak_runs(_drawn(chord))
+    if not any(r[0] < gaps[0] < r[1] for r in runs):
+        fails.append(f"a highlight drawn from the two ends alone still broke at "
+                     f"{gaps[0]:,.2f}: {runs} — the measurement cannot fail")
 
     # The figure: as many rings as there are samples at the maximum.
     for state, line_id, prof in (tied_lines[0], single_lines[0]):
@@ -1290,18 +1338,88 @@ def test_the_inset_follows_the_selection():
     return fails
 
 
+def test_the_pile_is_read_at_every_node_it_stands_on():
+    """A pile profile reports one station per node of the pile, and the soil
+    reaction it reports does not alternate from node to node.
+
+    On a quadratic mesh each beam element stands on three nodes -- the two
+    corners of the soil edge and that edge's midside node -- so a chain of n
+    elements has 2n+1 nodes and the profiles are read at all of them. The
+    reaction is the beam's out-of-balance nodal force at each interior node,
+    spread over the length that node stands for, which is the element's own
+    consistent-load weight there: L/6 at a corner and 2L/3 at a midside node.
+    Divide by the spacing instead and a uniformly loaded pile reports its midside
+    nodes at twice its corner nodes, so the series alternates high and low all
+    the way down -- a sawtooth put there by the arithmetic and not by the soil.
+    """
+    from xslope.fem_details import pile_profile
+    fails = []
+    slope_data, fem_data, solution = _solved(PILES_XLSX)
+
+    types = np.asarray(fem_data.get("element_types_1d", []), dtype=int)
+    mask = np.asarray(fem_data.get("pile_elem_mask", []), dtype=bool)
+    if not len(types) or not mask.any():
+        return ["the piles sample carries no pile element"]
+    if int(types[mask].min()) < 3:
+        return ["the piles sample's beam elements are two-node, so the station "
+                "count below proves nothing"]
+
+    n_lines = len(slope_data.get("pile_lines", []))
+    for index in range(n_lines):
+        profile = pile_profile(fem_data, solution, index, slope_data)
+        n_elem = int(profile["n_elements"])
+        if not n_elem:
+            continue
+        want = 2 * n_elem + 1
+        got = len(profile["node_depth"])
+        if got != want:
+            fails.append(f"pile {index + 1}: {got} stations for {n_elem} "
+                         f"three-node elements, expected {want}")
+        if len(profile["u_lateral"]) != got:
+            fails.append(f"pile {index + 1}: the lateral displacement is "
+                         f"reported at {len(profile['u_lateral'])} stations and "
+                         f"the depth at {got}")
+        if len(profile["elem_depth"]) != n_elem:
+            fails.append(f"pile {index + 1}: {len(profile['elem_depth'])} "
+                         f"element shears for {n_elem} elements")
+
+        # Each three-node element reports its own reaction, at the station its
+        # shear is reported at.
+        reaction = np.asarray(profile["reaction"], dtype=float)
+        if len(reaction) != n_elem:
+            fails.append(f"pile {index + 1}: the reaction is reported at "
+                         f"{len(reaction)} stations for {n_elem} elements")
+        if len(profile["reaction_depth"]) != len(reaction):
+            fails.append(f"pile {index + 1}: the reaction has "
+                         f"{len(reaction)} values at "
+                         f"{len(profile['reaction_depth'])} depths")
+        # A sawtooth reverses sign at nearly every step. A real reaction
+        # distribution reverses where the pile crosses the mechanism, once or
+        # twice down its length.
+        if len(reaction) >= 5:
+            live = reaction[np.abs(reaction) > 1e-9 * max(
+                float(np.max(np.abs(reaction))), 1e-30)]
+            if len(live) >= 5:
+                flips = int(np.sum(np.sign(live[:-1]) != np.sign(live[1:])))
+                if flips > 0.4 * (len(live) - 1):
+                    fails.append(
+                        f"pile {index + 1}: the soil reaction changes sign at "
+                        f"{flips} of {len(live) - 1} steps, which reads as an "
+                        f"alternating artifact rather than a distribution")
+    return fails
+
+
 CHECKS = [
-    ("the failure band needs the mechanism", test_the_band_needs_the_mechanism),
     ("the reaction panel says where its limit is",
      test_the_reaction_panel_says_where_its_limit_is),
-    ("the band is named for the field it was read from",
-     test_the_band_is_named_for_the_field_it_was_read_from),
     ("the inset follows the selection", test_the_inset_follows_the_selection),
     ("the peak utilization is tie-aware",
      test_the_peak_utilization_is_tie_aware),
     ("the toolbar button and its gate", test_gate),
     ("the gate check would catch a mutation", test_gate_mutation),
     ("the member list and its badges", test_list),
+    ("the panel's verdict is the summary's",
+     test_the_verdict_is_the_summary_s),
     ("the envelope is the solver's capacity", test_envelope),
     ("the envelope is the shared function", test_envelope_mutation),
     ("profiles survive save + reload", test_reload),
@@ -1311,6 +1429,8 @@ CHECKS = [
     ("at-failure profiles are the snapshot's", test_field_state_profiles),
     ("the field state survives save + reload", test_field_state_reload),
     ("the export records the field state", test_field_state_export),
+    ("a pile is read at every node it stands on",
+     test_the_pile_is_read_at_every_node_it_stands_on),
 ]
 
 # Checks that need the Studio layer; skipped when PySide6 is absent.

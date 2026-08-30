@@ -63,6 +63,10 @@ Seepage — redraw as you type, so a wrong option choice is obvious at a glance:
 
 ![Materials list view](images/editing_materials_list.png)
 
+On a Hoek-Brown material the strength envelope also reads out the rock-mass constants
+$m_b$, $s$ and $a$ that σci, GSI, mi and D derive to — the three numbers a published
+Hoek-Brown table quotes, so the four entered inputs can be confirmed against one.
+
 A **blank property stays blank**. Leaving a unit weight, cohesion, friction angle,
 `d`/`ψ`, `E`, `ν`, `r_u` or `k₁` cell empty reads back as unset, not as zero, in both
 views — so a cohesionless material and one nobody has filled in are different models,
@@ -165,6 +169,18 @@ already in the table it asks first, and can add to them instead of replacing the
 On a section with no room for a circle to daylight the button is dimmed and its
 tooltip says so.
 
+Under the table, the **Search window** group holds the ten optional limits that
+confine an automated circular search — entry and exit x ranges, a center box, a
+maximum tangent depth and a minimum slip depth. They are the `circles` sheet's own
+J8:K17 block, and each is independent: a blank field is a limit that is not applied,
+a range applies only when both of its ends are filled, and an all-blank group is the
+unconstrained search. A range typed backwards is refused when you press **OK**,
+naming the pair, because a file carrying one will not load. Whatever the group
+holds is drawn on the preview with the circles: the entry and exit ranges as bars
+lying on the ground surface, the center box as a dashed rectangle. Editing a limit
+drops any solution already computed — it changes what a search would find — but
+keeps the mesh, which the window has no bearing on.
+
 The non-circular editor carries a **Generate from the weak zone…** button. Some
 slopes fail along a weak layer rather than along their own geometry, and no circle
 passes through that mechanism — the surface runs flat inside the seam and turns up
@@ -218,7 +234,7 @@ use in the table.
 
 **Reinforcement** lines are grouped as **Identity** (the line's label),
 **Geometry** (endpoints), **Capacity** (Tmax, Tres, E, Area), **Anchorage**
-(Lp1/Lp2 pullout lengths, Tend1/Tend2 end capacities, Spacing), and **Type** —
+(the pullout law, Tend1/Tend2 end capacities, Spacing), and **Type** —
 picking a Type (geosynthetic, nail, tieback, anchor) fills **Dir** and **Appl**
 with that support's pair, exactly as the `reinforce` worksheet's formulas do.
 Change either afterwards and the change stands; picking a Type again puts the
@@ -227,6 +243,16 @@ preview draws the lines on the section with the selected one emphasized and its
 pullout breakpoints marked:
 
 ![Reinforcement editor (list view)](images/editing_reinforcement_editor.png)
+
+A line develops its pullout capacity one of two ways, and the **Pullout** selector
+at the top of the Anchorage group chooses per line: **Development length (Lp1,
+Lp2)**, or **Overburden (Adhesion, Delta)**, where the resistance follows the
+effective overburden along the line. The pair not in use is grayed rather than
+cleared, in both views — the values stay in their cells, and switching back brings
+them into force again. The selector is a reading of the line itself: a line arrives
+on **Overburden** when it carries both Adhesion and Delta, and on **Development
+length** otherwise, so a file edited outside Studio opens showing the law it
+actually uses.
 
 Table view lays every column out at once — the bulk-entry path for the fifteen-plus
 lines of a tiered wall:
@@ -255,9 +281,9 @@ with the selected one highlighted, and clicking a boundary there selects it:
 ### Transient seepage
 
 **Transient** edits the model's transient-seepage inputs — the data that a
-[transient run](analysis.md#transient-seepage) marches through. There is no on/off
-toggle: leaving every field blank keeps the model steady (the steady-vs-transient
-*run* choice lives on the Run Seepage dialog). It gathers:
+[transient run](analysis.md#transient-seepage) steps through. There is no on/off
+toggle: with no times or values entered the model stays steady (the
+steady-vs-transient *run* choice lives on the Run Seepage dialog). It gathers:
 
 - the **run controls** — **Duration**, **Save interval**, the rapid-drawdown
   **Stage 1** / **Stage 2** times (set both or neither; Stage 1 earlier than Stage 2),
@@ -266,7 +292,9 @@ toggle: leaving every field blank keeps the model steady (the steady-vs-transien
   and the stability time can also be set at their point of use, in the
   [Run LEM and Run FEM dialogs](analysis.md#seepage-time) — both places write the same
   values;
-- the **time-series table** — a shared **time** axis and up to five named series. A
+- the **time-series table** — a shared **time** axis and up to five named series
+  (the names default to **t1**–**t5**, matching the input template's tseep sheet,
+  and can be renamed). A
   seep BC head/flux **value** cell that contains a series name is driven by that
   series (a time-varying boundary condition). A blank cell is no breakpoint (the
   series is linearly interpolated between its own points), and a **repeated time** is
@@ -345,8 +373,12 @@ Results are derived from the inputs, so editing an input that a result depended 
 makes that result stale. Studio handles this automatically:
 
 - Editing any input clears a stale **LEM solution** (its tab is removed).
-- Editing the **geometry** (profile/polygon lines, max depth, reinforcement, piles)
-  also clears the **mesh**, so Seepage and FEM re-gate on a fresh **Build Mesh**.
+- Editing the **geometry** (profile/polygon lines, max depth, the endpoints of a
+  reinforcement or pile row, or adding or removing a row) also clears the
+  **mesh**, so Seepage and FEM re-gate on a fresh **Build Mesh**. Changing a
+  row's other properties — spacing, capacities, stiffness, how its force is
+  applied — leaves the mesh in place, because a row enters the mesh only as a
+  constraint line.
 - Undo/redo apply the same rule — stale solution tabs are dropped, and the mesh
   follows the restored geometry.
 

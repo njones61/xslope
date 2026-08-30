@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import time
 import warnings
 from math import degrees, sin, cos, sqrt, asin, tan
 
 
 import numpy as np
-from scipy.sparse import lil_matrix, csr_matrix
+from scipy.sparse import csr_matrix, issparse
 from scipy.sparse.linalg import splu
 import shapely
 from shapely.geometry import LineString, Point, Polygon
@@ -39,6 +40,29 @@ def _extract_nodal_uv(disp, fem_data):
         u = disp[0::2]
         v = disp[1::2]
     return u, v
+
+
+def _extract_nodal_theta(disp, fem_data):
+    """Per-node rotation from a mixed-DOF vector, or None where no node has one.
+
+    Only pile nodes carry a rotational degree of freedom; every other node is
+    reported at zero, so the column reads across the whole mesh.
+    """
+    dof_offset = fem_data.get("dof_offset", None)
+    is_pile_node = fem_data.get("is_pile_node", None)
+    if dof_offset is None or is_pile_node is None:
+        return None
+    is_pile_node = np.asarray(is_pile_node, dtype=bool)
+    if not is_pile_node.any():
+        return None
+    n_nodes = len(fem_data["nodes"])
+    theta = np.zeros(n_nodes)
+    for i in range(n_nodes):
+        if i < len(is_pile_node) and is_pile_node[i]:
+            base = int(dof_offset[i]) + 2
+            if base < len(disp):
+                theta[i] = disp[base]
+    return theta
 
 
 # Scalar fields of a solve_fem field carried across a save/reload for the
@@ -179,6 +203,14 @@ def _fem_solution_dataframes(fem_data, solution):
         "u_mag_vp": u_mag_vp,
     })
 
+    # Pile nodes carry a rotation as well as a displacement, and it is part of
+    # the field: the moment and the soil reaction a pile reports are read from it.
+    # Written only where the model has a pile, so a model without one exports
+    # exactly the columns it always did.
+    theta = _extract_nodal_theta(disp_total, fem_data)
+    if theta is not None:
+        node_df["theta"] = theta
+
     centroids = np.zeros((len(elements), 2))
     for i, elem_nodes in enumerate(elements):
         active_nodes = elem_nodes[:element_types[i]]
@@ -224,19 +256,15 @@ def _fem_reinforcement_dataframe(fem_data, solution):
 
     One row per reinforcement 1D element with engineer-readable columns: the global
     element id and 1-based line id, the two endpoint coordinates, the axial force,
-    the allowable and residual tensile capacities, the cap the solve enforced, the
-    mobilization (force / T_allow), and the failed / softened flags. This doubles as
-    a human-readable results file AND carries everything needed to rebuild
+    the allowable and residual tensile capacities, the mobilization (force /
+    T_allow), and the failed / softened flags. This doubles as a human-readable
+    results file AND carries everything needed to rebuild
     ``solution['forces_1d']`` / ``['failed_1d_elements']`` / ``['softened_1d_elements']``
-    / ``['t_cap_1d']`` for the reinforcement-force colorbar and the per-line detail
-    profiles on reload.
+    for the reinforcement-force colorbar and the per-line detail profiles on reload.
 
-    ``t_cap`` is the newer column. It equals ``t_allow`` on the default path and
-    differs only under the optional bond-slip model, whose re-capped envelope is
-    otherwise unrecoverable from a reloaded file: ``fem_data`` is rebuilt from the
-    model and never learns which run options the solve used. Sidecars written
-    before the column existed simply lack it, and the reader falls back to
-    ``t_allow`` — which is what those runs used.
+    The capacity the solve enforces is ``fem_data['t_allow_by_1d_elem']``, which is
+    rebuilt from the model on reload, so it is written here for the reader but never
+    read back.
     """
     import pandas as pd
 
@@ -257,8 +285,6 @@ def _fem_reinforcement_dataframe(fem_data, solution):
     forces = _as_len(solution.get("forces_1d", np.zeros(n_1d)), n_1d)
     failed = _as_len(solution.get("failed_1d_elements", np.zeros(n_1d)), n_1d, bool)
     softened = _as_len(solution.get("softened_1d_elements", np.zeros(n_1d)), n_1d, bool)
-    t_cap = solution.get("t_cap_1d", None)
-    t_cap = t_allow if t_cap is None else _as_len(t_cap, n_1d)
 
     n0 = np.array([nodes[elements_1d[i][0]] for i in reinf_idx])
     n1 = np.array([nodes[elements_1d[i][1]] for i in reinf_idx])
@@ -275,7 +301,6 @@ def _fem_reinforcement_dataframe(fem_data, solution):
         "y_end": n1[:, 1],
         "axial_force": forces[reinf_idx],
         "t_allow": ta,
-        "t_cap": t_cap[reinf_idx],
         "t_res": t_res[reinf_idx],
         "mobilization": mobilization,
         "failed": failed[reinf_idx],
@@ -346,41 +371,33 @@ def _fem_pile_dataframe(fem_data, solution):
 def _reconstruct_reinforcement(fem_data, reinf_df, solution):
     """Restore the reinforcement result arrays onto ``solution`` from the sidecar.
 
-    ``forces_1d`` / ``failed_1d_elements`` / ``softened_1d_elements`` / ``t_cap_1d``
-    are rebuilt at full 1D-element length, each row placed at its global
-    ``element_id``; pile slots stay zero — the renderer and the print summaries skip
-    them via ``pile_elem_mask``.
+    ``forces_1d`` / ``failed_1d_elements`` / ``softened_1d_elements`` are rebuilt at
+    full 1D-element length, each row placed at its global ``element_id``; pile slots
+    stay zero — the renderer and the print summaries skip them via ``pile_elem_mask``.
 
-    ``t_cap`` is optional in the file. A sidecar written before that column existed
-    falls back to ``t_allow``, which is the cap those runs enforced (the column
-    records only what the optional bond-slip model changed, and a file without the
-    column predates it).
+    The capacity is not restored from the file: it is ``t_allow_by_1d_elem``, which
+    ``build_fem_data`` rebuilds from the model.
     """
     elements_1d = fem_data.get("elements_1d", None)
     n_1d = 0 if elements_1d is None else len(elements_1d)
     forces = np.zeros(n_1d)
     failed = np.zeros(n_1d, dtype=bool)
     softened = np.zeros(n_1d, dtype=bool)
-    t_cap = _as_len(fem_data.get("t_allow_by_1d_elem", np.zeros(n_1d)), n_1d).copy()
 
     eid = reinf_df["element_id"].to_numpy()
     f = reinf_df["axial_force"].to_numpy()
     fl = reinf_df["failed"].to_numpy().astype(bool)
     sf = reinf_df["softened"].to_numpy().astype(bool)
-    tc = (reinf_df["t_cap"].to_numpy() if "t_cap" in reinf_df.columns
-          else reinf_df["t_allow"].to_numpy())
     for k in range(len(reinf_df)):
         j = int(eid[k])
         if 0 <= j < n_1d:
             forces[j] = f[k]
             failed[j] = fl[k]
             softened[j] = sf[k]
-            t_cap[j] = tc[k]
 
     solution["forces_1d"] = forces
     solution["failed_1d_elements"] = failed
     solution["softened_1d_elements"] = softened
-    solution["t_cap_1d"] = t_cap
 
 
 def _reconstruct_piles(fem_data, pile_df, solution):
@@ -721,10 +738,11 @@ def _reconstruct_fem_solution(fem_data, node_df, element_df):
     """Rebuild a solve_fem field dict from one persisted node/element CSV pair.
 
     Only the quantities the result plots need are restored: total and elastic
-    displacements (rebuilt into the mixed-DOF vector via ``dof_offset``; pile
-    rotational DOFs, which the CSV does not store, are left zero — the plots use
-    only translations), element stresses/strains, vp shear strain, the plastic
-    mask, and the yield function.
+    displacements (rebuilt into the mixed-DOF vector via ``dof_offset``, including
+    the pile nodes' rotations where the CSV carries a ``theta`` column — a file
+    written without one leaves them zero, which is what the plots, reading only
+    translations, always saw), element stresses/strains, vp shear strain, the
+    plastic mask, and the yield function.
 
     Raises:
         ValueError: if the CSV node/element counts do not match ``fem_data``.
@@ -746,10 +764,16 @@ def _reconstruct_fem_solution(fem_data, node_df, element_df):
     disp_vp = np.zeros(n_dof)
     ux, uy = node_df["u_x"].to_numpy(), node_df["u_y"].to_numpy()
     uxv, uyv = node_df["u_x_vp"].to_numpy(), node_df["u_y_vp"].to_numpy()
+    theta = (node_df["theta"].to_numpy() if "theta" in node_df.columns
+             else None)
+    is_pile_node = fem_data.get("is_pile_node", None)
     for i in range(len(nodes)):
         base = int(dof_offset[i]) if dof_offset is not None else 2 * i
         disp_total[base], disp_total[base + 1] = ux[i], uy[i]
         disp_vp[base], disp_vp[base + 1] = uxv[i], uyv[i]
+        if (theta is not None and is_pile_node is not None
+                and i < len(is_pile_node) and is_pile_node[i]):
+            disp_total[base + 2] = theta[i]
 
     return {
         "displacements": disp_total,
@@ -849,6 +873,242 @@ def import_fem_solution(fem_data, output_stem):
 _SIDE_EDGE_DRIFT_FRAC = 5e-3
 
 
+def _midside_1d_node(elements_1d, element_types_1d, elem_idx):
+    """The midside node of 1D element ``elem_idx``, or None where it has none.
+
+    A 1D element on a quadratic soil edge stands on that edge's midside node as
+    well as its two corners; ``element_types_1d`` records 3 for those and 2 for
+    an element on a linear edge, whose third column is a padding zero. Node 0 is
+    a real node, so the node count decides, never the stored value.
+    """
+    try:
+        if int(element_types_1d[elem_idx]) < 3:
+            return None
+    except (IndexError, TypeError, ValueError):
+        return None
+    element = elements_1d[elem_idx]
+    if len(element) < 3:
+        return None
+    return int(element[2])
+
+
+def _quintic_hermite_bending_matrix():
+    """The 6x6 bending stiffness of a three-node C1 beam element on the unit
+    interval, in the DOF order [v1, dv1, v2, dv2, v3, dv3].
+
+    The deflection is the quintic that matches a value and a slope at both ends
+    AND at the midside node -- six conditions, six coefficients, so the shape
+    functions are unique. Euler-Bernoulli is kept exactly: the entries are the
+    integrals of EI H_i'' H_j'' with EI and the length divided out, and the
+    quintic space contains both the cubic and the quartic exact solutions the
+    beam benchmarks are written for, so a three-node element reproduces them to
+    round-off just as the two-node cubic element does.
+
+    The element of length L with rotations measured in x follows by scaling:
+    K_bending = EI / L**3 * S @ M @ S with S = diag(1, L, 1, L, 1, L).
+    Integrated with four-point Gauss, which is exact for the degree-six
+    integrand.
+    """
+    # p(xi) = sum_k a_k xi**k, k = 0..5. Rows of C are the six conditions in DOF
+    # order, so a = C^-1 q and the shape functions are the columns of C^-1.
+    def row_value(x):
+        return np.array([1.0, x, x**2, x**3, x**4, x**5])
+
+    def row_slope(x):
+        return np.array([0.0, 1.0, 2*x, 3*x**2, 4*x**3, 5*x**4])
+
+    C = np.array([row_value(0.0), row_slope(0.0),
+                  row_value(1.0), row_slope(1.0),
+                  row_value(0.5), row_slope(0.5)])
+    C_inv = np.linalg.inv(C)
+
+    # Four-point Gauss-Legendre on [0, 1].
+    g = np.array([-0.8611363115940526, -0.3399810435848563,
+                  0.3399810435848563, 0.8611363115940526])
+    w = np.array([0.3478548451374538, 0.6521451548625461,
+                  0.6521451548625461, 0.3478548451374538])
+    xi = 0.5 * (g + 1.0)
+    wt = 0.5 * w
+
+    M = np.zeros((6, 6))
+    for x, weight in zip(xi, wt):
+        b = np.array([0.0, 0.0, 2.0, 6*x, 12*x**2, 20*x**3])   # p''(xi)
+        h2 = C_inv.T @ b                                        # H_i''(xi)
+        M += weight * np.outer(h2, h2)
+    return M
+
+
+def _quintic_hermite_third_derivative(xi):
+    """d3H/dxi3 of the three-node C1 beam shape functions at ``xi``, in the DOF
+    order [v1, dv1, v2, dv2, v3, dv3].
+
+    The shear at a station is EI v'''(x) = EI / L**3 * (d3H/dxi3) . q_hat, with
+    q_hat the DOFs scaled to the unit interval. On a two-node cubic element that
+    quantity is the element's constant shear, so reading it at the element center
+    is the same measurement carried onto the three-node element, where the shear
+    varies along the element.
+    """
+    def row_value(x):
+        return np.array([1.0, x, x**2, x**3, x**4, x**5])
+
+    def row_slope(x):
+        return np.array([0.0, 1.0, 2*x, 3*x**2, 4*x**3, 5*x**4])
+
+    C = np.array([row_value(0.0), row_slope(0.0),
+                  row_value(1.0), row_slope(1.0),
+                  row_value(0.5), row_slope(0.5)])
+    C_inv = np.linalg.inv(C)
+    b3 = np.array([0.0, 0.0, 0.0, 6.0, 24.0 * xi, 60.0 * xi**2])
+    return C_inv.T @ b3
+
+
+def _quintic_hermite_fourth_derivative(xi):
+    """d4H/dxi4 of the three-node C1 beam shape functions at ``xi``, in the DOF
+    order [v1, dv1, v2, dv2, v3, dv3].
+
+    EI times the fourth derivative of the deflection is the distributed lateral
+    load the element's own deflected shape carries -- what the soil is passing to
+    the pile along it, per unit length. For the quintic that is linear along the
+    element and generally not zero; for a two-node cubic element it is identically
+    zero, which is why a chain of them can only report the reaction by
+    differencing one element's shear against the next.
+    """
+    def row_value(x):
+        return np.array([1.0, x, x**2, x**3, x**4, x**5])
+
+    def row_slope(x):
+        return np.array([0.0, 1.0, 2*x, 3*x**2, 4*x**3, 5*x**4])
+
+    C = np.array([row_value(0.0), row_slope(0.0),
+                  row_value(1.0), row_slope(1.0),
+                  row_value(0.5), row_slope(0.5)])
+    C_inv = np.linalg.inv(C)
+    b4 = np.array([0.0, 0.0, 0.0, 0.0, 24.0, 120.0 * xi])
+    return C_inv.T @ b4
+
+
+#: The constants the three-node beam element is built from, computed once.
+_QUINTIC_BENDING_M = _quintic_hermite_bending_matrix()
+_QUINTIC_SHEAR_MID = _quintic_hermite_third_derivative(0.5)
+_QUINTIC_LOAD_MID = _quintic_hermite_fourth_derivative(0.5)
+
+
+def pile_element_reaction(u_elem, cos_t, sin_t, L, EI, n_node):
+    """The lateral soil reaction per unit length at a pile element's center, or
+    None on an element that cannot report one.
+
+    A three-node beam element carries its own distributed load: EI times the
+    fourth derivative of its deflected shape, which is linear along the element
+    and read here at its midpoint. The sign follows the element's local
+    transverse axis, the same sense its shear is reported in.
+
+    A two-node element's deflection is a cubic, whose fourth derivative is zero
+    everywhere, so it can say nothing about the load along itself -- a chain of
+    them reports the reaction at the nodes BETWEEN elements instead, by
+    differencing their shears.
+    """
+    if n_node != 3:
+        return None
+    u_local = _beam_rotation(cos_t, sin_t, 3) @ u_elem
+    q_hat = np.array([u_local[1], L * u_local[2],
+                      u_local[4], L * u_local[5],
+                      u_local[7], L * u_local[8]])
+    return -float(EI / (L ** 4) * (_QUINTIC_LOAD_MID @ q_hat))
+
+#: Quadratic bar axial stiffness on the unit interval, node order
+#: [end 1, end 2, mid]. K_axial = EA / (3 L) * this.
+_QUADRATIC_BAR_AXIAL = np.array([[ 7.0,  1.0, -8.0],
+                                 [ 1.0,  7.0, -8.0],
+                                 [-8.0, -8.0, 16.0]])
+
+
+def _beam_local_stiffness(EA, EI, L, three_node):
+    """The pile beam element's local stiffness matrix.
+
+    Two-node: the 6x6 Euler-Bernoulli matrix in [u1, v1, th1, u2, v2, th2].
+
+    Three-node: 9x9 in [u1, v1, th1, u2, v2, th2, u3, v3, th3] with node 3 the
+    midside node of the soil edge the element lies on. Bending is the quintic
+    Hermite block above, axial is the quadratic bar, and the two are uncoupled
+    exactly as they are on the two-node element.
+    """
+    L2 = L * L
+    L3 = L2 * L
+    if not three_node:
+        return np.array([
+            [ EA/L,   0.0,          0.0,        -EA/L,  0.0,          0.0       ],
+            [ 0.0,    12*EI/L3,     6*EI/L2,     0.0,  -12*EI/L3,    6*EI/L2   ],
+            [ 0.0,    6*EI/L2,      4*EI/L,      0.0,  -6*EI/L2,     2*EI/L    ],
+            [-EA/L,   0.0,          0.0,         EA/L,   0.0,         0.0       ],
+            [ 0.0,   -12*EI/L3,    -6*EI/L2,     0.0,   12*EI/L3,   -6*EI/L2   ],
+            [ 0.0,    6*EI/L2,      2*EI/L,      0.0,  -6*EI/L2,     4*EI/L    ],
+        ])
+
+    K = np.zeros((9, 9))
+    axial_dofs = [0, 3, 6]            # u at end 1, end 2, mid
+    K[np.ix_(axial_dofs, axial_dofs)] = (EA / (3.0 * L)) * _QUADRATIC_BAR_AXIAL
+
+    scale = np.diag([1.0, L, 1.0, L, 1.0, L])
+    K_bend = (EI / L3) * (scale @ _QUINTIC_BENDING_M @ scale)
+    bend_dofs = [1, 2, 4, 5, 7, 8]    # (v, theta) at end 1, end 2, mid
+    K[np.ix_(bend_dofs, bend_dofs)] = K_bend
+    return K
+
+
+def _pile_element_actions(u_elem, cos_t, sin_t, L, EA, EI, K_local, n_node):
+    """``(axial, V, M1, M2, u_local)`` for one pile beam element.
+
+    ``axial`` is the axial force at the element center and ``V`` the shear there;
+    ``M1`` and ``M2`` are the bending moments at the two END nodes, which is what
+    the moment profile is drawn from and what the plastic-hinge check compares
+    against M_cap.
+
+    On the two-node element the shear is constant along the element and these are
+    the closed forms the element has always used. On the three-node element the
+    end moments are rows 2 and 5 of K_local u_local -- the same quantity, read off
+    the assembled element rather than off a transcribed row -- and the shear is
+    EI v'''(L/2), which on a two-node element is exactly that constant shear.
+    """
+    T = _beam_rotation(cos_t, sin_t, n_node)
+    u_local = T @ u_elem
+
+    # Axial force at the element center: EA times the chord strain, on both the
+    # linear and the quadratic bar.
+    axial = EA / L * (u_local[3] - u_local[0])
+
+    if n_node == 2:
+        L2 = L * L
+        L3 = L2 * L
+        V = (12 * EI / L3 * (u_local[1] - u_local[4])
+             + 6 * EI / L2 * (u_local[2] + u_local[5]))
+        M1 = EI * (6.0 / L2 * u_local[1] + 4.0 / L * u_local[2]
+                   - 6.0 / L2 * u_local[4] + 2.0 / L * u_local[5])
+        M2 = EI * (6.0 / L2 * u_local[1] + 2.0 / L * u_local[2]
+                   - 6.0 / L2 * u_local[4] + 4.0 / L * u_local[5])
+        return axial, V, M1, M2, u_local
+
+    S = K_local @ u_local
+    M1, M2 = float(S[2]), float(S[5])
+    q_hat = np.array([u_local[1], L * u_local[2],
+                      u_local[4], L * u_local[5],
+                      u_local[7], L * u_local[8]])
+    V = float(EI / (L * L * L) * (_QUINTIC_SHEAR_MID @ q_hat))
+    return axial, V, M1, M2, u_local
+
+
+def _beam_rotation(cos_t, sin_t, n_node):
+    """Local-from-global rotation for a beam element, block diagonal with one
+    [[c, s, 0], [-s, c, 0], [0, 0, 1]] per node."""
+    n = 3 * n_node
+    T = np.zeros((n, n))
+    for k in range(n_node):
+        b = 3 * k
+        T[b, b], T[b, b + 1] = cos_t, sin_t
+        T[b + 1, b], T[b + 1, b + 1] = -sin_t, cos_t
+        T[b + 2, b + 2] = 1.0
+    return T
+
+
 def build_fem_data(slope_data, mesh=None, verbose=False):
     """
     Build a fem_data dictionary from slope_data and optional mesh.
@@ -910,17 +1170,31 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             - k_by_1d_elem: np.ndarray (n_1d_elements,) of axial stiffness values for reinforcement lines
             - cos_theta_1d: np.ndarray (n_1d_elements,) of direction cosines (x) for each 1D element
             - sin_theta_1d: np.ndarray (n_1d_elements,) of direction cosines (y) for each 1D element
-            - dof_indices_1d: np.ndarray (n_1d_elements, 4) of global DOF indices using dof_offset
-            - K_global_1d_elems: list of np.ndarray (4, 4) global stiffness matrices for each 1D element
+            - dof_indices_1d: np.ndarray (n_1d_elements, 6) of global DOF indices using dof_offset,
+              ordered [end 1, end 2, mid]; only the first n_dof_by_1d_elem entries of a row are used
+            - n_dof_by_1d_elem: np.ndarray (n_1d_elements,) of 4 (two-node bar) or 6 (three-node bar)
+            - K_global_1d_elems: list of np.ndarray (4, 4) or (6, 6) global stiffness matrices for each 1D element
             - dof_offset: np.ndarray (n_nodes+1,) cumulative DOF count; pile nodes get 3 DOFs, others get 2
             - is_pile_node: np.ndarray (n_nodes,) boolean, True for nodes belonging to pile elements
             - n_dof_total: int, total number of DOFs (dof_offset[n_nodes])
-            - dof_indices_pile: np.ndarray (n_pile_elements, 6) of global DOF indices for 6-DOF beam elements
-            - K_global_pile_elems: list of np.ndarray (6, 6) global stiffness matrices for pile beam elements
+            - dof_indices_pile: np.ndarray (n_pile_elements, 9) of global DOF indices for beam elements,
+              ordered [u, v, theta] at end 1, end 2 and mid; only the first n_dof_by_pile_elem entries are used
+            - n_dof_by_pile_elem: np.ndarray (n_pile_elements,) of 6 (two-node beam) or 9 (three-node beam)
+            - pile_elem_nodes: np.ndarray (n_pile_elements, 3) of [end 1, end 2, mid] node indices, mid = -1 without one
+            - K_local_by_pile_elem: list of local-frame beam stiffness matrices, one per pile element
+            - K_global_pile_elems: list of np.ndarray (6, 6) or (9, 9) global stiffness matrices for pile beam elements
             - EI_by_pile_elem: np.ndarray (n_pile_elements,) of flexural rigidity per unit width
             - EA_by_pile_elem: np.ndarray (n_pile_elements,) of axial rigidity per unit width
             - pile_head_nodes: np.ndarray of node indices for each pile line's top node
-            - pile_head_fixed: np.ndarray of booleans for fixity of each pile head
+            - pile_head_fixed: np.ndarray of booleans, True where the pile head's
+              rotation is held ('Head' = unrotated or fixed in the piles sheet)
+            - pile_head_pinned: np.ndarray of booleans, True where the pile head's
+              translations are held ('Head' = pinned or fixed)
+            - pile_tip_nodes: np.ndarray of node indices for each pile line's bottom node
+            - pile_tip_fixed: np.ndarray of booleans, True where the pile tip's
+              rotation is held ('Tip' = unrotated or fixed)
+            - pile_tip_pinned: np.ndarray of booleans, True where the pile tip's
+              translations are held ('Tip' = pinned or fixed)
             - unit_weight: float, unit weight of water
             - k_seismic: float, seismic coefficient (horizontal acceleration / gravity)
     """
@@ -1287,19 +1561,22 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     k_by_1d_elem = np.zeros(n_1d_elements)
     cos_theta_1d = np.zeros(n_1d_elements)
     sin_theta_1d = np.zeros(n_1d_elements)
-    dof_indices_1d = np.zeros((n_1d_elements, 4), dtype=int)
+    # Six DOF slots per bar: (x, y) at end 1, end 2 and -- on a quadratic mesh --
+    # the midside node of the soil edge the bar lies on. n_dof_by_1d_elem says how
+    # many of them an element actually uses, 4 or 6, and every reader slices by it.
+    dof_indices_1d = np.zeros((n_1d_elements, 6), dtype=int)
+    n_dof_by_1d_elem = np.full(n_1d_elements, 4, dtype=int)
     K_global_1d_elems = []
-    # Per-1D-element geometry retained for the OPTIONAL bond-slip load-transfer
-    # model (solve_fem/solve_ssrm bond_slip=...). Zero for pile elements and for
-    # elements this loop skips; the bond-slip helper only ever reads reinforcement
-    # rows it was explicitly asked to cap. Unused by the default (end-ramp) path.
+    # Per-1D-element geometry along the reinforcement line, used by the 1D details
+    # panel to order a line's elements and place them on its arc length. Zero for
+    # pile elements and for elements this loop skips.
     elem_length_1d = np.zeros(n_1d_elements)
     dist_end1_1d = np.zeros(n_1d_elements)   # centroid -> line end 1
     dist_end2_1d = np.zeros(n_1d_elements)   # centroid -> line end 2
-    t_max_1d = np.zeros(n_1d_elements)       # material tensile capacity (axial cap)
-    centroid_1d = np.zeros((n_1d_elements, 2))
 
     if n_1d_elements > 0 and "reinforcement_lines" in slope_data:
+        from .fileio import ensure_reinforce_pullout
+        ensure_reinforce_pullout(slope_data)
         reinforcement_lines = slope_data["reinforcement_lines"]
 
         for elem_idx in range(n_1d_elements):
@@ -1308,11 +1585,13 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             if line_id < len(reinforcement_lines):
                 line_data = reinforcement_lines[line_id]
 
-                # Get element geometry — use only end nodes [0] and [1],
-                # ignore mid-node for quadratic elements
+                # Element geometry. The chord runs between end nodes [0] and [1];
+                # node [2], where the mesh recorded one, is the midside node of
+                # the soil edge the bar lies on and is a node of the bar too.
                 elem_nodes_1d = elements_1d[elem_idx]
                 node_0 = elem_nodes_1d[0]
                 node_1 = elem_nodes_1d[1]
+                node_m = _midside_1d_node(elements_1d, element_types_1d, elem_idx)
                 coord_0 = nodes[node_0]
                 coord_1 = nodes[node_1]
 
@@ -1329,8 +1608,17 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     cos_theta_1d[elem_idx] = cos_t
                     sin_theta_1d[elem_idx] = sin_t
 
-                    # DOF indices for end nodes (4 DOFs total)
-                    dof_indices_1d[elem_idx] = [2*node_0, 2*node_0+1, 2*node_1, 2*node_1+1]
+                    # DOF indices, in the element's own node order
+                    # [end 1, end 2, mid]. Rebuilt against dof_offset below.
+                    if node_m is None:
+                        dof_indices_1d[elem_idx, :4] = [2*node_0, 2*node_0+1,
+                                                        2*node_1, 2*node_1+1]
+                        n_dof_by_1d_elem[elem_idx] = 4
+                    else:
+                        dof_indices_1d[elem_idx] = [2*node_0, 2*node_0+1,
+                                                    2*node_1, 2*node_1+1,
+                                                    2*node_m, 2*node_m+1]
+                        n_dof_by_1d_elem[elem_idx] = 6
 
                     # Compute distance from element centroid to line ends
                     x1, y1 = line_data.get("x1", 0), line_data.get("y1", 0)
@@ -1339,15 +1627,13 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     dist_to_left = np.linalg.norm(elem_centroid - [x1, y1])
                     dist_to_right = np.linalg.norm(elem_centroid - [x2, y2])
 
-                    # Retain geometry for the optional bond-slip model.
+                    # Retain the line geometry for the 1D details panel.
                     elem_length_1d[elem_idx] = elem_length
                     dist_end1_1d[elem_idx] = dist_to_left
                     dist_end2_1d[elem_idx] = dist_to_right
-                    centroid_1d[elem_idx] = elem_centroid
 
                     # Get reinforcement properties
                     t_max = line_data.get("t_max", 0.0)
-                    t_max_1d[elem_idx] = t_max
                     # NaN = unset: no post-peak drop (elastic-perfectly-plastic).
                     # An explicit 0.0 is different — it means brittle rupture.
                     t_res = line_data.get("t_res", float('nan'))
@@ -1364,28 +1650,44 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     # anchorage. With tend = 0 this reproduces the historical
                     # nearest-end taper for any element whose centroid lies in at
                     # most one pullout zone, and is the correct min() when zones
-                    # overlap.
+                    # overlap. A line on the overburden-dependent law carries a
+                    # pullout profile instead of a development length, and the
+                    # same call reads that: both engines take their capacity
+                    # from one function under either law.
                     from .fileio import reinforce_available_tension
                     t_allow = reinforce_available_tension(
-                        dist_to_left, dist_to_right, t_max, lp1, lp2, tend1, tend2)
+                        dist_to_left, dist_to_right, t_max, lp1, lp2, tend1, tend2,
+                        pullout=line_data.get("_pullout_profile"))
                     t_allow_by_1d_elem[elem_idx] = t_allow
 
                     if t_res != t_res:
                         # Unset: this line never softens, anywhere along its length.
                         t_res_by_1d_elem[elem_idx] = float('nan')
-                    elif t_allow >= t_max - 1e-12:
-                        # Beyond the pullout zones - full capacity, material residual
-                        t_res_by_1d_elem[elem_idx] = t_res
                     else:
-                        # Inside a friction ramp. Historically residual = 0 (sudden,
-                        # complete pullout). With end anchorage, the hardware
-                        # survives soil/grout failure up to its own capacity,
-                        # capped by the material residual: min(Tres, Tend of the
-                        # governing end).
-                        cap1 = t_max if lp1 <= 0 else tend1 + t_max * dist_to_left / lp1
-                        cap2 = t_max if lp2 <= 0 else tend2 + t_max * dist_to_right / lp2
-                        tend_g = tend1 if cap1 <= cap2 else tend2
-                        t_res_by_1d_elem[elem_idx] = min(t_res, tend_g)
+                        # Two independent post-peak mechanisms, and the element is
+                        # governed by whichever leaves it the less capacity.
+                        #
+                        # Bond slip is PERFECTLY PLASTIC: an element inside a
+                        # pullout ramp that reaches the capacity its embedment can
+                        # develop keeps slipping AT that capacity. The soil-bar
+                        # interface is frictional, and friction does not vanish
+                        # once it is overcome. t_allow — the ramped envelope,
+                        # including end anchorage — is therefore both the yield
+                        # force and the post-slip force.
+                        #
+                        # Tres is the RUPTURE residual: what the bar itself retains
+                        # once the material tears. It is a property of the
+                        # reinforcement, not of the embedment.
+                        #
+                        # So the element can never carry more than the smaller of
+                        # the two. This is the same envelope the limit-equilibrium
+                        # engine applies (fileio.reinforce_available_tension) and
+                        # the standard cable/geogrid treatment.
+                        #
+                        # (Elements inside a ramp were dropped all the way to zero
+                        # in earlier versions — "sudden complete pullout" — so
+                        # results predating this rule read lower.)
+                        t_res_by_1d_elem[elem_idx] = min(t_res, t_allow)
 
                     # Compute axial stiffness. E and Area are OPTIONAL in the
                     # input (the LEM needs neither — it applies the capacity
@@ -1408,63 +1710,60 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                             f"The LEM does not — it applies the tensile capacity "
                             f"envelope (Tmax/Lp) directly — so this file can run in the "
                             f"LEM but not the FEM until E and Area are filled in.")
+                    # The CHORD stiffness EA/L. It is the axial stiffness of the
+                    # two-node bar, and it is also what force recovery multiplies
+                    # the chord elongation by on the three-node bar, where
+                    # EA(u2-u1)/L is the axial force at the element center.
                     k_val = E * A / elem_length
                     k_by_1d_elem[elem_idx] = k_val
 
-                    # Build 4x4 truss element stiffness matrix in global coordinates
-                    # T = [[cos, sin, 0, 0], [0, 0, cos, sin]]  (2x4)
-                    # K_local = k * [[1, -1], [-1, 1]]           (2x2)
-                    # K_global_elem = T^T @ K_local @ T          (4x4)
-                    c2 = cos_t * cos_t
-                    cs = cos_t * sin_t
-                    s2 = sin_t * sin_t
-                    K_global_elem = k_val * np.array([
-                        [ c2,  cs, -c2, -cs],
-                        [ cs,  s2, -cs, -s2],
-                        [-c2, -cs,  c2,  cs],
-                        [-cs, -s2,  cs,  s2]
-                    ])
+                    if node_m is None:
+                        # Two-node bar, DOFs [x1, y1, x2, y2].
+                        # T = [[cos, sin, 0, 0], [0, 0, cos, sin]]  (2x4)
+                        # K_axial = k * [[1, -1], [-1, 1]]          (2x2)
+                        # K_global_elem = T^T @ K_axial @ T         (4x4)
+                        c2 = cos_t * cos_t
+                        cs = cos_t * sin_t
+                        s2 = sin_t * sin_t
+                        K_global_elem = k_val * np.array([
+                            [ c2,  cs, -c2, -cs],
+                            [ cs,  s2, -cs, -s2],
+                            [-c2, -cs,  c2,  cs],
+                            [-cs, -s2,  cs,  s2]
+                        ])
+                    else:
+                        # Three-node isoparametric quadratic bar, axial DOFs in
+                        # the element's node order [end 1, end 2, mid]:
+                        #
+                        #   K_axial = EA/(3L) * [[ 7,  1, -8],
+                        #                        [ 1,  7, -8],
+                        #                        [-8, -8, 16]]
+                        #
+                        # (the exact two-point Gauss integral of EA (dN/dx)^2).
+                        # Rotated into global coordinates by the 3x6
+                        # T = [[c, s, 0, 0, 0, 0],
+                        #      [0, 0, c, s, 0, 0],
+                        #      [0, 0, 0, 0, c, s]].
+                        K_axial = (E * A / (3.0 * elem_length)) * np.array([
+                            [ 7.0,  1.0, -8.0],
+                            [ 1.0,  7.0, -8.0],
+                            [-8.0, -8.0, 16.0],
+                        ])
+                        T_bar = np.zeros((3, 6))
+                        T_bar[0, 0], T_bar[0, 1] = cos_t, sin_t
+                        T_bar[1, 2], T_bar[1, 3] = cos_t, sin_t
+                        T_bar[2, 4], T_bar[2, 5] = cos_t, sin_t
+                        K_global_elem = T_bar.T @ K_axial @ T_bar
                     K_global_1d_elems.append(K_global_elem)
                 else:
                     K_global_1d_elems.append(np.zeros((4, 4)))
             else:
                 K_global_1d_elems.append(np.zeros((4, 4)))
 
-    # Local vertical overburden at each reinforcement 1D element centroid, for the
-    # OPTIONAL bond-slip model (sigma_n in tau_bond = bond_c + sigma_n*tan(bond_phi)).
-    # Same ray-cast definition as the ru pore-pressure overburden above: integrate
-    # moist gamma of the soil column above the centroid. Computed only when there are
-    # reinforcement 1D elements, and never consumed unless a bond_slip run option is
-    # passed — so it cannot perturb the default (end-ramp) solve, which is bit-identical.
-    sigma_v_1d = np.zeros(n_1d_elements)
+    # Reinforcement line labels, in line order — how the 1D details panel names a
+    # line when the model gives it one.
     reinforce_line_labels = [ln.get("label") for ln in
                              slope_data.get("reinforcement_lines", [])]
-    _reinf_1d = (n_1d_elements > 0 and "reinforcement_lines" in slope_data
-                 and np.any(elem_length_1d > 0))
-    if _reinf_1d:
-        from shapely.geometry import LineString as _RayLS2, Polygon as _RayPoly2
-        from .mesh import get_material_polygons as _gmp2
-        _rp2 = []
-        for _pi2, _pd2 in enumerate(_gmp2(slope_data)):
-            _mid2 = _pd2.get('mat_id')
-            _midx2 = _mid2 if (_mid2 is not None and 0 <= _mid2 < len(materials)) else _pi2
-            _rp2.append((_RayPoly2(_pd2['coords']),
-                         float(materials[_midx2].get('gamma', 0.0))))
-        _ytop2 = float(np.max(nodes[:, 1])) + 1.0
-        for _i2 in range(n_1d_elements):
-            if elem_length_1d[_i2] <= 0:
-                continue
-            _x2c, _y2c = float(centroid_1d[_i2, 0]), float(centroid_1d[_i2, 1])
-            _ray2 = _RayLS2([(_x2c, _y2c), (_x2c, _ytop2)])
-            _sv2 = 0.0
-            for _poly2, _g2 in _rp2:
-                _minx2, _miny2, _maxx2, _maxy2 = _poly2.bounds
-                if _x2c < _minx2 or _x2c > _maxx2 or _y2c >= _maxy2:
-                    continue
-                _int2 = _ray2.intersection(_poly2)
-                if not _int2.is_empty:
-                    _sv2 += _g2 * _int2.length
-            sigma_v_1d[_i2] = _sv2
 
     # === PILE BEAM ELEMENTS ===
     # Pile 1D elements are identified by element_materials_1d values that exceed
@@ -1480,6 +1779,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     cos_theta_pile = []
     sin_theta_pile = []
     K_global_pile_elems = []
+    K_local_by_pile_elem = []   # local-frame stiffness, for end-action recovery
     pile_elem_indices = []  # maps pile element index to global 1D element index
     V_cap_by_pile_elem = []
     M_cap_by_pile_elem = []
@@ -1487,7 +1787,12 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     S_by_pile_elem = []
     EI_by_pile_elem = []
     EA_by_pile_elem = []
-    pile_node_pairs = []  # (node_0, node_1) for each pile element
+    pile_node_pairs = []  # (node_0, node_1) -- the END nodes of each pile element
+    # Every node of each pile element, [end 1, end 2, mid], with mid = -1 where
+    # the element has none. pile_node_pairs stays the end pair, so readers that
+    # chain elements end to end are unaffected.
+    pile_elem_nodes = []
+    n_dof_by_pile_elem = []  # 6 on a two-node element, 9 on a three-node one
     pile_line_idx_by_pile_elem = []  # which pile_line each pile element belongs to
 
     if n_1d_elements > 0 and n_pile_lines > 0:
@@ -1506,6 +1811,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             elem_nodes = elements_1d[elem_idx]
             node_0 = elem_nodes[0]
             node_1 = elem_nodes[1]
+            node_m = _midside_1d_node(elements_1d, element_types_1d, elem_idx)
             coord_0 = nodes[node_0]
             coord_1 = nodes[node_1]
 
@@ -1549,38 +1855,26 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
                 L = elem_length
 
-                # Build full 6x6 Euler-Bernoulli beam stiffness in local coords
-                # DOFs: [u1, v1, theta1, u2, v2, theta2]
-                # u = axial, v = transverse, theta = rotation
-                L2 = L * L
-                L3 = L2 * L
-                K_local = np.array([
-                    [ EA/L,   0.0,          0.0,        -EA/L,  0.0,          0.0       ],
-                    [ 0.0,    12*EI/L3,     6*EI/L2,     0.0,  -12*EI/L3,    6*EI/L2   ],
-                    [ 0.0,    6*EI/L2,      4*EI/L,      0.0,  -6*EI/L2,     2*EI/L    ],
-                    [-EA/L,   0.0,          0.0,         EA/L,   0.0,         0.0       ],
-                    [ 0.0,   -12*EI/L3,    -6*EI/L2,     0.0,   12*EI/L3,   -6*EI/L2   ],
-                    [ 0.0,    6*EI/L2,      2*EI/L,      0.0,  -6*EI/L2,     4*EI/L    ],
-                ])
-
-                # 6x6 rotation matrix T (local -> global)
-                # local x along element, local y perpendicular
-                c = cos_t
-                s = sin_t
-                T = np.array([
-                    [ c,  s, 0, 0, 0, 0],
-                    [-s,  c, 0, 0, 0, 0],
-                    [ 0,  0, 1, 0, 0, 0],
-                    [ 0,  0, 0, c, s, 0],
-                    [ 0,  0, 0,-s, c, 0],
-                    [ 0,  0, 0, 0, 0, 1],
-                ])
+                # Local beam stiffness. Two-node: 6x6 Euler-Bernoulli in
+                # [u1, v1, theta1, u2, v2, theta2]. Three-node -- on a quadratic
+                # mesh, where the element also stands on the midside node of the
+                # soil edge -- 9x9 in [u1, v1, th1, u2, v2, th2, u3, v3, th3],
+                # quintic Hermite bending with quadratic axial. Rotated into
+                # global coordinates by the matching block-diagonal T.
+                three_node = node_m is not None
+                n_node = 3 if three_node else 2
+                K_local = _beam_local_stiffness(EA, EI, L, three_node)
+                T = _beam_rotation(cos_t, sin_t, n_node)
                 K_beam = T.T @ K_local @ T
 
                 cos_theta_pile.append(cos_t)
                 sin_theta_pile.append(sin_t)
                 pile_node_pairs.append((node_0, node_1))
+                pile_elem_nodes.append((int(node_0), int(node_1),
+                                        int(node_m) if three_node else -1))
+                n_dof_by_pile_elem.append(3 * n_node)
                 K_global_pile_elems.append(K_beam)
+                K_local_by_pile_elem.append(K_local)
                 elem_length_by_pile_elem.append(elem_length)
                 EI_by_pile_elem.append(EI)
                 EA_by_pile_elem.append(EA)
@@ -1597,6 +1891,10 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
     cos_theta_pile = np.array(cos_theta_pile)
     sin_theta_pile = np.array(sin_theta_pile)
+    pile_elem_nodes = (np.array(pile_elem_nodes, dtype=int) if n_pile_elements > 0
+                       else np.zeros((0, 3), dtype=int))
+    n_dof_by_pile_elem = (np.array(n_dof_by_pile_elem, dtype=int)
+                          if n_pile_elements > 0 else np.zeros(0, dtype=int))
     pile_elem_indices = np.array(pile_elem_indices, dtype=int)
     V_cap_by_pile_elem = np.array(V_cap_by_pile_elem)
     M_cap_by_pile_elem = np.array(M_cap_by_pile_elem)
@@ -1608,25 +1906,30 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
     # === BUILD DOF OFFSET MAP ===
     # Pile nodes get 3 DOFs (ux, uy, theta), all other nodes get 2 DOFs (ux, uy).
+    # Every node a pile element stands on, midside nodes included: the midside
+    # node carries the beam's deflection and slope like any other node on it.
     is_pile_node = np.zeros(n_nodes, dtype=bool)
     for p_idx in range(n_pile_elements):
-        n0, n1 = pile_node_pairs[p_idx]
-        is_pile_node[n0] = True
-        is_pile_node[n1] = True
+        for nd in pile_elem_nodes[p_idx]:
+            if nd >= 0:
+                is_pile_node[nd] = True
 
     dof_offset = np.zeros(n_nodes + 1, dtype=int)
     for i in range(n_nodes):
         dof_offset[i + 1] = dof_offset[i] + (3 if is_pile_node[i] else 2)
     n_dof_total = int(dof_offset[n_nodes])
 
-    # Build 6-element DOF indices for pile elements (using dof_offset)
-    dof_indices_pile = np.zeros((n_pile_elements, 6), dtype=int) if n_pile_elements > 0 else np.zeros((0, 6), dtype=int)
+    # Pile element DOF indices against dof_offset: three per node, and nine slots
+    # per element so a three-node element fits. n_dof_by_pile_elem says how many
+    # of them each element uses, and every reader slices by it.
+    dof_indices_pile = np.zeros((n_pile_elements, 9), dtype=int) if n_pile_elements > 0 else np.zeros((0, 9), dtype=int)
     for p_idx in range(n_pile_elements):
-        n0, n1 = pile_node_pairs[p_idx]
-        dof_indices_pile[p_idx] = [
-            dof_offset[n0], dof_offset[n0] + 1, dof_offset[n0] + 2,
-            dof_offset[n1], dof_offset[n1] + 1, dof_offset[n1] + 2,
-        ]
+        row = []
+        for nd in pile_elem_nodes[p_idx]:
+            if nd < 0:
+                continue
+            row += [dof_offset[nd], dof_offset[nd] + 1, dof_offset[nd] + 2]
+        dof_indices_pile[p_idx, :len(row)] = row
 
     # Rebuild 1D truss DOF indices using dof_offset (in case any share nodes with piles)
     for elem_idx in range(n_1d_elements):
@@ -1635,33 +1938,70 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         elem_nodes_1d = elements_1d[elem_idx]
         node_0 = elem_nodes_1d[0]
         node_1 = elem_nodes_1d[1]
-        dof_indices_1d[elem_idx] = [dof_offset[node_0], dof_offset[node_0] + 1,
-                                     dof_offset[node_1], dof_offset[node_1] + 1]
+        node_m = _midside_1d_node(elements_1d, element_types_1d, elem_idx)
+        row = [dof_offset[node_0], dof_offset[node_0] + 1,
+               dof_offset[node_1], dof_offset[node_1] + 1]
+        if node_m is not None and n_dof_by_1d_elem[elem_idx] == 6:
+            row += [dof_offset[node_m], dof_offset[node_m] + 1]
+        dof_indices_1d[elem_idx, :len(row)] = row
 
-    # Identify pile head nodes and their fixity for boundary conditions
-    # The pile head is the top node (highest y) of each pile line.
+    # Identify the pile end nodes and their rotation restraints for boundary
+    # conditions. The head is the top node (highest y) of each pile line and the
+    # tip is the bottom node (lowest y). Each end carries its own restraint --
+    # 'Head' and 'Tip' in the piles sheet -- and 'fixed' constrains that node's
+    # ROTATION degree of freedom only; the translations stay with the boundary
+    # conditions and the surrounding soil. ``fixity`` is read as the head for a
+    # slope_data dict built before the two ends were separated.
     pile_head_nodes = []
-    pile_head_fixed = []
+    pile_head_fixed = []     # rotation held ('Head' = unrotated or fixed)
+    pile_head_pinned = []    # translations held ('Head' = pinned or fixed)
+    pile_tip_nodes = []
+    pile_tip_fixed = []      # rotation restrained ('Tip' = fixed)
+    pile_tip_pinned = []     # translations restrained ('Tip' = pinned or fixed)
     for pl_idx in range(n_pile_lines):
         pile_data = pile_lines[pl_idx]
-        fixity = pile_data.get("fixity", "free")
+        head_fixity = pile_data.get("head_fixity", pile_data.get("fixity", "free"))
+        tip_fixity = pile_data.get("tip_fixity", "free")
 
-        # Collect all nodes belonging to this pile line
+        # Collect all nodes belonging to this pile line, midside nodes included,
+        # and the end nodes separately.
         pile_nodes_for_line = set()
+        end_nodes_for_line = set()
         for p_idx in range(n_pile_elements):
             if pile_line_idx_by_pile_elem[p_idx] == pl_idx:
                 n0, n1 = pile_node_pairs[p_idx]
-                pile_nodes_for_line.add(n0)
-                pile_nodes_for_line.add(n1)
+                end_nodes_for_line.update((int(n0), int(n1)))
+                for nd in pile_elem_nodes[p_idx]:
+                    if nd >= 0:
+                        pile_nodes_for_line.add(int(nd))
 
         if pile_nodes_for_line:
-            # Top node = highest y coordinate
+            # Top node = highest y coordinate; bottom node = lowest y
             top_node = max(pile_nodes_for_line, key=lambda nd: nodes[nd, 1])
+            bottom_node = min(pile_nodes_for_line, key=lambda nd: nodes[nd, 1])
+            # A midside node sits at the midpoint of its element, strictly
+            # between the two ends in y, so the extremes are end nodes. The head
+            # and tip restraints are stated for the ends of the pile, and a
+            # midside node picked up here would put them mid-element.
+            if top_node not in end_nodes_for_line or bottom_node not in end_nodes_for_line:
+                raise ValueError(
+                    f"Pile line {pl_idx + 1}: the highest or lowest node of the "
+                    f"pile is not an end node of one of its elements, so the head "
+                    f"and tip restraints cannot be placed. Check that the pile "
+                    f"line is not horizontal.")
             pile_head_nodes.append(top_node)
-            pile_head_fixed.append(fixity == "fixed")
+            pile_head_fixed.append(head_fixity in ("unrotated", "fixed"))
+            pile_head_pinned.append(head_fixity in ("pinned", "fixed"))
+            pile_tip_nodes.append(bottom_node)
+            pile_tip_fixed.append(tip_fixity in ("unrotated", "fixed"))
+            pile_tip_pinned.append(tip_fixity in ("pinned", "fixed"))
 
     pile_head_nodes = np.array(pile_head_nodes, dtype=int)
     pile_head_fixed = np.array(pile_head_fixed, dtype=bool)
+    pile_head_pinned = np.array(pile_head_pinned, dtype=bool)
+    pile_tip_nodes = np.array(pile_tip_nodes, dtype=int)
+    pile_tip_fixed = np.array(pile_tip_fixed, dtype=bool)
+    pile_tip_pinned = np.array(pile_tip_pinned, dtype=bool)
 
     # Set up boundary conditions
     
@@ -2231,16 +2571,16 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "t_allow_by_1d_elem": t_allow_by_1d_elem,
         "t_res_by_1d_elem": t_res_by_1d_elem,
         "k_by_1d_elem": k_by_1d_elem,
-        # Geometry + local overburden for the optional bond-slip load-transfer model.
+        # Per-element geometry along each reinforcement line, and the line labels:
+        # what the 1D details panel needs to place and name a line's elements.
         "elem_length_1d": elem_length_1d,
         "dist_end1_1d": dist_end1_1d,
         "dist_end2_1d": dist_end2_1d,
-        "t_max_1d": t_max_1d,
-        "sigma_v_1d": sigma_v_1d,
         "reinforce_line_labels": reinforce_line_labels,
         "cos_theta_1d": cos_theta_1d,
         "sin_theta_1d": sin_theta_1d,
         "dof_indices_1d": dof_indices_1d,
+        "n_dof_by_1d_elem": n_dof_by_1d_elem,
         "K_global_1d_elems": K_global_1d_elems,
         "unit_weight": unit_weight,
         "k_seismic": k_seismic,
@@ -2252,14 +2592,16 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "dof_offset": dof_offset,
         "is_pile_node": is_pile_node,
         "n_dof_total": n_dof_total,
-        # Pile beam elements (6-DOF Euler-Bernoulli)
+        # Pile beam elements (Euler-Bernoulli)
         "n_pile_elements": n_pile_elements,
         "pile_elem_mask": pile_elem_mask,
         "pile_elem_indices": pile_elem_indices,
         "cos_theta_pile": cos_theta_pile,
         "sin_theta_pile": sin_theta_pile,
         "dof_indices_pile": dof_indices_pile,
+        "n_dof_by_pile_elem": n_dof_by_pile_elem,
         "K_global_pile_elems": K_global_pile_elems,
+        "K_local_by_pile_elem": K_local_by_pile_elem,
         "V_cap_by_pile_elem": V_cap_by_pile_elem,
         "M_cap_by_pile_elem": M_cap_by_pile_elem,
         "elem_length_by_pile_elem": elem_length_by_pile_elem,
@@ -2267,9 +2609,14 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "EI_by_pile_elem": EI_by_pile_elem,
         "EA_by_pile_elem": EA_by_pile_elem,
         "pile_node_pairs": pile_node_pairs,
+        "pile_elem_nodes": pile_elem_nodes,
         "pile_line_idx_by_pile_elem": pile_line_idx_by_pile_elem,
         "pile_head_nodes": pile_head_nodes,
         "pile_head_fixed": pile_head_fixed,
+        "pile_head_pinned": pile_head_pinned,
+        "pile_tip_nodes": pile_tip_nodes,
+        "pile_tip_fixed": pile_tip_fixed,
+        "pile_tip_pinned": pile_tip_pinned,
     }
 
 
@@ -2282,94 +2629,6 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         fem_data["time_unit"] = slope_data["time_unit"]
 
     return fem_data
-
-
-def _resolve_bond_slip_lines(bond_slip, reinforce_line_labels, n_reinf_lines):
-    """Resolve a bond_slip dict {line_key: (bond_c, bond_phi_deg, perimeter)} into
-    {line_id_0based: (bond_c, bond_phi_deg, perimeter)}.
-
-    line_key may be a reinforcement line LABEL (str), a 1-based line id (int), or
-    '*' (every reinforcement line). An unknown label / out-of-range id raises
-    ValueError rather than silently no-opping (mirrors tension_cutoff_by_material).
-    """
-    resolved = {}
-    for key, params in bond_slip.items():
-        try:
-            bond_c, bond_phi, perim = params
-        except (TypeError, ValueError):
-            raise ValueError(
-                f"bond_slip['{key}'] must be a 3-tuple (bond_c, bond_phi_deg, "
-                f"perimeter); got {params!r}")
-        if isinstance(key, str) and key.strip() == '*':
-            targets = list(range(n_reinf_lines))
-        elif isinstance(key, str):
-            if key not in reinforce_line_labels:
-                raise ValueError(
-                    f"bond_slip references reinforcement line '{key}', which is not "
-                    f"among the model's lines {reinforce_line_labels}")
-            targets = [i for i, lbl in enumerate(reinforce_line_labels) if lbl == key]
-        else:
-            lid = int(key) - 1   # 1-based -> 0-based
-            if lid < 0 or lid >= n_reinf_lines:
-                raise ValueError(
-                    f"bond_slip references reinforcement line id {key}, outside the "
-                    f"1..{n_reinf_lines} range of the model's reinforcement lines")
-            targets = [lid]
-        for lid in targets:
-            resolved[lid] = (float(bond_c), float(bond_phi), float(perim))
-    return resolved
-
-
-def _bond_slip_caps(fem_data, bond_slip):
-    """Effective per-1D-element tensile cap under the bond-slip load-transfer model.
-
-    Returns a copy of ``t_allow_by_1d_elem`` in which every element of a bond-slip
-    reinforcement line is re-capped by the Coulomb bond envelope, REPLACING that
-    line's fixed end-ramp (lp1/lp2) taper. For an element at centroid arc-length s
-    on a line, the bond force that can be anchored against pull-out toward either
-    free end is the integral of the bond capacity per unit length
-
-        q(s) = perimeter * max(0, bond_c + sigma_n(s) * tan(bond_phi))
-
-    from that end to s (sigma_n = local vertical overburden, sigma_v_1d). The force
-    at s cannot exceed the smaller of the two one-sided integrals, and is finally
-    capped by the material axial capacity t_max:
-
-        t_bond(s) = min( INT_end1^s q,  INT_s^end2 q )
-        t_cap(s)  = min( t_max, t_bond(s) )
-
-    In the constant-q, single-material limit this reduces to q*min(d1, d2) — exactly
-    the classical double-ended pull-out ramp, with slope q instead of t_max/lp.
-    """
-    element_materials_1d = fem_data["element_materials_1d"]
-    t_allow = fem_data["t_allow_by_1d_elem"]
-    labels = fem_data.get("reinforce_line_labels", [])
-    n_reinf_lines = len(labels)
-    resolved = _resolve_bond_slip_lines(bond_slip, labels, n_reinf_lines)
-
-    length = fem_data["elem_length_1d"]
-    d1 = fem_data["dist_end1_1d"]
-    t_max = fem_data["t_max_1d"]
-    sv = fem_data["sigma_v_1d"]
-
-    t_cap = np.array(t_allow, dtype=float, copy=True)
-    for lid, (bond_c, bond_phi, perim) in resolved.items():
-        # 1-based material id in element_materials_1d
-        idxs = np.where(element_materials_1d == (lid + 1))[0]
-        idxs = idxs[length[idxs] > 0.0]
-        if idxs.size == 0:
-            continue
-        order = np.argsort(d1[idxs], kind="stable")   # end1 -> end2 along the line
-        ido = idxs[order]
-        tanphi = np.tan(np.radians(bond_phi))
-        q = perim * np.maximum(0.0, bond_c + sv[ido] * tanphi)   # force / length
-        qlen = q * length[ido]
-        cum = np.cumsum(qlen)
-        c1 = cum - 0.5 * qlen                 # bond from end1 up to each centroid
-        c2 = (cum[-1] - cum) + 0.5 * qlen     # bond from each centroid to end2
-        t_bond = np.minimum(c1, c2)
-        t_cap[ido] = np.maximum(0.0, np.minimum(t_max[ido], t_bond))
-    return t_cap
 
 
 # Implementation of Perzyna Visco-Plastic Algorithm for Slope Stability
@@ -2529,6 +2788,75 @@ def _gauss_point_overburden(fem_data, elem_gp_data):
     return sv0
 
 
+class _CholmodFactorSolver:
+    """``.solve(b)`` over a CHOLMOD Cholesky factor, matching SuperLU's interface."""
+
+    kind = "CHOLMOD Cholesky"
+
+    def __init__(self, factor):
+        self._factor = factor
+
+    def solve(self, b):
+        return self._factor(b)
+
+
+def _factorize_free_stiffness(K_free):
+    """Factorize the free-free stiffness once, for reuse by every iteration.
+
+    After the constrained DOFs are removed, K is symmetric positive definite, so
+    the general unsymmetric LU that ``splu`` performs by default stores and
+    applies two triangular factors where one would do -- and the back-
+    substitution is roughly 60 % of every viscoplastic pass. Two symmetric paths
+    are used instead, in order of preference:
+
+    * CHOLMOD (``scikit-sparse``), a true supernodal Cholesky, if it is
+      importable. It is an optional accelerator, never a requirement.
+    * ``splu``'s documented symmetric mode -- ``permc_spec='MMD_AT_PLUS_A'``
+      with the diagonal pivot threshold at zero and ``SymmetricMode`` on -- which
+      orders for the symmetric pattern and pivots down the diagonal.
+
+    Either way the matrix itself is unchanged, and a factorization that fails
+    (an indefinite or singular K, which means a badly posed model rather than a
+    bad solver choice) falls back to the general LU so the failure is reported
+    where it always was. ``XSLOPE_FEM_FACTOR`` (``auto``, ``cholmod``,
+    ``symmetric``, ``unsymmetric``) pins the path for measurement.
+
+    Returns (factor, kind) where factor exposes ``.solve(b)``.
+    """
+    # Default is the symmetric path (the full FEM suite ran on it 2026-08-23:
+    # 186/189, the two genuine movers being knife-edge models whose near-critical
+    # answer is round-off sensitive under any configuration — their locks carry
+    # that note). XSLOPE_FEM_FACTOR pins a specific path when reproducing an
+    # older configuration.
+    mode = os.environ.get("XSLOPE_FEM_FACTOR", "auto").strip().lower()
+
+    if mode in ("auto", "cholmod"):
+        try:
+            from sksparse.cholmod import cholesky as _cholmod_cholesky
+        except Exception:
+            if mode == "cholmod":
+                raise
+        else:
+            try:
+                return (_CholmodFactorSolver(_cholmod_cholesky(K_free.tocsc())),
+                        _CholmodFactorSolver.kind)
+            except Exception:
+                if mode == "cholmod":
+                    raise
+
+    if mode in ("auto", "symmetric"):
+        try:
+            return (splu(K_free.tocsc(), permc_spec="MMD_AT_PLUS_A",
+                         diag_pivot_thresh=0.0,
+                         options=dict(SymmetricMode=True)),
+                    "SuperLU symmetric mode")
+        except Exception:
+            if mode == "symmetric":
+                raise
+
+    return splu(K_free.tocsc()), "SuperLU general LU"
+
+
 def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                        suction_cap=None, elastic_mask=None,
                        tension_cap_by_elem=None, tension_cutoff=False,
@@ -2655,6 +2983,10 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     has_pile_elements = n_pile_elements > 0
     pile_head_nodes = fem_data.get("pile_head_nodes", np.array([], dtype=int))
     pile_head_fixed = fem_data.get("pile_head_fixed", np.array([], dtype=bool))
+    pile_head_pinned = fem_data.get("pile_head_pinned", np.array([], dtype=bool))
+    pile_tip_nodes = fem_data.get("pile_tip_nodes", np.array([], dtype=int))
+    pile_tip_fixed = fem_data.get("pile_tip_fixed", np.array([], dtype=bool))
+    pile_tip_pinned = fem_data.get("pile_tip_pinned", np.array([], dtype=bool))
 
     constraint_dofs = []
     for i in range(n_nodes):
@@ -2667,28 +2999,41 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         elif bc_type[i] == 3 or i in roller_y_nodes:  # Y-roller
             constraint_dofs.append(dof_y)
     if has_pile_elements:
-        for ph_idx in range(len(pile_head_nodes)):
-            if pile_head_fixed[ph_idx]:
-                ph_node = pile_head_nodes[ph_idx]
-                rot_dof = dof_offset[ph_node] + 2 if dof_offset is not None else None
-                if rot_dof is not None:
-                    constraint_dofs.append(rot_dof)
+        # Each pile end has four states, the same at the head and the tip:
+        # 'free' (nothing held — the soil, or the boundary the node sits on,
+        # decides), 'pinned' (translations held, rotation free), 'unrotated'
+        # (rotation held, translations free), 'fixed' (all three held). A held
+        # rotation constrains the third DOF a pile node carries; held
+        # translations constrain its two displacement DOFs.
+        for _end_nodes, _rot_held, _trans_held in (
+                (pile_head_nodes, pile_head_fixed, pile_head_pinned),
+                (pile_tip_nodes, pile_tip_fixed, pile_tip_pinned)):
+            for pe_idx in range(len(_end_nodes)):
+                pe_node = _end_nodes[pe_idx]
+                base = dof_offset[pe_node] if dof_offset is not None else 2 * pe_node
+                if _rot_held[pe_idx] and dof_offset is not None:
+                    constraint_dofs.append(base + 2)
+                if len(_trans_held) > pe_idx and _trans_held[pe_idx]:
+                    constraint_dofs.append(base)
+                    constraint_dofs.append(base + 1)
 
     constraint_set = set(constraint_dofs)
     free_dofs = np.array(sorted(set(range(n_dof)) - constraint_set))
     n_free = len(free_dofs)
 
     # ---- Extract K_free and PRE-FACTORIZE ----
-    if hasattr(K_global, 'toarray'):
-        K_dense = K_global.toarray()
-    else:
-        K_dense = K_global
-    K_free = csr_matrix(K_dense[np.ix_(free_dofs, free_dofs)])
-    K_factor = splu(K_free.tocsc())
+    # Constrained DOFs are eliminated by taking the free-free submatrix, exactly
+    # as before -- the selection is done sparsely, so K never exists as a dense
+    # n_dof x n_dof array (1.4 GB at the 2 ft mesh, 21.8 GB at 1 ft).
+    K_csr = K_global if issparse(K_global) else csr_matrix(K_global)
+    K_csr = K_csr.tocsr()
+    K_free = K_csr[free_dofs][:, free_dofs]
+    K_free.eliminate_zeros()
+    K_factor, K_factor_kind = _factorize_free_stiffness(K_free)
 
     if debug_level >= 1:
         print(f"  DOFs: {n_dof} total, {n_free} free, {len(constraint_dofs)} constrained")
-        print(f"  K factorized (reused for all iterations)")
+        print(f"  K factorized ({K_factor_kind}, reused for all iterations)")
 
     # ---- dt from material properties (Smith & Griffiths) + Rankine dt_r ----
     # NOTE: this is the phi-INDEPENDENT part only. It is a safe bound while the
@@ -3104,6 +3449,174 @@ _HYBRID_GROWTH_MIN = 0.02      # elastic displacements gained over the trailing 
 # noise; under it the classifier declines to rule.
 _HYBRID_U_SCALE_FLOOR_FRAC = 1e-6
 
+# Iterations without a >1% improvement on the best out-of-balance value seen after
+# which the residual is called PLATEAUED. This is a reporting threshold only: a
+# plateau is recorded in the result and the solve keeps running (see the no-progress
+# watch inside solve_fem for why it may not decide a verdict).
+_NO_PROGRESS_WINDOW = 1500
+
+# === Budget extension =========================================================
+# Reaching `max_iterations` is not a verdict either. A trial whose out-of-balance
+# is still TRENDING DOWN when the budget runs out has not failed; it has run out of
+# budget, and the number of iterations a viscoplastic solve needs grows with mesh
+# refinement and with proximity to the critical F. So the budget is EXTENDED, one
+# chunk at a time, for as long as the residual keeps falling, up to a hard ceiling
+# (`max_iterations_ceiling`).
+#
+# The trend is read from the mean of the last window against the mean of the window
+# before it, rather than from a single iterate: the residual oscillates on the yield
+# surface (see oob_window) and creeps non-monotonically, so consecutive values say
+# nothing. Requiring the same 1% the no-progress watch uses keeps one definition of
+# "meaningful improvement" in the file.
+_OOB_TREND_WINDOW = 500        # iterations averaged in each of the two windows
+_OOB_TREND_MIN = 0.01          # the later window must be this much lower (1%)
+# A steady decay is not the only way a solve is worth more iterations. Measured on
+# the reinforced slope at F = 1.25 (tri6, 1 ft): the residual falls to 2e-3 by
+# iteration 9,000, sits there, then RISES eighty-fold through a burst of plastic
+# redistribution around iteration 14,000 before coming back down and reaching
+# equilibrium at 16,242 — while max|u| moves from 0.1101 to 0.1139 ft. The slope is
+# standing still the whole time; only the residual is thrashing. At iteration 12,000
+# that solve is mid-excursion, so a trend test alone reads RISING and stops it 4,000
+# iterations short of its answer.
+#
+# The second signal is therefore the DISPLACEMENT field, read through the same
+# classifier the failure criterion uses: a trial whose displacement is not growing
+# and whose evidence the classifier cannot rule on (AMBIGUOUS) has not shown itself
+# to be failing, and gets more budget. A trial that IS growing is failing and gets
+# none — which is also where the iterations are saved. A STABLE_STUCK trial is
+# excluded deliberately: the classifier can already rule on it, and under the hybrid
+# criterion it counts as standing, so spending the ceiling on it would buy nothing.
+
+
+# === Early failure ============================================================
+# The mirror image of the budget extension. A trial that is running away does not
+# need its whole budget to prove it: the evidence is already in the two series the
+# loop samples every `_HYBRID_SAMPLE_EVERY` iterations, and once it is unambiguous
+# there is nothing left to learn from the remaining iterations.
+#
+# What makes this safe is where the thresholds sit. Every candidate test was
+# measured pass-by-pass on 45 strength-reduction trials — 24 that reached
+# equilibrium and 21 that did not — drawn from five complete bisection walks on two
+# models (an embankment at two mesh sizes, a reinforced slope under two bar rules,
+# and one of those at a deliberately small budget). NEAR the critical strength the
+# two sides of the bracket are not separable: a trial that reaches equilibrium can
+# grow past five times its elastic response, sit with a flat residual for thousands
+# of iterations, and then converge. So the two tests below are placed OUTSIDE that
+# region entirely — at levels no trial that reached equilibrium was observed to
+# come near (the closest came within a factor of 3.0 of the first and 1.59 of the
+# second). They therefore catch only the gross runaways, about half of the failing
+# trials, and leave the near-critical ones to spend their budget as before. That is
+# the deliberate trade: the factor of safety is decided by the near-critical trials,
+# and nothing here is allowed to touch them.
+#
+# Both are measured in the trial's OWN elastic displacement, so the rule carries to
+# any model and any mesh without retuning.
+_EARLY_FAIL_WINDOW = 2000      # iterations in the trailing window read by (b)
+_EARLY_FAIL_WARMUP = 500       # (b) may not fire before this iteration
+_EARLY_FAIL_GAIN = 1.0         # (b): elastic displacements gained over that window
+_EARLY_FAIL_U_MAX = 8.0        # (f): elastic displacements, the absolute runaway level
+
+
+def _early_failure(disp_hist, oob_hist, u_elastic_scale,
+                   sample_every=_HYBRID_SAMPLE_EVERY,
+                   window=_EARLY_FAIL_WINDOW, gain=_EARLY_FAIL_GAIN,
+                   u_max=_EARLY_FAIL_U_MAX, grow=_HYBRID_GROWTH_MIN,
+                   min_fall=_OOB_TREND_MIN, warmup=_EARLY_FAIL_WARMUP):
+    """Has this trial already proved that it is failing?
+
+    Read from the same two sampled series the budget extension uses, at the latest
+    sample. Either signal is sufficient:
+
+      * ``'stalled_residual'`` — the residual has NOT fallen by ``min_fall`` over the
+        last ``window`` iterations (the mean of the window's second half against the
+        mean of its first, i.e. ``_oob_still_falling`` negated) AND the field gained
+        at least ``gain`` elastic displacements over that same window. A residual
+        that has stopped coming down while the slope moves by a whole elastic
+        response is not a solve in difficulty; it is a slope in motion.
+      * ``'runaway'`` — max|u| has passed ``u_max`` elastic displacements and is
+        still gaining (at least ``grow`` of one over the last doubling of the
+        iteration count). No trend shape is asked for, only a level, which is the one
+        thing a trend test cannot supply.
+
+    The first is gated by ``warmup``; the second is not, because it is an absolute
+    level — eight times the elastic response — that a solve still warming up cannot
+    reach, and gating it would only delay the cheapest catches (the grossest
+    runaways declare themselves within a few hundred iterations).
+
+    Returns the signal's name, or None while neither is satisfied.
+    """
+    if not u_elastic_scale or u_elastic_scale <= 0.0:
+        return None
+    i = len(disp_hist) - 1
+    if i < 4:
+        return None                      # no doubling to read yet
+    d_now = float(disp_hist[i])
+    # Still gaining: the last doubling of the iteration count added displacement.
+    gaining = (d_now - float(disp_hist[i // 2])) >= grow * u_elastic_scale
+
+    # (f) absolute runaway
+    if d_now >= u_max * u_elastic_scale and gaining:
+        return 'runaway'
+
+    # (b) residual stalled while the field keeps moving
+    k = max(2, int(window // max(1, sample_every)))     # samples in the window
+    if i < k or i < (warmup // max(1, sample_every)):
+        return None
+    h = k // 2
+    prev = sum(oob_hist[i - k + 1:i - h + 1]) / float(k - h)
+    last = sum(oob_hist[i - h + 1:i + 1]) / float(h)
+    if prev > 0.0 and last < (1.0 - min_fall) * prev:
+        return None                      # still falling -> not a failure
+    if (d_now - float(disp_hist[i - k])) < gain * u_elastic_scale:
+        return None                      # not moving fast enough to call it
+    return 'stalled_residual'
+
+
+def _still_progressing(oob_hist, disp_hist, u_elastic_scale, mesh_height,
+                       window=_OOB_TREND_WINDOW):
+    """Is this solve worth more iterations than its budget allowed?
+
+    Two signals, either of which counts:
+
+      * the residual is TRENDING DOWN — the mean over the last ``window`` iterations
+        is at least ``_OOB_TREND_MIN`` below the mean over the ``window`` before it.
+        This is the ordinary case: a solve part-way down its decay.
+      * the displacement field is STANDING STILL on evidence the failure classifier
+        cannot rule on — verdict AMBIGUOUS with no trailing growth. This is the
+        excursion case: the residual is off on a rise while the slope does not move.
+
+    Neither signal is present in a trial whose displacement is GROWING while its
+    residual sits flat: that is a slope failing, and it stops at its budget exactly as
+    it always has. A STABLE_STUCK trial is left alone too — the classifier can
+    already rule on it, and under the hybrid criterion it counts as standing, so
+    spending the ceiling on it would buy nothing.
+    """
+    if _oob_still_falling(oob_hist, window=window):
+        return True
+    verdict, _, growth = classify_nonconvergence(
+        disp_hist, u_elastic_scale, 'iteration_cap', model_height=mesh_height)
+    return (verdict == 'AMBIGUOUS' and growth is not None
+            and growth <= _HYBRID_GROWTH_MIN)
+
+
+def _oob_still_falling(oob_hist, sample_every=_HYBRID_SAMPLE_EVERY,
+                       window=_OOB_TREND_WINDOW, min_fall=_OOB_TREND_MIN):
+    """Is the out-of-balance residual still trending down?
+
+    Compares the mean of the last ``window`` iterations against the mean of the
+    ``window`` before it, both read from ``oob_hist`` (sampled every
+    ``sample_every`` iterations). Returns False when there is not yet enough
+    history to judge, which is the conservative answer: no history, no extension.
+    """
+    k = max(2, int(window // max(1, sample_every)))
+    if len(oob_hist) < 2 * k:
+        return False
+    last = sum(oob_hist[-k:]) / k
+    prev = sum(oob_hist[-2 * k:-k]) / k
+    if not (prev > 0.0):
+        return False
+    return last < (1.0 - min_fall) * prev
+
 
 def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
                             sample_every=_HYBRID_SAMPLE_EVERY, model_height=None):
@@ -3137,7 +3650,11 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
     Parameters:
         disp_hist (list of float): max|u| sampled every ``sample_every`` iterations.
         u_elastic_scale (float): max|u| of the purely elastic solution for this trial.
-        exit_reason (str): 'iteration_cap', 'no_progress' or 'disp_limit'.
+        exit_reason (str): 'iteration_cap', 'inconclusive', 'disp_limit' or
+            'diverging' ('no_progress' is still accepted and read as
+            'iteration_cap'; solve_fem no longer ends a solve on a no-progress
+            plateau). 'disp_limit' and 'diverging' are evidence in their own right
+            and return FAILED.
         sample_every (int): sampling stride (documentation only; the window is a
             fraction of the sample count, so the stride does not enter the maths).
         model_height (float or None): mesh height, used only to floor the elastic
@@ -3157,8 +3674,11 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
             or float(u_elastic_scale) < scale_floor):
         # 'disp_limit' is the one verdict that survives a missing yardstick: it is an
         # ABSOLUTE displacement budget (a fraction of mesh height), so it is evidence
-        # in its own right and does not divide by the elastic scale.
-        return ('FAILED' if exit_reason == 'disp_limit' else 'AMBIGUOUS'), None, None
+        # in its own right and does not divide by the elastic scale. ('diverging' is
+        # listed for completeness only — the early-failure rule reads ratios to the
+        # elastic scale and cannot fire without one.)
+        return ('FAILED' if exit_reason in ('disp_limit', 'diverging')
+                else 'AMBIGUOUS'), None, None
 
     u_ratio = float(disp_hist[-1]) / float(u_elastic_scale)
 
@@ -3168,11 +3688,19 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
         return 'FAILED', u_ratio, None
 
     if n < _HYBRID_MIN_SAMPLES:
-        return 'AMBIGUOUS', u_ratio, None
+        return ('FAILED' if exit_reason == 'diverging' else 'AMBIGUOUS'), u_ratio, None
 
     k = max(2, int(round(n * _HYBRID_WINDOW_FRAC)))
     growth = (float(disp_hist[-1]) - float(disp_hist[n - k])) / float(u_elastic_scale)
     growing = growth > _HYBRID_GROWTH_MIN
+
+    # The early-failure rule (see _early_failure) is a failure verdict already made,
+    # on thresholds no trial that reaches equilibrium has been observed to reach.
+    # It is not re-litigated here on a truncated history — reading the classifier at
+    # a fraction of a budget is exactly the false-FAILED mechanism the no-progress
+    # exit used to produce.
+    if exit_reason == 'diverging':
+        return 'FAILED', u_ratio, growth
 
     if u_ratio >= _HYBRID_U_FAIL_MIN and growing:
         return 'FAILED', u_ratio, growth
@@ -3181,15 +3709,16 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
     return 'AMBIGUOUS', u_ratio, growth
 
 
-def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
+def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None, min_slip_depth=None,
               ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=None,
-              elastic_mask=None, bond_slip=None,
+              elastic_mask=None,
               suction_phi_b=None, suction_cap=None, _prepared=None,
               fast_kernel='auto', failure_criterion="hybrid", k0=None,
-              _init_state=None):
+              max_iterations_ceiling=50000, early_failure=True, _init_state=None,
+              _softened_seed=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -3227,7 +3756,22 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         fem_data (dict): FEM data dictionary from build_fem_data
         F (float): Shear strength reduction factor (c/F, tan(phi)/F)
         debug_level (int): 0=silent, 1=summary, 2=per-iteration
-        max_iterations (int): Maximum viscoplastic iterations (default 3000)
+        max_iterations (int): Viscoplastic iteration budget per trial (default
+            12000). It is a budget, not a ceiling: a trial that reaches it with the
+            out-of-balance residual still trending down is EXTENDED by another
+            budget's worth, repeatedly, while the trend holds.
+        max_iterations_ceiling (int): Hard stop on that extension (default 50000).
+            A trial that reaches the ceiling while still improving stops with
+            exit_reason 'inconclusive' - neither converged nor failed - and
+            solve_ssrm reports it as the bracket's upper uncertainty rather than
+            counting it as a failure.
+        early_failure (bool): End a trial as soon as its movement is unambiguously
+            running away, rather than spending the rest of its budget proving it
+            (default True). exit_reason 'diverging', which the bisection reads as
+            failed. The thresholds sit far outside the range any trial that reaches
+            equilibrium has been observed to occupy, so no verdict moves; see
+            `_early_failure`. Off for the at-failure capture solve, whose whole
+            purpose is to let the mechanism develop.
         tolerance (float): Convergence tolerance ||du|| / ||u|| (default 1e-3).
             Normalized by the current displacement (Smith & Griffiths CHECON-style),
             so steady benign viscoplastic creep is accepted as converged; false
@@ -3405,17 +3949,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             elastic set — ``option = elastic`` materials plus any v20 "SSR elastic"
             (-3) overlay row — else no elastic elements (bit-identical to the
             pre-existing path).
-        bond_slip (dict or None): OPT-IN bond-slip load-transfer model for 1D
-            reinforcement, as {line_key: (bond_c, bond_phi_deg, perimeter)}. For each
-            named line, the fixed end-ramp (lp1/lp2) pull-out taper is REPLACED by a
-            Coulomb bond envelope: the tension a bar can carry at any point is the
-            integral of the bond capacity per unit length
-            q = perimeter*(bond_c + sigma_n*tan(bond_phi)) from the nearer free end
-            to that point (sigma_n = local vertical overburden at the element), still
-            capped by the material axial capacity t_max. line_key is a reinforcement
-            line label (str), a 1-based line id (int), or '*' (all reinforcement
-            lines); an unknown reference raises ValueError. None (default) = the
-            end-ramp path, bit-identical. See _bond_slip_caps.
         suction_phi_b (dict or None): OPT-IN matric-suction strength, {material
             name: phi_b degrees}. Turns the signed (un-clamped) pore pressure's
             negative part s = max(0, -u) into an apparent cohesion s*tan(phi_b),
@@ -3470,6 +4003,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             Studio included. The standing guard is benchmarks/kernel_xcheck.py,
             which solves cases both ways and fails on any divergence; it MUST NOT
             be removed while 'auto' is the default.
+        early_exit (bool): Watch the out-of-balance residual for a no-progress
+            plateau and report it (`plateau_iteration`, `plateau_ratio`). The plateau
+            is an observation only - it does not end the solve, and a trial always
+            runs to convergence, its iteration cap, or the displacement cap. It used
+            to end the solve and report the trial as failed, which cut off trials that
+            were still converging and biased the factor of safety low; the residual is
+            not monotone and the iterations a trial needs grow with mesh refinement,
+            so a fixed window cannot decide the outcome (see the watch in the
+            iteration loop).
         failure_criterion (str): 'hybrid' (DEFAULT since 2026-07-26) or
             'non_convergence' (the legacy verdict, still fully supported). Under
             'hybrid', a trial that does not reach equilibrium is put through
@@ -3498,7 +4040,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             - u_ratio (float or None): max|u| / max|u|_elastic at the end of the solve
             - u_growth (float or None): elastic displacements gained over the trailing
               window of the iteration history (the growth signal)
-            - exit_reason (str): 'converged' | 'iteration_cap' | 'no_progress' | 'disp_limit'
+            - exit_reason (str): 'converged' | 'iteration_cap' | 'inconclusive' |
+              'disp_limit' | 'diverging' - why this solve stopped
+            - diverging_iteration (int or None): iteration at which the early-failure
+              rule fired, and diverging_signal (str or None) which of its two tests
+              fired ('runaway' or 'stalled_residual'); None on any other exit
+            - plateau_iteration (int or None): iteration at which the out-of-balance
+              stopped improving by >1% for `_NO_PROGRESS_WINDOW` iterations, or None
+              if it never stalled. A plateau does NOT stop the solve; it is reported
+              so a trial that ran to its cap can say the residual had gone flat.
+            - plateau_ratio (float or None): the out-of-balance ratio it stalled at
             - iterations (int): Number of iterations used
             - displacements (ndarray): Nodal displacement vector
             - stresses (ndarray): Element stress array (n_elements, 4) [sig_x, sig_y, tau_xy, sig_vm] compression-positive
@@ -3740,16 +4291,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         cos_theta_1d = fem_data["cos_theta_1d"]
         sin_theta_1d = fem_data["sin_theta_1d"]
         dof_indices_1d = fem_data["dof_indices_1d"]
-
-        # Effective tensile cap per 1D element. Default: the end-ramp envelope
-        # t_allow_by_1d_elem (SAME object — the default path is bit-identical). With
-        # the optional bond-slip load-transfer model, reinforcement lines named in
-        # bond_slip are re-capped by the Coulomb bond envelope (see _bond_slip_caps),
-        # replacing their fixed lp1/lp2 pull-out ramp; other lines keep t_allow.
-        if bond_slip:
-            t_cap_1d = _bond_slip_caps(fem_data, bond_slip)
-        else:
-            t_cap_1d = t_allow_by_1d_elem
+        # How many of each row's DOF slots the element uses: 4 for a two-node
+        # bar, 6 for a three-node bar that also stands on the midside node of
+        # its soil edge.
+        n_dof_1d = fem_data.get("n_dof_by_1d_elem",
+                                np.full(n_1d_elements, 4, dtype=int))
 
         # Tracking arrays for 1D element status
         forces_1d = np.zeros(n_1d_elements)
@@ -3764,14 +4310,22 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         # is FINITE — an unset (NaN) t_res means the bar is
         # elastic-perfectly-plastic and holds t_allow forever.
         softened_1d = np.zeros(n_1d_elements, dtype=bool)
+        # A carried-in post-peak set (INTERNAL; solve_ssrm's at-failure capture).
+        # The capture solve runs beyond critical, where the slope never passes
+        # through equilibrium, so the fixed point below can never fire and every
+        # softening bar would sit at its peak capacity in the at-failure field.
+        # Seeding it with the set the bracket's failed-edge trial actually shed
+        # to shows those bars at their residual, which is the state that failed.
+        if _softened_seed is not None and len(_softened_seed) == n_1d_elements:
+            softened_1d |= np.asarray(_softened_seed, dtype=bool)
         can_soften_1d = (np.isfinite(t_res_by_1d_elem)
-                         & (t_res_by_1d_elem < t_cap_1d - 1e-12))
+                         & (t_res_by_1d_elem < t_allow_by_1d_elem - 1e-12))
         n_soften_rounds = 0
 
         if debug_level >= 1:
             print(f"  1D truss elements: {n_1d_elements}")
 
-    # Extract pile beam element data (6-DOF Euler-Bernoulli)
+    # Extract pile beam element data (Euler-Bernoulli)
     n_pile_elements = fem_data.get("n_pile_elements", 0)
     has_pile_elements = n_pile_elements > 0
     pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(n_1d_elements, dtype=bool))
@@ -3780,6 +4334,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         cos_theta_pile = fem_data["cos_theta_pile"]
         sin_theta_pile = fem_data["sin_theta_pile"]
         dof_indices_pile = fem_data["dof_indices_pile"]
+        # 6 on a two-node beam element, 9 on a three-node one.
+        n_dof_pile = fem_data.get("n_dof_by_pile_elem",
+                                  np.full(n_pile_elements, 6, dtype=int))
+        K_local_pile = fem_data.get("K_local_by_pile_elem", None)
         V_cap_pile = fem_data["V_cap_by_pile_elem"]
         M_cap_pile = fem_data["M_cap_by_pile_elem"]
         L_pile_elem = fem_data["elem_length_by_pile_elem"]
@@ -3794,7 +4352,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         yielded_pile_M = np.zeros(n_pile_elements, dtype=bool)
 
         if debug_level >= 1:
-            print(f"  Pile beam elements: {n_pile_elements} (6-DOF Euler-Bernoulli)")
+            _n_node_pile = sorted({int(n) // 3 for n in n_dof_pile}) or [2]
+            _pile_kind = "/".join(f"{n}-node" for n in _n_node_pile)
+            print(f"  Pile beam elements: {n_pile_elements} "
+                  f"({_pile_kind} Euler-Bernoulli)")
 
     # ---- Working Gauss-point groups: the F-DEPENDENT half, rebuilt each solve ----
     # The prepared model carries the F-INDEPENDENT halves of each group (geometry
@@ -3963,7 +4524,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     disp_hist = []
     u_elastic_scale = 0.0
     exit_reason = 'iteration_cap'
-    ee_suppressed = False
+    plateau_iter = None            # iteration at which the residual plateaued
+    plateau_ratio = None           # the out-of-balance ratio it plateaued at
+    diverging_iter = None          # iteration at which the early-failure rule fired
+    diverging_signal = None        # which of its two tests fired
+    n_extensions = 0               # budget extensions granted (all stages)
+    budget = int(max_iterations)
     sq3 = np.sqrt(3.0)   # loop-invariant constant (hoisted out of the VP iteration)
 
     for stage_idx, (base_loads, u_gp_active, u_gp_signed_active, stage_label) in enumerate(stage_list):
@@ -4085,9 +4651,58 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         disp_hist = []                 # max|u| samples (hybrid criterion)
         u_elastic_scale = float(np.max(np.abs(u_e_grav))) if u_e_grav.size else 0.0
         exit_reason = 'iteration_cap'
-        ee_suppressed = False          # hybrid: full budget granted to a stuck-looking state
+        plateau_iter = None            # no-progress watch, reset per stage
+        plateau_ratio = None
+        diverging_iter = None          # early-failure watch, reset per stage
+        diverging_signal = None
+        oob_hist = []                  # out-of-balance samples (budget-extension trend)
+        budget = int(max_iterations)   # this stage's CURRENT budget; may be extended
+        ceiling = max(int(max_iterations_ceiling or 0), budget)
+        chunk = int(max_iterations)    # one extension is worth one original budget
+        # Two trend windows have to FIT inside the budget, or the trend can never be
+        # read and a small budget would never be extended. They are the nominal
+        # width, capped at a quarter of the budget.
+        trend_window = min(_OOB_TREND_WINDOW,
+                           max(2 * _HYBRID_SAMPLE_EVERY, budget // 4))
 
-        for iteration in range(max_iterations):
+        iteration = -1
+        while True:
+            iteration += 1
+            if iteration >= budget:
+                # Budget reached. Extend it while the solve is still progressing.
+                if budget < ceiling and _still_progressing(
+                        oob_hist, disp_hist, u_elastic_scale, mesh_height,
+                        trend_window):
+                    budget = min(ceiling, budget + chunk)
+                    n_extensions += 1
+                    if debug_level >= 1:
+                        print(f"  Budget extended at iteration {iteration}: "
+                              f"the solve is still making progress "
+                              f"({unbalanced_force_ratio:.2e} against tolerance "
+                              f"{force_tol:.1e}); budget now {budget} "
+                              f"(ceiling {ceiling})")
+                else:
+                    if (budget >= ceiling
+                            and _still_progressing(oob_hist, disp_hist,
+                                                   u_elastic_scale, mesh_height,
+                                                   trend_window)
+                            and _oob_still_falling(oob_hist, window=trend_window)):
+                        # Out of ceiling, not out of progress: this trial has not
+                        # failed and has not converged, and nothing here can say
+                        # which. The residual must be measurably STILL FALLING for
+                        # that claim — an undecidable displacement field on its own
+                        # keeps the legacy verdict, so the bisection is only ever
+                        # halted on positive evidence of an unfinished convergence.
+                        exit_reason = 'inconclusive'
+                        if debug_level >= 1:
+                            print(f"  Iteration ceiling {ceiling} reached with the "
+                                  f"solve still making progress "
+                                  f"({unbalanced_force_ratio:.2e} against tolerance "
+                                  f"{force_tol:.1e}) - INCONCLUSIVE, neither "
+                                  f"converged nor failed")
+                    converged = False
+                    iteration -= 1          # the last iteration actually performed
+                    break
             # Build body load correction from accumulated viscoplastic strains
             loads = base_loads.copy()
 
@@ -4307,13 +4922,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 for elem_idx_1d in range(n_1d_elements):
                     if pile_elem_mask[elem_idx_1d]:
                         continue  # pile elements handled separately below
-                    dof_idx = dof_indices_1d[elem_idx_1d]
+                    dof_idx = dof_indices_1d[elem_idx_1d][:n_dof_1d[elem_idx_1d]]
                     k = k_by_1d_elem[elem_idx_1d]
                     cos_t = cos_theta_1d[elem_idx_1d]
                     sin_t = sin_theta_1d[elem_idx_1d]
 
-                    # Relative displacement projected along element axis
-                    u_elem = u[dof_idx]  # [u_x0, u_y0, u_x1, u_y1]
+                    # Relative displacement of the two ends, projected along the
+                    # element axis. On the three-node bar that chord elongation
+                    # gives the axial force AT THE ELEMENT CENTER exactly, which
+                    # is the station every reader of forces_1d already places it
+                    # at, so the formula and its meaning are unchanged.
+                    u_elem = u[dof_idx]  # [u_x0, u_y0, u_x1, u_y1, (u_xm, u_ym)]
                     du_x = u_elem[2] - u_elem[0]
                     du_y = u_elem[3] - u_elem[1]
                     delta = du_x * cos_t + du_y * sin_t
@@ -4346,7 +4965,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     # comment at softened_1d for why.
                     T_cap = (t_res_by_1d_elem[elem_idx_1d]
                              if softened_1d[elem_idx_1d]
-                             else t_cap_1d[elem_idx_1d])
+                             else t_allow_by_1d_elem[elem_idx_1d])
                     T_true = min(max(T, 0.0), T_cap)
 
                     if T < 0:
@@ -4373,7 +4992,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     correction_T = T - T_true
 
                     if abs(correction_T) > 1e-30:
-                        # Internal force pattern for tension T: [-cos, -sin, +cos, +sin]
+                        # Internal force pattern for a constant tension T:
+                        # [-cos, -sin, +cos, +sin] at the two ends. On the
+                        # three-node bar the consistent nodal forces for a
+                        # constant axial force are [-T, +T, 0] in node order, so
+                        # the midside node takes no share of the correction.
                         loads[dof_idx[0]] += correction_T * (-cos_t)
                         loads[dof_idx[1]] += correction_T * (-sin_t)
                         loads[dof_idx[2]] += correction_T * cos_t
@@ -4384,48 +5007,28 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                           f"{n_1d_exceeded} exceeded capacity, "
                           f"{np.sum(failed_1d)} total failed")
 
-            # ---- Pile beam element force computation and capacity checks (6-DOF) ----
+            # ---- Pile beam element force computation and capacity checks ----
             if has_pile_elements:
                 n_pile_yielded_V = 0
                 n_pile_yielded_M = 0
                 for p_idx in range(n_pile_elements):
-                    dof_idx = dof_indices_pile[p_idx]
+                    n_dof_e = int(n_dof_pile[p_idx])
+                    n_node_e = n_dof_e // 3
+                    dof_idx = dof_indices_pile[p_idx][:n_dof_e]
                     cos_t = cos_theta_pile[p_idx]
                     sin_t = sin_theta_pile[p_idx]
                     L = L_pile_elem[p_idx]
                     EI_val = EI_pile[p_idx]
                     EA_val = EA_pile[p_idx]
+                    Kl = K_local_pile[p_idx] if K_local_pile is not None else None
 
-                    # Extract 6 global DOFs: [ux1, uy1, theta1, ux2, uy2, theta2]
+                    # [ux, uy, theta] at end 1, end 2 and -- on a three-node
+                    # element -- the midside node of the soil edge.
                     u_elem = u[dof_idx]
+                    T_force, V, M1, M2, u_local = _pile_element_actions(
+                        u_elem, cos_t, sin_t, L, EA_val, EI_val, Kl, n_node_e)
 
-                    # Transform to local coordinates using rotation matrix T
-                    c = cos_t
-                    s = sin_t
-                    T = np.array([
-                        [ c,  s, 0, 0, 0, 0],
-                        [-s,  c, 0, 0, 0, 0],
-                        [ 0,  0, 1, 0, 0, 0],
-                        [ 0,  0, 0, c, s, 0],
-                        [ 0,  0, 0,-s, c, 0],
-                        [ 0,  0, 0, 0, 0, 1],
-                    ])
-                    u_local = T @ u_elem  # [u1_axial, v1_trans, theta1, u2_axial, v2_trans, theta2]
-
-                    # Axial force: T = EA/L * (u2_axial - u1_axial)
-                    T_force = EA_val / L * (u_local[3] - u_local[0])
                     forces_pile_axial[p_idx] = T_force
-
-                    # Shear force: V = dM/dx, from beam theory
-                    # V = 12*EI/L^3 * (v1 - v2) + 6*EI/L^2 * (theta1 + theta2)
-                    L2 = L * L
-                    L3 = L2 * L
-                    V = 12*EI_val/L3 * (u_local[1] - u_local[4]) + 6*EI_val/L2 * (u_local[2] + u_local[5])
-
-                    # Bending moments at node 1 and node 2 from K_local rows 2 and 5
-                    M1 = EI_val * (6.0/L2 * u_local[1] + 4.0/L * u_local[2] - 6.0/L2 * u_local[4] + 2.0/L * u_local[5])
-                    M2 = EI_val * (6.0/L2 * u_local[1] + 2.0/L * u_local[2] - 6.0/L2 * u_local[4] + 4.0/L * u_local[5])
-
                     forces_pile_moment[p_idx] = [M1, M2]
 
                     # --- V_cap check ---
@@ -4440,12 +5043,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     forces_pile_lateral[p_idx] = V
 
                     if abs(correction_V) > 1e-30:
-                        # Convert lateral correction to global nodal forces
-                        # In local coords, shear internal force pattern: [0, 1, 0, 0, -1, 0]
-                        # Transform to global: correction_V * T^T @ [0, 1, 0, 0, -1, 0]
-                        f_local = np.array([0.0, correction_V, 0.0, 0.0, -correction_V, 0.0])
-                        f_global = T.T @ f_local
-                        for k in range(6):
+                        # Convert lateral correction to global nodal forces.
+                        # In local coordinates the shear internal-force pattern is
+                        # [0, 1, 0, 0, -1, 0] at the two ends; on a three-node
+                        # element the midside node takes no share of it, so the
+                        # cap is delivered entirely at the ends. (Distributing it
+                        # over the element's own shear shape is a refinement, and
+                        # so is hinging at the midside node under M_cap.)
+                        f_local = np.zeros(n_dof_e)
+                        f_local[1] = correction_V
+                        f_local[4] = -correction_V
+                        f_global = _beam_rotation(cos_t, sin_t, n_node_e).T @ f_local
+                        for k in range(n_dof_e):
                             loads[dof_idx[k]] += f_global[k]
 
                     # --- M_cap check (plastic hinge at each node) ---
@@ -4570,6 +5179,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # criterion, only the VERDICT's effect on the caller differs.
             if iteration % _HYBRID_SAMPLE_EVERY == 0:
                 disp_hist.append(float(norm_u_new))
+                oob_hist.append(float(unbalanced_force_ratio))
 
             # Force-equilibrium condition. The threshold is ABSOLUTE, which is what
             # makes the test immune to the size of the domain and to the size of the
@@ -4587,70 +5197,52 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # non-conservatively HIGH factor of safety.
             plastic_settled = unbalanced_force_ratio < force_tol
 
-            # No-progress early exit: if a long window passes with no meaningful
-            # improvement (>1%) on the best out-of-balance value seen, this trial is
-            # not going to reach `force_tol` in the remaining budget, so stop rather
-            # than burn the iteration ceiling.
+            # No-progress WATCH. When `_NO_PROGRESS_WINDOW` iterations pass with no
+            # meaningful improvement (>1%) on the best out-of-balance value seen, the
+            # residual is called PLATEAUED: the fact is recorded and reported, and the
+            # solve carries on to its iteration cap. A plateau is an observation about
+            # the residual, never a verdict on the slope.
             #
-            # NOTE ON ITS PREMISE. This exit was originally justified by "a settling
-            # state's out-of-balance keeps decaying; a failing state's plateaus", and
-            # that premise is FALSE IN BOTH DIRECTIONS: stable states plateau too
-            # (the residual can stall above an absolute tolerance while the slope is
-            # standing perfectly still), and failing states can keep inching the
-            # residual down while the displacement field runs away. The exit is
-            # therefore a BUDGET decision — "this solve is not converging" — and not
-            # by itself a verdict on the slope. Under failure_criterion='hybrid' the
-            # verdict is taken afterwards by classify_nonconvergence() from the
-            # displacement history, on the same footing as an iteration-cap exit.
+            # It used to END the solve and report the trial as failed, and that was
+            # wrong in the direction that matters. Two measurements say so:
+            #
+            #   * THE RESIDUAL IS NOT MONOTONE. On the reinforced slope at F = 1.25
+            #     (tri6, 1 ft elements) it sits near 2e-3 around iteration 9,500 —
+            #     twice the tolerance it is chasing — climbs back above 1e-2, and only
+            #     then falls through 1e-3 at iteration 16,242. "No improvement lately"
+            #     is not evidence that the solve is finished.
+            #   * THE WORK A TRIAL NEEDS GROWS WITH MESH REFINEMENT, A FIXED WINDOW
+            #     DOES NOT. Iterations to equilibrium at that same F are 5,054 /
+            #     10,555 / 16,242 at 2.5 / 1.5 / 1.0 ft element size, so a fixed
+            #     1,500-iteration window is 30% of the required work on the coarse
+            #     mesh and 9% on the fine one: refining the mesh tightened the
+            #     guillotine without anyone asking it to. The bisection closed on the
+            #     false failure and reported FS = 1.238 for a slope that reaches
+            #     equilibrium at F = 1.25, and again at F = 1.424, on that same mesh.
+            #     With the plateau demoted to an observation it reports 1.434, and the
+            #     spread over a 6x range in element count falls from 18% to 5%.
+            #
+            # A near-tolerance guard ("do not stop while the residual is within 10 x
+            # force_tol") was measured and does NOT repair it — the stop simply fires
+            # later, on the rebound, at iteration 12,920. The window had to stop
+            # deciding, not move.
+            #
+            # The cost falls on trials that genuinely fail: they now spend the whole
+            # budget instead of leaving early. Converged trials are untouched, because
+            # a converging solve leaves on convergence, which comes before the cap.
             if unbalanced_force_ratio < 0.99 * ufr_best:
                 ufr_best = unbalanced_force_ratio
                 last_progress_iter = iteration
-            # Window calibration: genuinely settling states can stall for >500
-            # iterations mid-decay (the reinforced slope at F=1.6 settles at ~2900
-            # iterations with a ~1000-iteration plateau on the way), so the window must
-            # be generous; post-vectorization the extra iterations cost seconds.
-            _trip = (early_exit and not ee_suppressed and not plastic_settled
-                     and iteration - last_progress_iter > 1500)
-            # HYBRID: the classifier's calibration was measured on FULL-BUDGET solves,
-            # and it must only be applied to full-budget solves. The early exit's
-            # window is far shorter than the time a slow runaway takes to become
-            # visible in the displacement field, so a truncated history can look
-            # frozen while the slope is in fact accelerating. Measured on RS2-62c at
-            # F = 0.800: the exit fires at iteration 5,118 with max|u| at 1.03x
-            # elastic and zero trailing growth — indistinguishable from a genuinely
-            # stuck state — while the SAME trial run to 40,000 iterations reaches
-            # 1.72x elastic and is growing by 0.23 per window, i.e. plainly failing
-            # (and matching the 1.7x this benchmark's verification section reports).
-            # So when the exit trips on a state the classifier would call
-            # STABLE_STUCK, do not exit: suppress the exit for the rest of this solve
-            # and let the trial spend its budget, so the verdict rests on a
-            # full-budget observation. The time saving is kept for every other case —
-            # a state already beyond elastic scale exits immediately, because its
-            # FAILED verdict is corroborated the moment the exit trips.
-            if _trip and failure_criterion == 'hybrid':
-                _v, _, _ = classify_nonconvergence(disp_hist, u_elastic_scale,
-                                                   'no_progress',
-                                                   model_height=mesh_height)
-                if _v == 'STABLE_STUCK':
-                    _trip = False
-                    ee_suppressed = True
-                    if debug_level >= 1:
-                        print(f"  Early exit suppressed at iteration {iteration+1}: "
-                              f"out-of-balance plateaued but max|u| is still at "
-                              f"elastic scale — running the full budget so the "
-                              f"verdict is not taken on a truncated history")
-            if _trip:
-                converged = False
-                exit_reason = 'no_progress'
-                u = u_new
+            if (early_exit and plateau_iter is None and not plastic_settled
+                    and iteration - last_progress_iter > _NO_PROGRESS_WINDOW):
+                plateau_iter = iteration + 1
+                plateau_ratio = float(unbalanced_force_ratio)
                 if debug_level >= 1:
-                    _tail = ("- verdict deferred to the displacement classifier"
-                             if failure_criterion == 'hybrid' else "- declared FAILED")
-                    print(f"  Early exit at iteration {iteration+1}: no progress in "
-                          f"out-of-balance force for 1500 iterations (plateau "
-                          f"{unbalanced_force_ratio:.2e} vs tolerance {force_tol:.1e})"
-                          f" {_tail}")
-                break
+                    print(f"  Out-of-balance plateaued at iteration {iteration+1} "
+                          f"({unbalanced_force_ratio:.2e} against tolerance "
+                          f"{force_tol:.1e}; no >1% improvement for "
+                          f"{_NO_PROGRESS_WINDOW} iterations) - recorded; the solve "
+                          f"continues to its iteration cap")
 
             if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
                 print(f"  Iter {iteration+1:4d}: max|du|/max|u| = {relative_change:.3e}, "
@@ -4661,8 +5253,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # progress bar within this viscoplastic solve, not just between solves.
             if progress_callback is not None and iteration % 10 == 0:
                 try:
-                    progress_callback((iteration + 1) / max_iterations,
-                                      f"vp iter {iteration + 1}/{max_iterations}, "
+                    progress_callback((iteration + 1) / budget,
+                                      f"vp iter {iteration + 1}/{budget}, "
                                       f"oob={unbalanced_force_ratio:.1e}")
                 except Exception:
                     pass
@@ -4709,7 +5301,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 if has_1d_elements and can_soften_1d.any():
                     demand = forces_1d
                     newly = (~softened_1d & can_soften_1d
-                             & (demand > t_cap_1d + 1e-9))
+                             & (demand > t_allow_by_1d_elem + 1e-9))
                     if newly.any() and n_soften_rounds < n_1d_elements:
                         softened_1d |= newly
                         n_soften_rounds += 1
@@ -4722,6 +5314,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                         # new equilibrium is judged on its own decay history
                         ufr_best = np.inf
                         last_progress_iter = iteration
+                        plateau_iter = None
+                        plateau_ratio = None
                         u = u_new
                         continue
                 # -------------------------------------------------------------
@@ -4734,6 +5328,29 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                           f"max nodal OOB = {unbalanced_force_ratio:.2e} < {force_tol:.1e})")
                 break
 
+            # Early failure. Read on the sampled iterations only, from the two series
+            # just appended above, and only AFTER the convergence test, so a solve
+            # that settles on this very iteration always settles. A trial that fires
+            # never reaches the budget check at the top of the loop, so it is never
+            # considered for an extension — the two rules meet, but do not interact.
+            if early_failure and iteration % _HYBRID_SAMPLE_EVERY == 0:
+                _signal = _early_failure(disp_hist, oob_hist, u_elastic_scale)
+                if _signal is not None:
+                    converged = False
+                    exit_reason = 'diverging'
+                    diverging_iter = iteration
+                    diverging_signal = _signal
+                    u = u_new
+                    if debug_level >= 1:
+                        print(f"  Failing at iteration {iteration}: max|u| = "
+                              f"{norm_u_new:.4g} "
+                              f"({norm_u_new / u_elastic_scale:.1f}x elastic), "
+                              f"out-of-balance {unbalanced_force_ratio:.2e} "
+                              f"({_signal}) - the slope is running away; the trial "
+                              f"is closed as FAILED without spending the rest of "
+                              f"its budget")
+                    break
+
             u = u_new
 
 
@@ -4742,7 +5359,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             break   # stage failed -> overall failure
 
     if not converged and debug_level >= 1:
-        print(f"  Did NOT converge after {max_iterations} iterations (max|du|/max|u| = {relative_change:.3e})")
+        print(f"  Did NOT converge after {total_iterations} iterations "
+              f"(max|du|/max|u| = {relative_change:.3e}, exit {exit_reason})")
 
     # === Hybrid failure criterion: classify a non-converged trial ===
     # Computed on EVERY criterion so the metadata is always available for reporting
@@ -4916,7 +5534,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     # ---- Step 10b: Compute final 1D truss element forces ----
     if has_1d_elements:
         for elem_idx_1d in range(n_1d_elements):
-            dof_idx = dof_indices_1d[elem_idx_1d]
+            dof_idx = dof_indices_1d[elem_idx_1d][:n_dof_1d[elem_idx_1d]]
             k = k_by_1d_elem[elem_idx_1d]
             cos_t = cos_theta_1d[elem_idx_1d]
             sin_t = sin_theta_1d[elem_idx_1d]
@@ -4929,48 +5547,30 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
 
             # Report the force the bar actually delivers, under the same law that
             # was enforced in the viscoplastic loop: tension-only, yielding at the
-            # effective cap (end-ramp t_allow or the bond-slip envelope) — or at
-            # t_res if the bar ended up in the softened set.
+            # end-ramp envelope t_allow — or at t_res if the bar ended up in
+            # the softened set.
             cap = (t_res_by_1d_elem[elem_idx_1d] if softened_1d[elem_idx_1d]
-                   else t_cap_1d[elem_idx_1d])
+                   else t_allow_by_1d_elem[elem_idx_1d])
             forces_1d[elem_idx_1d] = min(max(T, 0.0), cap)
 
     # ---- Step 10c: Compute final pile beam element forces (capped at capacity) ----
     if has_pile_elements:
         for p_idx in range(n_pile_elements):
-            dof_idx = dof_indices_pile[p_idx]
+            n_dof_e = int(n_dof_pile[p_idx])
+            n_node_e = n_dof_e // 3
+            dof_idx = dof_indices_pile[p_idx][:n_dof_e]
             cos_t = cos_theta_pile[p_idx]
             sin_t = sin_theta_pile[p_idx]
             L = L_pile_elem[p_idx]
             EI_val = EI_pile[p_idx]
             EA_val = EA_pile[p_idx]
+            Kl = K_local_pile[p_idx] if K_local_pile is not None else None
 
             u_elem = u[dof_idx]
+            T_force, V, M1, M2, u_local = _pile_element_actions(
+                u_elem, cos_t, sin_t, L, EA_val, EI_val, Kl, n_node_e)
 
-            c = cos_t
-            s = sin_t
-            T = np.array([
-                [ c,  s, 0, 0, 0, 0],
-                [-s,  c, 0, 0, 0, 0],
-                [ 0,  0, 1, 0, 0, 0],
-                [ 0,  0, 0, c, s, 0],
-                [ 0,  0, 0,-s, c, 0],
-                [ 0,  0, 0, 0, 0, 1],
-            ])
-            u_local = T @ u_elem
-
-            # Axial force
-            T_force = EA_val / L * (u_local[3] - u_local[0])
             forces_pile_axial[p_idx] = T_force
-
-            # Shear force
-            L2 = L * L
-            L3 = L2 * L
-            V = 12*EI_val/L3 * (u_local[1] - u_local[4]) + 6*EI_val/L2 * (u_local[2] + u_local[5])
-
-            # Bending moments
-            M1 = EI_val * (6.0/L2 * u_local[1] + 4.0/L * u_local[2] - 6.0/L2 * u_local[4] + 2.0/L * u_local[5])
-            M2 = EI_val * (6.0/L2 * u_local[1] + 2.0/L * u_local[2] - 6.0/L2 * u_local[4] + 4.0/L * u_local[5])
             forces_pile_moment[p_idx] = [M1, M2]
 
             # Cap shear at V_cap
@@ -5029,9 +5629,23 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         # Equilibrated initial-stress state (K0 runs only; None otherwise). Internal:
         # solve_ssrm's equilibration solve hands this to every trial as _init_state.
         "_k0_state": k0_state,
-        # True when the hybrid criterion held the no-progress exit back so a
-        # stuck-looking state could spend its full iteration budget.
-        "early_exit_suppressed": ee_suppressed,
+        # The no-progress watch: the iteration at which the out-of-balance stopped
+        # improving, and the value it stalled at, or None if it never stalled. A
+        # plateau does not end the solve — a trial that plateaus and then runs out of
+        # budget reports exit_reason 'iteration_cap' with these fields set, which is
+        # what tells a reader the residual had stopped moving before the cap.
+        "plateau_iteration": plateau_iter,
+        "plateau_ratio": plateau_ratio,
+        # The early-failure rule: the iteration at which it fired and which of its
+        # two tests fired, or None on any other exit (see _early_failure).
+        "diverging_iteration": diverging_iter,
+        "diverging_signal": diverging_signal,
+        # Retained name: True when a plateau was seen and the solve carried on anyway.
+        "early_exit_suppressed": plateau_iter is not None,
+        # Budget extension: how many extra chunks this solve was granted because the
+        # solve was still progressing at the budget, and the budget it ended on.
+        "budget_extensions": n_extensions,
+        "iteration_budget": budget,
         "failure_criterion": failure_criterion,
         "iterations": total_iterations,
         "displacements": u_reported,
@@ -5049,14 +5663,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         "unbalanced_force_ratio": unbalanced_force_ratio,
         "plastic_fraction": n_plastic / n_elements if n_elements > 0 else 0.0,
         "forces_1d": forces_1d if has_1d_elements else np.array([]),
-        # The tensile cap this solve actually enforced, per 1D element. Equal to
-        # fem_data['t_allow_by_1d_elem'] on the default path; the Coulomb bond
-        # envelope where the optional bond-slip model re-capped a line. Reported
-        # because it is the only place that distinction survives: fem_data is
-        # rebuilt from the model on reload and knows nothing about the run
-        # options, so a reader handed t_allow alone would draw the wrong capacity
-        # for a bond-slip run.
-        "t_cap_1d": t_cap_1d if has_1d_elements else np.array([]),
         "failed_1d_elements": failed_1d if has_1d_elements else np.array([], dtype=bool),
         # bars that dropped to their residual capacity (converged-state fixed point)
         "softened_1d_elements": softened_1d if has_1d_elements else np.array([], dtype=bool),
@@ -5074,8 +5680,14 @@ def print_reinforcement_summary(fem_data, solution):
     Print a summary table of reinforcement line results.
 
     Groups 1D elements by reinforcement line and reports per-line statistics
-    including element counts, force ranges, and failure modes.
+    including element counts, force ranges, and failure modes. Each line's
+    verdict is :func:`xslope.fem_details.reinforcement_status`, which is where
+    the Studio 1D Details panel and the report read it from as well: the word
+    printed here is the word on the screen.
     """
+    from .fem_details import (REINFORCEMENT_STATE_ORDER, REINFORCEMENT_STATES,
+                              reinforcement_status)
+
     elements_1d = fem_data.get("elements_1d", np.array([]).reshape(0, 3))
     n_1d = len(elements_1d)
     if n_1d == 0:
@@ -5142,23 +5754,15 @@ def print_reinforcement_summary(fem_data, solution):
         active_forces = line_forces[line_forces > 0]
         avg_t = active_forces.mean() if len(active_forces) > 0 else 0.0
 
-        # Status. A line that has actually shed capacity (dropped to Tres) is the
-        # most serious state and outranks a merely-yielded one.
-        n_softened = int(line_softened.sum())
-        if n_softened > 0:
-            status = "SOFTENED"
-        elif n_yield_outside_lp > 0:
-            status = "YIELDED"
-        elif n_yield_in_lp > 0:
-            status = "PULLOUT"
-        elif max_t > 0.95 * t_max_line and t_max_line > 0:
-            status = "NEAR CAPACITY"
-        elif n_active > 0:
-            status = "OK"
-        else:
-            status = "INACTIVE"
+        # The line's verdict, from the one function that decides it — the same
+        # call, and so the same word, the Studio 1D Details panel puts on the
+        # line and the report writes into its prose.
+        status_key, phrase = reinforcement_status(
+            line_forces, line_t_allow, t_res=line_t_res, failed=line_failed,
+            softened=line_softened)
+        status = phrase.upper()
 
-        statuses_seen.add(status)
+        statuses_seen.add(status_key)
 
         print(f"{line_id:>4}  {n_elem:>5}  {max_t:>8.1f}  {avg_t:>8.1f}  "
               f"{n_active:>7}  {n_pullout:>5}  {n_yield_outside_lp:>7}  "
@@ -5166,17 +5770,11 @@ def print_reinforcement_summary(fem_data, solution):
 
     print("-" * 80)
 
-    # Print notes for statuses that appeared
-    status_notes = {
-        "OK": "OK: All elements within allowable capacity, none yielding.",
-        "NEAR CAPACITY": "NEAR CAPACITY: Maximum force exceeds 95% of Tmax. Close to yielding.",
-        "PULLOUT": "PULLOUT: Elements near the reinforcement ends have reached their embedment-limited (pullout) capacity and are slipping at that force. Interior elements are below capacity.",
-        "YIELDED": "YIELDED: One or more elements away from the ends are at the full tensile capacity Tmax and holding it (perfectly plastic). The line is fully mobilized.",
-        "SOFTENED": "SOFTENED: One or more elements yielded and then dropped to the residual capacity Tres entered for this line (Tres = 0 means brittle rupture). Post-peak behavior is OFF unless Tres is filled in.",
-        "INACTIVE": "INACTIVE: No elements are carrying tension. The reinforcement is not engaged.",
-    }
-    notes = [status_notes[s] for s in ["OK", "NEAR CAPACITY", "PULLOUT", "YIELDED",
-                                       "SOFTENED", "INACTIVE"] if s in statuses_seen]
+    # What each state that appeared means, in the words every other surface
+    # defines it in (:data:`xslope.fem_details.REINFORCEMENT_STATES`).
+    notes = [f"{REINFORCEMENT_STATES[key][0].upper()}: the line "
+             f"{REINFORCEMENT_STATES[key][1]}."
+             for key in REINFORCEMENT_STATE_ORDER if key in statuses_seen]
     if notes:
         print()
         for note in notes:
@@ -5658,6 +6256,8 @@ def _verdict_note(sol):
     has ("Converged" / "Did NOT converge") with the displacement evidence appended."""
     if sol.get("converged"):
         return "Converged"
+    if sol.get("exit_reason") == 'inconclusive':
+        return "INCONCLUSIVE at the iteration ceiling (still improving)"
     v = sol.get("verdict") or "FAILED"
     ur = sol.get("u_ratio")
     ur_txt = "" if ur is None else f", max|u| = {ur:.2f}x elastic"
@@ -5666,6 +6266,14 @@ def _verdict_note(sol):
     if v == 'AMBIGUOUS':
         return f"Did NOT converge (AMBIGUOUS evidence -> failed{ur_txt})"
     return f"Did NOT converge ({v}{ur_txt})"
+
+
+def _failed_edge_softened(solution):
+    """The softened 1D-element set of a failed trial, or None when it has none."""
+    if not solution:
+        return None
+    soft = np.asarray(solution.get("softened_1d_elements", []), dtype=bool)
+    return soft if soft.size and soft.any() else None
 
 
 def _ssrm_bisect_steps(width, tolerance):
@@ -5785,7 +6393,8 @@ def _compose_ssr_zone_masks(fem_data, zones):
 
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, force_tol=1e-3,
                oob_window=10,
-               max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
+               max_iterations=12000, max_iterations_ceiling=50000,
+               convergence_tol=1e-3, max_disp_factor=0.1,
                failure_criterion="hybrid", n_sweep=10,
                staged=False, tension_cutoff=False, char_point=None,
                pp_formulation='effective', dt_scale=1.0, cancel_check=None,
@@ -5793,10 +6402,10 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None,
                tension_cutoff_by_material=None, tension_srf=None, k0=None,
-               elastic_materials=None, bond_slip=None,
+               elastic_materials=None,
                suction_phi_b=None, suction_cap=None,
                capture_failure_state=True, capture_max_iterations=None,
-               capture_margin=0.15):
+               capture_margin=0.15, early_failure=True):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -5839,7 +6448,18 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             shallow zone still yields, it just cannot decide the bisection alone. Set the
             same value on the LEM search (search.py) to compare like-for-like surfaces.
         debug_level (int): Verbosity (0=silent, 1=summary, 2=detailed)
-        max_iterations (int): Max viscoplastic iterations passed to solve_fem
+        max_iterations (int): Viscoplastic iteration BUDGET per trial, passed to
+            solve_fem (default 12000). A trial that reaches it with the
+            out-of-balance residual still trending down is extended by another
+            budget's worth, repeatedly, up to max_iterations_ceiling.
+        max_iterations_ceiling (int): Hard stop on that extension (default 50000).
+            A trial that reaches the ceiling while still improving is INCONCLUSIVE:
+            it is not counted as a failure. The bisection carries on below it, the
+            factor of safety is reported as the final bracket's midpoint exactly as
+            on any other run, and the result carries 'inconclusive' and a 'note'
+            recording that the bracket's upper edge is undecided rather than a
+            measured failure.
+
         convergence_tol (float): Convergence tolerance passed to solve_fem
         max_disp_factor (float): Displacement limit (fraction of mesh height) used as a
             backstop/early-termination cap inside solve_fem trials (default 0.1).
@@ -5985,14 +6605,6 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             it when there are none); pass [] to force the elastic set empty.
             POLYGON-ADDRESSED TWIN: a v20 "SSR elastic" (-3) polygon row joins this
             same mask by union, naming the region by outline instead of by material.
-        bond_slip (dict or None): OPT-IN bond-slip load-transfer model for 1D
-            reinforcement, {line_key: (bond_c, bond_phi_deg, perimeter)}, passed
-            unchanged to every solve_fem trial. Replaces the fixed lp1/lp2 pull-out
-            ramp of each named line with a stress-dependent Coulomb bond envelope
-            (df/ds <= perimeter*(bond_c + sigma_n*tan(bond_phi)), sigma_n = local
-            overburden), still capped by t_max. line_key is a line label (str),
-            1-based id (int), or '*' (all lines); unknown references raise ValueError.
-            None (default) = the end-ramp path, bit-identical. See solve_fem.
         suction_phi_b (dict or None): OPT-IN matric-suction strength (Fredlund
             extended Mohr-Coulomb), {material name: phi_b degrees}, threaded
             unchanged to every solve_fem trial. Above the water table the pore
@@ -6038,6 +6650,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             capture solve. None (default) uses max(max_iterations, 3000) — a generous
             budget so the mechanism develops fully. Ignored when
             capture_failure_state is False.
+        early_failure (bool): Close a trial as failed as soon as its movement is
+            unambiguously running away, instead of spending the rest of its budget
+            (default True; see solve_fem). It applies to every bisection trial and
+            never to the at-failure capture solve. The 'displacement_increase'
+            criterion does not use it at all: that search reads how far each trial
+            moves rather than whether it failed, and cutting a trial short shortens
+            the very displacement its curve is made of.
 
     Returns:
         dict: Result with keys FS, converged, last_solution, final_interval, and —
@@ -6188,14 +6807,6 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         elastic_mask = (_zone_elastic_mask if elastic_mask is None
                         else (np.asarray(elastic_mask, dtype=bool) | _zone_elastic_mask))
 
-    # Validate bond-slip line references once, up front, so an unknown line name /
-    # id raises here rather than inside the first trial (fail fast, clear message).
-    if bond_slip:
-        _resolve_bond_slip_lines(bond_slip, fem_data.get("reinforce_line_labels", []),
-                                 len(fem_data.get("reinforce_line_labels", [])))
-        if debug_level >= 1:
-            print(f"  Bond-slip load transfer on lines: {list(bond_slip.keys())}")
-
     # Warn about volumetric locking with low-order elements
     element_types = fem_data['element_types']
     has_linear = any(t in (3, 4) for t in element_types)
@@ -6278,13 +6889,15 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             fem_data_trials, F=1.0, debug_level=max(0, debug_level - 1),
             force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
             pp_formulation=pp_formulation, max_iterations=max_iterations,
+            max_iterations_ceiling=max_iterations_ceiling,
             tolerance=convergence_tol, max_disp_factor=None, staged=staged,
             tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
             early_exit=True, ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-            elastic_mask=elastic_mask, bond_slip=bond_slip,
+            elastic_mask=elastic_mask,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-            failure_criterion=failure_criterion, _prepared=prep)
+            failure_criterion=failure_criterion, early_failure=early_failure,
+            _prepared=prep)
         equilibration = {
             "converged": bool(eq["converged"]),
             "stable": bool(eq["stable"]),
@@ -6316,12 +6929,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 "FS < 1. The bisection runs without a carried in-situ state.")
 
     if failure_criterion in ("non_convergence", "hybrid"):
-        # Same driver, same trials, same early exit — 'hybrid' only changes how a
-        # NON-CONVERGED trial's verdict is read (see classify_nonconvergence).
+        # Same driver, same trials — 'hybrid' only changes how a NON-CONVERGED
+        # trial's verdict is read (see classify_nonconvergence).
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
             oob_window=oob_window, hybrid=(failure_criterion == "hybrid"),
             debug_level=debug_level, max_iterations=max_iterations,
+            max_iterations_ceiling=max_iterations_ceiling,
             convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
             tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
@@ -6329,14 +6943,15 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-            elastic_mask=elastic_mask, bond_slip=bond_slip,
+            elastic_mask=elastic_mask,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-            _prepared=prep, _init_state=init_state)
+            early_failure=early_failure, _prepared=prep, _init_state=init_state)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
             oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
+            max_iterations_ceiling=max_iterations_ceiling,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
             staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
@@ -6344,9 +6959,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-            elastic_mask=elastic_mask, bond_slip=bond_slip,
+            elastic_mask=elastic_mask,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-            _prepared=prep, _init_state=init_state)
+            early_failure=early_failure, _prepared=prep, _init_state=init_state)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -6357,7 +6972,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             cancel_check=cancel_check, progress_callback=progress_callback,
             min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-            elastic_mask=elastic_mask, bond_slip=bond_slip,
+            elastic_mask=elastic_mask,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
             _prepared=prep, _init_state=init_state)
     else:
@@ -6403,13 +7018,16 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 fem_data_trials, F=F_fail, debug_level=max(0, debug_level - 1),
                 force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
                 pp_formulation=pp_formulation, max_iterations=cap_iters,
-                tolerance=convergence_tol, max_disp_factor=None, staged=staged,
+                max_iterations_ceiling=cap_iters, tolerance=convergence_tol,
+                max_disp_factor=None, staged=staged,
                 tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
-                early_exit=False, ssr_exclude_mask=ssr_exclude_mask,
+                early_exit=False, early_failure=False,
+                ssr_exclude_mask=ssr_exclude_mask,
                 tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
-                elastic_mask=elastic_mask, bond_slip=bond_slip,
+                elastic_mask=elastic_mask,
                 suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-                _prepared=prep, _init_state=init_state)
+                _prepared=prep, _init_state=init_state,
+                _softened_seed=result.get("failed_edge_softened"))
             result["failure_solution"] = failure_solution
             if debug_level >= 1:
                 print(f"    at-failure field: converged={failure_solution['converged']} "
@@ -6440,6 +7058,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
 def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, force_tol=1e-3,
                               oob_window=10, k0=None,
                               debug_level=0, max_iterations=500,
+                              max_iterations_ceiling=50000,
                               convergence_tol=1e-3, max_disp_factor=0.1,
                               staged=False, tension_cutoff=False,
                  pp_formulation='effective',
@@ -6447,7 +7066,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                  grid=None, min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
-                 bond_slip=None, suction_phi_b=None, suction_cap=None,
+                 suction_phi_b=None, suction_cap=None, early_failure=True,
                  _prepared=None, _init_state=None, hybrid=False):
     """SSRM using fixed VP displacement limit as failure criterion.
 
@@ -6465,10 +7084,34 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     settings, so an A/B comparison needs no extra solves."""
 
     trials = []                        # per-trial verdict metadata (both settings)
+    inconclusive = []                  # trials that hit the iteration ceiling, still improving
 
     def _stable(sol):
         """Does the bisection treat this trial as standing at its F?"""
         return bool(sol.get("stable", sol["converged"])) if hybrid else bool(sol["converged"])
+
+    def _inconclusive(sol):
+        """Did this trial run out of CEILING rather than out of progress?
+
+        Such a trial is neither converged nor failed: the residual was still coming
+        down when the hard ceiling stopped it. Counting it as a failure is what the
+        no-progress exit used to do, and it biases the factor of safety low, so the
+        bisection refuses to rule on it. A criterion that CAN rule on it — the
+        hybrid's STABLE_STUCK verdict — is left to do so, so this asks only about
+        trials the bisection would otherwise have counted as failures."""
+        return sol.get("exit_reason") == 'inconclusive' and not _stable(sol)
+
+    def _note_inconclusive(F, sol):
+        msg = (f"SSRM: trial F = {F:.4f} is inconclusive at the iteration ceiling "
+               f"({sol.get('iterations', 0)} iterations, out-of-balance still "
+               f"falling) - raise max_iterations_ceiling to decide it. It is NOT "
+               f"counted as a failure: the bracket's upper edge carries this trial "
+               f"as an uncertainty rather than a measured failure, and the factor of "
+               f"safety is reported as the bracket midpoint, as on any other run.")
+        inconclusive.append({"F": float(F), "iterations": int(sol.get("iterations", 0)),
+                             "message": msg})
+        print(f"\n{msg}")
+        return msg
 
     def _record(F, sol, role):
         trials.append({
@@ -6480,6 +7123,12 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "u_ratio": sol.get("u_ratio"),
             "growth": sol.get("u_growth"),
             "exit_reason": sol.get("exit_reason"),
+            # The residual went flat before this trial stopped (None if it never did).
+            "plateau_iteration": sol.get("plateau_iteration"),
+            # How many extra budgets this trial was granted for still improving.
+            "budget_extensions": int(sol.get("budget_extensions", 0) or 0),
+            # The iteration the early-failure rule fired at (None if it never did).
+            "diverging_iteration": sol.get("diverging_iteration"),
             "ee_suppressed": bool(sol.get("early_exit_suppressed", False)),
             "iterations": int(sol.get("iterations", 0)),
         })
@@ -6523,17 +7172,18 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          oob_window=oob_window,
                          dt_scale=dt_scale, pp_formulation=pp_formulation,
                          max_iterations=max_iterations, tolerance=convergence_tol,
+                         max_iterations_ceiling=max_iterations_ceiling,
                          max_disp_factor=max_disp_factor, staged=staged,
                          tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
                          early_exit=(max_disp_factor is None),
                          ssr_exclude_mask=ssr_exclude_mask,
                          tension_cap_by_elem=tension_cap_by_elem,
                          tension_srf=tension_srf, elastic_mask=elastic_mask,
-                         bond_slip=bond_slip,
                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                          progress_callback=_fem_progress(step, prefix),
                          failure_criterion=("hybrid" if hybrid else "non_convergence"),
-                         k0=k0, _prepared=_prepared, _init_state=_init_state)
+                         k0=k0, early_failure=early_failure,
+                         _prepared=_prepared, _init_state=_init_state)
 
     F_left = F_min
     F_right = F_max
@@ -6556,6 +7206,11 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         print(f"  Verifying lower bound F={F_left:.2f} converges...")
     solution_min = _record(F_left, _solve_at(F_left, bracket_step,
                                              f"Lower bound F={F_left:.3f}"), "lower")
+    if _inconclusive(solution_min):
+        # An inconclusive lower bound has not been shown to stand, so the bracket
+        # walks down exactly as it would for a failure — but the trial is recorded
+        # as the uncertainty it is rather than silently counted as a failure.
+        _note_inconclusive(F_left, solution_min)
     n_expand = 0
     while not _stable(solution_min):
         if F_left <= f_min_floor + 1e-9 or n_expand >= max_expand:
@@ -6572,6 +7227,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         _bump_bracket()
         solution_min = _record(F_left, _solve_at(F_left, bracket_step,
                                                 f"Lower bound F={F_left:.3f}"), "lower")
+        if _inconclusive(solution_min):
+            _note_inconclusive(F_left, solution_min)
     F_min = F_left
     if debug_level >= 1:
         print(f"    -> Converged in {solution_min['iterations']} iters (F_min={F_min:.2f})")
@@ -6584,6 +7241,11 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         print(f"  Verifying upper bound F={F_right:.2f} does not converge...")
     solution_max = _record(F_right, _solve_at(F_right, bracket_step,
                                               f"Upper bound F={F_right:.3f}"), "upper")
+    if _inconclusive(solution_max):
+        # The upper bound only has to NOT stand, and an inconclusive trial does not:
+        # it is accepted as the bracket's upper edge, carrying its uncertainty, and
+        # the bisection proceeds below it.
+        _note_inconclusive(F_right, solution_max)
     n_expand = 0
     while _stable(solution_max):
         if F_right >= f_max_ceiling - 1e-9 or n_expand >= max_expand:
@@ -6602,6 +7264,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         _bump_bracket()
         solution_max = _record(F_right, _solve_at(F_right, bracket_step,
                                                  f"Upper bound F={F_right:.3f}"), "upper")
+        if _inconclusive(solution_max):
+            _note_inconclusive(F_right, solution_max)
     F_max = F_right
     if debug_level >= 1:
         print(f"    -> Did NOT converge ({solution_max['iterations']} iters, F_max={F_max:.2f})")
@@ -6610,6 +7274,10 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     prog["n_steps"] = _ssrm_bisect_steps(F_right - F_left, tolerance)
 
     last_converged_solution = solution_min
+    # The bracket's failed edge, kept for the at-failure capture: the post-peak
+    # set the trial at F_right shed to before it gave way (empty when nothing
+    # can soften). Updated whenever a trial moves F_right down.
+    failed_edge_solution = solution_max
     iteration = 0
     from .search import _check_cancel
 
@@ -6642,6 +7310,16 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             solution = _record(
                 F_mid, _solve_at(F_mid, step, f"F={F_mid:.3f} [{lo_f:.3f}, {hi_f:.3f}]"),
                 "bisect")
+            if _inconclusive(solution):
+                # A trial nothing can rule on becomes the bracket's UPPER
+                # UNCERTAINTY: the search carries on below it, so the run still
+                # reports the highest F that actually reached equilibrium, but that
+                # edge is never counted as a measured failure and never sets the
+                # answer by being averaged into it.
+                _note_inconclusive(F_mid, solution)
+                i_hi = i_mid
+                iteration += 1
+                continue
             if _stable(solution):
                 i_lo = i_mid
                 last_converged_solution = solution
@@ -6649,6 +7327,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                     print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
             else:
                 i_hi = i_mid
+                failed_edge_solution = solution
                 if debug_level >= 1:
                     print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
             iteration += 1
@@ -6669,6 +7348,17 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                 _solve_at(F_mid, step, f"F={F_mid:.3f} [{F_left:.3f}, {F_right:.3f}]"),
                 "bisect")
 
+            if _inconclusive(solution):
+                # A trial nothing can rule on becomes the bracket's UPPER
+                # UNCERTAINTY: the search carries on below it, so the run still
+                # reports the highest F that actually reached equilibrium, but that
+                # edge is never counted as a measured failure and never sets the
+                # answer by being averaged into it.
+                _note_inconclusive(F_mid, solution)
+                F_right = F_mid
+                iteration += 1
+                continue
+
             if _stable(solution):
                 F_left = F_mid
                 last_converged_solution = solution
@@ -6676,6 +7366,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                     print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
             else:
                 F_right = F_mid
+                failed_edge_solution = solution
                 if debug_level >= 1:
                     print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
 
@@ -6684,6 +7375,11 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     # Report the midpoint of the final bracket (unbiased, +/- tolerance/2, or exactly
     # the grid-cell center when grid bisection is used);
     # the full bracket is returned in 'final_interval'.
+    #
+    # An INCONCLUSIVE trial does not change how the number is reported: the midpoint
+    # is still the estimate, +/- half the bracket. What changes is what the bracket's
+    # upper edge means - an undecided trial rather than a measured failure - and that
+    # is disclosed in 'inconclusive', in 'note', and on the log.
     critical_FS = 0.5 * (F_left + F_right)
 
     _ssrm_progress(progress_callback, _total() * SUBDIV, _total() * SUBDIV, f"FS = {critical_FS:.3f}")
@@ -6698,10 +7394,20 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         "iterations_ssrm": iteration,
         "final_interval": (F_left, F_right),
         "interval_width": F_right - F_left,
+        # The post-peak set the failed-edge trial shed to (None when nothing can
+        # soften): what the at-failure capture starts from, so a softening bar
+        # is shown at its residual in the field that failed.
+        "failed_edge_softened": _failed_edge_softened(failed_edge_solution),
         # Per-trial record: F, role, converged/stable, hybrid verdict, u_ratio,
         # growth, exit_reason, iterations. Populated on every criterion so an A/B
         # between criteria costs no extra solves.
         "trials": trials,
+        # Trials the iteration ceiling could not decide (empty on a clean run). When
+        # this is non-empty the reported FS is still the bracket midpoint, but the
+        # bracket's upper edge is an UNCERTAINTY rather than a measured failure, and
+        # `note` says so in words.
+        "inconclusive": inconclusive,
+        "note": (inconclusive[-1]["message"] if inconclusive else None),
         "failure_criterion": ("hybrid" if hybrid else
                               "non_convergence" if max_disp_factor is None
                               else "displacement_limit"),
@@ -6727,7 +7433,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
-                 bond_slip=None, suction_phi_b=None, suction_cap=None,
+                 suction_phi_b=None, suction_cap=None, early_failure=False,
                  _prepared=None, _init_state=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
@@ -6797,10 +7503,17 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                         ssr_exclude_mask=ssr_exclude_mask,
                         tension_cap_by_elem=tension_cap_by_elem,
                         tension_srf=tension_srf, elastic_mask=elastic_mask,
-                        bond_slip=bond_slip,
                         suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb,
-                        k0=k0, _prepared=_prepared, _init_state=_init_state)
+                        k0=k0, early_failure=early_failure,
+                        _prepared=_prepared, _init_state=_init_state)
+        # NOTE on early_failure: this criterion does not read a VERDICT off each
+        # trial, it reads a MEASUREMENT — how far the characteristic point moves at
+        # this F — and takes the factor of safety from where that measurement jumps.
+        # Stopping a running-away trial early shortens the very displacement the
+        # curve is made of, so the default here is OFF (set by the caller below);
+        # the early-failure thresholds were measured against bisection verdicts,
+        # not against this curve.
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks
         # the catastrophic growth in plastic displacement at failure.
@@ -6948,11 +7661,80 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
     }
 
 
+def _coo_to_csr_ordered(rows, cols, vals, shape):
+    """Sum stacked COO triplets into a CSR matrix, in the order they were staged.
+
+    ``scipy``'s own duplicate summation is free to add the entries of a repeated
+    (row, col) in any order, and a floating-point sum is not associative: the
+    last bits of the assembled stiffness would depend on how the library chose
+    to sort. The stiffness feeds a factorization that feeds a viscoplastic
+    fixed-point iteration with a convergence test, and near-critical strength
+    reduction trials are decided in exactly those last bits, so the summation
+    order is held fixed here instead.
+
+    Entries are grouped by (row, col) with a stable sort -- so within a group
+    they keep the element order they were staged in -- and then added one rank
+    at a time, which is the same left-to-right accumulation the entry-by-entry
+    ``K[i, j] += ...`` fill performed. Exact zeros are dropped, as the dense
+    round-trip this replaced also dropped them.
+    """
+    n_dof = shape[0]
+    if not rows:
+        return csr_matrix(shape)
+
+    rows = np.concatenate(rows).astype(np.int64, copy=False)
+    cols = np.concatenate(cols).astype(np.int64, copy=False)
+    vals = np.concatenate(vals)
+    if len(rows) == 0:
+        return csr_matrix(shape)
+
+    # Stable sort on the flattened (row, col) key: duplicates stay in staging order.
+    key = rows * np.int64(shape[1]) + cols
+    order = np.argsort(key, kind='stable')
+    key = key[order]
+    vals = vals[order]
+
+    starts = np.flatnonzero(np.r_[True, key[1:] != key[:-1]])
+    group_of = np.zeros(len(key), dtype=np.int64)
+    group_of[starts[1:]] = 1
+    np.cumsum(group_of, out=group_of)
+    rank = np.arange(len(key), dtype=np.int64) - starts[group_of]
+
+    data = vals[starts].copy()                     # rank 0 of every group
+    for r in range(1, int(rank.max()) + 1 if len(rank) else 1):
+        sel = rank == r
+        if not sel.any():
+            break
+        data[group_of[sel]] += vals[sel]           # one entry per group per rank
+
+    g_rows = key[starts] // shape[1]
+    g_cols = key[starts] - g_rows * shape[1]
+
+    keep = data != 0.0
+    if not keep.all():
+        data = data[keep]
+        g_rows = g_rows[keep]
+        g_cols = g_cols[keep]
+
+    indptr = np.zeros(n_dof + 1, dtype=np.int64)
+    np.cumsum(np.bincount(g_rows, minlength=n_dof), out=indptr[1:])
+    K = csr_matrix((data, g_cols, indptr), shape=shape)
+    K.has_sorted_indices = True
+    return K
+
+
 def build_global_stiffness(nodes, elements, element_types, element_materials, E_by_mat, nu_by_mat, fem_data=None):
     """
     Build global stiffness matrix from 2D soil elements and (optionally) 1D truss + pile beam elements.
 
     Uses dof_offset from fem_data to support mixed DOF systems (pile nodes have 3 DOFs).
+
+    Assembly is COO: each element's stiffness block and its global row/column
+    indices are stacked, and the whole matrix is built in one pass with
+    ``_coo_to_csr_ordered``. That helper sums each repeated (row, col) entry in
+    ELEMENT ORDER, which is the order the earlier entry-by-entry ``lil_matrix``
+    fill used, so the assembled matrix is bit-for-bit what it was -- the change
+    is the cost of building it, never its value.
     """
     n_nodes = len(nodes)
 
@@ -6963,7 +7745,16 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
     else:
         n_dof = 2 * n_nodes
 
-    K_global = lil_matrix((n_dof, n_dof))
+    coo_rows = []
+    coo_cols = []
+    coo_vals = []
+
+    def _stage(K_block, dof_idx):
+        """Queue one element block (n x n) against its n global DOF indices."""
+        n = len(dof_idx)
+        coo_rows.append(np.repeat(dof_idx, n))
+        coo_cols.append(np.tile(dof_idx, n))
+        coo_vals.append(np.asarray(K_block, dtype=float).ravel())
 
     for elem_idx, element in enumerate(elements):
         elem_type = element_types[elem_idx]
@@ -6995,58 +7786,39 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
             print(f"Error building stiffness for element {elem_idx}, type {elem_type}: {e}")
             continue
 
-        # Assemble into global matrix using dof_offset for global DOF indices
-        for i in range(elem_type):
-            for j in range(elem_type):
-                node_i = elem_nodes[i]
-                node_j = elem_nodes[j]
-
-                if dof_offset is not None:
-                    base_i = dof_offset[node_i]
-                    base_j = dof_offset[node_j]
-                else:
-                    base_i = 2 * node_i
-                    base_j = 2 * node_j
-
-                for di in range(2):
-                    for dj in range(2):
-                        global_i = base_i + di
-                        global_j = base_j + dj
-                        local_i = 2 * i + di
-                        local_j = 2 * j + dj
-
-                        if local_i < K_elem.shape[0] and local_j < K_elem.shape[1]:
-                            K_global[global_i, global_j] += K_elem[local_i, local_j]
+        # Assemble into global matrix using dof_offset for global DOF indices.
+        # An element matrix smaller than its 2 x n_node DOF count contributes
+        # only its leading block (the guard the entry-by-entry fill applied).
+        dof_idx = _elem_dof_indices(elem_nodes, dof_offset=dof_offset)
+        n_use = min(len(dof_idx), K_elem.shape[0], K_elem.shape[1])
+        _stage(K_elem[:n_use, :n_use], dof_idx[:n_use])
 
     # Assemble 1D truss element stiffness matrices (reinforcement only — skip pile elements)
     if fem_data is not None:
         K_global_1d_elems = fem_data.get("K_global_1d_elems", [])
-        dof_indices_1d = fem_data.get("dof_indices_1d", np.zeros((0, 4), dtype=int))
+        dof_indices_1d = fem_data.get("dof_indices_1d", np.zeros((0, 6), dtype=int))
         pile_elem_mask = fem_data.get("pile_elem_mask", np.zeros(len(K_global_1d_elems), dtype=bool))
 
         for elem_idx_1d in range(len(K_global_1d_elems)):
             if pile_elem_mask[elem_idx_1d]:
                 continue  # pile elements use beam stiffness, assembled below
-            K_elem_1d = K_global_1d_elems[elem_idx_1d]
-            dof_idx = dof_indices_1d[elem_idx_1d]
+            # A two-node bar reaches four DOFs and a three-node bar six, so the
+            # element's own block size selects the DOFs it is staged against.
+            n_use = np.asarray(K_global_1d_elems[elem_idx_1d]).shape[0]
+            _stage(K_global_1d_elems[elem_idx_1d],
+                   np.asarray(dof_indices_1d[elem_idx_1d])[:n_use])
 
-            for i in range(4):
-                for j in range(4):
-                    K_global[dof_idx[i], dof_idx[j]] += K_elem_1d[i, j]
-
-        # Assemble pile beam element stiffness matrices (6x6 Euler-Bernoulli)
+        # Assemble pile beam element stiffness matrices (Euler-Bernoulli, 6x6 on
+        # a two-node element and 9x9 on a three-node one)
         K_global_pile_elems = fem_data.get("K_global_pile_elems", [])
-        dof_indices_pile = fem_data.get("dof_indices_pile", np.zeros((0, 6), dtype=int))
+        dof_indices_pile = fem_data.get("dof_indices_pile", np.zeros((0, 9), dtype=int))
 
         for p_idx in range(len(K_global_pile_elems)):
-            K_beam = K_global_pile_elems[p_idx]
-            dof_idx = dof_indices_pile[p_idx]
+            n_use = np.asarray(K_global_pile_elems[p_idx]).shape[0]
+            _stage(K_global_pile_elems[p_idx],
+                   np.asarray(dof_indices_pile[p_idx])[:n_use])
 
-            for i in range(6):
-                for j in range(6):
-                    K_global[dof_idx[i], dof_idx[j]] += K_beam[i, j]
-
-    return K_global.tocsr()
+    return _coo_to_csr_ordered(coo_rows, coo_cols, coo_vals, (n_dof, n_dof))
 
 
 
@@ -7512,10 +8284,8 @@ def compute_triangle_strains_manual(coords, displacements):
 
 def build_constitutive_matrix(E, nu):
     """Build constitutive matrix for plane strain - standard tension-positive convention."""
-    # Add numerical stability check for near-incompressible materials
-    if nu >= 0.45:
-        print(f"Warning: Poisson's ratio {nu:.3f} is close to incompressible limit (0.5)")
-        print("Consider using nu <= 0.4 for better numerical stability")
+    # A near-incompressible nu (> 0.45) is reported by preflight
+    # (mat.nu_implausible) before any run; nothing is printed per element here.
 
     factor = E / ((1 + nu) * (1 - 2*nu))
     D = factor * np.array([

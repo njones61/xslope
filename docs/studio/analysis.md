@@ -166,8 +166,9 @@ same sweep engine as the library — see
 [Parametric Studies](../parametric/index.md) for the engine, and the
 [`/xslope` skill](../usage/claude/index.md) for the scripted recipes.
 
-One dialog covers three study modes, chosen by its **Mode** selector — **Sensitivity**,
-**Design**, and **Back-Analysis**. In **LEM** three controls are shared by all of them:
+One dialog covers four study modes, chosen by its **Mode** selector — **Sensitivity**,
+**Design**, **Back-Analysis**, and **Factor of safety vs time**. In **LEM** three controls
+are shared by all of them:
 **Method** (any of the seven LEM methods), **Number of slices**, and a **Parameter** picker —
 a **Material** dropdown (each material plus a *k_seismic (global)* entry) and a **Property**
 dropdown listing that material's option-aware sweepable fields (both drawn from the engine's
@@ -212,6 +213,48 @@ investigation: because a slide has occurred, the target defaults to **FS = 1.0**
 result is read as the parameter value consistent with the observed failure (the
 back-calculated strength, most commonly). The controls are identical to Design.
 
+### Factor of safety vs time
+
+The fourth mode sweeps the saved instants of a
+[transient seepage](../seep/transient.md) analysis instead of a parameter. Each point solves
+the same model against that instant's pore pressures — no input changes between them, so
+the axis is time — and the reservoir load is re-derived from the pool as it stood at that
+moment. The parameter picker steps aside and a **Saved frames** checklist takes its place,
+listing every instant the run stored with all of them ticked; **All** and **None** set the
+whole list, and unticking samples a long one, each frame being a full stability run. The
+**Method**, **Number of slices** and **Re-search the critical surface at each step**
+controls apply as they do everywhere else, and the circles sheet's search window is
+applied, which is what keeps the curve on one mechanism rather than letting it jump
+families between instants. A **Grid search (auto-seed the circular search)** checkbox
+under the frames list does here what it does in
+[Limit equilibrium](#limit-equilibrium-lem): every instant is
+searched from a geometry-derived sweep of centers and tangent elevations rather than from
+the circles sheet alone, which is what a curve needs when the critical mechanism moves
+between parts of the section — a dam whose downstream face governs at full pool and whose
+upstream face governs during a drawdown, for instance:
+
+![Parametric dialog in Factor of safety vs time mode](images/analysis_sensitivity_fs_time_dialog.png)
+
+A **Rapid drawdown at each time** checkbox below the frames list turns every ticked instant
+into a three-stage [rapid drawdown](../lem/rapid.md) instead of a single-stage
+analysis: stage 1 is the transient run's initial state (the `tseep` sheet's `stage_1`, normally
+t = 0 at full pool), stage 2 is that instant's drawn-down state, and stage 3 re-checks the
+same section with drained strengths. The reported value is the drawdown's own — the lower of
+stages 2 and 3 — so the curve answers *how safe is this slope if the pool falls to where it
+stands at t*, instant by instant. The box is available only on a model whose materials carry
+the drawdown strengths `d` and ψ; without them it is greyed and says so, because all three
+stages would read the same strengths. A drawdown point is always searched from the starting
+circle, so **Re-search** is held on and greyed while the box is ticked.
+
+The mode is available in **LEM** and **FEM** mode on a model that carries a transient
+seepage solution and at least one material reading `u = seep`. Without one of those it is
+disabled and names the reason — *Run a transient seepage analysis first*, *No material takes
+its pore pressure from the seepage solution*, or, in Seepage mode, that the seepage solution
+is this run's input rather than its output. The drawdown option is LEM only: the three-stage
+procedure is a limit-equilibrium construction with no SSRM equivalent. The engine page
+[Factor of safety versus time](../parametric/sensitivity.md#factor-of-safety-versus-time)
+carries the sweep itself.
+
 ### Running and cancelling
 
 Clicking **Run** launches the sweep on a background thread, so the window stays responsive.
@@ -247,12 +290,38 @@ same tab, with the target at FS = 1.0):
 
 ![Design curve with crossing](images/analysis_sensitivity_design_curve.png)
 
+**Factor of safety vs time** opens an **FS vs Time** tab: the factor of safety at each
+evaluated instant as a line with a marker per point, the lowest of them ringed and
+annotated with its own time, and the model's `tseep` time series — the drawdown schedule
+that drives the curve — drawn faintly behind it on a second axis. Where that schedule falls,
+the interval it falls over is shaded and labeled *drawdown*, the factor of safety measured
+before the fall began is carried across as a dashed **full pool** reference, and — where the
+instants come out on more than one face of the embankment — each marker is colored by the
+face its critical circle sits on, with a legend entry per face. When the sweep is done the
+per-instant table (time, factor of safety, the critical circle) is printed to the
+[Log pane](interface.md#the-log-pane), and an instant that produced no result appears there
+with its reason rather than as a gap in the line. A **rapid drawdown** run opens the same tab
+under the name **Drawdown vs Time**: its table carries the three stage factors of safety and
+which of stages 2 and 3 governed each instant, while the plot draws the reported curve alone —
+the lower of stages 2 and 3:
+
+![FS vs Time result tab](images/analysis_sensitivity_fs_time.png)
+
 When the swept range never reaches the target, the result is honest about it: no crossing is
 drawn, and an amber note reports the FS span and which way to widen the range — the GUI face
 of the engine's
 [never-extrapolate discipline](../parametric/design.md#honest-about-misses):
 
 ![Design honest miss](images/analysis_sensitivity_design_miss.png)
+
+Every result view above carries two sub-tabs: **Plot**, which it opens on, and **Table** — the
+numbers the plot is drawn from, as a grid. Each mode shows its own: the low and high bound of
+each tornado bar, the swept values and factors of safety of a design or back-analysis curve,
+and, for a march, one row per instant with its factor of safety, the critical circle and the
+face that circle sits on (plus the three stage values and the governing stage on a drawdown).
+An instant that produced no result carries its reason in the row rather than leaving a gap.
+**Save CSV…** writes the grid to a comma-separated file, offered as `<model>_<mode>.csv`
+beside the project.
 
 ### Sweeps in FEM and Seepage mode
 
@@ -341,6 +410,11 @@ follows the engine:
 
 ![Monte Carlo reliability histogram](images/analysis_reliability_mc_histogram.png)
 
+Those views carry the same **Table** sub-tab the Parametric ones do. The Taylor series lists
+each parameter with its most-likely value, its σ, the factor of safety at plus and minus one
+σ, and the swing ΔF the variance is built from; a sampling run lists the statistics its
+histogram is a picture of. **Save CSV…** writes either one to a file beside the model.
+
 The engines are the same ones the library exposes — `reliability` (the front door),
 `reliability_taylor`, `reliability_mc`, `reliability_rs`, and `reliability_fem`; see
 [Reliability Analysis](../reliability/index.md) for the theory and worked examples.
@@ -357,6 +431,16 @@ Seepage and FEM run on a finite-element mesh, which you build explicitly. In
 - **Element type** — `tri3`, `tri6`, `quad4`, `quad8`, or `quad9`.
 - **Target size** — entered directly, or auto-sized as the slope width divided by a
   number of divisions.
+- **1D element size** — the element size along the reinforcement and pile lines,
+  blank by default, which meshes them at the target size like everything else. A
+  value refines the beam and bar elements *and* the soil elements that share their
+  nodes, growing back to the target size away from the lines, so a member can be
+  discretized finely without paying for a finer mesh across the whole section. It is
+  a model input — **1D element size** on the main sheet — so the box opens on
+  whatever the file states and an entry is written back to the model, saved with the
+  file and undone like any other edit. A value at or above the target size is
+  ignored, since sizes compose by taking the smaller and a coarser request could
+  never bind.
 - **Quadrilateral style** — **Free (recommended)**, or **Structured where possible**,
   which sweeps rows and columns of quads through the grid-like zones and free-meshes
   the rest. Available for the quad element types only, and dimmed for the triangular
@@ -447,9 +531,9 @@ so the dialog carries no stage fields, only a caption pointing there.
 
 ![Run Seep dialog in Transient mode](images/analysis_run_seep_transient.png)
 
-Because the march covers a known duration, the run reports **determinate progress** —
+Because the run covers a known duration, it reports **determinate progress** —
 the status bar's progress bar tracks the simulated-time fraction (`t / duration`) —
-and a **Cancel** button beside it stops the march cleanly; a cancelled run stores no
+and a **Cancel** button beside it stops the run cleanly; a cancelled run stores no
 partial result and returns the UI to idle.
 
 The run produces a single **Seep · Transient** tab that shows one frame at a time
@@ -500,8 +584,8 @@ instant:
   displaying. Also instant, and offered only while that tab is open.
 - **Another time** — any instant within the run duration. The pore pressures for it
   do not exist yet and are never interpolated between frames, so choosing it
-  **re-marches** the transient solution with that instant added to the save schedule,
-  then starts the analysis. The dialog says so before you commit, the re-march reports
+  **reruns** the transient seepage analysis with that instant added to the save schedule,
+  then starts the stability analysis. The dialog says so before you commit, the rerun reports
   progress, and it can be cancelled — cancelling it abandons the analysis too.
 
 The group opens on the model's own `stability_time` when the tseep sheet declares one,
@@ -532,7 +616,7 @@ checks refuse as they would on any other model: run the seepage analysis first.
 
 Ticking **Rapid drawdown** in the Run LEM dialog replaces the single-instant selector
 with **Stage 1 time** and **Stage 2 time**, pre-filled from the model. These are the
-two instants the drawdown stages read out of the march — pure extraction parameters,
+two instants the drawdown stages read out of the transient solution — pure extraction parameters,
 since the drawdown schedule itself lives in the boundary conditions — so they are
 edited here, at the point of use, as well as under
 [Inputs → Transient](editing.md#transient-seepage). Both places write the same two
@@ -540,7 +624,7 @@ values on the tseep sheet, and an edit here lands in the model immediately.
 
 Run refuses stage times it cannot use — one blank, stage 2 at or before stage 1, or a
 stage beyond the run duration — and says which. Stage times the loaded solution never
-saved trigger the same re-march as a free-entry seepage time.
+saved trigger the same rerun as a free-entry seepage time.
 
 ---
 
@@ -551,6 +635,19 @@ Shear Strength Reduction Method), with `F` (or `F_min`/`F_max`), a tolerance, an
 the failure criterion.
 
 ![Run FEM dialog](images/analysis_run_fem_dialog.png)
+
+**Max iterations per trial** (12000) is the viscoplastic budget each trial *starts*
+with, not a hard stop. A trial that uses it up with its out-of-balance force still
+falling is given another budget's worth, repeatedly, until either it settles or it
+reaches the **Iteration ceiling** (50000). That is what keeps the answer from
+depending on the budget: a model needing 16,000 iterations returns the same factor
+of safety whether the budget was typed as 3000 or 12000. A trial that reaches the
+ceiling while still improving is *inconclusive* — neither settled nor failed — and
+the run says so in the Log rather than counting it as a failure. The factor of safety
+is still the final bracket's midpoint, as on any other run; what changes is that the
+bracket's upper edge is an undecided trial rather than a measured failure, which the
+Log states beside the answer. Raise the ceiling, or loosen the SSRM tolerance, when
+that happens.
 
 The [model checks](#model-checks-before-a-run) in the dialog's second column are the
 finite-element ones: a blank Poisson's ratio (which reads as 0.0 and moved the
@@ -631,9 +728,11 @@ default: the developed collapse mechanism) or **Last converged** (the sub-critic
 converged solution) — and it applies to the deformation, shear-strain, and
 displacement-vector plots alike, so they always tell the same story. The
 deformation plot adds its own controls: the **Original mesh** reference (dashed
-outline, full grid, or off), the **Deformed color** of the displaced grid, a
-**Deform** exaggeration percent, and an explicit **Displ. ×** multiplier that
-overrides it. The displacement-vector plot can **color arrows by magnitude** (with
+outline, full grid, or off), the **Deformed color** of the displaced grid, and
+the exaggeration pair — **Scale ×**, the displacement multiplier the plot title
+prints, whose **Auto** default picks whatever draws the largest displacement at
+the **Auto size** percent of the mesh height; entering an explicit Scale ×
+dims Auto size until the box returns to Auto. The displacement-vector plot can **color arrows by magnitude** (with
 a colorbar) instead of solid black.
 
 The FEM · Results toolbar also carries **1D Details…**, which opens a non-modal panel
@@ -651,6 +750,15 @@ the field state they were taken at. The button is
 dimmed, with a tooltip saying why, for a model that carries neither reinforcement lines
 nor piles. See [FEM Reinforcement](../fem/reinforcement.md#inspecting-the-results) and
 [FEM Piles](../fem/piles.md#inspecting-the-results) for what the profiles show.
+
+Each reinforcement row also carries the state the line is in — *within capacity*, *near
+capacity*, *pullout*, *yielded*, *softened*, *ruptured* or *inactive* — and so does the
+line under the plot, with its meaning in the tooltip. Two lines both standing at 100% are
+told apart by that word and not by the badge: *pullout* is an end slipping at what its
+embedment can develop, *yielded* is the middle of the line at its full tensile capacity.
+The states are defined in [The state of a
+line](../fem/reinforcement.md#the-state-of-a-line), and they are the words
+`print_reinforcement_summary()` prints and a generated report writes.
 
 ---
 

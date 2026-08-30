@@ -2548,10 +2548,10 @@ The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn
 yield is released over the pressure band *h*<sub>0</sub> < ψ < 0, so on a 2.5 m mesh the file's
 *h*<sub>0</sub> = −1.0 m is narrower than one element — the same under-resolution
 [VP77](#vp77) fixes by setting *h*<sub>0</sub> to roughly one element of its own seepage mesh.
-Porting that rule here means *h*<sub>0</sub> = −2.5 m, and it is worth almost nothing: re-marching
+Porting that rule here means *h*<sub>0</sub> = −2.5 m, and it is worth almost nothing: re-running
 the drawdown returns Spencer **2.051** at 300 h against the committed field's **2.045**, i.e. −2.0%
 against Slide2's 2.092 where the committed field gives −2.2%. An eighth of the residual, not the
-residual. Widening it further is not free either: at *h*<sub>0</sub> = −5.0 m the 1500 h march does
+residual. Widening it further is not free either: at *h*<sub>0</sub> = −5.0 m the 1500 h run does
 not converge at all. VP77's other half cannot port either: it solves its flow on a
 tri3 mesh because "tri6 midside k<sub>r</sub> sampling whips the front", and here the snapshot mesh
 is the mesh the [strength-reduction rows](rs2.md#p4-vp102) consume, so it has to stay quadratic.
@@ -2790,7 +2790,7 @@ Slide within 0.8% and with the originating paper within 2.4%.
 
 **Input files:** [vp106a_fem.xlsx](files/rocscience/vp106a_fem.xlsx) (no pile) ·
 [vp106c_fem.xlsx](files/rocscience/vp106c_fem.xlsx) (D1/D = 3, free head) ·
-[vp106c_fem_fix.xlsx](files/rocscience/vp106c_fem_fix.xlsx) (D1/D = 3, head rotation restrained)
+[vp106c_fem_fix.xlsx](files/rocscience/vp106c_fem_fix.xlsx) (D1/D = 3, unrotated head — rotation held, translation free)
 
 Cai & Ugai analysed this slope twice. The limit-equilibrium side is [VP106](#vp106) above. The other side is
 a **three-dimensional** shear-strength-reduction finite-element model that meshes the individual piles and
@@ -2808,27 +2808,38 @@ model, and the differences below are the measurement of what separates them rath
 | Case | XSLOPE SSRM (2D beam) | Cai & Ugai 3D FE |
 |---|---|---|
 | No pile | 1.136 | 1.14 (−0.4%) |
-| Pile, free head | 1.497 | 1.36 (+10.1%) |
-| Pile, head rotation restrained | 1.552 | 1.45 (+7.0%) |
+| Pile, free head | 1.472 | 1.36 (+8.2%) |
+| Pile, unrotated head | 1.587 | 1.45 (+9.4%) |
 
 Without a pile the two agree to −0.4%: the same section, the same soil, the same strength-reduction
 procedure, and nothing three-dimensional in either model. That row is what makes the other two readable —
 what they carry is the pile, not the slope.
 
-With the pile in place the two-dimensional model reads high, by +10.1% with a free head and +7.0% with the
-head rotation restrained. Read as the credit each model gives the pile row, XSLOPE multiplies its own
-unreinforced factor of safety by 1.318 and Cai & Ugai's model multiplies theirs by 1.193. The direction is
+With the pile in place the two-dimensional model reads high, by +8.2% with a free head and +9.4% with the
+head unrotated. Read as the credit each model gives the pile row, XSLOPE multiplies its own
+unreinforced factor of safety by 1.296 and Cai & Ugai's model multiplies theirs by 1.193. The direction is
 the one the idealization predicts. In three dimensions the soil at three diameters' spacing arches onto the
 piles, some of it moves between them, and it can slip along each pile's surface; in a plane-strain smear the
 row is a continuous sheet at one-third the stiffness, and everything above it has to push through it.
-Restraining the head rotation is worth less in XSLOPE for the same reason — a factor of 1.037 against their
-1.066 — because a smeared row is already stiffer than the row it stands for, so stiffening its head adds
-less.
+Restraining the head rotation is worth a comparable amount in the two models — a factor of 1.078 in XSLOPE
+against their 1.066. Cai & Ugai vary the head alone, and their Table 3 carries two further conditions —
+a hinged head at 1.54 and a fully fixed head at 1.55 — which XSLOPE's Head column also offers but which
+these files do not build. The two rows above differ by the head condition and nothing else: holding the tip
+as well leaves the unrotated-head factor of safety at 1.587 and moves the free-head one by a single
+bisection step, because the tip sits on the model's own base.
 
-On this problem the limit-equilibrium path lands closer to the three-dimensional answer than the
-two-dimensional finite-element path does: [VP106](#vp106)'s Bishop search reads 1.451 where the paper's own
-limit-equilibrium value is 1.37, and the Ito & Matsui limit pressure behind it is a theory *of* the
-three-dimensional mechanism rather than a two-dimensional stand-in for it.
+The free-head model sits close enough to its critical factor that the answer is sensitive at the round-off
+level: different valid numerical configurations land a bisection step or two apart, and the lock records
+the configuration the package ships.
+
+The limit-equilibrium path lands a comparable distance above the three-dimensional answer rather than a
+materially smaller one: [VP106](#vp106)'s Bishop search reads 1.451 where the paper's own
+limit-equilibrium value is 1.37, a credit of 1.269 against the beam's 1.296 and the three-dimensional
+1.193. Both two-dimensional credits stand well above the three-dimensional one — the beam by 0.103 and the
+limit-equilibrium search by 0.076 — and the 0.027 between them is small beside either gap, so this problem
+does not rank the two-dimensional routes against each other, and neither of them recovers
+the three-dimensional credit. What recommends the limit-equilibrium path is the Ito & Matsui limit pressure
+behind it, a theory *of* the three-dimensional mechanism rather than a two-dimensional stand-in for it.
 
 **Scope.** The plane-strain beam is an exact representation of a member that really is continuous out of
 plane, and it is verified as one against a sheet pile wall in
@@ -2839,8 +2850,8 @@ limit equilibrium with the Ito & Matsui limit pressure — [VP106](#vp106) acros
 **Sources:** Cai & Ugai (2000), the three-dimensional shear-strength-reduction results.
 
 <!-- test: file=files/rocscience/vp106a_fem.xlsx, type=fem_ssrm, expected_fs=1.136, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.85, f_max=1.45, max_iter=16000, benchmark=VP106-FEM-nopile -->
-<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.497, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
-<!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.552, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed -->
+<!-- test: file=files/rocscience/vp106c_fem.xlsx, type=fem_ssrm, expected_fs=1.472, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=VP106-FEM-free -->
+<!-- test: file=files/rocscience/vp106c_fem_fix.xlsx, type=fem_ssrm, expected_fs=1.587, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.9, max_iter=16000, benchmark=VP106-FEM-fixed -->
 
 ## VP107: Retaining walls, gabion walls, supports {#vp107}
 

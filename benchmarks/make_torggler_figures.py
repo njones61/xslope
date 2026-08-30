@@ -93,9 +93,12 @@ def capture_failure(fem_data, result, max_iterations):
     f_fail = max(result['final_interval'][1], result['FS'] * (1.0 + CAPTURE_MARGIN))
     with contextlib.redirect_stdout(io.StringIO()):
         with RT._force_fast_kernel(_fem, False):
+            # early_failure off, as in solve_ssrm's own capture: this solve
+            # exists to let the mechanism develop.
             return f_fail, solve_fem(trials, F=f_fail, debug_level=0,
                                      max_iterations=max(max_iterations, 3000),
-                                     early_exit=False, fast_kernel=False)
+                                     early_exit=False, early_failure=False,
+                                     fast_kernel=False)
 
 
 def figure_tags():
@@ -118,6 +121,7 @@ def render(tag):
         mesh = build_mesh_from_polygons(
             polys, target_size=tag.get('target_size'),
             element_type=tag['element_type'], lines=lines,
+            element_size_1d=sd.get('element_size_1d'),
             point_constraints=extract_point_constraints(sd),
             size_regions=extract_size_regions(sd), **RT._refine_kwargs(tag))
         fem_data = build_fem_data(sd, mesh)

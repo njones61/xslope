@@ -138,7 +138,13 @@ def _base_sd():
     sd['materials'] = [fill, liner]
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(_FILL)},
                       {'mat_id': 1, 'polygon': Polygon(_LINER)}]
-    sd['circles'] = [{'Xo': 15.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}]
+    # Starting circle: the 'circles' sheet is unused by this deck's locked
+    # analysis (type=tseep_head reads only the transient seepage field), but
+    # xslope requires circles[0] to actually slice. This deck has a normal
+    # embankment slope (unlike the four 1-D columns), so a straightforward
+    # circle through the crest and the downstream toe works.
+    sd['circles'] = [{'Xo': 17.955512, 'Yo': 17.207637, 'Depth': 1.2,
+                      'R': 16.007637}]
     sd['seepage_bc'] = {'specified_heads': [
         {'head': 'pond', 'kind': 'reservoir', 'coords': _POND_FLOOR},
         {'head': _WT, 'coords': _WT_FACE}], 'exit_face': _SEEP_FACE}

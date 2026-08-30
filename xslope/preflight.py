@@ -142,6 +142,7 @@ _AT_PIEZO = "(Piezometric lines; piezo sheet)"
 _AT_DLOADS = "(Distributed loads; dloads sheet)"
 _AT_DLOADS2 = "(Distributed loads, Set 2; dloads (2) sheet)"
 _AT_SEEPBC = "(Seep BC; seep bc sheet)"
+_AT_SEEPBC2 = "(Seep BC, Set 2; seep bc (2) sheet)"
 _AT_PILES = "(Piles; piles sheet)"
 _AT_REINF = "(Reinforcement; reinforce sheet)"
 _AT_PROFILE = "(Profile lines; profile sheet)"
@@ -186,6 +187,14 @@ LEM_METHOD_OPTIONS = ("oms", "bishop", "janbu", "corps", "lowe", "spencer", "mpr
 #: -- a circle truncated at bedrock still carries ``Xo``/``Yo``/``R``).
 CIRCULAR_ONLY_METHODS = ("oms", "bishop")
 
+#: Methods that FIX the interslice-force inclination from the geometry instead of
+#: solving for it, and which stop converging where the friction angle runs much
+#: above 55 degrees. That is a standing property of the two force-equilibrium
+#: formulations, not of any one strength model -- plain Mohr-Coulomb at phi > 55
+#: fails the same way -- but a curved envelope reaches those angles on its own,
+#: which is what makes the pairing worth reporting (docs/lem/overview.md).
+FIXED_INCLINATION_METHODS = ("corps", "lowe")
+
 #: Display names for the messages, so a refusal reads as the dialog's own label.
 _METHOD_NAMES = {
     "oms": "the Ordinary Method of Slices",
@@ -209,7 +218,7 @@ REMEDIES = {
                         "(Global parameters; main D13).",
     "reverse_polyline": "Reverse a right-to-left load or piezometric line.",
     "add_ponded_water_load": "Add the standing water as a distributed load.",
-    "switch_to_auto_water": "Set Water loads to auto (main D23) so the engine "
+    "switch_to_auto_water": "Set Water loads to auto (the main sheet's Water loads row) so the engine "
                             "derives them, removing the transcribed blocks they "
                             "replace.",
     "extend_piezo_line": "Extend the piezometric line across the section.",
@@ -241,6 +250,7 @@ SWEEPABLE_FIELDS = (
     "pow_a", "pow_b", "pow_c", "pow_d", "hb_sci", "hb_gsi", "hb_mi", "hb_d",
     "k1", "k2", "alpha", "kr0", "h0", "head",
     "t_max", "t_res", "lp1", "lp2", "tend1", "tend2", "spacing",
+    "adhesion", "delta",
     "H", "theta", "D", "S", "V_cap", "M_cap",
     "k_seismic", "tcrack_depth", "tcrack_water", "piezo",
 )
@@ -794,7 +804,7 @@ class _Ctx:
         """``"circular"``, ``"noncircular"``, or ``None`` when nothing states one.
 
         A deck may carry both families, and two things can state which one is meant:
-        the model itself (``main!D24``) and this run. The file's statement is the
+        the model itself (the main sheet's Surface family row) and this run. The file's statement is the
         standing answer -- it is what a run dialog opens on, what a scripted run that
         selects nothing gets, and what every consumer outside a dialog reads -- and a
         run that states a family of its own is a change to it, taken live here and
@@ -937,6 +947,74 @@ class _Ctx:
             if ok:
                 return True
         return False
+
+    def circle_slice_failure(self, circle):
+        """The slicer's own reason a circle yields no slices, or ``None``.
+
+        The same question as :meth:`circle_slices`, asked so the answer can be
+        QUOTED. A rule that refuses a circle has to say what the slicer said,
+        because the failure modes here are geometric and various -- an arc that
+        never reaches the ground, one that leaves through a vertical edge of the
+        section, one that wanders outside the domain polygon -- and a paraphrase
+        covering all of them says nothing a user can act on.
+
+        Asked on a copy whose pore pressure is neutralized, which is what makes
+        this a question about the CIRCLE. A deck that reads pore pressure from a
+        seepage solution built at run time carries no field on disk, so slicing it
+        as it sits fails for a reason that has nothing to do with the geometry --
+        two dozen of the groundwater and transient decks are exactly this, and
+        blaming their circles would report a fault on models whose circles are
+        sound. A missing field is the ``seep_field.`` family's business; this asks
+        only whether the arc reaches the ground and stays inside the domain.
+
+        Both ways a run can consume a circle are tried, exactly as
+        :meth:`circle_slices` tries them: a plain arc, and a composite surface
+        truncated at the domain floor. Either one succeeding means the circle is
+        usable, so a rule built on this cannot fire on a model that runs.
+        """
+        from .slice import generate_slices
+        sd = dict(self.sd)
+        sd["materials"] = [dict(m, u="none") if isinstance(m, dict) else m
+                           for m in (self.sd.get("materials") or [])]
+        first = None
+        for composite in (False, True):
+            try:
+                ok, res = generate_slices(sd, circle=dict(circle),
+                                          composite=composite, debug=False,
+                                          check_inputs=False)
+            except Exception as exc:
+                ok, res = False, f"{type(exc).__name__}: {exc}"
+            if ok:
+                # "It ran" is not "it produced a failure surface". generate_slices
+                # trims slices narrower than an ABSOLUTE 1e-2 (slice.py, "Remove
+                # thin slices"), so on a section only centimetres wide every slice
+                # is trimmed and the call returns success with an EMPTY table. A
+                # circle that yields no slices is dead whichever way it got there,
+                # so the emptiness is reported rather than passed on as success.
+                try:
+                    n = len(res[0])
+                except (TypeError, IndexError, KeyError):
+                    n = None
+                if n:
+                    return None
+                if first is None:
+                    first = ("the slicer accepted the circle but produced no "
+                             "slices from it: every slice was narrower than the "
+                             "minimum slice width, which is an absolute length, so "
+                             "a section this small has no room for one")
+                continue
+            if first is None:
+                first = str(res).strip()
+        if not first:
+            return "the slicer produced no slices from it"
+        # Drop the slicer's own "Failed to generate surface:" lead-in. The sentence
+        # quoting this already says the circle produces no failure surface, and
+        # repeating it swallows the part that actually identifies the geometry.
+        for lead in ("Failed to generate surface:", "Failed to generate surface"):
+            if first.startswith(lead):
+                first = first[len(lead):].lstrip(": ").strip()
+                break
+        return first or "the slicer produced no slices from it"
 
     @property
     def has_non_circ(self):
@@ -1134,6 +1212,49 @@ class _Ctx:
             if v is not None:
                 out.append(v)
         return out
+
+    @property
+    def staged_drawdown(self):
+        """True when this rapid drawdown will take BOTH its stages from the march.
+
+        Two routes reach a drawdown's stage 2: boundary set 2, solved on its own,
+        and two instants of a transient march. Which one is running is a property of
+        the RUN, not of the file -- a model can carry set 2, a pool schedule and
+        stage times together and be run either way -- so it is read from the two
+        places a run states it. An interface states it ahead of the run, as a
+        ``seep_frame`` naming two instants (:attr:`seep_frame`). A scripted run has
+        already staged the model by the time it gets here, and states it by the
+        stage-2 instant :func:`xslope.seep.stage_transient_for_drawdown` wrote.
+        """
+        if "rapid" not in self.analyses:
+            return False
+        return (len(self.seep_frame_times) >= 2
+                or self.sd.get("seep_u2_time") is not None)
+
+    @property
+    def staged_stage2_time(self):
+        """The instant :attr:`staged_drawdown` reads stage 2 at, or ``None``."""
+        times = self.seep_frame_times
+        if len(times) >= 2:
+            return times[1]
+        return _num(self.sd.get("seep_u2_time"))
+
+    @property
+    def staged_stage1_time(self):
+        """The instant :attr:`staged_drawdown` reads stage 1 at, or ``None``.
+
+        The mirror of :attr:`staged_stage2_time`, read from the same three places
+        in the same order: the interface's ``seep_frame``, the instant a scripted
+        run already wrote, and -- for a run that has named its stage 2 without
+        naming its stage 1 -- the ``tseep`` sheet the staging would read.
+        """
+        times = self.seep_frame_times
+        if len(times) >= 2:
+            return times[0]
+        t = _num(self.sd.get("seep_u_time"))
+        if t is not None:
+            return t
+        return _num((self.tseep or {}).get("stage_1"))
 
     def series_at_start(self, name):
         """The first value of a named tseep series, or ``None`` when it has none."""
@@ -1822,7 +1943,7 @@ def _ponded_no_dload(ctx):
 
 
 # ---------------------------------------------------------------------------
-# Family: automatic water loads (main!D23 = auto)
+# Family: automatic water loads (main sheet, Water loads = auto)
 #
 # The mirror image of the manual-mode rules above. There, the risk is a water
 # load nobody entered; here it is a water load entered twice, or a derivation
@@ -1859,7 +1980,7 @@ def _auto_double_count(ctx):
                    f"{100 * measures['worst']:.2g}%. It will be counted twice. "
                    f"Delete the block {_at_dloads(stage)}, or set Water loads to "
                    f"manual if this file is meant to carry its water loads "
-                   f"explicitly (main D23).")
+                   f"explicitly (the main sheet's Water loads row).")
 
 
 @rule("water.auto_derivation_empty", WARNING, ("lem", "rapid"),
@@ -1889,7 +2010,7 @@ def _auto_derivation_empty(ctx):
     return (f"Water loads is set to auto and Piezometric Line 1 stands up to "
             f"{depth:.3g} above the ground surface, but the engine derived no water "
             f"load at all: {why}. The reservoir's weight is missing from the "
-            f"analysis (main D23).")
+            f"analysis (the main sheet's Water loads row).")
 
 
 @rule("water.sources_disagree", WARNING, ("lem", "rapid"),
@@ -1998,21 +2119,119 @@ def _mat_option_missing(ctx):
                    f"or elastic) {_AT_MAT}.")
 
 
-@rule("mat.gamma_nonpositive", ERROR, ("lem",),
-      "A material carrying strength data needs a positive unit weight.",
+#: Every field a material row carries when it comes off the mat sheet. A key
+#: outside this set on an in-memory material (an assistant snippet, a script) is
+#: one nothing reads -- the value it holds silently does not exist to the run.
+MATERIAL_FIELDS = frozenset((
+    "name", "gamma", "gamma_sat", "option", "c", "phi", "cp", "r_elev", "d",
+    "psi", "t_cut", "phi_b", "s_cap", "Ss", "Sy", "pow_a", "pow_b", "pow_c",
+    "pow_d", "hb_sci", "hb_gsi", "hb_mi", "hb_d", "u", "ru", "sigma_gamma",
+    "sigma_c", "sigma_phi", "sigma_cp", "sigma_d", "sigma_psi", "k1", "k2",
+    "alpha", "kr0", "h0", "unsat", "vg_a", "vg_n", "E", "nu",
+))
+
+
+def _nearest_material_field(key):
+    """The real field a stray key most likely meant. An abbreviation is the
+    common case (gsat for gamma_sat, sigc for sigma_c), so a field that contains
+    the key's letters in order wins, shortest first; failing that, the closest
+    spelling by edit similarity."""
+    import difflib
+    k = key.lower()
+
+    def _subseq(short, long):
+        it = iter(long.lower())
+        return all(ch in it for ch in short)
+
+    ordered = sorted((f for f in MATERIAL_FIELDS if len(f) > len(k) and _subseq(k, f)),
+                     key=len)
+    if ordered:
+        return ordered[0]
+    near = difflib.get_close_matches(key, MATERIAL_FIELDS, n=1, cutoff=0.6)
+    return near[0] if near else None
+
+
+@rule("mat.gamma_sat_without_water", INFO, ("lem",),
+      "A saturated unit weight is set but the model has no water table, so it "
+      "never applies.", fields=("gamma_sat",))
+def _mat_gamma_sat_without_water(ctx):
+    sd = ctx.sd
+    def _present(v):
+        if v is None:
+            return False
+        try:
+            return len(v) > 0
+        except TypeError:
+            return True
+    has_water = any(_present(sd.get(k)) for k in
+                    ("piezo_line", "piezo_line2", "seep_u", "seep_u2")) or \
+        any(str(m.get("u") or "").strip().lower() in ("seep", "piezo")
+            for m in ctx.materials if isinstance(m, dict))
+    if has_water:
+        return None
+    rows = [ctx.mat_label(i) for i, m in enumerate(ctx.materials)
+            if isinstance(m, dict) and _num(m.get("gamma_sat")) is not None]
+    if not rows:
+        return None
+    yield (f"{', '.join(rows)} carr{'ies' if len(rows) == 1 else 'y'} a saturated "
+           f"unit weight, but the model has no water table (no piezometric line "
+           f"and no seepage solution), so gamma_sat never applies and gamma is "
+           f"used throughout. Add the water, or leave gamma_sat blank {_AT_MAT}.")
+
+
+@rule("mat.unknown_field", WARNING, ("lem", "fem", "seep"),
+      "A material carries a field the model does not read; the value it holds "
+      "is silently ignored.")
+def _mat_unknown_field(ctx):
+    # Measured case: an assistant asked for saturated unit weights wrote
+    # m['gsat'] = 135 -- valid Python, no error anywhere, and the saved workbook
+    # carried gamma_sat = None, so two answers came back 7% high with nothing in
+    # the session noticing. The right name is one edit away; say it.
+    import difflib
+    for i, m in enumerate(ctx.materials):
+        if not isinstance(m, dict):
+            continue
+        for key in m:
+            if not isinstance(key, str) or key.startswith("_") or key in MATERIAL_FIELDS:
+                continue
+            near = _nearest_material_field(key)
+            hint = f" Did you mean '{near}'?" if near else ""
+            yield (f"{ctx.mat_label(i)} carries a field named '{key}'.{hint} No "
+                   f"analysis reads it, so whatever it holds ({m[key]!r}) is not "
+                   f"part of the model. The material fields are those of the mat "
+                   f"sheet: {', '.join(sorted(MATERIAL_FIELDS))}.")
+
+
+@rule("mat.gamma_nonpositive", ERROR, ("lem", "fem"),
+      "A material a stability run weighs needs a positive unit weight.",
       fields=("gamma", "gamma_sat"))
 def _mat_gamma_nonpositive(ctx):
-    for i, m in enumerate(ctx.materials):
+    # This is the ONLY place a missing unit weight is caught: the loader reads the
+    # workbook whatever the mat sheet says, so that a model still being built opens.
+    # Every stability analysis reaches here -- lem, rapid (inherits lem), fem, ssrm
+    # (inherits fem), and a sweep or reliability run on either base. A seepage-only
+    # run never weighs anything, so the rule is silent there.
+    #
+    # WHICH rows: the finite element engine demands gamma of every material table
+    # row and refuses the run on the first bad one (fem.py:1304-1317), so a finite
+    # element run is checked row by row, elastic rows included. A limit equilibrium
+    # run only weighs what a failure surface can cross, which is the rows carrying a
+    # strength model.
+    fem = "fem" in ctx.analyses
+    for i, m in (ctx.fem_materials() if fem else enumerate(ctx.materials)):
         opt = str(m.get("option") or "").strip().lower()
-        if opt not in ("mc", "cp", "pow", "hb"):
+        if not fem and opt not in ("mc", "cp", "pow", "hb"):
             continue
         if _pos(m.get("gamma")):
             continue
+        why = (f"the finite element engine weighs every material it meshes"
+               if fem else
+               f"the row carries a strength model (option = {opt}), so it is a "
+               f"slope-stability material")
         yield (f"{ctx.mat_label(i)} has no unit weight: g is "
-               f"{_fmt(m.get('gamma'))}. The row carries a strength model "
-               f"(option = {opt}), so it is a slope-stability material and needs a "
-               f"positive unit weight -- a gamma of zero produces zero slice weights "
-               f"and a meaningless factor of safety {_AT_MAT}.")
+               f"{_fmt(m.get('gamma'))}. Enter one -- {why}, and a gamma of zero "
+               f"produces zero weights and a meaningless factor of safety "
+               f"{_AT_MAT}.")
 
 
 @rule("mat.no_shear_strength", WARNING, ("lem",),
@@ -2025,7 +2244,7 @@ def _mat_no_shear_strength(ctx):
         c, phi = _num(m.get("c")) or 0.0, _num(m.get("phi")) or 0.0
         if c == 0.0 and phi == 0.0:
             yield (f"{ctx.mat_label(i)} has no shear strength at all: option = mc "
-                   f"with c = 0 and f = 0. If it is cohesionless, enter its friction "
+                   f"with c = 0 and φ = 0. If it is cohesionless, enter its friction "
                    f"angle -- nothing can tell 'cohesionless' from 'no data' "
                    f"{_AT_MAT}.")
 
@@ -2057,6 +2276,27 @@ def _mat_ru_zero(ctx):
                    f"generated, which is identical to a dry model and "
                    f"non-conservative. Enter a positive pore pressure ratio, or set "
                    f"u = none {_AT_MAT}.")
+
+
+@rule("mat.hb_method_convergence", WARNING, ("lem",),
+      "Corps of Engineers and Lowe & Karafiath may not converge on a Hoek-Brown "
+      "material.")
+def _mat_hb_method_convergence(ctx):
+    m = ctx.method
+    if m not in FIXED_INCLINATION_METHODS:
+        return None
+    for i, mat in ctx.strength_materials():
+        if str(mat.get("option") or "").strip().lower() != "hb":
+            continue
+        yield (f"{ctx.mat_label(i)} uses the Hoek-Brown strength model "
+               f"(option = hb), and this run selects {_METHOD_NAMES[m]}. That "
+               f"method fixes the interslice force inclination from the geometry "
+               f"instead of solving for it, and stops converging above about 55 "
+               f"degrees of friction -- which the instantaneous tangent of a "
+               f"Hoek-Brown envelope reaches at the low normal stresses on a "
+               f"shallow slice near the crest. Run Spencer's Method or the "
+               f"Morgenstern-Price Method, which solve for the inclination "
+               f"(Materials table, mat sheet; Run LEM, main D14).")
 
 
 # ---------------------------------------------------------------------------
@@ -2194,7 +2434,7 @@ def _family_ambiguous(ctx):
             "the run did not state which to analyse. The circular surface will be "
             "used; the non-circular surface will be ignored -- set Surface family "
             "to say which (Circles, circles sheet; Non-circular surface, non-circ "
-            "sheet; main D24).")
+            "sheet; the main sheet's Surface family row).")
 
 
 # ---------------------------------------------------------------------------
@@ -2332,6 +2572,184 @@ def _circle_below_domain_floor(ctx):
             f"above y = {_fmt(floor)} {_AT_CIRCLES}, or deepen the model so the "
             f"circle fits inside it -- {deeper}."))
     return out
+
+
+@rule("surface.circle_daylights_above_center", WARNING, ("lem",),
+      summary="A circle that meets the ground above its own center cannot be "
+              "built as a failure surface; where that circle IS the run's "
+              "surface, it is an error.")
+def _circle_daylights_above_center(ctx):
+    # The second way a circle drawn on the section can be dead, and the one that
+    # looks least like a fault: the circle plainly cuts the slope, and the slicer
+    # still reports that it does not reach the ground.
+    #
+    # A failure surface is built as the BOTTOM semicircle (slice.generate_failure_
+    # surface), so the two daylight points have to bound an arc no longer than half
+    # the circle -- both of them at or below the center. A crossing ABOVE the center
+    # bounds a major arc, whose end slices would overhang: a base steeper than
+    # vertical, which no limit-equilibrium formulation here can carry. So
+    # circle_polyline_intersections discards that crossing rather than splicing a
+    # vertical face down to the arc, which would invent a tension crack of arbitrary
+    # depth and lower FS by the depth of the invention.
+    #
+    # The SEVERITY split is the sibling rule's, for the same reason and measured the
+    # same way: a search refines off its seeds and reaches the critical surface
+    # anyway, so a dead seed costs the seed and not the answer (WARNING); a
+    # single-surface run analyses circles[0] and nothing else, so a dead first
+    # circle is the whole analysis (ERROR).
+    #
+    # A tension crack is the one sanctioned escape (slice._recover_ends_via_tcrack:
+    # the arc exits at the crack on the uphill side and on the true ground at the
+    # toe), so a model that states one is not reported -- vp030a/b carry exactly
+    # this geometry and solve.
+    if ctx.surface_supplied:
+        return None
+    if ctx.effective_surface_family == "noncircular":
+        return None
+    if (_num(ctx.sd.get("tcrack_depth")) or 0.0) > 0:
+        return None
+    ground = ctx.sd.get("ground_surface")
+    if ground is None:
+        return None
+    from .slice import crossings_above_center
+    out = []
+    for i, c in enumerate(ctx.sd.get("circles") or []):
+        if not isinstance(c, dict):
+            continue
+        Xo, Yo, R = _num(c.get("Xo")), _num(c.get("Yo")), _num(c.get("R"))
+        if None in (Xo, Yo, R):
+            continue
+        try:
+            above = crossings_above_center(Xo, Yo, R, ground)
+        except Exception:
+            continue
+        if not above:
+            continue
+        # Asked of the slicer itself, exactly as the sibling rule asks it: a circle
+        # with a third crossing above the center and two sound ones below it still
+        # slices, and a rule that fires on a model that runs is miscalibrated.
+        if ctx.circle_slices(c):
+            continue
+        p = max(above, key=lambda q: q.y)
+        fatal = (i == 0 and not ctx.is_search)
+        if fatal:
+            cost = (" This run analyses that circle and no other, so it has no "
+                    "failure surface to work on.")
+        elif ctx.is_search:
+            cost = (" The search's other circles are unaffected; this one is lost, "
+                    "and the answer comes from the grid around it rather than from "
+                    "the circle drawn.")
+        else:
+            cost = (f" This run analyses {ctx.circle_label(0)} only and does not "
+                    f"read this one, so it does not affect the answer -- but a "
+                    f"search seeded from this sheet would lose it.")
+        out.append((
+            ERROR if fatal else WARNING,
+            f"{ctx.circle_label(i)} (Xo = {_fmt(Xo)}, Yo = {_fmt(Yo)}, R = "
+            f"{_fmt(R)}) meets the ground surface at ({_fmt(p.x)}, {_fmt(p.y)}), "
+            f"above its own center at y = {_fmt(Yo)}. The arc would rise above its "
+            f"center on that side -- an arc longer than a semicircle, whose end "
+            f"slices would overhang -- which the slicer cannot build, so no slices "
+            f"can be generated from this circle.{cost} Lower the center or enlarge "
+            f"the radius so both crossings sit below it {_AT_CIRCLES}."))
+    return out
+
+
+#: The standing repair for a first circle that cannot be sliced, in one sentence.
+#: Named once because three severities share it and they must not drift apart.
+_CIRCLE_RULE = ("A workable circle enters near the crest, runs tangent near the "
+                "base of the zone that governs, and daylights near the toe")
+
+
+@rule("surface.circle_cannot_be_sliced", WARNING, ("*",),
+      summary="The first circle must produce slices; where that circle IS the "
+              "run's surface, one that cannot is an error.",
+      remedy="generate_starting_circles")
+def _circle_cannot_be_sliced(ctx):
+    # The catch-all beneath the two rules above. Those name the two causes that can
+    # be diagnosed by INSPECTION -- a tangent depth below the domain floor, and a
+    # crossing above the circle's own center -- and each names the field to change.
+    # Every OTHER way a circle can be dead reaches the user as a slicing failure
+    # naming no field, several layers below the sheet they would fix: a section too
+    # narrow for the arc to daylight twice, so it leaves through a vertical edge; an
+    # arc that misses the ground entirely; a surface that wanders outside the domain
+    # polygon. From the run's point of view those are one condition -- there is no
+    # failure surface -- so they are reported as one, quoting the slicer's own
+    # reason rather than paraphrasing it into something too general to act on.
+    #
+    # WHY circles[0] ONLY. That is the circle a single-surface run analyses, and the
+    # one a shipped file is judged on. A search reads the whole sheet and refines
+    # off the survivors, so a dead seed costs the seed and not the answer (measured
+    # in the sibling rule above); reporting every dead circle in a large starting
+    # set would bury the one that decides whether the run has a surface at all.
+    #
+    # THE SEVERITY LADDER, and what each step costs:
+    #   single-surface LEM -- ERROR. run_lem_analysis takes circles[0] and nothing
+    #     else, so a dead first circle is the whole analysis.
+    #   seeded search -- WARNING. The grid moves off the seeds, so the run still
+    #     reaches a critical surface; what is lost is the circle the user drew.
+    #   no stability analysis selected -- INFO. A seepage, transient or
+    #     finite-element run never reads the circles sheet, so nothing about this
+    #     run is wrong. It is still worth saying: the file carries a circle no
+    #     limit-equilibrium run could use, and the moment someone selects one it
+    #     becomes the error above.
+    if ctx.surface_supplied:
+        return None
+    if ctx.effective_surface_family == "noncircular":
+        return None
+    circles = ctx.sd.get("circles") or []
+    if not circles or not isinstance(circles[0], dict):
+        return None
+    c = circles[0]
+
+    # Defer where a specific rule already explains THIS circle. Both of those fire
+    # on circles[0] under the same conditions this rule would, and each names the
+    # single field to change; saying the same thing twice, the second time in less
+    # detail, is worse than saying it once.
+    floor = ctx.domain_floor
+    depth = _num(c.get("Depth"))
+    if floor is not None and depth is not None and depth < floor:
+        return None
+    if (_num(ctx.sd.get("tcrack_depth")) or 0.0) <= 0:
+        ground = ctx.sd.get("ground_surface")
+        Xo, Yo, R = _num(c.get("Xo")), _num(c.get("Yo")), _num(c.get("R"))
+        if ground is not None and None not in (Xo, Yo, R):
+            from .slice import crossings_above_center
+            try:
+                if crossings_above_center(Xo, Yo, R, ground):
+                    return None
+            except Exception:
+                pass
+
+    reason = ctx.circle_slice_failure(c)
+    if reason is None:
+        return None
+
+    Xo, Yo, R = _num(c.get("Xo")), _num(c.get("Yo")), _num(c.get("R"))
+    where = ""
+    if None not in (Xo, Yo, R):
+        where = f" (Xo = {_fmt(Xo)}, Yo = {_fmt(Yo)}, R = {_fmt(R)})"
+
+    if "lem" not in ctx.analyses:
+        severity = INFO
+        cost = (f" This run does not read the circles sheet, so its own answer is "
+                f"unaffected -- but the file carries a starting circle that no "
+                f"limit-equilibrium run could use.")
+    elif ctx.is_search:
+        severity = WARNING
+        cost = (" The search's other circles are unaffected; this one is lost, and "
+                "the answer comes from the grid around it rather than from the "
+                "circle drawn.")
+    else:
+        severity = ERROR
+        cost = (" This run analyses that circle and no other, so it has no failure "
+                "surface to work on.")
+
+    return [(severity,
+             f"{ctx.circle_label(0)}{where} produces no failure surface. The "
+             f"slicer's own reason: {reason}{cost} {_CIRCLE_RULE} -- replace the "
+             f"circle with one placed that way {_AT_CIRCLES}, or generate a "
+             f"starting set from the model's geometry.")]
 
 
 # ---------------------------------------------------------------------------
@@ -2627,6 +3045,22 @@ def _seep_field_node_count(ctx):
     return out
 
 
+@rule("seep_field.no_consumer", WARNING, ("lem", "fem"),
+      "A solved seepage field no material reads produces no pore pressure.")
+def _seep_field_no_consumer(ctx):
+    # The twin of piezo.no_consumer: the field exists -- solved, or loaded from
+    # its sidecar -- and no material has u = seep, so the run computes with
+    # whatever the materials do say (none, piezo, ru) and the seepage solve is
+    # never read. Silent on a model with no field to read.
+    if ctx.sd.get("seep_u") is None or ctx.uses_seep_u:
+        return None
+    return ("This model carries a solved seepage field, but no material takes its "
+            "pore pressure from it: every material's u option is none, piezo or "
+            "ru, so the run never reads the seepage solution. Set u = seep on the "
+            "materials that should read it, or leave them as they are if the "
+            "seepage run was not meant to feed this analysis.")
+
+
 @rule("seep_field.missing", ERROR, ("lem",),
       "A material with u = seep needs a solved pore-pressure field.")
 def _seep_field_missing(ctx):
@@ -2651,7 +3085,7 @@ def _seep_field_missing(ctx):
 
 
 @rule("seep_field.transient_frame", INFO, ("lem", "fem"),
-      "u = seep against a transient march reads one named instant of it.")
+      "u = seep against a transient seepage analysis reads one named instant of it.")
 def _seep_field_transient_frame(ctx):
     """Name the instant the run will read out of the attached transient solution.
 
@@ -2828,15 +3262,33 @@ def _seep_exit_only(ctx):
             "head that drives the flow (Seep BC; seep bc sheet).")
 
 
-@rule("seep.no_gradient", WARNING, ("seep",),
+@rule("seep.no_gradient", ERROR, ("seep",),
       "Two heads of the same value, or one head alone, drive no flow.")
 def _seep_no_gradient(ctx):
+    # An ERROR, not a warning (Norm 2026-08-26): a set of boundary conditions
+    # that is nothing but specified heads at one value poses no flow problem —
+    # there is no gradient and no solution, and the unconfined sweep runs to its
+    # limit looking for one. An exit face does not rescue it: it is a place
+    # water may leave, not a head that drives any.
     bc = ctx.seep_bc
     heads = bc.get("specified_heads") or []
     n_flux = len(bc.get("specified_fluxes") or [])
-    n_exit = len(bc.get("exit_face") or [])
-    if n_flux or n_exit or not heads:
+    if n_flux or not heads:
         return None
+    # An exit face IS an outlet where it lies below the water the heads set:
+    # there the pressure is zero and the head equals the elevation, which is a
+    # gradient (the corpus's dam-with-a-seepage-face cases). An exit face that
+    # sits entirely above every specified head drains nothing and rescues
+    # nothing.
+    exit_face = bc.get("exit_face") or []
+    finite_heads = [float(b.get("head")) for b in heads if _finite(b.get("head"))]
+    if exit_face and finite_heads:
+        try:
+            lowest_exit = min(float(pt[1]) for pt in exit_face)
+        except (TypeError, ValueError, IndexError):
+            lowest_exit = None
+        if lowest_exit is not None and lowest_exit < max(finite_heads) - 1e-9:
+            return None
     if ctx.sd.get("tseep") is not None:
         return None            # a transient run drives the heads from its series
     if any(isinstance(b.get("head"), str) for b in heads):
@@ -2845,9 +3297,10 @@ def _seep_no_gradient(ctx):
               if _finite(b.get("head"))}
     if len(values) >= 2:
         return None
-    return ("The specified heads all carry the same value, so this confined model "
-            "has no gradient and no flow. A confined model needs at least two "
-            "distinct head values, or a flux boundary (Seep BC; seep bc sheet).")
+    return ("The specified heads all carry the same value, so this model has no "
+            "gradient and no flow: the problem has no solution to find. Give the "
+            "boundary set at least two distinct head values, or a flux boundary "
+            "(Seep BC; seep bc sheet).")
 
 
 @rule("seep.bc_polyline_too_short", ERROR, ("seep",),
@@ -2918,14 +3371,14 @@ def _mat_tensile_cap_missing(ctx):
         phi = _num(m.get("phi")) or 0.0
         c = _num(m.get("c")) or 0.0
         if phi <= 0:
-            what = ("nowhere at all -- with f = 0 the Mohr-Coulomb cone has no apex, "
+            what = ("without limit -- with φ = 0 the Mohr-Coulomb cone has no apex, "
                     "so nothing bounds the tensile stress the material can carry")
         else:
             apex = c / math.tan(math.radians(phi)) if phi < 90 else 0.0
-            what = (f"at the Mohr-Coulomb cone apex, c/tan(f) = {apex:.4g}, which "
+            what = (f"up to the Mohr-Coulomb cone apex, c/tan(φ) = {apex:.4g}, which "
                     f"may be far above the material's real tensile strength")
-        yield (f"{ctx.mat_label(i)} has no tensile strength: a blank t_cut leaves "
-               f"tension capped {what}. Enter t_cut, or 0 for a no-tension soil. A "
+        yield (f"{ctx.mat_label(i)} has no tensile cutoff: a blank t_cut allows "
+               f"tension {what}. Enter t_cut, or 0 for a no-tension soil. A "
                f"dropped cap is not visible in any result: it raises the "
                f"strength-reduction factor of safety silently {_AT_MAT}.")
 
@@ -2942,7 +3395,7 @@ def _tension_srf_unset(ctx):
         return None
     return (f"Tension SRF (FEM) is blank, so the engine default applies: the "
             f"tensile cap is divided by the trial strength-reduction factor "
-            f"alongside c and tan(f). {len(capped)} material(s) carry a t_cut. Set "
+            f"alongside c and tan(φ). {len(capped)} material(s) carry a t_cut. Set "
             f"it to NO to hold the cap at its entered value instead "
             f"{_at_global('D17')}.")
 
@@ -3321,7 +3774,7 @@ def _tseep_storage(ctx):
                    f"{_fmt(m.get('Ss'))} on a transient run. A zero removes the "
                    f"entire storage term where the material is saturated, and with "
                    f"Sy zero as well the residual storage floor collapses too and "
-                   f"the time march no longer terminates {_AT_MAT}.")
+                   f"the time stepping no longer terminates {_AT_MAT}.")
         if unconfined and not _pos(m.get("Sy")):
             yield (f"{ctx.mat_label(i)} has no specific yield: Sy is "
                    f"{_fmt(m.get('Sy'))}, and this model is unconfined (an exit face "
@@ -3360,7 +3813,7 @@ def _tseep_duration(ctx):
     if _pos(ts.get("duration")):
         return None
     return (f"Duration is {_fmt(ts.get('duration'))}. A transient run needs a "
-            f"positive duration -- it is the length of the march, and there is "
+            f"positive duration -- it is the length of the run, and there is "
             f"deliberately no default {_AT_TSEEP}.")
 
 
@@ -3385,7 +3838,7 @@ def _tseep_save_interval(ctx):
                 f"Save interval = {si:g} is longer than the Duration ({dur:g}), so "
                 f"only the endpoint and the scheduled breakpoints are saved. A "
                 f"stability run asking for an intermediate time would have to "
-                f"re-march to reach it {_AT_TSEEP}.")
+                f"re-run the analysis to reach it {_AT_TSEEP}.")
     return None
 
 
@@ -3414,7 +3867,7 @@ def _tseep_stage_times(ctx):
     if s1 >= s2:
         return (f"Stage 1 time = {s1:g} is not earlier than Stage 2 time = {s2:g}. "
                 f"The full-pool state must precede the drawn-down state. Today the "
-                f"march runs to completion and reports success; the ordering only "
+                f"run completes and reports success; the ordering only "
                 f"surfaces if the staging is invoked afterwards {_AT_TSEEP}.")
     dur = _num(ts.get("duration"))
     if dur is not None and s2 > dur:
@@ -3438,7 +3891,7 @@ def _tseep_save_times(ctx):
     if not over:
         return None
     return (f"{len(over)} extra save time(s) lie beyond the Duration ({dur:g}) -- "
-            f"{', '.join(f'{_num(t):g}' for t in over[:4])}. The march stops at the "
+            f"{', '.join(f'{_num(t):g}' for t in over[:4])}. The run stops at the "
             f"duration, so no frame is saved at those times {_AT_TSEEP}.")
 
 
@@ -3463,8 +3916,33 @@ def _tseep_initial_condition(ctx):
                 f"so it holds flat at its first defined breakpoint until that point. "
                 f"The initial condition is a steady solve at the t = 0 boundary "
                 f"configuration, so give the driving series its t = 0 value to "
-                f"control the state the march starts from {_AT_TSEEP}.")
+                f"control the state the transient run starts from {_AT_TSEEP}.")
     return out
+
+
+@rule("seep.steady_reads_series_at_t0", INFO, ("seep",),
+      "A steady run reads each series-bound boundary at its t = 0 value.")
+def _steady_reads_series_at_t0(ctx):
+    # Fires on the STEADY run only. A transient run inherits every seep rule
+    # (analyses expansion), but there the series drive the march itself -- guard
+    # on the exact analysis, not the expanded set.
+    if ctx.analysis_name != "seep":
+        return None
+    bc = ctx.seep_bc
+    names = [b.get("head") for b in bc.get("specified_heads") or []]
+    names += [b.get("flux") for b in bc.get("specified_fluxes") or []]
+    bound = list(dict.fromkeys(v for v in names if isinstance(v, str) and v.strip()))
+    if not bound:
+        return None
+    parts = []
+    for s in bound:
+        v = ctx.series_at_start(s)
+        parts.append(f"'{s}'" if v is None else f"'{s}' = {v:g}")
+    listed = ", ".join(parts)
+    return (f"Boundary values bound to a time series are read at their t = 0 "
+            f"values for a steady run ({listed}) -- the initial-condition "
+            f"snapshot, the same field a transient run starts from. The Log "
+            f"states each reading {_AT_SEEPBC}.")
 
 
 @rule("tseep.reservoir_face_above_level", INFO, ("seep",),
@@ -3490,7 +3968,7 @@ def _reservoir_above_level(ctx):
                    f"y = {top:g}, above its level ({level:g}). A reservoir boundary "
                    f"is submerged-only: nodes at or below the level are held at it, "
                    f"and the nodes above become seepage-exit faces. That is how a "
-                   f"rising pool is modelled -- it is only wrong if the face was "
+                   f"rising pool is modeled -- it is only wrong if the face was "
                    f"meant to be held at the level throughout {_AT_SEEPBC}.")
     return out
 
@@ -3534,6 +4012,91 @@ def _rapid_stage2_water(ctx):
             f"beside the .xlsx. It is not loaded, and the stage-2 pore pressure "
             f"would read zero everywhere.")
     return out
+
+
+@rule("rapid.stage2_bc_ignored", WARNING, ("rapid",),
+      "On the transient-staged route boundary set 2 supplies nothing: both stages "
+      "come from the transient run.")
+def _rapid_stage2_bc_ignored(ctx):
+    """Boundary set 2 left on a file whose drawdown is taking both stages from a march.
+
+    The two routes disagree about what the drawn-down state IS, and only one of them
+    can be right for a given run. On the transient-staged route the pool is a
+    schedule and the drawn-down state is where that schedule has got to at the
+    stage-2 time; boundary set 2 is a separate, constant-head statement of a
+    drawn-down state that this run neither solves nor reads. Left on the file it is
+    silent -- the run is correct without it -- but it is the obvious thing to edit
+    when the answer is not what the modeller expected, and editing it changes
+    nothing.
+    """
+    if not ctx.staged_drawdown:
+        return None
+    bc2 = ctx.sd.get("seepage_bc2") or {}
+    if not (bc2.get("specified_heads") or bc2.get("specified_fluxes")):
+        return None
+    t2 = ctx.staged_stage2_time
+    unit = str(ctx.sd.get("time_unit") or "").strip()
+    when = ("the stage-2 time" if t2 is None
+            else f"t = {_fmt(t2)}" + (f" {unit}" if unit else ""))
+    n_h, n_f, _n_e = ctx.bc_counts(2)
+    return (f"Boundary set 2 carries {n_h} specified head(s) and {n_f} specified "
+            f"flux(es), but this rapid drawdown reads BOTH its stages from the "
+            f"transient seepage analysis: the drawn-down pool and pore pressures come from the "
+            f"pool schedule at {when}, on boundary set 1. Set 2 is ignored and "
+            f"editing it changes nothing. Clear it, or run the two-steady route -- "
+            f"clear the Stage 1 / Stage 2 times {_AT_TSEEP} and solve set 2 on its "
+            f"own -- to make it the drawn-down state {_AT_SEEPBC2}.")
+
+
+@rule("rapid.pool_static_between_stages", WARNING, ("rapid",),
+      "On the transient-staged route the pool has to fall between the stage times, "
+      "or both stages read the full pool.")
+def _rapid_pool_static(ctx):
+    """A staged drawdown whose boundary set 1 states the same pool at both instants.
+
+    On the transient-staged route the drawdown IS the pool schedule: stage 1 is
+    boundary set 1 as the schedule stands at the stage-1 time and stage 2 is the
+    same boundary set at the stage-2 time. Nothing else lowers the water. So a
+    reservoir head left as a fixed number, or bound to a series that is flat across
+    the two instants, does not describe a drawdown at all -- the march runs, both
+    frames come back, and the two stages are the same state. The answer is the
+    full-pool factor of safety wearing a drawdown's name, which is the
+    unconservative direction and reads as a perfectly ordinary result.
+
+    Only boundary set 1 is measured, because on this route it is the only set read
+    (see :func:`_rapid_stage2_bc_ignored`), and only blocks drawn ON the ground
+    surface count as a pool -- the same reading ``water.bc_pool_levels`` gives the
+    load derivation, so the rule and the water the run actually applies cannot
+    disagree.
+    """
+    if not ctx.staged_drawdown:
+        return None
+    t1, t2 = ctx.staged_stage1_time, ctx.staged_stage2_time
+    if t1 is None or t2 is None:
+        return None
+    from .water import bc_pool_levels           # local: water.py is a heavy import
+    ground = ctx.sd.get("ground_surface")
+    p1 = bc_pool_levels(ctx.seep_bc, ground, ctx.sd, t1)
+    p2 = bc_pool_levels(ctx.seep_bc, ground, ctx.sd, t2)
+    if not p1 or len(p1) != len(p2):
+        return None            # nothing states a pool, or the two readings do not pair
+    height = ctx.slope_height or 1.0
+    tol = max(1e-9, 1e-4 * height)
+    if any(a[0] - b[0] > tol for a, b in zip(p1, p2)):
+        return None            # some pool falls -- this run has a drawdown in it
+    top1, _anchors, label = max(p1, key=lambda e: e[0])
+    top2 = max(e[0] for e in p2)
+    unit = str(ctx.sd.get("time_unit") or "").strip()
+    unit = f" {unit}" if unit else ""
+    return (f"The pool stands at elevation {top1:g} at the stage-1 time "
+            f"(t = {_fmt(t1)}{unit}) and at {top2:g} at the stage-2 time "
+            f"(t = {_fmt(t2)}{unit}): it does not fall between them. This rapid "
+            f"drawdown reads BOTH its stages from the transient seepage analysis, so nothing "
+            f"else lowers the water -- the run never lowers the pool, and the "
+            f"drawdown answer is the full-pool state read twice, which is too high. "
+            f"Bind {label.split(' at elevation')[0]}'s Value to a time series "
+            f"that falls across the two stage times {_AT_SEEPBC}, and give the "
+            f"series the levels it holds at each of them {_AT_TSEEP}.")
 
 
 @rule("rapid.ru_has_no_stage2", WARNING, ("rapid",),
@@ -3957,6 +4520,21 @@ def _pile_spacing_invalid(ctx):
                f"pile keeps contributing it in full {_AT_PILES}.")
 
 
+@rule("pile.capacity_nonpositive", ERROR, ("lem", "fem"),
+      "A pile's H, Vcap and Mcap must be positive where they are given; a "
+      "number you do not have is left blank, never 0.",
+      fields=("H", "V_cap", "M_cap"))
+def _pile_capacity_nonpositive(ctx):
+    for i, p in enumerate(ctx.piles):
+        for key, name in (("H", "H"), ("V_cap", "Vcap"), ("M_cap", "Mcap")):
+            v = _num(p.get(key))
+            if v is None or v > 0:
+                continue
+            yield (f"{ctx.pile_label(i)} has {name} = {v:g}. {name} is a capacity "
+                   f"and must be positive; leave it blank if it is not known "
+                   f"{_AT_PILES}.")
+
+
 @rule("pile.spacing_not_greater_than_diameter", ERROR, ("lem",),
       "Ito & Matsui needs a clear gap between piles: S must exceed D.",
       fields=("S", "D"))
@@ -4089,24 +4667,43 @@ def _reinf_line_length(r):
         return None
 
 
+def _vocab(value):
+    """The word a vocabulary cell holds, or None when the cell is genuinely blank.
+
+    Blank means None or an empty string, and nothing else. The obvious
+    ``str(value or "")`` idiom reads every FALSY value as blank, so a number in a
+    word column -- ``Dir = 0.0`` -- was let through as "the cell is empty, take
+    the default" by the one rule whose whole job is to refuse words that are not
+    in the vocabulary. ``Dir = 'sideways'`` was caught and ``Dir = 0.0`` was not.
+    A number is not a word: it is checked like any other entry, and 0 is checked
+    like any other number.
+    """
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    text = str(value).strip()
+    return text.lower() if text else None
+
+
 @rule("reinforce.dir_vocabulary", ERROR, ("*",),
       "Type, Dir and Appl each speak a fixed vocabulary.")
 def _reinf_vocabulary(ctx):
-    types = ("", "geosynthetic", "nail", "tieback", "anchor")
+    types = ("geosynthetic", "nail", "tieback", "anchor")
     for i, r in enumerate(ctx.reinforcement):
-        t = str(r.get("type") or "").strip().lower()
-        if t not in types:
+        t = _vocab(r.get("type"))
+        if t is not None and t not in types:
             yield (f"{ctx.reinf_label(i)} sets Type = {r.get('type')!r}, which is "
                    f"not a support type. Expected one of: geosynthetic, nail, "
                    f"tieback, anchor (or blank for a generic tensile line) "
                    f"{_AT_REINF}.")
-        d = str(r.get("dir") or "").strip().lower()
-        if d and d not in ("tangent", "axial"):
+        d = _vocab(r.get("dir"))
+        if d is not None and d not in ("tangent", "axial"):
             yield (f"{ctx.reinf_label(i)} sets Dir = {r.get('dir')!r}, which is "
                    f"not a direction. Expected: tangent (along the failure surface) "
                    f"or axial (along the bar) {_AT_REINF}.")
-        a = str(r.get("appl") or "").strip().lower()
-        if a and a not in ("active", "passive"):
+        a = _vocab(r.get("appl"))
+        if a is not None and a not in ("active", "passive"):
             yield (f"{ctx.reinf_label(i)} sets Appl = {r.get('appl')!r}, which is "
                    f"not an application. Expected: active (allowable force) or "
                    f"passive (ultimate capacity, divided by the factor of safety) "
@@ -4173,7 +4770,7 @@ def _reinf_incomplete_cross(ctx):
       "A blank Type defaults to tangent/active -- 13% off a soil nail.")
 def _reinf_type_blank(ctx):
     rows = [i for i, r in enumerate(ctx.reinforcement)
-            if not str(r.get("type") or "").strip()]
+            if _vocab(r.get("type")) is None]
     if not rows:
         return None
     return (f"{len(rows)} reinforcement line(s) leave Type blank, starting at "
@@ -4197,6 +4794,63 @@ def _reinf_pullout_negative(ctx):
                        f"turns the weakest pullout case into the strongest and "
                        f"raises the factor of safety. Enter the anchorage length, "
                        f"or 0 for a fully anchored end {_AT_REINF}.")
+
+
+@rule("reinforce.pullout_law_incomplete", ERROR, ("lem", "fem"),
+      "Adhesion and Delta describe one pullout law: both, or neither.",
+      fields=("adhesion", "delta"))
+def _reinf_pullout_law_incomplete(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        a, d = _num(r.get("adhesion")), _num(r.get("delta"))
+        if (a is None) == (d is None):
+            continue
+        have, missing = ("Adhesion", "Delta") if a is not None else ("Delta", "Adhesion")
+        yield (f"{ctx.reinf_label(i)} fills {have} but leaves {missing} blank. The "
+               f"two are one law -- pullout resistance 2*(Adhesion + sigma'v*tan "
+               f"Delta) per unit length -- and half of it is not a law: the missing "
+               f"half would have to be read as zero, which is either no interface "
+               f"friction at all or no adhesion at all, neither of them what a "
+               f"half-filled row means. Fill both to use the overburden-dependent "
+               f"law, or clear both to use the development lengths Lp1/Lp2 "
+               f"{_AT_REINF}.")
+
+
+@rule("reinforce.pullout_delta_range", ERROR, ("lem", "fem"),
+      "The interface friction angle is an angle between 0 and 90 degrees.",
+      fields=("delta",))
+def _reinf_pullout_delta_range(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        d = _num(r.get("delta"))
+        if d is None or 0.0 < d < 90.0:
+            continue
+        yield (f"{ctx.reinf_label(i)} has Delta = {d:g} degrees. The interface "
+               f"friction angle must lie strictly between 0 and 90: at 0 the "
+               f"overburden contributes nothing and the law reduces to adhesion "
+               f"alone (leave Delta blank and use Lp instead if that is the "
+               f"intent), and at 90 tan Delta is infinite. A value entered as a "
+               f"tangent or a percentage rather than degrees lands here "
+               f"{_AT_REINF}.")
+
+
+@rule("reinforce.pullout_lp_ignored", INFO, ("lem", "fem"),
+      "Lp1/Lp2 play no part on a line that uses the overburden-dependent law.",
+      fields=("adhesion", "delta", "lp1", "lp2"))
+def _reinf_pullout_lp_ignored(ctx):
+    rows = []
+    for i, r in enumerate(ctx.reinforcement):
+        a, d = _num(r.get("adhesion")), _num(r.get("delta"))
+        if a is None or d is None:
+            continue
+        if _num(r.get("lp1")) or _num(r.get("lp2")):
+            rows.append(i)
+    if not rows:
+        return []
+    return [f"{len(rows)} reinforcement line(s) carry both a development length "
+            f"and the overburden-dependent pullout law, starting at "
+            f"{ctx.reinf_label(rows[0])}. Adhesion and Delta govern there: the "
+            f"capacity is the interface resistance integrated from each end, and "
+            f"Lp1/Lp2 are not read. Clear Adhesion and Delta to go back to the "
+            f"development lengths {_AT_REINF}."]
 
 
 @rule("reinforce.envelope_inconsistent", WARNING, ("lem", "fem"),
@@ -4348,18 +5002,69 @@ def _mat_E_band(ctx):
 
 
 @rule("mat.nu_implausible", WARNING, ("fem",),
-      "A Poisson's ratio below 0.1 is outside the range of any soil or rock.")
+      "A Poisson's ratio below 0.1 is outside the range of any soil or rock; one "
+      "above 0.45 is near the incompressible limit and conditions the stiffness "
+      "matrix badly.")
 def _mat_nu_band(ctx):
     for i, m in ctx.fem_materials():
         nu = _num(m.get("nu"))
         if nu is None or nu <= 0 or nu >= 0.5:
             continue           # blank / out of range is the ERROR above
+        if nu > 0.45:
+            yield (f"{ctx.mat_label(i)} has nu = {nu:g}, close to the incompressible "
+                   f"limit of 0.5. The plane-strain stiffness scales with "
+                   f"1 / (1 - 2 nu), so the element matrices are poorly conditioned "
+                   f"and the strength reduction converges slowly or not at all. Use "
+                   f"0.45 or less; an undrained clay is modelled at 0.45, not 0.49 "
+                   f"{_AT_MAT}.")
+            continue
         if nu >= 0.1:
             continue
         yield (f"{ctx.mat_label(i)} has nu = {nu:g}. Soils sit at 0.2-0.45 and "
                f"rock at 0.15-0.3; below 0.1 the material has almost no lateral "
                f"coupling, which changes the stress field the strength reduction "
                f"acts on {_AT_MAT}.")
+
+
+#: Floor below which a Hoek-Brown σci is weaker in unconfined compression than any
+#: intact rock -- expressed in kPa and converted for an Imperial model, the same way
+#: the structural modulus band below is. The magnitude is the diagnostic: σci is
+#: quoted in MPa everywhere in the rock-mechanics literature and entered here in the
+#: model's own stress unit, so a number typed straight off a lab report lands three
+#: orders of magnitude low. The corpus's own rock is Hammah's 30 MPa weak mass at
+#: 30,000 kPa, well clear of this; what sits below it is the Li normalized family
+#: (0.598-4.37 kPa), which is reported deliberately -- a normalized model is
+#: indistinguishable from a mis-keyed one by magnitude alone, which is exactly why
+#: this is a warning and not a refusal.
+_HB_SCI_MIN_KPA = 1.0e3
+
+
+def _hb_sci_floor(ctx):
+    from .units import KPA_TO_PSF, normalize_unit_system
+    if normalize_unit_system(ctx.sd.get("unit_system")) == "imperial":
+        return round(_HB_SCI_MIN_KPA * KPA_TO_PSF, -2), "psf"
+    return _HB_SCI_MIN_KPA, "kPa"
+
+
+@rule("mat.hb_sci_units", WARNING, ("lem", "fem"),
+      "A Hoek-Brown σci too small, in the declared unit system, to be intact rock.",
+      fields=("hb_sci",))
+def _mat_hb_sci_units(ctx):
+    lo, unit = _hb_sci_floor(ctx)
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "hb":
+            continue
+        sci = _num(m.get("hb_sci"))
+        if sci is None or sci <= 0 or sci >= lo:
+            continue
+        yield (f"{ctx.mat_label(i)} has σci = {sci:g}, below {lo:g} {unit} -- "
+               f"weaker in unconfined compression than any intact rock. σci is "
+               f"entered in this model's own stress units and xslope never "
+               f"converts: 30 MPa is 30,000 kPa or 626,000 psf, so a σci carried "
+               f"straight over in MPa describes a rock mass a thousand times "
+               f"weaker than the one intended. A normalized model, which holds "
+               f"σci/γH at a critical ratio, is the one case where a value this "
+               f"small is meant {_AT_MAT}.")
 
 
 #: Plausible Young's-modulus band for a structural element -- a geosynthetic sheet
@@ -4450,7 +5155,7 @@ def _mat_phi_range(ctx):
         if v is None or v < 90.0:
             continue
         yield (f"{ctx.mat_label(i)} has f (friction angle) = {v:g} degrees. The "
-               f"Mohr-Coulomb strength is c + s'*tan(f), which has no finite value "
+               f"Mohr-Coulomb strength is c + σ′·tan(φ), which has no finite value "
                f"at 90 degrees and changes sign above it. Enter an angle below 90 "
                f"{_AT_MAT}.")
 

@@ -42,7 +42,7 @@ values    Individual numbers held: methods x models, list elements, point
 
 models    Distinct input files behind the tags.
 
-The six certified verification pages carry a second, independent counter:
+The certified verification pages carry a second, independent counter:
 ``tools/verification_checks/tags.py`` reports "values checked" for the subset of
 keys it audits against the printed text.  This script prints that subset as a
 cross-check line so the two counters can be reconciled.
@@ -83,17 +83,19 @@ FAMILIES = [
     ("docs/verification/geostudio.md", "GeoStudio SLOPE/W + SEEP/W"),
     ("docs/verification/ssrm.md", "Analytical / classical literature (FEM)"),
     ("docs/verification/seep.md", "Analytical / classical literature (seepage)"),
+    ("docs/verification/published.md", "Published worked problems (design manuals)"),
 ]
 SAMPLES_FAMILY = "Samples, design and parametric pages"
 
-#: The six certified verification pages, and the tag keys their independent
+#: The certified verification pages, and the tag keys their independent
 #: text-vs-tag auditor reads (``tools/verification_checks/config.py``).  Counting
 #: this subset here reproduces that auditor's own "values checked" total, so the
 #: two counters can be reconciled without running the solver.
-CERTIFIED_PAGES = ["geostudio", "rocscience", "rocscience_groundwater", "rs2",
-                   "seep", "ssrm"]
+CERTIFIED_PAGES = ["geostudio", "published", "rocscience",
+                   "rocscience_groundwater", "rs2", "seep", "ssrm"]
 CHECKER_KEYS = ["expected_fs*", "fs_*", "expected_beta", "expected_kc",
-                "expected_flowrate*", "expected_head*", "points", "expected"]
+                "expected_flowrate*", "expected_head*", "expected_pullout",
+                "expected_envelope", "points", "expected"]
 CHECKER_TOTAL = 803     # as reported by tools/verification_checks/tags.py
 
 
@@ -160,6 +162,13 @@ def tally(kv):
         n = len([v for v in kv.get("expected", "").split(";") if v.strip()])
         n += sum(1 for k in ("critical_time", "min_fs") if k in kv)
         return n, 1, n
+    if t == "pullout_envelope":
+        # A pullout table: one element per reinforcement layer in each list, and
+        # one envelope evaluation per element.  The two lists are two quantities
+        # read at the same stations, so each is one "field" comparison.
+        keys = [k for k in ("expected_pullout", "expected_envelope") if k in kv]
+        n = sum(len([e for e in kv[k].split(";") if e.strip()]) for k in keys)
+        return n, len(keys), n
     if t == "reliability_mc":
         n = sum(1 for k in ("expected_beta", "expected_pf") if k in kv)
         return n, n, n

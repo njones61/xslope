@@ -8,7 +8,7 @@ three sources in a strict order:
 1. **Live** — the selected provider's own list-models endpoint, read with the
    user's stored key over the same ``urllib`` path the updater uses (Anthropic
    ``GET /v1/models``, OpenAI ``GET /v1/models``, the OpenAI-compatible
-   ``{base}/models`` for DeepSeek and Z.ai, Ollama's ``GET /api/tags``).
+   ``{base}/models`` for Kimi and Z.ai, Ollama's ``GET /api/tags``).
 2. **Cache** — whatever the last successful enumeration returned for that
    provider, kept in the app's own settings store, so an offline laptop still
    shows a current list.
@@ -40,14 +40,14 @@ import os
 import re
 import urllib.request
 
-from .config import PROVIDERS
+from .config import PROVIDERS, model_is_vision
 from ..updater import REPO, TIMEOUT, due_for_check, utc_stamp
 
 __all__ = [
     "LISTING", "MANIFEST_NAME", "MANIFEST_URL", "SUPPORTED_SCHEMA", "TIMEOUT",
     "ModelChoice", "listing_url", "auth_headers", "parse_models", "is_chat_model",
-    "list_models", "fetch_models", "manifest_url", "fetch_manifest",
-    "valid_manifest", "load_manifest", "store_manifest", "manifest_due",
+    "is_offerable", "list_models", "fetch_models", "manifest_url",
+    "fetch_manifest", "valid_manifest", "load_manifest", "store_manifest", "manifest_due",
     "load_cached", "save_cached", "resolve_models", "model_choices",
     "recommended_model", "default_model",
 ]
@@ -61,8 +61,8 @@ LISTING = {
                   "style": "openai"},          # {"data": [{"id": ...}, ...]}
     "openai": {"base": "https://api.openai.com", "path": "/v1/models",
                "style": "openai"},
-    "deepseek": {"base": "https://api.deepseek.com", "path": "/models",
-                 "style": "openai"},
+    "kimi": {"base": "https://api.moonshot.ai/v1", "path": "/models",
+             "style": "openai"},
     "zai": {"base": None, "path": "/models", "style": "openai"},
     "ollama": {"base": "http://localhost:11434", "path": "/api/tags",
                "style": "ollama"},             # {"models": [{"name": ...}, ...]}
@@ -99,7 +99,10 @@ _NOT_CHAT = {
     # An Ollama tag list is whatever the user pulled; only embedding models are
     # unusable as a chat model.
     "ollama": re.compile(r"(embed|bge-|nomic-)", re.I),
-    # Anthropic and DeepSeek list chat models only — nothing to filter.
+    # Moonshot lists chat models only, and kimi-thinking-preview — the one id with
+    # no tool support at all, so it cannot drive the assistant.
+    "kimi": re.compile(r"(kimi-thinking-preview|embedding|moderation)", re.I),
+    # Anthropic lists chat models only — nothing to filter.
 }
 
 
@@ -173,6 +176,13 @@ def parse_models(provider, payload):
         key_order = ("id",)
     if not isinstance(rows, list):
         return []
+    # OpenAI-style listings arrive oldest first (OpenAI's own runs gpt-3.5 to
+    # gpt-5.x over 80+ rows); where the rows carry a created stamp the list
+    # is turned newest first so the current models sit at the top of the combo.
+    if style != "ollama" and any(isinstance(r, dict) and isinstance(r.get("created"), (int, float))
+                                 for r in rows):
+        rows = sorted(rows, key=lambda r: (r.get("created") or 0)
+                      if isinstance(r, dict) else 0, reverse=True)
     for row in rows:
         value = None
         if isinstance(row, dict):
@@ -201,6 +211,28 @@ def is_chat_model(provider, model_id):
     return not pattern.search(str(model_id or ""))
 
 
+def is_offerable(provider, model_id):
+    """Whether ``model_id`` belongs in this provider's list at all.
+
+    A chat model (:func:`is_chat_model`) and — for the providers whose catalogue
+    is mixed (``vision_only`` in :data:`studio.ai.config.PROVIDERS`: Kimi, Z.ai,
+    Ollama) — one that can read an image. The assistant's headline request is a
+    cross section handed over as a picture, and a text-only model turns that into
+    a conversation about what the picture shows, so those catalogues are offered
+    as the part of themselves that can do the job rather than in full.
+
+    The filter is a NAME test, so it is as conservative as the naming convention
+    it reads: a provider that renames its vision family drops out of the list
+    rather than being mislabelled, and the model box stays editable, so an id
+    published this morning can always be typed in.
+    """
+    if not is_chat_model(provider, model_id):
+        return False
+    if not (PROVIDERS.get(provider) or {}).get("vision_only"):
+        return True
+    return bool(model_is_vision(provider, model_id))
+
+
 def list_models(provider, api_key=None, base_url=None, timeout=TIMEOUT, url=None):
     """GET, parse and filter one provider's model list. **Raises** on failure.
 
@@ -213,7 +245,7 @@ def list_models(provider, api_key=None, base_url=None, timeout=TIMEOUT, url=None
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         raw = resp.read(1 << 20)          # a model list is a few KB; cap the read
     payload = json.loads(raw.decode("utf-8"))
-    return [m for m in parse_models(provider, payload) if is_chat_model(provider, m)]
+    return [m for m in parse_models(provider, payload) if is_offerable(provider, m)]
 
 
 def fetch_models(provider, api_key=None, base_url=None, timeout=TIMEOUT, url=None):

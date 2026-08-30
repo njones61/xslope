@@ -874,6 +874,9 @@ DEFAULT_OPTIONS = {
     # --- what the report documents ---
     "method": None,                   # which method(s) the detail follows; a name
                                       # or a list of them
+    "template": None,                 # the Word template the document is built
+                                      # on; None is the one shipped with xslope
+                                      # (xslope.report_docx.DEFAULT_TEMPLATE)
     "input_path": None,               # the .xlsx, for the traceability stamp
     "solved_at": None,                # datetime of the solve; None = read it off
                                       # the run's own record, and omit the row
@@ -1555,12 +1558,44 @@ def one_d_counts(fem_data):
         n = int(keep.sum())
         if not n:
             continue
-        kinds = sorted({int(t) for t in types[keep]}) if len(types) == n_1d else [2]
-        nodes = _join(["two-node" if k == 2 else "three-node" if k == 3
-                       else f"{k}-node" for k in kinds]) or "two-node"
+        nodes = _one_d_node_phrase(types, keep, n_1d)
         out.append(f"{n:,} {nodes} {element} "
                    f"{'element' if n == 1 else 'elements'} for {many}")
     return out
+
+
+def _one_d_node_phrase(types, keep, n_1d):
+    """``"three-node"`` -- how many nodes one kind's 1D elements stand on, said
+    the way a reader would say it, and joined where a mesh carries both.
+
+    ``element_types_1d`` records 2 or 3 nodes per 1D element: 2 on a linear mesh,
+    3 on a quadratic one, where the element also stands on the midside node of
+    the soil edge it lies on.
+    """
+    import numpy as _np
+    types = _np.asarray(types)
+    kinds = sorted({int(t) for t in types[keep]}) if len(types) == n_1d else [2]
+    return _join(["two-node" if k == 2 else "three-node" if k == 3
+                  else f"{k}-node" for k in kinds]) or "two-node"
+
+
+def one_d_node_phrase(fem_data, pile):
+    """``"three-node"`` for the piles (``pile=True``) or the reinforcement
+    (``pile=False``) of one finite element mesh."""
+    import numpy as _np
+    elements = fem_data.get("elements_1d")
+    n_1d = 0 if elements is None else len(elements)
+    if not n_1d:
+        return "two-node"
+    mask = _np.asarray(fem_data.get("pile_elem_mask",
+                                    _np.zeros(n_1d, dtype=bool)), dtype=bool)
+    if mask.shape != (n_1d,):
+        mask = _np.zeros(n_1d, dtype=bool)
+    types = fem_data.get("element_types_1d", _np.full(n_1d, 2))
+    keep = mask if pile else ~mask
+    if not keep.any():
+        return "two-node"
+    return _one_d_node_phrase(types, keep, n_1d)
 
 
 #: Why the one- and two-dimensional elements sharing nodes matters, said once,
@@ -2447,9 +2482,9 @@ def _point(m, x, y):
 #: solver reads it afterwards.
 REINFORCEMENT_PROPERTIES = {
     "lem": ("label", "start", "end", "t_max", "tend1", "tend2", "lp1", "lp2",
-            "spacing", "dir", "appl"),
+            "adhesion", "delta", "spacing", "dir", "appl"),
     "fem": ("label", "start", "end", "t_max", "t_res", "tend1", "tend2",
-            "lp1", "lp2", "spacing", "E", "area"),
+            "lp1", "lp2", "adhesion", "delta", "spacing", "E", "area"),
 }
 
 #: The same, for the piles. The limit equilibrium analysis takes the lateral
@@ -2457,14 +2492,14 @@ REINFORCEMENT_PROPERTIES = {
 #: Ito and Matsui method from the diameter and spacing — at the inclination given
 #: for it, capped by the shear and moment capacities, and active or passive
 #: (``slice.py``). The finite element analysis assembles the pile as a beam in
-#: the mesh and needs its section stiffness and the fixity of its head
+#: the mesh and needs its section stiffness and the rotation restraint at each end
 #: (``fem.py``); it takes no stated force, because the force is an outcome of the
 #: solution rather than an input to it.
 PILE_PROPERTIES = {
     "lem": ("label", "top", "bottom", "H", "theta_p", "D_pile", "S",
             "V_cap", "M_cap", "appl"),
     "fem": ("label", "top", "bottom", "D_pile", "S", "V_cap", "M_cap",
-            "E", "I", "area", "fixity"),
+            "E", "I", "area", "head_fixity", "tip_fixity"),
 }
 
 
@@ -2487,6 +2522,13 @@ def _reinforcement_fields(slope_data):
                   lambda m: _fmt(m.get("tend2"), "{:g}"), False),
         "lp1": ("lp1", f"L_p1{lu}", lambda m: _fmt(m.get("lp1"), "{:g}"), True),
         "lp2": ("lp2", f"L_p2{lu}", lambda m: _fmt(m.get("lp2"), "{:g}"), True),
+        # The overburden pullout law. Printed only on the lines that carry it —
+        # a blank pair means the development lengths above are the law, and a
+        # column of blanks would say nothing.
+        "adhesion": ("adhesion", f"Adhesion{su}",
+                     lambda m: _fmt(m.get("adhesion"), "{:g}"), False),
+        "delta": ("delta", "Delta (deg)",
+                  lambda m: _fmt(m.get("delta"), "{:g}"), False),
         "spacing": ("spacing", f"Spacing{lu}",
                     lambda m: _fmt(m.get("spacing"), "{:g}"), True),
         "dir": ("dir", "Direction",
@@ -2540,8 +2582,11 @@ def _pile_fields(slope_data):
         "E": ("E", f"E{su}", lambda m: _fmt(m.get("E"), "{:,.0f}"), False),
         "I": ("I", f"I{iu}", lambda m: _fmt(m.get("I"), "{:g}"), False),
         "area": ("area", f"Area{au}", lambda m: _fmt(m.get("area"), "{:g}"), False),
-        "fixity": ("fixity", "Head fixity",
-                   lambda m: str(m.get("fixity") or ""), False),
+        "head_fixity": ("head_fixity", "Head fixity",
+                        lambda m: str(m.get("head_fixity")
+                                      or m.get("fixity") or ""), False),
+        "tip_fixity": ("tip_fixity", "Tip fixity",
+                       lambda m: str(m.get("tip_fixity") or ""), False),
     }
 
 
@@ -2615,9 +2660,9 @@ _PILE_PROSE = {
     "fem": "its diameter and out-of-plane spacing, the shear and moment "
            "capacities that cap what it carries, the modulus, area and second "
            "moment of area that set the stiffness of the beam that represents "
-           "it, "
-           "and the fixity of its head. The force a pile carries is an outcome "
-           "of the solution here rather than an input to it",
+           "it, and the rotation restraint at its head and at its tip. The "
+           "force a pile carries is an outcome of the solution here rather "
+           "than an input to it",
 }
 
 
@@ -3017,8 +3062,20 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
     kind = search.get("kind", "circular")
 
     items = [("Surface family", "circular" if kind == "circular" else "non-circular"),
-             ("Method", method_label(method)),
-             ("Trial surfaces evaluated", f"{len(fs_cache):,}")]
+             ("Method", method_label(method))]
+    # A circular search's factor-of-safety cache holds one entry per grid CENTER,
+    # and each center is solved at many depths: the cache length is not the number
+    # of trial surfaces and reporting it as such understated an 838-surface
+    # search as 96. The true count is the one the search itself discloses — the unique
+    # surfaces handed to the solver (:class:`~xslope.search.UnsolvedTrials`). The
+    # non-circular search caches one entry per surface, so there the cache length
+    # IS the count and there is no second number to give.
+    trials = _num((search.get("unsolved") or {}).get("attempted"))
+    if trials:
+        items.append(("Trial surfaces evaluated", f"{int(trials):,}"))
+        items.append(("Grid centers refined", f"{len(fs_cache):,}"))
+    else:
+        items.append(("Trial surfaces evaluated", f"{len(fs_cache):,}"))
     if path_pts:
         items.append(("Refinement stages", str(len(path_pts))))
     valid = [c for c in fs_cache if _num(c.get("FS")) is not None
@@ -4017,7 +4074,7 @@ EQUATION_SYMBOLS = {
     "Z_i": "interslice resultant on the left side of the slice, carried in from "
            "the slice before it",
     "Z_{i+1}": "interslice resultant on the right side of the slice, which the "
-               "march solves for and carries into the next slice",
+               "slice-by-slice sweep solves for and carries into the next slice",
     "m_α": "the base-normal denominator, which carries the factor of safety and "
            "is what makes the solution iterative",
     "f_o": "Janbu's empirical correction factor for the neglected interslice shear",
@@ -4033,7 +4090,7 @@ EQUATION_SYMBOLS = {
            "at the solution",
     "R_2": "moment imbalance of the whole sliding mass at a trial (F, θ) — zero "
            "at the solution",
-    "Z_n": "interslice force left over at the far end of the march — zero at the "
+    "Z_n": "interslice force left over at the far end of the sweep — zero at the "
            "solution",
     "M_O": "moment about the coordinate origin O of one force acting on the "
            "sliding mass; the sum over every force is the moment of the mass "
@@ -4241,15 +4298,15 @@ WHOLE_MASS_BALANCE_PHRASE = "the force-equilibrium derivation"
 #: to the first, and the reader had the interslice forces leaving the equilibrium
 #: of the mass.
 WHOLE_MASS_BALANCE_LEAD = (
-    "Summing the march's equation (6) over the slices cancels the interslice "
+    "Summing the per-slice equation (6) over the slices cancels the interslice "
     "forces, since each enters one slice with the value it left the one "
     "before. What remains is the horizontal equilibrium of the whole sliding "
     "mass. Rearranged for the factor of safety, it is equation (12) of the "
     "force-equilibrium derivation, which carries every force a slice can take. "
     "It is not solved directly for F: the factor of safety stands on both "
     "sides, inside N' and in the strength mobilized on the slice bases. The "
-    "march is what solves for F, and equation (12) is the balance that holds "
-    "at the factor of safety the march reaches:")
+    "sweep is what solves for F, and equation (12) is the balance that holds "
+    "at the factor of safety the sweep reaches:")
 
 #: The registry contributions equation (12) is assembled from. They are the same
 #: two the evaluated quotient below it is formed from, so the published form and
@@ -4693,7 +4750,7 @@ TRANSCRIPTIONS = {
     "corps": Transcription(
         consumers=("march_x", "march_y"), build="march",
         lead="Equations (6) and (7) of the derivation are the horizontal and "
-             "vertical equilibrium of one slice. The march solves them on each "
+             "vertical equilibrium of one slice. The sweep solves them on each "
              "slice in turn for the base normal N' and the interslice resultant "
              "Z_{i+1} on its right, given the Z_i carried in from the slice "
              "before it:",
@@ -4701,14 +4758,14 @@ TRANSCRIPTIONS = {
     "lowe": Transcription(
         consumers=("march_x", "march_y"), build="march",
         lead="Equations (6) and (7) of the derivation are the horizontal and "
-             "vertical equilibrium of one slice. The march solves them on each "
+             "vertical equilibrium of one slice. The sweep solves them on each "
              "slice in turn for the base normal N' and the interslice resultant "
              "Z_{i+1} on its right, given the Z_i carried in from the slice "
              "before it:",
         reduces="so equations (6) and (7) reduce to:"),
     "mprice": Transcription(
         consumers=("march_x", "march_y"), build="march",
-        lead="The march solves the same per-slice system as the "
+        lead="The sweep solves the same per-slice system as the "
              "force-equilibrium methods — equations (6) and (7) of that "
              "derivation, the horizontal and vertical equilibrium of one slice "
              "— for the base normal N' and the interslice resultant Z_{i+1} on "
@@ -5923,7 +5980,7 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     # say so: what reaches their solution is a slice-by-slice march, and the
     # quotient under it is a balance that holds because the march closed.
     if method in WHOLE_MASS_BALANCE_METHODS:
-        intro = (f"The slice-by-slice march that reaches this solution is the "
+        intro = (f"The slice-by-slice sweep that reaches this solution is the "
                  f"derivation published for {label}, in the symbols of the "
                  f"XSLOPE documentation; the numbers below are the converged "
                  f"values.")
@@ -6170,7 +6227,7 @@ def _quotient_close(calc, table_number, bookmark, unit_labels):
         blocks.append(Prose(
             "Summed over every force on every slice it vanishes at the "
             "solution, as does the interslice force left at the far end of the "
-            "march:"))
+            "sweep:"))
         blocks.append(Math(f"Z_n = {format_residual(residuals[0])}"))
         blocks.append(Math(f"sum{{M_O}} = {format_residual(residuals[1])}"))
     return blocks
@@ -7020,7 +7077,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     # than one: a model documented on the steady states alone has no other basis
     # for the sentence to distinguish it from.
     basis = ("This is a steady state: the field was solved with the boundary "
-             "conditions held where this set puts them, not marched. "
+             "conditions held where this set puts them, not stepped through time. "
              if basis_named else "")
     if unconfined is None:
         text = basis + SEEP_BC_UNRECORDED
@@ -7365,7 +7422,7 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     text = ("Flow was solved as a transient analysis: the head field is marched "
             "through time rather than solved at a single state.")
     if ledger["duration"] is not None:
-        text += (f" The march ran from t = 0 to "
+        text += (f" The analysis ran from t = 0 to "
                  f"{_time_phrase(slope_data, ledger['duration'], plural=True)}")
         text += (f" and saved {saved:,} states." if saved
                  else " and saved no states.")
@@ -7393,18 +7450,18 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     if converged is not None:
         if not converged:
             sub.blocks.append(Prose(
-                "The march did not converge at every step, and the fields it "
+                "The analysis did not converge at every step, and the fields it "
                 "reports are not reliable."))
         elif ledger["closure"] is not None:
             sub.blocks.append(Prose(
-                f"The march converged, closing the change in stored water "
+                f"The analysis converged, closing the change in stored water "
                 f"against the net boundary flow to within "
                 f"{100.0 * ledger['closure']:.3g} percent."))
         else:
-            sub.blocks.append(Prose("The march converged."))
+            sub.blocks.append(Prose("The analysis converged."))
     elif ledger["closure"] is not None:
         sub.blocks.append(Prose(
-            f"The march closed the change in stored water against the net "
+            f"The analysis closed the change in stored water against the net "
             f"boundary flow to within {100.0 * ledger['closure']:.3g} percent."))
 
     # A transient state has no flow net, and the head figures below say so before
@@ -7506,7 +7563,7 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
                     if history.get("outflow") is not None else "",
                 ])
                 sub.blocks.append(Prose(
-                    f"The march over time is shown in {where}, including "
+                    f"The transient solution over time is shown in {where}, including "
                     f"{traces}.", links=links))
                 sub.blocks.append(figure)
     return sub
@@ -7771,11 +7828,11 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                         f"in {where}, colored by material")
                 if marked and n_face:
                     lead += (f", with the nodes that keep one boundary type "
-                             f"throughout the march marked: the {marked} "
+                             f"throughout the run marked: the {marked} "
                              f"nodes" + for_set)
                     lead += (f" The {n_face:,} nodes of the reservoir face are not "
                              f"marked: each takes its boundary type at every step "
-                             f"of the march from where the water line stands at "
+                             f"of the run from where the water line stands at "
                              f"that step.")
                 elif marked:
                     lead += f", with every {marked} node marked" + for_set
@@ -7933,11 +7990,13 @@ DETAIL_KINDS = {
 
 #: How each kind of member is modelled, in the terms its documentation page
 #: uses. The linked phrase is the element formulation itself, which is what
-#: separates this treatment from the limit equilibrium one.
+#: separates this treatment from the limit equilibrium one. ``{nodes}`` is
+#: filled in from the mesh by :func:`detail_modelling`, since a member on a
+#: quadratic mesh stands on three nodes per element and on a linear mesh on two.
 DETAIL_MODELLING = {
     "reinforcement": (
-        "two-node truss elements",
-        "Each reinforcement line is modeled as a chain of two-node truss "
+        "{nodes} truss elements",
+        "Each reinforcement line is modeled as a chain of {nodes} truss "
         "elements on the mesh's own nodes, and carries axial tension only. The force it can "
         "hold at a point along the line is the smaller of the tensile capacity "
         "T_max and the pullout resistance developed from the nearer free end "
@@ -7946,13 +8005,22 @@ DETAIL_MODELLING = {
         "the axial force builds along the line the soil is loading it, and where "
         "the force holds steady the soil is passing it nothing."),
     "pile": (
-        "Euler-Bernoulli beam elements",
-        "Each pile is modeled as a chain of Euler-Bernoulli beam elements on "
-        "the mesh's own nodes, with a rotational degree of freedom at each. The pile "
+        "{nodes} Euler-Bernoulli beam elements",
+        "Each pile is modeled as a chain of {nodes} Euler-Bernoulli beam "
+        "elements on the mesh's own nodes, with a rotational degree of freedom "
+        "at each. The pile "
         "resists the moving ground through its own bending stiffness rather "
         "than through a force applied to it, and the shear and moment "
         "capacities the model declares limit what it can carry."),
 }
+
+
+def detail_modelling(kind, fem_data):
+    """``(phrase, prose)`` for one member kind, with the element named for the
+    number of nodes it stands on in this mesh."""
+    nodes = one_d_node_phrase(fem_data, pile=(kind == "pile"))
+    phrase, prose = DETAIL_MODELLING[kind]
+    return phrase.format(nodes=nodes), prose.format(nodes=nodes)
 
 #: What one detail figure draws, per kind, as the sentence that cites it is
 #: built: the subject, the verb agreeing with it, and the clause the sentence
@@ -7972,19 +8040,24 @@ DETAIL_FIGURE_SHOWS = {
 #: and the owner asked for it on these two (fem_piles review, 2026-08-09).
 #:
 #: Only what every such figure carries is stated. The marks a figure carries
-#: conditionally — the failure band, the softened and pulled-out elements, the
-#: peak-utilization ring — are named where the run that produced them is
-#: described, so a figure with none of them is not credited with them.
+#: conditionally — the shear band's crossing, the softened and pulled-out
+#: elements, the peak-utilization ring — are named where the run that produced
+#: them is described, so a figure with none of them is not credited with them.
 DETAIL_FIGURE_READING = {
     "reinforcement": (
         "The upper panel plots the axial force the line has mobilized along its "
         "length, over the dashed capacity envelope. The envelope ramps up from "
-        "each free end over the pullout length declared for that end and levels "
+        "each free end at the rate the pullout law declared for that line "
+        "develops — a constant rate over the pullout length, or the interface "
+        "resistance the effective overburden supports at each point where the "
+        "line states an adhesion and an interface friction angle — and levels "
         "off at the tensile capacity T_max between them, so the force a line "
         "can hold near an end is the pullout resistance and not the capacity of "
         "the bar. Where the two meet, the line is holding everything available "
-        "to it there. The point of greatest utilization is ringed and labeled "
-        "with the fraction of capacity the line reaches at it. The lower panel "
+        "to it there. The point of greatest utilization is ringed, and where the "
+        "line holds that utilization over a stretch every sample on the stretch "
+        "is ringed and the run of curve between them thickened, so a break in "
+        "the thickened curve is where the line comes off capacity. The lower panel "
         "plots the bond transfer rate dT/ds — the force the ground hands the "
         "line per unit of its length — which is how fast the force in the panel "
         "above is building: a steep stretch of force is a stretch the ground is "
@@ -7997,7 +8070,8 @@ DETAIL_FIGURE_READING = {
         "panels carry a dashed line at each declared capacity, Vcap and Mcap, "
         "drawn on both sides of the axis because either sign reaches it; a "
         "profile inside them is inside capacity. The depth of the largest "
-        "moment is ringed and ruled across all four panels. On the soil "
+        "moment is ringed and ruled across all four panels, and the largest "
+        "shear is ringed at its own depth on its own panel. On the soil "
         "reaction panel the dashed Ito and Matsui limiting resistance is the "
         "most the ground can offer at that depth, and the panel states the peak "
         "of the mobilized reaction as a fraction of it."),
@@ -8021,51 +8095,53 @@ UTILIZATION_DEFINED = {
         "limiting resistance where it does not."),
 }
 
-#: What the band drawn across a member is, per the field it was read from
-#: (:func:`xslope.fem_details.band_state`). A strength reduction run captured a
-#: mechanism and the band marks where it crosses the member. A run that converged
-#: under gravity found no failure at all, and the band it carries is where the
-#: computed shear strain concentrates — the same reading, of a section that is
-#: standing. The figure names the mark the same way
-#: (:func:`xslope.plot_fem_details.band_label`).
+#: What the mark a figure's legend calls the shear band crossing is, per the
+#: field it was read from (:func:`xslope.fem_details.band_state`). A strength
+#: reduction run captured a mechanism and the mark is where it crosses the
+#: member. A run that converged under gravity found no failure at all, and the
+#: band it carries is where the computed shear strain concentrates — the same
+#: reading, of a section that is standing. One name serves both on the figure
+#: (:data:`xslope.plot_fem_details.BAND_LABEL`), because the mark is the
+#: crossing and not the verdict; the sentence is what says which field the
+#: crossing was read from.
+#:
+#: One sentence per state, because there is one mark: the shaded stretch of the
+#: member the band crosses. It is measured by walking the member and sampling
+#: the shear strain field along it (:func:`xslope.fem_details._band_walk`), so
+#: it is where the band crosses rather than which of the member's elements the
+#: crossing falls on — and the dashed rule a crossing inside one element used to
+#: be drawn as, with the sentence that described it, is gone.
 BAND_DEFINED = {
-    ("failure", "band"): (
-        "The failure band shaded on a figure is the stretch of the member the "
-        "failure mechanism passes through, read from the shear strain field; a "
-        "member the mechanism does not reach carries none."),
-    ("failure", "line"): (
-        "The dashed line marked across a figure is where the failure mechanism "
-        "crosses the member, read from the shear strain field; the crossing "
-        "falls on a single element of the member, so it is drawn as a line "
-        "rather than as a stretch, and a member the mechanism does not reach "
-        "carries neither."),
-    ("converged", "band"): (
-        "The shear strain band shaded on a figure is the stretch of the member "
-        "where the computed shear strain concentrates; a member the "
+    "failure": (
+        "The stretch shaded on a figure and labeled Shear band crossing is where "
+        "the failure mechanism passes through the member, read from the shear "
+        "strain field; a member the mechanism does not reach carries none."),
+    "converged": (
+        "The stretch shaded on a figure and labeled Shear band crossing is where "
+        "the computed shear strain concentrates along the member; a member the "
         "concentration does not reach carries none."),
-    ("converged", "line"): (
-        "The dashed line marked across a figure is where the computed shear "
-        "strain concentrates on the member; the concentration falls on a single "
-        "element, so it is drawn as a line rather than as a stretch, and a "
-        "member the concentration does not reach carries neither."),
 }
 
 
-def _band_artist(profiles):
-    """``"band"``, ``"line"`` or ``""`` — the mark the detail figures of these
-    members actually carry.
+def _band_marked(profiles):
+    """Whether the detail figures of these members carry the band's mark at all.
 
-    The plotters shade the stretch the mechanism crosses a member over, and rule
-    a single line where that stretch collapses onto one element
-    (:mod:`xslope.plot_fem_details`). The sentence that explains the mark is
-    chosen from what was drawn, so a reader is never told to look for a band on
-    a figure that carries a line.
+    The plotters shade the stretch the band crosses a member over
+    (:mod:`xslope.plot_fem_details`), and a run whose mechanism reaches none of
+    these members draws nothing. The sentence that explains the mark follows
+    what was drawn, so a reader is never told to look for a mark no figure
+    carries.
     """
-    spans = [(p.get("band_lo"), p.get("band_hi")) for p in profiles]
-    spans = [(lo, hi) for lo, hi in spans if lo is not None and hi is not None]
-    if not spans:
-        return ""
-    return "band" if any(hi - lo >= 1e-9 for lo, hi in spans) else "line"
+    # A pile figure draws no mark (the owner's ruling: a pile's actions are set
+    # by the soil moving past its whole length, and the mark said nothing the
+    # shear-strain field does not), so only reinforcement members count here.
+    # No detail figure draws the mark any more (the owner's ruling, 2026-08-25:
+    # the shaded stretch was a threshold on a sampled field that no reader
+    # could recover from its legend), so no page carries the sentence.
+    return False
+    profiles = [p for p in profiles if p.get("kind") != "pile"]
+    return any(p.get("band_lo") is not None and p.get("band_hi") is not None
+               for p in profiles)
 
 #: What one detail figure's caption calls it, before the member's own name.
 DETAIL_FIGURE_CAPTIONS = {
@@ -8249,7 +8325,7 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         return None
 
     sec = Section(spec["title"])
-    phrase, modelling = DETAIL_MODELLING[kind]
+    phrase, modelling = detail_modelling(kind, bundle.get("fem_data") or {})
     url = docs_url(FEM_DETAIL_DOC_PAGES[kind])
     sec.blocks.append(Prose(modelling, links=[(phrase, url)] if url else []))
 
@@ -8316,17 +8392,20 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         gives = ("its length, the largest shear and bending moment along it, "
                  "the depth of each of them, the lateral displacement of its "
                  "head, and the utilization it reaches")
-    # What the states an overlay and a figure report mean, where the model
-    # declares a residual capacity and softening is a state its members can
-    # reach. A line holding its full capacity has not softened: it is at
-    # capacity, which is the state the word describes and the one the overlay
-    # colors it by.
+    # What each state a figure reports means, defined in the words the solver's
+    # own summary and the Studio panel use (there is one vocabulary, held in
+    # xslope.fem_details.REINFORCEMENT_STATES). Only the states this model can
+    # reach are defined: without a residual capacity a line cannot soften or
+    # rupture, and defining those two would describe behavior the run has none of.
     states = ""
-    if kind == "reinforcement" and _declares_residual(slope_data, profiles):
-        states = (" A line reported at capacity is holding the full capacity "
-                  "declared for it. One that has dropped onto its residual "
-                  "capacity is reported as softened, and one whose residual is "
-                  "nothing and which now carries nothing as pulled out.")
+    if kind == "reinforcement":
+        from .fem_details import REINFORCEMENT_STATES
+        reachable = ["near capacity", "pullout", "yielded"]
+        if _declares_residual(slope_data, profiles):
+            reachable += ["softened", "ruptured"]
+        states = "".join(f" A line reported {REINFORCEMENT_STATES[key][0]} "
+                         f"{REINFORCEMENT_STATES[key][1]}."
+                         for key in reachable)
 
     # What a member is NAMED by, for the locator to send a reader to. With a
     # summary table that is the table; without one it is the properties table
@@ -8411,13 +8490,15 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
             if any(p.get("peak_span") for p in (chosen or profiles)):
                 stretch = (
                     " A line that reaches its greatest utilization at more than "
-                    "one point has the whole stretch those points span marked, "
-                    "and its label gives the two ends of it.")
+                    "one point has every one of those points ringed and the run "
+                    "of curve between them thickened, so what the mark shows is "
+                    "the whole stretch the line holds that utilization over.")
                 if any(len(_series(p, "peak_gap_s"))
                        for p in (chosen or profiles)):
                     stretch += (
                         " A point inside that stretch which stands below them "
-                        "is excepted from it, and the mark breaks there.")
+                        "breaks the thickened run, so the mark comes in pieces "
+                        "where the line comes off capacity.")
             trailing = " ".join(
                 part.strip() for part in
                 [stretch, " ".join(definitions), states, read_at]
@@ -8432,12 +8513,11 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         # found. Keyed by which sentence it is, so a report carrying both kinds
         # of run writes each once rather than letting the first silence the
         # second.
-        # Named for the mark the figures below actually carry — shaded stretch
-        # or dashed line — and only where they carry one at all.
-        artist = _band_artist(chosen or profiles)
+        # Written only where the figures below carry the mark at all.
         band = BAND_DEFINED.get(
-            (band_state(bundle.get("solution") or {},
-                        bundle.get("failure_solution")), artist)) if artist else None
+            band_state(bundle.get("solution") or {},
+                       bundle.get("failure_solution"))
+        ) if _band_marked(chosen or profiles) else None
         if band and band not in defined:
             defined.add(band)
             text += f" {band}"
@@ -9687,7 +9767,11 @@ def generate_report(slope_data, solutions=None, options=None, path=None,
     ----------
     slope_data, solutions, options
         As for :func:`build_report`. :func:`solutions_from_sidecars` assembles
-        ``solutions`` from a solved model's companion files.
+        ``solutions`` from a solved model's companion files. One option is read
+        here rather than by the builder: ``template``, the Word template the
+        document is built on, in place of the one shipped with xslope. A
+        template that does not declare the styles the report is written in is
+        refused before anything is built, naming the style it lacks.
     path : str
         The document to write. Its suffix selects the format unless ``fmt`` says
         otherwise.
@@ -9718,6 +9802,15 @@ def generate_report(slope_data, solutions=None, options=None, path=None,
                        f"{', '.join(sorted(FORMATS))}.")
     if not spec["enabled"]:
         return False, f"{spec['label']} reports are not available yet."
+
+    # The template is checked before a figure is drawn: a template that cannot
+    # be built on costs the whole build otherwise, and the sentence that says
+    # what is wrong with it is the same sentence either way.
+    from .report_docx import template_problem
+
+    problem = template_problem((options or {}).get("template"))
+    if problem:
+        return False, problem
 
     from .search import AnalysisCancelled
 

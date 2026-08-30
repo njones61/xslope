@@ -119,7 +119,7 @@ storage is the elastic $S_s$, above it the retention curve's capacity alone. Com
 is not added to the unsaturated zone. This matters because the storage term sets the *timing*
 of the whole solution and the two coefficients can be orders of magnitude apart — a stiff soil
 with a flat retention curve has an $S_s$ that would swamp its true drainage capacity and slow
-the march several-fold if both were counted. RS2 and SEEP/W both apply their $m_v$ in the
+the run several-fold if both were counted. RS2 and SEEP/W both apply their $m_v$ in the
 saturated zone only, so this is also the convention their published transient results are
 computed on (see [GW18](../verification/rocscience_groundwater.md#gw18)).
 
@@ -206,14 +206,14 @@ and large ones through quiescent periods:
 - **Convergence-based growth.** After a step that converges easily the next step grows by a
   fixed factor; after one that needed many iterations it shrinks. A step that fails to converge
   is halved and retried down to a minimum size, at which point the last iterate is
-  force-accepted (and the run flagged non-converged) so the march always makes progress.
+  force-accepted (and the run flagged non-converged) so the run always makes progress.
 - **Schedule clamping.** The step is always clamped so the stepper lands *exactly* on every
   saved time. Saved frames are therefore computed states, never interpolated between steps.
 
 ### Lumped mass
 
 The storage matrix is **lumped** (diagonalized) rather than kept in consistent form. A
-consistent mass matrix couples neighbouring nodes and can produce non-physical overshoot ahead
+consistent mass matrix couples neighboring nodes and can produce non-physical overshoot ahead
 of a steep wetting front; lumping suppresses this. XSLOPE uses HRZ (special lumping) diagonal
 scaling, which coincides with row-summing on linear elements and stays strictly positive on
 quadratic ones. Lumped mass is the default and only option.
@@ -234,6 +234,12 @@ tseep sheet holds a single shared time column and up to **five named series** (d
 `t1`…`t5`, renamable). One series can drive several boundaries, and each referencing block's
 own **type** — `head`, `reservoir` or `flux` — decides whether its numbers are read as a plain
 Dirichlet head, a submerged-only reservoir level, or a specified flux.
+
+A series-bound value does not rule out a **steady** run: the series is read at its **t = 0
+value**, and the Log states each reading (`Series 'pool' read at t = 0 for the steady solve`).
+That steady solution is the initial-condition snapshot — the same field a transient run
+starts from, and its first saved frame — so a quick steady run is the natural check on a model
+before committing to a long one.
 
 Each series is a curve of value versus time with these **breakpoint semantics**:
 
@@ -279,7 +285,7 @@ the same way, so draw the face only up to the level unless that migration is int
 line switch from held reservoir head to exit face, and the still-saturated soil drains back out
 through the newly exposed surface.*
 
-### Exit-face behaviour {#exit-face-behavior}
+### Exit-face behavior {#exit-face-behavior}
 
 The exit face — present statically as a downstream seepage face, or appearing dynamically as a
 reservoir level falls below a node — is resolved each step with the same SEEP2D-style
@@ -306,7 +312,7 @@ rule, and a step that converges the ordinary way never reaches this path.
 Marching in time needs a head field at $t = 0$. By default XSLOPE computes it as a **steady
 solve at the $t = 0$ boundary configuration**: the series are evaluated at $t = 0$ and the
 ordinary steady solver is run — one linear solve for a confined problem, the steady exit-face
-Picard solver for an unconfined one. The march therefore begins from a genuine steady state
+Picard solver for an unconfined one. The transient run therefore begins from a genuine steady state
 rather than a guess. An explicit initial head field may be supplied instead when one is known.
 
 Because of that rule, the way to start from a particular steady state — a full reservoir before
@@ -339,8 +345,8 @@ stage times, and every series breakpoint — de-duplicated, sorted, and always i
 $t = 0$.*
 
 Since the schedule is what a stability run can read, a time that has to be available later has
-to be on it. A time that is **not** a saved frame is served by re-marching with that time added
-to `save_times` — never by interpolating between two frames, since a field blended from two
+to be on it. A time that is **not** a saved frame is served by rerunning the transient seepage
+analysis with that time added to `save_times` — never by interpolating between two frames, since a field blended from two
 solutions is not itself a solution of anything.
 
 ### Files
@@ -395,8 +401,8 @@ signal to tighten the step controls.
 
 A transient run produces a *sequence* of pore-pressure fields, but a stability analysis with
 `u = seep` consumes exactly **one**. The tseep controls carry an optional **stability_time**
-naming which instant that is. It is a consumption time, not a control on the march: it selects
-which frame is read out and changes nothing about how the march is solved. Like the stage times
+naming which instant that is. It is a consumption time, not a control on the analysis: it selects
+which frame is read out and changes nothing about how the transient solution is computed. Like the stage times
 it is forced into the saved-frame schedule, so the instant it names is always a computed frame.
 
 Which instant a run reads, in order of precedence:
@@ -409,7 +415,7 @@ Which instant a run reads, in order of precedence:
 
 `select_transient_frame_u(slope_data, solution, time=...)` places the chosen frame's pore
 pressures into `slope_data['seep_u']`; `apply_transient_stability_frame` wraps the whole
-resolution — precedence, rapid-drawdown staging, and the optional re-march:
+resolution — precedence, rapid-drawdown staging, and the optional rerun:
 
 ```python
 from xslope.seep import apply_transient_stability_frame
@@ -423,7 +429,8 @@ apply_transient_stability_frame(slope_data, solution, time=30.0)
 ```
 
 A time with no saved frame is refused by default, listing the times that do exist. Passing
-`remarch=True` together with the run's `seep_data` re-marches instead, with the requested
+`remarch=True` together with the run's `seep_data` reruns the transient seepage analysis
+instead, with the requested
 instant injected into `save_times`:
 
 ```python
@@ -431,8 +438,8 @@ apply_transient_stability_frame(slope_data, solution, time=100.0,
                                 seep_data=seep_data, remarch=True)
 ```
 
-`remarch_for_times(seep_data, slope_data, times)` does the re-march on its own and returns the
-new solution. A re-march is a full re-solve — seconds on a short march, minutes on a long one.
+`remarch_for_times(seep_data, slope_data, times)` does that rerun on its own and returns the
+new solution. It is a full re-solve — seconds on a short run, minutes on a long one.
 
 Selecting a frame also records *which moment* those pore pressures belong to, so under
 [automatic water loads](../usage/preflight.md#automatic-water-loads) the weight of the
@@ -476,7 +483,7 @@ progress and can be cancelled — then step through the saved frames in the solu
 The Run LEM and Run FEM dialogs carry a **seepage-time selector** when a transient solution is
 loaded, so the instant a stability run reads is named where the run is started rather than
 inherited from the play bar. It offers the saved frames, the frame the results viewer is
-showing, and free entry of any other time (which re-marches); the choice can be written back to
+showing, and free entry of any other time (which reruns the analysis); the choice can be written back to
 `stability_time`. The rapid-drawdown stage times are edited in the same dialog. See
 [Studio → Running Analyses → Seepage time](../studio/analysis.md#seepage-time).
 
@@ -529,7 +536,7 @@ slope_data = stage_transient_for_drawdown(slope_data, solution)
 
 **Worked examples** — complete input files you can download and open:
 
-- [Earth Dam — Reservoir Drawdown](samples.md#8-earth-dam-reservoir-drawdown-transient): a homogeneous dam followed through a drawdown driven by a falling `reservoir` series.
+- [Earth Dam — Reservoir Drawdown](samples.md#8-earth-dam-reservoir-drawdown-transient): a shell-and-core dam followed through a drawdown driven by a falling `reservoir` series.
 - [Johnson Reservoir — Zoned Drawdown](samples.md#9-johnson-reservoir-zoned-drawdown-transient): the zoned Johnson Reservoir dam drawn down over 45 days, with `stage_1` / `stage_2` set.
 - [Rapid drawdown from a transient solution](../lem/rapid.md#worked-example): that drawdown carried into a three-stage rapid-drawdown stability analysis.
 

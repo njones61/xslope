@@ -161,7 +161,7 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         sci, gsi, mi, dfac = g("hb_sci"), g("hb_gsi"), g("hb_mi"), g("hb_d")
         if sci <= 0 or gsi <= 0 or mi <= 0:
             return _material_hint(ax, "enter hb_sci, hb_gsi, hb_mi", "Hoek–Brown")
-        from .hoekbrown import hb_tangent
+        from .hoekbrown import hb_constants, hb_tangent
         # Range derived from σci so both stiff rock and weak rock mass show the
         # envelope's curvature; the low-stress end (curvature) is what matters for
         # slopes. Evaluated through the SAME hb_tangent the solver linearizes with:
@@ -171,6 +171,21 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
         c_i, phi_i = hb_tangent(s, sci, gsi, mi, dfac)
         tau = c_i + s * np.tan(np.radians(phi_i))
         ax.plot(s, tau, color=_STRENGTH_COLOR, lw=2)
+        # The rock-mass constants, derived rather than entered: mb, s and a are what
+        # GSI/mi/D actually produce, and they are the numbers a published table
+        # quotes. Showing them beside the envelope is what turns this into a
+        # confirmation of the three inputs rather than of a curve shape — s in
+        # particular spans orders of magnitude with GSI, and its exponent is the
+        # difference between competent rock and rubble. Anchored in axes fractions
+        # in the corner the envelope leaves empty (it rises left to right from the
+        # origin), so the block follows the axes at any canvas size.
+        mb_v, s_v, a_v = hb_constants(gsi, mi, dfac)
+        ax.text(0.03, 0.97,
+                f"mb = {float(mb_v):.4g}\n s = {float(s_v):.4g}\n a = {float(a_v):.4g}",
+                transform=ax.transAxes, va="top", ha="left",
+                fontsize=9, family="monospace", color=_REF_COLOR,
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
+                          edgecolor=_REF_COLOR, alpha=0.85))
         ax.set_xlabel("σₙ  (normal stress)")
         ax.set_ylabel("τ  (shear strength)")
         ax.set_title(f"Hoek–Brown   (σci={sci:g}, GSI={gsi:g}, mi={mi:g})")
@@ -1511,14 +1526,73 @@ def sliced_mass_bounds(ax, gids=SLICED_MASS_GIDS):
     y = np.concatenate(ys)
     return float(x.min()), float(x.max()), float(y.min()), float(y.max())
 
-def plot_piezo_line(ax, slope_data, style=None):
+def piezo_line_used(slope_data, stage=1):
+    """Whether the stage's piezometric line is READ by the analysis.
+
+    A piezometric line is an input sheet a model may carry without the analysis
+    consuming it, and the plots draw it only where it does something. Three things
+    read it:
+
+    * **Pore pressure** — a material whose ``u`` option is ``piezo`` takes the
+      pressure on a slice base from the line. The option is global to the
+      materials table, so it makes both lines live; Line 2 is the drawn-down pool
+      of a rapid-drawdown deck and exists only when that deck does, which is what
+      its own presence states.
+    * **The water load** — the weight of the pool standing on the ground surface.
+      Which sheet states that pool follows :func:`xslope.water.water_line_for_stage`'s
+      precedence — the seepage head boundaries wherever a seepage analysis is
+      defined, otherwise the stage's piezometric line — so a model whose materials
+      all read a seepage solution still draws its piezometric line when no
+      boundary set was defined and the line is what puts water on the slope. The
+      derivation itself (:func:`xslope.water.derive_water_loads`) answers this,
+      rather than the precedence being restated here, so the line drawn and the
+      load applied can never disagree.
+    * **The weight split** — a material carrying ``gamma_sat`` weighs its slice
+      saturated below the water table and moist above it, and the water table is
+      the seepage solution's u = 0 contour where there is one and the piezometric
+      line otherwise (``xslope.slice.generate_slices``). Line 1 alone: rapid
+      drawdown keys the weight to the pre-drawdown state, so Line 2 never sets it.
+
+    A line that does none of the three is not drawn: with ``u`` at ``none`` or
+    ``ru``, no saturated unit weight to place and no pool on the surface, nothing
+    in the run reads it.
+
+    ``stage`` is 1 for Line 1, 2 for Line 2.
+    """
+    sd = slope_data or {}
+    key = "piezo_line" if stage == 1 else "piezo_line2"
+    if not sd.get(key):
+        return False
+    materials = sd.get("materials") or []
+    if any(str(m.get("u") or "").strip().lower() == "piezo" for m in materials):
+        return True
+    has_seep_field = (sd.get("mesh") is not None and sd.get("seep_u") is not None)
+    if (stage == 1 and not has_seep_field
+            and any(m.get("gamma_sat") is not None for m in materials)):
+        return True
+    from .water import derive_water_loads
+    name = "Piezometric Line 1" if stage == 1 else "Piezometric Line 2"
+    try:
+        found = derive_water_loads(sd, stage=stage)
+    except Exception:
+        return True          # a half-built model shows its line rather than hiding it
+    return bool(found["blocks"]) and str(found["source"]).startswith(name)
+
+
+def plot_piezo_line(ax, slope_data, style=None, only_if_used=True):
     """
     Plots the piezometric line(s) with markers at their midpoints.
+
+    Each line is drawn only where the analysis reads it — see
+    :func:`piezo_line_used` for the three ways it does. Pass
+    ``only_if_used=False`` to draw whatever the model defines, which is what an
+    editor previewing the sheet being typed wants.
 
     Parameters:
         ax: matplotlib Axes object
         data: Dictionary containing plot data with 'piezo_line' and optionally 'piezo_line2'
         style: optional style sheet (see xslope.style); None → defaults.
+        only_if_used: skip a line the analysis does not read (default True).
 
     Returns:
         None
@@ -1549,9 +1623,14 @@ def plot_piezo_line(ax, slope_data, style=None):
     # Plot both piezometric lines
     f1 = feature_style(style, "piezo_line")
     f2 = feature_style(style, "piezo_line2")
-    plot_single_piezo_line(ax, slope_data.get('piezo_line'), f1.get('color', 'b'),
+    pz1 = slope_data.get('piezo_line')
+    pz2 = slope_data.get('piezo_line2')
+    if only_if_used:
+        pz1 = pz1 if piezo_line_used(slope_data, stage=1) else None
+        pz2 = pz2 if piezo_line_used(slope_data, stage=2) else None
+    plot_single_piezo_line(ax, pz1, f1.get('color', 'b'),
                            "Piezometric Line", f1.get('linewidth', 2), f1.get('linestyle', '-'))
-    plot_single_piezo_line(ax, slope_data.get('piezo_line2'), f2.get('color', 'skyblue'),
+    plot_single_piezo_line(ax, pz2, f2.get('color', 'skyblue'),
                            "Piezometric Line 2", f2.get('linewidth', 2), f2.get('linestyle', '-'))
 
 
@@ -2990,7 +3069,7 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
 
 # ========== FOR PLOTTING INPUT DATA  =========
 
-def plot_reinforcement_lines(ax, slope_data, style=None):
+def plot_reinforcement_lines(ax, slope_data, style=None, solution=False):
     """
     Plots the reinforcement lines from slope_data.
     
@@ -3018,17 +3097,22 @@ def plot_reinforcement_lines(ax, slope_data, style=None):
                 linewidth=rfs.get('linewidth', 3), linestyle=rfs.get('linestyle', '-'),
                 alpha=rfs.get('alpha', 0.8), label='Reinforcement Line' if i == 0 else "")
         
-        # Add markers at each point to show tension values
-        for j, point in enumerate(line):
-            tension = point.get('T', 0.0)
-            if tension > 0:
-                # Use smaller marker size proportional to tension (normalized)
-                max_tension = max(p.get('T', 0.0) for p in line)
-                marker_size = 10 + 15 * (tension / max_tension) if max_tension > 0 else 10
-                ax.scatter(point['X'], point['Y'], s=marker_size, 
-                          color='red', alpha=0.7, zorder=5,
-                          label='Tension Points' if not tension_points_plotted else "")
-                tension_points_plotted = True
+        # On a SOLUTION plot, two dots per line mark where the available
+        # tension first reaches its full value from each end -- the ends of the
+        # pullout ramps -- so the dots read like the Lp diagram: the stretch
+        # between them carries Tmax, the stretches outside it are developing
+        # it. An input plot draws none (Norm 2026-08-25: a dot at every stored
+        # tension point, thinned or not, meant nothing to a reader).
+        if solution and len(line) >= 2:
+            ts = [float(point.get('T', 0.0) or 0.0) for point in line]
+            t_max = max(ts)
+            if t_max > 0:
+                full = [k for k, t in enumerate(ts) if t >= 0.999 * t_max]
+                for k in (full[0], full[-1]):
+                    ax.scatter(line[k]['X'], line[k]['Y'], s=22, color='red',
+                               alpha=0.85, zorder=5,
+                               label='Development length ends' if not tension_points_plotted else "")
+                    tension_points_plotted = True
 
 
 def _line_load_tails(slope_data):
@@ -3595,13 +3679,11 @@ def plot_inputs(
     # the model the SSRM will run.
     if mode == "fem":
         plot_ssr_zones(ax, slope_data, style=style)
-    # A defined piezometric line is the model's water table whether or not a
-    # material's u option consumes it: with u = "none" it still splits each
-    # slice's weight into saturated below / moist above, so it changes the
-    # answer and must be visible. It is a stability input — it sets the pore
-    # pressure on a slice base and at a node — so it is drawn where the engine
-    # that reads it is documented, and not on the shared section. Seep mode
-    # draws its own water surfaces.
+    # The piezometric line is a stability input — it sets the pore pressure on a
+    # slice base and at a node, and it states the pool whose weight presses on the
+    # slope — so it is drawn where the engine that reads it is documented, and not
+    # on the shared section. Seep mode draws its own water surfaces. Each line
+    # appears only where the analysis actually reads it (piezo_line_used).
     if mode not in ("seep", "shared"):
         plot_piezo_line(ax, slope_data, style=style)
         # The water surface the head/reservoir boundaries state, drawn beside
@@ -3882,8 +3964,9 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_base_geometry(ax, slope_data, style=style)
     plot_slices(ax, slice_df, fill=False)
     plot_failure_surface(ax, failure_surface)
-    # Drawn whenever the model defines one — a piezometric line read only for
-    # saturated unit weights (u = "none") still moves the factor of safety.
+    # Drawn where the analysis reads it: as a material's pore-pressure source, as
+    # the water table a gamma_sat weight split is measured from, or as the pool
+    # whose weight loads the slope (piezo_line_used).
     plot_piezo_line(ax, slope_data, style=style)
 
     # Seep overlays: head contours and phreatic surface when any material uses seep
@@ -3943,7 +4026,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_dloads(ax, slope_data, style=style)
     plot_tcrack_surface(ax, slope_data, style=style)
     plot_tcrack_water_force(ax, slice_df, slope_data)
-    plot_reinforcement_lines(ax, slope_data, style=style)
+    plot_reinforcement_lines(ax, slope_data, style=style, solution=True)
     plot_piles(ax, slope_data, slice_df=slice_df, style=style, label_h=False)
     plot_line_loads(ax, slope_data, style=style)
     # Slice numbers go on last of all, once the frame and the layout are final —
@@ -5092,6 +5175,328 @@ def annotate_design_crossing(ax, target_fs, summary):
                 bbox=dict(boxstyle="round,pad=0.4", fc="#fff4d6",
                           ec="#e0b400", alpha=0.95))
     return ax
+
+
+#: The two faces of an embankment, in the colors an FS-versus-time curve marks its
+#: instants with: the reservoir side warm, the dry side cool. Both are clear of the
+#: default line color, so a colored marker never reads as part of the line under it.
+_FACE_COLORS = {'upstream': '#b5460f', 'downstream': '#2b7bb0'}
+_STAGE_COLORS = {2: '#e07b00', 3: '#1f8a4c'}
+
+
+def _crest_span(slope_data):
+    """The x range of a ground surface's crest — its highest run.
+
+    A flat crest has a left and a right edge; a peaked one has both at the same x,
+    so one span answers for either. Returns ``None`` where the model carries no
+    ground surface, or where the surface has no relief at all — a profile with no
+    faces to tell apart.
+    """
+    gs = (slope_data or {}).get('ground_surface')
+    if gs is None:
+        return None
+    try:
+        coords = ([(float(x), float(y)) for x, y in gs.coords]
+                  if hasattr(gs, 'coords')
+                  else [(float(p[0]), float(p[1])) for p in gs])
+    except (TypeError, ValueError):
+        return None
+    if len(coords) < 2:
+        return None
+    ys = [y for _, y in coords]
+    y_max, relief = max(ys), max(ys) - min(ys)
+    if relief <= 0:
+        return None
+    tol = 1e-6 * relief
+    xs = [x for x, y in coords if y_max - y <= tol]
+    return min(xs), max(xs)
+
+
+def _circle_face(slope_data, span, Xo, Yo=None, R=None):
+    """Which face of the embankment a critical circle sits on — ``'upstream'``,
+    ``'downstream'``, or ``None`` where the geometry does not say.
+
+    The center decides it: left of the crest's left edge is the reservoir side,
+    right of its right edge the dry side. A center standing OVER the crest belongs
+    to neither by that test, so the surface itself is asked instead — the ends it
+    daylights at, which is where the mechanism actually is. A surface that
+    daylights on both sides of the crest, or one that cannot be built from the
+    circle the row carries, is left unclassified rather than assigned a face on a
+    guess.
+    """
+    if span is None or Xo is None:
+        return None
+    left, right = span
+    Xo = float(Xo)
+    if not np.isfinite(Xo):
+        return None
+    if Xo < left:
+        return 'upstream'
+    if Xo > right:
+        return 'downstream'
+    if Yo is None or R is None or not (np.isfinite(float(Yo)) and np.isfinite(float(R))):
+        return None
+    try:
+        ok, out = generate_failure_surface(
+            slope_data['ground_surface'], circular=True,
+            circle={'Xo': Xo, 'Yo': float(Yo), 'R': float(R),
+                    'Depth': float(Yo) - float(R)})
+    except Exception:                                      # noqa: BLE001
+        return None
+    if not ok:
+        return None
+    sides = {('upstream' if x < left else 'downstream' if x > right else 'crest')
+             for x in (float(out[0]), float(out[1]))} - {'crest'}
+    return sides.pop() if len(sides) == 1 else None
+
+
+def _drawdown_interval(ts):
+    """The stretch of a ``tseep`` schedule over which the pool is falling — from the
+    breakpoint where it starts down to the one where it stops.
+
+    Read off the series that actually falls, so a schedule that only fills, or one
+    held flat, has no interval and the curve is drawn without a band. Returns
+    ``(t_start, t_end)``, or ``None``.
+    """
+    times = [float(t) for t in (ts.get('times') or [])]
+    if len(times) < 2:
+        return None
+    for vals in (ts.get('series') or {}).values():
+        if vals is None or len(vals) != len(times):
+            continue
+        vv = [float(v) for v in vals]
+        falls = [k for k in range(len(vv) - 1) if vv[k + 1] < vv[k]]
+        if falls:
+            return times[falls[0]], times[falls[-1] + 1]
+    return None
+
+
+def plot_fs_vs_time(result, slope_data=None, figsize=(8.6, 5.0), save_png=False,
+                    dpi=300, fig=None, style=None, compare=None,
+                    compare_label=None):
+    """Plot an :func:`xslope.sensitivity.fs_vs_time` curve: the factor of safety at
+    every evaluated instant of a transient seepage march.
+
+    The curve is read for its SHAPE — where it dips, how far, how fast it recovers —
+    so the lowest point is annotated with its own time rather than left for the
+    reader to find, and the model's drawdown schedule (the ``tseep`` sheet's time
+    series) is drawn faintly behind it on a second axis when ``slope_data`` carries
+    one. A dip cannot be placed against a schedule drawn somewhere else: the whole
+    reading of a drawdown curve is WHEN the minimum falls relative to the water
+    that caused it.
+
+    Instants that produced no result are not drawn (they are rows carrying a reason
+    in ``result['df']``); their absence is stated in the legend as a count, so a
+    gap in the line is never silent.
+
+    Where the schedule falls, the interval it falls over is banded and labeled
+    ``drawdown``, and the factor of safety measured before the fall began is
+    carried across the figure as a thin dashed **full pool** reference — the two
+    marks a dip is read against.
+
+    Where the instants come out on MORE THAN ONE face of the embankment, each
+    marker is colored by its own face (the critical circle's center against the
+    crest) and the line between them is drawn neutral: a curve that hands over from
+    one slope to the other is two mechanisms in sequence, not one moving surface,
+    and a single-colored line would hide the handover. A curve that stays on one
+    face is drawn plain, with no face entries in the legend — there is no handover
+    to show.
+
+    On a **rapid-drawdown** curve (``rapid=True``) the reported curve is the
+    drawdown's own factor of safety — the lower of stages 2 and 3 — and only that
+    curve is drawn; the per-stage values are in the run's console table and in
+    ``result['df']``.
+
+    Parameters:
+        result: the dict from ``fs_vs_time`` (reads 'df', 'critical_time',
+            'min_fs', 'output_label').
+        slope_data: the model, for the time/length unit labels and the ``tseep``
+            series drawn as the driver. Optional — without it the figure is the
+            curve alone.
+    """
+    import numpy as np
+    df = result['df'] if isinstance(result, dict) else result
+    output = df['output'].iloc[0] if 'output' in df.columns and len(df) else 'FS'
+    output_label = (df['output_label'].iloc[0]
+                    if 'output_label' in df.columns and len(df)
+                    else 'Factor of Safety')
+    ulab = declared_unit_labels(slope_data) if slope_data else None
+    t_unit = f" ({ulab['time']})" if ulab and ulab.get('time') else ""
+
+    if fig is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        ax = fig.add_subplot(111)
+
+    rapid = all(c in df.columns for c in ('stage1_FS', 'stage2_FS', 'stage3_FS'))
+
+    # The face each instant's critical circle came out on, read off the row's own
+    # circle. Colored only where the curve actually changes face: on a single-face
+    # march the colors would carry no information and the legend would claim a
+    # handover the run never made.
+    span = _crest_span(slope_data)
+    face_by_row = {}
+    if span is not None and all(c in df.columns for c in ('Xo', 'Yo', 'R')):
+        for i in df.index[df['success'].astype(bool)]:
+            face_by_row[i] = _circle_face(slope_data, span, df.at[i, 'Xo'],
+                                          df.at[i, 'Yo'], df.at[i, 'R'])
+    color_faces = len({f for f in face_by_row.values() if f}) > 1
+    # On a rapid drawdown sweep each instant's answer is the lower of stage 2
+    # (undrained) and stage 3 (drained), and which one it was is the reading the
+    # curve otherwise hides; the markers take the governing stage's color instead
+    # of the face's, again only where the sweep actually changes hands.
+    stage_by_row = {}
+    if rapid and 'governs' in df.columns:
+        for i in df.index[df['success'].astype(bool)]:
+            g = df.at[i, 'governs']
+            if g == g:
+                stage_by_row[i] = int(g)
+    color_stages = len(set(stage_by_row.values())) > 1
+    if color_stages:
+        color_faces = False
+    one_method = int(df['method'].nunique()) <= 1 if len(df) else True
+
+    n_failed = 0
+    for method, g in df.groupby('method'):
+        pts = g.loc[g['success']].sort_values('value')
+        n_failed += int((~g['success']).sum())
+        if pts.empty:
+            continue
+        kw = dict(marker='o', ms=5, lw=1.8)
+        if (color_faces or color_stages) and one_method:
+            # The reported curve is the lower of two mechanisms, so the line itself
+            # belongs to neither face and is drawn in neither's color. With several
+            # methods on one figure the line keeps its method color instead — that
+            # distinction is the one the reader would lose.
+            kw['color'] = '#6f7883'
+        ax.plot(pts['value'], pts['fs'],
+                label=(f"{method} (drawdown)" if rapid else str(method)), **kw)
+    if color_faces:
+        for face in ('upstream', 'downstream'):
+            sel = [i for i, f in face_by_row.items() if f == face]
+            if not sel:
+                continue
+            ax.plot(df.loc[sel, 'value'], df.loc[sel, 'fs'], 'o',
+                    color=_FACE_COLORS[face], ms=6, zorder=5,
+                    label=f"critical on the {face} face")
+    if color_stages:
+        for stage, name in ((2, 'stage 2 (undrained) governs'),
+                            (3, 'stage 3 (drained) governs')):
+            sel = [i for i, g in stage_by_row.items() if g == stage]
+            if not sel:
+                continue
+            ax.plot(df.loc[sel, 'value'], df.loc[sel, 'fs'], 'o',
+                    color=_STAGE_COLORS[stage], ms=6, zorder=5, label=name)
+    if n_failed:
+        ax.plot([], [], ' ', label=f"{n_failed} instant(s) produced no result")
+
+    # A second sweep of the same instants, drawn on the same axes so the distance
+    # between the two answers is read against one scale, one schedule and one
+    # drawdown band -- the rapid drawdown curve against the single-stage curve of
+    # the same transient run is the case. Only the main result is ringed.
+    if compare is not None and isinstance(compare, dict) and 'df' in compare:
+        cdf = compare['df']
+        cpts = cdf.loc[cdf['success'].astype(bool)].sort_values('value')
+        if len(cpts):
+            ax.plot(cpts['value'], cpts['fs'], '-o', color='#2b7bb0', lw=1.8,
+                    ms=5, zorder=3,
+                    label=compare_label or ("single-stage" if rapid
+                                            else "comparison"))
+
+    crit_t = result.get('critical_time') if isinstance(result, dict) else None
+    crit_fs = result.get('min_fs') if isinstance(result, dict) else None
+    if crit_t is not None and crit_fs is not None:
+        ax.plot([crit_t], [crit_fs], 'o', ms=11, mfc='none', mec='C3', mew=1.6,
+                zorder=5)
+        # The label goes UP and to the right of the ring: the annotated point is the
+        # curve's minimum, so the space below it is the figure's own bottom margin
+        # and a downward label lands on the axis.
+        ax.margins(y=0.10)
+        ax.annotate(f"lowest: {crit_fs:.3f} at t = {crit_t:g}"
+                    f"{(' ' + ulab['time']) if ulab and ulab.get('time') else ''}",
+                    xy=(crit_t, crit_fs), xytext=(20, 16),
+                    textcoords='offset points', fontsize=9, color='C3',
+                    arrowprops=dict(arrowstyle='-|>', color='C3', lw=0.9))
+    # FS = 1 is drawn when it is within the curve's OWN swing of the lowest point —
+    # the scale the reader is judging against. On a slope that never comes near
+    # failure the guide would otherwise set the y-axis and flatten a curve whose
+    # whole story is its shape; its absence claims nothing.
+    fs_ok = df.loc[df['success'], 'fs'].astype(float)
+    if output == 'FS' and len(fs_ok):
+        span = float(fs_ok.max() - fs_ok.min())
+        if float(fs_ok.min()) - 1.0 <= max(span, 0.0):
+            ax.axhline(1.0, color='r', linestyle='--', linewidth=0.8, label='FS = 1')
+    ax.set_xlabel(f"time{t_unit}")
+    ax.set_ylabel(output_label)
+    ax.set_title(f"Rapid drawdown {output} versus time" if rapid
+                 else f"{output} versus time")
+    ax.grid(True, alpha=0.3)
+
+    ts = (slope_data or {}).get('tseep') or {}
+    band = _drawdown_interval(ts)
+    # The state the fall started from, carried across the figure: a dip is read as
+    # a distance below the level the slope held at full pool, and that level is a
+    # number on this curve rather than one the reader has to remember. Taken from
+    # the earliest instant AT OR BEFORE the fall begins -- a curve whose first
+    # result is already mid-drawdown never measured the full-pool slope, so it gets
+    # no line rather than a wrong one.
+    if band is not None:
+        ok_rows = df.loc[df['success']].sort_values('value')
+        pre = ok_rows.loc[ok_rows['value'].astype(float)
+                          <= band[0] + 1e-9 * max(1.0, abs(band[0]))]
+        if len(pre):
+            full_pool = float(pre['fs'].iloc[0])
+            ax.axhline(full_pool, color='#8a6d3b', lw=1.0, ls=(0, (4, 3)),
+                       zorder=2)
+            ax.annotate(f"full pool, {full_pool:.3f}", xy=(1.0, full_pool),
+                        xycoords=('axes fraction', 'data'), xytext=(-4, -3),
+                        textcoords='offset points', fontsize=8.5,
+                        color='#8a6d3b', ha='right', va='top')
+
+    # The schedule that drives the curve, behind it: pale, dashed, on its own axis.
+    handles, labels_ = ax.get_legend_handles_labels()
+    series = {k: v for k, v in (ts.get('series') or {}).items()
+              if v is not None and len(v) == len(ts.get('times') or [])}
+    if series:
+        sched = ax.twinx()
+        # A series is held flat outside its own breakpoints, so the trace is carried
+        # to the ends of the time axis rather than stopping mid-figure at the last
+        # breakpoint, which would read as the schedule ending there.
+        t_lo, t_hi = ax.get_xlim()
+        for k, (name, vals) in enumerate(series.items()):
+            tt = [float(t) for t in ts['times']]
+            vv = [float(v) for v in vals]
+            if t_lo < tt[0]:
+                tt, vv = [t_lo] + tt, [vv[0]] + vv
+            if t_hi > tt[-1]:
+                tt, vv = tt + [t_hi], vv + [vv[-1]]
+            sched.plot(tt, vv, color='#3f4a55', lw=1.3,
+                       ls=(0, (5, 3)), alpha=0.55 - 0.12 * k, zorder=0,
+                       label=f"{name} (schedule)")
+        unit = f" ({ulab['length']})" if ulab and ulab.get('length') else ""
+        sched.set_ylabel(f"{' / '.join(series)}{unit}", color='#3f4a55')
+        sched.tick_params(axis='y', colors='#3f4a55')
+        sched.set_zorder(ax.get_zorder() - 1)
+        ax.patch.set_visible(False)
+        h2, l2 = sched.get_legend_handles_labels()
+        handles, labels_ = handles + h2, labels_ + l2
+    # The interval the pool is falling over, shaded behind everything. It goes on
+    # the schedule's own axis where there is one -- that axis sits below the curve,
+    # so a band drawn there cannot cover the trace it was read from.
+    if band is not None:
+        t_lo, t_hi = ax.get_xlim()
+        (sched if series else ax).axvspan(band[0], band[1], color='#eef4f9',
+                                          zorder=-1)
+        ax.annotate('drawdown', xy=(0.5 * (band[0] + band[1]), 1.0),
+                    xycoords=('data', 'axes fraction'), xytext=(0, -4),
+                    textcoords='offset points', fontsize=8.5, color='#3f4a55',
+                    ha='center', va='top')
+        ax.set_xlim(t_lo, t_hi)
+    ax.legend(handles, labels_, fontsize=9)
+    fig.tight_layout()
+    if save_png:
+        fig.savefig("fs_vs_time.png", dpi=dpi, bbox_inches='tight')
+    return fig
 
 
 def _bar_chart_height_in(n_bars, per_bar_in=0.5, margin_in=1.4, min_in=2.4,

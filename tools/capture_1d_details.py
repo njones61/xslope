@@ -26,8 +26,8 @@ Each sample is read back from the companions committed beside it
 is the run the sample page reports and the mechanism it reports it at. It used to
 solve each model here at a fixed strength reduction instead, which reached the
 right factor and captured no mechanism at all — so the panel was grabbed on a
-converged field, without the failure band or the stretches of capacity the
-at-failure state is where the members hold.
+converged field, without the shear band's crossing or the stretches of capacity
+the at-failure state is where the members hold.
 
     python tools/capture_1d_details.py
 """

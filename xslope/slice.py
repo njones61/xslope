@@ -21,9 +21,43 @@ import pandas as pd
 from shapely.geometry import LineString, Point, MultiPoint, GeometryCollection
 
 from .mesh import find_element_containing_point, interpolate_at_point
+from .water import seep_water_table_profile
 from .hoekbrown import hb_tangent
 
 _ito_matsui_warned = False  # module-level flag: warn once about large H
+
+
+def _support_choice(row, key, vocabulary, default, index, what):
+    """One structural-row vocabulary field (Dir, Appl), or a loud refusal.
+
+    A blank field -- absent, None, NaN or empty -- takes the documented default,
+    which is what a blank cell means on the sheet. Anything else must be a word
+    from the vocabulary.
+
+    The engine used to test these with ``== "tangent"`` and ``== "active"`` and
+    take the other branch for everything else, so an entry that is not a
+    direction at all was applied AXIALLY and an entry that is not an application
+    was applied as PASSIVE capacity. A ``Dir = 0.0`` written into the sheet came
+    back as a different, entirely valid model -- a different force, at a
+    different inclination, with no sign anywhere that the input had been
+    reinterpreted. The loader and the preflight both refuse these values; when
+    they are bypassed (a model assembled in memory, an importer, a sweep) the
+    engine states the problem rather than guessing at it.
+    """
+    raw = row.get(key, None)
+    if raw is None or (isinstance(raw, float) and raw != raw):
+        return default
+    value = str(raw).strip().lower()
+    if not value:
+        return default
+    if value not in vocabulary:
+        label = row.get("label") or f"{what} {index + 1}"
+        raise ValueError(
+            f"{what} '{label}' (row {index + 1}) has {key.capitalize()} = "
+            f"{raw!r}, which is not one of: {', '.join(vocabulary)}. Fix the "
+            f"value on the sheet; the engine will not guess which one was meant.")
+    return value
+
 
 def get_circular_y_coordinates(x_coords, Xo, Yo, R):
     """
@@ -150,9 +184,37 @@ def get_piezometric_y_coordinates(x_coords, piezo_line):
     return y_coords
 
 
+def _dedupe_coincident(points, tol=1e-6):
+    """
+    Collapse runs of coincident points to one representative, preserving order.
+
+    Crossings are found segment by segment, so a circle that passes exactly
+    through a polyline VERTEX produces that vertex twice — once as the end root
+    of the segment arriving at it, once as the start root of the segment leaving
+    it. A tangent circle likewise yields its single touch point twice, from the
+    two equal roots of one segment. Both are one geometric crossing, and callers
+    that count crossings must not see them as two.
+
+    ``tol`` is the module's geometric tolerance in model units (see
+    _resolve_right_facing and the clip-endpoint test in generate_failure_surface);
+    two genuinely distinct daylight points a micron apart would be a degenerate
+    sliver, not a surface worth slicing.
+    """
+    kept = []
+    for p in points:
+        if any(abs(p.x - q.x) <= tol and abs(p.y - q.y) <= tol for q in kept):
+            continue
+        kept.append(p)
+    return kept
+
+
 def _circle_polyline_all(Xo, Yo, R, polyline):
     """
-    Every crossing of a full circle with a polyline, unfiltered.
+    Every crossing of a full circle with a polyline, one point per crossing.
+
+    Coincident roots from adjoining segments (a vertex hit) or from one segment
+    (a tangency) are collapsed by _dedupe_coincident, so the length of the
+    returned list is a crossing count callers can trust.
 
     Callers almost always want circle_polyline_intersections instead — see its
     docstring for why crossings above the equator must not reach the slicer.
@@ -181,7 +243,7 @@ def _circle_polyline_all(Xo, Yo, R, polyline):
             t = (-b + sign * sqrt_disc) / (2 * a)
             if 0 <= t <= 1:
                 intersections.append(Point(x1 + t * dx, y1 + t * dy))
-    return intersections
+    return _dedupe_coincident(intersections)
 
 
 def circle_polyline_intersections(Xo, Yo, R, polyline):
@@ -204,6 +266,18 @@ def circle_polyline_intersections(Xo, Yo, R, polyline):
     crack — see _recover_ends_via_tcrack.
     """
     return [p for p in _circle_polyline_all(Xo, Yo, R, polyline) if p.y < Yo]
+
+
+def crossings_above_center(Xo, Yo, R, polyline):
+    """The ground crossings ``circle_polyline_intersections`` throws away.
+
+    The complement of that function's filter, and the reason a circle can be
+    reported as "never reaches the ground" while a plot of it plainly shows it
+    cutting the section. Kept here so the slicer's error message, the preflight
+    rule and the search all name the same points from one rule rather than three
+    re-derivations of it.
+    """
+    return [p for p in _circle_polyline_all(Xo, Yo, R, polyline) if p.y >= Yo]
 
 
 def _recover_ends_via_tcrack(ground_surface, circle, tcrack_depth):
@@ -260,9 +334,35 @@ def get_sorted_intersections(failure_surface, ground_surface, circle_params=None
         else:
             points = []
 
+    # Collapse coincident crossings BEFORE counting or pruning. A circle through a
+    # ground-surface vertex reports it once per adjoining segment; unmerged, that
+    # third point sent the pair-picking below to two copies of the same vertex and
+    # the clipped surface came back as a zero-length segment instead of the arc.
+    # Shapely's intersection on the non-circular path can double a vertex the same
+    # way. After this, a surface that still has fewer than two DISTINCT crossings is
+    # rejected below by the usual reason, as a tangent or grazing circle should be.
+    points = _dedupe_coincident(points)
+
     # need at least two
     if len(points) < 2:
-        return False, f"Expected at least 2 intersection points, but got {len(points)}.", None
+        msg = f"Expected at least 2 intersection points, but got {len(points)}."
+        # A circle can lose a crossing two ways, and only one of them is about the
+        # circle being too small or too shallow. The other is the equator filter in
+        # circle_polyline_intersections: a crossing ABOVE the center is discarded,
+        # because the arc joining it to the toe is longer than a semicircle and the
+        # bottom-semicircle surface built below cannot represent it. Left unnamed,
+        # that arrives as a count and sends the reader to the ground surface, which
+        # is not where the fault is.
+        if circle_params is not None:
+            above = crossings_above_center(Xo, Yo, R, ground_surface)
+            if above:
+                p = max(above, key=lambda q: q.y)
+                msg += (f" The circle (Xo={Xo:g}, Yo={Yo:g}, R={R:g}) meets the "
+                        f"ground at ({p.x:.4g}, {p.y:.4g}), above its own center at "
+                        f"y={Yo:g}: the arc would rise above its center on that "
+                        f"side, which this slicer does not build. Lower the center "
+                        f"or enlarge the radius so both crossings sit below it.")
+        return False, msg, None
 
     # sort by x
     points = sorted(points, key=lambda p: p.x)
@@ -1071,6 +1171,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # In manual mode with_water_loads returns the caller's model by identity and
     # both derived lists are empty, so every list below is the one this function
     # has always built and the analysis is bit-identical.
+    # Resolve any overburden-dependent pullout law BEFORE with_water_loads, which
+    # in auto mode hands back a shallow copy: the refreshed point list has to land
+    # on the caller's model, not on a copy this function then drops.
+    if slope_data.get("reinforcement_lines"):
+        from .fileio import ensure_reinforce_pullout
+        ensure_reinforce_pullout(slope_data)
     from .water import with_water_loads, DERIVED_KEYS
     slope_data = with_water_loads(slope_data)
     dloads = list(slope_data["dloads"]) + list(slope_data.get(DERIVED_KEYS[1]) or [])
@@ -1133,13 +1239,23 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Prepare reinforcement lines data. Preferred source is the raw
     # 'reinforcement_lines' dicts, which carry the full capacity envelope
     # (t_max/lp/tend) plus the v12 Dir/Appl settings; the available tension at a
-    # crossing is evaluated exactly via fileio.reinforce_available_tension. The
-    # legacy 'reinforce_lines' point-list path is kept for callers that build
-    # slope_data by hand (treated as tangent/active, interpolated on X as before).
+    # crossing is evaluated exactly via fileio.reinforce_available_tension.
+    #
+    # An EXPLICIT 'reinforcement_lines' list is the model's own statement about
+    # its reinforcement, the empty list included: a model that says it has no
+    # reinforcement lines has none. 'reinforce_lines' is DERIVED from that list
+    # (fileio.build_reinforce_lines), so falling back to it whenever the source
+    # was empty resurrected the reinforcement a user had just deleted -- "remove
+    # the reinforcement" silently did nothing, because the point lists built
+    # before the edit were still there and still crossed the surface. The legacy
+    # point-list path (tangent/active, interpolated on X) is therefore reached
+    # only when the model carries no 'reinforcement_lines' key at all --
+    # slope_data assembled by hand.
     reinf_lines_data = []
-    if slope_data.get("reinforcement_lines"):
+    _reinf_source = slope_data.get("reinforcement_lines")
+    if _reinf_source:
         from .fileio import reinforce_available_tension  # shared envelope
-        for r in slope_data["reinforcement_lines"]:
+        for _ri, r in enumerate(_reinf_source):
             dxl = r["x2"] - r["x1"]
             dyl = r["y2"] - r["y1"]
             length = np.hypot(dxl, dyl)
@@ -1155,15 +1271,18 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             reinf_lines_data.append({
                 "geom": LineString([(r["x1"], r["y1"]), (r["x2"], r["y2"])]),
                 "envelope": (r["t_max"], r["lp1"], r["lp2"],
-                             r.get("tend1", 0.0), r.get("tend2", 0.0)),
+                             r.get("tend1") or 0.0, r.get("tend2") or 0.0),
+                "pullout": r.get("_pullout_profile"),
                 "length": length,
-                "dir": r.get("dir", "tangent"),
-                "appl": r.get("appl", "active"),
+                "dir": _support_choice(r, "dir", ("tangent", "axial"),
+                                       "tangent", _ri, "Reinforcement line"),
+                "appl": _support_choice(r, "appl", ("active", "passive"),
+                                        "active", _ri, "Reinforcement line"),
                 "psi": psi_line,
                 "avail": reinforce_available_tension,
                 "claimed": set(),
             })
-    elif slope_data.get("reinforce_lines"):
+    elif _reinf_source is None and slope_data.get("reinforce_lines"):
         for line in slope_data["reinforce_lines"]:
             xs = [pt["X"] for pt in line]
             ts = [pt["T"] for pt in line]
@@ -1175,7 +1294,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Prepare pile lines data
     pile_lines_data = []
     if slope_data.get("pile_lines"):
-        for pile in slope_data["pile_lines"]:
+        for _pi, pile in enumerate(slope_data["pile_lines"]):
             geom = LineString([(pile["x1"], pile["y1"]), (pile["x2"], pile["y2"])])
             pile_lines_data.append({
                 "geom": geom,
@@ -1185,7 +1304,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 "S": pile.get("S"),
                 "V_cap": pile.get("V_cap"),
                 "M_cap": pile.get("M_cap"),
-                "appl": pile.get("appl", "active"),
+                # Same guard as the reinforcement Dir/Appl above: a value that is
+                # not an application was applied as PASSIVE capacity.
+                "appl": _support_choice(pile, "appl", ("active", "passive"),
+                                        "active", _pi, "Pile"),
                 "label": pile.get("label", ""),
                 "claimed": set(),
             })
@@ -1578,58 +1700,20 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     water_table_y_all = np.full(len(slice_centers), np.nan)
     if any_gamma_sat:
         if has_seep_data:
-            cache = slope_data.get('_water_table_profile')
-            if cache is None:
-                mesh = slope_data['mesh']
-                seep_u = np.asarray(slope_data['seep_u'], dtype=float)
-                nodes = np.asarray(mesh['nodes'], dtype=float)
-                xs_grid = np.linspace(nodes[:, 0].min(), nodes[:, 0].max(), 201)
-                y_lo_all, y_hi_all = nodes[:, 1].min(), nodes[:, 1].max()
-                wt = np.full(xs_grid.shape, np.nan)
-                for k, xg in enumerate(xs_grid):
-                    def _u(yy):
-                        val, found = interpolate_at_point(
-                            mesh['nodes'], mesh['elements'], mesh['element_types'],
-                            seep_u, (xg, yy), return_found=True)
-                        return (val, found)
-                    u_lo, f_lo = _u(y_lo_all + 1e-6)
-                    u_hi, f_hi = _u(y_hi_all - 1e-6)
-                    if not (f_lo or f_hi):
-                        continue
-                    if f_hi and u_hi >= 0:
-                        wt[k] = y_hi_all          # fully saturated column
-                        continue
-                    if f_lo and u_lo <= 0:
-                        wt[k] = y_lo_all          # fully unsaturated column
-                        continue
-                    lo, hi = y_lo_all, y_hi_all
-                    for _ in range(30):           # bisect u(y) = 0
-                        mid = 0.5 * (lo + hi)
-                        um, fm = _u(mid)
-                        if not fm:
-                            hi = mid
-                            continue
-                        if um > 0:
-                            lo = mid
-                        else:
-                            hi = mid
-                    wt[k] = 0.5 * (lo + hi)
-                cache = (xs_grid, wt)
-                slope_data['_water_table_profile'] = cache
-                if piezo_line:
-                    print("gamma_sat weight split: using the seepage solution's u = 0 "
-                          "contour as the water table; the piezometric line is NOT "
-                          "used for unit weight (it may still supply pore pressure "
-                          "and plotting).")
+            had_cache = slope_data.get('_water_table_profile') is not None
+            cache = seep_water_table_profile(slope_data)
+            if not had_cache and piezo_line:
+                print("gamma_sat weight split: using the seepage solution's u = 0 "
+                      "contour as the water table; the piezometric line is NOT "
+                      "used for unit weight (it may still supply pore pressure "
+                      "and plotting).")
             xs_grid, wt = cache
             water_table_y_all = np.interp(slice_centers, xs_grid, wt)
         elif piezo_line:
             water_table_y_all = np.asarray(piezo_y_all, dtype=float)
-        else:
-            warnings.warn(
-                "One or more materials specify gamma_sat, but the model has no "
-                "water table (no piezometric line or seepage solution) — the "
-                "saturated unit weight can never apply and gamma is used throughout.")
+        # gamma_sat with no water table is reported once, before the run, by
+        # preflight (mat.gamma_sat_without_water); a warning here would repeat
+        # per trial surface of a search.
 
     # Interpolation functions for distributed loads. np.interp requires the
     # sample points to be in ascending-X order; sort each load line so a load
@@ -1914,15 +1998,16 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 s_along = rl["geom"].project(intersec)
                 t_mx, lp1, lp2, te1, te2 = rl["envelope"]
                 t_i = rl["avail"](s_along, rl["length"] - s_along,
-                                  t_mx, lp1, lp2, te1, te2)
+                                  t_mx, lp1, lp2, te1, te2,
+                                  pullout=rl.get("pullout"))
             else:
                 # legacy point-list path (hand-built slope_data): interp on X
                 t_i = np.interp(intersec.x, rl["xs"], rl["ts"], left=0.0, right=0.0)
             if t_i <= 0.0:
                 continue
 
-            if rl.get("dir", "tangent") == "tangent":
-                if rl.get("appl", "active") == "active":
+            if rl["dir"] == "tangent":
+                if rl["appl"] == "active":
                     p_sum += t_i
                 else:
                     p_pt_sum += t_i
@@ -1933,7 +2018,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 # right-facing flip, exactly as it does for the tangent force.
                 psi_i = rl["psi"]
                 ci, si = cos(psi_i), sin(psi_i)
-                if rl.get("appl", "active") == "active":
+                if rl["appl"] == "active":
                     pa_cx += t_i * ci
                     pa_cy += t_i * si
                     pa_mx += t_i * si * intersec.x
@@ -2034,7 +2119,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 # names which bound produced the applied force.
                 _rec = {"label": pl["label"], "x": float(intersec.x),
                         "y": float(intersec.y), "computed": bool(pile_H_was_auto),
-                        "S": pl.get("S"), "appl": pl.get("appl", "active"),
+                        "S": pl.get("S"), "appl": pl["appl"],
                         "H_width": float(pile_H), "F_soil": None, "F_used": None,
                         "governed": None, "L_m": None, "depth": None}
                 try:
@@ -2065,7 +2150,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 pile_report.append(_rec)
 
                 h_pile += pile_H
-                if pl.get("appl", "active") == "passive":
+                if pl["appl"] == "passive":
                     h_pile_pas += pile_H
                 theta_p_val = pl["theta_p"]  # last pile's angle if multiple (unusual)
                 x_pile = intersec.x

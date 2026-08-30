@@ -20,7 +20,7 @@ license.
 
 [Download for Windows](https://github.com/njones61/xslope/releases/latest/download/XSLOPE-Studio-windows-x64-setup.exe){ .btn .btn-neutral .download-btn }
 
-[`pip install xslope`](usage/installation.md){ .btn .btn-neutral .download-btn }
+[`pip install xslope`](getting_started/install.md#python-package){ .btn .btn-neutral .download-btn }
 
 </div>
 
@@ -228,7 +228,7 @@ Studio calls, and read and write the same Excel problems — so a model can be
 built in Studio and swept in a notebook, or the reverse. That is what makes
 parametric sweeps, Monte Carlo reliability studies and AI-assisted workflows
 ordinary here and awkward in a closed graphical program. The
-[Usage Guide](usage/installation.md) covers installation and the input template,
+[Usage Guide](usage/index.md) covers the input template,
 [Colab Notebooks](usage/notebooks.md) runs XSLOPE in a browser with nothing
 installed, and the [API](api/solve.md) section documents every function.
 

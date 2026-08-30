@@ -10,7 +10,7 @@ embankment: 750 psf over a 10 ft strip, set back 5 ft from the top of the face.
 The slope, the soil and the rigid base are unchanged — the load is the only new
 input, and it is the one that decides the answer.
 
-![The embankment carrying the crest surcharge](images/lem02_problem.png){width=1000}
+![The embankment carrying the crest surcharge](images/lem02_problem_sketch.png){width=1000}
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">
@@ -19,11 +19,10 @@ input, and it is the one that decides the answer.
 <div class="tgt-tile"><span class="tg-label">By hand</span><p>15–20 min</p></div>
 </div>
 <div class="tgm-obj" markdown>
-**Objectives** — Load an existing model four ways — spread over an area, gathered
-onto a point, pushed perpendicular to the ground or straight down, and shaken —
-read what each does to the factor of safety and to the critical surface, then run
-the sweep that says what strength would carry the load at a target factor of
-safety.
+**Objectives** — Learn how to apply loads to a slope model: how to enter
+distributed and line loads and set their direction, what a seismic coefficient
+does, how each load moves the factor of safety and the critical surface, and how
+to sweep strength against a target factor of safety.
 </div>
 <p><span class="tg-pill">distributed loads</span><span class="tg-pill">line loads</span><span class="tg-pill">load direction</span><span class="tg-pill">seismic coefficient</span><span class="tg-pill">design mode</span></p>
 <div class="tgm-model" markdown>**Completed model** — [xslope_crest_surcharge.xlsx](../lem/files/xslope_crest_surcharge.xlsx) — LEM-1's embankment with the surcharge added</div>
@@ -33,13 +32,13 @@ safety.
 
 ## The problem
 
-This tutorial starts from a model that already exists. Build it in
+We start from a model that already exists. Build it in
 [LEM-1](lem01_simple_embankment.md), or open that page's completed file
 directly — [xslope_simple_embankment.xlsx](../lem/files/xslope_simple_embankment.xlsx)
 — and save a copy under a name of your own. Nothing in it changes here:
 
 | | |
-|---|---|
+| --- | --- |
 | **Material** | one Mohr-Coulomb soil, γ = 125 pcf, c = 500 psf, φ = 0 |
 | **Geometry** | a 20 ft embankment, 1:1 face, level crest, rigid base at y = 0 |
 | **Failure surface** | one starting circle, center (10, 40), tangent to the base |
@@ -50,7 +49,7 @@ Two points are the whole load here, because the intensity is uniform between
 them:
 
 | X (ft) | Y (ft) | N (psf) |
-|:---:|:---:|:---:|
+| :---: | :---: | :---: |
 | 25 | 20 | 750 |
 | 35 | 20 | 750 |
 
@@ -59,8 +58,8 @@ carries nothing. **A distributed load stops where its points stop** — the
 intensity is not spread over the rest of the crest, and it is not tapered at the
 ends unless you enter a point saying so.
 
-The table is the input, laid out exactly as the `dloads` worksheet and Studio's
-loads editor are — **X**, **Y**, **N**, one point per row. Select the two rows
+The table above is laid out exactly as the `dloads` worksheet and Studio's
+loads editor — **X**, **Y**, **N**, one point per row. Select the two rows
 of values, copy, and paste them straight into the sheet or editor rather than
 retyping them.
 
@@ -111,7 +110,7 @@ written to disk until you use **Save As**.
   decides which end carries which value on a load that is not uniform. If they
   came back reversed, say: *"List the load points in increasing x."*
 - **Nothing else moved.** The material, the profile line, the maximum depth and
-  the starting circle are LEM-1's, unchanged.
+  the starting circle are unchanged from LEM-1.
 
 Continue at [Running the analysis](#running-the-analysis).
 
@@ -127,8 +126,8 @@ The sheet carries six load blocks side by side, four columns apart — **X**,
 Enter (or copy-paste) the two load points from the table above, and leave
 `dloads!D5` **Direction** blank. A blank cell means `normal` — the load acts
 perpendicular to its own line — and on a level crest that is straight down
-anyway. It is the [face load](#which-way-the-load-pushes) further down this
-page where the word starts to matter.
+anyway. The word starts to matter on the [face load](#which-way-the-load-pushes)
+further down this page.
 
 ![The finished dloads worksheet](images/lem02_sheet_dloads.png)
 
@@ -166,7 +165,7 @@ Continue below.
 
 ## Running the analysis
 
-However you added it, you now hold the same model:
+However you added it, the model is now the same:
 
 ![The finished model](images/lem02_inputs.png){width=1000}
 
@@ -193,7 +192,7 @@ small-looking input, and the reason is visible in the figure rather than in the
 number: **the surface moved to find the load.**
 
 | | unloaded | with the surcharge |
-|---|:---:|:---:|
+| --- | :---: | :---: |
 | Factor of safety (Spencer) | 1.276 | 0.918 |
 | Circle radius (ft) | 40.4 | 33.8 |
 | Surface exits the crest at x = | 44.5 | 35.0 |
@@ -210,17 +209,16 @@ than the unloaded critical surface while carrying 7500 lb/ft more force.
 
 ### The warnings LEM-1 left behind
 
-LEM-1's uncracked embankment could not be solved cleanly: Spencer and Bishop
+The uncracked embankment in LEM-1 could not be solved cleanly: Spencer and Bishop
 disagreed (1.276 against 1.215) because the crest slices were being asked to
 carry tension, and 26 of the trial circles that ranked below the reported minimum
-admitted no solution at all. Run the loaded model with Bishop, the Ordinary
-Method of Slices (OMS) or
-Morgenstern-Price and all three return **0.918 on the same circle** as Spencer,
-and no trial circle below the minimum goes unsolved.
+admitted no solution at all. Now we run the loaded model with Bishop, the Ordinary
+Method of Slices (OMS) and Morgenstern-Price: all three return **0.918 on the same
+circle** as Spencer, and no trial circle below the minimum goes unsolved.
 
 The surcharge is what changed: pressing down on the crest is the opposite of the
 tension that was breaking those solutions, and it shows up between the slices
-rather than under them. On LEM-1's critical surface Spencer's most tensile
+rather than under them. On the critical surface in LEM-1 Spencer's most tensile
 interslice force was −3258 lb/ft against a largest compression of 5568 — 58% of
 it. Under the surcharge it is −822 lb/ft against 6234, or 13%, and Spencer's
 line-of-thrust warning clears. The base itself barely moves: the most tensile
@@ -234,12 +232,12 @@ surface the search is able to report.
 
 A **line load** is a concentrated force per unit width, acting at one point on
 the ground surface: a footing, or the weight of a wall facing. The surcharge
-above amounts to 750 psf × 10 ft = **7500 lb/ft**. Put all of it on the single
-point at the middle of the strip instead — one row, in the columns the `lloads`
+above amounts to 750 psf × 10 ft = **7500 lb/ft**. Now we put all of it on the
+single point at the middle of the strip — one row, in the columns the `lloads`
 worksheet and Studio's line-loads editor share:
 
 | Label | x (ft) | y (ft) | P (lb/ft) | Angle (deg) |
-|---|:---:|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: | :---: |
 | footing | 30 | 20 | 7500 | -90 |
 
 - **Studio** — click **Line loads** in the **Inputs** tree, **Add row**, and
@@ -298,8 +296,7 @@ in almost equal measure.
 stockpile.** A pile of gravel does not push horizontally into a hillside. Choose
 `normal` for a pressure — ponded water, a reservoir, anything acting *on* a
 surface — and `vertical` for anything whose load is its own weight. On level
-ground the choice is free; on a face it is worth a quarter of the factor of
-safety.
+ground the choice is free; on a face it costs a quarter of the factor of safety.
 
 ### A second kind of demand
 
@@ -314,7 +311,7 @@ earthquake would do. It is a single global number:
 With the crest surcharge back in place:
 
 | k | 0.00 | 0.10 | 0.15 |
-|---|:---:|:---:|:---:|
+| --- | :---: | :---: | :---: |
 | Factor of safety (Spencer) | 0.918 | 0.817 | 0.774 |
 
 ![Spencer at k = 0.15](images/lem02_solution_seismic.png){width=1000}
@@ -334,8 +331,8 @@ safety* but *what would it take to reach the one I need* — and that is a sweep
 not a guess.
 
 **Design mode** varies one input across a range, solves the model at every step,
-and reports the value where the answer crosses a target. Ask it what cohesion
-would hold FS = 1.5 under the surcharge.
+and reports the value where the answer crosses a target. Here we ask it what
+cohesion would hold FS = 1.5 under the surcharge.
 
 In Studio, click **Run → Parametric…**:
 
@@ -359,7 +356,7 @@ In Studio, click **Run → Parametric…**:
 **c = 817 psf.** The soil would have to be 63% stronger than the 500 psf it has
 to carry this stockpile at a factor of safety of 1.5.
 
-Two things about the curve are worth reading:
+Two things stand out on the curve:
 
 - **It is a straight line.** With φ = 0 the strength along the surface is c ×
   length and the driving side does not involve c at all; the search returns the
@@ -396,8 +393,8 @@ This tutorial covered:
 - Loads reshape the critical surface, so every load case gets its own search.
 
 **Where to go next:** [Tutorial LEM-3](lem03_layered_slope.md) gives the ground
-under the slope a second material — the case this page's design sweep names as
-the one where the critical surface migrates as the parameter moves.
+under the slope a second material — the case flagged in the design sweep above,
+where the critical surface migrates as the parameter moves.
 [Design Mode](../parametric/design.md) and
 [Back-Analysis](../parametric/back_analysis.md) carry the sweep above further —
 every parameter it can vary, and what a sweep that never reaches its target

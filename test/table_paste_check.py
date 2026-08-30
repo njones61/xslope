@@ -196,7 +196,7 @@ def test_hidden_columns_are_not_filled():
     t = _new_table(ReinforcementEditor.FIELDS, new_row=_new_reinf_row)
     t.apply_usage_filter({"lem"})          # the FEM tail (Tres, E, Area) folds away
     _paste(t, _tsv([["layer 1", 0, 0, 20, 0, "geosynthetic", "tangent", "active",
-                     800, 4, 4, 0, 0, 1, 77, 77, 77]]))
+                     800, 4, 4, "", "", 0, 0, 1, 77, 77, 77]]))
     row = t.result_rows()[0]
     out = _fail(row["spacing"] == 1.0, f"the last visible column took {row['spacing']}")
     out += _fail((row["t_res"], row["E"], row["area"]) == (0.0, 0.0, 0.0),
@@ -327,10 +327,11 @@ def test_the_reinforcement_two_block_paste():
             ("layer 5", 20, 16, 40, 16), ("layer 6", 25, 20, 45, 20)]
     _paste(t, _tsv(ends))
     keys = [f.key for f in ReinforcementEditor.FIELDS]
-    _paste(t, _tsv([(800, 4, 4, 0, 0, 1)] * 6), row=0, col=keys.index("t_max"))
+    _paste(t, _tsv([(800, 4, 4, "", "", 0, 0, 1)] * 6), row=0,
+           col=keys.index("t_max"))
     rows = t.result_rows()
     out = _fail(len(rows) == 6, f"the two-block paste left {len(rows)} lines")
-    out += _fail(_summary(t) == "Pasted 6 rows × 6 columns.",
+    out += _fail(_summary(t) == "Pasted 6 rows × 8 columns.",
                  f"the second block reported {_summary(t)!r}")
     for i, r in enumerate(rows[:6]):
         out += _fail(r["label"] == ends[i][0],
@@ -826,6 +827,16 @@ def test_lem04_materials():
                           os.path.join(_MODELS, "xslope_method_slices_problem.xlsx"))
 
 
+def test_w02_materials():
+    """W-2's three soils — the only taught materials table whose model came in
+    through an importer rather than being typed. A DXF carries no properties at
+    all, so this block is the whole of what the reader supplies, and the page is
+    the only place the three rows exist."""
+    return _materials_leg("W-2 materials", "w02_import.md",
+                          os.path.join(_REPO, "docs", "tutorials", "files",
+                                       "w02_section_imported.xlsx"))
+
+
 def test_lem05_materials():
     return _materials_leg("LEM-5 materials", "lem05_weak_layer_noncircular.md",
                           os.path.join(_MODELS, "xslope_noncircular.xlsx"))
@@ -984,7 +995,8 @@ def test_lem08_reinforcement_blocks():
     page = "lem08_reinforced_slope.md"
     model = _load(os.path.join(_MODELS, "xslope_reinforce.xlsx"))
     ends = _taught(page, ["Label", "x1", "y1", "x2", "y2"])
-    caps = _taught(page, ["Tmax", "Lp1", "Lp2", "Tend1", "Tend2", "Spacing"])
+    caps = _taught(page, ["Tmax", "Lp1", "Lp2", "Adhesion", "Delta",
+                          "Tend1", "Tend2", "Spacing"])
     editor = ReinforcementEditor()
     dlg = editor.build(dict(model, reinforcement_lines=[]), None)
     dlg.set_view_mode("table")
@@ -996,7 +1008,7 @@ def test_lem08_reinforcement_blocks():
     _paste(dlg._table, _tsv([["Geosynthetic"]] * len(ends)),
            row=0, col=keys.index("type"))
     _paste(dlg._table, _tsv(caps), row=0, col=keys.index("t_max"))
-    out += _fail(_summary(dlg._table) == "Pasted 6 rows × 6 columns.",
+    out += _fail(_summary(dlg._table) == "Pasted 6 rows × 8 columns.",
                  f"LEM-8's capacity block reported {_summary(dlg._table)!r}")
     landed = dict(model, reinforcement_lines=[])
     dlg.accept()
@@ -1028,7 +1040,8 @@ def test_lem09_anchor_blocks():
     page = "lem09_tieback_wall.md"
     model = _load(LEM09_MODEL)
     ends = _taught(page, ["Label", "x1", "y1", "x2", "y2"])
-    caps = _taught(page, ["Tmax", "Lp1", "Lp2", "Tend1", "Tend2", "Spacing"])
+    caps = _taught(page, ["Tmax", "Lp1", "Lp2", "Adhesion", "Delta",
+                          "Tend1", "Tend2", "Spacing"])
     editor = ReinforcementEditor()
     dlg = editor.build(dict(model, reinforcement_lines=[]), None)
     dlg.set_view_mode("table")
@@ -1037,7 +1050,7 @@ def test_lem09_anchor_blocks():
     _paste(dlg._table, _tsv(ends))                             # Label..y2, whole
     _paste(dlg._table, _tsv([["Anchor"]] * len(ends)), row=0, col=keys.index("type"))
     _paste(dlg._table, _tsv(caps), row=0, col=keys.index("t_max"))
-    out = _fail(_summary(dlg._table) == "Pasted 2 rows × 6 columns.",
+    out = _fail(_summary(dlg._table) == "Pasted 2 rows × 8 columns.",
                 f"LEM-9's capacity block reported {_summary(dlg._table)!r}")
     landed = dict(model, reinforcement_lines=[])
     dlg.accept()
@@ -1285,6 +1298,7 @@ CHECKS = [
     ("LEM-3 materials", test_lem03_materials),
     ("LEM-4 materials", test_lem04_materials),
     ("LEM-5 materials", test_lem05_materials),
+    ("W-2 materials", test_w02_materials),
     ("LEM-6 materials", test_lem06_materials),
     ("LEM-7 power -> Mohr-Coulomb", test_lem07_power_to_mohr_coulomb),
     ("LEM-7 c/p -> constant", test_lem07_profile_to_constant),

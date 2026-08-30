@@ -2,8 +2,8 @@
 """
 Regression test suite for xslope.
 
-Scans docs/{lem,fem,seep}/samples.md and docs/seep/seep_slope.md for test
-tags of the form:
+Scans docs/{lem,fem,seep}/samples.md, docs/seep/seep_slope.md, docs/verification/,
+docs/parametric/ and docs/tutorials/ for test tags of the form:
 
     <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, expected_fs=1.234, num_slices=30 -->
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025 -->
@@ -14,6 +14,22 @@ tags of the form:
     <!-- test: file=files/foo.xlsx, type=seep_elements, expected_flowrate=40.062, target_size=1.5, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=fem_elements, expected_fs=1.36, target_size=3.5, tolerance=0.04, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
     <!-- test: file=files/foo.xlsx, type=mesh_elements, element_type=tri6, target_size=6.5, expected_elements=3166, expected_nodes=6555, benchmark=RS2-4-mesh -->
+    <!-- test: file=files/foo.xlsx, type=pullout_envelope, expected_pullout=10.28:5378;9.22:7488, tolerance=0.002, benchmark=FHWA-E1 -->
+    <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, seep=steady, element_type=tri6, size_divisions=100, expected_fs=1.248 -->
+    <!-- test: file=files/foo.xlsx, type=circular_search, method=spencer, rapid=true, seep=transient, size_divisions=100, expected_fs=1.016 -->
+    <!-- test: file=files/foo.xlsx, type=fs_vs_time, method=spencer, rapid=true, march=file, expected_first=1.4563, critical_time=50, min_fs=1.0157 -->
+
+``seep=steady`` / ``seep=transient`` RUN the model's own seepage before the
+stability analysis and stage its pore pressures, instead of reading a solved
+sidecar shipped beside the workbook — the route of a page that meshes, solves the
+flow, and only then searches or reduces strength (see ``_stage_seep_fields``).
+``size_divisions`` is the Build Mesh dialog's auto-size spinner: the section width
+over that number, so a page is locked at the mesh it actually built.
+
+The pullout_envelope type locks a published PULLOUT TABLE -- the resistance a
+reinforcement layer develops beyond an assumed failure surface, layer by layer.
+It evaluates the capacity envelope the engines share and solves nothing, so it
+costs milliseconds; see run_pullout_envelope_test for the tag's two list keys.
 
 The mesh_elements type locks a published MESH SIZE — the element and node count
 one model meshes to at one target size. It builds the mesh and counts it, and
@@ -113,6 +129,13 @@ BUNDLED_TEMPLATE = _repo('xslope/resources/input_template.xlsx')  # copy shipped
 # Studio assistant on pip installs, where docs/ is absent). Must stay byte-identical.
 SKILL_MASTER = _repo('docs/usage/claude/xslope.md')
 BUNDLED_SKILL = _repo('xslope/resources/xslope_skill.md')
+# The Analysis Report's Word template: the one shipped in the wheel is the master
+# (tools/build_report_template.py writes it), and the documentation hands out a
+# copy for the reader to restyle in Word and pick in the report dialog. A docs
+# copy that has drifted is a download that is not the template reports are built
+# on, so the two must stay byte-identical.
+REPORT_TEMPLATE = _repo('xslope/resources/report_template.docx')
+DOCS_REPORT_TEMPLATE = _repo('docs/studio/files/report_template.docx')
 # The hand-drawn slice force diagrams the Analysis Report prints at the head of
 # each Calculations section: the drawings the LEM documentation displays, and the
 # copies shipped in the wheel (docs/ is not packaged). Which drawings they are is
@@ -196,6 +219,11 @@ ROUNDTRIP_KEYS = [
     # the v19 template must NOT let the template's own pre-filled D17='YES' leak in.
     'lem_method', 'num_slices', 'k0', 'tension_srf', 'element_type',
     'target_size', 'ssrm_f_min', 'ssrm_f_max', 'search_window',
+    # v25 1D element size (main D20). None on every corpus file — they predate the
+    # cell — so the check that matters here is the same one as the options above:
+    # saving them into the v25 template must not invent a 1D size, and the SSRM
+    # bracket beside it must come back from its new row rather than the old one.
+    'element_size_1d',
     # v22 water-load mode. Unlike the options above it is never None: these
     # pre-v22 fixtures resolve to 'manual' on load, and the check that matters
     # here is that saving them into the v22 template — which ships D23 pre-filled
@@ -213,6 +241,13 @@ ROUNDTRIP_KEYS = [
     # The SURVIVAL of a populated set is the ssr_zone_roundtrip row below.
     'ssr_zones',
 ]
+#: The Max depth a polygon-geometry round-trip declares before saving, to prove
+#: the value survives on a model whose geometry is the polygon sheet. Any number
+#: that is not the template's own 0 does; -10 is the one the defect was found on.
+POLYGON_MAX_DEPTH = -10.0
+#: "this round-trip had no polygon geometry to declare a Max depth on", which is
+#: not the same as a None that came back from the file.
+_NOT_CHECKED = object()
 
 
 def _legacy_manual_water(sd):
@@ -292,6 +327,10 @@ V19_ROUNDTRIP_VALUES = {
     'target_size': 2.75,
     'ssrm_f_min': 0.8,
     'ssrm_f_max': 2.4,
+    # v25: the cell that shifted the two rows above down one. Set here for the same
+    # reason they are — a distinct non-default value, so a writer left on the old
+    # row would come back wrong rather than merely blank.
+    'element_size_1d': 1.25,
 }
 # --- v20 SSR-zone overlay round-trip ---
 # A polygon-geometry model, so the zone rows are written AFTER real material-zone
@@ -354,6 +393,12 @@ def _roundtrip_diff(a, b, path=''):
         if not isinstance(b, dict):
             return [f"{path}: dict vs {type(b).__name__}"]
         for k in a:
+            # Underscore keys are DERIVED caches, not file state — a reinforcement
+            # line's resolved pullout profile, a model's water-table sampling. They
+            # are rebuilt from the values beside them on every load, so comparing
+            # them compares two objects, not two files.
+            if isinstance(k, str) and k.startswith('_'):
+                continue
             if k not in b:
                 out.append(f"{path}.{k}: missing")
             else:
@@ -443,6 +488,155 @@ def _refine_kwargs(test):
     return kw
 
 
+def _tag_target_size(test, slope_data, default_divisions=120):
+    """The mesh target size a tag asks for.
+
+    ``target_size`` is the size itself. ``size_divisions`` is instead what the
+    Build Mesh dialog's *Auto-size from geometry* spinner holds — the section width
+    over that number — so a page that states its divisions is locked at the mesh it
+    actually built rather than at a size back-computed by hand and rounded. Neither
+    key present: the width over ``default_divisions``, the historical default."""
+    ts = test.get('target_size')
+    if ts is not None and str(ts).strip() != '':
+        return float(ts)
+    xs = [x for x, _ in slope_data['ground_surface'].coords]
+    width = max(xs) - min(xs)
+    div = test.get('size_divisions')
+    if div is not None and str(div).strip() != '':
+        return width / float(div)
+    return width / float(default_divisions)
+
+
+def _tag_mesh(slope_data, test, default_element_type='tri3', default_divisions=120):
+    """Build the mesh a tag describes and attach it to ``slope_data``.
+
+    The Build Mesh step of a page that runs seepage before stability: same
+    polygons, same constraint lines and same size regions Studio's mesh runner
+    uses, at the tag's ``element_type`` / ``target_size`` (or ``size_divisions``).
+    Attached to the model because the ``u = 'seep'`` interpolation reads it from
+    there, and because a seepage-coupled FEM row must solve on the very mesh the
+    field was computed on."""
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_constraint_line_geometry, extract_size_regions)
+    constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+    polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
+    mesh = build_mesh_from_polygons(
+        polygons,
+        target_size=_tag_target_size(test, slope_data, default_divisions),
+        element_type=test.get('element_type', default_element_type),
+        lines=constraint_lines or None,
+        element_size_1d=slope_data.get('element_size_1d'),
+        size_regions=extract_size_regions(slope_data),
+        **_refine_kwargs(test))
+    slope_data['mesh'] = mesh
+    return mesh
+
+
+def _tag_transient_solution(slope_data, test):
+    """The transient march a tag's stability run reads, plus the ``seep_data`` it
+    was solved on.
+
+    ``march=file`` reads the frames shipped beside the workbook
+    (``{base}_tseep.csv`` + meta) on the model's own companion mesh, which is what
+    a reader who opens a solved model gets. Otherwise the march is recomputed here
+    from the file's own ``tseep`` schedule on the tag's mesh — the same rebuild
+    ``run_tseep_head_test`` makes, so the field under a stability lock is the one
+    those rows lock. Stepper knobs (``dt_max`` / ``max_head_change_frac`` /
+    ``theta``) ride the tag either way."""
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             import_transient_solution, run_transient_seepage)
+
+    if str(test.get('march', '')).strip().lower() == 'file':
+        mesh = slope_data.get('mesh')
+        if mesh is None:
+            return None, None, (f"march=file needs the solved model's companion mesh "
+                                f"({os.path.basename(test['file'])} ships none)")
+        seep_data = build_seep_data(mesh, slope_data)
+        base = os.path.splitext(test['file'])[0]
+        return seep_data, import_transient_solution(seep_data, base), None
+
+    tseep_data = build_tseep_data(slope_data)
+    if tseep_data is None:
+        return None, None, "file carries no tseep sheet (not a transient model)"
+    mesh = _tag_mesh(slope_data, test)
+    seep_data = build_seep_data(mesh, slope_data)
+    kw = {'verbose': False}
+    for key in ('dt_max', 'max_head_change_frac', 'theta'):
+        if key in test and str(test[key]).strip() != '':
+            kw[key] = float(test[key])
+    solution = run_transient_seepage(seep_data, tseep_data, **kw)
+    if not solution.get('converged', True):
+        return None, None, "transient seepage solution did not converge"
+    return seep_data, solution, None
+
+
+def _stage_seep_fields(slope_data, test):
+    """Run this model's own seepage and put the resulting pore pressures into it,
+    the way Studio does, so a stability tag can lock a page whose route is *mesh,
+    solve the seepage, then run the stability analysis*. Returns an error message,
+    or None when the model is staged (or the tag asked for no staging).
+
+    Every lock in this suite up to here read its field off a solved sidecar shipped
+    beside the workbook (``{base}_seep.csv`` / ``_seep2.csv``, picked up by
+    ``load_slope_data``). A tutorial's model ships no sidecar — the page's own
+    instructions are what produce the field, and a reader who follows them starts
+    from the workbook alone — so the route has to be run, not loaded. The tag key
+    is ``seep=``:
+
+    ``seep=steady``
+        Solve boundary set 1 into ``seep_u``, and set 2 (when the file declares
+        one) into ``seep_u2``, which is the pair a rapid drawdown's stages 1 and
+        2 read. One steady run of the seepage dialog on a two-set file solves
+        both, and this is that run.
+    ``seep=transient``
+        March the file's own schedule (or read the shipped frames, see
+        ``_tag_transient_solution``) and stage the instant(s) the run needs
+        through ``xslope.seep.apply_transient_stability_frame`` — the stage_1 /
+        stage_2 frames when the tag is ``rapid=true``, otherwise the single
+        instant named by ``seep_time`` (default: the file's ``stability_time``,
+        else the last saved frame). This is the call Studio's run path makes,
+        so a staged drawdown lock runs the route the page ran and not a
+        reconstruction of it.
+
+    Mesh keys (``element_type``, ``target_size`` / ``size_divisions``) describe the
+    Build Mesh step and are read by ``_tag_mesh``."""
+    route = str(test.get('seep', '')).strip().lower()
+    if not route:
+        return None
+    from xslope.seep import (apply_steady_stability_field, build_seep_data,
+                             apply_transient_stability_frame, run_seepage_analysis)
+
+    if route == 'steady':
+        mesh = _tag_mesh(slope_data, test)
+        for bc in (1, 2):
+            if bc == 2 and not slope_data.get('has_seepage_bc2'):
+                continue
+            seep_data = build_seep_data(mesh, slope_data, seep_bc=bc)
+            solution = run_seepage_analysis(seep_data, tol=1e-4,
+                                            max_iter=int(test.get('max_iter', 400)))
+            if not solution.get('converged', True):
+                return f"steady seepage on BC set {bc} did not converge"
+            apply_steady_stability_field(slope_data, solution, bc=bc, verbose=False)
+        return None
+
+    if route == 'transient':
+        _seep_data, solution, err = _tag_transient_solution(slope_data, test)
+        if err:
+            return err
+        rapid = str(test.get('rapid', 'false')).strip().lower() in ('true', '1', 'yes')
+        t = test.get('seep_time')
+        try:
+            apply_transient_stability_frame(
+                slope_data, solution, rapid=rapid, verbose=False,
+                time=(float(t) if t is not None and str(t).strip() != '' else None))
+        except ValueError as e:
+            return f"transient staging refused the run: {e}"
+        return None
+
+    return (f"seep={route!r} is not a route; use 'steady' (solve the file's "
+            f"boundary set(s)) or 'transient' (march and stage the frames)")
+
+
 def run_lem_test(test):
     """Run a single LEM test (single_circle, circular_search, or noncircular_search)."""
     from xslope.fileio import load_slope_data
@@ -522,6 +716,22 @@ def run_lem_test(test):
 
     slope_data = load_slope_data(file_path)
 
+    # `u_option=none|piezo|seep|ru` overrides the materials table's pore-pressure
+    # column on every row. It exists for the one published comparison that cannot be
+    # made from a file — what the SAME model answers when a solved field is left
+    # unread (COMBO-1's u = none against u = seep) — and it is the whole edit: the
+    # geometry, the strengths and the water are the file's.
+    u_option = str(test.get('u_option', '')).strip()
+    if u_option:
+        for m in slope_data.get('materials', []):
+            m['u'] = u_option
+
+    # `seep=steady|transient` runs the model's own seepage first and stages the
+    # field(s) a u = 'seep' run reads (see _stage_seep_fields).
+    err = _stage_seep_fields(slope_data, test)
+    if err:
+        return None, err
+
     if test_type == 'single_circle':
         # circle_index picks one of several specified surfaces stored in the same
         # file (default 0, the historical behaviour). A model whose published
@@ -588,6 +798,123 @@ def run_lem_test(test):
 
     else:
         return None, f"Unknown LEM test type: {test_type}"
+
+
+def run_pullout_envelope_test(test):
+    """Check the reinforcement capacity envelope at named stations along the lines.
+
+    This is the regression form for a published PULLOUT table — a design manual
+    that tabulates, layer by layer, the resistance a reinforcement develops in
+    the zone beyond an assumed failure surface. Nothing is solved: the check
+    reads the same ``PulloutProfile`` the LEM and FEM engines read and evaluates
+    the same envelope function they call, so it costs milliseconds and still
+    exercises the whole overburden-dependent law — the soil column above each
+    point, the material zones it crosses, the pore pressure, and the integral.
+
+    Tag keys, both semicolon lists with ONE ELEMENT PER REINFORCEMENT LINE in the
+    order the file's reinforce sheet carries them:
+
+    ``expected_pullout=<x>:<value>``
+        the resistance developed between the station ``x`` and the FAR end of the
+        line (``Tend2`` plus the integral of r from the station to end 2), which
+        is the quantity a pullout table publishes: what the resisting zone alone
+        can hold back. ``x`` is a horizontal station, projected onto the line.
+    ``expected_envelope=<x>:<value>``
+        optional, and the full three-way envelope at the same station —
+        ``min(Tmax, Tend1 + int, Tend2 + int)``. It is what a trial surface
+        crossing there would actually mobilize, so a table where rupture governs
+        can say so and have it checked.
+
+    ``tolerance`` is RELATIVE (default 0.002), because these values run from
+    hundreds to tens of thousands in the same table and one absolute band would
+    be meaningless at one end of it.
+
+    Returns (0.0, None) on success, else (None, message).
+    """
+    import math
+
+    from xslope.fileio import (ensure_reinforce_pullout, load_slope_data,
+                               reinforce_available_tension)
+
+    tol = float(test.get('tolerance', 0.002))
+
+    def _stations(key):
+        raw = test.get(key)
+        if raw is None or str(raw).strip() == '':
+            return None
+        out = []
+        for tok in str(raw).split(';'):
+            tok = tok.strip()
+            if not tok:
+                continue
+            x, sep, val = tok.rpartition(':')
+            if not sep:
+                raise ValueError(f"{key} entry {tok!r} must be 'station:value'")
+            out.append((float(x), float(val)))
+        return out
+
+    want_pull = _stations('expected_pullout')
+    want_env = _stations('expected_envelope')
+    if not want_pull and not want_env:
+        return None, ("a pullout_envelope tag needs expected_pullout and/or "
+                      "expected_envelope")
+
+    slope_data = ensure_reinforce_pullout(load_slope_data(test['file']))
+    lines = slope_data.get('reinforcement_lines') or []
+    if not lines:
+        return None, "the model carries no reinforcement lines"
+    for key, want in (('expected_pullout', want_pull),
+                      ('expected_envelope', want_env)):
+        if want is not None and len(want) != len(lines):
+            return None, (f"{key} lists {len(want)} element(s) but the model has "
+                          f"{len(lines)} reinforcement line(s)")
+
+    problems = []
+    for i, line in enumerate(lines):
+        prof = line.get('_pullout_profile')
+        if prof is None:
+            problems.append(f"line {i + 1} is not on the overburden-dependent "
+                            f"law (Adhesion/Delta blank)")
+            continue
+        x1, y1 = float(line['x1']), float(line['y1'])
+        x2, y2 = float(line['x2']), float(line['y2'])
+        length = math.hypot(x2 - x1, y2 - y1)
+        for key, want in (('expected_pullout', want_pull),
+                          ('expected_envelope', want_env)):
+            if want is None:
+                continue
+            station, expected = want[i]
+            if x2 == x1:
+                return None, (f"line {i + 1} is vertical; a horizontal station "
+                              f"cannot be projected onto it")
+            frac = (station - x1) / (x2 - x1)
+            if not 0.0 <= frac <= 1.0:
+                problems.append(f"line {i + 1}: station {station:g} is off the "
+                                f"line (x from {x1:g} to {x2:g})")
+                continue
+            d1 = frac * length
+            d2 = length - d1
+            if key == 'expected_pullout':
+                got = float(line.get('tend2', 0.0)) + prof.from_end2(d2)
+            else:
+                got = reinforce_available_tension(
+                    d1, d2, line['t_max'], line['lp1'], line['lp2'],
+                    line.get('tend1', 0.0), line.get('tend2', 0.0), pullout=prof)
+            if expected == 0:
+                ok = abs(got) <= tol
+                rel = abs(got)
+            else:
+                rel = abs(got - expected) / abs(expected)
+                ok = rel <= tol
+            if not ok:
+                problems.append(f"line {i + 1} {key[9:]} at x={station:g}: "
+                                f"{got:.1f} vs {expected:g} ({rel * 100:.2f}% off, "
+                                f"tolerance {tol * 100:.2f}%)")
+
+    if problems:
+        return None, (f"{len(problems)} station(s) off: "
+                      + "; ".join(problems[:6]))
+    return 0.0, None
 
 
 def run_critical_kc_test(test):
@@ -756,6 +1083,15 @@ def build_fem_ssrm_case(test):
 
     slope_data = load_slope_data(file_path)
 
+    # `seep=steady|transient` runs the model's own seepage first (see
+    # _stage_seep_fields) — the route of a page that meshes, solves the flow and
+    # then reduces the strengths on that same mesh, with no solved field shipped
+    # beside the workbook. It leaves the mesh on the model, which the branch below
+    # then keeps for exactly the reason stated there.
+    err = _stage_seep_fields(slope_data, test)
+    if err:
+        raise ValueError(err)
+
     # Seepage-coupled models (material u option = 'seep') must run on the SAME
     # mesh as the stored seepage solution: seep_u is nodal, and build_fem_data
     # silently zeroes the pore pressures if the node count differs.
@@ -777,6 +1113,7 @@ def build_fem_ssrm_case(test):
         mesh = build_mesh_from_polygons(
             polygons, target_size=target_size, element_type=element_type,
             lines=constraint_lines,
+            element_size_1d=slope_data.get('element_size_1d'),
             point_constraints=extract_point_constraints(slope_data),
             size_regions=extract_size_regions(slope_data),
             **_refine_kwargs(test)
@@ -838,25 +1175,6 @@ def build_fem_ssrm_case(test):
         kwargs['elastic_materials'] = [s.strip() for s in
                                        str(test['elastic_materials']).split(';')
                                        if s.strip()]
-    # Bond-slip load transfer for 1D reinforcement (opt-in). Tags split on commas,
-    # so line entries are SEMICOLON-separated and their fields COLON-separated:
-    # bond_slip=<line>:<bond_c>:<bond_phi_deg>:<perimeter>[;<line>:...]. <line> is a
-    # reinforcement line label, a 1-based id, or '*' (all lines). Off by default.
-    if 'bond_slip' in test:
-        bs = {}
-        for entry in str(test['bond_slip']).split(';'):
-            entry = entry.strip()
-            if not entry:
-                continue
-            key, c, phi, perim = entry.split(':')
-            key = key.strip()
-            # numeric key => 1-based line id; otherwise a label (or '*')
-            try:
-                key = int(key)
-            except ValueError:
-                pass
-            bs[key] = (float(c), float(phi), float(perim))
-        kwargs['bond_slip'] = bs
     # Matric-suction strength (Fredlund extended MC), opt-in. suction_phi_b is a
     # per-material angle list "Name:deg;Name2:deg" (semicolon-separated, since tags
     # split on commas); suction_cap is one number (stress units) bounding the credited
@@ -1074,10 +1392,7 @@ def run_seep_test(test):
 
     polygons = get_material_polygons(slope_data)
     element_type = test.get('element_type', 'tri3')
-    target_size = test.get('target_size')
-    if target_size is None:
-        x_coords = [x for x, _ in slope_data['ground_surface'].coords]
-        target_size = (max(x_coords) - min(x_coords)) / 120
+    target_size = _tag_target_size(test, slope_data)
     mesh = build_mesh_from_polygons(polygons, target_size, element_type,
                                     size_regions=extract_size_regions(slope_data),
                                     **_refine_kwargs(test))
@@ -1106,10 +1421,7 @@ def run_seep_head_test(test):
 
     slope_data = load_slope_data(test['file'])
     polygons = get_material_polygons(slope_data)
-    target_size = test.get('target_size')
-    if target_size is None:
-        xs = [x for x, _ in slope_data['ground_surface'].coords]
-        target_size = (max(xs) - min(xs)) / 120
+    target_size = _tag_target_size(test, slope_data)
     mesh = build_mesh_from_polygons(polygons, float(target_size),
                                     test.get('element_type', 'tri3'),
                                     size_regions=extract_size_regions(slope_data),
@@ -1174,10 +1486,7 @@ def run_tseep_head_test(test):
         return None, "file carries no tseep sheet (not a transient model)"
 
     polygons = get_material_polygons(slope_data)
-    target_size = test.get('target_size')
-    if target_size is None:
-        xs = [x for x, _ in slope_data['ground_surface'].coords]
-        target_size = (max(xs) - min(xs)) / 120
+    target_size = _tag_target_size(test, slope_data)
     mesh = build_mesh_from_polygons(polygons, float(target_size),
                                     test.get('element_type', 'tri3'),
                                     size_regions=extract_size_regions(slope_data),
@@ -1239,53 +1548,60 @@ def run_fs_vs_time_test(test):
     tag -- the runner never computes a reference), tolerance (default 0.005),
     optional critical_time / min_fs (the curve's own minimum, locked as such),
     num_slices, and the mesh/stepper knobs run_tseep_head_test takes
-    (target_size, element_type, dt_max, max_head_change_frac, theta).
+    (target_size or size_divisions, element_type, dt_max, max_head_change_frac,
+    theta).
 
-    A frame that produced no result is a failure of this row and is reported with
-    the reason the mode recorded, never skipped: a curve missing its critical
-    instant reads as a healthier slope than the model describes.
+    ``times`` and ``expected`` are OPTIONAL, and omitting them sweeps EVERY saved
+    frame -- which is what a published curve is, and the only footing on which its
+    minimum can be locked as the minimum. On that sweep ``expected_first`` locks
+    the curve's opening instant (the full-pool figure a page states beside its
+    minimum) and ``critical_time`` / ``min_fs`` lock where and how low it falls.
+    Naming a subset of instants instead re-scopes the whole row: the minimum then
+    means the lowest of THOSE, which is a weaker statement than the page makes.
+
+    ``rapid=true`` makes every instant a three-stage Duncan-Wright-Wong drawdown
+    whose stage 1 is the march's initial state, rather than a single-stage
+    analysis of that instant's water -- the drawdown-versus-time curve, and the
+    same switch the Parametric dialog offers.
+
+    ``march=file`` reads the frames shipped beside the workbook instead of
+    re-marching (see ``_tag_transient_solution``).
+
+    A NAMED instant that produced no result is a failure of this row and is
+    reported with the reason the mode recorded, never skipped: a curve missing an
+    instant it was asked for reads as a healthier slope than the model describes.
+    On a rapid curve the march's initial instant is the one exception the mode
+    itself raises -- stage 2 there would be a fall from the pool to itself -- so
+    ``expected_first`` locks the first instant that HAS an answer.
 
     Pass/fail: returns 0.0 on success. One row is one march plus one search per
-    instant -- around a minute -- so it is dispatched like a tseep_head row."""
+    instant -- around a minute, and longer on a rapid curve, whose every instant
+    is three analyses -- so it is dispatched like a tseep_head row."""
     from xslope.fileio import load_slope_data
-    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_size_regions)
-    from xslope.seep import build_seep_data, build_tseep_data, run_transient_seepage
     from xslope.sensitivity import fs_vs_time
 
     slope_data = load_slope_data(test['file'])
-    tseep_data = build_tseep_data(slope_data)
-    if tseep_data is None:
-        return None, "file carries no tseep sheet (not a transient model)"
+    _seep_data, solution, err = _tag_transient_solution(slope_data, test)
+    if err:
+        return None, err
 
-    polygons = get_material_polygons(slope_data)
-    target_size = test.get('target_size')
-    if target_size is None:
-        xs = [x for x, _ in slope_data['ground_surface'].coords]
-        target_size = (max(xs) - min(xs)) / 120
-    mesh = build_mesh_from_polygons(polygons, float(target_size),
-                                    test.get('element_type', 'tri3'),
-                                    size_regions=extract_size_regions(slope_data),
-                                    **_refine_kwargs(test))
-    slope_data['mesh'] = mesh                  # the u = 'seep' interpolation reads it
-    seep_data = build_seep_data(mesh, slope_data)
-
-    kw = {'verbose': False}
-    for key in ('dt_max', 'max_head_change_frac', 'theta'):
-        if key in test and str(test[key]).strip() != '':
-            kw[key] = float(test[key])
-    solution = run_transient_seepage(seep_data, tseep_data, **kw)
-    if not solution.get('converged', True):
-        return None, "transient seepage solution did not converge"
-
-    times = [float(v) for v in str(test['times']).split(';')]
-    expected = [float(v) for v in str(test['expected']).split(';')]
-    if len(times) != len(expected):
+    # No times named: the whole curve, every saved frame (fs_vs_time's own default).
+    if 'times' in test and str(test['times']).strip() != '':
+        times = [float(v) for v in str(test['times']).split(';')]
+    else:
+        times = None
+    if 'expected' in test and str(test['expected']).strip() != '':
+        expected = [float(v) for v in str(test['expected']).split(';')]
+    else:
+        expected = []
+    if times is not None and len(times) != len(expected):
         return None, (f"tag lists {len(times)} times but {len(expected)} expected "
                       f"factors of safety")
 
     ok, res = fs_vs_time(slope_data, solution, times=times,
                          methods=(test.get('method', 'spencer'),),
+                         rapid=str(test.get('rapid', 'false')).strip().lower()
+                         in ('true', '1', 'yes'),
                          num_slices=int(test.get('num_slices', 40)))
     if not ok:
         return None, f"fs_vs_time refused the run: {res}"
@@ -1293,7 +1609,17 @@ def run_fs_vs_time_test(test):
 
     errs = []
     tol = float(test.get('tolerance', 0.005))
-    for t, want in zip(times, expected):
+    if 'expected_first' in test:
+        first = df.loc[df['success']].sort_values('value')
+        if first.empty:
+            errs.append("first instant: no instant of the curve produced a result")
+        else:
+            got = float(first.iloc[0]['fs'])
+            want = float(test['expected_first'])
+            if abs(got - want) > tol:
+                errs.append(f"t={float(first.iloc[0]['value']):g} (first): expected "
+                            f"{want:.4f}, got {got:.4f}")
+    for t, want in zip(times or [], expected):
         row = df.loc[(df['value'] - t).abs() < 1e-6]
         if row.empty:
             errs.append(f"t={t:g}: no row in the returned table")
@@ -1402,6 +1728,7 @@ def run_fem_elements_test(test):
                 mesh = build_mesh_from_polygons(
                     polygons, target_size=target_size, element_type=et,
                     lines=constraint_lines,
+                    element_size_1d=slope_data.get('element_size_1d'),
                     size_regions=extract_size_regions(slope_data))
                 fem_data = build_fem_data(slope_data, mesh)
                 result = solve_ssrm(fem_data, F_min=test.get('f_min', 0.5),
@@ -1673,6 +2000,7 @@ def run_fem_reliability_test(test):
     polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
     mesh = build_mesh_from_polygons(polygons, target_size=target_size,
                                     element_type=element_type, lines=constraint_lines,
+                                    element_size_1d=slope_data.get('element_size_1d'),
                                     size_regions=extract_size_regions(slope_data))
     with contextlib.redirect_stdout(io.StringIO()):
         success, result = reliability_fem(
@@ -1745,8 +2073,26 @@ def run_roundtrip_test(test):
         save_slope_data_to_xlsx(d1, tmp,
                                 template=test.get('template', ROUNDTRIP_TEMPLATE))
         d2 = load_slope_data(tmp)
+        # A Max depth DECLARED on a polygon model. The comparison above sees only
+        # the corpus files' own value, which on every polygon-native file is None,
+        # so it could not see the writer skipping the profile sheet entirely on
+        # this geometry: a max_depth set in memory (a Studio edit, an assistant
+        # snippet) went into the file nowhere and reloaded as None with nothing
+        # said. Nothing downstream reads it here — the polygons are the domain
+        # floor — which is exactly why the loss stayed silent.
+        md_back = _NOT_CHECKED
+        if not d1.get('profile_lines'):
+            declared = dict(d1, max_depth=POLYGON_MAX_DEPTH)
+            tmp_md = os.path.join(td, 'roundtrip_max_depth.xlsx')
+            save_slope_data_to_xlsx(
+                declared, tmp_md,
+                template=test.get('template', ROUNDTRIP_TEMPLATE))
+            md_back = load_slope_data(tmp_md).get('max_depth')
 
     mismatches = []
+    if md_back is not _NOT_CHECKED and md_back != POLYGON_MAX_DEPTH:
+        mismatches.append(f"max_depth declared on a polygon model came back "
+                          f"{md_back!r}, not {POLYGON_MAX_DEPTH}")
     for k in ROUNDTRIP_KEYS:
         mismatches += _roundtrip_diff(d1.get(k), d2.get(k), k)
 
@@ -1811,7 +2157,7 @@ def run_v19_roundtrip_test(test):
 
 
 def run_surface_family_roundtrip_test(test):
-    """Verify the v22 surface-family cell (main D24) survives save -> load.
+    """Verify the v22 surface-family cell (main D24, D25 from v25) survives save -> load.
 
     The rare deck defines BOTH a circular and a non-circular surface, and nothing in
     its geometry says which one it means — the circles simply win. The cell is where
@@ -1836,6 +2182,14 @@ def run_surface_family_roundtrip_test(test):
     template = test.get('template', ROUNDTRIP_TEMPLATE)
     problems = []
 
+    # The cell moved down one row at v25, which inserted '1D element size' above it.
+    # Located from the DESTINATION template's own version rather than hardcoded, so
+    # this reads the cell the writer was actually aiming at.
+    _twb = openpyxl.load_workbook(template, read_only=True)
+    _tv = int(float(_twb['main']['D5'].value))
+    _twb.close()
+    SF_CELL = f"D{25 if _tv >= 25 else 24}"
+
     def _cycle(mutate):
         d1 = load_slope_data(test['file'])
         mutate(d1)
@@ -1843,7 +2197,7 @@ def run_surface_family_roundtrip_test(test):
         try:
             save_slope_data_to_xlsx(d1, tmp, template=template)
             wb = openpyxl.load_workbook(tmp)
-            cell = wb['main']['D24'].value
+            cell = wb['main'][SF_CELL].value
             wb.close()
             return load_slope_data(tmp), cell
         finally:
@@ -1858,7 +2212,8 @@ def run_surface_family_roundtrip_test(test):
     # (1) A model that states nothing writes a blank cell and reads back None.
     d2, cell = _cycle(lambda d: _both(d, None))
     if cell is not None:
-        problems.append(f"blank: the writer put {cell!r} in D24 instead of a blank cell")
+        problems.append(f"blank: the writer put {cell!r} in {SF_CELL} instead of "
+                        f"a blank cell")
     if d2.get('surface_family') is not None:
         problems.append(f"blank: came back as {d2.get('surface_family')!r}, not None")
     if not d2.get('circular'):
@@ -1871,7 +2226,8 @@ def run_surface_family_roundtrip_test(test):
                                          ('noncircular', 'non-circular', False)):
         d2, cell = _cycle(lambda d, f=family: _both(d, f))
         if cell != want_cell:
-            problems.append(f"{family}: D24 holds {cell!r}, expected {want_cell!r}")
+            problems.append(f"{family}: {SF_CELL} holds {cell!r}, expected "
+                            f"{want_cell!r}")
         if d2.get('surface_family') != family:
             problems.append(f"{family}: came back as {d2.get('surface_family')!r}")
         if bool(d2.get('circular')) != want_flag:
@@ -1886,7 +2242,7 @@ def run_surface_family_roundtrip_test(test):
     #     blank, and a value that somehow got in cannot claim the absent surface.
     d2, cell = _cycle(lambda d: None)
     if cell is not None or d2.get('surface_family') is not None:
-        problems.append(f"single-family: D24 = {cell!r}, model = "
+        problems.append(f"single-family: {SF_CELL} = {cell!r}, model = "
                         f"{d2.get('surface_family')!r} — both should be blank/None")
     d2, cell = _cycle(lambda d: d.update(surface_family='noncircular'))
     if not d2.get('circular'):
@@ -1898,7 +2254,7 @@ def run_surface_family_roundtrip_test(test):
     try:
         _cycle(lambda d: d.update(surface_family='spiral'))
     except ValueError as exc:
-        if 'D24' not in str(exc):
+        if SF_CELL not in str(exc):
             problems.append(f"an unknown family raised without naming the cell: {exc}")
     else:
         problems.append("an unknown surface family was written without an error")
@@ -2233,7 +2589,10 @@ def _editor_fixture():
         p = {"label": "P", "x1": x1, "y1": y1, "x2": x2, "y2": y2, "H": 10.0,
              "theta_p": math.degrees(math.atan2(x2 - x1, -(y2 - y1))),
              "D_pile": 2.0, "S": 6.0, "E": 3000.0, "I": 1.5, "area": 4.0,
-             "V_cap": 50.0, "M_cap": 200.0, "fixity": "fixed", "appl": appl}
+             "V_cap": 50.0, "M_cap": 200.0, "head_fixity": "fixed",
+             # v25: the tip restraint, stated 'fixed' because 'free' is the default
+             # a dropped field would come back as anyway.
+             "tip_fixity": "fixed", "appl": appl}
         return p
 
     return {
@@ -3049,6 +3408,259 @@ def run_template_sync_test(test):
     return 0.0, None
 
 
+def run_pullout_law_test(test):
+    """The overburden-dependent pullout law against arithmetic done by hand.
+
+    Three checks, and each would fail if the law were computed any other way:
+
+    1. **Uniform soil, no water.** A horizontal line 5 deep in one 20-unit-weight
+       material, adhesion 0, delta 45 degrees. sigma'v = 20*5 = 100 everywhere, so
+       r = 2*(0 + 100*tan45) = 200 per unit length and T(s) = min(200 s, 200(L-s)).
+    2. **Two materials and a water table.** The column above the line crosses a
+       lower zone (gamma_sat 22) and an upper zone (gamma_sat 20 below the water
+       table, moist 18 above it), and the point's material takes its pore pressure
+       from the piezometric line. Every one of those five numbers moves the answer,
+       so a gamma/gamma_sat mix-up, a dropped zone, or a forgotten u cannot pass.
+    3. **The constant-rate law is untouched.** With no Adhesion/Delta the envelope
+       must reproduce the linear ramps exactly, bit for bit, at every sample.
+    4. **A line ending on a zone boundary.** The far end sits exactly on the
+       vertical edge two side-by-side zones share, which is where a reinforcement
+       layer ends in every zoned retaining structure. A shapely polygon owns its
+       own boundary, so the column standing there intersects BOTH zones over its
+       whole length; weighed once per zone it would carry twice the soil it has,
+       and the resistance developed from that end would read high.
+
+    Then the mutations: perturbing the law's own terms one at a time must break
+    check 1 or 2. A test that passes against a broken implementation is not a test.
+    """
+    import math
+    import numpy as np
+    from shapely.geometry import Polygon, LineString
+    from xslope.fileio import (attach_reinforce_pullout,
+                               reinforce_available_tension)
+
+    def _line(**kw):
+        base = dict(x1=0.0, y1=5.0, x2=10.0, y2=5.0, t_max=1.0e9,
+                    t_res=float('nan'), lp1=0.0, lp2=0.0, E=float('nan'),
+                    area=float('nan'), tend1=0.0, tend2=0.0, spacing=1.0,
+                    label='L', type='', dir='tangent', appl='active',
+                    adhesion=float('nan'), delta=float('nan'))
+        base.update(kw)
+        return base
+
+    def _uniform(adhesion, delta, gamma=20.0):
+        return {
+            'materials': [{'name': 'sand', 'gamma': gamma, 'gamma_sat': None,
+                           'u': 'none'}],
+            'polygons': [{'polygon': Polygon([(0, 0), (20, 0), (20, 10), (0, 10)]),
+                          'mat_id': 0}],
+            'ground_surface': LineString([(0, 10), (20, 10)]),
+            'gamma_water': 9.81,
+            'reinforcement_lines': [_line(adhesion=adhesion, delta=delta)],
+        }
+
+    def _boundary(adhesion, delta, gamma=20.0):
+        """Two zones of the same soil meeting at x = 10, where the line ends."""
+        return {
+            'materials': [{'name': 'left', 'gamma': gamma, 'gamma_sat': None,
+                           'u': 'none'},
+                          {'name': 'right', 'gamma': gamma, 'gamma_sat': None,
+                           'u': 'none'}],
+            'polygons': [{'polygon': Polygon([(0, 0), (10, 0), (10, 10), (0, 10)]),
+                          'mat_id': 0},
+                         {'polygon': Polygon([(10, 0), (20, 0), (20, 10), (10, 10)]),
+                          'mat_id': 1}],
+            'ground_surface': LineString([(0, 10), (20, 10)]),
+            'gamma_water': 9.81,
+            'reinforcement_lines': [_line(adhesion=adhesion, delta=delta)],
+        }
+
+    def _layered(adhesion, delta):
+        return {
+            'materials': [{'name': 'upper', 'gamma': 18.0, 'gamma_sat': 20.0,
+                           'u': 'piezo'},
+                          {'name': 'lower', 'gamma': 21.0, 'gamma_sat': 22.0,
+                           'u': 'piezo'}],
+            'polygons': [{'polygon': Polygon([(0, 6), (20, 6), (20, 10), (0, 10)]),
+                          'mat_id': 0},
+                         {'polygon': Polygon([(0, 0), (20, 0), (20, 6), (0, 6)]),
+                          'mat_id': 1}],
+            'ground_surface': LineString([(0, 10), (20, 10)]),
+            'piezo_line': [(0, 8), (20, 8)],
+            'gamma_water': 9.81,
+            'reinforcement_lines': [_line(y1=4.0, y2=4.0, adhesion=adhesion,
+                                          delta=delta)],
+        }
+
+    def _envelope(sd, t_max=1.0e9, tend=0.0, lp=0.0):
+        attach_reinforce_pullout(sd)
+        p = sd['reinforcement_lines'][0]['_pullout_profile']
+        if p is None:
+            return None
+        return [reinforce_available_tension(s, 10.0 - s, t_max, lp, lp, tend, tend,
+                                            pullout=p)
+                for s in (0.0, 1.0, 2.5, 5.0, 7.5, 9.0, 10.0)]
+
+    def _hand(rate):
+        return [min(1.0e9, rate * s, rate * (10.0 - s))
+                for s in (0.0, 1.0, 2.5, 5.0, 7.5, 9.0, 10.0)]
+
+    problems = []
+
+    # 1 — uniform soil, no water
+    rate1 = 2.0 * (0.0 + 20.0 * 5.0 * math.tan(math.radians(45.0)))
+    got = _envelope(_uniform(0.0, 45.0))
+    for g, w in zip(got, _hand(rate1)):
+        if abs(g - w) > 1e-6 * max(1.0, abs(w)):
+            problems.append(f"uniform: {g:.6f} != {w:.6f}")
+            break
+
+    # 2 — two materials, a water table, and pore pressure at the line
+    sigma_v = 2 * 22.0 + 2 * 20.0 + 2 * 18.0        # 4->6 sat, 6->8 sat, 8->10 moist
+    u = (8.0 - 4.0) * 9.81
+    rate2 = 2.0 * (5.0 + (sigma_v - u) * math.tan(math.radians(30.0)))
+    got = _envelope(_layered(5.0, 30.0))
+    for g, w in zip(got, _hand(rate2)):
+        if abs(g - w) > 1e-6 * max(1.0, abs(w)):
+            problems.append(f"layered: {g:.6f} != {w:.6f}")
+            break
+
+    # 4 — the far end sits on the boundary two zones share: the soil above it is
+    # the same 5 units of one 20-unit-weight column, counted once. Under a
+    # per-zone sum it is counted twice, which inflates what the far end develops
+    # (visible at s = 9, where that branch governs) while leaving the near-end
+    # branch and the two endpoints looking right.
+    got = _envelope(_boundary(0.0, 45.0))
+    for s_at, g, w in zip((0.0, 1.0, 2.5, 5.0, 7.5, 9.0, 10.0), got,
+                          _hand(rate1)):
+        if abs(g - w) > 1e-6 * max(1.0, abs(w)):
+            problems.append(f"zone boundary at the far end: {g:.6f} != {w:.6f} "
+                            f"at s={s_at:g}")
+            break
+
+    # 3 — the constant-rate law must be bit-for-bit what it always was
+    for lp1, lp2, te1, te2, tmx in ((4.0, 4.0, 0.0, 0.0, 800.0),
+                                    (0.0, 3.0, 0.0, 200.0, 500.0),
+                                    (2.5, 2.5, 35.0, 0.0, 400.0)):
+        for s in np.linspace(0.0, 10.0, 21):
+            new = reinforce_available_tension(s, 10.0 - s, tmx, lp1, lp2, te1, te2)
+            cap1 = tmx if lp1 <= 0 else min(tmx, te1 + tmx * s / lp1)
+            cap2 = tmx if lp2 <= 0 else min(tmx, te2 + tmx * (10.0 - s) / lp2)
+            old = max(0.0, min(cap1, cap2))
+            if new != old:
+                problems.append(f"constant-rate drift at s={s:g}: {new!r} != {old!r}")
+                break
+
+    # 4 — mutations: each perturbation of the law must be caught by check 1 or 2
+    mutations = [
+        ("adhesion dropped", _uniform(7.0, 45.0),
+         2.0 * (0.0 + 20.0 * 5.0)),
+        ("one face instead of two", _uniform(0.0, 45.0), rate1 / 2.0),
+        ("total stress instead of effective", _layered(5.0, 30.0),
+         2.0 * (5.0 + sigma_v * math.tan(math.radians(30.0)))),
+        ("moist gamma below the water table", _layered(5.0, 30.0),
+         2.0 * (5.0 + (2 * 21.0 + 2 * 18.0 + 2 * 18.0 - u)
+                * math.tan(math.radians(30.0)))),
+        ("delta read as a tangent", _uniform(0.0, 45.0),
+         2.0 * (0.0 + 20.0 * 5.0 * 45.0)),
+    ]
+    for name, sd, wrong_rate in mutations:
+        got = _envelope(sd)
+        wrong = _hand(wrong_rate)
+        if all(abs(g - w) <= 1e-6 * max(1.0, abs(w)) for g, w in zip(got, wrong)):
+            problems.append(f"mutation not caught: {name}")
+
+    if problems:
+        return None, "; ".join(problems[:6])
+    return 0.0, None
+
+
+def run_pullout_switch_test(test):
+    """The reinforcement editor's Pullout switch, driven offscreen on a real model.
+
+    The switch is a reading of the line, not a stored field, so the checks are
+    about what it reads and what it leaves behind: a file with no Adhesion/Delta
+    opens on the development lengths; switching to Overburden dims Lp1/Lp2 without
+    touching their values; switching back parks Adhesion/Delta rather than losing
+    them; and the table view grays the same pair the list view dims.
+    """
+    import os as _os
+    _os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    from PySide6.QtWidgets import QApplication
+    from xslope.fileio import load_slope_data
+    from studio.editors import ReinforcementEditor
+
+    app = QApplication.instance() or QApplication([])
+    path = _repo('docs/tutorials/files/xslope_reinforced_slope_start.xlsx')
+    if not _os.path.exists(path):
+        return None, f"the FEM-2 starter is missing: {path}"
+    sd = load_slope_data(path)
+    if not (sd.get('reinforcement_lines') or []):
+        return None, "the FEM-2 starter carries no reinforcement lines"
+
+    editor = ReinforcementEditor()
+    dlg = editor.build(sd, None)
+    dlg.set_view_mode("list")
+    lv = dlg._list_view
+    lv.list.setCurrentRow(0)
+    problems = []
+
+    combo = lv._switch_combo
+    if combo is None:
+        return None, "the reinforcement list view has no Pullout switch"
+    if combo.currentText() != "Development length (Lp1, Lp2)":
+        problems.append(f"a file with no Adhesion/Delta opened on "
+                        f"{combo.currentText()!r}")
+    if not lv._cells['lp1'].isEnabled():
+        problems.append("Lp1 is dimmed on a line that uses the development lengths")
+    if lv._cells['adhesion'].isEnabled():
+        problems.append("Adhesion is live on a line that uses the development lengths")
+
+    lp1_text = lv._edits['lp1'].text()
+    combo.setCurrentIndex(1)                      # -> Overburden
+    if lv._cells['lp1'].isEnabled():
+        problems.append("Lp1 stayed live after the switch to Overburden")
+    if not lv._cells['adhesion'].isEnabled():
+        problems.append("Adhesion stayed dimmed after the switch to Overburden")
+    if lv._edits['lp1'].text() != lp1_text:
+        problems.append(f"the switch changed Lp1 from {lp1_text!r} to "
+                        f"{lv._edits['lp1'].text()!r} — values must survive it")
+
+    lv._edits['adhesion'].setText("5")
+    lv._edits['delta'].setText("30")
+    lv._commit()
+    row = lv._rows[0]
+    if ReinforcementEditor.pullout_mode(row) != "overburden":
+        problems.append("a filled Adhesion/Delta pair did not read as the "
+                        "overburden law")
+    if ReinforcementEditor.dim_keys(row) != frozenset(("lp1", "lp2")):
+        problems.append(f"the table view grays {sorted(ReinforcementEditor.dim_keys(row))} "
+                        f"on an overburden line, not Lp1/Lp2")
+
+    combo.setCurrentIndex(0)                      # -> back to the lengths
+    row = lv._rows[0]
+    if ReinforcementEditor.pullout_mode(row) != "lp":
+        problems.append("switching back to the development lengths left the "
+                        "overburden law in force")
+    if lv._edits['lp1'].text() != lp1_text:
+        problems.append("Lp1 did not survive the round trip through Overburden")
+    combo.setCurrentIndex(1)                      # -> Overburden again
+    if (lv._edits['adhesion'].text(), lv._edits['delta'].text()) != ("5", "30"):
+        problems.append(f"the parked Adhesion/Delta came back as "
+                        f"{lv._edits['adhesion'].text()!r}/"
+                        f"{lv._edits['delta'].text()!r}, not '5'/'30'")
+
+    if ReinforcementEditor.dim_keys({'adhesion': float('nan'),
+                                     'delta': float('nan')}):
+        problems.append("the table view grays a pair on a development-length line, "
+                        "which would leave Adhesion untypable there")
+
+    dlg.deleteLater()
+    if problems:
+        return None, "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_diagram_sync_test(test):
     """Verify every slice force diagram the Analysis Report prints is
     byte-identical to the drawing the LEM documentation displays.
@@ -3319,6 +3931,12 @@ PREFLIGHT_BASE_BOTH = _repo('docs/verification/files/rocscience/vp042.xlsx')
 PREFLIGHT_BASE_TSEEP = _repo('docs/seep/files/xslope_earth_dam_tseep.xlsx')
 PREFLIGHT_BASE_RAPID = _repo('docs/verification/files/rocscience/vp096.xlsx')
 PREFLIGHT_BASE_RAPID_MULTI = _repo('docs/verification/files/rocscience/vp099.xlsx')
+#: The one file that can be run as EITHER rapid-drawdown route: the Johnson
+#: Reservoir dam carries boundary set 1 bound to a pool schedule, boundary set 2 as
+#: a constant drawn-down state, and the stage times that couple the drawdown to the
+#: march. Which route it runs is a property of the run and not of the file, which is
+#: exactly what ``rapid.stage2_bc_ignored`` has to be able to tell apart.
+PREFLIGHT_BASE_RAPID_TSEEP = _repo('docs/tutorials/files/xslope_johnson_rapid.xlsx')
 PREFLIGHT_BASE_PILES = _repo('docs/lem/files/xslope_piles.xlsx')
 PREFLIGHT_BASE_PILES_FEM = _repo('docs/fem/files/xslope_piles_fem.xlsx')
 PREFLIGHT_BASE_REINF = _repo('docs/inputs/slope/xslope_reinf.xlsx')
@@ -3386,6 +4004,13 @@ def _pf_tseep(sd, **kw):
     return sd
 
 
+def _pf_bc_head(sd, i, value, which=1):
+    """Set the VALUE of one specified-head block: a number, or a tseep series name."""
+    bc = sd['seepage_bc' if which == 1 else 'seepage_bc2']
+    bc['specified_heads'][i]['head'] = value
+    return sd
+
+
 def _pf_pts(obj):
     """(x, y) pairs from a shapely line or a plain coordinate list."""
     return [(float(x), float(y)) for x, y in getattr(obj, 'coords', obj)]
@@ -3402,6 +4027,58 @@ def _pf_circle_depth(sd, below):
     for c in sd.get('circles') or []:
         c['Depth'] = floor - below
         c['R'] = c['Yo'] - c['Depth']
+    return sd
+
+
+def _pf_circle_buried(sd, xo=270.0, yo=280.0, depth=220.0):
+    """Sink every circle INTO the slope, so its ground crossings sit above its center.
+
+    The dam's crest runs at y = 317, so a center at (270, 280) is under the ground
+    it is drawn beneath and both daylight points -- (212.7, 297.9) and (317.2, 317)
+    -- lie above it. That is what makes the arc between them a MAJOR arc, which
+    ``generate_failure_surface`` (the bottom semicircle) cannot represent.
+
+    ``R`` follows ``Depth`` for the same reason ``_pf_circle_depth``'s does: the
+    loader collapses every circle to ``R = Yo - Depth``, so the mutated circle is
+    one a user could have typed rather than an inconsistent pair.
+    """
+    for c in sd.get('circles') or []:
+        c.update(Xo=xo, Yo=yo, Depth=depth, R=yo - depth)
+    return sd
+
+
+def _pf_circle_stranded(sd, xo=270.0, yo=280.0, r=5.0):
+    """Shrink circle 1 to a small arc buried inside the slope, touching nothing.
+
+    The third way a circle can be dead, and the one NEITHER sibling rule can name:
+    its nadir sits well above the domain floor, so the depth rule is silent, and it
+    has no ground crossing above its center because it has no ground crossing at
+    all. It is simply an arc that never reaches the ground. That is what makes it
+    this rule's case -- the catch-all quotes the slicer's own reason instead of
+    diagnosing a cause, precisely because the remaining causes have no shared shape.
+
+    Only circle 1 is moved. The rule reads circles[0] and nothing else, so leaving
+    the rest of the set sound is also what proves that.
+    """
+    cs = sd.get('circles') or []
+    if cs:
+        cs[0].update(Xo=xo, Yo=yo, R=r, Depth=yo - r)
+    return sd
+
+
+def _pf_seep_no_field(sd):
+    """Point every material at a seepage solution the model does not carry.
+
+    The control condition for the circle catch-all: slicing this model as it sits
+    fails, but for a reason that is not the circle's -- the pore-pressure field is
+    built by a run that has not happened yet. Two dozen groundwater and transient
+    decks ship exactly like this, so a rule that blamed their circles would refuse
+    models whose circles are sound.
+    """
+    for m in sd.get('materials') or []:
+        m['u'] = 'seep'
+    sd.pop('mesh', None)
+    sd.pop('seep_u', None)
     return sd
 
 
@@ -3535,9 +4212,19 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='mat.gamma_nonpositive', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_mats(sd, gamma=0.0),
          expect='has no unit weight'),
+    # Through the writer and the loader: a workbook with the unit weight column
+    # blank LOADS (a model still being built has values left to type), and the
+    # missing weight is caught here rather than at load time.
     dict(rule='mat.gamma_nonpositive', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, gamma=0.0),
-         load_error='non-positive unit weight'),
+         expect='has no unit weight'),
+    # The finite element engine weighs EVERY material table row, elastic ones
+    # included -- a row a failure surface would never cross, and which the limit
+    # equilibrium half of the rule skips.
+    dict(rule='mat.gamma_nonpositive', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_mats(sd, option='elastic', gamma=0.0),
+         expect='weighs every material it meshes'),
     dict(rule='mat.no_shear_strength', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, option='mc', c=0.0, phi=0.0),
          expect='no shear strength at all'),
@@ -3547,6 +4234,18 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='mat.ru_zero', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, u='ru', ru=0.0),
          expect='selects u = ru'),
+    # The pairing is the mutation: the SAME Hoek-Brown material under the two
+    # selections, so what the rule reads is the method and not the file. Corps and
+    # Lowe fix the interslice inclination up front; Spencer solves for it, which is
+    # the control.
+    dict(rule='mat.hb_method_convergence', base=PREFLIGHT_BASE_LEM, mode='excel',
+         selection={'surface': 'circular', 'method': 'corps'},
+         control_selection={'surface': 'circular', 'method': 'spencer'},
+         mutation=lambda sd: _pf_mat(sd, 0, option='hb', hb_sci=30000.0,
+                                     hb_gsi=50.0, hb_mi=10.0, hb_d=0.0),
+         control=lambda sd: _pf_mat(sd, 0, option='hb', hb_sci=30000.0,
+                                    hb_gsi=50.0, hb_mi=10.0, hb_d=0.0),
+         expect='stops converging above about 55 degrees'),
 
     # --- main-sheet scalars ------------------------------------------------
     dict(rule='main.seismic_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
@@ -3613,6 +4312,52 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_circle_depth(sd, 200.0),
          control=lambda sd: _pf_circle_depth(sd, 20.0),
          expect='no slices can be generated from it'),
+    # The sibling defect, and the one that looks least like a fault: an ordinary
+    # circle drawn across the section, with its CENTER in the wrong place -- under
+    # the ground, so both daylight points sit above it and the arc between them is
+    # longer than a semicircle. The control is the file's own circles, which slice.
+    dict(rule='surface.circle_daylights_above_center', base=PREFLIGHT_BASE_LEM,
+         mode='excel',
+         mutation=lambda sd: _pf_circle_buried(sd),
+         expect='above its own center'),
+    # The severity split, on one model read as two runs: a single-surface run has
+    # no other circle to fall back on, and a search refines off the seed and still
+    # answers. Same mutation, same control -- only the selection differs, which is
+    # what proves the severity is decided by the run and not by the file.
+    dict(rule='surface.circle_daylights_above_center', base=PREFLIGHT_BASE_LEM,
+         mode='excel', selection={'surface': 'circular', 'search': True},
+         mutation=lambda sd: _pf_circle_buried(sd),
+         expect='the answer comes from the grid around it'),
+    # The catch-all under those two. Neither of them can name this circle -- its
+    # nadir is above the floor and it has no crossing to sit above its center --
+    # so without this rule it reaches the user as a slicing failure naming no
+    # field. The control is the file's own circle 1, which slices.
+    dict(rule='surface.circle_cannot_be_sliced', base=PREFLIGHT_BASE_LEM,
+         mode='excel',
+         mutation=lambda sd: _pf_circle_stranded(sd),
+         expect='produces no failure surface'),
+    # The severity ladder, one model read as three runs. Same mutation every time:
+    # what changes is only who is asking, which is what proves the severity is
+    # decided by the run rather than by the file.
+    dict(rule='surface.circle_cannot_be_sliced', base=PREFLIGHT_BASE_LEM,
+         mode='excel', selection={'surface': 'circular', 'search': True},
+         mutation=lambda sd: _pf_circle_stranded(sd),
+         expect='the answer comes from the grid around it'),
+    dict(rule='surface.circle_cannot_be_sliced', base=PREFLIGHT_BASE_LEM,
+         mode='excel', analysis='seep', selection={},
+         mutation=lambda sd: _pf_circle_stranded(sd),
+         expect='does not read the circles sheet'),
+    # The miscalibration this rule is one step away from: a model whose pore
+    # pressure comes from a seepage solution built at RUN time carries no field on
+    # disk, so slicing it as it sits fails -- for a reason that is not the circle's.
+    # Mutation and control differ in the circle alone, both with the field missing,
+    # so the only thing that can make the mutation report and the control stay
+    # silent is that the rule neutralizes pore pressure before it asks.
+    dict(rule='surface.circle_cannot_be_sliced', base=PREFLIGHT_BASE_LEM,
+         mode='excel',
+         mutation=lambda sd: _pf_circle_stranded(_pf_seep_no_field(sd)),
+         control=lambda sd: _pf_seep_no_field(sd),
+         expect='produces no failure surface'),
 
     # --- polyline ordering -------------------------------------------------
     dict(rule='order.piezo_reversed', base=PREFLIGHT_BASE_LEM, mode='excel',
@@ -3688,6 +4433,12 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='seep_field.missing', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_mats(sd, u='seep'),
          expect='carries no mesh'),
+    # The twin of piezo.no_consumer: a solved field is attached and no material
+    # reads it. Built on the LEM base (no mesh, so the node-count rule stays
+    # silent) with a field simply present.
+    dict(rule='seep_field.no_consumer', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_set(_pf_mats(sd, u='none'), seep_u=[0.0, 0.0, 0.0]),
+         expect='no material takes its pore pressure from it'),
     # The transient counterpart: the same u = seep materials, but the RUN states
     # that it will stage one instant of a transient march into the model before the
     # solver starts. The selection is the mutation — that fact is API-only, which is
@@ -3760,6 +4511,14 @@ PREFLIGHT_RULE_SPECS = [
              specified_heads=[dict(b, coords=b['coords'][:1])
                               for b in sd['seepage_bc']['specified_heads']])),
          expect='fewer than two points'),
+    dict(rule='seep.steady_reads_series_at_t0', base=PREFLIGHT_BASE_SEEP,
+         mode='dict', analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc=dict(
+             sd['seepage_bc'],
+             specified_heads=[dict(sd['seepage_bc']['specified_heads'][0],
+                                   head='t1')]
+             + sd['seepage_bc']['specified_heads'][1:])),
+         expect='read at their t = 0 values'),
 
     # --- finite element elastic properties and the tensile cap -------------
     dict(rule='mat.nu_unusable', base=PREFLIGHT_BASE_FEM, mode='excel',
@@ -3770,7 +4529,7 @@ PREFLIGHT_RULE_SPECS = [
          analysis='ssrm',
          mutation=lambda sd: _pf_mats(sd, t_cut=None),
          control=lambda sd: _pf_mats(sd, t_cut=50.0),
-         expect='has no tensile strength'),
+         expect='has no tensile cutoff'),
     dict(rule='main.tension_srf_unset', base=PREFLIGHT_BASE_FEM, mode='excel',
          analysis='ssrm',
          mutation=lambda sd: _pf_mats(_pf_set(sd, tension_srf=None), t_cut=50.0),
@@ -3877,6 +4636,41 @@ PREFLIGHT_RULE_SPECS = [
          analysis='rapid',
          mutation=lambda sd: _pf_set(sd, piezo_line2=[]),
          expect='Piezometric Line 2'),
+    # The two ways a run says it is taking both drawdown stages from the march, each
+    # against the control that is the SAME file run the other way. The first is the
+    # scripted route, which has already staged the model and says so by the stage-2
+    # instant it wrote; the second is the interface route, which says so before the
+    # run as a seep_frame naming two instants. In both controls the file still
+    # carries boundary set 2 -- it is the route that changes, not the file, which is
+    # the whole point.
+    dict(rule='rapid.stage2_bc_ignored', base=PREFLIGHT_BASE_RAPID_TSEEP,
+         mode='dict', analysis='rapid',
+         mutation=lambda sd: _pf_set(sd, seep_u2_time=50.0),
+         expect='Set 2 is ignored'),
+    dict(rule='rapid.stage2_bc_ignored', base=PREFLIGHT_BASE_RAPID_TSEEP,
+         mode='dict', analysis='rapid',
+         selection={'surface': 'circular',
+                    'seep_frame': {'times': [0.0, 50.0]}},
+         control_selection={'surface': 'circular'},
+         mutation=lambda sd: sd,
+         expect='reads BOTH its stages from the transient seepage analysis'),
+    # The two ways the pool schedule can fail to be a drawdown, each against the
+    # SAME file staged the same way with its real falling schedule in place: a
+    # reservoir head typed as a fixed number (no series bound at all), and one bound
+    # to a series that is flat across the stage times. In both the march runs and
+    # both frames come back -- what is missing is the fall.
+    dict(rule='rapid.pool_static_between_stages', base=PREFLIGHT_BASE_RAPID_TSEEP,
+         mode='dict', analysis='rapid',
+         mutation=lambda sd: _pf_set(_pf_bc_head(sd, 0, 160.0), seep_u2_time=50.0),
+         control=lambda sd: _pf_set(sd, seep_u2_time=50.0),
+         expect='does not fall between them'),
+    dict(rule='rapid.pool_static_between_stages', base=PREFLIGHT_BASE_RAPID_TSEEP,
+         mode='dict', analysis='rapid',
+         selection={'surface': 'circular',
+                    'seep_frame': {'times': [0.0, 50.0]}},
+         mutation=lambda sd: _pf_tseep(sd, series={
+             k: [v[0]] * len(v) for k, v in sd['tseep']['series'].items()}),
+         expect='does not fall between them'),
     dict(rule='rapid.ru_has_no_stage2', base=PREFLIGHT_BASE_RAPID, mode='excel',
          analysis='rapid',
          mutation=lambda sd: _pf_mats(sd, u='ru', ru=0.3),
@@ -3957,6 +4751,12 @@ PREFLIGHT_RULE_SPECS = [
          expect='does not include'),
 
     # --- piles -------------------------------------------------------------
+    dict(rule='pile.capacity_nonpositive', base=PREFLIGHT_BASE_PILES, mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=0.0),
+         expect='has H = 0'),
+    dict(rule='pile.capacity_nonpositive', base=PREFLIGHT_BASE_PILES, mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', V_cap=-5.0),
+         expect='has Vcap = -5'),
     dict(rule='pile.spacing_invalid', base=PREFLIGHT_BASE_PILES, mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', S=0.0),
          expect='has a spacing of 0'),
@@ -3998,6 +4798,28 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
          load_error="unrecognized Dir"),
+    # A NUMBER in a word column. The rule used to read its cells with
+    # str(value or ""), which calls every falsy value blank, so Dir = 0.0 was
+    # taken for an empty cell and passed the one check whose job is to refuse
+    # anything that is not a direction -- while Dir = 'sideways' was caught. The
+    # engine then applied the line axially. Each of the three vocabulary columns
+    # carries the mutation, since they were all read the same way.
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir=0.0),
+         expect='is not a direction'),
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir=0.0),
+         load_error="unrecognized Dir"),
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', appl=0.0),
+         expect='is not an application'),
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', type=0.0),
+         expect='is not a support type'),
     dict(rule='reinforce.tmax_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_max=0.0),
@@ -4027,6 +4849,39 @@ PREFLIGHT_RULE_SPECS = [
          mode='dict',
          mutation=lambda sd: _pf_move(sd, 'reinforcement_lines', dx=1.0e5),
          expect='crosses any failure surface'),
+    # The overburden pullout law. Mode 'dict': the base file predates the columns,
+    # so a save would drop them — which is itself the right behavior, and not what
+    # these rows are testing.
+    dict(rule='reinforce.pullout_law_incomplete', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', adhesion=5.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                     adhesion=5.0, delta=30.0),
+         expect='half of it is not a law'),
+    dict(rule='reinforce.pullout_law_incomplete', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', delta=30.0),
+         expect='fills Delta but leaves Adhesion blank'),
+    dict(rule='reinforce.pullout_delta_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                      adhesion=0.0, delta=95.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                     adhesion=0.0, delta=30.0),
+         expect='strictly between 0 and 90'),
+    dict(rule='reinforce.pullout_delta_range', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                      adhesion=0.0, delta=0.0),
+         expect='strictly between 0 and 90'),
+    dict(rule='reinforce.pullout_lp_ignored', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                      adhesion=5.0, delta=30.0, lp1=4.0),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                     adhesion=5.0, delta=30.0,
+                                     lp1=0.0, lp2=0.0),
+         expect='Lp1/Lp2 are not read'),
 
     # --- magnitude plausibility (the sniff tests) --------------------------
     dict(rule='mat.E_off_soil_type_band', base=PREFLIGHT_BASE_FEM, mode='excel',
@@ -4037,10 +4892,31 @@ PREFLIGHT_RULE_SPECS = [
          analysis='ssrm',
          mutation=lambda sd: _pf_mats(sd, nu=0.05),
          expect='almost no lateral coupling'),
+    dict(rule='mat.nu_implausible', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_mats(sd, nu=0.49),
+         expect='close to the incompressible limit'),
+    dict(rule='mat.unknown_field', base=PREFLIGHT_BASE_FEM, mode='dict',
+         mutation=lambda sd: _pf_mats(sd, gsat=135.0),
+         expect="Did you mean 'gamma_sat'"),
+    dict(rule='mat.gamma_sat_without_water', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: (sd.update(piezo_line=[], piezo_line2=[], seep_u=None,
+                                         seep_u2=None),
+                              _pf_mats(sd, gamma_sat=135.0, u='none'))[-1],
+         expect='never applies'),
     dict(rule='structural.modulus_off_band', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=12.0),
          expect='outside that range'),
+    # The units slip itself: 30 MPa of intact rock typed as the bare 30 into a
+    # model whose stress unit is the kPa. The control is the same material with
+    # the same rock, entered in the model's units.
+    dict(rule='mat.hb_sci_units', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mat(sd, 0, option='hb', hb_sci=30.0,
+                                     hb_gsi=50.0, hb_mi=10.0, hb_d=0.0),
+         control=lambda sd: _pf_mat(sd, 0, option='hb', hb_sci=30000.0,
+                                    hb_gsi=50.0, hb_mi=10.0, hb_d=0.0),
+         expect='weaker in unconfined compression than any intact rock'),
 
     # --- material field ranges (what a swept or perturbed value trips) ------
     dict(rule='mat.strength_negative', base=PREFLIGHT_BASE_LEM, mode='excel',
@@ -4266,6 +5142,9 @@ PREFLIGHT_TAG_ANALYSIS = {
     # A mesh-size lock names no analysis of its own: the file's OTHER tags say
     # what the model is for, and this row only counts what the mesher produced.
     'mesh_elements': ('fem', {}),
+    # A pullout table names no surface family either: it reads the reinforcement
+    # capacity envelope, which every LEM run on the file shares.
+    'pullout_envelope': ('lem', {}),
 }
 
 
@@ -4303,14 +5182,22 @@ def run_preflight_corpus_test(test):
         # would have no corpus regression at all.
         if analysis == 'lem' and str(t.get('rapid', '')).strip().lower() == 'true':
             analysis = 'rapid'
-        cases.setdefault((f, analysis, tuple(sorted(sel.items()))), (analysis, sel))
+        # A tag that builds its own seepage field at run time (`seep=steady`,
+        # `seep=transient`, `march=file`) is checked as the run that follows it:
+        # the field the shipped file lacks is exactly what the route produces.
+        field_at_run = bool(t.get('seep') or t.get('march'))
+        key = (f, analysis, tuple(sorted(sel.items())))
+        if key in cases:
+            cases[key] = (analysis, sel, cases[key][2] or field_at_run)
+        else:
+            cases[key] = (analysis, sel, field_at_run)
 
     problems = []
     checked = 0
     loaded = {}
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
-        for (path, _a, _s), (analysis, sel) in sorted(cases.items()):
+        for (path, _a, _s), (analysis, sel, field_at_run) in sorted(cases.items()):
             if not os.path.exists(path):
                 continue
             if path not in loaded:
@@ -4326,6 +5213,9 @@ def run_preflight_corpus_test(test):
             checked += 1
             report = preflight(sd, analysis, sel)
             for f in report.errors:
+                if field_at_run and (f.rule_id.startswith('seep_field.')
+                                     or f.rule_id == 'rapid.stage2_water_missing'):
+                    continue
                 problems.append(f"{os.path.basename(path)} [{analysis}]: "
                                 f"{f.rule_id}: {f.message[:100]}")
             for f in report.infos:
@@ -5086,6 +5976,7 @@ def _auto_water_mesh(sd):
     return build_mesh_from_polygons(get_material_polygons(sd, reinf_lines=lines),
                                     target_size=(max(xs) - min(xs)) / 40,
                                     element_type='tri3', lines=lines,
+                                    element_size_1d=sd.get('element_size_1d'),
                                     point_constraints=extract_point_constraints(sd),
                                     size_regions=extract_size_regions(sd))
 
@@ -5251,7 +6142,13 @@ def run_auto_water_test(test):
             _remedy_excel(AUTO_WATER_CASES[0][0],
                           lambda sd: dict(sd, water_loads='sometimes'), template)
         except Exception as exc:
-            if 'D23' not in str(exc):
+            # The mode cell moved from D23 to D24 at v25, which inserted a row above
+            # it; the refusal names the cell in the destination template's own layout.
+            import openpyxl as _opx
+            _wbv = _opx.load_workbook(template, read_only=True)
+            _wl_cell = ('D24' if int(float(_wbv['main']['D5'].value)) >= 25 else 'D23')
+            _wbv.close()
+            if _wl_cell not in str(exc):
                 problems.append(f"an unknown water-load mode was refused without "
                                 f"naming the cell: {str(exc)[:80]}")
         else:
@@ -5445,6 +6342,174 @@ GENERATOR_CASES = [
     (_repo('docs/inputs/slope/xslope_dam.xlsx'), 2, True),
     (_repo('docs/verification/files/rocscience/vp005.xlsx'), 2, True),
 ]
+
+
+#: Directories under ``docs/`` whose workbooks are SHIPPED models -- the corpus a
+#: user opens, plus the samples the documentation links. ``archive`` subtrees are
+#: excluded wherever they appear: those are superseded template revisions kept for
+#: reference, not files anybody runs.
+CORPUS_CIRCLE_ROOTS = ('docs/inputs', 'docs/lem', 'docs/fem', 'docs/seep',
+                       'docs/verification', 'docs/tutorials', 'docs/parametric',
+                       'docs/usage')
+
+
+#: The slicer's absolute minimum slice width (xslope/slice.py, "Remove thin
+#: slices"). Mirrored rather than imported because it is a local in that function;
+#: if the two drift apart the waiver below simply stops matching, which is the
+#: safe direction -- a file stops being waived and has to be looked at.
+SLICE_MIN_WIDTH = 1e-2
+
+
+def _corpus_section_below_slice_floor(sd):
+    """True when the section is too small for the slicer to build ANY slice.
+
+    The trim threshold is an absolute length, so on a section whose whole width is
+    a couple of slice widths across there is no circle at all that survives it --
+    the defect is one of scale, not of the circle, and no edit to the Circles sheet
+    can answer it. Measured from the model so this waiver lapses on its own if the
+    trim is ever made relative to the span.
+    """
+    try:
+        xs = [p[0] for p in sd['ground_surface'].coords]
+    except (KeyError, TypeError, AttributeError):
+        return False
+    if not xs:
+        return False
+    return (max(xs) - min(xs)) < 2 * SLICE_MIN_WIDTH
+
+
+def _corpus_circle_files():
+    """Every shipped workbook, newest-first by directory, as absolute paths."""
+    out = []
+    for root in CORPUS_CIRCLE_ROOTS:
+        base = _repo(root)
+        if not os.path.isdir(base):
+            continue
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = [d for d in dirnames if d != 'archive']
+            for fn in filenames:
+                if fn.endswith('.xlsx') and not fn.startswith('~$'):
+                    out.append(os.path.join(dirpath, fn))
+    return sorted(set(out))
+
+
+def run_corpus_circles_test(test):
+    """Every shipped workbook's FIRST circle must produce slices.
+
+    The regression guard for a defect that shipped 46 times: a starting circle
+    written as a placeholder -- one generic circle stamped onto decks of every size
+    -- which the slicer refuses because the arc never reaches the ground, or leaves
+    through a vertical edge of a section too narrow to hold it. Nothing caught it,
+    because most of those decks are locked by seepage or finite-element rows that
+    never read the circles sheet: the circle was dead and the file was green.
+
+    ``circles[0]`` specifically, because that is the circle a single-surface run
+    analyses and the one a reader of the file meets first. A search reads the whole
+    sheet and refines off whichever seeds survive, so the rest of a starting set is
+    not load-bearing in the same way.
+
+    Cheap on purpose -- a load and one slice generation per file, no solve -- so it
+    can ride with the preflight scope rather than waiting for a full suite.
+    """
+    import warnings as _warnings
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+
+    def _blank_strength(sd):
+        """True when no material carries any strength at all.
+
+        A tutorial's ``_start`` workbook ships with the materials table empty for
+        the reader to fill in, and ``generate_slices`` refuses it on that ground
+        before it ever looks at the circle. Its circle is not judged here because
+        it cannot be: this is the slicer's own precondition (slice.py), tested
+        structurally rather than by matching its message.
+        """
+        def _val(v):
+            try:
+                return abs(float(v))
+            except (TypeError, ValueError):
+                return 0.0
+        mats = [m for m in (sd.get('materials') or []) if isinstance(m, dict)]
+        if not mats:
+            return True
+        return all(not any(_val(m.get(k)) for k in ('c', 'phi', 'gamma'))
+                   for m in mats)
+
+    problems, checked, skipped = [], 0, 0
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        for path in _corpus_circle_files():
+            name = os.path.relpath(path, _repo('.'))
+            try:
+                sd = load_slope_data(path)
+            except Exception:
+                # Not a slope model at all (a seepage-only deck, a sheet sample, a
+                # bare template). It has no circle to check.
+                skipped += 1
+                continue
+            circles = sd.get('circles') or []
+            if not circles or not isinstance(circles[0], dict):
+                skipped += 1
+                continue
+            if _blank_strength(sd):
+                skipped += 1
+                continue
+            # Pore pressure neutralized, and both consumption paths tried, exactly
+            # as preflight's own probe does it -- see _Ctx.circle_slice_failure for
+            # why a deck whose seepage field is built at run time must not be
+            # blamed for a circle that is sound.
+            probe = dict(sd)
+            probe['materials'] = [dict(m, u='none') if isinstance(m, dict) else m
+                                  for m in (sd.get('materials') or [])]
+            reason = None
+            ok = False
+            for composite in (False, True):
+                try:
+                    ok, res = generate_slices(probe, circle=dict(circles[0]),
+                                              composite=composite, debug=False,
+                                              check_inputs=False)
+                except Exception as exc:
+                    ok, res = False, f"{type(exc).__name__}: {exc}"
+                if ok:
+                    # Success is not enough: generate_slices trims slices narrower
+                    # than an ABSOLUTE 1e-2 and can return an EMPTY table while
+                    # reporting success, which is a dead circle wearing a pass.
+                    try:
+                        if len(res[0]):
+                            break
+                    except (TypeError, IndexError, KeyError):
+                        pass
+                    ok = False
+                    if reason is None:
+                        reason = 'accepted but produced no slices (all trimmed as too thin)'
+                    continue
+                if reason is None:
+                    reason = str(res).strip()
+            # A section narrower than two minimum slice widths has no room for a
+            # single slice, whatever circle is drawn on it: the trim threshold is an
+            # absolute length (slice.py, `min_width = 1e-2`), not a fraction of the
+            # span. The two GeoStudio 1-D columns that hit this are centimetre-scale
+            # laboratory sections; their circles are geometrically sound (they
+            # daylight twice inside the domain) and their locks are transient-seepage
+            # rows that never read a circle. Waived here, measured rather than named,
+            # so the day the trim is made relative this stops applying by itself.
+            if not ok and _corpus_section_below_slice_floor(sd):
+                skipped += 1
+                continue
+            checked += 1
+            if not ok:
+                c = circles[0]
+                problems.append(
+                    f"{name}: circle 1 (Xo={c.get('Xo')}, Yo={c.get('Yo')}, "
+                    f"R={c.get('R')}) produces no slices -- {reason[:110]}")
+
+    if problems:
+        return None, (f"{len(problems)} of {checked} shipped workbook(s) carry a "
+                      f"first circle that cannot be sliced (fix the BUILDER, never "
+                      f"the .xlsx): " + "; ".join(problems[:5]))
+    if checked == 0:
+        return None, 'no shipped workbooks with circles were found'
+    return 0.0, None
 
 
 def run_generator_circles_test(test):
@@ -5733,7 +6798,7 @@ def run_dload_direction_test(test):
 
 
 def run_verification_pages_test(test):
-    """Standing checks on the six verification pages under docs/verification.
+    """Standing checks on the verification pages under docs/verification.
 
     Three checks run per page (tools/verification_checks): every printed
     percentage and absolute FS difference is re-derived from two numbers the
@@ -5861,6 +6926,7 @@ def run_mesh_elements_test(test):
         polygons, target_size=target_size,
         element_type=test.get('element_type', 'tri6'),
         lines=constraint_lines,
+        element_size_1d=slope_data.get('element_size_1d'),
         point_constraints=extract_point_constraints(slope_data),
         size_regions=extract_size_regions(slope_data),
         **_refine_kwargs(test)
@@ -5949,6 +7015,43 @@ def run_docs_heading_trap_test(test):
     return 0.0, None
 
 
+def run_reinforcement_edits_test(test):
+    """What an EDIT to the reinforcement does to the model (test/reinforcement_edits_check.py).
+
+    Three ways an edit was absorbed instead of applied. A ``Dir`` or ``Appl``
+    outside the vocabulary: the slicer tested them with ``== "tangent"`` and
+    ``== "active"`` and took the other branch for everything else, so ``Dir =
+    0.0`` was applied AXIALLY and a nonsense ``Appl`` as passive capacity, and
+    the answer came back as if that were the model asked for. Clearing the
+    lines: ``reinforce_lines`` is derived from ``reinforcement_lines``, and the
+    slicer fell back to the derived list whenever the source was empty, so
+    deleting every row left the analysis reinforced by the point lists built
+    before the deletion. Saving the file: the sheet fills Dir and Appl with a
+    VLOOKUP on Type and holds each column as one shared-formula group, so
+    writing a literal into the master at H3/I3 deleted the only copy of the
+    formula and Dir rows 9-22 read back as a bare '='.
+
+    Each leg pins the behavior the fix must not have disturbed as well: a blank
+    still takes the documented default, a model carrying no source key still
+    runs the legacy point-list path, and a row whose Dir/Appl are exactly what
+    its Type derives is saved as the Type alone with the formula left in place.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'reinforcement_edits_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('reinforcement_edits_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures[:6])
+    return 0.0, None
+
+
 def run_k0_level_ground_test(test):
     """The K0 initial stress must be an exact equilibrium on level ground.
 
@@ -6006,6 +7109,38 @@ def run_beam_element_test(test):
     if not path.exists():
         return None, f"missing {path}"
     spec = importlib.util.spec_from_file_location('beam_element_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_one_d_compatibility_test(test):
+    """Embedded 1D elements against the soil edge they lie on.
+
+    A bar or beam element couples to the soil only where they share a node, so on
+    a quadratic mesh it must stand on the midside node of its soil edge as well as
+    on the two corners. Checked at the mesh (every 1D element records three nodes,
+    the third being the edge's own midside node, both from the mesher and from a
+    stored mesh read back), at the element (a bar under a uniform axial strain
+    carries exactly EA*eps, the midside node takes no share of a constant axial
+    force, and the midside degrees of freedom are really in the member stiffness),
+    and against the linear mesh, whose stiffness and member forces must be
+    bit-for-bit what the two-node escape hatch gives.
+
+    The check itself lives in test/one_d_compatibility_check.py (file-less: it
+    meshes a small block with a constraint line across it, at tri6 and tri3).
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'one_d_compatibility_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('one_d_compatibility_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -6076,6 +7211,72 @@ def run_spencer_disclosure_test(test):
     if not path.exists():
         return None, f"missing {path}"
     spec = importlib.util.spec_from_file_location('spencer_disclosure_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_circle_vertex_test(test):
+    """A circle that daylights exactly on a ground-surface vertex.
+
+    Crossings are solved segment by segment, so a circle passing precisely through
+    a vertex reported it once per adjoining segment. get_sorted_intersections saw
+    three points where there are two crossings, read that as "the circle re-enters
+    beyond the toe", and kept the two copies of the vertex — the clipped surface
+    came back as a zero-length segment standing at one x, drawn as nothing and
+    scored as a surface rather than refused.
+
+    The check itself lives in test/circle_vertex_intersection_check.py (file-less
+    apart from the shipped models it loads): the earth dam's exact-vertex circle
+    (44^2 + 33^2 = 55^2 on the crest edge), the arc it must span, FS continuity
+    through it against nudged neighbors, a tangent circle refused by the usual
+    reason, the six shipped reinforcement circles held to their exact endpoints,
+    and a mutation that restores the bug with the dedupe disabled.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'circle_vertex_intersection_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('circle_vertex_intersection_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_circle_above_center_test(test):
+    """A circle that meets the ground above its own center.
+
+    The bottom-semicircle surface cannot represent an arc longer than half the
+    circle, so a crossing above the center is discarded — correctly, and at the
+    cost of six locked searches if it were not. What was missing was the wording:
+    the slicer reported a count ("got 1") that reads as a circle missing the
+    ground, the search silently scored its seed's grid instead, and nine shipped
+    sample circles were dead this way with nothing saying so.
+
+    The check itself lives in test/circle_above_center_check.py: the named cause
+    (with the tutorial-quoted opening sentence intact), a genuinely one-crossing
+    circle that must NOT get the diagnosis, the preflight rule's error/warning
+    split and its silence under a stated tension crack, the search's disclosure
+    line, every repaired file's circle building, and a mutation that stubs the
+    helper empty and takes the cause away from both readers.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'circle_above_center_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('circle_above_center_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -6220,6 +7421,64 @@ def run_report_test(test):
     except Exception:
         pass                       # no PySide6: the module skips its Studio checks
     spec = importlib.util.spec_from_file_location('report_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_report_template_field_test(test):
+    """The report dialog's Template field and what refuses a bad template
+    (test/report_template_field_check.py).
+
+    A company template restyles the whole report, so it is a choice made in the
+    dialog and remembered between sessions. What can go wrong is silent: a
+    template that does not declare the Title/Heading/Body Text/Caption styles
+    produces a document where everything is body text, and a remembered template
+    that has been moved would otherwise be reported around without a word. Both
+    are pinned here, with the refusal mutation-tested one required style at a
+    time. Builds dialogs offscreen and solves nothing.
+
+    Returns (0.0, None) on success, else (None, message)."""
+    import importlib.util
+    path = Path(__file__).parent / 'test' / 'report_template_field_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        return 0.0, None           # no PySide6: nothing here to check
+    spec = importlib.util.spec_from_file_location('report_template_field_check',
+                                                  path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_report_no_resolve_test(test):
+    """A report never re-solves an engine that is already solved
+    (test/report_no_resolve_check.py).
+
+    Generates a full report on a model whose seepage and finite element
+    solutions are attached from its sidecars, with every seepage and FEM solve
+    entry point replaced by a stub that raises. The sections must be there, the
+    one limit equilibrium method the report was asked for must be run exactly
+    once, and nothing else may be solved. ~10 s: one single-surface LEM solve and
+    the report's figures.
+
+    Returns (0.0, None) on success, else (None, message)."""
+    import importlib.util
+    path = Path(__file__).parent / 'test' / 'report_no_resolve_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('report_no_resolve_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -6571,8 +7830,16 @@ def run_fs_vs_time_mode_test(test):
     every failed row, the sentinel/negative screen, the refusal of a field
     interpolated between frames, one re-march for the whole set rather than one per
     instant, the base-model gate before the first solve, and the critical
-    time/minimum the curve reports. File-light (it loads the shipped ACADS sample
-    and builds synthetic frame ledgers) and solves no seepage.
+    time/minimum the curve reports. Those legs are file-light (they load the shipped
+    ACADS sample and build synthetic frame ledgers) and solve no seepage.
+
+    Two Studio legs follow, and skip cleanly without PySide6: the Parametric
+    dialog's fourth mode (the entry, its fields in place of the parameter picker,
+    and the plain reason on each model that cannot make a curve), and the whole path
+    end to end -- the COMBO-3 tutorial dam meshed, marched and swept through the
+    dialog's own options and the Studio runner, against that page's published curve.
+    The end-to-end leg solves real seepage and searches at every instant, so this row
+    costs a couple of minutes.
 
     Returns (0.0, None) on success, else (None, message) — a pass/fail test.
     """
@@ -6628,6 +7895,66 @@ def run_sweep_window_test(test):
     return 0.0, None
 
 
+def run_rapid_stage1_frames_test(test):
+    """The Parametric dialog under Rapid drawdown at each time: the frames at or
+    before stage 1 cannot be a stage 2, so they are unticked and dimmed instead of
+    returning as failed rows. See test/rapid_stage1_frames_check.py. Skips cleanly
+    without PySide6. Returns (0.0, None) on success, else (None, message)."""
+    import importlib.util
+    import os
+
+    try:
+        import PySide6  # noqa: F401
+    except ImportError:
+        return 0.0, None
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    path = Path(__file__).parent / 'test' / 'rapid_stage1_frames_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('rapid_stage1_frames_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    try:
+        mod.main()
+    except AssertionError as e:
+        return None, str(e) or "assertion failed"
+    return 0.0, None
+
+
+def run_sweep_table_test(test):
+    """The Table sub-tab every Parametric result view carries (``studio.sweep_table``).
+
+    A Parametric plot is a picture of a table the run already computed, and the
+    table is the half that gets quoted. Three ways that can go wrong are pinned:
+    a grid with fewer rows than the run produced (the failure with no symptom —
+    nothing on screen says a row went missing), a Save CSV… file that is not the
+    grid it was written from, and a table that disagrees with the figure beside it.
+
+    The check itself lives in test/sweep_table_check.py: the two sub-tabs on every
+    mode's view with the plot first, the row count against each result's own table
+    (march instants, sweep points, tornado bars, reliability parameters), the CSV
+    read back cell for cell, the offered ``<model>_<mode>.csv`` name, and the
+    march's face / stage / reason columns against COMBO-3's published tables. It
+    drives the views offscreen off those published tables and small synthetic
+    sweeps, so it solves nothing and runs in seconds. Skips cleanly without
+    PySide6.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'sweep_table_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('sweep_table_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_water_hoist_test(test):
     """Where the automatic water load is derived, and how often (``xslope.search``).
 
@@ -6655,6 +7982,39 @@ def run_water_hoist_test(test):
     if not path.exists():
         return None, f"missing {path}"
     spec = importlib.util.spec_from_file_location('water_hoist_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_piezo_visibility_test(test):
+    """Which piezometric lines the input and solution plots draw (``xslope.plot``).
+
+    A piezometric line is an input sheet a model may carry without the analysis
+    consuming it, and a line on the section that nothing reads is a statement
+    about the model the run does not honor. Each line is therefore drawn only
+    where it is read: as some material's pore-pressure source (u = piezo), or as
+    the sheet that states the pool loading the slope -- which is the seepage head
+    boundaries wherever a seepage analysis is defined, and the piezometric line
+    otherwise (``xslope.water.water_line_for_stage``).
+
+    The check itself lives in test/piezo_visibility_check.py: the predicate and
+    the rendered legend both, over a piezo-option model, a rapid-drawdown pair, a
+    seepage model with no line at all, and a reservoir model with and without its
+    boundary set -- plus the editor preview's opt-out, which draws the sheet as
+    typed. File-light: four shipped workbooks and one 20-slice solve.
+
+    Returns (0.0, None) on success, else (None, message) -- a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'piezo_visibility_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('piezo_visibility_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -7092,6 +8452,51 @@ def run_assistant_guardrails_test(test):
     except Exception:
         pass                       # no PySide6: the module skips its checks
     spec = importlib.util.spec_from_file_location('assistant_guardrails_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures[:6])
+    return 0.0, None
+
+
+def run_assistant_suite_test(test):
+    """The scored scenario suite that measures the assistant (`tools/assistant_suite.py`).
+
+    The suite is what says whether a change to the assistant's brief helped or
+    hurt: thirty conversations played through the real Studio window, each scored
+    against criteria that re-solve the model here rather than believing what the
+    assistant said about it. A live run costs money, so what runs in the suite is
+    everything provable without one — and the leg that matters most is that a
+    ``--dry-run`` really is free: it plays two scenarios end to end through the
+    window, the dock, the transcript and the whole scoring path while asserting
+    that ``litellm.completion`` is never entered.
+
+    The rest is the suite auditing itself: the registry (every scenario names a
+    model that exists and criteria it can fail), the planted faults (applied to a
+    COPY, with the repository's own workbook byte-identical afterwards), the
+    scorers (each run against a session built to pass it and one built to fail
+    it — a criterion that cannot fail measures nothing), the transcript parser
+    that keeps a claim apart from the measurement behind it, replay determinism,
+    that nothing is written into docs/, and the one dated price table.
+
+    The check itself lives in test/assistant_suite_check.py: offscreen, no
+    provider contacted and no network at all.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'assistant_suite_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its checks
+    spec = importlib.util.spec_from_file_location('assistant_suite_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -11241,10 +12646,16 @@ def _dispatch_test(test):
         return run_preflight_remedies_test(test)
     if test_type == 'generator_circles':
         return run_generator_circles_test(test)
+    if test_type == 'corpus_circles':
+        return run_corpus_circles_test(test)
     if test_type == 'auto_water':
         return run_auto_water_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
+    if test_type == 'pullout_law':
+        return run_pullout_law_test(test)
+    if test_type == 'pullout_switch':
+        return run_pullout_switch_test(test)
     if test_type == 'diagram_sync':
         return run_diagram_sync_test(test)
     if test_type == 'deps_declared':
@@ -11257,14 +12668,22 @@ def _dispatch_test(test):
         return run_dload_direction_test(test)
     if test_type == 'dload_sign':
         return run_dload_sign_test(test)
+    if test_type == 'reinforcement_edits':
+        return run_reinforcement_edits_test(test)
     if test_type == 'k0_level_ground':
         return run_k0_level_ground_test(test)
     if test_type == 'beam_element':
         return run_beam_element_test(test)
+    if test_type == 'one_d_compatibility':
+        return run_one_d_compatibility_test(test)
     if test_type == 'flow_recovery':
         return run_flow_recovery_test(test)
     if test_type == 'spencer_disclosure':
         return run_spencer_disclosure_test(test)
+    if test_type == 'circle_vertex':
+        return run_circle_vertex_test(test)
+    if test_type == 'circle_above_center':
+        return run_circle_above_center_test(test)
     if test_type == 'stability_time':
         return run_stability_time_test(test)
     if test_type == 'steady_seep_save':
@@ -11285,6 +12704,8 @@ def _dispatch_test(test):
         return run_assistant_models_test(test)
     if test_type == 'assistant_guardrails':
         return run_assistant_guardrails_test(test)
+    if test_type == 'assistant_suite':
+        return run_assistant_suite_test(test)
     if test_type == 'quad_mesh':
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
@@ -11297,6 +12718,10 @@ def _dispatch_test(test):
         return run_report_test(test)
     if test_type == 'report_finalize':
         return run_report_finalize_test(test)
+    if test_type == 'report_template_field':
+        return run_report_template_field_test(test)
+    if test_type == 'report_no_resolve':
+        return run_report_no_resolve_test(test)
     if test_type == 'mode_segments':
         return run_mode_segments_test(test)
     if test_type == 'thread_safety':
@@ -11313,10 +12738,18 @@ def _dispatch_test(test):
         return run_fs_vs_time_mode_test(test)
     if test_type == 'sweep_window':
         return run_sweep_window_test(test)
+    if test_type == 'sweep_table':
+        return run_sweep_table_test(test)
+    if test_type == 'rapid_stage1_frames':
+        return run_rapid_stage1_frames_test(test)
+    if test_type == 'piezo_visibility':
+        return run_piezo_visibility_test(test)
     if test_type == 'water_hoist':
         return run_water_hoist_test(test)
     if test_type == 'mesh_elements':
         return run_mesh_elements_test(test)
+    if test_type == 'pullout_envelope':
+        return run_pullout_envelope_test(test)
     if test_type == 'cwd_invariant':
         return run_cwd_invariant_test(test)
     if test_type == 'docs_heading_trap':
@@ -11392,27 +12825,32 @@ def _expected_and_tol(test, default_tolerance):
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
-                       'preflight_remedies', 'generator_circles', 'auto_water',
+                       'preflight_remedies', 'generator_circles', 'corpus_circles',
+                       'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'beam_element', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
                        'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
-                       'fs_vs_time_mode', 'sweep_window', 'water_hoist',
+                       'fs_vs_time_mode', 'sweep_window', 'sweep_table',
+                       'rapid_stage1_frames', 'pullout_envelope',
+                       'water_hoist', 'piezo_visibility',
                        'project_package', 'docs_links',
                        'noncircular_generator', 'circles_editor', 'table_paste',
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
+                       'report_template_field', 'report_no_resolve',
                        'assistant_models', 'assistant_guardrails',
+                       'assistant_suite',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'seep_cycle',
                        'tseep_exit_cycle',
                        'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'piezo_u_guard',
-                       'spencer_disclosure',
+                       'spencer_disclosure', 'circle_vertex', 'circle_above_center',
                        'gsat_pair', 'seep_head',
                        'tseep_head', 'design_callable', 'kernel_xcheck'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
@@ -11426,11 +12864,13 @@ def _expected_and_tol(test, default_tolerance):
 # Rough per-type cost ranks so the parallel scheduler starts the slow tests
 # first (wall time is otherwise dominated by an FEM case landing last).
 _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'reliability_rs': 6, 'fem_ssrm': 5, 'fem_elements': 5,
-              'preflight_corpus': 5, 'preflight_rules': 4,
+              'preflight_corpus': 5, 'preflight_rules': 4, 'corpus_circles': 5,
               'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'fs_vs_time': 5,
+              'fs_vs_time_mode': 4,
               'transient_seep': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2,
-              'spencer_disclosure': 3}
+              'spencer_disclosure': 3, 'circle_vertex': 2,
+              'circle_above_center': 2}
 
 
 def _parallel_worker(item):
@@ -11679,6 +13119,32 @@ def main():
             elif run_lem:
                 tests.append(t)
 
+    # The tutorial pages (docs/tutorials/*.md). A tutorial states the numbers a
+    # reader will see on their own screen after following its steps, at the
+    # settings its own dialogs were left on, and those numbers were checked by
+    # nothing until they were tagged: the verification and sample locks stand on
+    # other files, or on the same file at other settings. Scanned in sorted order
+    # (discovery must not depend on directory order) and routed by type exactly as
+    # the verification pages are, so one page can lock a seepage discharge, an LEM
+    # search and a strength reduction and each rides its own group.
+    for tutorial_md in sorted(Path(_repo('docs/tutorials')).glob('*.md')):
+        for t in parse_test_tags(tutorial_md):
+            ttype = t.get('type', '')
+            if ttype in ('fem_ssrm', 'fem_elements', 'fem_reliability'):
+                if run_fem:
+                    tests.append(t)
+            elif ttype == 'mesh_elements':
+                if run_mesh:
+                    tests.append(t)
+            elif ttype in ('tseep_head', 'fs_vs_time'):
+                if run_tseep:
+                    tests.append(t)
+            elif ttype in ('seep', 'seep_elements', 'seep_head'):
+                if run_seep:
+                    tests.append(t)
+            elif run_lem:
+                tests.append(t)
+
     # Private test problems (CE 544 homework/exam keys, plus synthetic variants)
     # live in a separate repo kept out of the public xslope tree. Look for it as a
     # sibling directory or at $XSLOPE_PRIVATE_TESTS; scan its markdown files for
@@ -11784,6 +13250,14 @@ def main():
         tests.append({'type': 'spencer_disclosure',
                       'file': 'Spencer insoluble surfaces + search disclosure',
                       'method': 'spencer', 'source': 'spencer_disclosure'})
+        # A circle daylighting exactly on a ground-surface vertex reported that
+        # vertex once per adjoining segment, and the extra point sent the
+        # count-and-prune to two copies of it — a zero-length "surface" that was
+        # scored instead of refused. The arc, its FS continuity, a tangent circle's
+        # refusal, and the shipped vertex circles' endpoints are pinned together.
+        tests.append({'type': 'circle_vertex',
+                      'file': 'circle through a ground-surface vertex',
+                      'method': '-', 'source': 'circle_vertex'})
 
     # Preflight (xslope.preflight) — the rule registry's own regression family.
     # The contract and mutation checks are file-less; the corpus check is one row
@@ -11792,6 +13266,14 @@ def main():
         tests.append({'type': 'preflight_contract', 'file': '(rule registry)',
                       'method': '-', 'source': 'preflight'})
         tests.append({'type': 'preflight_rules', 'file': '(one mutation per rule)',
+                      'method': '-', 'source': 'preflight'})
+        # A circle whose center sits under the ground: both daylight points above
+        # it, an arc longer than a semicircle, and no failure surface at all. The
+        # rule that reports it, the slicer refusal that names the cause, and the
+        # search line that says it launched from the grid instead are one story, so
+        # they are pinned together rather than one rule at a time.
+        tests.append({'type': 'circle_above_center',
+                      'file': 'circle daylighting above its own center',
                       'method': '-', 'source': 'preflight'})
         # The two-stage sweep contract: a full base-model preflight once, a
         # per-step re-check of only the rules the substituted value touches, a
@@ -11803,6 +13285,13 @@ def main():
         tests.append({'type': 'preflight_remedies', 'file': '(the remedy contract)',
                       'method': '-', 'source': 'preflight'})
         tests.append({'type': 'generator_circles', 'file': '(starting circles)',
+                      'method': '-', 'source': 'preflight'})
+        # The corpus counterpart of the rule: the generator must produce usable
+        # circles, and every workbook already SHIPPED must carry one. Rides with
+        # preflight because it is the same question the rule asks, asked of the
+        # files instead of of a mutation.
+        tests.append({'type': 'corpus_circles',
+                      'file': '(shipped workbooks: circle 1 slices)',
                       'method': '-', 'source': 'preflight'})
         # Automatic water loads ride with preflight too: the mode is a preflight
         # concern (which rules apply), and the remedy that flips it is one of these.
@@ -11820,7 +13309,8 @@ def main():
             _repo('docs/parametric/sensitivity.md'), _repo('docs/parametric/reliability.md'),
             _repo('docs/fem/samples.md'), _repo('docs/seep/samples.md'),
             _repo('docs/seep/seep_slope.md'),
-        ] + sorted(glob.glob(_repo('docs/verification/*.md'))))
+        ] + sorted(glob.glob(_repo('docs/verification/*.md')))
+          + sorted(glob.glob(_repo('docs/tutorials/*.md'))))
         # The private fixtures are corpus too: they carry the same tags and the same
         # standing locks, so a rule that refuses one of them is equally miscalibrated.
         _pf_priv = _private_dir()
@@ -11847,6 +13337,21 @@ def main():
         # from their editable docs masters.
         tests.append({'type': 'template_sync', 'file': BUNDLED_TEMPLATE,
                       'method': '-', 'source': 'template'})
+        # The overburden-dependent pullout law against hand arithmetic, with the
+        # constant-rate law checked bit-for-bit beside it.
+        tests.append({'type': 'pullout_law', 'file': 'reinforcement pullout law',
+                      'method': '-', 'source': 'reinforce'})
+        # The editor's Pullout switch, driven offscreen: which law a line reads as,
+        # and that neither pair's values are lost switching between them.
+        tests.append({'type': 'pullout_switch', 'file': 'reinforcement pullout switch',
+                      'method': '-', 'source': 'reinforce'})
+        # What an edit to the reinforcement does to the model: a Dir/Appl outside
+        # the vocabulary must stop the run rather than be applied as a different
+        # (valid) model, an emptied line list must mean no reinforcement rather
+        # than fall back to the derived point lists, and a saved file must keep
+        # the Dir/Appl formulas the sheet derives from Type.
+        tests.append({'type': 'reinforcement_edits', 'file': 'reinforcement edits',
+                      'method': '-', 'source': 'reinforce'})
         # Same guard for the slice force diagrams the Analysis Report prints:
         # the documentation's drawings are the masters, and the report embeds
         # the copies in the wheel.
@@ -11885,6 +13390,14 @@ def main():
         # assembles only the beam matrices build_fem_data returns).
         tests.append({'type': 'beam_element', 'file': 'pile beam element vs beam theory',
                       'method': '-', 'source': 'beam_element'})
+        # Guard the coupling between an embedded 1D element and the soil edge it
+        # lies on: on a quadratic mesh the element stands on the edge's midside
+        # node as well as its corners, a bar under uniform axial strain carries
+        # EA*eps with nothing at the midside node, and a linear mesh is
+        # bit-for-bit unchanged. File-less (it meshes a small block).
+        tests.append({'type': 'one_d_compatibility',
+                      'file': '1D elements vs the soil edge they lie on',
+                      'method': '-', 'source': 'one_d_compatibility'})
         # Guard the seepage post-processing — the gradient and Darcy velocity
         # differentiated out of the solved head — against the linear field whose
         # answer is exact on any mesh. It rides the DEFAULT set rather than --seep
@@ -11922,6 +13435,13 @@ def main():
         tests.append({'type': 'water_hoist',
                       'file': 'water load derived once per search',
                       'method': '-', 'source': 'water_hoist'})
+        # Guard which piezometric lines reach a figure: a line is drawn only where
+        # the analysis reads it -- as a material's pore-pressure source, or as the
+        # sheet that states the pool loading the slope. A line nothing reads is a
+        # statement about the model the run does not honor.
+        tests.append({'type': 'piezo_visibility',
+                      'file': 'piezometric lines drawn only where read',
+                      'method': '-', 'source': 'piezo_visibility'})
         # Guard the Build-mesh dialog's quadrilateral style radio group: the choice
         # is per-run and stored in no file, so a broken wire between the group and
         # build_mesh_from_polygons leaves no trace in any input file. Builds no mesh.
@@ -11994,6 +13514,21 @@ def main():
         tests.append({'type': 'report_finalize',
                       'file': 'Analysis Report page numbers built',
                       'method': '-', 'source': 'report_finalize'})
+        # Guard the report dialog's Template field — the company template a
+        # report is built on: what the field opens on, what Browse and the
+        # Shipped template button do, what is remembered, and the refusal that
+        # names the style a template is missing rather than writing a document
+        # with no headings in it.
+        tests.append({'type': 'report_template_field',
+                      'file': 'Analysis Report template field',
+                      'method': '-', 'source': 'report_template'})
+        # Guard that a report documents the engines that were run and re-runs
+        # none of them: a full report over a model whose seepage and FEM
+        # solutions are already attached, with every one of those solvers
+        # replaced by a stub that raises.
+        tests.append({'type': 'report_no_resolve',
+                      'file': 'Analysis Report re-solves nothing',
+                      'method': '-', 'source': 'report_no_resolve'})
         # Guard the non-circular starting-surface generator: the mobilizable-strength
         # metric it ranks zones on, the separation threshold that decides whether it
         # picks or raises the zone picker, the geometry invariants that make the
@@ -12016,6 +13551,21 @@ def main():
         # tell the reader to paste rather than retype; this is what keeps that true.
         tests.append({'type': 'table_paste', 'file': 'Studio table copy/paste',
                       'method': '-', 'source': 'table_paste'})
+        # Guard the Table sub-tab every Parametric result view carries: one row per
+        # thing the run produced, the face and stage columns that keep a march's
+        # grid saying what its figure says, and a Save CSV… file that is the grid
+        # cell for cell. Drives the views offscreen off published tables and small
+        # synthetic sweeps — it solves nothing.
+        tests.append({'type': 'sweep_table',
+                      'file': 'Parametric result tables (Studio)',
+                      'method': '-', 'source': 'sweep_table'})
+        # Guard the Parametric dialog's frame list under Rapid drawdown: the frames
+        # at or before stage 1 are unticked and dimmed (they are the state the
+        # others fall from), All/None leave them alone, and unticking Rapid
+        # drawdown gives them back. Offscreen, no solve.
+        tests.append({'type': 'rapid_stage1_frames',
+                      'file': 'Parametric frames under Rapid drawdown (Studio)',
+                      'method': '-', 'source': 'rapid_stage1_frames'})
         # Guard Studio's in-app updater: the version comparison, the platform
         # artifact key, the minimum_version gate, the checksum refusal, and the
         # command each platform branch would spawn. Touches no network — the
@@ -12039,6 +13589,15 @@ def main():
         tests.append({'type': 'assistant_guardrails',
                       'file': 'assistant guardrails (rules + input checks)',
                       'method': '-', 'source': 'assistant_guardrails'})
+        # Guard the scored scenario suite that measures the assistant: the
+        # registry, the planted faults (on copies — never the repository's own
+        # models), the scorers themselves (each one run against a session built
+        # to pass it and one built to fail it), replay determinism, and that a
+        # --dry-run reaches no provider. Same reason this rides here as the two
+        # above: offscreen Qt, no network, nothing billed.
+        tests.append({'type': 'assistant_suite',
+                      'file': 'assistant scenario suite (scored)',
+                      'method': '-', 'source': 'assistant_suite'})
         # Guard against the Markdown heading trap: this theme's parser accepts
         # '#word' with no space as a heading, so a wrapped docs line starting
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.
@@ -12060,6 +13619,12 @@ def main():
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
                       'method': '-', 'source': 'skill'})
+        # Same guard for the report's Word template: the wheel's copy is what
+        # every report is built on, and docs/studio/files holds the copy the
+        # documentation hands out for restyling.
+        tests.append({'type': 'template_sync', 'file': DOCS_REPORT_TEMPLATE,
+                      'master': REPORT_TEMPLATE, 'copy': DOCS_REPORT_TEMPLATE,
+                      'method': '-', 'source': 'report_template'})
         # Guard that the generated corpus example index — the machine index and
         # the skill's TOPIC -> EXAMPLES table — matches what the docs' test tags
         # and the models they name would produce today. Regenerates in memory;

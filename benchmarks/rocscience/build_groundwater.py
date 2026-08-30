@@ -71,15 +71,96 @@ ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 
 
-def _base_sd(k1=1e-5, kr0=1e-3, h0=-0.4):
+# ---------------------------------------------------------------------------
+# THE TIME BASE OF EACH STEADY CASE
+#
+# Every model here carries a conductivity, and a conductivity is a length over a
+# TIME, so each file declares the base its k is written in (the 'main' sheet's Time
+# selector).  The base is read off the vendor model, per case, never inherited from
+# a sibling: RS2 stores k in whatever base the model's own ``TimeUnit`` names, and
+# the set is not uniform -- ``#019``/``#020`` are hours and ``#021`` is minutes, and
+# their k values are the m/hr and m/min numbers to match (see the transient tiers
+# below, which already declare theirs).
+#
+# For the STEADY tier the vendor is unanimous.  Every one of ``groundwater #001``
+# through ``#013`` declares ``TimeUnit: second`` and ``metric permeability:
+# "meters/second"`` in its own ``.fea``, and each builder's k is that model's own
+# ``SK`` / conductivity-table value at face value in that base -- #002's 1e-05,
+# #009_01's 6.67e-06, #010's 1.1574e-05, #011's 1e-07, #012's 1e-05, #013's 0.001,
+# and the m/s fluxes the manual prints for #001 (2.5e-6), #007 (2.1e-4) and #008
+# (4.4444e-5).  So all thirteen declare ``sec``.
+#
+# GW9 dam 1 is the case worth naming, because the page reports its discharge in
+# m3/(min*m): that is a CONVERSION for comparison with Bowles, who works the dam in
+# m/min.  The file's own conductivity is the vendor's 6.67e-6 m/s, and the locked
+# flowrate 2.3069e-05 is the per-second number the page's 1.384e-3 is sixty times.
+# Its declared base is therefore ``sec``, like every other steady case; labelling it
+# per minute would put a unit on the figure that its own printed Q contradicts.
+# ---------------------------------------------------------------------------
+
+
+def _circle_through(p1, p2, yn):
+    """The circle through ground points p1, p2 whose lowest point sits at
+    elevation yn - the standing starting-circle rule (enter near the crest,
+    tangent near the base of the governing zone, daylight near the toe) made
+    constructive.  These groundwater decks never search or lock a factor of
+    safety (every tag here is seep/seep_head/tseep_head, none of which read
+    the circles sheet), but a shipped first circle still has to slice, so
+    each caller below solves for one through two real points on its own
+    ground/top boundary rather than carrying a generic placeholder.
+
+    Returns {'Xo','Yo','Depth','R'}; raises if no such real circle exists
+    (both points must sit above yn)."""
+    (x1, y1), (x2, y2) = p1, p2
+    A, B = y1 - yn, y2 - yn
+    if A <= 0 or B <= 0:
+        raise ValueError(f'_circle_through: p1/p2 must sit above yn={yn}: {p1} {p2}')
+    a = B - A
+    b = 2.0 * (A * x2 - B * x1)
+    c = B * x1 * x1 - A * x2 * x2 - A * B * (y2 - y1)
+    roots = []
+    if abs(a) < 1e-14:
+        if abs(b) > 1e-14:
+            roots = [-c / b]
+    else:
+        disc = b * b - 4 * a * c
+        if disc < 0:
+            raise ValueError(f'_circle_through: no real circle for {p1} {p2} yn={yn}')
+        sq = math.sqrt(disc)
+        roots = [(-b + sq) / (2 * a), (-b - sq) / (2 * a)]
+    lo, hi = min(x1, x2), max(x1, x2)
+    best = None
+    for Xo in roots:
+        Yo = ((Xo - x1) ** 2 + y1 * y1 - yn * yn) / (2.0 * A)
+        R = Yo - yn
+        if R <= 0:
+            continue
+        pen = 0.0 if lo <= Xo <= hi else min(abs(Xo - lo), abs(Xo - hi))
+        if best is None or pen < best[0]:
+            best = (pen, {'Xo': Xo, 'Yo': Yo, 'Depth': yn, 'R': R})
+    if best is None:
+        raise ValueError(f'_circle_through: no admissible root for {p1} {p2} yn={yn}')
+    return best[1]
+
+
+def _base_sd(k1=1e-5, kr0=1e-3, h0=-0.4, time_unit=None):
     """Seepage-only base model: one material with u='seep'; the LEM circle is
-    a placeholder (these problems are never solved for a factor of safety)."""
+    a placeholder (these problems are never solved for a factor of safety).
+
+    ``time_unit`` is the TIME BASE the case's conductivities are expressed against,
+    and every caller states it rather than inheriting a default: a conductivity is
+    length/time, so an undeclared base leaves the k column and the solved flowrate
+    as bare numbers in the figures, the Studio material table and the results CSV.
+    It is passed per case and never guessed -- the block comment above carries the
+    evidence each case's base rests on.
+    """
     sd = load_slope_data(ACADS_1A)
     m = dict(sd['materials'][0])
     m.update(name='Soil', c=1.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
              option='mc', u='seep', k1=k1, k2=k1, alpha=0.0, kr0=kr0, h0=h0)
     sd['materials'] = [m]
     sd['gamma_water'] = 9.81
+    sd['time_unit'] = time_unit
     sd['dloads'] = []
     sd['piezo_line'] = []
     sd['circular'] = True
@@ -106,12 +187,17 @@ def gw001():
     the SEEP2D cross-check documents); Q=P*L=2.5e-5 m3/s per m is exact by
     construction. The free surface is k- and unsat-model independent (mass balance
     sets it); the flowrate lock plus a mound-guarding head regression are taken."""
-    sd = _base_sd(k1=1e-5)
+    sd = _base_sd(k1=1e-5, time_unit='sec')
     from shapely.geometry import Polygon
     sd['profile_lines'] = []
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
         [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0), (0.0, 5.0)])}]
     sd['max_depth'] = None
+    # First circle: enters/daylights on the flat top near the two ends of the
+    # domain (1.0, 5.0) - (9.0, 5.0), tangent at el 1.5. Unused by the flowrate/
+    # head locks (seep tags never read circles), but must slice per the standing
+    # rule; the placeholder {5,10,0,10} did not.
+    sd['circles'] = [_circle_through((1.0, 5.0), (9.0, 5.0), 1.5)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 3.75, 'coords': [(0.0, 0.0), (0.0, 3.75)]},
@@ -147,7 +233,7 @@ def gw007():
     GW6/GW7 - only the flowrate is locked (Q=q*L=1.68e-4, exact by construction),
     with a head regression guarding the field. xslope reproduces the stated water
     table (daylights at el 0.30 at the toe) and the perched zone above the lens."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     med = dict(sd['materials'][0])
     med.update(name='Medium sand', k1=0.0014, k2=0.0014, alpha=0.0,
                kr0=1e-3, h0=-0.4, unsat='vg', vg_a=1.7745, vg_n=2.3276)
@@ -166,6 +252,9 @@ def gw007():
             [(1.0, 0.7), (2.4, 0.7), (2.4, 1.0), (1.6, 1.0)])},
     ]
     sd['max_depth'] = None
+    # First circle: enters on the toe slope (0.24, 0.32) and daylights on the
+    # crest (2.16, 1.0), tangent at el 0.096 near the base of the fine lens.
+    sd['circles'] = [_circle_through((0.24, 0.32), (2.16, 1.0), 0.096)]
     sd['seepage_bc'] = {
         'specified_heads': [{'head': 0.3, 'coords': [(0.0, 0.2), (0.2, 0.3)]}],
         'specified_fluxes': [{'flux': 2.1e-4, 'coords': [(1.6, 1.0), (2.4, 1.0)]}],
@@ -183,7 +272,7 @@ def gw002():
     heads at the 5 printed points - xslope matches Slide within 0.0013 m
     everywhere and the closed form within its own idealization error.
     Homogeneous confined flow: the head field is k-independent."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     from shapely.geometry import Polygon
     arc = [(4.0 - math.cos(t), math.sin(t))
            for t in [math.pi * i / 24 for i in range(25)]]
@@ -192,6 +281,9 @@ def gw002():
     sd['polygons'] = [{'mat_id': 0,
                        'polygon': Polygon(coords + [(8.0, 4.0), (0.0, 4.0)])}]
     sd['max_depth'] = None
+    # First circle: flat-top entry/daylight points (0.8, 4.0) - (7.2, 4.0),
+    # tangent at el 1.2.
+    sd['circles'] = [_circle_through((0.8, 4.0), (7.2, 4.0), 1.2)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 1.0, 'coords': [(0.0, 0.0), (0.0, 4.0)]},
@@ -208,13 +300,20 @@ def gw003():
     block 40 x 10 m; head 5 on the ground x 0-8, head 0 on x 20-40, dam base
     x 8-20 impervious (no BC). Targets: head profiles along line 1-1 (y=-4)
     and line 2-2 (x=20) from Fig 3.5/3.6 - xslope within 0.08 m of the
-    chart (Slide's markers coincide with Rushton & Redshaw's)."""
-    sd = _base_sd()
+    chart (Slide's markers coincide with Rushton & Redshaw's).
+
+    k = 1e-7 m/s, the vendor model's own SK (#003.slw). The problem is confined
+    and homogeneous, so the published head-profile targets are k-independent;
+    only the self-locked flowrate scales with it."""
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     from shapely.geometry import Polygon
     sd['profile_lines'] = []
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
         [(0.0, -10.0), (40.0, -10.0), (40.0, 0.0), (0.0, 0.0)])}]
     sd['max_depth'] = None
+    # First circle: entry/daylight on the top edge (4.0, 0.0) - (36.0, 0.0),
+    # tangent at el -7.0 near the base of the 10 m block.
+    sd['circles'] = [_circle_through((4.0, 0.0), (36.0, 0.0), -7.0)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 5.0, 'coords': [(0.0, 0.0), (8.0, 0.0)]},
@@ -265,7 +364,7 @@ def gw004():
     0.377 / 0.394 / 0.401 / 0.404 / 0.407 at target_size 0.25 / 0.147 /
     0.09 / 0.06 / 0.045 / 0.03, and the tags run at 0.06."""
     from shapely.geometry import Polygon
-    sd = _base_sd(k1=1e-7, h0=-0.25)
+    sd = _base_sd(k1=1e-7, h0=-0.25, time_unit='sec')
     sd['profile_lines'] = []
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
         [(0.0, 0.0), (10.0, 5.0), (12.5, 5.0),
@@ -326,7 +425,7 @@ def gw005():
     water loads typed in. No result is affected — the file's only locks are the
     seepage flowrate and head field, and seepage never reads a surface load."""
     from shapely.geometry import Polygon
-    sd = _base_sd(k1=1e-10)
+    sd = _base_sd(k1=1e-10, time_unit='sec')
     host = sd['materials'][0]
     host.update(name='Material 1', k1=1e-10, k2=1e-10, alpha=0.0,
                 kr0=1.0, h0=-0.4)          # kr0=1 -> the vendor's constant k(psi)
@@ -343,6 +442,9 @@ def gw005():
                                           (30.0, 2.0), (30.0, 4.0), (0.0, 4.0)])},
     ]
     sd['max_depth'] = None
+    # First circle: enters on the upper block's flat crest (4.0, 10.0) and
+    # daylights on the shelf (36.0, 2.0), tangent at el 0.6 near the shelf.
+    sd['circles'] = [_circle_through((4.0, 10.0), (36.0, 2.0), 0.6)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 10.0, 'coords': [(0.0, 0.0), (0.0, 10.0)]},
@@ -366,7 +468,7 @@ def gw009a():
     Example 9-2 / Fig E9-2a: direct 11.01e-4, flow-net 12.8e-4, k = 4e-4 m/min
     = 6.67e-6 m/s). Dam 2 (the toe-drain variant, Bowles Fig E9-2b) is
     gw009b()."""
-    sd = _base_sd(k1=6.67e-6)
+    sd = _base_sd(k1=6.67e-6, time_unit='sec')
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, kr0=0.0, h0=0.0,
              unsat='vg', vg_a=0.2835, vg_n=2.765)
@@ -404,7 +506,7 @@ def gw009b():
     m3/(s*m) in Bowles' own units line. The k=2e-6 caption over-reads Q by ~10x
     (linear in k); see the GW9 section."""
     from shapely.geometry import Polygon
-    sd = _base_sd(k1=2e-7)
+    sd = _base_sd(k1=2e-7, time_unit='sec')
     body = sd['materials'][0]
     body.update(name='Dam fill', c=10.0, phi=30.0, k1=2e-7, k2=2e-7, alpha=0.0,
                 kr0=0.0, h0=0.0, unsat='vg', vg_a=0.2835, vg_n=2.765)
@@ -440,12 +542,15 @@ def gw010():
     4.87 vs Clement 4.8 / Slide 5.0 (the manual's "seepage face" column is
     the exit ELEVATION, not a face length). Only the tailwater-2 case has
     published numbers."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     sd['materials'][0].update(u='none', k1=1.1574e-5, k2=1.1574e-5, alpha=0.0,
                               unsat='vg', vg_a=0.64, vg_n=4.65,
                               kr0=0.001, h0=-1.0)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 10.0), (10.0, 10.0)]}]
     sd['max_depth'] = 0.0
+    # First circle: flat-top entry/daylight (1.0, 10.0) - (9.0, 10.0),
+    # tangent at el 7.0.
+    sd['circles'] = [_circle_through((1.0, 10.0), (9.0, 10.0), 7.0)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 10.0, 'coords': [(0.0, 0.0), (0.0, 10.0)]},
@@ -465,12 +570,15 @@ def gw012():
     (+1.1%) / Vedernikov k(B+AH)/2 = 4.0e-4 (+3.4%); flow-bulb half-width
     ~42 vs Slide 41 / theory 40. The detached bulb converges at
     max_iter=1500 (tag key), not the default 400."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     sd['materials'][0].update(u='none', k1=1e-5, k2=1e-5, alpha=0.0,
                               unsat='lf', kr0=0.001, h0=-1.0)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 40.0), (15.0, 40.0),
                                                     (25.0, 50.0), (100.0, 50.0)]}]
     sd['max_depth'] = 0.0
+    # First circle: enters on the ditch bank (10.0, 40.0) and daylights on the
+    # far flat (90.0, 50.0), tangent at el 12.0.
+    sd['circles'] = [_circle_through((10.0, 40.0), (90.0, 50.0), 12.0)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 50.0, 'coords': [(0.0, 40.0), (15.0, 40.0), (25.0, 50.0)]},
@@ -486,12 +594,15 @@ def gw013():
     """GW#13: Vedernikov's triangular ditch into a deep drainage layer,
     half-model: apex (0,40) to (10,50), k=1e-3. Q_half = 2.087e-2 vs Slide
     2.050e-2 (+1.8%) / Vedernikov 2.0e-2 (+4.3%). max_iter=1500 as GW#12."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     sd['materials'][0].update(u='none', k1=1e-3, k2=1e-3, alpha=0.0,
                               unsat='lf', kr0=0.001, h0=-1.0)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 40.0), (10.0, 50.0),
                                                     (100.0, 50.0)]}]
     sd['max_depth'] = 0.0
+    # First circle: flat-top entry/daylight (10.0, 50.0) - (90.0, 50.0),
+    # tangent at el 15.0.
+    sd['circles'] = [_circle_through((10.0, 50.0), (90.0, 50.0), 15.0)]
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 50.0, 'coords': [(0.0, 40.0), (10.0, 50.0)]},
@@ -519,7 +630,7 @@ def gw011():
     from Table 11.1 (p.46) for the companion non-homogeneous case.
     Target: release point on the downstream face - Slide 19.397 m,
     ABAQUS/Zhang 19.64 m (p.46)."""
-    sd = _base_sd(k1=1e-7)
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     sd['materials'][0].update(name='Dam fill', kr0=0.0, h0=0.0,
                               unsat='gard', vg_a=0.15, vg_n=6.0)
     sd['profile_lines'] = [
@@ -572,7 +683,7 @@ def gw006a():
     Slide's curve there, mesh- and fit-insensitive; locked at xslope's own
     values. Cases 2 (9:1 anisotropy), 3 (core), 4 (infiltration) and 5
     (seepage face) are gw006b/c/d/e."""
-    sd = _base_sd(k1=1e-7)
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, kr0=0.0, h0=0.0, **_GW6_VG)
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 0.0), (24.0, 12.0),
@@ -601,7 +712,7 @@ def gw006b():
     head 6.52 / 4.74 / 3.28 / 1.85 / 0.38 m at elevations 0 / 2 / 4 / 6 / 8 vs
     the chart's 6.5 / 4.7 / 3.2 / 1.85 / 0.4. Chart-only target (no tabulated
     value), so xslope's own flowrate and total-head field are locked."""
-    sd = _base_sd(k1=9e-7)
+    sd = _base_sd(k1=9e-7, time_unit='sec')
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, k1=9e-7, k2=1e-7, alpha=0.0,
              kr0=0.0, h0=0.0, **_GW6_VG)
@@ -625,8 +736,12 @@ def gw006c():
     identical unsaturated relative shape (both custom functions are parallel).
     Same 12 m dam, 2:1 faces, 12 m toe drain, reservoir at 10 m.
 
-    The domain is tiled by four non-overlapping polygons (three shell pieces +
-    the core) so the core is a true internal zone. The low-k core forces almost
+    The domain is tiled by two non-overlapping polygons — one notched shell that
+    wraps the core on three sides plus over its top, and the core rectangle
+    itself — so the core is a true internal zone with no seam through the shell.
+    (An earlier version cut the shell into three pieces around the core; the two
+    extra seams were internal boundaries the mesher had to honour, dividing the
+    shell for no physical reason.) The low-k core forces almost
     the entire hydraulic-head drop across its 4 m width (the crowded contours of
     Fig 6.13). Target: pressure head along line 1-1 (x=26, now inside the core,
     Fig 6.14). xslope reproduces the profile shape and sits at the high end of
@@ -638,7 +753,7 @@ def gw006c():
     every metre, and its core's is that function 100x lower, so both zones take
     the shared fit."""
     from shapely.geometry import Polygon
-    sd = _base_sd(k1=1e-7)
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     shell = sd['materials'][0]
     shell.update(name='Shell', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
                  kr0=0.0, h0=0.0, **_GW6_VG)
@@ -646,11 +761,14 @@ def gw006c():
     core.update(name='Core', k1=1e-9, k2=1e-9)
     sd['materials'] = [shell, core]
     sd['profile_lines'] = []
+    # The shell is the dam outline with the core's footprint notched out of its
+    # base: along the base to the core's upstream face, up and over the core,
+    # back down to the base, on to the downstream toe, then up the downstream
+    # face, across the crest and down the upstream face.
     sd['polygons'] = [
-        {'mat_id': 0, 'polygon': Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 12.0)])},
-        {'mat_id': 0, 'polygon': Polygon([(24.0, 10.0), (28.0, 10.0),
+        {'mat_id': 0, 'polygon': Polygon([(0.0, 0.0), (24.0, 0.0), (24.0, 10.0),
+                                          (28.0, 10.0), (28.0, 0.0), (52.0, 0.0),
                                           (28.0, 12.0), (24.0, 12.0)])},
-        {'mat_id': 0, 'polygon': Polygon([(28.0, 0.0), (52.0, 0.0), (28.0, 12.0)])},
         {'mat_id': 1, 'polygon': Polygon([(24.0, 0.0), (28.0, 0.0),
                                           (28.0, 10.0), (24.0, 10.0)])},
     ]
@@ -677,7 +795,7 @@ def gw006e():
     6.35 / 4.41 / 2.45 / 0.50 m at elevations 0 / 2 / 4 / 6 / 8 vs the chart's
     8.4 / 6.4 / 4.5 / 2.5 / 0.55. Chart-only target, so xslope's own flowrate
     and total-head field are locked."""
-    sd = _base_sd(k1=1e-7)
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
              kr0=0.0, h0=0.0, **_GW6_VG)
@@ -721,7 +839,7 @@ def gw006d():
     tracks the Slide markers to 0.19 m rms over the 13 stations, running above
     them by 0.18 m on average.
     Chart-only target, so xslope's own flowrate and total-head field are locked."""
-    sd = _base_sd(k1=1e-7)
+    sd = _base_sd(k1=1e-7, time_unit='sec')
     m = sd['materials'][0]
     m.update(name='Dam fill', c=10.0, phi=30.0, k1=1e-7, k2=1e-7, alpha=0.0,
              kr0=0.0, h0=0.0, **_GW6_VG)
@@ -784,7 +902,7 @@ def gw008():
     Targets are chart-only (the manual prints no point value and no
     discharge): the Fig 8.3 pressure-head contours above the water table
     and the Fig 8.4 total-head contours plus its drawn water table."""
-    sd = _base_sd()
+    sd = _base_sd(time_unit='sec')
     soil_b = dict(sd['materials'][0])
     soil_b.update(name='Soil B', k1=1.111111e-4, k2=1.111111e-4, alpha=0.0,
                   kr0=0.0, h0=0.0, unsat='gard', vg_a=277.777, vg_n=4.2)
@@ -797,6 +915,10 @@ def gw008():
         {'mat_id': 1, 'coords': [(0.0, 0.1), (1.0, 0.1)]},
     ]
     sd['max_depth'] = 0.0
+    # First circle: this section is essentially flat (a 1 x 0.5 m ditch-drain
+    # box, no slope) - the simplest circle that genuinely slices, flat-top
+    # entry/daylight (0.1, 0.5) - (0.9, 0.5), tangent at el 0.15.
+    sd['circles'] = [_circle_through((0.1, 0.5), (0.9, 0.5), 0.15)]
     sd['seepage_bc'] = {
         'specified_heads': [],
         'specified_fluxes': [
@@ -943,7 +1065,10 @@ def _gw15_column(single_drainage):
     sd['materials'] = [_tseep_material(sd['materials'][0], 'Soil', _GW15_K, ss)]
     sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
         [(0.0, 0.0), (0.25, 0.0), (0.25, 1.0), (0.0, 1.0)])}]
-    sd['circles'] = [{'Xo': 0.125, 'Yo': 2.0, 'Depth': 0.0, 'R': 2.0}]
+    # First circle: this section is flat (a 0.25 x 1.0 m 1-D column, no
+    # slope) - the simplest circle that genuinely slices, flat-top
+    # entry/daylight (0.025, 1.0) - (0.225, 1.0), tangent at el 0.95.
+    sd['circles'] = [_circle_through((0.025, 1.0), (0.225, 1.0), 0.95)]
     heads = [{'head': 'res', 'coords': [(0.0, 1.0), (0.25, 1.0)]}]  # top drain
     if not single_drainage:
         heads.append({'head': 'res', 'coords': [(0.0, 0.0), (0.25, 0.0)]})  # bottom
@@ -1002,7 +1127,10 @@ _GW16_B = (10.0, 10.0)
 
 def _gw16_base():
     sd = _tseep_base_sd(gamma_w=1.0, time_unit='sec', unit_system=None)
-    sd['circles'] = [{'Xo': 0.25, 'Yo': 2.0, 'Depth': 0.0, 'R': 2.0}]
+    # First circle: this section is flat (a 0.5 x 1.0 m 1-D column, no
+    # slope) - the simplest circle that genuinely slices, flat-top
+    # entry/daylight (0.05, 1.0) - (0.45, 1.0), tangent at el 0.85.
+    sd['circles'] = [_circle_through((0.05, 1.0), (0.45, 1.0), 0.85)]
     sd['seepage_bc'] = {'specified_heads': [
         {'head': 'res', 'coords': [(0.0, 1.0), (0.5, 1.0)]}], 'exit_face': []}  # top drain
     base = _H_REF + _GW16_U0
@@ -1340,7 +1468,9 @@ def gw019():
             [(0.0, 9.0), (19.0, 9.0), (19.0, 10.0), (0.0, 10.0)])},
     ]
     sd['max_depth'] = None
-    sd['circles'] = [{'Xo': 9.5, 'Yo': 20.0, 'Depth': 0.0, 'R': 15.0}]
+    # First circle: flat-top entry/daylight (1.9, 10.0) - (17.1, 10.0),
+    # tangent at el 3.0 near the base of the 9 m soil layer.
+    sd['circles'] = [_circle_through((1.9, 10.0), (17.1, 10.0), 3.0)]
     sd['seepage_bc'] = {
         'specified_heads': [
             # lagoon floor (x 0-2, y=10): ponded reservoir series, 5 -> 11 at t=0
@@ -1398,7 +1528,10 @@ def gw020():
             [(1.0, 0.7), (2.4, 0.7), (2.4, 1.0), (1.6, 1.0)])},
     ]
     sd['max_depth'] = None
-    sd['circles'] = [{'Xo': 1.2, 'Yo': 3.0, 'Depth': 0.0, 'R': 3.0}]
+    # Same slope face as gw007() (this is its transient re-run): entry on the
+    # toe slope (0.24, 0.32), daylight on the crest (2.16, 1.0), tangent at
+    # el 0.096 near the base of the fine lens.
+    sd['circles'] = [_circle_through((0.24, 0.32), (2.16, 1.0), 0.096)]
     sd['seepage_bc'] = {
         'specified_heads': [{'head': 0.3, 'coords': [(0.0, 0.2), (0.2, 0.3)]}],
         # rainfall flux: 0 at t=0 (IC), stepped to 2.1e-4 for t>0 (series 'infil')

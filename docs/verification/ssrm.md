@@ -49,11 +49,11 @@ alongside a SLIDE limit-equilibrium table read the same way.
 | [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | Displacement-vs-$F$ upturn $F \approx 1.40$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.36 vs their FE 1.4 (−2.9%) | criterion-matched FE-vs-FE reading is the basis of the dot |
 | [2](#verification-griffiths2) | 🟢 | Example 2 — homogeneous slope with a foundation layer | Upturn $F \approx 1.4$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.34 vs their FE 1.4 (−4.3%) · Spencer toe circle 1.37 vs the paper's "correct" 1.4 (−2.1%) | the foundation leaves the factor of safety unchanged, as the paper argues |
 | [3](#verification-griffiths3) | 🟢 | Example 3 — undrained clay slope with a thin weak layer | Worst station $c_{u2}/c_{u1} = 0.2$: Janbu 0.462 vs the paper's own Janbu three-line wedge 0.45–0.50 (inside the band) · Spencer 0.462 on the same surface · circular search 1.23 vs the paper's stated ≈1.3 (−5.4%) | scored at the source's own 0.05 read-off resolution |
-| [4](#verification-griffiths4) | 🟢 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.45 vs Griffiths & Lane FE 1.45 (0.0%) · SSRM 2.02 vs their FE 2.03 (−0.5%) · relative jump ×1.40 vs their ×1.40 (0.0%) | the critical mechanism flips base → toe, as in the paper's Fig. 11 |
+| [4](#verification-griffiths4) | 🟢 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.45 vs Griffiths & Lane FE 1.45 (0.0%) · SSRM 2.034 vs their FE 2.03 (+0.2%) · relative jump ×1.40 vs their ×1.40 (0.0%) | the critical mechanism flips base → toe, as in the paper's Fig. 11 |
 | [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown sweep | Submerged plateau 1.86 vs Griffiths & Lane FE 1.85 (+0.5%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.39 vs their FE 1.40 (−0.7%) | the three refined quad8 locks read 1.1–2.9% below the printed FE values |
-| [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.87 vs Griffiths & Lane FE 1.9 (−1.6%) · before filling 2.40 vs their FE 2.4 (0.0%) | FE against FE, both printed to 0.1 |
-| [7](#verification-torggler3a) | 🟢 | Torggler §3 — homogeneous slope with a 7.5 m plate | Unsupported 1.129 vs Torggler PLAXIS 1.111 (+1.6%) · with plate 1.187 vs his 1.175 (+1.0%) · plate peak shear 20.9 kN/m vs his 21 kN (−0.5%) | the plate variant without interfaces is XSLOPE's shared-node beam |
-| [8](#verification-torggler3b) | 🔴 | Torggler §4 — weak-layer slope with a 15 m plate | Unsupported 1.064 vs Torggler PLAXIS 1.045 (+1.8%) · with plate 1.277 vs his 1.725 (−26.0%) | the beam does not cut the weak-layer mechanism: the supported model keeps the unsupported one, and the plate carries about half his internal forces |
+| [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.87 vs Griffiths & Lane FE 1.9 (−1.6%) · before filling 2.42 vs their FE 2.4 (+0.8%) | FE against FE, both printed to 0.1 |
+| [7](#verification-torggler3a) | 🟢 | Torggler §3 — homogeneous slope with a 7.5 m plate | Unsupported 1.129 vs Torggler PLAXIS 1.111 (+1.6%) · with plate 1.195 vs his 1.175 (+1.7%) · plate shear in the lower lobe 25.8 kN/m vs his 21 kN (+22.9%) | the plate variant without interfaces is XSLOPE's shared-node beam; the factors of safety pair closely and the plate's internal forces run above his |
+| [8](#verification-torggler3b) | 🟢 | Torggler §4 — weak-layer slope with a 15 m plate | Unsupported 1.055 vs Torggler PLAXIS 1.045 (+1.0%) · with plate 1.673 vs his 1.725 (−3.0%) · plate peak moment 1176 kNm/m vs his 1250 kNm/m (−5.9%) · plate peak shear 359 kN/m vs his 500 kN/m (−28.2%) | the factors of safety and the bending moment pair; the weak band still shears where his supported mechanism leaves it |
 
 </div>
 
@@ -252,7 +252,7 @@ strength ratio $c_{u2}/c_{u1}$ to reproduce the paper's Fig. 7.
 | SSRM, $0.8$ | 1.41 tri6 | FE 1.45 (−2.8%) | |
 | SSRM, $0.6$ (transition) | 1.38 tri6 | FE 1.40 (−1.4%) | transition |
 | SSRM, $0.5$ | 1.19 tri6 | FE 1.25 (−4.8%) | |
-| SSRM, $0.4$ | 0.96 tri6 | FE 1.05 (−8.6%) | |
+| SSRM, $0.4$ | 0.93 tri6 | FE 1.05 (−11.4%) | undecided trial at the ceiling |
 | SSRM, $0.2$ | 0.48 tri6 · **0.45** quad8 | FE 0.60 (−20.0% / −25.0%) | |
 | **Non-circular Spencer / Janbu at $0.2$** | **0.462 / 0.462** | **Janbu three-line wedge, 0.45–0.50 (inside the band)** | Fig. 7 at the paper's 0.05 resolution |
 | Circular search at $0.2$ (wrong mechanism family) | 1.23 | circular mechanism ≈1.3 (−5.4%) | stated in the text, p. 396 |
@@ -262,7 +262,10 @@ $c_{u2}/c_{u1} = 1$ the paper's text anchors on Taylor's (1937) classical $\phi_
 stability-number solution, FOS = 1.47; its own FE point plots at 1.50 in Fig. 7 while Fig. 10
 plots the identical physical case at 1.45, so the paper's own reading of that station spans
 1.45–1.50. Every Fig. 7 comparison value here is graphical, read from the plotted points,
-and Griffiths & Lane report their FE results only "to the nearest 0.05" (p. 394).*
+and Griffiths & Lane report their FE results only "to the nearest 0.05" (p. 394). At
+$c_{u2}/c_{u1} = 0.4$ the trial at the bracket's upper edge, F = 0.95, reached the iteration
+ceiling with its out-of-balance force still falling, so that edge is an undecided trial rather
+than a measured failure.*
 
 This is Example 3 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 (their Fig. 6): an **undrained** ($\phi_u = 0$) clay slope on a foundation layer
@@ -462,7 +465,7 @@ times the failure-path length rather than by the exact band thickness.
 <!-- test: file=../fem/files/xslope_griffiths3_r0p8.xlsx, type=fem_ssrm, expected_fs=1.41, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000 -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p6.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.9, f_max=1.7, max_iter=4000 -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p5.xlsx, type=fem_ssrm, expected_fs=1.19, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.8, f_max=1.6, max_iter=4000 -->
-<!-- test: file=../fem/files/xslope_griffiths3_r0p4.xlsx, type=fem_ssrm, expected_fs=0.96, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.6, f_max=1.4, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths3_r0p4.xlsx, type=fem_ssrm, expected_fs=0.93, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.6, f_max=1.4, max_iter=4000 -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=fem_ssrm, expected_fs=0.48, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.3, f_max=1.1, max_iter=4000 -->
 <!-- Thickness sensitivity: half-thickness band at cu2/cu1=0.2 barely moves the FS (0.49 -> 0.51),
      confirming the weak-ratio result is set by cu2 x path length, not the undimensioned band thickness. -->
@@ -480,8 +483,8 @@ straddle a change of failure mechanism.
 
 | Case | XSLOPE | Griffiths & Lane (1999), Fig. 10 |
 |---|---|---|
-| SSRM (quad8), $c_{u2}/c_{u1} = 1$ — deep base circle | 1.45 | **FE 1.45** (0.0%) |
-| SSRM (quad8), $c_{u2}/c_{u1} = 2$ — shallow toe circle | 2.02 | **FE 2.03** (−0.5%) |
+| SSRM, $c_{u2}/c_{u1} = 1$ — deep base circle | 1.44 tri6 · **1.45** quad8 | **FE 1.45** (−0.7% / 0.0%) |
+| SSRM, $c_{u2}/c_{u1} = 2$ — shallow toe circle | 2.075 tri6 · **2.034** quad8 | **FE 2.03** (+2.2% / +0.2%) |
 | Relative jump, ratio 1 → ratio 2 | ×1.40 | FE ×1.40 (0.0%) |
 | Spencer circular search, $c_{u2}/c_{u1} = 1$ (base circle) | 1.47 | their base-circle limit-equilibrium curve, 1.46 (+0.7%) |
 | Spencer circular search, $c_{u2}/c_{u1} = 2$ (toe circle) | 2.02 | their toe-circle limit-equilibrium curve, 2.04 (−1.0%) |
@@ -574,10 +577,10 @@ limit-equilibrium method finds the correct mechanism family on its own here, and
 and Spencer results agree on both the factor of safety and the base→toe transition.
 
 <!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=fem_ssrm, expected_fs=1.447, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G4 -->
-<!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=fem_ssrm, expected_fs=2.020, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.8, f_max=2.4, max_iter=16000, benchmark=SSRM-G4 -->
+<!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=fem_ssrm, expected_fs=2.034, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.8, f_max=2.4, max_iter=16000, benchmark=SSRM-G4 -->
 <!-- Coarse tri6 quick SSRM (ungated): base case (cu2=cu1) and toe case (cu2=2cu1); confirms the mechanism flip lifts the FS from ~1.44 to ~2.0. -->
 <!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=fem_ssrm, expected_fs=1.44, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.8, max_iter=4000 -->
-<!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=fem_ssrm, expected_fs=2.02, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.6, f_max=2.4, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=fem_ssrm, expected_fs=2.075, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.6, f_max=2.4, max_iter=4000 -->
 <!-- LEM companions: the unconstrained global search finds the BASE circle (~1.47, tangent to the firm base) at cu2=cu1 and the TOE circle (~2.02, confined to the upper clay) at cu2=2cu1 — the same base->toe flip as the SSRM and Taylor's charts. -->
 <!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.468, tolerance=0.02 -->
 <!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=2.022, tolerance=0.02 -->
@@ -734,8 +737,8 @@ An actual earth dam cross-section, analysed with the reservoir full and before f
 | Case | XSLOPE | Griffiths & Lane FE | Note |
 |---|---|---|---|
 | SSRM, full reservoir (free surface) | 1.87 | **1.9** (−1.6%) | their Figs 18, 20, 21 |
-| SSRM, before filling (no free surface) | 2.40 | **2.4** (0.0%) | their Figs 18, 19, 21 |
-| Reservoir effect, wet/dry | 0.78 | 0.79 (−1.3%) | from their FE 1.9 / 2.4; their limit equilibrium gives 0.79 again, from 1.90 / 2.42 |
+| SSRM, before filling (no free surface) | 2.42 | **2.4** (+0.8%) | their Figs 18, 19, 21 |
+| Reservoir effect, wet/dry | 0.77 | 0.79 (−2.5%) | from their FE 1.9 / 2.4; their limit equilibrium gives 0.79 again, from 1.90 / 2.42 |
 
 Cross-bearing against the paper's own limit-equilibrium solution:
 
@@ -773,7 +776,7 @@ Excel input files:
 
 ![griffiths6_full_inputs.png](../fem/images/griffiths6_full_inputs.png){width=1000}
 
-Solution for the before-filling (dry) case at the computed factor of safety (F = 2.40). The
+Solution for the before-filling (dry) case at the computed factor of safety (F = 2.42). The
 shear strain concentration and displacement vectors show the critical mechanism passing
 beneath the crest and exiting on the downstream face:
 
@@ -801,7 +804,7 @@ striking: XSLOPE's own Spencer analysis of the same section finds the same
 downstream critical surface as the paper's, and the relative reservoir effect
 matches the paper.
 
-<!-- test: file=../fem/files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.40, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=16000, benchmark=SSRM-2 -->
+<!-- test: file=../fem/files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.422, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=16000, benchmark=SSRM-2 -->
 <!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.867, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=16000, benchmark=SSRM-2 -->
 
 ### Torggler (2016) §3 — Homogeneous slope with a vertical plate {#verification-torggler3a}
@@ -813,8 +816,8 @@ both the factor of safety and the plate's internal forces.
 | Quantity | XSLOPE | Torggler PLAXIS | Note |
 |---|---|---|---|
 | SSRM FS, unsupported (tri6, 6,793 elements) | 1.129 | **1.111** (+1.6%) | his Table 2 / Table 3 |
-| SSRM FS, plate without interfaces (tri6, 6,834 elements) | 1.187 | **1.175** (+1.0%) | his §3.2.1 |
-| Plate peak shear | 20.9 kN/m | **21 kN** (−0.5%) | at a depth of −5.11 m against his −4.85 m; his §3.2, Fig. 14 |
+| SSRM FS, plate without interfaces (tri6, 6,834 elements) | 1.195 | **1.175** (+1.7%) | his §3.2.1 |
+| Plate peak shear, lower lobe, at failure | 25.8 kN/m | **21 kN** (+22.9%) | at a depth of −5.80 m against his −4.85 m; his §3.2, Fig. 14 |
 
 Same-method limit-equilibrium pairings against his SLIDE circular column:
 
@@ -823,6 +826,10 @@ Same-method limit-equilibrium pairings against his SLIDE circular column:
 | Bishop simplified | 1.135 | 1.138 (−0.3%) |
 | Spencer | 1.132 | 1.130 (+0.2%) |
 | Morgenstern-Price | 1.132 | GLE/Morgenstern-Price 1.131 (+0.1%) |
+
+The plate's shear reverses sign along its length: an upper lobe peaking at
+30.3 kN/m at a depth of −1.70 m and a lower one peaking at 25.8 kN/m at −5.80 m. The
+lower lobe is the branch Torggler's Fig. 14 reads, so it is the one paired above.
 
 *The dot is scored on the two SSRM rows — FE against FE on the mechanism each
 engine finds for itself. The plate variant compared is the one without interfaces,
@@ -881,15 +888,15 @@ three element sizes rather than at one:
 | Target size | tri6 elements | SSRM FS, unsupported | SSRM FS, with plate |
 |---|---:|---:|---:|
 | 2.0 m | 860 | 1.155 | — |
-| 1.0 m | 3,345 | 1.136 | 1.186 |
-| 0.7 m | 6,793 | 1.129 | 1.187 |
+| 1.0 m | 3,345 | 1.136 | 1.195 |
+| 0.7 m | 6,793 | 1.129 | 1.195 |
 
 The unsupported factor of safety falls with refinement, the last halving of element
-area moving it from 1.136 to 1.129 (−0.6%); the supported one is already stationary
-at 1.0 m. The locks are taken at 0.7 m.
+area moving it from 1.136 to 1.129 (−0.6%); the supported one reads the same at both
+sizes. The locks are taken at 0.7 m.
 
 <!-- test: file=../fem/files/xslope_torggler_3a_nopile.xlsx, type=fem_ssrm, expected_fs=1.129, element_type=tri6, target_size=0.7, tolerance=0.01, f_min=1.0, f_max=1.25, max_iter=8000, benchmark=SSRM-TORGGLER -->
-<!-- test: file=../fem/files/xslope_torggler_3a_plate.xlsx, type=fem_ssrm, expected_fs=1.187, element_type=tri6, target_size=0.7, tolerance=0.01, f_min=1.05, f_max=1.30, max_iter=8000, benchmark=SSRM-TORGGLER -->
+<!-- test: file=../fem/files/xslope_torggler_3a_plate.xlsx, type=fem_ssrm, expected_fs=1.195, element_type=tri6, target_size=0.7, tolerance=0.01, f_min=1.05, f_max=1.30, max_iter=8000, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3a_nopile.xlsx, type=circular_search, method=bishop, num_slices=40, expected_fs=1.135, tolerance=0.01, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3a_nopile.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.132, tolerance=0.01, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3a_nopile.xlsx, type=circular_search, method=mprice, num_slices=40, expected_fs=1.132, tolerance=0.01, benchmark=SSRM-TORGGLER -->
@@ -898,15 +905,15 @@ at 1.0 m. The locks are taken at 0.7 m.
 
 The same slope carrying a 1 m band of near-cohesionless soil along a published
 failure line, unsupported and then supported by a 15 m vertical plate at mid-slope.
-The unsupported case agrees; the supported case does not, and it does not because
-the plate never takes the weak layer out of the mechanism.
+Both factors of safety pair with his, and so does the plate's peak bending moment;
+the plate's peak shear runs well below his.
 
 | Quantity | XSLOPE | Torggler PLAXIS | Note |
 |---|---|---|---|
-| SSRM FS, unsupported (tri6, 4,929 elements) | 1.064 | **1.045** (+1.8%) | his Table 11 / Table 12 |
-| SSRM FS, plate without interfaces (tri6, 4,945 elements) | 1.277 | **1.725** (−26.0%) | his §4.2 |
-| Plate peak moment, at failure | 594 kNm/m | **1250 kNm/m** (−52.5%) | at a depth of −9.6 m against his −9.5 m; his Fig. 66, chart read |
-| Plate peak shear, at failure | 225 kN/m | **500 kN/m** (−55.0%) | at a depth of −7.5 m against his −13 m; his Fig. 66, chart read |
+| SSRM FS, unsupported (tri6, 4,929 elements) | 1.055 | **1.045** (+1.0%) | his Table 11 / Table 12 |
+| SSRM FS, plate without interfaces (tri6, 4,945 elements) | 1.673 | **1.725** (−3.0%) | his §4.2 |
+| Plate peak moment, at failure | 1176 kNm/m | **1250 kNm/m** (−5.9%) | at a depth of −10.0 m against his −9.5 m; his Fig. 66, chart read |
+| Plate peak shear, at failure | 359 kN/m | **500 kN/m** (−28.2%) | at a depth of −13.5 m against his −13 m; his Fig. 66, chart read |
 
 Same-method limit-equilibrium pairing on his own published failure line:
 
@@ -958,42 +965,49 @@ so the band is resolved at every global size:
 
 | Target size | tri6 elements | SSRM FS, unsupported | SSRM FS, with plate |
 |---|---:|---:|---:|
-| 1.5 m | 3,152 | 1.064 | 1.256 |
-| 1.0 m | 4,929 | 1.064 | 1.277 |
+| 1.5 m | 3,152 | 1.055 | 1.673 |
+| 1.0 m | 4,929 | 1.055 | 1.673 |
 
-The unsupported answer is identical at both sizes. The supported one rises from
-1.256 to 1.277 (+1.7%) over the same refinement and does not approach 1.725.
+Both answers are identical at the two sizes, so neither the supported nor the
+unsupported factor of safety is set by the discretization. The locks are taken
+at 1.0 m.
 
-**The beam does not cut the weak-layer mechanism.** In PLAXIS the plate changes
-which mechanism controls: "Because the plate is modelled as elastic material a
-different failure mechanism as compared to the unsupported case is developed
-(failure in the weak layer is prevented by the plate)" (§4.2), and §4.3.1 places
-the supported mechanisms "outside the weakness zone." In XSLOPE the supported
-model keeps the unsupported mechanism. The weak layer shears along its whole
-length, from its daylight at the toe to its daylight on the plateau, straight past
-the plate station at $x$ = 28.66:
+**The plate is heavily engaged, and the band still shears.** In PLAXIS the
+plate changes which mechanism controls: "Because the plate is modelled as elastic
+material a different failure mechanism as compared to the unsupported case is
+developed (failure in the weak layer is prevented by the plate)" (§4.2), and §4.3.1
+places the supported mechanisms "outside the weakness zone." In XSLOPE the weak
+layer still shears, from its daylight at the toe to its daylight on the plateau —
+but no longer evenly. Each mechanism below is the at-failure field of its own run,
+so the two rows are read for their shape along the band rather than against each
+other:
 
-| Model, trial $F$ | Mean viscoplastic shear strain in the band, per 4 m reach from $x$ = 18 to $x$ = 46 |
+| Model, at-failure field | Mean viscoplastic shear strain in the band, per 4 m reach from $x$ = 18 to $x$ = 46 |
 |---|---|
-| Unsupported, $F$ = 1.10 (its FS is 1.064) | 0.216 · 0.251 · 0.237 · 0.239 · 0.211 · 0.209 · 0.238 |
-| With plate, $F$ = 1.30 (its FS is 1.277) | 0.077 · 0.084 · 0.076 · 0.095 · 0.098 · 0.113 · 0.123 |
-| With plate, $F$ = 1.60 | 0.476 · 0.475 · 0.399 · 0.456 · 0.513 · 0.587 · 0.585 |
+| Unsupported, captured at $F$ = 1.21 | 0.807 · 0.733 · 0.703 · 0.724 · 0.701 · 0.725 · 0.612 |
+| With plate, captured at $F$ = 1.92 | 0.786 · 0.538 · 0.373 · 0.568 · 0.846 · 0.966 · 0.917 |
 
-No reach of the band is spared, and the reaches downslope and upslope of the plate
-shear as hard as the reach the plate passes through — one mass sliding on the band,
-the same mechanism the model without the plate fails in. The plate's internal
-forces are consistent with that: it carries about half of what Torggler's does,
-594 against ≈1250 kNm/m of moment and 225 against ≈500 kN/m of shear.
+Without the plate the band shears at much the same rate along its whole length.
+With it, the reach the plate passes through — $x$ = 26 to 30, the plate at $x$ =
+28.66 — carries the least strain of any reach, well under half the reaches upslope
+of it, and the band is worked hardest where the mass has to shear past the plate
+rather than at the plate itself.
 
-Two measurements place the gap at the beam and not at the soil, the weak layer or
-the geometry. The same model without the beam lands 1.8% from the published
-unsupported answer on a mesh-stationary factor of safety. Raising the plate's
-stiffness a hundredfold moves the supported factor of safety only to 1.345, and
-lowers its peak shear, so the beam is not merely too flexible. What is short is the
-load the sliding mass transmits into the beam. That shortfall is XSLOPE's and is
-unexplained.
+The plate's internal actions reproduce his distributions in shape and in turning
+point. Its bending moment peaks at 1176 kNm/m at a depth of −10.0 m against his
+≈1250 kNm/m at −9.5 m, and its shear reverses sign along the member, peaking at
+359 kN/m at −13.5 m against his ≈500 kN/m at −13 m. The moments pair to 5.9%; the
+shears do not, XSLOPE's peak standing 28.2% below his.
 
-<!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=fem_ssrm, expected_fs=1.064, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=0.9, f_max=1.2, max_iter=6000, benchmark=SSRM-TORGGLER -->
-<!-- test: file=../fem/files/xslope_torggler_3b_plate.xlsx, type=fem_ssrm, expected_fs=1.277, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=1.15, f_max=1.45, max_iter=8000, benchmark=SSRM-TORGGLER -->
+What remains open is the part of the mechanism his supported model sheds and this
+one does not. His plate takes the weak layer out of the failure entirely and
+reaches 1.725; XSLOPE's leaves a band that still shears along its length and stops
+3.0% below him, with the plate's peak shear 28.2% short. Neither the mesh nor the
+unsupported model accounts for it: both factors of safety are unchanged between the
+two element sizes above, and the same section without the plate lands 1.0% from the
+published unsupported answer.
+
+<!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=fem_ssrm, expected_fs=1.055, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=0.9, f_max=1.2, max_iter=6000, benchmark=SSRM-TORGGLER -->
+<!-- test: file=../fem/files/xslope_torggler_3b_plate.xlsx, type=fem_ssrm, expected_fs=1.673, element_type=tri6, target_size=1.0, tolerance=0.01, f_min=1.45, f_max=1.95, max_iter=8000, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=single_noncirc, method=spencer, num_slices=40, expected_fs=1.121, tolerance=0.01, benchmark=SSRM-TORGGLER -->
 <!-- test: file=../fem/files/xslope_torggler_3b_nopile.xlsx, type=single_noncirc, method=mprice, num_slices=40, expected_fs=1.093, tolerance=0.01, benchmark=SSRM-TORGGLER -->

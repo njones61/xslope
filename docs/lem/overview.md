@@ -109,7 +109,9 @@ routinely exceeds 60°. The Corps of Engineers and Lowe & Karafiath methods, whi
 inclination up front rather than solving for it, can fail to converge at friction angles that high. This is a
 pre-existing property of those force-equilibrium methods, not of the Hoek-Brown implementation — plain
 Mohr-Coulomb materials with $\phi > 55°$ fail the same way. Prefer Bishop, Spencer, or Morgenstern-Price on rock
-slopes.
+slopes. The [preflight checks](../usage/preflight.md#what-is-checked) report both traps before a run — either of
+those two methods selected on a Hoek-Brown material, and a $\sigma_{ci}$ small enough to have been carried over
+in MPa rather than the model's own stress units.
 
 !!! warning "Weak rock masses and shallow surfaces"
     The other side of the same coin: a Hoek-Brown envelope has very little strength at *zero* confinement. The

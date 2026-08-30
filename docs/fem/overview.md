@@ -158,7 +158,7 @@ there lies above the true envelope and inflates the factor of safety.
     Corkum, B., & Curran, J.H. (2005), *The shear strength reduction method for the generalized Hoek-Brown
     criterion*, Proc. 40th U.S. Symposium on Rock Mechanics (ARMA/USRMS), Paper 05-810 — a 10 m, 45° slope in
     a weak rock mass ($\sigma_{ci}$ = 30 MPa, GSI = 5, $m_i$ = 2, $D$ = 0). XSLOPE returns Spencer **1.152**
-    and Bishop **1.150** against the paper's 1.152 and 1.153, and SSRM **1.159** against its published SSRM
+    and Bishop **1.150** against the paper's 1.152 and 1.153, and SSRM **1.166** against its published SSRM
     value of 1.15. The derived constants ($m_b$ = 0.0672, $s$ = 2.605e-5, $a$ = 0.6192) reproduce the paper's
     Table 1 exactly.
 
@@ -218,6 +218,16 @@ Quadratic elements are required for reliable factors of safety — linear triang
 quads lock volumetrically and read high (see
 [Element type and volumetric locking](#element-type-selection-and-volumetric-locking)). Mesh
 construction is covered in [Mesh Generation](mesh.md).
+
+Reinforcement and pile lines are embedded in the same mesh, so their 1D elements are edges of the
+soil elements around them and every 1D node is a soil node. That coupling makes their discretization
+a mesh question rather than a per-member one: refining a member means refining the soil it hands its
+load to. The **1D element size** on the main sheet is where a model states it — the element size
+along those lines, blank to mesh them at the global target size like everything else. A stated size
+is applied as a graded band around the lines, so the structural elements and the soil sharing their
+nodes both come back at that size and grow back to the target away from them, and a member can be
+discretized finely without a finer mesh across the whole section. It only ever refines: a value at
+or above the target size cannot coarsen the lines and is ignored.
 
 ### Stiffness and assembly
 
@@ -662,21 +672,52 @@ Four dependencies are worth knowing, because the tolerance is absolute:
 >  converged. Leave `dt_scale` at 1.0, and never lower it to force a reluctant model to "converge".
 
 **Defaults and budgets.** $\text{tol} = 10^{-3}$ (displacement) and
-$\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value), with a ceiling of
-3000 iterations — 1500–4000 iterations is normal just below failure, consistent with Griffiths &
-Lane's reported 792 iterations just below their Example 1 failure point. A genuinely stable trial
-that exhausts the ceiling is called failed, which biases the factor of safety **low**, the
-conservative direction; under the default hybrid criterion such a trial is checked against its
-displacement field before the verdict is taken.
+$\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value), with a budget of
+`max_iterations` = 12000 iterations per trial. 1500–4000 iterations is normal well below failure —
+consistent with Griffiths & Lane's reported 792 just below their Example 1 failure point — but the
+count climbs steeply as a trial approaches the critical factor and as the mesh is refined: the same
+reinforced slope reaches equilibrium at $F = 1.25$ in 5,054 iterations at 2.5 ft element size and
+16,242 at 1 ft.
 
-A **no-progress early exit** stops a solve that goes 1500 iterations without improving on the lowest
-out-of-balance value it has seen by more than 1%, and reports it as failed exactly as an exhausted
-ceiling would. This is a **budget** decision, not an independent test of the slope: because the
-residual can stall long before the outcome is decided, the exit can truncate a solve that would
-still have converged, biasing the factor of safety low. That is the trade for the iterations it
-saves. Turn it off with `early_exit=False` on `solve_fem()` when a marginal trial matters more than
-runtime; inside the bisection the hybrid criterion handles the same problem by suppressing the exit
-where it would fire on a stable-looking state.
+**Running out of budget is not a verdict.** A trial that reaches `max_iterations` with its
+out-of-balance still **trending down** — the mean over the last 500 iterations at least 1% below the
+mean over the 500 before it — is given another `max_iterations` worth, and again, for as long as the
+trend holds, up to `max_iterations_ceiling` (default 50000). So the budget sets where the extension
+starts, not where the trial dies, and the answer stops depending on it: the FEM-1 embankment returns
+FS = 1.3633 from a 3000-iteration budget and from a 12000-iteration one. A trial whose residual is
+**not** falling at the budget stops there and is failed exactly as before.
+
+**Inconclusive trials.** A trial that reaches `max_iterations_ceiling` while still improving is
+neither settled nor failed, and it is reported as `exit_reason = 'inconclusive'`. The bisection does
+not count it as a failure — that is what biases a factor of safety low. It carries on below the
+inconclusive $F$, and the factor of safety is the final bracket's midpoint, exactly as on any other
+run. What the inconclusive trial changes is the meaning of the bracket's upper edge: an undecided
+trial rather than a measured failure. The result says so — `inconclusive` lists the trials and
+`note` names the last of them in a sentence, which is also printed to the log. Raise the ceiling or
+loosen the bisection tolerance to resolve it.
+
+A **no-progress plateau** — 1500 iterations without improving on the lowest out-of-balance value
+seen by more than 1% — is recorded (`plateau_iteration`, `plateau_ratio`) and **does not stop the
+solve**: a trial runs to convergence, to its iteration ceiling, or to the displacement cap, and
+nothing else ends it. A plateau is an observation about the residual, not a verdict on the slope.
+It cannot be one, for two measured reasons: the residual is **not monotone** — a reinforced slope
+whose out-of-balance sits at twice `force_tol` around iteration 9,500 climbs back an order of
+magnitude and then converges at 16,242 — and the iterations a trial needs **grow with mesh
+refinement** while a fixed window does not, so on that model a 1500-iteration window was 30% of the
+required work at 2.5 ft element size and 9% at 1 ft. Stopping on the plateau reported those trials
+as failed and the bisection closed on the false failure, biasing the factor of safety low by 18% on
+the finest mesh. The price of letting them run is paid by trials that genuinely fail: they spend
+the whole budget unless the rule below closes them sooner, which is why `max_iterations` should be
+set to what the model needs rather than left to absorb hopeless trials.
+
+**A trial whose movement is clearly running away is declared failed early** — max|u| past 8 times
+that trial's own elastic displacement and still growing, or the out-of-balance flat over the last
+2000 iterations while the field gains a whole elastic displacement — and stops there with
+`exit_reason = 'diverging'` instead of spending the rest of its budget (`early_failure=False` turns
+it off; the at-failure capture solve always runs to its own budget). Both thresholds are measured in
+the trial's own elastic response, and both sit far outside the range occupied by trials that go on
+to reach equilibrium — which near the critical factor grow past five times elastic with a flat
+residual — so the rule catches only gross runaways and no verdict moves.
 
 The **displacement limit** (`max_disp_factor`) is disabled on the default criterion, and
 deliberately so: its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a
@@ -775,17 +816,20 @@ Its principal arguments:
 
 >- **`F`** (default 1.0): strength reduction factor, applied as $c_r = c/F$ and
 >  $\tan\phi_r = \tan\phi/F$.<br>
->- **`max_iterations`** (default 3000) and **`tolerance`** (default $10^{-3}$): the iteration budget
+>- **`max_iterations`** (default 12000) and **`tolerance`** (default $10^{-3}$): the iteration budget
 >  and the CHECON displacement tolerance.<br>
+>- **`max_iterations_ceiling`** (default 50000): hard stop on the automatic extension of that
+>  budget. Reaching it while still improving gives `exit_reason = 'inconclusive'`.<br>
 >- **`force_tol`** (default $10^{-3}$): the per-node force-equilibrium tolerance; with `oob_window`
 >  (default 10) the averaging width that cancels the yield-surface limit cycle.<br>
 >- **`failure_criterion`** (default `"hybrid"`): how a non-converged trial is judged — see
 >  [SSRM failure criteria](#ssrm-failure-criteria).<br>
 >- **`max_disp_factor`** (default 0.1, `None` to disable): displacement backstop as a fraction of
 >  mesh height. The SSRM's default path disables it.<br>
->- **`early_exit`** (default `True`): the no-progress budget exit described above.<br>
+>- **`early_exit`** (default `True`): watch the residual for the no-progress plateau described
+>  above and report it. The plateau does not end the solve.<br>
 >- **`k0`**, **`staged`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
->  **`bond_slip`**, **`suction_phi_b`** / **`suction_cap`**: the options described in their own
+>  **`suction_phi_b`** / **`suction_cap`**: the options described in their own
 >  sections; all default to off or to what the input file declares.<br>
 >- **`debug_level`** (default 0): 0 silent, 1 summary, 2 per-iteration.
 
@@ -873,10 +917,9 @@ where the evidence is unambiguous, and every trial's verdict, $u_{ratio}$ and gr
 
 **The history must be a full-budget history.** Both signals are calibrated on solves that ran to
 their iteration ceiling. A slow runaway takes far longer to become visible in the displacement field
-than the no-progress early exit takes to fire, so a truncated history can look frozen while the
-slope is accelerating. Under the hybrid criterion the early exit is therefore **suppressed** whenever
-it trips on a state that currently looks stuck; every other case exits as before, keeping the time
-saving where the FAILED verdict is already corroborated.
+than a residual plateau takes to appear, so a truncated history can look frozen while the slope is
+accelerating. Every trial now spends its whole budget — a plateau is reported, never acted on — so
+the classifier always reads a full-budget history.
 
 **Calibration.** The thresholds are $u_{ratio} \le 1.25$ for "at elastic scale", $u_{ratio} \ge 1.5$
 for "beyond it", and a growth of 0.02 elastic displacements over the trailing window for "still
@@ -958,7 +1001,8 @@ Its principal arguments:
 >  the reported FS is independent of the bracket, at the same $\log_2$ cost. Used by the
 >  [reliability analysis](../reliability/fem.md) for reproducible results.<br>
 >- **`failure_criterion`** (`"hybrid"`), **`convergence_tol`** ($10^{-3}$), **`force_tol`**
->  ($10^{-3}$), **`max_iterations`** (3000): passed to each trial.<br>
+>  ($10^{-3}$), **`max_iterations`** (12000), **`max_iterations_ceiling`** (50000): passed to each
+>  trial.<br>
 >- **`max_disp_factor`** (0.1): the displacement-limit fraction. It is what the
 >  `"displacement_limit"` criterion bisects on; the equilibrium-based criteria disable it in their
 >  trials.<br>
@@ -967,7 +1011,7 @@ Its principal arguments:
 >  a failing state under an absolute `force_tol`.<br>
 >- **`pp_formulation`** (`"effective"`), **`k0`**, **`staged`**, **`min_slip_depth`**,
 >  **`ssr_exclude`** / **`ssr_zone`**, **`tension_cutoff_by_material`** / **`tension_srf`**,
->  **`elastic_materials`**, **`bond_slip`**, **`suction_phi_b`** / **`suction_cap`**: as described in
+>  **`elastic_materials`**, **`suction_phi_b`** / **`suction_cap`**: as described in
 >  their own sections.<br>
 >- **`n_sweep`** (10): coarse sweep points for the `"displacement_increase"` criterion.<br>
 >- **`capture_failure_state`** (`True`) and **`capture_margin`** (0.15): after the bracket resolves,
@@ -975,7 +1019,11 @@ Its principal arguments:
 >  backstop and early exit off and a generous ceiling — so the unconverged field develops the
 >  **at-failure mechanism** (the rotational collapse: crest settlement, toe heave). Right at the
 >  critical factor the collapse develops too slowly to become visible in a finite number of
->  iterations, hence the margin. The result is returned as `failure_solution` and changes nothing
+>  iterations, hence the margin. A slope beyond critical never passes through equilibrium, and a
+>  reinforcement element drops to its residual only on an equilibrium state, so the capture solve
+>  starts from the post-peak set the bracket's failed-edge trial shed to: a layer that gave way at
+>  its residual is shown at that residual in the at-failure field (`failed_edge_softened` in the
+>  result). The field is returned as `failure_solution` and changes nothing
 >  else, so turning it off leaves the factor of safety, the bracket and `last_solution` untouched —
 >  which is what the reliability and sensitivity analyses do, since they never draw the field.
 
@@ -1239,12 +1287,9 @@ share nodes with the surrounding soil elements and participate in the viscoplast
 body-force corrections.
 
 - **[Soil Reinforcement](reinforcement.md)**: geotextiles, soil nails and ground anchors as
-  tension-only truss elements with axial stiffness $EA/L$ — including the failure modes (pullout,
-  peak-residual softening, complete failure) and typical material properties. The optional
-  **`bond_slip`** run argument replaces a line's fixed pullout ramp with a stress-dependent Coulomb
-  bond that caps the force gradient along the embedded length,
-  $dT/ds \le P(c_{bond} + \sigma_n \tan\phi_{bond})$; it is off by default. See
-  [Bond-Slip Load Transfer](reinforcement.md#bond-slip-load-transfer-optional).
+  tension-only truss elements with axial stiffness $EA/L$, on every node of the soil edge they lie
+  on — including the failure modes (perfectly
+  plastic pullout, peak-residual softening, brittle rupture) and typical material properties.
 
 - **[Piles and Concrete Piers](piles.md)**: beam elements carrying both axial stiffness ($EA/L$) and
   lateral bending stiffness ($12EI/L^3$), and — unlike reinforcement — both tension and compression.
@@ -1396,10 +1441,14 @@ a captured mechanism simply omits those rows.
 | `x_start`, `y_start`, `x_end`, `y_end` | Element endpoint coordinates. |
 | `axial_force` | Axial (tensile) force carried by the element. |
 | `t_allow` | Allowable tensile capacity (reduced toward the ends by the pullout ramp). |
-| `t_cap` | The tensile cap the solve actually enforced. Equal to `t_allow` except where the optional [bond-slip model](reinforcement.md#bond-slip-load-transfer-optional) replaced the pullout ramp with its Coulomb bond envelope, which is a run option and so cannot be recovered from the model alone. Absent in files written before this column existed, which read back as `t_allow`. |
-| `t_res` | Residual tensile capacity after softening (0 for brittle rupture). |
+| `t_res` | Residual tensile capacity after softening: the smaller of the $T_{res}$ entered for the line and the capacity the embedment develops at that element. Zero only where the line's $T_{res}$ is zero — brittle rupture. Blank where the line declares no $T_{res}$ and so never softens. |
 | `mobilization` | Ratio of axial force to allowable capacity. |
 | `failed`, `softened` | Whether the element reached its capacity, and whether it dropped to residual. |
+
+These two flags, together with whether the elements at capacity sit inside a pullout ramp or out on the
+$T_{max}$ plateau, are what the line's reported state is built from — *within capacity*, *near capacity*,
+*pullout*, *yielded*, *softened*, *ruptured* or *inactive*, defined in
+[The state of a line](reinforcement.md#the-state-of-a-line).
 
 ### Pile results columns
 

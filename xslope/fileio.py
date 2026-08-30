@@ -210,7 +210,7 @@ POLYGON_TYPE_WORDS = {
 
 # === v12 reinforcement support-type presets (reinforce sheet, Type column) ===
 # type -> (dir, appl). The same table the sheet holds in its hidden lookup block
-# (reinforce!Z8:AB11), which its Dir and Appl formulas VLOOKUP: picking a Type
+# (reinforce!AB8:AD11), which its Dir and Appl formulas VLOOKUP: picking a Type
 # fills both, and typing over either keeps what was typed until the Type is picked
 # again. Module level rather than local to the loader so the Studio's reinforcement
 # editor fills its Dir/Appl combos from THIS table instead of restating it -- the
@@ -226,6 +226,20 @@ REINFORCE_TYPE_PRESETS = {
 }
 #: What a line with no Type gets: a generic tensile line.
 REINFORCE_TYPE_DEFAULT = ('tangent', 'active')
+
+
+def _reinf_word(value, default):
+    """A reinforcement vocabulary cell's word, or ``default`` when it is blank.
+
+    Blank is None, NaN or an empty string -- never a falsy NUMBER. The obvious
+    ``value or default`` reads ``0.0`` as an empty cell, which is how a nonsense
+    ``Dir`` got written back to the sheet as the Type's preset instead of as
+    itself, hiding from the loader the value that had actually been entered.
+    """
+    if value is None or (isinstance(value, float) and value != value):
+        return default
+    text = str(value).strip().lower()
+    return text if text else default
 
 
 def _opt_size_cell(df, row_idx, col_idx, where):
@@ -461,33 +475,108 @@ def _validate_polygons_no_overlap(polygons):
                     f"notch), not drawn on top of it.")
 
 
-def reinforce_available_tension(d1, d2, t_max, lp1, lp2, tend1=0.0, tend2=0.0):
+class PulloutProfile:
+    """The pullout resistance of one reinforcement line, integrated along it.
+
+    A pullout law states a resistance per unit length of line, r(s) — the force
+    the soil–reinforcement interface can hold back per unit of embedment at arc
+    length s from end 1. The capacity the line can develop at s is the resistance
+    earned over the embedment between s and whichever end is being counted from,
+    i.e. the integral of r. This object stores that integral once, sampled on a
+    fine grid, so the envelope can be evaluated at any point by interpolation
+    instead of re-integrating per trial surface.
+
+    Build one with :meth:`from_rate` and hand it to
+    :func:`reinforce_available_tension` as ``pullout=``.
+    """
+
+    __slots__ = ("length", "s", "cum", "total")
+
+    def __init__(self, length, s, cum):
+        self.length = float(length)
+        self.s = np.asarray(s, dtype=float)
+        self.cum = np.asarray(cum, dtype=float)
+        self.total = float(self.cum[-1]) if len(self.cum) else 0.0
+
+    @classmethod
+    def from_rate(cls, rate, length, n=201):
+        """Integrate a rate function r(s), s in [0, length], by the trapezoid
+        rule on ``n`` samples.
+
+        The rate is sampled rather than solved because it is not analytic: the
+        line crosses material boundaries and the water table, and the effective
+        overburden it reads is discontinuous at both. ``n`` = 201 puts a sample
+        every half percent of the line, which resolves those steps far finer
+        than the geometry that produced them.
+        """
+        length = float(length)
+        if length <= 0 or n < 2:
+            return cls(length, np.array([0.0]), np.array([0.0]))
+        s = np.linspace(0.0, length, int(n))
+        r = np.array([float(rate(float(v))) for v in s], dtype=float)
+        r = np.where(np.isfinite(r), r, 0.0)
+        cum = np.concatenate(([0.0], np.cumsum(0.5 * (r[1:] + r[:-1]) * np.diff(s))))
+        return cls(length, s, cum)
+
+    def _at(self, d):
+        return float(np.interp(d, self.s, self.cum, left=0.0, right=self.total))
+
+    def from_end1(self, d1):
+        """Resistance developed over the embedment d1 back to end 1."""
+        return self._at(d1)
+
+    def from_end2(self, d2):
+        """Resistance developed over the embedment d2 back to end 2."""
+        return self.total - self._at(self.length - d2)
+
+
+def reinforce_available_tension(d1, d2, t_max, lp1, lp2, tend1=0.0, tend2=0.0,
+                                pullout=None):
     """Available tensile force at a point along a reinforcement line — the
     capacity envelope shared by the LEM point list and the FEM element taper:
 
         T = min( Tmax,
-                 Tend1 + Tmax*d1/Lp1,     (Lp1 = 0 -> end 1 fully anchored)
-                 Tend2 + Tmax*d2/Lp2 )    (Lp2 = 0 -> end 2 fully anchored)
+                 Tend1 + int_0^s r,      (integral from end 1 to the point)
+                 Tend2 + int_s^L r )     (integral from the point to end 2)
 
     d1/d2 are the distances from the point to end 1 / end 2. Tend* are end
     anchorage capacities (plate/connection/anchor); 0 reproduces the classical
     friction-only taper exactly. One implementation for both engines, so the
     two can never drift.
+
+    The pullout rate r comes from one of two laws:
+
+    - **Constant rate** (``pullout=None``, the default): the bond develops the
+      full tensile capacity over the pullout length, r = Tmax/Lp, so the
+      integrals collapse to the linear ramps Tmax*d1/Lp1 and Tmax*d2/Lp2. An
+      Lp of 0 means that end is fully anchored — Tmax is available at the end
+      itself.
+    - **Overburden-dependent** (``pullout`` = a :class:`PulloutProfile`): r
+      varies along the line with the effective overburden, and the integrals
+      are read off the profile. Lp1/Lp2 play no part; the profile carries the
+      whole law.
     """
-    cap1 = t_max if lp1 <= 0 else min(t_max, tend1 + t_max * d1 / lp1)
-    cap2 = t_max if lp2 <= 0 else min(t_max, tend2 + t_max * d2 / lp2)
-    return max(0.0, min(cap1, cap2))
+    if pullout is not None:
+        cap1 = tend1 + pullout.from_end1(d1)
+        cap2 = tend2 + pullout.from_end2(d2)
+    else:
+        cap1 = t_max if lp1 <= 0 else tend1 + t_max * d1 / lp1
+        cap2 = t_max if lp2 <= 0 else tend2 + t_max * d2 / lp2
+    return max(0.0, min(t_max, cap1, cap2))
 
 
 def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area,
-                           Tend1=0.0, Tend2=0.0):
+                           Tend1=0.0, Tend2=0.0, pullout=None):
     """Build the LEM tension-distribution point list for ONE reinforcement line
     from its raw endpoints, pullout lengths, and end anchorage. Returns [] for a
     zero-length line.
 
-    The available tension is the piecewise-linear capacity envelope of
-    :func:`reinforce_available_tension`; the point list holds its breakpoints so
-    linear interpolation between points reproduces the envelope exactly.
+    The available tension is the capacity envelope of
+    :func:`reinforce_available_tension`. Under the constant-rate law that
+    envelope is piecewise linear and the point list holds its breakpoints, so
+    linear interpolation between points reproduces it exactly; under the
+    overburden-dependent law (``pullout``) it is a curve and the points are a
+    dense sampling of it.
 
     Extracted from load_slope_data so the same derivation can be reused (e.g. by
     the GUI) to rebuild the display format after editing the raw line data."""
@@ -502,28 +591,40 @@ def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area,
 
     def T_at(s):
         return reinforce_available_tension(s, line_length - s, Tmax, Lp1, Lp2,
-                                           Tend1, Tend2)
+                                           Tend1, Tend2, pullout=pullout)
 
-    # Candidate breakpoints: the endpoints plus every kink of the envelope —
-    # where each end's ramp reaches Tmax, and where the two ramps cross.
-    cands = {0.0, line_length}
-    if Lp1 > 0 and Tend1 < Tmax:
-        cands.add(min(line_length, (Tmax - Tend1) * Lp1 / Tmax))
-    if Lp2 > 0 and Tend2 < Tmax:
-        cands.add(max(0.0, line_length - (Tmax - Tend2) * Lp2 / Tmax))
-    if Lp1 > 0 and Lp2 > 0:
-        m1, m2 = Tmax / Lp1, Tmax / Lp2
-        s_x = (Tend2 + m2 * line_length - Tend1) / (m1 + m2)
-        # only a breakpoint when the ramps cross BELOW the Tmax plateau
-        if 0.0 < s_x < line_length and (Tend1 + m1 * s_x) < Tmax:
-            cands.add(s_x)
+    if pullout is not None:
+        # Overburden-dependent law: the envelope is a curve, not a polyline, so
+        # there are no kinks to solve for. Sample it on the profile's own grid,
+        # thinned to keep the stored point list a readable size — the LEM reads
+        # the envelope function directly at the crossing, so these points are
+        # for drawing and for hand-built models, not for the solve.
+        step = max(1, (len(pullout.s) - 1) // 40)
+        cands = set(float(v) for v in pullout.s[::step])
+        cands.update((0.0, line_length))
+    else:
+        # Candidate breakpoints: the endpoints plus every kink of the envelope —
+        # where each end's ramp reaches Tmax, and where the two ramps cross.
+        cands = {0.0, line_length}
+        if Lp1 > 0 and Tend1 < Tmax:
+            cands.add(min(line_length, (Tmax - Tend1) * Lp1 / Tmax))
+        if Lp2 > 0 and Tend2 < Tmax:
+            cands.add(max(0.0, line_length - (Tmax - Tend2) * Lp2 / Tmax))
+        if Lp1 > 0 and Lp2 > 0:
+            m1, m2 = Tmax / Lp1, Tmax / Lp2
+            s_x = (Tend2 + m2 * line_length - Tend1) / (m1 + m2)
+            # only a breakpoint when the ramps cross BELOW the Tmax plateau
+            if 0.0 < s_x < line_length and (Tend1 + m1 * s_x) < Tmax:
+                cands.add(s_x)
 
-    # Emit ordered, deduplicated breakpoints. The stored Tres mirrors the old
-    # semantics: the material residual where the full capacity is available,
-    # zero inside a friction ramp (sudden pullout) unless the governing end is
-    # anchored, in which case the anchor hardware survives up to min(Tres, Tend).
-    # An UNSET Tres (NaN) stays unset everywhere along the line — no post-peak
-    # drop anywhere — rather than collapsing to a number through min().
+    # Emit ordered, deduplicated breakpoints. The stored Tres is the residual
+    # capacity at the breakpoint: the smaller of the material residual and the
+    # capacity the envelope develops there. Bond slip is perfectly plastic — an
+    # element that slips keeps carrying the ramped capacity — so the only thing
+    # that can cut a point's post-peak capacity below the envelope is the
+    # material residual itself. An UNSET Tres (NaN) stays unset everywhere along
+    # the line — no post-peak drop anywhere — rather than collapsing to a number
+    # through min().
     tol = max(1e-9, 1e-9 * line_length)
     line_points = []
     for s in sorted(cands):
@@ -532,14 +633,8 @@ def _reinforce_line_points(x1, y1, x2, y2, Tmax, Tres, Lp1, Lp2, E, Area,
         T = T_at(s)
         if Tres != Tres:                      # NaN: unset, no post-peak drop
             tres_pt = float('nan')
-        elif T >= Tmax - 1e-12:
-            tres_pt = Tres
         else:
-            governing_tend = tend_g = 0.0
-            cap1 = Tmax if Lp1 <= 0 else Tend1 + Tmax * s / Lp1
-            cap2 = Tmax if Lp2 <= 0 else Tend2 + Tmax * (line_length - s) / Lp2
-            tend_g = Tend1 if cap1 <= cap2 else Tend2
-            tres_pt = min(Tres, tend_g)
+            tres_pt = min(Tres, T)
         line_points.append({"X": x1 + s * dx, "Y": y1 + s * dy, "T": T,
                             "Tres": tres_pt, "E": E, "Area": Area, "_s": s})
     for p in line_points:
@@ -558,15 +653,270 @@ def build_reinforce_lines(reinforcement_lines):
         pts = _reinforce_line_points(
             r["x1"], r["y1"], r["x2"], r["y2"], r["t_max"], r["t_res"],
             r["lp1"], r["lp2"], r["E"], r["area"],
-            r.get("tend1", 0.0), r.get("tend2", 0.0))
+            r.get("tend1") or 0.0, r.get("tend2") or 0.0,
+            pullout=r.get("_pullout_profile"))
         if len(pts) >= 2:
             lines.append(pts)
     return lines
 
 
+# ---------------------------------------------------------------------------
+# Overburden-dependent pullout
+#
+# The alternative to a development length: state the interface strength and let
+# the resistance follow the depth of burial. Per unit length of a planar
+# reinforcement, with soil bearing on both faces,
+#
+#     r(s) = 2 * ( a + sigma'_v(s) * tan(delta) )
+#
+# with a the soil-reinforcement adhesion and delta the interface friction angle
+# (the 'Adhesion' and 'Delta' columns of the reinforce sheet). sigma'_v is the
+# EFFECTIVE overburden at the point: the weight of the soil column standing
+# above it, less the pore pressure the model declares there. Both columns blank
+# is the default and leaves the constant-rate law untouched.
+#
+# The FHWA pullout-capacity form, F* and alpha against the same overburden, is
+# this law with a = 0 and delta = atan(F* * alpha).
+# ---------------------------------------------------------------------------
+
+def _ground_y(ground_surface, x):
+    """Ground elevation above x, or None off the ends of the section."""
+    if ground_surface is None or ground_surface.is_empty:
+        return None
+    coords = list(ground_surface.coords)
+    xs = [p[0] for p in coords]
+    if x < min(xs) or x > max(xs):
+        return None
+    if xs[0] > xs[-1]:
+        coords = coords[::-1]
+        xs = xs[::-1]
+    for k in range(len(coords) - 1):
+        x0, y0 = coords[k]
+        x1, y1 = coords[k + 1]
+        if x0 <= x <= x1 and x1 > x0:
+            return y0 + (x - x0) * (y1 - y0) / (x1 - x0)
+    return coords[-1][1] if x >= xs[-1] else coords[0][1]
+
+
+def _column_total_stress(slope_data, x, y, y_ground, y_water):
+    """Total vertical stress at (x, y) from the soil standing above it.
+
+    The same quantity ``generate_slices`` accumulates as ``sum_gam_h`` and
+    divides into the slice weight: every material zone the vertical column
+    crosses contributes its thickness times its unit weight, saturated below
+    the model's water table where the material declares a ``gamma_sat`` and
+    moist above it. Splitting the column at the water table before intersecting
+    the zones reproduces the slice generator's band-by-band split exactly.
+
+    ``y_water`` is NaN when the model defines no water table, in which case the
+    moist unit weight applies throughout — the same fallback the slice
+    generator takes.
+    """
+    if y_ground is None or y_ground <= y:
+        return 0.0
+    materials = slope_data.get('materials') or []
+    polygons = slope_data.get('polygons') or []
+    if y_water is None or not np.isfinite(y_water):
+        segments = [(y, y_ground, False)]
+    else:
+        y_split = min(max(float(y_water), y), y_ground)
+        segments = [(y, y_split, True), (y_split, y_ground, False)]
+    total = 0.0
+    for lo, hi, saturated in segments:
+        if hi - lo <= 0:
+            continue
+        column = LineString([(x, lo), (x, hi)])
+        # A zone owns the part of the column no zone before it already claimed.
+        # A shapely polygon includes its own boundary, so a column standing
+        # exactly on the vertical edge two zones share — which is where a
+        # reinforcement line ends in every zoned retaining structure, the back
+        # of the reinforced fill — intersects BOTH of them over its whole
+        # length and would be weighed twice. Claiming each length once makes the
+        # zone listed first own an interface, the same convention
+        # :func:`_material_at_point` already applies to a point on a boundary.
+        claimed = None
+        for poly in polygons:
+            shape = poly.get('polygon') if isinstance(poly, dict) else poly
+            mat_id = poly.get('mat_id') if isinstance(poly, dict) else None
+            if shape is None or mat_id is None:
+                continue
+            try:
+                piece = column.intersection(shape)
+                if claimed is not None:
+                    piece = piece.difference(claimed)
+            except Exception:                            # pragma: no cover
+                continue
+            if piece.is_empty:
+                continue
+            try:
+                mat = materials[int(mat_id)]
+            except (IndexError, TypeError, ValueError):
+                continue
+            claimed = piece if claimed is None else claimed.union(piece)
+            g_sat = mat.get('gamma_sat')
+            gamma = (g_sat if (saturated and g_sat is not None) else mat['gamma'])
+            total += piece.length * float(gamma)
+    return total
+
+
+def _material_at_point(slope_data, x, y):
+    """The material zone containing (x, y), or None."""
+    materials = slope_data.get('materials') or []
+    pt = Point(x, y)
+    for poly in slope_data.get('polygons') or []:
+        shape = poly.get('polygon') if isinstance(poly, dict) else poly
+        mat_id = poly.get('mat_id') if isinstance(poly, dict) else None
+        if shape is None or mat_id is None:
+            continue
+        try:
+            if shape.covers(pt):
+                return materials[int(mat_id)]
+        except (IndexError, TypeError, ValueError):
+            continue
+    return None
+
+
+def reinforce_effective_overburden(slope_data, x, y, y_water=None):
+    """Effective vertical stress at (x, y): the weight of the soil column above
+    it less the pore pressure the model declares there.
+
+    The pore pressure follows the ``u`` option of the material the point lands
+    in, exactly as a slice base does — a piezometric head, a pore-pressure ratio
+    on the soil column, or an interpolated seepage field — and a model with no
+    water reads zero. Suction is not credited: a point above the water table
+    contributes its total stress, never more.
+    """
+    from .water import water_table_y
+    if y_water is None:
+        y_water = float(water_table_y(slope_data, x))
+    y_ground = _ground_y(slope_data.get('ground_surface'), x)
+    sigma_v = _column_total_stress(slope_data, x, y, y_ground, y_water)
+    if sigma_v <= 0:
+        return 0.0
+    material = _material_at_point(slope_data, x, y)
+    from .generators import _pore_pressure
+    u = _pore_pressure(slope_data, material, x, y, sigma_v)
+    return max(0.0, sigma_v - u)
+
+
+def reinforce_pullout_profile(line, slope_data, n=201):
+    """The :class:`PulloutProfile` for one raw reinforcement line, or None when
+    the line does not use the overburden-dependent law.
+
+    ``line`` is a ``reinforcement_lines`` dict; the law is active when both its
+    ``adhesion`` and ``delta`` are present and finite. The rate is divided by
+    the line's ``Spacing`` for the same reason every other capacity term is —
+    everything downstream of the loader is per unit width of slope — so a
+    continuous sheet, whose Spacing is blank, is unaffected.
+    """
+    adhesion = line.get('adhesion')
+    delta = line.get('delta')
+    if adhesion is None or delta is None:
+        return None
+    adhesion, delta = float(adhesion), float(delta)
+    if not (np.isfinite(adhesion) and np.isfinite(delta)):
+        return None
+
+    x1, y1 = float(line['x1']), float(line['y1'])
+    x2, y2 = float(line['x2']), float(line['y2'])
+    length = math.hypot(x2 - x1, y2 - y1)
+    if length <= 0:
+        return None
+    # The law reads the soil column above the line. Without material zones there
+    # is no column to read and the overburden term would silently vanish,
+    # leaving the adhesion alone — a much weaker line, and nothing on screen
+    # saying why.
+    if not (slope_data.get('polygons') and slope_data.get('materials')):
+        warnings.warn(
+            f"Reinforcement line {line.get('label') or ''!r} states an "
+            f"overburden-dependent pullout law (Adhesion and Delta), but this "
+            f"model carries no material zones, so the effective overburden along "
+            f"the line reads zero and only the adhesion develops any resistance.")
+    dx, dy = (x2 - x1) / length, (y2 - y1) / length
+    tan_delta = math.tan(math.radians(delta))
+    # The loader has already divided the entered per-element capacities by
+    # Spacing; the rate is divided here for the same reason, so a discrete
+    # support's envelope stays in one convention end to end.
+    spacing = float(line.get('spacing') or 1.0)
+
+    def rate(s):
+        x, y = x1 + s * dx, y1 + s * dy
+        sigma_v = reinforce_effective_overburden(slope_data, x, y)
+        return 2.0 * (adhesion + sigma_v * tan_delta) / spacing
+
+    return PulloutProfile.from_rate(rate, length, n=n)
+
+
+def attach_reinforce_pullout(slope_data, n=201):
+    """Build each reinforcement line's pullout profile and refresh the derived
+    LEM point lists.
+
+    Called once by :func:`load_slope_data`, and by any caller that assembles
+    ``slope_data`` itself (the Studio document, the GeoStudio importer) after
+    the geometry, materials and water are in place — the profile reads all
+    three. Lines on the constant-rate law get ``_pullout_profile = None`` and
+    behave exactly as before.
+    """
+    lines = slope_data.get('reinforcement_lines') or []
+    if not lines:
+        return slope_data
+    for r in lines:
+        r['_pullout_profile'] = reinforce_pullout_profile(r, slope_data, n=n)
+        r['_pullout_key'] = _pullout_key(r)
+    if any(r.get('_pullout_profile') is not None for r in lines):
+        slope_data['reinforce_lines'] = build_reinforce_lines(lines)
+    return slope_data
+
+
+def _pullout_key(line):
+    """The inputs a line's pullout profile was built from.
+
+    Comparing this against the line's current values is how a profile is known
+    to be stale: a Studio edit, a sensitivity sweep, or an importer writing new
+    values all mutate the line dict in place, and a profile that outlived its
+    inputs would answer with the old law and say nothing about it.
+    """
+    return tuple(line.get(k) for k in
+                 ('adhesion', 'delta', 'spacing', 'x1', 'y1', 'x2', 'y2'))
+
+
+def ensure_reinforce_pullout(slope_data):
+    """Resolve any pullout profile that is missing or out of date.
+
+    :func:`load_slope_data` builds them once, but a ``slope_data`` assembled in
+    memory — by the Studio, by an importer, by a sweep, by a test — reaches an
+    engine with the Adhesion/Delta columns filled and no profile behind them, or
+    with a profile built before the last edit. Both engines call this on the way
+    in, so the law is honored wherever the model came from. Files on the
+    constant-rate law cost one tuple comparison per line.
+    """
+    lines = slope_data.get('reinforcement_lines') or []
+    if not lines and 'reinforcement_lines' in slope_data:
+        # The source list is the model's own statement about its reinforcement,
+        # the empty list included. 'reinforce_lines' is derived from it, and a
+        # derived list that outlives the row it came from is reinforcement the
+        # model no longer has -- still drawn by plot.plot_reinforcement_lines,
+        # and (before the slicer stopped falling back to it) still carried into
+        # the factor of safety.
+        if slope_data.get('reinforce_lines'):
+            slope_data['reinforce_lines'] = []
+        return slope_data
+    for r in lines:
+        if r.get('_pullout_key') != _pullout_key(r):
+            attach_reinforce_pullout(slope_data)
+            break
+    return slope_data
+
+
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 23
+SUPPORTED_TEMPLATE_VERSION = 25
+
+# The template version that inserted the 1D element size cell at main!D20, pushing
+# every main-sheet run option below it down one row. Files at or above it are read
+# (and written) with that one-row shift; older ones keep their original layout and
+# carry no 1D size at all.
+_ELEMENT_SIZE_1D_TEMPLATE_VERSION = 25
 
 # The template version that introduced the water-load mode cell (main!D23). Below it
 # a file cannot say who supplies the weight of standing water, so it always means
@@ -865,12 +1215,19 @@ def _parse_tseep_sheet(xls, template_version=18):
     }
 
 
-def load_slope_data(filepath, dest=None, overwrite=False):
+def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=True):
     """
     This function reads input data from various Excel sheets and parses it into
     structured components used throughout the slope stability analysis framework.
     It handles circular and non-circular failure surface data, reinforcement, piezometric
     lines, and distributed loads.
+
+    ``require_analysis_data=False`` loads a model that is not yet runnable — no
+    failure surfaces, no mesh, and no seepage boundary conditions (e.g. a partially
+    built model saved from an editor, or a tutorial starter file). Such a model is
+    validated on the seepage-only path (unit weights may be blank); everything else
+    is checked as usual. The default (True) keeps the analysis-entry behavior: a
+    file with none of the four is rejected.
 
     ``filepath`` is a workbook (.xlsx) or a project package (.xslz). A package is
     unpacked first and the extracted workbook loaded, because the sidecars this
@@ -953,6 +1310,12 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             f"xslope supports versions up to {SUPPORTED_TEMPLATE_VERSION}. "
             "Update xslope to read this file.")
 
+    # v25 inserted '1D element size' at main!D20, so every run option below it moved
+    # down one row. One offset carries that through the whole main-sheet block --
+    # including the cell names the error messages quote, which must name the row the
+    # user is actually looking at.
+    _shift = 1 if _tv >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION else 0
+
     # === MAIN-SHEET GLOBALS (version-gated positional map) ===
     # v18 inserted two declaration cells at the top of the block and shifted the three
     # existing globals down two rows:
@@ -1011,12 +1374,15 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     #   D14 LEM method       D15 number of slices   D16 K0 initial stress (FEM)
     #   D17 Tension SRF      D18 mesh element type  D19 mesh target size
     #   D20 SSRM F min       D21 SSRM F max
+    # From v25 the block gains D20 '1D element size' and the SSRM bracket moves to
+    # D21/D22; the rows below shift with it (see _shift).
     lem_method = None
     num_slices_opt = None
     k0 = None
     tension_srf_opt = None
     element_type = None
     target_size = None
+    element_size_1d = None
     ssrm_f_min = None
     ssrm_f_max = None
 
@@ -1097,14 +1463,27 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 "in cell D19. It must be positive (leave it blank for the "
                 "automatic size).")
 
-        # -- D20/D21 SSRM bracket.
-        ssrm_f_min = _opt_num(19, 'SSRM F min')                          # D20
-        ssrm_f_max = _opt_num(20, 'SSRM F max')                          # D21
+        # -- D20 1D element size (v25). The target edge length along the 1D
+        # members -- piles and reinforcement lines. Blank means unspecified, and
+        # the mesher's own subdivision applies, so a v24 file (which has no such
+        # cell at all) and a v25 file with the cell empty are the same model.
+        if _tv >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
+            element_size_1d = _opt_num(19, '1D element size')            # D20
+            if element_size_1d is not None and element_size_1d <= 0:
+                raise ValueError(
+                    f"The 'main' sheet declares a 1D element size of "
+                    f"{element_size_1d} in cell D20. It must be positive (leave it "
+                    "blank to subdivide the 1D members automatically).")
+
+        # -- SSRM bracket (D20/D21 through v24, D21/D22 from v25).
+        ssrm_f_min = _opt_num(19 + _shift, 'SSRM F min')
+        ssrm_f_max = _opt_num(20 + _shift, 'SSRM F max')
         if (ssrm_f_min is not None and ssrm_f_max is not None
                 and ssrm_f_min >= ssrm_f_max):
             raise ValueError(
-                f"The 'main' sheet declares SSRM F min = {ssrm_f_min} (D20) >= "
-                f"F max = {ssrm_f_max} (D21). The bracket must be increasing.")
+                f"The 'main' sheet declares SSRM F min = {ssrm_f_min} "
+                f"(D{20 + _shift}) >= F max = {ssrm_f_max} (D{21 + _shift}). "
+                f"The bracket must be increasing.")
 
     # === SIDE BOUNDARY CONDITION (v21, main D22) ===
     # How the FEM restrains the left and right truncation boundaries:
@@ -1116,14 +1495,16 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # untouched cell is the same model as its v20 original.
     side_bc = None
     if _tv >= 21:
-        _sbc_raw = _cell_str(main_df.iloc[21, 3]) if main_df.shape[0] > 21 else ''
+        _sbc_row = 21 + _shift
+        _sbc_raw = (_cell_str(main_df.iloc[_sbc_row, 3])
+                    if main_df.shape[0] > _sbc_row else '')
         if _sbc_raw:
             side_bc = _sbc_raw.lower()
             if side_bc not in SIDE_BC_OPTIONS:
                 raise ValueError(
                     f"The 'main' sheet declares a Side BC of {_sbc_raw!r} in cell "
-                    f"D22. Expected one of: {', '.join(SIDE_BC_OPTIONS)} (or leave it "
-                    "blank for the default, rollers).")
+                    f"D{_sbc_row + 1}. Expected one of: {', '.join(SIDE_BC_OPTIONS)} "
+                    "(or leave it blank for the default, rollers).")
 
     # === WATER LOADS (v22, main D23) ===
     # Who supplies the weight of standing water:
@@ -1140,14 +1521,17 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # under them would count the reservoir twice.
     water_loads = 'manual'
     if _tv >= 22:
-        _wl_raw = _cell_str(main_df.iloc[22, 3]) if main_df.shape[0] > 22 else ''
+        _wl_row = 22 + _shift
+        _wl_raw = (_cell_str(main_df.iloc[_wl_row, 3])
+                   if main_df.shape[0] > _wl_row else '')
         if _wl_raw:
             water_loads = _wl_raw.lower()
             if water_loads not in WATER_LOAD_OPTIONS:
                 raise ValueError(
                     f"The 'main' sheet declares a Water loads mode of {_wl_raw!r} in "
-                    f"cell D23. Expected one of: {', '.join(WATER_LOAD_OPTIONS)} (or "
-                    "leave it blank for the default, auto).")
+                    f"cell D{_wl_row + 1}. Expected one of: "
+                    f"{', '.join(WATER_LOAD_OPTIONS)} (or leave it blank for the "
+                    "default, auto).")
         else:
             water_loads = 'auto'
 
@@ -1165,14 +1549,17 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     # spells the second one with a hyphen.
     surface_family = None
     if _tv >= 22:
-        _sf_raw = _cell_str(main_df.iloc[23, 3]) if main_df.shape[0] > 23 else ''
+        _sf_row = 23 + _shift
+        _sf_raw = (_cell_str(main_df.iloc[_sf_row, 3])
+                   if main_df.shape[0] > _sf_row else '')
         if _sf_raw:
             _sf = _sf_raw.strip().lower().replace('_', '-').replace(' ', '')
             if _sf not in SURFACE_FAMILY_OPTIONS + ('noncircular',):
                 raise ValueError(
                     f"The 'main' sheet declares a surface family of {_sf_raw!r} in "
-                    f"cell D24. Expected one of: {', '.join(SURFACE_FAMILY_OPTIONS)} "
-                    "(or leave it blank to use whichever family the model defines).")
+                    f"cell D{_sf_row + 1}. Expected one of: "
+                    f"{', '.join(SURFACE_FAMILY_OPTIONS)} (or leave it blank to use "
+                    "whichever family the model defines).")
             surface_family = 'noncircular' if _sf.startswith('non') else 'circular'
 
     # === PROFILE LINES ===
@@ -1584,8 +1971,17 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 "geometry method, not both.")
         _validate_polygons_no_overlap(polygons_from_sheet)
         polygons = polygons_from_sheet
-        # max_depth is a profile-sheet concept; it has no meaning for polygon input.
-        max_depth = None
+        # max_depth shapes nothing here — the polygons define the domain floor, and
+        # the profile sheet is not this model's geometry source. It is still a value
+        # the file can DECLARE, so it is carried through rather than dropped: a
+        # model that states a rigid base and is saved must come back stating it
+        # (save_slope_data_to_xlsx writes B2 on a polygon model for that reason).
+        # A blank cell declares nothing, and neither does the template's own 0 on a
+        # sheet this model does not use — every polygon-native file in the corpus
+        # carries that untouched 0, and reading it as a declaration would put a
+        # maximum-depth elevation nobody typed into their reports and plot extents.
+        if max_depth is None or max_depth != max_depth or max_depth == 0:
+            max_depth = None
     elif profile_lines:
         # Convert profile lines -> polygons. max_depth is used ONLY here, as the
         # bottom boundary for build_polygons (mat_id is 0-based in both).
@@ -2062,6 +2458,16 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 "tend1": tend1 / spacing,
                 "tend2": tend2 / spacing,
                 "spacing": spacing,
+                # v24 overburden-dependent pullout. NaN = blank = the constant-
+                # rate law from Lp1/Lp2, so a file written before the columns
+                # existed reads exactly as it always did. These two are entered
+                # per unit AREA of interface and stay that way — the rate they
+                # produce is divided by Spacing where it is integrated, not
+                # here.
+                "adhesion": (float(row['adhesion'])
+                             if pd.notna(row.get('adhesion')) else float('nan')),
+                "delta": (float(row['delta'])
+                          if pd.notna(row.get('delta')) else float('nan')),
             })
         except Exception as e:
             raise ValueError(f"Error processing reinforcement line '{label}' in row {excel_row}: {e}")
@@ -2081,6 +2487,13 @@ def load_slope_data(filepath, dest=None, overwrite=False):
         piles_df = xls.parse('piles', header=1)
         piles_df.columns = [str(c).strip().lower() for c in piles_df.columns]
         _theta_col = 'qp' if 'qp' in piles_df.columns else 'theta'
+        # v25 split the single rotation restraint into one per end: the old
+        # 'Fixity' column became 'Head' (top node) and a new 'Tip' column
+        # (bottom node) was inserted after it. A v24 or older file carries
+        # only 'Fixity', which is read as the head, and no Tip at all, which
+        # reads as 'free' -- exactly the behavior it had before the column
+        # existed.
+        _head_col = 'head' if 'head' in piles_df.columns else 'fixity'
         for i, row in piles_df.iterrows():
             # Stop reading when column x1 is empty
             if pd.isna(row.get('x1')):
@@ -2106,10 +2519,17 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 area = float(row['area']) if pd.notna(row.get('area')) else None
                 V_cap = float(row['vcap']) if pd.notna(row.get('vcap')) else None
                 M_cap = float(row['mcap']) if pd.notna(row.get('mcap')) else None
-                fixity_raw = str(row['fixity']).strip().lower() if pd.notna(row.get('fixity')) else 'free'
-                if fixity_raw not in ('free', 'fixed'):
-                    raise ValueError(f"Fixity must be 'free' or 'fixed', got '{fixity_raw}'")
-                fixity = fixity_raw
+                head_fixity = (str(row[_head_col]).strip().lower()
+                               if pd.notna(row.get(_head_col)) else 'free')
+                if head_fixity not in ('free', 'pinned', 'unrotated', 'fixed'):
+                    raise ValueError(f"{_head_col.capitalize()} must be 'free', "
+                                     f"'pinned', 'unrotated' or 'fixed', got "
+                                     f"'{head_fixity}'")
+                tip_fixity = (str(row['tip']).strip().lower()
+                              if pd.notna(row.get('tip')) else 'free')
+                if tip_fixity not in ('free', 'pinned', 'unrotated', 'fixed'):
+                    raise ValueError(f"Tip must be 'free', 'pinned', 'unrotated' or "
+                                     f"'fixed', got '{tip_fixity}'")
                 # Force application (v12, LEM only): Active = allowable force, not
                 # divided by FS (default, pre-v12 behavior); Passive = ultimate
                 # capacity divided by FS.
@@ -2122,14 +2542,9 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 line_length = ((x2 - x1)**2 + (y2 - y1)**2)**0.5
                 if line_length == 0:
                     continue
-                if H is not None and H <= 0:
-                    raise ValueError(f"H must be positive, got {H}")
-                if V_cap is not None and V_cap <= 0:
-                    raise ValueError(f"Vcap must be positive, got {V_cap}")
-                if M_cap is not None and M_cap <= 0:
-                    raise ValueError(f"Mcap must be positive, got {M_cap}")
-                if (V_cap is not None or M_cap is not None) and S is None:
-                    raise ValueError(f"S (pile spacing) is required when Vcap or Mcap are specified")
+                # H / Vcap / Mcap positivity and the spacing-required rule are
+                # value checks and live in preflight (pile.capacity_nonpositive,
+                # pile.spacing_invalid); the loader stays structural.
 
                 pile_lines.append({
                     "x1": x1, "y1": y1,
@@ -2143,7 +2558,8 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                     "area": area,
                     "V_cap": V_cap,
                     "M_cap": M_cap,
-                    "fixity": fixity,
+                    "head_fixity": head_fixity,
+                    "tip_fixity": tip_fixity,
                     "appl": appl_raw,
                     "label": label,
                 })
@@ -2281,14 +2697,21 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     has_seepage_bc = (len(seepage_bc.get("specified_heads", [])) > 0 or
                      len(seepage_bc.get("specified_fluxes", [])) > 0 or
                      len(seepage_bc.get("exit_face", [])) > 0)
-    is_seepage_only = has_seepage_bc and not circular and len(non_circ) == 0
+    # An editor load (require_analysis_data=False) of a model with no surfaces takes
+    # the same validation path: it is a seepage model in progress, so unit weights
+    # may still be blank and no failure surfaces are demanded.
+    is_seepage_only = ((has_seepage_bc or not require_analysis_data)
+                       and not circular and len(non_circ) == 0)
     # A mesh-based run with no LEM surfaces is a seepage or FEM (SSRM) analysis;
     # neither needs circular/non-circular failure surfaces.
     is_mesh_analysis = mesh is not None and not circular and len(non_circ) == 0
 
     # Only require circular/non-circular data for a pure LEM run (no seep BCs, no mesh)
     if not is_seepage_only and not is_mesh_analysis and not circular and len(non_circ) == 0:
-        raise ValueError("Input must include either circular or non-circular surface data.")
+        raise ValueError(
+            "Input must include circular or non-circular surface data (for a "
+            "slope-stability run), a mesh, or seepage boundary conditions (for a "
+            "seepage run).")
     if not polygons:
         raise ValueError("Geometry is missing: provide either the 'profile' sheet or the 'polygon' sheet.")
     if not materials:
@@ -2304,20 +2727,12 @@ def load_slope_data(filepath, dest=None, overwrite=False):
                 f"A geometry zone references an invalid Mat ID ({mid + 1}); it must "
                 f"reference a material in the 'mat' sheet (1..{len(materials)}).")
 
-    # For slope-stability (non seep-only) runs, every material referenced by the
-    # geometry must have a positive unit weight. A gamma of 0 silently produces
-    # zero slice weights and meaningless factors of safety; seep-only runs do not
-    # use unit weight, so they are exempt.
-    if not is_seepage_only:
-        for poly in polygons:
-            mid = poly.get('mat_id')
-            if mid is not None and 0 <= mid < len(materials):
-                if materials[mid].get('gamma', 0) <= 0:
-                    raise ValueError(
-                        f"Material '{materials[mid]['name']}' (Mat ID {mid + 1}) has a "
-                        f"non-positive unit weight (gamma = {materials[mid]['gamma']}). "
-                        f"A positive unit weight is required for slope-stability analysis.")
-
+    # A missing unit weight is NOT refused here. Loading answers "is this workbook
+    # structurally readable" -- sheet shapes, required columns, ID references -- and
+    # a model being built legitimately has values still to type. Whether gamma is
+    # usable is a question about the RUN, and preflight's 'mat.gamma_nonpositive'
+    # asks it for every stability analysis (and stays silent for a seepage-only one,
+    # which never reads unit weight).
 
     # === TRANSIENT-SEEPAGE VALIDATION (only when a tseep sheet is in use) ===
     if tseep is not None:
@@ -2407,6 +2822,7 @@ def load_slope_data(filepath, dest=None, overwrite=False):
     globals_data["tension_srf"] = tension_srf_opt
     globals_data["element_type"] = element_type
     globals_data["target_size"] = target_size
+    globals_data["element_size_1d"] = element_size_1d
     globals_data["ssrm_f_min"] = ssrm_f_min
     globals_data["ssrm_f_max"] = ssrm_f_max
     # v21 side boundary condition (None = unspecified -> the engine default, rollers).
@@ -2464,6 +2880,11 @@ def load_slope_data(filepath, dest=None, overwrite=False):
             f"({gamma_water:g}) matches neither the SI (~9.81) nor the Imperial "
             f"(~62.4) band, so the model is left unlabeled. Physics is unaffected "
             f"(gamma_water is used as entered); only unit labels are unavailable.")
+    # Overburden-dependent pullout reads the geometry, the materials and the
+    # water, so it is resolved once the whole model is assembled — the profile
+    # then rides on each line for both engines and for the plots.
+    attach_reinforce_pullout(globals_data)
+
     for w in units_check(globals_data):
         warnings.warn(w)
 
@@ -2726,8 +3147,28 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 f"carrying no water load at all, losing the standing water. Save into "
                 f"the current template, or set the mode to manual and enter the water "
                 f"loads on the dloads sheet.")
+    # The workbook is built in a temporary file beside the destination and moved
+    # into place only once every sheet has been written: a failure partway
+    # (a None where a number was expected, a template mismatch) must not leave a
+    # bare template copy under the model's name, which looks like a saved model
+    # and loads as an empty one.
+    _final_path = filepath
+    # (openpyxl opens files by extension, so the scratch copy keeps .xlsx)
+    filepath = f"{_final_path}.writing-{os.getpid()}.xlsx"
     shutil.copy(template, filepath)
+    try:
+        return _save_slope_data_into(slope_data, filepath, template, _final_path)
+    except BaseException:
+        try:
+            os.remove(filepath)
+        except OSError:
+            pass
+        raise
 
+
+def _save_slope_data_into(slope_data, filepath, template, _final_path):
+    """The body of :func:: fill the template copy at
+    filepath and move it to _final_path when complete."""
     def _f(v):
         return float(v)
 
@@ -2746,6 +3187,10 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     # the writer copied `template`, so the main-sheet globals go at the positions that
     # template uses, and tseep is written only if the template actually has the sheet.
     _dest_version, _dest_sheets = _read_template_info(filepath)
+    # v25 inserted '1D element size' at main!D20 and pushed the run options below it
+    # down one row; the same offset the loader uses, applied to the DESTINATION's
+    # layout so an archived template is still written at its own positions.
+    _dshift = 1 if _dest_version >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION else 0
 
     # === main === (version-gated positional map; see load_slope_data)
     if _dest_version >= 18:
@@ -2780,16 +3225,25 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             main_u['D18'] = str(slope_data['element_type']) if slope_data.get('element_type') else None
             main_u['D19'] = (_f(slope_data['target_size'])
                              if slope_data.get('target_size') is not None else None)
-            main_u['D20'] = (_f(slope_data['ssrm_f_min'])
-                             if slope_data.get('ssrm_f_min') is not None else None)
-            main_u['D21'] = (_f(slope_data['ssrm_f_max'])
-                             if slope_data.get('ssrm_f_max') is not None else None)
+            if _dest_version >= _ELEMENT_SIZE_1D_TEMPLATE_VERSION:
+                # v25 1D element size (D20). Written unconditionally like the rest
+                # of the block: the template ships the cell blank, and a model that
+                # declares no 1D size must save as blank rather than inherit one.
+                main_u['D20'] = (_f(slope_data['element_size_1d'])
+                                 if slope_data.get('element_size_1d') is not None
+                                 else None)
+            main_u[f'D{20 + _dshift}'] = (
+                _f(slope_data['ssrm_f_min'])
+                if slope_data.get('ssrm_f_min') is not None else None)
+            main_u[f'D{21 + _dshift}'] = (
+                _f(slope_data['ssrm_f_max'])
+                if slope_data.get('ssrm_f_max') is not None else None)
         if _dest_version >= 21:
             # v21 side BC (D22). Written unconditionally for the same leak reason as
             # the run options above: the blank template ships D22 pre-filled
             # 'rollers', and a model that declares nothing must not inherit it.
             _sbc = slope_data.get('side_bc')
-            main_u['D22'] = str(_sbc).lower() if _sbc else None
+            main_u[f'D{22 + _dshift}'] = str(_sbc).lower() if _sbc else None
         if _dest_version >= 22:
             # v22 water loads (D23). Written EXPLICITLY, never blank, and this one
             # matters more than the leak cases above: the template ships D23
@@ -2805,9 +3259,9 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 # and the answer decides whether the reservoir is counted once.
                 raise ValueError(
                     f"Cannot save this model: its water-load mode is {_wl!r}, which "
-                    f"is not a value cell D23 of the 'main' sheet can hold. Expected "
-                    f"one of: {', '.join(WATER_LOAD_OPTIONS)}.")
-            main_u['D23'] = _wl
+                    f"is not a value cell D{23 + _dshift} of the 'main' sheet can "
+                    f"hold. Expected one of: {', '.join(WATER_LOAD_OPTIONS)}.")
+            main_u[f'D{23 + _dshift}'] = _wl
             # v22 amendment: the surface family (D24). Written unconditionally, so a
             # model that states nothing writes a blank cell -- the normal state, and
             # the template ships blank, so there is nothing here to leak. A model that
@@ -2821,11 +3275,12 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 if _sf_key not in SURFACE_FAMILY_CELL:
                     raise ValueError(
                         f"Cannot save this model: its surface family is {_sf!r}, which "
-                        f"is not a value cell D24 of the 'main' sheet can hold. Expected "
-                        f"one of: {', '.join(SURFACE_FAMILY_OPTIONS)}.")
-                main_u['D24'] = SURFACE_FAMILY_CELL[_sf_key]
+                        f"is not a value cell D{24 + _dshift} of the 'main' sheet "
+                        f"can hold. Expected one of: "
+                        f"{', '.join(SURFACE_FAMILY_OPTIONS)}.")
+                main_u[f'D{24 + _dshift}'] = SURFACE_FAMILY_CELL[_sf_key]
             else:
-                main_u['D24'] = None
+                main_u[f'D{24 + _dshift}'] = None
         updates['main'] = main_u
     else:
         updates['main'] = {
@@ -2978,6 +3433,14 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 prof[cell_ref(_prof_coord_row + i, y_col)] = _f(y)
         updates['profile'] = prof
     else:
+        # A polygon model's geometry is the polygon sheet, but Max depth is on the
+        # profile sheet whichever source the model uses — and skipping the sheet
+        # entirely left a declared max_depth out of the file altogether, so it
+        # reloaded as None with nothing said. Written explicitly, and blank when
+        # the model declares none, so the template's own 0 cannot read back as a
+        # declaration.
+        md = slope_data.get('max_depth')
+        updates['profile'] = {'B2': _f(md) if md is not None else None}
         for pdict in slope_data.get('polygons') or []:
             mat_id = pdict.get('mat_id')
             if mat_id is None:
@@ -3094,9 +3557,17 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         updates['dloads (2)'] = d2
 
     # === reinforce ===  (raw endpoint form in 'reinforcement_lines' round-trips)
-    # v12 layout: # | Label | x1 y1 x2 y2 | Type Dir Appl | Tmax Lp1 Lp2 Tend1
-    # Tend2 Spacing | Tres E Area. Capacity terms were divided by Spacing at load,
-    # so they are multiplied back here -- the file carries per-element values.
+    # Layout: # | Label | x1 y1 x2 y2 | Type Dir Appl | Tmax Lp1 Lp2 Adhesion
+    # Delta Tend1 Tend2 Spacing | Tres E Area. Adhesion/Delta arrived at v24 and
+    # shifted everything after Lp2, and this writer also fills ARCHIVED older
+    # templates (the legacy round-trip fixtures), so each field's column is read
+    # from the target template's own header row rather than hardcoded. A header
+    # the target does not carry is skipped -- saving a model that uses the
+    # overburden law into a pre-v24 template drops the two columns rather than
+    # writing them into whatever sits at that position.
+    # Capacity terms were divided by Spacing at load, so they are multiplied back
+    # here -- the file carries per-element values. Adhesion and Delta are not:
+    # they are interface properties, entered per unit area either way.
     # Dir/Appl carry in-sheet default formulas driven by Type: those cells are
     # written ONLY when the value differs from what the Type preset (or the
     # generic default) would produce, so the formulas survive a round-trip and
@@ -3104,38 +3575,74 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     # the sheet's lookup block and the Studio editor's fill.
     _REINF_PRESETS = REINFORCE_TYPE_PRESETS
     reinf = {}
+    if slope_data.get('reinforcement_lines'):
+        _reinf_hdr = pd.read_excel(template, sheet_name='reinforce', header=1,
+                                   nrows=0)
+        _rcol = {}
+        for i, c in enumerate(_reinf_hdr.columns):
+            name = str(c).strip().lower()
+            if name and not name.startswith('unnamed'):
+                _rcol.setdefault(name, i + 1)
     for n, r in enumerate(slope_data.get('reinforcement_lines') or []):
         row = 3 + n
         sp = float(r.get('spacing', 1.0) or 1.0)
-        reinf.update({
-            cell_ref(row, 1): n + 1,
-            cell_ref(row, 2): str(r.get('label', f"Line {n + 1}")),
-            cell_ref(row, 3): _f(r['x1']), cell_ref(row, 4): _f(r['y1']),
-            cell_ref(row, 5): _f(r['x2']), cell_ref(row, 6): _f(r['y2']),
-            cell_ref(row, 10): _f(r['t_max']) * sp,
-            cell_ref(row, 11): _f(r['lp1']), cell_ref(row, 12): _f(r['lp2']),
-            cell_ref(row, 13): _f(r.get('tend1', 0.0)) * sp,
-            cell_ref(row, 14): _f(r.get('tend2', 0.0)) * sp,
-            cell_ref(row, 15): sp,
-            # unset Tres round-trips as a BLANK cell, not a literal NaN
-            cell_ref(row, 16): (None if _isnan(r.get('t_res'))
-                                else _f(r.get('t_res', 0.0)) * sp),
-            cell_ref(row, 17): _f(r['E']), cell_ref(row, 18): _f(r['area']) * sp,
-        })
-        rtype = str(r.get('type', '') or '')
+        reinf[cell_ref(row, _rcol.get('#', 1))] = n + 1
+        reinf[cell_ref(row, _rcol.get('label', 2))] = str(r.get('label', f"Line {n + 1}"))
+        for hdr, val in (('x1', _f(r['x1'])), ('y1', _f(r['y1'])),
+                         ('x2', _f(r['x2'])), ('y2', _f(r['y2'])),
+                         ('tmax', _f(r['t_max']) * sp),
+                         ('lp1', _f(r['lp1'])), ('lp2', _f(r['lp2'])),
+                         ('tend1', _f(r.get('tend1') or 0.0) * sp),
+                         ('tend2', _f(r.get('tend2') or 0.0) * sp),
+                         ('spacing', sp),
+                         # unset Tres round-trips as a BLANK cell, not a literal NaN
+                         ('tres', None if _isnan(r.get('t_res'))
+                          else _f(r.get('t_res', 0.0)) * sp),
+                         # E / Area left unset (None) round-trip as blank cells
+                         ('e', None if _isnan(r.get('E')) else _f(r['E'])),
+                         ('area', None if _isnan(r.get('area'))
+                          else _f(r['area']) * sp)):
+            col = _rcol.get(hdr)
+            if col is not None:
+                reinf[cell_ref(row, col)] = val
+        # Blank Adhesion/Delta round-trip as blank cells: the constant-rate law
+        # is what a blank pair MEANS, and a literal NaN in the sheet would read
+        # back as a half-filled pair the preflight then refuses.
+        for hdr, key in (('adhesion', 'adhesion'), ('delta', 'delta')):
+            col = _rcol.get(hdr)
+            if col is not None:
+                reinf[cell_ref(row, col)] = (None if _isnan(r.get(key))
+                                             else _f(r.get(key)))
+        # Type is the INPUT; Dir and Appl are derived from it in the sheet by a
+        # VLOOKUP against the type table. A row whose direction and application
+        # are exactly what its Type derives is written as the Type alone, so the
+        # formula stays in the cell and keeps answering after the next edit —
+        # writing the preset back as a literal would replace a live default with
+        # a frozen one. A row that OVERRIDES the preset has to state the
+        # override, which is what typing over the cell means in the sheet; the
+        # cell writer expands the column's shared-formula group first so the
+        # rows below keep a formula (_expand_shared_formulas).
+        #
+        # Each column is written only where the target template actually carries
+        # it. v11 has no Type/Dir/Appl at all, and the positional fallbacks these
+        # lookups used to carry would have put the words into whatever that
+        # template keeps in columns G, H and I.
+        rtype = _reinf_word(r.get('type'), '')
         d_def, a_def = _REINF_PRESETS.get(rtype, REINFORCE_TYPE_DEFAULT)
-        if rtype:
-            reinf[cell_ref(row, 7)] = rtype.capitalize()
-        if str(r.get('dir', d_def)) != d_def:
-            reinf[cell_ref(row, 8)] = str(r['dir']).capitalize()
-        if str(r.get('appl', a_def)) != a_def:
-            reinf[cell_ref(row, 9)] = str(r['appl']).capitalize()
+        for hdr, value, derived in (
+                ('type', rtype, ''),
+                ('dir', _reinf_word(r.get('dir'), d_def), d_def),
+                ('appl', _reinf_word(r.get('appl'), a_def), a_def)):
+            col = _rcol.get(hdr)
+            if col is not None and value and value != derived:
+                reinf[cell_ref(row, col)] = value.capitalize()
     if reinf:
         updates['reinforce'] = reinf
 
     # === piles ===  (header row 2, data rows 3+. The piles layout changed at
     # v23 — the qp force-angle column was dropped, shifting everything after H
-    # one column left — and this writer also fills ARCHIVED older templates
+    # one column left — and again at v25, where Fixity became Head and a Tip
+    # column was inserted after it; this writer also fills ARCHIVED older templates
     # (the legacy round-trip fixtures), so each field's column is read from the
     # target template's own header row rather than hardcoded. A header the
     # target does not carry is skipped.)
@@ -3160,16 +3667,23 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 val = p.get(key)
                 if col is not None and val is not None:
                     piles_u[cell_ref(row, col)] = _f(val)
-            # Appl is written explicitly both ways (like Fixity below): a
+            # Appl is written explicitly both ways (like Head/Tip below): a
             # blank cell still LOADS as active, but a default a reader cannot
             # see in the sheet is a trap, so saved files spell the choice out.
             if 'appl' in _pcol:
                 piles_u[cell_ref(row, _pcol['appl'])] = \
                     'Passive' if str(p.get('appl', 'active')) == 'passive' \
                     else 'Active'
-            if 'fixity' in _pcol:
-                piles_u[cell_ref(row, _pcol['fixity'])] = \
-                    str(p.get('fixity', 'free'))
+            # Head fixity is 'Head' from v25 on and 'Fixity' before it; Tip is
+            # v25-only. Each is written only where the target sheet carries the
+            # column, so a v24 file round-trips through its own layout.
+            _head = str(p.get('head_fixity', p.get('fixity', 'free')) or 'free')
+            for hdr in ('head', 'fixity'):
+                if hdr in _pcol:
+                    piles_u[cell_ref(row, _pcol[hdr])] = _head
+            if 'tip' in _pcol:
+                piles_u[cell_ref(row, _pcol['tip'])] = \
+                    str(p.get('tip_fixity', 'free') or 'free')
     if piles_u:
         updates['piles'] = piles_u
 
@@ -3248,7 +3762,8 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
 
     updates = {k: v for k, v in updates.items() if v}
     write_cells_to_xlsx(filepath, updates)
-    return filepath
+    os.replace(filepath, _final_path)
+    return _final_path
 
 
 def save_data_to_pickle(data, filepath):
@@ -3333,7 +3848,11 @@ def print_dictionary(dictionary):
 #     the edits. We force fullCalcOnLoad and delete calcChain.xml so Excel
 #     rebuilds it. (See the xlsx calcChain/recalc note in project memory.)
 #   * Never write a plain value into a cell that itself holds a formula — that
-#     breaks calcChain.xml. Callers must target precedent/value cells only.
+#     breaks calcChain.xml. Callers must target precedent/value cells only. The
+#     one place a value legitimately replaces a formula is a DERIVED column the
+#     sheet lets a user type over (reinforce Dir/Appl); those columns are shared
+#     formula groups, so _expand_shared_formulas gives the rest of the column its
+#     own copy of the formula before the cell is overwritten.
 #
 # Requires the `zip` CLI (used to replace single entries inside the archive in
 # place; Python's zipfile cannot update an existing member without rewriting
@@ -3416,6 +3935,79 @@ def _build_new_cell(ref, value):
         return f'<c r="{ref}" t="inlineStr"><is><t>{xml_escape(value)}</t></is></c>'
     else:
         return f'<c r="{ref}"><v>{value}</v></c>'
+
+
+_SHARED_CELL_RE = re.compile(
+    r'<c\s+r="([A-Z]+\d+)"(?:\s[^>]*)?>(?:(?!</c>).)*?<f\b[^>]*?\bt="shared"'
+    r'[^>]*?(?:/>|>.*?</f>).*?</c>', re.DOTALL)
+_SHARED_F_RE = re.compile(r'<f\b([^>]*?)(?:/>|>(.*?)</f>)', re.DOTALL)
+
+
+def _shared_group_of(cell_xml):
+    """(si, formula_text_or_None) for a shared-formula cell, else (None, None).
+
+    The master of a group carries the formula text; every other member carries a
+    bare ``<f t="shared" si="N"/>`` that points back at it.
+    """
+    m = _SHARED_F_RE.search(cell_xml)
+    if not m or 't="shared"' not in m.group(1):
+        return None, None
+    si = re.search(r'\bsi="(\d+)"', m.group(1))
+    if not si:
+        return None, None
+    text = m.group(2)
+    return si.group(1), (text if text else None)
+
+
+def _expand_shared_formulas(xml_bytes, refs):
+    """Give every member of a touched shared-formula group its own formula.
+
+    A shared group stores its formula ONCE, on the master cell; the other members
+    hold a bare back-reference. Overwriting the master with a value therefore
+    deletes the only copy of the formula and leaves the rest of the group
+    pointing at nothing. Measured on the reinforce sheet, whose Dir and Appl
+    columns are one shared group each (master at H3/I3, ``ref="H3:H22"``):
+    saving a model whose Dir overrides the Type preset wrote a literal into H3
+    and left Dir rows 9-22 reading back as a bare ``'='``. Excel handles an edit
+    inside a shared group by expanding it first, and so does this: each member
+    gets the master's formula translated to its own address, after which the
+    cell about to be written is an ordinary cell.
+
+    Only groups a written cell actually belongs to are expanded; every other
+    sheet in the workbook is untouched.
+    """
+    from openpyxl.formula.translate import Translator
+
+    xml_text = xml_bytes.decode('utf-8')
+    if 't="shared"' not in xml_text:
+        return xml_bytes
+    cells = {}                       # ref -> (si, formula text or None)
+    masters = {}                     # si -> (ref, formula text)
+    for m in _SHARED_CELL_RE.finditer(xml_text):
+        si, text = _shared_group_of(m.group(0))
+        if si is None:
+            continue
+        cells[m.group(1)] = (si, text)
+        if text:
+            masters[si] = (m.group(1), text)
+    touched = {cells[ref][0] for ref in refs if ref in cells}
+    touched &= set(masters)
+    if not touched:
+        return xml_bytes
+
+    def _expand(match):
+        ref = match.group(1)
+        entry = cells.get(ref)
+        if entry is None or entry[0] not in touched:
+            return match.group(0)
+        origin, text = masters[entry[0]]
+        formula = (text if ref == origin else
+                   Translator('=' + text, origin=origin)
+                   .translate_formula(ref)[1:])
+        return _SHARED_F_RE.sub(lambda _m: f'<f>{formula}</f>',
+                                match.group(0), count=1)
+
+    return _SHARED_CELL_RE.sub(_expand, xml_text).encode('utf-8')
 
 
 def _modify_sheet_xml(xml_bytes, cells):
@@ -3587,7 +4179,8 @@ def write_cells_to_xlsx(filepath, updates):
     with zipfile.ZipFile(filepath) as zf:
         for sheet_name, cells in updates.items():
             path = sheet_paths[sheet_name]
-            parts[path] = _reset_view(_modify_sheet_xml(zf.read(path), cells))
+            parts[path] = _reset_view(_modify_sheet_xml(
+                _expand_shared_formulas(zf.read(path), cells), cells))
         wb_text = zf.read('xl/workbook.xml').decode('utf-8')
         parts['xl/workbook.xml'] = _force_full_recalc(wb_text).encode('utf-8')
         drop_cc = _drop_calcchain(parts, zf.read)

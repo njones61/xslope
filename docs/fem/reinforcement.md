@@ -19,26 +19,41 @@ reflects the behavior of flexible reinforcement materials like geotextiles and e
 
 Truss elements are incorporated into the XSLOPE finite element mesh by passing the geometry of the reinforcement
 lines from the input template to the mesh generation process. The reinforcement lines are discretized into multiple
-truss elements based on the specified mesh density (target_size). The 1D elements are fully integrated with the 2D
+truss elements based on the specified mesh density (target_size), or on the **1D element size** on the main sheet
+where a model states one — the element size along the reinforcement and pile lines, which refines the truss elements
+and the soil sharing their nodes together. The 1D elements are fully integrated with the 2D
 elements - each 1D element corresponds to the edge of two adjacent 2D elements and both the 1D and 2D elements share
 the same nodes. The 1D elements have their own set of material properties corresponding to the properties of the
 corresponding reinforcement lines input by the user and include $T_{max}$, $T_{res}$, $E$, and cross-sectional area
 $A$.
 
-Only the two end nodes of each 1D element are used for computing truss stiffness and axial forces. When the mesh uses
-quadratic (8-node) 2D elements, the 1D elements may have a mid-side node shared with the adjacent 2D elements. This
-mid-node participates in the 2D element shape functions for displacement interpolation but is ignored for the truss
-element formulation. A 2-node linear truss element is exact for a prismatic bar with constant axial stiffness, so
-the quadratic interpolation adds no physical fidelity for the 1D element.
+Each truss element stands on every node of the 2D element edge it lies on. On a linear mesh that is the edge's two
+end nodes and the element is a 2-node bar. On a quadratic mesh (tri6, quad8, quad9) the edge also carries a midside
+node, and the truss element is a 3-node bar carrying that node too.
+
+The midside node is what ties the bar to the soil in the middle of the edge. The soil's displacement along a quadratic
+edge is a parabola through all three nodes, so a bar attached at the corners alone leaves the edge free to bow away
+from it between them, and leaves the midside node free to slide along it: the bar and the soil around it displace
+together at only half the stations the edge has. Carrying the node closes that gap, and it costs no node and moves
+none, because the node is already there as part of the 2D element.
+
+The 3-node bar is the standard isoparametric quadratic bar, and its axial force at the element center is
+$EA(u_2 - u_1)/L$ — the same chord expression the 2-node bar uses, so an element's reported force means what it always
+did.
 
 The meshing algorithms used in XSLOPE, including the integration of 1D and 2D elements for problems involving soil
 reinforcement are documented in the [Mesh Generation](mesh.md) page.
 
 ## Mathematical Formulation
 
-**Truss Element Stiffness Matrix:** Each 1D truss element contributes to the global stiffness matrix through its element stiffness matrix. For a truss element with nodes $i$ and $j$, the element stiffness matrix in local coordinates is:
+**Truss Element Stiffness Matrix:** Each 1D truss element contributes to the global stiffness matrix through its element stiffness matrix. On a linear mesh the element has two nodes $i$ and $j$, and its stiffness in local (axial) coordinates is:
 
 >>$[K_e]_{local} = \dfrac{AE}{L} \begin{bmatrix} 1 & -1 \\ -1 & 1 \end{bmatrix}$
+
+On a quadratic mesh the element also carries the midside node $m$ of its soil edge, and its stiffness is the quadratic
+bar's, in the node order $(i, j, m)$:
+
+>>$[K_e]_{local} = \dfrac{AE}{3L} \begin{bmatrix} 7 & 1 & -8 \\ 1 & 7 & -8 \\ -8 & -8 & 16 \end{bmatrix}$
 
 where $A$ is the cross-sectional area, $E$ is the elastic modulus, and $L$ is the element length.
 
@@ -50,6 +65,9 @@ The transformation is built from $\psi$, the inclination of the reinforcement li
 angle the LEM formulation uses for the direction of an axial reinforcement force:
 
 >>$[R] = \begin{bmatrix} \cos\psi & \sin\psi & 0 & 0 \\ 0 & 0 & \cos\psi & \sin\psi \end{bmatrix}$
+
+with one more row, $\begin{bmatrix} 0 & 0 & 0 & 0 & \cos\psi & \sin\psi \end{bmatrix}$, for the midside node of a
+three-node bar.
 
 **Assembly Process:** The global stiffness matrix combines contributions from both 2D soil elements and 1D truss elements:
 
@@ -94,9 +112,10 @@ A blank $T_{res}$ means *no post-peak drop* — it does **not** mean zero.
 
 **Peak-Residual Model:**
 
-Entering a value for $T_{res}$ turns on post-peak behavior: an element that yields drops from $T_{allow}$ to
-$T_{res}$. Appropriate for ductile materials where the published capacity is a peak rather than a plateau; typical
-residual ratios for geosynthetics are $T_{res}/T_{allow} = 0.3-0.7$.
+Entering a value for $T_{res}$ turns on post-peak behavior: an element that yields drops from $T_{allow}$ to its
+residual capacity, which is $T_{res}$ or the capacity its embedment can develop, whichever is smaller. Appropriate
+for ductile materials where the published capacity is a peak rather than a plateau; typical residual ratios for
+geosynthetics are $T_{res}/T_{allow} = 0.3-0.7$.
 
 The drop is decided **only on a converged equilibrium state**, never inside the viscoplastic iteration. This
 matters: the first iterate of a viscoplastic solve is the elastic predictor, whose bar forces overshoot badly
@@ -126,8 +145,11 @@ For each reinforcement line, it is assumed that the tension force in the reinfor
 - The available strength is limited by pullout resistance rather than material strength<br>
 - For elements at distance $d$ from the reinforcement end where $d < L_p$:<br>
   >>$T_{available} = T_{allow} \times \frac{d}{L_p}$<br>
-- Pullout failure is typically sudden and complete (no residual capacity)<br>
-- Progressive pullout can occur as elements near the ends fail sequentially
+- Pullout is **perfectly plastic**. An element that reaches its embedment-limited capacity slips at that force and
+  goes on carrying it: interface friction does not vanish once it has been overcome, so there is no drop to zero.
+  This is the standard cable and geogrid treatment, and it is the same assumption the LEM envelope makes.<br>
+- Pullout spreads along a line as elements near the ends reach their capacity one after another and shed the
+  balance of the demand into the interior
 
 **Tension-Only Behavior:**
 
@@ -169,7 +191,7 @@ This matrix is factored once (via sparse LU decomposition) and reused for all vi
 
 These corrections are added to the same load vector that receives the soil viscoplastic strain corrections ($[B]^T [D] \{\varepsilon_{vp}\}$). The factored stiffness matrix then solves the corrected system, and the process repeats until convergence.
 
-**Failure irreversibility:** Once an element is marked as failed (having exceeded $T_{allow}$), it remains failed for all subsequent iterations within that analysis. Its effective capacity permanently drops from $T_{allow}$ to $T_{res}$. This models the irreversible nature of material yielding or pullout failure.
+**Failure irreversibility:** Once an element is marked as failed (having exceeded $T_{allow}$), it remains failed for all subsequent iterations within that analysis. Its effective capacity permanently drops from $T_{allow}$ to the residual assigned to it. This models the irreversible nature of material yielding.
 
 ## Strength Reduction and Reinforcement
 
@@ -192,9 +214,11 @@ In the Excel input template used by XSLOPE, the user can define up to 20 reinfor
 | x1, y1 | The x and y coordinates of the left end of the line |
 | x2, y2 | The x and y coordinates of the right end of the line |
 | Tmax | Maximum allowable tensile force |
-| Tres | Residual tensile force after yield. **Leave blank for no post-peak drop** (elastic-perfectly-plastic — the usual choice, and the default). An explicit `0` means brittle rupture. Used by the FEM only. |
+| Tres | Residual tensile force the reinforcement retains after it ruptures, capped by the capacity its embedment can develop. **Leave blank for no post-peak drop** (elastic-perfectly-plastic — the usual choice, and the default). An explicit `0` means brittle rupture. Used by the FEM only. |
 | Lp1  | The pullout length on the left side |
 | Lp2  | The pullout length on the right side |
+| Adhesion | Soil-reinforcement interface adhesion. Filled together with Delta, it replaces Lp1/Lp2 with the overburden-dependent pullout law. Blank (with Delta blank) uses the pullout lengths. |
+| Delta | Soil-reinforcement interface friction angle, degrees. |
 | E    | The modulus of elasticity of reinforcement material  |
 | Area | The cross-sectional area of the reinforcement material  |
 
@@ -204,7 +228,7 @@ should be in $ft^2$. Alternately, E could be in $psi$ as long as Area is in $in^
 
 ### Element Discretization and Capacity Assignment
 
-A separate pullout length (Lp) is used for each end since each end may be embedded in a separate soil with different shear resistance values.
+A separate pullout length (Lp) is used for each end since each end may be embedded in a separate soil with different shear resistance values. A line may instead state its interface strength through Adhesion and Delta, in which case the resistance follows the effective overburden along the line and the pullout lengths are not used.
 
 During mesh generation, each reinforcement line is discretized into multiple truss elements based on the specified mesh density. The discretization process follows these steps:
 
@@ -214,25 +238,23 @@ During mesh generation, each reinforcement line is discretized into multiple tru
 Elastic modulus: $E$<br>
 Element stiffness: $K_e = AE/L$ (where L varies based on element length)<br>
 
-2. **Tensile Capacity Assignment**: Each truss element is assigned an allowable $T_{allow}$ and residual $T_{res}$ tensile capacity based on the following logic:
+2. **Tensile Capacity Assignment**: Each truss element is assigned an allowable $T_{allow}$ and residual $T_{res}$ tensile capacity. $T_{allow}$ is the capacity envelope at the element centroid — the **same** envelope the limit-equilibrium engine applies at a slip-surface crossing, evaluated by the same function, so the two engines cannot drift:
 
->>For an element whose center is at distance $d$ from the nearest reinforcement end, where $L_p$ is the pullout length corresponding to that end ($L_{p1}$ if nearest to end 1, $L_{p2}$ if nearest to end 2):
+>>For an element whose centroid is at distances $d_1$ and $d_2$ from the two ends of a line of length $L$:
 >>
->>$T_{allow} = \begin{cases}
-T_{max} \cdot \dfrac{d}{L_p} & \text{if } d < L_p \\
-T_{max} & \text{if } d \geq L_p
-\end{cases}$
+>>$T_{allow} = \min\left(T_{max},\;\; T_{end1} + \displaystyle\int_0^{d_1} r,\;\; T_{end2} + \int_{L-d_2}^{L} r\right)$
+>>
+>>where $r$ is the pullout resistance per unit length. Under the development-length law $r = T_{max}/L_p$ at each end, and the integrals are the linear ramps $T_{max}d_1/L_{p1}$ and $T_{max}d_2/L_{p2}$. Under the overburden-dependent law (Adhesion and Delta both filled) $r = 2(a + \sigma'_v\tan\delta)$ varies along the line with the effective overburden, and $L_{p1}$/$L_{p2}$ are not read. Both laws, and the end anchorage capacities $T_{end}$, are set out in **[Soil Reinforcement in LEM](../lem/reinforcement.md#capacity-envelope)**.
 
 >>
 >>$T_{res} = \begin{cases}
 \text{unset (no post-peak drop)} & \text{if } T_{res}\ \text{is blank in the input} \\
-0 & \text{if } d < L_p \\
-T_{residual} & \text{if } d \geq L_p
+\min\left(T_{residual},\ T_{allow}\right) & \text{otherwise}
 \end{cases}$
 
-This approach ensures that elements near the reinforcement ends have reduced capacity (starting from zero at the ends), while elements beyond the pullout length carry the full design strength. The linear variation within the pullout length reflects the gradual development of pullout resistance through interface friction. Since each end of a reinforcement line may be embedded in a different soil with different shear resistance, the appropriate pullout length ($L_{p1}$ or $L_{p2}$) is selected based on which end is nearest to the element centroid.
+Elements near a free end therefore have reduced capacity — zero at the end itself, unless an anchorage capacity $T_{end}$ is entered there — while elements far enough from both ends carry the full design strength. The taper is the gradual development of pullout resistance through interface friction, and the minimum is taken over BOTH ends rather than the nearer one, which is the same answer wherever the two zones do not overlap and the correct one where they do. Each end has its own $L_{p1}$/$L_{p2}$ because each may be embedded in a different soil; under the overburden law the same variation comes from $\sigma'_v$ instead, without the soils having to be named.
 
-The residual capacity is only assigned at all when the user has entered a $T_{res}$ for the line. Where post-peak behavior *is* switched on, an element inside a pullout ramp ($d < L_p$) takes a residual of zero, because pullout failure is assumed to be sudden and complete; beyond the ramp ($d \geq L_p$) the element takes the user's residual strength. If the line has end anchorage, the hardware survives soil/grout failure up to its own capacity, so the residual there is $\min(T_{res}, T_{end})$ for the governing end.
+The residual capacity is only assigned at all when the user has entered a $T_{res}$ for the line. Where post-peak behavior *is* switched on, two independent mechanisms can limit what an element retains, and the smaller of the two governs. Bond slip is perfectly plastic, so the embedment goes on developing $T_{allow}$ — the ramped envelope, end anchorage included — however far the bar is pulled. $T_{residual}$ is the rupture residual, a property of the reinforcement itself and not of its embedment. Beyond the ramps $T_{allow} = T_{max}$ and the element takes the user's residual strength; inside a ramp it takes whichever of the two is less.
 
 ### Axial Stiffness (EA)
 
@@ -271,58 +293,6 @@ These equations are a general guide that can be used to come up with reasonable 
 | **Soil Nails** | 1.5 - 3.0 | Depends on soil conditions and nail diameter |
 | **Geotextiles** | 0.5 - 1.5 | Depends on normal stress and surface texture |
 | **Geogrid** | 1.0 - 2.0 | Depends on aperture size and bearing resistance |
-
-### Bond-Slip Load Transfer (optional)
-
-The pullout ramp above uses a **fixed** development length $L_p$ at each end: the available
-tension rises linearly from zero at the end to $T_{max}$ at a distance $L_p$, regardless of
-where the element sits in the slope. This is a good first approximation, but the pullout
-resistance actually depends on the **local normal stress** — a bar segment under deep
-overburden can develop force faster than one near the surface, so the development length is
-not really constant along the line.
-
-The optional **bond-slip** model makes this explicit. Instead of a fixed $L_p$, it caps the
-rate at which tension can develop along the bar by a stress-dependent Coulomb bond per unit
-length:
-
->>$\dfrac{dT}{ds} \leq q(s) = P\,\big(c_{bond} + \sigma_n(s)\,\tan\phi_{bond}\big)$
-
-where $P$ is the bonded perimeter per unit width (2 for a geotextile sheet — friction on both
-faces; $\pi D / S$ for a nail of diameter $D$ at horizontal spacing $S$), $c_{bond}$ and
-$\phi_{bond}$ are the interface cohesion and friction angle, and $\sigma_n(s)$ is the local
-vertical overburden at the segment (integrated soil column above it — the same quantity used
-for $r_u$ pore pressures). The available tension at a point is the smaller of the two one-sided
-integrals of $q$ from each free end, still capped by the material axial capacity:
-
->>$T_{allow}(s) = \min\!\Big(T_{max},\; \int_{\text{end 1}}^{s} q\,ds',\; \int_{s}^{\text{end 2}} q\,ds'\Big)$
-
-![reinf_bond_slip.png](images/reinf_bond_slip.png)
-
-The two envelopes on a line whose overburden grows from the face into the fill. The bond envelope develops
-tension more slowly than the fixed ramp where the line is shallow, and far faster where it is deeply buried.
-
-In the constant-$\sigma_n$, single-soil limit this reduces exactly to the fixed double-ended
-ramp with slope $q$ in place of $T_{max}/L_p$ — the two models agree where the overburden is
-uniform, and diverge where it is not (a face-parallel geotextile whose upslope end lies under
-a thick fill develops force faster there than the fixed ramp allows). The bond parameters map
-directly onto a grouted-joint interface property in continuum codes (RS2's stress-dependent
-joint, for example).
-
-Bond-slip is a **run option**, off by default:
-
-```python
-solve_ssrm(fem_data, bond_slip={"geotextile 1": (0.0, 28.35, 2.0)})
-#                                 line label     c_bond  φ_bond  P
-```
-
-The dictionary is keyed by reinforcement line **label** (a string), **1-based id** (an
-integer), or `"*"` (every reinforcement line); each value is the tuple
-`(bond_c, bond_phi_deg, perimeter)`. Only the named lines switch from the fixed $L_p$ ramp to
-the bond envelope — unnamed lines keep their ramp. With `bond_slip=None` (the default) the
-solve is bit-identical to the fixed-ramp path. The same option is available on `solve_fem`,
-and from a verification tag as `bond_slip=<line>:<c>:<phi_deg>:<perimeter>` (semicolon-separated
-for several lines). The invariant (off ≡ fixed ramp), the closed-form envelope, the axial cap,
-and unknown-name rejection are asserted by `benchmarks/bondslip_guard.py`.
 
 ### Wished-in-Place Analysis and EA Selection
 
@@ -413,10 +383,10 @@ version of XSLOPE.
 
 The FEM results view colors each reinforcement element by the force it carries, which shows at a glance which
 lines are working hardest. To read one line along its length, use the **1D Details…** button on that view's
-toolbar. It opens a panel listing every reinforcement line and pile in the model, each with a utilization badge,
-and draws the selected member's profiles beside the list. Under the list is a map of the section with the selected
-member picked out, so a name in a list is a place on the slope. The button is dimmed for a model with no
-reinforcement lines and no piles.
+toolbar. It opens a panel listing every reinforcement line and pile in the model with its utilization and a badge
+colored by it — a reinforcement row also names the state the line is in — and draws the selected member's profiles
+beside the list. Under the list is a map of the section with the selected member picked out, so a name in a list is
+a place on the slope. The button is dimmed for a model with no reinforcement lines and no piles.
 
 ![Reinforcement detail for Line 4 of the reinforcement sample](images/reinforce_fem_details.png){width=1000}
 
@@ -425,31 +395,38 @@ envelope of the [pullout section above](#determining-reinforcement-line-pullout-
 developing from each free end over its pullout length $L_p$, the tensile plateau at $T_{max}$ in the middle, and
 the step to the end anchorage capacity $T_{end}$ where one is declared. That envelope is the same expression the
 solver evaluates at each element centroid to set $T_{allow}$, so the curve and the element capacities cannot
-disagree. Where $T_{res}$ is filled in, the residual capacity is drawn as a dotted step, and elements that have
-softened to it are marked; elements that have pulled out are marked at zero force.
+disagree. Where $T_{res}$ is filled in, the residual capacity is drawn as a dotted step beneath it — flat at
+$T_{res}$ along the middle of the line, and following the friction ramp wherever the embedment develops less than
+that — and elements that have softened onto it are marked. An element left with no residual at all, and therefore
+carrying no force, is marked at zero.
 
 The greatest utilization along a line is usually held over a stretch rather than at a point, the force being capped
-by a flat envelope. Where it is a point, that point is ringed and annotated with its force and its fraction of
-capacity. Where it is a stretch, every sample on the stretch is ringed, the run of curve between them is thickened,
-and the annotation gives the extent instead — and a stretch with a sample inside it that stands below the rest is
-drawn as the runs it really is, with the annotation excepting that sample by position.
+by a flat envelope. Where it is a point, that point is ringed. Where it is a stretch, every sample on the stretch is
+ringed and the run of curve between them is thickened — and a stretch with a sample inside it that stands below the
+rest is drawn as the runs it really is, so a break in the thickened curve is where the line comes off capacity. The
+legend calls the mark **At capacity**, or **Peak utilization** on a line that never reaches its envelope, and the
+title states the fraction of capacity the peak reaches.
 
-A band is shaded behind the profile where the viscoplastic shear strain concentrates along the line. On a run that
-captured a mechanism it is the failure band and is labelled as one; on a run that converged and reached no failure
-it is labelled a shear strain band, which is what it is. A line the concentration does not reach carries no band.
+The profile draws no mark for where the shear band crosses the line. The field figure is where a crossing is
+read — the band is drawn there as strain contours — and the profile is where what the line carries is read; a
+shaded stretch derived from a threshold on the sampled strain added a rule between the two that the legend
+could not explain.
+
+Every mark on the panel is named in the legend, and nothing is labeled over the curves: the panel is wide and
+shallow, and a label placed in it stands over the profile it describes.
 
 Beneath the force profile is the bond transfer rate $dT/ds$: the force the ground hands the bar per unit of its
 length, which is the gradient of the profile above it. There is no companion slip series because the formulation
 has no slip degree of freedom — a reinforcement element is a truss bar on the continuum's own nodes, so bar and
-soil displacement are the same number at every node. Load transfer is expressed through the capacity envelope
-(or, with [bond-slip](#bond-slip-load-transfer-optional) enabled, through the Coulomb bond envelope that replaces
-it), not through a slip law.
+soil displacement are the same number at every node. Load transfer is expressed through the capacity envelope, not through a slip law.
 
 A **Field state** control at the foot of the panel selects which field the profiles are read from — the at-failure
 mechanism an SSRM run captured, or the last converged solution — and is the same switch, with the same default, as
 the one on the results view, so the two views can be set to the same instant of the analysis. It is dimmed for a
-run that captured no mechanism, where there is only one field to read, and neither the capacity envelope nor the
-shaded band moves with it.
+run that captured no mechanism, where there is only one field to read, and the capacity envelope does not move with it. On a softening line the two fields can differ in kind: an element drops to its residual
+only when an equilibrium state demands more than its capacity, so the last converged field may show no softened
+element at all while the at-failure field — which starts from the set the failed-edge trial shed to — shows the
+elements that gave way sitting on the residual line, marked *Softened*.
 
 **Export** writes the current view as a PNG and its plotted series as a CSV named from the model, the line and the
 field state, with that state also recorded in the CSV's header, so the picture and the numbers behind it stay
@@ -457,8 +434,32 @@ together. The panel is non-modal and reads the solution it was opened
 with, so it can stay open beside the results view; it works the same on a solution reloaded from its saved
 sidecar files as on a fresh solve.
 
-The screenshot above is the reinforcement sample's own strength reduction run, $FS = 1.49$, read at the mechanism
+The screenshot above is the reinforcement sample's own strength reduction run, $FS = 1.50$, read at the mechanism
 it developed (see [FEM sample problems](samples.md)).
+
+### The state of a line
+
+One line is in one state, named the same way everywhere XSLOPE reports it: on the panel's list rows and under its
+plot, in the title of a detail figure, in the table `print_reinforcement_summary()` prints, and in a generated
+report.
+
+| State | The line |
+|-------|----------|
+| within capacity | is below the capacity available to it everywhere along its length |
+| near capacity | is below capacity everywhere, but close to it where it is most utilized |
+| pullout | is slipping near an end at the capacity its embedment can develop there |
+| yielded | is at its full tensile capacity away from the ends and holding it |
+| softened | has dropped off its peak capacity onto its residual |
+| ruptured | has softened with no residual capacity left and now carries nothing |
+| inactive | carries no tension anywhere and is not engaged |
+
+The two middle states are the ones worth separating, and they read alike on a badge: both are a line standing at
+100% of what is available to it. **Pullout** is an end element at the reduced capacity its embedment can develop —
+the friction ramp doing what a friction ramp does, with the interior of the line still below capacity. **Yielded**
+is an element out on the $T_{max}$ plateau, where the whole tensile strength of the geosynthetic is mobilized. A
+line in both states at once is reported yielded, the more serious of the two. **Softened** and **ruptured** need a
+$T_{res}$: a line that declares none cannot reach them.
+
 
 ## References
 

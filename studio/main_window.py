@@ -47,6 +47,8 @@ from .editors import CATEGORY_EDITORS
 from .runners import (FemRunner, LemRunner, MeshWorker, ReliabilityRunner,
                       ReportRunner, SeepRunner, SensitivityRunner,
                       resume_cycle_gc, suspend_cycle_gc)
+from .sweep_table import (SweepResultView, curve_table, parametric_table,
+                          reliability_table)
 from .update_ui import UpdateController
 from .welcome import WelcomeDialog
 
@@ -236,6 +238,11 @@ class SweepCanvas(MplCanvas):
         self._draw(lambda fig: plot_sensitivity(df, target_fs=target_fs, fig=fig),
                    dxf=False)
 
+    def render_fs_vs_time(self, result, slope_data=None):
+        from xslope.plot import plot_fs_vs_time
+        self._draw(lambda fig: plot_fs_vs_time(result, slope_data=slope_data,
+                                               fig=fig), dxf=False)
+
     def render_design(self, df, target_fs, summary):
         from xslope.plot import plot_sensitivity
 
@@ -303,6 +310,7 @@ class MainWindow(QMainWindow):
         self.sens_canvas = None            # tornado
         self.sens_curve_canvas = None      # click-through FS-vs-value curve
         self.design_canvas = None          # design curve + target crossing
+        self.fs_time_canvas = None         # factor of safety vs time (transient)
         self.seep_data_canvas = {}        # bc set -> MplCanvas
         self.seep_solution_canvas = {}    # bc set -> MplCanvas
         self.transient_seep_view = None   # TransientSeepView (frames + play bar)
@@ -1143,9 +1151,9 @@ class MainWindow(QMainWindow):
         A .gsz needs no mapping wizard — its geometry, materials and water conditions
         are already identified — so the only prompt is which analysis to import, since
         a file usually holds several and they can differ in materials. Whatever xslope
-        cannot represent (reinforcement, loads, SLOPE/W's search definition) comes back
-        as caveats and is shown, not dropped quietly. Left unsaved so the user reviews
-        it and Saves As."""
+        cannot represent (SLOPE/W's search definition, reinforcement sets, unsupported
+        strength or pore-pressure options) comes back as notes and is shown, not
+        dropped quietly. Left unsaved so the user reviews it and Saves As."""
         if not self._confirm_discard():
             return
         start = os.path.dirname(self._recent[0]) if self._recent else ""
@@ -1849,8 +1857,20 @@ class MainWindow(QMainWindow):
             if isinstance(o, (list, tuple)):
                 return [clean(x) for x in o]
             return o
+        def geometry_only(key, rows):
+            # A reinforcement or pile row enters the mesh as a constraint line
+            # and nothing more: only its endpoints (and how many rows there are)
+            # can change the mesh. Editing S, D, Tmax, Appl or any other property
+            # on a row must not throw the mesh away.
+            if key not in ("reinforcement_lines", "pile_lines") or not rows:
+                return clean(rows)
+            try:
+                return [[clean(r.get("x1")), clean(r.get("y1")),
+                         clean(r.get("x2")), clean(r.get("y2"))] for r in rows]
+            except Exception:
+                return clean(rows)
         try:
-            return json.dumps({k: clean(sd.get(k)) for k in MainWindow.MESH_KEYS},
+            return json.dumps({k: geometry_only(k, sd.get(k)) for k in MainWindow.MESH_KEYS},
                               sort_keys=True, default=str)
         except Exception:
             return None
@@ -1865,6 +1885,7 @@ class MainWindow(QMainWindow):
             return
         single = ["search_canvas", "solution_canvas", "reliability_canvas",
                   "sens_canvas", "sens_curve_canvas", "design_canvas",
+                  "fs_time_canvas",
                   "fem_data_canvas", "fem_results_canvas"]
         if clear_mesh:
             single.append("mesh_canvas")
@@ -1891,7 +1912,7 @@ class MainWindow(QMainWindow):
         self.seep_solution_canvas = {}
         self.transient_seep_view = None
         for key in ("lem_solution", "seep_solutions", "transient_seep",
-                    "fem_solution", "design", "sensitivity"):
+                    "fem_solution", "design", "sensitivity", "fs_vs_time"):
             self.doc.results.pop(key, None)
         if clear_mesh:
             self.doc.slope_data["mesh"] = None
@@ -1932,6 +1953,10 @@ class MainWindow(QMainWindow):
             seed("num_slices", sd.get("num_slices"))
         elif which == "mesh":
             seed("element_type", sd.get("element_type"), bool)
+            # The 1D element size is a model input the dialog writes back, so the
+            # model wins over the last run's value: the box always shows what the
+            # file states, including a value cleared since the last build.
+            d["element_size_1d"] = sd.get("element_size_1d")
             if "target_size" not in d and sd.get("target_size") is not None:
                 d["target_size"] = float(sd["target_size"])
                 # An explicit size in the file means the file MEANT that size, so
@@ -1955,6 +1980,14 @@ class MainWindow(QMainWindow):
             return
         opts = dlg.options()
         self._last_mesh_opts = opts
+        # The 1D element size is a model input (main!D20), not a per-run choice, so
+        # an entry goes back into the model — saved with the file and undoable like
+        # any other edit. Nothing is recorded when the value is unchanged, so opening
+        # the dialog and building does not by itself dirty the document.
+        if opts.get("element_size_1d") != self.doc.slope_data.get("element_size_1d"):
+            self.doc.begin_edit("1D element size")
+            self.doc.slope_data["element_size_1d"] = opts["element_size_1d"]
+            self.doc.commit_edit()
         self._mesh_busy = True
         self._update_run_actions()    # disable Run/Build while meshing
         self.statusBar().showMessage("Building mesh …")
@@ -2144,7 +2177,7 @@ class MainWindow(QMainWindow):
         # A re-march started for a stability run takes that run down with it.
         if self._pending_run is not None:
             self._pending_run = None
-            self.statusBar().showMessage("Re-march cancelled — the analysis was not run.")
+            self.statusBar().showMessage("Seepage re-run cancelled — the analysis was not run.")
             return
         self.statusBar().showMessage("Run cancelled.")
 
@@ -2186,13 +2219,13 @@ class MainWindow(QMainWindow):
         unit = self.doc.slope_data.get("time_unit")
         listed = ", ".join(f"t = {t:g}" + (f" {unit}" if unit else "") for t in times)
         if QMessageBox.question(
-                self, "Re-march the transient solution",
+                self, "Re-run the transient seepage analysis",
                 f"The loaded transient solution has no saved frame at {listed}.\n\n"
                 f"Pore pressures are never interpolated between frames, so the "
-                f"transient march will be re-run with {'this instant' if len(times) == 1 else 'these instants'} "
+                f"transient seepage analysis will be re-run with {'this instant' if len(times) == 1 else 'these instants'} "
                 f"added to the save schedule, and the analysis will start when it "
-                f"finishes. A re-march is a full re-solve — seconds on a short march, "
-                f"minutes on a long one. It can be cancelled.\n\nRe-march now?",
+                f"finishes. It is a full re-solve — seconds on a short run, "
+                f"minutes on a long one. It can be cancelled.\n\nRe-run now?",
                 QMessageBox.Yes | QMessageBox.Cancel,
                 QMessageBox.Yes) != QMessageBox.Yes:
             return
@@ -2201,7 +2234,7 @@ class MainWindow(QMainWindow):
         opts = {"mode": "transient", "bc": 1,
                 "tol": (self._last_seep_opts or {}).get("tol", 1e-4),
                 "extra_save_times": [float(t) for t in times]}
-        self.statusBar().showMessage("Re-marching transient seepage …")
+        self.statusBar().showMessage("Re-running transient seepage …")
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
@@ -2260,6 +2293,11 @@ class MainWindow(QMainWindow):
         panel = self._display_panels.get(canvas)
         if bundle and panel and canvas is not None:
             try:
+                # Default the flow-net base material to the solver-side pick
+                # (nearest-to-squares) until the user chooses one by hand.
+                from xslope.plot_seep import flownet_base_material
+                panel.suggest_base_mat(flownet_base_material(
+                    bundle["seep_data"], bundle["solution"]))
                 canvas.render_seep_solution(
                     bundle["seep_data"], bundle["solution"], panel.options(),
                     style=self.doc.style or None)
@@ -2876,7 +2914,7 @@ class MainWindow(QMainWindow):
 
     def _show_reliability(self, reliability_data):
         if self.reliability_canvas is None:
-            self.reliability_canvas = MplCanvas(self)
+            self.reliability_canvas = SweepResultView(MplCanvas(self), self)
             self.view_tabs.insertTab(1, self.reliability_canvas, "LEM · Reliability")
             panel = ReliabilityDisplayPanel()
             panel.changed.connect(self._rerender_reliability)
@@ -2890,6 +2928,11 @@ class MainWindow(QMainWindow):
         bundle = self.doc.results.get("reliability")
         rel = bundle.get("reliability") if bundle else None
         panel = self._display_panels.get(self.reliability_canvas)
+        if rel and self.reliability_canvas is not None:
+            # The per-parameter table stands whether or not the run kept the
+            # surfaces the plot needs.
+            self._fill_result_table(self.reliability_canvas,
+                                    reliability_table(rel, bundle.get("engine")))
         if (rel and panel and self.reliability_canvas is not None
                 and rel.get("fs_cache")):
             try:
@@ -2900,7 +2943,7 @@ class MainWindow(QMainWindow):
 
     def _show_reliability_histogram(self):
         if self.reliability_hist_canvas is None:
-            self.reliability_hist_canvas = MplCanvas(self)
+            self.reliability_hist_canvas = SweepResultView(MplCanvas(self), self)
             self.view_tabs.insertTab(1, self.reliability_hist_canvas,
                                      "Reliability · MC")
             panel = ReliabilityMcDisplayPanel()
@@ -2920,6 +2963,10 @@ class MainWindow(QMainWindow):
         bundle = self.doc.results.get("reliability")
         rel = bundle.get("reliability") if bundle else None
         panel = self._display_panels.get(self.reliability_hist_canvas)
+        if rel and self.reliability_hist_canvas is not None:
+            self._fill_result_table(
+                self.reliability_hist_canvas,
+                reliability_table(rel, bundle.get("engine") or "mc"))
         if (rel and panel and self.reliability_hist_canvas is not None
                 and rel.get("fs_samples") is not None):
             try:
@@ -3104,7 +3151,8 @@ class MainWindow(QMainWindow):
             return
         dlg = SensitivityDialog(self, defaults=self._last_sens_opts.get(self._mode, {}),
                                 slope_data=self.doc.slope_data, app_mode=self._mode,
-                                document=self.doc)
+                                document=self.doc,
+                                transient=self.transient_solution())
         if not dlg.exec():
             return
         opts = dlg.options()
@@ -3123,14 +3171,16 @@ class MainWindow(QMainWindow):
             return
         self.act_sensitivity.setEnabled(False)
         self.act_run.setEnabled(False)
-        verb = {"design": "Design sweep", "back_analysis": "Back-analysis"}.get(
-            study, "Sensitivity sweep")
+        verb = {"design": "Design sweep", "back_analysis": "Back-analysis",
+                "fs_vs_time": ("Rapid drawdown vs time" if opts.get("rapid")
+                               else "FS vs time")}.get(study, "Sensitivity sweep")
         self.statusBar().showMessage(f"{verb} — {opts['method']} …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
         self.cancel_btn.setEnabled(True)
         self.cancel_btn.setVisible(True)
-        self._sens_runner = SensitivityRunner(self.doc.slope_data, opts, parent=self)
+        self._sens_runner = SensitivityRunner(self.doc.slope_data, opts, parent=self,
+                                             transient=self.transient_solution())
         self._sens_runner.succeeded.connect(self._on_sens_succeeded)
         self._sens_runner.failed.connect(self._on_sens_failed)
         self._sens_runner.cancelled.connect(self._on_sens_cancelled)
@@ -3139,7 +3189,23 @@ class MainWindow(QMainWindow):
         self._sens_runner.start()
 
     def _on_sens_succeeded(self, bundle):
-        if bundle.get("kind") == "design":
+        if bundle.get("kind") == "fs_vs_time":
+            self.doc.results["fs_vs_time"] = bundle
+            self._show_fs_vs_time()
+            if self.fs_time_canvas is not None:
+                self.view_tabs.setCurrentWidget(self.fs_time_canvas)
+            unit = str(self.doc.slope_data.get("time_unit") or "").strip()
+            what = ("Rapid drawdown vs time" if bundle.get("rapid")
+                    else "FS vs time")
+            if bundle.get("min_fs") is not None:
+                self.statusBar().showMessage(
+                    f"{what} — lowest {bundle['min_fs']:.3f} at t = "
+                    f"{bundle['critical_time']:g}{(' ' + unit) if unit else ''} "
+                    f"over {len(bundle.get('times', []))} instant(s)")
+            else:
+                self.statusBar().showMessage(
+                    f"{what} — no instant produced a result; see the Log pane.")
+        elif bundle.get("kind") == "design":
             self.doc.results["design"] = bundle
             self._show_design()
             if self.design_canvas is not None:
@@ -3190,9 +3256,56 @@ class MainWindow(QMainWindow):
             self._sens_runner = None
         self._update_run_actions()
 
+    # --- the numbers behind a Parametric plot ----------------------------
+    def _sweep_csv_path(self, stem):
+        """Where Save CSV… offers to write a result table: ``<model>_<mode>.csv``
+        beside the project, so a sweep's numbers land next to the file they came
+        from. An unsaved project has no directory to sit beside, so the name alone
+        is offered and the dialog opens wherever it last was."""
+        path = self.doc.path
+        if not path:
+            return f"{stem}.csv"
+        base = os.path.splitext(os.path.basename(path))[0]
+        return os.path.join(os.path.dirname(path), f"{base}_{stem}.csv")
+
+    def _fill_result_table(self, view, built):
+        """Hand a builder's ``(headers, rows, stem)`` to a result view's Table
+        sub-tab, with the CSV name the stem implies."""
+        if view is None:
+            return
+        headers, rows, stem = built
+        view.set_table(headers, rows, self._sweep_csv_path(stem))
+
+    def _show_fs_vs_time(self):
+        if self.fs_time_canvas is None:
+            self.fs_time_canvas = SweepResultView(SweepCanvas(self), self)
+            self.view_tabs.addTab(self.fs_time_canvas, "FS vs Time")
+        # The tab says which curve it is holding: a drawdown curve and a
+        # single-stage curve are different analyses of the same march, and the tab
+        # is reused for whichever ran last.
+        i = self.view_tabs.indexOf(self.fs_time_canvas)
+        if i >= 0:
+            self.view_tabs.setTabText(
+                i, "Drawdown vs Time"
+                if (self.doc.results.get("fs_vs_time") or {}).get("rapid")
+                else "FS vs Time")
+        self._rerender_fs_vs_time()
+
+    def _rerender_fs_vs_time(self):
+        bundle = self.doc.results.get("fs_vs_time")
+        if bundle and self.fs_time_canvas is not None:
+            try:
+                self.fs_time_canvas.render_fs_vs_time(bundle,
+                                                      slope_data=self.doc.slope_data)
+                self._fill_result_table(
+                    self.fs_time_canvas,
+                    parametric_table(bundle, self.doc.slope_data))
+            except Exception:
+                traceback.print_exc()
+
     def _show_design(self):
         if self.design_canvas is None:
-            self.design_canvas = SweepCanvas(self)
+            self.design_canvas = SweepResultView(SweepCanvas(self), self)
             self.view_tabs.addTab(self.design_canvas, "Design")
             # No display-option panel: the curve/target are set at run time. The
             # Display dock tracks the tab (shows the placeholder), like other views.
@@ -3204,6 +3317,8 @@ class MainWindow(QMainWindow):
             try:
                 self.design_canvas.render_design(bundle["df"], bundle["target_fs"],
                                                  bundle)
+                self._fill_result_table(self.design_canvas,
+                                        parametric_table(bundle))
             except Exception:
                 traceback.print_exc()
 
@@ -3217,7 +3332,7 @@ class MainWindow(QMainWindow):
             self.sens_curve_canvas.deleteLater()
             self.sens_curve_canvas = None
         if self.sens_canvas is None:
-            self.sens_canvas = SweepCanvas(self)
+            self.sens_canvas = SweepResultView(SweepCanvas(self), self)
             self.view_tabs.addTab(self.sens_canvas, "Sensitivity")
             # Double-click a bar to open that parameter's FS-vs-value curve (tornado
             # only; enabled per-render below).
@@ -3247,6 +3362,7 @@ class MainWindow(QMainWindow):
                 self.sens_canvas.render_rank(bundle["rank"])
             else:
                 self.sens_canvas.render_tornado(bundle["tornado"])
+            self._fill_result_table(self.sens_canvas, parametric_table(bundle))
         except Exception:
             traceback.print_exc()
 
@@ -3268,9 +3384,14 @@ class MainWindow(QMainWindow):
         if df is None:
             return
         if self.sens_curve_canvas is None:
-            self.sens_curve_canvas = SweepCanvas(self)
+            self.sens_curve_canvas = SweepResultView(SweepCanvas(self), self)
             self.view_tabs.addTab(self.sens_curve_canvas, "Sensitivity · Curve")
         self.sens_curve_canvas.render_curve(df, target_fs=bundle.get("target_fs"))
+        self._fill_result_table(
+            self.sens_curve_canvas,
+            curve_table(param, df, output=bundle.get("tornado", {}).get("output",
+                                                                       "FS")))
+        self.sens_curve_canvas.show_plot()
         self.view_tabs.setCurrentWidget(self.sens_curve_canvas)
 
     def _clear_result_tabs(self):
@@ -3278,8 +3399,8 @@ class MainWindow(QMainWindow):
         stale results from the previous project."""
         single = ("mesh_canvas", "search_canvas", "solution_canvas",
                   "reliability_canvas", "reliability_hist_canvas", "sens_canvas",
-                  "sens_curve_canvas", "design_canvas", "fem_data_canvas",
-                  "fem_results_canvas")
+                  "sens_curve_canvas", "design_canvas", "fs_time_canvas",
+                  "fem_data_canvas", "fem_results_canvas")
         # The seep canvases are per-BC dicts; flatten them in with the rest, along
         # with the transient view (frames + play bar) when present.
         canvases = [getattr(self, a) for a in single]

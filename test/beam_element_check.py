@@ -1,11 +1,17 @@
 """The pile beam element against closed-form beam theory.
 
-XSLOPE models a pile as a two-node Euler-Bernoulli beam element: a 6x6 local
-stiffness in [u1, v1, theta1, u2, v2, theta2] built at ``fem.py`` in
-``build_fem_data``, rotated into global coordinates by a 6x6 transformation, and
-assembled into the mixed-DOF global system (pile nodes carry three DOFs, soil
-nodes two). The element's internal actions are recovered afterwards from the
-local end displacements.
+XSLOPE models a pile as a chain of Euler-Bernoulli beam elements built at
+``fem.py`` in ``build_fem_data``, rotated into global coordinates and assembled
+into the mixed-DOF global system (pile nodes carry three DOFs, soil nodes two).
+The element's internal actions are recovered afterwards from the local end
+displacements.
+
+On a linear soil mesh the element is two-node: a 6x6 local stiffness in
+[u1, v1, theta1, u2, v2, theta2]. On a quadratic mesh it also stands on the
+midside node of the soil edge it lies on, and is three-node: a 9x9 local
+stiffness carrying (u, v, theta) at all three, with quintic Hermite bending and
+a quadratic bar in axial. Both are exercised below against the same closed
+forms, at the same tolerance.
 
 That element is the whole of XSLOPE's structural-member physics, so it is worth
 pinning against solutions that do not depend on any of XSLOPE's own machinery.
@@ -79,17 +85,26 @@ RTOL = 1e-9
 # --------------------------------------------------------------------------- #
 
 def build_beam(length, n_elem, angle_deg=0.0, spacing=1.0, E=E_BEAM, I=I_BEAM,
-               area=A_BEAM):
+               area=A_BEAM, three_node=False):
     """A straight chain of ``n_elem`` equal pile beam elements of total
     ``length``, laid at ``angle_deg`` to the x axis.
 
     Returns ``(fem_data, node_ids)`` where ``node_ids`` runs from the start of
     the line to its end, so station k sits at arc length k*length/n_elem.
+    ``node_ids`` names the ELEMENT END nodes whether or not the elements carry a
+    midside node, so a leg written against it reads the same either way; the
+    midside node ids are in ``fem_data['pile_elem_nodes'][:, 2]``.
+
+    With ``three_node`` the chain is built the way a quadratic mesh delivers it:
+    each element also stands on a node at its own midpoint, which is the midside
+    node of the soil edge it lies on.
     """
     s = length / n_elem
     t = np.radians(angle_deg)
     ax, ay = np.cos(t), np.sin(t)
-    stations = np.arange(n_elem + 1) * s
+    n_station = 2 * n_elem + 1 if three_node else n_elem + 1
+    step = s / 2.0 if three_node else s
+    stations = np.arange(n_station) * step
     beam_nodes = np.column_stack([stations * ax, stations * ay])
 
     # One dummy 2D element, parked well away from the beam. build_fem_data wants
@@ -105,9 +120,12 @@ def build_beam(length, n_elem, angle_deg=0.0, spacing=1.0, E=E_BEAM, I=I_BEAM,
         'elements': elements,
         'element_types': np.array([3]),
         'element_materials': np.array([1]),
-        'elements_1d': np.array([[n0 + i, n0 + i + 1, 0] for i in range(n_elem)],
-                                dtype=int),
-        'element_types_1d': np.full(n_elem, 2, dtype=int),
+        'elements_1d': (
+            np.array([[n0 + 2 * i, n0 + 2 * i + 2, n0 + 2 * i + 1]
+                      for i in range(n_elem)], dtype=int) if three_node else
+            np.array([[n0 + i, n0 + i + 1, 0] for i in range(n_elem)],
+                     dtype=int)),
+        'element_types_1d': np.full(n_elem, 3 if three_node else 2, dtype=int),
         'element_materials_1d': np.ones(n_elem, dtype=int),
     }
     slope_data = {
@@ -117,9 +135,11 @@ def build_beam(length, n_elem, angle_deg=0.0, spacing=1.0, E=E_BEAM, I=I_BEAM,
         'pile_lines': [{'x1': float(beam_nodes[0, 0]), 'y1': float(beam_nodes[0, 1]),
                         'x2': float(beam_nodes[-1, 0]), 'y2': float(beam_nodes[-1, 1]),
                         'E': E, 'I': I, 'area': area, 'S': spacing,
-                        'fixity': 'free'}],
+                        'head_fixity': 'free'}],
     }
     fem_data = build_fem_data(slope_data, mesh)
+    if three_node:
+        return fem_data, [n0 + 2 * i for i in range(n_elem + 1)]
     return fem_data, list(range(n0, n0 + n_elem + 1))
 
 
@@ -136,6 +156,8 @@ def assemble(fem_data):
     K = np.zeros((n_dof, n_dof))
     beam_dofs = set()
     for Ke, idx in zip(fem_data['K_global_pile_elems'], fem_data['dof_indices_pile']):
+        n = np.asarray(Ke).shape[0]          # 6 on a two-node element, 9 on a three-node one
+        idx = np.asarray(idx)[:n]
         K[np.ix_(idx, idx)] += Ke
         beam_dofs.update(int(i) for i in idx)
     return K, np.array(sorted(beam_dofs), dtype=int)
@@ -163,7 +185,7 @@ def end_actions(fem_data, u, p_idx):
     """(V, M1, M2, axial) for pile element ``p_idx`` -- the expressions in
     ``fem.py``'s "Compute final pile beam element forces" step, applied to the
     same local displacement vector."""
-    idx = fem_data['dof_indices_pile'][p_idx]
+    idx = np.asarray(fem_data['dof_indices_pile'][p_idx])[:6]
     c = fem_data['cos_theta_pile'][p_idx]
     s = fem_data['sin_theta_pile'][p_idx]
     L = fem_data['elem_length_by_pile_elem'][p_idx]
@@ -218,7 +240,7 @@ def udl_consistent(fem_data, node_ids, w):
             [0, 0, 0, -s_, c, 0],
             [0, 0, 0, 0, 0, 1],
         ])
-        f[idx] += T.T @ f_local
+        f[np.asarray(idx)[:6]] += T.T @ f_local
     return f
 
 
@@ -470,7 +492,7 @@ def leg_circular_section():
                        'option': 'mc', 'c': 25.0, 'phi': 30.0, 'u': 'none'}],
         'gamma_water': 9.81,
         'pile_lines': [{'x1': 0.0, 'y1': 0.0, 'x2': 8.0, 'y2': 0.0,
-                        'E': E_BEAM, 'D_pile': D, 'S': 1.0, 'fixity': 'free'}],
+                        'E': E_BEAM, 'D_pile': D, 'S': 1.0, 'head_fixity': 'free'}],
     }
     fd = build_fem_data(slope_data, mesh)
     cmp(fails, "I from D            pi D^4/64", fd['EI_by_pile_elem'][0] / E_BEAM,
@@ -482,6 +504,260 @@ def leg_circular_section():
 
 # --------------------------------------------------------------------------- #
 
+
+# --------------------------------------------------------------------------- #
+# The three-node element: the same benchmarks, on the element a quadratic mesh
+# delivers
+# --------------------------------------------------------------------------- #
+#
+# On a tri6/quad8 soil mesh a pile element stands on three nodes -- the two
+# corners of the soil edge it lies on and that edge's midside node -- and carries
+# (u, v, theta) at all three. Bending is the quintic that matches a value and a
+# slope at all three, which keeps Euler-Bernoulli exactly and contains both the
+# cubic and the quartic exact solutions the benchmarks below are written for. So
+# the three-node element must reach every one of those closed forms to the same
+# machine tolerance the two-node element reaches them at.
+#
+# The consistent load vector for the uniformly loaded legs is integrated here
+# from the definition of the element -- match value and slope at 0, 1 and 1/2 --
+# rather than taken from xslope, so the load side of the comparison is not
+# supplied by the code being checked.
+
+
+def _quintic_inverse():
+    """C^-1 for the three-node C1 beam on the unit interval: the columns are the
+    shape functions' polynomial coefficients, in the DOF order
+    [v1, dv1, v2, dv2, v3, dv3] with derivatives taken in xi."""
+    rows = []
+    for x in (0.0, 1.0, 0.5):
+        rows.append([1.0, x, x**2, x**3, x**4, x**5])
+        rows.append([0.0, 1.0, 2*x, 3*x**2, 4*x**3, 5*x**4])
+    return np.linalg.inv(np.array(rows))
+
+
+def quintic_element_load(L, w):
+    """The three-node element's own consistent load vector for a uniform
+    transverse load ``w`` along -local y, as a 9-vector in the local DOF order
+    [u1, v1, th1, u2, v2, th2, u3, v3, th3].
+
+    f_i = -w * integral of H_i over the element. On the unit interval the
+    integral of xi^k is 1/(k+1), so integrating the shape functions is exact.
+    """
+    c_inv = _quintic_inverse()
+    moments = np.array([1.0 / (k + 1) for k in range(6)])
+    integral = c_inv.T @ moments                 # integral of H_i d(xi)
+    scale = np.array([1.0, L, 1.0, L, 1.0, L])   # dv/d(xi) = L * theta
+    f_bend = -w * L * integral * scale
+    f_local = np.zeros(9)
+    f_local[[1, 2, 4, 5, 7, 8]] = f_bend
+    return f_local
+
+
+def quintic_udl_consistent(fem_data, w):
+    """Global load vector for a uniform transverse load ``w`` on every element of
+    a three-node chain."""
+    from xslope.fem import _beam_rotation
+    f = np.zeros(int(fem_data['dof_offset'][-1]))
+    for p_idx, idx in enumerate(fem_data['dof_indices_pile']):
+        c = fem_data['cos_theta_pile'][p_idx]
+        s_ = fem_data['sin_theta_pile'][p_idx]
+        L = fem_data['elem_length_by_pile_elem'][p_idx]
+        T = _beam_rotation(c, s_, 3)
+        f[np.asarray(idx)[:9]] += T.T @ quintic_element_load(L, w)
+    return f
+
+
+def local_end_actions(fem_data, u, p_idx):
+    """The element's local end-action vector S = K_local u_local, and u_local.
+
+    Nine entries on a three-node element: [N, V, M] at end 1, at end 2 and at the
+    midside node. The bending moments at the two ends are S[2] and S[5], the same
+    entries the two-node element's M1 and M2 are the closed forms of.
+    """
+    from xslope.fem import _beam_rotation
+    idx = np.asarray(fem_data['dof_indices_pile'][p_idx])[:9]
+    c = fem_data['cos_theta_pile'][p_idx]
+    s_ = fem_data['sin_theta_pile'][p_idx]
+    u_local = _beam_rotation(c, s_, 3) @ u[idx]
+    return fem_data['K_local_by_pile_elem'][p_idx] @ u_local, u_local
+
+
+def leg3_point_load():
+    """L = 8 m, P = 1000 kN at midspan, on three-node elements. The load lands on
+    an element END node, so the exact deflection is a cubic inside every element
+    and the quintic reproduces it."""
+    print("  three-node, simply supported, L=8 m, central P=1000 kN:")
+    fails = []
+    L, P, n = 8.0, 1000.0, 16
+    fd, nid = build_beam(L, n, three_node=True)
+    mid = nid[n // 2]
+    K, bd = assemble(fd)
+    f = np.zeros(int(fd['dof_offset'][-1]))
+    f[dofs(fd, mid, 1)] = -P
+    fixed = [dofs(fd, nid[0], 1), dofs(fd, nid[-1], 1), dofs(fd, nid[0], 0)]
+    u, R = solve(K, bd, f, fixed)
+
+    cmp(fails, "midspan deflection  PL^3/48EI", -u[dofs(fd, mid, 1)],
+        P * L ** 3 / (48 * EI), unit='m')
+    cmp(fails, "support reaction    P/2", R[dofs(fd, nid[0], 1)], P / 2.0, unit='kN')
+
+    S, _ = local_end_actions(fd, u, n // 2 - 1)
+    cmp(fails, "midspan moment      PL/4", abs(S[5]), P * L / 4.0, unit='kN m')
+    # Nothing loads the element between its ends, so its shear is the constant
+    # P/2 and the midside node carries no net force.
+    cmp(fails, "shear, left half    P/2", abs(S[1]), P / 2.0, unit='kN')
+    cmp(fails, "mid-node force / (P/2)", abs(S[7]) / (P / 2.0), 0.0,
+        atol=1e-12, unit='-')
+    return fails
+
+
+def leg3_udl_simply_supported():
+    """L = 8 m, w = 100 kN/m, on three-node elements. The exact deflection is a
+    quartic, which the quintic contains, so the nodal answers are exact."""
+    print("  three-node, simply supported, L=8 m, w=100 kN/m:")
+    fails = []
+    L, w, n = 8.0, 100.0, 8
+    fd, nid = build_beam(L, n, three_node=True)
+    K, bd = assemble(fd)
+    f = quintic_udl_consistent(fd, w)
+    fixed = [dofs(fd, nid[0], 1), dofs(fd, nid[-1], 1), dofs(fd, nid[0], 0)]
+    u, R = solve(K, bd, f, fixed)
+
+    mid = nid[n // 2]
+    cmp(fails, "midspan deflection  5wL^4/384EI", -u[dofs(fd, mid, 1)],
+        5 * w * L ** 4 / (384 * EI), unit='m')
+    cmp(fails, "support reaction    wL/2", R[dofs(fd, nid[0], 1)], w * L / 2.0,
+        unit='kN')
+
+    p_left = n // 2 - 1
+    S, _ = local_end_actions(fd, u, p_left)
+    fe = quintic_element_load(fd['elem_length_by_pile_elem'][p_left], w)
+    cmp(fails, "midspan moment      wL^2/8", abs(S[5] - fe[5]), w * L ** 2 / 8.0,
+        unit='kN m')
+
+    S0, _ = local_end_actions(fd, u, 0)
+    fe0 = quintic_element_load(fd['elem_length_by_pile_elem'][0], w)
+    cmp(fails, "moment at pinned end / (wL^2/8)",
+        abs(S0[2] - fe0[2]) / (w * L ** 2 / 8.0), 0.0, atol=1e-12, unit='-')
+    cmp(fails, "shear at support    wL/2", abs(S0[1] - fe0[1]), w * L / 2.0,
+        unit='kN')
+    return fails
+
+
+def leg3_udl_cantilever():
+    """L = 3 m, w = 100 kN/m, built in at the first node, on three-node
+    elements."""
+    print("  three-node, cantilever, L=3 m, w=100 kN/m:")
+    fails = []
+    L, w, n = 3.0, 100.0, 6
+    fd, nid = build_beam(L, n, three_node=True)
+    K, bd = assemble(fd)
+    f = quintic_udl_consistent(fd, w)
+    root = nid[0]
+    fixed = [dofs(fd, root, 0), dofs(fd, root, 1), dofs(fd, root, 2)]
+    u, R = solve(K, bd, f, fixed)
+
+    cmp(fails, "tip deflection      wL^4/8EI", -u[dofs(fd, nid[-1], 1)],
+        w * L ** 4 / (8 * EI), unit='m')
+    cmp(fails, "base reaction shear wL", R[dofs(fd, root, 1)], w * L, unit='kN')
+    cmp(fails, "base reaction moment wL^2/2", abs(R[dofs(fd, root, 2)]),
+        w * L ** 2 / 2.0, unit='kN m')
+
+    S, _ = local_end_actions(fd, u, 0)
+    fe = quintic_element_load(fd['elem_length_by_pile_elem'][0], w)
+    cmp(fails, "fixed-end moment    wL^2/2", abs(S[2] - fe[2]), w * L ** 2 / 2.0,
+        unit='kN m')
+    cmp(fails, "fixed-end shear     wL", abs(S[1] - fe[1]), w * L, unit='kN')
+
+    S_t, _ = local_end_actions(fd, u, n - 1)
+    fe_t = quintic_element_load(fd['elem_length_by_pile_elem'][n - 1], w)
+    cmp(fails, "moment at free tip / (wL^2/2)",
+        abs(S_t[5] - fe_t[5]) / (w * L ** 2 / 2.0), 0.0, atol=1e-12, unit='-')
+    return fails
+
+
+def leg3_equivalence():
+    """One three-node element of length L against two two-node elements of L/2.
+
+    Under loads applied only at the ends the exact deflection is a cubic, which
+    both element spaces contain, so both are exact at every node and must agree
+    to round-off -- including at the station in the middle, which is the midside
+    node of the three-node element and the shared end node of the two-node pair.
+    """
+    print("  one three-node element of L against two two-node elements of L/2:")
+    fails = []
+    L, P, M = 4.0, 500.0, 300.0
+
+    def solve_cantilever(fd, nid, mid_node, tip_node):
+        K, bd = assemble(fd)
+        f = np.zeros(int(fd['dof_offset'][-1]))
+        f[dofs(fd, tip_node, 1)] = -P
+        f[dofs(fd, tip_node, 2)] = M
+        root = nid[0]
+        u, R = solve(K, bd, f,
+                     [dofs(fd, root, 0), dofs(fd, root, 1), dofs(fd, root, 2)])
+        return (u[dofs(fd, mid_node, 1)], u[dofs(fd, mid_node, 2)],
+                u[dofs(fd, tip_node, 1)], u[dofs(fd, tip_node, 2)],
+                R[dofs(fd, root, 1)], R[dofs(fd, root, 2)])
+
+    fd3, nid3 = build_beam(L, 1, three_node=True)
+    got = solve_cantilever(fd3, nid3, int(fd3['pile_elem_nodes'][0][2]), nid3[-1])
+
+    fd2, nid2 = build_beam(L, 2)
+    want = solve_cantilever(fd2, nid2, nid2[1], nid2[-1])
+
+    labels = ["mid deflection", "mid rotation", "tip deflection", "tip rotation",
+              "base reaction shear", "base reaction moment"]
+    for label, g, wv in zip(labels, got, want):
+        cmp(fails, f"{label:26s}", g, wv, unit='-')
+
+    # ... and against the closed forms, so the pair is not merely self-consistent.
+    cmp(fails, "tip deflection  PL^3/3EI - ML^2/2EI", -got[2],
+        P * L ** 3 / (3 * EI) - M * L ** 2 / (2 * EI), unit='m')
+    cmp(fails, "base reaction moment  PL - M", abs(got[5]), P * L - M, unit='kN m')
+    return fails
+
+
+def leg3_center_shear():
+    """The shear the solver reports for a three-node element is read at the
+    element center, and on a field of constant shear that is the constant.
+
+    A cantilever under a tip point load has the same shear P at every station, so
+    ``_pile_element_actions`` must return P for every element of the chain
+    whatever its position. On a two-node element the same call returns the
+    element's single constant shear, which is what this quantity has always
+    meant.
+    """
+    print("  element-center shear against a constant-shear field:")
+    fails = []
+    from xslope.fem import _pile_element_actions
+    L, P, n = 6.0, 750.0, 6
+
+    for three_node in (False, True):
+        fd, nid = build_beam(L, n, angle_deg=-25.0, three_node=three_node)
+        K, bd = assemble(fd)
+        f = np.zeros(int(fd['dof_offset'][-1]))
+        # A load normal to the axis, so the whole chain carries shear P.
+        c = fd['cos_theta_pile'][0]
+        s_ = fd['sin_theta_pile'][0]
+        f[dofs(fd, nid[-1], 0)] = -P * -s_
+        f[dofs(fd, nid[-1], 1)] = -P * c
+        root = nid[0]
+        u, _ = solve(K, bd, f,
+                     [dofs(fd, root, 0), dofs(fd, root, 1), dofs(fd, root, 2)])
+        tag = "three-node" if three_node else "two-node"
+        for p_idx in (0, n // 2, n - 1):
+            n_dof = int(fd['n_dof_by_pile_elem'][p_idx])
+            idx = np.asarray(fd['dof_indices_pile'][p_idx])[:n_dof]
+            _, V, _, _, _ = _pile_element_actions(
+                u[idx], fd['cos_theta_pile'][p_idx], fd['sin_theta_pile'][p_idx],
+                fd['elem_length_by_pile_elem'][p_idx],
+                fd['EA_by_pile_elem'][p_idx], fd['EI_by_pile_elem'][p_idx],
+                fd['K_local_by_pile_elem'][p_idx], n_dof // 3)
+            cmp(fails, f"[{tag:10s}] element {p_idx} shear  P", abs(V), P, unit='kN')
+    return fails
+
+
 LEGS = [
     ("simply supported, central point load", leg_point_load),
     ("simply supported, uniform load", leg_udl_simply_supported),
@@ -489,6 +765,11 @@ LEGS = [
     ("orientation invariance", leg_orientation),
     ("axial stiffness and spacing", leg_axial_and_spacing),
     ("circular section from diameter", leg_circular_section),
+    ("three-node, simply supported, central point load", leg3_point_load),
+    ("three-node, simply supported, uniform load", leg3_udl_simply_supported),
+    ("three-node, cantilever, uniform load", leg3_udl_cantilever),
+    ("one three-node element against two two-node elements", leg3_equivalence),
+    ("element-center shear", leg3_center_shear),
 ]
 
 

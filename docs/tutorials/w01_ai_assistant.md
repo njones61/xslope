@@ -246,7 +246,7 @@ Next, we take the finished slope and change three things in one conversation: th
 the water, and the foundation's strength. Each edit is rerun, so the factor of
 safety moves in front of us — and on the third, so does the governing circle.
 
-We open LEM-3's completed model,
+First, we open LEM-3's completed model,
 [xslope_simple_mult_layers.xlsx](../lem/files/xslope_simple_mult_layers.xlsx),
 and send three requests. First the face:
 

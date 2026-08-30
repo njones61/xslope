@@ -187,8 +187,8 @@ template. Start from the one XSLOPE ships —
 Word, where its page size and margins, its header and footer and the fonts and
 colors of its styles are all yours. Three edits make a letterhead:
 
-- **A logo in the header**, sized to the header frame.
-- **The firm's name**, beside the logo.
+- **The firm's name in the header** (a logo can sit beside it, sized to the
+  header frame).
 - **A footer line** naming the firm and the document type.
 
 Where those three go decides whether they survive. The report writes its running
@@ -217,7 +217,7 @@ place anywhere, under Word's own property names rather than the dialog's labels:
 
 XSLOPE ships that template for a firm invented for this page —
 [report_template_example.docx](files/report_template_example.docx), the shipped
-file with a logo and the firm's name in a header table and a footer line above the
+file with the firm's name in a header table and a footer line above the
 page numbers, nothing else changed. Download it and open the dialog again with
 **File → Generate Report…**.
 
@@ -231,7 +231,7 @@ Method**, leaving
 Spencer's finished search as the only stability run, and under **Title page** set
 **Organization** to `ACME Geotechnical`. Click **Generate**.
 
-![The first body page of the report built on the example template: the logo and firm name in the head, the firm's line in the foot](images/w03_page_template.png){width=620}
+![The first body page of the report built on the example template: the firm's name in the head, the firm's line in the foot](images/w03_page_template.png){width=620}
 
 The letterhead prints on every page after the title page, with the report's own
 running head under it. **Template** is remembered between sessions, so the next
@@ -240,7 +240,7 @@ report on any model opens on the same letterhead. The 22-page result downloads a
 
 ### Check its work
 
-- **The logo and firm name are in the head of page 2 and every page after it**,
+- **The firm's name is in the head of page 2 and every page after it**,
   including the landscape slice table. A letterhead that reaches the contents page
   and stops was put in a paragraph rather than a table.
 - **The footer carries the firm's line above *page N of M*.** Both print, because
@@ -256,9 +256,8 @@ This tutorial covered:
 
 - A report generated from a model whose seepage and finite element solutions were
   attached rather than re-solved, documenting four results from one run.
-- The Generate Report dialog's three groups and its contents tree, and what
-  ticking an unrun method costs: Bishop searched for its own surface and reported
-  1.222 against Spencer's 1.248, the pair §4.4 sets side by side.
+- The Generate Report dialog's three groups and its contents tree, with any
+  unrun limit equilibrium method solved on the fly.
 - What the document states — the flow net and the fields beside it, and each
   method's equation with its converged numbers in it.
 - A company template made from the shipped one: keep the style names, place the

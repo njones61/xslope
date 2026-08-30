@@ -169,7 +169,7 @@ same work differently, and so will the same model on another day. Treat the
 transcripts as an illustration of what the requests look like, not as a script to
 match line for line.
 
-The assistant is good at this work, and everything it produces should still be
+The assistant is good at this work, but everything it produces should still be
 checked — the same checking a model built by hand deserves. Where the five models
 went wrong most often: a material swap in a broken file missed, or undone by
 editing the derived polygons; a slope ratio inverted in code; and a sentence that

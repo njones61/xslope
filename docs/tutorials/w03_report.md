@@ -63,11 +63,12 @@ engine a report runs itself: the slice computations are fast, so any method
 ticked without a result is solved on the fly — which is what lets several
 methods go into one report.
 
-One analysis is still missing. No companion file carries a limit equilibrium
-solution, so the stability run is ours to make. Switch the mode strip to **LEM**
-(`Ctrl+1`) and click **Run → Run LEM…**. Leave **Method** on **Spencer**,
-**Analysis** on **Auto search** and **Number of slices** at 40, and click
-**Run**. The search returns **FS = 1.248**, COMBO-1's own answer on this model.
+No companion file carries a limit equilibrium solution, and none is needed —
+the report will run whatever methods we tick. Still, a quick run confirms the
+model arrived intact. Switch the mode strip to **LEM** (`Ctrl+1`) and click
+**Run → Run LEM…**. Leave **Method** on **Spencer**, **Analysis** on
+**Auto search** and **Number of slices** at 40, and click **Run**. The search
+returns **FS = 1.248**, COMBO-1's own answer on this model.
 
 ---
 

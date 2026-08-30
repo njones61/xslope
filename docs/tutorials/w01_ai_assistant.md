@@ -93,7 +93,9 @@ served from the provider's prompt cache at a tenth the price of fresh input. A
 request that has to measure something costs several times that: the diagnosis
 below spends 177,000 across nine calls.
 
-The line under the input box reports the tokens each turn spent and the running
+A turn is one message you send and the reply it gets; inside a turn the
+assistant may call the model several times, once per snippet it runs. The line
+under the input box reports the tokens each turn spent and the running
 total for the conversation:
 
 ```

@@ -66,7 +66,7 @@ The dialog has four fields and a checkbox:
 **Claude (Anthropic)**, **OpenAI**, **Kimi (Moonshot AI)** and **Z.ai (GLM)**,
 which are hosted and bill for what you use, and **Ollama**, which runs a model
 on your own machine, free, and sends nothing anywhere; the list may change from
-release to release. Where a provider's catalogue mixes models that read images
+release to release. Where a provider's catalog mixes models that read images
 with text-only ones — OpenAI, Kimi, Z.ai and Ollama — only the models that can
 read an image are listed, and the caption under the box says so; every Claude
 model on the list reads images already. Handing the assistant a photograph or a
@@ -181,13 +181,13 @@ all three faults, then applied the material fix to the polygons Studio derives
 from the profile lines, which Studio rebuilds and says it has rebuilt, so the
 fix never reached the model and 1.208 went out as the repaired answer. gpt-5.5
 ran the leanest of the five, 29 calls and 364,000 input tokens for the same
-eight conversations, and it runs what the request asks for rather than stopping
-to offer it; it misses the material swap in the broken file outright and reports
-that same 1.208. Kimi K3 built and edited the model exactly as Opus did and
-scores lowest on explanation, three of its four misses being a sentence its own
-output contradicts: flattening the face called a drop in a
-factor of safety its table shows rising, a rise attributed to lighter soil by a
-snippet that made the soil heavier, and the top of the foundation named as its
+eight conversations, and it is exact on every number it computes; it misses the
+material swap in the broken file outright and reports that same 1.208. Kimi K3
+built and edited the model exactly as Opus did and ties GLM-5V-Turbo at the
+bottom of the explanation column, three of its four misses being a sentence its
+own output contradicts: flattening the face called a drop in a factor of safety
+its table shows rising, a rise attributed to lighter soil by a snippet that made
+the soil heavier, and the top of the foundation named as its
 base. GLM-5V-Turbo, at a third of the cost of the next cheapest, builds the
 section correctly and then inverts the slope ratio in the ad-hoc sweep — 20 ft
 of rise over a 10 ft run for 2:1 — so it answers a different problem, about
@@ -351,10 +351,10 @@ Reduce the foundation cohesion to 250 psf and rerun the search. Which circle gov
 ```
 </div>
 
-![The three-turn conversation in the dock: the geometry read back and rewritten for the 3:1 face, then the piezometric line and the saturated unit weights, then the cohesion change, each with a before-and-after table and a searched factor of safety](images/w1_modify_3.png){width=560}
+![The three-turn conversation in the dock: the geometry read back and rewritten for the 3:1 face, then the piezometric line and the saturated unit weights, then the cohesion change, each with the edit reported and a searched factor of safety](images/w1_modify_3.png){width=560}
 
 The first turn reads before it writes, and its first write goes to the wrong
-place. One snippet prints the polygons, the profile lines and the circles; the
+place. One snippet prints the polygons, the maximum depth and the circles; the
 next rewrites the polygons — and Studio derives those from the profile lines on
 this model, so it rebuilt them and printed *"The polygon edit did not take."*
 The session read that, printed the profile lines, and redid the edit there: line
@@ -367,18 +367,20 @@ thrust outside the slice on 10% of boundaries.
 
 **That turn also widened the section, which nothing asked for.** It rewrote
 profile line 2 from (−30, 0)–(90, 0) to (−50, 0)–(110, 0), and said so in the
-same table it reported the face in: flat ground extended on both sides so that
-trial circles daylight inside the model, twice the 20 ft height beyond the toe
-and beyond the crest. The reasoning holds, and the change is disclosed rather
-than hidden — but it is a change to the model, and it means this 1.546 is not on
-the extents the file was built with.
+same table it reported the face in: flat ground extended 50 ft beyond the toe and
+50 ft beyond the crest break, so that trial circles daylight inside the model.
+Its own note calls that twice the 20 ft height; against a break now at x = 60 it
+is two and a half times. The change is disclosed rather than hidden — but it is a
+change to the model, and it means this 1.546 is not on the extents the file was
+built with.
 
 The second turn adds the piezometric line at (−50, 30) to (110, 30), sets
 `u = piezo` on both materials and enters γsat = 135 and 140 pcf. **FS = 2.767**
 on (32.98, 53.76) with R = 53.76, no admissibility notes at all. The assistant
 added no distributed load for the pool and named the reason: `water_loads` is
 already `auto`, so the hydrostatic load on the submerged profile is derived from
-the piezometric line itself, and a `dloads` row would count the same water twice.
+the piezometric line itself. That is why a `dloads` row here would count the same
+water twice.
 It gave the φ = 0 reason for the rise as well — pore pressures cannot reduce an
 undrained strength, so the change comes from the 10 ft of water standing on the
 slope, whose weight acts as a stabilizing surcharge — and offered to isolate the
@@ -422,9 +424,9 @@ in [w1_modify_transcript.md](files/w1_modify_transcript.md).
   `u = piezo`, with γsat = 135 and 140 pcf beside their total unit weights of 130
   and 135 — the water is explicit and the unit weights are total, which is how
   XSLOPE wants a submerged section stated.
-- **Check which method ran.** The file names no method, which the session's own
-  readback prints as `lem_method None`, so every run in this conversation took
-  XSLOPE's default of Spencer.
+- **Check which method ran.** The file names no method, so every
+  `run_lem(search=True)` in this conversation came back headed
+  `spencer (auto search, circular)` — XSLOPE's default.
 
 ---
 
@@ -468,8 +470,7 @@ than leaving the reader to find out: *"I did not vary the embankment cohesion to
 confirm that, so treat the cause as inferred from the flat segment, not
 measured."*
 
-Settling it by hand takes one more solve per step, and it is what turns the flat
-tail of the table into a statement about the slope.
+Settling it by hand takes one more solve per step.
 
 ### Check its work
 
@@ -505,9 +506,10 @@ Compute the factor of safety for face slopes of 2:1, 2.5:1 and 3:1, keeping the 
 
 ![The face-slope sweep in the dock: the geometry read back, the loop that moves the crest break and regenerates the circles, the three searched steps, the finished table, and the restored geometry printed at the end](images/w1_sweep_adhoc_1.png){width=560}
 
-It reads the geometry twice — the polygons first, then the profile lines the
-polygons come from — and writes its own loop rather than calling a helper, which
-is what a study with no mode behind it needs. Each pass moves the crest break to
+It reads the geometry twice — the polygons, the circles and `lem_method None`
+first, then the profile lines the polygons come from — and writes its own loop
+rather than calling a helper, which is what a study with no mode behind it
+needs. Each pass moves the crest break to
 x = 2H, 2.5H and 3H for a 20 ft height, holds the toe at (0, 0) and the crest at
 elevation 20, runs the flat ground from x = −50 out to 50 ft beyond the break,
 calls `resync_geometry()`, and regenerates the starting circles so each face
@@ -553,9 +555,9 @@ even though the model is back where it started.
   conversations agree on that face.
 - **Read the 2:1 row against the published answer.** It returns 1.244146 against
   LEM-3's 1.244108 — the same mechanism on a slightly different search. The sweep
-  regenerates three starting circles at each step and widens the ground; the
-  saved workbook, back on the file's own two circles and its own extents, returns
-  1.244108.
+  regenerates the starting circles at each step — three on the 2:1 and 2.5:1
+  sections, two on the 3:1 — and widens the ground; the saved workbook, back on
+  the file's own two circles and its own extents, returns 1.244108.
 - **Reload the saved workbook.** The section is back at (0, 0)–(40, 20)–(90, 20)
   over (−30, 0)–(90, 0) with the original two circles, so the restoration is in
   the file and not only in the printout.
@@ -590,10 +592,12 @@ The first turn calls `suggest_elastic()`, which classifies each material from it
 strength: the embankment at c = 400 psf and φ = 0 as **Soft Clay**, at
 E = 167,100 psf with ν = 0.45, and the foundation at c = 800 psf as **Medium
 Clay**, at E = 668,300 psf with ν = 0.40. It wrote both onto the materials and
-quoted the tool's own reason back rather than dressing the numbers up as
-measurements — E the midpoint of the published range for that soil type, ν its
-typical value, a last-resort fill that any stated value outranks — and closed by
-asking for measured or design stiffnesses if there are any.
+gave them the classifier's own standing rather than dressing them up as
+measurements: *"a last-resort fallback, since the problem states no
+stiffnesses"*, classified from each material's strength. The `reason` the tool
+prints beside each value carries the rest — E the midpoint of the published range
+for that soil type, ν its typical value, and any stated value outranking both.
+The turn closed by asking for measured or design stiffnesses if there are any.
 
 The second turn opens by saying the solve is the long part, then runs both
 engines. Spencer with a search comes back at **FS = 1.244** on (18.50, 43.75)
@@ -791,9 +795,12 @@ invented foundation", set back to −10 because the request states the rock sits
 the dominant error because it let the search reach circles that cannot exist
 above rock, and the nearly weightless fill was pulling the other way, which is
 why the file arrived at a plausible-looking 1.004 rather than at something
-obviously wrong. It also replaced the two stale trial circles — the old deep one
-bottomed 24.6 ft below the real rock line — with a toe circle at R = 44.72,
-Depth = −4.72 and one tangent to the rock at Depth = −10, R = 50.
+obviously wrong. It also restaged the trial circles for the corrected base,
+though only one of the two moved: the first became a toe circle at R = 44.72,
+Depth = −4.72, and the second was rewritten to the Depth = −10, R = 50 it already
+carried. Its account of that step says the old deep circle bottomed 24.6 ft below
+the rock line; it bottomed at −10, on the rock line, and −24.58 is where the
+*searched* surface of the broken model bottomed.
 
 The rerun returns **FS = 1.244** on (18.51, 42.98) with R = 42.98, bottoming at
 elevation 0, with both admissibility notes passed on.
@@ -806,8 +813,8 @@ row order is not, and the saved
 first. A defensible fix, and one to notice before the next person reads that
 table top down.
 
-**One sentence in the summary puts that circle 10 ft below where the run puts
-it.** The closing paragraph reads:
+**Two sentences in that summary put a feature at the wrong elevation.** One is
+the circle description above; the other closes the answer:
 
 > **FS = 1.244** (Spencer, critical circle Xo = 18.51, Yo = 42.98, R = 42.98,
 > Depth = 0.0, entry x = 54.83, exit x = 4.61). The critical circle now bottoms
@@ -815,9 +822,9 @@ it.** The closing paragraph reads:
 
 That `Depth = 0.0` gives the elevation of the surface's lowest point, and the
 rock in this model sits at −10, so the circle bottoms at the
-embankment/foundation contact, 10 ft above the rock. Every number is right and
-the feature named beside them is not, which is the shape most wrong explanations
-in these eight sessions take.
+embankment/foundation contact, 10 ft above the rock. Every number in that
+paragraph is right and the feature named beside them is not, which is the shape
+most wrong explanations in these eight sessions take.
 
 <!-- test: file=files/w1_diagnose_start.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.004, tolerance=0.005 -->
 <!-- test: file=files/w1_diagnose_after.xlsx, type=circular_search, method=spencer, num_slices=40, expected_fs=1.244, tolerance=0.005 -->
@@ -869,7 +876,7 @@ Write the analysis report.
 ```
 </div>
 
-![Both turns in the dock: the search returning 1.244 with its circle laid out in a table, then the one call to generate_report, the path of the finished document, and the document offered as an attachment](images/w1_report_2.png){width=560}
+![Both turns in the dock: the search returning 1.244 with its circle laid out in a table, then the one call to generate_report, and the path of the finished document](images/w1_report_2.png){width=560}
 
 The first turn returns **FS = 1.244** on the circle (18.50, 43.75) with R = 43.75
 — [LEM-3](lem03_layered_slope.md)'s published answer, circle included. It read
@@ -884,9 +891,9 @@ the file name, six figures, and the run the document covers. The document itself
 carries six numbered figures and three numbered tables across *1 Traceability*,
 *2 Project Definition* and *3 Limit Equilibrium Analysis*, the last holding
 3.1 Analysis Inputs, 3.2 Materials, 3.3 Loads and 3.4 Spencer's Method, itself
-split into the search, the results, the slice table and the calculations. It
-lands in the folder **Files…** opens, and the dock shows it as an attachment with
-a *show in folder* link beside it. The session saved
+split into the search, the results, the slice table and the calculations. The
+snippet printed the path it was written to, and the reply points at the chat and
+at the dock's **Files…** button for opening it. The session saved
 [w1_report_after.docx](files/w1_report_after.docx).
 
 ### Check its work
@@ -947,12 +954,15 @@ against the elevations the model declares, is what finds it.
 As the slope and the prompts get more complicated, the opportunity for error
 rises. The same eight tasks were also run on the reinforced slope of [LEM-8](lem08_reinforced_slope.md) — a
 2 ft cohesive band along the face, six geogrid layers with pullout at both ends,
-and a surcharge across the crest — scored the same two ways. Claude Opus 5 is
+and a surcharge across the crest — scored the same two ways. Those sessions were
+recorded earlier, under different wording of the same requests, so read the two
+sets as two problems rather than as one model measured twice. Claude Opus 5 is
 again right on every model and every number, at $2.23 against the $1.77 the
-layered slope cost it, and again loses three of the second column. The five models
-above score 5 to 8 of 8 on model and numbers there and 4 to 7 of 8 on
-explanation, and a sixth and smaller one, Claude Haiku 4.5, gets 2 and 3. Late
-August 2026, on the same list prices as the table above:
+layered slope cost it, and this time loses three of the second column against the
+one it lost on the layered slope. The five models above score 5 to 8 of 8 on
+model and numbers there and 4 to 7 of 8 on explanation, and a sixth and smaller
+one, Claude Haiku 4.5, gets 2 and 3. Late August 2026, on the same list prices as
+the table above:
 
 | Model | Cost | Model and numbers | Explanation |
 | :--- | :---: | :---: | :---: |

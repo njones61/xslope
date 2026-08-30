@@ -12,7 +12,7 @@ question out of the built-in documentation, and write the analysis report — al
 in the open project, on the same undo stack the editors use.
 
 We set the assistant up first, then work through eight sample conversations on
-one slope. Each one closes on the checking it deserves.
+one slope.
 
 <div class="tut-glance" markdown>
 <div class="tgt-row">

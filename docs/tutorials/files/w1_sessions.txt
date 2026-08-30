@@ -21,7 +21,7 @@ A sweep written ad hoc                       1     5      87,126 ( 79,255)  2,75
 Stiffnesses and a strength reduction run     2     5      87,553 ( 63,404)  1,613  571.2s w1_elastic_fem_transcript.md
 Two documentation questions                  2     5      92,550 ( 79,255)  5,250   87.9s w1_conceptual_transcript.md
 A broken file                                1     9     176,923 (142,659)  8,544  173.0s w1_diagnose_transcript.md
-Generating the report                        2     4      67,664 ( 63,404)    839   30.2s w1_report_transcript.md
+Generating a report                          2     4      67,664 ( 63,404)    839   30.2s w1_report_transcript.md
 ---------------------------------------- ----- ----- --------------------- ------ ------- ----------------------------------
 Total                                       13    46     852,959 (697,444) 29,113 1153.7s
 

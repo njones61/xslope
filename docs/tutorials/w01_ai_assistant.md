@@ -117,7 +117,7 @@ The eight conversations below cost this much between them, measured as they ran:
 | Stiffnesses and a strength reduction run | 2 | 5 | 87,553 (63,404) | 1,613 | 571 s |
 | Two documentation questions | 2 | 5 | 92,550 (79,255) | 5,250 | 88 s |
 | A broken file | 1 | 9 | 176,923 (142,659) | 8,544 | 173 s |
-| Generating the report | 2 | 4 | 67,664 (63,404) | 839 | 30 s |
+| Generating a report | 2 | 4 | 67,664 (63,404) | 839 | 30 s |
 | **Total** | **13** | **46** | **852,959 (697,444)** | **29,113** | **1,154 s** |
 
 That comes to **\$1.85** at Anthropic's list prices on 2026-08-29 (\$5.00 per

@@ -3447,6 +3447,264 @@ SHOTS.update({
 
 
 # --------------------------------------------------------------------------- #
+# W-2 — Bringing in models from CAD and other programs
+#
+# Three importers, and only the first of them runs on a file this repository ships.
+# The DXF shots use ``docs/tutorials/files/w02_section.dxf``, built by
+# ``tools/build_w02_import_dxf.py``. The GeoStudio and Slide2 shots need the
+# vendors' own model files, which are theirs and are never committed here: they are
+# read from a local archive whose root is ``$XSLOPE_VENDOR_FILES`` (default
+# ``~/python_projects/vendor_files``), and each shot SKIPS with a message when its
+# file is not there, so an argument-less sweep runs clean on a machine without the
+# archive. Both files are public downloads, and the tutorial says where each comes
+# from.
+# --------------------------------------------------------------------------- #
+W02_DXF = os.path.join(REPO_ROOT, "docs/tutorials/files/w02_section.dxf")
+W02_XLSX = os.path.join(REPO_ROOT, "docs/tutorials/files/w02_section_imported.xlsx")
+
+VENDOR_FILES = os.environ.get(
+    "XSLOPE_VENDOR_FILES", os.path.expanduser("~/python_projects/vendor_files"))
+
+#: Seequent's SLOPE/W verification example for manual §2.25 — files.seequent.com.
+W02_GSZ = os.path.join(VENDOR_FILES, "gsz_corpus",
+                       "Baker and Leschinsky - Earth Dam.gsz")
+
+#: Rocscience's Slide2 Tutorial 28 model, from the public deprecated-tutorials zip.
+W02_SLMD_NAME = "Tutorial 28 Seismic.slmd"
+
+
+def _find_vendor(name):
+    """The first copy of ``name`` under the vendor archive, or None.
+
+    The Slide2 tutorial models arrive as one zip that unpacks into nested folders
+    whose names carry the release, so the file is located by search rather than by
+    a path spelled here — which would break on the next release.
+    """
+    import glob
+
+    for depth in range(1, 7):
+        hits = glob.glob(os.path.join(VENDOR_FILES, *(["*"] * depth), name))
+        if hits:
+            return sorted(hits)[0]
+    return None
+
+
+def _skip(shot, path, source):
+    print("skipped %s — %s not in the vendor archive (%s)"
+          % (shot, os.path.basename(path), source))
+    return None
+
+
+def _main_window(model_or_builder, name, width=1500, height=950):
+    """The whole Studio window on a model, offscreen.
+
+    Same technique as ``lem01_canvas``: the canvas render is deferred and there are
+    no paint events without a screen, so it is kicked synchronously; the assistant
+    dock is hidden (W-2 does not use it) and the log cleared, because what the log
+    holds at this point is the capture's own doing rather than the reader's.
+
+    ``model_or_builder`` is either a path to open or a callable taking the window,
+    which is how the vendor shots put an *imported* model on the canvas: they run
+    the same ``ProjectDocument`` call File → Import … makes.
+    """
+    from studio.main_window import MainWindow
+
+    win = MainWindow()
+    win.resize(width, height)
+    if callable(model_or_builder):
+        model_or_builder(win)
+    else:
+        win.open_path(model_or_builder)
+    for dock in ("assistant_dock", "chat_dock", "ai_dock"):
+        d = getattr(win, dock, None)
+        if d is not None:
+            d.hide()
+    win.show()
+    _settle()
+    win.canvas.render_inputs(win.doc.slope_data)
+    _settle()
+    win.canvas._render_timer.stop()
+    win.canvas._render_current()
+    win.log.clear()
+    _settle()
+    pix = win.grab()
+    out = os.path.join(OUT_DIR, name)
+    pix.save(out)
+    print("-> %s  (%dx%d, offscreen main window)" % (name, pix.width(), pix.height()))
+    # An imported project is unsaved by design, and closing one puts up the modal
+    # "Save changes before closing?" question — which the capture harness does not
+    # stub (it replaces only the static warning/information/critical helpers) and
+    # which would hang a headless run. The document is marked clean first; nothing
+    # here is meant to be kept.
+    win.doc._dirty = False
+    win.close()
+    return out
+
+
+def w02_dxf_wizard():
+    """The DXF import wizard on W-2's own drawing.
+
+    Read with the reader the importer uses and mapped with the wizard's own
+    suggestion function, so the six rows, their Contents summaries and every
+    suggested target are the ones the reader sees — three material zones, the
+    search circles, the load and the piezometric line.
+    """
+    from xslope.cad import read_dxf_layers, suggest_dxf_target
+    from studio.dialogs import DxfImportDialog
+
+    layers, _warnings = read_dxf_layers(W02_DXF)
+    dlg = DxfImportDialog(layers, suggest_dxf_target)
+    # Trimmed to its own six rows: the wizard opens at a height sized for a drawing
+    # with far more layers than this one, and the blank half of it is not the shot's
+    # subject. Measured off the built table rather than guessed.
+    dlg.show()
+    _settle()
+    table = dlg.table
+    rows = sum(table.rowHeight(r) for r in range(table.rowCount()))
+    chrome = dlg.height() - table.viewport().height()
+    dlg.resize(dlg.width(), rows + chrome + 2 * table.frameWidth())
+    return _grab(dlg, "w02_dxf_wizard.png")
+
+
+def w02_dxf_window():
+    """The imported section on the canvas, with the properties filled in — the
+    state Part 1 ends in, on the workbook the page ships."""
+    return _main_window(W02_XLSX, "w02_dxf_window.png")
+
+
+def _gsz_import(analysis_name="Spencer"):
+    """Read W-2's GeoStudio file and return ``(gsz, analysis_id, analyses)``."""
+    from xslope.geostudio import read_gsz, list_analyses
+
+    gsz = read_gsz(W02_GSZ)
+    analyses = list_analyses(gsz)
+    chosen = next(a for a in analyses if a["name"] == analysis_name)
+    return gsz, chosen["id"], analyses
+
+
+def w02_gsz_analyses():
+    """The analysis picker on the Baker & Leshchinsky dam: the two Spencer
+    analyses the file holds, which is the choice the import asks for."""
+    from studio.dialogs import GszImportDialog
+
+    if not os.path.exists(W02_GSZ):
+        return _skip("w02_gsz_analyses", W02_GSZ, "Seequent verification examples")
+    _gsz, _id, analyses = _gsz_import()
+    dlg = GszImportDialog(analyses)
+    return _grab(dlg, "w02_gsz_analyses.png")
+
+
+def w02_gsz_notes():
+    """The notes the GeoStudio import reports, in the box Studio shows them in.
+
+    The box is built here rather than driven out of ``MainWindow`` because the
+    capture harness replaces the static ``QMessageBox`` helpers so that nothing
+    blocks a headless run. The title, the wording and the caveats are the real
+    ones — ``build_from_gsz`` produces the list.
+    """
+    from PySide6.QtWidgets import QMessageBox
+    from studio.document import ProjectDocument
+
+    if not os.path.exists(W02_GSZ):
+        return _skip("w02_gsz_notes", W02_GSZ, "Seequent verification examples")
+    gsz, analysis_id, _analyses = _gsz_import()
+    doc = ProjectDocument()
+    caveats = doc.build_from_gsz(gsz, analysis_id)
+
+    box = QMessageBox()
+    box.setIcon(QMessageBox.Information)
+    box.setWindowTitle("GeoStudio imported")
+    box.setText("Imported with notes:\n\n• " + "\n• ".join(caveats)
+                + "\n\nSee the Log pane for details.")
+    box.setStandardButtons(QMessageBox.Ok)
+    # A QMessageBox sizes itself to its text and wraps hard; four caveats of full
+    # sentences come out a column two words wide. The width is forced through the
+    # layout's own spacer row, which is the only handle the class offers.
+    from PySide6.QtWidgets import QSpacerItem, QSizePolicy
+    layout = box.layout()
+    layout.addItem(QSpacerItem(660, 0, QSizePolicy.Minimum, QSizePolicy.Expanding),
+                   layout.rowCount(), 0, 1, layout.columnCount())
+    return _grab(box, "w02_gsz_notes.png")
+
+
+def w02_gsz_window():
+    """The imported dam on the canvas: three zones, the piezometric line through
+    the core, and SLOPE/W's own solved circle."""
+    if not os.path.exists(W02_GSZ):
+        return _skip("w02_gsz_window", W02_GSZ, "Seequent verification examples")
+    gsz, analysis_id, _analyses = _gsz_import()
+
+    def build(win):
+        win.doc.build_from_gsz(gsz, analysis_id)
+
+    return _main_window(build, "w02_gsz_window.png")
+
+
+def _slmd_import(scenario_name="No Seismic"):
+    """Read W-2's Slide2 file and return ``(d, scenario_index, scenarios, path)``."""
+    from xslope.slide2 import read_slmd, list_scenarios
+
+    path = _find_vendor(W02_SLMD_NAME)
+    if path is None:
+        return None
+    d = read_slmd(path)
+    scenarios = list_scenarios(d)
+    chosen = next(s for s in scenarios if s["name"] == scenario_name)
+    return d, chosen["index"], scenarios, path
+
+
+def w02_slide2_scenarios():
+    """The scenario picker on Slide2's Tutorial 28 model: the master scenario and
+    the four the tutorial builds on it."""
+    from studio.dialogs import Slide2ImportDialog
+
+    found = _slmd_import()
+    if found is None:
+        return _skip("w02_slide2_scenarios", W02_SLMD_NAME,
+                     "Slide2 deprecated tutorials")
+    _d, _index, scenarios, _path = found
+    dlg = Slide2ImportDialog(scenarios)
+    return _grab(dlg, "w02_slide2_scenarios.png")
+
+
+def w02_slide2_window():
+    """The imported three-layer slope on the canvas, with the starting circle
+    Part 3 has the reader add — a Slide2 scenario defines a search, so the import
+    arrives with no surface."""
+    import math
+
+    found = _slmd_import()
+    if found is None:
+        return _skip("w02_slide2_window", W02_SLMD_NAME,
+                     "Slide2 deprecated tutorials")
+    d, index, _scenarios, _path = found
+
+    def build(win):
+        win.doc.build_from_slide2(d, index)
+        sd = win.doc.slope_data
+        # Part 3's starting circle: centered over the middle of the face, two slope
+        # heights above the toe, through the toe itself.
+        Xo, Yo, toe = 40.0, 45.0, (30.0, 25.0)
+        R = math.hypot(Xo - toe[0], Yo - toe[1])
+        sd["circles"] = [{"Xo": Xo, "Yo": Yo, "R": R, "Depth": Yo - R}]
+        sd["circular"] = True
+        win._populate_inputs_tree()
+
+    return _main_window(build, "w02_slide2_window.png")
+
+
+SHOTS.update({
+    "w02_dxf_wizard": w02_dxf_wizard,
+    "w02_dxf_window": w02_dxf_window,
+    "w02_gsz_analyses": w02_gsz_analyses,
+    "w02_gsz_notes": w02_gsz_notes,
+    "w02_gsz_window": w02_gsz_window,
+    "w02_slide2_scenarios": w02_slide2_scenarios,
+    "w02_slide2_window": w02_slide2_window,
+})
+
+
+# --------------------------------------------------------------------------- #
 # W-1 — Working with the assistant
 #
 # Not a dialog capture. The assistant tutorial's figures are recorded CONVERSATIONS

@@ -596,11 +596,12 @@ The transcript is [w1_diagnose_transcript.md](files/w1_diagnose_transcript.md).
 
 ## Generating the report
 
-We run Spencer with a search and then ask for the analysis report in one
-sentence. What comes back is the same document **File → Generate Report…** writes,
-built from the same run.
-
-The report documents what the session has solved, so the run comes first:
+Every analysis ends in a document someone else reads, and Studio writes that
+document itself — the same report **File → Generate Report…** produces, which
+[W-3](w03_report.md) walks through in full. The assistant can drive it from the
+chat box, so we close the eight conversations by asking for it. The report
+documents what the session has solved, so a Spencer's-method search comes
+first:
 
 <div class="prompt-block" markdown>
 ```text

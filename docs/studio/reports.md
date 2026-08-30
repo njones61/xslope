@@ -230,9 +230,15 @@ raised no findings, which is the statement a reviewer came for.
 
 ![The Generate Report dialog](images/reports_dialog.png){width="920"}
 
-**Output.** The format and where the file goes. Word (`.docx`) is what is
-available; PDF is listed and dimmed. The path defaults to `<model>_report.docx`
-beside the model.
+**Output.** The format, where the file goes, and the template it is built on.
+Word (`.docx`) is what is available; PDF is listed and dimmed. The path defaults
+to `<model>_report.docx` beside the model. **Template** reads *Shipped template*
+until **Browse…** points it at a company template; **Shipped template** puts it
+back. A template that does not declare the styles the report is written in is
+refused when Generate is pressed, naming the style it lacks, rather than after a
+build. The choice is remembered between sessions — and a remembered template
+that has since been moved or deleted falls back to the shipped one and says
+which file went, on the field.
 
 **Analysis.** Which methods the report documents in full — each ticked method
 gets its own block, and the factor of safety table lists exactly those. Every
@@ -254,8 +260,8 @@ on that section's own default, which is on for everything except **Result plots
 at the last converged state** and **Model checks**.
 
 What is remembered between sessions is what belongs to the person rather than to
-the project: the organization, the author, the format, the signature-line
-choice, the ticked methods and every content box. The project title is filled in
+the project: the organization, the author, the format, the template, the
+signature-line choice, the ticked methods and every content box. The project title is filled in
 from the model's own file name, never from the last project reported on.
 
 Generating runs off the GUI thread, so the window stays live: the progress bar
@@ -355,9 +361,7 @@ page size and margins, the Title, Heading, Body Text and Caption styles, the
 rule under the title, and the header and footer frames; the report supplies only
 content. Body text is 10.5 pt, a first-level heading 14 pt and the title 24 pt
 ranged left, on one-inch margins — sized for a submittal rather than a
-presentation. A company template can be used in its place by passing it to
-`generate_report`; the metadata already maps onto Word document properties, so
-such a template can place them wherever it likes.
+presentation.
 
 The header carries the project title and the section being read; the footer
 carries *page N of M* and the report date. Both are live fields.
@@ -375,6 +379,30 @@ A figure is sized to leave room for the sentence above it, which is kept on the
 figure's page: a lead line orphaned at the foot of one page with its figure at
 the top of the next wastes most of both. A caption is bound to the figure above
 it and to nothing after it.
+
+### A company template
+
+A report goes out on the firm's letterhead by being built on the firm's own
+template. Start from the one xslope ships —
+[report_template.docx](files/report_template.docx) — and edit it in Word: the
+page size and margins, the header and footer, a logo in either of them, and the
+fonts and colors of the Title, Heading, Body Text and Caption styles.
+Then pick it in the report dialog's **Template** field, or pass it to
+`generate_report` as the `template` option.
+
+Two things make a template one of these reports can be built on:
+
+- **Keep the style names.** The report is written in *Title*, *Heading 1*,
+  *Heading 2*, *Heading 3*, *Body Text* and *Caption*, and it asks the template
+  for them by name. Restyle them as far as you like; renaming one is what the
+  refusal on Generate is about.
+- **Leave the metadata to the fields.** The title, project number, organization
+  and author reach the document as Word document properties, so a template can
+  place them wherever it likes — a `DOCPROPERTY` field in the header, on a cover
+  page of its own — and they fill in with what the dialog was given.
+
+Body content in the template is not kept: the report replaces it, and takes the
+styles, the page setup and the header and footer frames.
 
 ---
 
@@ -426,7 +454,10 @@ the dialog does not offer:
   built.
 
 `generate_report` reads one option of its own, `template`: the Word template to
-build the document on, in place of the one shipped with xslope.
+build the document on, in place of the one shipped with xslope — the same choice
+the dialog's Template field makes (see [A company template](#a-company-template)).
+A template that does not declare the styles the report is written in is refused
+before anything is built, and the message names the style it lacks.
 
 Report generation is headless: it renders through the Agg backend, opens no
 windows, and never opens the finished document.

@@ -129,6 +129,13 @@ BUNDLED_TEMPLATE = _repo('xslope/resources/input_template.xlsx')  # copy shipped
 # Studio assistant on pip installs, where docs/ is absent). Must stay byte-identical.
 SKILL_MASTER = _repo('docs/usage/claude/xslope.md')
 BUNDLED_SKILL = _repo('xslope/resources/xslope_skill.md')
+# The Analysis Report's Word template: the one shipped in the wheel is the master
+# (tools/build_report_template.py writes it), and the documentation hands out a
+# copy for the reader to restyle in Word and pick in the report dialog. A docs
+# copy that has drifted is a download that is not the template reports are built
+# on, so the two must stay byte-identical.
+REPORT_TEMPLATE = _repo('xslope/resources/report_template.docx')
+DOCS_REPORT_TEMPLATE = _repo('docs/studio/files/report_template.docx')
 # The hand-drawn slice force diagrams the Analysis Report prints at the head of
 # each Calculations section: the drawings the LEM documentation displays, and the
 # copies shipped in the wheel (docs/ is not packaged). Which drawings they are is
@@ -7422,6 +7429,64 @@ def run_report_test(test):
     return 0.0, None
 
 
+def run_report_template_field_test(test):
+    """The report dialog's Template field and what refuses a bad template
+    (test/report_template_field_check.py).
+
+    A company template restyles the whole report, so it is a choice made in the
+    dialog and remembered between sessions. What can go wrong is silent: a
+    template that does not declare the Title/Heading/Body Text/Caption styles
+    produces a document where everything is body text, and a remembered template
+    that has been moved would otherwise be reported around without a word. Both
+    are pinned here, with the refusal mutation-tested one required style at a
+    time. Builds dialogs offscreen and solves nothing.
+
+    Returns (0.0, None) on success, else (None, message)."""
+    import importlib.util
+    path = Path(__file__).parent / 'test' / 'report_template_field_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        return 0.0, None           # no PySide6: nothing here to check
+    spec = importlib.util.spec_from_file_location('report_template_field_check',
+                                                  path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_report_no_resolve_test(test):
+    """A report never re-solves an engine that is already solved
+    (test/report_no_resolve_check.py).
+
+    Generates a full report on a model whose seepage and finite element
+    solutions are attached from its sidecars, with every seepage and FEM solve
+    entry point replaced by a stub that raises. The sections must be there, the
+    one limit equilibrium method the report was asked for must be run exactly
+    once, and nothing else may be solved. ~10 s: one single-surface LEM solve and
+    the report's figures.
+
+    Returns (0.0, None) on success, else (None, message)."""
+    import importlib.util
+    path = Path(__file__).parent / 'test' / 'report_no_resolve_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('report_no_resolve_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_report_finalize_test(test):
     """Building the Analysis Report's page numbers (test/report_finalize_check.py).
 
@@ -12653,6 +12718,10 @@ def _dispatch_test(test):
         return run_report_test(test)
     if test_type == 'report_finalize':
         return run_report_finalize_test(test)
+    if test_type == 'report_template_field':
+        return run_report_template_field_test(test)
+    if test_type == 'report_no_resolve':
+        return run_report_no_resolve_test(test)
     if test_type == 'mode_segments':
         return run_mode_segments_test(test)
     if test_type == 'thread_safety':
@@ -12772,6 +12841,7 @@ def _expected_and_tol(test, default_tolerance):
                        'noncircular_generator', 'circles_editor', 'table_paste',
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
+                       'report_template_field', 'report_no_resolve',
                        'assistant_models', 'assistant_guardrails',
                        'assistant_suite',
                        'fs_vs_time',
@@ -13444,6 +13514,21 @@ def main():
         tests.append({'type': 'report_finalize',
                       'file': 'Analysis Report page numbers built',
                       'method': '-', 'source': 'report_finalize'})
+        # Guard the report dialog's Template field — the company template a
+        # report is built on: what the field opens on, what Browse and the
+        # Shipped template button do, what is remembered, and the refusal that
+        # names the style a template is missing rather than writing a document
+        # with no headings in it.
+        tests.append({'type': 'report_template_field',
+                      'file': 'Analysis Report template field',
+                      'method': '-', 'source': 'report_template'})
+        # Guard that a report documents the engines that were run and re-runs
+        # none of them: a full report over a model whose seepage and FEM
+        # solutions are already attached, with every one of those solvers
+        # replaced by a stub that raises.
+        tests.append({'type': 'report_no_resolve',
+                      'file': 'Analysis Report re-solves nothing',
+                      'method': '-', 'source': 'report_no_resolve'})
         # Guard the non-circular starting-surface generator: the mobilizable-strength
         # metric it ranks zones on, the separation threshold that decides whether it
         # picks or raises the zone picker, the geometry invariants that make the
@@ -13534,6 +13619,12 @@ def main():
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
                       'method': '-', 'source': 'skill'})
+        # Same guard for the report's Word template: the wheel's copy is what
+        # every report is built on, and docs/studio/files holds the copy the
+        # documentation hands out for restyling.
+        tests.append({'type': 'template_sync', 'file': DOCS_REPORT_TEMPLATE,
+                      'master': REPORT_TEMPLATE, 'copy': DOCS_REPORT_TEMPLATE,
+                      'method': '-', 'source': 'report_template'})
         # Guard that the generated corpus example index — the machine index and
         # the skill's TOPIC -> EXAMPLES table — matches what the docs' test tags
         # and the models they name would produce today. Regenerates in memory;

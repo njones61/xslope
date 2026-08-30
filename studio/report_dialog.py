@@ -15,17 +15,18 @@
 """Generate Report… — where the user composes the Analysis Report.
 
 The dialog is a front end to :func:`xslope.report.generate_report` and holds no
-report logic of its own: it collects an output path, a format, the title-page
-metadata, which methods the report documents in full, and a checkbox tree of
-content, and hands them over as the options dict that function documents.
+report logic of its own: it collects an output path, a format, the Word template
+the document is built on, the title-page metadata, which methods the report
+documents in full, and a checkbox tree of content, and hands them over as the
+options dict that function documents.
 
 Two things persist between runs, and they are different kinds of thing. The
-organization and the author are properties of the person using the program, so
-they are remembered in QSettings and pre-filled every time. The content
-selections are remembered the same way, because a user who wants the slice table
-left out wants it left out every week. The project title and number are
-properties of the PROJECT and are pre-filled from the model's own file name, never
-from the last project the user reported on.
+organization, the author and the company template are properties of the person
+using the program, so they are remembered in QSettings and pre-filled every
+time. The content selections are remembered the same way, because a user who
+wants the slice table left out wants it left out every week. The project title
+and number are properties of the PROJECT and are pre-filled from the model's own
+file name, never from the last project the user reported on.
 
 The layout follows the Run dialogs: controls in a left column, the content tree
 in a right one (:func:`studio.preflight_panel.two_pane`), buttons beneath both.
@@ -417,6 +418,33 @@ class ReportDialog(QDialog):
         row.setContentsMargins(0, 0, 0, 0)
         out_form.addRow("Save as", holder)
 
+        # The Word template the document is built on. It is a path the user
+        # picks, never types: a template is chosen by finding it, and a field
+        # that could be half-typed would be a path validated on Generate for no
+        # reason. Empty means the shipped template, and the field says so in
+        # words rather than standing blank — blank reads as "nothing set here
+        # yet", which is exactly what it is not.
+        self._template = None
+        row = QHBoxLayout()
+        self.template = QLineEdit()
+        self.template.setReadOnly(True)
+        self.template.setMinimumWidth(
+            self.template.fontMetrics().horizontalAdvance("n" * 48))
+        template_browse = QPushButton("Browse…")
+        template_browse.clicked.connect(self._browse_template)
+        template_shipped = QPushButton("Shipped template")
+        template_shipped.setToolTip(
+            "Build the report on the template shipped with xslope.")
+        template_shipped.clicked.connect(self.use_shipped_template)
+        row.addWidget(self.template, 1)
+        row.addWidget(template_browse)
+        row.addWidget(template_shipped)
+        holder = QWidget()
+        holder.setLayout(row)
+        row.setContentsMargins(0, 0, 0, 0)
+        out_form.addRow("Template", holder)
+        self.use_shipped_template()
+
         layout.addWidget(out_box)
 
         # --- what is reported ------------------------------------------------
@@ -622,6 +650,51 @@ class ReportDialog(QDialog):
         if path:
             self.path.setText(path)
 
+    #: What the Template field reads when no template has been chosen, and the
+    #: label on the button that puts it back. One string, so the field and the
+    #: button cannot come to say different things.
+    SHIPPED_TEMPLATE_TEXT = "Shipped template"
+
+    #: The Template field's standing tooltip. A run that fell back to the shipped
+    #: template because the remembered one had gone says so here instead.
+    TEMPLATE_TOOLTIP = (
+        "The Word template the report is built on: its page size and margins, "
+        "its header and footer, and the Title, Heading, Body Text and Caption "
+        "styles the report is written in. Leave it on the shipped template, or "
+        "browse to a company template that keeps those style names.")
+
+    def _browse_template(self):
+        """Pick a Word template. The dialog opens where the current one is, so
+        replacing a company template with the next one beside it is one click."""
+        start = self._template or os.path.dirname(self.path.text().strip() or "")
+        path, _sel = QFileDialog.getOpenFileName(
+            self, "Choose a report template", start,
+            "Word templates (*.docx);;All files (*)")
+        if path:
+            self.set_template(path)
+
+    def set_template(self, path, note=""):
+        """Show ``path`` as the template — or the shipped one when it is empty.
+
+        ``note`` is a line prepended to the field's tooltip, which is where the
+        one thing the user has to be told about a template that was chosen for
+        them goes.
+        """
+        self._template = path or None
+        self.template.setText(self._template or self.SHIPPED_TEMPLATE_TEXT)
+        self.template.setToolTip(
+            f"{note}\n\n{self.TEMPLATE_TOOLTIP}" if note else self.TEMPLATE_TOOLTIP)
+
+    def use_shipped_template(self):
+        """Build on the template shipped with xslope: what the Shipped template
+        button does, and where the field starts."""
+        self.set_template(None)
+
+    def template_path(self):
+        """The chosen template, or None for the shipped one — which is what
+        :func:`xslope.report.generate_report` reads the option as."""
+        return self._template
+
     def _on_item_changed(self, item, _column):
         key = item.data(0, Qt.UserRole)
         if key in self._items and self._items[key] is item:
@@ -651,6 +724,7 @@ class ReportDialog(QDialog):
             "author": self.author.text().strip(),
             "signature_lines": self.signature_lines.isChecked(),
             "method": self.selected_methods(),
+            "template": self.template_path(),
             "input_path": self._model_path,
         }
         for key, item in self._items.items():
@@ -680,6 +754,18 @@ class ReportDialog(QDialog):
             self.format.setCurrentIndex(i)
         self.signature_lines.setChecked(
             _as_bool(s.value(SETTINGS_PREFIX + "signature_lines", False)))
+        # A company template belongs to the person, not to the project, so it is
+        # remembered like the organization. One that has since been moved or
+        # deleted falls back to the shipped template and says which file went —
+        # silently reporting on a different template than last week is the one
+        # outcome this must not have.
+        template = str(s.value(SETTINGS_PREFIX + "template", "") or "")
+        if template and os.path.exists(template):
+            self.set_template(template)
+        elif template:
+            self.set_template(None, note=(
+                f"The remembered template {template} is no longer there, so "
+                f"the shipped template is used."))
         # The methods are remembered like the content boxes: an engineer who
         # reports Spencer and Bishop side by side reports them side by side every
         # week. The results view's own method still opens ticked where nothing was
@@ -711,15 +797,28 @@ class ReportDialog(QDialog):
         s.setValue(SETTINGS_PREFIX + "signature_lines",
                    self.signature_lines.isChecked())
         s.setValue(SETTINGS_PREFIX + "methods", self.selected_methods())
+        s.setValue(SETTINGS_PREFIX + "template", self._template or "")
         for key, item in self._items.items():
             s.setValue(SETTINGS_PREFIX + "content/" + key,
                        item.checkState(0) == Qt.Checked)
 
     def accept(self):
+        from PySide6.QtWidgets import QMessageBox
+
         if not self.output_path():
-            from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Generate Report",
                                 "Choose where the report should be saved.")
+            return
+        # The template is checked here rather than at the end of the build: the
+        # answer is the same either way, and a report is a minute of figures to
+        # find out that the document could not be written on the template it was
+        # asked for. The renderer owns the question (it is the thing that reads
+        # the styles), so this asks it and prints what it says.
+        from xslope.report_docx import template_problem
+
+        problem = template_problem(self.template_path())
+        if problem:
+            QMessageBox.warning(self, "Generate Report", problem)
             return
         self.remember()
         super().accept()

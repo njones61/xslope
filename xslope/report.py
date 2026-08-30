@@ -874,6 +874,9 @@ DEFAULT_OPTIONS = {
     # --- what the report documents ---
     "method": None,                   # which method(s) the detail follows; a name
                                       # or a list of them
+    "template": None,                 # the Word template the document is built
+                                      # on; None is the one shipped with xslope
+                                      # (xslope.report_docx.DEFAULT_TEMPLATE)
     "input_path": None,               # the .xlsx, for the traceability stamp
     "solved_at": None,                # datetime of the solve; None = read it off
                                       # the run's own record, and omit the row
@@ -9764,7 +9767,11 @@ def generate_report(slope_data, solutions=None, options=None, path=None,
     ----------
     slope_data, solutions, options
         As for :func:`build_report`. :func:`solutions_from_sidecars` assembles
-        ``solutions`` from a solved model's companion files.
+        ``solutions`` from a solved model's companion files. One option is read
+        here rather than by the builder: ``template``, the Word template the
+        document is built on, in place of the one shipped with xslope. A
+        template that does not declare the styles the report is written in is
+        refused before anything is built, naming the style it lacks.
     path : str
         The document to write. Its suffix selects the format unless ``fmt`` says
         otherwise.
@@ -9795,6 +9802,15 @@ def generate_report(slope_data, solutions=None, options=None, path=None,
                        f"{', '.join(sorted(FORMATS))}.")
     if not spec["enabled"]:
         return False, f"{spec['label']} reports are not available yet."
+
+    # The template is checked before a figure is drawn: a template that cannot
+    # be built on costs the whole build otherwise, and the sentence that says
+    # what is wrong with it is the same sentence either way.
+    from .report_docx import template_problem
+
+    problem = template_problem((options or {}).get("template"))
+    if problem:
+        return False, problem
 
     from .search import AnalysisCancelled
 

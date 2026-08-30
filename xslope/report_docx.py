@@ -18,7 +18,13 @@ The document is built ON a template — ``xslope/resources/report_template.docx`
 by default — and inherits everything the template declares: the page size and
 margins, the Title / Heading / Body / Caption styles, and the header and footer
 frames. Nothing here sets a font or a margin; a company template dropped in its
-place restyles the whole report (S4 makes that a dialog setting).
+place restyles the whole report — from Python as ``generate_report``'s
+``template`` option, and in Studio as the report dialog's Template field.
+
+A template is only a template of this report if it declares the styles the
+report is written in (:data:`REQUIRED_STYLES`). One that does not is refused by
+name (:func:`template_problem`) before a figure is drawn, rather than producing
+a document whose headings and captions are all body text.
 
 What this module does own is the document's *structure*: the title page, the
 table-of-contents field, the header and footer content, the landscape section the
@@ -83,6 +89,23 @@ STYLE = {
     # cell margins from.
     "plain_table": "Normal Table",
 }
+
+#: The styles a template has to define before the report can be built on it.
+#:
+#: The renderer asks the template for a good many styles and falls back to Normal
+#: for any it does not find, which is the right treatment of a missing List
+#: Bullet or Table Grid. It is the wrong treatment of these: a document whose
+#: title, headings, body and captions all print as Normal is not a report anyone
+#: asked for, and the fault — a template written for something else — is
+#: invisible in the result. So these are checked before anything is written, and
+#: a template missing one is refused by name (:func:`template_problem`).
+#:
+#: Built from :data:`STYLE`, so the list cannot name a style the renderer no
+#: longer uses; the heading depth is ``report.HEADING_LEVELS``, which the report
+#: never writes past, and the two are checked against each other.
+REQUIRED_STYLES = ((STYLE["title"],)
+                   + tuple(STYLE["heading"] % level for level in (1, 2, 3))
+                   + (STYLE["body"], STYLE["caption"]))
 
 #: The style whose paragraphs the running head names — the top-level sections.
 #: A STYLEREF field is given a style's UI name, which is what Word's own field
@@ -2327,12 +2350,62 @@ def _render_section(doc, section_node, level, state):
 # Entry point
 # ---------------------------------------------------------------------------
 
+class TemplateError(Exception):
+    """A template the report cannot be built on. The message is the sentence the
+    user is shown, so it names the file and what is wrong with it."""
+
+
+def template_problem(template):
+    """Why ``template`` cannot be built on, in one sentence, or ``""`` when it
+    can.
+
+    Four ways a chosen template is not one, each said in the terms the user
+    chose it in: the file is not there, it is not a ``.docx``, Word's format
+    reader cannot open it, or it does not declare a style the report is written
+    in (:data:`REQUIRED_STYLES`). The missing style is NAMED — "keep the style
+    names" is the whole instruction for making a company template, so the one
+    that was renamed is the only useful thing to say.
+
+    ``None`` or ``""`` is the shipped template, which is never a problem.
+    """
+    if not template:
+        return ""
+    name = os.path.basename(template)
+    if not os.path.exists(template):
+        return (f"The report template {template} is no longer there. Choose "
+                f"another, or use the shipped template.")
+    if os.path.splitext(template)[1].lower() != ".docx":
+        return (f"{name} is not a Word template: a report is built on a .docx "
+                f"file.")
+    try:
+        doc = Document(template)
+    except Exception as exc:
+        return f"{name} could not be opened as a Word document: {exc}"
+    have = {style.name for style in doc.styles}
+    missing = [name_ for name_ in REQUIRED_STYLES if name_ not in have]
+    if missing:
+        return (f"{name} does not define the "
+                f"{', '.join(repr(m) for m in missing)} "
+                f"style{'' if len(missing) == 1 else 's'}, which the report is "
+                f"written in. A template for xslope keeps the style names "
+                f"{', '.join(REQUIRED_STYLES)}.")
+    return ""
+
+
 def render_docx(report, path, template=None):
     """Write ``report`` (a :class:`xslope.report.Report`) to ``path`` as a
     ``.docx``, built on ``template`` (the shipped default when None).
 
+    A named template that cannot be built on raises :class:`TemplateError` with
+    the sentence :func:`template_problem` states. Studio checks the same thing
+    when the template is chosen, so this is the guard for the Python caller and
+    for a file that has moved since it was picked.
+
     Returns the path written.
     """
+    problem = template_problem(template)
+    if problem:
+        raise TemplateError(problem)
     template = template or DEFAULT_TEMPLATE
     doc = Document(template) if os.path.exists(template) else Document()
 

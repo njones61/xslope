@@ -230,6 +230,11 @@ exchange is in
 - **Materials editor.** 130 pcf / 400 psf and 135 pcf / 800 psf, φ = 0 and
   `u = none` on both, embankment first. The order fixes the Mat IDs the profile
   lines point at, so a foundation entered first is a section built upside down.
+- **The two admissibility warnings are expected.** They are the crest tension of
+  a φ = 0 slope with no tension crack, the same two
+  [LEM-3](lem03_layered_slope.md#the-search-result)'s solution carries; LEM-3
+  shows the tension crack that clears them without changing the critical
+  surface.
 
 ---
 

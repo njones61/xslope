@@ -148,7 +148,9 @@ about the mechanism or the finding is right.
 
 All five build the model correctly and get the 1.244 that LEM-3 publishes for
 this slope; they part ways on the harder requests, and Opus 5 is the only one
-that gets every number right. Z.ai
+that gets every number right. Its one explanation miss is a single wrong
+sentence in the broken-file session, quoted and taken apart under
+[A broken file](#a-broken-file). Z.ai
 publishes no price for GLM-5V-Turbo; its cost here is at the rate a reseller
 lists for it.
 

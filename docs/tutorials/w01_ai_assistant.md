@@ -112,15 +112,15 @@ The eight conversations below cost this much between them, measured as they ran:
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Building a model from a drawing | 1 | 3 | 52,172 (47,553) | 2,211 | 43 s |
 | Modifying the model | 3 | 12 | 230,865 (190,212) | 6,198 | 122 s |
-| A sweep with the helper | 1 | 2 | 33,236 (31,702) | 860 | 56 s |
+| A sweep with the helper | 1 | 3 | 58,106 (31,702) | 1,699 | 73 s |
 | A sweep written ad hoc | 1 | 5 | 87,126 (79,255) | 2,759 | 54 s |
 | Stiffnesses and a strength reduction run | 2 | 4 | 69,743 (47,553) | 1,485 | 556 s |
 | Two documentation questions | 2 | 5 | 92,550 (79,255) | 5,250 | 88 s |
 | A broken file | 1 | 9 | 176,923 (142,659) | 8,544 | 173 s |
 | Generating the report | 2 | 4 | 67,664 (63,404) | 839 | 30 s |
-| **Total** | **13** | **44** | **810,279 (681,593)** | **28,146** | **1,120 s** |
+| **Total** | **13** | **45** | **835,149 (681,593)** | **28,985** | **1,138 s** |
 
-That comes to **\$1.69** at Anthropic's list prices on 2026-08-29 (\$5.00 per
+That comes to **\$1.83** at Anthropic's list prices on 2026-08-29 (\$5.00 per
 million input tokens, a cache read at a tenth of that, \$25.00 per million output
 tokens). Price and wall time do not track each other: the strength reduction run
 takes half the total time for under a tenth of the cost, because 521 of its 556
@@ -140,7 +140,7 @@ about the mechanism or the finding is right.
 
 | Model | Calls | Tokens in (cached) | Tokens out | Cost | Model and numbers | Explanation |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Claude Opus 5 | 44 | 810,279 (681,593) | 28,146 | \$1.69 | 8 of 8 | 7 of 8 |
+| Claude Opus 5 | 45 | 835,149 (681,593) | 28,985 | \$1.83 | 8 of 8 | 7 of 8 |
 | Claude Sonnet 5 | 45 | 935,563 (684,517) | 28,060 | \$0.92 | 7 of 8 | 7 of 8 |
 | OpenAI gpt-5.5 | 29 | 364,339 (325,120) | 17,437 | \$0.88 | 7 of 8 | 6 of 8 |
 | Kimi K3 (Moonshot AI) | 37 | 449,769 (343,143) | 44,953 | \$1.10 | 7 of 8 | 4 of 8 |
@@ -322,21 +322,22 @@ in [w1_modify_transcript.md](files/w1_modify_transcript.md).
 
 ## A sweep with the helper
 
-Next, we ask for the foundation's cohesion swept from 200 to 800 psf with a search at
-every step. `sensitivity()` is a sweep helper preloaded in the assistant's
-kernel, the counterpart of Studio's **Parametric…** dialog, so the request tests
-whether the assistant reaches for the machinery already there.
+Next, we ask for the foundation's cohesion swept from 200 to 800 psf with a
+search at every step, in the words a user would type:
 
 <div class="prompt-block" markdown>
 ```text
-Use the sensitivity helper to sweep the foundation cohesion from 200 to 800 psf in steps of 100 psf, Spencer with a search at each step, and give me the factor of safety at each. Leave the model as it was.
+Sweep the foundation cohesion from 200 to 800 psf in steps of 100 psf, Spencer with a search at each step, and give me the factor of safety at each. Leave the model as it was.
 ```
 </div>
 
-![The sweep in the dock: one code block calling the sensitivity helper with an apply closure, the seven searched steps printed as they ran, and the finished table with its reading](images/w1_sweep_builtin_1.png){width=560}
+![The sweep in the dock: one code block calling a preloaded sweep helper, the seven searched steps, and the table of results](images/w1_sweep_builtin_1.png)
 
-It called the helper, wrote `sensitivity.csv` and `sensitivity.png` to the folder
-**Files…** opens, and printed the restored cohesion — `foundation c now: [800.0]`.
+Nothing in the request names a tool, and the assistant reached for one on its
+own: `design_sweep`, one of the sweep helpers preloaded in its kernel, the
+counterpart of Studio's **Parametric…** dialog. It ran the seven searches,
+printed the critical circle and its depth at every step, and put the cohesion
+back — `foundation c now = 800.0`.
 
 | Foundation c (psf) | FS (Spencer, searched) |
 | :---: | :---: |
@@ -348,10 +349,11 @@ It called the helper, wrote `sensitivity.csv` and `sensitivity.png` to the folde
 | 700 | 1.244 |
 | 800 | 1.244 |
 
-The rise below 500 psf is close to linear, and the last three rows are identical.
-It put the plateau down to the embankment governing above 600 psf, and flagged
-that as the one thing it had not measured: *"treat the cause as inferred from the
-flat segment, not measured."* The transcript is
+The rise below 500 psf is close to linear, and the last three rows are
+identical. This time the cause is in the table it printed: below 600 psf every
+critical circle bottoms on the rock at elevation −10, and from 600 psf up the
+surface moves to the contact and the embankment governs, capping the factor of
+safety at 1.244. The transcript is
 [w1_sweep_builtin_transcript.md](files/w1_sweep_builtin_transcript.md).
 
 ### Check its work
@@ -359,16 +361,15 @@ flat segment, not measured."* The transcript is
 - **Re-run any step.** The seven values reproduce.
 - **Read two rows against LEM-3.** 0.792 at 300 psf is its weak-foundation
   answer; 1.244 at 800 psf is its published one.
-- **Pull the critical circle at each step** — the inference it flagged. Below
-  600 psf every surface bottoms on the rock; from 600 psf up they bottom on the
-  contact. The mechanism has left the foundation, which is why more foundation
-  strength buys nothing.
+- **Read the Depth column.** The switch from −10 to 0 at 600 psf is the
+  mechanism change, printed rather than guessed.
+- **Materials editor.** The foundation's cohesion reads 800 psf again.
 
 ---
 
 ## A sweep written ad hoc
 
-We ask for the factor of safety at face slopes of 2:1, 2.5:1 and 3:1, with the
+In this test, we ask for the factor of safety at face slopes of 2:1, 2.5:1 and 3:1, with the
 toe and crest elevation held. What varies is the shape of the section rather than
 a value in a cell, so no dialog offers the study: whatever runs it has to rebuild
 the geometry between steps.
@@ -695,7 +696,7 @@ the checks above re-run the measurements rather than read the conclusions.
 This tutorial covered:
 
 - Setting the assistant up: a provider, a model and a key in **Settings…**, and
-  13 turns of work for about \$1.69.
+  13 turns of work for about \$1.83.
 - Building a layered model from a drawing and editing it three ways — face, water
   and strength — with every factor of safety reproducing from the saved workbook.
 - Two sweeps, a strength reduction run, two questions answered without touching

@@ -1017,9 +1017,9 @@ def w1_sweep_builtin(dry_run=False):
     """
     return run_assistant_session(
         "sweep_builtin", W1_MODEL,
-        ["Use the sensitivity helper to sweep the foundation cohesion from 200 "
-         "to 800 psf in steps of 100 psf, Spencer with a search at each step, "
-         "and give me the factor of safety at each. Leave the model as it was."],
+        ["Sweep the foundation cohesion from 200 to 800 psf in steps of 100 psf, "
+         "Spencer with a search at each step, and give me the factor of safety at "
+         "each. Leave the model as it was."],
         timeout_s=900, max_height=20000, dry_run=dry_run)
 
 

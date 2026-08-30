@@ -723,8 +723,39 @@ def _checks_selection(sd):
     return {}
 
 
-def model_checks_text(slope_data, memo=None):
+def model_checks_text(slope_data, memo=None, extra_errors=()):
     """The MODEL CHECKS block for a model that a snippet just changed.
+
+    ``extra_errors`` are ``(rule_id, message)`` pairs the input checks cannot
+    derive — today, a polygon edit the geometry resync discarded, which leaves a
+    model that is VALID and simply is not the one the snippet wrote. They lead the
+    block as ERRORs, and they turn a clean block into one, because this is the
+    block iron rule 5 says a model may not be reported ready over.
+    """
+    return _with_extra_errors(_preflight_checks_text(slope_data, memo),
+                              extra_errors)
+
+
+def _with_extra_errors(block, extra_errors):
+    """``block``, with findings the input checks cannot see put at its head."""
+    rows = list(extra_errors or ())
+    if not rows:
+        return block
+    lead = ("The input checks cannot see the following, and nothing they report "
+            "answers it. Do not report this model ready over it.")
+    lines = [lead] + [f"  ERROR [{rule}] {msg}" for rule, msg in rows]
+    if block and block != MODEL_CHECKS_CLEAN:
+        head, _, rest = block.partition("\n")        # head is MODEL_CHECKS_OPEN
+        return "\n".join([head] + lines + ([rest] if rest else []))
+    if block == MODEL_CHECKS_CLEAN:
+        # Say so — the block that would have read "clean" is now an open one, and
+        # what the input checks found is still worth one line.
+        lines.append("The input checks themselves found nothing else.")
+    return "\n".join([MODEL_CHECKS_OPEN] + lines + [MODEL_CHECKS_END])
+
+
+def _preflight_checks_text(slope_data, memo=None):
+    """The input checks' own part of the MODEL CHECKS block.
 
     Rebuilds the derived geometry first (so the checks read the domain the edit
     actually produced, not the one before it) and then runs :func:`xslope.preflight
@@ -1519,7 +1550,17 @@ class Assistant(QObject):
             return
 
         stdout, outputs, error, checks, warnings = self._run_python(code)
+        from .kernel import POLYGON_EDIT_DISCARDED, POLYGON_EDIT_WARNING
+
         parts = []
+        # A discarded polygon edit leads the result, ahead of the snippet's own
+        # output: the snippet PRINTED the polygons it wrote — before the rebuild
+        # threw them away — so its stdout reads as the edit applied. Said
+        # underneath that read-back, it lost to it twice in one benchmark. Said
+        # first, the printed values are labelled before any of them is read.
+        led = POLYGON_EDIT_WARNING in warnings
+        if led:
+            parts.append(POLYGON_EDIT_DISCARDED)
         if stdout.strip():
             parts.append(stdout.rstrip())
         if outputs:
@@ -1531,7 +1572,9 @@ class Assistant(QObject):
             parts.append("(no output)")
         # A geometry edit made on the source the resync overwrites: the snippet
         # succeeded, the model did not change, and nothing else would say so.
-        parts += list(warnings)
+        # (The polygon one already led the result; it is not said twice.)
+        parts += [w for w in warnings
+                  if not (led and w == POLYGON_EDIT_WARNING)]
         if checks:
             parts.append(checks)        # LAST: the final thing the model reads
         result_text = "\n".join(parts)
@@ -1544,12 +1587,14 @@ class Assistant(QObject):
         """Run one snippet and return
         ``(stdout, outputs, error, checks, warnings)``.
 
-        ``checks`` is the MODEL CHECKS block, and it is produced ONLY when the
-        snippet actually changed the model — the same per-key signature comparison
-        that decides whether the run becomes an undo step. A read-only query costs
-        nothing extra, and an edit pays one preflight pass. The session's
-        :class:`ChecksMemo` carries what earlier blocks already said, so a repeat
-        of a standing finding costs one line instead of its paragraph.
+        ``checks`` is the MODEL CHECKS block, and it is produced when the snippet
+        actually changed the model — the same per-key signature comparison that
+        decides whether the run becomes an undo step — or when a geometry edit was
+        discarded, which is a change the snippet MEANT to make and the signature
+        cannot see. A read-only query costs nothing extra, and an edit pays one
+        preflight pass. The session's :class:`ChecksMemo` carries what earlier
+        blocks already said, so a repeat of a standing finding costs one line
+        instead of its paragraph.
 
         ``warnings`` is the kernel's own account of a geometry edit made on the
         source the resync rebuilds FROM — polygons on a profile-line model — which
@@ -1599,9 +1644,20 @@ class Assistant(QObject):
             self._mw.refresh_inputs_view()
         except Exception:
             pass
-        checks = (model_checks_text(doc.slope_data, self._checks_memo)
-                  if edited else "")
-        return stdout, outputs, error, checks, self._kernel.geometry_warnings()
+        warnings = self._kernel.geometry_warnings()
+        # The discarded polygon edit is business for the block as well as the lead
+        # line: the checks read the model AFTER the rebuild, where the geometry is
+        # valid and merely not the one the snippet wrote, so they would report it
+        # clean. Forced even when nothing counted as an edit — a snippet that
+        # resynced its own discarded edit changed the model not at all, which is
+        # precisely the case that must not come back silent.
+        from .kernel import POLYGON_EDIT_DISCARDED_FINDING, POLYGON_EDIT_WARNING
+        extra = ([POLYGON_EDIT_DISCARDED_FINDING]
+                 if POLYGON_EDIT_WARNING in warnings else [])
+        checks = (model_checks_text(doc.slope_data, self._checks_memo,
+                                    extra_errors=extra)
+                  if (edited or extra) else "")
+        return stdout, outputs, error, checks, warnings
 
     def output_dir(self):
         """Folder where the assistant writes generated files (plots, CSVs, …)."""

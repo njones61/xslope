@@ -99,6 +99,37 @@ PROFILE_EDIT_WARNING = (
     "now rebuilt from those profile lines, so the model's own polygons no longer "
     "apply. Edit polygons instead on this model.")
 
+#: The same discard, said BEFORE the snippet's own output rather than after it —
+#: because the snippet's prints ran before the rebuild. A snippet that swaps two
+#: zones' mat_id and prints the polygons back reads its edit as applied, in its own
+#: stdout, and a warning underneath that read-back loses to it: two benchmark
+#: sessions printed the swap, read the warning, and still reported the model
+#: repaired. So the first thing on the tool result says what the printed values
+#: are — the discarded version — before any of them is read.
+POLYGON_EDIT_DISCARDED = (
+    "READ THIS FIRST — THE POLYGON EDIT WAS DISCARDED. This model is defined by "
+    "profile lines, so its polygons are rebuilt from profile_lines after the "
+    "snippet returns, and the model still carries the polygons it had. Every "
+    "polygon value printed below is the DISCARDED version, not the model's: a "
+    "read-back showing the edit is showing what was thrown away, so do not report "
+    "the change as made. Edit slope_data['profile_lines'] instead — the line's "
+    "'coords' and its 'mat_id' are what set a layer's shape and the material that "
+    "fills it — then call resync_geometry() and read the model back.\n"
+    + POLYGON_EDIT_WARNING)
+
+#: The same fact as an input-check finding, so the block the model must clear
+#: before reporting a model ready carries it too (see
+#: :func:`studio.ai.assistant.model_checks_text`). The checks cannot derive it:
+#: after the rebuild the geometry is valid, and merely not the geometry the
+#: snippet wrote.
+POLYGON_EDIT_DISCARDED_FINDING = (
+    "geom.polygon_edit_discarded",
+    "The polygons this snippet edited were rebuilt from profile_lines and the "
+    "edit was discarded — the model's geometry is unchanged. Nothing the snippet "
+    "printed for polygons describes the model as it now stands. Make the change "
+    "on profile_lines (coords / mat_id) and resync_geometry(), then read the "
+    "model back before reporting anything about it.")
+
 
 def _geometry_native(slope_data):
     """Which geometry source this model is built on — ``"profile"`` when it has

@@ -252,6 +252,18 @@ slope_data['polygons'] = [{'coords': [(0.0, 5.0), (45.0, 20.0), (90.0, 20.0),
 print('polygons rebuilt for a 3:1 face')
 """
 
+#: The same discarded edit, with the READ-BACK that made it dangerous: the
+#: snippet swaps the zone's material and prints the polygons back, and its print
+#: runs BEFORE the rebuild, so its own output shows the edit as applied. Two
+#: benchmark sessions printed exactly this and reported the model repaired.
+SNIPPET_POLYGON_EDIT_READ_BACK = """
+slope_data['polygons'] = [{'coords': [(0.0, 5.0), (45.0, 20.0), (90.0, 20.0),
+                                      (90.0, -20.0), (0.0, -20.0)], 'mat_id': 1}]
+for i, p in enumerate(slope_data['polygons']):
+    print('polygon', i, 'mat_id', p['mat_id'], 'coords', p['coords'])
+print('READ BACK: the zone is now material', slope_data['polygons'][0]['mat_id'])
+"""
+
 #: The same section built the OTHER way — polygons and no profile lines — and
 #: then edited on its own source, which must not be warned about.
 SNIPPET_POLYGON_NATIVE_BUILD = """
@@ -1293,7 +1305,7 @@ def check_mutation_disables_the_checks():
     from studio.ai import assistant as A
     out = []
     original = A.model_checks_text
-    A.model_checks_text = lambda sd, memo=None: ""
+    A.model_checks_text = lambda sd, memo=None, extra_errors=(): ""
     try:
         survivors = [name for name, fn in (
             ("clean build", check_clean_build),
@@ -1873,6 +1885,66 @@ def check_polygon_edit_on_a_profile_model_is_named():
     return out
 
 
+def check_discarded_polygon_edit_cannot_read_as_applied():
+    """A discarded polygon edit is stated BEFORE the read-back that contradicts it,
+    and the checks block calls it an error.
+
+    The snippet's prints run before the resync, so a session that edits `polygons`
+    and prints them back sees its own edit in its own output: two benchmark
+    sessions did that, read the warning underneath, and still delivered the model
+    as repaired. So the discard leads the tool result — ahead of every printed
+    value it invalidates — and rides in the MODEL CHECKS block as an ERROR, which
+    is the block iron rule 5 forbids reporting a model ready over. The input
+    checks cannot produce it themselves: after the rebuild the model is valid, and
+    merely not the one the snippet wrote.
+    """
+    from studio.ai.kernel import (POLYGON_EDIT_DISCARDED,
+                                  POLYGON_EDIT_DISCARDED_FINDING)
+    rule = POLYGON_EDIT_DISCARDED_FINDING[0]
+    out = []
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    result = _run(asst, SNIPPET_POLYGON_EDIT_READ_BACK)
+
+    if not result.startswith(POLYGON_EDIT_DISCARDED):
+        out.append("the tool result does not OPEN on the discard: "
+                   f"{result[:300]!r}")
+    if "READ BACK" in result and result.index("READ BACK") < len(
+            POLYGON_EDIT_DISCARDED):
+        out.append("the snippet's read-back is printed before the discard is said")
+    for phrase in ("discarded", "profile_lines", "mat_id"):
+        if phrase not in POLYGON_EDIT_DISCARDED.lower():
+            out.append(f"the discard line does not say {phrase!r}")
+    block = _block(result)
+    if block is None:
+        out.append("a discarded polygon edit produced no MODEL CHECKS block")
+    elif f"ERROR [{rule}]" not in block:
+        out.append("the MODEL CHECKS block carries no error for the discard: "
+                   f"{block[:400]!r}")
+    if result.count(POLYGON_EDIT_DISCARDED_FINDING[1]) > 1:
+        out.append("the discard finding is quoted more than once")
+    # The premise: the model really is unchanged by that snippet.
+    zones = mw.doc.slope_data.get("polygons") or []
+    if any(z.get("mat_id") == 1 for z in zones):
+        out.append("the polygon edit survived, so this is not the discard case")
+    mw.deleteLater()
+
+    # The control: the same model, edited on the source it IS built from. A
+    # profile_lines edit is an ordinary edit — no discard line, no error.
+    mw, asst = _session()
+    _run(asst, SNIPPET_MATERIALS)
+    _run(asst, SNIPPET_GEOMETRY)
+    result = _run(asst, SNIPPET_RAISE_CREST)
+    if POLYGON_EDIT_DISCARDED in result:
+        out.append("a profile_lines edit was reported as a discarded polygon edit")
+    if rule in result:
+        out.append("a profile_lines edit raised the discard error: "
+                   f"{result[:300]!r}")
+    mw.deleteLater()
+    return out
+
+
 def check_chat_renders_markdown():
     """The transcript renders the assistant's markdown.
 
@@ -2372,6 +2444,8 @@ CHECKS = [
     ("L. the result names its own surface", check_run_lem_returns_the_surface),
     ("L. a geometry edit on the wrong source is named",
      check_polygon_edit_on_a_profile_model_is_named),
+    ("L. a discarded polygon edit cannot read as applied",
+     check_discarded_polygon_edit_cannot_read_as_applied),
     ("L. the chat renders markdown", check_chat_renders_markdown),
     ("L. the chat degrades LaTeX to text", check_chat_degrades_latex),
     ("M. a prose fence is not code", check_prose_fence_is_not_code),

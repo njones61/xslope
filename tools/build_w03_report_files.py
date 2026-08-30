@@ -222,6 +222,9 @@ def build_report(slope_data, solutions, path, methods, template=None, meta=None)
     options.update(input_path=MODEL, method=methods)
     if template:
         options["template"] = template
+    # The shipped copies carry figures at half the default resolution: 300 dpi
+    # doubles the file size for no gain at reading zoom (owner ruling 2026-08-30).
+    options["dpi"] = 150
     ok, out = _quiet(generate_report, slope_data, solutions, options, path)
     if not ok:
         raise SystemExit(f"the report would not build: {out}")

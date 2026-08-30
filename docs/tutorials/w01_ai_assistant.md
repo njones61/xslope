@@ -323,7 +323,7 @@ in [w1_modify_transcript.md](files/w1_modify_transcript.md).
 ## A sweep with the helper
 
 Next, we ask for the foundation's cohesion swept from 200 to 800 psf with a
-search at every step, in the words a user would type:
+search at every step:
 
 <div class="prompt-block" markdown>
 ```text

@@ -1971,8 +1971,17 @@ def load_slope_data(filepath, dest=None, overwrite=False, require_analysis_data=
                 "geometry method, not both.")
         _validate_polygons_no_overlap(polygons_from_sheet)
         polygons = polygons_from_sheet
-        # max_depth is a profile-sheet concept; it has no meaning for polygon input.
-        max_depth = None
+        # max_depth shapes nothing here — the polygons define the domain floor, and
+        # the profile sheet is not this model's geometry source. It is still a value
+        # the file can DECLARE, so it is carried through rather than dropped: a
+        # model that states a rigid base and is saved must come back stating it
+        # (save_slope_data_to_xlsx writes B2 on a polygon model for that reason).
+        # A blank cell declares nothing, and neither does the template's own 0 on a
+        # sheet this model does not use — every polygon-native file in the corpus
+        # carries that untouched 0, and reading it as a declaration would put a
+        # maximum-depth elevation nobody typed into their reports and plot extents.
+        if max_depth is None or max_depth != max_depth or max_depth == 0:
+            max_depth = None
     elif profile_lines:
         # Convert profile lines -> polygons. max_depth is used ONLY here, as the
         # bottom boundary for build_polygons (mat_id is 0-based in both).
@@ -3424,6 +3433,14 @@ def _save_slope_data_into(slope_data, filepath, template, _final_path):
                 prof[cell_ref(_prof_coord_row + i, y_col)] = _f(y)
         updates['profile'] = prof
     else:
+        # A polygon model's geometry is the polygon sheet, but Max depth is on the
+        # profile sheet whichever source the model uses — and skipping the sheet
+        # entirely left a declared max_depth out of the file altogether, so it
+        # reloaded as None with nothing said. Written explicitly, and blank when
+        # the model declares none, so the template's own 0 cannot read back as a
+        # declaration.
+        md = slope_data.get('max_depth')
+        updates['profile'] = {'B2': _f(md) if md is not None else None}
         for pdict in slope_data.get('polygons') or []:
             mat_id = pdict.get('mat_id')
             if mat_id is None:

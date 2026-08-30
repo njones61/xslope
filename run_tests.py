@@ -234,6 +234,13 @@ ROUNDTRIP_KEYS = [
     # The SURVIVAL of a populated set is the ssr_zone_roundtrip row below.
     'ssr_zones',
 ]
+#: The Max depth a polygon-geometry round-trip declares before saving, to prove
+#: the value survives on a model whose geometry is the polygon sheet. Any number
+#: that is not the template's own 0 does; -10 is the one the defect was found on.
+POLYGON_MAX_DEPTH = -10.0
+#: "this round-trip had no polygon geometry to declare a Max depth on", which is
+#: not the same as a None that came back from the file.
+_NOT_CHECKED = object()
 
 
 def _legacy_manual_water(sd):
@@ -2059,8 +2066,26 @@ def run_roundtrip_test(test):
         save_slope_data_to_xlsx(d1, tmp,
                                 template=test.get('template', ROUNDTRIP_TEMPLATE))
         d2 = load_slope_data(tmp)
+        # A Max depth DECLARED on a polygon model. The comparison above sees only
+        # the corpus files' own value, which on every polygon-native file is None,
+        # so it could not see the writer skipping the profile sheet entirely on
+        # this geometry: a max_depth set in memory (a Studio edit, an assistant
+        # snippet) went into the file nowhere and reloaded as None with nothing
+        # said. Nothing downstream reads it here — the polygons are the domain
+        # floor — which is exactly why the loss stayed silent.
+        md_back = _NOT_CHECKED
+        if not d1.get('profile_lines'):
+            declared = dict(d1, max_depth=POLYGON_MAX_DEPTH)
+            tmp_md = os.path.join(td, 'roundtrip_max_depth.xlsx')
+            save_slope_data_to_xlsx(
+                declared, tmp_md,
+                template=test.get('template', ROUNDTRIP_TEMPLATE))
+            md_back = load_slope_data(tmp_md).get('max_depth')
 
     mismatches = []
+    if md_back is not _NOT_CHECKED and md_back != POLYGON_MAX_DEPTH:
+        mismatches.append(f"max_depth declared on a polygon model came back "
+                          f"{md_back!r}, not {POLYGON_MAX_DEPTH}")
     for k in ROUNDTRIP_KEYS:
         mismatches += _roundtrip_diff(d1.get(k), d2.get(k), k)
 

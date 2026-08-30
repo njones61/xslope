@@ -89,6 +89,7 @@ nav:
       - 3. Factor of Safety vs Time: tutorials/combo03_fs_vs_time.md
     - Workflow:
       - 1. The AI Assistant: tutorials/w01_ai_assistant.md
+      - 2. Bringing in Models from CAD and Other Programs: tutorials/w02_import.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

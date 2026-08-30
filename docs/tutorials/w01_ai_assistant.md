@@ -146,14 +146,10 @@ about the mechanism or the finding is right.
 | GLM-5V-Turbo (Z.ai) | 40 | 563,429 (459,660) | 13,480 | ~\$0.29 | 6 of 8 | 4 of 8 |
 
 All five build the model correctly and get the 1.244 that LEM-3 publishes for
-this slope. Where they differ is the harder tasks. Opus 5 is the only one that
-gets every number right; its one miss is a wrong sentence in the diagnosis,
-quoted below. The other four all stumble on the broken file: Sonnet 5 and
-Kimi K3 find the three faults but their repair does not take, and gpt-5.5 and
-GLM-5V-Turbo miss one of the faults altogether, so all four end that session
-with a wrong factor of safety. GLM also misreads "2:1" as 2 vertical to 1
-horizontal in the face-slope sweep. Z.ai publishes no price for that model; its
-cost here is at the rate a reseller lists for it.
+this slope; they part ways on the harder requests, and Opus 5 is the only one
+that gets every number right. Where the others went wrong is noted in the
+sections it happened in. Z.ai publishes no price for GLM-5V-Turbo; its cost
+here is at the rate a reseller lists for it.
 
 Prices change; the current ones are on each provider's pricing page:
 [Anthropic](https://www.anthropic.com/pricing),

@@ -726,9 +726,9 @@ A transient run lands in a **Seep · Transient** tab carrying every frame, with 
 play bar under the plot; [SEEP-3](seep03_reservoir_drawdown.md#reading-the-frames)
 covers its controls. Two of the 28 frames carry the result.
 
-![Day 200: the end of the hold, the wettest the dam gets](images/seep04_studio_playbar_day200.png)
+![Day 200: the last day of full-rate rain, the wettest the dam gets](images/seep04_studio_playbar_day200.png)
 
-**Day 200 (t = 1.728 × 10<sup>7</sup> sec), the end of the hold.** The subtitle
+**Day 200 (t = 1.728 × 10<sup>7</sup> sec), the last day of full-rate rain.** The subtitle
 reads **Inflow 4.95 × 10<sup>−7</sup> / Outflow 4.87 × 10<sup>−7</sup> m³/sec per
 m** — two numbers where a steady solution reports one, because the difference is
 what the soil is still taking into storage. The drain's

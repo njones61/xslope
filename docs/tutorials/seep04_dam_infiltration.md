@@ -623,14 +623,10 @@ fill the two columns at the right of the row:
 | :---: | --- | :---: | :---: |
 | 1 | `Dam fill` | 0.0003 | 0.15 |
 
-These are the compacted-silt entries from those tables — a stiff, fine-grained fill
-of the kind this dam's conductivity and retention curve describe. They are chosen,
-not measured, and they set the *timing* of everything below, though not in
-proportion to their own size: halving `Sy` to 0.075 brings the drain to 90% of its
-rise in **66 days** against **102** for the value in the table — a speed-up of
-about one and a half rather than two, because the saturated zone stores through
-`Ss` whatever `Sy` does, and the thirty-day ramp that starts the rain is the same
-length either way. Click **OK**.
+These are the compacted-silt entries from those tables — a stiff, fine-grained
+fill of the kind this dam's conductivity and retention curve describe. They are
+chosen, not measured, and they set how fast the dam responds: a smaller `Sy`
+means less water to move and a quicker rise. Click **OK**.
 
 ### The storm
 

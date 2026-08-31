@@ -630,8 +630,11 @@ means less water to move and a quicker rise. Click **OK**.
 
 ### The storm
 
-Click **Transient** in the Inputs dock — the row reads `off` until the sheet has
-something on it. The editor is one form: the run controls on the right, the time
+So far every rain on this page has fallen forever. A real storm arrives, holds
+for a while, and stops, and describing that takes a schedule: a series of times
+with a rate at each, which the model reads as it marches. That schedule is
+entered in the Transient editor. Click **Transient** in the Inputs dock — the
+row reads `off` until the sheet has something on it. The editor is one form: the run controls on the right, the time
 series on the left.
 
 ![The Transient editor with the storm defined](images/seep04_studio_transient.png)

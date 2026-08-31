@@ -630,10 +630,20 @@ means less water to move and a quicker rise. Click **OK**.
 
 ### The storm
 
-So far every rain on this page has fallen forever. A real storm arrives, holds
-for a while, and stops, and describing that takes a schedule: a series of times
-with a rate at each, which the model reads as it marches. That schedule is
-entered in the Transient editor. Click **Transient** in the Inputs dock — the
+The next step is to set up the transient flux boundary. That takes two pieces:
+entering the rain as a time series, then pointing the flux boundary conditions
+at it — the same pattern [SEEP-3](seep03_reservoir_drawdown.md) uses for its
+falling pool, where a head boundary follows a series.
+
+**Why two series.** The three rain blocks do not carry one rate. The crest takes
+the vertical rain and the two 2:1 faces take it times cos θ = 2/√5, which is the
+projection the flux section works out. A single series driving all three would
+put the crest rate on the faces and take in 10% more water than fell on the dam.
+So the schedule is written twice: `storm` is the rain itself and `storm_face` is
+the same curve scaled by 0.894427. The ratio between the columns is the same
+ratio that was between the three numbers before.
+
+Click **Transient** in the Inputs dock — the
 row reads `off` until the sheet has something on it. The editor is one form: the run controls on the right, the time
 series on the left.
 
@@ -655,14 +665,6 @@ Set **Duration (sec)** to `51840000` and **Save interval (sec)** to `2160000`.
 Leave **Stage 1 time (sec)**, **Stage 2 time (sec)**, **Stability time (sec)** and
 **Extra save times** empty — the stage fields flag the rapid-drawdown states a
 stability analysis reads, and this page stops at the seepage field. Click **OK**.
-
-**Why two series.** The three rain blocks do not carry one rate. The crest takes
-the vertical rain and the two 2:1 faces take it times cos θ = 2/√5, which is the
-projection [the flux section](#a-flux-is-a-rate-normal-to-the-boundary) works out.
-A single series driving all three would put the crest rate on the faces and take in
-10% more water than fell on the dam. So the schedule is written twice: `storm` is
-the rain itself and `storm_face` is the same curve scaled by 0.894427. The ratio
-between the columns is the same ratio that was between the three numbers before.
 
 **Why those times.** The times are in **seconds**, because this model's **Time** is
 `sec` — the schedule has to be in whatever unit the conductivity is in. In days

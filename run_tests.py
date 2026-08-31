@@ -7084,6 +7084,36 @@ def run_k0_level_ground_test(test):
     return 0.0, None
 
 
+def run_nr_ssrm_test(test):
+    """The two SSRM drivers must agree on one locked case.
+
+    The bisection can be driven by the viscoplastic initial-stiffness iteration
+    (the default, and the definition of every locked factor of safety) or by a
+    Newton-Raphson iteration on a consistent Mohr-Coulomb tangent
+    (``fem_solver='newton'``). They are different numerical routes to the same
+    physical question, so they must reach the same answer — and the Newton route
+    must decide every trial it visits rather than leaving one at an iteration
+    ceiling with no verdict.
+
+    The check itself lives in test/nr_ssrm_check.py (Griffiths & Lane Example 1 at
+    a deliberately coarse tri6 mesh, locked at FS = 1.39).
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'nr_ssrm_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('nr_ssrm_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_beam_element_test(test):
     """The pile beam element against closed-form beam theory.
 
@@ -12711,6 +12741,8 @@ def _dispatch_test(test):
         return run_reinforcement_edits_test(test)
     if test_type == 'k0_level_ground':
         return run_k0_level_ground_test(test)
+    if test_type == 'nr_ssrm':
+        return run_nr_ssrm_test(test)
     if test_type == 'beam_element':
         return run_beam_element_test(test)
     if test_type == 'one_d_compatibility':
@@ -12869,7 +12901,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'beam_element', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'nr_ssrm', 'beam_element', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -13424,6 +13456,12 @@ def main():
         # no-op there. File-less (builds a 20 x 10 m block).
         tests.append({'type': 'k0_level_ground', 'file': 'K0 level-ground equilibrium',
                       'method': '-', 'source': 'k0_level_ground'})
+        # Guard that the two SSRM drivers — the default viscoplastic iteration and
+        # the Newton-Raphson one behind fem_solver='newton' — reproduce the same
+        # locked factor of safety, and that the Newton run leaves no trial
+        # undecided. Griffiths & Lane Example 1 at a coarse tri6 mesh.
+        tests.append({'type': 'nr_ssrm', 'file': 'SSRM drivers agree (viscoplastic vs Newton)',
+                      'method': '-', 'source': 'nr_ssrm'})
         # Guard the pile beam element against closed-form beam theory — the
         # SIGMA/W "Beams and Bars in a Frame" simply-supported and cantilever
         # solutions, plus orientation invariance, the axial action and the 1/S

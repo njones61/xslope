@@ -386,7 +386,7 @@ set **Flux value (m/sec):**, and enter or copy-paste the block's two points.
 
 ![The boundary list with Flux 1 selected](images/seep04_studio_seep_bc.png)
 
-The list now reads `Head 1 (h = 10.0)`, the three flux blocks with their rates,
+The list now reads `Head 1  (h = 10.0)`, the three flux blocks with their rates,
 and `Exit face`. Flux 1 is selected in the shot — its rate in the value box
 (displayed shortened), its two points below — and the preview draws the selected
 boundary bold over its stretch of the upstream face, dimming the others.
@@ -616,8 +616,8 @@ van Genuchten material it doubles as the drainable water content θ<sub>s</sub> 
 θ<sub>r</sub>. [Storage](../seep/transient.md#storage) carries both in full, with
 tables of representative values.
 
-Click **Materials**, keep **Show parameters for:** on **Seepage**, and fill the two
-columns at the right of the row:
+Click **Materials**, keep the **Show parameters for:** toggles on **Seepage**, and
+fill the two columns at the right of the row:
 
 | mat | name | Ss (1/m) | Sy |
 | :---: | --- | :---: | :---: |
@@ -625,8 +625,12 @@ columns at the right of the row:
 
 These are the compacted-silt entries from those tables — a stiff, fine-grained fill
 of the kind this dam's conductivity and retention curve describe. They are chosen,
-not measured, and they set the *timing* of everything below: halve `Sy` and the dam
-responds twice as fast. Click **OK**.
+not measured, and they set the *timing* of everything below, though not in
+proportion to their own size: halving `Sy` to 0.075 brings the drain to 90% of its
+rise in **66 days** against **102** for the value in the table — a speed-up of
+about one and a half rather than two, because the saturated zone stores through
+`Ss` whatever `Sy` does, and the thirty-day ramp that starts the rain is the same
+length either way. Click **OK**.
 
 ### The storm
 
@@ -649,9 +653,9 @@ series table:
 | 19872000 | 0 | 0 |
 
 Set **Duration (sec)** to `51840000` and **Save interval (sec)** to `2160000`.
-Leave **Stage 1 time (sec)**, **Stage 2 time (sec)**, **Stability time (sec)**
-and **Extra save times** empty — the stage fields flag the rapid-drawdown states a stability
-analysis reads, and this page stops at the seepage field. Click **OK**.
+Leave **Stage 1 time (sec)**, **Stage 2 time (sec)**, **Stability time (sec)** and
+**Extra save times** empty — the stage fields flag the rapid-drawdown states a
+stability analysis reads, and this page stops at the seepage field. Click **OK**.
 
 **Why two series.** The three rain blocks do not carry one rate. The crest takes
 the vertical rain and the two 2:1 faces take it times cos θ = 2/√5, which is the
@@ -671,7 +675,8 @@ every 25:
   these days are the check that it does.
 - **A thirty-day ramp to the full rate**, then a **140-day hold** at
   1 × 10<sup>−8</sup> m/s — the rain the rest of this page uses. Between them the
-  storm delivers 170 days of rain at that rate.
+  storm spans 170 days, and with the two ramps counted at their average the whole
+  schedule delivers the volume of 170 days at the full rate.
 - **A thirty-day fall back to nothing**, then **370 days of draining**, which is
   long enough for the dam to give back what it took in.
 
@@ -695,11 +700,11 @@ drives it:
 
 ![The boundary list with the flux values bound to series](images/seep04_studio_seep_bc_series.png)
 
-The list now reads `Flux 1 (q = storm_face)`, `Flux 2 (q = storm)` and
-`Flux 3 (q = storm_face)` where it read three rates, and the head boundary is still
+The list now reads `Flux 1  (q = storm_face)`, `Flux 2  (q = storm)` and
+`Flux 3  (q = storm_face)` where it read three rates, and the head boundary is still
 the number 10 — a model can mix constant and time-varying boundaries freely.
-Click **OK**, and save the model under a name of your own; the file below calls it
-`xslope_dam_infiltration_storm.xlsx`.
+Click **OK**, and save the model under a name of your own; the file linked at the
+top of this section calls it `xslope_dam_infiltration_storm.xlsx`.
 
 ### Running the march
 
@@ -722,12 +727,12 @@ covers its controls. Two of the 28 frames carry the result.
 ![Day 200: the end of the hold, the wettest the dam gets](images/seep04_studio_playbar_day200.png)
 
 **Day 200 (t = 1.728 × 10<sup>7</sup> sec), the end of the hold.** The subtitle
-reads **Inflow 4.95 × 10<sup>−7</sup> / Outflow 4.87 × 10<sup>−7</sup> m³/s per
+reads **Inflow 4.95 × 10<sup>−7</sup> / Outflow 4.87 × 10<sup>−7</sup> m³/sec per
 m** — two numbers where a steady solution reports one, because the difference is
 what the soil is still taking into storage. The drain's
 **4.87 × 10<sup>−7</sup>** is 99% of the
-**4.916 × 10<sup>−7</sup>** the steady rain run gave, so 170 days of rain very
-nearly gets this dam to the answer "steady rain" assumes. The phreatic surface
+**4.916 × 10<sup>−7</sup>** the steady rain run gave, so 170 days of rain gets this
+dam most of the way to the answer "steady rain" assumes. The phreatic surface
 stands essentially where the steady rain run put it, and the soil above it has
 taken water in: the pressure head on the crest centerline, −4.2 m in dry weather,
 has eased to **−2.8 m** — set the Display panel's **Variable** to **Pore
@@ -744,11 +749,15 @@ phreatic surface has dropped visibly and the velocity vectors under the downstre
 face have swung toward the drain.
 
 Scrubbing the whole bar gives the shape of the response, and it is not the shape of
-the rain. The rain reaches full rate on day 60; the drain does not reach its peak
-until day 200. The rain stops on day 230; the drain is still 2% above its
-dry-weather discharge 200 days after that. **The dam lags the weather by months**, and the lag is
-asymmetric: the storm pushed the water table up in 170 days and gravity alone takes
-370 to bring it back down.
+the rain. The rain reaches full rate on day 60 and the drain is still climbing a
+hundred days after that; it stops climbing only because the rain does, so day 200
+is a breakpoint in the schedule rather than a limit the dam reached. The dam's own
+pace is in the rise instead: measured from the moment the rain starts on day 30,
+the drain takes **102 days** to cover 90% of its climb. The fall is slower still —
+the rain stops on day 230, and two hundred days after that the drain is still 1.7%
+above its dry-weather discharge. **The dam lags the weather by months**, and the
+lag is asymmetric: the storm pushed the water table up over 170 days and gravity
+alone takes 370 to bring it back down.
 
 ### Checking the run
 
@@ -760,15 +769,16 @@ asymmetric: the storm pushed the water table up in 170 days and gravity alone ta
   2.813 × 10<sup>−7</sup> and the crest suction is back to −4.2 m, both within a
   fraction of a percent of where they started. The dam returns to the dry-weather
   solution because that is the state its unchanged boundaries hold it in.
-- **Its plateau is the steady answer.** The peak discharge is 99% of the steady
-  rain run's, on the same mesh with the same rain — the transient and steady
-  solvers agreeing about a state they reach two different ways.
+- **It heads for the steady answer.** The peak discharge is 99% of the steady rain
+  run's, on the same mesh with the same rain. The remaining 1% is response the
+  storm ended before the dam finished: the discharge is still rising frame by frame
+  when the rain begins to fall.
 - **The water is accounted for.** At the peak the dam holds **1.04 m³ per meter**
   more water than it started with, against **1.02 m³ per meter** of net inflow
   over the same 200 days, and the Log's mass-balance closure for that frame reads
-  2.3 × 10<sup>−2</sup>. That closure is a ratio between those two terms, and by
-  the end of the run both are near zero because the dam has given everything back,
-  so the figures it prints for the last frames carry no meaning.
+  2.3 × 10<sup>−2</sup>. That closure is the gap between those two terms measured
+  against the inflow, so by the end of the run, when the dam has given everything
+  back and both are near zero, the figures it prints carry no meaning.
 
 <!-- Transient regression: total head at three interior stations at the end of the storm's hold (day 200 = 1.728e7 sec), re-solved through the run_tests tseep_head path (tri3, target_size=1.0). Built by tools/build_seep04_transient.py, which asserts the same three values. -->
 <!-- test: file=files/xslope_dam_infiltration_storm.xlsx, type=tseep_head, target_size=1.0, time=17280000, points=26:8:8.4242;26:4:8.0568;34:2:5.3144, tolerance=0.05 -->

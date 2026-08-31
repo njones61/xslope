@@ -17,9 +17,12 @@ only edits are the ones the page's transient section asks the reader to make:
   * STORAGE. A transient run needs ``Ss`` and ``Sy`` on every material, and the
     source problem is steady and publishes neither. They are chosen from the tables
     in docs/seep/transient.md for the dam fill this problem describes: a compacted
-    silt, ``Ss = 3e-4`` /m (the stiff-clay / dense-silt band) and ``Sy = 0.15``
-    (the silt band, which is also this soil's van Genuchten drainable water
-    content).
+    silt, ``Ss = 3e-4`` /m (the stiff-clay / dense-silt band) and ``Sy = 0.15`` (the
+    silt band) — a plausible drainable porosity for such a fill, picked for a
+    readable response time. The page says so: chosen, not measured. (``Sy`` is not
+    corroborated by the material's van Genuchten pair, because XSLOPE *defines*
+    theta_s - theta_r := ``Sy`` and the material carries no independent retention
+    data; the table is the whole justification.)
 
   * TWO SERIES, NOT ONE. The three flux blocks do not carry one rate — the crest
     takes the vertical rain rate and the two 2:1 faces take it times cos θ = 2/√5,

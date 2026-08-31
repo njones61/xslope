@@ -3154,7 +3154,7 @@ _MAT_ALL_OPTION_FIELDS = ["c", "phi", "cp", "r_elev", "pow_a", "pow_b", "pow_c",
 _MAT_SUCTION_DIM = frozenset(["phi_b", "s_cap"])
 
 # v16: an option=elastic material cannot fail — the mat sheet grays every strength
-# column, t_cut, the dilation pair, the matric-suction pair, u/ru and the strength
+# column, t_cut, the rapid-drawdown pair d/ψ, the matric-suction pair, u/ru and the strength
 # standard deviations for such a row (CF ranges F..N, Q..R, AB..AF on $E="elastic").
 # g/gsat, E/ν, s(γ) and the seepage block stay live. The editor mirrors that: these
 # keys read-only/gray on both views when the row's option is elastic.
@@ -3487,7 +3487,7 @@ class _MaterialListView(QWidget):
         v.addWidget(g)
 
         # Strength: option combo, then only the selected option's fields, then
-        # dilation d/ψ and elastic E/ν.
+        # rapid-drawdown d/ψ and elastic E/ν.
         g = QGroupBox("Strength")
         gv = QVBoxLayout(g)
         opt_cell = QWidget()
@@ -3728,7 +3728,7 @@ class _MaterialListView(QWidget):
 
     def _update_elastic_disable(self):
         """Gray the fields inert for an option=elastic material (mirrors the mat-sheet
-        conditional formatting): t_cut, the dilation pair d/ψ and the pore-pressure
+        conditional formatting): t_cut, the rapid-drawdown pair d/ψ and the pore-pressure
         model u/ru go read-only; g/gsat, E/ν and the seepage block stay live. The
         strength-option cells are already hidden for 'elastic' (empty option set), so
         only the always-shown cells need graying. Disabling a whole d/ψ cell also

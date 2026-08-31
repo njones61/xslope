@@ -2489,7 +2489,7 @@ def _table_value(value):
     A blank mat-sheet cell edited in Studio now reaches the model as ``None``
     rather than as an invented ``0.0``, so anything that compares a property has to
     survive one. Absent reads as zero here, which is what the comparisons meant all
-    along -- ``mat.get('d', 0) > 0`` was already asking "is a dilation entered?".
+    along -- ``mat.get('d', 0) > 0`` was already asking "is a rapid-drawdown d entered?".
     """
     try:
         f = float(value)
@@ -2517,8 +2517,9 @@ def plot_lem_material_table(ax, materials, xloc=0.6, yloc=0.7):
     Adds a limit equilibrium material properties table to the plot.
 
     Displays soil properties for limit equilibrium analysis including unit weight (γ),
-    cohesion (c), friction angle (φ), and optionally dilation angle (d) and
-    dilatancy angle (ψ). Supports both Mohr-Coulomb (mc) and constant-phi (cp) options.
+    cohesion (c), friction angle (φ), and optionally the rapid-drawdown envelope
+    parameters d and ψ (K_f-line intercept and slope angle). Supports both
+    Mohr-Coulomb (mc) and constant-phi (cp) options.
 
     Parameters:
         ax: matplotlib Axes object to add the table to
@@ -2530,8 +2531,11 @@ def plot_lem_material_table(ax, materials, xloc=0.6, yloc=0.7):
             - 'phi': Friction angle for mc option (float)
             - 'cp': Constant phi for cp option (float)
             - 'r_elev': Reference elevation for cp option (float)
-            - 'd': Dilation angle, optional (float)
-            - 'psi': Dilatancy angle, optional (float)
+            - 'd': Rapid-drawdown K_f-line intercept, optional (float)
+            - 'psi': Rapid-drawdown K_f-line slope angle, optional (float)
+                     NOTE: not a dilation angle. The FE solver's ``psi``
+                     (fem.py) is a dilation angle; these LEM material-sheet
+                     columns are not.
         xloc: x-location of table bottom-left corner in axes coordinates (0-1, default: 0.6)
         yloc: y-location of table bottom-left corner in axes coordinates (0-1, default: 0.7)
 

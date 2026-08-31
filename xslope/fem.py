@@ -6045,17 +6045,24 @@ def _nr_assemble_tangent(groups, tangents, pattern):
 # Newton-Raphson controls. These are the spike's defaults; every one of them is a
 # solver control, not a modeling choice, and none of them changes what the trial
 # means — only how hard the solver works before it declares the load unreachable.
-_NR_MAX_ITER = 40          # Newton iterations allowed inside ONE load increment
+_NR_MAX_ITER = 150         # Newton iterations allowed inside ONE load increment
 _NR_MIN_STEP = 1.0 / 64    # smallest load increment; below it the load is unreachable
-_NR_STAGNANT = 6           # iterations over which the residual must halve, or the
-_NR_STAGNANT_DROP = 0.5    # increment is abandoned as unreachable rather than ground
-                           # out to the iteration cap. Near the limit load a failing
-                           # attempt converges linearly at a rate that approaches 1,
-                           # which is the signal itself; spending the whole cap on it
-                           # buys nothing but time.
+# A load increment is abandoned when it makes NO PROGRESS — no improvement on the
+# best residual it has seen for this many iterations — or when the residual climbs
+# far above that best. It is NOT abandoned for being slow. An elastoplastic Newton
+# solve characteristically sits on a long plateau while the active set churns and
+# then drops quadratically: on the dry-dam benchmark at F = 2.4 the relative
+# residual holds between 1.4e-1 and 1.3e-1 for ten iterations and then falls
+# 4e-3 -> 6e-5 -> 9e-8 -> 1e-12. An earlier rule that required the residual to
+# HALVE over six iterations cut exactly that solve off mid-plateau and reported a
+# slope that demonstrably stands (the viscoplastic field there is in equilibrium
+# and violates the yield surface by 0.2% of the cohesion, which is a lower-bound
+# proof of stability) as failed, moving the factor of safety from 2.42 to 1.75.
+_NR_NO_PROGRESS = 30       # iterations without a >1% improvement on the best residual
+_NR_DIVERGED = 1.0e3       # ... or the residual standing this far above that best
 _NR_GROW = 1.6             # increment growth after a comfortable step
 _NR_COMFORT = 8            # ... which is a step converged in this many iterations
-_NR_LS_MAX = 4             # line-search backtracks
+_NR_LS_MAX = 9             # line-search backtracks (down to a step of 1/256)
 _NR_REL_TOL = 1e-8         # ||r|| / ||f_ext||, the step-level equilibrium test
 _NR_RUNAWAY = 50.0         # max|u| / max|u_elastic| beyond which a step is a runaway
 _NR_TANGENT_H = 1e-7       # strain perturbation for the algorithmic tangent
@@ -6188,6 +6195,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         r0_norm = None
         oob_here = np.inf
         r_hist = []
+        r_best = float('inf')
+        last_progress = 0
         lu = None                  # the live tangent factorization (see below)
         prev_r = None
         for it in range(1, nr_max_iter + 1):
@@ -6218,13 +6227,13 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             if r_norm / f_norm < _NR_REL_TOL or oob_here < 0.1 * force_tol:
                 ok = True
                 break
-            if r_norm > 1e6 * r0_norm:
-                break
             prev_r = r_hist[-1] if r_hist else None
             r_hist.append(r_norm)
-            if (len(r_hist) > _NR_STAGNANT
-                    and r_norm > _NR_STAGNANT_DROP * r_hist[-1 - _NR_STAGNANT]):
-                break                       # stagnating: this load is unreachable
+            if r_norm < 0.99 * r_best:
+                r_best = r_norm
+                last_progress = it
+            if it - last_progress > _NR_NO_PROGRESS or r_norm > _NR_DIVERGED * r_best:
+                break                       # no progress: this load is unreachable
 
             if reform:
                 K = _nr_assemble_tangent(groups, tangents, pattern)
@@ -6242,17 +6251,41 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             # residual worse, then backtrack. Near the limit load the full step
             # regularly overshoots, and halving is what keeps the iteration in the
             # basin instead of throwing it into a spurious runaway.
+            #
+            # The step actually taken is always one that was MEASURED, and the best
+            # of those measured. Taking an unmeasured fallback step — what this did
+            # when every backtrack failed — is how the dry-dam solve blew up: with a
+            # near-singular tangent the correction was enormous, no tested step
+            # reduced the residual, the untested one was applied anyway, and the
+            # displacement reached 4.6e13 times the elastic response in a single
+            # iteration. A step that cannot be shown to help is a step that has to
+            # stay small.
             alpha = 1.0
+            best_alpha, best_rc = None, np.inf
             for _ls in range(_NR_LS_MAX):
                 cand = u_try + alpha * du
                 f_c, _, _ = _nr_internal_force(groups, cand, n_dof)
                 rc = float(np.linalg.norm((f_ext - f_c)[free_dofs]))
+                if np.isfinite(rc) and rc < best_rc:
+                    best_rc, best_alpha = rc, alpha
                 if np.isfinite(rc) and rc < r_norm:
                     break
                 alpha *= 0.5
+            alpha = best_alpha if best_alpha is not None else 0.0
             u_try = u_try + alpha * du
+            if debug_level >= 3:
+                print(f"      NR lam={lam_try:.4f} it={it:3d} "
+                      f"||r||/||f||={r_norm / f_norm:.3e} oob={oob_here:.2e} "
+                      f"alpha={alpha:.3g} max|u|={np.max(np.abs(u_try)):.4g} "
+                      f"({np.max(np.abs(u_try)) / max(u_elastic_scale, 1e-30):.1f}x "
+                      f"elastic){' [tangent re-formed]' if reform else ''}")
 
             if u_elastic_scale > 0 and np.max(np.abs(u_try)) > _NR_RUNAWAY * u_elastic_scale:
+                if debug_level >= 2:
+                    print(f"    NR increment to {lam_try:.4f} abandoned at iteration "
+                          f"{it}: max|u| reached "
+                          f"{np.max(np.abs(u_try)) / u_elastic_scale:.1f}x the elastic "
+                          f"response")
                 break                       # the slope is running away under this load
 
         total_iterations += it
@@ -6381,6 +6414,21 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "plastic_fraction": (int(np.count_nonzero(plastic_elements)) / n_elements
                              if n_elements else 0.0),
         # Newton-specific accounting, read by the spike's measurement harness.
+        # The branch histogram is how a run is read for WHY it behaved as it did:
+        # apex points carry a zero tangent, so a field full of them has no
+        # stiffness left to iterate on.
+        "nr_branch_counts": {
+            "elastic": int(sum(int(np.count_nonzero(g['_branch'] == _NR_ELASTIC))
+                               for g in groups)),
+            "main": int(sum(int(np.count_nonzero(g['_branch'] == _NR_MAIN))
+                            for g in groups)),
+            "right_corner": int(sum(int(np.count_nonzero(g['_branch'] == _NR_RIGHT))
+                                    for g in groups)),
+            "left_corner": int(sum(int(np.count_nonzero(g['_branch'] == _NR_LEFT))
+                                   for g in groups)),
+            "apex": int(sum(int(np.count_nonzero(g['_branch'] == _NR_APEX))
+                            for g in groups)),
+        },
         "nr_load_steps": n_steps,
         "nr_step_cuts": n_cuts,
         "nr_step_iterations": step_iters,

@@ -2041,9 +2041,134 @@ def seep04_run_seep():
     return _grab(dlg, "seep04_studio_run_seep.png")
 
 
+#: The storm model — the same dam with its three flux values bound to time series
+#: instead of numbers, built by ``tools/build_seep04_transient.py``. It ships its
+#: mesh beside it, so ``_load`` attaches the page's own 473-node mesh and the
+#: play-bar shots march on it rather than on a freshly generated one.
+SEEP04_STORM = os.path.join(
+    REPO_ROOT, "docs/tutorials/files/xslope_dam_infiltration_storm.xlsx")
+#: Seconds in a day: the model's Time unit is sec, and the page reads in days.
+SEEP04_DAY = 86400.0
+#: The two instants the play bar is parked on. Day 200 is the end of the hold —
+#: the wettest the dam gets, the frame the page's lock is taken from. Day 300 is
+#: seventy days after the rain stopped, with the mound draining toward the toe.
+SEEP04_FRAME_DAYS = (200.0, 300.0)
+
+
+def seep04_transient_editor():
+    """The Transient editor holding the storm.
+
+    Both series are on the one form: ``storm`` is the vertical rain the crest block
+    takes, ``storm_face`` the same curve at 2/√5 for the two 2:1 faces, and the plot
+    beside them draws the pair — flat, ramp, hold, fall, flat — so the schedule can
+    be read at a glance rather than off five rows of seconds. The stage-time fields
+    are empty: they flag the rapid-drawdown states a stability analysis reads, and
+    SEEP-4 stops at the seepage field.
+
+    The preview is rendered explicitly rather than waited for: the pane's redraw is
+    debounced, so a grab taken straight after ``show()`` catches a blank canvas.
+    """
+    from studio.editors import TransientDialog
+
+    data = _load(SEEP04_STORM)
+    dlg = TransientDialog(data.get("tseep"), data, None)
+    dlg.resize(1220, 640)
+    dlg.show()
+    _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    dlg._preview.canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, "seep04_studio_transient.png")
+    dlg.grab().save(out)
+    dlg.close()
+    print("-> seep04_studio_transient.png")
+    return out
+
+
+def seep04_seep_bc_series():
+    """The same boundary set with the rain made time-varying: the upstream-face
+    block open, and ``storm_face`` in its **Flux value (m/sec):** box where the
+    number 8.94427191e-09 stood.
+
+    The list behind it shows what a series-bound set reads like — the head still a
+    number, the three flux rows carrying names rather than rates — which is the
+    difference between this shot and ``seep04_studio_seep_bc.png``.
+    """
+    from studio.editors import SeepBcEditor
+
+    data = _load(SEEP04_STORM)
+    dlg = SeepBcEditor().build(data, None, select=(0, SEEP04_BC_ROW))
+    dlg.resize(1080, 560)
+    return _grab(dlg, "seep04_studio_seep_bc_series.png")
+
+
+def _seep04_frames():
+    """March the storm model once and return (bundle, times in days).
+
+    The run is the page's own: the shipped file on the mesh shipped beside it,
+    through ``SeepRunner`` — the same call the Run button makes — so every frame
+    under the play bar is a frame the reader will have.
+    """
+    from studio.runners import SeepRunner
+
+    data = _load(SEEP04_STORM)
+    mesh = data["mesh"]                  # the sidecar beside the workbook
+    runner = SeepRunner(data, {"mode": "transient"})
+    bundle, err = {}, {}
+    runner.succeeded.connect(lambda b: bundle.update(b))
+    runner.failed.connect(lambda m: err.setdefault("msg", m))
+    with contextlib.redirect_stdout(io.StringIO()):
+        runner._run_transient(data, mesh)
+    if err:
+        raise RuntimeError("seep04 play bar: transient run failed: %s" % err["msg"])
+    times = [float(f["time"]) / SEEP04_DAY for f in bundle["frames"]]
+    return bundle, times
+
+
+def seep04_playbar():
+    """The **Seep · Transient** results tab at the two instants the page reads.
+
+    One march, two grabs, so the pair is the same run and the same color scale. The
+    display options are the transient panel's defaults: no flow lines (a
+    storage-release state has no flow net), the instantaneous water levels on, and
+    velocity vectors, which is how a transient frame's flow direction is read.
+    """
+    from studio.transient import TransientSeepView
+
+    bundle, times = _seep04_frames()
+    opts = {"variable": "head", "levels": 12, "flowlines": False,
+            "vectors": True, "phreatic": True, "show_bc_levels": True}
+    view = TransientSeepView()
+    # The canvas sizes its figure to the viewport, and this dam is four times as
+    # wide as it is tall, so a tall view leaves the frame stranded in white space.
+    view.resize(1000, 460)
+    view.set_frames(bundle["seep_data"], bundle["frames"],
+                    opts_getter=lambda: opts, style_getter=lambda: None,
+                    keep_index=False)
+    view.show()
+    _settle()
+    written = []
+    for day in SEEP04_FRAME_DAYS:
+        view.set_index(min(range(len(times)), key=lambda i: abs(times[i] - day)))
+        _settle()
+        view.canvas._render_current()      # force the raster into the scene
+        _settle()
+        name = "seep04_studio_playbar_day%g.png" % day
+        out = os.path.join(OUT_DIR, name)
+        view.grab().save(out)
+        print("-> %s" % name)
+        written.append(out)
+    view.close()
+    return written
+
+
 SHOTS.update({
     "seep04_seep_bc": seep04_seep_bc,
     "seep04_run_seep": seep04_run_seep,
+    "seep04_transient_editor": seep04_transient_editor,
+    "seep04_seep_bc_series": seep04_seep_bc_series,
+    "seep04_playbar": seep04_playbar,
 })
 
 

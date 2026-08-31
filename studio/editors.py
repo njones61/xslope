@@ -7262,6 +7262,17 @@ class TransientDialog(QDialog):
         self.setWindowTitle("Transient seepage")
         self.resize(1080, 620)
         self._unit_labels = _unit_labels_for(slope_data)
+        # Which series drive which kind of boundary, read off the seep BC set: a
+        # series named in a head value is a length, one named in a flux value is a
+        # Darcy velocity. The plot's y-axis label needs this — a schedule of rain is
+        # not measured in meters (see _series_value_unit).
+        self._series_kinds = {}
+        for _key, _kind in (("specified_heads", "length"),
+                            ("specified_fluxes", "k")):
+            for _b in ((slope_data or {}).get("seepage_bc") or {}).get(_key, []) or []:
+                _v = _b.get("head" if _kind == "length" else "flux")
+                if isinstance(_v, str) and _v.strip():
+                    self._series_kinds.setdefault(_v.strip(), set()).add(_kind)
         self._preview = None            # so an early schedule() is safe
         self._populating = True
         tseep = tseep or {}
@@ -7486,15 +7497,33 @@ class TransientDialog(QDialog):
             rows.append((t, vals))
         return rows
 
+    def _series_value_unit(self, plotted):
+        """The unit label for the series plot's y-axis, given the series names on it.
+
+        A series drives whatever boundary names it, and the two kinds do not share a
+        dimension: a head series is a length, a flux series a Darcy velocity. So the
+        axis is labeled from the bindings — the k unit when every bound series on the
+        plot is a flux, the length unit when none of them is, and nothing at all when
+        the plot carries both (one axis, two dimensions, no honest label)."""
+        ul = self._unit_labels or {}
+        kinds = set()
+        for name in plotted:
+            kinds |= self._series_kinds.get(name, set())
+        if kinds == {"k"}:
+            return f" ({ul['k']})" if ul.get("k") else ""
+        if "k" in kinds:                       # mixed heads and fluxes
+            return ""
+        return f" ({ul['length']})" if ul.get("length") else ""
+
     def _draw_plot(self, ax):
         ul = self._unit_labels
         t_unit = f" ({ul['time']})" if (ul and ul.get("time")) else ""
-        len_unit = f" ({ul['length']})" if (ul and ul.get("length")) else ""
         ax.set_xlabel(f"Time{t_unit}")
-        ax.set_ylabel(f"Series value{len_unit}")
         ax.grid(True, alpha=0.3)
         rows = self._pending_rows()
         names = [e.text().strip() for e in self._name_edits]
+        ax.set_ylabel("Series value"
+                      + self._series_value_unit([n for n in names if n]))
         any_series = False
         for c in range(_TSEEP_N_SERIES):
             nm = names[c]

@@ -8195,6 +8195,45 @@ def run_circles_editor_test(test):
     return 0.0, None
 
 
+def run_seep_bc_series_test(test):
+    """The value fields of Studio's Seep BC editor: that a head and a flux read a
+    typed value by the same rule, and that Set 2 holds both of them to numbers.
+
+    A seepage boundary's value may name a tseep series instead of holding a number —
+    that is how a time-varying boundary is written, and the loader resolves the name
+    against the tseep sheet. The head field honored that; the flux field answered the
+    ValueError from its float() by storing 0.0, so typing a series name into "Flux
+    value:" turned the boundary the user had just made time-varying into a no-flow
+    boundary, silently, and saved it that way. Every symptom of that points at the
+    physics — a march with no rain in it — rather than at the field that dropped the
+    name.
+
+    The check itself lives in test/seep_bc_series_check.py: a series name typed into a
+    flux surviving the editor, surviving save and load, coerced to 0 in the
+    constant-steady set 2 the way a head is, and plain numbers still parsing.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'seep_bc_series_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('seep_bc_series_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_table_paste_test(test):
     """The table clipboard every Studio editor shares, and the tutorials' tables
     against it.
@@ -12692,6 +12731,8 @@ def _dispatch_test(test):
         return run_noncircular_generator_test(test)
     if test_type == 'circles_editor':
         return run_circles_editor_test(test)
+    if test_type == 'seep_bc_series':
+        return run_seep_bc_series_test(test)
     if test_type == 'table_paste':
         return run_table_paste_test(test)
     if test_type == 'project_package':
@@ -12838,7 +12879,7 @@ def _expected_and_tol(test, default_tolerance):
                        'rapid_stage1_frames', 'pullout_envelope',
                        'water_hoist', 'piezo_visibility',
                        'project_package', 'docs_links',
-                       'noncircular_generator', 'circles_editor', 'table_paste',
+                       'noncircular_generator', 'circles_editor', 'seep_bc_series', 'table_paste',
                        'updater', 'fem_1d_details',
                        'report', 'report_finalize',
                        'report_template_field', 'report_no_resolve',
@@ -13544,6 +13585,13 @@ def main():
         # rows the user already has. Builds dialogs offscreen and solves nothing.
         tests.append({'type': 'circles_editor', 'file': 'Studio circles editor',
                       'method': '-', 'source': 'circles_editor'})
+        # Guard the Seep BC editor's value fields: that a flux takes a tseep series
+        # name the way a head does (a series name typed into a flux used to be
+        # answered with 0.0, turning a time-varying boundary into a no-flow one),
+        # that the name survives save and load, and that the constant-steady set 2
+        # still refuses one. Builds widgets offscreen and solves nothing.
+        tests.append({'type': 'seep_bc_series', 'file': 'Studio seep BC value fields',
+                      'method': '-', 'source': 'seep_bc_series'})
         # Guard the table clipboard every editor shares — what a pasted block fills,
         # what it refuses to fill and says so about — and the tutorials' own tables
         # against it: each taught block is read out of its page, pasted into the real

@@ -5762,6 +5762,10 @@ class _SeepBcSetWidget(QWidget):
         frow.addWidget(self.flux_label)
         self.flux_edit = QLineEdit()
         self.flux_edit.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        if self._constant_only:
+            self.flux_edit.setToolTip(
+                "Set 2 is the constant, steady rapid-drawdown boundary set — enter a "
+                "number. Time-varying (tseep series) values belong on Set 1.")
         frow.addWidget(self.flux_edit, 1)
         right.addLayout(frow)
         self._holder = QVBoxLayout()
@@ -5834,12 +5838,14 @@ class _SeepBcSetWidget(QWidget):
             self._exit = coords
         elif self._is_flux(self._cur):
             f = self._fluxes[self._flux_idx(self._cur)]
-            txt = self.flux_edit.text()
-            if not _unedited(txt, f.get("flux")):   # untouched keeps the stored value
-                try:
+            txt = self.flux_edit.text().strip()
+            try:
+                if not _unedited(txt, f.get("flux")):  # untouched keeps the stored value
                     f["flux"] = float(txt or 0)
-                except ValueError:
-                    f["flux"] = 0.0
+            except ValueError:
+                # a non-numeric flux value is a tseep series name (time-varying BC) —
+                # allowed on set 1 only; set 2 is constant, so coerce it to 0.
+                f["flux"] = 0.0 if self._constant_only else txt
             f["coords"] = coords
         elif self._is_head(self._cur):
             txt = self.head_edit.text().strip()

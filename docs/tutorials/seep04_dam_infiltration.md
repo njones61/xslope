@@ -635,8 +635,8 @@ entering the rain as a time series, then pointing the flux boundary conditions
 at it — the same pattern [SEEP-3](seep03_reservoir_drawdown.md) uses for its
 falling pool, where a head boundary follows a series.
 
-It takes two series rather than one, because the three rain blocks do not carry
-one rate: the crest takes the vertical rain, and the two 2:1 faces take it
+For the time series defining how the flux changes over time, we need two
+series rather than one, because the three rain blocks do not carry one rate: the crest takes the vertical rain, and the two 2:1 faces take it
 times cos θ = 2/√5 — the projection worked out in the flux section above. A
 single series driving all three would put the crest rate on the faces and take
 in 10% more water than fell on the dam. So the schedule is written twice —

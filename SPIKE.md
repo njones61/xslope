@@ -96,15 +96,15 @@ The Newton path itself:
   power-curve envelopes, matric suction, tension caps, K0 initial stress and
   staged loading raise rather than being silently ignored.
 
-Two things in the implementation are worth naming because they decided whether
-the speed criterion was met at all. The assembly pattern is fixed for a whole
-solve, so it is built once and each tangent re-form is a single `bincount` into a
+One implementation detail is worth naming because it decided whether the speed
+criterion was in reach at all. The assembly pattern is fixed for a whole solve,
+so it is built once and each tangent re-form is a single `bincount` into a
 ready-made CSC structure; rebuilding a COO matrix and re-sorting it every
-iteration cost as much as the factorization it fed (FEM-1 went from 16.8 s to
-9.4 s on that change alone). And a load increment is abandoned as soon as its
-residual stops halving over six iterations, rather than being ground out to the
-iteration cap — near the limit load a failing attempt converges linearly at a
-rate approaching 1, which is the signal itself.
+iteration cost as much as the factorization it fed, and dropping that took FEM-1
+from 16.8 s to 9.4 s on its own.
+
+The step control went through two settings, and which one is in force changes the
+answers, not just the run time. That is the subject of its own section below.
 
 ## Results
 

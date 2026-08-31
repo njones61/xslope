@@ -763,24 +763,16 @@ alone takes 370 to bring it back down.
 
 ### Checking the run
 
-- **It starts where it should.** The drain reads 2.808 × 10<sup>−7</sup> m³/s per m
-  at day 0 and again at day 25, which is the dry-weather discharge this page
-  measured before any rain was added. A march that begins at equilibrium stays
-  there while nothing drives it.
-- **It ends where it should.** At day 600 the drain is at
-  2.813 × 10<sup>−7</sup> and the crest suction is back to −4.2 m, both within a
-  fraction of a percent of where they started. The dam returns to the dry-weather
-  solution because that is the state its unchanged boundaries hold it in.
-- **It heads for the steady answer.** The peak discharge is 99% of the steady rain
-  run's, on the same mesh with the same rain. The remaining 1% is response the
-  storm ended before the dam finished: the discharge is still rising frame by frame
-  when the rain begins to fall.
-- **The water is accounted for.** At the peak the dam holds **1.04 m³ per meter**
-  more water than it started with, against **1.02 m³ per meter** of net inflow
-  over the same 200 days, and the Log's mass-balance closure for that frame reads
-  2.3 × 10<sup>−2</sup>. That closure is the gap between those two terms measured
-  against the inflow, so by the end of the run, when the dam has given everything
-  back and both are near zero, the figures it prints carry no meaning.
+- **It starts where it should.** The drain reads 2.808 × 10<sup>−7</sup> m³/s
+  per m at day 0 — the dry-weather discharge — and holds there until the rain.
+- **It ends where it should.** By day 600 the drain and the crest suction are
+  back within a fraction of a percent of their dry-weather values.
+- **The peak is right.** The largest discharge is 99% of the steady rain run's
+  on the same mesh — the storm ends just before the dam finishes responding.
+- **The water balances.** What the dam stores at the peak matches the net
+  inflow to within the Log's mass-balance closure for that frame. (The closure
+  printed for the last frames means nothing — by then both totals are near
+  zero.)
 
 <!-- Transient regression: total head at three interior stations at the end of the storm's hold (day 200 = 1.728e7 sec), re-solved through the run_tests tseep_head path (tri3, target_size=1.0). Built by tools/build_seep04_transient.py, which asserts the same three values. -->
 <!-- test: file=files/xslope_dam_infiltration_storm.xlsx, type=tseep_head, target_size=1.0, time=17280000, points=26:8:8.4242;26:4:8.0568;34:2:5.3144, tolerance=0.05 -->

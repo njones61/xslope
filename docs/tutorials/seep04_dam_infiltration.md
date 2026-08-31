@@ -635,16 +635,17 @@ entering the rain as a time series, then pointing the flux boundary conditions
 at it — the same pattern [SEEP-3](seep03_reservoir_drawdown.md) uses for its
 falling pool, where a head boundary follows a series.
 
-**Why two series.** The three rain blocks do not carry one rate. The crest takes
-the vertical rain and the two 2:1 faces take it times cos θ = 2/√5, which is the
-projection the flux section works out. A single series driving all three would
-put the crest rate on the faces and take in 10% more water than fell on the dam.
-So the schedule is written twice: `storm` is the rain itself and `storm_face` is
-the same curve scaled by 0.894427. The ratio between the columns is the same
-ratio that was between the three numbers before.
+It takes two series rather than one, because the three rain blocks do not carry
+one rate: the crest takes the vertical rain, and the two 2:1 faces take it
+times cos θ = 2/√5 — the projection worked out in the flux section above. A
+single series driving all three would put the crest rate on the faces and take
+in 10% more water than fell on the dam. So the schedule is written twice —
+`storm` is the rain itself, `storm_face` the same curve scaled by 0.894427 —
+and the ratio between the two columns is the same ratio that stood between the
+three numbers before.
 
-Click **Transient** in the Inputs dock — the
-row reads `off` until the sheet has something on it. The editor is one form: the run controls on the right, the time
+With that settled, the series can be entered. Click **Transient** in the Inputs
+dock — the row reads `off` until the sheet has something on it. The editor is one form: the run controls on the right, the time
 series on the left.
 
 ![The Transient editor with the storm defined](images/seep04_studio_transient.png)

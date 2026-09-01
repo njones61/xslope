@@ -124,7 +124,10 @@ That comes to **\$1.85** at Anthropic's list prices on 2026-08-29 (\$5.00 per
 million input tokens, a cache read at a tenth of that, \$25.00 per million output
 tokens). Price and wall time do not track each other: the strength reduction run
 takes half the total time for under a tenth of the cost, because 521 of its 556
-seconds are spent inside the solver.
+seconds are spent inside the solver. These sessions were measured with the
+assistant's reference brief cached but the conversation history sent at full
+price on every call; the assistant now caches the history as well, so the same
+sessions cost less today than the table shows.
 
 The same eight sessions were then played, unchanged, on four other models.
 **Everything in this table is a snapshot: the models as they behaved and the list

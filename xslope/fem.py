@@ -6060,11 +6060,11 @@ _NR_MIN_STEP = 1.0 / 64    # smallest load increment; below it the load is unrea
 # proof of stability) as failed, moving the factor of safety from 2.42 to 1.75.
 _NR_NO_PROGRESS = 30       # iterations without a >1% improvement on the best residual
 _NR_DIVERGED = 1.0e3       # ... or the residual standing this far above that best
+_NR_INIT_STEP = 1.0        # first load increment attempted (1.0 = full gravity in one step)
 _NR_GROW = 1.6             # increment growth after a comfortable step
 _NR_COMFORT = 8            # ... which is a step converged in this many iterations
 _NR_LS_MAX = 9             # line-search backtracks (down to a step of 1/256)
 _NR_REL_TOL = 1e-8         # ||r|| / ||f_ext||, the step-level equilibrium test
-_NR_RUNAWAY = 50.0         # max|u| / max|u_elastic| beyond which a step is a runaway
 _NR_TANGENT_H = 1e-7       # strain perturbation for the algorithmic tangent
 
 
@@ -6173,7 +6173,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     ext_norm = float(np.linalg.norm(base_loads[free_dofs]))
     u = np.zeros(n_dof)
     lam = 0.0
-    dlam = 1.0
+    dlam = float(_NR_INIT_STEP)
     total_iterations = 0
     n_steps = 0
     n_cuts = 0
@@ -6280,13 +6280,25 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                       f"({np.max(np.abs(u_try)) / max(u_elastic_scale, 1e-30):.1f}x "
                       f"elastic){' [tangent re-formed]' if reform else ''}")
 
-            if u_elastic_scale > 0 and np.max(np.abs(u_try)) > _NR_RUNAWAY * u_elastic_scale:
-                if debug_level >= 2:
-                    print(f"    NR increment to {lam_try:.4f} abandoned at iteration "
-                          f"{it}: max|u| reached "
-                          f"{np.max(np.abs(u_try)) / u_elastic_scale:.1f}x the elastic "
-                          f"response")
-                break                       # the slope is running away under this load
+            # There is deliberately NO displacement gate here. An earlier version
+            # abandoned an increment once max|u| passed 50x the elastic response, on
+            # the reasoning that a slope moving that far is running away. It is not a
+            # statement about the slope: at the limit load the load-displacement curve
+            # flattens, so the last standing increments are exactly the ones with the
+            # largest displacements, and the gate cut them off. Measured on Griffiths
+            # & Lane 1 (quad9, 3.5) at F = 1.400: with the gate the trial is reported
+            # FAILED after 440 iterations; without it the same driver reaches
+            # equilibrium in 48, at an out-of-balance of 3e-8 and with no Gauss point
+            # more than 1.5e-8 of its strength outside the yield surface -- a
+            # statically admissible field, which is the definition of the trial
+            # standing. One trial's verdict, and the factor of safety moved 1.3969 ->
+            # 1.4031. A load that cannot be carried already proves itself by driving
+            # the increment below its floor, which is a statement about the slope; a
+            # displacement threshold is a statement about a number nobody chose for a
+            # reason. The runaway is still caught, just not by a threshold: a
+            # non-finite residual, a singular tangent and the no-progress watch all
+            # end the increment, and the failing trials in the benchmark table all
+            # terminate at the load-step floor without it.
 
         total_iterations += it
         if ok:
@@ -6337,6 +6349,46 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     for grp in groups:
         grp['_u'] = u
     _nr_internal_force(groups, u, n_dof)          # refresh _sig / _branch at u
+
+    # ---- the verdict's own evidence -----------------------------------------
+    # A converged Newton trial asserts two things about the slope: that full
+    # gravity is carried in equilibrium, and that no Gauss point is outside the
+    # yield surface. `residual` already carries the first as the Dawson
+    # out-of-balance. This carries the second — the largest yield-function value
+    # over every Gauss point, divided by that point's own strength scale, so it
+    # reads as a fraction of the strength available there.
+    #
+    # It is computed from the INVARIANT form of the Mohr-Coulomb function that the
+    # viscoplastic path uses, not from the ordered-principal-stress form the return
+    # map is written on. The two are the same surface algebraically, so a defect in
+    # one cannot hide behind the other, and a converged trial that reports a
+    # violation near machine precision is a statically admissible stress field
+    # rather than a solver's word for one.
+    sq3_ = np.sqrt(3.0)
+    max_yield_violation = 0.0
+    for grp in groups:
+        sg = grp['_sig']
+        sx_, sy_, txy_, sz_ = sg[:, 0], sg[:, 1], sg[:, 2], sg[:, 3]
+        sigm_ = (sx_ + sy_ + sz_) / 3.0
+        dsbar_ = np.sqrt(((sx_ - sy_) ** 2 + (sy_ - sz_) ** 2 + (sz_ - sx_) ** 2
+                          + 6.0 * txy_ ** 2) / 2.0)
+        dx_, dy_, dz_ = sx_ - sigm_, sy_ - sigm_, sz_ - sigm_
+        ds3_ = np.maximum(dsbar_, 1e-10) ** 3
+        sine_ = np.clip(np.where(dsbar_ > 1e-10,
+                                 -13.5 * (dx_ * dy_ * dz_ - dz_ * txy_ ** 2) / ds3_,
+                                 0.0), -1.0, 1.0)
+        th_ = np.arcsin(sine_) / 3.0
+        fv_ = (sigm_ * grp['snph']
+               + dsbar_ * (np.cos(th_) / sq3_ - np.sin(th_) * grp['snph'] / 3.0)
+               - grp['c_r'] * grp['csph'])
+        # Strength scale at the point: the two terms the deviatoric radius is held
+        # against. A material held linear elastic carries c = inf and is skipped,
+        # as is a point with no strength scale to divide by.
+        den_ = grp['c_r'] * grp['csph'] + np.abs(sigm_) * grp['snph']
+        ok_ = np.isfinite(den_) & (den_ > 0.0)
+        if np.any(ok_):
+            max_yield_violation = max(max_yield_violation,
+                                      float(np.max(fv_[ok_] / den_[ok_])))
 
     sig_by_gp = [[None] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
     branch_by_gp = [[0] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
@@ -6397,6 +6449,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "budget_extensions": 0,
         "iteration_budget": nr_max_iter,
         "failure_criterion": "newton",
+        # The largest Mohr-Coulomb violation over all Gauss points at the reported
+        # state, as a fraction of the local strength scale (see above). On a
+        # converged trial this is the yield half of the verdict's evidence; the
+        # force half is `residual`.
+        "nr_max_yield_violation": float(max_yield_violation),
         "iterations": int(total_iterations),
         "displacements": u,
         "displacements_elastic": u_elastic,

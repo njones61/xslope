@@ -55,6 +55,12 @@ four could not see:
     variable cannot recompute a session's factors of safety on the non-default
     driver in silence.
 
+And one more for the monotonic strength-reduction ramp (SPIKE.md, "RAMP"), the
+third SSRM route: it lands on the same limit the Newton bisection does, which is a
+real question because the two carry different plastic histories to the same
+strength, and it never evaluates a strength more than its initial increment above
+the highest one it has carried — which is the whole of its cost advantage.
+
 Run directly:  PYTHONPATH=. python3 test/nr_ssrm_check.py
 """
 
@@ -144,8 +150,65 @@ def run():
     failures += check_step_control_not_decisive(fem_data)
     failures += check_displacement_bound()
     failures += check_env_override_announces_itself()
+    failures += check_ramp(fem_data, results['newton'].get('FS'))
 
     return failures
+
+
+# The ramp's first strength increment, written out rather than imported: the
+# never-past-the-limit property is bounded BY that increment, so reading it from
+# the module would make the assertion follow the code instead of holding it.
+RAMP_DF_INIT = 0.05
+
+
+def check_ramp(fem_data, fs_bisection):
+    """The monotonic ramp lands on the bisection's answer and never overshoots it.
+
+    Two properties, on the same coarse mesh the bisection ran above (see SPIKE.md,
+    "RAMP"):
+
+      * the answer. The ramp reduces strength along ONE warm-started history
+        instead of solving each trial from zero, and non-associated Mohr-Coulomb is
+        path-dependent, so this is a real question rather than a formality — the
+        two routes have to reach the same limit.
+      * it never goes past failure. The bisection's worst trials are the ones far
+        above the limit, where the Newton driver costs 17x to 47x the viscoplastic
+        driver's constitutive work to prove a load unreachable; the ramp stops one
+        increment past the highest strength it has carried, by construction. That
+        is asserted as an exact bound: no strength evaluated may exceed the last
+        one carried by more than the ramp's initial increment.
+    """
+    fails = []
+    res = solve_ssrm(fem_data, F_min=F_MIN, F_max=F_MAX, tolerance=TOLERANCE,
+                     max_iterations=MAX_ITER, fem_solver='newton',
+                     ssrm_driver='ramp', capture_failure_state=False)
+    fs = res.get('FS')
+    if fs is None:
+        return [f"the ramp returned no factor of safety "
+                f"({res.get('error', 'no message')})"]
+    if abs(fs - LOCKED_FS) > TOLERANCE:
+        fails.append(f"ramp: FS = {fs:.4f} is {abs(fs - LOCKED_FS):.4f} from the "
+                     f"locked {LOCKED_FS:.2f}, outside the tolerance {TOLERANCE:g}")
+    if fs_bisection is not None and abs(fs - fs_bisection) > TOLERANCE:
+        fails.append(f"the two Newton SSRM drivers disagree: bisection "
+                     f"{fs_bisection:.4f} vs ramp {fs:.4f}, a gap of "
+                     f"{abs(fs - fs_bisection):.4f} against {TOLERANCE:g}")
+    carried = res.get('ramp_last_carried')
+    evaluated = [t['F'] for t in res.get('trials', [])]
+    if carried is None or not evaluated:
+        fails.append("the ramp result carries no step record, so its "
+                     "never-past-the-limit property cannot be read")
+    else:
+        top = max(evaluated)
+        if top > carried + RAMP_DF_INIT + 1e-9:
+            fails.append(
+                f"the ramp evaluated F = {top:.4f}, which is "
+                f"{top - carried:.4f} above the highest strength it carried "
+                f"({carried:.4f}) and more than its {RAMP_DF_INIT:g} initial "
+                f"increment. Its whole cost advantage is that it never solves far "
+                f"past failure, which is where a load-controlled Newton trial is "
+                f"at its most expensive.")
+    return fails
 
 
 def check_return_map():
@@ -449,7 +512,9 @@ def main():
           "lands on the yield surface on every branch, a converged trial "
           "certifies its own stress field in force AND in displacement, neither "
           "the loading path nor the step control changes a verdict, and the "
-          "environment override cannot swap the driver in silence.")
+          "environment override cannot swap the driver in silence. The monotonic "
+          "ramp reaches the same limit along one warm-started history and never "
+          "solves past it.")
 
 
 if __name__ == '__main__':

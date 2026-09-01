@@ -3741,7 +3741,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               suction_phi_b=None, suction_cap=None, _prepared=None,
               fast_kernel='auto', failure_criterion="hybrid", k0=None,
               max_iterations_ceiling=50000, early_failure=True, _init_state=None,
-              _softened_seed=None, fem_solver=None):
+              _softened_seed=None, fem_solver=None, _nr_export=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -4300,6 +4300,27 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     # through and the rest of this function is untouched. 'newton' hands the trial
     # to the Newton-Raphson driver, which returns the same result dictionary.
     if resolve_fem_solver(fem_solver) == 'newton':
+        if _nr_export is not None:
+            # The ramp driver (see _ssrm_ramp_newton) continues ONE solve across
+            # strength steps, so it needs the working state this call is about to
+            # build and a way to re-reduce the strengths in place. Only the ramp
+            # passes this; every other caller leaves it None and nothing here runs.
+            def _restrength(groups, F_new):
+                Fb = np.full(n_elements, float(F_new))
+                if ssr_exclude_mask is not None:
+                    Fb[np.asarray(ssr_exclude_mask, dtype=bool)] = 1.0
+                c_r_new = c_by_elem / Fb
+                phi_r_new = np.arctan(np.tan(np.radians(phi_by_elem)) / Fb)
+                for grp in groups:
+                    e = grp['e_idx']
+                    cc = c_r_new[e]
+                    if 'elastic' in grp:
+                        cc = cc.copy()
+                        cc[grp['elastic']] = np.inf
+                    grp['c_r'] = cc
+                    grp['snph'] = np.sin(phi_r_new[e])
+                    grp['csph'] = np.cos(phi_r_new[e])
+            _nr_export['restrength'] = _restrength
         if _init_state is not None:
             raise NotImplementedError(
                 "fem_solver='newton' does not carry a K0-equilibrated initial "
@@ -4313,7 +4334,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             elastic_by_elem=elastic_by_elem, t_cap_by_elem=t_cap_by_elem,
             pp_formulation=pp_formulation, force_tol=force_tol,
             min_slip_depth=min_slip_depth, max_iterations=max_iterations,
-            max_disp_factor=max_disp_factor,
+            max_disp_factor=max_disp_factor, _nr_export=_nr_export,
             debug_level=debug_level, progress_callback=progress_callback)
 
     if debug_level >= 1:
@@ -6142,10 +6163,151 @@ _NR_TANGENT_H = 1e-7       # strain perturbation for the algorithmic tangent
 _NR_DISP_FACTOR = 0.1
 
 
+def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
+                    force_tol, oob_fn, nr_max_iter, u_elastic_scale,
+                    debug_level=0, label=""):
+    """Drive the equilibrium residual to zero at a FIXED external load.
+
+    The inner Newton iteration, lifted out of :func:`_solve_fem_newton` verbatim so
+    the two drivers that need it share one copy. The bisection driver calls it once
+    per gravity increment with ``f_ext`` a fraction of the load; the ramp driver
+    calls it once per strength step with ``f_ext`` the whole load and ``u_start``
+    the previous step's converged field.
+
+    Nothing here knows what is being continued. It starts from ``u_start``, uses
+    whatever strengths the groups currently carry, and returns
+
+        (ok, u, iterations, force_evaluations, out_of_balance, relative_du)
+
+    without committing plastic strain — the caller decides whether the state is
+    worth keeping.
+    """
+    f_ext_free = f_ext[free_dofs]
+    f_norm = max(float(np.linalg.norm(f_ext_free)), 1e-30)
+    n_fe = 0
+    rel_du = 0.0
+    u_try = u_start.copy()
+    ok = False
+    it = 0
+    r0_norm = None
+    oob_here = np.inf
+    r_hist = []
+    r_best = float('inf')
+    last_progress = 0
+    lu = None                  # the live tangent factorization (see below)
+    prev_r = None
+    for it in range(1, nr_max_iter + 1):
+        # Re-form and re-factorize the tangent only when the previous step did
+        # not earn its keep. The consistent tangent changes only where the
+        # active set changes, so once the plastic zone has settled the SAME
+        # factorization drives the remaining iterations at essentially the same
+        # rate for a fraction of the cost — the assembly and the LU are the
+        # whole per-iteration expense, the return map is not. A step whose
+        # residual stops falling by 4x per iteration gets a fresh tangent.
+        reform = lu is None or prev_r is None or r_hist[-1] > 0.25 * prev_r
+        fint, tangents, _ = _nr_internal_force(groups, u_try, n_dof,
+                                               h_eps=h_eps, want_tangent=reform)
+        n_fe += 1
+        r = f_ext - fint
+        r_free = r[free_dofs]
+        r_norm = float(np.linalg.norm(r_free))
+        if not np.isfinite(r_norm):
+            break
+        r_full = np.zeros(n_dof)
+        r_full[free_dofs] = r_free
+        oob_here = oob_fn(r_full)
+        if r0_norm is None:
+            r0_norm = max(r_norm, 1e-30)
+        # Equilibrium for this increment. Either test alone is enough: the
+        # relative norm is the Newton-natural one, and the Dawson measure at a
+        # tenth of the trial tolerance guarantees the final state passes the
+        # same gate the viscoplastic verdict is read on.
+        if r_norm / f_norm < _NR_REL_TOL or oob_here < 0.1 * force_tol:
+            ok = True
+            break
+        prev_r = r_hist[-1] if r_hist else None
+        r_hist.append(r_norm)
+        if r_norm < 0.99 * r_best:
+            r_best = r_norm
+            last_progress = it
+        if it - last_progress > _NR_NO_PROGRESS or r_norm > _NR_DIVERGED * r_best:
+            break                       # no progress: this load is unreachable
+
+        if reform:
+            K = _nr_assemble_tangent(groups, tangents, pattern)
+            try:
+                lu = splu(K)
+            except RuntimeError:
+                break                   # singular tangent = the limit load
+        du_free = lu.solve(r_free)
+        if not np.all(np.isfinite(du_free)):
+            break
+        du = np.zeros(n_dof)
+        du[free_dofs] = du_free
+
+        # Line search: accept the full Newton step unless it makes the
+        # residual worse, then backtrack. Near the limit load the full step
+        # regularly overshoots, and halving is what keeps the iteration in the
+        # basin instead of throwing it into a spurious runaway.
+        #
+        # The step actually taken is always one that was MEASURED, and the best
+        # of those measured. Taking an unmeasured fallback step — what this did
+        # when every backtrack failed — is how the dry-dam solve blew up: with a
+        # near-singular tangent the correction was enormous, no tested step
+        # reduced the residual, the untested one was applied anyway, and the
+        # displacement reached 4.6e13 times the elastic response in a single
+        # iteration. A step that cannot be shown to help is a step that has to
+        # stay small.
+        alpha = 1.0
+        best_alpha, best_rc = None, np.inf
+        for _ls in range(_NR_LS_MAX):
+            cand = u_try + alpha * du
+            f_c, _, _ = _nr_internal_force(groups, cand, n_dof)
+            n_fe += 1
+            rc = float(np.linalg.norm((f_ext - f_c)[free_dofs]))
+            if np.isfinite(rc) and rc < best_rc:
+                best_rc, best_alpha = rc, alpha
+            if np.isfinite(rc) and rc < r_norm:
+                break
+            alpha *= 0.5
+        alpha = best_alpha if best_alpha is not None else 0.0
+        u_try = u_try + alpha * du
+        _umax = float(np.max(np.abs(u_try)))
+        rel_du = (float(np.max(np.abs(alpha * du))) / _umax) if _umax > 0.0 else 0.0
+        if debug_level >= 3:
+            print(f"      NR {label} it={it:3d} "
+                  f"||r||/||f||={r_norm / f_norm:.3e} oob={oob_here:.2e} "
+                  f"alpha={alpha:.3g} max|u|={np.max(np.abs(u_try)):.4g} "
+                  f"({np.max(np.abs(u_try)) / max(u_elastic_scale, 1e-30):.1f}x "
+                  f"elastic){' [tangent re-formed]' if reform else ''}")
+
+        # There is deliberately NO displacement gate here. An earlier version
+        # abandoned an increment once max|u| passed 50x the elastic response, on
+        # the reasoning that a slope moving that far is running away. It is not a
+        # statement about the slope: at the limit load the load-displacement curve
+        # flattens, so the last standing increments are exactly the ones with the
+        # largest displacements, and the gate cut them off. Measured on Griffiths
+        # & Lane 1 (quad9, 3.5) at F = 1.400: with the gate the trial is reported
+        # FAILED after 440 iterations; without it the same driver reaches
+        # equilibrium in 48, at an out-of-balance of 3e-8 and with no Gauss point
+        # more than 1.5e-8 of its strength outside the yield surface -- a
+        # statically admissible field, which is the definition of the trial
+        # standing. One trial's verdict, and the factor of safety moved 1.3969 ->
+        # 1.4031. A load that cannot be carried already proves itself by driving
+        # the increment below its floor, which is a statement about the slope; a
+        # displacement threshold is a statement about a number nobody chose for a
+        # reason. The runaway is still caught, just not by a threshold: a
+        # non-finite residual, a singular tangent and the no-progress watch all
+        # end the increment, and the failing trials in the benchmark table all
+        # terminate at the load-step floor without it.
+
+    return ok, u_try, it, n_fe, oob_here, rel_du
+
+
 def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                       elastic_by_elem, t_cap_by_elem, pp_formulation,
                       force_tol, min_slip_depth, max_iterations,
-                      max_disp_factor=None,
+                      max_disp_factor=None, _nr_export=None,
                       debug_level=0, progress_callback=None,
                       nr_max_iter=_NR_MAX_ITER, nr_min_step=_NR_MIN_STEP):
     """One strength-reduction trial by Newton-Raphson (SPIKE; see SPIKE.md).
@@ -6279,124 +6441,12 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         step = min(dlam, 1.0 - lam)
         lam_try = lam + step
         f_ext = lam_try * base_loads
-        f_ext_free = f_ext[free_dofs]
-        f_norm = max(float(np.linalg.norm(f_ext_free)), 1e-30)
 
-        u_try = u.copy()
-        ok = False
-        it = 0
-        r0_norm = None
-        oob_here = np.inf
-        r_hist = []
-        r_best = float('inf')
-        last_progress = 0
-        lu = None                  # the live tangent factorization (see below)
-        prev_r = None
-        for it in range(1, nr_max_iter + 1):
-            # Re-form and re-factorize the tangent only when the previous step did
-            # not earn its keep. The consistent tangent changes only where the
-            # active set changes, so once the plastic zone has settled the SAME
-            # factorization drives the remaining iterations at essentially the same
-            # rate for a fraction of the cost — the assembly and the LU are the
-            # whole per-iteration expense, the return map is not. A step whose
-            # residual stops falling by 4x per iteration gets a fresh tangent.
-            reform = lu is None or prev_r is None or r_hist[-1] > 0.25 * prev_r
-            fint, tangents, _ = _nr_internal_force(groups, u_try, n_dof,
-                                                   h_eps=h_eps, want_tangent=reform)
-            n_force_evals += 1
-            r = f_ext - fint
-            r_free = r[free_dofs]
-            r_norm = float(np.linalg.norm(r_free))
-            if not np.isfinite(r_norm):
-                break
-            r_full = np.zeros(n_dof)
-            r_full[free_dofs] = r_free
-            oob_here = _oob(r_full)
-            if r0_norm is None:
-                r0_norm = max(r_norm, 1e-30)
-            # Equilibrium for this increment. Either test alone is enough: the
-            # relative norm is the Newton-natural one, and the Dawson measure at a
-            # tenth of the trial tolerance guarantees the final state passes the
-            # same gate the viscoplastic verdict is read on.
-            if r_norm / f_norm < _NR_REL_TOL or oob_here < 0.1 * force_tol:
-                ok = True
-                break
-            prev_r = r_hist[-1] if r_hist else None
-            r_hist.append(r_norm)
-            if r_norm < 0.99 * r_best:
-                r_best = r_norm
-                last_progress = it
-            if it - last_progress > _NR_NO_PROGRESS or r_norm > _NR_DIVERGED * r_best:
-                break                       # no progress: this load is unreachable
-
-            if reform:
-                K = _nr_assemble_tangent(groups, tangents, pattern)
-                try:
-                    lu = splu(K)
-                except RuntimeError:
-                    break                   # singular tangent = the limit load
-            du_free = lu.solve(r_free)
-            if not np.all(np.isfinite(du_free)):
-                break
-            du = np.zeros(n_dof)
-            du[free_dofs] = du_free
-
-            # Line search: accept the full Newton step unless it makes the
-            # residual worse, then backtrack. Near the limit load the full step
-            # regularly overshoots, and halving is what keeps the iteration in the
-            # basin instead of throwing it into a spurious runaway.
-            #
-            # The step actually taken is always one that was MEASURED, and the best
-            # of those measured. Taking an unmeasured fallback step — what this did
-            # when every backtrack failed — is how the dry-dam solve blew up: with a
-            # near-singular tangent the correction was enormous, no tested step
-            # reduced the residual, the untested one was applied anyway, and the
-            # displacement reached 4.6e13 times the elastic response in a single
-            # iteration. A step that cannot be shown to help is a step that has to
-            # stay small.
-            alpha = 1.0
-            best_alpha, best_rc = None, np.inf
-            for _ls in range(_NR_LS_MAX):
-                cand = u_try + alpha * du
-                f_c, _, _ = _nr_internal_force(groups, cand, n_dof)
-                n_force_evals += 1
-                rc = float(np.linalg.norm((f_ext - f_c)[free_dofs]))
-                if np.isfinite(rc) and rc < best_rc:
-                    best_rc, best_alpha = rc, alpha
-                if np.isfinite(rc) and rc < r_norm:
-                    break
-                alpha *= 0.5
-            alpha = best_alpha if best_alpha is not None else 0.0
-            u_try = u_try + alpha * du
-            _umax = float(np.max(np.abs(u_try)))
-            rel_du = (float(np.max(np.abs(alpha * du))) / _umax) if _umax > 0.0 else 0.0
-            if debug_level >= 3:
-                print(f"      NR lam={lam_try:.4f} it={it:3d} "
-                      f"||r||/||f||={r_norm / f_norm:.3e} oob={oob_here:.2e} "
-                      f"alpha={alpha:.3g} max|u|={np.max(np.abs(u_try)):.4g} "
-                      f"({np.max(np.abs(u_try)) / max(u_elastic_scale, 1e-30):.1f}x "
-                      f"elastic){' [tangent re-formed]' if reform else ''}")
-
-            # There is deliberately NO displacement gate here. An earlier version
-            # abandoned an increment once max|u| passed 50x the elastic response, on
-            # the reasoning that a slope moving that far is running away. It is not a
-            # statement about the slope: at the limit load the load-displacement curve
-            # flattens, so the last standing increments are exactly the ones with the
-            # largest displacements, and the gate cut them off. Measured on Griffiths
-            # & Lane 1 (quad9, 3.5) at F = 1.400: with the gate the trial is reported
-            # FAILED after 440 iterations; without it the same driver reaches
-            # equilibrium in 48, at an out-of-balance of 3e-8 and with no Gauss point
-            # more than 1.5e-8 of its strength outside the yield surface -- a
-            # statically admissible field, which is the definition of the trial
-            # standing. One trial's verdict, and the factor of safety moved 1.3969 ->
-            # 1.4031. A load that cannot be carried already proves itself by driving
-            # the increment below its floor, which is a statement about the slope; a
-            # displacement threshold is a statement about a number nobody chose for a
-            # reason. The runaway is still caught, just not by a threshold: a
-            # non-finite residual, a singular tangent and the no-progress watch all
-            # end the increment, and the failing trials in the benchmark table all
-            # terminate at the load-step floor without it.
-
+        ok, u_try, it, _fe, oob_here, rel_du = _nr_equilibrate(
+            groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
+            _oob, nr_max_iter, u_elastic_scale, debug_level=debug_level,
+            label=f"lam={lam_try:.4f}")
+        n_force_evals += _fe
         total_iterations += it
         if ok:
             u = u_try
@@ -6533,6 +6583,15 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     if elastic_by_elem is not None:
         plastic_elements[elastic_by_elem] = False
 
+    if _nr_export is not None:
+        # Hand the live solve state to the ramp driver, which continues it.
+        _nr_export.update({
+            'groups': groups, 'pattern': pattern, 'base_loads': base_loads,
+            'oob_fn': _oob, 'h_eps': h_eps, 'u_elastic_scale': u_elastic_scale,
+            'free_dofs': free_dofs, 'n_dof': n_dof, 'u': u,
+            'disp_limit': nr_disp_limit, 'prep': prep,
+        })
+
     strains = compute_strains(nodes, elements, element_types, u,
                               dof_offset=dof_offset)
     max_disp = float(np.max(np.abs(u))) if u.size else 0.0
@@ -6638,6 +6697,214 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "yielded_pile_V": np.array([], dtype=bool),
         "yielded_pile_M": np.array([], dtype=bool),
         "yielded_pile": np.array([], dtype=bool),
+    }
+
+
+# ===================== The monotonic strength-reduction ramp (SPIKE) =========
+#
+# An alternative to the bisection, reachable only on the Newton driver:
+# solve_ssrm(..., fem_solver='newton', ssrm_driver='ramp'). See SPIKE.md, "RAMP".
+#
+# The bisection asks an independent question at every trial — it drops the model
+# back to zero displacement, re-applies gravity from nothing and rediscovers the
+# whole elastoplastic history at the new strength. The ramp carries ONE history:
+# it reaches equilibrium once at the starting strength and then reduces strength
+# monotonically, each step warm-started from the state before it. The gravity load
+# never changes after the first solve; only c and tan(phi) do. So a step is a
+# continuation in F rather than in load, and the mechanism develops instead of
+# being rebuilt.
+#
+# Two properties follow by construction rather than by tuning:
+#   * the verdict sequence cannot be non-monotone, because there is one history;
+#   * no strength more than one step past the highest one carried is ever
+#     evaluated, which is where the Newton driver is at its worst (17x to 47x the
+#     viscoplastic driver's constitutive work on trials well past failure).
+_RAMP_DF_INIT = 0.05       # first strength increment
+_RAMP_DF_MIN = 0.005       # below this a failed step means the limit is reached
+_RAMP_DF_GROW = 1.6        # increment growth after a comfortable step
+_RAMP_RESOLUTION = 0.01    # the answer is reported to this, as the bisection is
+
+
+def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_tol,
+                      max_iterations, oob_window, dt_scale, pp_formulation,
+                      staged, tension_cutoff, min_slip_depth, ssr_exclude_mask,
+                      tension_cap_by_elem, tension_srf, elastic_mask,
+                      suction_phi_b, suction_cap, k0, f_adjust, f_min_floor,
+                      max_expand, debug_level=0, progress_callback=None,
+                      cancel_check=None):
+    """Walk F up from a converged state, warm-starting every step.
+
+    Returns the same result shape solve_ssrm's bisection drivers return, so the
+    caller consumes it unchanged. ``trials`` records every strength actually
+    evaluated, in the order evaluated, including the steps that were rejected and
+    retried at half the increment.
+    """
+    trials = []
+    ctx = {}
+
+    def _cold(F):
+        return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1),
+                         force_tol=force_tol, oob_window=oob_window,
+                         dt_scale=dt_scale, pp_formulation=pp_formulation,
+                         max_iterations=max_iterations, tolerance=convergence_tol,
+                         max_disp_factor=None, staged=staged,
+                         tension_cutoff=tension_cutoff,
+                         min_slip_depth=min_slip_depth,
+                         ssr_exclude_mask=ssr_exclude_mask,
+                         tension_cap_by_elem=tension_cap_by_elem,
+                         tension_srf=tension_srf, elastic_mask=elastic_mask,
+                         suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                         k0=k0, fem_solver='newton', _prepared=prep,
+                         _nr_export=ctx)
+
+    def _record(F, verdict, iters, fevals, oob, maxu, kind, why=None):
+        trials.append({"F": float(F), "verdict": verdict, "iterations": int(iters),
+                       "nr_force_evals": int(fevals),
+                       "unbalanced_force_ratio": float(oob),
+                       "max_displacement": float(maxu), "ramp_step": kind,
+                       "exit_reason": why})
+
+    # --- the foot of the ramp: one cold solve, walked down if it does not stand --
+    F0 = float(F_min)
+    n_expand = 0
+    sol0 = _cold(F0)
+    _record(F0, sol0['verdict'], sol0['iterations'], sol0.get('nr_force_evals', 0),
+            sol0['unbalanced_force_ratio'], sol0['max_displacement'], 'cold',
+            sol0.get('exit_reason'))
+    while not sol0['converged']:
+        if F0 <= f_min_floor + 1e-9 or n_expand >= max_expand:
+            msg = (f"SSRM (ramp): the slope does not reach equilibrium even at "
+                   f"F = {F0:.2f} — it is unstable at or below this strength-"
+                   f"reduction factor (FS < {F0:.2f}).")
+            print(f"\n{msg}")
+            return {"converged": False, "error": msg, "FS": None, "trials": trials}
+        F0 = max(f_min_floor, F0 - f_adjust)
+        n_expand += 1
+        ctx = {}
+        sol0 = _cold(F0)
+        _record(F0, sol0['verdict'], sol0['iterations'],
+                sol0.get('nr_force_evals', 0), sol0['unbalanced_force_ratio'],
+                sol0['max_displacement'], 'cold', sol0.get('exit_reason'))
+
+    groups, pattern = ctx['groups'], ctx['pattern']
+    base_loads, oob_fn = ctx['base_loads'], ctx['oob_fn']
+    free_dofs, n_dof = ctx['free_dofs'], ctx['n_dof']
+    h_eps, u_el = ctx['h_eps'], ctx['u_elastic_scale']
+    disp_limit = ctx['disp_limit']
+    restrength = ctx['restrength']
+    u = ctx['u']
+
+    F_stands = F0
+    last_solution = sol0
+    dF = _RAMP_DF_INIT
+    n_steps, n_retries = 0, 0
+    total_iters = int(sol0['iterations'])
+    total_fevals = int(sol0.get('nr_force_evals', 0))
+    warm_iters = []
+    F_refused = None
+
+    if debug_level >= 1:
+        print("=== SSRM Analysis (Newton, monotonic ramp) ===")
+        print(f"  Foot of the ramp: F = {F0:.4f} stands "
+              f"({sol0['iterations']} iterations, cold)")
+
+    while True:
+        if cancel_check is not None and cancel_check():
+            break
+        F_try = F_stands + dF
+        if F_try > F_max + 1e-12:
+            # The ramp has carried the whole requested range. There is no failed
+            # step above it, so the answer is a lower bound, not a limit.
+            msg = (f"SSRM (ramp): the slope still stands at F = {F_stands:.4f}, the "
+                   f"top of the requested range — FS > {F_stands:.2f}. Raise F_max.")
+            print(f"\n{msg}")
+            return {"converged": False, "error": msg, "FS": None, "trials": trials,
+                    "last_solution": last_solution}
+
+        restrength(groups, F_try)
+        ok, u_try, it, fe, oob, _rel = _nr_equilibrate(
+            groups, pattern, u, base_loads, free_dofs, n_dof, h_eps, force_tol,
+            oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
+            label=f"ramp F={F_try:.4f}")
+        total_iters += it
+        total_fevals += fe
+        maxu = float(np.max(np.abs(u_try))) if u_try.size else 0.0
+        # The SAME admissibility standard a converged bisection trial passes: force
+        # equilibrium under the tolerance, and a state the small-strain model can
+        # represent.
+        admissible = bool(ok) and oob < force_tol and (
+            disp_limit is None or maxu <= disp_limit)
+        why = ('converged' if admissible else
+               'displacement_limit' if (ok and oob < force_tol) else
+               'diverging')
+        _record(F_try, 'CONVERGED' if admissible else 'FAILED', it, fe, oob, maxu,
+                f'step dF={dF:.5f}', why)
+
+        if admissible:
+            u = u_try
+            for grp in groups:
+                grp['_u'] = u
+            _nr_commit_plastic_strain(groups)
+            F_stands = F_try
+            n_steps += 1
+            warm_iters.append(it)
+            if it <= _NR_COMFORT:
+                dF = min(_RAMP_DF_INIT, dF * _RAMP_DF_GROW)
+            if debug_level >= 1:
+                print(f"    F = {F_stands:.4f} carried in {it} iterations "
+                      f"(oob {oob:.2e}, max|u| {maxu:.4g})")
+            if progress_callback is not None:
+                try:
+                    progress_callback(
+                        min(1.0, (F_stands - F0) / max(1e-9, F_max - F0)),
+                        f"ramp F={F_stands:.3f}")
+                except Exception:
+                    pass
+        else:
+            # Reject the step and retry from the SAME converged state at half the
+            # increment. Nothing was committed, so there is nothing to undo but the
+            # strengths, which the next attempt overwrites.
+            F_refused = F_try
+            n_retries += 1
+            if debug_level >= 1:
+                print(f"    F = {F_try:.4f} refused ({why}, {it} iterations, "
+                      f"oob {oob:.2e}, max|u| {maxu:.4g}); halving dF to "
+                      f"{dF / 2:.5f}")
+            dF *= 0.5
+            if dF < _RAMP_DF_MIN:
+                break
+
+    # The limit: the last strength carried, with the refused step above it.
+    FS = round(F_stands / _RAMP_RESOLUTION) * _RAMP_RESOLUTION
+    if FS > F_stands + 1e-12:          # never report ABOVE what was carried
+        FS -= _RAMP_RESOLUTION
+    restrength(groups, F_stands)
+    if debug_level >= 1:
+        print(f"  Ramp limit: {F_stands:.4f} carried, {F_refused:.4f} refused "
+              f"-> FS = {FS:.4f} ({n_steps} steps, {n_retries} retries, "
+              f"{total_iters} iterations, {total_fevals} force evaluations)")
+    return {
+        "converged": True,
+        "FS": float(FS),
+        "last_solution": last_solution,
+        "iterations_ssrm": n_steps,
+        "final_interval": (float(F_stands), float(F_refused)),
+        "interval_width": float(F_refused - F_stands),
+        "failed_edge_softened": None,
+        "trials": trials,
+        "inconclusive": [],
+        "note": None,
+        "failure_criterion": "newton_ramp",
+        "method": "SSRM — monotonic strength-reduction ramp (Newton)",
+        # Ramp accounting, read by the spike's measurement harness.
+        "ramp_steps": n_steps,
+        "ramp_retries": n_retries,
+        "ramp_iterations": total_iters,
+        "ramp_force_evals": total_fevals,
+        "ramp_warm_iterations": warm_iters,
+        "ramp_foot": float(F0),
+        "ramp_last_carried": float(F_stands),
+        "ramp_first_refused": float(F_refused),
     }
 
 
@@ -7371,7 +7638,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                elastic_materials=None,
                suction_phi_b=None, suction_cap=None,
                capture_failure_state=True, capture_max_iterations=None,
-               capture_margin=0.15, early_failure=True, fem_solver=None):
+               capture_margin=0.15, early_failure=True, fem_solver=None,
+               ssrm_driver='bisection'):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -7894,7 +8162,42 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 "does not stand under its own weight with this initial stress, so "
                 "FS < 1. The bisection runs without a carried in-situ state.")
 
-    if failure_criterion in ("non_convergence", "hybrid"):
+    # ---- SSRM driver switch (INTERNAL, spike; see SPIKE.md, "RAMP") ---------
+    # 'bisection' is the default and the definition of every locked factor of
+    # safety; it falls straight through and nothing below it changes. 'ramp' is
+    # the monotonic strength-reduction continuation, and it exists only on the
+    # Newton per-trial driver — there is no viscoplastic warm start to continue.
+    _driver = str(ssrm_driver or 'bisection').strip().lower()
+    if _driver not in ('bisection', 'ramp'):
+        raise ValueError(
+            f"Unknown ssrm_driver {ssrm_driver!r}. Supported: 'bisection' "
+            "(default) and 'ramp'.")
+    if _driver == 'ramp':
+        if resolve_fem_solver(fem_solver) != 'newton':
+            raise ValueError(
+                "ssrm_driver='ramp' requires fem_solver='newton'. The ramp warm-"
+                "starts each strength step from the previous step's converged "
+                "state, which the viscoplastic driver does not carry.")
+        if failure_criterion not in ("non_convergence", "hybrid"):
+            raise ValueError(
+                f"ssrm_driver='ramp' does not run failure_criterion="
+                f"'{failure_criterion}'. Its verdict is force equilibrium plus the "
+                "Newton displacement bound, which is the hybrid/non-convergence "
+                "question.")
+        result = _ssrm_ramp_newton(
+            fem_data_trials, F_min, F_max, prep=prep, force_tol=force_tol,
+            convergence_tol=convergence_tol, max_iterations=max_iterations,
+            oob_window=oob_window, dt_scale=dt_scale,
+            pp_formulation=pp_formulation, staged=staged,
+            tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
+            ssr_exclude_mask=ssr_exclude_mask,
+            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
+            elastic_mask=elastic_mask, suction_phi_b=suction_phi_b,
+            suction_cap=suction_cap, k0=k0, f_adjust=f_adjust,
+            f_min_floor=f_min_floor, max_expand=max_expand,
+            debug_level=debug_level, progress_callback=progress_callback,
+            cancel_check=cancel_check)
+    elif failure_criterion in ("non_convergence", "hybrid"):
         # Same driver, same trials — 'hybrid' only changes how a NON-CONVERGED
         # trial's verdict is read (see classify_nonconvergence).
         result = _ssrm_displacement_limit(

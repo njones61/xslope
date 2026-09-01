@@ -2513,3 +2513,86 @@ reinforcement line — blank in one, "geosynthetic" in the other — which nothi
 the FEM path reads. The tables in "REINFORCEMENT — results" and "THE COHESIONLESS
 SOLVE — results" both present five reinforced rows; they are FOUR distinct models,
 with the geogrid sample measured twice under two file names.
+
+
+## THE ADAPTIVE PREDICTOR — the three-layer row, and the criterion for closing it
+
+Written after the adjudication and BEFORE any remedy code, so that what follows is
+a test and not a description. Same machine and settings as everything above:
+`force_tol` 1e-3, hybrid criterion, `capture_failure_state=False`, tolerance 0.01,
+tri6.
+
+### The defect, restated from what is already measured
+
+On the three-layer reinforced model the Newton bisection reads **1.1641**. The
+adjudication certified that the slope STANDS at F = 1.2063 — an admissible field in
+equilibrium with full gravity, confirmed by an independent referee and reached by a
+4-iteration Newton solve seeded from the viscoplastic-with-cutoff state — so 1.1641
+is about 0.045 low. The legal reference answer on this model is **1.2109**, the
+viscoplastic bisection with the Rankine cutoff on; the shipped viscoplastic 1.2391
+is inflated by fields carrying up to 729 psf of tension in a zero-cohesion soil and
+is NOT the target.
+
+The mechanism is documented in "THE COHESIONLESS SOLVE": a trial near but below the
+true limit needs a developed plastic zone that Newton cannot grow from a zero start,
+and the viscoplastic predictor supplies it. What fails is the SHAPE of the predictor
+budget. It is a fixed ladder, `_NR_VP_PREDICTOR_ITERS = (250, 1000)`, and on this
+model six fixed budgets up to 32,000 iterations all failed at F = 1.225 while a
+CONVERGED-state seed succeeded in a handful of iterations. A fixed ladder cannot
+express "run until this walk has finished", which is what the seed on this model
+needs.
+
+### The direction
+
+Two changes, and both are to the PREDICTOR only. The return map, the residual, the
+force gate, the displacement bound and the yield reading are untouched, so the
+verdict stays entirely the corrector's.
+
+1. **Adaptive budget instead of a fixed ladder.** Continue the viscoplastic
+   predictor while it is making measurable progress, with a hard ceiling so a
+   genuinely failing trial still exits promptly. The progress test is not invented
+   here: `_still_progressing` is the viscoplastic driver's OWN budget-extension
+   rule, already calibrated and already in the file — the residual's trailing-window
+   mean falling by at least 1% against the window before it, OR a displacement field
+   standing still on evidence the failure classifier cannot rule on. Handing the
+   predictor a small chunk and a large ceiling makes that rule the predictor's
+   stopping rule. Whether it tracks what the CORRECTOR needs is a measurement, and
+   it is made below before the rule is adopted.
+
+2. **The predictor runs with tension capped.** The adjudication showed the trap: on
+   a c = 0 material a psi = 0 flow rule cannot relieve a tensile mean stress, so the
+   viscoplastic predictor freezes with Gauss points hundreds of psf outside a cone
+   through the origin. The corrector's yield gate protects the verdict from such a
+   state, but a seed deep in illegal territory is a poor seed — measured: at
+   F = 1.1875 the plain predictor's converged state has a 26.6 psf violation and the
+   corrector takes it in 5 iterations; at F = 1.20 the violation is 169.1 psf and the
+   corrector fails. Running the predictor under a Rankine cutoff (T = 0) keeps the
+   seed admissible. Whether it seeds BETTER is a measurement, and it is made below.
+
+### Success criterion (verbatim)
+
+- **Three-layers Newton bisection FS within 0.01 of 1.2109** (the legal reference),
+  and the trial at F = 1.2063 (or the nearest bisection trial below it) converges —
+  the certified-standing state must be reachable.
+- **The ramp agrees with the fixed bisection within 0.01 on three-layers.**
+- **The other three reinforced benchmarks are unchanged within 0.01**: the geogrid
+  sample, half capacity, and the geogrid locked mesh — and the locked mesh must stay
+  EXACTLY on 1.5609, because it is the showcase.
+- **The plain-soil eight-row table does not move.** Every row reported; no row moves
+  more than 0.01, and the predictor-fire count is asserted ZERO on the cohesive
+  plain-soil rows, where the answer must therefore be bit-identical.
+- **The probes still hold.** nu = 0.49 and the FEM-1 past-failure trials at F = 2, 3
+  and 5 are unchanged, and a past-failure trial does not regress in cost by more
+  than about 1.5x — the ceiling plus the progress test must exit it cheaply rather
+  than burn the ceiling every time.
+- **The locks catch it.** `test/nr_ssrm_check.py`'s cohesionless lock is extended
+  with the three-layer case, which must FAIL on the driver as it stands today
+  (bisection 1.1641, the F = 1.2063 trial refused) and pass after — the mutation run
+  both ways and recorded — and the whole check must pass.
+- **The default path is unchanged**, against the standard control: Griffiths & Lane
+  6 dry with no `fem_solver` argument, FS 2.421875 on iteration counts 147, 781,
+  3393, 2031, 2841, 9541, 12000, 8617, 8777.
+- **An honest negative is a valid outcome and must be written.** If the adaptive
+  budget only reaches 1.2109 by turning every failing trial into a whole
+  viscoplastic solve, or if the capped predictor buys the three-layer row and costs
+  the locked mesh, that is the result.

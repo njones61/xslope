@@ -5716,6 +5716,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 # a two-vector return at the sextant corners and a return to the tensile apex.
 
 _FEM_SOLVER_ENV = "XSLOPE_FEM_SOLVER"
+# The environment override announces itself once per process. A stale shell
+# variable would otherwise silently recompute every factor of safety in a session
+# on the non-default driver, and the run would look exactly like a default run.
+_FEM_SOLVER_ENV_ANNOUNCED = False
 
 
 def resolve_fem_solver(fem_solver=None):
@@ -5725,13 +5729,30 @@ def resolve_fem_solver(fem_solver=None):
     ``XSLOPE_FEM_SOLVER``, then to 'viscoplastic'. The environment hook exists so
     a whole benchmark run can be flipped without touching a call site; an
     explicit argument always wins over it.
+
+    When the ENVIRONMENT — and not an explicit argument — is what selects a
+    non-default driver, one warning line is printed per process. The explicit
+    argument path stays silent: a caller that named the solver knows which one it
+    asked for, while a shell variable left over from an earlier session does not
+    announce itself any other way.
     """
+    global _FEM_SOLVER_ENV_ANNOUNCED
+    from_env = False
     if fem_solver is None:
-        fem_solver = os.environ.get(_FEM_SOLVER_ENV) or "viscoplastic"
+        env_value = os.environ.get(_FEM_SOLVER_ENV)
+        from_env = bool(env_value)
+        fem_solver = env_value or "viscoplastic"
     key = str(fem_solver).strip().lower()
     if key in ("vp", "viscoplastic", "griffiths", "default"):
         return "viscoplastic"
     if key in ("nr", "newton", "newton-raphson", "newton_raphson"):
+        if from_env and not _FEM_SOLVER_ENV_ANNOUNCED:
+            _FEM_SOLVER_ENV_ANNOUNCED = True
+            print(f"\n*** {_FEM_SOLVER_ENV}={fem_solver!r} is set in the environment: "
+                  f"every FEM/SSRM solve in this process runs on the NON-DEFAULT "
+                  f"'newton' driver, and its factors of safety are NOT the locked "
+                  f"viscoplastic ones. Unset {_FEM_SOLVER_ENV} to restore the "
+                  f"default. ***\n")
         return "newton"
     raise ValueError(
         f"Unknown fem_solver {fem_solver!r}. Supported: 'viscoplastic' (default) "

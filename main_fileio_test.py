@@ -1,13 +1,8 @@
+from xslope.fileio import load_slope_data, print_dictionary
 
-from xslope.fileio import load_slope_data
-
-filepath = "docs/inputs/slope/input_template_MASTER5.xlsx"  # Replace with full path if needed
+# A reinforced model, so the dump covers materials, profile lines, polygons,
+# piezometric data and reinforcement lines rather than just the geometry.
+filepath = "docs/inputs/slope/xslope_reinf.xlsx"
 slope_data = load_slope_data(filepath)
 
-for key, value in slope_data.items():
-    print(f"\n=== {key} ===")
-    if isinstance(value, list):
-        for item in value:
-            print(item)
-    else:
-        print(value)
+print_dictionary(slope_data)

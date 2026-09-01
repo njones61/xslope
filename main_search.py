@@ -1,5 +1,3 @@
-from xslope.global_config import non_circ
-
 from xslope.fileio import load_slope_data
 from xslope.plot import plot_circular_search_results, plot_noncircular_search_results
 from xslope.solve import oms, bishop, spencer, janbu, corps, lowe, mprice

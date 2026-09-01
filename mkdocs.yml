@@ -140,7 +140,6 @@ nav:
     - FEM: api/fem.md
     - File I/O: api/fileio.md
     - Generators: api/generators.md
-    - Global Config: api/global_config.md
     - Mesh: api/mesh.md
     - Plot: api/plot.md
     - Plot FEM: api/plot_fem.md

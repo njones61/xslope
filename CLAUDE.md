@@ -51,7 +51,6 @@ python main_seep2d.py         # Test 2D seep analysis
 - **`plot.py`**: Visualization functions for slopes, slices, and results. Contains `plot_solution()` and `plot_inputs()`.
 - **`seep.py`**: Seepage analysis integration with finite element mesh data.
 - **`mesh.py`**: Finite element mesh handling and interpolation functions.
-- **`global_config.py`**: Configuration variables and constants.
 
 ### Data Flow
 

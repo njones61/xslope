@@ -11,8 +11,6 @@
 #                    material standard deviations (mat sheet cols L-Q) in the input.
 import numpy as np
 import math
-from xslope.global_config import non_circ
-
 from shapely.geometry import Polygon
 from xslope.fileio import load_slope_data, build_ground_surface_from_polygons
 from xslope.mesh import build_polygons

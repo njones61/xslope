@@ -14,7 +14,6 @@
 
 import xslope as xslope
 
-from xslope.global_config import non_circ
 from xslope.slice import generate_slices
 from xslope.fileio import load_slope_data, load_data_from_pickle
 from xslope.plot import plot_circular_search_results, plot_inputs, plot_solution

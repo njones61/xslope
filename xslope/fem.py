@@ -3494,20 +3494,43 @@ _OOB_TREND_MIN = 0.01          # the later window must be this much lower (1%)
 # loop samples every `_HYBRID_SAMPLE_EVERY` iterations, and once it is unambiguous
 # there is nothing left to learn from the remaining iterations.
 #
-# What makes this safe is where the thresholds sit. Every candidate test was
-# measured pass-by-pass on 45 strength-reduction trials — 24 that reached
-# equilibrium and 21 that did not — drawn from five complete bisection walks on two
-# models (an embankment at two mesh sizes, a reinforced slope under two bar rules,
-# and one of those at a deliberately small budget). NEAR the critical strength the
-# two sides of the bracket are not separable: a trial that reaches equilibrium can
-# grow past five times its elastic response, sit with a flat residual for thousands
-# of iterations, and then converge. So the two tests below are placed OUTSIDE that
-# region entirely — at levels no trial that reached equilibrium was observed to
-# come near (the closest came within a factor of 3.0 of the first and 1.59 of the
-# second). They therefore catch only the gross runaways, about half of the failing
-# trials, and leave the near-critical ones to spend their budget as before. That is
-# the deliberate trade: the factor of safety is decided by the near-critical trials,
-# and nothing here is allowed to touch them.
+# The thresholds were calibrated pass-by-pass on 45 strength-reduction trials — 24
+# that reached equilibrium and 21 that did not — drawn from five complete bisection
+# walks on two models (an embankment at two mesh sizes, a reinforced slope under two
+# bar rules, and one of those at a deliberately small budget). NEAR the critical
+# strength the two sides of the bracket are not separable: a trial that reaches
+# equilibrium can grow past five times its elastic response, sit with a flat
+# residual for thousands of iterations, and then converge. The intent of the levels
+# below is therefore to sit OUTSIDE that region, catching only the gross runaways —
+# about half of the failing trials — and leaving the near-critical ones to spend
+# their budget as before.
+#
+# CORRECTED 2026-08-31. This comment used to state the margin as a fact about the
+# rule: that the levels sit where no trial that reached equilibrium was observed to
+# come near, "the closest came within a factor of 3.0 of the first and 1.59 of the
+# second". That is a property of the calibration set, not of the rule, and it does
+# not survive contact with a model outside it.
+#
+# Measured this session on Griffiths & Lane 1 at quad9, mesh size 3.5, force
+# tolerance 1e-3. The trial at F = 1.3875 is closed HERE as 'runaway', at 23,861
+# iterations, with max|u| at 8.0002 times its elastic response — the level, to four
+# figures. Re-run with early_failure=False and one 400,000-iteration budget, the
+# same trial on the same mesh reaches equilibrium: 72,580 iterations, out-of-balance
+# 9.998e-4 against the 1e-3 tolerance, max|u| = 0.5689 m on a 50 m model, which is
+# 1.14% of its height and 10.03 times the elastic response.
+#
+# So `u_max` = 8.0 does not sit outside the equilibrating trials' range on this
+# model; it sits INSIDE the displacement path of one of them, at 80% of where that
+# trial finally settles. The margin is not a factor of 3, it is negative, and the
+# rule has a demonstrated false-positive mode: it can close a trial that would have
+# stood. The two neighbours are closed the same way (F = 1.390625 at 15,231
+# iterations, F = 1.396875 at 9,241, both at 8.00 times elastic).
+#
+# The rule is left EXACTLY as calibrated. Every locked and published factor of
+# safety in this repository is defined by it, and moving it would move them; that is
+# the owner's call, not a comment's. What changes here is only the claim: this is a
+# threshold with a known false-positive mode near the critical strength, not a
+# threshold with a proven margin.
 #
 # Both are measured in the trial's OWN elastic displacement, so the rule carries to
 # any model and any mesh without retuning.

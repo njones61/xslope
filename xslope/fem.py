@@ -4329,13 +4329,53 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             raise NotImplementedError(
                 "fem_solver='newton' does not run staged loading. Run this model "
                 "on the default viscoplastic solver.")
-        return _solve_fem_newton(
-            fem_data, F, prep, c_reduced=c_reduced, phi_reduced=phi_reduced,
+        _nr_kw = dict(
+            c_reduced=c_reduced, phi_reduced=phi_reduced,
             elastic_by_elem=elastic_by_elem, t_cap_by_elem=t_cap_by_elem,
             pp_formulation=pp_formulation, force_tol=force_tol,
             min_slip_depth=min_slip_depth, max_iterations=max_iterations,
             max_disp_factor=max_disp_factor, _nr_export=_nr_export,
             debug_level=debug_level, progress_callback=progress_callback)
+        _sol = _solve_fem_newton(fem_data, F, prep, **_nr_kw)
+        # The viscoplastic predictor (see _NR_VP_PREDICTOR_ITERS). Only a trial that
+        # died at the LOAD-STEP FLOOR is retried — a trial that reached full gravity
+        # and was refused on force or on displacement has an answer already, and
+        # re-deriving it from a different starting state would be re-litigating a
+        # verdict rather than reaching one.
+        if (_nr_export is None and _NR_VP_PREDICTOR_ITERS
+                and not _sol["converged"] and _sol.get("exit_reason") == 'diverging'):
+            for _budget in _NR_VP_PREDICTOR_ITERS:
+                _vp = solve_fem(
+                    fem_data, F=F, debug_level=0, max_iterations=_budget,
+                    tolerance=tolerance, max_disp_factor=None,
+                    tension_cutoff=tension_cutoff, staged=staged,
+                    dt_scale=dt_scale, pp_formulation=pp_formulation,
+                    force_tol=force_tol, oob_window=oob_window,
+                    early_exit=early_exit, min_slip_depth=min_slip_depth,
+                    ssr_exclude_mask=ssr_exclude_mask,
+                    tension_cap_by_elem=tension_cap_by_elem,
+                    tension_srf=tension_srf, elastic_mask=elastic_mask,
+                    suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                    _prepared=prep, fast_kernel=fast_kernel,
+                    failure_criterion=failure_criterion,
+                    max_iterations_ceiling=_budget, early_failure=False,
+                    fem_solver='viscoplastic')
+                _retry = _solve_fem_newton(
+                    fem_data, F, prep,
+                    _nr_seed=(_vp["displacements"], _vp["plastic_strains"]),
+                    **_nr_kw)
+                # Work is CUMULATIVE: the failed cold attempt, every predictor run
+                # and every corrector are all charged to this trial, so no cost is
+                # hidden by the retry succeeding.
+                _retry["iterations"] += _sol["iterations"]
+                _retry["nr_force_evals"] += _sol["nr_force_evals"]
+                _retry["nr_predictor_iterations"] = (
+                    _sol.get("nr_predictor_iterations", 0)
+                    + int(_vp.get("iterations", 0)))
+                _sol = _retry
+                if _sol["converged"]:
+                    break
+        return _sol
 
     if debug_level >= 1:
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
@@ -6277,6 +6317,35 @@ _NR_TANGENT_H = 1e-7       # strain perturbation for the algorithmic tangent
 # which is for experiments, not for runs whose answers are quoted.
 _NR_DISP_FACTOR = 0.1
 
+# The viscoplastic predictor. A trial that dies at the load-step floor is retried
+# once per budget here: a bounded viscoplastic run at the SAME strength on the SAME
+# prepared model supplies a displacement field and, more to the point, a plastic
+# strain field, and the Newton iteration corrects that instead of walking the load
+# path from zero.
+#
+# It exists because the Newton driver's difficulty on a cohesionless soil is the
+# plastic HISTORY and not the equilibrium. Measured on the reinforced specimen
+# (docs/fem/files/xslope_reinforce_fem.xlsx, softening unset, tri6/2.0), F = 1.3:
+# from zero the driver fails at every load increment down to the 1/64 floor, and
+# does so after 18,914 iterations when the per-increment cap and the no-progress
+# watch are both lifted, carrying 3% of gravity. Handed a 200-iteration
+# viscoplastic state it reaches full gravity in 27 Newton iterations at an
+# out-of-balance of 3.7e-7. The root was always there and always Newton-attracting;
+# load control from a zero start could not reach it.
+#
+# What this is NOT is a fallback to the viscoplastic verdict. The predictor's own
+# convergence is never read — it runs with `early_failure=False` and is stopped by
+# its budget, not by a verdict — and the answer is decided entirely by whether the
+# Newton corrector reaches full gravity in equilibrium and passes the same force and
+# displacement gates every other trial passes. A trial that is genuinely past
+# failure gets a predictor state that is running away, and the corrector refuses it.
+#
+# Two rungs, because a state near the limit needs a longer walk than one well below
+# it. The measured need on the specimen is 100 iterations at F = 1.3 and 50 at
+# F = 1.5; the rungs are set well above that and the second exists for the trials
+# that sit hard against the limit.
+_NR_VP_PREDICTOR_ITERS = (250, 1000)
+
 
 def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
                     force_tol, oob_fn, nr_max_iter, u_elastic_scale,
@@ -6425,7 +6494,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                       force_tol, min_slip_depth, max_iterations,
                       max_disp_factor=None, _nr_export=None,
                       debug_level=0, progress_callback=None,
-                      nr_max_iter=_NR_MAX_ITER, nr_min_step=_NR_MIN_STEP):
+                      nr_max_iter=_NR_MAX_ITER, nr_min_step=_NR_MIN_STEP,
+                      _nr_seed=None):
     """One strength-reduction trial by Newton-Raphson (SPIKE; see SPIKE.md).
 
     Returns the same result dictionary solve_fem returns, so the SSRM bisection
@@ -6564,6 +6634,21 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
 
     ext_norm = float(np.linalg.norm(base_loads[free_dofs]))
     u = np.zeros(n_dof)
+    # A seeded start (see _NR_VP_PREDICTOR_ITERS): the plastic strain field and the
+    # displacements come from a bounded viscoplastic run at this same strength, on
+    # this same prepared model, so the load path is already walked and this call has
+    # only to correct it. `plastic_strains` carries the same quantity on both
+    # drivers — eps^p per Gauss point, [ex, ey, gxy, ez], with
+    # sigma = D (B u - eps^p) — which is what makes the hand-over meaningful rather
+    # than a shared array name.
+    if _nr_seed is not None:
+        u_seed, ep_seed = _nr_seed
+        u = np.asarray(u_seed, dtype=float)[:n_dof].copy()
+        for grp in groups:
+            ep = np.empty_like(grp['ep'])
+            for k, (e, gp) in enumerate(grp['pairs']):
+                ep[k] = ep_seed[e][gp]
+            grp['ep'] = ep
     lam = 0.0
     dlam = float(_NR_INIT_STEP)
     total_iterations = 0
@@ -6587,7 +6672,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     rel_du = 0.0
 
     while lam < 1.0 - 1e-12:
-        step = min(dlam, 1.0 - lam)
+        # A seeded trial does not walk the load path — the predictor already did,
+        # and cutting the load below full gravity from a state that stands at full
+        # gravity would be solving a different problem. It is one attempt at the
+        # whole load, and it either corrects the seed or the trial has failed.
+        step = 1.0 - lam if _nr_seed is not None else min(dlam, 1.0 - lam)
         lam_try = lam + step
         f_ext = lam_try * base_loads
 
@@ -6623,6 +6712,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             if debug_level >= 2:
                 print(f"    NR increment to {lam_try:.4f} failed after {it} "
                       f"iterations; cutting to {dlam:.5f}")
+            if _nr_seed is not None:
+                converged = False
+                exit_reason = 'diverging'
+                u = u_try
+                break
             if dlam < nr_min_step:
                 converged = False
                 exit_reason = 'diverging'
@@ -6857,6 +6951,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             "apex": int(sum(int(np.count_nonzero(g['_branch'] == _NR_APEX))
                             for g in groups)),
         },
+        # Whether this trial was solved from a viscoplastic predictor's state
+        # rather than from zero, and how many predictor iterations it cost (see
+        # _NR_VP_PREDICTOR_ITERS). Zero on every trial the driver solves on its own,
+        # which is every trial that does not fail at the load-step floor.
+        "nr_predictor_iterations": 0,
         "nr_load_steps": n_steps,
         "nr_step_cuts": n_cuts,
         "nr_step_iterations": step_iters,
@@ -8609,6 +8708,13 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "diverging_iteration": sol.get("diverging_iteration"),
             "ee_suppressed": bool(sol.get("early_exit_suppressed", False)),
             "iterations": int(sol.get("iterations", 0)),
+            # Newton-only, and zero on the viscoplastic driver: the constitutive
+            # work actually done (see the note at `nr_force_evals`), and the
+            # viscoplastic predictor iterations the trial was charged (see
+            # `_NR_VP_PREDICTOR_ITERS`). Both are here so a run's total work can be
+            # read off the trial record rather than re-derived.
+            "nr_force_evals": int(sol.get("nr_force_evals", 0) or 0),
+            "nr_predictor_iterations": int(sol.get("nr_predictor_iterations", 0) or 0),
         })
         return sol
 

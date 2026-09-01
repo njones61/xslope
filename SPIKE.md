@@ -1874,3 +1874,382 @@ bisection and eight plain-soil benchmarks is what the criterion below asks.
 - **An honest negative is a valid outcome and must be written.** If the
   conditioning buys the specimen and costs the plain-soil table, or if it needs a
   schedule tuned per model, that is the result.
+
+
+### THE COHESIONLESS SOLVE — results
+
+Same machine and settings as the criterion above. Every number below was measured
+on this checkout in this session; the "before" columns are the driver with the
+remedy switched off, re-run here rather than quoted, and they reproduce the
+figures recorded earlier in this document to the digit.
+
+#### The remedies the criterion named, and why two of them were not built
+
+**Apex tangent conditioning — not applicable, measured.** The probes put the apex
+branch at a mean of 3.0 Gauss points out of 6,303 over the 592 tangent re-forms of
+the specimen trial. Conditioning three points changes nothing.
+
+**Smoothed Mohr-Coulomb (Abbo & Sloan) — not applicable, measured.** The hyperbolic
+approximation rounds the apex and the deviatoric corners. The apex fires at three
+points and the corner branches do not execute at all on this model — zero right
+corners and zero left corners at every trial measured. Smoothing a surface where
+the solver is not is not a remedy; it would only change the answer.
+
+**Tangent conditioning, generalized — BUILT, MEASURED, AND REJECTED.** The rank
+deficiency is not at the apex, it is at every yielding point, so the honest version
+of the same idea is to condition every plastic tangent: blend it toward the elastic
+operator, `(1 - beta) D_ep + beta D_e`, which restores the missing rank without
+touching the return map or the residual. One step of it is spectacular — at the
+specimen state the accepted step goes from 0.994 of the current residual to 0.301.
+A whole solve is not. With beta pinned and the per-increment cap raised to 400,
+the F = 1.3 trial still carries no load at any setting tried:
+
+| beta | 0 (as shipped) | 0.02 | 0.05 | 0.1 | 0.2 | 0.4 | 1.0 (initial stiffness) |
+|---|---|---|---|---|---|---|---|
+| F = 1.3 | FAILED, 599 | FAILED, 499 | FAILED, 524 | FAILED, 720 | FAILED, 1,033 | FAILED, 1,786 | FAILED, 4,195 |
+| F = 1.5 | FAILED, 261 | FAILED, 673 | FAILED, 520 | FAILED, 747 | FAILED, 1,138 | FAILED, 1,824 | — |
+
+Run adaptively — beta raised when the line search cannot take a step worth having
+and decayed when it can — it was worse than useless: it saturated at the elastic
+operator and turned the F = 1.45 trial, which the shipped driver converges in 73
+iterations, into a failure. It is not in the code. What it bought was the
+measurement above, which says the problem is not the conditioning of the tangent.
+
+#### What the problem actually is
+
+Three measurements, in the order they were made.
+
+**More iterations do not fix it.** With the per-increment cap raised to 6,000 and
+the no-progress watch lifted entirely, the F = 1.3 trial runs 18,914 Newton
+iterations and carries **3% of gravity** — two increments of a sixty-fourth each,
+and then it cannot take a third. It is not a stall that a budget closes.
+
+**The root exists and Newton finds it in sixteen iterations, given the plastic
+strain field.** The viscoplastic driver reaches equilibrium at F = 1.3 on this mesh
+in 1,679 iterations. Seeded with that displacement field AND its accumulated
+plastic strain — the same quantity on both drivers, `eps^p` per Gauss point with
+`sigma = D (B u - eps^p)` — the Newton iteration corrects it at FULL gravity in
+**16 iterations and 55 force evaluations, to an out-of-balance of 2.7e-5**, 36
+times inside the trial tolerance. At F = 1.45 the same hand-over costs 17
+iterations and lands at 1.2e-8.
+
+**A short predictor is enough, and the shorter the better where it works.** Bounded
+viscoplastic runs, then the corrector, on the locked mesh:
+
+| predictor iterations | 50 | 100 | 200 | 400 | 800 | 1,600 |
+|---|---|---|---|---|---|---|
+| F = 1.3, corrector | fails | 45 it, oob 8.8e-8 | 27 it, 3.7e-7 | 17 it, 4.5e-8 | 11 it, 8.0e-9 | 14 it, 2.7e-6 |
+| F = 1.5, corrector | 44 it, 3.9e-7 | 40 it, 1.1e-7 | 37 it, 7.3e-8 | 29 it, 2.9e-5 | 22 it, 5.7e-5 | 14 it, 2.0e-5 |
+
+So the Newton driver's difficulty on a cohesionless soil is the plastic HISTORY and
+not the equilibrium. Load control from a zero start has to discover that history by
+walking gravity up in increments, and with c = 0 that walk is obstructed — the
+elastic domain is a cone through the origin, so the yield check is scale-free and a
+smaller load increment does not make a smaller plastic problem. The equilibrium
+itself was never hard.
+
+#### What was built
+
+`_NR_VP_PREDICTOR_ITERS` in `xslope/fem.py`, and a seeded entry to
+`_solve_fem_newton`. A trial that dies at the LOAD-STEP FLOOR — and only that
+trial; one refused on force or on displacement has an answer already — is retried
+from a bounded viscoplastic run at the same strength on the same prepared model.
+The seeded trial does not walk the load path: it is one attempt at full gravity,
+and it either corrects the seed or the trial has failed. Two rungs, 250 and 1,000.
+
+It is not a fallback to the viscoplastic verdict. The predictor runs with
+`early_failure=False` and is stopped by its budget rather than by a verdict; its
+own convergence is never read. The answer is decided entirely by whether the Newton
+corrector reaches full gravity in equilibrium and passes the same force gate, the
+same displacement bound and the same yield reading every other trial passes. Work
+is cumulative — the failed cold attempt, every predictor run and every corrector
+are all charged to the trial — and `nr_predictor_iterations` reports what the
+predictor cost. `nr_force_evals` and `nr_predictor_iterations` now travel in the
+bisection's trial record, so a run's work is readable from the record.
+
+#### The five reinforced benchmarks
+
+Brackets 1.2-1.8 (geogrid, FEM-2, locked), 1.1-1.7 (half capacity), 1.0-1.6 (three
+layers); tolerance 0.01. The viscoplastic column was re-measured here — it reads
+about one bisection cell above the reinforcement round's figures on every row,
+which is the bracket and not the driver, and the comparison below is like for like
+because both columns come from the same runs.
+
+| Case | Mesh | VP FS | N-R before | N-R after | gap after | gap before | ramp after |
+|---|---|---|---|---|---|---|---|
+| Geogrid sample | tri6, 4 | 1.5984 | 1.6078 | 1.6078 | **+0.0094** | +0.0094 | 1.6031 |
+| FEM-2 tutorial | tri6, 4 | 1.5984 | 1.6078 | 1.6078 | **+0.0094** | +0.0094 | 1.6031 |
+| Half capacity | tri6, 4 | 1.4141 | 1.4141 | 1.4141 | **0.0000** | 0.0000 | 1.4031 |
+| Three layers | tri6, 4 | 1.2391 | 1.1172 | 1.1641 | **-0.0750** | -0.1219 | 1.0531 |
+| Geogrid LOCKED | tri6, 2 | 1.5609 | 1.2719 | **1.5609** | **0.0000** | -0.2875 | 1.5469 |
+
+**The locked mesh — the case this round was commissioned on — now agrees with the
+viscoplastic driver EXACTLY, trial for trial and verdict for verdict**, on all
+eight trials of the bisection. It was 0.2875 low. Four of the five rows are inside
+the 0.01 tolerance; one is not, and it is the subject of the honest negative below.
+
+One thing the round found while measuring rather than by looking for it: the
+"geogrid sample" and "FEM-2 tutorial" benchmarks are the same model. The two files
+differ only in a cosmetic `type` label on each reinforcement line — same materials,
+same profile lines, same six layers — and they mesh to the same 563 elements and
+solve to the same factor of safety on the same trial sequence, iteration for
+iteration, on both drivers. The reinforcement round's table reports them as two
+benchmarks; they are one, measured twice.
+
+The pre-remedy driver on the locked mesh does not merely give the wrong answer. Run
+trial by trial it produces max|u| = 3.8e9 on a 34 m model at F = 1.8, and a full
+pre-remedy bisection on that mesh aborts the process inside OpenBLAS partway
+through. With the predictor the same bisection runs clean.
+
+#### The refinement ladder
+
+The geogrid sample at three mesh sizes, verdict and Newton iterations at each
+strength. Before and after:
+
+| Mesh | elements | F = 1.2 | F = 1.4 | F = 1.5 | F = 1.55 | F = 1.6 | F = 1.7 |
+|---|---|---|---|---|---|---|---|
+| tri6, 4 — before | 563 | CONV 17 | CONV 21 | CONV 28 | — | CONV 46 | — |
+| tri6, 4 — after | 563 | CONV 17 | CONV 21 | CONV 28 | CONV 66 | CONV 46 | FAIL 565 |
+| tri6, 3 — before | 978 | CONV 21 | CONV 158 | CONV 39 | — | FAIL 921 | — |
+| tri6, 3 — after | 978 | CONV 21 | CONV 158 | CONV 39 | CONV 52 | FAIL 1,140 | FAIL 726 |
+| tri6, 2 — before | 2,101 | CONV 39 | **FAIL 880** | **FAIL 261** | **FAIL 628** | FAIL 58 | — |
+| tri6, 2 — after | 2,101 | CONV 39 | CONV 897 | CONV 300 | CONV 665 | FAIL 135 | FAIL 738 |
+
+Every rung is monotone in F — everything below the limit converges and everything
+above it fails — and the three rungs now agree with each other on where the limit
+is, which they did not before. The finest mesh, which used to be the broken one, is
+the one that brackets the limit most tightly.
+
+#### The plain-soil eight rows
+
+Newton bisection, every row re-measured. The "before" column is the same driver
+with the predictor switched off, re-run in this session: on the four rows checked
+against it, it reproduces the recorded iteration and force-evaluation counts
+exactly — FEM-1 at 1,485 / 10,680, Griffiths & Lane 1 quad8 at 1,688 / 11,592,
+Griffiths & Lane 6 dry tri6 at 2,791 / 19,209 and quad8 at 3,026 / 20,135 — so the
+predictor-off path is the shipped driver and not an approximation of it.
+
+| Benchmark | Mesh | VP FS | N-R before | N-R after | move |
+|---|---|---|---|---|---|
+| FEM-1 tutorial | tri6, 3.5 | 1.3633 | 1.3711 | 1.37109375 | **0.0000** |
+| LEM-3 tutorial | tri6, 1.2 | 1.2539 | 1.2695 | 1.26953125 | **0.0000** |
+| Griffiths & Lane 1 | quad8, 3.5 | 1.3656 | 1.3719 | 1.37187500 | **0.0000** |
+| Griffiths & Lane 1 | tri6, 3.5 | 1.3656 | 1.3656 | 1.36562500 | **0.0000** |
+| Griffiths & Lane 1 | quad9, 3.5 | 1.3844 | 1.3969 | 1.39687500 | **0.0000** |
+| Griffiths & Lane 6 dry | quad8, 2 | 2.4219 | 2.4186 | 2.41562500 | **-0.0030** |
+| Griffiths & Lane 6 dry | tri6, 2 | 2.4531 | 2.4531 | 2.45937500 | **+0.0063** |
+| Griffiths & Lane 3, r = 0.8 | tri6, 6 | 1.4219 | 1.4281 | 1.42812500 | **0.0000** |
+
+Six of the eight are unchanged to every digit recorded. Two moved, by one bisection
+cell each and both inside the 0.01 tolerance. The tri6 dry-dam row is the one this
+document already flagged as sitting on a knife edge: its deciding trial,
+F = 2.45625, converges or fails on the last bit of the mantissa, and widening the
+no-progress window moves it to the same 2.4594 the predictor moves it to.
+
+#### The predictor's own knob
+
+Three schedules, seven benchmarks, one run each.
+
+| Benchmark | (250, 1000) — as shipped | (100,) | (500, 2000) |
+|---|---|---|---|
+| Geogrid coarse | 1.6078 | 1.6078 | 1.6078 |
+| Half capacity | 1.4141 | 1.4141 | 1.4141 |
+| Geogrid LOCKED | 1.5609 | 1.5703 | 1.5609 |
+| FEM-1 tutorial | 1.3711 | 1.3711 | 1.3711 |
+| Griffiths & Lane 1 quad8 | 1.3719 | 1.3719 | 1.3719 |
+| Griffiths & Lane 6 dry tri6 | 2.4594 | 2.4531 | 2.4594 |
+| **Three layers** | **1.1641** | **1.1172** | **1.1734** |
+
+Four rows do not move at all. Two move by one bisection cell at the shortest
+schedule and are inside 0.01 of the viscoplastic answer at every schedule. The
+three-layer row moves by 0.056, and that is a finding and not a tuning problem —
+see below.
+
+And where the predictor does not fire, it changes nothing at all: the locked mesh
+at F = 1.45, which the driver solves cold, returns 73 iterations and 422 force
+evaluations with the predictor on and with it off, and the two displacement fields
+are **bitwise identical**. Where it does fire, the state it produces passes the same
+evidence: F = 1.3 on the locked mesh converges at an out-of-balance of 1.7e-5 with
+a worst Mohr-Coulomb violation of 1.7e-15 of the local strength.
+
+#### Work
+
+Force evaluations, and the viscoplastic predictor iterations charged on top:
+
+| Benchmark | fe before | fe after | ratio | predictor iterations |
+|---|---|---|---|---|
+| FEM-1 tutorial | 10,680 | 13,492 | 1.26x | 3,750 |
+| Griffiths & Lane 1 quad8 | 11,592 | 14,904 | 1.29x | 3,750 |
+| Griffiths & Lane 6 dry tri6 | 19,209 | 22,231 | 1.16x | 7,500 |
+| Geogrid coarse | 11,368 | 13,321 | 1.17x | 2,500 |
+| Half capacity | 15,144 | 17,349 | 1.15x | 6,250 |
+| Three layers | 14,845 | 25,663 | 1.73x | 7,750 |
+
+The criterion asked for 1.2x. Two of the six clean rows miss it, at 1.26x and
+1.29x, and the three-layer row — where the predictor fires on nearly every trial and
+rescues none — costs 1.73x. The cost falls entirely on FAILING trials, which are
+the ones that now pay a cold attempt plus a predictor plus a corrector; a
+converging trial costs exactly what it cost before, to the force evaluation.
+
+#### The probes
+
+**Past failure.** FEM-1 at F = 2, 3 and 5 still fail, and still promptly: 399, 497
+and 303 Newton iterations, 3,073 / 3,458 / 2,453 force evaluations, 12 s, 14 s and
+10 s, each after both predictor rungs are exhausted. The predictor does not turn a
+grossly overloaded slope into a standing one — a state that is running away is not a
+state the corrector can equilibrate — which is the property the whole design rests
+on.
+
+**nu = 0.49.** Unchanged and untouched. Converged at F = 1.00, 1.30 and 1.36 in 11,
+12 and 12 iterations with 27, 29 and 30 force evaluations and ZERO predictor
+iterations — the same counts this document already records — and failed at F = 1.40
+and 1.50.
+
+**The default path.** Griffiths & Lane 6 dry, quad8, size 2, no `fem_solver`
+argument: FS = 2.421875 with per-trial iteration counts
+
+    147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777
+
+value for value the control sequence.
+
+#### The locks
+
+`test/nr_ssrm_check.py` gains `check_cohesionless_solve`, on the locked tri6/2.0
+mesh — the expensive one, because the defect is invisible at tri6/4.0 and only
+marginal at tri6/3.0. It asserts that F = 1.45 converges to an ADMISSIBLE field
+(worst yield violation under 1e-6 of the local strength), that F = 1.3 converges to
+force equilibrium with a stress field on the yield surface, and that F = 1.3's
+displacement is below F = 1.45's, since a stronger soil under the same gravity
+cannot move further.
+
+The middle assertion carries the whole argument without reference to the other
+driver: strength reduction only ever raises c and tan(phi) as F falls, so an
+admissible field in equilibrium with full gravity at F = 1.45 is admissible at
+every lower F under the same load, and the lower-bound theorem says the slope
+stands there.
+
+**Mutation, run both ways.** With `_NR_VP_PREDICTOR_ITERS` emptied — which is the
+driver exactly as it stood before this work — the check fails, and names what it
+found: "F = 1.3 came back FAILED (diverging, signal 'load_step_floor') after 599
+iterations at a load factor of 0.00, on a slope the SAME driver reports standing at
+F = 1.45 with a yield violation of 2.5e-15." As shipped it passes. The whole check
+file passes.
+
+#### The criterion, line by line
+
+**The five reinforced benchmarks — PARTLY MET.** Four of five agree with the
+viscoplastic driver inside 0.01, two of them exactly: the geogrid sample and the
+FEM-2 tutorial at +0.0094 (and they are the same model), half capacity at 0.0000,
+and the locked mesh at 0.0000 — trial for trial, from a gap of 0.2875. The three-layer
+variant misses at -0.0750, improved from -0.1219.
+
+**The refinement ladder — MET.** Clean at 563, 978 and 2,101 elements: no false
+failure at any strength on any rung, verdict monotone in F everywhere, and the
+three rungs agreeing with each other on the limit.
+
+**The plain-soil table — MET.** Six rows bit-identical, two moved by one bisection
+cell (-0.0030 and +0.0063), none by more than 0.01. Every row reported above.
+
+**The knob — PARTLY MET.** The answer does not move at all on four of the seven
+benchmarks tested across three predictor schedules, and moves by one bisection cell
+on two more, staying inside 0.01 of the viscoplastic answer at every schedule. It
+moves by 0.056 on the three-layer row. And the identity clause is met exactly:
+where the predictor does not fire the converged state is bitwise identical with it
+on and off.
+
+**Work — NOT MET.** 1.15x to 1.29x on the clean rows against a 1.2x requirement,
+1.73x on the three-layer row, plus 2,500 to 7,750 viscoplastic predictor iterations.
+All of it falls on failing trials; converging trials are unchanged to the force
+evaluation.
+
+**The probes — MET.** Past-failure verdicts unchanged and prompt; nu = 0.49
+unchanged, with the predictor never firing on it.
+
+**The locks — MET.** The new check fails on the driver as it stood and passes now,
+run both ways; the whole check file passes.
+
+**The default path — MET.** FS 2.421875 on the control iteration sequence.
+
+#### The honest negative: the three-layer model
+
+One row does not close, and the reason is measured rather than guessed.
+
+At F = 1.1875 the viscoplastic driver reaches equilibrium in 2,608 iterations, and a
+predictor long enough to include that convergence hands Newton a state it corrects
+in **5 iterations**. A predictor stopped at 1,000 or 2,000 iterations does not:
+the corrector fails at an out-of-balance of 1.8 and 4.6e-2. So on this model the
+seed has to be a CONVERGED viscoplastic state, not merely a well-developed one, and
+that is what makes the predictor budget a dial on this row and on no other.
+
+At F = 1.225 it is worse than a budget question. The viscoplastic driver converges
+there in 23,251 iterations at an out-of-balance of 9.99e-4 — just inside the 1e-3
+gate — and handed THAT state, fully converged, the Newton corrector still fails, at
+an out-of-balance of 3.7. Predictor budgets of 1,000, 2,000, 4,000, 8,000, 16,000
+and 32,000 iterations were each tried and each corrected to a different
+non-equilibrium state. **The viscoplastic converged state at that strength is not a
+root of the Newton residual, and there is no root near it.** That is a genuine
+disagreement between the two formulations about whether this slope stands at
+F = 1.225, not a solver budget, and closing it is a separate measurement about
+which of the two is right — the viscoplastic reading there is itself marginal, at
+an out-of-balance sitting on the tolerance after twenty-three thousand iterations.
+
+Raising the predictor budget until it always covers a viscoplastic convergence
+would move this row to about 1.20 rather than to 1.2391, and it would make every
+failing Newton trial cost a whole viscoplastic trial — which is to say it would
+turn the Newton driver into the viscoplastic driver with a polish. That is why the
+budget is 250 and 1,000 and not the trial's own iteration ceiling.
+
+#### Verdict
+
+The Newton driver is ready for reinforced and general c = 0 questions on the meshes
+the corpus is written on, with one model's worth of caveat.
+
+The case the round was commissioned on is closed completely. The geogrid sample at
+its locked mesh went from 0.2875 below the viscoplastic answer to exactly it, on
+every one of the eight bisection trials, and the refinement ladder that used to
+degrade monotonically — clean at 563 elements, marginal at 978, broken at 2,101 —
+is now clean at all three rungs with the three of them agreeing on where the limit
+is. The plain-soil table did not move: six of eight rows are bit-identical and the
+other two moved by one bisection cell. The default path is untouched.
+
+And the diagnosis in the reinforcement round was wrong, which matters more than the
+fix. It named the Mohr-Coulomb apex, where the consistent tangent is zero. The apex
+fires at three Gauss points out of 6,303. What is actually degenerate is every
+yielding point — on a linear yield surface without hardening the trial-to-returned
+Jacobian has determinant `1 - A - Bc`, and `A + Bc = 1` identically, so a whole line
+of trial states maps to one returned state and the consistent tangent has a null
+direction wherever a point yields. That is the constitutive law and not a defect,
+and conditioning it away does not help: blending the tangent toward the elastic
+operator was built and measured at seven settings from 0.02 to the elastic operator
+itself, and the specimen trial fails at every one of them. Nor does the vendors'
+documented workaround: a token cohesion of 5 or 10 psf moves the false failures to
+different strengths and leaves the verdict sequence non-monotone at both.
+
+What was actually wrong is that the Newton driver had to discover the plastic strain
+field by walking gravity up from zero, and with c = 0 that walk is obstructed —
+the elastic domain is a cone through the origin, so a smaller load increment is not
+a smaller plastic problem. Eighteen thousand iterations carry 3% of gravity. Two
+hundred viscoplastic iterations, and the same Newton iteration lands the whole load
+in twenty-seven. The equilibrium was never the hard part.
+
+What remains, in the order it matters:
+
+- **The three-layer model.** The two drivers genuinely disagree there at F = 1.225,
+  and no predictor budget closes it: the viscoplastic converged state at that
+  strength is not a root of the Newton residual. Which of the two is right is a
+  measurement nobody has made, and it is the one place in this branch where the
+  answer still depends on a solver setting.
+- **The cost of a failing trial.** A trial that fails now pays a cold attempt, a
+  predictor and a corrector — 1.15x to 1.29x the force evaluations on the clean
+  benchmarks plus 2,500 to 7,750 viscoplastic iterations. Skipping the cold attempt
+  on a model that has already needed the predictor once would recover most of that
+  and was not done this round.
+- **The ramp still walks its own steps cold.** It gets the predictor only at the
+  foot of the ramp, which is why it reads 1.5469 against the bisection's 1.5609 on
+  the locked mesh — closer than the 1.2406 it read before, and still its own
+  answer. A refused ramp step is the same load-step-floor failure the bisection
+  retries, and it should be retried the same way.
+- **Post-peak softening is still refused**, so neither of the repository's published
+  reinforced factors of safety is reachable on this driver. That is unchanged by
+  this round and is the larger of the two things standing between the Newton path
+  and a reinforced answer anyone would quote.

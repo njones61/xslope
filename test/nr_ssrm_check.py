@@ -190,6 +190,7 @@ def run():
     failures += check_unsupported_features_refuse()
     failures += check_reinforcement_refusals()
     failures += check_reinforcement()
+    failures += check_cohesionless_solve()
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
 
@@ -795,6 +796,86 @@ def check_reinforcement():
     return fails
 
 
+def check_cohesionless_solve():
+    """A cohesionless base must not manufacture failures at strengths that stand.
+
+    The reinforcement sample at its LOCKED tri6/2.0 mesh — 2,101 elements — over a
+    lower material with c = 0, phi = 37. This is the case that broke the Newton
+    driver (SPIKE.md, "THE COHESIONLESS SOLVE"): from a zero start the driver could
+    not carry any part of gravity at F = 1.3, refusing the load at every increment
+    down to the 1/64 floor, while converging at F = 1.2 below it and F = 1.45 above
+    it. A verdict sequence that goes stands / fails / stands is wrong however the
+    physics is read.
+
+    Three assertions, and the middle one is the one the fix has to earn:
+
+      * F = 1.45 converges. It is what makes the F = 1.3 verdict falsifiable without
+        any reference to the other driver: strength reduction only ever RAISES c and
+        tan(phi) as F falls, so an admissible stress field at F = 1.45 in equilibrium
+        with full gravity is admissible at every lower F with the same load, and the
+        lower-bound theorem then says the slope stands there. Its own yield-violation
+        reading is asserted, because that is what makes the field admissible rather
+        than merely converged.
+      * F = 1.3 converges, to force equilibrium AND with a stress field on the yield
+        surface. On the driver before the viscoplastic predictor this comes back
+        FAILED at a load factor of 0.00 after 599 iterations, so the check fails
+        there — which is the point of it.
+      * ... and it converges to a state BELOW F = 1.45's, since a stronger soil under
+        the same load cannot move further. A trial that passed the first two by
+        finding some other equilibrium would not pass this.
+
+    The mesh is the expensive one on purpose. The defect is invisible at tri6/4.0,
+    marginal at tri6/3.0 and decisive here, so a cheaper mesh would lock nothing.
+    """
+    fails = []
+    fd = _reinf_fem_data(target_size=2.0)
+    if len(fd['elements']) < 1500:
+        return [f"the cohesionless specimen meshed to {len(fd['elements'])} elements, "
+                f"too coarse to carry the defect this check exists for"]
+
+    above = _newton(fd, 1.45)
+    if not above['converged']:
+        return fails + [
+            f"F = 1.45 on the cohesionless specimen came back {above['verdict']} "
+            f"({above.get('exit_reason')}); it is the converged upper trial the whole "
+            f"lower-bound argument below rests on, so nothing else here can be read"]
+    if above['nr_max_yield_violation'] > 1e-6:
+        fails.append(
+            f"F = 1.45 converged with a worst yield violation of "
+            f"{above['nr_max_yield_violation']:.3e} of the local strength; the "
+            f"lower-bound argument needs an ADMISSIBLE field, not just an "
+            f"equilibrated one")
+
+    below = _newton(fd, 1.3)
+    if not below['converged']:
+        fails.append(
+            f"F = 1.3 came back {below['verdict']} ({below.get('exit_reason')}, "
+            f"signal {below.get('diverging_signal')!r}) after {below['iterations']} "
+            f"iterations at a load factor of {below.get('nr_load_factor', 0.0):.2f}, "
+            f"on a slope the SAME driver reports standing at F = 1.45 with a yield "
+            f"violation of {above['nr_max_yield_violation']:.1e}. Strength reduction "
+            f"only raises c and tan(phi) as F falls, so that field stands at 1.3 too: "
+            f"this is the solver refusing a load the slope carries.")
+    else:
+        if below['unbalanced_force_ratio'] >= 1e-3:
+            fails.append(
+                f"F = 1.3 is reported CONVERGED at an out-of-balance of "
+                f"{below['unbalanced_force_ratio']:.3e}, at or above the 1e-3 force "
+                f"tolerance")
+        if below['nr_max_yield_violation'] > 1e-6:
+            fails.append(
+                f"F = 1.3 is reported CONVERGED with a worst yield violation of "
+                f"{below['nr_max_yield_violation']:.3e} of the local strength: the "
+                f"stress field is outside the surface it is meant to lie on")
+        if below['max_displacement'] > above['max_displacement']:
+            fails.append(
+                f"F = 1.3 converged to max|u| = {below['max_displacement']:.4g}, "
+                f"further than F = 1.45's {above['max_displacement']:.4g}. A stronger "
+                f"soil under the same gravity cannot move more; the two trials have "
+                f"not found the same solution branch.")
+    return fails
+
+
 def check_env_override_announces_itself():
     """A stale XSLOPE_FEM_SOLVER may not redefine the default in silence.
 
@@ -851,7 +932,9 @@ def main():
           "the loading path nor the step control changes a verdict, Hoek-Brown, "
           "power-curve, suction, softening-bar and pile models are refused by "
           "name, a reinforced bisection lands on its measured strength with every "
-          "bar force inside the capacity its embedment develops, and the "
+          "bar force inside the capacity its embedment develops, a cohesionless "
+          "base does not manufacture a failure at a strength the driver's "
+          "own converged answer above it proves standing, and the "
           "environment override cannot swap the driver in silence. The monotonic "
           "ramp reaches the same limit along one warm-started history, reports it "
           "on the bisection's midpoint convention, and never solves past it.")

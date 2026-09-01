@@ -70,6 +70,11 @@ SD_RATIO = 3        # D1/D -- the spacing the diagnostic is stated at
 
 def _slope_data(with_pile, head_fixity='free'):
     sd = load_slope_data(DONOR)
+    # The donor is RS2-1 and declares an isotropic at-rest initial stress
+    # (main!D16, K0 = 1) that RS2 solved its SSR under. It belongs to that
+    # problem alone, so it is cleared here rather than riding into files whose
+    # own analysis is authored without one (benchmarks/tag_k0.py).
+    sd['k0'] = None
     m = sd['materials'][0]
     m.update(name='Soil', c=10.0, phi=20.0, gamma=20.0, gamma_sat=20.0,
              option='mc', u='none', ru=0.0, E=E_SOIL, nu=NU_SOIL, t_cut=None)

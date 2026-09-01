@@ -3373,6 +3373,18 @@ def _mat_tensile_cap_missing(ctx):
         if phi <= 0:
             what = ("without limit -- with φ = 0 the Mohr-Coulomb cone has no apex, "
                     "so nothing bounds the tensile stress the material can carry")
+        elif c <= 0:
+            # The apex bound is 0 here, but a blank t_cut is NOT equivalent to a
+            # no-tension material: the viscoplastic flow rule (ψ = 0) is purely
+            # deviatoric, so it cannot relieve mean stress, and a zone pulled into
+            # tension freezes there while the convergence measure still falls to
+            # zero. The solver then reports a converged state that carries tension
+            # a cohesionless soil cannot hold, and the factor of safety reads high.
+            # Only the Rankine cutoff (t_cut = 0) actually removes the tension.
+            what = ("that the solver cannot shed: with c = 0 any tensile stress is "
+                    "outside the yield surface, but the flow rule cannot relieve "
+                    "it, so a zone pulled into tension is carried as if the soil "
+                    "gripped it and the factor of safety reads high")
         else:
             apex = c / math.tan(math.radians(phi)) if phi < 90 else 0.0
             what = (f"up to the Mohr-Coulomb cone apex, c/tan(φ) = {apex:.4g}, which "

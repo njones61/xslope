@@ -54,3 +54,20 @@ def donor_material(slope_data, **overrides):
     m.update({k: 0.0 for k in _SIGMA_KEYS})
     m.update(overrides)
     return m
+
+
+def load_donor(path):
+    """Load the ACADS donor for a GS-2 build, with its file-level run options dropped.
+
+    ``donor_material`` cleans what a copied MATERIAL dict drags along; this is the
+    same argument one level up. The donor is RS2-1, so it declares an isotropic
+    at-rest initial stress (``main!D16``, K0 = 1) that RS2 solved its SSR under. No
+    GS-2 row is a finite-element row, and none of these problems is authored at
+    K0 = 1, so an inherited K0 describes nothing here -- but it would ride into
+    thirteen files, and on any future FEM row it would silently change the answer.
+    Cleared at the door, where the elastic constants and the sigmas are cleared.
+    """
+    from xslope.fileio import load_slope_data
+    sd = load_slope_data(path)
+    sd['k0'] = None
+    return sd

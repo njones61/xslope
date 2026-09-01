@@ -1278,13 +1278,53 @@ class _AgentWorker(QThread):
 
     def _system_message(self):
         # Anthropic prompt caching: a content block carrying cache_control. The
-        # large skill prompt then bills at cache-read rates on repeat turns.
+        # large skill prompt then bills at cache-read rates on repeat turns. The
+        # one-hour TTL covers the gaps a person leaves between turns while they
+        # read a result or edit the model; the default five minutes did not.
         # Plain string for other providers (a list-content system can 400 there).
         if self._cache_system:
             return {"role": "system", "content": [
                 {"type": "text", "text": self._system,
-                 "cache_control": {"type": "ephemeral"}}]}
+                 "cache_control": {"type": "ephemeral", "ttl": "1h"}}]}
         return {"role": "system", "content": self._system}
+
+    @staticmethod
+    def _with_cache_mark(msg):
+        """A copy of ``msg`` carrying a cache_control mark on its last block.
+
+        The mark goes on the LAST message of every request, so the cache prefix
+        walks forward with the conversation: each completion reads everything
+        before it at cache-read rates and writes only the new tail. The system
+        block alone was cached before, and on a long turn the history behind it
+        dwarfed the brief — the Anthropic console's "low cache hit rate" warning
+        was this. The shared history is never mutated (a mark left behind would
+        accumulate past the four-breakpoint limit and 400 the request).
+        """
+        mark = {"type": "ephemeral"}
+        role = msg.get("role")
+        content = msg.get("content")
+        if role == "user":
+            out = dict(msg)
+            if isinstance(content, list) and content:
+                blocks = list(content)
+                blocks[-1] = dict(blocks[-1], cache_control=mark)
+                out["content"] = blocks
+            elif isinstance(content, str) and content:
+                out["content"] = [{"type": "text", "text": content,
+                                   "cache_control": mark}]
+            return out
+        if role == "tool":
+            # LiteLLM carries a message-level mark onto the tool_result block.
+            return dict(msg, cache_control=mark)
+        return msg
+
+    def _request_messages(self):
+        """The message list for one completion: system first, history, with the
+        moving cache mark on the last message when the provider caches."""
+        msgs = [self._system_message()] + list(self._messages)
+        if self._cache_system and self._messages:
+            msgs[-1] = self._with_cache_mark(self._messages[-1])
+        return msgs
 
     def cancel(self):
         self._cancel.set()
@@ -1303,7 +1343,7 @@ class _AgentWorker(QThread):
                 if self._cancel.is_set():
                     break
                 resp = litellm.completion(
-                    messages=[self._system_message()] + self._messages,
+                    messages=self._request_messages(),
                     tools=self._tools, max_tokens=MAX_TOKENS, **self._kwargs)
                 # Every completion in the turn counts, not just the last: an
                 # agentic turn is a dozen of these, and the tool results between

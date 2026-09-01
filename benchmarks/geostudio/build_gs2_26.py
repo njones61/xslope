@@ -54,7 +54,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
-from _gs2_donor import donor_material  # noqa: E402
+from _gs2_donor import donor_material, load_donor  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -70,7 +70,7 @@ def gs2_26():
     """Baker (2001) planar-homogeneous slope, evaluated on the manual's
     critical plane (X = x/H = 0.85 through the toe). c'=30, phi'=30, gamma=20,
     dry, Mohr-Coulomb (manual Table 73)."""
-    sd = load_slope_data(ACADS_1A)
+    sd = load_donor(ACADS_1A)
     m = donor_material(sd)
     m.update(name='MC Material', c=30.0, phi=30.0, gamma=20.0, option='mc', u='none')
     sd['materials'] = [m]

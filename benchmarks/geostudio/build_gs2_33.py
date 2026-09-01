@@ -82,7 +82,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
-from _gs2_donor import donor_material  # noqa: E402
+from _gs2_donor import donor_material, load_donor  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -116,7 +116,7 @@ def gs2_33():
     """Priest (1993) rigid-block planar failure with a 15 m tension crack,
     25% water-filled. Single MC material c'=20, phi'=30, gamma=25 (Table 91).
     Manual: Janbu Simplified 1.049 (Priest / SLOPE/W), M-P 1.049 (SLOPE/W)."""
-    sd = load_slope_data(ACADS_1A)
+    sd = load_donor(ACADS_1A)
     m = donor_material(sd)
     m.update(name='Material 1', c=20.0, phi=30.0, gamma=25.0, option='mc', u='piezo')
     sd['materials'] = [m]

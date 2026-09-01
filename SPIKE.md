@@ -4169,3 +4169,53 @@ What remains, in the order it matters:
   mechanism is understood. Whether it ever moves a verdict is unmeasured; on the
   benchmarks here it did not, since that model's two drivers land 0.0055
   apart with both inside the lock.
+
+
+## MERGED FROM `main`, 2026-09-01
+
+`main` moved seven commits while this branch was being written, and three of them
+reach the Newton driver.
+
+**Two of the driver's eight refusals were refusals of things that no longer
+exist.** `pp_formulation` (49331fd2) and `staged` (e9615718) are gone from
+`solve_fem` and `solve_ssrm`: the effective-stress formulation is the only one,
+and there is one load stage. Git auto-merged `xslope/fem.py` without a textual
+conflict, which is the dangerous outcome rather than the safe one — the branch's
+Newton code went on calling a signature that had been deleted under it. The
+refusal table now reads:
+
+| Feature | Verdict |
+|---|---|
+| pile beam elements | refuses, names piles |
+| post-peak softening on reinforcement bars | refuses, names softening and counts the bars |
+| Hoek-Brown strength envelopes | refuses, names Hoek-Brown |
+| power-curve strength envelopes | refuses, names the power curve |
+| matric suction | refuses, names matric suction |
+| the Rankine tension cutoff | carried |
+| **K0 initial stress** | **carried** |
+| staged loading | no longer exists |
+| `pp_formulation` | no longer exists |
+
+Nothing in this document was measured under either keyword: no workbook and no
+test tag in the repository ever set one, so the removal changes no benchmark
+above. It shortens the list rather than the results.
+
+**K0 is in the corpus workbooks now** (1f34a0d, `main!D16` on 107 models, guarded
+by the new `tag_k0` suite row). The driver has carried K0 since 8a217d4c, so no
+code follows from it — but it changes what an experiment MEANS, which the K0 round
+already recorded: dropping a `k0=` test tag no longer turns the procedure off,
+because the loader supplies it. Every K0 leg on this branch passes `k0` as an
+explicit argument, so none of them was running the experiment it thought it was;
+the branch's own scripts were re-read to confirm that rather than assumed.
+
+The post-merge checks, all run in the worktree with its root first on `sys.path`
+and `xslope.__file__` asserted:
+
+| Check | Result |
+|---|---|
+| Default path: Griffiths & Lane 6 dry, quad8/2, no `fem_solver` | FS **2.421875**, per-trial iterations 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777 — value for value |
+| Griffiths & Lane 1, tri6/3.5, Newton bisection | FS **1.36562500**, 9 trials, 3,121 iterations, 22,650 force evaluations — value for value |
+| Three layers, `t_cut` = 0, tri6/4 | viscoplastic **1.2109375**, Newton **1.2109375** — value for value |
+| `vp017` (RS2-13), `k0 = 1` from the MERGED workbook, tri6/0.5, the tag's bracket | viscoplastic **1.336328125**, Newton **1.336328125**, 5,846 force evaluations — value for value, and 0.0043 from the published 1.332 against a tolerance of 0.02 |
+| `test/nr_ssrm_check.py` | passes end to end |
+| `python3 run_tests.py --preflight` | 31 passed, 0 failed |

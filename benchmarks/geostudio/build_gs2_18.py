@@ -60,7 +60,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
-from _gs2_donor import donor_material  # noqa: E402
+from _gs2_donor import donor_material, load_donor  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -74,7 +74,7 @@ CRIT_CIRCLE = {'Xo': 3.465515637162291, 'Yo': 5.664150600821959,
 def gs2_18():
     """Borges & Cardoso (2002) Case 2 geosynthetic-reinforced embankment on
     depth-varying soft clay (manual Table 55 / Figure 62 / Table 56)."""
-    sd = load_slope_data(ACADS_1A)
+    sd = load_donor(ACADS_1A)
     base = donor_material(sd)
 
     def mat(name, opt, c, phi, g, cp=0.0, r_elev=0.0):

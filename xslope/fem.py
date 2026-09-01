@@ -2971,7 +2971,6 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     F_gravity = build_gravity_loads(nodes, elements, element_types,
                                     element_materials, gamma_by_mat, k_seismic,
                                     fem_data=fem_data)
-    F_grav_pure = F_gravity.copy()
     for i in range(n_nodes):
         if bc_type[i] == 4:  # Force boundary condition
             dof_x = dof_offset[i] if dof_offset is not None else 2 * i
@@ -3372,7 +3371,6 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     return {
         "K_factor": K_factor,
         "F_gravity": F_gravity,
-        "F_grav_pure": F_grav_pure,
         "free_dofs": free_dofs,
         "n_free": n_free,
         "n_dof": n_dof,
@@ -3733,8 +3731,8 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
 
 
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e-3,
-              max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
-              pp_formulation='effective', force_tol=1e-3, oob_window=10,
+              max_disp_factor=0.1, tension_cutoff=False, dt_scale=1.0,
+              force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None, min_slip_depth=None,
               ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=None,
               elastic_mask=None,
@@ -3834,18 +3832,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             search filter (Slide2's "minimum depth"); the search-side twin lives in
             search.py. Off by default, so the reported FS is the true global minimum
             (surficial skin included) unless the caller opts in.
-        pp_formulation (str): How pore pressures enter the analysis.
-            'effective' (default): u is moved into the load vector
-            (K du = F_ext + int B^T m u dV) and the elastic stresses are
-            EFFECTIVE stresses directly. This is the standard effective-stress
-            formulation (Potts & Zdravkovic); under a flooded boundary it
-            yields sigma'_v = gamma'*z with compressive lateral stresses.
-            'total': legacy recipe — solve the total-stress elastic problem
-            and subtract u pointwise at Gauss points before the yield check.
-            With nu < 0.5 this produces a spurious effective-tension zone of
-            magnitude ~(1-2*nu)/(1-nu)*u at submerged boundaries (the lateral
-            elastic response to the water load is nu/(1-nu) of it while u
-            subtracts all of it), which yields and creeps indefinitely.
         tension_cutoff (bool): If True (default False), applies a RANKINE tension
             cutoff at T = 0 everywhere: the major principal (most-tensile) stress is
             capped at zero via a second viscoplastic yield surface F_t = sigma_1 - 0
@@ -3856,11 +3842,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             spirit to the tension cutoff used by commercial SSRM codes; Griffiths &
             Lane (1999) include no tension treatment. This is the T = 0 special case
             of the per-element cap below.
-        staged (bool): If True and the model has water loads (applied boundary
-            forces and/or pore pressures), solve in two stages: stage 1 applies
-            gravity only (dry), stage 2 adds the water loads and pore pressures,
-            continuing from the converged stage-1 state with accumulated
-            viscoplastic strains (construction history: built, then filled).
         dt_scale (float): Multiplier on the viscoplastic pseudo-timestep
             (research/diagnostic knob; default 1.0).
         progress_callback (callable or None): If given, called (throttled, ~every
@@ -3921,9 +3902,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 sigma'_v = -(soil column weight above the point) + u
                 sigma'_h = sigma'_z = k0 * sigma'_v   (in-plane AND out-of-plane)
                 tau_xy   = 0
-            (tension-positive; u is this stage's pore pressure, so a staged run
-            gets the dry state in stage 1 and the submerged one in stage 2). The
-            state is then carried through the classical initial-stress method --
+            (tension-positive; u is the model's pore pressure). The state is then
+            carried through the classical initial-stress method --
             sigma = sigma_0 + D (B u - evp), with int B^T sigma_0 dV moved to the
             right-hand side -- so the solver still ITERATES TO EQUILIBRIUM under the
             body forces from that starting point. Where sigma_0 already balances
@@ -3954,9 +3934,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             ratio and the hybrid criterion's history are all relative to the
             equilibrated configuration, while stresses and structural forces remain
             functions of the absolute displacement. Requires k0 and the same prepared
-            model and pore-pressure formulation the state was produced with; a staged
-            run is collapsed to a single stage, since the state already IS the
-            built-up end of the staging.
+            model the state was produced with.
         elastic_mask (array of bool or None): Per-element mask (length n_elements)
             marking elements that are PURE LINEAR ELASTIC — held out of the
             plastic-correction loop entirely. A True element accumulates no
@@ -4155,7 +4133,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 
     K_factor = prep["K_factor"]
     F_gravity = prep["F_gravity"]
-    F_grav_pure = prep["F_grav_pure"]
     free_dofs = prep["free_dofs"]
     n_free = prep["n_free"]
     dt = prep["dt"]
@@ -4196,11 +4173,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             raise ValueError("_init_state was given without k0; an equilibrated "
                              "initial state has no meaning without the K0 "
                              "formulation.")
-        if _init_state.get("pp_formulation") != pp_formulation:
-            raise ValueError(
-                f"_init_state was produced under pp_formulation="
-                f"'{_init_state.get('pp_formulation')}' but this solve uses "
-                f"'{pp_formulation}'; the two carry different stress conventions.")
         _init_evp = _init_state["evp"]
         _init_u = np.asarray(_init_state["u"], dtype=float)
         _sizes = [len(_sg['pairs']) for _sg in prep["gp_groups_static"]]
@@ -4209,11 +4181,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 "_init_state does not match this prepared model's Gauss-point "
                 "groups / degrees of freedom; the state must be produced on the "
                 "same prepared model.")
-        if staged:
-            # The carried state already IS the end of the staging sequence, so
-            # replaying stage 1 (dry, no reservoir) from it would apply that stage's
-            # loads to a state built under the later stage's.
-            staged = False
     # Displacement datum: the state displacements are measured FROM. Zero (the
     # default) leaves every measurement exactly as it was.
     u_datum = np.zeros(n_dof) if _init_u is None else _init_u
@@ -4332,14 +4299,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     grp['csph'] = np.cos(phi_r_new[e])
                     _nr_group_tension_cap(grp, tc_new)
             _nr_export['restrength'] = _restrength
-        if staged and (bool(np.any(bc_type == 4)) or prep["pp_option"] != "none"):
-            raise NotImplementedError(
-                "fem_solver='newton' does not run staged loading. Run this model "
-                "on the default viscoplastic solver.")
         _nr_kw = dict(
             c_reduced=c_reduced, phi_reduced=phi_reduced,
             elastic_by_elem=elastic_by_elem, t_cap_by_elem=t_cap_by_elem,
-            pp_formulation=pp_formulation, force_tol=force_tol,
+            force_tol=force_tol,
             min_slip_depth=min_slip_depth, max_iterations=max_iterations,
             max_disp_factor=max_disp_factor, _nr_export=_nr_export,
             k0=k0, _nr_init_state=_init_state,
@@ -4359,8 +4322,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 _vp = solve_fem(
                     fem_data, F=F, debug_level=0, max_iterations=_chunk,
                     tolerance=tolerance, max_disp_factor=None,
-                    tension_cutoff=tension_cutoff, staged=staged,
-                    dt_scale=dt_scale, pp_formulation=pp_formulation,
+                    tension_cutoff=tension_cutoff,
+                    dt_scale=dt_scale,
                     force_tol=force_tol, oob_window=oob_window,
                     early_exit=early_exit, min_slip_depth=min_slip_depth,
                     ssr_exclude_mask=ssr_exclude_mask,
@@ -4615,25 +4578,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         evp.append([np.zeros(4) for _ in range(n_gp)])
 
 
-    # ---- Step 9: Viscoplastic iteration loop (optionally staged) ----
-    # Staged loading: stage 1 applies gravity only (dry); stage 2 adds the
-    # water loads (applied boundary forces, e.g. reservoir pressure) and the
-    # pore-pressure field, continuing from the converged stage-1 state with
-    # accumulated viscoplastic strains. This follows construction history
-    # (dam built, then reservoir filled) and avoids the spurious effective-
-    # tension zone produced by one-shot gravity+water elastic loading.
-    water_present = bool(np.any(bc_type == 4)) or pp_option != "none"
-    # Per-stage SIGNED pore-pressure field for the suction option: dry in stage 1
-    # (no suction credited before the water is applied), the full signed field in
-    # stage 2. None when suction is inactive or the pp source carries no suction.
-    _sig_dry = ([[0.0] * len(g) for g in u_gp]
-                if (suction_active and u_gp_signed is not None) else None)
-    if staged and water_present:
-        u_gp_dry = [[0.0] * len(g) for g in u_gp]
-        stage_list = [(F_grav_pure, u_gp_dry, _sig_dry, 'stage 1: gravity (dry)'),
-                      (F_gravity, u_gp, u_gp_signed, 'stage 2: + water loads and pore pressures')]
-    else:
-        stage_list = [(F_gravity, u_gp, u_gp_signed, None)]
+    # ---- Step 9: Viscoplastic iteration loop ----
+    # Self weight, the applied boundary forces (e.g. reservoir pressure) and the
+    # pore-pressure field are all applied together, in one load stage.
+    stage_list = [(F_gravity, u_gp, u_gp_signed, None)]
 
     total_iterations = 0
     u = np.zeros(n_dof)
@@ -4692,15 +4640,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # equilibrium with gravity (level ground, K0 = nu/(1-nu)) the displacement
         # solution is ~0; on a slope it is not, and the iteration redistributes.
         #
-        # sigma_0 is EFFECTIVE and per stage:
+        # sigma_0 is EFFECTIVE:
         #     sigma'_v = -(soil overburden) + u        (u >= 0, tension-positive)
         #     sigma'_h = sigma'_z = K0 * sigma'_v      (in-plane AND out-of-plane)
         #     tau_xy   = 0
-        # so a staged run gets the dry K0 state in stage 1 and the submerged one in
-        # stage 2, matching the load vector each stage actually applies. Under the
-        # legacy 'total' formulation the stored addend is sigma_0 - u*m, because
-        # there the yield check adds u back pointwise; either way the EFFECTIVE
-        # initial stress is the same.
+        # matching the load vector the stage actually applies.
         F_sig0 = None
         if sv0_gp is not None:
             k0f = float(k0)
@@ -4711,25 +4655,22 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 sh_eff = k0f * sv_eff
                 z = np.zeros_like(sv_eff)
                 sig0 = np.stack([sh_eff, sv_eff, z, sh_eff], axis=1)
-                if pp_formulation != 'effective':
-                    sig0 = sig0 - np.stack([u_st, u_st, z, u_st], axis=1)
                 grp['sig0'] = sig0
                 contrib = np.einsum('gij,gi->gj', grp['B'], sig0[:, :3]) * grp['w'][:, None]
                 np.add.at(F_sig0, grp['dof'].ravel(), contrib.ravel())
 
-        if pp_formulation == 'effective':
-            # Effective-stress formulation: equilibrium of sigma_total =
-            # sigma_eff - u*m (tension-positive) gives
-            #   int B^T sigma_eff dV = F_ext + int B^T m u dV,
-            # so the pore-pressure term joins the load vector and D*B*u is the
-            # EFFECTIVE stress directly (no subtraction at the yield check).
-            F_u = np.zeros(n_dof)
-            for grp in gp_groups:
-                contrib = (grp['w'] * grp['u_gp'])[:, None] * (
-                    grp['B'][:, 0, :] + grp['B'][:, 1, :])
-                np.add.at(F_u, grp['dof'], contrib)
-                grp['u_gp'] = np.zeros_like(grp['u_gp'])
-            base_loads = base_loads + F_u
+        # Effective-stress formulation: equilibrium of sigma_total =
+        # sigma_eff - u*m (tension-positive) gives
+        #   int B^T sigma_eff dV = F_ext + int B^T m u dV,
+        # so the pore-pressure term joins the load vector and D*B*u is the
+        # EFFECTIVE stress directly (no subtraction at the yield check).
+        F_u = np.zeros(n_dof)
+        for grp in gp_groups:
+            contrib = (grp['w'] * grp['u_gp'])[:, None] * (
+                grp['B'][:, 0, :] + grp['B'][:, 1, :])
+            np.add.at(F_u, grp['dof'], contrib)
+            grp['u_gp'] = np.zeros_like(grp['u_gp'])
+        base_loads = base_loads + F_u
 
         # ---- The hybrid criterion's yardstick ----
         # `loads_grav` is this stage's APPLIED load — self weight, water, surcharge —
@@ -5269,9 +5210,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             # Convergence check: max|du| / max|u| < tolerance — Smith & Griffiths'
             # CHECON test (infinity norms), exactly as in p62.f90. The max-norm
             # matters: a small cluster of Gauss points sustaining benign localized
-            # creep (possible under pp_formulation='total', whose subtract-at-GP
-            # recipe leaves mild effective tension at submerged boundaries)
-            # produces a bounded per-iteration du measured against the GLOBAL
+            # creep produces a bounded per-iteration du measured against the GLOBAL
             # maximum displacement, so the ratio decays and the stable state is
             # accepted within the iteration ceiling. A true failure mechanism
             # keeps feeding the global du and stays above tolerance. False
@@ -5534,7 +5473,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
     if sv0_gp is not None:
         k0_state = {"u": u.copy(),
                     "evp": [grp['evp'].copy() for grp in gp_groups],
-                    "pp_formulation": pp_formulation,
                     "F": float(F), "converged": bool(converged)}
 
     # ---- Step 10: Compute final stresses, strains, plastic elements ----
@@ -5567,16 +5505,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
 
         stress_avg_tp4 /= n_gp
         u_elem_avg = sum(u_gp[elem_idx]) / len(u_gp[elem_idx]) if u_gp[elem_idx] else 0.0
-        if pp_formulation == 'effective':
-            # D*B*u is effective; report total stresses for output (legacy
-            # convention) and use the stresses as-is for the yield check.
-            stress_total_tp4 = stress_avg_tp4 - np.array(
-                [u_elem_avg, u_elem_avg, 0.0, u_elem_avg])
-            sig_eff4 = stress_avg_tp4
-        else:
-            stress_total_tp4 = stress_avg_tp4
-            sig_eff4 = stress_avg_tp4 + np.array(
-                [u_elem_avg, u_elem_avg, 0.0, u_elem_avg])
+        # D*B*u is effective; report total stresses for output (legacy
+        # convention) and use the stresses as-is for the yield check.
+        stress_total_tp4 = stress_avg_tp4 - np.array(
+            [u_elem_avg, u_elem_avg, 0.0, u_elem_avg])
+        sig_eff4 = stress_avg_tp4
         # compression-positive in-plane components for output; sig_vm = dsbar
         sig_x, sig_y = -stress_total_tp4[0], -stress_total_tp4[1]
         tau_xy = stress_total_tp4[2]
@@ -6461,10 +6394,9 @@ def _nr_group_sig0(grp, sg, prep, k0):
         sigma'_h = sigma'_z = K0 sigma'_v        (in-plane AND out-of-plane)
         tau_xy   = 0
 
-    Only the EFFECTIVE formulation is built here, because the Newton driver
-    refuses every other one; under 'effective' the pore-pressure term is already
-    in the load vector and D (B u - eps^p) is the effective stress directly, so
-    the initial stress is effective too and needs no correction.
+    The field is EFFECTIVE, as it is on the viscoplastic path: the pore-pressure
+    term is already in the load vector and D (B u - eps^p) is the effective stress
+    directly, so the initial stress is effective too and needs no correction.
 
     ``sig0`` is the full in-situ field and ``sig0_s`` is that field at the live
     LOAD FACTOR: the driver walks gravity in increments and the overburden IS
@@ -6933,7 +6865,7 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
 
 
 def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
-                      elastic_by_elem, t_cap_by_elem, pp_formulation,
+                      elastic_by_elem, t_cap_by_elem,
                       force_tol, min_slip_depth, max_iterations,
                       max_disp_factor=None, _nr_export=None,
                       debug_level=0, progress_callback=None,
@@ -7019,8 +6951,6 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # sigma_h = K0 sigma'_v, and the same in-situ pre-equilibration sequencing
     # through `_nr_init_state`. It arrives here as prep['sv0_gp'] plus the k0
     # argument, so nothing about the field's semantics is decided on this path.
-    if pp_formulation != "effective":
-        unsupported.append(f"pp_formulation='{pp_formulation}'")
     if unsupported:
         raise NotImplementedError(
             "fem_solver='newton' is a plain Mohr-Coulomb spike and does not "
@@ -7396,7 +7326,6 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     if groups and groups[0].get('sig0') is not None:
         nr_k0_state = {"u": u.copy(),
                        "evp": [g['ep'].copy() for g in groups],
-                       "pp_formulation": pp_formulation,
                        "F": float(F), "converged": bool(converged)}
     u_ratio = (max_disp / u_elastic_scale) if u_elastic_scale > 0 else None
     verdict = 'CONVERGED' if converged else 'FAILED'
@@ -7544,8 +7473,8 @@ _RAMP_DF_GROW = 1.6        # increment growth after a comfortable step
 
 
 def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_tol,
-                      max_iterations, oob_window, dt_scale, pp_formulation,
-                      staged, tension_cutoff, min_slip_depth, ssr_exclude_mask,
+                      max_iterations, oob_window, dt_scale,
+                      tension_cutoff, min_slip_depth, ssr_exclude_mask,
                       tension_cap_by_elem, tension_srf, elastic_mask,
                       suction_phi_b, suction_cap, k0, f_adjust, f_min_floor,
                       max_expand, max_iterations_ceiling=50000, early_failure=True,
@@ -7571,9 +7500,9 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
         # not the state at the limit the ramp just carried.
         return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1),
                          force_tol=force_tol, oob_window=oob_window,
-                         dt_scale=dt_scale, pp_formulation=pp_formulation,
+                         dt_scale=dt_scale,
                          max_iterations=max_iterations, tolerance=convergence_tol,
-                         max_disp_factor=None, staged=staged,
+                         max_disp_factor=None,
                          tension_cutoff=tension_cutoff,
                          min_slip_depth=min_slip_depth,
                          ssr_exclude_mask=ssr_exclude_mask,
@@ -7688,8 +7617,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                     fem_data, F=F_try, debug_level=0, max_iterations=_chunk,
                     max_iterations_ceiling=_ceiling, tolerance=convergence_tol,
                     max_disp_factor=None, tension_cutoff=tension_cutoff,
-                    staged=staged, dt_scale=dt_scale,
-                    pp_formulation=pp_formulation, force_tol=force_tol,
+                    dt_scale=dt_scale, force_tol=force_tol,
                     oob_window=oob_window, min_slip_depth=min_slip_depth,
                     ssr_exclude_mask=ssr_exclude_mask,
                     tension_cap_by_elem=tension_cap_by_elem,
@@ -8562,8 +8490,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                max_iterations=12000, max_iterations_ceiling=50000,
                convergence_tol=1e-3, max_disp_factor=0.1,
                failure_criterion="hybrid", n_sweep=10,
-               staged=False, tension_cutoff=False, char_point=None,
-               pp_formulation='effective', dt_scale=1.0, cancel_check=None,
+               tension_cutoff=False, char_point=None,
+               dt_scale=1.0, cancel_check=None,
                progress_callback=None,
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None,
@@ -9055,9 +8983,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         eq = solve_fem(
             fem_data_trials, F=1.0, debug_level=max(0, debug_level - 1),
             force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
-            pp_formulation=pp_formulation, max_iterations=max_iterations,
+            max_iterations=max_iterations,
             max_iterations_ceiling=max_iterations_ceiling,
-            tolerance=convergence_tol, max_disp_factor=None, staged=staged,
+            tolerance=convergence_tol, max_disp_factor=None,
             tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
             early_exit=True, ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
@@ -9126,7 +9054,6 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             fem_data_trials, F_min, F_max, prep=prep, force_tol=force_tol,
             convergence_tol=convergence_tol, max_iterations=max_iterations,
             oob_window=oob_window, dt_scale=dt_scale,
-            pp_formulation=pp_formulation, staged=staged,
             tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
@@ -9145,8 +9072,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             oob_window=oob_window, hybrid=(failure_criterion == "hybrid"),
             debug_level=debug_level, max_iterations=max_iterations,
             max_iterations_ceiling=max_iterations_ceiling,
-            convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
-            tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
+            convergence_tol=convergence_tol, max_disp_factor=None,
+            tension_cutoff=tension_cutoff, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
@@ -9163,7 +9090,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             debug_level=debug_level, max_iterations=max_iterations,
             max_iterations_ceiling=max_iterations_ceiling,
             convergence_tol=convergence_tol, max_disp_factor=max_disp_factor,
-            staged=staged, tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
+            tension_cutoff=tension_cutoff, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             f_adjust=f_adjust, f_min_floor=f_min_floor, f_max_ceiling=f_max_ceiling,
             max_expand=max_expand, grid=grid, min_slip_depth=min_slip_depth,
@@ -9179,7 +9106,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             oob_window=oob_window,
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, n_sweep=n_sweep,
-            tension_cutoff=tension_cutoff, char_point=char_point, pp_formulation=pp_formulation, dt_scale=dt_scale,
+            tension_cutoff=tension_cutoff, char_point=char_point, dt_scale=dt_scale,
             cancel_check=cancel_check, progress_callback=progress_callback,
             min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
@@ -9228,9 +9155,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             failure_solution = solve_fem(
                 fem_data_trials, F=F_fail, debug_level=max(0, debug_level - 1),
                 force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
-                pp_formulation=pp_formulation, max_iterations=cap_iters,
+                max_iterations=cap_iters,
                 max_iterations_ceiling=cap_iters, tolerance=convergence_tol,
-                max_disp_factor=None, staged=staged,
+                max_disp_factor=None,
                 tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
                 early_exit=False, early_failure=False,
                 ssr_exclude_mask=ssr_exclude_mask,
@@ -9271,8 +9198,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                               debug_level=0, max_iterations=500,
                               max_iterations_ceiling=50000,
                               convergence_tol=1e-3, max_disp_factor=0.1,
-                              staged=False, tension_cutoff=False,
-                 pp_formulation='effective',
+                              tension_cutoff=False,
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                  grid=None, min_slip_depth=None, ssr_exclude_mask=None,
@@ -9388,10 +9314,10 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     def _solve_at(F, step, prefix):
         return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1), force_tol=force_tol,
                          oob_window=oob_window,
-                         dt_scale=dt_scale, pp_formulation=pp_formulation,
+                         dt_scale=dt_scale,
                          max_iterations=max_iterations, tolerance=convergence_tol,
                          max_iterations_ceiling=max_iterations_ceiling,
-                         max_disp_factor=max_disp_factor, staged=staged,
+                         max_disp_factor=max_disp_factor,
                          tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
                          early_exit=(max_disp_factor is None),
                          ssr_exclude_mask=ssr_exclude_mask,
@@ -9648,7 +9574,6 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                                  debug_level=0, max_iterations=500,
                                  convergence_tol=1e-3, n_sweep=10,
                                  tension_cutoff=False, char_point=None,
-                 pp_formulation='effective',
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
@@ -9715,7 +9640,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
     def _get_max_vp_disp(F_val, progress_cb=None):
         """Run solve_fem; return the displacement measure (characteristic-point
         VP displacement, or global max before the point is selected)."""
-        sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1), dt_scale=dt_scale, pp_formulation=pp_formulation, force_tol=force_tol,
+        sol = solve_fem(fem_data, F=F_val, debug_level=max(0, debug_level-1), dt_scale=dt_scale, force_tol=force_tol,
                         oob_window=oob_window, min_slip_depth=min_slip_depth,
                         max_iterations=max_iterations, tolerance=convergence_tol,
                         max_disp_factor=early_term_factor,

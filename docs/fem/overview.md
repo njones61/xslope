@@ -378,8 +378,8 @@ it on at an elevation below the mesh, which states that the ground beyond is dry
 `u = piezo` when the file defines no piezometric line is refused on the same grounds: a model with
 no water is `u = none`.
 
-**How pore pressure enters the equilibrium.** With `pp_formulation="effective"` (the default) the
-total-stress statement $\int B^T (\sigma' - u\,m)\,dV = F_{ext}$, $m = [1, 1, 0, 1]^T$, is
+**How pore pressure enters the equilibrium.** The total-stress statement
+$\int B^T (\sigma' - u\,m)\,dV = F_{ext}$, $m = [1, 1, 0, 1]^T$, is
 rearranged so the pore-pressure term joins the load vector,
 
 >>$\int B^T \sigma'\, dV = F_{ext} + \int B^T m\, u\, dV$
@@ -387,11 +387,7 @@ rearranged so the pore-pressure term joins the load vector,
 and the stresses computed from the displacement solution are **effective stresses directly**.
 Physically the added load term converts the body force in submerged soil to its buoyant weight (plus
 seepage forces wherever $u$ is not hydrostatic), so all three effective stress components below a
-flooded boundary come out compressive and level flooded ground sits elastically at rest. The legacy
-alternative, `pp_formulation="total"` — solve the total-stress problem and subtract $u$ at each
-Gauss point before the yield check — leaves a spurious effective-tension zone of magnitude
-$\frac{1-2\nu}{1-\nu}u$ at submerged boundaries, which yields and creeps at any strength reduction
-factor.
+flooded boundary come out compressive and level flooded ground sits elastically at rest.
 
 ## K0 initial stress
 
@@ -452,13 +448,11 @@ so the only changes are one extra load term and one extra addend at the yield ch
 still **iterates to equilibrium under the body forces**; it simply starts from the $K_0$ state
 rather than from nothing.
 
-Three details follow from the definition:
+Two details follow from the definition:
 
 - The overburden is **soil only**. Surface tractions — a reservoir load, a distributed load, a
   footing — are not in-situ stress and are applied as boundary forces during the equilibrium
   iteration, where a load applied after the in-situ state belongs.
-- In a **staged** run the state is rebuilt per stage from that stage's pore pressure, so stage 1
-  gets the dry $K_0$ state and stage 2 the submerged one.
 - The compiled [fast kernel](#fast-kernel) has no slot for an initial stress, so a $K_0$ run always
   takes the NumPy reference path — the oracle, but slower.
 
@@ -601,11 +595,6 @@ failure criterion are calibrated jointly with it — see the warning on `dt_scal
 A **tension cutoff** is available as a second viscoplastic yield surface acting through the same
 mechanism; because it decides SSRM answers rather than ordinary stress analyses, it is described
 under [Tensile strength in the SSRM](#tensile-strength-in-ssrm).
-
-**Staged loading.** With `staged=True`, a model carrying water solves in two stages: gravity only
-(dry) first, then the water loads and pore pressures added on top of the converged stage-1 state
-with its accumulated viscoplastic strains — the construction history of a fill that was built and
-then filled.
 
 ### Convergence criterion
 
@@ -828,7 +817,7 @@ Its principal arguments:
 >  mesh height. The SSRM's default path disables it.<br>
 >- **`early_exit`** (default `True`): watch the residual for the no-progress plateau described
 >  above and report it. The plateau does not end the solve.<br>
->- **`k0`**, **`staged`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
+>- **`k0`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
 >  **`suction_phi_b`** / **`suction_cap`**: the options described in their own
 >  sections; all default to off or to what the input file declares.<br>
 >- **`debug_level`** (default 0): 0 silent, 1 summary, 2 per-iteration.
@@ -1009,7 +998,7 @@ Its principal arguments:
 >- **`dt_scale`** (1.0): multiplier on the viscoplastic pseudo-time step. **Do not lower it to make
 >  a model converge** — it shrinks the residual without making the slope any more stable, and can push
 >  a failing state under an absolute `force_tol`.<br>
->- **`pp_formulation`** (`"effective"`), **`k0`**, **`staged`**, **`min_slip_depth`**,
+>- **`k0`**, **`min_slip_depth`**,
 >  **`ssr_exclude`** / **`ssr_zone`**, **`tension_cutoff_by_material`** / **`tension_srf`**,
 >  **`elastic_materials`**, **`suction_phi_b`** / **`suction_cap`**: as described in
 >  their own sections.<br>

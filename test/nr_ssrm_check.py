@@ -191,6 +191,7 @@ def run():
     failures += check_reinforcement_refusals()
     failures += check_reinforcement()
     failures += check_cohesionless_solve()
+    failures += check_cohesionless_seed_depth()
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
 
@@ -604,16 +605,23 @@ def check_unsupported_features_refuse():
     return fails
 
 
-def _reinf_fem_data(path=None, target_size=REINF_SIZE, soften=False):
+def _reinf_fem_data(path=None, target_size=REINF_SIZE, soften=False,
+                    keep_lines=None):
     """A reinforced model, meshed with its reinforcement lines as constraints.
 
     ``soften=False`` unsets ``t_res`` on every line, which is the model's own
     "no post-peak drop" default and the law the Newton bar element implements:
     tension-only, elastic-perfectly-plastic at the capacity the embedment develops.
     ``soften=True`` leaves the file as it ships, which is what the guard refuses.
+
+    ``keep_lines`` is a slice of the reinforcement stack, 0-based, keeping only
+    those layers — a leaner reinforcement layout over the same soil.
     """
     from xslope.mesh import extract_constraint_line_geometry
     slope_data = load_slope_data(str(path or REINF_MODEL))
+    if keep_lines is not None:
+        _all = slope_data.get('reinforcement_lines', []) or []
+        slope_data['reinforcement_lines'] = [_all[i] for i in keep_lines]
     if not soften:
         for line in slope_data.get('reinforcement_lines', []) or []:
             line['t_res'] = float('nan')
@@ -873,6 +881,91 @@ def check_cohesionless_solve():
                 f"further than F = 1.45's {above['max_displacement']:.4g}. A stronger "
                 f"soil under the same gravity cannot move more; the two trials have "
                 f"not found the same solution branch.")
+    return fails
+
+
+# The three-layer variant of the reinforcement sample — the same soil and the same
+# six-layer geometry with only layers 1, 3 and 5 carrying capacity. It is the model
+# that needed the ADAPTIVE predictor rung (SPIKE.md, "THE ADAPTIVE PREDICTOR"): the
+# short fixed rungs rescue nothing on it, and the whole bisection sits 0.045 below
+# the strength an admissible field proves it carries.
+#
+# The deciding trial, and where the numbers come from. An independent referee sharing
+# no code with either driver certified this model standing at F = 1.20625 — a stress
+# field in equilibrium with full gravity and nowhere outside the Mohr-Coulomb surface
+# (SPIKE.md, "THE THREE-LAYER DISAGREEMENT"). It is the trial that decides the
+# bisection on the bracket 1.0-1.6: converge here and the answer is 1.2109, refuse it
+# and the answer is 1.1641.
+THREE_LAYER_KEEP = (0, 2, 4)
+THREE_LAYER_STANDS = 1.20625
+THREE_LAYER_FAILS = 1.215625
+
+
+def check_cohesionless_seed_depth():
+    """A seed has to be deep enough, and the model that proves it.
+
+    On the three-layer variant the plastic walk the corrector needs is twenty-odd
+    THOUSAND viscoplastic iterations long, so a predictor on a fixed budget cannot
+    reach it however the budget is chosen — six fixed budgets up to 32,000 were tried
+    and each corrected to a different non-equilibrium state. What closes it is a rung
+    that runs while the walk is still progressing and stops when it is not.
+
+    Two assertions, and neither refers to the other driver:
+
+      * F = 1.20625 converges to an ADMISSIBLE field — force equilibrium inside the
+        trial tolerance AND a stress field on the yield surface. That is a statically
+        admissible field in equilibrium with full gravity, so by the lower-bound
+        theorem the slope stands there, and the bisection that refuses it is 0.045
+        low. On the driver before the adaptive rung this comes back FAILED, which is
+        the point of the check.
+      * F = 1.215625, one bisection cell above it, still FAILS. The predictor is a
+        seed generator and never a verdict: if a longer walk could talk the corrector
+        into standing anywhere, this is where it would show.
+
+    The mesh is the coarse tri6/4.0 one on purpose. Unlike the locked-mesh check
+    above, the defect here is not a mesh-refinement effect — it is the length of the
+    plastic walk — so the cheap mesh carries it.
+    """
+    fails = []
+    fd = _reinf_fem_data(target_size=4.0, keep_lines=THREE_LAYER_KEEP)
+    n_cap = int(np.count_nonzero(
+        np.asarray(fd['t_allow_by_1d_elem']) > 1e-9))
+    if n_cap == 0:
+        return ["the three-layer specimen carries no bar with capacity, so nothing "
+                "here is a reinforced measurement"]
+
+    stands = _newton(fd, THREE_LAYER_STANDS)
+    if not stands['converged']:
+        fails.append(
+            f"F = {THREE_LAYER_STANDS} came back {stands['verdict']} "
+            f"({stands.get('exit_reason')}, signal "
+            f"{stands.get('diverging_signal')!r}) after {stands['iterations']} "
+            f"iterations at a load factor of "
+            f"{stands.get('nr_load_factor', 0.0):.2f}, on {stands.get('nr_predictor_iterations', 0)} "
+            f"predictor iterations. An admissible stress field in equilibrium with "
+            f"full gravity exists at this strength, so the slope stands here and the "
+            f"bisection that refuses it reads about 0.045 low: the seed the corrector "
+            f"was handed is not deep enough.")
+    else:
+        if stands['unbalanced_force_ratio'] >= 1e-3:
+            fails.append(
+                f"F = {THREE_LAYER_STANDS} is reported CONVERGED at an out-of-balance "
+                f"of {stands['unbalanced_force_ratio']:.3e}, at or above the 1e-3 "
+                f"force tolerance")
+        if stands['nr_max_yield_violation'] > 1e-6:
+            fails.append(
+                f"F = {THREE_LAYER_STANDS} is reported CONVERGED with a worst yield "
+                f"violation of {stands['nr_max_yield_violation']:.3e} of the local "
+                f"strength: the field is outside the surface it is meant to lie on, "
+                f"so it proves nothing about whether the slope stands")
+
+    above = _newton(fd, THREE_LAYER_FAILS)
+    if above['converged']:
+        fails.append(
+            f"F = {THREE_LAYER_FAILS} came back CONVERGED. The predictor supplies a "
+            f"starting state and must never supply a verdict; a converged trial one "
+            f"bisection cell above the certified limit means a deeper seed is now "
+            f"talking the corrector into standing where it did not.")
     return fails
 
 

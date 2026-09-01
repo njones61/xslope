@@ -4342,11 +4342,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # and was refused on force or on displacement has an answer already, and
         # re-deriving it from a different starting state would be re-litigating a
         # verdict rather than reaching one.
-        if (_nr_export is None and _NR_VP_PREDICTOR_ITERS
-                and not _sol["converged"] and _sol.get("exit_reason") == 'diverging'):
-            for _budget in _NR_VP_PREDICTOR_ITERS:
+        if (_nr_export is None and not _sol["converged"]
+                and _sol.get("exit_reason") == 'diverging'):
+            for (_chunk, _ceiling, _prep_seed,
+                 _pred_early_failure) in _nr_predictor_rungs(
+                     prep, n_elements, max_iterations, max_iterations_ceiling,
+                     early_failure):
                 _vp = solve_fem(
-                    fem_data, F=F, debug_level=0, max_iterations=_budget,
+                    fem_data, F=F, debug_level=0, max_iterations=_chunk,
                     tolerance=tolerance, max_disp_factor=None,
                     tension_cutoff=tension_cutoff, staged=staged,
                     dt_scale=dt_scale, pp_formulation=pp_formulation,
@@ -4356,9 +4359,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     tension_cap_by_elem=tension_cap_by_elem,
                     tension_srf=tension_srf, elastic_mask=elastic_mask,
                     suction_phi_b=suction_phi_b, suction_cap=suction_cap,
-                    _prepared=prep, fast_kernel=fast_kernel,
+                    _prepared=_prep_seed, fast_kernel=fast_kernel,
                     failure_criterion=failure_criterion,
-                    max_iterations_ceiling=_budget, early_failure=False,
+                    max_iterations_ceiling=_ceiling,
+                    early_failure=_pred_early_failure,
                     fem_solver='viscoplastic')
                 _retry = _solve_fem_newton(
                     fem_data, F, prep,
@@ -6262,6 +6266,33 @@ def _nr_assemble_tangent(groups, tangents, pattern, bars=None):
                       shape=(n_free, n_free))
 
 
+def _nr_tangent_factorable(K):
+    """Is this tangent something SuperLU can be handed at all?
+
+    A consistent Mohr-Coulomb tangent can lose a degree of freedom ENTIRELY: the
+    apex branch returns a zero tangent, so a node every one of whose elements has
+    yielded to the apex carries an all-zero row and column. That matrix is
+    structurally singular, and ``splu`` does not raise on it — it builds a
+    degenerate supernode and the process DIES inside OpenBLAS, printing
+    "lda must be >= MAX(N,1)" and taking the whole run with it. Measured on
+    Griffiths & Lane 1 (quad8, 3.5) at F = 1.8, well past its limit of about 1.37:
+    the second tangent re-form of a seeded trial has 98 zero rows and 98 zero
+    columns out of 2,788, every entry finite, and SuperLU aborts on it.
+
+    A degree of freedom with no stiffness at all carries exactly the information the
+    ``RuntimeError`` path carries — this load is unreachable — so the caller takes
+    the same exit. The scan is a bincount and a reduceat over the stored values,
+    which costs a small fraction of the factorization it precedes.
+    """
+    if K.data.size == 0 or np.any(np.diff(K.indptr) == 0):
+        return False
+    a = np.abs(K.data)
+    if not np.all(np.add.reduceat(a, K.indptr[:-1]) > 0.0):
+        return False                    # an all-zero column
+    return bool(np.all(np.bincount(K.indices, weights=a,
+                                   minlength=K.shape[0]) > 0.0))
+
+
 # Newton-Raphson controls. These are the spike's defaults; every one of them is a
 # solver control, not a modeling choice, and none of them changes what the trial
 # means — only how hard the solver works before it declares the load unreachable.
@@ -6334,17 +6365,87 @@ _NR_DISP_FACTOR = 0.1
 # load control from a zero start could not reach it.
 #
 # What this is NOT is a fallback to the viscoplastic verdict. The predictor's own
-# convergence is never read — it runs with `early_failure=False` and is stopped by
-# its budget, not by a verdict — and the answer is decided entirely by whether the
-# Newton corrector reaches full gravity in equilibrium and passes the same force and
-# displacement gates every other trial passes. A trial that is genuinely past
-# failure gets a predictor state that is running away, and the corrector refuses it.
+# convergence is never read, and the answer is decided entirely by whether the Newton
+# corrector reaches full gravity in equilibrium and passes the same force gate, the
+# same displacement bound and the same yield reading every other trial passes. A
+# trial that is genuinely past failure gets a predictor state that is running away,
+# and the corrector refuses it.
 #
-# Two rungs, because a state near the limit needs a longer walk than one well below
-# it. The measured need on the specimen is 100 iterations at F = 1.3 and 50 at
+# Two SHORT rungs, because a state near the limit needs a longer walk than one well
+# below it. The measured need on the specimen is 100 iterations at F = 1.3 and 50 at
 # F = 1.5; the rungs are set well above that and the second exists for the trials
 # that sit hard against the limit.
 _NR_VP_PREDICTOR_ITERS = (250, 1000)
+
+# AND ONE ADAPTIVE RUNG, appended. A fixed ladder cannot express "run until this walk
+# has finished", which is what a seed on a cohesionless model near its limit needs:
+# on the three-layer reinforced variant six FIXED budgets up to 32,000 iterations all
+# failed at F = 1.225 while a converged-state seed succeeded in a handful of
+# iterations. The last rung is therefore budgeted exactly as a viscoplastic trial of
+# the same model at the same strength would be — the caller's own `max_iterations` as
+# the chunk, the caller's own `max_iterations_ceiling` as the hard stop, and the
+# caller's own `early_failure` — which puts the stopping decision on
+# `_still_progressing`, the viscoplastic driver's already-calibrated budget-extension
+# rule: continue while the residual's trailing-window mean is falling by at least 1%,
+# or while the displacement field is standing still on evidence the failure
+# classifier cannot rule on. There is no new dial, and the hard ceiling is the same
+# one every viscoplastic trial on this model already respects.
+#
+# It is APPENDED rather than substituted, and that is deliberate. The short rungs are
+# not merely cheaper, they are sometimes better: on the locked tri6/2.0 reinforced
+# mesh at F = 1.55625 a 250-iteration seed corrects in 51 Newton iterations while the
+# adaptive rung stops one chunk short of its own convergence and the corrector
+# refuses it. Keeping the short rungs first and unchanged means every trial the
+# driver already rescued is rescued at the same rung from the same state, so the
+# extra rung can only convert a FAILED trial, never move a passing one.
+#
+# What justifies the progress test is a measurement, not its provenance. On the
+# three-layer model at the four strengths that decide its bisection, and at three
+# chunk sizes, the corrector converged on EVERY seed the adaptive rung had carried to
+# its own convergence and on NO seed it had not.
+_NR_VP_PREDICTOR_ADAPTIVE = True
+
+# THE ADAPTIVE RUNG RUNS UNDER A RANKINE CAP. With psi = 0 the Mohr-Coulomb flow is
+# purely deviatoric, so it cannot relieve a point's MEAN stress; on a c = 0 material
+# the yield surface is a cone through the origin, so a tensile point sheds its
+# deviatoric stress, stops flowing, and freezes hundreds of psf outside the surface.
+# The viscoplastic force gate has no term that could notice (see SPIKE.md, "THE
+# THREE-LAYER DISAGREEMENT"), so an uncapped long predictor hands the corrector a
+# state that is in force equilibrium but not admissible — and there is no root of the
+# Newton residual near it. Measured on the three-layer model at F = 1.20625: the
+# UNCAPPED rung converges in 19,716 iterations and the corrector refuses its state;
+# the capped rung converges in 22,964 and the corrector takes it in FOUR iterations,
+# to an out-of-balance of 1.1e-5 and a yield violation of 1.2e-15.
+#
+# The cap is on the SEED only. The corrector runs on the caller's own tensile caps
+# and reports the caller's own yield reading, so nothing about the verdict is capped.
+_NR_VP_PREDICTOR_TENSION_CAP = True
+
+
+def _nr_predictor_rungs(prep, n_elements, max_iterations, max_iterations_ceiling,
+                        early_failure):
+    """The predictor's rungs, in the order they are tried.
+
+    Each rung is ``(chunk, ceiling, prepared_model, early_failure)``. The short fixed
+    rungs come first, on the caller's own prepared model and with the predictor's own
+    convergence never able to end them early; the adaptive rung comes last, on a
+    prepared model that is the caller's with its tensile caps replaced by a Rankine
+    T = 0. That capped model shares everything else with ``prep`` — the
+    factorization, the geometry precompute, the Gauss-point groups are all
+    independent of the caps — so building it costs a dict copy.
+
+    See ``_NR_VP_PREDICTOR_ITERS`` and ``_NR_VP_PREDICTOR_ADAPTIVE``.
+    """
+    rungs = [(int(b), int(b), prep, False) for b in (_NR_VP_PREDICTOR_ITERS or ())]
+    if _NR_VP_PREDICTOR_ADAPTIVE:
+        prep_seed = prep
+        if _NR_VP_PREDICTOR_TENSION_CAP:
+            prep_seed = dict(prep)
+            prep_seed["t_cap_base"] = np.zeros(int(n_elements))
+        rungs.append((int(max_iterations),
+                      max(int(max_iterations_ceiling or 0), int(max_iterations)),
+                      prep_seed, bool(early_failure)))
+    return tuple(rungs)
 
 
 def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
@@ -6420,6 +6521,8 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
 
         if reform:
             K = _nr_assemble_tangent(groups, tangents, pattern, bars=bars)
+            if not _nr_tangent_factorable(K):
+                break                   # structurally singular = the limit load
             try:
                 lu = splu(K)
             except RuntimeError:
@@ -7012,7 +7115,8 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                       staged, tension_cutoff, min_slip_depth, ssr_exclude_mask,
                       tension_cap_by_elem, tension_srf, elastic_mask,
                       suction_phi_b, suction_cap, k0, f_adjust, f_min_floor,
-                      max_expand, debug_level=0, progress_callback=None,
+                      max_expand, max_iterations_ceiling=50000, early_failure=True,
+                      debug_level=0, progress_callback=None,
                       cancel_check=None):
     """Walk F up from a converged state, warm-starting every step.
 
@@ -7024,7 +7128,14 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     trials = []
     ctx = {}
 
-    def _cold(F):
+    def _cold(F, export_only=False):
+        # `_nr_export` is what makes a solve a RAMP FOOT: it hands back the working
+        # state the ramp then continues, and it is also what holds the viscoplastic
+        # predictor off, because a ramp manages its own plastic history. The final
+        # export solve continues nothing, so it takes the predictor like any other
+        # standalone trial — without it the state written to figures and CSVs would
+        # be whatever the cold path could reach, which on a cohesionless model is
+        # not the state at the limit the ramp just carried.
         return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1),
                          force_tol=force_tol, oob_window=oob_window,
                          dt_scale=dt_scale, pp_formulation=pp_formulation,
@@ -7037,7 +7148,9 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                          tension_srf=tension_srf, elastic_mask=elastic_mask,
                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                          k0=k0, fem_solver='newton', _prepared=prep,
-                         _nr_export=ctx)
+                         max_iterations_ceiling=max_iterations_ceiling,
+                         early_failure=early_failure,
+                         _nr_export=(None if export_only else ctx))
 
     def _record(F, verdict, iters, fevals, oob, maxu, kind, why=None):
         trials.append({"F": float(F), "verdict": verdict, "iterations": int(iters),
@@ -7087,6 +7200,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     warm_iters = []
     F_refused = None
     cancelled = False
+    pred_iters = 0             # viscoplastic predictor iterations, charged on top
 
     if debug_level >= 1:
         print("=== SSRM Analysis (Newton, monotonic ramp) ===")
@@ -7108,12 +7222,68 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                     "last_solution": last_solution}
 
         restrength(groups, F_try)
+        seeded, ep_save = False, None
         ok, u_try, it, fe, oob, _rel = _nr_equilibrate(
             groups, pattern, u, base_loads, free_dofs, n_dof, h_eps, force_tol,
             oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
             label=f"ramp F={F_try:.4f}", bars=bars)
         total_iters += it
         total_fevals += fe
+        if not (ok and oob < force_tol):
+            # The step is refused, and on a cohesionless model that is the same
+            # failure the bisection retries (see _NR_VP_PREDICTOR_ITERS): the warm
+            # plastic history this ramp carries is not the field this strength
+            # needs, and the corrector cannot grow one from it. So grow one the same
+            # way — a viscoplastic predictor at THIS strength, under the same
+            # Rankine cap — and give the corrector one attempt from that state.
+            #
+            # The verdict stays the corrector's: the same force gate and the same
+            # displacement bound the cold step just failed, read on the corrected
+            # state and not on the seed. The ramp used to walk every step cold,
+            # which is why it read 1.0531 on the three-layer model against the
+            # bisection's 1.2109.
+            ep_save = [grp['ep'] for grp in groups]
+            for _chunk, _ceiling, _seed_prep, _seed_ef in _nr_predictor_rungs(
+                    prep, len(fem_data['elements']), max_iterations,
+                    max_iterations_ceiling, early_failure):
+                _vp = solve_fem(
+                    fem_data, F=F_try, debug_level=0, max_iterations=_chunk,
+                    max_iterations_ceiling=_ceiling, tolerance=convergence_tol,
+                    max_disp_factor=None, tension_cutoff=tension_cutoff,
+                    staged=staged, dt_scale=dt_scale,
+                    pp_formulation=pp_formulation, force_tol=force_tol,
+                    oob_window=oob_window, min_slip_depth=min_slip_depth,
+                    ssr_exclude_mask=ssr_exclude_mask,
+                    tension_cap_by_elem=tension_cap_by_elem,
+                    tension_srf=tension_srf, elastic_mask=elastic_mask,
+                    suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                    _prepared=_seed_prep, early_failure=_seed_ef,
+                    fem_solver='viscoplastic')
+                pred_iters += int(_vp.get('iterations', 0) or 0)
+                _u_seed = np.asarray(_vp['displacements'], dtype=float)[:n_dof].copy()
+                _ep_vp = _vp['plastic_strains']
+                for grp in groups:
+                    _ep = np.empty_like(grp['ep'])
+                    for _k, (_e, _gp) in enumerate(grp['pairs']):
+                        _ep[_k] = _ep_vp[_e][_gp]
+                    grp['ep'] = _ep
+                ok, u_try, it2, fe2, oob, _rel = _nr_equilibrate(
+                    groups, pattern, _u_seed, base_loads, free_dofs, n_dof, h_eps,
+                    force_tol, oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
+                    label=f"ramp F={F_try:.4f} (seeded)", bars=bars)
+                # Work is cumulative: the refused cold step, every predictor run and
+                # every corrector are all charged to this step.
+                it += it2
+                fe += fe2
+                total_iters += it2
+                total_fevals += fe2
+                if ok:
+                    seeded = True
+                    break
+                # Nothing was carried, so the ramp's own history goes back exactly
+                # as it was before the seed overwrote it.
+                for grp, _ep0 in zip(groups, ep_save):
+                    grp['ep'] = _ep0
         maxu = float(np.max(np.abs(u_try))) if u_try.size else 0.0
         # The SAME admissibility standard a converged bisection trial passes: force
         # equilibrium under the tolerance, and a state the small-strain model can
@@ -7149,7 +7319,11 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
         else:
             # Reject the step and retry from the SAME converged state at half the
             # increment. Nothing was committed, so there is nothing to undo but the
-            # strengths, which the next attempt overwrites.
+            # strengths, which the next attempt overwrites — and a predictor seed, if
+            # one equilibrated here only to be refused on displacement.
+            if seeded:
+                for grp, _ep0 in zip(groups, ep_save):
+                    grp['ep'] = _ep0
             F_refused = F_try
             n_retries += 1
             if debug_level >= 1:
@@ -7170,12 +7344,13 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     # from `last_solution`, and the ramp's warm state carries no post-processing.
     # One cold solve at the last carried strength matches what the bisection
     # driver exports for its final converged trial.
-    sol_end = _cold(F_stands)
+    sol_end = _cold(F_stands, export_only=True)
     _record(F_stands, sol_end['verdict'], sol_end['iterations'],
             sol_end.get('nr_force_evals', 0), sol_end['unbalanced_force_ratio'],
             sol_end['max_displacement'], 'final_export', sol_end.get('exit_reason'))
     total_iters += int(sol_end['iterations'])
     total_fevals += int(sol_end.get('nr_force_evals', 0))
+    pred_iters += int(sol_end.get('nr_predictor_iterations', 0) or 0)
     if sol_end.get('converged'):
         last_solution = sol_end
 
@@ -7207,6 +7382,9 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
         "ramp_retries": n_retries,
         "ramp_iterations": total_iters,
         "ramp_force_evals": total_fevals,
+        # Viscoplastic predictor iterations spent rescuing refused steps, charged
+        # on top of the Newton work above (see _NR_VP_PREDICTOR_ITERS).
+        "ramp_predictor_iterations": pred_iters,
         "ramp_warm_iterations": warm_iters,
         "ramp_foot": float(F0),
         "ramp_last_carried": float(F_stands),
@@ -8501,6 +8679,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             elastic_mask=elastic_mask, suction_phi_b=suction_phi_b,
             suction_cap=suction_cap, k0=k0, f_adjust=f_adjust,
             f_min_floor=f_min_floor, max_expand=max_expand,
+            max_iterations_ceiling=max_iterations_ceiling,
+            early_failure=early_failure,
             debug_level=debug_level, progress_callback=progress_callback,
             cancel_check=cancel_check)
     elif failure_criterion in ("non_convergence", "hybrid"):

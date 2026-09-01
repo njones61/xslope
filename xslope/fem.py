@@ -6239,6 +6239,13 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     exit_reason = 'converged'
     converged = True
     last_oob = 0.0
+    # Work, honestly counted. An "iteration" here buys one residual evaluation AND
+    # up to `_NR_LS_MAX` more inside the line search, so an iteration count compared
+    # against the viscoplastic driver's — where an iteration is one constitutive
+    # pass — understates Newton's constitutive work by up to a factor of ten. Every
+    # call to _nr_internal_force in this solve is counted, including the two
+    # reporting passes at the end.
+    n_force_evals = 0
     # The viscoplastic driver publishes max|du| / max|u| as `residual`. This is the
     # same quantity on this path, recorded at the last accepted load increment, so
     # the key means one thing on both drivers.
@@ -6273,6 +6280,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             reform = lu is None or prev_r is None or r_hist[-1] > 0.25 * prev_r
             fint, tangents, _ = _nr_internal_force(groups, u_try, n_dof,
                                                    h_eps=h_eps, want_tangent=reform)
+            n_force_evals += 1
             r = f_ext - fint
             r_free = r[free_dofs]
             r_norm = float(np.linalg.norm(r_free))
@@ -6328,6 +6336,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             for _ls in range(_NR_LS_MAX):
                 cand = u_try + alpha * du
                 f_c, _, _ = _nr_internal_force(groups, cand, n_dof)
+                n_force_evals += 1
                 rc = float(np.linalg.norm((f_ext - f_c)[free_dofs]))
                 if np.isfinite(rc) and rc < best_rc:
                     best_rc, best_alpha = rc, alpha
@@ -6404,6 +6413,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # gate the viscoplastic verdict is read on, or it is not converged.
     if converged:
         fint, _, _ = _nr_internal_force(groups, u, n_dof)
+        n_force_evals += 1
         r_full = np.zeros(n_dof)
         r_full[free_dofs] = (base_loads - fint)[free_dofs]
         last_oob = _oob(r_full)
@@ -6428,6 +6438,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     for grp in groups:
         grp['_u'] = u
     _nr_internal_force(groups, u, n_dof)          # refresh _sig / _branch at u
+    n_force_evals += 1
 
     # ---- the verdict's own evidence -----------------------------------------
     # A converged Newton trial asserts two things about the slope: that full
@@ -6569,6 +6580,10 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "residual": float(last_rel_du),
         "unbalanced_force_ratio": last_oob,
         "nr_last_oob": last_oob,
+        # Constitutive work actually done: residual evaluations plus every line
+        # search backtrack. `iterations` counts only the outer Newton iterations, so
+        # it understates the work by up to _NR_LS_MAX per iteration.
+        "nr_force_evals": int(n_force_evals),
         "plastic_fraction": (int(np.count_nonzero(plastic_elements)) / n_elements
                              if n_elements else 0.0),
         # Newton-specific accounting, read by the spike's measurement harness.

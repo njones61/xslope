@@ -4219,3 +4219,148 @@ and `xslope.__file__` asserted:
 | `vp017` (RS2-13), `k0 = 1` from the MERGED workbook, tri6/0.5, the tag's bracket | viscoplastic **1.336328125**, Newton **1.336328125**, 5,846 force evaluations — value for value, and 0.0043 from the published 1.332 against a tolerance of 0.02 |
 | `test/nr_ssrm_check.py` | passes end to end |
 | `python3 run_tests.py --preflight` | 31 passed, 0 failed |
+
+## MATRIC SUCTION — the Newton driver learns the apparent cohesion
+
+Written before any feature code, so that what follows is a test and not a
+description. Same machine and settings as everything above: `force_tol` 1e-3,
+hybrid criterion, `capture_failure_state=False`, tolerance 0.01.
+
+### Why this one now
+
+The K0 round ended on a short list rather than a class: five power-curve models,
+three Hoek-Brown, three matric suction. Suction is the only one of the three that
+needs no new yield surface. Fredlund's extended Mohr-Coulomb does not bend the
+envelope — it adds an APPARENT COHESION to the same linear surface the return map
+already solves — so the shear surface, the Rankine cap, the corner and apex
+construction and the flow rule are all unchanged, and the whole of the work is
+plumbing.
+
+The corpus inventory names the models, and the two families in it are not the same
+test. `rs2_28a/b/c` is RS2-28, Ng & Shi's (1998) Hong Kong cut at three far-field
+heads, with `phi_b` = 15 deg declared in the FILE, a vendor tensile cap of 10 kPa
+that binds, `k0 = 1`, and 63% of the domain declared `elastic`; each carries one
+locked factor of safety and every one of the three is gated on suction alone.
+`vp102t_60/300/1500` is the RS2 Part 4 VP102 transient set, with `phi_b` = 37 deg
+supplied by the TEST TAG rather than the file; each carries TWO locks, a `c2` row
+with no suction and a `c3` row with it, so only the three `c3` rows are gated.
+Nine locked factors of safety on six workbooks.
+
+There is no LEM-side suction sample to add. Every workbook under
+`docs/inputs/slope`, `docs/lem/files`, `docs/fem/files`, `docs/tutorials/files`
+and `docs/seep/files` was loaded through `load_slope_data`, and not one carries a
+`phi_b`. The suction corpus is the RS2 verification block and nothing else.
+
+### The semantics being reproduced, read from the viscoplastic driver
+
+Not assumed — read out of `_resolve_suction_by_elem`, `_prepare_fem_model` and
+`solve_fem` and restated here, because the Newton path has to solve the same
+model:
+
+- **The credit.** Per Gauss point,
+  `c_suction = min(max(0, -u_w), s_cap) * tan(phi_b)`, added to `c'` in the
+  Mohr-Coulomb yield function. `u_w` is the SIGNED pore pressure
+  (`prep['u_gp_signed']`), not the clamped `u >= 0` the effective-normal term
+  reads: the whole point is the negative pressure above the water table that the
+  clamp throws away.
+- **The source.** The signed field is built only for `u = piezo` or `u = seep`,
+  and only when some material carries a positive `phi_b`. `prep['suction_active']`
+  is that gate, and when it is False no suction array exists at all — which is
+  what makes an untouched default path a structural fact rather than a
+  measurement.
+- **`phi_b` and `s_cap` are per MATERIAL**, resolved to per-element arrays by
+  `_resolve_suction_by_elem` with the same auto-wire / override precedence the
+  limit-equilibrium engine uses: the file's `phi_b` / `s_cap` columns unless a
+  `suction_phi_b` / `suction_cap` kwarg says otherwise, and `{}` forces the credit
+  off. A blank `s_cap` is `inf` — uncapped.
+- **It IS reduced by F.** `grp['c_suc_r'] = tanphib * s * Finv` with
+  `Finv = 1 / F_by_elem`, so the credit is divided by the trial strength exactly
+  as `c'` is, and by the SAME per-element factor — which is 1.0 on an
+  `ssr_exclude` element. `docs/fem/overview.md` states it in as many words: "the
+  apparent cohesion is reduced by the trial factor alongside c' and tan(phi')".
+  That is what distinguishes it from the tensile cap, which is reduced only when
+  `tension_srf` says so.
+- **The envelope is `c_env = c_r + c_suc_r`** and nothing else moves: psi = 0
+  flow, the same corners, the same apex, the Rankine cap still a separate surface.
+- **An `elastic` material is inert.** The viscoplastic path drops elastic Gauss
+  points from the yielding mask entirely; the Newton path gives them `c_r = inf`.
+  A finite credit added to either is a no-op, and RS2-28 exercises it, since most
+  of its domain is `Plasticity: None`.
+- **The credit never touches the effective normal stress.** `u_gp` stays clamped
+  and moves to the load vector as it always did; only the cohesive intercept picks
+  up the suction.
+
+### Design
+
+- **Apparent cohesion is a per-Gauss-point cohesion, and that is all it is.** The
+  Newton return map already takes `c` per point (`grp['c_r']`, handed straight to
+  `mc_return_map`), so the credit is folded into `c_r` where the group is built
+  and no return-map, tangent or yield-surface code is touched at all. Everything
+  downstream that reads `c_r` — the return map, the algorithmic tangent, the
+  strength scale `nr_max_yield_violation` divides by — is then reading the
+  envelope the trial is actually solved on, with no second code path to keep in
+  step.
+- **The formula is shared, not mirrored.** One helper computes
+  `min(max(0, -u_signed), s_cap) * tan(phi_b) / F`, and BOTH drivers call it, so
+  the only thing a driver-against-driver comparison can find is a plumbing
+  difference — which field, which cap, which F. The viscoplastic call site keeps
+  its own arithmetic in its own order, so the default path's numbers cannot move.
+- **The F-independent half is cached.** The capped suction
+  `s = min(max(0, -u_w), s_cap)` does not depend on F, so it is built once per
+  group and only the `tan(phi_b) * s / F` product is re-formed. That is what lets
+  the ramp's `restrength` re-derive the credit at every new F without a field
+  lookup — which it MUST, because the credit scales as 1/F and a ramp carrying the
+  foot's credit up the whole ramp would be reducing only part of the envelope.
+- **The predictor already carries it.** The viscoplastic predictor rungs are
+  handed `suction_phi_b` / `suction_cap` already, so a seed is grown on the same
+  envelope the corrector will use. Nothing to change; the criterion asserts it
+  rather than assuming it.
+- **The guard's suction line goes, and nothing else does.** Piles, post-peak bar
+  softening, Hoek-Brown and the power curve stay refused, each naming itself.
+
+### Success criterion (verbatim)
+
+1. **The suction-gated locked models.** On the three `rs2_28` models (locks 1.606
+   / 1.544 / 1.381, tolerance 0.02) and the three `vp102t` `c3` rows (1.779 /
+   2.162 / 2.687, tolerance 0.02), each built through `run_tests.py`'s own
+   `build_fem_ssrm_case` so that the mesh, the bracket, `tension_srf`, `k0` and
+   `suction_phi_b` are the suite's and not this round's: the Newton bisection
+   reproduces the published lock within its own tolerance AND lands within 0.01 of
+   the viscoplastic driver run in the same configuration. Reported per model:
+   viscoplastic FS, Newton FS, the lock, the tolerance, and the constitutive work
+   on each driver.
+2. **The two drivers build the same apparent-cohesion field.** On one model at
+   F = 1 the per-Gauss-point `c_suction` each driver computes is compared point for
+   point and the maximum absolute difference is REPORTED as a number. Shared code
+   makes ~1e-16 the expectation; anything larger is a plumbing difference and is
+   the finding.
+3. **`s_cap` binds, and both drivers move together.** On one model the cap is
+   lowered until it is the binding constraint, and the factor of safety is
+   reported at each of two or three cap values on BOTH drivers, agreeing within
+   0.01 at every one. The number of Gauss points where `s > s_cap` is reported
+   alongside, because a cap that binds nowhere proves nothing.
+4. **The ramp agrees** with the Newton bisection within 0.01 on at least two of
+   the six models.
+5. **The no-suction path is bit-identical**, on the same control-tree protocol the
+   previous rounds used: the plain-soil eight rows, the four reinforced
+   benchmarks, the tension-cutoff rows and the K0 vendor rows re-run against a
+   control run of the parent commit staged in a separate package tree — every
+   converged trial identical in factor of safety, verdict, iterations and force
+   evaluations — plus the plain Mohr-Coulomb return map bit-identical over 800,000
+   random trial states.
+6. **The refusal is gone and the guard list is updated.** Piles, post-peak bar
+   softening, Hoek-Brown and power-curve envelopes each still raise and each still
+   names its own feature, with the viscoplastic control accepting all of them.
+7. **The locks catch it.** `test/nr_ssrm_check.py` gains a suction check, and it
+   asserts the FIELD and not only a factor of safety, so a mutation cannot pass by
+   landing on the same number. Two mutations, run both ways and recorded: **the
+   cap dropped** (`s_cap` ignored) must FAIL it, and **the F-reduction of the
+   apparent cohesion dropped** (the credit taken unreduced, which is what the
+   viscoplastic driver does NOT do) must FAIL it. The whole check file passes.
+8. **The default path is unchanged**, against the standard control: Griffiths &
+   Lane 6 dry with no `fem_solver` argument, FS 2.421875 on per-trial iteration
+   counts 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777.
+9. **An honest negative is a valid outcome and must be written.** If the two
+   drivers disagree on a suction model by more than the bisection tolerance, or if
+   the credit needs anything the return map does not already have, that is the
+   result.

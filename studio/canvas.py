@@ -678,11 +678,6 @@ class MplCanvas(QWidget):
         self._render_current()
         self._restore_pan_cursor()
 
-    def reset_100(self):
-        self.view.resetTransform()
-        self._schedule_refine()
-        self._restore_pan_cursor()
-
     def zoom_in(self):
         self.view.scale(ZOOM_STEP, ZOOM_STEP)
         self._schedule_refine()

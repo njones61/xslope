@@ -5974,11 +5974,108 @@ def _nr_group_state(grp, u, h_eps):
     return sig, branch, Dep
 
 
-def _nr_internal_force(gp_groups, u, n_dof, h_eps=None, want_tangent=False):
+def _nr_build_bars(fem_data):
+    """The model's reinforcement bar elements, grouped by DOF count, or ``None``.
+
+    One entry per distinct element size — four DOFs for a two-node bar, six for a
+    three-node bar standing on the midside node of its soil edge — so each group is
+    a dense array pass. Pile elements are excluded; the Newton driver refuses any
+    model that has them.
+
+    Every array here is read from ``fem_data`` and never written, so the two solvers
+    carry the SAME bar: ``K_global_1d_elems`` is the element matrix the global
+    elastic stiffness is assembled from, ``k_by_1d_elem`` the chord stiffness EA/L
+    the force recovery uses, and ``t_allow_by_1d_elem`` the capacity envelope shared
+    with the limit-equilibrium engine.
+
+    ``p`` is the chord pattern [-cos, -sin, +cos, +sin, 0, 0]: ``p . u_e`` is the
+    chord elongation, which on a three-node bar is the axial force station at the
+    element center — the same quantity every reader of ``forces_1d`` expects.
+    """
+    elements_1d = fem_data.get("elements_1d", None)
+    if elements_1d is None or len(elements_1d) == 0:
+        return None
+    n_1d = len(elements_1d)
+    pile_mask = np.asarray(fem_data.get("pile_elem_mask", np.zeros(n_1d)), dtype=bool)
+    reinf = np.flatnonzero(~pile_mask)
+    if reinf.size == 0:
+        return None
+    K_list = fem_data.get("K_global_1d_elems", [])
+    dof_all = np.asarray(fem_data["dof_indices_1d"], dtype=np.int64)
+    nd_all = np.asarray(fem_data.get("n_dof_by_1d_elem",
+                                     np.full(n_1d, 4, dtype=int)), dtype=int)
+    k_all = np.asarray(fem_data["k_by_1d_elem"], dtype=float)
+    cos_all = np.asarray(fem_data["cos_theta_1d"], dtype=float)
+    sin_all = np.asarray(fem_data["sin_theta_1d"], dtype=float)
+    cap_all = np.asarray(fem_data["t_allow_by_1d_elem"], dtype=float)
+
+    bars = []
+    for nd in (4, 6):
+        sel = reinf[nd_all[reinf] == nd]
+        if sel.size == 0:
+            continue
+        p = np.zeros((sel.size, nd))
+        p[:, 0], p[:, 1] = -cos_all[sel], -sin_all[sel]
+        p[:, 2], p[:, 3] = cos_all[sel], sin_all[sel]
+        K = np.array([np.asarray(K_list[i], dtype=float)[:nd, :nd] for i in sel])
+        bars.append({
+            'idx': sel, 'nd': nd, 'dof': dof_all[sel, :nd], 'K': K, 'p': p,
+            'k': k_all[sel], 't_cap': cap_all[sel],
+            # k p (x) p, the rank-one block the tangent LOSES when a bar goes
+            # slack or reaches its capacity. On a two-node bar it is K itself.
+            'kpp': k_all[sel][:, None, None] * (p[:, :, None] * p[:, None, :]),
+        })
+    return bars or None
+
+
+def _nr_bar_force(bg, u, want_tangent):
+    """One bar group's internal force (and tangent) at displacement ``u``.
+
+    The physics is the viscoplastic driver's, restated as a residual. There the
+    global stiffness carries the bar's FULL elastic matrix and the part of the
+    elastic force the bar cannot deliver is subtracted as a body load, so the bar's
+    internal force is
+
+        K_bar u_e - (T - T_true) p,   T = k (p . u_e),   T_true = clip(T, 0, t_cap)
+
+    — tension only, capped at the pullout/anchorage envelope, and on a two-node bar
+    that expression is exactly ``T_true p``. On a three-node bar it is not, and this
+    reproduces the three-node expression rather than a cleaner one, because the two
+    drivers have to be solving the same model.
+
+    The map is piecewise LINEAR in u_e, so its tangent is exact with nothing
+    differenced: dT/du = k p, and dT_true/du is k p while the bar is active
+    (0 < T < t_cap) and zero otherwise. The element tangent is therefore K_bar for
+    an active bar and K_bar - k p (x) p for a slack or capacity-limited one. On a
+    two-node bar the second is exactly zero — a yielded bar adds no stiffness. On a
+    three-node bar it is a rank-one positive-semidefinite block that resists only
+    the midside node leaving the chord.
+
+    There is no state: with softening refused, T_true is a function of the current
+    displacement alone, so the bar law is nonlinear-ELASTIC and nothing is committed
+    at the end of a step.
+    """
+    ue = u[bg['dof']]
+    T = bg['k'] * np.einsum('ij,ij->i', bg['p'], ue)
+    T_true = np.clip(T, 0.0, bg['t_cap'])
+    f = np.einsum('ijk,ik->ij', bg['K'], ue) - (T - T_true)[:, None] * bg['p']
+    bg['_T'], bg['_T_true'] = T, T_true
+    if want_tangent:
+        active = (T > 0.0) & (T < bg['t_cap'])
+        bg['_Ke'] = np.where(active[:, None, None], bg['K'], bg['K'] - bg['kpp'])
+    return f
+
+
+def _nr_internal_force(gp_groups, u, n_dof, h_eps=None, want_tangent=False,
+                       bars=None):
     """Assemble the internal force vector (and optionally the per-group tangents).
 
     ``h_eps=None`` with ``want_tangent=False`` is the cheap residual-only pass the
     line search uses: one return map per group and no differentiation.
+
+    ``bars`` adds the reinforcement bar elements' contribution. Their tangents are
+    stashed on the bar groups (``_Ke``) rather than returned, because they need no
+    differencing and the caller consumes them through the same assembly pattern.
     """
     fint = np.zeros(n_dof)
     tangents = [] if want_tangent else None
@@ -6002,6 +6099,10 @@ def _nr_internal_force(gp_groups, u, n_dof, h_eps=None, want_tangent=False):
         n_plastic_gp += int(np.count_nonzero(branch))
         contrib = (sig[:, None, :3] @ grp['B'])[:, 0, :] * grp['w'][:, None]
         np.add.at(fint, grp['dof'].ravel(), contrib.ravel())
+    if bars is not None:
+        for bg in bars:
+            fb = _nr_bar_force(bg, u, want_tangent)
+            np.add.at(fint, bg['dof'].ravel(), fb.ravel())
     return fint, tangents, n_plastic_gp
 
 
@@ -6060,7 +6161,7 @@ def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem):
     return groups
 
 
-def _nr_prepare_assembly(groups, free_dofs, n_dof):
+def _nr_prepare_assembly(groups, free_dofs, n_dof, bars=None):
     """Cache the assembly pattern every tangent re-form reuses.
 
     The sparsity pattern is fixed for the whole solve — only the VALUES change
@@ -6069,12 +6170,18 @@ def _nr_prepare_assembly(groups, free_dofs, n_dof):
     ready-made CSC structure. Rebuilding a COO matrix and re-sorting it into CSC
     every iteration, which is the obvious way to write this, costs as much as the
     factorization it feeds.
+
+    Reinforcement bar blocks join the pattern EXPLICITLY, after the soil groups and
+    in the order :func:`_nr_assemble_tangent` walks them. On these meshes a bar lies
+    along a soil element edge, so its DOF pairs happen to be in the soil pattern
+    already — but relying on that would make the tangent silently lose a bar whose
+    end nodes did not share an element.
     """
     n_free = len(free_dofs)
     fidx = np.full(n_dof, -1, dtype=np.int64)
     fidx[free_dofs] = np.arange(n_free)
     lin_parts = []
-    for grp in groups:
+    for grp in list(groups) + (list(bars) if bars else []):
         fd = fidx[grp['dof']]
         G, nd = fd.shape
         rows = np.broadcast_to(fd[:, :, None], (G, nd, nd))
@@ -6093,14 +6200,21 @@ def _nr_prepare_assembly(groups, free_dofs, n_dof):
             "indptr": indptr, "n_free": n_free}
 
 
-def _nr_assemble_tangent(groups, tangents, pattern):
-    """Global non-symmetric tangent stiffness on the free degrees of freedom."""
+def _nr_assemble_tangent(groups, tangents, pattern, bars=None):
+    """Global non-symmetric tangent stiffness on the free degrees of freedom.
+
+    Soil groups first, then the reinforcement bar groups — the same order
+    :func:`_nr_prepare_assembly` built the pattern in.
+    """
     vals = []
     for grp, Dep in zip(groups, tangents):
         Bt = np.ascontiguousarray(grp['B'].transpose(0, 2, 1))
         ke = (Bt @ Dep) @ grp['B']
         ke *= grp['w'][:, None, None]
         vals.append(ke[grp['_keep']])
+    if bars is not None:
+        for bg in bars:
+            vals.append(bg['_Ke'][bg['_keep']])
     data = np.bincount(pattern["inv"], weights=np.concatenate(vals),
                        minlength=pattern["nnz"])
     n_free = pattern["n_free"]
@@ -6166,7 +6280,7 @@ _NR_DISP_FACTOR = 0.1
 
 def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
                     force_tol, oob_fn, nr_max_iter, u_elastic_scale,
-                    debug_level=0, label=""):
+                    debug_level=0, label="", bars=None):
     """Drive the equilibrium residual to zero at a FIXED external load.
 
     The inner Newton iteration, lifted out of :func:`_solve_fem_newton` verbatim so
@@ -6207,7 +6321,8 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         # residual stops falling by 4x per iteration gets a fresh tangent.
         reform = lu is None or prev_r is None or r_hist[-1] > 0.25 * prev_r
         fint, tangents, _ = _nr_internal_force(groups, u_try, n_dof,
-                                               h_eps=h_eps, want_tangent=reform)
+                                               h_eps=h_eps, want_tangent=reform,
+                                               bars=bars)
         n_fe += 1
         r = f_ext - fint
         r_free = r[free_dofs]
@@ -6235,7 +6350,7 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
             break                       # no progress: this load is unreachable
 
         if reform:
-            K = _nr_assemble_tangent(groups, tangents, pattern)
+            K = _nr_assemble_tangent(groups, tangents, pattern, bars=bars)
             try:
                 lu = splu(K)
             except RuntimeError:
@@ -6263,7 +6378,7 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         best_alpha, best_rc = None, np.inf
         for _ls in range(_NR_LS_MAX):
             cand = u_try + alpha * du
-            f_c, _, _ = _nr_internal_force(groups, cand, n_dof)
+            f_c, _, _ = _nr_internal_force(groups, cand, n_dof, bars=bars)
             n_fe += 1
             rc = float(np.linalg.norm((f_ext - f_c)[free_dofs]))
             if np.isfinite(rc) and rc < best_rc:
@@ -6326,10 +6441,13 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     'displacement_limit', which is distinguishable from the force-side failures
     ('diverging' at the load-step floor, 'iteration_cap' at the final force gate).
 
-    Deliberately narrow: plain Mohr-Coulomb, psi = 0, no strain softening. Every
-    modeling feature the spike does not cover raises rather than being silently
-    ignored, because a switch that quietly drops a tensile cap or a reinforcement
-    bar would return a wrong factor of safety that looks right.
+    Deliberately narrow: plain Mohr-Coulomb, psi = 0, no strain softening.
+    Reinforcement bar elements ARE carried (see _nr_build_bars and _nr_bar_force),
+    with the soil strength reduced and the bars keeping their capacity, which is the
+    vendor convention and what the LEM does. Everything else the spike does not
+    cover raises rather than being silently ignored, because a switch that quietly
+    drops a tensile cap or a softening bar would return a wrong factor of safety
+    that looks right.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -6344,8 +6462,25 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     unsupported = []
     if fem_data.get("n_pile_elements", 0):
         unsupported.append("pile beam elements")
-    if len(fem_data.get("elements_1d", np.array([]).reshape(0, 3))):
-        unsupported.append("1D reinforcement elements")
+    # Reinforcement bars ARE carried (see _nr_build_bars). Post-peak softening is
+    # not: a bar with a finite t_res BELOW the capacity its embedment develops drops
+    # to that residual through a converged-state fixed point, which changes the
+    # constitutive law between solves and re-opens the iteration each time it grows.
+    # That is exactly where a Newton continuation is weakest, and approximating it
+    # would be a fudged tangent reporting a factor of safety that looks right.
+    _n1d = len(fem_data.get("elements_1d", np.array([]).reshape(0, 3)))
+    if _n1d:
+        _tres = np.asarray(fem_data.get("t_res_by_1d_elem", np.full(_n1d, np.nan)),
+                           dtype=float)
+        _tal = np.asarray(fem_data.get("t_allow_by_1d_elem", np.zeros(_n1d)),
+                          dtype=float)
+        _pmask = np.asarray(fem_data.get("pile_elem_mask", np.zeros(_n1d)), dtype=bool)
+        _soft = np.isfinite(_tres) & (_tres < _tal - 1e-12) & ~_pmask
+        if np.any(_soft):
+            unsupported.append(
+                f"post-peak softening on {int(_soft.sum())} of {_n1d} "
+                f"reinforcement bar element(s) (a residual tension t_res below the "
+                f"capacity the embedment develops)")
     if np.any(fem_data.get("pow_flag_by_elem", np.zeros(n_elements, bool))):
         unsupported.append("power-curve strength envelopes")
     if np.any(fem_data.get("hb_flag_by_elem", np.zeros(n_elements, bool))):
@@ -6364,8 +6499,21 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             "handle " + ", ".join(unsupported) + ". Run this model on the "
             "default viscoplastic solver.")
 
+    # The displacement bound (_NR_DISP_FACTOR) reads max|u| over the RAW degree-of-
+    # freedom vector, so every entry has to be a length. Reinforcement bars stand on
+    # soil nodes and add none of their own; a rotational degree of freedom appears
+    # only where is_pile_node is set, which requires a pile element, which the guard
+    # above refuses. This asserts that rather than assuming it, because a third DOF
+    # slipping into the vector would silently compare a length against a radian.
+    if dof_offset is not None and int(dof_offset[len(nodes)]) != 2 * len(nodes):
+        raise NotImplementedError(
+            "fem_solver='newton' found rotational degrees of freedom in the "
+            "displacement vector. Its displacement bound is a length. Run this "
+            "model on the default viscoplastic solver.")
+
     groups = _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem)
-    pattern = _nr_prepare_assembly(groups, free_dofs, n_dof)
+    bars = _nr_build_bars(fem_data)
+    pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars)
 
     # ---- external load -------------------------------------------------------
     # Effective-stress formulation, exactly as the viscoplastic path builds it:
@@ -6446,7 +6594,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         ok, u_try, it, _fe, oob_here, rel_du = _nr_equilibrate(
             groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
             _oob, nr_max_iter, u_elastic_scale, debug_level=debug_level,
-            label=f"lam={lam_try:.4f}")
+            label=f"lam={lam_try:.4f}", bars=bars)
         n_force_evals += _fe
         total_iterations += it
         if ok:
@@ -6486,7 +6634,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # A trial that reached full load must still pass the SAME force-equilibrium
     # gate the viscoplastic verdict is read on, or it is not converged.
     if converged:
-        fint, _, _ = _nr_internal_force(groups, u, n_dof)
+        fint, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars)
         n_force_evals += 1
         r_full = np.zeros(n_dof)
         r_full[free_dofs] = (base_loads - fint)[free_dofs]
@@ -6511,8 +6659,31 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # ---- reporting ----------------------------------------------------------
     for grp in groups:
         grp['_u'] = u
-    _nr_internal_force(groups, u, n_dof)          # refresh _sig / _branch at u
+    # refresh _sig / _branch (and the bar forces) at the reported state
+    _nr_internal_force(groups, u, n_dof, bars=bars)
     n_force_evals += 1
+
+    # ---- reinforcement diagnostics ------------------------------------------
+    # The same three arrays the viscoplastic path returns, at full 1D-element
+    # length so every reader indexes them the same way: the force each bar actually
+    # delivers (the elastic k*delta clipped into [0, t_allow], which is what
+    # forces_1d means on both drivers), which bars are AT their capacity, and the
+    # post-peak set — necessarily empty, since softening is refused above.
+    #
+    # One convention difference is deliberate and is not a defect on either side.
+    # The viscoplastic driver's failed mask LATCHES: it records every bar that
+    # exceeded its capacity at any point in the iteration history, including the
+    # elastic predictor's overshoot before the soil sheds load into the bars. This
+    # one is read on the reported state, so it says which bars are at capacity in
+    # the field being exported. The Newton mask is therefore a subset.
+    n_1d_total = len(fem_data.get("elements_1d", np.array([]).reshape(0, 3)))
+    forces_1d_out = np.zeros(n_1d_total)
+    failed_1d_out = np.zeros(n_1d_total, dtype=bool)
+    softened_1d_out = np.zeros(n_1d_total, dtype=bool)
+    if bars is not None:
+        for bg in bars:
+            forces_1d_out[bg['idx']] = bg['_T_true']
+            failed_1d_out[bg['idx']] = bg['_T'] > bg['t_cap'] + 1e-9
 
     # ---- the verdict's own evidence -----------------------------------------
     # A converged Newton trial asserts two things about the slope: that full
@@ -6587,7 +6758,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     if _nr_export is not None:
         # Hand the live solve state to the ramp driver, which continues it.
         _nr_export.update({
-            'groups': groups, 'pattern': pattern, 'base_loads': base_loads,
+            'groups': groups, 'bars': bars,
+            'pattern': pattern, 'base_loads': base_loads,
             'oob_fn': _oob, 'h_eps': h_eps, 'u_elastic_scale': u_elastic_scale,
             'free_dofs': free_dofs, 'n_dof': n_dof, 'u': u,
             'disp_limit': nr_disp_limit, 'prep': prep,
@@ -6689,9 +6861,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "nr_step_cuts": n_cuts,
         "nr_step_iterations": step_iters,
         "nr_load_factor": float(lam),
-        "forces_1d": np.array([]),
-        "failed_1d_elements": np.array([], dtype=bool),
-        "softened_1d_elements": np.array([], dtype=bool),
+        # Empty arrays on a model with no bars, exactly as the viscoplastic path
+        # returns them there (`forces_1d if has_1d_elements else np.array([])`).
+        "forces_1d": forces_1d_out,
+        "failed_1d_elements": failed_1d_out,
+        "softened_1d_elements": softened_1d_out,
         "forces_pile_axial": np.array([]),
         "forces_pile_lateral": np.array([]),
         "forces_pile_moment": np.zeros((0, 2)),
@@ -6795,7 +6969,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                 sol0.get('nr_force_evals', 0), sol0['unbalanced_force_ratio'],
                 sol0['max_displacement'], 'cold', sol0.get('exit_reason'))
 
-    groups, pattern = ctx['groups'], ctx['pattern']
+    groups, pattern, bars = ctx['groups'], ctx['pattern'], ctx.get('bars')
     base_loads, oob_fn = ctx['base_loads'], ctx['oob_fn']
     free_dofs, n_dof = ctx['free_dofs'], ctx['n_dof']
     h_eps, u_el = ctx['h_eps'], ctx['u_elastic_scale']
@@ -6838,7 +7012,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
         ok, u_try, it, fe, oob, _rel = _nr_equilibrate(
             groups, pattern, u, base_loads, free_dofs, n_dof, h_eps, force_tol,
             oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
-            label=f"ramp F={F_try:.4f}")
+            label=f"ramp F={F_try:.4f}", bars=bars)
         total_iters += it
         total_fevals += fe
         maxu = float(np.max(np.abs(u_try))) if u_try.size else 0.0

@@ -1382,3 +1382,322 @@ for the variant. Either outcome is written.
   something this design does not have — if the tangent has to be fudged, if the
   verdicts move, if the diagnostics disagree with the viscoplastic driver's — that
   is the result.
+
+
+### REINFORCEMENT — results
+
+Same machine and settings as everything above: `force_tol` 1e-3, hybrid criterion,
+`capture_failure_state=False`, tolerance 0.01, tri6.
+
+#### What was built
+
+`_nr_build_bars` and `_nr_bar_force` in `xslope/fem.py`, threaded through
+`_nr_internal_force`, `_nr_prepare_assembly`, `_nr_assemble_tangent`,
+`_nr_equilibrate` and the ramp. The guard no longer refuses 1D elements; it refuses
+piles, and it refuses post-peak softening by name, counting the elements that
+declare it.
+
+**The tangent is exact, and that is measured rather than asserted.** 400 random bar
+elements at random orientations, lengths and rigidities, four-DOF and six-DOF, with
+the displacement drawn to land on all three branches (73 active, 212 slack, 115 at
+capacity): the analytic element tangent matches a central difference of the
+element's own internal force to **3.5e-10** relative on the two-node bar and
+**2.0e-10** on the three-node bar. A yielded two-node bar keeps exactly no stiffness;
+a yielded three-node bar keeps a rank-one positive-semidefinite block, which is the
+midside node's departure from the chord and nothing else. Trials whose perturbation
+straddled a branch boundary were skipped, since a central difference there averages
+two tangents; none of the 400 did.
+
+#### The locked benchmarks are refused, and that is not a formality
+
+Both of the repository's reinforced FEM benchmarks —
+`docs/fem/files/xslope_reinforce_fem.xlsx` (FS 1.497) and
+`docs/tutorials/files/xslope_reinforced_slope.xlsx` (FS 1.496) — ship with
+`t_res` = 600 against `t_max` = 800, so both declare post-peak softening and both
+are refused by the guard. The comparison therefore runs the softening-DISABLED
+variant of each, on both drivers.
+
+Whether that variant is the same model was measured rather than assumed, and it is
+NOT. On the geogrid sample the viscoplastic bisection reads **1.4969 as shipped and
+1.5594 with softening unset** at the locked tri6/2.0 mesh — 0.0625 apart, six
+bisection cells — and 1.5594 against 1.5969 at the coarse tri6/4.0 mesh used below.
+Softening is doing real work on these models. So the locked values check the
+viscoplastic driver on the shipped files, which reproduce them (1.496875 against
+1.497 at the locked mesh), and the Newton comparison stands on the viscoplastic
+answer for the variant it can actually solve.
+
+**The consequence is the first honest negative: the Newton driver cannot reproduce
+either of the repository's published reinforced factors of safety, because both are
+defined on a constitutive law it refuses.**
+
+#### The comparison
+
+All five rows on the softening-disabled model, tri6. The first four are the coarse
+mesh (563 elements, 36 bar elements, all carrying capacity) on which the Newton
+driver is well behaved; the fifth is the LOCKED mesh (2101 elements), on which it is
+not.
+
+| Case | Mesh | Layout | VP FS | Newton FS | gap | Ramp FS | ramp − Newton |
+|---|---|---|---|---|---|---|---|
+| Geogrid sample | tri6, 4 | 6 layers, t_max 800 | 1.5969 | 1.6094 | +0.0125 | 1.6094 | **0.0000** |
+| FEM-2 tutorial | tri6, 4 | 6 layers, t_max 800 | 1.5977 | 1.6055 | +0.0078 | 1.6031 | −0.0023 |
+| Half capacity | tri6, 4 | 6 layers, t_max 400 | 1.4113 | 1.4113 | **0.0000** | 1.4031 | −0.0082 |
+| Three layers | tri6, 4 | layers 1, 3, 5 only | 1.2285 | 1.0879 | **−0.1406** | 1.0531 | −0.0348 |
+| Geogrid sample | tri6, 2 | 6 layers, t_max 800 | 1.5594 | 1.2719 | **−0.2875** | 1.2406 | −0.0313 |
+
+The reinforcement is doing real work on every row and the two drivers see the same
+work: halving the capacity moves the viscoplastic answer from 1.5969 to 1.4113 and
+the Newton answer from 1.6094 to 1.4113, and dropping three of the six layers moves
+the viscoplastic answer to 1.2285. The half-capacity row — the one where the bars are
+most heavily engaged, with the largest number of them sitting at their cap — is the
+row where the two drivers agree EXACTLY, interval for interval,
+[1.4078125, 1.41484375] on both.
+
+And two rows are badly wrong, both LOW.
+
+#### Where it breaks, and what breaks it
+
+The failure is not in the bars. On the locked mesh the Newton verdict as a function
+of strength is:
+
+| F | 1.2 | 1.3 | 1.4 | 1.45 | 1.5 | 1.55 | 1.6 |
+|---|---|---|---|---|---|---|---|
+| verdict | CONVERGED | FAILED | FAILED | **CONVERGED** | FAILED | FAILED | FAILED |
+| iterations | 39 | 599 | 880 | 73 | 261 | 628 | 58 |
+| load factor reached | 1.00 | **0.00** | 0.69 | 1.00 | **0.00** | 0.29 | 0.00 |
+
+A slope that stands at F = 1.45 stands at F = 1.3. The F = 1.3 and F = 1.5 trials do
+not merely fail — they carry NO load at all, failing at every increment from full
+gravity down to the 1/64 floor, at a maximum displacement of 0.0016 m on a 34 m
+model. That is not a statement about the slope.
+
+**The mechanism was tested and it is the soil, not the reinforcement.** Recording
+the active set at every tangent re-form of the F = 1.3 trial: the bar active set
+flips 817 times over 591 re-forms and is UNCHANGED on 461 of them, one or two bars at
+a time. The soil branch set flips 52,441 times over the same 591 re-forms — about 89
+Gauss points changing branch per tangent, never settling. At F = 1.2, where the same
+model converges in 39 iterations, the soil flips fall from 116 to 1 over the last 25
+re-forms and the solve ends. The tension-only kink in the bar law, which was the
+obvious suspect, is not what is churning.
+
+Two controls place it further. Removing the reinforcement entirely and re-running:
+both drivers converge at F = 1.0 and both fail at F = 1.2, so the unreinforced slope
+genuinely does not stand there and the "no bars, no convergence" reading is physics
+rather than a defect. And the model's lower material is **c = 0, phi = 37** — a
+cohesionless base whose Mohr-Coulomb apex sits at the origin, so every tensile Gauss
+point returns to the apex, where the consistent tangent is zero. The reinforcement is
+what holds this slope up, and the Newton driver's difficulty is in solving the soil it
+holds up, at meshes fine enough to resolve it.
+
+Mesh by mesh, at strengths either side of the limit (`CONV`/`FAIL`, iterations):
+
+| Mesh | elements | F = 1.2 | F = 1.4 | F = 1.5 | F = 1.6 |
+|---|---|---|---|---|---|
+| tri6, 4 | 563 | CONV 17 | CONV 21 | CONV 28 | CONV 46 |
+| tri6, 3 | 978 | CONV 21 | CONV 158 | CONV 39 | FAIL 921 |
+| tri6, 2 | 2101 | CONV 39 | FAIL 880 | FAIL 261 | FAIL 58 |
+
+It degrades monotonically with refinement, which is the opposite of what a
+convergent scheme should do.
+
+#### The bar diagnostics
+
+`forces_1d`, `failed_1d_elements` and `softened_1d_elements` come back at full
+1D-element length on every row, and every structural property holds on every row: no
+bar reports a compressive force, no bar carries more than the capacity its embedment
+develops, every element the failed mask marks sits at that capacity to within 1e-6 of
+it, and the post-peak set is empty — the only value reachable while softening is
+refused. The halved-capacity variant reports a largest force of exactly 400.0 against
+the unmodified model's 800.0, so the cap being enforced is the model's cap.
+
+Against the viscoplastic driver's bar forces at the same strength, on the same model:
+
+| Case | largest T, Newton | largest T, viscoplastic | ΣT, Newton | ΣT, viscoplastic | at capacity, N / VP | worst per-bar gap |
+|---|---|---|---|---|---|---|
+| Geogrid | 800.0 | 800.0 | 18,991 | 18,264 | 19 / 16 | 0.20 |
+| FEM-2 | 800.0 | 800.0 | 18,343 | 18,216 | 18 / 16 | 0.12 |
+| Half capacity | 400.0 | 400.0 | 7,995 | 9,687 | 13 / 25 | 0.41 |
+| Three layers | 107.5 | 272.2 | 350 | 1,086 | 0 / 0 | 0.76 |
+
+The at-capacity counts are not expected to match exactly and their difference is not
+a defect: the viscoplastic mask LATCHES every bar that exceeded its capacity at any
+point in the iteration history, including the elastic predictor's overshoot before
+the soil sheds load into the bars, while the Newton mask is read on the reported
+state. The Newton mask is a subset by construction, and the code says so.
+
+The force gaps are a different matter and only the first two are comfortable. Where
+both drivers reach the same equilibrium the totals agree to 0.7% and 4%. Where the
+bisection midpoint sits above the last standing trial — the geogrid and
+half-capacity rows, where BOTH drivers report the trial failed — the comparison is
+between two failed states and means little. The three-layer row is the one that
+should worry a reader: both drivers CONVERGE there, and the Newton field has the bars
+carrying 350 against the viscoplastic field's 1,086, a factor of three. Two
+converged states, two very different degrees of reinforcement engagement. In the
+fully elastic regime the two agree exactly — at F = 0.2 and F = 0.5 on the locked
+mesh both report a largest bar force of 15.4 and their displacement fields agree to
+7e-7 and 3e-5 — so this is not a formulation difference in the bar; it is the two
+drivers arriving at different elastoplastic states, and a tension-only bar reads that
+difference much more sharply than the soil does.
+
+#### Work
+
+Constitutive work, on the coarse mesh where the answers are comparable:
+
+| Case | VP iterations | VP wall | Newton iterations | Newton wall | Ramp iterations | Ramp force evals | Ramp wall |
+|---|---|---|---|---|---|---|---|
+| Geogrid | 88,614 | 49.2 s | 3,278 | 36.9 s | 711 | 4,451 | 7.3 s |
+| FEM-2 | 67,907 | 44.2 s | 1,851 | 22.4 s | 528 | 3,108 | 5.4 s |
+| Half capacity | 86,918 | 52.6 s | 1,897 | 21.3 s | 526 | 3,355 | 5.5 s |
+| Three layers | 109,969 | 60.9 s | 2,347 | 25.1 s | 179 | 1,296 | 2.1 s |
+
+Newton runs 27x to 47x fewer iterations than the viscoplastic driver and 1.3x to
+2.5x less wall time; the ramp is 6.7x, 8.2x, 9.6x and 29x faster than the
+viscoplastic driver in wall time. Reinforcement costs the Newton assembly almost
+nothing — the bar blocks are 36 dense 6x6 matrices against 563 elements' worth of
+soil — so the speed picture is the unreinforced one, unchanged.
+
+#### The unreinforced path is unchanged
+
+Measured against a control run of the parent commit (`318c5686`, the driver before
+the bar element existed) staged in a separate package tree, not against a number in
+this document. Two runs on each:
+
+- **Griffiths & Lane 1, tri6, 3.5, Newton bisection.** FS 1.3656249999999999 on both,
+  and the same nine trials in the same order with the same verdicts and the same
+  iteration counts: (1.0 CONVERGED 10), (1.8 FAILED 482), (1.4 FAILED 354),
+  (1.2 CONVERGED 13), (1.3 CONVERGED 16), (1.35 CONVERGED 26), (1.375 FAILED 566),
+  (1.3625 CONVERGED 32), (1.36875 FAILED 861). Identical.
+- **Griffiths & Lane 6 dry, quad8, 2, no `fem_solver` — the default path.**
+  FS 2.421875 on both, per-trial iterations 147, 781, 3393, 2031, 2841, 9541, 12000,
+  8617, 8777 on both. Identical, and the same sequence recorded in the corrections
+  above.
+
+A model with no 1D elements takes `bars = None` through every new code path, and
+`np.bincount` over an unchanged pattern is bit-identical, which is what those two
+runs confirm rather than assume.
+
+#### The ramp does not rescue it
+
+The obvious hypothesis for the two bad rows was the loading path: the bisection drops
+each trial back to zero and re-applies gravity, so the tension-only bars re-engage
+from nothing every time, and the ramp — one warm-started history, gravity applied
+once — should not have that problem.
+
+**Falsified.** The ramp reads 1.2406 against the viscoplastic 1.5594 on the locked
+mesh, and 1.0531 against 1.2285 on the three-layer variant. It agrees with the
+Newton bisection to 0.0313 and 0.0348 there, which is to say it agrees with the
+Newton driver and not with the answer. On the three rows where the bisection is
+sound the ramp tracks it to 0.0000, −0.0023 and −0.0082, so the ramp is doing what
+the ramp does; it inherits the per-step solve, and the per-step solve is what fails.
+
+#### The criterion, line by line
+
+**Correctness — NOT MET.** Two of the five rows agree with the viscoplastic driver
+inside the 0.01 bisection tolerance (half capacity at 0.0000, exactly, interval for
+interval; FEM-2 at +0.0078). The geogrid sample misses by a quarter of a cell at
++0.0125. Two rows are wrong by 0.14 and 0.29, both LOW, and the low direction is
+unconservative in the sense that matters here: the reinforced slope is reported as
+weaker than it is, which is safe for a design but wrong as a measurement, and it is
+wrong because the solver could not carry a load rather than because the slope could
+not.
+
+**Locked values — NOT MET, by construction.** Both published reinforced factors of
+safety are defined on models that declare post-peak softening, which this driver
+refuses. The viscoplastic driver reproduces its own lock on the shipped file
+(1.496875 against 1.497), and the softening-disabled variant it can be compared
+against is a different model by 0.0625.
+
+**The ramp agrees with the Newton bisection — MET on three of five** (0.0000,
+−0.0023, −0.0082) and missed on the two rows where both routes are wrong (−0.0348,
+−0.0313). It agrees with the driver, which is all this clause ever asked.
+
+**The diagnostics — MET structurally, PARTLY MET against the viscoplastic driver.**
+All three arrays come back at full 1D-element length on every row; no bar reports a
+compressive force or a force above the capacity its embedment develops; every element
+the failed mask marks is at that capacity; the post-peak set is empty everywhere; and
+the halved-capacity variant reports a largest force of exactly 400.0 against 800.0.
+Against the viscoplastic driver's forces the totals agree to 0.7% and 4.0% where the
+two reach the same state, and differ by a factor of three on the three-layer row
+where both converge to different states.
+
+**The unreinforced path — MET, exactly.** Identical factor of safety and identical
+per-trial iteration sequences against a control run of the parent commit, on both the
+Newton bisection and the default viscoplastic path.
+
+**Work — reported.** 27x to 47x fewer iterations than the viscoplastic driver and
+1.3x to 2.5x less wall time on the bisection; 6.7x to 29x less wall time on the ramp.
+Reinforcement itself costs the assembly almost nothing.
+
+**The refusals — MET.** A model declaring softening raises with the count of bar
+elements that declare it; a pile model raises naming piles; and the three envelope
+guards closed earlier this session still fire.
+
+#### Verdict
+
+The bar element is right, and the Newton driver it is bolted to is not ready to
+answer a reinforced question.
+
+Everything that can be checked about the bar checks out. Its consistent tangent
+matches a central difference of its own residual to 1e-10 on all three branches, and
+a yielded bar keeps exactly the stiffness it should keep and no more. In the elastic
+regime the two drivers report the same bar force to the last digit and the same
+displacement field to 1e-7. The capacity is enforced — no bar anywhere carries more
+than its embedment develops, halving the capacity halves the largest reported force
+exactly, and it moves the viscoplastic answer from 1.5969 to 1.4113 and the Newton
+answer from 1.6094 to the same 1.4113. That half-capacity row, where the most bars
+are pinned at their cap and the bar law is doing the most work, is the row where the
+two drivers agree exactly, interval for interval. Strength reduction leaves the
+reinforcement alone, as the vendor convention requires, and a bar at capacity holds
+the same force at two different strength reductions.
+
+What does not work is the solve around it. On two of five rows the Newton answer is
+0.14 and 0.29 below the viscoplastic one, and the mechanism is measured rather than
+guessed: on the locked mesh the driver converges at F = 1.2, fails at 1.3 and 1.4,
+converges again at 1.45, and fails above — and the failures at 1.3 and 1.5 carry NO
+load at all, giving up at every increment down to the 1/64 floor at a displacement of
+1.6 mm on a 34 m model. Instrumenting the active set at every tangent re-form of that
+trial puts the churn in the soil and not in the bars: 52,441 soil branch flips over
+591 re-forms, never settling, against 817 bar flips of which most re-forms have none.
+It gets monotonically worse with mesh refinement — clean at 563 elements, marginal at
+978, broken at 2101 — which is the opposite of what a convergent scheme does. The
+ramp inherits it rather than curing it. And the model that exposes it is not exotic:
+its lower material is c = 0, phi = 37, so every tensile Gauss point returns to the
+Mohr-Coulomb apex where the consistent tangent is zero, and a reinforced slope is
+precisely the kind of model that stands only because something carries the tension the
+soil cannot.
+
+So the honest reading is narrower than "reinforcement works". The bar element is a
+correct, exact, cheap addition that costs the assembly nothing and is ready to be
+carried forward. The reinforced factor of safety it produces is only as good as the
+Newton solve underneath it, and on the reinforced corpus that solve is unreliable at
+the meshes the locks are written on. Two things would have to happen before a
+reinforced Newton answer could be quoted: the apex/zero-tangent regime would need
+whatever regularization or line-search treatment makes a c = 0 material solvable at
+practical refinement, which is a soil problem this round did not open; and post-peak
+softening would need a treatment, because without it the driver cannot reach either
+of the repository's published reinforced values at all. Until then the extension's
+value is that it makes reinforced models *reachable* on the Newton path rather than
+refused, and that it exposed where the driver actually fails — which is not where
+this round expected to find it.
+
+#### What the corpus could not supply
+
+The criterion asked for a third reinforced benchmark with a different layout, grepped
+from the corpus. The corpus does not have one that the Newton driver can solve. Every
+reinforced model in `docs/` was scanned: 39 files carry reinforcement lines, and of
+those only seven also carry the E and area a bar element needs. `vp060` and `vp032a/c`
+declare a Rankine tension cutoff, which the guard refuses; `vp060` also carries K0
+initial stress. `gs2_18` fails to factorize its own elastic stiffness. `vp030a` and
+`vp030b` did not complete a single trial inside a ten-minute budget in either
+configuration and were not pursued. `vp032b` and `vp088` fail on the Newton driver at
+every strength tried — and with their reinforcement stripped out they fail
+IDENTICALLY, which places that failure in the soil, not the bars; both carry
+cohesionless materials at a free face.
+
+The third and fourth cases here are therefore constructed rather than found: the same
+soil and the same six lines at half capacity, and the same soil with three of the six
+lines. Both are real models that both drivers solve, both change the answer
+substantially (1.5969 to 1.4113 and to 1.2285 on the viscoplastic driver), and the
+first of them is the most severe test of the bar law in this round because it puts
+the most bars at their cap. Neither is a substitute for a vendor-verified reinforced
+benchmark, and the reason there is none in this table is the finding above.

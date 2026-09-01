@@ -68,6 +68,14 @@ Mohr-Coulomb, so a Hoek-Brown, power-curve or suction-bearing model must raise
 rather than be solved on the wrong strength envelope; each is built as a real model
 and the refusal message has to name the feature.
 
+Reinforcement (SPIKE.md, "REINFORCEMENT") is the one feature the driver DOES carry,
+and it is checked from both sides. What it carries: a reinforced bisection lands on
+the strength measured for its mesh, its bar forces stay inside the capacity the
+embedment develops, the bars it marks failed sit at that capacity, and a capped bar
+holds the same force at two strength reductions — the reinforcement keeps its
+capacity while the soil loses its. What it refuses: post-peak softening, which both
+locked reinforced benchmarks declare, and piles.
+
 Run directly:  PYTHONPATH=. python3 test/nr_ssrm_check.py
 """
 
@@ -103,6 +111,24 @@ F_STANDS, F_FAILS = 1.35, 1.45
 # whole bisection.
 QUAD9_SIZE = 3.5
 Q9_ADMISSIBLE, Q9_INADMISSIBLE = 1.396875, 1.400
+
+# The reinforced case (SPIKE.md, "REINFORCEMENT"). The FEM reinforcement sample —
+# six geogrid layers in an embankment — on a mesh coarse enough for the suite. It
+# ships declaring post-peak softening (t_res 600 against t_max 800), which the
+# Newton driver refuses, so the solved model has t_res unset: elastic-perfectly-
+# plastic reinforcement, which is the model's own default and what the bar law the
+# driver implements describes.
+REINF_MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'fem' / 'files'
+               / 'xslope_reinforce_fem.xlsx')
+REINF_SIZE = 4.0
+REINF_F_MIN, REINF_F_MAX = 1.2, 1.8
+# Measured on this checkout, 2026-09-01: the Newton bisection reports 1.6078 on the
+# interval [1.60313, 1.61250]. Locked to this mesh rather than to a published value,
+# because the published reinforced values (1.497, 1.496) are defined on the SHIPPED
+# models, which declare softening and which this driver refuses — see SPIKE.md,
+# "REINFORCEMENT — results".
+REINF_LOCKED_FS = 1.6078
+REINF_TOL = 0.02
 
 
 def _mesh(element_type=ELEMENT_TYPE, target_size=TARGET_SIZE):
@@ -162,6 +188,8 @@ def run():
     failures += check_step_control_not_decisive(fem_data)
     failures += check_displacement_bound()
     failures += check_unsupported_features_refuse()
+    failures += check_reinforcement_refusals()
+    failures += check_reinforcement()
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
 
@@ -575,6 +603,198 @@ def check_unsupported_features_refuse():
     return fails
 
 
+def _reinf_fem_data(path=None, target_size=REINF_SIZE, soften=False):
+    """A reinforced model, meshed with its reinforcement lines as constraints.
+
+    ``soften=False`` unsets ``t_res`` on every line, which is the model's own
+    "no post-peak drop" default and the law the Newton bar element implements:
+    tension-only, elastic-perfectly-plastic at the capacity the embedment develops.
+    ``soften=True`` leaves the file as it ships, which is what the guard refuses.
+    """
+    from xslope.mesh import extract_constraint_line_geometry
+    slope_data = load_slope_data(str(path or REINF_MODEL))
+    if not soften:
+        for line in slope_data.get('reinforcement_lines', []) or []:
+            line['t_res'] = float('nan')
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+    mesh = build_mesh_from_polygons(
+        get_material_polygons(slope_data, reinf_lines=lines),
+        target_size=target_size, element_type='tri6', lines=lines,
+        element_size_1d=slope_data.get('element_size_1d'))
+    return build_fem_data(slope_data, mesh)
+
+
+def check_reinforcement_refusals():
+    """Bars are carried. Softening bars and piles are not, and they say so.
+
+    The scope line is the whole point of the guard: the Newton driver's bar element
+    is tension-only and elastic-perfectly-plastic, so a model whose bars declare a
+    RUPTURE residual below the capacity their embedment develops is describing a law
+    the driver does not implement. That law changes between solves — the post-peak
+    set is a converged-state fixed point that re-opens the iteration each time it
+    grows — which is where a Newton continuation is weakest.
+
+    This matters more than an ordinary guard because the model it refuses is the
+    shipped FEM reinforcement sample: both of the repository's locked reinforced FEM
+    benchmarks declare t_res = 600 against t_max = 800. If the guard stopped firing,
+    the driver would silently solve them with the bars holding their peak capacity
+    forever and return a factor of safety that is too high and looks right.
+    """
+    fails = []
+    shipped = _reinf_fem_data(soften=True)
+    n_soft = int(np.count_nonzero(
+        np.isfinite(np.asarray(shipped['t_res_by_1d_elem']))
+        & (np.asarray(shipped['t_res_by_1d_elem'])
+           < np.asarray(shipped['t_allow_by_1d_elem']) - 1e-12)))
+    if n_soft == 0:
+        fails.append(
+            "the shipped reinforcement sample no longer declares post-peak "
+            "softening on any bar element, so the softening refusal is untested "
+            "here — the model, not the guard, has changed")
+    else:
+        try:
+            solve_fem(shipped, F=1.0, fem_solver='newton')
+        except NotImplementedError as exc:
+            if 'softening' not in str(exc):
+                fails.append(f"the Newton driver refused the softening model with a "
+                             f"message that does not name softening: {exc}")
+        else:
+            fails.append(
+                f"the Newton driver ACCEPTED a model declaring post-peak softening "
+                f"on {n_soft} bar element(s). Its bar element is elastic-perfectly-"
+                f"plastic, so those bars would hold their peak capacity forever and "
+                f"the factor of safety would come back too high.")
+
+    # Piles are beam elements with rotational degrees of freedom and a bending
+    # capacity. Narrowing the guard to bars must not have narrowed it past them.
+    pile_model = (Path(__file__).resolve().parents[1] / 'docs' / 'fem' / 'files'
+                  / 'xslope_piles_fem.xlsx')
+    if pile_model.exists():
+        fd = _reinf_fem_data(path=pile_model, target_size=4.0)
+        if not fd.get('n_pile_elements', 0):
+            fails.append("the pile test model carries no pile elements, so the pile "
+                         "refusal is untested")
+        else:
+            try:
+                solve_fem(fd, F=1.0, fem_solver='newton')
+            except NotImplementedError as exc:
+                if 'pile' not in str(exc):
+                    fails.append(f"the Newton driver refused the pile model with a "
+                                 f"message that does not name piles: {exc}")
+            else:
+                fails.append(
+                    "the Newton driver ACCEPTED a pile model. Pile nodes carry a "
+                    "rotational degree of freedom, which the driver's displacement "
+                    "bound would then be comparing against a length, and the beam's "
+                    "bending capacity is not in its element at all.")
+    return fails
+
+
+def check_reinforcement():
+    """A reinforced Newton trial: the answer, and the bars' own evidence.
+
+    The reinforcement sample on a coarse mesh, with softening unset so the Newton
+    driver will take it. Four things, and only the first is about the number:
+
+      * the Newton bisection lands on the strength measured for this mesh. Break the
+        capacity cap — let a bar carry more than its embedment develops — and the
+        slope holds at strengths it should not, so this moves.
+      * the diagnostics are populated at full 1D-element length and physically
+        consistent: no force outside [0, t_allow], every element the failed mask
+        marks sitting AT its capacity, and the post-peak set empty, which is the only
+        value reachable while softening is refused.
+      * the bars agree with the viscoplastic driver's, which is the independent
+        reading — the two solvers assemble the same bar from the same fem_data but
+        drive it by completely different iterations.
+      * the capacity is NOT reduced by F. Only the soil strength is, which is the
+        vendor convention and what the limit-equilibrium engine does. A bar at
+        capacity therefore reports the SAME force at two different strength
+        reductions; dividing t_allow by F would make it fall.
+    """
+    fails = []
+    fd = _reinf_fem_data()
+    n_1d = len(fd['elements_1d'])
+    t_allow = np.asarray(fd['t_allow_by_1d_elem'], dtype=float)
+    if n_1d == 0 or not np.any(t_allow > 1e-9):
+        return ["the reinforced test model carries no bar element with capacity, so "
+                "nothing below tests the reinforcement"]
+
+    res = solve_ssrm(fd, F_min=REINF_F_MIN, F_max=REINF_F_MAX, tolerance=0.01,
+                     force_tol=1e-3, fem_solver='newton', max_iterations=16000,
+                     capture_failure_state=False)
+    fs = res.get('FS')
+    if fs is None:
+        return [f"the reinforced Newton bisection returned no factor of safety "
+                f"({res.get('message') or res.get('error', 'no message')})"]
+    if abs(fs - REINF_LOCKED_FS) > REINF_TOL:
+        fails.append(
+            f"reinforced: FS = {fs:.4f} is {abs(fs - REINF_LOCKED_FS):.4f} from the "
+            f"{REINF_LOCKED_FS:.4f} measured for this mesh, outside {REINF_TOL:g}. "
+            f"A reinforced factor of safety that moves is most likely the bar law: "
+            f"a broken capacity cap lets the bars carry the slope past where they "
+            f"can.")
+
+    sol = solve_fem(fd, F=fs, fem_solver='newton', max_iterations=16000)
+    forces = np.asarray(sol.get('forces_1d', []), dtype=float)
+    at_cap = np.asarray(sol.get('failed_1d_elements', []), dtype=bool)
+    softened = np.asarray(sol.get('softened_1d_elements', []), dtype=bool)
+    if forces.shape != (n_1d,) or at_cap.shape != (n_1d,) or softened.shape != (n_1d,):
+        return fails + [
+            f"the reinforced Newton solution's diagnostics are not at 1D-element "
+            f"length ({forces.shape}, {at_cap.shape}, {softened.shape} against "
+            f"{n_1d}); every reader of forces_1d indexes them by element"]
+    if np.any(forces < -1e-9):
+        fails.append(f"{int(np.count_nonzero(forces < -1e-9))} bar(s) report a "
+                     f"COMPRESSIVE force; the bar element is tension-only")
+    over = forces > t_allow + 1e-6
+    if np.any(over):
+        fails.append(
+            f"{int(over.sum())} bar(s) carry more than the capacity their embedment "
+            f"develops (worst {np.max(forces[over] - t_allow[over]):.3g} over a cap "
+            f"of {t_allow[over][np.argmax(forces[over] - t_allow[over])]:.3g}). The "
+            f"capacity cap is what makes a reinforced slope failable at all.")
+    if at_cap.any():
+        off = np.abs(forces[at_cap] - t_allow[at_cap])
+        if np.max(off) > 1e-6 * max(1.0, float(t_allow.max())):
+            fails.append(f"a bar the failed mask marks is not at its capacity "
+                         f"(worst gap {np.max(off):.3g})")
+    if np.any(softened):
+        fails.append(f"{int(softened.sum())} bar(s) are reported in the post-peak "
+                     f"set on a driver that refuses softening")
+
+    # The independent reading: the viscoplastic driver, same model, same strength.
+    vp = solve_fem(fd, F=fs, max_iterations=16000)
+    f_vp = np.asarray(vp.get('forces_1d', []), dtype=float)
+    if f_vp.shape == forces.shape and f_vp.max() > 0:
+        gap = float(np.max(np.abs(forces - f_vp)) / f_vp.max())
+        if gap > 0.35:
+            fails.append(
+                f"the two drivers' bar forces differ by {gap:.2f} of the largest "
+                f"force at F = {fs:.4f}. They assemble the SAME bar from the same "
+                f"fem_data, so a gap this size is a difference in the bar law and "
+                f"not in the soil solve.")
+
+    # Capacity is not reduced by F: a bar at capacity holds it at every strength.
+    lo = solve_fem(fd, F=max(1.0, fs - 0.2), fem_solver='newton', max_iterations=16000)
+    f_lo = np.asarray(lo.get('forces_1d', []), dtype=float)
+    both = at_cap & np.asarray(lo.get('failed_1d_elements', []), dtype=bool)
+    if both.any():
+        drift = np.max(np.abs(forces[both] - f_lo[both]))
+        if drift > 1e-6 * max(1.0, float(t_allow.max())):
+            fails.append(
+                f"a bar at capacity reports {drift:.4g} more force at one strength "
+                f"reduction than at another. Only the SOIL strength is reduced — the "
+                f"reinforcement keeps its capacity, which is the vendor convention "
+                f"and what the LEM applies — so a capped bar's force cannot depend "
+                f"on F.")
+    elif not at_cap.any():
+        fails.append(
+            "no bar reaches its capacity at the critical strength on this mesh, so "
+            "the capped branch of the bar law — the branch that decides a reinforced "
+            "factor of safety — is not exercised here")
+    return fails
+
+
 def check_env_override_announces_itself():
     """A stale XSLOPE_FEM_SOLVER may not redefine the default in silence.
 
@@ -629,7 +849,9 @@ def main():
           "lands on the yield surface on every branch, a converged trial "
           "certifies its own stress field in force AND in displacement, neither "
           "the loading path nor the step control changes a verdict, Hoek-Brown, "
-          "power-curve and suction models are refused by name, and the "
+          "power-curve, suction, softening-bar and pile models are refused by "
+          "name, a reinforced bisection lands on its measured strength with every "
+          "bar force inside the capacity its embedment develops, and the "
           "environment override cannot swap the driver in silence. The monotonic "
           "ramp reaches the same limit along one warm-started history, reports it "
           "on the bisection's midpoint convention, and never solves past it.")

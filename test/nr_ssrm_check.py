@@ -219,10 +219,13 @@ def check_verdict_evidence(fem_data):
         fails.append(f"F = {F_STANDS} was expected to stand on this mesh and the "
                      f"Newton driver failed it ({sol.get('exit_reason')})")
         return fails
-    if sol['residual'] >= 1e-3:
+    # `unbalanced_force_ratio` is the like-for-like key: it is the Dawson
+    # out-of-balance on BOTH drivers. (`residual` is the relative displacement
+    # change on both, which is a different quantity and not the force gate.)
+    if sol['unbalanced_force_ratio'] >= 1e-3:
         fails.append(f"the converged trial at F = {F_STANDS} reports an "
-                     f"out-of-balance of {sol['residual']:.3e}, at or above the "
-                     f"1e-3 force tolerance it is meant to have passed")
+                     f"out-of-balance of {sol['unbalanced_force_ratio']:.3e}, at or "
+                     f"above the 1e-3 force tolerance it is meant to have passed")
     viol = sol.get('nr_max_yield_violation')
     if viol is None:
         fails.append("the Newton result carries no 'nr_max_yield_violation': a "

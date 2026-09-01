@@ -6239,6 +6239,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     exit_reason = 'converged'
     converged = True
     last_oob = 0.0
+    # The viscoplastic driver publishes max|du| / max|u| as `residual`. This is the
+    # same quantity on this path, recorded at the last accepted load increment, so
+    # the key means one thing on both drivers.
+    last_rel_du = 0.0
+    rel_du = 0.0
 
     while lam < 1.0 - 1e-12:
         step = min(dlam, 1.0 - lam)
@@ -6331,6 +6336,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                 alpha *= 0.5
             alpha = best_alpha if best_alpha is not None else 0.0
             u_try = u_try + alpha * du
+            _umax = float(np.max(np.abs(u_try)))
+            rel_du = (float(np.max(np.abs(alpha * du))) / _umax) if _umax > 0.0 else 0.0
             if debug_level >= 3:
                 print(f"      NR lam={lam_try:.4f} it={it:3d} "
                       f"||r||/||f||={r_norm / f_norm:.3e} oob={oob_here:.2e} "
@@ -6366,6 +6373,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             _nr_commit_plastic_strain(groups)
             lam = lam_try
             last_oob = oob_here
+            last_rel_du = rel_du
             n_steps += 1
             step_iters.append(it)
             if it <= _NR_COMFORT:
@@ -6424,8 +6432,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # ---- the verdict's own evidence -----------------------------------------
     # A converged Newton trial asserts two things about the slope: that full
     # gravity is carried in equilibrium, and that no Gauss point is outside the
-    # yield surface. `residual` already carries the first as the Dawson
-    # out-of-balance. This carries the second — the largest yield-function value
+    # yield surface. `unbalanced_force_ratio` already carries the first as the
+    # Dawson out-of-balance. This carries the second — the largest yield-function value
     # over every Gauss point, divided by that point's own strength scale, so it
     # reads as a fraction of the strength available there.
     #
@@ -6551,8 +6559,16 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "plastic_strains": {e: np.array(ep_by_gp[e]) for e in range(n_elements)},
         "algorithm": "Newton-Raphson, consistent Mohr-Coulomb tangent (psi = 0)",
         "F": F,
-        "residual": last_oob,
+        # `residual` means the SAME thing on both drivers: the relative change in
+        # the displacement field over the last iteration, max|du| / max|u|. It used
+        # to carry the out-of-balance here, which reads like the viscoplastic key of
+        # the same name but is a different physical quantity by three or more orders
+        # of magnitude, so any code comparing the two drivers on it was comparing
+        # nothing. The out-of-balance is `unbalanced_force_ratio` — like-for-like on
+        # both drivers — and `nr_last_oob` for the Newton-specific reading.
+        "residual": float(last_rel_du),
         "unbalanced_force_ratio": last_oob,
+        "nr_last_oob": last_oob,
         "plastic_fraction": (int(np.count_nonzero(plastic_elements)) / n_elements
                              if n_elements else 0.0),
         # Newton-specific accounting, read by the spike's measurement harness.

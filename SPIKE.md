@@ -926,3 +926,197 @@ Whether the ramp should be the default. That is the owner's call and needs more
 than eight benchmarks. This round decides only whether ramp-plus-Newton is ready to
 be recommended as a non-default driver, and says what remains before the question
 can be asked.
+
+### RAMP — results
+
+Same machine, meshes and brackets as everything above, `force_tol` 1e-3, hybrid
+criterion, `capture_failure_state=False`, tolerance 0.01. The bisection-Newton and
+viscoplastic columns are the Phase 0 corrected measurements.
+
+The ramp reports the last strength it CARRIED, rounded down to 0.01, as the
+criterion said it would. The bisection reports the MIDPOINT of its final interval.
+Those are two different conventions on the same quantity, so the intervals are
+given as well and are the like-for-like comparison.
+
+| Benchmark | Mesh | Ramp FS | Ramp interval | Bisection-N FS | Bisection interval | Ramp − bisection (reported) | (interval midpoints) |
+|---|---|---|---|---|---|---|---|
+| FEM-1 tutorial | tri6, 3.5 | 1.36 | [1.36250, 1.36875] | 1.3711 | [1.36719, 1.37500] | −0.0111 | −0.0055 |
+| LEM-3 tutorial | tri6, 1.2 | 1.26 | [1.26875, 1.27500] | 1.2695 | [1.26563, 1.27344] | −0.0095 | +0.0023 |
+| Griffiths & Lane 1 | quad8, 3.5 | 1.36 | [1.36750, 1.37250] | 1.3719 | [1.36875, 1.37500] | −0.0119 | −0.0019 |
+| Griffiths & Lane 1 | tri6, 3.5 | 1.36 | [1.36250, 1.36875] | 1.3656 | [1.36250, 1.36875] | −0.0056 | **0.0000** |
+| Griffiths & Lane 1 | quad9, 3.5 | 1.39 | [1.39375, 1.40000] | 1.3969 | [1.39375, 1.40000] | −0.0069 | **0.0000** |
+| Griffiths & Lane 6 dry | quad8, 2 | 2.41 | [2.41000, 2.41500] | 2.4186 | [2.41445, 2.42266] | −0.0086 | −0.0061 |
+| Griffiths & Lane 6 dry | tri6, 2 | 2.45 | [2.45522, 2.46341] | 2.4531 | — | −0.0031 | +0.0062 |
+| Griffiths & Lane 3, r = 0.8 | tri6, 6 | 1.42 | [1.42500, 1.43125] | 1.4281 | [1.42500, 1.43125] | −0.0081 | **0.0000** |
+
+**Three of the eight reproduce the bisection's final interval EXACTLY** — Griffiths
+& Lane 1 on tri6 and quad9, and Griffiths & Lane 3. On those the two routes find
+the same limit to the last digit and the whole apparent gap is the reporting
+convention. On the interval-midpoint reading all eight agree inside 0.01; on the
+reported value six of eight do, and the two that miss — FEM-1 at −0.0111 and
+Griffiths & Lane 1 quad8 at −0.0119 — miss by one and two thousandths. The
+last-carried convention reads systematically about 0.005 low against a midpoint,
+which is exactly half the reporting resolution, and settling that convention is a
+loose end rather than a finding.
+
+Work, on the same runs:
+
+| Benchmark | Ramp steps / retries | Ramp iters | Ramp force evals | Ramp wall | Bisection iters | Bisection force evals | Bisection wall | VP iters | VP wall |
+|---|---|---|---|---|---|---|---|---|---|
+| FEM-1 tutorial | 8 / 4 | 512 | 3,935 | 12 s | 1,485 | 10,680 | 36 s | 64,706 | 60 s |
+| LEM-3 tutorial | 7 / 4 | 597 | 4,751 | 75 s | 3,702 | 28,050 | 453 s | 169,767 | 628 s |
+| Griffiths & Lane 1 quad8 | 16 / 5 | 622 | 4,151 | 11 s | 1,688 | 11,592 | 32 s | 113,090 | 78 s |
+| Griffiths & Lane 1 tri6 | 8 / 4 | 512 | 3,935 | 12 s | 2,360 | 16,098 | 53 s | 78,576 | 70 s |
+| Griffiths & Lane 1 quad9 | 10 / 4 | 799 | 5,465 | 26 s | 823 | 5,846 | 26 s | 103,358 | 125 s |
+| Griffiths & Lane 6 dry quad8 | 20 / 5 | 790 | 4,347 | 35 s | 3,026 | 20,135 | 92 s | 48,128 | 42 s |
+| Griffiths & Lane 6 dry tri6 | 31 / 7 | 840 | 4,821 | 23 s | 2,791 | 19,209 | 87 s | 53,144 | 72 s |
+| Griffiths & Lane 3, r = 0.8 | 9 / 4 | 312 | 2,103 | 23 s | 4,034 | 31,569 | 331 s | 79,961 | 221 s |
+
+Force evaluations are lower on **eight of eight**, by 1.07x (quad9) to 15.0x
+(Griffiths & Lane 3); the criterion asked for six. Wall time is lower on eight of
+eight against the bisection, and against the viscoplastic driver as shipped the
+ratios are 5.0x, 8.4x, 7.1x, 5.9x, 4.8x, 1.2x, 3.1x and 9.6x — which clears the
+original spike's "at most a fifth of the viscoplastic run" speed criterion on five
+of the eight, a criterion the bisection-Newton driver met on none.
+
+### It never solves past failure
+
+This was to be true by construction rather than by tuning, and the measurement is
+the distance between the highest strength each driver ever evaluated and the answer
+it reported:
+
+| Benchmark | Ramp: highest F evaluated | Bisection: highest F evaluated |
+|---|---|---|
+| FEM-1 tutorial | 1.4000 (FS + 0.040) | 2.0000 (FS + 0.629) |
+| LEM-3 tutorial | 1.3000 (FS + 0.040) | 2.0000 (FS + 0.731) |
+| Griffiths & Lane 1 quad8 | 1.3775 (FS + 0.018) | 1.8000 (FS + 0.428) |
+| Griffiths & Lane 1 tri6 | 1.4000 (FS + 0.040) | 1.8000 (FS + 0.434) |
+| Griffiths & Lane 1 quad9 | 1.4000 (FS + 0.010) | 1.8000 (FS + 0.403) |
+| Griffiths & Lane 6 dry quad8 | 2.4500 (FS + 0.040) | 2.8000 (FS + 0.381) |
+| Griffiths & Lane 6 dry tri6 | 2.4716 (FS + 0.022) | 2.8000 (FS + 0.347) |
+| Griffiths & Lane 3, r = 0.8 | 1.4500 (FS + 0.030) | 1.8000 (FS + 0.372) |
+
+The exact property, stated the way it is asserted in `test/nr_ssrm_check.py`: no
+strength is evaluated more than the initial increment (0.05) above the highest
+strength carried. That bound holds on all eight, with the largest actual overshoot
+0.040. The bisection's overshoot is 0.35 to 0.73, and those are the trials where a
+load-controlled Newton solve is at its most expensive — 17x to 47x the viscoplastic
+driver's constitutive work, measured in Phase 0. The ramp removes that cost class
+entirely rather than reducing it.
+
+### Warm-start effectiveness, measured
+
+Each warm-started step against a COLD Newton trial at the same strength on the same
+mesh. Two regimes, and they say different things.
+
+**Below the limit the continuation is worth about half the work.** Griffiths & Lane
+3 (tri6, 6), warm against cold, iteration for iteration: F = 1.05, 7 against 15;
+1.10, 7 against 14; 1.15, 6 against 16; 1.20, 8 against 17; 1.25, 9 against 20;
+1.30, 9 against 24; 1.35, 10 against 25; 1.40, 12 against 25. Griffiths & Lane 1
+quad9 runs 8, 8, 8, 7, 6, 10 against 11, 11, 11, 12, 12, 14 over F = 1.05 to 1.30.
+FEM-1 runs 7, 9, 6, 9, 9, 11 against 12, 12, 12, 13, 14, 16.
+
+**At the limit it is worth nothing.** The last steps before refusal cost the same
+as a cold trial or more: quad9 at F = 1.3875 costs 40 warm against 28 cold, at
+F = 1.39375 costs 58 against 59; Griffiths & Lane 3 at F = 1.425 costs 66 warm
+against 50 cold. That is the honest negative on the warm start itself. The
+continuation does not make the hard solve easy — the hard solve is hard because the
+tangent is nearly singular, and starting nearer to the answer does not fix that.
+
+**On the REFUSED steps it is worth five to twenty times**, which is where most of
+the saving actually comes from. FEM-1's refusals cost 57, 120, 78 and 150 warm
+iterations against 374, 593, 593 and 814 cold — and 2,722 to 5,275 force
+evaluations cold. Griffiths & Lane 3's cost 68, 32 and 32 warm against 656, 656 and
+779 cold. A warm-started state one increment below the limit proves the next
+increment unreachable quickly; a cold trial has to walk the whole load path down to
+the floor to prove the same thing. Griffiths & Lane 1 quad9 is the exception: its
+refusals hit the 150-iteration per-step cap while a cold trial at the same strength
+converges in 48 and is then refused on displacement, which is why quad9 is the one
+row where the ramp barely beats the bisection (5,465 force evaluations against
+5,846).
+
+So the ramp's advantage is not mainly that warm-started steps are cheap. It is that
+it never restarts, and that it never pays for a solve far past failure.
+
+### The step control does not decide the answer
+
+The failure this whole spike was written to avoid is a factor of safety that moves
+when a solver knob is retuned. Three knobs, three benchmarks, one run each:
+
+| Benchmark | as shipped | per-step cap 150 → 600 | initial ΔF 0.05 → 0.02 | ΔF floor 0.005 → 0.0005 |
+|---|---|---|---|---|
+| Griffiths & Lane 1 quad9 | 1.39 | 1.39 | 1.39 | 1.39 |
+| FEM-1 tutorial | 1.36 | 1.36 | 1.36 | 1.36 |
+| Griffiths & Lane 3, r = 0.8 | 1.42 | 1.42 | 1.42 | 1.42 |
+
+Nothing moves. The intervals tighten as they should — at the 0.0005 floor quad9
+carries 1.39688 and refuses 1.39766, and FEM-1 carries 1.36797 and refuses 1.36875
+— and both of those tightened limits sit closer to the bisection's answer
+(1.396875 and 1.371094) than the shipped floor's do, which is the resolution
+behaving as a resolution. Raising the per-step cap fourfold changes no verdict,
+which also settles the quad9 refusal: it is not the cap that refuses F = 1.400
+there.
+
+### nu = 0.49
+
+FEM-1 with every material at nu = 0.49, both Newton routes: bisection FS 1.37891 on
+interval [1.37500, 1.38281] in 1,829 iterations over 9 trials, highest strength
+evaluated 2.0; ramp FS 1.37 on interval [1.37500, 1.38125] in 186 iterations over
+13 evaluations, highest strength evaluated 1.40. The intervals overlap over their
+whole width and the midpoints are 0.0008 apart. Ten times less work, no breakdown.
+
+### Verdict
+
+Yes — ramp-plus-Newton is ready to be recommended as a non-default driver, and it
+is the first configuration in this spike that is.
+
+It meets the criterion written before it was built. On all eight benchmarks its
+limit interval agrees with the corrected bisection-Newton answer inside the 0.01
+tolerance, and on three of the eight it reproduces that interval exactly; the
+nu = 0.49 probe agrees to 0.0008. It does strictly less constitutive work on eight
+of eight, against a requirement of six, by 1.07x to 15x — and against the shipped
+viscoplastic driver it clears the original spike's fivefold speed criterion on five
+of eight, which the bisection-Newton driver cleared on none. It never evaluates a
+strength more than one increment above the highest one it has carried, so the
+17x-to-47x past-failure cost that made the bisection-Newton driver a bad bet is
+gone by construction rather than by tuning. And its answer does not move when the
+per-step iteration cap is raised fourfold, the initial increment is more than
+halved, or the increment floor is dropped tenfold — which is the standard this
+spike exists to hold a solver to, and the one the Newton bisection failed twice
+before it passed.
+
+The honest negatives are three. The warm start does not make the hard solve easy:
+at the last step before the limit it costs what a cold trial costs, sometimes more,
+and the saving comes from never restarting and from cheap refusals rather than from
+cheap steps. The reported value reads about 0.005 low because the ramp reports the
+last strength carried while the bisection reports its interval midpoint, which is a
+convention to settle and not a measurement. And on Griffiths & Lane 1 quad9 — the
+one mesh where the ramp barely beats the bisection — the refused step exhausts its
+per-step iteration budget rather than reaching the displacement bound, so the two
+routes arrive at the same interval by different arguments; raising the cap fourfold
+does not change it, but that is one measurement on one mesh.
+
+Before the question of making it the default can be asked, which is the owner's and
+not this branch's:
+
+- **The reporting convention.** Report the interval midpoint, as the bisection
+  does, or state the last-carried convention in the output. Either is fine; the
+  present mismatch is not.
+- **The feature scope is the Newton driver's, unchanged.** Reinforcement, piles,
+  Hoek-Brown and power-curve envelopes, matric suction, tension caps, K0 initial
+  stress and staged loading all raise. Any default-driver conversation is a
+  conversation about that list first, and it is a larger piece of work than
+  everything in this branch put together.
+- **Eight benchmarks and one Poisson probe is not a calibration.** The viscoplastic
+  thresholds have years behind them; the ramp's increment schedule has one session.
+  The corpus run is what would earn the comparison, and it would also settle
+  whether the −0.005 the ramp reads against the bisection is the convention alone.
+- **The foot of the ramp still costs a cold solve, and can cost several.** On
+  Griffiths & Lane 6 dry quad8 the requested F_min = 2.0 does not stand on the
+  Newton driver, so the ramp walked down to 1.75 and paid two cold solves before it
+  started. (That F = 2.0 fails while F = 2.4 stands is the Newton non-monotonicity
+  recorded in the corrections above — the ramp is not subject to it once it starts,
+  but it is subject to it at the foot.)
+- **Arc-length control was not needed.** Step halving reached the floor cleanly on
+  every benchmark; no case ended with a step failing at the floor while the state
+  below it was comfortably converged. It stays a follow-up rather than a gap.

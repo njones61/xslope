@@ -76,6 +76,16 @@ holds the same force at two strength reductions — the reinforcement keeps its
 capacity while the soil loses its. What it refuses: post-peak softening, which both
 locked reinforced benchmarks declare, and piles.
 
+The Rankine tension cutoff (SPIKE.md, "THE TENSION CUTOFF") is the second feature
+the driver carries rather than refuses, and it matters because new materials are
+authored with ``t_cut = 0``, so the old refusal covered the default case. It is
+checked on four legs: the capped return map's invariants and its branch histogram,
+which has to show the Mohr-Coulomb / Rankine intersection edge actually executing;
+a cap above the Mohr-Coulomb apex reproducing the uncapped return bit for bit,
+since no admissible state can reach that apex; the cap being reduced by the trial
+strength when ``tension_srf`` says so; and the factor of safety on a capped model,
+from both drivers.
+
 Run directly:  PYTHONPATH=. python3 test/nr_ssrm_check.py
 """
 
@@ -1199,7 +1209,9 @@ def main():
           "name, a reinforced bisection lands on its measured strength with every "
           "bar force inside the capacity its embedment develops, a cohesionless "
           "base does not manufacture a failure at a strength the driver's "
-          "own converged answer above it proves standing, and the "
+          "own converged answer above it proves standing, a Rankine tensile cap "
+          "returns to both yield surfaces at once and is reduced with the trial "
+          "strength while an inert cap changes nothing at all, and the "
           "environment override cannot swap the driver in silence. The monotonic "
           "ramp reaches the same limit along one warm-started history, reports it "
           "on the bisection's midpoint convention, and never solves past it.")

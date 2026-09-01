@@ -1104,8 +1104,9 @@ not this branch's:
   present mismatch is not.
 - **The feature scope is the Newton driver's, unchanged.** Reinforcement, piles,
   Hoek-Brown and power-curve envelopes, matric suction, tension caps, K0 initial
-  stress and staged loading all raise. Any default-driver conversation is a
-  conversation about that list first, and it is a larger piece of work than
+  stress and staged loading all raise. *(Reinforcement and the tension cap have
+  since been built — see "REINFORCEMENT" and "THE TENSION CUTOFF", below.)* Any
+  default-driver conversation is a conversation about that list first, and it is a larger piece of work than
   everything in this branch put together.
 - **Eight benchmarks and one Poisson probe is not a calibration.** The viscoplastic
   thresholds have years behind them; the ramp's increment schedule has one session.
@@ -1302,7 +1303,8 @@ than a cleaner one, because the two drivers have to be solving the same model.
   tangent this spike exists to avoid.
 - **Everything else in the guard stands**: Hoek-Brown, power curve, suction, the
   Rankine tension cutoff, K0 initial stress, staged loading, non-effective pore
-  pressure.
+  pressure. *(The Rankine tension cutoff is no longer among them — see "THE
+  TENSION CUTOFF", below.)*
 
 ### Design
 
@@ -3038,3 +3040,465 @@ set and verified after the fact rather than decided by a case tree.
    return map costs the plain-soil table, or if the two drivers disagree on a
    capped model by more than the bisection tolerance and the reason is the
    formulation rather than a solver rule, that is the result.
+
+
+### THE TENSION CUTOFF — results
+
+Same machine and settings as everything above: `force_tol` 1e-3, hybrid criterion,
+`capture_failure_state=False`, tolerance 0.01. Every number below was measured on
+this checkout in this session. The "before" figures are not quoted from the tables
+above — where the question is whether something moved, the comparison is against a
+control run of **bb4c6a9a**, the driver before this round, staged in a separate
+package tree.
+
+#### What was built
+
+`mc_return_map` takes an optional per-point tensile cap and Lame constant;
+`_nr_rankine_return` and `_nr_surface` beside it; `_nr_group_tension_cap` on the
+group build and on the ramp's `restrength`. The guard no longer lists the Rankine
+tension cutoff.
+
+The cap is a SECOND yield surface and the two combine by Koiter's rule, which is
+what the viscoplastic driver does when it sums the two flows into `evpg`. Here the
+same physics is a multi-surface return, and it is done as an ACTIVE-SET SEARCH
+rather than as a case tree: seven candidate sets, each returned exactly by one small
+linear solve — every surface is linear in the principal stress with a constant flow
+direction, so there is nothing to iterate — and each accepted only if every
+multiplier is non-negative, the returned state is still ordered, and BOTH surfaces
+are satisfied. Nothing decides a region by inspecting the trial state, so a region
+the design got wrong shows up as an inconsistent return rather than as a wrong
+answer that looks right.
+
+Two facts about the ordered sextant cut the combinatorics to seven, and both are
+exact rather than heuristic. The Mohr-Coulomb plane on (1,3) is in the active set
+whenever any Mohr-Coulomb plane is, because f(1,3) >= f(1,2) and f(1,3) >= f(2,3)
+identically there. And a returned state must be ordered, so if sigma_2 is at the cap
+then sigma_1 is: the Rankine active set is a PREFIX, {1}, {1,2} or {1,2,3}. The last
+of those is the hydrostatic-tension return to (T, T, T), and it is what replaces the
+Mohr-Coulomb apex whenever T sits below it — with psi = 0 the shear flow is
+deviatoric and cannot relieve a tensile mean stress at all, which is the whole
+reason the second surface exists.
+
+Two further properties fall out and are used rather than assumed. Any
+Mohr-Coulomb-admissible state has sigma_1 <= c cot(phi), so a cap at or above the
+apex can NEVER bind — that is why a blank `t_cut` and a large one have to give the
+same answer, and the check asserts they give bit-identical returns. And the
+Mohr-Coulomb-only return already in the driver is a valid answer for any point whose
+returned sigma_1 is under its cap, with the Rankine multiplier zero, so only the rest
+are reworked: an uncapped model never enters the new code at all.
+
+#### Two defects, and the measurement that caught each
+
+**The two-stage return, caught by the branch histogram.** The first implementation
+returned to the Mohr-Coulomb surface and THEN capped the result. That is not
+Koiter's rule — the rule is simultaneous, `sigma = sigma_trial - sum_k gamma_k D
+m_k` over the whole active set — and doing it in two stages fails in a way that
+hides. The Rankine step lowers the Mohr-Coulomb function by
+`gamma * (2 mu A + lambda sin(phi))`, which is non-negative at every friction angle,
+so a state already on the shear surface comes back INSIDE it: every point looks
+admissible, every invariant passes, and the intersection edge never executes. It was
+caught by nothing except the branch histogram, which read **zero** on the
+Mohr-Coulomb / Rankine edge, zero on the corner-plus-cap branch and zero on
+main-plus-two-caps, over the 240,000 returns of the first pass. This is why the
+criterion asked for the histogram: a fuzz that never lands on a region proves
+nothing about it.
+
+**The residual-only path, caught by the verdict's own evidence.**
+`_nr_internal_force` has a cheap branch that skips the tangent differencing and
+duplicates the return-map call inline. It was not capped, so the line search and the
+residual ran on a different material from the tangent. The symptom was a trial that
+came back FAILED reporting `nr_max_tension_violation` = 0.0136 of the local strength
+with the branch histogram showing no capped Gauss point at all — a state above its
+own cap that the return map said it had never touched. With the fix the same trial
+CONVERGES, at a tension violation of exactly 0.0 and a yield violation of 3.5e-15.
+This is the reading `nr_max_tension_violation` was added for, and it earned itself
+on the first model it was pointed at.
+
+#### The return map, measured
+
+200,000 random trial states at each of four friction angles and each of three caps —
+zero, a small positive value, and one above the Mohr-Coulomb apex — is 2,400,000
+returns:
+
+| invariant | worst |
+|---|---|
+| Mohr-Coulomb residual, as a fraction of the stress scale | 1.68e-15 |
+| Rankine residual, as a fraction of the stress scale | 1.18e-15 |
+| principal ordering violation | 0 (exactly) |
+| elastic states modified | 0 (exactly) |
+| returns that GREW the deviatoric radius | 0 |
+| mean stress moved on a deviatoric branch | 0 |
+| states left unresolved by every candidate active set | 0 |
+
+Multipliers are non-negative by construction — a candidate with a negative one is
+rejected and the search moves on — and the zero in the last row is what says the
+candidate list is complete: not one state in 2.4 million needed the fallback.
+
+The branch histogram, which says what actually ran:
+
+| branch | t_cut = 0 | t_cut small | t_cut inert |
+|---|---|---|---|
+| elastic | 24,199 | 24,528 | 29,712 |
+| main plane | 121,584 | 132,565 | 200,491 |
+| right corner | 78,049 | 88,943 | 162,480 |
+| left corner | 73,629 | 85,839 | 181,869 |
+| apex | 0 | 0 | 225,448 |
+| cap alone | 19,815 | 16,073 | 0 |
+| cap on two principals | 23,903 | 18,131 | 0 |
+| hydrostatic tension (T, T, T) | 4,875 | 4,118 | 0 |
+| **Mohr-Coulomb / Rankine edge** | **119,056** | **102,408** | 0 |
+| corner and cap | 302,995 | 299,905 | 0 |
+| main plane, cap on two | 31,895 | 27,490 | 0 |
+
+Every region the design names is exercised. The inert column is the plain
+Mohr-Coulomb histogram unchanged, with no capped branch anywhere and the apex
+carrying its usual share — and the returns themselves are bit-identical to the
+uncapped map, which the check asserts. The apex column is the other half of the same
+statement: with a cap below it the Mohr-Coulomb apex NEVER fires, because the
+hydrostatic-tension return has taken its place.
+
+#### The consistent tangent
+
+Two measurements, because the tangent carries two different kinds of error and only
+one of them is about the cap.
+
+**The branch algebra is exact.** With the principal frame held still — tau_xy = 0 and
+no shear perturbation, so the in-plane axes cannot rotate — every branch is affine in
+the trial stress and a one-sided quotient must equal a two-sided one to round-off. At
+a step of 1e-3 of the stress scale, a thousand times larger than the driver's own
+probe, the worst gap over 1.4 million states is **5.5e-12** on a derivative of order
+one, and the new branches are the cleanest of them: 4.7e-13 on the cap alone,
+3.0e-12 on the intersection edge, against 1.4e-12 on the plain main plane and 2.7e-12
+on the left corner.
+
+**What is left is the principal frame's rotation, and it is first-order in the probe
+step and identical on old branches and new.** Differencing the actual assembled
+block, `d[sx, sy, txy] / d[ex, ey, gxy]`, against a central difference of the same,
+normalized by the elastic block's own magnitude (a plastic tangent is rank-deficient
+by construction, so a quotient against its own norm divides by a number that is
+legitimately zero):
+
+| branch | h = 1e-6 of the scale | h = 1e-7 | ratio |
+|---|---|---|---|
+| main plane | 6.31e-6 | 6.31e-7 | 10.0 |
+| right corner | 3.75e-6 | 8.32e-7 | — |
+| left corner | 4.00e-6 | 4.00e-7 | 10.0 |
+| **Mohr-Coulomb / Rankine edge** | **5.85e-6** | **5.86e-7** | **10.0** |
+| cap alone | 4.63e-6 | 4.63e-7 | 10.0 |
+| cap on two principals | 6.46e-6 | 6.46e-7 | 10.0 |
+| corner and cap | 4.62e-7 | 5.84e-8 | — |
+| hydrostatic tension | 7.10e-10 | 7.01e-9 | — |
+| elastic | 1.4e-14 | 1.4e-13 | — |
+
+The exact 10:1 scaling is the point: this is pure first-order truncation from the
+smooth rotation of the frame, which the map's docstring has named since the spike's
+first round, and it is the SAME size on the branches added here as on the branches
+this driver has been running on all along. The criterion asked for 1e-8 relative; the
+best any branch reaches is around 5.8e-8, at the step where truncation and round-off
+balance, and it is reached by an old branch and a new one alike. **That clause is not
+met as written, and what is measured in its place is the stronger comparison: the
+capped branches are exactly as differentiable as the uncapped ones, and the algebra
+under both is affine to round-off.**
+
+#### The benchmarks
+
+Every row is the SAME model, mesh and bracket on both drivers, with the cutoff on,
+`tension_srf` at the file's own setting, tolerance 0.01:
+
+| Case | Mesh | `t_cut` | VP + cutoff | Newton + cutoff | gap |
+|---|---|---|---|---|---|
+| Three layers, reinforced | tri6, 4 | 0 on all soils | 1.2109375 | **1.2109375** | **0.0000** |
+| Geogrid sample, LOCKED mesh | tri6, 2 | 0 on all soils | 1.5515625 | **1.5515625** | **0.0000** |
+| Griffiths & Lane 1 | tri6, 3.5 | 0 | 1.3531250 | **1.3531250** | **0.0000** |
+| Griffiths & Lane 1 | tri6, 3.5 | 30 | 1.3531250 | 1.3593750 | +0.0063 |
+| RS2-13, `vp017` | tri6, 0.5 | **9.8, the vendor's** | 1.3363281 | **1.3363281** | **0.0000** |
+| RS2-63, `rs2_63` | tri6, 1.0 | **10.0, the vendor's** | 1.3953125 | **1.3953125** | **0.0000** |
+
+Five of the six agree to every digit the bisection can express, and the sixth is
+inside a bisection cell. The two drivers do not merely land in the same tolerance on
+the capped models — on four of them they close on the SAME interval.
+
+**(a) Three layers.** This is the row the cutoff was named for. The adjudication
+above proved the slope stands at F = 1.2063 and that the shipped viscoplastic answer
+of 1.2391 rests on fields carrying up to 729 psf of tension in a zero-cohesion soil;
+the legal reference is the viscoplastic-with-cutoff bisection, 1.2109. The Newton
+driver on plain Mohr-Coulomb already reads 1.2109375 there, and with the cutoff on it
+still reads 1.2109375 — the model can now be run as the remedy says to run it, and
+the answer does not move. That is the useful outcome: the plain-Mohr-Coulomb Newton
+answer on that model was already the admissible one, and the cap confirms it rather
+than correcting it.
+
+**(b) Geogrid sample, locked mesh.** 1.5515625 on both drivers, against 1.5609375
+uncapped on both. The cutoff moves this model by one and a half bisection cells and
+the two drivers move together.
+
+**(c) The vendor cap.** `vp017` is RS2-13, Yamagami & Ueta's simple slope III, whose
+one material carries a vendor `t_cut` of 9.8 against a cohesion of 9.8 and a friction
+angle of 10 degrees — a cap well below that envelope's own apex of 55.6, so it is a
+cap that can bind, and at F = 1.3 it binds at 13 Gauss points. Both drivers read
+**1.336328125**, identical to the digit. The published lock is FS 1.332 with a
+tolerance of 0.02 (`docs/verification/rs2.md`, benchmark RS2-13), so the Newton
+driver reproduces it at 0.0043. The lock's test tag also carries `k0=1`, which the
+Newton driver refuses — so the K0 leg was measured on the driver that can run it:
+the viscoplastic bisection reads **1.336328125 with `k0=1` and 1.336328125 without
+it**, identical, so on this model the K0 procedure is worth nothing and the number
+Newton reproduces is the locked configuration's own.
+
+`rs2_63` is the second vendor case, Cheng et al.'s homogeneous slope with a vendor
+`t_cut` of 10.0 against an apex of 17.3. Both drivers read 1.3953125 without K0.
+There the K0 procedure IS worth something — the viscoplastic bisection reads
+1.3859375 with `k0=1` — so this row is a driver-against-driver comparison and not a
+lock reproduction, and it is reported as such.
+
+**(d) The plain cohesive benchmark, and what the cap is worth there.** Griffiths &
+Lane 1 on tri6/3.5, with and without a `t_cut` of 0 added:
+
+| | viscoplastic | Newton | gap |
+|---|---|---|---|
+| no cap (as the file ships) | 1.3656250 | 1.3656250 | 0.0000 |
+| `t_cut` = 0 | 1.3531250 | 1.3531250 | 0.0000 |
+| **the cap is worth** | **-0.0125** | **-0.0125** | |
+
+Two bisection cells, and the same two on both drivers. That is the measurement the
+criterion asked for: it is how much fictitious tension the uncapped Mohr-Coulomb
+envelope — which permits tension up to its own implicit c cot(phi), 859 psf here —
+was holding this slope up with. The `docs/usage/input_template.md` warning that
+"leaving t_cut blank does not mean no tension" has a number on this model now.
+
+#### tension_srf, both ways
+
+The setting divides a finite positive cap by the trial F, so that the factor of
+safety is the factor on the whole envelope rather than on its shear half. Two
+measurements, and they say different things.
+
+**It is exactly in force, and that is read off the stress field.** On the coarse
+model at F = 1.2 with a cap of 30, the converged Newton field's largest major
+principal stress is **25.000** with the reduction on — which is 30/1.2 to six
+figures — and **30.000** with it off. This is the leg the check locks and the leg the
+mutation breaks.
+
+**It does not move the factor of safety on any model measured here.** On Griffiths &
+Lane 1 with a cap of 30 the viscoplastic bisection reads 1.3531250 either way and the
+Newton bisection reads 1.3593750 either way; on `vp017` with its vendor cap both
+drivers read 1.336328125 either way; on `rs2_63` the viscoplastic bisection reads
+1.3953125 either way. So the YES-minus-NO difference is **0.0000 on both drivers on
+three models**, which is what the criterion asked to agree — it agrees, at zero. The
+field does move: at F = 1.4 on `rs2_63` the cap binds at 30 Gauss points with the
+reduction on and at 1 with it off. What that says is that on these models the
+deciding trial is settled by the shear envelope and the cap is a constraint the
+mechanism routes around rather than one it presses against. It is a real reading and
+not a null result, because the same measurement on a model whose limit IS set by
+tension would move.
+
+#### What the corpus could not supply, and what it could
+
+The criterion asked for a vendor-transcribed corpus model carrying an explicit
+POSITIVE `t_cut` and a LOCKED factor of safety, inside the Newton driver's feature
+envelope. **The corpus does not have one, and the reason is systematic rather than
+incidental.** Every `type=fem_ssrm` lock in `docs/verification/` whose file carries a
+finite positive `t_cut` — 142 rows scanned, materials read through
+`load_slope_data` — ALSO carries `k0=1` in its test tag, which turns on the K0
+initial-stress procedure that this driver refuses. The correlation is 100%, with no
+exceptions: RS2's published verification set is solved with its K0 procedure on, so
+the transcriptions are locked that way too. The only vp-corpus FEM-SSRM locks that
+omit the `k0` tag are the three `vp106` rows, and none of their materials carries a
+`t_cut` (two of the three also carry a pile).
+
+So the leg was run the only way it can be: the vendor model, its own vendor cap,
+with the K0 tag dropped — and BOTH drivers run that way, so the comparison between
+them is like for like even though neither is the locked configuration.
+
+#### The ramp
+
+The three-layer model with `t_cut` = 0 on the ramp, against the same model on the
+Newton bisection, and against both without a cap:
+
+| | ramp | ramp interval | bisection | ramp - bisection |
+|---|---|---|---|---|
+| no cap | 1.2156250 | [1.21250, 1.21875] | 1.2109375 | +0.0047 |
+| `t_cut` = 0 | 1.2218750 | [1.21875, 1.22500] | 1.2109375 | **+0.0109** |
+
+The ramp carries the cap through its warm history correctly — `restrength` re-reduces
+it at every step, which it has to when `tension_srf` is on — and it lands one of its
+own increments above the bisection, which is where it lands on this model without a
+cap too. **The criterion asked for 0.01 and the capped row misses it at 0.0109**, by
+one thousandth. It is the same one-cell high reading the uncapped row gives at
+0.0047, one cell further out, and it is reported rather than tuned: the two routes
+carry different plastic histories to the same strength and the last cell is where
+that shows.
+
+#### The no-cutoff path is unchanged
+
+Two proofs, and the first is the stronger one.
+
+**The arithmetic.** The plain Mohr-Coulomb return map, run against the driver as it
+stood at **bb4c6a9a** staged in a separate package tree, on 800,000 random trial
+states across four friction angles: **BIT-IDENTICAL**, stress and branch code alike.
+A model that sets no `t_cut` takes `t_cap=None` through the map, and the question
+worth asking is not whether it gets the same answer but whether it is on the same
+arithmetic. It is.
+
+**The benchmarks**, every one re-run on both trees rather than compared against a
+number in this document, and compared trial by trial — factor of safety, and each
+trial's verdict, iterations and force evaluations. (The LEM-3 file carries no E or
+nu, being a limit-equilibrium model, so both trees were given the same values the
+earlier rounds took from the elastic-property classifier — 167,100 / 0.45 and
+668,300 / 0.40 — written out, so the two are solving the same model.)
+
+| Benchmark | Mesh | driver | FS, both trees | trials | iterations | force evals | identical? |
+|---|---|---|---|---|---|---|---|
+| FEM-1 tutorial | tri6, 3.5 | Newton | 1.37109375 | 9 | 1,871 | 14,233 | **yes** |
+| Griffiths & Lane 1 | tri6, 3.5 | Newton | 1.36562500 | 9 | 3,121 | 22,650 | **yes** |
+| Griffiths & Lane 1 | quad8, 3.5 | Newton | 1.37187500 | 9 | 2,213 | 16,354 | **yes** |
+| Griffiths & Lane 1 | quad9, 3.5 | Newton | 1.39687500 | 9 | 844 | 6,030 | **yes** |
+| Griffiths & Lane 6 dry | quad8, 2 | Newton | 2.41562500 | 9 | 4,146 | 29,059 | **yes** |
+| Griffiths & Lane 6 dry | tri6, 2 | Newton | 2.45937500 | 9 | 3,333 | 23,672 | **yes** |
+| Griffiths & Lane 3, r = 0.8 | tri6, 6 | Newton | 1.42812500 | 9 | 5,015 | 40,652 | **yes** |
+| LEM-3 tutorial | tri6, 1.2 | Newton | 1.26953125 | 9 | 4,945 | 38,463 | **yes** |
+| Geogrid sample | tri6, 4 | Newton | 1.60781250 | 8 | 2,129 | 14,680 | **yes** |
+| Half capacity | tri6, 4 | Newton | 1.41406250 | 8 | 2,728 | 18,214 | **yes** |
+| Three layers | tri6, 4 | Newton | 1.21093750 | 8 | 3,622 | 25,170 | **yes** |
+| Geogrid sample, LOCKED mesh | tri6, 2 | Newton | 1.56093750 | 8 | 2,732 | 17,903 | **yes** |
+| **Griffiths & Lane 6 dry — the DEFAULT path** | quad8, 2 | viscoplastic | **2.421875** | 9 | 48,128 | — | **yes** |
+
+Thirteen pairs, 113 trials compared, every one identical in verdict, iterations
+and force evaluations. The eight plain-soil factors of safety and the four reinforced
+ones all reproduce the values recorded earlier in this document. The default
+viscoplastic path returns FS 2.421875 on per-trial iteration counts
+
+    147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777
+
+value for value the control sequence, on both trees.
+
+#### The locks
+
+`test/nr_ssrm_check.py` gains `check_tension_cutoff`, on the same coarse tri6 model
+the rest of the file uses, in about 36 s. Four legs, and each fails on a different
+defect: the capped return map's invariants and its branch histogram, which asserts
+the intersection edge and the hydrostatic-tension return actually execute and that
+no state comes back on the fallback; a cap above the Mohr-Coulomb apex reproducing
+the uncapped return BIT FOR BIT; the cap being divided by the trial strength when
+`tension_srf` is on; and the factor of safety on the capped model from both drivers.
+
+**Mutation, run both ways.**
+
+| driver | verdict | what the check saw |
+|---|---|---|
+| as shipped | **PASS** | — |
+| the intersection edge removed from the candidate sets | **FAIL** | "9,669 state(s) came back on the unresolved fallback — no candidate active set was consistent, which means the region list is incomplete", on 9 of the 12 legs |
+| the cap no longer reduced by the trial F | **FAIL** | "tension_srf=True: the converged field reaches a major principal stress of 29.999950, above the 25.000000 cap in force" |
+
+The whole check file passes.
+
+#### The criterion, line by line
+
+**1. The return map — MET, except one clause of the tangent.** 2,400,000 returns:
+both surfaces satisfied to 1.7e-15 of the stress scale, ordering exact, no elastic
+state modified, no radius grown, no mean stress moved on a deviatoric branch, and
+zero states left unresolved by the candidate active sets. Multipliers are
+non-negative by construction — a candidate with a negative one is rejected. The
+branch histogram exercises every region the design names, including 119,056 returns
+on the Mohr-Coulomb / Rankine intersection edge and 4,875 on the hydrostatic-tension
+return, and it was the histogram that caught the two-stage return. **The tangent
+clause is NOT met as written**: the best any branch reaches against a central
+difference is about 5.8e-8 relative, not 1e-8, and it is reached by an old branch and
+a new one alike. What is measured in its place is stronger: the branch algebra is
+affine to 5.5e-12 with the principal frame held still, and the residual error is
+first-order in the probe step at exactly 10:1, the same size on the new branches as
+on the ones this driver already runs.
+
+**2. The benchmarks — MET, and four of six exactly.** (a) Three layers at 1.2109375
+against the 1.2109 reference, 0.0000. (b) The geogrid locked mesh at 1.5515625 on
+both drivers, 0.0000. (c) `vp017` carries a vendor `t_cut` of 9.8 and a lock of
+1.332 +/- 0.02; both drivers read 1.336328125 and the viscoplastic driver reads the
+same number in the lock's own `k0=1` configuration, so the lock is reproduced at
+0.0043. (d) Griffiths & Lane 1 with `t_cut` = 0 reads 1.3531250 on both drivers
+against 1.3656250 uncapped on both — the cap is worth -0.0125 there, two bisection
+cells, and that is how much fictitious tension the uncapped envelope was carrying.
+
+**3. Both `tension_srf` settings — MET.** Exercised on three models and on both
+drivers. The difference between YES and NO is 0.0000 on both drivers on all three,
+so it agrees. That the difference is zero is itself the finding, and it is not a
+vacuous one: the setting is demonstrably in force, since at F = 1.2 with a cap of 30
+the converged field's largest major principal stress is 25.000 with the reduction and
+30.000 without it, and on `rs2_63` at F = 1.4 the cap binds at 30 Gauss points with
+the reduction and 1 without. The field moves; the bisection's answer does not,
+because on these models the deciding trial is settled by the shear envelope.
+
+**4. The no-cutoff path is bit-identical — MET.** The return map itself is
+bit-identical to bb4c6a9a over 800,000 trial states, and every benchmark re-run on
+both trees returns the same factor of safety on the same trials with the same
+iteration and force-evaluation counts.
+
+**5. The refusal is gone — MET.** The guard no longer lists the Rankine tension
+cutoff. A `t_cut` on a material declared `elastic` is ignored on both drivers: on a
+model with half its elements declared elastic and a cap of 0 everywhere, 0 of 579
+elastic Gauss points carry a finite cap and 582 non-elastic ones do, and the model
+solves on both drivers.
+
+**6. The ramp — NOT MET, by one thousandth.** 1.221875 against the bisection's
+1.2109375, a gap of 0.0109 against the 0.01 allowed. Reported above with the
+uncapped row beside it, which reads +0.0047 the same direction.
+
+**7. The locks — MET.** `check_tension_cutoff` passes as shipped, fails with the
+intersection edge removed from the candidate sets, and fails with the cap's
+F-reduction dropped. The whole check file passes.
+
+**8. The default path — MET.** Griffiths & Lane 6 dry, quad8, size 2, no
+`fem_solver` argument: FS 2.421875 with per-trial iteration counts 147, 781, 3393,
+2031, 2841, 9541, 12000, 8617, 8777 — value for value the control sequence, and
+identical to the same run on bb4c6a9a.
+
+**9. The honest negatives** are the tangent clause, the ramp's thousandth, and the
+corpus's inability to supply a lock inside the feature envelope. All three are
+written above.
+
+#### Verdict
+
+**A fresh Studio model runs on the Newton driver, and its answer is the old
+solver's.** That is the question the round was commissioned on, and it is answered
+on every capped benchmark measured: three layers 1.2109375 against 1.2109375,
+the geogrid locked mesh 1.5515625 against 1.5515625, Griffiths & Lane 1 with
+`t_cut` = 0 at 1.3531250 against 1.3531250, and RS2-13 with its vendor cap of 9.8 at
+1.336328125 against 1.336328125 — four models where the two drivers do not merely
+agree inside the bisection tolerance but close on the same interval. The ramp carries
+the cap too, and lands one of its own increments high, which is where it lands on
+that model without a cap.
+
+What made it possible is that the cap is not a special case bolted to the shear
+return. It is a second surface, and the return is Koiter's rule solved as an
+active-set search: seven candidate sets, each an exact linear solve, each accepted
+only on its own consistency. Nothing in the code decides a region by looking at the
+trial state, so the two defects this round found were both found by measurement
+rather than by reading — the branch histogram caught a two-stage return that
+satisfied every invariant and never once executed the intersection edge, and the
+verdict's own tension reading caught a residual path running an uncapped material
+under a capped tangent. Neither would have shown up in a factor of safety.
+
+Three things did not close, and all three are written above rather than tuned away.
+The tangent's agreement with a central difference reaches about 5.8e-8 and not the
+1e-8 the criterion asked; the residual is first-order truncation from the principal
+frame's rotation, it scales exactly 10:1 with the probe step, and it is the same size
+on the new branches as on the branches this driver has always run — so what the
+criterion wanted proved is proved, by a different measurement, and the clause as
+written is not met. The ramp misses its 0.01 by a thousandth on the one model it was
+run on. And the corpus cannot supply the lock the criterion asked for: every
+`fem_ssrm` lock in the repository whose model carries a positive `t_cut` also carries
+`k0=1`, so the vendor row above is the lock reproduced with the K0 tag dropped —
+which on that model was measured to be worth nothing, but is a caveat and not a
+formality.
+
+What remains, in the order it matters:
+
+- **K0 initial stress is now the gating refusal for the vendor corpus.** It was one
+  of eight refused features; with the tension cutoff carried it is the ONE that
+  stands between this driver and 142 locked vendor benchmarks, every one of which
+  would otherwise be reachable. That is a much sharper target than the list it came
+  from.
+- **Post-peak softening is still refused**, unchanged, and still the reason neither
+  published reinforced factor of safety is reachable here.
+- **The `tension_srf` setting moves the stress field and not the answer** on every
+  model measured. Whether that holds on a model whose limit is genuinely set by
+  tension is unmeasured, and it is the natural next reading.
+- **The ramp's cell.** One model, one thousandth. Worth re-reading on a second capped
+  model before it is called anything.

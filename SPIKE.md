@@ -839,3 +839,90 @@ region where the verdicts are consistent. It is, however, the clearest single
 argument for the monotonic strength-reduction ramp: a ramp carries one continuous
 history through increasing F and cannot produce a non-monotone verdict sequence by
 construction.
+
+## RAMP — the monotonic strength-reduction driver
+
+Written before any of it was built, so that what follows is a test and not a
+description.
+
+### Why
+
+The bisection asks a fresh, independent question at every trial: it drops the
+model back to zero displacement, re-applies gravity from nothing, and re-discovers
+the whole elastoplastic history at the new strength. Nine trials means nine
+histories. Three things follow from that, all visible in the Phase 0 measurements:
+
+- **It re-solves what it already knows.** Every trial repeats the easy early part
+  of a solve the previous trial already completed.
+- **It spends its worst effort where it learns least.** A trial well past failure
+  costs 297 to 491 Newton iterations and 2,400 to 3,400 force evaluations to prove
+  the load is unreachable at every increment size down to the floor, and a
+  bisection with a poor initial bracket visits exactly those trials first. On
+  Griffiths & Lane 6 dry the bracketing pass alone visits F = 2.8 and F = 2.0
+  before it starts bisecting.
+- **It can return a non-monotone verdict sequence.** On Griffiths & Lane 6 dry
+  (quad8, 2) the Newton bisection records F = 2.0 FAILED and then F = 2.275,
+  2.40625 and 2.414453 CONVERGED. A slope that fails at 2.0 cannot stand at 2.4;
+  independent load-controlled histories at each F is how that happens.
+
+A ramp carries ONE history. It starts from a converged state and reduces strength
+monotonically, warm-starting each step from the state before it, so the mechanism
+develops continuously instead of being rediscovered nine times. It cannot produce a
+non-monotone verdict sequence, and it cannot spend anything on trials far past
+failure, because it never goes there.
+
+### Design
+
+- **Continuation in F, not in load.** From a converged state at $F_k$, the gravity
+  load does not change; only the strengths do. One step is: reduce $c$ and
+  $\tan\phi$ to $F_{k+1}$, then drive the equilibrium residual at FULL gravity to
+  convergence starting from the previous step's displacements. The load-stepping
+  machinery is used only for the very first, cold solve.
+- **Warm start.** The step inherits the previous converged displacement field, its
+  committed plastic strains and its stress state. Gauss-point groups are built once
+  for the whole ramp and re-strengthened in place, so nothing about the mechanism
+  is rediscovered.
+- **Adaptive $\Delta F$.** A step that fails to converge is retried at half the
+  increment, from the same converged state, down to a floor of 0.005 and at most a
+  few retries; a step that converges comfortably grows the increment back. The
+  limit is reached when a step at the floor cannot be carried.
+- **Admissibility.** Every accepted step passes the SAME standard a converged
+  bisection trial passes: the Dawson out-of-balance under `force_tol`, and max|u|
+  under `_NR_DISP_FACTOR` of the model height. A step that reaches force
+  equilibrium in an inadmissible state is a failed step, not an accepted one.
+- **The answer.** The limit is the last $F$ carried, with the failed step above it,
+  reported to a 0.01 resolution so it is directly comparable with the bisection's
+  answer at `tolerance=0.01`.
+- **No arc-length control this round.** Step halving is the only recovery near the
+  limit. If halving proves insufficient — steps failing at the floor while the
+  state below is still comfortably converged — that is the follow-up, and it will
+  be written as such rather than worked around.
+- **Switch.** Internal only: `solve_ssrm(..., ssrm_driver='bisection')` is the
+  default and reaches nothing new; `ssrm_driver='ramp'` is accepted only together
+  with `fem_solver='newton'`. The viscoplastic path and the bisection path are
+  untouched.
+
+### Success criterion (verbatim)
+
+- **Correctness.** On all eight benchmarks the ramp's factor of safety agrees with
+  the Phase-0 corrected bisection-Newton factor of safety within 0.01, and the
+  nu = 0.49 probe agrees.
+- **Work.** Total force evaluations strictly below the bisection-Newton run's on at
+  least six of the eight benchmarks.
+- **It never goes past failure.** The ramp evaluates no $F$ more than one step past
+  its own limit. This is by construction rather than by tuning, and it is what
+  kills the 17x-to-47x past-failure weakness measured in Phase 0.
+- **Warm-start effectiveness is reported as a number, not a claim.** Iterations on
+  a warm-started step against a cold Newton trial at the same $F$, measured on the
+  same mesh.
+- **An honest negative is a valid outcome and must be written.** In particular, if
+  the warm-started steps do not converge in the expected handful of iterations —
+  if a step near the limit costs what a cold trial costs — that is the result, and
+  it says the continuation is buying nothing.
+
+### What this round does not decide
+
+Whether the ramp should be the default. That is the owner's call and needs more
+than eight benchmarks. This round decides only whether ramp-plus-Newton is ready to
+be recommended as a non-default driver, and says what remains before the question
+can be asked.

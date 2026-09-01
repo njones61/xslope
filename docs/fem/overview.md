@@ -378,8 +378,8 @@ it on at an elevation below the mesh, which states that the ground beyond is dry
 `u = piezo` when the file defines no piezometric line is refused on the same grounds: a model with
 no water is `u = none`.
 
-**How pore pressure enters the equilibrium.** With `pp_formulation="effective"` (the default) the
-total-stress statement $\int B^T (\sigma' - u\,m)\,dV = F_{ext}$, $m = [1, 1, 0, 1]^T$, is
+**How pore pressure enters the equilibrium.** The total-stress statement
+$\int B^T (\sigma' - u\,m)\,dV = F_{ext}$, $m = [1, 1, 0, 1]^T$, is
 rearranged so the pore-pressure term joins the load vector,
 
 >>$\int B^T \sigma'\, dV = F_{ext} + \int B^T m\, u\, dV$
@@ -387,11 +387,7 @@ rearranged so the pore-pressure term joins the load vector,
 and the stresses computed from the displacement solution are **effective stresses directly**.
 Physically the added load term converts the body force in submerged soil to its buoyant weight (plus
 seepage forces wherever $u$ is not hydrostatic), so all three effective stress components below a
-flooded boundary come out compressive and level flooded ground sits elastically at rest. The legacy
-alternative, `pp_formulation="total"` — solve the total-stress problem and subtract $u$ at each
-Gauss point before the yield check — leaves a spurious effective-tension zone of magnitude
-$\frac{1-2\nu}{1-\nu}u$ at submerged boundaries, which yields and creeps at any strength reduction
-factor.
+flooded boundary come out compressive and level flooded ground sits elastically at rest.
 
 ## K0 initial stress
 
@@ -1009,7 +1005,7 @@ Its principal arguments:
 >- **`dt_scale`** (1.0): multiplier on the viscoplastic pseudo-time step. **Do not lower it to make
 >  a model converge** — it shrinks the residual without making the slope any more stable, and can push
 >  a failing state under an absolute `force_tol`.<br>
->- **`pp_formulation`** (`"effective"`), **`k0`**, **`staged`**, **`min_slip_depth`**,
+>- **`k0`**, **`staged`**, **`min_slip_depth`**,
 >  **`ssr_exclude`** / **`ssr_zone`**, **`tension_cutoff_by_material`** / **`tension_srf`**,
 >  **`elastic_materials`**, **`suction_phi_b`** / **`suction_cap`**: as described in
 >  their own sections.<br>

@@ -1254,7 +1254,7 @@ def _admissibility_warnings(c, N_eff, Z, y_lt=None, y_lb=None, yt_l=None):
     return warns
 
 
-def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50, debug=False, right_facing=False):
+def force_equilibrium(slice_df, theta_list, tol=1e-6, max_iter=50, debug=False, right_facing=False):
     """
     Limit‐equilibrium by force equilibrium in X & Y with variable interslice angles.
 
@@ -1274,7 +1274,6 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
             'h_pile' (pile force, optional), 'theta_p' (pile inclination, RADIANS, optional)
         theta_list (array-like): slice‐boundary force inclinations (degrees),
                                  length must be n+1 if there are n slices
-        fs_guess (float): initial guess for factor of safety
         tol (float): convergence tolerance on residual
         max_iter (int): maximum number of Newton (secant) iterations
         debug (bool): print residuals during iteration
@@ -1344,6 +1343,8 @@ def force_equilibrium(slice_df, theta_list, fs_guess=1.5, tol=1e-6, max_iter=50,
         N[:] = N_march
         Z[:] = Z_march
         return Z[n]
+
+    fs_guess = 1.5      # secant seed
 
     if debug:
         r0 = residual(fs_guess)
@@ -2560,8 +2561,8 @@ def _mp_line_of_thrust(slice_df, Z, theta_rad, right_facing, FS=1.0):
     slice_df['yt_r'] = yt_r
 
 
-def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
-                      max_iter=50, lambda_bracket=(-1.5, 1.5), solver='auto',
+def mprice(slice_df, f_type='half_sine', tol=1e-6,
+                      max_iter=50, solver='auto',
                       debug_level=0):
     """Morgenstern-Price complete-equilibrium method (Approach A: F_f / F_m crossing).
 
@@ -2579,7 +2580,6 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
 
     Parameters:
         f_type: 'constant' (== Spencer regression) or 'half_sine' (design default).
-        lambda_bracket: search interval for ``λ`` (sign change of ``F_f − F_m``).
     Returns:
         (True, {'method','FS','lambda','f_type','theta'(deg, per boundary, n+1)})
         or (False, message).
@@ -2607,8 +2607,8 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
     # loops call _mp_residuals(A, ...) — no per-iteration DataFrame access.
     A = _mp_extract(slice_df, right_facing)
 
-    # Seed FS from Bishop where possible (as Spencer does), else fs_guess.
-    seed = fs_guess
+    # Seed FS from Bishop where possible (as Spencer does), else the fixed seed.
+    seed = 1.5
     try:
         ok_b, res_b = bishop(slice_df)
         if ok_b:
@@ -2633,7 +2633,7 @@ def mprice(slice_df, f_type='half_sine', fs_guess=1.5, tol=1e-6,
         Approach-B Newton, S5, is the fast path.)"""
         return _mp_residuals(A, f_vals, lam, F_f(lam, seed))[3]
 
-    lo, hi = lambda_bracket
+    lo, hi = -1.5, 1.5      # λ search interval (sign change of F_f − F_m)
 
     def approach_A():
         """Robust reference (slow): scan h(λ) on a grid, brentq each sign change,

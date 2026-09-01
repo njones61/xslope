@@ -3233,9 +3233,8 @@ def _resolve_exit_cycle(act, new_act, corner_candidate, mid_cands,
 
 
 def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
-                          dt0=None, dt_max=None, dt_min=None, growth=1.3,
-                          max_head_change_frac=0.05, picard_tol=1e-5,
-                          picard_max=25, h_init=None, verbose=True,
+                          dt_max=None, growth=1.3,
+                          max_head_change_frac=0.05, h_init=None, verbose=True,
                           progress_callback=None):
     """Transient variably-saturated seepage solver (plan §1/§3/§5).
 
@@ -3431,17 +3430,16 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         for v in _series(b["series"])[1]:
             hmin, hmax = min(hmin, v), max(hmax, v)
     char_h = max(hmax - hmin, float(np.max(y) - np.min(y)), 1.0)
-    picard_eps = picard_tol * char_h
+    picard_max = 25                # Picard iterations allowed within a step
+    picard_eps = 1e-5 * char_h     # inner-loop tolerance, scaled to the head range
     dh_limit = max_head_change_frac * char_h
 
     targets, save_interval = _transient_saved_schedule(tseep_data, duration)
     if dt_max is None:
         dt_max = save_interval
-    if dt0 is None:
-        first = targets[0] if targets else duration
-        dt0 = max(min(first, save_interval) / 10.0, duration * 1e-9)
-    if dt_min is None:
-        dt_min = dt0 * 1e-6
+    first = targets[0] if targets else duration
+    dt0 = max(min(first, save_interval) / 10.0, duration * 1e-9)
+    dt_min = dt0 * 1e-6
 
     # Nodal storage parameters for the secant mass-balance ledger (smoothing a
     # per-element scalar to nodes is exact for a single material and adequate

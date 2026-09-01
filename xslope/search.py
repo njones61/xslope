@@ -629,7 +629,7 @@ def noncircular_search_opts(search_opts):
 
 
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
-                    shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.03, depth_tol_frac=0.03,
+                    shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.03,
                     diagnostic=False, num_slices=40, cancel_check=None, composite=False,
                     seed='circles', min_slip_depth=None, center_box=None, entry_range=None,
                     exit_range=None, tangent_depth=None, unsolved_out=None):

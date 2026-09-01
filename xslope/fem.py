@@ -6723,7 +6723,15 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
 _RAMP_DF_INIT = 0.05       # first strength increment
 _RAMP_DF_MIN = 0.005       # below this a failed step means the limit is reached
 _RAMP_DF_GROW = 1.6        # increment growth after a comfortable step
-_RAMP_RESOLUTION = 0.01    # the answer is reported to this, as the bisection is
+# The ramp reports the MIDPOINT of its final interval, (F_stands + F_refused)/2,
+# because that is the convention every locked and published factor of safety in
+# this repository is defined on: the bisection returns the midpoint of the last
+# bracket it could not split further. The ramp used to report the last strength it
+# had CARRIED, floored to 0.01, which is the interval's lower edge rounded down —
+# two separate downward biases, measured at 0.0031 to 0.0119 below the bisection's
+# answer across the eight spike benchmarks, none of it a difference in what the two
+# routes found. The raw facts are still reported, unrounded, as `ramp_last_carried`
+# and `ramp_first_refused`, so the interval is always readable.
 
 
 def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_tol,
@@ -6898,10 +6906,11 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     if sol_end.get('converged'):
         last_solution = sol_end
 
-    # The limit: the last strength carried, with the refused step above it.
-    FS = round(F_stands / _RAMP_RESOLUTION) * _RAMP_RESOLUTION
-    if FS > F_stands + 1e-12:          # never report ABOVE what was carried
-        FS -= _RAMP_RESOLUTION
+    # The limit lies between the last strength carried and the first one refused,
+    # and is reported as that interval's MIDPOINT — the bisection's convention, and
+    # therefore the convention of every locked and published factor of safety here.
+    # See the note at _RAMP_DF_GROW.
+    FS = 0.5 * (F_stands + F_refused)
     restrength(groups, F_stands)
     if debug_level >= 1:
         print(f"  Ramp limit: {F_stands:.4f} carried, {F_refused:.4f} refused "

@@ -1172,3 +1172,50 @@ the midpoint. Before any ramp value is locked or published it must be converted 
 the midpoint convention: report (F_stands + F_refused)/2, not the floored edge.
 Left unchanged in code for now so the tables above stay reproducible; this is the
 first item to settle if the ramp is promoted beyond an internal option.
+
+
+## Roadmap items closed, 2026-09-01
+
+Two of the items the ramp verdict listed under "Before the question of making it
+the default can be asked" are settled here. Everything measured on this checkout,
+same machine, meshes and brackets as the tables above, `force_tol` 1e-3, hybrid
+criterion, `capture_failure_state=False`, tolerance 0.01.
+
+### The reporting convention — CLOSED
+
+The ramp now reports the MIDPOINT of its final interval, `(F_stands + F_refused)/2`,
+which is the convention the bisection uses and therefore the convention every locked
+and published factor of safety in this repository is defined on. The raw edges are
+still returned unrounded as `ramp_last_carried` and `ramp_first_refused`, so the
+interval is readable from any result, and `_RAMP_RESOLUTION` — the 0.01 flooring
+that produced the second half of the bias — is gone.
+
+The eight-row column, re-measured. Every one of the eight final intervals
+reproduces the interval recorded in "RAMP — results" to the digit, so the only thing
+that moved is what is reported from it:
+
+| Benchmark | Mesh | Ramp interval | Ramp FS, floored edge | Ramp FS, midpoint | Bisection-N FS | Midpoint − bisection |
+|---|---|---|---|---|---|---|
+| FEM-1 tutorial | tri6, 3.5 | [1.36250, 1.36875] | 1.36 | **1.3656** | 1.3711 | −0.0055 |
+| LEM-3 tutorial | tri6, 1.2 | [1.26875, 1.27500] | 1.26 | **1.2719** | 1.2695 | +0.0023 |
+| Griffiths & Lane 1 | quad8, 3.5 | [1.36750, 1.37250] | 1.36 | **1.3700** | 1.3719 | −0.0019 |
+| Griffiths & Lane 1 | tri6, 3.5 | [1.36250, 1.36875] | 1.36 | **1.3656** | 1.3656 | **0.0000** |
+| Griffiths & Lane 1 | quad9, 3.5 | [1.39375, 1.40000] | 1.39 | **1.3969** | 1.3969 | **0.0000** |
+| Griffiths & Lane 6 dry | quad8, 2 | [2.41000, 2.41500] | 2.41 | **2.4125** | 2.4186 | −0.0061 |
+| Griffiths & Lane 6 dry | tri6, 2 | [2.45522, 2.46341] | 2.45 | **2.4593** | 2.4531 | +0.0062 |
+| Griffiths & Lane 3, r = 0.8 | tri6, 6 | [1.42500, 1.43125] | 1.42 | **1.4281** | 1.4281 | **0.0000** |
+
+The agreement tightens on every row and changes sign on two, which is what a
+reporting bias looks like when it is removed rather than a measurement moving. The
+worst disagreement with the Newton bisection goes from 0.0119 to 0.0062; all eight
+rows are now inside the 0.01 bisection tolerance where six were before, and the
+three rows that reproduce the bisection's interval exactly now report the same
+number as the bisection to four decimals rather than one to two thousandths below
+it. The residual spread — two rows above, three below, three exact — is the two
+routes finding slightly different limits, which is the thing the comparison was
+meant to measure and which the old convention was hiding under a uniform −0.005 to
+−0.012 offset.
+
+`test/nr_ssrm_check.py` locks the convention structurally: the reported FS must be
+the midpoint of the interval the same result reports, and must lie inside it.
+Restoring the floored edge fails it with the interval printed alongside.

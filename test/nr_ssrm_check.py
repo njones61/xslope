@@ -58,8 +58,10 @@ four could not see:
 And one more for the monotonic strength-reduction ramp (SPIKE.md, "RAMP"), the
 third SSRM route: it lands on the same limit the Newton bisection does, which is a
 real question because the two carry different plastic histories to the same
-strength, and it never evaluates a strength more than its initial increment above
-the highest one it has carried — which is the whole of its cost advantage.
+strength, it reports the MIDPOINT of its final interval — the convention every
+locked and published factor of safety here is defined on — and it never evaluates a
+strength more than its initial increment above the highest one it has carried,
+which is the whole of its cost advantage.
 
 Run directly:  PYTHONPATH=. python3 test/nr_ssrm_check.py
 """
@@ -98,11 +100,16 @@ QUAD9_SIZE = 3.5
 Q9_ADMISSIBLE, Q9_INADMISSIBLE = 1.396875, 1.400
 
 
-def _fem_data(element_type=ELEMENT_TYPE, target_size=TARGET_SIZE):
+def _mesh(element_type=ELEMENT_TYPE, target_size=TARGET_SIZE):
     slope_data = load_slope_data(str(MODEL))
     mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
                                     target_size=target_size,
                                     element_type=element_type)
+    return slope_data, mesh
+
+
+def _fem_data(element_type=ELEMENT_TYPE, target_size=TARGET_SIZE):
+    slope_data, mesh = _mesh(element_type, target_size)
     return build_fem_data(slope_data, mesh)
 
 
@@ -177,6 +184,13 @@ def check_ramp(fem_data, fs_bisection):
         increment past the highest strength it has carried, by construction. That
         is asserted as an exact bound: no strength evaluated may exceed the last
         one carried by more than the ramp's initial increment.
+      * it reports the MIDPOINT of its final interval. Every locked and published
+        factor of safety in this repository is a bisection midpoint, and the ramp
+        used to report the last strength it CARRIED, floored to 0.01 — the
+        interval's lower edge, rounded down again. Across the eight spike
+        benchmarks that read 0.0031 to 0.0119 low against the bisection, none of it
+        a difference in what the two routes found. Asserted against the interval
+        the same result reports, so the two can never drift apart.
     """
     fails = []
     res = solve_ssrm(fem_data, F_min=F_MIN, F_max=F_MAX, tolerance=TOLERANCE,
@@ -194,6 +208,24 @@ def check_ramp(fem_data, fs_bisection):
                      f"{fs_bisection:.4f} vs ramp {fs:.4f}, a gap of "
                      f"{abs(fs - fs_bisection):.4f} against {TOLERANCE:g}")
     carried = res.get('ramp_last_carried')
+    refused = res.get('ramp_first_refused')
+    if carried is None or refused is None:
+        fails.append("the ramp result no longer carries both raw edges of its "
+                     "final interval (ramp_last_carried / ramp_first_refused), so "
+                     "its reporting convention cannot be read")
+    else:
+        mid = 0.5 * (carried + refused)
+        if abs(fs - mid) > 1e-12:
+            fails.append(
+                f"the ramp reports FS = {fs:.6f}, which is not the midpoint of its "
+                f"final interval [{carried:.6f}, {refused:.6f}] (midpoint "
+                f"{mid:.6f}). Every locked and published factor of safety here is a "
+                f"bisection midpoint; reporting the lower edge, or flooring it to a "
+                f"resolution, reads systematically low against them.")
+        if not (carried <= fs <= refused):
+            fails.append(
+                f"the ramp reports FS = {fs:.6f}, outside its own final interval "
+                f"[{carried:.6f}, {refused:.6f}]")
     evaluated = [t['F'] for t in res.get('trials', [])]
     if carried is None or not evaluated:
         fails.append("the ramp result carries no step record, so its "
@@ -513,8 +545,8 @@ def main():
           "certifies its own stress field in force AND in displacement, neither "
           "the loading path nor the step control changes a verdict, and the "
           "environment override cannot swap the driver in silence. The monotonic "
-          "ramp reaches the same limit along one warm-started history and never "
-          "solves past it.")
+          "ramp reaches the same limit along one warm-started history, reports it "
+          "on the bisection's midpoint convention, and never solves past it.")
 
 
 if __name__ == '__main__':

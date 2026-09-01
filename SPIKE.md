@@ -1240,3 +1240,145 @@ are actually set, so a model that fails to exercise the guard is reported as a
 broken model rather than as a passing test; and it runs the same three models on the
 DEFAULT viscoplastic driver as a control, which must not refuse any of them.
 Deleting the Hoek-Brown line from the guard's `unsupported` list fails the check.
+
+
+## REINFORCEMENT — the Newton driver carries bars
+
+Written before any of it was built, so that what follows is a test and not a
+description.
+
+### Why this one first
+
+The ramp verdict named the feature list as the largest single item standing between
+this branch and any default-driver conversation: "Reinforcement, piles, Hoek-Brown
+and power-curve envelopes, matric suction, tension caps, K0 initial stress and
+staged loading all raise." Reinforcement is the first of them because it is the most
+common — the corpus carries reinforced models in the tutorials, the FEM samples and
+the vendor benchmark sets — and because its physics is the simplest of the eight: a
+bar element whose force is a function of the current displacement field, with no
+internal state.
+
+### What the viscoplastic driver actually does, read from the code
+
+The Newton path has to reproduce the physics, not the algorithm, so the physics is
+stated first. For one non-pile 1D element, per iteration, `solve_fem` computes:
+
+1. the chord elongation `δ = (u₂ − u₁)·(cos θ, sin θ)` from the two END nodes — on a
+   three-node bar the midside node carries stiffness but takes no part in the force
+   recovery;
+2. the elastic axial force `T = k δ`, with `k = EA/L` the chord stiffness;
+3. the force the bar can actually deliver, `T_true = clip(T, 0, T_cap)` — tension
+   only, so a bar in compression carries nothing at all;
+4. `T_cap = t_allow`, the capacity envelope shared with the limit-equilibrium engine
+   (`fileio.reinforce_available_tension`: tensile strength tapered by the pullout
+   ramps at both ends and by end anchorage), or `t_res` for an element that has
+   entered the post-peak set;
+5. `t_allow` is NOT divided by F. Only the soil strength is reduced, which is the
+   vendor convention and what the LEM does.
+
+Bond slip is not a separate interface element in this model. It is baked into
+`t_allow` as the ramped envelope, and the code says in as many words that it is
+elastic–perfectly-plastic: "the soil-bar interface is frictional, and friction does
+not vanish once it is overcome. t_allow ... is therefore both the yield force and
+the post-slip force." The only softening in the model is `t_res`, the RUPTURE
+residual — what the bar itself retains once the material tears — applied through a
+converged-state fixed point that re-solves as the softened set grows.
+
+The realization is a body-load correction: the global stiffness carries the bar's
+FULL elastic element matrix, and `(T − T_true)` times the chord pattern is
+subtracted, so the bar's internal force is `K_bar u_e − (T − T_true) p` with
+`p = [−c, −s, +c, +s, 0, 0]`. On a two-node bar that is exactly `T_true p`. On a
+three-node bar it is not, and the Newton path will reproduce THAT expression rather
+than a cleaner one, because the two drivers have to be solving the same model.
+
+### Scope, and what stays refused
+
+- **1D reinforcement bar elements only.** Piles are beam elements with rotational
+  degrees of freedom and a bending capacity; the pile guard is not touched.
+- **No softening.** A model with `t_res` finite and below `t_allow` on any bar
+  element is REFUSED with a message naming softening. Softening is a converged-state
+  latch that changes the constitutive law between solves, which is exactly where a
+  Newton continuation is weakest, and approximating it would be the kind of fudged
+  tangent this spike exists to avoid.
+- **Everything else in the guard stands**: Hoek-Brown, power curve, suction, the
+  Rankine tension cutoff, K0 initial stress, staged loading, non-effective pore
+  pressure.
+
+### Design
+
+- **Residual.** `f_int_bar = K_bar u_e − (T − T_true) p`, added to the soil internal
+  force. `K_bar` is `fem_data['K_global_1d_elems']`, the same matrix the global
+  elastic stiffness is assembled from, so the two drivers carry the same bar.
+- **Consistent tangent, exact.** The map is piecewise LINEAR in `u_e`, so there is
+  nothing to difference: `dT/du = k p`, and `dT_true/du` is `k p` while
+  `0 < T < T_cap` and zero otherwise. The element tangent is therefore `K_bar` for
+  an active bar and `K_bar − k p⊗p` for a slack or capacity-limited one. On a
+  two-node bar the second is exactly zero, which is the right answer — a yielded bar
+  adds no stiffness. On a three-node bar it is a rank-one positive-semidefinite
+  block resisting only the midside node's departure from the chord, which is to be
+  verified numerically rather than asserted.
+- **No history.** With softening refused, `T_true` is a function of the current
+  displacement alone. The bar law is nonlinear-elastic, not plastic, so there is
+  nothing to commit at the end of a step and the ramp's warm start needs no
+  extension for it.
+- **Assembly.** The bar blocks join the cached sparsity pattern explicitly rather
+  than relying on their DOFs already appearing in the soil pattern, so a bar whose
+  end nodes do not share a soil element cannot silently drop out of the tangent.
+- **Displacement bound.** `max|u|` is read over the raw DOF vector. Bars stand on
+  soil nodes and add no degrees of freedom of their own; rotational DOFs exist only
+  where `is_pile_node` is set, which requires a pile. The guard asserts that no
+  rotational DOF is present, so the bound cannot silently start comparing a length
+  against a radian.
+- **Strength reduction touches soil only.** The ramp's `restrength` rewrites
+  `c_r`, `snph` and `csph` on the soil Gauss-point groups and nothing else; the
+  criterion asserts that a bar's capacity is identical at the foot of the ramp and
+  at its limit.
+
+### The benchmarks
+
+| Case | File | Mesh | Bracket | Lock |
+|---|---|---|---|---|
+| Geogrid sample | `docs/fem/files/xslope_reinforce_fem.xlsx` | tri6, 2 | 1.1–1.9 | `docs/fem/samples.md`, FS 1.497 |
+| FEM-2 tutorial | `docs/tutorials/files/xslope_reinforced_slope.xlsx` | tri6, 2 | 1.0–2.0 | `docs/tutorials/fem02_reinforcement.md`, FS 1.496 |
+| A third, different layout | picked from the corpus scan for a reinforcement layout unlike the six-layer geogrid stack, and no softening parameters | — | — | measured against the viscoplastic driver |
+
+Both locked cases carry `t_res` = 600 against `t_max` = 800, so both declare
+softening and both are refused as they ship. The comparison therefore runs the
+softening-DISABLED variant of each — `t_res` unset, which is the model's own
+"elastic–perfectly-plastic" default and what most vendors solve — on BOTH drivers,
+so the two are answering the same question. Whether that variant is the same model
+as the locked one is a measurement, not an assumption: the viscoplastic driver is
+run on the shipped file and on the disabled variant, and if the two agree then the
+locked value checks the comparison too, and if they do not then the locked value
+checks only the shipped file and the comparison stands on the viscoplastic answer
+for the variant. Either outcome is written.
+
+### Success criterion (verbatim)
+
+- **Correctness.** On at least three reinforced benchmarks, the Newton bisection's
+  SSRM factor of safety agrees with the viscoplastic factor of safety on the SAME
+  model within the bisection tolerance, 0.01; and where a locked FS tag applies to
+  the model actually solved, it agrees with that too, inside the tag's tolerance.
+- **The ramp agrees.** On the same cases, the ramp's factor of safety agrees with
+  the Newton bisection's within 0.01.
+- **The diagnostics are populated and physically consistent.** A reinforced Newton
+  solution returns `forces_1d`, `failed_1d_elements` and `softened_1d_elements` at
+  full 1D-element length; every reported force lies in `[0, t_allow]`; every element
+  the failed mask marks sits AT its capacity; `softened_1d_elements` is all False
+  (softening is refused, so no other value is reachable). The forces are compared
+  element by element against the viscoplastic solution's on the same model at the
+  same F, and the agreement is reported as a number rather than asserted.
+- **The unreinforced path is unchanged.** One plain benchmark (Griffiths & Lane 1,
+  tri6, 3.5) re-run through the extended driver must return the IDENTICAL factor of
+  safety and the identical per-trial iteration counts as the pre-extension driver,
+  measured against a control run of the parent commit rather than against a number
+  in this document.
+- **Work.** Newton's constitutive work against the viscoplastic driver's on the
+  reinforced cases, reported as a measured ratio. No target this round — this is
+  reconnaissance, and the ratio is the finding.
+- **The refusals hold.** A pile model, and a model with softening parameters
+  active, both raise, and the softening message names softening.
+- **An honest negative is a valid outcome and must be written.** If the bars need
+  something this design does not have — if the tangent has to be fudged, if the
+  verdicts move, if the diagnostics disagree with the viscoplastic driver's — that
+  is the result.

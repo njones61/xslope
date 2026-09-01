@@ -4290,6 +4290,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             elastic_by_elem=elastic_by_elem, t_cap_by_elem=t_cap_by_elem,
             pp_formulation=pp_formulation, force_tol=force_tol,
             min_slip_depth=min_slip_depth, max_iterations=max_iterations,
+            max_disp_factor=max_disp_factor,
             debug_level=debug_level, progress_callback=progress_callback)
 
     if debug_level >= 1:
@@ -6067,10 +6068,40 @@ _NR_LS_MAX = 9             # line-search backtracks (down to a step of 1/256)
 _NR_REL_TOL = 1e-8         # ||r|| / ||f_ext||, the step-level equilibrium test
 _NR_TANGENT_H = 1e-7       # strain perturbation for the algorithmic tangent
 
+# Admissibility of the ANSWER, not a control on the solve. Reaching equilibrium is
+# only half of what "the slope stands at F" means; the other half is that the state
+# it stands in is one the model can represent. Everything here is small-strain
+# kinematics on an undeformed mesh, so a field that has moved a tenth of the model
+# height is outside the theory that produced it whatever its residual says. 0.1 is
+# solve_fem's own `max_disp_factor` default, i.e. the same standard the viscoplastic
+# driver applies to itself.
+#
+# This is deliberately NOT the gate that was removed (see the long note in the
+# increment loop). That one abandoned a load INCREMENT mid-solve on a displacement
+# threshold, so it decided verdicts by stopping the solver early. This one is read
+# ONCE, on the final fully-loaded equilibrated state, and it changes nothing about
+# how hard the solver works — the trial is driven to convergence exactly as before
+# and only then asked whether the converged state is admissible.
+#
+# Measured need, on Griffiths & Lane 1 (quad9, 3.5): F = 1.400 converges to an
+# out-of-balance of 3.05e-8 — machine-precision statics, and a worst yield violation
+# of 1.5e-8 — at max|u| = 7.693 m on a 50 m model, 15.4% of its height. The
+# neighbouring trials read 1.66% (F = 1.3875) and 6.04% (F = 1.396875) of the height:
+# the classic displacement upturn, with the limit between the last two. Griffiths &
+# Lane read their own Example 1 at about 1.40 the same way, off the upturn.
+#
+# An explicit non-None `max_disp_factor` from the caller wins; the constant supplies
+# the standard on the hybrid/non-convergence path, where solve_ssrm passes None
+# because the viscoplastic driver substitutes its own runaway classifier there and
+# the Newton driver has none. Setting this to None turns the bound off entirely,
+# which is for experiments, not for runs whose answers are quoted.
+_NR_DISP_FACTOR = 0.1
+
 
 def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                       elastic_by_elem, t_cap_by_elem, pp_formulation,
                       force_tol, min_slip_depth, max_iterations,
+                      max_disp_factor=None,
                       debug_level=0, progress_callback=None,
                       nr_max_iter=_NR_MAX_ITER, nr_min_step=_NR_MIN_STEP):
     """One strength-reduction trial by Newton-Raphson (SPIKE; see SPIKE.md).
@@ -6081,6 +6112,12 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     load increment is driven below its floor without reaching it (`FAILED`,
     exit_reason 'diverging') — so this path can never leave a trial
     'inconclusive'.
+
+    A trial that reaches full gravity in equilibrium is checked once more, against
+    the displacement bound (`_NR_DISP_FACTOR`): a converged state that has moved
+    more than a tenth of the model height is reported FAILED with exit_reason
+    'displacement_limit', which is distinguishable from the force-side failures
+    ('diverging' at the load-step floor, 'iteration_cap' at the final force gate).
 
     Deliberately narrow: plain Mohr-Coulomb, psi = 0, no strain softening. Every
     modeling feature the spike does not cover raises rather than being silently
@@ -6345,6 +6382,19 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             converged = False
             exit_reason = 'iteration_cap'
 
+    # ... and the same displacement bound. Force equilibrium alone is not the
+    # question; equilibrium in a state the small-strain model can represent is.
+    # See _NR_DISP_FACTOR. Read once, here, on the final state.
+    disp_factor = (max_disp_factor if max_disp_factor is not None
+                   else _NR_DISP_FACTOR)
+    nr_disp_limit = (disp_factor * prep["mesh_height"]
+                     if disp_factor is not None and prep["mesh_height"] > 0
+                     else None)
+    if converged and nr_disp_limit is not None:
+        if float(np.max(np.abs(u))) > nr_disp_limit:
+            converged = False
+            exit_reason = 'displacement_limit'
+
     # ---- reporting ----------------------------------------------------------
     for grp in groups:
         grp['_u'] = u
@@ -6430,7 +6480,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         print(f"  Newton-Raphson (F={F:.3f}): {'CONVERGED' if converged else 'FAILED'} "
               f"— {n_steps} load increment(s), {n_cuts} cut(s), "
               f"{total_iterations} Newton iterations, load factor {lam:.4f}, "
-              f"out-of-balance {last_oob:.2e}")
+              f"out-of-balance {last_oob:.2e}"
+              + ('' if converged else f", exit {exit_reason}")
+              + (f", max|u| {max_disp:.4g}"
+                 + (f" against limit {nr_disp_limit:.4g}"
+                    if nr_disp_limit is not None else "")))
 
     return {
         "converged": bool(converged),
@@ -6444,7 +6498,17 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "plateau_iteration": None,
         "plateau_ratio": None,
         "diverging_iteration": (total_iterations if not converged else None),
-        "diverging_signal": ('load_step_floor' if not converged else None),
+        # WHY the trial failed, distinguishable at a glance: the load could not be
+        # carried at all ('load_step_floor'), it was carried but not to the force
+        # tolerance ('force_tolerance'), or it was carried in force but into a state
+        # the small-strain model cannot represent ('displacement_limit').
+        "diverging_signal": (None if converged else
+                             {'diverging': 'load_step_floor',
+                              'iteration_cap': 'force_tolerance',
+                              'displacement_limit': 'displacement_limit'}
+                             .get(exit_reason, 'load_step_floor')),
+        # The bound the final state was measured against (None = bound off).
+        "nr_disp_limit": nr_disp_limit,
         "early_exit_suppressed": False,
         "budget_extensions": 0,
         "iteration_budget": nr_max_iter,

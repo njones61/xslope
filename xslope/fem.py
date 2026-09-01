@@ -4311,6 +4311,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     Fb[np.asarray(ssr_exclude_mask, dtype=bool)] = 1.0
                 c_r_new = c_by_elem / Fb
                 phi_r_new = np.arctan(np.tan(np.radians(phi_by_elem)) / Fb)
+                # The tensile cap is reduced with the shear strength when
+                # `tension_srf` is on, exactly as it is in the per-trial code
+                # above. Without this the ramp would carry the cap the FOOT was
+                # solved at all the way up, so the strength being reduced would
+                # not be the whole envelope the setting says it is.
+                tc_new = prep["t_cap_base"]
+                if tension_srf:
+                    tc_new = tc_new.copy()
+                    _rr = np.isfinite(tc_new) & (tc_new > 0.0)
+                    tc_new[_rr] = tc_new[_rr] / Fb[_rr]
                 for grp in groups:
                     e = grp['e_idx']
                     cc = c_r_new[e]
@@ -4320,6 +4330,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     grp['c_r'] = cc
                     grp['snph'] = np.sin(phi_r_new[e])
                     grp['csph'] = np.cos(phi_r_new[e])
+                    _nr_group_tension_cap(grp, tc_new)
             _nr_export['restrength'] = _restrength
         if _init_state is not None:
             raise NotImplementedError(
@@ -5849,9 +5860,162 @@ def resolve_fem_solver(fem_solver=None):
 
 # Branch codes recorded per Gauss point by the return map, for reporting only.
 _NR_ELASTIC, _NR_MAIN, _NR_RIGHT, _NR_LEFT, _NR_APEX = 0, 1, 2, 3, 4
+# ... and the Rankine tension-cutoff branches, reached only where a Gauss point
+# carries a FINITE tensile cap. The naming says which surfaces are active:
+# TENS = the cap alone on sigma_1; TENS2 = on sigma_1 and sigma_2; TENS3 = the
+# hydrostatic-tension return to (T, T, T), which is what replaces the Mohr-Coulomb
+# apex whenever T sits below it; MC_TENS = the Mohr-Coulomb main plane AND the cap,
+# which is the intersection edge; CORNER_TENS = a sextant corner and the cap;
+# MC_TENS2 = the main plane with the cap on two principal stresses.
+(_NR_TENS, _NR_TENS2, _NR_TENS3, _NR_MC_TENS, _NR_CORNER_TENS,
+ _NR_MC_TENS2, _NR_TENS_FALLBACK) = 5, 6, 7, 8, 9, 10, 11
+
+_NR_BRANCH_NAMES = {
+    _NR_ELASTIC: "elastic", _NR_MAIN: "main", _NR_RIGHT: "right_corner",
+    _NR_LEFT: "left_corner", _NR_APEX: "apex",
+    _NR_TENS: "tension", _NR_TENS2: "tension_2", _NR_TENS3: "tension_apex",
+    _NR_MC_TENS: "mc_tension_edge", _NR_CORNER_TENS: "corner_tension",
+    _NR_MC_TENS2: "mc_tension_2", _NR_TENS_FALLBACK: "tension_fallback",
+}
+
+# The active sets the combined Mohr-Coulomb / Rankine return tries, in order, with
+# the branch code each one records. A surface index is
+#   0,1,2 -> the Mohr-Coulomb planes on the ordered pairs (1,3), (1,2), (2,3)
+#   3,4,5 -> the Rankine planes sigma_1 <= T, sigma_2 <= T, sigma_3 <= T
+#
+# Two facts about the ordered sextant sigma_1 >= sigma_2 >= sigma_3 cut the
+# combinatorics down to these seven, and both are exact rather than heuristic:
+#
+#   * f(1,3) >= f(1,2) and f(1,3) >= f(2,3) identically there, so plane (1,3) is in
+#     the Mohr-Coulomb active set whenever any Mohr-Coulomb plane is. The only
+#     Mohr-Coulomb sets are {}, {13}, {13,12} and {13,23} — which are exactly the
+#     main plane and the two corners the plain map already carries.
+#   * a RETURNED state must be ordered, so if sigma_2 is at the cap then sigma_1 is
+#     too. The only Rankine sets are the prefixes {1}, {1,2} and {1,2,3}.
+#
+# Three principal stresses admit at most three independent active constraints, which
+# rules out the corner-plus-two-cap and main-plus-three-cap combinations.
+_NR_RANKINE_SETS = (
+    ((3,), _NR_TENS),
+    ((0, 3), _NR_MC_TENS),
+    ((0, 2, 3), _NR_CORNER_TENS),
+    ((0, 1, 3), _NR_CORNER_TENS),
+    ((3, 4), _NR_TENS2),
+    ((0, 3, 4), _NR_MC_TENS2),
+    ((3, 4, 5), _NR_TENS3),
+)
 
 
-def mc_return_map(sig_tr4, c, snph, csph, mu):
+def _nr_surface(k, A, Bc, ccp, mu, lam, T):
+    """One yield surface's normal, its elastic return vector, and its intercept.
+
+    Every surface here is LINEAR in the ordered principal stress — ``f_k = n_k . s
+    - r_k`` — with a CONSTANT flow direction, which is what makes a return for a
+    given active set one small linear solve and exact rather than iterated.
+
+    ``v_k = D m_k`` is the stress change per unit multiplier. For a Mohr-Coulomb
+    plane the psi = 0 flow ``m = (e_i - e_j)/2`` is deviatoric and the isotropic
+    operator maps it to ``mu (e_i - e_j)``, so that return cannot move the mean
+    stress. For a Rankine plane the flow is ASSOCIATED, ``m = e_k``, and
+    ``D m = 2 mu e_k + lambda 1`` DOES move it — which is the entire reason the
+    second surface exists, since a psi = 0 Mohr-Coulomb flow cannot relieve a
+    tensile mean stress at all.
+    """
+    z = np.zeros_like(A)
+    o = np.ones_like(A)
+    if k == 0:                                   # Mohr-Coulomb on (sigma_1, sigma_3)
+        return (np.stack([A, z, -Bc], 1),
+                mu[:, None] * np.stack([o, z, -o], 1), ccp)
+    if k == 1:                                   # ... on (sigma_1, sigma_2)
+        return (np.stack([A, -Bc, z], 1),
+                mu[:, None] * np.stack([o, -o, z], 1), ccp)
+    if k == 2:                                   # ... on (sigma_2, sigma_3)
+        return (np.stack([z, A, -Bc], 1),
+                mu[:, None] * np.stack([z, o, -o], 1), ccp)
+    e = np.zeros((len(A), 3))
+    e[:, k - 3] = 1.0                            # Rankine on sigma_(k-3)
+    return e, 2.0 * mu[:, None] * e + lam[:, None], T
+
+
+def _nr_solve_small(M, rhs):
+    """Solve a stack of small dense systems, flagging the singular ones.
+
+    ``M`` is (N, m, m) with m at most 3. A singular member is a degenerate active
+    set — two surfaces whose return vectors are parallel — and it is reported
+    rather than solved, so the caller moves on to the next candidate instead of
+    taking a nonsense multiplier.
+    """
+    m = M.shape[1]
+    det = np.linalg.det(M)
+    scale = np.max(np.abs(M), axis=(1, 2)) ** m
+    ok = np.abs(det) > 1e-12 * np.maximum(scale, 1e-300)
+    Ms = np.where(ok[:, None, None], M, np.eye(m))
+    # rhs is stacked explicitly: NumPy 2 reads a (N, m) right-hand side as one
+    # m-by-N matrix rather than as N vectors.
+    return np.linalg.solve(Ms, rhs[:, :, None])[:, :, 0], ok
+
+
+def _nr_rankine_return(s, A, Bc, ccp, mu, lam, T):
+    """Return ordered principal stresses to Mohr-Coulomb INTERSECTED with the cap.
+
+    ``s`` is (N, 3), already ordered sigma_1 >= sigma_2 >= sigma_3, tension-positive,
+    and every other argument is per-point. Returns ``(sigma, branch, unresolved)``.
+
+    This is Koiter's rule done as an ACTIVE-SET SEARCH rather than a case tree: each
+    candidate set in ``_NR_RANKINE_SETS`` is returned exactly by one linear solve,
+    and a candidate is accepted only if it is CONSISTENT — every multiplier
+    non-negative, the returned state still ordered, and BOTH surfaces satisfied. The
+    first consistent candidate wins. Nothing here decides a region by inspecting the
+    trial state, so a region the design got wrong shows up as an inconsistent return
+    rather than as a wrong answer that looks right.
+
+    Two passes over the candidates: the first at a tolerance three orders above
+    round-off, the second an order below the branch structure, which is what a point
+    sitting exactly ON a region boundary needs (there the two candidates agree to
+    round-off, so accepting either is the same answer). Anything still unresolved is
+    reported through ``unresolved`` and the caller decides; it is expected to be
+    empty and the fuzz asserts that it is.
+    """
+    n = len(s)
+    out = s.copy()
+    branch = np.zeros(n, dtype=np.int8)
+    todo = np.ones(n, dtype=bool)
+    sc = np.maximum.reduce([np.abs(s[:, 0]), np.abs(s[:, 2]), np.abs(T),
+                            np.abs(ccp), np.ones(n)])
+    for rel_tol in (1e-13, 1e-9):
+        for surf, code in _NR_RANKINE_SETS:
+            if not todo.any():
+                break
+            j = np.flatnonzero(todo)
+            parts = [_nr_surface(k, A[j], Bc[j], ccp[j], mu[j], lam[j], T[j])
+                     for k in surf]
+            nmat = np.stack([p[0] for p in parts], axis=1)      # (n, m, 3)
+            vmat = np.stack([p[1] for p in parts], axis=1)      # (n, m, 3)
+            rvec = np.stack([p[2] for p in parts], axis=1)      # (n, m)
+            M = np.einsum('nia,nja->nij', nmat, vmat)
+            rhs = np.einsum('nia,na->ni', nmat, s[j]) - rvec
+            gam, ok = _nr_solve_small(M, rhs)
+            sig = s[j] - np.einsum('ni,nia->na', gam, vmat)
+            tol = rel_tol * sc[j]
+            # A multiplier is checked through the stress it moves, so the test is in
+            # one unit whatever the surface's normalization.
+            ok &= np.all(gam * np.linalg.norm(vmat, axis=2)
+                         >= -tol[:, None], axis=1)
+            a1, a2, a3 = sig[:, 0], sig[:, 1], sig[:, 2]
+            ok &= (a1 >= a2 - tol) & (a2 >= a3 - tol)
+            ok &= (A[j] * a1 - Bc[j] * a3 - ccp[j]) <= tol
+            ok &= a1 <= T[j] + tol
+            if ok.any():
+                sel = j[ok]
+                out[sel] = sig[ok]
+                branch[sel] = code
+                todo[sel] = False
+        if not todo.any():
+            break
+    return out, branch, todo
+
+
+def mc_return_map(sig_tr4, c, snph, csph, mu, t_cap=None, lam=None):
     """Closest-point return to the Mohr-Coulomb cone, psi = 0, plane strain.
 
     ``sig_tr4`` is the (G, 4) elastic trial stress [sx, sy, txy, sz],
@@ -5859,8 +6023,15 @@ def mc_return_map(sig_tr4, c, snph, csph, mu):
     ``c``, ``snph``, ``csph``, ``mu`` are per-Gauss-point arrays of length G
     (cohesion, sin/cos of the friction angle, shear modulus).
 
+    ``t_cap`` is the per-point Rankine tensile cap T (``inf`` = none) and ``lam``
+    the Lame constant the associated Rankine flow needs; both ``None`` — the
+    default, and every call on a model that sets no ``t_cut`` — skips that code
+    entirely, so the plain Mohr-Coulomb path is untouched arithmetic for
+    untouched arithmetic. See :func:`_nr_rankine_return`.
+
     Returns ``(sig4, branch)`` — the returned stress and a per-point branch code
-    (0 elastic, 1 main plane, 2 right corner, 3 left corner, 4 apex).
+    (0 elastic, 1 main plane, 2 right corner, 3 left corner, 4 apex, and 5-11 for
+    the branches where the tensile cap is active; see ``_NR_BRANCH_NAMES``).
 
     On the ordered principal stresses sigma_1 >= sigma_2 >= sigma_3
     (tension-positive) the yield function is
@@ -5957,6 +6128,56 @@ def mc_return_map(sig_tr4, c, snph, csph, mu):
             n3 = np.where(apex, s_apex, n3)
             branch[apex] = _NR_APEX
 
+    # --- the Rankine tension cutoff, the SECOND surface -----------------------
+    # The cap is a separate yield surface from the Mohr-Coulomb one and the two
+    # combine by Koiter's rule, which is what the viscoplastic path does when it
+    # SUMS the two flows into evpg. Here the same physics is a multi-surface
+    # return: the Mohr-Coulomb-only state above is a valid answer for any point
+    # whose returned sigma_1 is already under its cap (the Rankine multiplier is
+    # zero there), so only the rest are reworked. That is what keeps a model with
+    # no cap on exactly the arithmetic it was on before this surface existed, and
+    # it is also why an inert cap — one at or above the Mohr-Coulomb apex, which no
+    # admissible state can reach — costs a comparison and nothing else.
+    if t_cap is not None:
+        T_ = np.broadcast_to(np.asarray(t_cap, dtype=float), f.shape)
+        over = np.isfinite(T_) & (n1 > T_)
+        if np.any(over):
+            if lam is None:
+                raise ValueError("mc_return_map needs `lam` when `t_cap` is set: "
+                                 "the Rankine flow is associated, so its return "
+                                 "vector is 2 mu e_k + lambda 1.")
+            k = np.flatnonzero(over)
+            A_ = np.broadcast_to(A, f.shape)
+            Bc_ = np.broadcast_to(Bc, f.shape)
+            ccp_ = np.broadcast_to(ccp, f.shape)
+            mu_ = np.broadcast_to(np.asarray(mu, dtype=float), f.shape)
+            lam_ = np.broadcast_to(np.asarray(lam, dtype=float), f.shape)
+            # From the TRIAL state, not from the Mohr-Coulomb-returned one. Koiter's
+            # rule is SIMULTANEOUS — sigma = sigma_trial - sum_k gamma_k D m_k over
+            # the whole active set — and returning to one surface and then to the
+            # other is a different, wrong operation. It is wrong in a way that
+            # hides: a state already returned to the Mohr-Coulomb surface and then
+            # capped comes back INSIDE that surface (the Rankine return lowers f by
+            # gamma*(2*mu*A + lambda*sin(phi)), which is non-negative at every
+            # friction angle), so every point looks admissible and the intersection
+            # edge never executes. The branch histogram is what says so.
+            sig_r, br_r, todo = _nr_rankine_return(
+                np.stack([s1[k], s2[k], s3[k]], axis=1),
+                A_[k], Bc_[k], ccp_[k], mu_[k], lam_[k], T_[k])
+            if np.any(todo):
+                # No candidate active set was consistent. The isotropic point at
+                # min(T, apex) satisfies BOTH surfaces, so the state stays
+                # admissible and the verdict's yield reading stays honest; the
+                # branch code says it happened, and the fuzz asserts it does not.
+                snph_s = np.where(snph > 1e-12, snph, 1.0)
+                apex_ = np.where(snph > 1e-12, ccp / snph_s, np.inf)
+                fb = np.minimum(np.broadcast_to(apex_, f.shape)[k][todo],
+                                T_[k][todo])
+                sig_r[todo] = fb[:, None]
+                br_r[todo] = _NR_TENS_FALLBACK
+            n1[k], n2[k], n3[k] = sig_r[:, 0], sig_r[:, 1], sig_r[:, 2]
+            branch[k] = br_r
+
     # --- back to component form ----------------------------------------------
     Pn = np.empty_like(P)
     np.put_along_axis(Pn, order, np.stack([n1, n2, n3], axis=1), axis=1)
@@ -5977,7 +6198,12 @@ def mc_return_map(sig_tr4, c, snph, csph, mu):
     out[:, 1] = ctr_n - rad_n * c2
     out[:, 2] = rad_n * s2t
     out[:, 3] = sz_n
-    el = ~yid
+    # An untouched point is restored EXACTLY rather than reconstructed, so a stress
+    # the return map did not act on carries no round-off from the round trip
+    # through the principal frame. Read off the branch code, which is zero on
+    # exactly the points no surface returned — including a point that yielded
+    # neither the shear surface nor the cap.
+    el = branch == _NR_ELASTIC
     if np.any(el):
         out[el] = sig_tr4[el]
     return out, branch
@@ -6001,8 +6227,9 @@ def _nr_group_state(grp, u, h_eps):
     eps4[:, :3] = eps - ep[:, :3]
     eps4[:, 3] = -ep[:, 3]
     sig_tr = (D4 @ eps4[:, :, None])[:, :, 0]
+    t_cap, lam = grp.get('t_cap'), grp.get('lam')
     sig, branch = mc_return_map(sig_tr, grp['c_r'], grp['snph'], grp['csph'],
-                                grp['mu'])
+                                grp['mu'], t_cap=t_cap, lam=lam)
     yid = branch != _NR_ELASTIC
     Dep = np.array(grp['D3'], copy=True)
     if np.any(yid):
@@ -6010,10 +6237,13 @@ def _nr_group_state(grp, u, h_eps):
         base = sig[idx, :3]
         s_tr = sig_tr[idx]
         D4y = D4[idx]
+        tc_y = None if t_cap is None else t_cap[idx]
+        lam_y = None if lam is None else lam[idx]
         for j in range(3):
             sp, _ = mc_return_map(s_tr + h_eps * D4y[:, :, j],
                                   grp['c_r'][idx], grp['snph'][idx],
-                                  grp['csph'][idx], grp['mu'][idx])
+                                  grp['csph'][idx], grp['mu'][idx],
+                                  t_cap=tc_y, lam=lam_y)
             Dep[idx, :, j] = (sp[:, :3] - base) / h_eps
     return sig, branch, Dep
 
@@ -6136,8 +6366,14 @@ def _nr_internal_force(gp_groups, u, n_dof, h_eps=None, want_tangent=False,
             eps4[:, :3] = eps - ep[:, :3]
             eps4[:, 3] = -ep[:, 3]
             sig_tr = (D4 @ eps4[:, :, None])[:, :, 0]
+            # The SAME constitutive law the tangent path takes, tensile cap
+            # included. This branch exists only to skip the differencing, so any
+            # divergence between the two is a residual and a tangent for two
+            # different materials.
             sig, branch = mc_return_map(sig_tr, grp['c_r'], grp['snph'],
-                                        grp['csph'], grp['mu'])
+                                        grp['csph'], grp['mu'],
+                                        t_cap=grp.get('t_cap'),
+                                        lam=grp.get('lam'))
         grp['_sig'] = sig
         grp['_branch'] = branch
         n_plastic_gp += int(np.count_nonzero(branch))
@@ -6166,7 +6402,34 @@ def _nr_commit_plastic_strain(gp_groups):
         grp['ep'] = ep
 
 
-def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem):
+def _nr_group_tension_cap(grp, t_cap_by_elem):
+    """Attach (or refresh) one group's Rankine tensile cap.
+
+    The keys are set ONLY where the group actually carries a finite cap, so
+    ``grp.get('t_cap')`` is None on every model that sets no ``t_cut`` and the
+    return map's cap code is never entered there. A material declared ``elastic``
+    is held out of the cap exactly as the viscoplastic path holds it out
+    (``tm & ~grp['elastic']``): it cannot fail, so it cannot crack either.
+    """
+    if t_cap_by_elem is None:
+        return
+    tc = np.asarray(t_cap_by_elem, dtype=float)[grp['e_idx']]
+    if 'elastic' in grp:
+        tc = tc.copy()
+        tc[grp['elastic']] = np.inf
+    if not np.isfinite(tc).any():
+        grp.pop('t_cap', None)
+        grp.pop('lam', None)
+        return
+    grp['t_cap'] = tc
+    # The associated Rankine flow returns 2*mu*e_k + lambda*1, so it needs the
+    # second Lame constant. D4[0, 1] is exactly lambda (see
+    # build_constitutive_matrix_4), which is why no second material lookup happens.
+    grp['lam'] = grp['D4'][:, 0, 1].copy()
+
+
+def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
+                     t_cap_by_elem=None):
     """The Newton path's working Gauss-point groups.
 
     Geometry (B, D4, w, dof) is shared BY REFERENCE with the prepared model, which
@@ -6201,6 +6464,7 @@ def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem):
                 grp['c_r'] = grp['c_r'].copy()
                 grp['c_r'][em] = np.inf
                 grp['elastic'] = em
+        _nr_group_tension_cap(grp, t_cap_by_elem)
         groups.append(grp)
     return groups
 
@@ -6441,7 +6705,13 @@ def _nr_predictor_rungs(prep, n_elements, max_iterations, max_iterations_ceiling
         prep_seed = prep
         if _NR_VP_PREDICTOR_TENSION_CAP:
             prep_seed = dict(prep)
-            prep_seed["t_cap_base"] = np.zeros(int(n_elements))
+            # COMPOSED with the caller's own caps rather than replacing them, so a
+            # model that already sets t_cut keeps the tighter of the two. A tensile
+            # cap is never negative, so this is the same zeros array on every model
+            # that sets none — the seed is the caller's model with no tension
+            # permitted anywhere, which is what the seed is for.
+            prep_seed["t_cap_base"] = np.minimum(
+                np.asarray(prep["t_cap_base"], dtype=float), 0.0)
         rungs.append((int(max_iterations),
                       max(int(max_iterations_ceiling or 0), int(max_iterations)),
                       prep_seed, bool(early_failure)))
@@ -6614,7 +6884,10 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     'displacement_limit', which is distinguishable from the force-side failures
     ('diverging' at the load-step floor, 'iteration_cap' at the final force gate).
 
-    Deliberately narrow: plain Mohr-Coulomb, psi = 0, no strain softening.
+    Deliberately narrow: Mohr-Coulomb, psi = 0, no strain softening. The Rankine
+    tension cutoff IS carried, as a second yield surface combined with the shear
+    one by Koiter's rule (see mc_return_map and _nr_rankine_return), which is the
+    same physics the viscoplastic path gets by summing the two flows.
     Reinforcement bar elements ARE carried (see _nr_build_bars and _nr_bar_force),
     with the soil strength reduced and the bars keeping their capacity, which is the
     vendor convention and what the LEM does. Everything else the spike does not
@@ -6660,8 +6933,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         unsupported.append("Hoek-Brown strength envelopes")
     if prep.get("suction_active"):
         unsupported.append("matric suction")
-    if t_cap_by_elem is not None and np.any(np.isfinite(t_cap_by_elem)):
-        unsupported.append("the Rankine tension cutoff")
+    # The Rankine tension cutoff IS carried (see mc_return_map's second surface and
+    # _nr_rankine_return). It arrives here as t_cap_by_elem, already reduced by the
+    # trial F where `tension_srf` says so, so nothing about the cap's semantics is
+    # decided on this path — it is the same per-element array the viscoplastic
+    # driver caps sigma_1 against.
     if prep.get("sv0_gp") is not None:
         unsupported.append("K0 initial stress")
     if pp_formulation != "effective":
@@ -6684,7 +6960,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             "displacement vector. Its displacement bound is a length. Run this "
             "model on the default viscoplastic solver.")
 
-    groups = _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem)
+    groups = _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
+                              t_cap_by_elem)
     bars = _nr_build_bars(fem_data)
     pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars)
 
@@ -6898,6 +7175,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # rather than a solver's word for one.
     sq3_ = np.sqrt(3.0)
     max_yield_violation = 0.0
+    max_tension_violation = None
     for grp in groups:
         sg = grp['_sig']
         sx_, sy_, txy_, sz_ = sg[:, 0], sg[:, 1], sg[:, 2], sg[:, 3]
@@ -6921,6 +7199,23 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         if np.any(ok_):
             max_yield_violation = max(max_yield_violation,
                                       float(np.max(fv_[ok_] / den_[ok_])))
+        # The tensile half of the same reading: how far the major principal stress
+        # sits above the cap, on the same scale. Computed from the components
+        # rather than from the return map's ordered principals, for the same reason
+        # the shear reading is — an independent form of the same statement.
+        _tc = grp.get('t_cap')
+        if _tc is not None:
+            _m = np.isfinite(_tc) & ok_
+            if np.any(_m):
+                _ctr = 0.5 * (sx_ + sy_)
+                _r = np.sqrt((0.5 * (sx_ - sy_)) ** 2 + txy_ ** 2)
+                _s1 = np.maximum(_ctr + _r, sz_)
+                _tv = float(np.max((_s1[_m] - _tc[_m]) / den_[_m]))
+                max_tension_violation = (
+                    _tv if max_tension_violation is None
+                    else max(max_tension_violation, _tv))
+    if max_tension_violation is not None:
+        max_yield_violation = max(max_yield_violation, max_tension_violation)
 
     sig_by_gp = [[None] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
     branch_by_gp = [[0] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
@@ -7043,17 +7338,17 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         # apex points carry a zero tangent, so a field full of them has no
         # stiffness left to iterate on.
         "nr_branch_counts": {
-            "elastic": int(sum(int(np.count_nonzero(g['_branch'] == _NR_ELASTIC))
-                               for g in groups)),
-            "main": int(sum(int(np.count_nonzero(g['_branch'] == _NR_MAIN))
-                            for g in groups)),
-            "right_corner": int(sum(int(np.count_nonzero(g['_branch'] == _NR_RIGHT))
-                                    for g in groups)),
-            "left_corner": int(sum(int(np.count_nonzero(g['_branch'] == _NR_LEFT))
-                                   for g in groups)),
-            "apex": int(sum(int(np.count_nonzero(g['_branch'] == _NR_APEX))
-                            for g in groups)),
+            name: int(sum(int(np.count_nonzero(g['_branch'] == code))
+                          for g in groups))
+            for code, name in sorted(_NR_BRANCH_NAMES.items())
         },
+        # The largest violation of the Rankine cap at the reported state, as a
+        # fraction of the same local strength scale, or None on a model with no
+        # cap. It is the tensile half of the same evidence `nr_max_yield_violation`
+        # carries for the shear surface, and it is folded into that number too, so
+        # a reader who checks only one still sees a capped model's whole
+        # admissibility.
+        "nr_max_tension_violation": max_tension_violation,
         # Whether this trial was solved from a viscoplastic predictor's state
         # rather than from zero, and how many predictor iterations it cost (see
         # _NR_VP_PREDICTOR_ITERS). Zero on every trial the driver solves on its own,

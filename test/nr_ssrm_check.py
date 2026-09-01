@@ -192,6 +192,7 @@ def run():
     failures += check_reinforcement()
     failures += check_cohesionless_solve()
     failures += check_cohesionless_seed_depth()
+    failures += check_tension_cutoff(fem_data)
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
 
@@ -966,6 +967,177 @@ def check_cohesionless_seed_depth():
             f"starting state and must never supply a verdict; a converged trial one "
             f"bisection cell above the certified limit means a deeper seed is now "
             f"talking the corrector into standing where it did not.")
+    return fails
+
+
+# The tension cutoff (SPIKE.md, "THE TENSION CUTOFF"). Measured on this checkout:
+# the coarse tri6 model with t_cut = 0 on its one material reads 1.375 on BOTH
+# drivers, one bisection cell below the uncapped 1.39 — the cap is doing real work
+# and the two drivers see the same work.
+TCUT_FS = 1.375
+# The tension_srf leg. A cap of 30 at F = 1.2 binds either way, so the two settings
+# are distinguishable: reduced with the trial it holds the major principal stress
+# at 30/1.2 = 25, held at its authored value it holds it at 30.
+TSRF_F, TSRF_CAP = 1.2, 30.0
+
+
+def check_tension_cutoff(fem_data):
+    """The Rankine tensile cap: the second surface, and the factor it is reduced by.
+
+    The Newton driver used to refuse any model with a finite ``t_cut``. Since
+    new materials are authored with ``t_cut = 0`` that refusal covered the default
+    case, and the cap is also the documented remedy for the illegal tension the
+    three-layer adjudication measured on a cohesionless soil (SPIKE.md, "THE
+    THREE-LAYER DISAGREEMENT"). Four things are asserted, and each one fails on a
+    different defect:
+
+      * **the return map**, capped. Random trial states at four friction angles and
+        three caps — none, zero, and one above the Mohr-Coulomb apex — must come
+        back satisfying BOTH surfaces, ordered, with elastic states untouched. The
+        BRANCH HISTOGRAM is asserted too: the Mohr-Coulomb / Rankine intersection
+        edge and the hydrostatic-tension return must actually execute, because a
+        fuzz that never lands on a region proves nothing about it, and no state may
+        come back on the unresolved fallback.
+      * **an inert cap is not a cap.** Every Mohr-Coulomb-admissible state has
+        sigma_1 <= c cot(phi), so a cap at or above that apex can never bind, and
+        the capped map must reproduce the uncapped one BIT FOR BIT. That is the
+        cheapest possible statement that the second surface does not perturb the
+        first.
+      * **the cap is reduced with the trial** when ``tension_srf`` is on, which is
+        what makes the factor of safety a factor on the whole envelope rather than
+        on its shear half. At F = 1.2 with a cap of 30 the converged state's major
+        principal stress sits at exactly 25 with the reduction and exactly 30
+        without it.
+      * **the factor of safety**, on the same coarse model the rest of this file
+        uses, with the cap on: both drivers, agreeing with each other and with the
+        strength measured for this mesh.
+    """
+    import numpy as _np
+    from xslope.fem import (_NR_BRANCH_NAMES, _NR_TENS_FALLBACK, _NR_MC_TENS,
+                            _NR_TENS3, build_constitutive_matrix_4)
+    fails = []
+    D4 = build_constitutive_matrix_4(30000.0, 0.3)
+    mu_v, lam_v = D4[2, 2], D4[0, 1]
+    rng = np.random.default_rng(17)
+    n, scale = 40000, 30.0
+    seen = {}
+    for phi_deg, c in ((0.0, 10.0), (20.0, 5.0), (35.0, 2.0), (45.0, 1.0)):
+        snph, csph = np.sin(np.radians(phi_deg)), np.cos(np.radians(phi_deg))
+        a, bc = 0.5 * (1.0 + snph), 0.5 * (1.0 - snph)
+        apex = np.inf if snph < 1e-12 else c * csph / snph
+        sig = rng.normal(0.0, scale, size=(n, 4))
+        sig[:, 2] *= 0.5
+        args = (np.full(n, c), np.full(n, snph), np.full(n, csph), np.full(n, mu_v))
+        plain, br_plain = mc_return_map(sig, *args)
+        for tag, T in (("t_cut=0", 0.0), ("t_cut=%g" % (0.35 * c * csph),
+                                          0.35 * c * csph),
+                       ("t_cut inert", (1e6 if not np.isfinite(apex)
+                                        else 10.0 * apex))):
+            out, br = mc_return_map(sig, *args, t_cap=np.full(n, T),
+                                    lam=np.full(n, lam_v))
+            ctr = 0.5 * (out[:, 0] + out[:, 1])
+            half = 0.5 * (out[:, 0] - out[:, 1])
+            r = np.sqrt(half * half + out[:, 2] ** 2)
+            pn = -np.sort(-np.stack([ctr + r, ctr - r, out[:, 3]], axis=1), axis=1)
+            sc = np.maximum(np.abs(pn[:, 0]), scale)
+            where = f"phi={phi_deg:g}, {tag}"
+            f_new = (a * pn[:, 0] - bc * pn[:, 2] - c * csph) / sc
+            if f_new.max() > 1e-12:
+                fails.append(f"{where}: a returned state is OUTSIDE the "
+                             f"Mohr-Coulomb surface by {f_new.max():.2e} of the "
+                             f"stress scale")
+            t_new = (pn[:, 0] - T) / sc
+            if t_new.max() > 1e-12:
+                fails.append(f"{where}: a returned state is above the tensile cap "
+                             f"by {t_new.max():.2e} of the stress scale — the "
+                             f"Rankine surface is not being enforced")
+            if (np.minimum(pn[:, 0] - pn[:, 1], pn[:, 1] - pn[:, 2])
+                    / sc).min() < -1e-12:
+                fails.append(f"{where}: a returned state has its principal "
+                             f"stresses out of order")
+            el = br == 0
+            if el.any() and np.abs(out[el] - sig[el]).max() > 0.0:
+                fails.append(f"{where}: an elastic point was modified")
+            nfb = int((br == _NR_TENS_FALLBACK).sum())
+            if nfb:
+                fails.append(f"{where}: {nfb} state(s) came back on the unresolved "
+                             f"fallback — no candidate active set was consistent, "
+                             f"which means the region list is incomplete")
+            if tag == "t_cut inert":
+                if not (np.array_equal(out, plain) and np.array_equal(br, br_plain)):
+                    fails.append(
+                        f"{where}: a cap ABOVE the Mohr-Coulomb apex changed the "
+                        f"return. No admissible state can reach sigma_1 = c "
+                        f"cot(phi), so an inert cap has to be bit-identical to no "
+                        f"cap at all")
+            for code, cnt in zip(*np.unique(br, return_counts=True)):
+                seen[int(code)] = seen.get(int(code), 0) + int(cnt)
+    for code in (_NR_MC_TENS, _NR_TENS3):
+        if not seen.get(code):
+            fails.append(
+                f"the '{_NR_BRANCH_NAMES[code]}' branch never executed in "
+                f"{4 * 3 * n} returns, so nothing here tests it. Either the fuzz "
+                f"no longer reaches that region or the region is unreachable — "
+                f"both are defects in this check")
+
+    # --- the cap is reduced with the trial strength ---------------------------
+    n_el = len(fem_data['elements'])
+    for tsrf, want in ((True, TSRF_CAP / TSRF_F), (False, TSRF_CAP)):
+        sol = solve_fem(fem_data, F=TSRF_F, fem_solver='newton',
+                        max_iterations=MAX_ITER, max_disp_factor=None,
+                        tension_cap_by_elem=_np.full(n_el, TSRF_CAP),
+                        tension_srf=tsrf, force_tol=1e-3)
+        if not sol['converged']:
+            fails.append(f"tension_srf={tsrf}: the F = {TSRF_F} trial did not "
+                         f"converge, so the cap in force cannot be read off it")
+            continue
+        st = sol['stresses']
+        sx, sy, txy = -st[:, 0], -st[:, 1], st[:, 2]
+        s1 = 0.5 * (sx + sy) + np.sqrt((0.5 * (sx - sy)) ** 2 + txy ** 2)
+        # Two-sided, and the two sides say different things. Above the cap would be
+        # a cap not enforced; far below it would be a cap that never binds, which
+        # would make this leg vacuous — the point is that BOTH settings bind here
+        # and land on their own value. (The stresses are element averages over the
+        # Gauss points, so the reading sits a hair under the cap the points are at.)
+        got = float(s1.max())
+        if got > want * (1.0 + 1e-6):
+            fails.append(
+                f"tension_srf={tsrf}: the converged field reaches a major "
+                f"principal stress of {got:.6f}, above the {want:.6f} cap in "
+                f"force")
+        elif got < want * 0.99:
+            fails.append(
+                f"tension_srf={tsrf}: the largest major principal stress in the "
+                f"converged field is {got:.6f}, well under the {want:.6f} the cap "
+                f"in force allows — the cap does not bind, so this leg tests "
+                f"nothing. With the reduction on the cap is t_cut/F and without "
+                f"it t_cut; a cap that is not divided by the trial makes the "
+                f"factor of safety a factor on the shear envelope only")
+        if sol.get('nr_max_tension_violation', 0.0) > 1e-8:
+            fails.append(
+                f"tension_srf={tsrf}: the converged field violates its own cap by "
+                f"{sol['nr_max_tension_violation']:.2e} of the local strength")
+
+    # --- and the factor of safety, both drivers -------------------------------
+    name = fem_data['material_names'][0]
+    got = {}
+    for solver in ('viscoplastic', 'newton'):
+        res = solve_ssrm(fem_data, F_min=F_MIN, F_max=F_MAX, tolerance=TOLERANCE,
+                         max_iterations=MAX_ITER, fem_solver=solver,
+                         tension_cutoff_by_material={name: 0.0},
+                         capture_failure_state=False)
+        got[solver] = res.get('FS')
+        if got[solver] is None:
+            fails.append(f"{solver}: no factor of safety on the capped model")
+        elif abs(got[solver] - TCUT_FS) > TOLERANCE:
+            fails.append(
+                f"{solver}: with t_cut = 0 the factor of safety is "
+                f"{got[solver]:.4f}, {abs(got[solver] - TCUT_FS):.4f} from the "
+                f"{TCUT_FS} measured for this mesh")
+    if None not in got.values() and abs(got['viscoplastic'] - got['newton']) > TOLERANCE:
+        fails.append(
+            f"the two drivers disagree on the CAPPED model: viscoplastic "
+            f"{got['viscoplastic']:.4f} vs Newton {got['newton']:.4f}")
     return fails
 
 

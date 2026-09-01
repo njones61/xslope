@@ -39,13 +39,26 @@ future change to the Newton path cannot quietly reintroduce any of them:
     map is written on;
   * the verdict does not depend on the loading path (one gravity increment or
     sixteen give the same answer);
-  * the verdict does not depend on the step-control knobs (the displacement
-    runaway gate, the no-progress window, the per-increment iteration cap and the
-    load-step floor can all be loosened without changing it).
+  * the verdict does not depend on the step-control knobs (the no-progress window,
+    the per-increment iteration cap and the load-step floor can all be loosened
+    without changing it), and the displacement gate that used to sit among them is
+    not defined on the module at all.
+
+Two more came from the 2026-08-31 corrections, and both hold behavior the first
+four could not see:
+
+  * a converged trial is admissible in DISPLACEMENT as well as in force — on the
+    quad9 mesh, F = 1.396875 stands and F = 1.400 reaches machine-precision statics
+    a sixth of the model height away and is refused for it, with the signal that
+    says which of the two it failed;
+  * the XSLOPE_FEM_SOLVER environment override announces itself, so a stale shell
+    variable cannot recompute a session's factors of safety on the non-default
+    driver in silence.
 
 Run directly:  PYTHONPATH=. python3 test/nr_ssrm_check.py
 """
 
+import os
 import warnings
 from pathlib import Path
 
@@ -71,12 +84,19 @@ MAX_ITER = 4000
 # the checks that ask what a verdict depends on rather than what it is.
 F_STANDS, F_FAILS = 1.35, 1.45
 
+# The same model on a FINER quad9 mesh, which is where the displacement bound
+# actually decides something (see check_displacement_bound). One trial either side
+# of the bound; the pair brackets the Newton factor of safety without paying for a
+# whole bisection.
+QUAD9_SIZE = 3.5
+Q9_ADMISSIBLE, Q9_INADMISSIBLE = 1.396875, 1.400
 
-def _fem_data():
+
+def _fem_data(element_type=ELEMENT_TYPE, target_size=TARGET_SIZE):
     slope_data = load_slope_data(str(MODEL))
     mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
-                                    target_size=TARGET_SIZE,
-                                    element_type=ELEMENT_TYPE)
+                                    target_size=target_size,
+                                    element_type=element_type)
     return build_fem_data(slope_data, mesh)
 
 
@@ -122,6 +142,8 @@ def run():
     failures += check_verdict_evidence(fem_data)
     failures += check_load_path_invariance(fem_data)
     failures += check_step_control_not_decisive(fem_data)
+    failures += check_displacement_bound()
+    failures += check_env_override_announces_itself()
 
     return failures
 
@@ -268,8 +290,23 @@ def check_step_control_not_decisive(fem_data):
     sixteenfold, all at once. The fourth knob that used to sit here, a displacement
     runaway gate, is gone from the driver — it decided a verdict, which is why it
     is gone (see SPIKE.md, "Bug hunt").
+
+    That last sentence used to be the whole guard against the gate coming back, and
+    it guarded nothing: reintroducing ``_NR_RUNAWAY`` and its increment-abandoning
+    test left this check passing, because loosening the OTHER three knobs does not
+    disturb a gate that is not one of them. Two things close that. The constant may
+    not exist on the module at all, and the behavior it used to break is measured
+    directly in :func:`check_displacement_bound`.
     """
     fails = []
+    if hasattr(_fem, '_NR_RUNAWAY'):
+        fails.append(
+            "xslope.fem defines _NR_RUNAWAY again. That constant was a displacement "
+            "gate inside the load-increment loop: it abandoned an increment once "
+            "max|u| passed a multiple of the elastic response, which reported trials "
+            "as failed at strengths where the same driver reaches equilibrium with a "
+            "statically admissible stress field. A displacement limit belongs on the "
+            "FINAL state (see _NR_DISP_FACTOR), never on the solver's path.")
     loose = dict(_NR_NO_PROGRESS=200, _NR_MAX_ITER=400, _NR_MIN_STEP=1.0 / 1024)
     for F in (F_STANDS, F_FAILS):
         shipped = _newton(fem_data, F)
@@ -279,6 +316,124 @@ def check_step_control_not_decisive(fem_data):
                 f"F = {F}: the verdict is decided by the step control — as shipped "
                 f"it is {shipped['verdict']}, with every knob loosened it is "
                 f"{relaxed['verdict']}")
+    return fails
+
+
+def check_displacement_bound():
+    """The two halves of "the slope stands at F", measured on the trial that needs both.
+
+    Equilibrium alone is not the question. Griffiths & Lane 1 on a quad9 mesh at
+    size 3.5 is the case that separates the two halves: at F = 1.400 the Newton
+    driver reaches machine-precision statics — an out-of-balance four orders of
+    magnitude under the force tolerance — in a state that has moved about a sixth of
+    the 50 m model height. That is outside the small-strain kinematics the whole
+    model is written in, so it is not a slope standing; it is the displacement
+    upturn, and the limit is the strength below it, which is where Griffiths & Lane
+    read their own Example 1.
+
+    Both directions are asserted, so the check is a bracket on the answer and not
+    just a label:
+
+      * F = 1.396875 converges AND stays under the bound (max|u| below a tenth of
+        the model height), so the boundary is above it;
+      * F = 1.400 is FAILED with the signal 'displacement_limit' AND with its
+        out-of-balance UNDER the force tolerance, so it was rejected on
+        displacement and not on forces, and the boundary is below it.
+
+    The second assertion is what makes this mutation-sensitive. Under the removed
+    ``_NR_RUNAWAY`` gate the same trial fails inside the increment loop and comes
+    back at the load-step floor with a large out-of-balance — same FAILED label,
+    different signal, different force reading — so a reintroduced gate cannot pass
+    this by producing the same verdict for the wrong reason.
+    """
+    fails = []
+    fd = _fem_data(element_type='quad9', target_size=QUAD9_SIZE)
+    height = float(np.max(fd['nodes'][:, 1]) - np.min(fd['nodes'][:, 1]))
+    bound = 0.1 * height
+
+    stands = _newton(fd, Q9_ADMISSIBLE)
+    if not stands['converged']:
+        fails.append(
+            f"F = {Q9_ADMISSIBLE} was expected to stand on the quad9 mesh and came "
+            f"back {stands['verdict']} ({stands.get('exit_reason')}, "
+            f"max|u| = {stands['max_displacement']:.4g} against a bound of "
+            f"{bound:.4g}); the Newton factor of safety is no longer bracketed here")
+    elif stands['max_displacement'] > bound:
+        fails.append(
+            f"F = {Q9_ADMISSIBLE} converged at max|u| = "
+            f"{stands['max_displacement']:.4g}, past the {bound:.4g} bound it is "
+            f"meant to sit under — the displacement bound is not being applied")
+
+    over = _newton(fd, Q9_INADMISSIBLE)
+    if over['converged']:
+        fails.append(
+            f"F = {Q9_INADMISSIBLE} came back CONVERGED at max|u| = "
+            f"{over['max_displacement']:.4g} on a {height:.0f} m model "
+            f"({100 * over['max_displacement'] / height:.1f}% of its height): a "
+            f"state the small-strain model cannot represent is being reported as a "
+            f"slope standing")
+    else:
+        if over.get('diverging_signal') != 'displacement_limit':
+            fails.append(
+                f"F = {Q9_INADMISSIBLE} failed for the wrong reason — signal "
+                f"{over.get('diverging_signal')!r}, exit "
+                f"{over.get('exit_reason')!r}, after {over['iterations']} "
+                f"iterations. It is meant to reach equilibrium and be refused on "
+                f"displacement; failing it inside the solve is the removed "
+                f"_NR_RUNAWAY gate's signature.")
+        if over['unbalanced_force_ratio'] >= 1e-3:
+            fails.append(
+                f"F = {Q9_INADMISSIBLE} was refused with an out-of-balance of "
+                f"{over['unbalanced_force_ratio']:.3e}, at or above the 1e-3 force "
+                f"tolerance: it never reached equilibrium, so this is a force-side "
+                f"failure wearing a displacement label")
+        if over['max_displacement'] <= bound:
+            fails.append(
+                f"F = {Q9_INADMISSIBLE} was refused on displacement at max|u| = "
+                f"{over['max_displacement']:.4g}, which is UNDER the {bound:.4g} "
+                f"bound")
+    return fails
+
+
+def check_env_override_announces_itself():
+    """A stale XSLOPE_FEM_SOLVER may not redefine the default in silence.
+
+    The variable swaps the driver for every solve in the process. Left set from an
+    earlier session it would recompute every factor of safety on the non-default
+    driver with nothing in the output to say so, and an explicit argument must stay
+    silent because a caller that named the solver already knows.
+    """
+    import io
+    import contextlib
+    fails = []
+    saved_env = os.environ.get('XSLOPE_FEM_SOLVER')
+    saved_flag = _fem._FEM_SOLVER_ENV_ANNOUNCED
+    try:
+        os.environ['XSLOPE_FEM_SOLVER'] = 'newton'
+        _fem._FEM_SOLVER_ENV_ANNOUNCED = False
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            got = _fem.resolve_fem_solver()
+        if got != 'newton':
+            fails.append(f"XSLOPE_FEM_SOLVER=newton resolved to {got!r}")
+        if 'XSLOPE_FEM_SOLVER' not in buf.getvalue():
+            fails.append(
+                "XSLOPE_FEM_SOLVER=newton switched the default driver without "
+                "printing a word: a stale shell variable would silently recompute "
+                "every factor of safety on the non-default solver")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            _fem.resolve_fem_solver('newton')
+        if buf.getvalue().strip():
+            fails.append(
+                "an EXPLICIT fem_solver='newton' printed a warning; only the "
+                "environment override is meant to announce itself")
+    finally:
+        if saved_env is None:
+            os.environ.pop('XSLOPE_FEM_SOLVER', None)
+        else:
+            os.environ['XSLOPE_FEM_SOLVER'] = saved_env
+        _fem._FEM_SOLVER_ENV_ANNOUNCED = saved_flag
     return fails
 
 
@@ -292,8 +447,9 @@ def main():
     print("\nBoth SSRM drivers reproduce the locked factor of safety, agree with "
           "each other, and the Newton run decided every trial. The return map "
           "lands on the yield surface on every branch, a converged trial "
-          "certifies its own stress field, and neither the loading path nor the "
-          "step control changes a verdict.")
+          "certifies its own stress field in force AND in displacement, neither "
+          "the loading path nor the step control changes a verdict, and the "
+          "environment override cannot swap the driver in silence.")
 
 
 if __name__ == '__main__':

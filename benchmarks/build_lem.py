@@ -14,6 +14,7 @@ from benchmarks._xlsx_writer import (
     noncirc_cells, piezo_cells,
 )
 from benchmarks.rocscience.vendor_tcut import VENDOR_T_CUT, VENDOR_E_NU
+from benchmarks.tag_k0 import tag_k0
 
 TEMPLATE = "docs/inputs/input_template.xlsx"
 OUTDIR = "docs/lem/files"
@@ -23,6 +24,11 @@ OUTDIR = "docs/lem/files"
 # FEM-only field — the LEM solvers never read it — so the LEM locks here are
 # untouched. The values live with every other RS2 cap in vendor_tcut.VENDOR_T_CUT.
 _T = VENDOR_T_CUT
+
+# All three are also SSRM rows, and RS2 authors its models at an isotropic at-rest
+# field stress (Kx = Kz = 1), so each file DECLARES K0 = 1 in main!D16 rather than
+# leaving the convention on the doc page's test tag. tag_k0 reads the value off that
+# tag (benchmarks/tag_k0.py) so the cell and the tag cannot drift apart.
 
 
 def _vendor_e_nu(dst_name, mat_name):
@@ -55,7 +61,8 @@ def build_acads_simple():
     new_file(dst, TEMPLATE)
     u = {}
     _E_AS = _vendor_e_nu("xslope_acads_simple.xlsx", "Soil")
-    u['main'] = main_cells(gamma_w=9.81, template=TEMPLATE)
+    u['main'] = main_cells(gamma_w=9.81, template=TEMPLATE,
+                           k0=tag_k0("xslope_acads_simple.xlsx"))
     u['mat'] = material_cells(1, "Soil", 20.0, "mc", c=3.0, phi=19.6, u="none", template=TEMPLATE,
                               t_cut=_T["xslope_acads_simple.xlsx"]["Soil"],
                               E=_E_AS[0], nu=_E_AS[1],
@@ -85,7 +92,8 @@ def build_acads_weak_layer():
     dst = f"{OUTDIR}/xslope_acads_weak_layer.xlsx"
     new_file(dst, TEMPLATE)
     u = {}
-    u['main'] = main_cells(gamma_w=9.81, template=TEMPLATE)
+    u['main'] = main_cells(gamma_w=9.81, template=TEMPLATE,
+                           k0=tag_k0("xslope_acads_weak_layer.xlsx"))
     mat = {}
     _t = _T["xslope_acads_weak_layer.xlsx"]
     _e1 = _vendor_e_nu("xslope_acads_weak_layer.xlsx", "Soil 1")
@@ -131,7 +139,8 @@ def build_arai_tagyo():
     new_file(dst, TEMPLATE)
     u = {}
     _E_AT = _vendor_e_nu("xslope_arai_tagyo.xlsx", "Soil")
-    u['main'] = main_cells(gamma_w=9.81, template=TEMPLATE)
+    u['main'] = main_cells(gamma_w=9.81, template=TEMPLATE,
+                           k0=tag_k0("xslope_arai_tagyo.xlsx"))
     u['mat'] = material_cells(1, "Soil", 18.82, "mc", c=41.65, phi=15.0, u="none", template=TEMPLATE,
                               t_cut=_T["xslope_arai_tagyo.xlsx"]["Soil"],
                               E=_E_AT[0], nu=_E_AT[1])

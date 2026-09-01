@@ -97,6 +97,11 @@ def load_slope_data(path):
     so this problem's own constants (vendor, then classifier) decide; see
     build_problems.load_slope_data."""
     sd = _load_slope_data(path)
+    # The donor is RS2-1 and declares an isotropic at-rest initial stress
+    # (main!D16, K0 = 1) that RS2 solved its SSR under. It belongs to that
+    # problem alone, so it is cleared here rather than riding into files whose
+    # own analysis is authored without one (benchmarks/tag_k0.py).
+    sd['k0'] = None
     if os.path.basename(str(path)) == 'xslope_acads_simple.xlsx':
         for m in sd.get('materials', []):
             m['E'] = 0.0

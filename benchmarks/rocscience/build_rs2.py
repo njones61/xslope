@@ -24,6 +24,7 @@ from xslope.fileio import build_ground_surface_from_polygons as _ground_from_pol
 from benchmarks._xlsx_writer import emit_water_mode  # noqa: E402
 from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
 from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
+from benchmarks.tag_k0 import apply_tag_k0  # noqa: E402
 
 
 def _circle_through(P1, P2, yn):
@@ -159,6 +160,12 @@ def save_slope_data_to_xlsx(slope_data, path):
     (resolve_unit_system) rather than inherited from the metric donor file, so an
     English-unit problem is not written out declaring SI.
 
+    The K0 initial stress is transcribed the same way (apply_tag_k0,
+    benchmarks/tag_k0.py), read from the row's own test tag and cleared first so the
+    K0 = 1 donor cannot pass its initial stress state to a problem that does not claim
+    one. Every SSRM row on rs2.md runs under RS2's isotropic at-rest field stress; the
+    file has to say so, or the lock is reproducible only from the tag.
+
     Water goes out in v22's automatic form (emit_water_mode): a transcribed
     reservoir block is removed from the file only where the load derived from the
     model's own water definition reproduces it, so the builder keeps its reading of
@@ -168,6 +175,7 @@ def save_slope_data_to_xlsx(slope_data, path):
     _vendor_set = apply_vendor_e_nu(slope_data.get('materials', []), path)
     assign_elastic_props(slope_data.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(slope_data.get('materials', []), path)
+    apply_tag_k0(slope_data, path)
     return _write_xlsx(emit_water_mode(slope_data, os.path.basename(path)), path)
 
 

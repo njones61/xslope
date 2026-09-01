@@ -28,6 +28,7 @@ from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
 from benchmarks._xlsx_writer import emit_water_mode  # noqa: E402
 from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
 from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
+from benchmarks.tag_k0 import apply_tag_k0  # noqa: E402
 
 # Files these builders load purely as a GEOMETRY/FORMAT donor, then overwrite with
 # their own problem. Their elastic constants belong to THEIR problem, so they are
@@ -119,6 +120,15 @@ def save_slope_data_to_xlsx(slope_data, path):
     donor is metric, most of these problems are not, and the v18 Units selector
     persists whatever label the data carries (resolve_unit_system, elastic_props.py).
 
+    The K0 initial stress goes on the same way (apply_tag_k0, benchmarks/tag_k0.py),
+    keyed by output file name and read from the doc page's own test tag: this corpus is
+    scored under RS2's isotropic at-rest field stress, and until the builders wrote
+    main!D16 that convention lived only on the tag, so the locked SSRM numbers were not
+    reproducible from the FILE. It CLEARS k0 first, for the same reason t_cut is
+    cleared -- ACADS 1(a) is the geometry donor for nearly every problem here and is
+    itself a K0 = 1 model, so an uncleared K0 would ride into every problem derived
+    from it.
+
     Finally the water goes out in v22's automatic form (emit_water_mode). A builder
     here transcribes the published figure, and published figures draw ponded water
     as a hydrostatic block on the submerged face — that transcription stays, because
@@ -133,6 +143,7 @@ def save_slope_data_to_xlsx(slope_data, path):
     _vendor_set = apply_vendor_e_nu(slope_data.get('materials', []), path)
     assign_elastic_props(slope_data.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(slope_data.get('materials', []), path)
+    apply_tag_k0(slope_data, path)
     return _write_xlsx(emit_water_mode(slope_data, os.path.basename(path)), path)
 
 

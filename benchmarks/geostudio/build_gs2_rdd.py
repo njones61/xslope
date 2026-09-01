@@ -86,7 +86,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from shapely.geometry import Polygon  # noqa: E402
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
-from _gs2_donor import donor_material  # noqa: E402
+from _gs2_donor import donor_material, load_donor  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
                    'docs', 'verification', 'files', 'geostudio')
@@ -134,7 +134,7 @@ _DRAIN = [(39.973763, 0.0), (40.0, -1.0), (50.0, -1.0), (50.0, 0.0), (47.0, 0.0)
 
 
 def _base_sd():
-    sd = load_slope_data(ACADS_1A)
+    sd = load_donor(ACADS_1A)
     sd['gamma_water'] = _GW
     sd['time_unit'] = 'sec'
     sd['unit_system'] = 'si'

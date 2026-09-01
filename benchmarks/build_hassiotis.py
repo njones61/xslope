@@ -95,6 +95,11 @@ def _material():
 
 def _slope_data():
     sd = load_slope_data(SEED)
+    # The donor is RS2-1 and declares an isotropic at-rest initial stress
+    # (main!D16, K0 = 1) that RS2 solved its SSR under. It belongs to that
+    # problem alone, so it is cleared here rather than riding into files whose
+    # own analysis is authored without one (benchmarks/tag_k0.py).
+    sd['k0'] = None
     sd['materials'] = [_material()]
     sd['gamma_water'] = 9.81
     sd['unit_system'] = 'si'

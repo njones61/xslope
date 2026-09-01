@@ -48,7 +48,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from xslope.fileio import load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
-from _gs2_donor import donor_material  # noqa: E402
+from _gs2_donor import donor_material, load_donor  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -64,7 +64,7 @@ PHI_STAR = math.degrees(math.atan(math.tan(math.radians(PHI_CHAR)) / GAMMA_PHI))
 
 
 def build():
-    sd = load_slope_data(ACADS_1A)   # valid metric single-material template
+    sd = load_donor(ACADS_1A)   # valid metric single-material template
 
     m = donor_material(sd)
     m.update(name='Clay (DA3 factored)', c=round(C_STAR, 4), phi=round(PHI_STAR, 4),

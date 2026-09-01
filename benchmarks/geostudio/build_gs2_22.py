@@ -52,7 +52,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from shapely.geometry import Polygon                       # noqa: E402
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
-from _gs2_donor import donor_material  # noqa: E402
+from _gs2_donor import donor_material, load_donor  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
                    'docs', 'verification', 'files', 'geostudio')
@@ -108,7 +108,7 @@ CIRCLES = [
 
 
 def build():
-    sd = load_slope_data(ACADS_1A)
+    sd = load_donor(ACADS_1A)
     base = donor_material(sd)
     sd['materials'] = [
         dict(base, name=name, option='mc', c=c, phi=phi, gamma=g, gamma_sat=g,

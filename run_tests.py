@@ -6888,6 +6888,113 @@ def run_corpus_index_test(test):
     return 0.0, None
 
 
+def run_tag_k0_test(test):
+    """Guard: a model scored under a K0 initial stress DECLARES it in the file.
+
+    ``k0`` on a test tag is a solver keyword — it reaches ``solve_ssrm`` /
+    ``solve_fem`` as an argument and overrides whatever the workbook says. The
+    workbook's own ``main!D16`` reaches the SAME parameter by a different route
+    (``build_fem_data`` copies ``slope_data['k0']`` into ``fem_data['k0']``, and
+    both solvers fall back to it when the keyword is None), so a tag that names a
+    K0 the file does not carry produces a locked number that only this suite can
+    reproduce: the identical model opened in Studio, or loaded and solved the way
+    a user would, initializes by gravity turn-on instead and answers a different
+    question. 107 of the 108 tagged models were in exactly that state until the
+    builders started writing D16 (``benchmarks/tag_k0.py``).
+
+    This row loads every model named by a ``k0=`` tag and requires the loaded
+    ``slope_data['k0']`` to equal the tag's value. The loader is used rather than
+    a raw cell read because the loader is the path a run takes.
+
+    It also sweeps the other direction, because that is the failure a builder
+    produces rather than a page: any model under ``docs/`` that DECLARES a K0 no
+    tag asked for. Nearly every corpus builder starts from
+    ``docs/lem/files/xslope_acads_simple.xlsx``, which is RS2-1 and carries K0 = 1,
+    so a builder that copies the donor's ``slope_data`` without clearing it writes
+    an at-rest initial stress into problems authored without one -- a whole group
+    at a time, and silently, since no LEM row reads K0. The donor-clearing calls in
+    the builders are what stops it; this is what notices when one goes missing.
+
+    The fix is never to edit a corpus workbook: change the tag if the tag is
+    wrong, then rebuild the file (``benchmarks/verify_rebuild.py --list`` names
+    the group).
+    """
+    import warnings as _warnings
+    import openpyxl
+    from xslope.fileio import load_slope_data
+
+    wanted = {}
+    docs = Path(_repo('docs'))
+    for md in sorted(docs.rglob('*.md')):
+        for t in parse_test_tags(md):
+            if 'k0' not in t:
+                continue
+            path = t.get('file')
+            if not path or not str(path).endswith('.xlsx'):
+                continue
+            value = float(t['k0'])
+            prev = wanted.get(os.path.normpath(path))
+            if prev is not None and prev[0] != value:
+                return None, (f"{os.path.basename(path)}: conflicting k0 test tags "
+                              f"({prev[0]:g} and {value:g})")
+            wanted.setdefault(os.path.normpath(path), (value, md.name))
+
+    problems = []
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        for path, (value, page) in sorted(wanted.items()):
+            if not os.path.exists(path):
+                problems.append(f"{os.path.basename(path)}: missing ({page})")
+                continue
+            try:
+                declared = load_slope_data(path).get('k0')
+            except Exception as exc:
+                problems.append(f"{os.path.basename(path)}: load failed "
+                                f"({type(exc).__name__})")
+                continue
+            if declared is None:
+                problems.append(f"{os.path.basename(path)}: tag says k0={value:g}, "
+                                f"main!D16 is blank")
+            elif abs(float(declared) - value) > 1e-9:
+                problems.append(f"{os.path.basename(path)}: tag says k0={value:g}, "
+                                f"main!D16 says {float(declared):g}")
+
+    # The reverse sweep. main!D16 only means K0 from template v19 on, so the
+    # version in D5 gates the read exactly the way fileio.load_slope_data gates it.
+    declared_by_tag = {os.path.basename(p) for p in wanted}
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        for book in sorted(docs.rglob('*.xlsx')):
+            if book.name.startswith('~$') or book.name in declared_by_tag:
+                continue
+            try:
+                wb = openpyxl.load_workbook(book, read_only=True, data_only=True)
+                try:
+                    if 'main' not in wb.sheetnames:
+                        continue
+                    sheet = wb['main']
+                    version = sheet['D5'].value
+                    cell = sheet['D16'].value
+                finally:
+                    wb.close()
+            except Exception:
+                continue           # not a model workbook; other rows own that
+            try:
+                if int(float(version)) < 19 or cell is None or float(cell) == 0:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            problems.append(f"{book.name}: declares K0 = {float(cell):g} in main!D16 "
+                            f"that no test tag asks for")
+
+    if problems:
+        return None, (f"{len(problems)} model(s) whose K0 does not match its test tag "
+                      f"(rebuild the file, do not edit it): " + "; ".join(problems[:5]))
+    if not wanted:
+        return None, "no k0 test tags found — the guard is not looking at anything"
+    return 0.0, None
+
+
 def run_mesh_elements_test(test):
     """Lock a published MESH SIZE: the element (and node) count of one model at
     one target size, built and counted, with nothing solved.
@@ -12799,6 +12906,8 @@ def _dispatch_test(test):
         return run_verification_pages_test(test)
     if test_type == 'corpus_index':
         return run_corpus_index_test(test)
+    if test_type == 'tag_k0':
+        return run_tag_k0_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
     if test_type == 'axial_mirror':
@@ -12869,7 +12978,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'beam_element', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'beam_element', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'tag_k0', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -13679,6 +13788,13 @@ def main():
         # the fix is always `python tools/make_corpus_index.py`.
         tests.append({'type': 'corpus_index', 'file': 'docs/verification/corpus_index.json',
                       'method': '-', 'source': 'corpus_index'})
+        # Guard that a K0 initial stress named on a test tag is also DECLARED by
+        # the model file (main!D16). The tag passes K0 as a solver keyword; the
+        # file's cell reaches the same solver parameter. If only the tag carries
+        # it, the locked number is reproducible from this suite and from nowhere
+        # else — the same file opened in Studio initializes by gravity turn-on.
+        tests.append({'type': 'tag_k0', 'file': 'K0 tags vs main!D16',
+                      'method': '-', 'source': 'tag_k0'})
         # Editor no-drop guard (studio.editors). Touches the studio/Qt layer, so
         # it's skipped cleanly when PySide6 is absent (engine-only installs), like
         # the DXF round-trip tests.

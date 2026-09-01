@@ -69,7 +69,7 @@ from xslope.fileio import load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
 from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_mesh_to_json  # noqa: E402
 from xslope.seep import build_seep_data, run_seepage_analysis, export_seep_solution  # noqa: E402
-from _gs2_donor import donor_material  # noqa: E402
+from _gs2_donor import donor_material, load_donor  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -88,7 +88,7 @@ RES_HEAD = 5.1
 
 
 def _slope_data():
-    sd = load_slope_data(ACADS_1A)
+    sd = load_donor(ACADS_1A)
     m = donor_material(sd)
     m.update(name='Clay (DA1-C2 factored)', c=round(C_STAR, 4), phi=round(PHI_STAR, 4),
              gamma=GAMMA, gamma_sat=GAMMA, option='mc', u='seep',

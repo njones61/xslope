@@ -1809,11 +1809,8 @@ plot_fem_data(fem_data, figsize=(14, 7), show_nodes=True, show_bc=True, save_png
 # initial bound verification — be patient before assuming a hang.
 F_min = 1.0   # Lower FS bound (must converge)
 F_max = 2.0   # Upper FS bound (should not converge)
-# staged=True: apply gravity first (dry), then add reservoir/water loads and pore
-# pressures — construction history (built, then filled). Use it whenever the model has
-# a reservoir or pore pressures; it is a no-op for dry slopes.
 result = solve_ssrm(fem_data, F_min=F_min, F_max=F_max, tolerance=0.05,
-                    staged=True, debug_level=1)
+                    debug_level=1)
 
 if result.get("converged", False):
     print(f"\nFactor of Safety: {result['FS']:.2f}")

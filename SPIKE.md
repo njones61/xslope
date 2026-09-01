@@ -1701,3 +1701,176 @@ substantially (1.5969 to 1.4113 and to 1.2285 on the viscoplastic driver), and t
 first of them is the most severe test of the bar law in this round because it puts
 the most bars at their cap. Neither is a substitute for a vendor-verified reinforced
 benchmark, and the reason there is none in this table is the finding above.
+
+
+## THE COHESIONLESS SOLVE — what actually breaks, and the criterion for fixing it
+
+Written after the diagnostic probes and BEFORE any remedy code, so that what
+follows is a test and not a description. Everything measured on this checkout,
+same machine and settings as the tables above: `force_tol` 1e-3, hybrid criterion,
+`capture_failure_state=False`, tolerance 0.01, tri6.
+
+### The specimen reproduces exactly
+
+The geogrid sample (`docs/fem/files/xslope_reinforce_fem.xlsx`, softening unset)
+at its locked tri6/2.0 mesh — 2,101 elements, 60 bar elements — run trial by
+trial on the Newton driver:
+
+| F | 1.2 | 1.3 | 1.4 | 1.45 | 1.5 | 1.55 | 1.6 |
+|---|---|---|---|---|---|---|---|
+| verdict | CONVERGED | FAILED | FAILED | **CONVERGED** | FAILED | FAILED | FAILED |
+| iterations | 39 | 599 | 880 | 73 | 261 | 628 | 58 |
+| load factor reached | 1.00 | **0.00** | 0.69 | 1.00 | **0.00** | 0.29 | 0.00 |
+
+Iteration for iteration the same sequence the reinforcement round recorded. The
+model's lower material is c = 0, phi = 37; its upper is c = 300 psf, phi = 37.
+
+### The F = 1.3 failure is provably false, without reference to the other driver
+
+The F = 1.45 trial converges to an out-of-balance of 5.167e-6 — a hundred and
+ninety times inside the trial tolerance — with a worst Mohr-Coulomb violation of
+**2.5e-15** of the local strength, read in the invariant form. That is a stress
+field in equilibrium with full gravity and nowhere outside the yield surface at
+the F = 1.45 reduced strengths.
+
+Strength reduction only ever raises c and tan(phi) as F falls, so that same field
+is admissible at every F below 1.45 and is in equilibrium with the same load. By
+the lower-bound theorem the slope therefore stands at F = 1.4, 1.3 and 1.2, and
+the driver's own converged answer at 1.45 is the proof. The FAILED verdicts at
+1.3, 1.4 and 1.5 are the solver's, not the slope's, and nothing in the argument
+needs the viscoplastic driver.
+
+### P1 — the token cohesion does NOT close it
+
+The vendors' documented user-level workaround for a cohesionless base is a small
+nonzero cohesion. Applied here to the c = 0 material only, on the same mesh:
+
+| c added | 1.2 | 1.3 | 1.4 | 1.45 | 1.5 | 1.55 | 1.6 |
+|---|---|---|---|---|---|---|---|
+| 0 psf (as shipped) | CONV 39 | FAIL 599 | FAIL 880 | CONV 73 | FAIL 261 | FAIL 628 | FAIL 58 |
+| 5 psf | CONV 32 | CONV 215 | **FAIL 877** | CONV 116 | CONV 80 | FAIL 608 | FAIL 541 |
+| 10 psf | CONV 225 | CONV 205 | CONV 290 | **FAIL 848** | **FAIL 689** | **CONV 296** | FAIL 870 |
+
+The churn moves; it does not go away. At 5 psf the F = 1.3 and F = 1.5 trials are
+recovered and F = 1.4 still fails between two converging neighbours; at 10 psf the
+false failures have simply migrated to 1.45 and 1.5, with 1.55 converging above
+them. The verdict sequence is non-monotone in F at every cohesion tried. **The
+workaround is falsified as a remedy and as an explanation**, and any real remedy
+has a lower bar to clear than it looked.
+
+### P2 — the flippers are the cohesionless material, and they are NOT at the apex
+
+Recording the branch code of all 6,303 Gauss points at every tangent re-form of
+the F = 1.3 trial: 592 re-forms, 52,441 branch flips, of which **51,923 (99.0%)
+are carried by the 6,051 Gauss points in the c = 0 material** and 518 by the 252
+points with cohesion. 2,494 of the cohesionless points flip at least once; the
+worst flips 90 times.
+
+The apex is not what they are flipping to. Over those same 592 re-forms the apex
+branch holds a mean of **3.0 points** and a maximum of 36, out of 6,303; the
+corner branches never execute at all. The churn is elastic against main-plane, in
+the cohesionless material. **The reinforcement round's stated mechanism — "every
+tensile Gauss point returns to the Mohr-Coulomb apex, where the consistent tangent
+is zero" — is wrong on the counts.** The apex tangent is indeed zero, and there are
+three of them.
+
+### What is actually degenerate
+
+Two measurements, both at a state 25 iterations into the F = 1.3 solve.
+
+**The assembled tangent is correct.** Compared against a central difference of the
+driver's own internal force along four random directions, at three step sizes: the
+relative error is 1.4e-8 at the natural step and the direction cosine is 1.00000.
+The tangent is the derivative of the residual it is used on, so nothing below is a
+differencing defect.
+
+**The consistent tangent is exactly rank-deficient at every plastic Gauss point.**
+Its smallest singular value over the 1,929 plastic points has a median of
+1.7e-9 of the shear modulus and a minimum of exactly zero, against elastic singular
+values of 1, 2 and 5 times it; the symmetric part carries a negative eigenvalue of
+up to -0.30 times the shear modulus at 1,927 of them.
+
+That is not a defect either — it is what perfect plasticity gives. On the main
+plane the return is `n1 = s1 - f`, `n3 = s3 + f` with `f = A s1 - Bc s3 - c cos(phi)`,
+so the trial-to-returned Jacobian in the (sigma_1, sigma_3) plane is
+`[[1-A, Bc], [A, 1-Bc]]`, whose determinant is `1 - A - Bc`. And `A + Bc = 1`
+identically, at every friction angle. A whole line of trial states — the flow
+direction — maps to one returned state, so the tangent has a null direction there
+by construction, for psi = 0 and for any other flow rule on a linear surface
+without hardening. The apex is the special case where the null space is the whole
+space.
+
+**What that does to the iteration** is measurable directly. At the same state, the
+line search along the consistent-tangent Newton direction reads:
+
+| step alpha | 1 | 1/2 | 1/4 | 1/8 | 1/16 | 1/32 | 1/64 | 1/128 | 1/256 |
+|---|---|---|---|---|---|---|---|---|---|
+| residual, as a fraction of the current one | 36.59 | 22.17 | 13.43 | 5.93 | 2.06 | 1.14 | 1.007 | **0.994** | 0.996 |
+| Gauss points changing branch | 509 | 349 | 248 | 183 | 95 | 40 | 20 | 12 | 5 |
+| ... of them in the c = 0 material | 492 | 336 | 239 | 177 | 92 | 38 | 18 | 10 | 5 |
+
+The full Newton step multiplies the residual by 36 and flips 509 Gauss points. The
+first step the line search can accept is 1/128 of it, and it buys 0.6% — so the
+solve makes 0.6% progress per iteration, per tangent re-form and per
+factorization, and the no-progress watch closes it. On the SAME model at the
+coarse tri6/4.0 mesh the same measurement reads zero flips at alpha = 1 and a
+residual of 1e-5 of the current one: full Newton, quadratic convergence, nothing
+to fix. The trust region collapses with refinement because refinement puts more
+Gauss points near a yield surface that, with c = 0, is a cone through the origin
+and therefore has no absolute margin anywhere: 1,712 of the 4,374 elastic points
+at that state sit within 5% of it.
+
+### The remedy this round tests
+
+Only the ITERATION matrix is at fault, so only the iteration matrix is changed.
+The return map, the residual and every convergence test stay exactly as they are,
+which makes the converged state identical by construction wherever the present
+driver converges at all.
+
+**Tangent conditioning.** Blend the consistent tangent toward the elastic operator,
+`D_beta = (1 - beta) D_ep + beta D_e`, with `beta` raised when the line search
+cannot take a reasonable step and decayed back to zero when it can. At `beta = 0`
+the code path is the present one untouched. Measured at the specimen state above,
+one step of the conditioned direction against the 0.994 the shipped driver gets:
+
+| beta | 0.02 | 0.05 | 0.1 | 0.2 | 0.4 | 0.7 | 1.0 (elastic) |
+|---|---|---|---|---|---|---|---|
+| residual after the accepted step | 0.382 | 0.301 | 0.296 | 0.318 | 0.358 | 0.403 | 0.442 |
+| step accepted | full | full | full | full | full | full | full |
+
+Two hundred times the progress of the shipped iteration, from a two-hundredth of
+the singular value being restored. Whether that survives a whole solve, a whole
+bisection and eight plain-soil benchmarks is what the criterion below asks.
+
+### Success criterion (verbatim)
+
+- **The five reinforced benchmarks agree with the viscoplastic driver within
+  0.01**: geogrid sample (VP 1.5969), FEM-2 tutorial (1.5977), half capacity
+  (1.4113), three layers (1.2285) and the geogrid locked mesh (1.5594). The last
+  two are the currently-broken ones, at -0.1406 and -0.2875.
+- **The refinement ladder is clean at every rung.** The geogrid sample at 563, 978
+  and 2,101 elements: no false failure at any strength, and a verdict sequence
+  monotone in F — everything below the limit converges and everything above it
+  fails.
+- **The plain-soil eight-row table does not move.** Every row re-measured and
+  reported; no factor of safety moves by more than 0.01, and wherever the shipped
+  driver's trials converged the answer is expected to be bit-identical, because
+  conditioning that never fires changes no arithmetic.
+- **The knob is not a tuning dial.** The converged state must be identical with the
+  conditioning on and off — asserted on the specimen, on the trial that needs it,
+  by comparing the displacement fields and not just the verdicts. And the answer
+  must not move when the conditioning schedule is retuned.
+- **Work does not regress.** The previously-clean cases stay inside 1.2x of their
+  current force-evaluation counts.
+- **The probes still hold.** nu = 0.49 agrees, and the past-failure probes on FEM-1
+  at F = 2, 3 and 5 still fail, promptly.
+- **The locks catch it.** `test/nr_ssrm_check.py` gains the locked-mesh reinforced
+  case. The present false answer, 1.2719, must FAIL the new lock on the code as it
+  stands today and pass after the remedy — run both ways, and the mutation
+  recorded — and the whole check must pass.
+- **The default path is unchanged**, against the standard control: Griffiths &
+  Lane 6 dry with no `fem_solver` argument, FS 2.421875 on iteration counts 147,
+  781, 3393, 2031, 2841, 9541, 12000, 8617, 8777.
+- **An honest negative is a valid outcome and must be written.** If the
+  conditioning buys the specimen and costs the plain-soil table, or if it needs a
+  schedule tuned per model, that is the result.

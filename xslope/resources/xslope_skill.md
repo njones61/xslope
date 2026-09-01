@@ -494,10 +494,13 @@ slope_data['materials'] = [
         #     units. Read by mc/cp/pow/hb (NOT 'elastic', which cannot fail regardless). None/
         #     blank = no cutoff — unbounded tension, exactly pre-v16 behavior; 0 = soil carries
         #     no tension. FEM only; LEM ignores it (model a tension crack instead). On 'mc', a
-        #     t_cut at or above the cone apex c/tan(phi) never binds (inert). Caution: in a
-        #     reinforced fill, t_cut=0 can block continuum equilibrium (the tension belongs to
-        #     the reinforcement, not the soil) — leave None or use a small nonzero value there.
-        't_cut': None,
+        #     t_cut at or above the cone apex c/tan(phi) never binds (inert). START NEW
+        #     MATERIALS AT 0 (Studio's new-material default): blank is the trap, not the safe
+        #     choice — with c = 0 the solver can freeze illegal tension into a "converged"
+        #     state and the FS reads high (preflight warns on a blank t_cut for exactly this).
+        #     Leave it blank only deliberately: to reproduce a published plain-M-C benchmark
+        #     that assumes unbounded tension, or when matching a vendor model that has no cap.
+        't_cut': 0,
         # --- matric-suction strength (v17): opt-in Fredlund extended Mohr-Coulomb apparent
         #     cohesion, read by BOTH solvers (LEM via generate_slices' suction_phi_b/
         #     suction_cap kwargs; FEM/SSRM via solve_fem/solve_ssrm's same-named kwargs) —

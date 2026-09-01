@@ -3118,7 +3118,13 @@ def _new_material():
             "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
             "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
             "Ss": None, "Sy": None,
-            "t_cut": None, "phi_b": None, "s_cap": None,
+            # t_cut starts at 0 (Rankine cutoff ON, no-tension soil) rather than
+            # blank: blank means unbounded tension, which is the trap the
+            # mat.tensile_cap_missing preflight rule warns about. A user who
+            # wants the unbounded plain-M-C convention clears the cell and gets
+            # that warning — the alarm fires on turning the cutoff OFF, not on
+            # every new material. (Norm's ruling, 2026-09-01.)
+            "t_cut": 0.0, "phi_b": None, "s_cap": None,
             "E": 0.0, "nu": 0.0}
 
 

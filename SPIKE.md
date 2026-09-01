@@ -2596,3 +2596,305 @@ verdict stays entirely the corrector's.
   budget only reaches 1.2109 by turning every failing trial into a whole
   viscoplastic solve, or if the capped predictor buys the three-layer row and costs
   the locked mesh, that is the result.
+
+
+### THE ADAPTIVE PREDICTOR — results
+
+Same machine and settings as the criterion above. Every number below was measured on
+this checkout in this session; the "before" columns are the driver with
+`_NR_VP_PREDICTOR_ADAPTIVE` switched off — which is the driver exactly as it stood
+at dea4c119 — re-run here rather than quoted. It reproduces the recorded figures on
+every row it can be checked against: three layers at 1.1641, the locked mesh at
+1.5609, and all eight plain-soil factors of safety.
+
+#### The adaptive rule, and the measurement that chose it
+
+The rung's stopping rule is not new code. `_still_progressing` is the viscoplastic
+driver's own budget-extension test — the residual's trailing-window mean falling by
+at least 1% against the window before it, OR a displacement field standing still on
+evidence the failure classifier cannot rule on — and handing the predictor the
+caller's own `max_iterations` as a chunk and `max_iterations_ceiling` as a hard stop
+makes that rule the predictor's stopping rule. The rung is budgeted, in other words,
+exactly as a viscoplastic trial of the same model at the same strength would be.
+
+What justified it is the table below, measured before the rule was adopted: the
+three-layer model at the four strengths that decide its bisection, at three chunk
+sizes, each seed handed to the same corrector.
+
+| chunk | F = 1.1875 | F = 1.20625 | F = 1.215625 | F = 1.225 |
+|---|---|---|---|---|
+| 2,000, uncapped | VP conv 2,608 → **CONV** | VP cap 6,000 → FAIL | VP cap 10,000 → FAIL | VP cap 6,000 → FAIL |
+| 2,000, capped | VP cap 2,000 → **CONV** | VP cap 10,000 → FAIL | VP cap 6,000 → FAIL | VP cap 8,000 → FAIL |
+| 6,000, uncapped | VP conv 2,608 → **CONV** | VP cap 6,000 → FAIL | VP cap 18,000 → FAIL | VP cap 6,000 → FAIL |
+| 6,000, capped | VP conv 4,708 → **CONV** | VP conv 22,964 → **CONV** | VP cap 6,000 → FAIL | VP cap 12,000 → FAIL |
+| 12,000, uncapped | VP conv 2,608 → **CONV** | VP conv 19,716 → **FAIL** | VP conv 22,614 → FAIL | VP conv 23,251 → FAIL |
+| 12,000, capped | VP conv 4,708 → **CONV** | VP conv 22,964 → **CONV** | VP cap 12,000 → FAIL | VP cap 12,000 → FAIL |
+
+Two things fall out of it. On the CAPPED rows the corrector converged on every seed
+the predictor had carried to its own convergence and on no seed it had not, without
+exception — so the predictor's progress rule is reading the same thing the corrector
+needs, and stopping it while it is still progressing is what loses the trial. And on
+the uncapped 12,000 row the correspondence breaks in exactly one place, at
+F = 1.20625, where a fully converged predictor state is refused: that is the
+adjudication's illegal-tension state, in force equilibrium and not admissible, with
+no root of the Newton residual near it.
+
+#### The cap, isolated
+
+The one row above is the whole case for the cap, and it was isolated rather than
+inferred. At F = 1.20625 on the three-layer model, adaptive rung both ways:
+
+| | predictor | corrector |
+|---|---|---|
+| uncapped | converged, 19,716 iterations | **FAILED** at a load factor of 0.00 |
+| capped (Rankine T = 0) | converged, 22,964 iterations | **CONVERGED in 4 iterations**, out-of-balance 1.1e-5, yield violation 1.2e-15 |
+
+The cap is on the SEED only. The corrector runs on the caller's own tensile caps and
+reports the caller's own yield reading, so the verdict is not capped — and the
+mutation below shows the check fails without it.
+
+#### Why the rung is APPENDED and not substituted
+
+The first attempt replaced the fixed ladder with the adaptive rung. It reached
+1.2109 on the three-layer model and it cost the showcase: the locked tri6/2.0 mesh
+fell from 1.5609 to 1.5516, because its trial at F = 1.55625 flipped. Isolated, on
+that trial:
+
+| seed | predictor | corrector |
+|---|---|---|
+| 250, uncapped | 250, not converged | **CONV, 51 iterations** |
+| 1,000, uncapped | 1,000, not converged | FAIL |
+| adaptive, uncapped | converged, 6,406 | **CONV, 10 iterations** |
+| 250, capped | 250, not converged | **CONV, 63 iterations** |
+| 1,000, capped | 1,000, not converged | **CONV, 41 iterations** |
+| adaptive, capped | 12,000, NOT converged (oob 5.7e-3) | FAIL |
+
+A short seed is not merely cheaper; on this model it is better. So the short rungs
+stay first and unchanged, and the adaptive rung is appended behind them. The
+consequence is a property worth more than the argument for it: **every trial the
+driver already rescued is rescued at the same rung from the same state, so the new
+rung can only convert a FAILED trial and can never move a passing one.**
+
+That is measured, not asserted. Per-trial, before against after, on four
+benchmarks — 34 trials:
+
+| | trials | converged trials identical in iterations AND force evaluations | failed trials |
+|---|---|---|---|
+| FEM-1 tutorial | 9 | 6 of 6 | 3 differ (extra rung) |
+| Griffiths & Lane 1 quad9 | 9 | 8 of 8 | 1 differs |
+| Griffiths & Lane 6 dry tri6 | 9 | 4 of 4 | 5 differ |
+| Geogrid LOCKED | 8 | 4 of 4 | 4 differ |
+
+The dry-dam row's deciding trial, F = 2.45625 — the knife-edge case this document
+already flags — is among the identical ones, at 606 iterations and 3,750 force
+evaluations on both drivers.
+
+#### The four reinforced benchmarks
+
+| Case | Mesh | before | after | reference | gap |
+|---|---|---|---|---|---|
+| Three layers | tri6, 4 | 1.1641 | **1.2109375** | 1.2109 (VP + cutoff) | **0.0000** |
+| Geogrid sample | tri6, 4 | 1.6078125 | 1.6078125 | — | **0.0000 move** |
+| Half capacity | tri6, 4 | 1.4140625 | 1.4140625 | — | **0.0000 move** |
+| Geogrid LOCKED | tri6, 2 | 1.5609375 | **1.5609375** | — | **exact** |
+
+The three-layer bisection now converges the trial the referee certified. Its eight
+trials, after: 1.0 CONV, 1.6 FAIL, 1.3 FAIL, 1.15 CONV, 1.225 FAIL, 1.1875 CONV,
+**1.20625 CONV**, 1.215625 FAIL — final interval [1.20625, 1.215625], which is the
+same interval the viscoplastic-with-cutoff bisection closed on.
+
+#### The ramp
+
+The ramp used to walk every step cold, and got the predictor only at the foot. A
+refused ramp step is the same load-step-floor failure the bisection retries, so it
+is now retried the same way: the same rungs, the same cap, and the corrector's own
+force gate and displacement bound deciding, read on the corrected state. The ramp's
+final export solve takes the predictor too, so what is written to figures is a solve
+at the limit rather than whatever the cold path could reach.
+
+| | before | after | bisection | agreement |
+|---|---|---|---|---|
+| Three layers | 1.053125 | **1.215625** | 1.2109375 | **0.0047** |
+| Griffiths & Lane 1 tri6 | 1.3656250 | 1.3656250 | 1.3656250 | 0.0000 |
+
+The ramp carries F = 1.2125 and refuses 1.21875, so it brackets the limit one cell
+above the bisection's [1.20625, 1.215625] and reports the midpoint of its own
+interval. On the plain benchmark it does not move at all.
+
+#### The plain-soil eight rows
+
+| Benchmark | Mesh | before | after | move | fe before | fe after | ratio |
+|---|---|---|---|---|---|---|---|
+| FEM-1 tutorial | tri6, 3.5 | 1.37109375 | 1.37109375 | **0.0000** | 13,492 | 14,233 | 1.05x |
+| LEM-3 tutorial | tri6, 1.2 | 1.26953125 | 1.26953125 | **0.0000** | 34,793 | 38,463 | 1.11x |
+| Griffiths & Lane 1 | quad8, 3.5 | 1.37187500 | 1.37187500 | **0.0000** | 14,904 | 16,354 | 1.10x |
+| Griffiths & Lane 1 | tri6, 3.5 | 1.36562500 | 1.36562500 | **0.0000** | 21,624 | 22,650 | 1.05x |
+| Griffiths & Lane 1 | quad9, 3.5 | 1.39687500 | 1.39687500 | **0.0000** | 5,920 | 6,030 | 1.02x |
+| Griffiths & Lane 6 dry | quad8, 2 | 2.41562500 | 2.41562500 | **0.0000** | 27,565 | 29,059 | 1.05x |
+| Griffiths & Lane 6 dry | tri6, 2 | 2.45937500 | 2.45937500 | **0.0000** | 22,231 | 23,672 | 1.06x |
+| Griffiths & Lane 3, r = 0.8 | tri6, 6 | 1.42812500 | 1.42812500 | **0.0000** | 37,791 | 40,652 | 1.08x |
+
+Eight rows, no movement at any digit. The reinforced rows that were meant to hold
+are the same: geogrid 1.10x, half capacity 1.05x, locked mesh 1.06x.
+
+**One expectation in the criterion is falsified, and it is worth stating plainly.**
+It expected the predictor never to fire on the cohesive plain-soil rows. It fires on
+every one of them — 1, 3, 3, 4, 6, 6, 6 and 7 trials across the eight — because a
+trial past the limit dies at the load-step floor on a cohesive soil exactly as it
+does on a cohesionless one, and that is the retry's trigger. What is true is the
+stronger statement measured above: the fires are all on trials that fail either way,
+and every converged trial is bit-identical. The fire counts are identical before and
+after on all eight rows, which is the additive design showing through — the same
+trials fire, and they get one more rung.
+
+The viscoplastic iterations charged on top are where the cost went: 1,250 to 7,647
+before, 1,521 to 76,581 after, all of it on failing trials. In wall clock that is
+1.14x to 1.74x on the plain rows and 1.33x to 1.50x on the reinforced ones.
+
+#### The probes
+
+**Past failure.** FEM-1 at F = 2, 3 and 5, before against after:
+
+| F | iterations | force evaluations | predictor iterations | wall |
+|---|---|---|---|---|
+| 2.0 | 403 → 404 | 3,105 → 3,115 | 1,431 → 1,431 | 13.5 s → 12.9 s |
+| 3.0 | 500 → 500 | 3,480 → 3,480 | 1,331 → 1,331 | 15.6 s → 16.0 s |
+| 5.0 | 305 → 306 | 2,465 → 2,475 | 1,301 → 1,301 | 10.3 s → 10.8 s |
+
+All three still fail, still promptly, and at **1.00x** the cost — against the 1.5x
+the criterion allowed. The reason is the mechanism the design rests on: a grossly
+overloaded slope runs away, `early_failure` closes the adaptive rung at about 180
+iterations, and the ceiling is never approached. The rung costs the full walk only
+where a full walk is what the model is doing.
+
+**nu = 0.49.** Unchanged. Converged at F = 1.00, 1.30 and 1.36 in 11, 12 and 12
+iterations with 27, 29 and 30 force evaluations and ZERO predictor iterations — the
+same counts this document already records — and still failed at F = 1.40 and 1.50.
+
+**The default path.** Griffiths & Lane 6 dry, quad8, size 2, no `fem_solver`
+argument: FS = 2.421875 with per-trial iteration counts
+
+    147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777
+
+value for value the control sequence.
+
+#### The locks
+
+`test/nr_ssrm_check.py` gains `check_cohesionless_seed_depth`, on the three-layer
+variant at the coarse tri6/4.0 mesh. It asserts that F = 1.20625 — the strength the
+referee certified — converges to an ADMISSIBLE field, force equilibrium inside the
+tolerance and a stress field on the yield surface, which by the lower-bound theorem
+is the proof that the slope stands there; and that F = 1.215625, one bisection cell
+above it, still FAILS, because the predictor supplies a starting state and must
+never supply a verdict. Neither assertion refers to the other driver.
+
+**Mutation, run four ways.** Each is the same check function against a driver with
+one thing removed:
+
+| driver | verdict | what the check saw |
+|---|---|---|
+| as shipped | **PASS** | — |
+| `_NR_VP_PREDICTOR_ADAPTIVE = False` — the driver at dea4c119 | **FAIL** | F = 1.20625 FAILED at a load factor of 0.00 on 1,250 predictor iterations |
+| predictor off entirely | **FAIL** | F = 1.20625 FAILED at a load factor of 0.53 on 0 predictor iterations |
+| adaptive rung, `_NR_VP_PREDICTOR_TENSION_CAP = False` | **FAIL** | F = 1.20625 FAILED at a load factor of 0.00 on 20,966 predictor iterations |
+
+Both halves of the fix are load-bearing: the rung alone does not close it and the cap
+alone cannot exist without the rung. The whole check file passes, and the previous
+round's `check_cohesionless_solve` passes on every one of these drivers, so the new
+check is testing something the old one could not see.
+
+#### A crash the deeper seeds made reachable
+
+Not in the criterion, and found by running it. On Griffiths & Lane 1 (quad8, 3.5) at
+F = 1.8 — well past its limit of about 1.37 — the corrector seeded from the adaptive
+rung killed the process: `lda must be >= MAX(N,1): lda=4 N=5`, an abort inside
+OpenBLAS with no Python exception to catch. The same abort is already recorded in
+this document, on the PRE-remedy driver on the locked mesh, so the failure mode is
+not new; the deeper seed reaches it on one more model.
+
+The cause, measured rather than guessed. The tangent at the second re-form of that
+trial is entirely finite, and it has **98 zero rows and 98 zero columns out of
+2,788**. A consistent Mohr-Coulomb tangent can lose a degree of freedom completely —
+the apex branch returns exactly zero — so a node every one of whose elements has
+yielded to the apex carries no stiffness at all. `splu` does not raise on a
+structurally singular matrix; it builds a degenerate supernode and the process dies
+in the triangular solve.
+
+`_nr_tangent_factorable` now refuses such a tangent before it reaches SuperLU. A
+degree of freedom with no stiffness carries exactly the information the
+`RuntimeError` path carries — this load is unreachable — so it takes the same exit,
+and the trial is refused rather than the run being lost. It cannot change any
+completed run, because a matrix it rejects is one that would have aborted the
+process. The scan is a bincount and a reduceat over the stored values, a small
+fraction of the factorization it precedes.
+
+#### The criterion, line by line
+
+**Three layers within 0.01 of 1.2109 — MET.** 1.2109375 against 1.2109, and the
+certified-standing trial at F = 1.20625 converges, to an out-of-balance of 1.1e-5
+with a worst yield violation of 1.2e-15 of the local strength.
+
+**The ramp agrees within 0.01 — MET.** 1.215625 against the bisection's 1.2109375, a
+gap of 0.0047, from 1.053125.
+
+**The other three reinforced benchmarks unchanged — MET.** Geogrid 1.6078125, half
+capacity 1.4140625, locked mesh 1.5609375, none of them moved at any digit, and the
+locked mesh is exact.
+
+**The plain-soil table — MET.** All eight rows reported above; none moved at any
+digit. The clause's parenthetical expectation — zero predictor fires on cohesive
+rows — is FALSIFIED and reported: the predictor fires on all eight. The stronger
+property holds in its place, measured trial by trial: every converged trial is
+bit-identical in iterations and force evaluations, and only failing trials differ.
+
+**The probes — MET.** nu = 0.49 unchanged with the predictor never firing on it; the
+FEM-1 past-failure trials unchanged in verdict and at 1.00x their cost, against the
+1.5x allowed.
+
+**The locks — MET.** The new check fails on the driver as it stood, fails with the
+predictor off entirely, fails with the cap removed, and passes as shipped; the whole
+check file passes.
+
+**The default path — MET.** FS 2.421875 on the control iteration sequence.
+
+#### Verdict
+
+The reinforced Newton story is complete on the four benchmarks. All four now land
+where an admissible field says they should: the locked mesh exactly on 1.5609, the
+geogrid sample and half capacity unmoved, and the three-layer model — the one row the
+previous two rounds left open — on 1.2109375, which is the answer the referee's
+certified standing state and the tension-capped viscoplastic bisection independently
+give. The ramp reaches the same limit on that model for the first time, having read
+1.0531 before. Nothing else moved: eight plain-soil factors of safety unchanged at
+every digit, the default path untouched, and every converged trial on every
+benchmark measured bit-identical to the driver before this round.
+
+The shape of the fix is what made that possible. The fixed ladder was not wrong, it
+was incomplete — and on the locked mesh a short seed is genuinely better than a long
+one, which is why the new rung is appended rather than substituted. Appending buys a
+guarantee that no amount of re-measurement could: a rung that only ever runs after
+the existing ones have failed can only convert a refused trial.
+
+What remains:
+
+- **The ramp's export solve.** The ramp carries F = 1.2125 on the three-layer model
+  along its warm history, and a fresh solve at that strength — cold, with the
+  predictor — still fails. So `last_solution`, which is what figures and CSVs are
+  written from, falls back to the foot of the ramp rather than the limit. The factor
+  of safety is unaffected; what is exported is not the state at the limit. This is
+  the pre-existing gap between the ramp's warm history and any cold reproduction of
+  it, and the ramp reaching a much higher strength has made it visible.
+- **Cost on failing trials.** A trial that fails now pays a cold attempt, two short
+  predictor rungs and an adaptive one. In force evaluations that is 1.02x to 1.11x;
+  in wall clock 1.14x to 2.05x, because the viscoplastic iterations charged on top
+  rose from 1,250-7,647 to 1,521-76,581. Skipping the cold attempt on a model that
+  has already needed the predictor once would recover part of it and was not done
+  this round.
+- **Post-peak softening is still refused**, so neither of the repository's published
+  reinforced factors of safety is reachable on this driver. Unchanged by this round,
+  and still the larger of the two things standing between the Newton path and a
+  reinforced answer anyone would quote.
+- **The viscoplastic driver's convergence criterion on zero-cohesion materials** is
+  still the owner's open decision, unchanged from the adjudication: the shipped
+  default accepts fields hundreds of psf outside a cone through the origin, and this
+  round only shows that the Newton path can now be trusted where it does not.

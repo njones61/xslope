@@ -203,6 +203,7 @@ def run():
     failures += check_cohesionless_solve()
     failures += check_cohesionless_seed_depth()
     failures += check_tension_cutoff(fem_data)
+    failures += check_k0_initial_stress()
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
 
@@ -1151,6 +1152,235 @@ def check_tension_cutoff(fem_data):
     return fails
 
 
+
+# The K0 initial stress (SPIKE.md, "K0 INITIAL STRESS"). The vendor lock this
+# check reproduces is RS2-27 at its coarsest tagged mesh — docs/verification/rs2.md,
+# `vp036.xlsx`, tri6 at target 1.5, k0 = 1, tension_srf off, FS 1.373 +/- 0.02. The
+# tag's settings are written out rather than read through run_tests, so the
+# assertion holds the mapping instead of following it.
+K0_MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'verification' / 'files'
+            / 'rocscience' / 'vp036.xlsx')
+K0_SIZE = 1.5
+K0_LOCKED_FS = 1.373
+K0_LOCK_TOL = 0.02
+K0_F_MIN, K0_F_MAX = 1.1, 1.6
+K0_MAX_ITER = 16000
+# The level-ground block, from test/k0_level_ground_check.py, which is where the
+# K0 field has a closed form. Machine-precision tolerances: the field is an exact
+# equilibrium, so the only thing between the solver and zero is round-off.
+K0_LG_MAX_U = 1e-10
+K0_LG_REL_STRESS = 1e-9
+K0_LG_MAX_ITER = 2
+
+
+def _k0_level_ground():
+    """The level-ground module's own model builders, loaded from beside this file."""
+    import importlib.util
+    path = Path(__file__).resolve().parent / 'k0_level_ground_check.py'
+    spec = importlib.util.spec_from_file_location('k0_level_ground_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def check_k0_initial_stress():
+    """The at-rest initial stress, on the driver that used to refuse it.
+
+    K0 was the last refusal standing between this driver and the vendor corpus:
+    every `fem_ssrm` lock in `docs/verification/` whose model carries a tensile cap
+    also carries `k0=1`, so 142 locked benchmarks were unreachable for want of it.
+    Four legs, and each fails on a different defect:
+
+      * **level ground is exact.** On flat ground the field sigma'_v = -gamma z,
+        sigma'_h = sigma'_z = K0 sigma'_v satisfies equilibrium identically for any
+        K0, so there is nothing to redistribute: the Newton corrector must reach
+        equilibrium on its first iteration, leave the mesh where it is, reproduce
+        the imposed stresses and yield nowhere. Run dry and with the water table at
+        the surface, where the K0 relation holds between EFFECTIVE stresses.
+      * **the out-of-plane component is asserted, not assumed.** sigma_z does not
+        appear in the in-plane equilibrium at all, so a wrong out-of-plane initial
+        stress moves no node and changes no sigma_x: it would pass every leg above
+        and still evaluate the yield surface on a state the model is not in. It is
+        read here twice — directly off the groups the driver builds, against the
+        analytic K0 sigma_v at each Gauss point, and through the von Mises stress
+        of the K0 = 1 dry state, which is hydrostatic and therefore zero exactly
+        when the third component is right.
+      * **the two drivers build the same in-situ state.** The pre-equilibration is
+        a full-strength solve whose (u, eps^p) every trial then starts from, so if
+        the drivers disagree there, every trial is answering a different question.
+        Compared on the reconstructed Gauss-point stress field rather than on
+        either driver's reporting path.
+      * **a locked vendor benchmark.** RS2-27, K0 = 1: both drivers inside the
+        published tolerance and inside the bisection tolerance of each other.
+    """
+    import numpy as _np
+    from xslope.fem import _prepare_fem_model, _nr_build_groups
+    fails = []
+    lg = _k0_level_ground()
+
+    # ---- (1) and (2a): level ground, exactly ------------------------------
+    fem_dry, fem_wet = lg._build(False), lg._build(True)
+    for k0, wet in ((1.0, False), (1.0, True)):
+        fd = fem_wet if wet else fem_dry
+        tag = f"K0={k0:g} {'wet' if wet else 'dry'}"
+        prep = _prepare_fem_model(fd, k0=k0)
+        sv_exp, sh_exp = lg._expected(fd, prep, k0, wet)
+        sol = solve_fem(fd, F=1.0, k0=k0, max_iterations=2000, fast_kernel=False,
+                        _prepared=prep, fem_solver='newton')
+        if not sol['converged']:
+            fails.append(f"K0 level ground, {tag}: the Newton driver did not reach "
+                         f"equilibrium on a field that is an exact one")
+            continue
+        ref = max(float(sv_exp.max()), 1e-30)
+        st = sol['stresses']
+        errs = {'sigma_y': float(_np.abs(st[:, 1] - sv_exp).max()) / ref,
+                'sigma_x': float(_np.abs(st[:, 0] - sh_exp).max()) / ref,
+                'tau_xy': float(_np.abs(st[:, 2]).max()) / ref}
+        for name, err in errs.items():
+            if err > K0_LG_REL_STRESS:
+                fails.append(
+                    f"K0 level ground, {tag}: {name} is off by {err:.3e} relative "
+                    f"— the recovered stress is not the imposed K0 field")
+        if float(sol['max_displacement']) > K0_LG_MAX_U:
+            fails.append(
+                f"K0 level ground, {tag}: max|u| = {sol['max_displacement']:.3e} "
+                f"> {K0_LG_MAX_U:.0e} — the mesh moved under a field that is an "
+                f"exact equilibrium")
+        if int(sol['iterations']) > K0_LG_MAX_ITER:
+            fails.append(
+                f"K0 level ground, {tag}: equilibrium took {sol['iterations']} "
+                f"iterations, not at most {K0_LG_MAX_ITER} — the K0 field is being "
+                f"redistributed, so it is not in equilibrium as built")
+        n_plastic = int(_np.count_nonzero(sol['plastic_elements']))
+        if n_plastic:
+            fails.append(
+                f"K0 level ground, {tag}: {n_plastic} yielded element(s) under an "
+                f"equilibrium state well inside the Mohr-Coulomb envelope")
+        if not wet:
+            # K0 = 1 dry is HYDROSTATIC, so the deviatoric stress is zero exactly
+            # when sigma_z is right — and a wrong sigma_z shows up nowhere else on
+            # level ground, because the out-of-plane component carries no in-plane
+            # equilibrium and no in-plane stress.
+            vm = float(_np.abs(st[:, 3]).max()) / ref
+            if vm > K0_LG_REL_STRESS:
+                fails.append(
+                    f"K0 level ground, {tag}: the state is not hydrostatic — von "
+                    f"Mises stress reaches {vm:.3e} of the overburden where K0 = 1 "
+                    f"makes it zero. The out-of-plane initial stress is wrong.")
+
+    # ---- (2b) the initial stress field itself, out-of-plane included -------
+    k0_probe = 0.5
+    prep = _prepare_fem_model(fem_dry, k0=k0_probe)
+    n_el = len(fem_dry['elements'])
+    groups = _nr_build_groups(prep, fem_dry['c_by_elem'],
+                              _np.radians(fem_dry['phi_by_elem']),
+                              None, None, k0=k0_probe)
+    worst_h = worst_z = worst_v = 0.0
+    n_gp = 0
+    y_top = float(_np.max(fem_dry['nodes'][:, 1]))
+    for grp, sg in zip(groups, prep['gp_groups_static']):
+        s0 = grp.get('sig0')
+        if s0 is None:
+            fails.append("the K0 initial stress is not attached to the Newton "
+                         "groups at all on a model that declares K0")
+            break
+        xy = lg._gauss_point_xy(fem_dry, prep)
+        sv_an = _np.array([-lg.GAMMA * (y_top - xy[e][g][1]) for e, g in sg['pairs']])
+        ref = max(float(_np.abs(sv_an).max()), 1e-30)
+        n_gp += len(sv_an)
+        worst_v = max(worst_v, float(_np.abs(s0[:, 1] - sv_an).max()) / ref)
+        worst_h = max(worst_h, float(_np.abs(s0[:, 0] - k0_probe * sv_an).max()) / ref)
+        worst_z = max(worst_z, float(_np.abs(s0[:, 3] - k0_probe * sv_an).max()) / ref)
+    for name, err in (('vertical', worst_v), ('in-plane horizontal', worst_h),
+                      ('OUT-OF-PLANE', worst_z)):
+        if err > K0_LG_REL_STRESS:
+            fails.append(
+                f"the K0 initial stress the Newton driver builds is wrong in its "
+                f"{name} component by {err:.3e} of the overburden, over {n_gp} "
+                f"Gauss points, against the analytic K0 = {k0_probe:g} field")
+
+    # ---- (3) the two drivers build the same in-situ state ------------------
+    slope_data = load_slope_data(str(K0_MODEL))
+    mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
+                                    target_size=K0_SIZE, element_type='tri6')
+    fd = build_fem_data(slope_data, mesh)
+    prep = _prepare_fem_model(fd, k0=1.0)
+
+    def _gp_sigma(state):
+        """sigma = sigma_0 + D (B u - eps^p), from first principles."""
+        u = _np.asarray(state['u'], dtype=float)
+        out = []
+        for sg, ev in zip(prep['gp_groups_static'], state['evp']):
+            B, D4, dof = sg['B'], sg['D4'], sg['dof']
+            ep = _np.asarray(ev, dtype=float)
+            eps = (B @ u[dof][:, :, None])[:, :, 0]
+            eps4 = _np.empty((len(eps), 4))
+            eps4[:, :3] = eps - ep[:, :3]
+            eps4[:, 3] = -ep[:, 3]
+            sig = (D4 @ eps4[:, :, None])[:, :, 0]
+            sv0 = _np.array([prep['sv0_gp'][e][g] for e, g in sg['pairs']])
+            ug = _np.array([prep['u_gp'][e][g] for e, g in sg['pairs']])
+            sv = -sv0 + ug
+            sh = 1.0 * sv          # K0 = 1 on this model
+            z = _np.zeros_like(sv)
+            out.append(sig + _np.stack([sh, sv, z, sh], axis=1))
+        return _np.concatenate(out, axis=0)
+
+    scale = max(float(max(max(row) for row in prep['sv0_gp'] if len(row))), 1e-30)
+    states = {}
+    for solver in ('viscoplastic', 'newton'):
+        sol = solve_fem(fd, F=1.0, k0=1.0, max_iterations=K0_MAX_ITER,
+                        max_disp_factor=None, force_tol=1e-3, early_exit=True,
+                        failure_criterion='hybrid', fast_kernel=False,
+                        _prepared=prep, fem_solver=solver)
+        if not sol['converged'] or sol['_k0_state'] is None:
+            fails.append(f"the {solver} driver could not establish the in-situ "
+                         f"state on {K0_MODEL.name} at full strength")
+        states[solver] = sol
+    if all(s['_k0_state'] is not None for s in states.values()):
+        d = _gp_sigma(states['viscoplastic']['_k0_state']) - \
+            _gp_sigma(states['newton']['_k0_state'])
+        rms = float(_np.sqrt(_np.mean(d ** 2))) / scale
+        if rms > 1e-2:
+            fails.append(
+                f"the two drivers' K0 in-situ stress fields differ by {rms:.3e} "
+                f"RMS relative to the overburden — every trial starts from this "
+                f"state, so a disagreement here is a disagreement about the model")
+        du = abs(states['viscoplastic']['max_displacement']
+                 - states['newton']['max_displacement'])
+        ref_u = max(states['viscoplastic']['max_displacement'], 1e-30)
+        if du / ref_u > 0.05:
+            fails.append(
+                f"the two drivers' in-situ redistribution differs by "
+                f"{du / ref_u:.1%} in max|u| "
+                f"({states['viscoplastic']['max_displacement']:.4g} against "
+                f"{states['newton']['max_displacement']:.4g})")
+
+    # ---- (4) the locked vendor benchmark ----------------------------------
+    fs = {}
+    for solver in ('viscoplastic', 'newton'):
+        res = solve_ssrm(fd, F_min=K0_F_MIN, F_max=K0_F_MAX, tolerance=0.01,
+                         max_iterations=K0_MAX_ITER, k0=1.0, tension_srf=False,
+                         fem_solver=solver, capture_failure_state=False)
+        fs[solver] = res.get('FS')
+        if fs[solver] is None:
+            fails.append(f"{solver}: no factor of safety on {K0_MODEL.name} "
+                         f"({res.get('error', 'no message')})")
+        elif abs(fs[solver] - K0_LOCKED_FS) > K0_LOCK_TOL:
+            fails.append(
+                f"{solver}: FS = {fs[solver]:.4f} on {K0_MODEL.name} is "
+                f"{abs(fs[solver] - K0_LOCKED_FS):.4f} from the locked "
+                f"{K0_LOCKED_FS:g}, outside the published tolerance "
+                f"{K0_LOCK_TOL:g}")
+    if all(v is not None for v in fs.values()) and \
+            abs(fs['viscoplastic'] - fs['newton']) > 0.01:
+        fails.append(
+            f"the two drivers disagree on {K0_MODEL.name} with K0 = 1: "
+            f"viscoplastic {fs['viscoplastic']:.4f} against Newton "
+            f"{fs['newton']:.4f}")
+    return fails
+
+
 def check_env_override_announces_itself():
     """A stale XSLOPE_FEM_SOLVER may not redefine the default in silence.
 
@@ -1211,7 +1441,10 @@ def main():
           "base does not manufacture a failure at a strength the driver's "
           "own converged answer above it proves standing, a Rankine tensile cap "
           "returns to both yield surfaces at once and is reduced with the trial "
-          "strength while an inert cap changes nothing at all, and the "
+          "strength while an inert cap changes nothing at all, the K0 initial "
+          "stress is an exact equilibrium on level ground down to its "
+          "out-of-plane component and reproduces a locked vendor benchmark on "
+          "both drivers, and the "
           "environment override cannot swap the driver in silence. The monotonic "
           "ramp reaches the same limit along one warm-started history, reports it "
           "on the bisection's midpoint convention, and never solves past it.")

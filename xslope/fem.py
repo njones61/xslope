@@ -4332,10 +4332,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     grp['csph'] = np.cos(phi_r_new[e])
                     _nr_group_tension_cap(grp, tc_new)
             _nr_export['restrength'] = _restrength
-        if _init_state is not None:
-            raise NotImplementedError(
-                "fem_solver='newton' does not carry a K0-equilibrated initial "
-                "state. Run this model on the default viscoplastic solver.")
         if staged and (bool(np.any(bc_type == 4)) or prep["pp_option"] != "none"):
             raise NotImplementedError(
                 "fem_solver='newton' does not run staged loading. Run this model "
@@ -4346,6 +4342,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             pp_formulation=pp_formulation, force_tol=force_tol,
             min_slip_depth=min_slip_depth, max_iterations=max_iterations,
             max_disp_factor=max_disp_factor, _nr_export=_nr_export,
+            k0=k0, _nr_init_state=_init_state,
             debug_level=debug_level, progress_callback=progress_callback)
         _sol = _solve_fem_newton(fem_data, F, prep, **_nr_kw)
         # The viscoplastic predictor (see _NR_VP_PREDICTOR_ITERS). Only a trial that
@@ -4374,11 +4371,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     failure_criterion=failure_criterion,
                     max_iterations_ceiling=_ceiling,
                     early_failure=_pred_early_failure,
+                    k0=k0, _init_state=_init_state,
                     fem_solver='viscoplastic')
-                _retry = _solve_fem_newton(
-                    fem_data, F, prep,
-                    _nr_seed=(_vp["displacements"], _vp["plastic_strains"]),
-                    **_nr_kw)
+                # On a K0 model the predictor's reported displacement is measured
+                # from the in-situ datum, so the seed is read off its `_k0_state`,
+                # which carries the ABSOLUTE field and the plastic strain in this
+                # prepared model's own group order. Without K0 the reported
+                # displacement IS the absolute one and the legacy per-element form
+                # is used unchanged, which is what keeps that path bit-identical.
+                _seed_kw = (dict(_nr_seed_state=_vp["_k0_state"]) if k0 is not None
+                            else dict(_nr_seed=(_vp["displacements"],
+                                                _vp["plastic_strains"])))
+                _retry = _solve_fem_newton(fem_data, F, prep, **_seed_kw, **_nr_kw)
                 # Work is CUMULATIVE: the failed cold attempt, every predictor run
                 # and every corrector are all charged to this trial, so no cost is
                 # hidden by the retry succeeding.
@@ -6227,6 +6231,13 @@ def _nr_group_state(grp, u, h_eps):
     eps4[:, :3] = eps - ep[:, :3]
     eps4[:, 3] = -ep[:, 3]
     sig_tr = (D4 @ eps4[:, :, None])[:, :, 0]
+    # K0 initial stress, at the live load factor (see _nr_group_sig0). The return
+    # map is handed the TOTAL trial stress, so sigma_0 sits inside the yield
+    # surface evaluation exactly as it does on the viscoplastic path — and, being
+    # constant in the strain, it drops out of the difference quotient below.
+    _s0 = grp.get('sig0_s')
+    if _s0 is not None:
+        sig_tr = sig_tr + _s0
     t_cap, lam = grp.get('t_cap'), grp.get('lam')
     sig, branch = mc_return_map(sig_tr, grp['c_r'], grp['snph'], grp['csph'],
                                 grp['mu'], t_cap=t_cap, lam=lam)
@@ -6366,8 +6377,11 @@ def _nr_internal_force(gp_groups, u, n_dof, h_eps=None, want_tangent=False,
             eps4[:, :3] = eps - ep[:, :3]
             eps4[:, 3] = -ep[:, 3]
             sig_tr = (D4 @ eps4[:, :, None])[:, :, 0]
+            _s0 = grp.get('sig0_s')
+            if _s0 is not None:
+                sig_tr = sig_tr + _s0
             # The SAME constitutive law the tangent path takes, tensile cap
-            # included. This branch exists only to skip the differencing, so any
+            # and K0 initial stress included. This branch exists only to skip the differencing, so any
             # divergence between the two is a residual and a tangent for two
             # different materials.
             sig, branch = mc_return_map(sig_tr, grp['c_r'], grp['snph'],
@@ -6395,7 +6409,15 @@ def _nr_commit_plastic_strain(gp_groups):
     """
     for grp in gp_groups:
         eps = (grp['B'] @ grp['_u'][grp['dof']][:, :, None])[:, :, 0]
-        eps_e4 = (grp['D4inv'] @ grp['_sig'][:, :, None])[:, :, 0]
+        # The ELASTIC part of the stress is what D4inv inverts: with a K0 initial
+        # stress the constitutive relation is sigma = sigma_0 + D (eps - eps^p), so
+        # sigma_0 comes off before the inversion or the whole in-situ field would be
+        # booked as elastic strain.
+        _sig = grp['_sig']
+        _s0 = grp.get('sig0_s')
+        if _s0 is not None:
+            _sig = _sig - _s0
+        eps_e4 = (grp['D4inv'] @ _sig[:, :, None])[:, :, 0]
         ep = np.empty_like(grp['ep'])
         ep[:, :3] = eps - eps_e4[:, :3]
         ep[:, 3] = -eps_e4[:, 3]
@@ -6428,8 +6450,55 @@ def _nr_group_tension_cap(grp, t_cap_by_elem):
     grp['lam'] = grp['D4'][:, 0, 1].copy()
 
 
+def _nr_group_sig0(grp, sg, prep, k0):
+    """Attach one group's K0 initial stress, or leave the group without one.
+
+    The field is the viscoplastic driver's, read from the same cached overburden
+    (``prep['sv0_gp']``, F-independent) and built by the same formula, per Gauss
+    point and tension-positive:
+
+        sigma'_v = -(soil overburden) + u        (u >= 0)
+        sigma'_h = sigma'_z = K0 sigma'_v        (in-plane AND out-of-plane)
+        tau_xy   = 0
+
+    Only the EFFECTIVE formulation is built here, because the Newton driver
+    refuses every other one; under 'effective' the pore-pressure term is already
+    in the load vector and D (B u - eps^p) is the effective stress directly, so
+    the initial stress is effective too and needs no correction.
+
+    ``sig0`` is the full in-situ field and ``sig0_s`` is that field at the live
+    LOAD FACTOR: the driver walks gravity in increments and the overburden IS
+    gravity, so the two scale together and lam = 0 is a genuinely stress-free
+    state. The key is set only on a K0 run, so ``grp.get('sig0_s')`` is None on
+    every other model and none of the initial-stress arithmetic is entered there.
+    """
+    if k0 is None or prep.get("sv0_gp") is None:
+        return
+    sv0_gp, u_gp_all = prep["sv0_gp"], prep["u_gp"]
+    pairs = sg['pairs']
+    sv0 = np.array([sv0_gp[e][g] for e, g in pairs], dtype=float)
+    u_st = np.array([u_gp_all[e][g] for e, g in pairs], dtype=float)
+    sv_eff = -sv0 + u_st
+    sh_eff = float(k0) * sv_eff
+    z = np.zeros_like(sv_eff)
+    grp['sig0'] = np.stack([sh_eff, sv_eff, z, sh_eff], axis=1)
+    grp['sig0_s'] = grp['sig0']
+
+
+def _nr_set_load_factor(groups, lam):
+    """Scale every group's initial stress to the load factor being attempted.
+
+    A no-op on a model without K0. Within one increment ``lam`` is fixed, so the
+    residual, the line search and the tangent all see the same material.
+    """
+    for grp in groups:
+        s0 = grp.get('sig0')
+        if s0 is not None:
+            grp['sig0_s'] = s0 if lam == 1.0 else lam * s0
+
+
 def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
-                     t_cap_by_elem=None):
+                     t_cap_by_elem=None, k0=None):
     """The Newton path's working Gauss-point groups.
 
     Geometry (B, D4, w, dof) is shared BY REFERENCE with the prepared model, which
@@ -6465,6 +6534,7 @@ def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
                 grp['c_r'][em] = np.inf
                 grp['elastic'] = em
         _nr_group_tension_cap(grp, t_cap_by_elem)
+        _nr_group_sig0(grp, sg, prep, k0)
         groups.append(grp)
     return groups
 
@@ -6868,7 +6938,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                       max_disp_factor=None, _nr_export=None,
                       debug_level=0, progress_callback=None,
                       nr_max_iter=_NR_MAX_ITER, nr_min_step=_NR_MIN_STEP,
-                      _nr_seed=None):
+                      _nr_seed=None, k0=None, _nr_init_state=None,
+                      _nr_seed_state=None):
     """One strength-reduction trial by Newton-Raphson (SPIKE; see SPIKE.md).
 
     Returns the same result dictionary solve_fem returns, so the SSRM bisection
@@ -6890,10 +6961,15 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     same physics the viscoplastic path gets by summing the two flows.
     Reinforcement bar elements ARE carried (see _nr_build_bars and _nr_bar_force),
     with the soil strength reduced and the bars keeping their capacity, which is the
-    vendor convention and what the LEM does. Everything else the spike does not
-    cover raises rather than being silently ignored, because a switch that quietly
-    drops a tensile cap or a softening bar would return a wrong factor of safety
-    that looks right.
+    vendor convention and what the LEM does. The K0 initial stress IS carried (see
+    _nr_group_sig0): the in-situ field rides inside the internal force rather than
+    being moved to the right-hand side, because Newton has an internal force to
+    write, and `_nr_init_state` starts a trial from the equilibrated in-situ state
+    with its displacement measured from there — the same sequencing solve_ssrm
+    gives the viscoplastic driver. Everything else the spike does not cover raises
+    rather than being silently ignored, because a switch that quietly drops a
+    tensile cap or a softening bar would return a wrong factor of safety that looks
+    right.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -6938,8 +7014,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # trial F where `tension_srf` says so, so nothing about the cap's semantics is
     # decided on this path — it is the same per-element array the viscoplastic
     # driver caps sigma_1 against.
-    if prep.get("sv0_gp") is not None:
-        unsupported.append("K0 initial stress")
+    # The K0 initial stress IS carried (see _nr_group_sig0): the same overburden
+    # integral the viscoplastic path reads, the same in-plane AND out-of-plane
+    # sigma_h = K0 sigma'_v, and the same in-situ pre-equilibration sequencing
+    # through `_nr_init_state`. It arrives here as prep['sv0_gp'] plus the k0
+    # argument, so nothing about the field's semantics is decided on this path.
     if pp_formulation != "effective":
         unsupported.append(f"pp_formulation='{pp_formulation}'")
     if unsupported:
@@ -6961,7 +7040,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             "model on the default viscoplastic solver.")
 
     groups = _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
-                              t_cap_by_elem)
+                              t_cap_by_elem, k0=k0)
     bars = _nr_build_bars(fem_data)
     pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars)
 
@@ -7029,6 +7108,48 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             for k, (e, gp) in enumerate(grp['pairs']):
                 ep[k] = ep_seed[e][gp]
             grp['ep'] = ep
+    # The equilibrated in-situ state (K0 runs only; see solve_ssrm's equilibration
+    # solve). It is the displacement field and the plastic strain at the end of a
+    # full-strength solve, in this prepared model's own group order, and starting
+    # here starts this trial from that solve's answer. Displacement is then measured
+    # FROM it — the reported field and the displacement bound both — because the
+    # in-situ displacement is the artifact of imposing a stress field the geometry
+    # does not hold in equilibrium, not travel the soil made. Stresses stay
+    # functions of the ABSOLUTE displacement, which is what the solve iterates on.
+    u_datum = np.zeros(n_dof)
+    if _nr_init_state is not None:
+        if not groups or groups[0].get('sig0') is None:
+            raise ValueError("_nr_init_state was given without k0; an equilibrated "
+                             "initial state has no meaning without the K0 "
+                             "formulation.")
+        _sizes = [len(g['pairs']) for g in groups]
+        _iu = np.asarray(_nr_init_state["u"], dtype=float)
+        _iev = _nr_init_state["evp"]
+        if [len(a) for a in _iev] != _sizes or _iu.shape != (n_dof,):
+            raise ValueError(
+                "_nr_init_state does not match this prepared model's Gauss-point "
+                "groups / degrees of freedom; the state must be produced on the "
+                "same prepared model.")
+        u_datum = _iu.copy()
+        u = u_datum.copy()
+        for grp, ev in zip(groups, _iev):
+            grp['ep'] = np.array(ev, dtype=float, copy=True)
+    # A predictor's state on a K0 model, in the same (u, eps^p) form the in-situ
+    # state carries. It moves where the solve STARTS and not what displacement is
+    # measured from: the datum stays the in-situ state, so a predictor's own travel
+    # is not quietly credited to the trial. (The `_nr_seed` form above is the
+    # no-K0 route, where the viscoplastic driver's reported displacement IS the
+    # absolute one and its plastic strain comes back per element.)
+    if _nr_seed_state is not None:
+        u = np.asarray(_nr_seed_state["u"], dtype=float)[:n_dof].copy()
+        for grp, ev in zip(groups, _nr_seed_state["evp"]):
+            grp['ep'] = np.array(ev, dtype=float, copy=True)
+    # A trial that starts from a state which already stands at full gravity does not
+    # walk the load path — the in-situ solve (or the predictor) already walked it,
+    # and cutting the load below full gravity from such a state would be solving a
+    # different problem.
+    _one_shot = (_nr_seed is not None or _nr_init_state is not None
+                 or _nr_seed_state is not None)
     lam = 0.0
     dlam = float(_NR_INIT_STEP)
     total_iterations = 0
@@ -7056,9 +7177,13 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         # and cutting the load below full gravity from a state that stands at full
         # gravity would be solving a different problem. It is one attempt at the
         # whole load, and it either corrects the seed or the trial has failed.
-        step = 1.0 - lam if _nr_seed is not None else min(dlam, 1.0 - lam)
+        step = 1.0 - lam if _one_shot else min(dlam, 1.0 - lam)
         lam_try = lam + step
         f_ext = lam_try * base_loads
+        # The K0 initial stress is gravity's own field, so it rides the load factor
+        # with the load: at lam the material carries lam*sigma_0 and lam of the
+        # weight, and lam = 1 is the authored in-situ state. A no-op without K0.
+        _nr_set_load_factor(groups, lam_try)
 
         ok, u_try, it, _fe, oob_here, rel_du = _nr_equilibrate(
             groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
@@ -7092,7 +7217,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             if debug_level >= 2:
                 print(f"    NR increment to {lam_try:.4f} failed after {it} "
                       f"iterations; cutting to {dlam:.5f}")
-            if _nr_seed is not None:
+            if _one_shot:
                 converged = False
                 exit_reason = 'diverging'
                 u = u_try
@@ -7126,7 +7251,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                      if disp_factor is not None and prep["mesh_height"] > 0
                      else None)
     if converged and nr_disp_limit is not None:
-        if float(np.max(np.abs(u))) > nr_disp_limit:
+        if float(np.max(np.abs(u - u_datum))) > nr_disp_limit:
             converged = False
             exit_reason = 'displacement_limit'
 
@@ -7255,11 +7380,24 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             'oob_fn': _oob, 'h_eps': h_eps, 'u_elastic_scale': u_elastic_scale,
             'free_dofs': free_dofs, 'n_dof': n_dof, 'u': u,
             'disp_limit': nr_disp_limit, 'prep': prep,
+            'u_datum': u_datum,
         })
 
     strains = compute_strains(nodes, elements, element_types, u,
                               dof_offset=dof_offset)
-    max_disp = float(np.max(np.abs(u))) if u.size else 0.0
+    # Measured from the datum (zero without a carried in-situ state), exactly as the
+    # viscoplastic path measures it.
+    u_reported = u if _nr_init_state is None else u - u_datum
+    max_disp = float(np.max(np.abs(u_reported))) if u.size else 0.0
+    # The equilibrated state, for a later solve to start from. Same shape and same
+    # meaning as the viscoplastic driver's `_k0_state`, over the same Gauss-point
+    # groups in the same order, so either driver's state can seed the other.
+    nr_k0_state = None
+    if groups and groups[0].get('sig0') is not None:
+        nr_k0_state = {"u": u.copy(),
+                       "evp": [g['ep'].copy() for g in groups],
+                       "pp_formulation": pp_formulation,
+                       "F": float(F), "converged": bool(converged)}
     u_ratio = (max_disp / u_elastic_scale) if u_elastic_scale > 0 else None
     verdict = 'CONVERGED' if converged else 'FAILED'
 
@@ -7281,7 +7419,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "u_growth": None,
         "u_elastic_scale": u_elastic_scale,
         "exit_reason": exit_reason,
-        "_k0_state": None,
+        "_k0_state": nr_k0_state,
         "plateau_iteration": None,
         "plateau_ratio": None,
         "diverging_iteration": (total_iterations if not converged else None),
@@ -7306,7 +7444,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         # force half is `residual`.
         "nr_max_yield_violation": float(max_yield_violation),
         "iterations": int(total_iterations),
-        "displacements": u,
+        "displacements": u_reported,
         "displacements_elastic": u_elastic,
         "stresses": final_stresses,
         "strains": strains,
@@ -7411,7 +7549,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                       tension_cap_by_elem, tension_srf, elastic_mask,
                       suction_phi_b, suction_cap, k0, f_adjust, f_min_floor,
                       max_expand, max_iterations_ceiling=50000, early_failure=True,
-                      debug_level=0, progress_callback=None,
+                      init_state=None, debug_level=0, progress_callback=None,
                       cancel_check=None):
     """Walk F up from a converged state, warm-starting every step.
 
@@ -7444,7 +7582,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                          k0=k0, fem_solver='newton', _prepared=prep,
                          max_iterations_ceiling=max_iterations_ceiling,
-                         early_failure=early_failure,
+                         early_failure=early_failure, _init_state=init_state,
                          _nr_export=(None if export_only else ctx))
 
     def _record(F, verdict, iters, fevals, oob, maxu, kind, why=None):
@@ -7483,6 +7621,11 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     disp_limit = ctx['disp_limit']
     restrength = ctx['restrength']
     u = ctx['u']
+    # Displacement is measured from the in-situ state on a K0 run and from zero
+    # otherwise, the same datum the foot's own verdict was read on.
+    u_datum = ctx.get('u_datum')
+    if u_datum is None:
+        u_datum = np.zeros(n_dof)
 
     F_stands = F0
     last_solution = sol0
@@ -7552,16 +7695,27 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                     tension_cap_by_elem=tension_cap_by_elem,
                     tension_srf=tension_srf, elastic_mask=elastic_mask,
                     suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                    k0=k0, _init_state=init_state,
                     _prepared=_seed_prep, early_failure=_seed_ef,
                     fem_solver='viscoplastic')
                 pred_iters += int(_vp.get('iterations', 0) or 0)
-                _u_seed = np.asarray(_vp['displacements'], dtype=float)[:n_dof].copy()
-                _ep_vp = _vp['plastic_strains']
-                for grp in groups:
-                    _ep = np.empty_like(grp['ep'])
-                    for _k, (_e, _gp) in enumerate(grp['pairs']):
-                        _ep[_k] = _ep_vp[_e][_gp]
-                    grp['ep'] = _ep
+                if k0 is not None:
+                    # The predictor's reported displacement is measured from the
+                    # in-situ datum; its `_k0_state` carries the absolute field and
+                    # the plastic strain in this model's own group order.
+                    _ks = _vp['_k0_state']
+                    _u_seed = np.asarray(_ks['u'], dtype=float)[:n_dof].copy()
+                    for grp, _ev in zip(groups, _ks['evp']):
+                        grp['ep'] = np.array(_ev, dtype=float, copy=True)
+                else:
+                    _u_seed = np.asarray(_vp['displacements'],
+                                         dtype=float)[:n_dof].copy()
+                    _ep_vp = _vp['plastic_strains']
+                    for grp in groups:
+                        _ep = np.empty_like(grp['ep'])
+                        for _k, (_e, _gp) in enumerate(grp['pairs']):
+                            _ep[_k] = _ep_vp[_e][_gp]
+                        grp['ep'] = _ep
                 ok, u_try, it2, fe2, oob, _rel = _nr_equilibrate(
                     groups, pattern, _u_seed, base_loads, free_dofs, n_dof, h_eps,
                     force_tol, oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
@@ -7579,7 +7733,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                 # as it was before the seed overwrote it.
                 for grp, _ep0 in zip(groups, ep_save):
                     grp['ep'] = _ep0
-        maxu = float(np.max(np.abs(u_try))) if u_try.size else 0.0
+        maxu = float(np.max(np.abs(u_try - u_datum))) if u_try.size else 0.0
         # The SAME admissibility standard a converged bisection trial passes: force
         # equilibrium under the tolerance, and a state the small-strain model can
         # represent.
@@ -8910,6 +9064,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             elastic_mask=elastic_mask,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
             failure_criterion=failure_criterion, early_failure=early_failure,
+            # The in-situ state is established on the SAME driver that will solve
+            # the trials. It is the state every trial starts from, so equilibrating
+            # it with one solver and then continuing it with another would hand the
+            # bisection a starting point its own corrector never produced.
+            fem_solver=fem_solver,
             _prepared=prep)
         equilibration = {
             "converged": bool(eq["converged"]),
@@ -8975,7 +9134,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             suction_cap=suction_cap, k0=k0, f_adjust=f_adjust,
             f_min_floor=f_min_floor, max_expand=max_expand,
             max_iterations_ceiling=max_iterations_ceiling,
-            early_failure=early_failure,
+            early_failure=early_failure, init_state=init_state,
             debug_level=debug_level, progress_callback=progress_callback,
             cancel_check=cancel_check)
     elif failure_criterion in ("non_convergence", "hybrid"):

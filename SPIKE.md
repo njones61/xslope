@@ -968,7 +968,7 @@ Work, on the same runs:
 | Griffiths & Lane 1 quad8 | 16 / 5 | 622 | 4,151 | 11 s | 1,688 | 11,592 | 32 s | 113,090 | 78 s |
 | Griffiths & Lane 1 tri6 | 8 / 4 | 512 | 3,935 | 12 s | 2,360 | 16,098 | 53 s | 78,576 | 70 s |
 | Griffiths & Lane 1 quad9 | 10 / 4 | 799 | 5,465 | 26 s | 823 | 5,846 | 26 s | 103,358 | 125 s |
-| Griffiths & Lane 6 dry quad8 | 20 / 5 | 790 | 4,347 | 35 s | 3,026 | 20,135 | 92 s | 48,128 | 42 s |
+| Griffiths & Lane 6 dry quad8 | 20 / 5 | ~~790~~ 1,291 | ~~4,347~~ 7,821 | 35 s | 3,026 | 20,135 | 92 s | 48,128 | 42 s |
 | Griffiths & Lane 6 dry tri6 | 31 / 7 | 840 | 4,821 | 23 s | 2,791 | 19,209 | 87 s | 53,144 | 72 s |
 | Griffiths & Lane 3, r = 0.8 | 9 / 4 | 312 | 2,103 | 23 s | 4,034 | 31,569 | 331 s | 79,961 | 221 s |
 
@@ -1120,3 +1120,55 @@ not this branch's:
 - **Arc-length control was not needed.** Step halving reached the floor cleanly on
   every benchmark; no case ended with a step failing at the floor while the state
   below it was comfortably converged. It stays a follow-up rather than a gap.
+
+
+## Corrections, 2026-09-01 — second adversarial review
+
+An independent reviewer re-ran seven of the eight ramp benchmarks and the nu=0.49
+probe with its own force-evaluation counter and F-trace. Every factor of safety,
+interval, and count reproduced to the digit except one cell, corrected below. The
+feature guards were exercised on all three entry points plus the environment route
+against reinforcement, pile, tension-cutoff, K0 and total-stress models: every one
+refuses with `NotImplementedError` before doing any work — no silent-wrong path.
+The default path was proven unchanged against a control run of the base commit
+(same FS, same nine-trial iteration sequence), not against this document.
+
+**Corrected cell.** The Griffiths & Lane 6 dry quad8 ramp row read 790 iterations /
+4,347 force evaluations. The ramp's counters were seeded after the foot walk-down,
+so the two failed cold solves it discarded there (501 iterations, 3,474 force
+evaluations) were dropped. True figures: 1,291 / 7,821, and that row's ratio over
+the bisection is 2.57x, not 4.63x. The headline — fewer force evaluations on eight
+of eight, 1.07x to 15.0x — survives; that row was never either end of the range.
+Fixed by computing the totals from the trial record, which lists every solve.
+
+**`last_solution` was the foot, not the limit.** The ramp returned the F = F0 cold
+solve as `last_solution`, so every figure and CSV exported from a ramp run showed a
+pre-critical field (FS itself was unaffected). Fixed: the ramp now finishes with
+one cold export solve at the last carried strength — the same state the bisection
+driver exports for its final converged trial — recorded in `trials` as
+`final_export` and included in the work totals, which therefore read one cold solve
+higher than the tables above.
+
+**Cancel raised instead of stopping.** Cancelling a ramp run before any step was
+refused left `F_refused = None` and the return path raised `TypeError` (Studio's
+Cancel button hit this). Fixed: a cancelled ramp returns a non-converged result
+that says so, carrying the trials so far.
+
+**Comment correction (`_NR_DISP_FACTOR`).** The claim that 0.1 is "the same
+standard the viscoplastic driver applies to itself" was wrong during an SSRM run:
+`solve_ssrm` passes `max_disp_factor=None` to every viscoplastic trial, which leans
+on the runaway rule instead. The comment now says what is true: 0.1 is the standard
+a single `solve_fem` call applies. The reviewer also noted the two drivers measure
+displacement differently (component-wise max of the total field vs nodal resultant
+of the plastic field); on these meshes the measures agree to ~1% and no verdict
+turns on it, but the difference is recorded here so it is not rediscovered.
+
+**The reporting-convention gap is larger and two-part.** The ramp's reported value
+sits 0.0031 to 0.0119 below the bisection midpoint on these benchmarks — not a
+uniform "about 0.005". Two mechanisms: the floor-to-resolution rounding of the last
+carried strength, and reporting the interval's lower edge where the bisection —
+the convention behind every locked and published FS in this repository — reports
+the midpoint. Before any ramp value is locked or published it must be converted to
+the midpoint convention: report (F_stands + F_refused)/2, not the floored edge.
+Left unchanged in code for now so the tables above stay reproducible; this is the
+first item to settle if the ramp is promoted beyond an internal option.

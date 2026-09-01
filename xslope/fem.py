@@ -6138,8 +6138,9 @@ _NR_TANGENT_H = 1e-7       # strain perturbation for the algorithmic tangent
 # it stands in is one the model can represent. Everything here is small-strain
 # kinematics on an undeformed mesh, so a field that has moved a tenth of the model
 # height is outside the theory that produced it whatever its residual says. 0.1 is
-# solve_fem's own `max_disp_factor` default, i.e. the same standard the viscoplastic
-# driver applies to itself.
+# solve_fem's own `max_disp_factor` default — the standard a SINGLE solve applies.
+# (It is not one the viscoplastic SSRM path enforces: solve_ssrm runs its VP trials
+# with `max_disp_factor=None` and leans on the runaway rule instead.)
 #
 # This is deliberately NOT the gate that was removed (see the long note in the
 # increment loop). That one abandoned a load INCREMENT mid-solve on a displacement
@@ -6798,10 +6799,13 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     last_solution = sol0
     dF = _RAMP_DF_INIT
     n_steps, n_retries = 0, 0
-    total_iters = int(sol0['iterations'])
-    total_fevals = int(sol0.get('nr_force_evals', 0))
+    # Every solve so far — the foot AND any failed walk-down solves — is already
+    # in `trials`; the totals count them all, not just the solve that stood.
+    total_iters = int(sum(t['iterations'] for t in trials))
+    total_fevals = int(sum(t['nr_force_evals'] for t in trials))
     warm_iters = []
     F_refused = None
+    cancelled = False
 
     if debug_level >= 1:
         print("=== SSRM Analysis (Newton, monotonic ramp) ===")
@@ -6810,6 +6814,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
 
     while True:
         if cancel_check is not None and cancel_check():
+            cancelled = True
             break
         F_try = F_stands + dF
         if F_try > F_max + 1e-12:
@@ -6873,6 +6878,25 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
             dF *= 0.5
             if dF < _RAMP_DF_MIN:
                 break
+
+    if cancelled:
+        msg = (f"SSRM (ramp): cancelled at F = {F_stands:.4f} after {n_steps} "
+               f"steps; no limit was reached.")
+        return {"converged": False, "error": msg, "FS": None, "trials": trials,
+                "last_solution": last_solution}
+
+    # Export the state at the limit, not the foot: figures and CSVs are written
+    # from `last_solution`, and the ramp's warm state carries no post-processing.
+    # One cold solve at the last carried strength matches what the bisection
+    # driver exports for its final converged trial.
+    sol_end = _cold(F_stands)
+    _record(F_stands, sol_end['verdict'], sol_end['iterations'],
+            sol_end.get('nr_force_evals', 0), sol_end['unbalanced_force_ratio'],
+            sol_end['max_displacement'], 'final_export', sol_end.get('exit_reason'))
+    total_iters += int(sol_end['iterations'])
+    total_fevals += int(sol_end.get('nr_force_evals', 0))
+    if sol_end.get('converged'):
+        last_solution = sol_end
 
     # The limit: the last strength carried, with the refused step above it.
     FS = round(F_stands / _RAMP_RESOLUTION) * _RAMP_RESOLUTION

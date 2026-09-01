@@ -2898,3 +2898,143 @@ What remains:
   still the owner's open decision, unchanged from the adjudication: the shipped
   default accepts fields hundreds of psf outside a cone through the origin, and this
   round only shows that the Newton path can now be trusted where it does not.
+
+
+## THE TENSION CUTOFF — the Newton driver learns the Rankine cap
+
+Written before any feature code, so that what follows is a test and not a
+description. Same machine and settings as everything above: `force_tol` 1e-3,
+hybrid criterion, `capture_failure_state=False`, tolerance 0.01.
+
+### Why this one now
+
+Two reasons, and the second is the one that makes it urgent.
+
+**Every fresh model now carries a cap.** New materials created in Studio default
+to `t_cut = 0` (`main`, commit f9685986). The Newton driver refuses any model with
+a finite tensile cap, so as of that commit it refuses every newly authored model
+outright — not a corner of the corpus, the default case.
+
+**The cap is the documented remedy for the defect this branch proved.** "THE
+THREE-LAYER DISAGREEMENT" above measured a zero-cohesion soil at a free face
+carrying up to 729 psf of tension in a viscoplastic converged state that the force
+gate accepted and an independent referee found 580 psf outside the yield surface.
+The named remedy is the Rankine cutoff, and switching it on moved that model's
+viscoplastic answer from an unsupported 1.2391 to a certified 1.2109. The Newton
+driver cannot currently be pointed at the fixed model. The adaptive predictor
+already runs its own seed under a Rankine cap (`_NR_VP_PREDICTOR_TENSION_CAP`), so
+the branch is in the position of using the cap internally while refusing it as a
+model input.
+
+### The semantics being reproduced, read from the viscoplastic driver
+
+Not assumed — read out of `solve_fem` and `_prepare_fem_model` and restated here,
+because the Newton path has to solve the same model:
+
+- The cap is per element, `t_cap_base`: `inf` where there is none, `0` where the
+  global `tension_cutoff` flag is set, and the material's own `t_cut` where the
+  file gives one. Blank `t_cut` is `inf` (no cap), `0` means no tension at all, a
+  positive value caps the major principal stress. `docs/usage/input_template.md`
+  is the published statement of that.
+- `tension_srf` (`main!D17`, default YES) divides a FINITE POSITIVE cap by the
+  trial F, alongside `c/F` and `tan(phi)/F`, so the factor of safety is the factor
+  on the whole envelope. A cap of 0 is not divided (it is already 0) and `inf` is
+  never divided. With `tension_srf` off the authored cap is held through the
+  bisection.
+- The surface is a Rankine cap on the MAJOR PRINCIPAL STRESS, tension-positive,
+  with ASSOCIATED flow `n = d(sigma_1)/d(sigma)`. It is a SEPARATE surface from
+  the Mohr-Coulomb one and where both are active the two viscoplastic flows SUM
+  (Koiter). The Mohr-Coulomb flow at psi = 0 is purely deviatoric and cannot
+  relieve a mean stress; the Rankine flow is not, and that is the whole reason the
+  second surface exists.
+- A material declared `elastic` is held out of BOTH surfaces.
+
+One difference is deliberate and will be measured rather than assumed. The
+viscoplastic code caps the IN-PLANE major principal stress `ctr + R` and argues in
+its own comment that this also bounds `sigma_z`, so that "EVERY principal stress is
+held <= T". The Newton return map is written on the ordered principal stresses, so
+it caps `sigma_1 = max(sigma_a, sigma_b, sigma_z)` — the viscoplastic driver's
+STATED semantics. The two coincide wherever that comment's argument holds, and the
+fuzz below counts the states where they do not.
+
+### Design
+
+Multi-surface plasticity in principal-stress space, returned exactly per active
+set and verified after the fact rather than decided by a case tree.
+
+- **Surfaces.** Mohr-Coulomb on the ordered pairs — `f = A s_i - Bc s_j - c cos
+  phi` for (1,3) and, at a sextant corner, (1,2) or (2,3) — plus the Rankine
+  planes `s_k - T`. Every one is LINEAR in the principal stress with a CONSTANT
+  flow direction, so a return for a given active set is one small linear solve and
+  is exact.
+- **The Rankine active set is a prefix.** A returned state must be ordered, so if
+  `s_2` is at the cap then `s_1` is too: the only Rankine sets are `{1}`, `{1,2}`
+  and `{1,2,3}`. The last is the hydrostatic-tension return to `(T, T, T)`, which
+  is what replaces the Mohr-Coulomb apex whenever `T` is below it.
+- **The cap is inert above the apex.** Any Mohr-Coulomb-admissible state has
+  `sigma_1 <= c cot phi`, so a cap at or above the apex can never bind. That is
+  the `inert-large` leg of the fuzz and it is also why a blank `t_cut` and a large
+  one must produce the same answer.
+- **Active-set search, then consistency.** The Mohr-Coulomb-only return already in
+  the driver is computed first; a point whose returned `sigma_1` is under its cap
+  is finished, with the Rankine multiplier zero, which is what keeps the no-cap
+  path untouched. Only the rest go through the candidate sets, and a candidate is
+  accepted only if every multiplier is non-negative, the returned state is ordered,
+  and BOTH surfaces are satisfied.
+- **Consistent tangent.** By differentiating through the discrete return map, the
+  way every existing branch is: each branch is affine in the trial stress, so the
+  quotient is exact on the branch. Verified against a central difference.
+- **The predictor's internal cap becomes the same code path**, composing with the
+  caller's cap (`min(cap, 0)`) instead of replacing it.
+- **The ramp's `restrength` re-reduces the cap** with each new F when
+  `tension_srf` is on, exactly as it re-reduces c and tan(phi). Without that a
+  ramp would carry the foot's cap up the whole ramp.
+- **`_nr_tangent_factorable` stays.** A Rankine return can zero a tangent the same
+  way the apex can.
+
+### Success criterion (verbatim)
+
+1. **The return map is right, measured.** On at least 200,000 random trial states
+   per friction angle (phi = 0, 20, 35, 45) at each of `t_cut` in {0, a small
+   positive value, a value above the apex}: every returned state satisfies BOTH
+   surfaces to within 1e-12 of the stress scale, every plastic multiplier is
+   non-negative, no elastic state is modified at all, and the principal ordering
+   survives. The branch histogram is reported and every region the design names
+   must actually be exercised — a fuzz that never lands on the Mohr-Coulomb /
+   Rankine intersection edge proves nothing about it. The consistent tangent
+   agrees with a central difference to 1e-8 relative on every branch.
+2. **Benchmarks against the viscoplastic driver WITH the cutoff**, same model,
+   same mesh, same bracket, `tension_srf` at the file's own setting, agreement
+   within 0.01:
+   (a) the three-layer reinforced variant with `t_cut = 0` on all soils — the
+   viscoplastic-plus-cutoff reference is 1.2109 and the Newton driver on plain
+   Mohr-Coulomb already reads 1.2109; the cutoff version must land there too;
+   (b) the geogrid sample at its locked tri6/2.0 mesh with `t_cut = 0`;
+   (c) at least ONE vendor-transcribed corpus model carrying an explicit POSITIVE
+   `t_cut` and a LOCKED factor of safety, inside the Newton driver's feature
+   envelope — the lock must be reproduced;
+   (d) one plain cohesive benchmark (Griffiths & Lane 1, tri6) with `t_cut = 0`
+   added: the two drivers must agree, and the delta against the same benchmark
+   with no cap is REPORTED — it measures how much tension that model was carrying.
+3. **Both `tension_srf` settings** are exercised on at least one model, and the
+   difference between YES and NO agrees between the two drivers.
+4. **The no-cutoff path is bit-identical.** The plain-soil eight-row table and the
+   four reinforced benchmarks re-run with `t_cut` blank: every converged trial
+   identical in factor of safety, iterations and force evaluations to the numbers
+   recorded above.
+5. **The refusal is gone and the guard list is updated.** A model with `t_cut` on
+   an `elastic` material still behaves per the viscoplastic semantics — ignored.
+6. **The ramp works with the cutoff.** Case (a) on the ramp, within 0.01 of the
+   bisection.
+7. **The locks catch it.** `test/nr_ssrm_check.py` gains a tension-cutoff check —
+   a factor of safety on a cheap capped case, the return-map invariants, and a
+   `tension_srf` leg. Mutation: break the intersection-edge return, and separately
+   drop the cap's F-reduction; each must FAIL the check, run both ways and
+   recorded. The whole check file passes.
+8. **The default path is unchanged**, against the standard control: Griffiths &
+   Lane 6 dry with no `fem_solver` argument, FS 2.421875 on iteration counts 147,
+   781, 3393, 2031, 2841, 9541, 12000, 8617, 8777.
+9. **An honest negative is a valid outcome and must be written.** If the capped
+   return map costs the plain-soil table, or if the two drivers disagree on a
+   capped model by more than the bisection tolerance and the reason is the
+   formulation rather than a solver rule, that is the result.

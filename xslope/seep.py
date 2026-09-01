@@ -1313,28 +1313,7 @@ def compute_tri6_centroid_pressure(p_nodes, element_nodes):
                   N_edge * (p_elem_nodes[3] + p_elem_nodes[4] + p_elem_nodes[5]))
     return p_centroid
 
-def compute_quad8_centroid_pressure(p_nodes, element_nodes):
-    """
-    Compute pressure at the centroid of a quad8 element using serendipity shape functions.
-    At centroid (xi=0, eta=0), only corner nodes contribute equally.
-    """
-    valid_nodes = element_nodes[:8][element_nodes[:8] != 0]
-    p_elem_nodes = p_nodes[valid_nodes]
-    # For serendipity quad8 at center, corner nodes have N=1/4, edge nodes have N=0
-    if len(valid_nodes) == 8:
-        # Corner nodes (0,1,2,3) contribute 1/4 each, edge nodes (4,5,6,7) contribute 0
-        return 0.25 * (p_elem_nodes[0] + p_elem_nodes[1] + p_elem_nodes[2] + p_elem_nodes[3])
-    else:
-        return np.mean(p_elem_nodes)  # Fallback for incomplete elements
 
-def compute_quad9_centroid_pressure(p_nodes, element_nodes):
-    """
-    Compute pressure at the centroid of a quad9 element using biquadratic shape functions.
-    At centroid (xi=0, eta=0), only the center node contributes.
-    """
-    p_elem_nodes = p_nodes[element_nodes[:9]]
-    # For biquadratic quad9 at center, only center node (node 8) has N=1, all others have N=0
-    return p_elem_nodes[8]
 
 def kr_frontal(p, kr0, h0):
     """
@@ -2034,50 +2013,7 @@ def _mass_storage_by_group(masm, p_nodes, Ss, Sy, h0, vg_a, vg_n, model):
     return out
 
 
-def diagnose_exit_face(nodes, bc_type, h, q, bc_values):
-    """
-    Diagnostic function to understand exit face behavior
-    """
 
-    print("\n=== Exit Face Diagnostics ===")
-    exit_nodes = np.where(bc_type == 2)[0]
-    y = nodes[:, 1]
-
-    print(f"Total exit face nodes: {len(exit_nodes)}")
-    print("\nNode | x      | y      | h      | h-y    | q        | Status")
-    print("-" * 65)
-
-    for node in exit_nodes:
-        x_coord = nodes[node, 0]
-        y_coord = y[node]
-        head = h[node]
-        pressure = head - y_coord
-        flow = q[node]
-
-        if head >= y_coord:
-            status = "SATURATED"
-        else:
-            status = "UNSATURATED"
-
-        print(f"{node:4d} | {x_coord:6.2f} | {y_coord:6.2f} | {head:6.3f} | {pressure:6.3f} | {flow:8.3e} | {status}")
-
-    # Summary statistics
-    saturated = np.sum(h[exit_nodes] >= y[exit_nodes])
-    print(f"\nSaturated nodes: {saturated}/{len(exit_nodes)}")
-
-    # Check phreatic surface
-    print("\n=== Phreatic Surface Location ===")
-    # Find where the phreatic surface intersects the exit face
-    for i in range(len(exit_nodes) - 1):
-        n1, n2 = exit_nodes[i], exit_nodes[i + 1]
-        if (h[n1] >= y[n1]) and (h[n2] < y[n2]):
-            # Interpolate intersection point
-            y1, y2 = y[n1], y[n2]
-            h1, h2 = h[n1], h[n2]
-            y_intersect = y1 + (y2 - y1) * (h1 - y1) / (h1 - y1 - h2 + y2)
-            print(f"Phreatic surface exits between nodes {n1} and {n2}")
-            print(f"Approximate exit elevation: {y_intersect:.3f}")
-            break
 
 def create_flow_potential_bc_from_elements(nodes, elements, element_types, head,
                                            k1_vals, k2_vals, angles,

@@ -1698,15 +1698,6 @@ def capabilities(slope_data, selection=None):
     return out
 
 
-def check_model(slope_data, analysis, selection=None):
-    """Run :func:`preflight` and raise :class:`PreflightError` on any error.
-
-    The one-liner the solver entry points call. Returns the report so a caller can
-    also read the warnings it did not refuse on.
-    """
-    report = preflight(slope_data, analysis, selection)
-    report.raise_for_errors()
-    return report
 
 
 def method_surface_reason(method, surface_family):

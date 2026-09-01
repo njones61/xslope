@@ -139,12 +139,6 @@ def _fnum(v, default=0.0):
         return default
 
 
-def _vlist(token):
-    """The integer vertex ids in a ``[a,b,c]`` token."""
-    if not token:
-        return []
-    inner = token.strip().lstrip("[").rstrip("]")
-    return [int(x) for x in inner.split(",") if x.strip().lstrip("-").isdigit()]
 
 
 def _parse_materials(body):

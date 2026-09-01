@@ -220,14 +220,6 @@ def _annotate_inside(ax, xy, text, color, fontsize=8.5, fontweight="bold",
 BAND_LABEL = "Shear band crossing"
 
 
-def band_label(profile):
-    """What the mark drawn across a member is called on the figure.
-
-    :data:`BAND_LABEL`, whichever field the band was read from — see there. The
-    argument is kept so a caller naming the mark for one member asks the figure
-    what it says rather than assuming.
-    """
-    return BAND_LABEL
 
 
 #: The alpha a shaded band is given IN THE LEGEND KEY. The band is drawn as a
@@ -238,20 +230,6 @@ def band_label(profile):
 BAND_KEY_ALPHA = 0.35
 
 
-def _band_handle():
-    """The legend key for the mark a member carries where the band crosses it:
-    the shaded stretch it is drawn as.
-
-    One key, because there is one mark. A crossing was ruled instead of shaded
-    wherever it fell on a single bar element, which is what a span sampled at
-    element centers collapses to — a crossing drawn as a point, on an element
-    two feet long. The span is read off a dense walk of the member now
-    (:func:`xslope.fem_details._band_walk`), so it is where the band crosses
-    rather than which element it crosses, and every crossing is shaded.
-    """
-    from matplotlib.patches import Patch
-
-    return Patch(facecolor=C_BAND, edgecolor="none", alpha=BAND_KEY_ALPHA)
 
 
 def _peak_label(profile):

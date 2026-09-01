@@ -173,13 +173,6 @@ def has_1d_details(fem_data):
     return elements_1d is not None and len(elements_1d) > 0
 
 
-def _n_reinforcement_lines(fem_data, slope_data=None):
-    labels = fem_data.get("reinforce_line_labels", None)
-    if labels is not None:
-        return len(labels)
-    if slope_data:
-        return len(slope_data.get("reinforcement_lines", []) or [])
-    return 0
 
 
 def _reinforcement_line_ids(fem_data):

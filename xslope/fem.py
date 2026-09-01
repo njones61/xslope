@@ -6134,48 +6134,6 @@ def _elem_dof_indices(elem_nodes, dof_offset=None):
     return dof_idx
 
 
-def compute_flow_vector_tp(stress_tp, psi=0.0):
-    """
-    Compute non-associated flow direction in tension-positive convention.
-
-    For psi=0 (non-associated, no dilation): purely deviatoric flow.
-
-    The plastic potential is g = tau_max - sigma_mean * sin(psi) (compression-positive).
-    We compute dg/d(sigma) in compression-positive, then convert to tension-positive.
-
-    Args:
-        stress_tp: [sig_x, sig_y, tau_xy] in tension-positive convention
-        psi: Dilation angle in radians (0 for non-associated)
-
-    Returns:
-        flow_tp: [dg/dsig_x, dg/dsig_y, dg/dtau_xy] in tension-positive convention
-    """
-    # Convert to compression-positive
-    sig_x_cp = -stress_tp[0]
-    sig_y_cp = -stress_tp[1]
-    tau_xy = stress_tp[2]
-
-    tau_max = sqrt(((sig_x_cp - sig_y_cp) / 2.0)**2 + tau_xy**2)
-
-    if tau_max < 1e-20:
-        return np.zeros(3)
-
-    sin_psi = sin(psi)
-
-    # Derivatives of g w.r.t. compression-positive stresses:
-    # dg/dsig_x_cp = (sig_x_cp - sig_y_cp) / (4*tau_max) - sin(psi)/2
-    # dg/dsig_y_cp = -(sig_x_cp - sig_y_cp) / (4*tau_max) - sin(psi)/2
-    # dg/dtau_xy   = tau_xy / tau_max
-    flow_x_cp = (sig_x_cp - sig_y_cp) / (4.0 * tau_max) - sin_psi * 0.5
-    flow_y_cp = -(sig_x_cp - sig_y_cp) / (4.0 * tau_max) - sin_psi * 0.5
-    flow_xy_cp = tau_xy / tau_max
-
-    # Convert to tension-positive: d/dsig_tp = -d/dsig_cp for normals; shear unchanged
-    flow_x_tp = -flow_x_cp
-    flow_y_tp = -flow_y_cp
-    flow_xy_tp = flow_xy_cp
-
-    return np.array([flow_x_tp, flow_y_tp, flow_xy_tp])
 
 
 def _ssrm_progress(callback, done, total, label):
@@ -8020,18 +7978,6 @@ def compute_quad8_jacobian(coords, xi, eta):
     return J
 
 
-def compute_quad_area(coords):
-    """
-    Compute area of quadrilateral (approximate).
-    """
-    if len(coords) >= 4:
-        # Use shoelace formula for polygon area
-        x = coords[:4, 0]
-        y = coords[:4, 1]
-        return 0.5 * abs(sum(x[i]*y[i+1] - x[i+1]*y[i] for i in range(-1, 3)))
-    else:
-        return 0.0
-
 
 
 def compute_B_matrix_triangle(coords):
@@ -8287,97 +8233,6 @@ def mc_yield_invariants(sigm, dsbar, theta, c, phi):
             + dsbar * (cos(theta) / sqrt(3.0) - sin(theta) * snph / 3.0)
             - c * cos(phi))
 
-
-def mc_flow_vector_4(stress4_tp, psi=0.0):
-    """Plastic-potential gradient dQ/dsigma for the 4-component plane-strain
-    stress (tension-positive), after Smith & Griffiths' MOCOUQ + FORMM.
-
-    Q has the same invariant form as the yield function with phi replaced by
-    the dilation angle psi. Near the Lode-angle corners (|sin(theta)| > 0.49,
-    i.e. theta within ~0.7 deg of +/-30 deg) the theta-dependence is frozen at
-    the corner value and the J3 term dropped — S&G's corner treatment, which
-    keeps the flow direction finite where tan(3*theta) blows up.
-
-    Returns the 4-component flow vector [dQ/dsx, dQ/dsy, dQ/dtxy, dQ/dsz]
-    (engineering shear).
-    """
-    sx, sy, txy, sz = stress4_tp
-    sigm, dsbar, theta = stress_invariants(stress4_tp)
-    if dsbar < 1e-20:
-        return np.zeros(4)
-
-    snps = sin(psi)
-    sq3 = sqrt(3.0)
-    snth = sin(theta)
-
-    # deviator components and J2
-    dx = (2.0 * sx - sy - sz) / 3.0
-    dy = (2.0 * sy - sz - sx) / 3.0
-    dz = (2.0 * sz - sx - sy) / 3.0
-    xj2 = dsbar**2 / 3.0
-
-    # dQ/dsigma = dq1 * d(sigm)/dsig + C2 * d(dsbar)/dsig + C3 * d(J3)/dsig
-    a1 = np.array([1.0/3.0, 1.0/3.0, 0.0, 1.0/3.0])
-    a2 = (3.0 / (2.0 * dsbar)) * np.array([dx, dy, 2.0 * txy, dz])
-    a3 = np.array([
-        dx*dx + txy*txy - (2.0/3.0) * xj2,
-        dy*dy + txy*txy - (2.0/3.0) * xj2,
-        -2.0 * dz * txy,
-        dz*dz - (2.0/3.0) * xj2,
-    ])
-
-    dq1 = snps
-    if abs(snth) > 0.49:
-        # corner: freeze K(theta) at theta = +/-30 deg, drop J3 term
-        c1 = 1.0 if snth >= 0.0 else -1.0
-        C2 = 0.5 - c1 * snps / 6.0          # K(+/-30 deg) = 1/2 -/+ snps/6
-        C3 = 0.0
-    else:
-        csth = cos(theta)
-        cs3th = cos(3.0 * theta)
-        tn3th = tan(3.0 * theta)
-        # K(theta) = cos(theta)/sqrt(3) - sin(theta)*snps/3
-        # K'(theta) = -sin(theta)/sqrt(3) - cos(theta)*snps/3
-        # From sin(3*theta) = -13.5*J3/dsbar^3:
-        #   d(theta) = -4.5/(cos3th*dsbar^3) dJ3 - (tan3th/dsbar) d(dsbar)
-        # so C2 = K - K'*tan(3*theta);  C3 = -4.5*K'/(cos(3*theta)*dsbar^2)
-        K = csth / sq3 - snth * snps / 3.0
-        Kp = -snth / sq3 - csth * snps / 3.0
-        C2 = K - Kp * tn3th
-        C3 = -4.5 * Kp / (cs3th * dsbar**2)
-
-    return dq1 * a1 + C2 * a2 + C3 * a3
-
-
-
-def check_mohr_coulomb_cp(stress_cp, c, phi, u=0.0):
-    """Mohr-Coulomb yield function for compression-positive stresses with pore pressure.
-
-    For compression-positive convention (compression > 0, tension < 0):
-    F = tau_max - sigma'_mean * sin(phi) - c * cos(phi)
-
-    Where:
-    - tau_max = maximum shear stress = sqrt((sig_x - sig_y)^2/4 + tau_xy^2)
-    - sigma'_mean = effective mean normal stress = (sig_x + sig_y)/2 - u
-    - u = pore pressure (positive value reduces effective compressive stress)
-    - Positive F indicates yielding
-
-    Args:
-        stress_cp: Array [sig_x, sig_y, tau_xy] in compression-positive convention
-        c: Cohesion
-        phi: Friction angle in radians
-        u: Pore pressure (default 0.0). Positive u reduces effective stress.
-
-    Returns:
-        F: Yield function value (F > 0 means yielding)
-    """
-    sig_x, sig_y, tau_xy = stress_cp
-    sig_mean = (sig_x + sig_y) / 2.0 - u  # effective mean stress
-    tau_max = sqrt(((sig_x - sig_y) / 2.0)**2 + tau_xy**2)
-    cos_phi = cos(phi)
-    sin_phi = sin(phi)
-    F = tau_max - sig_mean * sin_phi - c * cos_phi
-    return F
 
 
 

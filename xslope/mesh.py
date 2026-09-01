@@ -2898,65 +2898,8 @@ def line_segment_intersection(p1, p2, p3, p4, tol=1e-8):
     return None
 
 
-def point_near_existing(point, existing_points, tol=1e-8):
-    """Check if a point is near any existing points."""
-    px, py = point
-    for ex, ey in existing_points:
-        if abs(px - ex) < tol and abs(py - ey) < tol:
-            return True
-    return False
 
 
-def insert_point_into_polygon_edge(intersection, edge_start, edge_end, poly_data, point_map, target_size):
-    """Insert an intersection point into a polygon edge, updating the polygon's coordinate list."""
-    x, y = intersection
-    # Ensure the point exists in the point_map (for Gmsh)
-    if (x, y) not in point_map:
-        tag = len(point_map) + 1  # Simple tag assignment
-        point_map[(x, y)] = tag
-    
-    # Insert the intersection point into the polygon's coordinate list at the correct edge
-    # poly_data['pt_tags'] is a list of Gmsh point tags, but we need to update the coordinate list used to build the polygon
-    # We'll reconstruct the coordinate list from the tags and point_map
-    pt_tags = poly_data['pt_tags']
-    # Build coordinate list for the polygon
-    coords = []
-    tag_to_coord = {v: k for k, v in point_map.items()}
-    for tag in pt_tags:
-        if tag in tag_to_coord:
-            coords.append(tag_to_coord[tag])
-        else:
-            # Fallback: try to find the coordinate in point_map
-            found = False
-            for (cx, cy), t in point_map.items():
-                if t == tag:
-                    coords.append((cx, cy))
-                    found = True
-                    break
-            if not found:
-                coords.append((None, None))  # Should not happen
-    # Find the edge to insert after
-    insert_idx = None
-    for i in range(len(coords)):
-        a = coords[i]
-        b = coords[(i + 1) % len(coords)]
-        if (abs(a[0] - edge_start[0]) < 1e-8 and abs(a[1] - edge_start[1]) < 1e-8 and
-            abs(b[0] - edge_end[0]) < 1e-8 and abs(b[1] - edge_end[1]) < 1e-8):
-            insert_idx = i + 1
-            break
-        # Also check reversed edge
-        if (abs(a[0] - edge_end[0]) < 1e-8 and abs(a[1] - edge_end[1]) < 1e-8 and
-            abs(b[0] - edge_start[0]) < 1e-8 and abs(b[1] - edge_start[1]) < 1e-8):
-            insert_idx = i + 1
-            break
-    if insert_idx is not None:
-        # Insert the intersection point into the coordinate list
-        coords.insert(insert_idx, (x, y))
-        # Now update pt_tags to match
-        tag = point_map[(x, y)]
-        pt_tags.insert(insert_idx, tag)
-        # Update poly_data
-        poly_data['pt_tags'] = pt_tags
     # If not found, do nothing (should not happen)
 
 
@@ -3727,42 +3670,6 @@ def is_point_on_edge(point, edge_start, edge_end, tol=1e-8):
     
     return False
 
-def print_polygon_summary(polygons):
-    """
-    Prints a summary of the generated polygons for diagnostic purposes.
-    
-    Parameters:
-        polygons: List of polygon coordinate lists or dicts with "coords"
-    """
-    print("=== POLYGON SUMMARY ===")
-    print(f"Number of material zones: {len(polygons)}")
-    print()
-    
-    for i, polygon in enumerate(polygons):
-        coords = polygon.get("coords") if isinstance(polygon, dict) else polygon
-        mat_id = polygon.get("mat_id") if isinstance(polygon, dict) else i
-        if mat_id is None:
-            mat_id = i
-        print(f"Material Zone {i+1} (Material ID: {mat_id}):")
-        print(f"  Number of vertices: {len(coords)}")
-        
-        # Calculate area (simple shoelace formula)
-        area = 0
-        for j in range(len(coords) - 1):
-            x1, y1 = coords[j]
-            x2, y2 = coords[j + 1]
-            area += (x2 - x1) * (y2 + y1) / 2
-        area = abs(area)
-        
-        print(f"  Approximate area: {area:.2f} square units")
-        
-        # Print bounding box
-        xs = [x for x, y in coords]
-        ys = [y for x, y in coords]
-        print(f"  Bounding box: x=[{min(xs):.2f}, {max(xs):.2f}], y=[{min(ys):.2f}, {max(ys):.2f}]")
-        print()
-
-
 
 
 def export_mesh_to_json(mesh, filename):
@@ -3817,106 +3724,6 @@ def remove_duplicate_endpoint(poly, tol=1e-8):
     return poly
 
 
-def extract_1d_elements_from_2d_edges(nodes, elements_2d, element_types_2d, lines, debug=False):
-    """
-    Extract 1D elements from 2D element edges that lie along reinforcement lines.
-    This ensures proper finite element integration where 1D elements are shared edges of 2D elements.
-    
-    Parameters:
-        nodes: np.ndarray of node coordinates (n_nodes, 2)
-        elements_2d: np.ndarray of 2D element vertex indices (n_elements, 9)
-        element_types_2d: np.ndarray indicating 2D element type (3, 4, 6, 8, or 9 nodes)
-        lines: List of reinforcement lines, each defined by list of (x, y) tuples
-        debug: Enable debug output
-        
-    Returns:
-        tuple: (elements_1d, mat_ids_1d, element_node_counts_1d)
-    """
-    import numpy as np
-    from collections import defaultdict
-    
-    elements_1d = []
-    mat_ids_1d = []
-    element_node_counts_1d = []
-    
-    # Build edge-to-element mapping from 2D elements
-    edge_to_element = defaultdict(list)  # edge (n1, n2) -> list of element indices
-    element_edges = {}  # element_idx -> list of edges
-    
-    for elem_idx, (element, elem_type) in enumerate(zip(elements_2d, element_types_2d)):
-        edges = []
-        
-        if elem_type in [3, 6]:  # Triangle
-            # Triangle edges: (0,1), (1,2), (2,0)
-            corner_nodes = [element[0], element[1], element[2]]
-            edge_pairs = [(0, 1), (1, 2), (2, 0)]
-            
-            for i, j in edge_pairs:
-                n1, n2 = corner_nodes[i], corner_nodes[j]
-                edge_key = (min(n1, n2), max(n1, n2))  # Canonical edge representation
-                edges.append(edge_key)
-                edge_to_element[edge_key].append(elem_idx)
-                
-        elif elem_type in [4, 8, 9]:  # Quadrilateral
-            # Quadrilateral edges: (0,1), (1,2), (2,3), (3,0)
-            corner_nodes = [element[0], element[1], element[2], element[3]]
-            edge_pairs = [(0, 1), (1, 2), (2, 3), (3, 0)]
-            
-            for i, j in edge_pairs:
-                n1, n2 = corner_nodes[i], corner_nodes[j]
-                edge_key = (min(n1, n2), max(n1, n2))  # Canonical edge representation
-                edges.append(edge_key)
-                edge_to_element[edge_key].append(elem_idx)
-        
-        element_edges[elem_idx] = edges
-    
-    if debug:
-        print(f"Built edge map with {len(edge_to_element)} unique edges from {len(elements_2d)} 2D elements")
-    
-    # For each reinforcement line, find 2D element edges that lie along it
-    for line_idx, line_pts in enumerate(lines):
-        line_pts_clean = remove_duplicate_endpoint(list(line_pts))
-        
-        if len(line_pts_clean) < 2:
-            continue
-            
-        if debug:
-            print(f"Processing reinforcement line {line_idx}: {line_pts_clean}")
-        
-        # Find all 2D element edges that lie along this reinforcement line
-        line_edges = []
-        
-        for edge_key, elem_indices in edge_to_element.items():
-            n1, n2 = edge_key
-            
-            # Get coordinates of edge endpoints
-            coord1 = nodes[n1]
-            coord2 = nodes[n2]
-            
-            # Check if this edge lies along the reinforcement line
-            if is_edge_on_reinforcement_line(coord1, coord2, line_pts_clean, tolerance=1e-6):
-                line_edges.append((n1, n2))
-                if debug:
-                    print(f"  Found edge ({n1}, {n2}) at coords {coord1} -> {coord2}")
-        
-        # Sort edges to form continuous 1D elements along the line
-        if line_edges:
-            sorted_edges = sort_edges_along_line(line_edges, nodes, line_pts_clean, debug)
-            
-            # Create 1D elements from sorted edges
-            for n1, n2 in sorted_edges:
-                # For linear elements, just use the two nodes
-                elements_1d.append([n1, n2, 0])  # Pad to 3 columns
-                mat_ids_1d.append(line_idx)
-                element_node_counts_1d.append(2)
-            
-            if debug:
-                print(f"  Created {len(sorted_edges)} 1D elements for line {line_idx}")
-    
-    if debug:
-        print(f"Total 1D elements extracted: {len(elements_1d)}")
-    
-    return elements_1d, mat_ids_1d, element_node_counts_1d
 
 
 def is_edge_on_reinforcement_line(coord1, coord2, line_pts, tolerance=1e-6):

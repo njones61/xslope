@@ -101,9 +101,6 @@ def failure_kind(message):
     return None
 
 
-def spencer_no_solution(message):
-    """True when a failure message reports a surface with no admissible root."""
-    return failure_kind(message) == "no_admissible_solution"
 
 
 def _c_eff(slice_df):

@@ -1219,3 +1219,24 @@ meant to measure and which the old convention was hiding under a uniform −0.00
 `test/nr_ssrm_check.py` locks the convention structurally: the reported FS must be
 the midpoint of the interval the same result reports, and must lie inside it.
 Restoring the floored edge fails it with the interval printed alongside.
+
+### The three untested feature guards — CLOSED
+
+The Newton driver refuses eight modeling features it cannot represent. Five had
+been exercised; three had not, and an unexercised guard is a claim rather than a
+measurement. Each is now built as a real model on the same coarse Griffiths & Lane 1
+tri6 mesh the rest of the check file uses — the material re-declared on the envelope,
+or a suction angle passed in — and driven through `solve_fem(..., fem_solver='newton')`:
+
+| Feature | How the model is built | What the driver does |
+|---|---|---|
+| Hoek-Brown | material `option='hb'`, σci 30,000 / GSI 60 / mi 10 / D 0 — 387 of 387 elements carry `hb_flag_by_elem` | raises `NotImplementedError`, "does not handle Hoek-Brown strength envelopes" |
+| Power curve | material `option='pow'`, a 1.1 / b 0.9 / c 2.0 / d 4.0 — 387 of 387 carry `pow_flag_by_elem` | raises, "does not handle power-curve strength envelopes" |
+| Matric suction | `suction_phi_b={'soil': 15.0}`, which sets `prep['suction_active']` | raises, "does not handle matric suction" |
+
+The check asserts the message names the feature, not just that something raised, so
+a guard firing for an unrelated reason cannot pass it; it asserts the flag arrays
+are actually set, so a model that fails to exercise the guard is reported as a
+broken model rather than as a passing test; and it runs the same three models on the
+DEFAULT viscoplastic driver as a control, which must not refuse any of them.
+Deleting the Hoek-Brown line from the guard's `unsupported` list fails the check.

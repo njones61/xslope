@@ -63,6 +63,11 @@ locked and published factor of safety here is defined on — and it never evalua
 strength more than its initial increment above the highest one it has carried,
 which is the whole of its cost advantage.
 
+Finally, the driver refuses what it cannot represent. Its return map is plain
+Mohr-Coulomb, so a Hoek-Brown, power-curve or suction-bearing model must raise
+rather than be solved on the wrong strength envelope; each is built as a real model
+and the refusal message has to name the feature.
+
 Run directly:  PYTHONPATH=. python3 test/nr_ssrm_check.py
 """
 
@@ -156,6 +161,7 @@ def run():
     failures += check_load_path_invariance(fem_data)
     failures += check_step_control_not_decisive(fem_data)
     failures += check_displacement_bound()
+    failures += check_unsupported_features_refuse()
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
 
@@ -490,6 +496,85 @@ def check_displacement_bound():
     return fails
 
 
+def check_unsupported_features_refuse():
+    """The Newton driver must REFUSE a model whose strength it cannot represent.
+
+    The driver's return map is plain Mohr-Coulomb. A model built on a different
+    strength envelope, or one that carries suction strength, would still solve on
+    it — the guard is the only thing standing between such a model and a factor of
+    safety computed with the wrong envelope, which is the failure mode that looks
+    right. Three of the guarded features had no test:
+
+      * Hoek-Brown (``option='hb'``), which the viscoplastic loop handles by
+        inverting Balmer's curve for a tangent (c_i, phi_i) at each Gauss point;
+      * the power-curve envelope (``option='pow'``), linearized the same way;
+      * matric suction, which adds an apparent cohesion the return map knows
+        nothing about.
+
+    Each is built as a real model — the same coarse mesh the rest of this file
+    uses, with the material re-declared on that envelope, or with a suction angle
+    passed in — and the driver has to raise ``NotImplementedError`` naming the
+    feature. The message is asserted, not just the exception type, so a guard that
+    fires for some OTHER reason cannot pass this.
+
+    The control matters as much as the guard: the same three models run on the
+    default viscoplastic driver, which is where they belong.
+    """
+    import copy
+    fails = []
+    slope_data, mesh = _mesh()
+
+    def _variant(**over):
+        d = copy.deepcopy(slope_data)
+        d['materials'][0].update(over)
+        return build_fem_data(d, mesh)
+
+    plain = build_fem_data(copy.deepcopy(slope_data), mesh)
+    suction_name = plain['material_names'][0]
+
+    cases = [
+        ("Hoek-Brown",
+         _variant(option='hb', hb_sci=30000.0, hb_gsi=60.0, hb_mi=10.0, hb_d=0.0),
+         {}, 'hb_flag_by_elem'),
+        ("power-curve",
+         _variant(option='pow', pow_a=1.1, pow_b=0.9, pow_c=2.0, pow_d=4.0),
+         {}, 'pow_flag_by_elem'),
+        ("matric suction", plain, {'suction_phi_b': {suction_name: 15.0}}, None),
+    ]
+
+    for label, fd, kwargs, flag_key in cases:
+        # The model really is on that feature, so a guard firing is a guard doing
+        # its job rather than an unrelated refusal.
+        if flag_key is not None and not np.any(fd[flag_key]):
+            fails.append(
+                f"the {label} test model carries no {flag_key} elements, so it "
+                f"cannot exercise the guard — the model, not the guard, is broken")
+            continue
+        try:
+            solve_fem(fd, F=1.0, fem_solver='newton', **kwargs)
+        except NotImplementedError as exc:
+            if label not in str(exc):
+                fails.append(
+                    f"the Newton driver refused the {label} model with a message "
+                    f"that does not name it: {exc}")
+        else:
+            fails.append(
+                f"the Newton driver ACCEPTED a {label} model. Its return map is "
+                f"plain Mohr-Coulomb, so it would report a factor of safety "
+                f"computed on the wrong strength envelope — the one failure mode "
+                f"the guard exists for, because the answer looks right.")
+
+    # Control: the viscoplastic driver, which does carry all three, must not be
+    # refusing them. Two iterations is enough — the guard would raise before any.
+    for label, fd, kwargs, _flag in cases:
+        try:
+            solve_fem(fd, F=1.0, max_iterations=2, **kwargs)
+        except NotImplementedError as exc:
+            fails.append(f"the DEFAULT viscoplastic driver now refuses the "
+                         f"{label} model, which it is meant to handle: {exc}")
+    return fails
+
+
 def check_env_override_announces_itself():
     """A stale XSLOPE_FEM_SOLVER may not redefine the default in silence.
 
@@ -543,7 +628,8 @@ def main():
           "each other, and the Newton run decided every trial. The return map "
           "lands on the yield surface on every branch, a converged trial "
           "certifies its own stress field in force AND in displacement, neither "
-          "the loading path nor the step control changes a verdict, and the "
+          "the loading path nor the step control changes a verdict, Hoek-Brown, "
+          "power-curve and suction models are refused by name, and the "
           "environment override cannot swap the driver in silence. The monotonic "
           "ramp reaches the same limit along one warm-started history, reports it "
           "on the bisection's midpoint convention, and never solves past it.")

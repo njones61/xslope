@@ -335,6 +335,11 @@ bisection.
 
 ### The specimen trials
 
+> **SUPERSEDED in part — see "Corrections, 2026-08-31", item (a).** The last
+> column of this table was measured with `early_failure=False`, which the column
+> heading does not say, and a convergence produced in that configuration is not on
+> its own evidence that the slope stands.
+
 A bisection's answer is fixed entirely by the trials whose verdicts differ, so
 those were found first and everything below is measured on them.
 
@@ -418,6 +423,12 @@ corner returns, zero apex returns, out of 4,146 Gauss points. So do G&L 3 at
 F = 1.425 (9,126 points) and LEM-3 at F = 1.257813 and 1.265625 (12,912 points).
 
 ### What the gaps actually measure
+
+> **SUPERSEDED in part — see "Corrections, 2026-08-31", items (a), (b) and (c).**
+> Naming the mechanism "the 50,000-iteration ceiling" is wrong on five of the eight
+> benchmarks; the paragraph about `docs/verification/ssrm.md` is retracted; and the
+> 400,000-iteration column this section rests on is the `early_failure=False`
+> measurement of item (a).
 
 The viscoplastic driver's iteration ceiling. Every specimen trial where the two
 disagree is one the viscoplastic path abandons at 50,000 iterations with its
@@ -505,6 +516,12 @@ safety sits above the viscoplastic one.
 
 ### The re-measured table
 
+> **SUPERSEDED — see "Corrections, 2026-08-31", "The corrected Newton column".**
+> The Griffiths & Lane 1 quad9 row's 1.4031 is a state that has moved a sixth of
+> the model height; with the displacement bound the row reads 1.3969. The
+> Griffiths & Lane 3 viscoplastic reading of 1.4125 does not reproduce on this
+> checkout, which measures 1.4219.
+
 Viscoplastic column unchanged (that driver was not touched, and the default-path
 check below re-verifies it). Newton "before" is the shipped spike re-measured
 today; "after" is with the displacement gate removed.
@@ -537,7 +554,9 @@ and 441), failed at F = 1.40 and 1.50.
 **Default path re-verified.** Griffiths & Lane 6 dry re-run with no `fem_solver`
 argument returns FS = 2.421875 with per-trial iteration counts 147, 781, 3393,
 2031, 2841, 9541, 16000, 8617, 8777 — identical to the sequence recorded above,
-value for value.
+value for value. *(The seventh count is wrong: this checkout measures 12,000
+there, at 2e735693 and at every commit after it. See "Corrections, 2026-08-31",
+"The default path".)*
 
 ### Verdict
 
@@ -559,3 +578,264 @@ reported a trial as failed at a strength where the same driver reaches
 equilibrium in 48 iterations with a statically admissible stress field. It is
 removed, no benchmark that already agreed moved, and the one row it was deciding
 moved onto the viscoplastic driver's own unrestricted answer.
+
+## Corrections, 2026-08-31
+
+Everything above stands as written except where this section says otherwise. The
+superseded passages are marked in place and left in the document; nothing has been
+deleted. Every number below was measured on this checkout in one session, on the
+same machine, meshes and brackets as the tables above, `force_tol` 1e-3,
+`capture_failure_state=False`, hybrid failure criterion.
+
+### (a) The specimen column's measurement configuration
+
+The bug hunt's specimen table has a column headed "viscoplastic, one
+400,000-iteration budget". It was measured with `early_failure=False` as well, and
+the heading does not say so. That matters twice over.
+
+It matters first because the two are not interchangeable. Re-measured here on
+Griffiths & Lane 1 (quad9, 3.5), the shipped configuration does not reach the
+column's iteration counts and cannot: the three specimen trials are closed by the
+early-failure **runaway rule**, not by the ceiling — F = 1.3875 at 23,861
+iterations, F = 1.390625 at 15,231, F = 1.396875 at 9,241, each with max|u| at
+8.00 times its elastic response, which is `_EARLY_FAIL_U_MAX` to three figures. A
+column reporting 60,000 to 100,000 iterations on those trials can only have been
+produced with that rule switched off.
+
+It matters second because that configuration answers a different question than the
+one the column was used to settle. With `early_failure=False` and one
+400,000-iteration budget, the same model at **F = 1.8** — far past any reading of
+this slope's limit, both drivers put it near 1.39 — comes back CONVERGED: 134,825
+iterations, out-of-balance 9.768e-4, which passes the 1e-3 force criterion. Its
+stress field has 149 of 466 elements outside the yield surface, the worst by 7.75
+times its own $c_r\cos\phi_r$, and it has displaced 41.61 m on a 50 m model, 83.2%
+of the model height. So "the viscoplastic driver converges there given the
+iterations" is not by itself a statement that the slope stands. It needs the
+admissibility reading — yield violation and displacement — that the specimen table
+does not carry.
+
+The three quad9 specimen convergences were re-measured with that reading attached,
+and they are not gross: F = 1.3875 reaches equilibrium in 72,580 iterations at
+out-of-balance 9.998e-4 and max|u| = 0.5689 m (1.14% of the model height),
+F = 1.390625 in 87,499 at 0.7433 m (1.49%), F = 1.396875 in 92,941 at 1.133 m
+(2.27%). What that establishes is narrower than the argument built on it: the
+viscoplastic driver, with its early-failure rule off, stands at strengths where as
+shipped it fails. The 400,000-iteration column is void as a general warrant; these
+three readings are not.
+
+### (b) The `docs/verification/ssrm.md` corroboration is retracted
+
+The bug hunt argued that the verification corpus "already records the same thing
+from the other side", reading the page's 1.4%-to-4.8% shortfall against Griffiths &
+Lane's own values as independent evidence of a ceiling bias.
+
+That is a misreading of the page. `docs/verification/ssrm.md` scores Example 1 on
+two rows: "Displacement-vs-$F$ upturn (their criterion) — $F \approx 1.40$ vs their
+FE 1.4 (0.0%)" and "SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) —
+1.36 vs 1.4 (−2.9%)", with the comment "criterion-matched FE-vs-FE reading is the
+basis of the dot". Example 2 is scored the same way (upturn 0.0%, bisection
+−4.3%). The −2.9% and −4.3% are therefore an **already-documented criterion
+difference**, published as such, and the criterion-matched reading is 0.0%. A page
+that already says the two criteria answer differently cannot be cited as an
+independent measurement that one of them is biased.
+
+The page also carries the fact the same section needed and did not use. It records
+that Griffiths & Lane's own Table 2 converges at F = 1.35 and **fails at 1.40**,
+"where the dimensionless displacement $E'\delta_{max}/\gamma H^2$ jumps from 0.544
+to 1.476" — the paper's authors reading their own limit off the displacement
+upturn, at exactly the strength item (d) below is about.
+
+### (c) The reattribution's mechanism, restated
+
+"The viscoplastic driver's iteration ceiling" is the wrong name for it on most of
+these benchmarks. Measured here, trial by trial, the rule that closes the deciding
+viscoplastic trial is:
+
+| Benchmark | Deciding VP trial | Closed by | At |
+|---|---|---|---|
+| FEM-1 tutorial (tri6, 3.5) | F = 1.367188 | budget-extension heuristic (`_still_progressing` declined a third extension) | 36,000 iterations |
+| LEM-3 tutorial (tri6, 1.2) | F = 1.257813 and 1.265625 | **the 50,000-iteration ceiling** (`inconclusive`, 4 extensions each) | 50,000 |
+| G&L 1 (quad8, 3.5) | F = 1.368750 | budget-extension heuristic (declined a fourth) | 48,000 |
+| G&L 1 (tri6, 3.5) | F = 1.368750 | budget-extension heuristic | 24,000 |
+| G&L 1 (quad9, 3.5) | F = 1.387500 | **the early-failure runaway rule** (`diverging`, signal `runaway`) | 23,861 |
+| G&L 6 dry (quad8, 2) | F = 2.425000 | budget-extension heuristic (declined the first) | 12,000 |
+| G&L 3, r = 0.8 (tri6, 6) | F = 1.425000 | **the 50,000-iteration ceiling** (`inconclusive`, 4 extensions) | 50,000 |
+
+The ceiling binds on two of the eight rows, not on the ones the argument leaned on
+hardest. On five it is the budget-extension heuristic — a rule that reads the
+residual trend and the displacement evidence and decides the solve is not worth
+more iterations — and on the quad9 row, which carried the largest gap and most of
+the argument, it is the runaway rule. Those are three different rules with three
+different failure modes, and "raise the ceiling" is a remedy for only one of them.
+
+What survives is the shape of the claim rather than its mechanism: on the rows
+where the two drivers disagree, the viscoplastic verdict is set by a solver rule
+about when to stop rather than by the slope, and the rules differ per row. Whether
+each of those rules is closing a trial that would have stood is a separate
+measurement per rule; one of them, the runaway rule, now has a documented
+false-positive mode (see the corrected comment at `_EARLY_FAIL_U_MAX` in
+`xslope/fem.py`, and item (d)).
+
+### (d) The quad9 disagreement, resolved
+
+The largest gap in the spike was Griffiths & Lane 1 on quad9: viscoplastic 1.3844,
+Newton 1.4031. The two drivers were not disagreeing about equilibrium. They were
+applying two different, unstated displacement thresholds and neither one said so.
+
+The viscoplastic driver has `_EARLY_FAIL_U_MAX = 8.0` elastic displacements, and it
+is what closes the deciding trial (item (c)). The Newton driver had **no
+displacement bound at all**. Its deciding trial, F = 1.400, converges to
+out-of-balance 3.05e-8 — machine-precision statics, worst invariant-form yield
+violation 1.5e-8 — at max|u| = 7.693 m on a 50 m model, **15.39% of the model
+height**. Small-strain kinematics on an undeformed mesh does not describe that
+state, and the viscoplastic driver's own `max_disp_factor` default would have
+refused it at a tenth of the height.
+
+Held to one common standard — `max_disp_factor` = 0.1 of the model height, applied
+to the final converged state — the trials read:
+
+| F | out-of-balance | max&#124;u&#124; | as % of the 50 m height | verdict |
+|---|---|---|---|---|
+| 1.387500 | 1.45e-08 | 0.828 m | 1.66% | stands |
+| 1.396875 | 2.32e-07 | 3.019 m | 6.04% | stands |
+| 1.400000 | 3.05e-08 | 7.693 m | 15.39% | **refused: displacement** |
+
+That is the textbook displacement upturn, and the limit lies in
+[1.396875, 1.400]; the bisection reports its lower edge, 1.3969. It is also where
+Griffiths & Lane read their own Example 1 — their Table 2 converges at 1.35 and
+fails at 1.40 on a tenfold displacement jump, and `docs/verification/ssrm.md`
+already scores XSLOPE's upturn reading against their 1.4 at 0.0%.
+
+So both drivers were corrected by this, in opposite directions and for the same
+reason. The Newton bound is now in the code (`_NR_DISP_FACTOR`, read once on the
+final state, never inside the increment loop). The viscoplastic runaway level is
+NOT changed — every locked and published factor of safety in the repository is
+defined by it, and moving it would move them — but its comment no longer claims a
+margin it does not have: on this model an equilibrating trial passes THROUGH the
+level (it settles at 10.03 times its elastic response, the level being 8.0), so the
+rule has a demonstrated false-positive mode near the critical strength. The
+residual quad9 gap after the correction, viscoplastic 1.3844 against Newton 1.3969,
+is that rule and nothing else.
+
+### The corrected Newton column
+
+Full re-measurement with the displacement bound in force. The viscoplastic column
+was re-measured too — the driver was not touched, and this is the check that it was
+not.
+
+| Benchmark | Mesh | VP FS | N-R, spike | N-R, corrected | Gap | N-R iters | N-R force evals | N-R wall | VP iters | VP wall |
+|---|---|---|---|---|---|---|---|---|---|---|
+| FEM-1 tutorial | tri6, 3.5 | 1.3633 | 1.3711 | 1.3711 | +0.0078 | 1,485 | 10,680 | 36 s | 64,706 | 60 s |
+| LEM-3 tutorial | tri6, 1.2 | 1.2539 | 1.2695 | 1.2695 | +0.0156 | 3,702 | 28,050 | 453 s | 169,767 | 628 s |
+| Griffiths & Lane 1 | quad8, 3.5 | 1.3656 | 1.3719 | 1.3719 | +0.0063 | 1,688 | 11,592 | 32 s | 113,090 | 78 s |
+| Griffiths & Lane 1 | tri6, 3.5 | 1.3656 | 1.3656 | 1.3656 | 0.0000 | 2,360 | 16,098 | 53 s | 78,576 | 70 s |
+| Griffiths & Lane 1 | quad9, 3.5 | 1.3844 | 1.4031 | **1.3969** | +0.0125 | 823 | 5,846 | 27 s | 103,358 | 125 s |
+| Griffiths & Lane 6 dry | quad8, 2 | 2.4219 | 2.4186 | 2.4186 | −0.0033 | 3,026 | 20,135 | 92 s | 48,128 | 42 s |
+| Griffiths & Lane 6 dry | tri6, 2 | 2.4531 | 2.4531 | 2.4531 | 0.0000 | 2,791 | 19,209 | 87 s | 53,144 | 72 s |
+| Griffiths & Lane 3, r = 0.8 | tri6, 6 | **1.4219** | 1.4281 | 1.4281 | +0.0063 | 4,034 | 31,569 | 331 s | 79,961 | 221 s |
+
+**Exactly one Newton row moved**, and it is the one the bound was built for: quad9,
+1.4031 → 1.3969. The other seven reproduce the spike's post-gate-removal values to
+every digit recorded. The quad9 row also got much cheaper, 5,028 iterations down to
+823, because the bisection stops climbing into the region where every trial is a
+long solve to an inadmissible state.
+
+One **viscoplastic** row does not reproduce: Griffiths & Lane 3 at r = 0.8 measures
+1.4219 here against the 1.4125 recorded above, one bisection cell higher. Its
+deciding trial is the same one the bug hunt names (F = 1.425, inconclusive at
+50,000 iterations after four budget extensions); the bracket below it closes at
+F = 1.41875 in 16,237 iterations. That row's Newton gap is therefore +0.0063 and
+not the +0.0156 recorded above, and only two of the eight rows now sit outside the
+0.01 bisection tolerance (LEM-3 at +0.0156 and quad9 at +0.0125).
+
+**Force evaluations are the honest work count.** An `nr_force_evals` column is new
+here, and it exists because comparing Newton iterations against viscoplastic
+iterations flatters Newton by up to a factor of ten: a viscoplastic iteration is
+one constitutive pass, a Newton iteration is one residual evaluation plus up to
+nine more inside the line search. Across the eight rows the ratio of force
+evaluations to iterations runs 6.8x to 7.6x. Newton is still doing far less
+constitutive work than the viscoplastic driver on every row — 10,680 against 64,706
+on FEM-1, 28,050 against 169,767 on LEM-3 — but the "1,246 iterations against
+64,706" style of comparison in the tables above overstates the margin substantially.
+
+### The hard regimes, re-measured with the bound
+
+**Well past failure.** On FEM-1 at F = 2, 3 and 5 the two drivers still return the
+same verdict, and the displacement bound never fires — every Newton failure there
+is at the load-step floor, which is the point. The cost gap is worse than the
+iteration counts said: Newton 391 iterations / 3,009 force evaluations at F = 2
+against 181 viscoplastic iterations, 491 / 3,414 against 81 at F = 3, and
+297 / 2,409 against 51 at F = 5. That is 17x, 42x and 47x the constitutive work,
+not the 2x-to-6x an iteration count suggests, on exactly the trials a bisection
+with a poor initial bracket visits first.
+
+**nu = 0.49.** Unchanged and still clean. With every FEM-1 material at nu = 0.49 the
+two drivers agree at all five probes: converged at F = 1.00, 1.30 and 1.36 (Newton
+in 11, 12 and 12 iterations, 27, 29 and 30 force evaluations, against 120, 361 and
+441 viscoplastic iterations), failed at F = 1.40 and 1.50, both at the load-step
+floor. The converged states sit at 0.05% to 0.06% of the model height, nowhere near
+the bound.
+
+### The default path
+
+Griffiths & Lane 6 dry re-run with no `fem_solver` argument returns
+**FS = 2.421875**, with per-trial iteration counts, in the order recorded,
+
+    147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777
+
+The seventh count is 12,000, not the 16,000 recorded twice above. That is not a
+regression from any of this work: the identical run at **2e735693**, before any of
+these commits, returns the same sequence including the 12,000. The 16,000 in the
+text above does not reproduce on this checkout and should be read as a stale
+number. Everything else — the factor of safety and all eight other counts —
+matches, and the default viscoplastic path is byte-identical.
+
+### What the locks now cover
+
+`test/nr_ssrm_check.py` gained two checks and hardened a third.
+
+`check_step_control_not_decisive` claimed in its own docstring that the removed
+displacement gate "is gone from the driver — it decided a verdict, which is why it
+is gone", and guarded nothing: reintroducing `_NR_RUNAWAY = 50.0` and its
+increment-abandoning test on the code at 2e735693, and running the check as it
+stood at 2e735693, passes with its full success message. It now asserts that
+`xslope.fem` does not define `_NR_RUNAWAY` at all.
+
+`check_displacement_bound` is the behavioral half, on the trial that needs it: on
+quad9 at size 3.5, F = 1.396875 must converge and stay under a tenth of the model
+height, and F = 1.400 must come back FAILED with the signal `displacement_limit`
+AND with its out-of-balance under the force tolerance — reaching equilibrium and
+being refused on displacement, rather than failing to reach it. Under the
+reintroduced gate that trial instead dies inside the increment loop at the
+load-step floor after 440 iterations at max|u| = 2.858, so the mutation cannot pass
+by producing the same FAILED label for the wrong reason. All three legs fire on it.
+
+`check_env_override_announces_itself` holds the other correction: `XSLOPE_FEM_SOLVER`
+selecting a non-default driver must print, and an explicit `fem_solver` argument
+must not.
+
+The whole check runs in 48 s.
+
+### Design notes, not changes
+
+Two things were identified and deliberately not done, because both would move
+locked values and that is the owner's call.
+
+**The viscoplastic runaway verdict could be provisional.** The rule has a
+documented false-positive mode (item (d)). A trial it closes could be recorded as
+`runaway_provisional` rather than as a measured failure — the same treatment
+`inconclusive` already gets, where the bisection carries the trial as uncertainty
+instead of counting it as a failure. That would move every factor of safety the
+rule currently decides.
+
+**The Newton verdict is not monotone in F.** On Griffiths & Lane 6 dry (quad8, 2)
+the bisection's bracketing pass records F = 2.0 FAILED and then F = 2.275,
+F = 2.40625 and F = 2.414453 CONVERGED. A slope that fails at F = 2.0 cannot stand
+at 2.4; one of those verdicts is wrong, and load control from a zero start at each
+trial independently is how it happens — each trial is its own path, and the path
+matters under non-associated flow. It does not change that row's answer, because
+the bracket auto-expansion walks down to F = 1.75 and the bisection then works in a
+region where the verdicts are consistent. It is, however, the clearest single
+argument for the monotonic strength-reduction ramp: a ramp carries one continuous
+history through increasing F and cannot produce a non-monotone verdict sequence by
+construction.

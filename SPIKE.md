@@ -3494,7 +3494,7 @@ What remains, in the order it matters:
   of eight refused features; with the tension cutoff carried it is the ONE that
   stands between this driver and 142 locked vendor benchmarks, every one of which
   would otherwise be reachable. That is a much sharper target than the list it came
-  from.
+  from. *(Carried — see "K0 INITIAL STRESS", below.)*
 - **Post-peak softening is still refused**, unchanged, and still the reason neither
   published reinforced factor of safety is reachable here.
 - **The `tension_srf` setting moves the stress field and not the answer** on every
@@ -3669,3 +3669,503 @@ restated here, because the Newton path has to solve the same model:
    driver cannot reproduce the vendor locks at a useful rate, or if the two
    drivers' in-situ states differ materially, or if the K0 sequencing costs the
    no-K0 path, that is the result.
+
+
+### K0 INITIAL STRESS — results
+
+Same machine and settings as everything above: `force_tol` 1e-3, hybrid criterion,
+`capture_failure_state=False`, tolerance 0.01. Every number below was measured on
+this checkout in this session. The vendor benchmarks are built through
+`run_tests.py`'s own `build_fem_ssrm_case`, from the tags in `docs/verification/`
+and the workbooks those tags name, so the mesh, the bracket, the tension-cutoff
+setting and the K0 value are the suite's own and not this round's.
+
+#### What was built
+
+`_nr_group_sig0` beside `_nr_group_tension_cap` on the group build, and
+`_nr_set_load_factor` beside it; `_nr_init_state` and `_nr_seed_state` on
+`_solve_fem_newton`; the guard's K0 line replaced by a comment saying where the
+field is carried. `solve_ssrm`'s in-situ equilibration now runs on the driver that
+will solve the trials rather than on whatever `resolve_fem_solver` returns, and the
+ramp receives the state it produces.
+
+Two things were decided here rather than copied from the viscoplastic path, and
+both are consequences of Newton having an internal force to write.
+
+**The initial stress rides inside the internal force.** The viscoplastic path
+moves `int B^T sigma_0 dV` to the right-hand side because it solves a linear
+system with the elastic operator; there is no other place to put it. The Newton
+residual is `f_ext - int B^T sigma dV` with `sigma = sigma_0 + D (B u - eps^p)`,
+so the term is already there and moving it would be undoing it. The two are the
+same equation, which is the point: the Dawson out-of-balance both drivers report
+is the same quantity, and the force gate the verdict is read on does not change
+meaning on a K0 model. What is re-referenced is the DISPLACEMENT — reported field
+and bound alike — exactly as the viscoplastic path re-references it.
+
+**`sigma_0` scales with the load factor.** The driver walks gravity in increments
+and the overburden IS gravity, so at load factor `lam` the material carries
+`lam*sigma_0` and `lam` of the weight. Without that, `lam = 0` would be a state
+with the whole in-situ field and no load to balance it, and the graded load path —
+the driver's only recovery when the whole load in one step fails — would be
+walking toward the answer from a place that is not the origin. With
+`_NR_INIT_STEP = 1.0` the default first attempt is still the whole load at once,
+which is what the viscoplastic path does.
+
+One consequence is worth naming because the rest of the round rests on it. The
+Newton groups are built from `prep["gp_groups_static"]` in the same order over the
+same `pairs`, and `eps^p` means the same thing on both paths, so `_k0_state` is
+INTERCHANGEABLE between the drivers. That is what lets the viscoplastic predictor
+seed a Newton trial from the in-situ state rather than from zero — its reported
+displacement is datum-relative and would otherwise be the wrong vector — and it is
+what makes the agreement leg below a measurement rather than an assertion.
+
+#### Level ground, exactly
+
+On flat ground with the base fixed and the sides on x-rollers, the field
+`sigma'_v = -gamma z`, `sigma'_h = sigma'_z = K0 sigma'_v` satisfies equilibrium
+identically for ANY K0, so a correct implementation has nothing to redistribute:
+it must reach equilibrium immediately, leave the mesh where it is, reproduce the
+imposed stresses and yield nowhere. `test/k0_level_ground_check.py`'s own block —
+20 x 10 m, tri6 at target 1.0, 486 elements, gamma 20 — run through both drivers.
+Errors are relative to the peak vertical stress.
+
+| Case | Driver | Iterations | max&#124;u&#124; | err sigma_y | err sigma_x | err tau_xy | yielded |
+|---|---|---|---|---|---|---|---|
+| K0 = 0.5 dry | viscoplastic | 1 | 6.6e-18 | 5.8e-16 | 2.2e-16 | 1.2e-16 | 0 |
+| K0 = 0.5 dry | **Newton** | **1** | **0.0** | **0.0** | **0.0** | **0.0** | **0** |
+| K0 = 1 dry | viscoplastic | 1 | 6.9e-18 | 5.8e-16 | 4.4e-16 | 1.7e-16 | 0 |
+| K0 = 1 dry | **Newton** | **1** | **0.0** | **0.0** | **0.0** | **0.0** | **0** |
+| K0 = 1 dry, pre-equilibrated | **Newton** | **1** | **0.0** | **0.0** | **0.0** | **0.0** | **0** |
+| K0 = 2 dry | viscoplastic | 1 | 7.6e-18 | 5.8e-16 | 8.7e-16 | 3.0e-16 | 0 |
+| K0 = 2 dry | **Newton** | **1** | **0.0** | **0.0** | **0.0** | **0.0** | **0** |
+| K0 = 1, water at the surface | viscoplastic | 1 | 7.8e-18 | 5.8e-16 | 4.4e-16 | 1.6e-16 | 0 |
+| K0 = 1, water at the surface | **Newton** | **1** | **0.0** | **2.9e-16** | **2.9e-16** | **0.0** | **0** |
+
+The Newton column is exact — not small, zero. The residual at `u = 0` is
+`f_ext - int B^T sigma_0 dV`, which on level ground the tri6 discretization
+integrates exactly, so the first residual evaluation passes the equilibrium test
+and no correction is ever computed. The viscoplastic column carries about 1e-18
+because it starts from an elastic solve rather than from the initial state. The
+pre-equilibrated leg — the state handed back in as `_init_state`, which is what
+every SSRM trial does — reproduces the same solve to every digit and changes no
+stress at all.
+
+**The out-of-plane component, which nothing above can see.** `sigma_z` appears in
+no in-plane equilibrium equation and in no in-plane stress, so a wrong
+out-of-plane initial stress moves no node, changes no `sigma_x`, and passes every
+row of that table while evaluating the yield surface on a state the model is not
+in. Two readings hold it. The von Mises stress of the K0 = 1 dry state is 0.0
+exactly, where the same column reads 0.50 at K0 = 0.5 and 1.00 at K0 = 2 — that
+state is hydrostatic precisely when the third component is `K0 sigma'_v` and not
+something else. And the field the driver builds is compared component by
+component against the analytic `K0 = 0.5` overburden at all 1,458 Gauss points of
+the block, out-of-plane included. Both are in the lock; the mutation below breaks
+each of them.
+
+#### The two drivers' in-situ states
+
+Every SSRM trial starts from the full-strength pre-equilibrated state, so a
+disagreement there is a disagreement about the model rather than about a trial.
+The comparison is made on the Gauss-point stress field reconstructed from first
+principles — `sigma = sigma_0 + D (B u - eps^p)` over the prepared model's own
+groups — so neither driver's reporting path is trusted to answer the question
+about itself. Both drivers were given the same prepared model, `force_tol` 1e-3.
+
+| Benchmark | Model | Gauss points | RMS difference | max difference | VP: iters, oob, max&#124;u&#124; | N-R: iters, oob, max&#124;u&#124; |
+|---|---|---|---|---|---|---|
+| RS2-45a | `vp083a` | 2,253 | **9.9e-07** | 4.9e-05 | 103, 9.6e-4, 0.019530 | 23, 7.0e-6, 0.019530 |
+| RS2-67a | `rs2_67a` | 1,308 | **6.4e-04** | 8.9e-03 | 269, 9.9e-4, 0.019610 | 10, 5.8e-6, 0.019580 |
+| RS2-13 | `vp017` | 5,805 | **8.3e-04** | 1.4e-02 | 179, 1.0e-3, 0.005118 | 10, 5.5e-5, 0.005111 |
+| RS2-27-m1.5 | `vp036` | 696 | **1.0e-03** | 9.4e-03 | 322, 1.0e-3, 0.011626 | 10, 3.2e-6, 0.011621 |
+| RS2-5 | `xslope_acads_weak_layer` | 1,815 | **6.2e-03** | 6.8e-02 | 1,156, 9.9e-4, 0.034860 | 18, 3.0e-5, 0.034910 |
+| RS2-46a | `vp084a` | 1,995 | — | — | NOT ESTABLISHED | NOT ESTABLISHED |
+
+Differences are relative to the overburden scale. Four of the five agree to 1e-3
+RMS or better and the fifth reads 6.2e-3; the in-situ displacement agrees to
+0.05% or better on every one of them. `vp084a` is the sixth case and it is not a
+disagreement: its lock is FS 0.787, so the slope does not stand under its own
+weight at full strength, and BOTH drivers report the in-situ state as not
+established — which is the agreement that model can offer.
+
+**The residual difference is not a convergence artifact, and it was tested for
+being one.** On `vp036` the viscoplastic equilibration was re-run at force
+tolerances of 1e-3, 1e-4, 1e-5 and 1e-6 — 322 to 1,224 iterations, out-of-balance
+falling three orders of magnitude — and the RMS difference against the Newton
+state plateaus at 1.0000e-3, 1.0003e-3, 1.0001e-3, 1.0001e-3. It does not move.
+
+What it is, measured at the tightest setting: both states are in equilibrium
+(out-of-balance 1.0e-6 and 1.2e-12) and both are ADMISSIBLE — the largest
+Mohr-Coulomb value as a fraction of the local strength is +4.1e-8 on the
+viscoplastic state and +1.2e-15 on the Newton one — and both carry plasticity,
+125 Gauss points of 696 with a non-zero plastic strain on the viscoplastic side
+and 100 on the Newton side, peaking at 1.33e-3 and 1.41e-3. Two admissible fields
+in equilibrium with the same load under a non-associated flow rule, reached along
+two different paths, are not obliged to be the same field, and these are not:
+they differ by a tenth of a percent in the plastic strain's distribution. That is
+the honest reading of this leg — the criterion's 1e-3 was met on four models of
+five and the fifth is reported at 6.2e-3, and what the number measures is
+path-dependence rather than an error in either state.
+
+One reporting difference is not a state difference and is worth naming so it is
+not rediscovered: on `vp036` the viscoplastic driver reports 0 plastic elements at
+the in-situ state and the Newton driver reports 20. The plastic strain fields
+above show both drivers yielding there. The viscoplastic count is read off the
+element-averaged yield function, which is not positive for a point sitting ON the
+surface; the Newton count is every element with a Gauss point the return map
+moved.
+
+#### The locked vendor benchmarks
+
+This is the first time the Newton driver has been pointed at the verification
+corpus. Fifteen locked `fem_ssrm` benchmarks, every one carrying `k0=1`, drawn
+from six builder groups of the RS2 and vp block and from the LEM-file
+transcriptions, chosen by smallest mesh. Each is built through `run_tests.py`'s
+own `build_fem_ssrm_case` from the tag in `docs/verification/rs2.md`, so the mesh,
+the element type, the bracket, the `tension_srf` setting, the SSR zone or
+elastic-material list, the iteration budget and the K0 value are the suite's own.
+Work is the honest count on each driver — viscoplastic iterations against Newton
+force evaluations, one constitutive pass each.
+
+One thing is NOT the tag's: the bisection resolution. The tags carry
+`tolerance=0.01` or `0.02` and the suite passes that to `solve_ssrm` as the
+bisection tolerance as well as using it as the lock tolerance; every measurement
+in this document is made at 0.01, and these are too. That is the sharper setting,
+not the looser one, and it is what makes the two drivers comparable. The two rows
+where it could matter are re-run at the tag's own resolution below.
+
+| Benchmark | Model | Elements | Lock | Tol | VP FS | Newton FS | Newton − lock | VP − lock | VP work | N-R work |
+|---|---|---|---|---|---|---|---|---|---|---|
+| RS2-27-m1.5 | `vp036` | 232 | 1.373 | 0.02 | 1.377344 | **1.377344** | +0.0043 | +0.0043 | 42,147 | 6,554 |
+| RS2-64k | `rs2_64k` | 276 | 1.403 | 0.02 | 1.405273 | **1.410352** | +0.0074 | +0.0023 | 85,019 | 6,525 |
+| RS2-P4-VP2-m3.0 | `vp002` | 319 | 1.669 | 0.02 | 1.671875 | **1.678125** | +0.0091 | +0.0029 | 44,528 | 7,539 |
+| RS2-64l-split | `rs2_64l_split` | 399 | 1.147 | 0.02 | 1.151563 | **1.160937** | +0.0139 | +0.0046 | 38,624 | 3,658 |
+| RS2-67a | `rs2_67a` | 436 | 2.479 | 0.02 | 2.487305 | **2.499023** | +0.0200 **(out)** | +0.0083 | 154,157 | 9,250 |
+| RS2-64g | `rs2_64g` | 480 | 1.639 | 0.02 | 1.635742 | **1.647461** | +0.0085 | -0.0033 | 71,633 | 4,570 |
+| RS2-5 | `xslope_acads_weak_layer` | 605 | 1.280 | 0.01 | 1.280078 | **1.285547** | +0.0055 | +0.0001 | 134,546 | 6,547 |
+| RS2-14-m2.8 | `vp018` | 626 | 0.972 | 0.02 | 0.967188 | **0.967188** | -0.0048 | -0.0048 | 6,882 | 23,169 |
+| RS2-46a | `vp084a` | 665 | 0.787 | 0.02 | 0.776172 | **0.776172** | -0.0108 | -0.0108 | 7,605 | 2,600 |
+| RS2-65-m8 | `rs2_65` | 674 | 1.344 | 0.02 | 1.346875 | **1.353125** | +0.0091 | +0.0029 | 54,033 | 7,168 |
+| RS2-45a | `vp083a` | 751 | 1.314 | 0.02 | 1.317969 | **1.317969** | +0.0040 | +0.0040 | 31,524 | 5,195 |
+| RS2-29-clay | `rs2_29clay` | 798 | 0.997 | 0.02 | 0.992188 | **0.992188** | -0.0048 | -0.0048 | 20,856 | 28,652 |
+| RS2-20 | `vp025` | 827 | 1.003 | 0.01 | 1.002734 | **1.002734** | -0.0003 | -0.0003 | 4,309 | 3,187 |
+| RS2-63 | `rs2_63` | 1880 | 1.409 | 0.02 | 1.385937 | **1.395312** | -0.0137 | -0.0231 *(out)* | 68,765 | 2,444 |
+| RS2-13 | `vp017` | 1935 | 1.332 | 0.02 | 1.336328 | **1.336328** | +0.0043 | +0.0043 | 42,308 | 5,846 |
+
+**Fourteen of the fifteen reproduce their published lock inside its own
+tolerance**, at gaps of 0.0003 to 0.0139. The fifteenth, RS2-67a, misses at
+0.020023 against a tolerance of 0.020 — by twenty-three MILLIONTHS. Its final
+interval is [2.49609, 2.50195]; the viscoplastic driver's is [2.48438, 2.49023],
+one interval lower and inside the tolerance at 0.0083. Both drivers read above the
+vendor on that model. It is reported as a miss because that is what it is, and the
+re-run below shows it is not an artifact of the resolution: at the tag's own 0.02
+the Newton bisection reads 2.501953 and misses by 0.0230.
+
+**Seven of the fifteen return the IDENTICAL factor of safety on both drivers**,
+with the identical verdict at every trial the bisection visited — `vp036`,
+`vp018`, `vp084a`, `vp083a`, `rs2_29clay`, `vp025` and `vp017`. On those the two
+drivers do not merely land in the same tolerance: they close on the same interval
+by the same sequence of verdicts. On the other eight the Newton answer is HIGHER
+every time, by 0.0051 to 0.0117 — the same one-sided direction this document has
+recorded since the first table, and for the reason recorded there: where the two
+disagree, the viscoplastic verdict is set by one of its stopping rules rather than
+by the slope.
+
+`rs2_63` is the row where that direction decides a lock. At a 0.01 bisection the
+viscoplastic driver reads 1.385938 and is 0.0231 from its published 1.409 —
+outside its own tolerance — while the Newton driver reads 1.395313 and is inside
+at 0.0137. At the tag's own 0.02 resolution both drivers read 1.390625 and both
+are inside at 0.0184, which is the configuration the suite runs and the row passes
+there. The finer bisection is what separates them.
+
+**The two rows at the tag's own resolution.** Run again with the bisection
+tolerance the tag carries, which is the suite's configuration:
+
+| Benchmark | Lock | Tol | VP FS | Newton FS | VP − lock | Newton − lock |
+|---|---|---|---|---|---|---|
+| RS2-63 | 1.409 | 0.02 | 1.390625 | 1.390625 | −0.0184 | −0.0184 |
+| RS2-67a | 2.479 | 0.02 | 2.490234 | 2.501953 | +0.0112 | +0.0230 **(out)** |
+
+**The work.** The Newton driver does less constitutive work on thirteen of the
+fifteen, by 1.4x to 28.1x, median 7.2x. It does MORE on two: `vp018`
+(0.3x — 23,169 force evaluations against 6,882 viscoplastic iterations) and
+`rs2_29clay` (0.7x). Both are models whose factor of safety is BELOW 1, so the
+bisection spends most of its trials past failure, which is where load control has
+nothing to offer and where this document has measured Newton at 17x to 47x the
+cost since Phase 0. That weakness is unchanged by K0; the ramp is what removes it.
+
+**The predictor composes with the in-situ state.** On `vp036`, 20 of the 21
+Newton solves the bisection made carried the in-situ state, and 12 of them were
+additionally seeded from a viscoplastic predictor grown FROM that state — three
+rungs on each of the four failing trials. Every one of those twelve came back
+FAILED, which is the property that matters: the seed changes where the corrector
+starts and never what it decides.
+
+#### `vp017`, with and without the K0 procedure
+
+`vp017` is RS2-13, the row the tension-cutoff round could only run with the K0
+tag dropped. It runs in its locked configuration now.
+
+The comparison needs one correction first, and it is a real one. `main` has since
+written K0 into the corpus workbooks themselves (`main!D16`), so **dropping the
+test tag's `k0=` no longer drops K0**: the loader supplies it and the run is a K0
+run anyway. Every workbook checked — `vp017`, `rs2_63`, `vp036` — reads
+`k0 = 1.0` through `load_slope_data` where the branch's own older copies read
+`None`. Turning the procedure off means clearing `fem_data['k0']` as well.
+
+| Model | Configuration | viscoplastic | Newton | K0 is worth |
+|---|---|---|---|---|
+| `vp017` (RS2-13) | K0 = 1, the locked configuration | 1.336328125 | **1.336328125** | — |
+| `vp017` (RS2-13) | K0 off, in the tag AND in the file | 1.336328125 | **1.336328125** | **0.0000** |
+
+Both drivers, both ways, the same number to nine digits. On this model the K0
+procedure changes nothing, and the caveat the tension-cutoff round had to attach
+to its `vp017` row — "the lock reproduced with the K0 tag dropped, which on that
+model was measured to be worth nothing, but is a caveat and not a formality" — is
+discharged: the row now runs in its locked configuration and reads the same
+1.336328125, 0.0043 from the published 1.332 against a tolerance of 0.02.
+
+The finding underneath it is the one worth carrying forward. Because the workbooks
+now declare their own K0, an experiment that turns the procedure off by removing
+the tag is no longer running without it. That is how this comparison was first
+made in this session, and the first reading — `rs2_63` at 1.3859375 "without K0" —
+is the value SPIKE.md records for that model WITH K0, which is what exposed it.
+
+#### The ramp
+
+The same models on the monotonic strength-reduction ramp, against the Newton
+bisection on the same mesh and bracket. The ramp's foot is the tag's `F_min`; it
+walks down when that does not stand.
+
+| Benchmark | Model | Ramp FS | Ramp interval | Bisection-N FS | Ramp - bisection | steps / retries | ramp force evals |
+|---|---|---|---|---|---|---|---|
+| RS2-27-m1.5 | `vp036` | 1.378125 | [1.37500, 1.38125] | 1.377344 | +0.00078 | 6 / 4 | 9,705 |
+| RS2-64k | `rs2_64k` | 1.409375 | [1.40625, 1.41250] | 1.410352 | −0.00098 | 11 / 4 | 5,263 |
+| RS2-P4-VP2-m3.0 | `vp002` | 1.678125 | [1.67500, 1.68125] | 1.678125 | **0.00000** | 10 / 4 | 8,008 |
+| RS2-67a | `rs2_67a` | 2.496875 | [2.49375, 2.50000] | 2.499023 | −0.00215 | 22 / 4 | 15,527 |
+| RS2-45a | `vp083a` | 1.315625 | [1.31250, 1.31875] | 1.317969 | −0.00234 | 9 / 4 | 10,655 |
+| RS2-20 | `vp025` | 1.003125 | [1.00000, 1.00625] | 1.002734 | +0.00039 | 10 / 4 | 4,035 |
+
+**Six of six agree with the Newton bisection**, the worst at 0.0024 against the
+0.01 the criterion asked for, and one — `vp002` — reports the same number to
+seven digits. The ramp carries the in-situ state through its whole warm history:
+the foot's cold solve starts from it, `restrength` leaves `sigma_0` alone because
+an initial state is not a strength, and the displacement bound reads from the
+datum rather than from zero. On RS2-67a — the one row the bisection misses — the
+ramp reads 2.496875, which is INSIDE the published tolerance at 0.0179. That is
+one model and it is not evidence about the two routes; it is recorded because the
+row it lands on is the row this section had to report as a miss.
+
+#### The refusals that remain
+
+Every guard was exercised again on this checkout, and each must both fire and name
+its own feature:
+
+| Feature | Verdict |
+|---|---|
+| pile beam elements | refuses, names piles |
+| post-peak softening on reinforcement bars | refuses, names softening and counts the bars |
+| Hoek-Brown strength envelopes | refuses, names Hoek-Brown |
+| power-curve strength envelopes | refuses, names the power curve |
+| matric suction | refuses, names matric suction |
+| `pp_formulation != 'effective'` | refuses, names the formulation |
+| **K0 initial stress** | **carried** |
+
+The control holds too: all three of the envelope and suction models still solve on
+the default viscoplastic driver, which is where they belong. A model that trips
+several guards at once still reports the first in source order rather than a
+generic refusal.
+
+#### The no-K0 path is unchanged
+
+Two proofs, and the first is the stronger one.
+
+**The arithmetic.** The plain Mohr-Coulomb return map, run against the driver as
+it stood at **29ae321d** staged in a separate package tree, on 800,000 random
+trial states across four friction angles: **BIT-IDENTICAL**, stress and branch
+code alike. The reason it has to be is structural: a model that declares no K0
+never gets a `sig0` key on its groups, so `grp.get('sig0_s')` is None at every
+point the initial stress could enter — the trial stress in `_nr_group_state`, the
+residual-only branch of `_nr_internal_force`, and the elastic-strain inversion in
+`_nr_commit_plastic_strain` — and `_nr_set_load_factor` writes nothing.
+
+**The benchmarks**, every one re-run on BOTH trees rather than compared against a
+number in this document, and compared trial by trial: factor of safety, and each
+trial's verdict, iterations and force evaluations.
+
+| Benchmark | Mesh | Driver | FS, both trees | trials | iterations | force evals | identical? |
+|---|---|---|---|---|---|---|---|
+| FEM-1 tutorial | tri6, 3.5 | Newton | 1.37109375 | 9 | 1,871 | 14,233 | **yes** |
+| LEM-3 tutorial | tri6, 1.2 | Newton | 1.26953125 | 9 | 4,945 | 38,463 | **yes** |
+| Griffiths & Lane 1 | quad8, 3.5 | Newton | 1.37187500 | 9 | 2,213 | 16,354 | **yes** |
+| Griffiths & Lane 1 | tri6, 3.5 | Newton | 1.36562500 | 9 | 3,121 | 22,650 | **yes** |
+| Griffiths & Lane 1 | quad9, 3.5 | Newton | 1.39687500 | 9 | 844 | 6,030 | **yes** |
+| Griffiths & Lane 6 dry | quad8, 2 | Newton | 2.41562500 | 9 | 4,146 | 29,059 | **yes** |
+| Griffiths & Lane 6 dry | tri6, 2 | Newton | 2.45937500 | 9 | 3,333 | 23,672 | **yes** |
+| Griffiths & Lane 3, r = 0.8 | tri6, 6 | Newton | 1.42812500 | 9 | 5,015 | 40,652 | **yes** |
+| Geogrid sample | tri6, 4 | Newton | 1.60937500 | 9 | 4,408 | 29,841 | **yes** |
+| Half capacity | tri6, 4 | Newton | 1.40937500 | 9 | 2,664 | 18,179 | **yes** |
+| Three layers | tri6, 4 | Newton | 1.20742188 | 9 | 3,604 | 25,189 | **yes** |
+| Geogrid sample, LOCKED mesh | tri6, 2 | Newton | 1.57187500 | 9 | 4,680 | 29,139 | **yes** |
+| Three layers, `t_cut` = 0 | tri6, 4 | Newton | 1.20742188 | 9 | 3,657 | 25,720 | **yes** |
+| Geogrid LOCKED mesh, `t_cut` = 0 | tri6, 2 | Newton | 1.56562500 | 9 | 4,540 | 29,652 | **yes** |
+| Griffiths & Lane 1, `t_cut` = 0 | tri6, 3.5 | Newton | 1.35312500 | 9 | 3,342 | 24,637 | **yes** |
+| Griffiths & Lane 1, `t_cut` = 30 | tri6, 3.5 | Newton | 1.35937500 | 9 | 2,494 | 18,570 | **yes** |
+| **Griffiths & Lane 6 dry — the DEFAULT path** | quad8, 2 | viscoplastic | 2.42187500 | 9 | 48,128 | — | **yes** |
+
+#### The locks
+
+`test/nr_ssrm_check.py` gains `check_k0_initial_stress`, in about 31 s. Four legs:
+level-ground exactness on the Newton corrector, dry and with the water table at
+the surface; the initial stress field asserted component by component against the
+analytic K0 = 0.5 overburden at every Gauss point of the block, out-of-plane
+included; the two drivers' in-situ states compared on the reconstructed
+Gauss-point field; and RS2-27 at its coarsest tagged mesh reproduced on both
+drivers inside the published tolerance. The tag's settings — tri6 at 1.5,
+`k0 = 1`, `tension_srf` off, FS 1.373 +/- 0.02 — are written out rather than read
+through `run_tests`, so the assertion holds the mapping instead of following it.
+
+**Mutation, run both ways.** The criterion named the out-of-plane component
+because it is the one an in-plane check cannot see: `sigma_z` appears in no
+in-plane equilibrium equation and in no in-plane stress, so getting it wrong moves
+no node and changes no `sigma_x`.
+
+| driver | verdict | what the check saw |
+|---|---|---|
+| as shipped | **PASS** | — |
+| `sigma_z = sigma'_v` — the K0 factor dropped out-of-plane only | **FAIL** | "the K0 initial stress the Newton driver builds is wrong in its OUT-OF-PLANE component by 5.000e-01 of the overburden, over 1458 Gauss points, against the analytic K0 = 0.5 field" |
+| `sigma_z = 0` | **FAIL** | the same line, plus nine more — the level-ground solve no longer reaches equilibrium, the mesh moves 5.1e-05 where it must not move at all, 18 elements yield where none may, and the two drivers' in-situ fields part by 6.7e-02 |
+
+The first mutation is the sharp one. It is INVISIBLE at K0 = 1, which is the value
+every model in the vendor corpus is authored with, so it changes not one factor of
+safety in this document; only the leg written for it fires. The whole check file
+passes as shipped.
+
+#### The criterion, line by line
+
+**1. Level-ground exactness — MET, and exactly rather than nearly.** The Newton
+corrector reaches equilibrium on its FIRST residual evaluation at every K0 tested,
+leaves `max|u|` at 0.0 — not small, zero — reproduces the analytic `sigma_v` and
+`sigma_h` with an error of 0.0 dry and 2.9e-16 with the water table at the
+surface, and yields at zero Gauss points where the viscoplastic driver also
+reports zero. The pre-equilibrated leg changes no stress at all. The out-of-plane
+component, which the criterion did not name but the lock does, is asserted twice.
+
+**2. Agreement with the viscoplastic driver on the in-situ state — MET on four
+models of five, and the fifth is reported.** RMS differences of 9.9e-07, 6.4e-04,
+8.3e-04 and 1.0e-03 against the 1e-3 asked, and 6.2e-03 on `xslope_acads_weak_layer`;
+in-situ displacement agrees to 0.05% or better on all five. A sixth model,
+`vp084a`, has a factor of safety below 1 and BOTH drivers report the in-situ state
+as not established. The trial verdicts agree at every trial on seven of the
+fifteen vendor runs and differ on the rest by one or two bisection cells, always
+with Newton reading higher. The residual difference was tested for being a
+convergence artifact and is not one: it does not move over three orders of
+magnitude of viscoplastic force tolerance. Both states are admissible and in
+equilibrium; they differ in how the plastic strain is distributed, which is what
+two paths to the same limit under a non-associated flow rule are entitled to
+differ in.
+
+**3. The locked vendor benchmarks — MET at 14 of 15.** Fifteen locks across six
+builder groups, meshes from 232 to 1,935 elements, reproduced at 0.0003 to 0.0139
+against tolerances of 0.01 and 0.02. RS2-67a misses at 0.020023 against 0.020, and
+still misses at 0.0230 when re-run at the tag's own bisection resolution; it is
+reported as a miss. Seven rows return the identical factor of safety on both
+drivers with the identical verdict at every trial. Work is lower on the Newton
+driver on thirteen of fifteen, 1.4x to 28.1x, and higher on the two sub-unity
+models, which is the past-failure cost this document has measured since Phase 0
+and which K0 does not change.
+
+**4. The ramp — MET on 6 of the 6 run**, against the 3 asked. Worst disagreement
+with the Newton bisection 0.0024; `vp002` reproduces it to seven digits.
+
+**5. The no-K0 path is bit-identical — MET.** Seventeen benchmark pairs and 153
+trials against the driver staged at 29ae321d: every one identical in factor of
+safety, verdict, iterations and force evaluations, and the plain return map
+bit-identical over 800,000 trial states.
+
+**6. The refusal is gone and the guard list is updated — MET.** K0 is carried;
+piles, bar softening, Hoek-Brown, the power curve, matric suction and a
+non-effective pore-pressure formulation each still raise and each still names
+itself, with the viscoplastic control accepting all of them.
+
+**7. The locks — MET.** `check_k0_initial_stress` passes as shipped and fails on
+both out-of-plane mutations, including the subtle one that is invisible at K0 = 1
+and therefore moves no number in this document. The whole check file passes.
+
+**8. The default path — MET.** Griffiths & Lane 6 dry, quad8, size 2, no
+`fem_solver` argument: FS 2.421875 on per-trial iteration counts 147, 781, 3393,
+2031, 2841, 9541, 12000, 8617, 8777 — value for value the control sequence, on
+both trees.
+
+**9. The honest negatives** are RS2-67a's 2.3e-05, the 6.2e-03 initial-state
+difference on `xslope_acads_weak_layer`, the two sub-unity models where the Newton
+driver does more work than the viscoplastic one, and the finding that a `k0` test
+tag can no longer be dropped to turn K0 off. All four are written above.
+
+#### Verdict
+
+**The Newton driver meets the vendor corpus, and it reproduces it.** Fifteen
+locked benchmarks were run in their locked configurations — the suite's own
+meshes, brackets, SSR zones, elastic-material lists and `tension_srf` settings,
+with `k0 = 1` — and fourteen land inside their published tolerances, at 0.0003 to
+0.0139. Seven of the fifteen return the identical factor of safety to the
+viscoplastic driver with the identical verdict at every trial the bisection
+visited. That is the question this round was commissioned on and it is answered
+on more than the ten models the criterion asked for.
+
+What made it possible is that K0 is not a special case bolted to the solve. It is
+an initial stress, and Newton has an internal force to put it in: the residual
+`f_ext - int B^T (sigma_0 + D (B u - eps^p)) dV` is the same equation the
+viscoplastic driver solves after moving the term to the right-hand side, so the
+out-of-balance both drivers report keeps meaning one thing and the force gate the
+verdict is read on did not have to be redefined. The only genuinely new decision
+was to scale `sigma_0` with the load factor, and it is the decision that keeps the
+graded load path meaningful: the overburden IS gravity, so the two rise together
+and `lam = 0` is still the origin. On level ground the whole construction is
+exact — the first residual evaluation passes, `max|u|` is zero rather than small,
+and the analytic field comes back with an error of zero.
+
+Four things did not close, and all four are written above rather than tuned away.
+RS2-67a misses its tolerance by 2.3e-05 at a 0.01 bisection and by 0.0030 at the
+tag's own 0.02 — the Newton bisection closes one interval above the viscoplastic
+one, both above the vendor, and the ramp on the same model lands inside. The two drivers' in-situ states differ by 6.2e-03 RMS on
+`xslope_acads_weak_layer` against the 1e-3 the criterion asked, and by 1.0e-03 on
+`vp036`; the difference was tested for being a convergence artifact over three
+orders of magnitude of force tolerance and is not one — both states are in
+equilibrium and both are admissible, and they distribute their plastic strain
+differently, which two paths to the same limit under a non-associated flow rule
+are entitled to do. The two sub-unity models cost the Newton driver more work than
+the viscoplastic one, which is the past-failure weakness this document has
+recorded since Phase 0 and which this round does not touch. And a `k0` test tag
+can no longer be dropped to turn K0 off, because the workbooks now declare it
+themselves.
+
+**What this opens.** 144 locked `fem_ssrm` test tags in `docs/` carry a `k0`
+value, over 108 distinct workbooks. With the initial stress carried, **133 of them
+— 97 workbooks — are inside the Newton driver's feature envelope**, where before
+this round none were. Eleven remain refused, and the reasons are now a short list
+rather than a class: five power-curve models, three Hoek-Brown, three matric
+suction. On the fifteen actually run, fourteen reproduced their lock, a hit rate
+of 93% on a sample chosen for small meshes rather than for agreement.
+
+What remains, in the order it matters:
+
+- **The corpus run itself.** Fifteen models is a sample, not a calibration. The
+  reachable set is 133 tags and the driver has now been shown able to address
+  them; running them is what would turn "reproduces fourteen of fifteen" into a
+  statement about the corpus, and it is also the measurement the ramp verdict
+  named as the thing standing between this branch and any default-driver
+  conversation.
+- **The remaining eleven.** Power curve and Hoek-Brown are two linearizations of
+  the same shape and would come together; matric suction is an apparent cohesion
+  the return map would have to be told about. Piles and bar softening still block
+  a further eight and two locked models respectively, outside the K0 set.
+- **The past-failure cost is unchanged and it now has vendor evidence.** The two
+  models with a factor of safety below 1 are the two where the Newton bisection
+  did more constitutive work than the viscoplastic driver. A corpus run would meet
+  many more of them, and the ramp — which by construction never evaluates a
+  strength more than one increment past the highest it has carried — is the
+  answer this branch already has.
+- **The 6.2e-03 in-situ difference on one model.** One model, one number, and the
+  mechanism is understood. Whether it ever moves a verdict is unmeasured; on the
+  benchmarks here it did not, since that model's two drivers land 0.0055
+  apart with both inside the lock.

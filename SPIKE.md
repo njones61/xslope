@@ -3502,3 +3502,170 @@ What remains, in the order it matters:
   tension is unmeasured, and it is the natural next reading.
 - **The ramp's cell.** One model, one thousandth. Worth re-reading on a second capped
   model before it is called anything.
+
+
+## K0 INITIAL STRESS — the Newton driver learns the in-situ state
+
+Written before any feature code, so that what follows is a test and not a
+description. Same machine and settings as everything above: `force_tol` 1e-3,
+hybrid criterion, `capture_failure_state=False`, tolerance 0.01.
+
+### Why this one now
+
+The tension-cutoff round ended by naming it: "K0 initial stress is now the gating
+refusal for the vendor corpus. It was one of eight refused features; with the
+tension cutoff carried it is the ONE that stands between this driver and 142
+locked vendor benchmarks, every one of which would otherwise be reachable."
+
+The corpus inventory says the same thing from the other side. Of 188 FEM-bearing
+models, 100 are blocked by exactly two gates, and for almost all of them the two
+are `t_cut` and K0 together: Rocscience's published verification set is solved
+with its at-rest initial stress on, so every transcription of it carries `k0=1`
+on the tag and a per-material tensile cap in the file. Carrying the cap alone
+moved the reachable locked count by one model. Carrying K0 as well moves it by
+94.
+
+This round is also the first time the Newton driver is pointed at the vendor
+corpus at all. Every benchmark in this document so far is a Griffiths & Lane
+anchor, a tutorial, or a reinforced sample. The vendor block is a different
+population — different geometries, different transcription provenance, different
+mesh sizes, published tolerances of 0.01 to 0.05 — and how the driver does
+against it is the finding, not a formality.
+
+### The semantics being reproduced, read from the viscoplastic driver
+
+Not assumed — read out of `_prepare_fem_model`, `solve_fem` and `solve_ssrm` and
+restated here, because the Newton path has to solve the same model:
+
+- **The field.** Per Gauss point, tension-positive and EFFECTIVE:
+  `sigma'_v = -(soil column weight above the point) + u`,
+  `sigma'_h = sigma'_z = K0 sigma'_v` — in-plane AND out-of-plane —
+  `tau_xy = 0`. The overburden is SOIL ONLY: a reservoir load or a distributed
+  load is not part of the in-situ state and enters as a boundary force. The
+  overburden integral is `_gauss_point_overburden`, cached on the prepared model
+  as `sv0_gp` because it is F-independent.
+- **The method.** Classical initial stress: `sigma = sigma_0 + D (B u - eps^p)`,
+  with `int B^T sigma_0 dV` moved to the right-hand side of the linear solve. The
+  solver still iterates to equilibrium under the body forces; it starts from the
+  K0 state instead of from zero stress.
+- **The yield check reads the total field.** `sig4 + sig0`, so the initial stress
+  is inside the surface the constitutive law is evaluated on, not beside it.
+- **The SSRM sequencing.** `solve_ssrm` runs ONE full-strength solve at F = 1
+  before the bisection, with the displacement cap off, and keeps its `_k0_state`
+  — the displacement field and the accumulated plastic strain. Every trial is
+  then handed that state as `_init_state` and starts from it. The reason is
+  stated in `solve_fem`'s docstring: at a reduced strength the in-situ
+  redistribution would happen against weakened soil and its plastic strain would
+  be charged to the trial. The state is accepted on `stable`, not on
+  convergence; when it is not established the bisection runs without one and
+  warns.
+- **The datum.** A trial that starts from the equilibrated state measures
+  displacement FROM it — the reported field, the convergence ratio and the
+  failure criteria all read `u - u_eq` — while stresses and structural forces stay
+  functions of the absolute displacement. The in-situ displacement is an artifact
+  of imposing a stress field the geometry does not hold; the soil did not travel
+  there.
+- **The yardstick is not re-scaled.** The hybrid criterion's displacement scale
+  stays the elastic response to the APPLIED load (`loads_grav`), not to the
+  load minus the initial-stress term, so a K0-on and a K0-off verdict are read
+  off the same ruler.
+- **`k0` is not reduced by F.** It is an initial state, not a strength.
+
+### Design
+
+- **`sigma_0` on the Newton groups.** Built from the same `sv0_gp` and the same
+  formula, attached per group beside `c_r` and the tensile cap. The trial stress
+  the return map is handed becomes `D (B u - eps^p) + sigma_0`, so the initial
+  stress is inside the yield surface evaluation exactly as it is on the
+  viscoplastic path, and the committed plastic strain inverts the same relation.
+- **The residual is absolute, and it is the same residual.** Newton has an
+  internal force to write, so `sigma_0` does NOT move to the right-hand side: it
+  rides inside `f_int = int B^T sigma dV` and the residual stays
+  `f_ext - f_int` with `f_ext` the whole applied load. That is the same equation
+  the viscoplastic path solves after moving the term, so the Dawson
+  out-of-balance both drivers report is the same quantity, and the force gate
+  the verdict is read on does not change meaning. What DOES change is the
+  displacement measurement, which is re-referenced to the carried state exactly
+  as the viscoplastic path re-references it.
+- **The initial stress scales with the load factor.** The driver walks gravity
+  in increments; at load factor `lam` it carries `lam * sigma_0`, so `lam = 0`
+  is the true stress-free state and `lam = 1` the full in-situ one. The
+  overburden IS gravity, so the two scale together and the endpoint is exact.
+  With `_NR_INIT_STEP = 1.0` the default first attempt is still the whole load
+  in one step, which is what the viscoplastic path does; the graded path is only
+  the fallback.
+- **The pre-equilibration runs on the caller's driver.** `solve_ssrm`'s
+  equilibration solve currently takes whatever `resolve_fem_solver` returns
+  rather than the driver the trials will use. It gets the trials' driver, so a
+  Newton run equilibrates with the Newton corrector and a viscoplastic run is
+  untouched.
+- **`_k0_state` is interchangeable between the drivers.** The Newton groups are
+  built from `prep["gp_groups_static"]` in the same order, over the same
+  `pairs`, and `eps^p` means the same thing on both paths (`sigma = sigma_0 +
+  D (B u - eps^p)`). A Newton solve therefore returns a `_k0_state` of the same
+  shape, and a state from either driver can seed the other. That is what makes
+  the agreement leg of the criterion measurable at all.
+- **A trial seeded from the in-situ state does not walk the load path.** It
+  already stands at full gravity at full strength; cutting the load below full
+  gravity would be solving a different problem. One attempt at the whole load,
+  the same rule the viscoplastic predictor's seed already follows.
+- **The predictor seeds from the K0 state too.** The viscoplastic predictor
+  rungs are handed `k0` and the same `_init_state`, so a seed is grown from the
+  in-situ state rather than from zero. A predictor started from zero on a K0
+  model would hand the corrector a state built under a different initial
+  condition.
+- **The ramp carries it.** The foot's cold solve is seeded from the in-situ
+  state, `restrength` leaves `sigma_0` alone (it is not a strength), and the
+  displacement bound reads from the datum.
+
+### Success criterion (verbatim)
+
+1. **Level-ground exactness.** On the existing level-ground case
+   (`test/k0_level_ground_check.py`: a 20 x 10 m block, tri6 at target 1.0,
+   gamma 20, K0 in {0.5, 1.0, 2.0} dry and K0 = 1.0 with the water table at the
+   surface), the Newton driver reproduces the analytic field: element stresses
+   within 1e-9 relative of the imposed `sigma_v` / `sigma_h` (the same tolerance
+   the viscoplastic leg is held to), `max|u| <= 1e-10`, equilibrium in at most 2
+   iterations, and ZERO plastic points — asserted where the viscoplastic driver
+   reports zero. The pre-equilibrated leg (the state handed back in as
+   `_init_state`) must be an exact no-op there too.
+2. **Agreement with the viscoplastic driver on the pre-equilibrated state.** On
+   at least 3 models, the two drivers' full-strength in-situ states agree: the
+   Gauss-point stress fields within an RMS difference of 1e-3 relative to the
+   overburden scale (reported as a number, not asserted to pass), and the
+   bisection's trial verdicts agree at EVERY trial the two runs share.
+3. **The locked vendor benchmarks.** At least 10 locked `fem_ssrm` models
+   carrying `k0=1`, drawn from at least three distinct builder groups of the
+   RS2/vp block and chosen by smallest mesh, run through the Newton bisection
+   using `run_tests.py`'s own `build_fem_ssrm_case` mapping so the mesh and
+   solver options are the suite's and not this round's. Each lock reproduced
+   within its own published tolerance. Reported per model: viscoplastic FS,
+   Newton FS, the lock, the tolerance, and the ratio of constitutive work.
+   `vp017` (RS2-13, lock 1.332 +/- 0.02) is included by name and run WITH
+   `k0=1`, and the difference against last round's 1.3363 with the K0 tag
+   dropped is reported.
+4. **The ramp agrees.** On at least 3 of those models the ramp's factor of
+   safety is within 0.01 of the Newton bisection's.
+5. **The no-K0 path is bit-identical.** The plain-soil eight-row table, the four
+   reinforced benchmarks and the tension-cutoff benchmarks re-run with `k0`
+   unset: every converged trial identical in factor of safety, iterations and
+   force evaluations to the numbers recorded above, measured against a control
+   run of the parent commit staged in a separate package tree rather than
+   against a number in this document.
+6. **The refusal is gone and the guard list is updated.** Softening, piles,
+   Hoek-Brown, power-curve envelopes, matric suction and a non-effective
+   pore-pressure formulation still refuse, each verified to still raise and to
+   name its own feature.
+7. **The locks catch it.** `test/nr_ssrm_check.py` gains a K0 check with three
+   legs: level-ground exactness on the Newton driver, an initial-state agreement
+   leg against the viscoplastic driver, and one cheap locked vendor model solved
+   on both drivers. Mutation: corrupt the OUT-OF-PLANE component of the initial
+   stress (`sigma_z`, which no in-plane equilibrium check can see) and confirm
+   the check fails; revert. The whole check file passes.
+8. **The default path is unchanged**, against the standard control: Griffiths &
+   Lane 6 dry with no `fem_solver` argument, FS 2.421875 on per-trial iteration
+   counts 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777.
+9. **An honest negative is a valid outcome and must be written.** If the Newton
+   driver cannot reproduce the vendor locks at a useful rate, or if the two
+   drivers' in-situ states differ materially, or if the K0 sequencing costs the
+   no-K0 path, that is the result.

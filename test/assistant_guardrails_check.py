@@ -2396,6 +2396,46 @@ def check_a_runaway_snippet_is_stopped():
     return out
 
 
+
+def check_cache_marks_walk_the_history():
+    """The Anthropic request carries TWO cache marks: the system brief (1h TTL)
+    and the last message of the history, so the cached prefix walks forward with
+    the conversation instead of stopping at the brief. The shared history is never
+    mutated, and a provider without prompt caching gets no marks at all."""
+    from studio.ai.assistant import _AgentWorker
+    w = _AgentWorker.__new__(_AgentWorker)
+    w._system = "BRIEF"
+    w._cache_system = True
+    hist = [{"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "",
+             "tool_calls": [{"id": "t1", "type": "function",
+                             "function": {"name": "run_python", "arguments": "{}"}}]},
+            {"role": "tool", "tool_call_id": "t1", "content": "out"}]
+    w._messages = hist
+    m = w._request_messages()
+    assert m[0]["content"][0]["cache_control"] == {"type": "ephemeral", "ttl": "1h"}, \
+        "system brief must carry the one-hour cache mark"
+    assert m[-1]["cache_control"] == {"type": "ephemeral"}, \
+        "the last (tool) message must carry the moving cache mark"
+    assert "cache_control" not in hist[-1], "the shared history was mutated"
+    w._messages = hist[:1]
+    m = w._request_messages()
+    assert m[-1]["content"][0]["cache_control"] == {"type": "ephemeral"}, \
+        "a string user turn must be promoted to a marked text block"
+    assert hist[0]["content"] == "hi", "the shared history was mutated"
+    w._messages = [{"role": "user", "content": [
+        {"type": "text", "text": "a"},
+        {"type": "image_url", "image_url": {"url": "data:x"}}]}]
+    m = w._request_messages()
+    assert "cache_control" in m[-1]["content"][-1], "list content: mark on the last block"
+    assert "cache_control" not in w._messages[0]["content"][-1], "the shared history was mutated"
+    w._cache_system = False
+    m = w._request_messages()
+    assert isinstance(m[0]["content"], str), "a non-caching provider gets a plain system string"
+    assert "cache_control" not in m[-1]["content"][-1], "a non-caching provider gets no marks"
+    return []
+
+
 CHECKS = [
     ("A. iron rules, once per prompt tier", check_iron_rules_once),
     ("A. the live prompts carry them", check_assembled_prompt_is_the_real_one),
@@ -2404,6 +2444,7 @@ CHECKS = [
     ("D. the edit cascade surfaces", check_edit_cascade),
     ("D. ground past the toe surfaces", check_ground_past_the_toe),
     ("D. warnings are reported too", check_warning_is_reported_too),
+    ("H. cache marks walk the history", check_cache_marks_walk_the_history),
     ("D. surface-less LEM vs FEM models", check_surfaceless_models),
     ("G. staged-by-a-run findings annotated", check_staged_by_run_is_annotated),
     ("G. a surface-family flip is an edit", check_surface_family_flip_is_an_edit),

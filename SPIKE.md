@@ -1437,6 +1437,11 @@ mesh (563 elements, 36 bar elements, all carrying capacity) on which the Newton
 driver is well behaved; the fifth is the LOCKED mesh (2101 elements), on which it is
 not.
 
+Five rows, FOUR models: the "geogrid sample" and "FEM-2 tutorial" files are the same
+model under two names, differing only in a cosmetic `type` label on each
+reinforcement line — see "Bookkeeping: five benchmarks, four models" at the end of
+this document.
+
 | Case | Mesh | Layout | VP FS | Newton FS | gap | Ramp FS | ramp − Newton |
 |---|---|---|---|---|---|---|---|
 | Geogrid sample | tri6, 4 | 6 layers, t_max 800 | 1.5969 | 1.6094 | +0.0125 | 1.6094 | **0.0000** |
@@ -1973,7 +1978,9 @@ Brackets 1.2-1.8 (geogrid, FEM-2, locked), 1.1-1.7 (half capacity), 1.0-1.6 (thr
 layers); tolerance 0.01. The viscoplastic column was re-measured here — it reads
 about one bisection cell above the reinforcement round's figures on every row,
 which is the bracket and not the driver, and the comparison below is like for like
-because both columns come from the same runs.
+because both columns come from the same runs. Five rows, FOUR models: the geogrid
+sample and the FEM-2 tutorial are the same model under two file names (see below,
+and "Bookkeeping: five benchmarks, four models" at the end of this document).
 
 | Case | Mesh | VP FS | N-R before | N-R after | gap after | gap before | ramp after |
 |---|---|---|---|---|---|---|---|
@@ -2193,6 +2200,10 @@ F = 1.225, not a solver budget, and closing it is a separate measurement about
 which of the two is right — the viscoplastic reading there is itself marginal, at
 an out-of-balance sitting on the tolerance after twenty-three thousand iterations.
 
+**That measurement was made. See "THE THREE-LAYER DISAGREEMENT" at the end of this
+document: the Newton driver is right at F = 1.225, and the viscoplastic converged
+state there is 580 psf outside the yield surface.**
+
 Raising the predictor budget until it always covers a viscoplastic convergence
 would move this row to about 1.20 rather than to 1.2391, and it would make every
 failing Newton trial cost a whole viscoplastic trial — which is to say it would
@@ -2238,7 +2249,9 @@ What remains, in the order it matters:
   and no predictor budget closes it: the viscoplastic converged state at that
   strength is not a root of the Newton residual. Which of the two is right is a
   measurement nobody has made, and it is the one place in this branch where the
-  answer still depends on a solver setting.
+  answer still depends on a solver setting. *(Made — "THE THREE-LAYER
+  DISAGREEMENT", below. The Newton driver is right there; the disagreement is a
+  viscoplastic-side one and no code was changed.)*
 - **The cost of a failing trial.** A trial that fails now pays a cold attempt, a
   predictor and a corrector — 1.15x to 1.29x the force evaluations on the clean
   benchmarks plus 2,500 to 7,750 viscoplastic iterations. Skipping the cold attempt
@@ -2253,3 +2266,250 @@ What remains, in the order it matters:
   reinforced factors of safety is reachable on this driver. That is unchanged by
   this round and is the larger of the two things standing between the Newton path
   and a reinforced answer anyone would quote.
+
+
+## THE THREE-LAYER DISAGREEMENT — an independent referee, and which driver is right
+
+The cohesionless round closed with one row open and named the measurement nobody
+had made: on the three-layer reinforced model the viscoplastic driver converges at
+F = 1.225 in 23,251 iterations, and that converged state is not a root of the
+Newton residual — six predictor budgets up to 32,000 iterations each corrected to
+a different non-equilibrium state. Two formulations of "equilibrium at this state"
+disagree. This round finds out which one is telling the truth.
+
+Nothing in the drivers was changed. Everything below was measured on this
+checkout, on the coarse tri6/4.0 mesh (563 elements, 36 bar elements, of which the
+18 belonging to layers 1, 3 and 5 carry capacity), `force_tol` 1e-3, hybrid
+criterion, tolerance 0.01.
+
+### The referee, and what it is allowed to use
+
+The adjudication cannot be run on either driver's own arithmetic, so the
+equilibrium check was written from scratch and shares no code with either. It reads
+only model DATA out of `fem_data` — node coordinates, connectivity, the material
+table, the boundary-condition codes, the reinforcement line geometry and its E and
+area — plus a STATE, and it computes everything else itself:
+
+- its own tri6 shape functions and their derivatives, and the FULL isoparametric
+  Jacobian rather than the straight-sided shortcut the drivers take;
+- its own three-point triangle rule, its own plane-strain constitutive matrix
+  written from Hooke's law, and its own `integral B^T sigma dV`;
+- its own consistent gravity load `integral N^T (0, -gamma) dV`;
+- its own free-degree-of-freedom set from the boundary-condition codes, and its own
+  nodal tributary weights for the Dawson, Roth & Drescher normalization;
+- its own bar element: the two-point Gauss integral of `EA (dN/dx)^2` over the
+  three-node quadratic bar, rotated into global coordinates, plus the same chord
+  law both drivers implement, evaluated on the state's own reported bar forces;
+- its own Mohr-Coulomb yield function in the invariant form.
+
+**Validated first on a state where the two drivers agree**, because a referee that
+cannot confirm agreement cannot adjudicate disagreement. The geogrid sample, six
+layers, coarse mesh, at F = 1.5, a trial both drivers converge:
+
+| what | referee against the drivers |
+|---|---|
+| gravity load vector | 2.0e-15 relative |
+| free degree-of-freedom set | identical |
+| nodal tributary weights | 7.9e-15 relative |
+| 36 bar element matrices | worst 3.8e-16 relative |
+| Newton's converged state, out-of-balance | **3.7849e-06**, against the driver's own **3.785e-06** |
+| viscoplastic converged state, out-of-balance | **3.66e-04** — in equilibrium, well inside the 1e-3 gate |
+| Newton state, worst yield violation | 2.3e-12 of the local strength |
+| viscoplastic state, worst yield violation | 25.5 psf, one Gauss point |
+
+The referee reproduces the Newton driver's own out-of-balance to five significant
+figures and confirms the viscoplastic state is in force equilibrium too. It is
+believable on a state where the two agree.
+
+### The disputed state, refereed
+
+The three-layer model at F = 1.225. The viscoplastic driver converges there in
+23,251 iterations at its own out-of-balance of 9.988e-04, a thousandth inside the
+gate.
+
+**It IS in force equilibrium.** The referee reads an out-of-balance of **2.38e-05**
+on the stress field that state actually carries — forty times inside the trial
+tolerance. The viscoplastic scheme solves `integral B^T D (B u - eps^p) dV = F_ext`
+exactly at every iteration, and the referee confirms it independently.
+
+**It is NOT an admissible stress field.** Nine Gauss points sit outside the
+Mohr-Coulomb surface by more than 1% of the local strength AND more than 10 psf.
+The worst is out by **579.9 psf — 2.09 times the strength available at that point**.
+Eight of the nine are in the c = 0 material, and every one of those carries a
+TENSILE mean stress, up to **729.1 psf of tension in a soil with no cohesion**.
+
+**What admissibility costs.** Demanding a returned stress field at the same
+displacement and the same plastic strain — which is what the Newton residual asks —
+leaves an out-of-balance of **7.39** and a residual of **9.19e-02** of the external
+load. That is the Newton driver's residual on the viscoplastic converged state,
+confirmed by the referee rather than taken from the driver.
+
+### The gap is entirely in the soil, and the bar element is exonerated
+
+The same state, internal force split by element class, referee against Newton
+driver, relative to the norm of the external load:
+
+| class | referee vs driver |
+|---|---|
+| reinforcement bars | **6.0e-16** |
+| external gravity load | **2.0e-15** |
+| 2-D soil | **9.19e-02** |
+
+The bars agree to round-off and so does the load. The whole of the 9.19e-02 is the
+soil's return-map correction — the amount by which the viscoplastic stress field
+lies outside the yield surface, expressed as a force. The bar element, which was the
+prime suspect on the Newton side, has nothing to do with it.
+
+### Why the viscoplastic gate cannot see it
+
+The viscoplastic out-of-balance is not the equilibrium residual. It is the
+window-averaged INCREMENT of the viscoplastic body load — how fast plastic flow is
+still changing the state. On this model the two quantities come apart completely.
+The disputed trial re-run to fixed budgets with the force gate set unreachably
+tight, so nothing stops early:
+
+| budget | driver's own out-of-balance | referee: force equilibrium | worst violation | Gauss points out by >10% | max tension in the c = 0 soil |
+|---|---|---|---|---|---|
+| 2,000 | 1.50e-01 | 1.5e-05 | 1.40 | 4 | 332 psf |
+| 6,000 | 1.13e-01 | 2.5e-05 | 1.42 | 10 | 647 psf |
+| 12,000 | 5.89e-02 | 7.1e-06 | 1.47 | 11 | 792 psf |
+| 23,251 | 9.99e-04 | 2.4e-05 | 2.09 | 8 | 729 psf |
+| 40,000 | **1.25e-12** | 2.4e-05 | 1.54 | 8 | **809 psf** |
+
+The driver's measure falls twelve orders of magnitude while the violation does not
+fall at all and the tension GROWS. The gate is not failing to converge; it is
+converging to a state that is not admissible, and it has no term that could
+notice.
+
+### The mechanism, measured
+
+With psi = 0 the Mohr-Coulomb flow is purely deviatoric, so plastic flow carries no
+volume change and can never relieve a point's MEAN stress. Measured over every
+Gauss point that carries plastic strain at the disputed state — 546 of 1,689 —
+`|tr(eps^p)| / |eps^p|` is at most **3.6e-13**. The plastic strain is traceless to
+round-off, which is what the flow rule says it must be.
+
+On a c = 0 material the yield surface is a cone through the origin, so ANY tensile
+mean stress is outside it however much deviatoric stress the point sheds. Those
+points therefore shed their deviatoric stress, stop flowing, and freeze with the
+violation intact — which is exactly the 40,000-iteration row above. The code names
+this case itself, in the tension-cutoff block: "The psi=0 MC flow is purely
+deviatoric and cannot relax a near-apex tensile state, which is exactly what this
+surface handles." The Rankine tension cutoff is finite on **0 of 563 elements** on
+this model. It is off, and nothing else in the scheme caps tension.
+
+### How far it reaches
+
+Not a reinforcement problem, and not a three-layer problem:
+
+| model | trial | referee: force equilibrium | worst violation | tensile points in c = 0 soil |
+|---|---|---|---|---|
+| three layers, as disputed | F = 1.225, VP converged, 23,251 it | 2.4e-05 | 579.9 psf | 8, to 729 psf |
+| the SAME soil with every bar capacity removed | F = 1.0, VP converged, 7,215 it | 1.3e-12 | 5 points | 5, to 138 psf |
+| Griffiths & Lane 1, c = 312.5 psf, phi = 20 | F = 1.35, VP converged, 867 it | 7.8e-13 | 2.3e-04 of local strength | **none** |
+
+Strip the reinforcement out entirely and the same frozen tensile points are still
+there, so the bars do not cause it — they amplify it, by a factor of five in the
+tension carried, because a reinforced slope is precisely one that stands by pulling
+the soil into tension. Give the soil cohesion and it disappears: on the plain
+cohesive benchmark the viscoplastic converged field is admissible to 2.3e-04 of the
+local strength with no tensile point anywhere. **It is a zero-cohesion effect.**
+
+### What the factor of safety actually is
+
+The lower-bound theorem settles the part that can be settled: a field in
+equilibrium with full gravity and nowhere outside the yield surface proves the
+slope stands. Two independent routes produce one, and the referee certifies both.
+
+Handing each viscoplastic converged state to the Newton corrector:
+
+| F | VP iterations | VP field, worst violation | corrector | referee equilibrium | corrected field |
+|---|---|---|---|---|---|
+| 1.1875 | 2,608 | 26.6 psf | **CONVERGED, 5 it** | 7.8e-05 | **0.0 psf — admissible** |
+| 1.2000 | 5,389 | 169.1 psf | failed | 1.1e+01 | 731.8 psf |
+| 1.2125 | 21,023 | 551.2 psf | failed | 3.3e+05 | — |
+| 1.2250 | 23,251 | 579.9 psf | failed | 3.2e+02 | 15,818 psf |
+
+And with the tension cutoff switched ON — the code's own named remedy for the
+mechanism above, and a modeling choice, not a code change:
+
+| F | VP + cutoff | referee equilibrium | worst Mohr-Coulomb violation | plain-MC Newton seeded from it |
+|---|---|---|---|---|
+| 1.1875 | CONVERGED | 4.0e-08 | 0.1 psf | — |
+| **1.2063** | **CONVERGED, 22,735 it** | **5.6e-07** | **0.09 psf — admissible** | **CONVERGED in 4 it**, referee 1.1e-05, **0.00 psf** |
+| 1.2156 | FAILED | 6.7e-06 | 4.5 psf | failed |
+| 1.2250 | **FAILED** (converged without the cutoff) | 5.2e-07 | 7.6 psf | failed |
+
+Two things fall out of that table. The plain-Mohr-Coulomb Newton residual HAS a root
+at F = 1.2063 — four iterations from the right starting state, in equilibrium to
+1.1e-05 and admissible to 0.00 psf — so the Newton FORMULATION reaches strengths its
+cold-start path does not. And with tensile stress capped, the viscoplastic driver
+itself flips its verdict at F = 1.225 from CONVERGED to FAILED, landing on the same
+answer the Newton driver gives there.
+
+The three bisections, same model, same bracket 1.0-1.6, tolerance 0.01:
+
+| driver | FS | supported by an admissible field? |
+|---|---|---|
+| viscoplastic, as shipped | **1.2391** | no — its converged trials at 1.225 and 1.2344 are 580 psf outside the surface |
+| viscoplastic + tension cutoff | **1.2109** | yes — its deciding converged trial, F = 1.2063, is certified |
+| Newton bisection | **1.1641** | yes, but provably LOW — an admissible field exists at 1.2063 |
+
+**The slope provably stands at F = 1.2063.** Newton's 1.1641 is 0.042 below that, and
+the reason is the predictor budget the cohesionless round already documented, not
+the formulation: the root is there and a good enough seed finds it in four
+iterations. The viscoplastic 1.2391 is above the proven floor and rests on fields
+that carry 580 to 652 psf of stress outside a zero-cohesion yield surface, so it is
+not evidence of anything. Nothing measured here proves the slope fails between
+1.2063 and 1.2391 — only that neither shipped driver's number on this row is
+supported.
+
+### The verdict
+
+**At F = 1.225 the Newton driver is right and the viscoplastic driver is wrong.**
+The viscoplastic converged state is in force equilibrium — the referee confirms it
+independently, at 2.4e-05 — but it is not a statically admissible stress field, and
+so it is not equilibrium in the sense a factor of safety is defined on. Nine Gauss
+points are outside the yield surface, eight of them carrying up to 729 psf of
+tension in a soil with zero cohesion. There is no root of the Newton residual near
+that state because there is no admissible field near it, and the Newton driver's
+refusal to find one is the correct answer, not a defect.
+
+The clause that accepts it is the force gate, `unbalanced_force_ratio < force_tol`.
+That quantity is the window-averaged increment of the viscoplastic body load — a
+measure of how fast plastic flow is still changing the state — and on this model it
+falls to 1.2e-12 while the state stays 800 psf outside the surface. A psi = 0 flow
+rule cannot relieve a mean-stress violation (the plastic strain is traceless to
+3.6e-13), a c = 0 cone admits no tension at all, and the tension cutoff that exists
+for exactly this case is off. So the flow stops, the measure reports convergence,
+and the violation stays.
+
+**No code was changed.** This implicates the SHIPPED default driver's convergence
+criterion on zero-cohesion materials without a tension cutoff, and which engine
+ships as the default — and whether `unbalanced_force_ratio` should be joined by a
+yield-admissibility reading before a trial is called converged — is the owner's
+decision, not a spike's. What is measured and available for that decision:
+
+- The effect is NOT specific to reinforcement and NOT specific to this model. It is
+  the zero-cohesion material at a free face, present with every bar removed, absent
+  on a cohesive benchmark.
+- It is invisible to the viscoplastic driver's own diagnostics and visible for
+  almost nothing to a reader who asks for it: `nr_max_yield_violation` is the
+  Newton path's existing reading of exactly this quantity, and the referee's version
+  of it costs one pass over the Gauss points.
+- Switching the Rankine tension cutoff on moves this model's viscoplastic answer
+  from 1.2391 to 1.2109 and makes every reported converged field admissible.
+- The Newton driver's low answer on this row is a predictor budget, not a
+  formulation error, and it is already written up in the cohesionless round.
+
+### Bookkeeping: five benchmarks, four models
+
+Re-measured here rather than carried over: `docs/fem/files/xslope_reinforce_fem.xlsx`
+and `docs/tutorials/files/xslope_reinforced_slope.xlsx` are the SAME model. Loaded
+side by side, their materials are identical, their profile lines are identical, and
+their six reinforcement lines are identical in geometry, capacity, pullout lengths,
+E and area. The only difference in either file is a cosmetic `type` label on each
+reinforcement line — blank in one, "geosynthetic" in the other — which nothing in
+the FEM path reads. The tables in "REINFORCEMENT — results" and "THE COHESIONLESS
+SOLVE — results" both present five reinforced rows; they are FOUR distinct models,
+with the geogrid sample measured twice under two file names.

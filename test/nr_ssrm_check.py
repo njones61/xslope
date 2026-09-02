@@ -214,6 +214,7 @@ def run():
     failures += check_k0_initial_stress()
     failures += check_pile_element()
     failures += check_piles()
+    failures += check_softening()
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
 
@@ -883,20 +884,14 @@ def _reinf_fem_data(path=None, target_size=REINF_SIZE, soften=False,
 
 
 def check_reinforcement_refusals():
-    """Bars are carried. Softening bars are not, and they say so.
+    """Nothing about reinforcement is refused any more, and that is the assertion.
 
-    The scope line is the whole point of the guard: the Newton driver's bar element
-    is tension-only and elastic-perfectly-plastic, so a model whose bars declare a
-    RUPTURE residual below the capacity their embedment develops is describing a law
-    the driver does not implement. That law changes between solves — the post-peak
-    set is a converged-state fixed point that re-opens the iteration each time it
-    grows — which is where a Newton continuation is weakest.
-
-    This matters more than an ordinary guard because the model it refuses is the
-    shipped FEM reinforcement sample: both of the repository's locked reinforced FEM
-    benchmarks declare t_res = 600 against t_max = 800. If the guard stopped firing,
-    the driver would silently solve them with the bars holding their peak capacity
-    forever and return a factor of safety that is too high and looks right.
+    The driver used to refuse post-peak softening, which is what both of the
+    repository's locked reinforced FEM benchmarks declare — so the guard was covering
+    the showcase. It is carried now (see :func:`check_softening`), and what stands in
+    the guard's place here is the opposite claim: the shipped reinforcement sample,
+    with its softening as the file gives it, must SOLVE on the Newton driver rather
+    than raise.
     """
     fails = []
     shipped = _reinf_fem_data(soften=True)
@@ -907,23 +902,20 @@ def check_reinforcement_refusals():
     if n_soft == 0:
         fails.append(
             "the shipped reinforcement sample no longer declares post-peak "
-            "softening on any bar element, so the softening refusal is untested "
-            "here — the model, not the guard, has changed")
+            "softening on any bar element, so nothing here is a softening "
+            "measurement — the model, not the driver, has changed")
+        return fails
+    try:
+        sol = solve_fem(shipped, F=1.0, fem_solver='newton', max_disp_factor=None)
+    except NotImplementedError as exc:
+        fails.append(
+            f"the Newton driver still REFUSES the shipped reinforcement sample, "
+            f"which declares post-peak softening on {n_soft} bar element(s): {exc}")
     else:
-        try:
-            solve_fem(shipped, F=1.0, fem_solver='newton')
-        except NotImplementedError as exc:
-            if 'softening' not in str(exc):
-                fails.append(f"the Newton driver refused the softening model with a "
-                             f"message that does not name softening: {exc}")
-        else:
-            fails.append(
-                f"the Newton driver ACCEPTED a model declaring post-peak softening "
-                f"on {n_soft} bar element(s). Its bar element is elastic-perfectly-"
-                f"plastic, so those bars would hold their peak capacity forever and "
-                f"the factor of safety would come back too high.")
+        if 'softened_1d_elements' not in sol:
+            fails.append("a solved softening model returns no post-peak set")
 
-    # Piles used to be asserted here. They are CARRIED now (see
+    # Piles used to be asserted here too. They are CARRIED now (see
     # :func:`check_piles`), so a refusal expected here would be holding the driver
     # to a limitation it no longer has.
     return fails
@@ -2316,6 +2308,117 @@ def check_piles():
     return fails
 
 
+# Post-peak softening (SPIKE.md, "POST-PEAK SOFTENING"). The corpus cannot supply a
+# specimen on which the latch fires on the NEWTON path: on both published reinforced
+# models the Newton equilibrium at the deciding strengths leaves every softenable bar
+# at about 0.97 of its peak, so nothing drops. The specimen is therefore constructed
+# out of the same model, the same soil and the same six lines, with the capacities
+# drawn down until the demand has to cross them — the same construction the
+# reinforcement round used for its half-capacity row. Measured on this checkout:
+# nothing softens at F = 1.1 on either driver, and at F = 1.2 the Newton latch drops
+# seven bar elements where the viscoplastic one drops four.
+SOFT_SCALE, SOFT_RES = 0.35, 0.5
+SOFT_F_QUIET, SOFT_F_DROPS = 1.1, 1.2
+
+
+def _soft_fem_data():
+    """The constructed specimen: the geogrid model with capacities drawn down."""
+    fd = _reinf_fem_data(target_size=4.0, soften=True)
+    tal = np.asarray(fd['t_allow_by_1d_elem'], float) * SOFT_SCALE
+    fd['t_allow_by_1d_elem'] = tal
+    fd['t_res_by_1d_elem'] = np.where(
+        np.isfinite(fd['t_res_by_1d_elem']), tal * SOFT_RES, np.nan)
+    return fd
+
+
+def check_softening():
+    """The post-peak drop on the Newton path: it fires, it bites, and it is inert
+    where nothing crosses.
+
+    Three things, and the third is what makes the first two a measurement rather
+    than a description.
+
+    **It fires.** On a model whose bars are asked for more than they can hold, the
+    Newton latch must drop some of them and no dropped bar may report a force above
+    its residual. Remove the latch and this leg is the one that goes.
+
+    **The drop actually lowers the cap.** A latch that records the set without moving
+    the working capacity would report softening and enforce the peak, which is the
+    same failure mode the pile round's moment cap had. So the reported force of every
+    softened bar is checked against its RESIDUAL and not against its peak.
+
+    **It is inert where nothing crosses.** At a strength where no softenable bar
+    reaches its peak, the softened set must be empty on BOTH drivers, and the Newton
+    solve must be bit-identical to the same model with no residual declared at all —
+    same displacement field, same iteration count. That is what says the feature
+    costs nothing on the models that do not use it.
+
+    The driver no longer REFUSES softening, so the guard check cannot assert one; the
+    first leg here is what replaces it.
+    """
+    fails = []
+    fd = _soft_fem_data()
+    tal = np.asarray(fd['t_allow_by_1d_elem'], float)
+    tres = np.asarray(fd['t_res_by_1d_elem'], float)
+    can = np.isfinite(tres) & (tres < tal - 1e-12)
+    if not can.any():
+        return ["the softening specimen declares no softenable bar, so nothing "
+                "here is a softening measurement"]
+
+    # --- it fires, and the drop lowers the cap -----------------------------
+    try:
+        sol = solve_fem(fd, F=SOFT_F_DROPS, fem_solver='newton',
+                        max_disp_factor=None, max_iterations=16000)
+    except NotImplementedError as exc:
+        return [f"the Newton driver still REFUSES post-peak softening: {exc}"]
+    soft = np.asarray(sol['softened_1d_elements'], bool)
+    T = np.asarray(sol['forces_1d'], float)
+    if not soft.any():
+        fails.append(
+            f"at F = {SOFT_F_DROPS} on a model whose bars are asked for more than "
+            f"they can hold, the Newton latch dropped NO bar element. The latch reads "
+            f"the uncapped demand against t_allow on a state in equilibrium with full "
+            f"gravity, exactly as the viscoplastic driver does; if it never fires, "
+            f"the post-peak law is not being applied at all.")
+    else:
+        over = np.flatnonzero(soft & (T > tres + 1e-6))
+        if over.size:
+            fails.append(
+                f"{over.size} softened bar element(s) report a force above their "
+                f"RESIDUAL — the largest is {float(T[over].max()):.3f} against a "
+                f"residual of {float(tres[over].min()):.3f}. The latch recorded the "
+                f"drop without lowering the working capacity, so the equilibrium is "
+                f"still carrying the peak.")
+
+    # --- inert where nothing crosses ---------------------------------------
+    quiet = solve_fem(fd, F=SOFT_F_QUIET, fem_solver='newton',
+                      max_disp_factor=None, max_iterations=16000)
+    if np.any(np.asarray(quiet['softened_1d_elements'], bool)):
+        fails.append(f"a bar softened at F = {SOFT_F_QUIET}, where no softenable bar "
+                     f"reaches its peak — the trigger is not the demand")
+    quiet_vp = solve_fem(fd, F=SOFT_F_QUIET, fem_solver='viscoplastic',
+                         max_disp_factor=None, max_iterations=16000)
+    if np.any(np.asarray(quiet_vp['softened_1d_elements'], bool)):
+        fails.append(f"the VISCOPLASTIC driver softened a bar at F = {SOFT_F_QUIET} "
+                     f"where the Newton driver did not, so the two are not reading "
+                     f"the same trigger on the same model")
+    fd_off = dict(fd)
+    fd_off['t_res_by_1d_elem'] = np.full(len(tres), np.nan)
+    off = solve_fem(fd_off, F=SOFT_F_QUIET, fem_solver='newton',
+                    max_disp_factor=None, max_iterations=16000)
+    if not np.array_equal(np.asarray(quiet['displacements']),
+                          np.asarray(off['displacements'])):
+        fails.append(
+            "at a strength where nothing softens, the model that DECLARES a residual "
+            "and the model that declares none do not return the same displacement "
+            "field. The post-peak path must cost nothing where it does not fire.")
+    if quiet['iterations'] != off['iterations']:
+        fails.append(
+            f"at a strength where nothing softens, declaring a residual changed the "
+            f"iteration count from {off['iterations']} to {quiet['iterations']}")
+    return fails
+
+
 def check_env_override_announces_itself():
     """A stale XSLOPE_FEM_SOLVER may not redefine the default in silence.
 
@@ -2369,8 +2472,9 @@ def main():
           "each other, and the Newton run decided every trial. The return map "
           "lands on the yield surface on every branch, a converged trial "
           "certifies its own stress field in force AND in displacement, neither "
-          "the loading path nor the step control changes a verdict, a "
-          "softening-bar model is refused by name while Hoek-Brown and "
+          "the loading path nor the step control changes a verdict, a bar's "
+          "post-peak drop is latched on a converged state and walked down as a "
+          "continuation while Hoek-Brown and "
           "power-curve materials are carried per Gauss point on the envelope the "
           "material declares — mixed with Mohr-Coulomb in one mesh, reduced on "
           "their tangent and not on their own constants — "

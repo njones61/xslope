@@ -6828,3 +6828,322 @@ STEPPED CONTINUATION on the cap.
 9. **An honest negative is a valid outcome and must be written.** If (a+) misses the
    locks and the seed rung does not recover them, option (c) ships instead and the
    round says which and why.
+
+### POST-PEAK SOFTENING — results
+
+Same machine and settings as everything above: `force_tol` 1e-3, hybrid criterion,
+`capture_failure_state=False`, tolerance 0.01. Every number below was measured on
+this checkout in this session.
+
+#### What was built, and what shipped
+
+**Option (a+) shipped.** `_nr_soften_newly`, `_nr_soften_set_eta` and
+`_nr_soften_latch` in `xslope/fem.py`, called from `_solve_fem_newton` after the
+increment loop reaches full gravity and passes the force gate, and from the ramp
+after each accepted strength step. `_nr_build_bars` now carries the peak capacity,
+the residual, the softenable mask and the post-peak set beside the working cap;
+`_solve_fem_newton` takes a `_softened_seed`, and the predictor rungs pass the set
+both ways so a seed is grown on the same constitutive law the corrector will read.
+The guard's softening line is gone.
+
+The latch is the viscoplastic driver's, expression for expression:
+`~softened & can_soften & (demand > t_allow + 1e-9)`, on the uncapped elastic demand,
+read only on a state in equilibrium with full gravity, growing until nothing new
+crosses. What is this driver's is the PATH: the cap of a newly-dropped bar walks
+`t_allow -> t_res` over eta in [0, 1] with the same halve-on-failure control the
+gravity walk uses, and a step the corrector cannot carry at the floor is a limit
+point in the drop rather than a solver giving up.
+
+**Option (c) did not ship**, and the reason is a measurement rather than a
+preference. It is written below.
+
+#### The two published locks — NOT reproduced
+
+Both built through `run_tests.py`'s own `build_fem_ssrm_case` from their own tags.
+They are the SAME model under two file names (SPIKE.md, "Bookkeeping: five
+benchmarks, four models"), so the second row is a bracket check and not a second
+model, and the two Newton readings differ only by the grid.
+
+| Benchmark | Bracket | Lock | viscoplastic | Newton | Newton − lock |
+|---|---|---|---|---|---|
+| `xslope_reinforce_fem` (`docs/fem/samples.md`) | 1.1–1.9 | 1.497 | 1.496875 | **1.534375** | **+0.0374** |
+| `xslope_reinforced_slope` (FEM-2 tutorial) | 1.0–2.0 | 1.496 | 1.49609375 | **1.535156** | **+0.0392** |
+
+The viscoplastic driver reproduces both of its own locks to 0.0001. The Newton
+driver reads about 0.038 above them, which is the one-sided high direction this
+document has recorded on every corpus round since its first table.
+
+#### Why — and the reason is not the softening code
+
+The bisections differ at one trial, and it is the trial that closes both brackets:
+F = 1.5, which the viscoplastic driver fails and the Newton driver carries. Run
+directly, on the samples model at its locked tri6/2.0 mesh:
+
+| F | driver | verdict | exit | out-of-balance | iterations | softened | at capacity | max&#124;u&#124; |
+|---|---|---|---|---|---|---|---|---|
+| 1.49375 | viscoplastic | CONVERGED | `converged` | 9.99e-4 | 4,291 | **0** | 6 | 0.58% of H |
+| 1.49375 | **Newton** | **CONVERGED** | `converged` | **6.56e-5** | 967 | **0** | 5 | 0.58% of H |
+| 1.50 | viscoplastic | FAILED | `diverging` | **4.45e-1** | 15,261 | **6** | 20 | 0.83% of H |
+| 1.50 | **Newton** | **CONVERGED** | `converged` | **3.05e-5** | 300 | **0** | 5 | 0.60% of H |
+| 1.525 | viscoplastic | FAILED | `diverging` | 2.50e-1 | 19,171 | 4 | 28 | 1.49% of H |
+| 1.525 | **Newton** | **CONVERGED** | `converged` | **7.29e-9** | 84 | **0** | 7 | 0.87% of H |
+| 1.53125 | viscoplastic | FAILED | `diverging` | 3.90e-1 | 5,461 | 4 | 22 | 0.88% of H |
+| 1.53125 | **Newton** | **CONVERGED** | `converged` | **6.65e-8** | 125 | **0** | 7 | 0.85% of H |
+
+**The Newton latch never fires on either lock model, at any strength either
+bisection visits.** That is not the latch failing to run — it runs at every
+converged trial and finds nothing to drop. The measurement that says why, on the
+softenable bars only (36 of the 60 carry `t_allow` = 800 against a residual of 600;
+the other 24 sit inside a pullout ramp where `t_allow` is already below 600, so
+`min(t_res, t_allow)` leaves them perfectly plastic and they cannot soften at all):
+
+| F | driver | at capacity, of which softenable | largest T / t_allow over the unsoftened softenable bars |
+|---|---|---|---|
+| 1.49375 | viscoplastic | 6, **0 of them softenable** | 0.9788 |
+| 1.49375 | Newton | 5, **0 of them softenable** | 0.9707 |
+| 1.50 | viscoplastic | 20, **14 softenable** | **1.0000** |
+| 1.50 | Newton | 5, **0 of them softenable** | 0.9762 |
+
+At F = 1.49375 — the last trial the published lock stands at — NEITHER driver has
+softened a bar, and the largest softenable bar sits at 0.98 of its peak on both. **The
+published 1.497 and 1.496 are the strength at which the VISCOPLASTIC relaxation first
+pushes a softenable bar over its peak, and nothing about the deciding standing trial
+involves softening at all.** At F = 1.5 the viscoplastic path strains to max|u| = 0.284
+and fourteen softenable bars reach exactly 1.0000 of their peak; the Newton path
+reaches a different equilibrium at max|u| = 0.203 where the largest sits at 0.9762, so
+the threshold is not crossed and there is nothing to drop.
+
+That is a 2.4% difference in a bar force turning into a discrete verdict, which is
+precisely what the design memo predicted of this law: "the demand reading is taken on a
+viscoplastic fixed point that is not unique ... the latch just reads it through a
+threshold, which can turn a continuous 1% shift in a bar force into a discrete verdict
+flip."
+
+And the Newton state at F = 1.5 is not a solver's opinion. It is in equilibrium with
+full gravity to an out-of-balance of **3.05e-5** — thirty times inside the trial
+tolerance — with a worst Mohr-Coulomb value of **3.14e-15** of the local strength read
+in the INVARIANT form the return map is not written on, at 0.60% of the model height.
+That is a statically admissible stress field, and by the lower-bound theorem the slope
+stands at F = 1.5. The viscoplastic verdict there is `diverging` at an out-of-balance
+of 4.45e-1 against a 1e-3 gate — four hundred times out, not a near miss.
+
+#### The latch does fire, and it bites — on a specimen the corpus cannot supply
+
+The corpus has no model on which softening engages on the Newton path, for the reason
+above. So the specimen is constructed out of the same model, the same soil and the same
+six lines, with the capacities drawn down until the demand has to cross them — the same
+construction the reinforcement round used for its half-capacity row. `t_allow` scaled to
+0.35 of the file's, `t_res` to half of that, tri6/4.0:
+
+| F | driver | verdict | iterations | softened | out-of-balance |
+|---|---|---|---|---|---|
+| 1.0 | viscoplastic | CONVERGED | 501 | 0 | 1.00e-3 |
+| 1.0 | **Newton** | **CONVERGED** | 10 | 0 | 9.64e-9 |
+| 1.1 | viscoplastic | CONVERGED | 1,103 | 0 | 9.84e-4 |
+| 1.1 | **Newton** | **CONVERGED** | 13 | 0 | 4.58e-5 |
+| 1.2 | viscoplastic | CONVERGED | 8,149 | **4** | 9.51e-4 |
+| 1.2 | **Newton** | **FAILED** | 1,254 | **7** | — |
+
+At F = 1.2 the Newton latch drops SEVEN bar elements where the viscoplastic one drops
+four, and the continuation then reaches its floor: the structure cannot shed that much
+force along this path. That is the memo's outcome (3) — a drop the viscoplastic
+relaxation walks through and the continuation does not — and it is the one place on
+this model where the two drivers part on softening itself rather than on the trigger.
+The predictor rung, which carries the softened set into its seed, did not recover it.
+
+#### Why (c) did not ship
+
+Option (c) — route any trial with an active softening bar to the viscoplastic driver —
+would reproduce both locks trivially, because on these models every trial that decides
+the bracket is one the viscoplastic driver answers. What it would adopt as the answer
+is the state the criterion's own clause 8 asked to have refereed, and the referee's
+reading is below. It would also put two verdict rules inside one bisection, which is
+the risk the memo names against its own fallback.
+
+**The memo's decision rule 2 is the one this round lands on**: the miss is on trials
+where the viscoplastic state is inadmissible or is closed by a solver rule hundreds of
+times outside its own gate, so (a+) is shipped, the reinforced lock rows join the c = 0
+audit's flagged set, and whether the locks stand is the owner's decision and not a
+spike's. **Nothing on the viscoplastic driver was changed.**
+
+#### The memo's section-5 measurements
+
+**R1 — the lock states, refereed for illegal tension.** The FEM-2 tutorial model's
+lower material is c = 0, phi = 37 and it carries no tension cutoff. The two states the
+criterion named, read on the viscoplastic driver as it ships, with the Gauss-point
+stress reconstructed from first principles out of the prepared model's own arrays
+(`sigma = D (B u - eps^p)`) and the Mohr-Coulomb function evaluated in its invariant
+form:
+
+| F | verdict | iterations | softened | Gauss points outside the surface | of which in the c = 0 material | worst violation | worst relative violation on the COHESIVE material | largest tensile mean stress in the c = 0 material |
+|---|---|---|---|---|---|---|---|---|
+| **1.4922** (the deciding STANDING trial) | CONVERGED, oob 9.99e-4 | 4,291 | **0** | **862** | **817** | **+53.47 psf** | +2.01e-04 | **+90.63 psf** |
+| 1.5000 | FAILED, `iteration_cap`, oob 6.03e-2 | 12,000 | 1 | 1,111 | 1,037 | +12.57 psf | +1.23e-02 | +21.46 psf |
+
+The state the published 1.496 rests on carries 862 Gauss points outside its own yield
+surface, 817 of them in the zero-cohesion material, and 90.6 psf of tension in a soil
+with no cohesion at all. The cohesive material is admissible to 2e-4 of its local
+strength; the whole of the violation is the c = 0 half. **This is the c = 0 tension
+finding, reached from a third direction** — the three-layer adjudication found it on a
+reinforced variant, the tension-cutoff round found it on a fresh model's default, and
+here it sits under a published lock. Nothing was changed.
+
+**R2 — does the lock move through the latch at a larger budget?** No.
+
+| viscoplastic `max_iterations` | FS | per-trial iterations |
+|---|---|---|
+| 16,000 | **1.49609375** | 1563, 321, 15261, 1490, 2289, 2180, 4189, 3443, 4286 |
+| 32,000 | **1.49609375** | 1563, 321, 15261, 1490, 2289, 2180, 4189, 3443, 4286 |
+
+Identical, trial for trial and iteration for iteration. The deciding trial at F = 1.5
+closes at 15,261 iterations under both, so the budget was never what was binding there
+and the latch's budget coupling does not reach this lock. That risk is closed.
+
+#### What did not move
+
+| Check | Result |
+|---|---|
+| Default path: Griffiths & Lane 6 dry, quad8/2, no `fem_solver` | FS **2.421875**, iterations 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777 — value for value |
+| Griffiths & Lane 1, tri6/3.5, Newton bisection | FS **1.36562500**, 9 trials, 3,121 iterations, 22,650 force evaluations — value for value |
+| Three layers, `t_cut` = 0, tri6/4 | viscoplastic **1.2109375**, Newton **1.2109375**, 8 trials, 3,688 iterations, 25,515 force evaluations — value for value |
+| A model that DECLARES a residual, at a strength where nothing crosses | the same displacement field and the same iteration count as the identical model with no residual declared — asserted in the lock |
+
+The last row is the structural statement: a model with no `t_res` takes
+`can_soften` all-False and the latch never runs, and a model that has one costs
+nothing until the demand crosses.
+
+#### The refusals that remain
+
+| Feature | Verdict |
+|---|---|
+| **post-peak softening on reinforcement bars** | **carried** |
+| continuum strain-softening | refused on BOTH drivers, and there is no input for it |
+
+**The refusal list is empty.** Every one of the eight features the ramp verdict named
+is carried, and the two keywords `main` deleted are gone. Continuum strain-softening —
+a Mohr-Coulomb material whose c and phi decay with plastic strain — has no template
+column, no test tag and no lock, so there is nothing to guard; the memo's §2.3 says
+why it must stay out of both drivers until a regularization is chosen, and that is
+recorded here rather than left implicit.
+
+#### The locks
+
+`test/nr_ssrm_check.py` gains `check_softening`, on the constructed specimen, in about
+35 s. Three legs: the latch FIRES on a model whose bars are asked for more than they
+can hold; every softened bar's reported force is at or below its RESIDUAL, not its
+peak; and at a strength where nothing crosses the softened set is empty on both drivers
+AND the Newton solve is bit-identical to the same model with no residual declared —
+same displacement field, same iteration count.
+
+`check_reinforcement_refusals` no longer asserts a refusal it would be holding the
+driver to. It now asserts the opposite: the shipped reinforcement sample, softening and
+all, must SOLVE on the Newton driver.
+
+**Mutation, run both ways.**
+
+| driver | verdict | what the check saw |
+|---|---|---|
+| as shipped | **PASS** | — |
+| the latch never drops a bar | **FAIL** | "at F = 1.2 on a model whose bars are asked for more than they can hold, the Newton latch dropped NO bar element ... if it never fires, the post-peak law is not being applied at all" |
+| the drop recorded but the working cap never lowered | **FAIL** | "2 softened bar element(s) report a force above their RESIDUAL — the largest is 210.000 against a residual of 105.000 ... the equilibrium is still carrying the peak" |
+
+The second mutation is the one worth reading twice: it is the same failure mode the
+pile round's moment capacity had — a set recorded over an equilibrium that still
+carries the peak — and a check that read only the softened MASK would pass on it.
+
+#### The criterion, line by line
+
+**1. Both published locks within 0.01 — NOT MET.** 1.534375 against 1.497 and
+1.535156 against 1.496, both HIGH, both about 0.038 out. They are the same model under
+two file names and the two Newton readings differ only by the bracket grid.
+
+**2. Per-trial verdicts and softened sets identical — NOT MET, and it is the
+finding.** The bisections differ at F = 1.5, which closes both brackets: the
+viscoplastic driver fails there at an out-of-balance of 4.45e-1 having dropped six
+bars, and the Newton driver carries it having dropped none. The softened sets are
+EMPTY on the Newton path at every trial of both bisections, because the Newton
+equilibrium leaves every softenable bar at 0.976 of its peak where the viscoplastic
+one reaches exactly 1.0000.
+
+**3. Admissibility — MET on the trials that decide it, and read on the driver's own
+evidence rather than on an external referee.** The Newton state at F = 1.5 is in
+equilibrium to 3.05e-5 with a worst invariant-form Mohr-Coulomb value of 3.14e-15 of
+the local strength at 0.60% of the model height; at F = 1.525 and 1.53125 the readings
+are 7.29e-9 / 3.40e-15 and 6.65e-8 / 2.79e-15. **What the clause asked for and did not
+get is that reading on EVERY converged trial of both bisections**; it was made on the
+four that decide them.
+
+**4. The refinement ladder — NOT RUN.** Reported as a shortfall rather than glossed:
+with the latch not firing on this model at any rung, a ladder would be measuring the
+plain reinforced solve the reinforcement round already laddered.
+
+**5. Everything else bit-identical — PARTLY MET.** Three spot checks on this checkout
+reproduce their recorded values to the digit (the default path, Griffiths & Lane 1 on
+Newton, three layers with `t_cut` = 0), and the lock asserts bit-identity between a
+model that declares a residual and one that does not. **The full control-tree sweep the
+clause asked for — every row re-run against the parent commit staged in a separate
+package tree — was not made**, and that is a shortfall against the criterion as
+written.
+
+**6. The refusal list — MET.** Empty except continuum strain-softening, which has no
+input to refuse, and the round says so rather than describing it.
+
+**7. The locks — MET.** `check_softening` passes as shipped and fails on both
+mutations; `check_reinforcement_refusals` was rewritten to assert what is now true;
+the whole check file passes and the default control is unchanged.
+
+**8. The section-5 measurements — MET, both.** The lock does not move at 32,000
+iterations, trial for trial. The deciding standing state at F = 1.4922 carries 862
+Gauss points outside its yield surface, 817 of them in the c = 0 material, worst by
+53.47 psf, with 90.63 psf of tension in a cohesionless soil.
+
+**9. The honest negative** is clauses 1, 2, 4 and half of 5, and it is written above.
+
+#### Verdict
+
+**The last refusal is gone, the drop is implemented, and it does not reach the two
+published numbers — because on those two models it never engages.**
+
+Option (a+) is built and it works. The latch is the viscoplastic driver's expression
+read at the viscoplastic driver's moment; the drop is walked down rather than jumped,
+so a drop the structure cannot carry reads as a limit point; the softened set is
+reported, seeded and carried through the ramp; and on a specimen whose capacities are
+drawn down until the demand has to cross them the Newton latch drops seven bar elements
+where the viscoplastic one drops four. Where it does not fire it costs nothing, and
+that is asserted bitwise rather than argued.
+
+What it does not do is reproduce 1.497 and 1.496, and the measurement says why in one
+line: **at the trial those locks stand on, neither driver has softened a bar.** The
+published values are the strength at which the viscoplastic relaxation first strains a
+softenable bar past its peak — 1.0000 of it, on fourteen bars at once — and the Newton
+equilibrium at the same strength leaves the largest of them at 0.9762. A 2.4%
+difference in a bar force, read through a threshold, is the whole of the 0.038. The
+Newton state on the far side of it is in equilibrium to three parts in 10^5 with no
+Gauss point more than 3e-15 of its own strength outside the yield surface, which is a
+lower-bound proof that the slope stands there; the viscoplastic state on the near side
+carries 90 psf of tension in a soil with no cohesion.
+
+So option (c) was not shipped. It would reproduce the locks by routing every deciding
+trial to the driver whose answer this round has just measured to be inadmissible, and
+it would run two verdict rules inside one bisection. That is the memo's decision rule 2
+— ship (a+), flag the lock rows for the c = 0 audit, and leave whether the locks stand
+to the owner. Nothing on the viscoplastic driver was changed.
+
+What remains:
+
+- **Whose numbers 1.497 and 1.496 are.** This is now the fourth model class on which
+  the same question has been reached from a different direction — RS2-28, the four
+  disputed pile rows, the three-layer adjudication, and now the reinforced showcase.
+  Every one has the same shape: the lock is the viscoplastic driver's reading at a
+  strength where one of its stopping rules or its force gate is what decides, and the
+  Newton driver produces an admissible field above it. It is a corpus decision with a
+  measurement behind it.
+- **The one place the two drivers part on softening itself.** On the constructed
+  specimen at F = 1.2 the viscoplastic driver drops four bars and carries the load; the
+  Newton driver drops seven and its continuation reaches the floor. That is the memo's
+  outcome (3) surviving the eta walk, on one model, and the predictor rung did not
+  recover it. It is one measurement and it deserves the same trial-by-trial treatment
+  the other disagreements got.
+- **The clauses that were not run**: the refinement ladder, the referee on every
+  converged trial, and the full control-tree sweep. All three are shortfalls against
+  the criterion as written rather than results.

@@ -4539,12 +4539,19 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         # verdict rather than reaching one.
         if (_nr_export is None and not _sol["converged"]
                 and _sol.get("exit_reason") == 'diverging'):
+            # The post-peak set the failed attempt had reached, so both the seed and
+            # the corrector that reads it are built on the same constitutive law. A
+            # seed grown with every bar at its peak would be a different model.
+            _soft_seed = _sol.get("softened_1d_elements", None)
+            if _soft_seed is not None and not np.any(_soft_seed):
+                _soft_seed = None
             for (_chunk, _ceiling, _prep_seed,
                  _pred_early_failure) in _nr_predictor_rungs(
                      prep, n_elements, max_iterations, max_iterations_ceiling,
                      early_failure):
                 _vp = solve_fem(
                     fem_data, F=F, debug_level=0, max_iterations=_chunk,
+                    _softened_seed=_soft_seed,
                     tolerance=tolerance, max_disp_factor=None,
                     tension_cutoff=tension_cutoff,
                     dt_scale=dt_scale,
@@ -4569,6 +4576,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 _seed_kw = (dict(_nr_seed_state=_vp["_k0_state"]) if k0 is not None
                             else dict(_nr_seed=(_vp["displacements"],
                                                 _vp["plastic_strains"])))
+                # The predictor is allowed to have latched further than the cold
+                # attempt did; the corrector takes whichever set the seed was
+                # actually grown on, and its own latch continues from there.
+                _vp_soft = _vp.get("softened_1d_elements", None)
+                if _vp_soft is not None and np.any(_vp_soft):
+                    _seed_kw['_softened_seed'] = _vp_soft
+                elif _soft_seed is not None:
+                    _seed_kw['_softened_seed'] = _soft_seed
                 _retry = _solve_fem_newton(fem_data, F, prep, **_seed_kw, **_nr_kw)
                 # Work is CUMULATIVE: the failed cold attempt, every predictor run
                 # and every corrector are all charged to this trial, so no cost is
@@ -6744,6 +6759,13 @@ def _nr_build_bars(fem_data):
     cos_all = np.asarray(fem_data["cos_theta_1d"], dtype=float)
     sin_all = np.asarray(fem_data["sin_theta_1d"], dtype=float)
     cap_all = np.asarray(fem_data["t_allow_by_1d_elem"], dtype=float)
+    # The post-peak residual, and which bars can reach it. `build_fem_data` has
+    # already taken min(t_res, t_allow), so a bar inside a pullout ramp where
+    # t_allow < t_res cannot soften at all: bond slip stays perfectly plastic and
+    # only RUPTURE softens. Blank t_res is NaN, which is "no post-peak drop".
+    res_all = np.asarray(fem_data.get("t_res_by_1d_elem",
+                                      np.full(n_1d, np.nan)), dtype=float)
+    can_all = np.isfinite(res_all) & (res_all < cap_all - 1e-12)
 
     bars = []
     for nd in (4, 6):
@@ -6756,7 +6778,12 @@ def _nr_build_bars(fem_data):
         K = np.array([np.asarray(K_list[i], dtype=float)[:nd, :nd] for i in sel])
         bars.append({
             'idx': sel, 'nd': nd, 'dof': dof_all[sel, :nd], 'K': K, 'p': p,
-            'k': k_all[sel], 't_cap': cap_all[sel],
+            'k': k_all[sel],
+            # `t_cap` is the WORKING cap, which is the peak until a bar softens.
+            't_cap': cap_all[sel].copy(),
+            't_peak': cap_all[sel], 't_res': res_all[sel],
+            'can_soften': can_all[sel],
+            'softened': np.zeros(sel.size, dtype=bool),
             # k p (x) p, the rank-one block the tangent LOSES when a bar goes
             # slack or reaches its capacity. On a two-node bar it is K itself.
             'kpp': k_all[sel][:, None, None] * (p[:, :, None] * p[:, None, :]),
@@ -7555,6 +7582,108 @@ def _nr_predictor_rungs(prep, n_elements, max_iterations, max_iterations_ceiling
     return tuple(rungs)
 
 
+# ===================== Post-peak softening (SPIKE, "POST-PEAK SOFTENING") ====
+#
+# The step schedule the DROP is walked down on. A bar that has just been latched has
+# its cap taken from t_allow to t_res over eta in [0, 1], re-equilibrating at full
+# gravity at each accepted step, with the same halve-on-failure control the gravity
+# walk uses. A step the corrector cannot carry at the floor is a LIMIT POINT in the
+# drop -- the structure cannot shed that force -- which is the same argument this
+# driver already makes for gravity, and it is what keeps the verdict a statement
+# about the slope rather than about the solver.
+#
+# The first attempt is the whole drop in one step, because on a structure that can
+# carry it that is one equilibrate and the walk costs nothing.
+_NR_SOFTEN_INIT_STEP = 1.0
+_NR_SOFTEN_MIN_STEP = 1.0 / 64.0
+
+
+def _nr_soften_newly(bars):
+    """Which bars the latch drops now, per group.
+
+    The viscoplastic expression, unchanged: a bar softens when its UNCAPPED elastic
+    demand ``k*delta`` -- the quantity both drivers publish as ``forces_1d`` -- exceeds
+    the capacity it was allowed to carry, read on a state that has already reached
+    full gravity and passed the force gate. Never mid-iteration, never on a failed
+    trial, and the set only ever grows.
+    """
+    return [(~bg['softened'] & bg['can_soften']
+             & (bg['_T'] > bg['t_peak'] + 1e-9)) for bg in bars]
+
+
+def _nr_soften_set_eta(bars, newly, eta):
+    """Put the newly-dropping bars' caps at ``eta`` of the way from peak to residual."""
+    for bg, nw in zip(bars, newly):
+        if nw.any():
+            bg['t_cap'] = np.where(
+                nw, bg['t_peak'] - eta * (bg['t_peak'] - bg['t_res']), bg['t_cap'])
+
+
+def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
+                     force_tol, oob_fn, nr_max_iter, u_el, piles=None,
+                     trans_dofs=None, debug_level=0):
+    """Run the post-peak latch to its fixed point on a converged full-load state.
+
+    Returns ``(ok, u, iterations, force_evaluations, out_of_balance, rounds, cuts)``.
+    ``ok`` is False when a drop reaches the step floor, which is a LIMIT POINT in the
+    drop: the structure cannot shed that force. Nothing is committed on failure
+    beyond the plastic strains the accepted sub-steps already committed, which the
+    caller restores if it rejects the state.
+
+    The law is the viscoplastic driver's, read on the same uncapped demand against
+    the same threshold, at the same moment — a state in equilibrium with full
+    gravity. The PATH is this driver's: the cap walks down rather than jumping, so a
+    drop the structure survives but a single step from the pre-drop state cannot
+    reach is carried instead of being reported as a failure.
+    """
+    n_bars = sum(len(bg['idx']) for bg in bars)
+    it_total = fe_total = rounds = cuts = 0
+    oob_last = 0.0
+    while rounds < n_bars:
+        newly = _nr_soften_newly(bars)
+        if not any(nw.any() for nw in newly):
+            break
+        rounds += 1
+        eta, deta = 0.0, float(_NR_SOFTEN_INIT_STEP)
+        while eta < 1.0 - 1e-12:
+            eta_try = min(eta + deta, 1.0)
+            _nr_soften_set_eta(bars, newly, eta_try)
+            ok, u_try, it, fe, oob_here, _rel = _nr_equilibrate(
+                groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
+                oob_fn, nr_max_iter, u_el, debug_level=debug_level,
+                label=f"soften eta={eta_try:.4f}", bars=bars, piles=piles,
+                trans_dofs=trans_dofs)
+            it_total += it
+            fe_total += fe
+            if ok:
+                u = u_try
+                for grp in groups:
+                    grp['_u'] = u
+                _nr_commit_plastic_strain(groups)
+                eta = eta_try
+                oob_last = oob_here
+                if it <= _NR_COMFORT:
+                    deta = min(1.0, deta * _NR_GROW)
+            else:
+                cuts += 1
+                deta = (eta_try - eta) * 0.5
+                if deta < _NR_SOFTEN_MIN_STEP:
+                    return False, u_try, it_total, fe_total, oob_here, rounds, cuts
+        # The walk finished: those bars now hold the residual, permanently for this
+        # solve. The latch is one-way; the FORCE is not, since a softened bar that
+        # unloads carries less than its residual.
+        for bg, nw in zip(bars, newly):
+            if nw.any():
+                bg['softened'] |= nw
+                bg['t_cap'] = np.where(nw, bg['t_res'], bg['t_cap'])
+        if debug_level >= 1:
+            _n = sum(int(nw.sum()) for nw in newly)
+            _t = sum(int(bg['softened'].sum()) for bg in bars)
+            print(f"  Softening round {rounds}: {_n} bar element(s) dropped to "
+                  f"t_res ({_t} total); re-solved")
+    return True, u, it_total, fe_total, oob_last, rounds, cuts
+
+
 def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
                     force_tol, oob_fn, nr_max_iter, u_elastic_scale,
                     debug_level=0, label="", bars=None, piles=None,
@@ -7713,7 +7842,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                       debug_level=0, progress_callback=None,
                       nr_max_iter=_NR_MAX_ITER, nr_min_step=_NR_MIN_STEP,
                       _nr_seed=None, k0=None, _nr_init_state=None,
-                      _nr_seed_state=None, _nr_env_F=None):
+                      _nr_seed_state=None, _nr_env_F=None, _softened_seed=None):
     """One strength-reduction trial by Newton-Raphson (SPIKE; see SPIKE.md).
 
     Returns the same result dictionary solve_fem returns, so the SSRM bisection
@@ -7764,25 +7893,14 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # per-unit-width rigidities and capacities, and the same head/tip fixity, which
     # is a constraint on `prep["free_dofs"]` and therefore already in force on this
     # path. Nothing about a pile is reduced by F, as nothing about a bar is.
-    # Reinforcement bars ARE carried (see _nr_build_bars). Post-peak softening is
-    # not: a bar with a finite t_res BELOW the capacity its embedment develops drops
-    # to that residual through a converged-state fixed point, which changes the
-    # constitutive law between solves and re-opens the iteration each time it grows.
-    # That is exactly where a Newton continuation is weakest, and approximating it
-    # would be a fudged tangent reporting a factor of safety that looks right.
-    _n1d = len(fem_data.get("elements_1d", np.array([]).reshape(0, 3)))
-    if _n1d:
-        _tres = np.asarray(fem_data.get("t_res_by_1d_elem", np.full(_n1d, np.nan)),
-                           dtype=float)
-        _tal = np.asarray(fem_data.get("t_allow_by_1d_elem", np.zeros(_n1d)),
-                          dtype=float)
-        _pmask = np.asarray(fem_data.get("pile_elem_mask", np.zeros(_n1d)), dtype=bool)
-        _soft = np.isfinite(_tres) & (_tres < _tal - 1e-12) & ~_pmask
-        if np.any(_soft):
-            unsupported.append(
-                f"post-peak softening on {int(_soft.sum())} of {_n1d} "
-                f"reinforcement bar element(s) (a residual tension t_res below the "
-                f"capacity the embedment develops)")
+    # Reinforcement bars ARE carried (see _nr_build_bars), and so is their POST-PEAK
+    # drop (see _nr_soften). A bar with a finite t_res below the capacity its
+    # embedment develops drops to that residual through the same converged-state
+    # latch the viscoplastic path applies — read on the same uncapped demand, against
+    # the same threshold — with the drop walked down as a continuation on the cap so
+    # that a drop the structure cannot carry reads as a limit point rather than as a
+    # solver that gave up. CONTINUUM strain-softening is a different animal and stays
+    # refused on both drivers; there is no input for it, so there is nothing to guard.
     # The two CURVED envelopes ARE carried (see _nr_envelope_return and
     # _nr_envelope_by_elem), per GAUSS POINT, so one mesh can hold a Mohr-Coulomb
     # soil and a Hoek-Brown rock and solve them together. Both arrive here the way
@@ -7825,6 +7943,20 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                               t_cap_by_elem, k0=k0, finv_by_elem=finv_by_elem,
                               env_by_elem=env_by_elem)
     bars = _nr_build_bars(fem_data)
+    # A carried-in post-peak set. The bisection never passes one — every trial is a
+    # cold solve with an empty set, which is the viscoplastic convention — so this is
+    # the retry path (a seeded corrector picks up the set its cold attempt had
+    # reached) and the ramp (a bar that ruptured at one strength is ruptured at the
+    # next). Softening only ever grows, so the seed is a lower bound and never a
+    # verdict.
+    if bars is not None and _softened_seed is not None:
+        _seed = np.asarray(_softened_seed, dtype=bool)
+        if _seed.size == len(fem_data.get("elements_1d", ())):
+            for bg in bars:
+                take = _seed[bg['idx']] & bg['can_soften']
+                if take.any():
+                    bg['softened'] |= take
+                    bg['t_cap'] = np.where(take, bg['t_res'], bg['t_cap'])
     piles = _nr_build_piles(fem_data)
     pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars, piles=piles)
 
@@ -8027,6 +8159,46 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             converged = False
             exit_reason = 'iteration_cap'
 
+    # ---- post-peak softening: the viscoplastic latch, on a stepped continuation --
+    #
+    # The state is in equilibrium at full gravity. NOW, and only now, ask which bars
+    # have actually yielded -- their uncapped elastic demand exceeds the capacity they
+    # were allowed to carry -- and drop those with a finite residual to it. Shedding
+    # their load can push neighbours over, so the process repeats until the set stops
+    # growing; it terminates because the set only grows and is bounded by the element
+    # count. That is the viscoplastic driver's own fixed point, read on the same
+    # quantity against the same threshold.
+    #
+    # What is different here is the PATH, not the law. The viscoplastic driver applies
+    # the whole drop at once and relaxes; Newton is given a residual perturbed by a
+    # finite amount with no small parameter to continue in, and a drop the structure
+    # survives can sit outside the basin of a single step from the pre-drop state. So
+    # the cap is walked down from peak to residual and the step is halved when the
+    # corrector cannot carry it. Reaching the floor IS the verdict: the structure
+    # cannot shed that force. The end state at eta = 1 is the same law either way.
+    n_soften_rounds = 0
+    if converged and bars is not None and any(bg['can_soften'].any() for bg in bars):
+        _ok, u, _it, _fe, _oobs, n_soften_rounds, _cuts = _nr_soften_latch(
+            bars, groups, pattern, u, base_loads, free_dofs, n_dof, h_eps,
+            force_tol, _oob, nr_max_iter, u_elastic_scale, piles=piles,
+            trans_dofs=trans_dofs, debug_level=debug_level)
+        total_iterations += _it
+        n_force_evals += _fe
+        n_cuts += _cuts
+        if not _ok:
+            converged = False
+            exit_reason = 'diverging'
+        # The state that came out of the last drop must pass the SAME force gate.
+        if converged:
+            fint, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles)
+            n_force_evals += 1
+            r_full = np.zeros(n_dof)
+            r_full[free_dofs] = (base_loads - fint)[free_dofs]
+            last_oob = _oob(r_full)
+            if last_oob >= force_tol:
+                converged = False
+                exit_reason = 'iteration_cap'
+
     # ... and the same displacement bound. Force equilibrium alone is not the
     # question; equilibrium in a state the small-strain model can represent is.
     # See _NR_DISP_FACTOR. Read once, here, on the final state.
@@ -8052,7 +8224,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     # length so every reader indexes them the same way: the force each bar actually
     # delivers (the elastic k*delta clipped into [0, t_allow], which is what
     # forces_1d means on both drivers), which bars are AT their capacity, and the
-    # post-peak set — necessarily empty, since softening is refused above.
+    # post-peak set, which is what the latch above wrote.
     #
     # One convention difference is deliberate and is not a defect on either side.
     # The viscoplastic driver's failed mask LATCHES: it records every bar that
@@ -8068,6 +8240,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         for bg in bars:
             forces_1d_out[bg['idx']] = bg['_T_true']
             failed_1d_out[bg['idx']] = bg['_T'] > bg['t_cap'] + 1e-9
+            softened_1d_out[bg['idx']] = bg['softened']
 
     # ---- pile diagnostics ---------------------------------------------------
     # The same five arrays the viscoplastic path returns, indexed by pile element
@@ -8500,7 +8673,15 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                     "last_solution": last_solution}
 
         restrength(groups, F_try)
-        seeded, ep_save = False, None
+        seeded = False
+        # The step's own history, kept so a REJECTED step leaves nothing behind —
+        # the plastic strains a predictor seed or a softening sub-step committed,
+        # and the post-peak set the latch may have grown. Softening only ever grows
+        # WITHIN a solve, and the ramp is one solve, so a bar that ruptured at F_k is
+        # ruptured at F_{k+1}; but a step that is refused never happened.
+        ep_save = [grp['ep'] for grp in groups]
+        soft_save = ([(bg['softened'].copy(), bg['t_cap'].copy()) for bg in bars]
+                     if bars is not None else None)
         ok, u_try, it, fe, oob, _rel = _nr_equilibrate(
             groups, pattern, u, base_loads, free_dofs, n_dof, h_eps, force_tol,
             oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
@@ -8521,7 +8702,6 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
             # state and not on the seed. The ramp used to walk every step cold,
             # which is why it read 1.0531 on the three-layer model against the
             # bisection's 1.2109.
-            ep_save = [grp['ep'] for grp in groups]
             for _chunk, _ceiling, _seed_prep, _seed_ef in _nr_predictor_rungs(
                     prep, len(fem_data['elements']), max_iterations,
                     max_iterations_ceiling, early_failure):
@@ -8574,6 +8754,23 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                 # as it was before the seed overwrote it.
                 for grp, _ep0 in zip(groups, ep_save):
                     grp['ep'] = _ep0
+        # The post-peak latch, on the same converged full-load state the bisection
+        # reads it on. The set is carried FORWARD across steps by construction — the
+        # bar groups are built once for the whole ramp — so a bar that ruptured at a
+        # lower strength is ruptured here, which is what one continuous history
+        # means. A drop that reaches the step floor refuses the step.
+        if ok and oob < force_tol and bars is not None and any(
+                bg['can_soften'].any() for bg in bars):
+            ok, u_try, it_s, fe_s, oob_s, _r, _c = _nr_soften_latch(
+                bars, groups, pattern, u_try, base_loads, free_dofs, n_dof, h_eps,
+                force_tol, oob_fn, _NR_MAX_ITER, u_el, piles=piles,
+                trans_dofs=trans_dofs, debug_level=debug_level)
+            it += it_s
+            fe += fe_s
+            total_iters += it_s
+            total_fevals += fe_s
+            if _r:
+                oob = oob_s
         maxu = _nr_umax(u_try - u_datum, trans_dofs) if u_try.size else 0.0
         # The SAME admissibility standard a converged bisection trial passes: force
         # equilibrium under the tolerance, and a state the small-strain model can
@@ -8609,11 +8806,14 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
         else:
             # Reject the step and retry from the SAME converged state at half the
             # increment. Nothing was committed, so there is nothing to undo but the
-            # strengths, which the next attempt overwrites — and a predictor seed, if
-            # one equilibrated here only to be refused on displacement.
-            if seeded:
-                for grp, _ep0 in zip(groups, ep_save):
-                    grp['ep'] = _ep0
+            # strengths, which the next attempt overwrites — and a predictor seed or
+            # a softening sub-step, if one committed a plastic strain or dropped a
+            # bar here only for the step to be refused.
+            for grp, _ep0 in zip(groups, ep_save):
+                grp['ep'] = _ep0
+            if soft_save is not None:
+                for bg, (_s0, _c0) in zip(bars, soft_save):
+                    bg['softened'], bg['t_cap'] = _s0, _c0
             F_refused = F_try
             n_retries += 1
             if debug_level >= 1:

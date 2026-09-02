@@ -6313,3 +6313,135 @@ and `xslope.__file__` asserted:
 The pile sample is the sharp row: `main` rewrote the viscoplastic driver's pile
 capacity law, and that model's capacities do not bind, so both drivers had to come
 back on the number the piles round recorded. They did.
+
+## THE PILE HINGE — the Newton driver's moment capacity is a release
+
+Written before any feature code, so that what follows is a test and not a
+description. Same machine and settings as everything above: `force_tol` 1e-3,
+hybrid criterion, `capture_failure_state=False`, tolerance 0.01.
+
+### Why this one now
+
+The pile round measured the moment capacity INERT on both drivers and said so:
+"the moment correction is applied at the rotational degree of freedom the two
+adjacent beam elements SHARE, and at equilibrium their end moments there are equal
+and opposite, so the two corrections cancel. Reversing the sign reverses both of
+them and they cancel again." It then left the finding as the owner's decision
+rather than a fix.
+
+`main` has since made that decision on the DEFAULT driver (a115d9c5). A moment
+capacity is now a plastic hinge: the element's elastic end rotation is the nodal
+rotation less a plastic rotation `p`, the moment it delivers is
+`K_local (u_local - p)`, and the correction is the full element vector `K_local p`
+— which, unlike a nodal moment, acts on the element's translational rows and does
+not cancel. One release per pile NODE, because every interior node carries two
+element ends and releasing both leaves the node's rotation seeing equal and
+opposite capacities whatever it does. That commit's own note says the Newton
+driver on this branch "carries the same inert moment-cap form ... and needs the
+same hinge treatment, including the one-release-per-node rule, before its pile
+results mean anything on a model where M_cap binds."
+
+The shear leg needs nothing: the Newton path already writes it in the bar's
+convention — the part of the elastic action the member cannot deliver, subtracted
+from its own internal force — which is the sign `main` has now adopted.
+
+### The semantics being reproduced, read from the merged driver
+
+Not assumed — read out of `_pile_element_capacity`, `_pile_moment_hinge` and
+`_pile_hinge_ends` on `main` and restated here, because the two drivers have to
+solve the same model:
+
+- **The hinge.** With `A` the rotational block of `K_local` (its rows and columns
+  2 and 5, the two END nodes) and `m_e` the elastic end moments, the delivered
+  moments are `m_e - A p`, and requiring the hinged ends to sit on the capacity is
+  one 1x1 or 2x2 linear solve. Every end moment is linear in `p`, so there is
+  nothing to iterate. Releasing one end raises the moment at the other, so the
+  hinge set is GROWN until it is stable — at most two passes, there being two ends.
+- **One release per node.** `_pile_hinge_ends` gives each pile node to the first
+  element that reaches it; the other element's end at that node is left elastic,
+  and node equilibrium puts it on the capacity with the opposite sign anyway. The
+  mask is F-independent and is built once over the WHOLE pile element list, so the
+  ownership is global and not per DOF-count group.
+- **The correction is the full element vector.** `corr_local = K_local p_local`
+  with `p_local` carrying the plastic rotations in slots 2 and 5. The viscoplastic
+  scheme solves `K u = base_loads + corrections`, so the internal force the state
+  is in equilibrium with is `K u - corrections = T^T K_local (u_local - p_local)`.
+- **The axial force and the shear are re-read off the RELEASED displacement**
+  `u_local - p_local`, because a hinge changes them; the shear capacity is then
+  applied to that shear.
+- **`yielded_M` is set whenever the cap is exceeded**, whether or not the element's
+  own end took the release — the other end of a shared node is on the capacity too.
+- **The plastic rotation is reported**, on the solution as `pile_plastic_rotation`
+  and through the pile result sidecar, at the two END nodes of each element.
+
+### Design
+
+The Newton residual is written in the element's GLOBAL frame, so the whole of the
+above collapses to `f_int = K_global (u_e - p)` less the shear correction:
+`T^T K_local p_local = K_global p` because `p` carries only ROTATIONAL components
+and a rotation is invariant under the frame change. The rotational block of
+`K_global` at rows and columns 2 and 5 is `K_local`'s own for the same reason, so
+the hinge solve is the same 2x2 either way.
+
+- **The law is the shared one.** `_pile_moment_hinge` and `_pile_hinge_ends` are
+  called directly, so the hinge algebra and the ownership rule have exactly one
+  implementation and cannot drift between the drivers.
+  `_pile_element_capacity` itself is NOT reused, and the reason is stated rather
+  than assumed: it returns a LOCAL-frame correction and no tangent, and it re-reads
+  the actions through `_pile_element_actions`' closed forms, where the Newton path
+  needs them on the constant ROWS it differentiates. What it shares with this path
+  is the two functions that carry the law.
+- **The hinge solve runs only where a cap is exceeded.** An element under its
+  capacity takes `p = 0` and the arithmetic it was already on, which is why a model
+  where nothing binds has to come back bit-identical.
+- **Consistent tangent, with the rotational block condensed.** On a fixed active
+  set `A`, `p_A = S_AA^{-1} (m_A - sign(m_A) M_cap)` is affine in `u_e`, so
+  `dp/du_e = R` with `R` carrying `S_AA^{-1} G_A` in the released rotational rows
+  and zero elsewhere (`G` the two moment rows). Then `dw/du_e = I - R` and
+
+      dK/du_e = K (I - R) - [|V| > V_cap] * q_V (x) (g_V (I - R))
+
+  which is the derivative of the map the residual actually uses. A capped end's
+  moment has derivative exactly zero, which is what a hinge means.
+- **The displacement bound, the fixity constraint and the ramp are untouched.** A
+  hinge adds no degree of freedom and nothing latches — `p` is a function of the
+  current displacement alone — so the pile law stays nonlinear-ELASTIC and the
+  ramp's warm start needs no extension.
+
+### Success criterion (verbatim)
+
+1. **The binding case, from a115d9c5's own commit message.**
+   `docs/tutorials/files/xslope_pile_wall.xlsx`, tri6 at 2 ft, bracket 1.0-2.0,
+   with `M_cap`/S lowered from the file's 90,600 to 20,000. The viscoplastic
+   driver reads **FS 1.41015625** there, with the largest end moment in
+   equilibrium equal to 20,000, a plastic rotation of 1.98e-3 rad and 3 hinges.
+   The Newton bisection must land within 0.01 of that; at its reported state the
+   largest end moment must equal the cap to 1e-6 relative, and the hinge count
+   must match the viscoplastic driver's.
+2. **The non-binding cap is bit-identical to uncapped, on Newton.** The same model
+   at the file's own 90,600 — which the wall's elastic demand never reaches — must
+   return the same factor of safety, the same trial verdicts, the same iterations
+   and the same force evaluations as the same model with `M_cap` removed.
+3. **The eight pile locks do not move.** Every one of the pile round's eight
+   benchmarks, built through `run_tests.py`'s own `build_fem_ssrm_case`, must
+   return the Newton factor of safety the piles round recorded — including the four
+   disputed rows, which stay at their Newton values: the dispute there is the
+   viscoplastic early-failure classifier and not the capacity, and no capacity
+   binds on any trial of any of the eight.
+4. **The element tangent is the derivative of the element's own residual across
+   the RELEASED branch.** Against a central difference, 1e-8 relative or better,
+   with the branch histogram reported and the hinged branches actually reached.
+   The frame-rotation caveat this document has carried since the tension-cutoff
+   round applies to the difference and not to the tangent, and the 1/h scaling is
+   the evidence for which.
+5. **The locks catch it.** `check_piles` gains a moment-capacity leg, and the
+   mutation is the form this round removes: restore the cancelling nodal-moment
+   correction and the check must FAIL, run both ways and recorded. The whole check
+   file passes.
+6. **The default path is unchanged**, against the standard control: Griffiths &
+   Lane 6 dry with no `fem_solver` argument, FS 2.421875 on per-trial iteration
+   counts 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777.
+7. **An honest negative is a valid outcome and must be written.** If the hinge
+   costs a lock, if the released tangent will not difference, or if the two drivers
+   part on the binding case for a reason that is the formulation rather than a
+   solver rule, that is the result.

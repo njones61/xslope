@@ -5524,3 +5524,200 @@ What remains, in the order it matters:
   curve. Hoek-Brown and the power curve are two linearizations of the same shape and
   would come together; softening is still the reason neither published reinforced
   factor of safety is reachable here.
+
+
+## CURVED ENVELOPES — Hoek-Brown and the power curve, per element
+
+Written before any feature code, so that what follows is a test and not a
+description. Same machine and settings as everything above: `force_tol` 1e-3,
+hybrid criterion, `capture_failure_state=False`, tolerance 0.01.
+
+### Why this one now
+
+The pile round left three refusals: post-peak bar softening, Hoek-Brown and the
+power curve. The last two are the pair the K0 round said "would come together",
+and the eligibility inventory
+(`xslope_private/reports/newton_corpus_eligibility_2026-09-01.md`) puts eight
+locked `fem_ssrm` models behind them — three Hoek-Brown (`xslope_rock_slope`
+1.166, `hammah_hb1` 1.166, `vp044d` 1.115) and five power curve (`vp040` 1.023,
+`vp041` 1.656, `vp044a` 0.973, `vp045b` 2.637, `vp061a` 1.497). Every one of the
+eight carries `k0=1` and nothing else this driver refuses, so the envelope is the
+only gate on all of them.
+
+The owner's requirement is sharper than "carry the two envelopes". It is
+PER-ELEMENT DISPATCH: multiple materials, each with its own strength model, in
+one run — a Mohr-Coulomb soil and a Hoek-Brown rock in the same mesh, solved
+together. That is what the criterion's mixed-material clause is for, and it is
+the clause a design that swapped a global constitutive law for another global one
+would fail.
+
+### The semantics being reproduced, read from the viscoplastic driver
+
+Not assumed — read out of `build_fem_data`, `solve_fem`'s Step 6 and
+`xslope/hoekbrown.py`, and restated here, because the Newton path has to solve the
+same model.
+
+- **Both envelopes are carried as a per-Gauss-point MOHR-COULOMB LINEARIZATION,
+  re-derived every iteration.** There is no second yield surface and no second
+  flow rule anywhere in the viscoplastic path. `grp['c_r']`, `grp['snph']` and
+  `grp['csph']` are overwritten in place at the top of every Step-6 pass for the
+  Gauss points flagged `pow_m` / `hb_m`, and the identical MC yield function and
+  identical psi = 0 MOCOUQ flow then run on all points alike. The dispatch is
+  already per Gauss point on that path: `pow_flag_by_elem` and `hb_flag_by_elem`
+  are per-element boolean arrays, sliced onto each group as `grp['pow_m']` /
+  `grp['hb_m']`, and a group can hold Mohr-Coulomb, power-curve and Hoek-Brown
+  points at once.
+- **The power curve's abscissa is the in-plane Mohr-circle CENTRE.** With
+  `s' = -(sx + sy)/2` clamped at zero (compression-positive),
+  `s_eff = max(s' + pow_d, 1e-4 ref)`, the F-reduced tangent is
+  `slope = a b s_eff^(b-1) / F`, `tau_F = (a s_eff^b + pow_c)/F`,
+  `c_r = tau_F - s' slope`, `phi = atan(slope)`. `pow_d` is the tension
+  intercept: the envelope is `tau = a (sigma_n + d)^b + c_p`, so `d` shifts the
+  origin and the `1e-4 ref` floor is what stops a tensile point running past it.
+- **Hoek-Brown's abscissa is the FAILURE-PLANE normal stress**, taken from the
+  PREVIOUS iterate's reduced tangent:
+  `sigma_n = max(s' cos^2(phi) - c_r sin(phi) cos(phi), 0)`. That is the point at
+  which a Mohr circle of centre `s'` touches its tangent line, so the
+  linearization closes as a FIXED POINT inside the viscoplastic loop: at
+  convergence the circle, the tangent line and the reduced envelope all meet at
+  one `sigma_n`. `hb_tangent_const` then inverts Balmer's parametric curve by
+  bisection on `sigma_3` to get `(c_i, phi_i)`, from GSI/mi/D-derived `mb`, `s`,
+  `a`. The `sigma_n >= 0` clamp is load-bearing and is documented as such: at the
+  Hoek-Brown tensile apex `dsigma_1/dsigma_3` diverges and `phi_i -> 90 deg`.
+  The code also says in as many words NOT to linearize at `sigma_3` instead.
+- **Strength reduction divides the TANGENT, not the constants.** `c_i/F` and
+  `tan(phi_i)/F` — dividing a shear-strength function by F divides its tangent
+  line's slope and intercept by F. `sigma_ci/F` is a different envelope, because
+  of the exponent `a`. The per-Gauss-point F is `grp['F']`, which is 1.0 on an
+  `ssr_exclude` element, so an excluded curved-envelope element keeps its whole
+  envelope.
+- **The native Hoek-Brown tensile strength is `-s sigma_ci / mb`** (`hb_sigma_t`),
+  the apex where `sigma_1 = sigma_3`. It is used as the lower bracket of the
+  Balmer inversion and nowhere else: it does NOT become a Rankine cap. A model
+  that wants a tension cutoff states `t_cut` in the material table, which is the
+  same per-element `t_cap_base` machinery Mohr-Coulomb materials use
+  (`docs/usage/input_template.md`); `tension_srf` then divides a finite positive
+  cap by F alongside the rest of the envelope. The two are independent, and the
+  Newton path must compose them the same way.
+- **`c_by_elem` / `phi_by_elem` carry only a SEED tangent** for a curved-envelope
+  element, taken at the vertical-overburden estimate at the element centroid.
+  Anything that reads those arrays before the loop re-linearizes is reading a
+  seed, not the envelope.
+
+### Design
+
+Per-Gauss-point dispatch inside the return map's caller, on the same flags the
+viscoplastic path dispatches on. A Mohr-Coulomb point is untouched — the plain
+map, bit for bit. A curved-envelope point gets its own `(c, sin phi, cos phi)`
+for that evaluation and then goes through the SAME return map, because the
+linearized envelope IS a Mohr-Coulomb surface and the flow rule the two drivers
+share is psi = 0 on it.
+
+Two designs were open, and the reading above chooses between them:
+
+- **(A) Mirror the viscoplastic linearization.** Equivalent local `c`, `tan phi`
+  per point per evaluation, then the existing map.
+- **(B) An exact curved-surface return** — Newton on the true envelope in
+  principal-stress space, corners handled, with its own consistent tangent.
+
+**(A) is the design, and the reason is that (B) would be solving a different
+model.** The viscoplastic driver has no curved yield surface: it has a
+per-Gauss-point tangent line and the ordinary Mohr-Coulomb return on it. Its
+converged state is the fixed point where the tangent line is taken at the
+abscissa the converged stress itself produces. An exact curved-surface return
+would converge somewhere else, by an amount nobody has measured, and the round's
+first obligation is that the two drivers answer the same question. Where (B)
+would be visibly better — the corner and apex construction on a strongly curved
+surface — the measurement below says how often those branches fire at all.
+
+What (A) has to solve that a naive reading does not:
+
+- **The linearization must be a pure function of the displacement**, or the
+  residual is not one and neither the line search nor the convergence test means
+  anything. The viscoplastic path can lag its linearization by one iteration
+  because it has no line search; this path cannot. So the tangent is closed as a
+  SELF-CONSISTENT fixed point inside each residual evaluation: linearize,
+  return, re-read the abscissa off the RETURNED stress, re-linearize, to a fixed
+  tolerance and a hard iteration cap. That is the same fixed point the
+  viscoplastic loop converges to, reached per evaluation instead of per solve.
+- **The consistent tangent then comes for free, and that is the second reason for
+  (A).** `_nr_group_state` differences the whole map in the three free strain
+  components. With the linearization inside the map, that quotient automatically
+  carries `d(c, phi)/d(sigma)` — the derivative of the linearization — so the
+  tangent is consistent with the map the residual actually uses, with no separate
+  algebra to keep in step. It is no longer exact-on-the-branch, because the
+  linearization is a smooth nonlinear function of the trial stress, so the
+  differencing error is first-order in the probe step as it already is for the
+  principal frame's rotation. That is measured rather than assumed.
+- **The tension cutoff composes as it does for Mohr-Coulomb**: the cap is a
+  second surface on the SAME linearized shear surface, so the existing
+  active-set return takes it unchanged, inside the fixed point.
+- **The ramp's `restrength` must re-derive the reduced envelope per step.** For a
+  curved-envelope point the reduction is `1/F` on the tangent, and the tangent is
+  re-derived every evaluation anyway, so what `restrength` has to carry is the
+  per-element `F` the linearization divides by — not a `c_r` it computes once.
+- **Elastic materials and SSR exclusion are unchanged.** An `elastic` point keeps
+  `c_r = inf` and is never linearized; an `ssr_exclude` point linearizes at
+  F = 1.
+
+### Success criterion (verbatim)
+
+1. **The return map is right, per envelope, measured.** At least 200,000 random
+   trial states per envelope — several GSI/mi/D sets for Hoek-Brown and several
+   (a, b, c, d) sets for the power curve — with and without a finite `t_cut`:
+   every returned state satisfies BOTH surfaces to within 1e-12 of the stress
+   scale, the principal ordering survives, no elastic state is modified at all,
+   and the branch histogram is REPORTED with every branch the design names
+   actually exercised — a fuzz that never lands on a region proves nothing about
+   it. The consistent tangent is checked against a central difference on every
+   branch and REPORTED; the 1e-8 target is stated with the frame-rotation
+   truncation caveat this document has carried since the tension-cutoff round,
+   and the linearization's own smoothness is now a second first-order term.
+2. **The eight locked models**, three Hoek-Brown and five power curve, each built
+   through `run_tests.py`'s own `build_fem_ssrm_case` so the mesh, the element
+   type, the bracket, the iteration budget, `k0` and every solver option are the
+   suite's and not this round's. The Newton bisection must land inside each
+   published tolerance AND within 0.01 of the viscoplastic driver on at least 6
+   of the 8. Reported per model: viscoplastic FS, Newton FS, the lock, its
+   tolerance, and the constitutive work on each driver. **Every miss is diagnosed
+   rather than reported as a direction** — the trials whose verdicts differ are
+   run, the Newton state's own admissibility read (out-of-balance and the worst
+   yield violation in the invariant form on the linearized envelope), and the
+   viscoplastic out-of-balance at closure quoted, the way the RS2-28, three-layer
+   and pile disagreements were refereed. If the early-failure-classifier pattern
+   recurs, it is named as such.
+3. **MIXED MATERIALS — the owner's requirement.** At least one model carrying a
+   curved-envelope material AND a Mohr-Coulomb material in the same mesh,
+   constructed if the corpus has none. The Newton bisection must agree with the
+   viscoplastic driver within 0.01 on it, and the PER-ELEMENT DISPATCH must be
+   asserted rather than inferred: the branch and envelope counts per material
+   reported, with the Mohr-Coulomb elements shown taking the plain path and the
+   curved ones their own, in the same solve.
+4. **The ramp agrees** with the Newton bisection within 0.01 on at least 3 of the
+   models, and carries the reduced envelope through its warm history.
+5. **The Mohr-Coulomb-only path is bit-identical**, on the same control-tree
+   protocol every previous round used: the plain-soil eight rows, the reinforced
+   benchmarks, the tension-cutoff rows, a K0 vendor row, a matric-suction row and
+   a pile row, re-run against a control run of the parent commit staged in a
+   separate package tree — every trial identical in factor of safety, verdict,
+   iterations and force evaluations — plus the plain Mohr-Coulomb return map
+   bit-identical over 800,000 random trial states.
+6. **The refusals.** Only post-peak bar softening remains; it still raises and
+   still names itself, with the viscoplastic control accepting it. Asserted.
+7. **The locks catch it.** `test/nr_ssrm_check.py` gains
+   `check_curved_envelopes`: the fuzz and its branch histogram, one Hoek-Brown
+   model and one power-curve model on both drivers, and the mixed model on both
+   drivers AND on both Newton routes. Mutations, run both ways and recorded:
+   **corrupt `mb`** (or `a`) so the derived Hoek-Brown constants are wrong, and
+   **drop the F-reduction of the envelope** so the tangent is taken unreduced.
+   Each must FAIL the check. The whole check file passes.
+8. **The default path is unchanged**, against the standard control: Griffiths &
+   Lane 6 dry with no `fem_solver` argument, FS 2.421875 on per-trial iteration
+   counts 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777.
+9. **An honest negative is a valid outcome and must be written.** If the
+   self-consistent linearization does not close, if the tangent's conditioning
+   costs the plain table, if the two drivers disagree on a curved-envelope model
+   by more than the bisection tolerance for a reason that is the formulation
+   rather than a solver rule, or if design (A) turns out to be measurably further
+   from the limit-equilibrium answer on the same envelope than an exact return
+   would be — that is the result.

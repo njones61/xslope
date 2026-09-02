@@ -4758,3 +4758,249 @@ What remains, in the order it matters:
 - **The corpus run.** Unchanged from the K0 round's verdict: the reachable set is now
   larger by six workbooks and nine locks, and running it is still what would turn a
   sample into a statement about the corpus.
+
+## PILES — the Newton driver carries the beam element
+
+Written before any feature code, so that what follows is a test and not a
+description. Same machine and settings as everything above: `force_tol` 1e-3,
+hybrid criterion, `capture_failure_state=False`, tolerance 0.01.
+
+### Why this one now
+
+The suction round left four refusals: piles, post-peak bar softening, Hoek-Brown
+and the power curve. Piles gate the largest block of them — eight locked
+`fem_ssrm` benchmarks against three for Hoek-Brown and five for the power curve,
+and they are the only one of the four whose models span the tutorials, the FEM
+samples and two vendor corpora at once. They are also the only refused feature
+that changes the SHAPE of the problem rather than the constitutive law: a pile
+node carries a rotational degree of freedom, so a pile model is the first thing
+this driver has met whose displacement vector is not a list of lengths.
+
+That last point is why this round is not only an addition. The Newton
+displacement bound reads `max|u|` over the RAW degree-of-freedom vector, and the
+guard that has kept that honest until now is an assertion that no rotational
+degree of freedom exists — which is true exactly because piles are refused.
+Carrying piles without changing the bound would silently compare a length
+against a radian.
+
+The eight locked models, with the lock each carries (`docs/verification/`,
+`docs/fem/samples.md`, `docs/tutorials/fem03_piles.md`; every one at
+tolerance 0.01):
+
+| Benchmark | Model | Lock | What it exercises |
+|---|---|---|---|
+| SIGMAW-SRS-wall | `gs2_wall` | 1.647 | sheet pile wall, an elastic material, `t_cut` = 0 on two soils, a c = 0 layer |
+| VP106-FEM-free | `vp106c_fem` | 1.472 | pile row at S = 2.4, free head and tip |
+| VP106-FEM-fixed | `vp106c_fem_fix` | 1.587 | the same row with the head rotation HELD |
+| FEM-3-wall-ssrm | `xslope_pile_wall` | 1.559 | sheet pile wall, tip FIXED, a finite `M_cap` |
+| FEM-3-piles-ssrm | `xslope_piles` | 1.379 | two pile rows, finite `V_cap` AND `M_cap` |
+| (FEM sample) | `xslope_piles_fem` | 1.380 | the same two rows |
+| SSRM-TORGGLER | `xslope_torggler_3a_plate` | 1.195 | a 7.5 m plate, no capacities |
+| SSRM-TORGGLER | `xslope_torggler_3b_plate` | 1.673 | a 15 m plate over a weak band |
+
+### The semantics being reproduced, read from the viscoplastic driver
+
+Not assumed — read out of `build_fem_data`, `_prepare_fem_model` and `solve_fem`
+and restated here, because the Newton path has to solve the same model.
+
+- **The element.** A two-node Euler-Bernoulli beam on a linear soil edge, a
+  three-node one on a quadratic edge, standing on the same nodes as the soil.
+  Bending on the three-node element is the quintic Hermite that matches a value
+  and a slope at all three nodes; axial is the quadratic bar; the two are
+  uncoupled. `K_global_pile_elems` is `T^T K_local T`, and it is what the global
+  elastic stiffness is assembled from — the same matrix on both drivers.
+- **The degrees of freedom.** Every node a pile element stands on, midside nodes
+  included, carries three DOFs; every other node carries two. `dof_offset` is
+  the map and `is_pile_node` the flag.
+- **Per-unit-width.** `EA`, `EI`, `V_cap` and `M_cap` are all divided by the
+  spacing `S`, so everything the solver sees is per unit width of slope while the
+  file states the single-pile section. `docs/usage/input_template.md` is the
+  published statement of that convention.
+- **The actions.** Axial `EA/L (u2 - u1)` at the element center; the shear at the
+  center (constant along a two-node element, `EI v'''(L/2)` on the three-node
+  one); and the bending moments `M1`, `M2` at the two END nodes, read as rows 2
+  and 5 of `K_local u_local`. The midside node has no action of its own.
+- **The coupling is a shared node.** There is no interface element and no bond
+  law: the pile and the soil have identical displacements at every node, which is
+  a perfectly bonded interface (`docs/fem/piles.md`). There is nothing here to
+  reproduce beyond the beam blocks themselves.
+- **Fixity is a CONSTRAINT, not a load.** Head and tip each take free / pinned /
+  unrotated / fixed, and `_prepare_fem_model` removes the held degrees of freedom
+  from `free_dofs`. Both drivers read that same set, so tip fixity needs no code
+  on this path — which has to be ASSERTED rather than assumed.
+- **Nothing latches.** `yielded_pile_V` and `yielded_pile_M` are set for
+  reporting and never read back into the constitutive rule; the capacity check is
+  recomputed from the current displacement at every iteration. The pile law is
+  therefore nonlinear-ELASTIC with no history, exactly as the bar law is with
+  softening refused: nothing to commit at the end of a step and nothing for the
+  ramp's warm start to carry.
+- **Nothing is reduced by F.** `E`, `I`, `A`, `V_cap` and `M_cap` are held while
+  only `c` and `tan(phi)` fall, which is the vendor convention, what the bar does
+  and what `docs/fem/piles.md` states.
+- **The axial force has no capacity at all.** There is no `T_cap` on a pile.
+
+**And two things about the capacities that were measured rather than read**,
+because the shape of this round depends on them. Both were measured on
+`xslope_piles_fem` (tri6/2, 18 pile elements, `V_cap`/S = 7,666.7,
+`M_cap`/S = 10,000) at F = 1.3, on the DEFAULT driver, with nothing changed.
+
+**(i) The moment cap is inert, and no sign of it could be otherwise.** The
+correction `sign(M) M_cap - M` is applied to the shared rotational degree of
+freedom at the element's end node. Two beam elements meet at every interior node
+of a pile, and at equilibrium their end moments there are equal and opposite, so
+their two corrections are equal and opposite and cancel exactly. Measured: with
+`M_cap` set to 10,000, 1,000, 100 and 10 while the largest moment in the pile is
+6,763.5, the net applied moment summed over the pile's rotational degrees of
+freedom is 0, 8.2e-8, 1.8e-7 and 1.5e-7, and `max|u|` is 0.054093354479 at every
+one of the four — unchanged to twelve decimals across four decades of cap. The
+pile's own moments do not move either. A plastic hinge is a RELEASE of rotational
+continuity; a moment applied at a node the two elements share is not one, and the
+reported moments are clipped separately, twice (inside the loop and again at
+Step 10c), which is why an inert cap reads as an enforced one.
+
+**(ii) The shear cap is applied with the sign that makes it an anti-cap.** The
+viscoplastic scheme solves `K u = base_loads + corrections`, so the internal force
+the state is in equilibrium with is `K u - corrections`. The bar path applies
+`correction = T - T_true` and therefore delivers `T_true` — the comment there says
+in as many words that the opposite sign "turns the cap into an anti-cap: the bar
+ends up carrying 2T - T_true". The pile path applies `correction = V_true - V`.
+Measured at the converged state, reading the shear the pile actually delivers out
+of `K u - corrections` in the beam's own frame rather than out of the reported
+(clipped) array:
+
+| `V_cap`/S | reported max &#124;V&#124; | DELIVERED max &#124;V&#124; |
+|---|---|---|
+| none | 1,459.7 | 1,457.6 |
+| 7,666.7 (the file's) | 1,459.7 | 1,457.6 |
+| 766.7 | 766.7 | 1,731.3 |
+| 76.7 | 76.7 | 1,867.7 |
+
+The tighter the cap, the more shear the pile delivers. The reported column is the
+clip; the delivered column is the physics.
+
+Neither of those is changed by this round — `solve_fem` is not touched, and which
+number the repository's locked pile values should carry is the owner's decision,
+not a spike's. What they decide is what the Newton path can honestly implement,
+which the design states next.
+
+### Design
+
+- **`_nr_build_piles(fem_data)`**, grouped by degree-of-freedom count (6 on a
+  two-node element, 9 on a three-node one) so each group is a dense array pass,
+  holding the global element matrix `K`, the rotation `T`, the local rows that
+  read `V`, `M1` and `M2` out of `u_local`, the global patterns those actions are
+  delivered on, and the per-element caps. Every array is read from `fem_data` and
+  never written, so the two drivers carry the same beam.
+- **Residual.** `f_int = K u_e - sum_k (s_k - s_k_true) q_k` over the three capped
+  actions, with `s_true = clip(s, -cap, +cap)` and `q_k` the action's own internal
+  force pattern. That is the BAR's convention — the one that delivers `s_true` —
+  applied to a beam. It is not the viscoplastic driver's sign on the shear, and
+  the consequence is measured rather than assumed: on every model where no cap
+  binds the two drivers solve the identical problem, and on a model where one
+  binds they do not, and the criterion below says what has to be measured there.
+  The moment leg is written the same way and is expected to be inert for the
+  structural reason above, on this driver as on the other; that it is inert is
+  measured, not assumed.
+- **Consistent tangent, exact.** Each action is LINEAR in `u_e` and each capped
+  branch is affine, so there is nothing to difference: `ds/du = g` (a constant
+  row) and `d(s - s_true)/du` is `g` while the action is over its cap and zero
+  otherwise. The element tangent is `K - sum_active q_k (x) g_k`. This is verified
+  against a central difference of the element's own internal force rather than
+  asserted.
+- **Assembly.** The pile blocks join the cached sparsity pattern explicitly, after
+  the soil groups and the bars, in the order the assembler walks them — the same
+  treatment the bars got, and for the same reason: a rotational degree of freedom
+  appears in NO soil element, so relying on the soil pattern would silently drop
+  every rotation from the tangent.
+- **Tip and head fixity.** Nothing to build: the held degrees of freedom are
+  already out of `prep["free_dofs"]`. The criterion asserts that rather than
+  assuming it, on the one model that holds a head rotation and the one that fixes
+  a tip.
+- **No history.** With nothing latching, the pile law is a function of the current
+  displacement alone, so there is nothing to commit at the end of a load step and
+  the ramp's warm start needs no extension. The predictor carries the pile state
+  for free: its seed is a displacement field on the same mixed-DOF vector.
+- **Strength reduction touches soil only.** The ramp's `restrength` rewrites the
+  soil groups and nothing else; the criterion asserts that a pile's capacity and
+  rigidity are identical at the foot of the ramp and at its limit.
+- **The displacement bound becomes translational.** `max|u|` is read over the
+  TRANSLATIONAL degrees of freedom only, which is what the viscoplastic driver's
+  own displacement-limit check reads ("Extract translational DOFs only for VP
+  displacement check"). The same measure is used for the elastic displacement
+  scale, the tangent probe's step and the `max|du|/max|u|` the drivers both report
+  as `residual`, and for the ramp's own bound. On a model with no pile every
+  degree of freedom is translational, so every one of those quantities is
+  bit-identical there — which is what the no-pile control tree below checks.
+- **The guard's pile line goes and nothing else does.** Post-peak bar softening,
+  Hoek-Brown and the power curve stay refused, each naming itself.
+
+### Success criterion (verbatim)
+
+1. **The element is right, measured twice.** (a) On at least 400 random beam
+   elements — random orientation, length, `EA`, `EI`, two-node and three-node,
+   with the displacement drawn so that all capacity branches are exercised and the
+   branch histogram reported — the analytic element tangent agrees with a central
+   difference of that element's own internal force to 1e-8 relative or better, on
+   every branch. (b) An isolated beam with no soil present reproduces the
+   closed-form deflection to 1e-10 relative: a cantilever under an end load and a
+   simply supported beam under a central load, at more than one orientation.
+2. **The eight pile-gated locked models**, each built through `run_tests.py`'s own
+   `build_fem_ssrm_case` so the mesh, element type, bracket, iteration budget and
+   every solver option are the suite's and not this round's. Reported per model:
+   viscoplastic FS, Newton FS, the lock, its tolerance, and the constitutive work
+   on each driver. The criterion is that the Newton bisection lands inside the
+   published tolerance on at least 6 of the 8 AND within 0.01 of the viscoplastic
+   driver on at least 6 of the 8. **Every miss is diagnosed rather than reported as
+   a direction**, by running the trials whose verdicts differ and reading the
+   Newton state's own admissibility — out-of-balance and the worst Mohr-Coulomb
+   violation in the INVARIANT form — the way the RS2-28 and three-layer
+   disagreements were refereed.
+3. **The capacity divergence is measured, not left as a design note.** On each of
+   the three models carrying a finite capacity, whether any cap binds at any trial
+   of the bisection is reported. Where none binds, the two drivers must agree
+   exactly, because they are solving the same problem. Where one binds, the two
+   answers are reported side by side together with the delivered-force reading that
+   says which law each driver is enforcing, and a constructed model with a cap
+   tightened until it binds is run on both drivers so the divergence has a number
+   on it rather than an argument.
+4. **Pile diagnostics.** On at least 2 models, the axial force, shear and end
+   moments from the Newton solution are compared element by element against the
+   viscoplastic solution's at the same F, and the largest relative difference is
+   REPORTED as a number. The `yielded_pile_V` / `yielded_pile_M` masks are compared
+   and any difference is explained by the convention that produces it, as the bar
+   masks' latching difference was.
+5. **The displacement bound reads translational degrees of freedom only**, and the
+   lock asserts it: on a pile model whose rotations are large beside its
+   displacements, a mutation that puts the rotations back into the bound must FAIL
+   the check. Run both ways and recorded.
+6. **The no-pile path is bit-identical**, on the same control-tree protocol the
+   previous rounds used: the plain-soil eight rows, the four reinforced benchmarks,
+   the tension-cutoff rows, a K0 vendor row and a matric-suction row, re-run
+   against a control run of the parent commit staged in a separate package tree —
+   every trial identical in factor of safety, verdict, iterations and force
+   evaluations — plus the plain Mohr-Coulomb return map bit-identical over 800,000
+   random trial states.
+7. **The ramp agrees** with the Newton bisection within 0.01 on at least 3 of the 8
+   models, and carries the pile through its warm history: a pile's rigidity and
+   capacity at the top of the ramp are identical to the foot's.
+8. **The refusal is gone and the guard list is updated.** Piles are carried;
+   post-peak bar softening, Hoek-Brown and power-curve envelopes each still raise
+   and each still names its own feature, with the viscoplastic control accepting
+   all three. A pile model whose viscoplastic treatment involves anything this path
+   does not carry must refuse with a message naming it rather than being solved
+   silently.
+9. **The locks catch it.** `test/nr_ssrm_check.py` gains `check_piles`, asserting
+   the element (tangent against a central difference, and the closed-form beam),
+   the fixity constraint, the factor of safety on one cheap locked pile model from
+   both drivers, and the translational bound. Three mutations, run both ways and
+   recorded: corrupt the beam's bending stiffness, put the rotations back into the
+   displacement bound, and drop the capacity correction from the residual. Each
+   must FAIL the check. The whole check file passes.
+10. **The default path is unchanged**, against the standard control: Griffiths &
+    Lane 6 dry with no `fem_solver` argument, FS 2.421875 on per-trial iteration
+    counts 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777.
+11. **An honest negative is a valid outcome and must be written.** If the beam
+    needs something this design does not have — if the rotational degrees of
+    freedom break the tangent's conditioning, if the locks cannot be reproduced, or
+    if the capacity divergence turns out to decide a published number — that is the
+    result.

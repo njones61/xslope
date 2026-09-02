@@ -7551,3 +7551,104 @@ Two rows are their own business. `RS2-66c-deep` is not rescued by any of this an
 fails at the load-step floor with a bounded field, which is a different defect on one
 model. `vp005` under Part 4's SSR polygon, the eleventh low row in the sweep, carries
 no depth filter and was never part of this.
+
+
+## THE COST OF THE RESCUE — where the Newton driver's fifteen hours go
+
+Written before any of it was measured or built, so what follows is a test and not a
+description.
+
+### Why this one now
+
+Every feature round in this document asked whether the Newton driver reaches the
+right answer. The 191-row calibration sweep answered a different question, and the
+answer is against the driver.
+
+Counted honestly, Newton does 2,036,692 force evaluations plus 5,054,073
+viscoplastic PREDICTOR iterations — 7,090,765 constitutive passes against the
+viscoplastic driver's 10,341,933, or 69% of them — and takes 15.0 hours of summed
+per-row wall against 11.8. It is faster on 72 of 191 rows. On plain Mohr-Coulomb,
+the class where this spike's first round measured 2x-to-4x speedups on eight
+benchmarks, it is 1.8x SLOWER across 36 rows. The predictor fired on all 191.
+
+The 69% is the number that matters, because the predictor is a viscoplastic solve.
+Two thirds of the Newton driver's constitutive work is the other driver's algorithm
+running inside it, and it buys robustness rather than speed: the viscoplastic driver
+left 37 trials INCONCLUSIVE across 31 rows and Newton left zero.
+
+The suspected mechanism is that the rescue chain does not know which trials it is
+for. A trial whose cold attempt dies at the load-step floor gets a 250-iteration
+viscoplastic seed, a Newton corrector, a 1,000-iteration seed, another corrector,
+and then an ADAPTIVE rung budgeted exactly as a full viscoplastic trial of the same
+model — the caller's `max_iterations` chunk under the caller's ceiling, stopped by
+the viscoplastic driver's own progress rule. That chain runs on every genuinely
+failing trial too, and half of every bisection is genuinely failing. On a trial the
+bisection visits only to prove it fails, the chain can only ever confirm the verdict
+the cold attempt already reached, at up to a full viscoplastic trial's price.
+
+This round changes only cost. No verdict may move.
+
+### What is measured first
+
+Phase 0 attributes the wall time of a Newton bisection, per trial, to:
+
+- the COLD attempt (Newton iterations and line-search force evaluations from zero);
+- the PREDICTOR, by rung (250, 1,000, adaptive);
+- the SEEDED correctors that follow each rung;
+- and the converged-trial cost, kept apart from the rest.
+
+Split by trial outcome (CONVERGED / FAILED) and by the trial's distance above the
+highest strength the bisection has carried, in units of the initial bracket width.
+The instrumentation is bookkeeping only and is held to the control-tree protocol
+like any other change.
+
+The slice is 46 rows drawn from the 191 by class, not by convenience: the plain
+Mohr-Coulomb benchmarks this spike was built on, sub-unity models, reinforced,
+piled, tensile-capped, K0 vendor transcriptions, SSR-zone, matric suction, curved
+envelopes and depth-filtered rows. Smaller meshes are preferred so the slice runs in
+well under an hour on eight workers and every policy below can be measured against
+the same baseline.
+
+### The policies, in the order they are tested
+
+**P1 — the ramp as the Newton driver's SSRM driver.** `ssrm_driver='ramp'` becomes
+the default when `fem_solver='newton'`, the bisection stays selectable. The ramp's
+answers are allowed to differ from the bisection's by the documented reporting
+convention — interval midpoints within 0.01 — and the predictor it spends on its own
+refused steps is counted.
+
+**P2 — rescue budget by distance from the standing bracket.** A trial adjacent to
+the standing bound gets the full chain; a trial far above the highest carried
+strength gets a truncated chain or none. "Far" is set by the Phase 0 measurement of
+where a rescue has ever CONVERTED a verdict, not by taste.
+
+**P3 — per-model memory.** Once a trial on a model has converged only from a seed,
+later trials skip the cold attempt and start from the seed.
+
+**P4 — a cheaper cold attempt.** Fewer load increments, a shorter line search, before
+the hand-off.
+
+### Success criterion (verbatim)
+
+> 1. **Verdict bit-identity.** Every policy adopted from P2, P3, P4 reproduces the
+>    Phase 0 baseline on all 46 slice rows EXACTLY: same FS, same final interval,
+>    same per-trial F sequence and same per-trial verdict. A single flipped verdict
+>    rejects that policy. The final configuration reproduces the Sweep 1 Newton
+>    column row by row on all 191.
+> 2. **The ramp is judged on its own convention.** P1 agrees with the bisection to
+>    within 0.01 on the interval midpoints on >= 95% of the slice rows.
+> 3. **Work.** On the full 191-row sweep the winning configuration's summed Newton
+>    wall is at or below the viscoplastic driver's 42,449 s; predictor iterations
+>    fall by >= 50% from 5,054,073; and the plain Mohr-Coulomb class is no longer
+>    slower than the viscoplastic driver.
+> 4. **Robustness is not traded away.** Inconclusive trials stay at 0 across the
+>    full sweep.
+> 5. **Locks.** `test/nr_ssrm_check.py` gains a COST lock — the predictor-fire count
+>    on a cheap case, together with the verdict identity that count is allowed to
+>    hold — with mutations that fail it. The whole check passes and the default
+>    viscoplastic control is unchanged (G&L6 dry, quad8 at 2, no `fem_solver`:
+>    FS 2.421875, iterations 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777).
+> 6. **An honest negative is a valid outcome and must be written.** If the rescue
+>    chain cannot be made cheap without moving a verdict, that is the result, and it
+>    says the Newton driver's robustness is bought at the measured price and not at
+>    a lower one.

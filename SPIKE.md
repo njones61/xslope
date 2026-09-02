@@ -5983,6 +5983,26 @@ strength models at once**, and the ramp lands one of its own increments above it
 +0.0078, which is inside the tolerance and is where the ramp lands on models with a
 single envelope too.
 
+**A second, larger mixed model says the same thing and prices it.** The same
+construction on `docs/fem/files/xslope_griffiths4_r1.xlsx` — its foundation clay
+re-declared Hoek-Brown — gives 4,405 elements, 1,470 Mohr-Coulomb and 2,935
+Hoek-Brown, which is 4,410 Mohr-Coulomb and 8,805 Hoek-Brown Gauss points in one
+mesh. The viscoplastic bisection reads **1.71484375** in 1,020 s. Rather than pay
+for a whole Newton bisection on it, the two trials either side of that answer were
+run directly:
+
+| F | driver | verdict | out-of-balance | iterations | worst yield violation | wall |
+|---|---|---|---|---|---|---|
+| 1.70 | viscoplastic | CONVERGED | 1.00e-03 | 3,658 | — | 98 s |
+| 1.70 | **Newton** | **CONVERGED** | **1.70e-05** | **27** | **1.5e-08** | 31 s |
+| 1.73 | viscoplastic | FAILED (`iteration_cap`) | 3.08e-01 | 12,000 | — | 308 s |
+| 1.73 | **Newton** | **FAILED** (load-step floor) | — | 729 | — | 1,334 s |
+
+Same verdict on both sides of the viscoplastic answer, and the price is the one
+this document has recorded since Phase 0 rather than anything the envelope adds:
+the standing trial costs Newton a third of the viscoplastic wall time on 135 times
+fewer iterations, and the failing trial costs it 4.3 times as much.
+
 #### The ramp
 
 The ramp carries the reduced envelope through its warm history: `restrength`

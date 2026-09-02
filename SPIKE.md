@@ -5120,3 +5120,59 @@ been silently comparing a length against a radian would otherwise have been deci
 verdicts. The lock asserts it structurally, on the index set the bound reads; the
 behavioural mutation the criterion asked for could not be built on a physically-sized
 model, and that is reported rather than manufactured.
+
+#### The two capacities, on both drivers
+
+The design said the Newton path would write the capacity the way the bar's is
+written — the part of the elastic action the member cannot deliver, subtracted from
+its own internal force — and that the consequence would be measured rather than
+assumed. It was, on the three locked models that carry a finite capacity.
+
+**The moment cap is inert on BOTH drivers, and no sign of it could be otherwise.**
+`xslope_pile_wall` carries `M_cap` = 90,600 and nothing else, and its Newton
+solution at the reported state has an element AT that cap. Run with the cap and with
+it removed entirely, same mesh, same bracket:
+
+| | `M_cap` = 90,600, as the file gives it | `M_cap` removed |
+|---|---|---|
+| viscoplastic | 1.55859375 | 1.55859375 |
+| Newton | 1.80078125 | 1.80078125 |
+
+Neither answer moves. The reason is structural and was measured on the viscoplastic
+path before any of this was built (see "the semantics being reproduced", above): the
+moment correction is applied at the rotational degree of freedom the two adjacent
+beam elements SHARE, and at equilibrium their end moments there are equal and
+opposite, so the two corrections cancel. Reversing the sign reverses both of them
+and they cancel again. A plastic hinge is a release of rotational continuity, and a
+moment applied at a shared node is not one. What the Newton path adds is that the
+same construction is inert on it too, so the two drivers agree about a cap that
+neither of them enforces — and the reported moments are clipped, which is why an
+inert cap reads as an enforced one on both.
+
+**The shear cap is enforced on the Newton path and anti-enforced on the
+viscoplastic one**, and neither model in the corpus notices. On `xslope_piles_fem`
+and `xslope_piles` the shear cap is `V_cap`/S = 7,666.7 and the largest shear
+anywhere in either bisection's reported state is 2,391 — the cap is a third of the
+way out of reach, so it never binds, and the two drivers agree at every trial of
+both bisections. On `xslope_pile_wall` there is no shear cap at all. **On the eight
+locked pile models the shear cap therefore decides nothing, and the difference
+between the two laws costs nothing.**
+
+Where it does bind it is not small, and that was measured rather than left as an
+argument. `xslope_pile_wall` at F = 1.2, with the shear capacity tightened to a
+quarter of what the uncapped pile carries:
+
+| | uncapped | cap at a quarter of the free shear |
+|---|---|---|
+| Newton: elements at the cap | 0 | 6 of 10 |
+| Newton: max&#124;u&#124; | 0.038574 | larger — the slope moves MORE |
+
+A member that can deliver less force cannot hold the soil back better, and that is
+the direction the check asserts. Under the viscoplastic sign the same tightening
+raises the shear the pile delivers (1,457.6 uncapped, 1,731.3 at a tenth of the cap,
+1,867.7 at a hundredth, measured on `xslope_piles_fem` and reported in the semantics
+section above), so the slope would move LESS. The lock's capacity leg fails on a
+driver with either the correction dropped or the sign reversed.
+
+Nothing in `solve_fem` was changed. Which number the repository's locked pile values
+should carry, on a model where a capacity does bind, is the owner's decision.

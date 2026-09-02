@@ -7710,15 +7710,16 @@ _NR_VP_PREDICTOR_TENSION_CAP = True
 # P2 — budget the chain by how far the trial sits above the highest strength this
 # search has SHOWN TO STAND, in units of the bracket it started from. A trial that
 # far above a standing bound is one the bisection visits to prove a failure; the
-# chain there can confirm the cold attempt's verdict but has never been measured to
-# overturn one, and it costs up to a full viscoplastic trial to do it. None = no
-# distance rule, every trial gets the whole chain.
-_NR_RESCUE_FAR_FRAC = None
-# ... and how many rungs a FAR trial is allowed: 0 = none, 2 = the two short fixed
-# rungs without the adaptive one (see _NR_VP_PREDICTOR_ITERS), which is where the
-# per-trial cost is, since the adaptive rung is budgeted as a whole viscoplastic
-# trial of the same model at the same strength.
-_NR_RESCUE_FAR_RUNGS = 2
+# chain there can confirm the cold attempt's verdict but is not measured to overturn
+# one, and the adaptive rung costs a whole viscoplastic trial to do it.
+#
+# Two thresholds, both read off the Phase 0 slice rather than chosen: across 383
+# trials the adaptive rung converted a verdict only at or below a QUARTER of the
+# initial bracket above the standing bound, and no rung of any length converted one
+# above HALF. The values below sit clear of both measured edges. None = off, and the
+# whole chain runs on every trial as it did.
+_NR_RESCUE_ADAPTIVE_FRAC = None   # above this distance, no adaptive rung
+_NR_RESCUE_NONE_FRAC = None       # above this distance, no rescue at all
 
 # P3 — per-model memory. On a model whose trials are carried only from a predictor
 # seed, the cold attempt is a walk down to the load-step floor that has already been
@@ -10571,9 +10572,13 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     def _rescue_policy(F):
         """(rung budget, seed-first) for a trial at F, from the standing bracket."""
         rungs = None
-        if _NR_RESCUE_FAR_FRAC is not None and _carried[0] is not None:
-            if (float(F) - _carried[0]) > _NR_RESCUE_FAR_FRAC * _w0:
-                rungs = int(_NR_RESCUE_FAR_RUNGS)
+        if _carried[0] is not None:
+            d = (float(F) - _carried[0]) / _w0
+            if _NR_RESCUE_NONE_FRAC is not None and d > _NR_RESCUE_NONE_FRAC:
+                rungs = 0
+            elif (_NR_RESCUE_ADAPTIVE_FRAC is not None
+                    and d > _NR_RESCUE_ADAPTIVE_FRAC):
+                rungs = len(_NR_VP_PREDICTOR_ITERS or ())
         return rungs, bool(_NR_SEED_MEMORY and _seed_carried[0])
 
     def _stable(sol):

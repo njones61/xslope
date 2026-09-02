@@ -7797,3 +7797,48 @@ spike began with: an expensive model whose cold Newton attempts are the cost. It
 stays selectable, and the two defects above — a foot that cannot use the predictor,
 and a bracket that cannot expand upward — are what would have to be fixed before the
 question of a default could be asked again.
+
+### P2, P3, P4 — the three bisection policies, each against the same baseline
+
+Every row below is the whole 46-row slice re-run with one knob changed and nothing
+else, on the same machine, and every one of them is checked first for **verdict
+bit-identity**: the same factor of safety, the same final interval, and the same
+verdict at the same strength for every trial the bisection visits. A single flipped
+verdict rejects the policy, and none of the three flipped one.
+
+| | wall (s) | force evals | predictor iters | Newton iters | verdicts |
+|---|---|---|---|---|---|
+| baseline | 8,955 | 633,868 | 1,272,677 | 88,851 | — |
+| **P2** distance-budgeted rescue | 8,365 (0.93x) | 608,787 (0.96x) | 1,090,099 (**0.86x**) | 85,972 | identical |
+| **P3** per-model seed memory | 7,668 (0.86x) | 476,239 (0.75x) | 1,323,587 (1.04x) | 63,459 (0.71x) | identical |
+| **P4** cheaper cold attempt | 7,172 (**0.80x**) | 409,350 (**0.65x**) | 1,306,837 (1.03x) | 56,606 (**0.64x**) | identical |
+| **P2+P3** | 7,013 (0.78x) | 451,718 (0.71x) | 1,143,259 (0.90x) | 60,645 (0.68x) | identical |
+| **P2+P3+P4** | **5,800 (0.65x)** | **303,685 (0.48x)** | 1,145,509 (0.90x) | **40,932 (0.46x)** | **identical** |
+
+**P2 is the only one that reduces predictor work, and it is the smallest saving.**
+It drops the adaptive rung on trials more than 0.30 initial-bracket widths above the
+standing bound and the whole chain above 0.75 — thresholds set by the Phase 0
+measurement of where a rescue has ever converted a verdict, with margin on both. It
+removes 14% of the predictor iterations for 7% of the wall, which is the honest size
+of the "trials the search visits only to prove a failure" idea: on a bisection, only
+the bracket-establishment trial and the first one or two steps are that far out.
+
+**P3 and P4 are larger, and neither touches the predictor.** They cut the COLD
+attempt instead — P3 by skipping it entirely once a model has shown that only a seed
+carries it, P4 by giving the attempt that is going to be handed off anyway a coarser
+increment floor (1/8 rather than 1/64) and a shorter per-increment budget (60
+iterations rather than 150). Between them they take Newton iterations down by more
+than half and force evaluations to 48% of the baseline. Their predictor counts go
+slightly UP, and for a reason worth stating: a trial whose cold attempt used to
+succeed and now does not reaches the chain, is carried by rung 0, and is charged its
+250 iterations. It reaches the same verdict by a cheaper route, not a different one.
+
+**The three compose.** Combined they run the slice in 5,800 s against 8,955 —
+**0.65x, with every verdict identical** — and the saving is concentrated exactly
+where the baseline was worst: piled 0.46x, reinforced 0.49x, sub-unity 0.55x, plain
+Mohr-Coulomb 0.58x. The SSR-zone class barely moves (0.94x) because its cost was
+never the cold attempt: it is 91% rescue.
+
+On the slice this takes the Newton driver from 1.71x the viscoplastic driver's wall
+to **1.11x**. The slice is weighted toward the classes where Newton is worst, so what
+that ratio does on the whole corpus is a separate measurement and is below.

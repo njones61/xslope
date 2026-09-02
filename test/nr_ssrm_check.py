@@ -218,6 +218,7 @@ def run():
     failures += check_softening()
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
+    failures += check_rescue_cost(fem_data, results['newton'])
 
     return failures
 
@@ -1221,6 +1222,21 @@ def check_cohesionless_solve():
                 f"further than F = 1.45's {above['max_displacement']:.4g}. A stronger "
                 f"soil under the same gravity cannot move more; the two trials have "
                 f"not found the same solution branch.")
+        # ... and the rescue chain is what carries it. The cost policy budgets the
+        # chain by rungs (SPIKE.md, "THE COST OF THE RESCUE"), so the budget has to
+        # be able to decide a verdict where the chain is decisive — otherwise the
+        # verdict-identity assertion in check_rescue_cost is testing a knob attached
+        # to nothing. Take the rungs away here and F = 1.3 must go back to what the
+        # cold attempt alone reaches, which is the load-step floor.
+        stripped = solve_fem(fd, F=1.3, fem_solver='newton', max_disp_factor=None,
+                             force_tol=1e-3, _nr_rescue_rungs=0)
+        if stripped['converged']:
+            fails.append(
+                f"F = 1.3 still converged with the rescue chain budgeted to zero "
+                f"rungs ({stripped['iterations']} iterations, out-of-balance "
+                f"{stripped['unbalanced_force_ratio']:.3e}). The predictor is meant "
+                f"to be what carries this trial, so a rung budget that cannot take "
+                f"it away is not reaching the chain at all.")
     return fails
 
 
@@ -2576,6 +2592,123 @@ def check_env_override_announces_itself():
         else:
             os.environ['XSLOPE_FEM_SOLVER'] = saved_env
         _fem._FEM_SOLVER_ENV_ANNOUNCED = saved_flag
+    return fails
+
+
+# The rescue chain's cost policy (SPIKE.md, "THE COST OF THE RESCUE"). Phase 0
+# attributed half the Newton driver's wall time to a chain that confirms failures the
+# cold attempt had already reached, so the chain is budgeted by how far a trial sits
+# above the highest strength the search has shown to stand. The two thresholds are
+# read off that measurement rather than chosen: across 383 trials no rung of any
+# length converted a verdict more than half the initial bracket above a standing
+# bound, and the adaptive rung -- the one that costs a whole viscoplastic solve --
+# never converted one more than a quarter above. They are written out here rather
+# than imported from the module, so the assertion holds the code instead of
+# following it.
+COST_ADAPTIVE_FRAC = 0.30
+COST_NONE_FRAC = 0.75
+
+
+def _bisect_newton(fem_data, **over):
+    """The check's own Newton bisection, with module globals optionally overridden."""
+    saved = {k: getattr(_fem, k) for k in over}
+    for k, v in over.items():
+        setattr(_fem, k, v)
+    try:
+        return solve_ssrm(fem_data, F_min=F_MIN, F_max=F_MAX, tolerance=TOLERANCE,
+                          max_iterations=MAX_ITER, fem_solver='newton',
+                          capture_failure_state=False)
+    finally:
+        for k, v in saved.items():
+            setattr(_fem, k, v)
+
+
+def _verdict_fingerprint(res):
+    """Everything a cost policy is forbidden to move."""
+    return (round(float(res['FS']), 12),
+            tuple(round(float(x), 12) for x in res['final_interval']),
+            tuple((round(float(t['F']), 12), bool(t['stable']),
+                   str(t['exit_reason'])) for t in res['trials']))
+
+
+def _predictor_work(res):
+    trials = res['trials']
+    return (sum(int(t.get('nr_predictor_iterations', 0)) for t in trials),
+            sum(1 for t in trials if t.get('nr_predictor_iterations')))
+
+
+def check_rescue_cost(fem_data, base):
+    """The rescue chain is budgeted by distance, and the budget moves no verdict.
+
+    The viscoplastic predictor is what makes the Newton driver decide every trial --
+    across the 191-row corpus it left none inconclusive where the viscoplastic driver
+    left 37 -- and it is also two thirds of the driver's constitutive work, because
+    it runs on every trial that dies at the load-step floor and half of every
+    bisection does. What keeps both is a distance rule: a trial near the highest
+    strength the search has carried gets the whole chain; a trial far above it, which
+    the search is visiting only to prove a failure, gets less of it.
+
+    Four assertions, and the last two are what make the first two mean anything:
+
+      * the policy SHIPS OFF, so the default Newton driver is the one every measured
+        value in SPIKE.md is defined on;
+      * this fixture still exercises the chain -- a mesh on which the predictor never
+        fired would pass everything below without testing any of it;
+      * at the measured thresholds the bisection returns the same factor of safety,
+        the same final interval and the same verdict for every trial at the same
+        strength, on strictly less predictor work;
+      * and the knob reaches the chain: drive the threshold to zero and no trial
+        above a standing bound may be charged a predictor iteration. Without that, a
+        rule quietly doing nothing would pass the identity test perfectly.
+    """
+    fails = []
+
+    for name, want in (('_NR_RESCUE_ADAPTIVE_FRAC', None),
+                       ('_NR_RESCUE_NONE_FRAC', None),
+                       ('_NR_SEED_MEMORY', False),
+                       ('_NR_COLD_CHEAP', False)):
+        got = getattr(_fem, name, '<not defined>')
+        if got != want:
+            fails.append(
+                f"the rescue cost policy does not ship off: {name} is {got!r}, not "
+                f"{want!r}. Every Newton factor of safety in SPIKE.md is measured "
+                f"with the whole chain running on every trial that reaches it.")
+
+    p0, fired0 = _predictor_work(base)
+    if fired0 < 2:
+        return fails + [
+            f"the predictor fired on {fired0} of {len(base['trials'])} trials on this "
+            f"fixture, so there is no rescue chain here to budget and nothing below "
+            f"this line tests one"]
+
+    cheap = _bisect_newton(fem_data,
+                           _NR_RESCUE_ADAPTIVE_FRAC=COST_ADAPTIVE_FRAC,
+                           _NR_RESCUE_NONE_FRAC=COST_NONE_FRAC)
+    if _verdict_fingerprint(cheap) != _verdict_fingerprint(base):
+        fails.append(
+            f"budgeting the rescue chain by distance moved a verdict: FS "
+            f"{base['FS']:.6f} on {base['final_interval']} became {cheap['FS']:.6f} "
+            f"on {cheap['final_interval']}. A cost policy may change what the driver "
+            f"spends and nothing else.")
+    p1, _ = _predictor_work(cheap)
+    if p1 >= p0:
+        fails.append(
+            f"the distance rule saved nothing: {p1} predictor iterations against "
+            f"{p0} with the whole chain. The bracket-establishment trial alone sits a "
+            f"full bracket above the standing bound, so it should never reach the "
+            f"adaptive rung.")
+
+    silent = _bisect_newton(fem_data, _NR_RESCUE_NONE_FRAC=0.0)
+    charged = [t['F'] for t in silent['trials']
+               if t.get('nr_predictor_iterations') and t.get('bracket')
+               and float(t['F']) > float(t['bracket'][0])]
+    if charged:
+        fails.append(
+            "the rung budget does not reach the chain: with the distance threshold at "
+            "zero the predictor still ran on the trial(s) at F = "
+            + ", ".join(f"{f:.4f}" for f in charged)
+            + ". The identity result above cannot be read as evidence while the knob "
+              "it turns is wired to nothing.")
     return fails
 
 

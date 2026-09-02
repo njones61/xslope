@@ -5176,3 +5176,96 @@ driver with either the correction dropped or the sign reversed.
 
 Nothing in `solve_fem` was changed. Which number the repository's locked pile values
 should carry, on a model where a capacity does bind, is the owner's decision.
+
+#### The eight pile-gated locked benchmarks
+
+Every row built through `run_tests.py`'s own `build_fem_ssrm_case`, so the mesh, the
+element type, the bracket, the iteration budget and every solver option are the
+suite's and not this round's; the bisection tolerance is the tag's own 0.01 on all
+eight. Work is the honest count on each driver — viscoplastic iterations against
+Newton force evaluations, one constitutive pass each.
+
+| Benchmark | Model | Elements | Lock | Tol | VP FS | VP − lock | Newton FS | Newton − lock | driver gap | VP work | N-R work |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| FEM-3-piles-ssrm | `xslope_piles` | 1521 | 1.379 | 0.01 | 1.3789063 | −0.0001 | **1.3789063** | −0.0001 | **0.0000** | 20,534 | 32,057 |
+| (FEM sample) | `xslope_piles_fem` | 1521 | 1.380 | 0.01 | 1.3796875 | −0.0003 | **1.3796875** | −0.0003 | **0.0000** | 20,054 | 27,736 |
+| FEM-3-wall-ssrm | `xslope_pile_wall` | 1510 | 1.559 | 0.01 | 1.5585938 | −0.0004 | **1.8007813** | +0.2418 **(out)** | 0.2422 | 13,094 | 26,436 |
+| VP106-FEM-free | `vp106c_fem` | 1591 | 1.472 | 0.01 | 1.4718750 | −0.0001 | **1.5781250** | +0.1061 **(out)** | 0.1063 | 38,370 | 33,172 |
+| VP106-FEM-fixed | `vp106c_fem_fix` | 1591 | 1.587 | 0.01 | 1.5871094 | +0.0001 | (pending) | | | 104,508 | |
+| SSRM-TORGGLER | `xslope_torggler_3a_plate` | 6834 | 1.195 | 0.01 | 1.1945313 | −0.0005 | (pending) | | | 33,442 | |
+| SSRM-TORGGLER | `xslope_torggler_3b_plate` | 4945 | 1.673 | 0.01 | (pending) | | (pending) | | | | |
+| SIGMAW-SRS-wall | `gs2_wall` | 6532 | 1.647 | 0.01 | (pending) | | (pending) | | | | |
+
+The viscoplastic column reproduces every lock it has reached, which is what makes
+the comparison readable. **Two of the rows agree with the viscoplastic driver
+EXACTLY** — `xslope_piles` and `xslope_piles_fem` return the identical factor of
+safety with the identical verdict at every trial the bisection visited, over nine
+and eight trials, and those are the two models where a pile capacity is finite. Two
+do not: `xslope_pile_wall` reads 0.2418 above its lock and `vp106c_fem` 0.1061,
+both HIGH, which is the one-sided direction this document has recorded since its
+first table.
+
+#### The two misses, refereed by the Newton state's own evidence
+
+The criterion said a miss would be diagnosed rather than reported as a direction, so
+the trials whose verdicts differ were run directly. `xslope_pile_wall` (mesh height
+30) and `vp106c_fem` (mesh height 20), at strengths between the viscoplastic answer
+and the Newton one:
+
+| Model | F | driver | verdict | exit | out-of-balance | iterations | worst yield violation | max&#124;u&#124; |
+|---|---|---|---|---|---|---|---|---|
+| pile wall | 1.5625 | viscoplastic | FAILED | `diverging` | 9.49e-02 | 1,231 | — | 0.55% of H |
+| pile wall | 1.5625 | **Newton** | **CONVERGED** | `converged` | **3.05e-05** | 508 | **1.3e-08** | 0.56% of H |
+| pile wall | 1.7500 | viscoplastic | FAILED | `diverging` | 2.60e+00 | 261 | — | 0.56% of H |
+| pile wall | 1.7500 | **Newton** | **CONVERGED** | `converged` | **9.91e-06** | 517 | **1.5e-08** | 0.93% of H |
+| pile wall | 1.7969 | viscoplastic | FAILED | `diverging` | 3.15e+00 | 221 | — | 0.55% of H |
+| pile wall | 1.7969 | **Newton** | **CONVERGED** | `converged` | **1.83e-05** | 469 | **1.4e-08** | 2.72% of H |
+| vp106c | 1.5000 | viscoplastic | FAILED | `diverging` | 6.54e-01 | 1,501 | — | 0.65% of H |
+| vp106c | 1.5000 | **Newton** | **CONVERGED** | `converged` | **2.67e-05** | 606 | **1.4e-08** | 0.78% of H |
+| vp106c | 1.5500 | viscoplastic | FAILED | `diverging` | 1.57e+00 | 861 | — | 0.65% of H |
+| vp106c | 1.5500 | **Newton** | **CONVERGED** | `converged` | **1.34e-06** | 569 | **1.6e-08** | 1.33% of H |
+| vp106c | 1.5750 | viscoplastic | FAILED | `diverging` | 1.99e+00 | 721 | — | 0.65% of H |
+| vp106c | 1.5750 | **Newton** | **CONVERGED** | `converged` | **5.05e-06** | 99 | **1.6e-08** | 5.19% of H |
+
+The yield violation is the largest Mohr-Coulomb value over every Gauss point as a
+fraction of the local strength, read in the INVARIANT form the return map is not
+written on. A stress field in equilibrium with full gravity to between 1.3e-6 and
+3.1e-5 — thirty to seven hundred times inside the trial tolerance — and nowhere more
+than 1.6e-8 of its own strength outside the yield surface is a statically admissible
+field, and by the lower-bound theorem it is a proof that the slope stands at that
+strength. The argument needs neither driver to be trusted; it is the Newton driver's
+own converged state checked against a yield function it does not solve on.
+
+The viscoplastic verdicts at those strengths are not near misses. Every one of them
+is closed by the early-failure classifier (`diverging`) with the out-of-balance at
+9.5e-2 to 3.2 against a 1e-3 gate — two to three orders of magnitude out, not a run
+that a longer budget would flip. **This is the same shape as the RS2-28 misses of
+the matric-suction round**, and it has the same reading: the Newton driver does not
+miss the two locks by being wrong about the slope, it misses two locks that are
+DEFINED by the driver it is being compared against.
+
+One thing this round can add that the RS2-28 round could not, on `vp106c_fem`: the
+vendor's own number is on the other side. `docs/verification/rocscience.md` records
+Cai & Ugai's three-dimensional strength-reduction value for this pile row and states
+that XSLOPE's plane-strain beam already reads 8.2% ABOVE it with a free head; the
+Newton answer of 1.578 is 7.2% above the viscoplastic 1.472, so it is further above
+the three-dimensional answer, not nearer to it. On that model, more admissible does
+not mean more like the vendor — the plane-strain idealization is what separates them
+and it is documented as such.
+
+#### The ramp
+
+The same models on the monotonic strength-reduction ramp, against the Newton
+bisection on the same mesh and bracket:
+
+| Benchmark | Ramp FS | Ramp interval | Bisection-N FS | Ramp − bisection | ramp force evals |
+|---|---|---|---|---|---|
+| `vp106c_fem` | 1.5781250 | [1.57500, 1.58125] | 1.5781250 | **0.00000** | 22,761 |
+| `xslope_pile_wall` | 1.8031250 | [1.80000, 1.80625] | 1.8007813 | +0.00234 | 10,508 |
+| `xslope_piles_fem` | 1.3843750 | [1.38125, 1.38750] | 1.3796875 | +0.00469 | 10,982 |
+
+Three of three inside 0.01, against the three the criterion asked for, and one
+reproduces the bisection to eight digits. The ramp carries the pile through its whole
+warm history without any extension: `restrength` rewrites the SOIL groups and nothing
+else, and the pile groups are built once, so a pile's rigidity and its capacity at
+the top of the ramp are the same objects they were at the foot.

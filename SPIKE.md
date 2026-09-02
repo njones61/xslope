@@ -5191,19 +5191,33 @@ Newton force evaluations, one constitutive pass each.
 | (FEM sample) | `xslope_piles_fem` | 1521 | 1.380 | 0.01 | 1.3796875 | −0.0003 | **1.3796875** | −0.0003 | **0.0000** | 20,054 | 27,736 |
 | FEM-3-wall-ssrm | `xslope_pile_wall` | 1510 | 1.559 | 0.01 | 1.5585938 | −0.0004 | **1.8007813** | +0.2418 **(out)** | 0.2422 | 13,094 | 26,436 |
 | VP106-FEM-free | `vp106c_fem` | 1591 | 1.472 | 0.01 | 1.4718750 | −0.0001 | **1.5781250** | +0.1061 **(out)** | 0.1063 | 38,370 | 33,172 |
-| VP106-FEM-fixed | `vp106c_fem_fix` | 1591 | 1.587 | 0.01 | 1.5871094 | +0.0001 | (pending) | | | 104,508 | |
-| SSRM-TORGGLER | `xslope_torggler_3a_plate` | 6834 | 1.195 | 0.01 | 1.1945313 | −0.0005 | (pending) | | | 33,442 | |
-| SSRM-TORGGLER | `xslope_torggler_3b_plate` | 4945 | 1.673 | 0.01 | (pending) | | (pending) | | | | |
-| SIGMAW-SRS-wall | `gs2_wall` | 6532 | 1.647 | 0.01 | (pending) | | (pending) | | | | |
+| VP106-FEM-fixed | `vp106c_fem_fix` | 1591 | 1.587 | 0.01 | 1.5871094 | +0.0001 | **1.5941406** | +0.0071 | 0.0070 | 104,508 | 32,515 |
+| SSRM-TORGGLER | `xslope_torggler_3a_plate` | 6834 | 1.195 | 0.01 | 1.1945313 | −0.0005 | **1.1945313** | −0.0005 | **0.0000** | 33,442 | 28,067 |
+| SSRM-TORGGLER | `xslope_torggler_3b_plate` | 4945 | 1.673 | 0.01 | 1.6726563 | −0.0003 | **1.7429688** | +0.0700 **(out)** | 0.0703 | 289,072 | 22,065 |
+| SIGMAW-SRS-wall | `gs2_wall` | 6532 | 1.647 | 0.01 | (not completed) | | **1.6906250** | +0.0436 **(out)** | — | (not completed) | 25,218 |
 
-The viscoplastic column reproduces every lock it has reached, which is what makes
-the comparison readable. **Two of the rows agree with the viscoplastic driver
-EXACTLY** — `xslope_piles` and `xslope_piles_fem` return the identical factor of
-safety with the identical verdict at every trial the bisection visited, over nine
-and eight trials, and those are the two models where a pile capacity is finite. Two
-do not: `xslope_pile_wall` reads 0.2418 above its lock and `vp106c_fem` 0.1061,
-both HIGH, which is the one-sided direction this document has recorded since its
-first table.
+The viscoplastic column reproduces every lock it reached — seven of seven, at
+0.0001 to 0.0005 — which is what makes the comparison readable. `gs2_wall` is the
+one row without a viscoplastic answer: its bisection is nine trials on 6,532
+elements with a 16,000-iteration budget and a 50,000 ceiling, and it did not
+complete inside this round. The Newton driver solved the same model in 25,218 force
+evaluations.
+
+**Four of the eight land inside their published tolerance and four do not.**
+`xslope_piles`, `xslope_piles_fem` and `xslope_torggler_3a_plate` return the
+IDENTICAL factor of safety to the viscoplastic driver, with the identical verdict at
+every trial the bisection visited; `vp106c_fem_fix` agrees to 0.0070. The other four
+read 0.0436, 0.0700, 0.1061 and 0.2418 above their locks, every one HIGH, which is
+the one-sided direction this document has recorded since its first table. **The
+criterion asked for six of eight on both counts and the measurement is four of
+eight; that clause is NOT met.**
+
+One pairing in that split is worth naming because it is a controlled comparison.
+`vp106c_fem` and `vp106c_fem_fix` are the same slope, the same mesh and the same
+pile row, differing only in whether the pile HEAD's rotation is held. The free-head
+row is one of the four misses, at +0.1061; the held-head row is one of the four that
+agree, at +0.0070. Holding one degree of freedom is the difference between the two
+drivers agreeing and disagreeing by a tenth.
 
 #### The two misses, refereed by the Newton state's own evidence
 

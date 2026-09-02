@@ -5912,7 +5912,7 @@ their own column.
 | RS2-P4-VP41 | `vp041` | power curve | 1944 | 1.656 | 0.02 | 1.6593750 | **1.6593750** | +0.0034 | **0.0000** | 8,690 | 3,632 | 13,835 |
 | RS2-31c | `vp044a` | power curve | 1966 | 0.973 | 0.02 | 0.9683594 | **0.9683594** | −0.0046 | **0.0000** | 9,661 | 2,711 | 12,964 |
 | RS2-32b | `vp045b` | power curve | 2154 | 2.637 | 0.02 | 2.6402344 | **2.6402344** | +0.0032 | **0.0000** | 26,144 | 2,236 | 24,302 |
-| RS2-34b | `vp061a` | power curve | 1966 | 1.497 | 0.02 | 1.4921875 | **1.4921875** | −0.0048 | **0.0000** | 3,607 | 3,607 | 14,745 |
+| RS2-34b | `vp061a` | power curve | 1966 | 1.497 | 0.02 | 1.4921875 | **1.4921875** | −0.0048 | **0.0000** | 75,126 | 3,607 | 14,745 |
 
 **Eight of eight reproduce their published lock, and eight of eight return the
 IDENTICAL factor of safety to the viscoplastic driver** — not merely inside the
@@ -5921,10 +5921,19 @@ row. The criterion asked for six on each count. There is no miss to diagnose, an
 the one-sided high reading this document has recorded on every previous corpus round
 does not appear here at all.
 
-`vp061a`'s viscoplastic work column reads 3,607 because that row's viscoplastic
-iteration total is not what the others' are; the figure carried through from the
-run record is the Newton force-evaluation count and the viscoplastic total for that
-row is 75,126. Every other row's pair is as printed.
+**The work goes the same way it has gone since Phase 0.** The Newton driver does
+less constitutive work than the viscoplastic one on seven of the eight — 2.0x on
+`hammah_hb1` and `xslope_rock_slope`, 8.9x on `vp044d`, 27.0x on `vp040`, 2.4x on
+`vp041`, 3.6x on `vp044a`, 11.7x on `vp045b` and 20.8x on `vp061a` — before the
+viscoplastic predictor iterations it charges on top, which run 11,772 to 24,302 and
+fall entirely on the failing trials. Counting those in, the ratio runs 0.48x to
+5.53x: the Newton driver does MORE total constitutive work than the viscoplastic
+one on `hammah_hb1` and `xslope_rock_slope` (0.48x), `vp041` (0.50x), `vp044a`
+(0.62x) and `vp045b` (0.99x), and less on `vp044d` (2.43x), `vp061a` (4.09x) and
+`vp040` (5.53x). Wall time runs 100-1,554 s against 36-647 s, and the curved
+evaluation is the reason: one residual evaluation on a Hoek-Brown group is a
+fixed point of return maps around a 40-step Balmer bisection, and one tangent
+re-form is four of them.
 
 **Bookkeeping: eight benchmarks, seven models.** `hammah_hb1` and
 `xslope_rock_slope` are the same model under two names. Loaded side by side their
@@ -6054,3 +6063,104 @@ its own feature:
 still accepts it. Nothing about a curved envelope raises any more: both envelopes,
 the two of them mixed with Mohr-Coulomb in one mesh, SSR elastic zones over a curved
 material, SSR exclusion, K0 and the Rankine cap all run.
+
+#### The locks
+
+`test/nr_ssrm_check.py` gains `check_curved_envelopes`, in about 100 s, and loses
+`check_unsupported_features_refuse` — which existed to assert the two refusals this
+round removed, and which would otherwise be holding the driver to a limitation it
+no longer has. Four legs, and each fails on a different defect:
+
+  * the RETURN MAP on both envelopes at three caps — 40,000 states each, every
+    returned state on the linearized Mohr-Coulomb surface and under its cap, the
+    ordering intact, no elastic state modified, no state on the unresolved
+    fallback, and a branch histogram asserted to reach every region the design
+    names, because a fuzz that never lands on a region proves nothing about it;
+  * the LINEARIZATION is self-consistent — the tangent the return was taken on is
+    the tangent at the abscissa the RETURNED stress produces;
+  * the TANGENT IS THE MATERIAL'S — compared against one computed from scratch out
+    of the material's own columns, through the public `hb_tangent` (which
+    re-derives mb, s and a from GSI, mi and D) and through the power curve's own
+    formula. This is the leg a driver-against-driver comparison could not supply: a
+    parameter wired from the wrong per-element array is self-consistent with itself
+    and only an independent expectation can see it;
+  * the F-REDUCTION divides the tangent and not the constants — at F = 2 the
+    cohesive intercept and tan(phi) are exactly half their F = 1 values on both
+    envelopes;
+  * and the MIXED model — 137 Mohr-Coulomb, 46 Hoek-Brown and 72 power-curve
+    elements on one mesh — with the per-element dispatch asserted material by
+    material from a solve, and a strength bracket both drivers must agree on.
+
+**Mutation, run four ways.** Each is the same check function against a driver with
+one thing changed:
+
+| driver | verdict | what the check saw |
+|---|---|---|
+| as shipped | **PASS** | — |
+| the Hoek-Brown `mb` the Newton path carries multiplied by 1.5 | **FAIL** | "the tangent the Newton path derives is not the envelope the material declares — the cohesive intercept differs by 5.567e-02 and tan(phi) by 2.425e-01 relative, against an expectation computed from the material's own columns" |
+| the Hoek-Brown exponent `a` shifted by 0.08 | **FAIL** | the same line, at 2.178e-01 and 1.643e-01 |
+| the F-reduction of the envelope dropped | **FAIL** | the same line on BOTH envelopes at 7.000e-01, plus all four F-reduction legs ("the cohesive intercept ... at F = 2 is 1.000000 ... of its value at F = 1"), plus the mixed model standing at F = 2.1 where the Mohr-Coulomb half of the same mesh says it must not |
+
+The first two are the mutations the criterion named, and the leg that catches them
+had to be added: an earlier version of this check, with the fuzz and the mixed model
+but without the material-table comparison, PASSED both of them. A corrupted rock
+constant is self-consistent with itself, and the mixed model's Hoek-Brown material
+is not what decides its bracket.
+
+The whole check file passes end to end.
+
+#### The criterion, line by line
+
+**1. The return map — MET, except the tangent clause.** 3,200,000 returns across
+two envelopes, four caps, two strength reductions and four parameter sets each:
+both surfaces satisfied to 4.9e-14 of the stress scale, zero ordering violations,
+zero elastic states modified, zero states on the unresolved fallback. The branch
+histogram exercises every region the design names on both envelopes, including
+6,497 and 10,571 returns on the Mohr-Coulomb / Rankine intersection edge and 998
+and 1,039 on the hydrostatic-tension return, and it shows the Mohr-Coulomb apex
+firing 80,640 and 94,022 times uncapped and not once with a cap below it. **The
+tangent clause is NOT met as written** — no branch reaches 1e-8 on this harness —
+and it is not met by the plain Mohr-Coulomb branches either, which is the
+measurement that stands in its place: on the same harness and the same states, the
+Mohr-Coulomb control reads the same medians and the same worst cases as the curved
+rows. The fixed point's own residual is the honest negative and is reported: 1.9e-5
+to 5.7e-3 on the fuzz's states, against `_NR_ENV_TOL` on every corpus state.
+
+**2. The eight locked models — MET, and at eight of eight rather than six.** Every
+one reproduces its published lock, at −0.0048 to +0.0034 against tolerances of 0.01
+and 0.02, and every one returns the IDENTICAL factor of safety to the viscoplastic
+driver — the same final interval to nine digits. There is no miss, so there is
+nothing to diagnose and the early-failure-classifier pattern the previous three
+rounds met does not appear.
+
+**3. Mixed materials — MET.** The corpus has none, so one was constructed: 137
+Mohr-Coulomb, 46 Hoek-Brown and 72 power-curve elements on one mesh, the two curved
+materials fitted to the strengths the file's own Mohr-Coulomb materials carry.
+Both drivers read 1.9703125. The dispatch is asserted from the solve rather than
+inferred, material by material, with the envelope each element took and the branch
+counts under it.
+
+**4. The ramp — MET on 4 of the 4 run**, against the 3 asked: 0.00000, −0.00063,
+−0.00123 and +0.00781 from the Newton bisection, the last of them on the mixed
+model.
+
+**5. The Mohr-Coulomb-only path is bit-identical — MET.** Eighteen benchmark pairs
+and 157 trials against the driver staged at de9cda60 in a separate package tree:
+every one identical in factor of safety, verdict, iterations and force evaluations,
+across the plain-soil eight, four reinforced rows, three tension-cutoff rows, a K0
+vendor row, a suction row, a pile row and the default viscoplastic path. The plain
+return map is bit-identical over 800,000 trial states to a SHA-256 of the returns.
+
+**6. The refusals — MET.** Only post-peak bar softening remains, it still names
+itself and counts the bars, and the viscoplastic control still accepts it.
+
+**7. The locks — MET.** `check_curved_envelopes` passes as shipped and fails on all
+three mutations the criterion named; the whole check file passes end to end.
+
+**8. The default path — MET.** Griffiths & Lane 6 dry, quad8, size 2, no
+`fem_solver` argument: FS 2.421875 on per-trial iteration counts 147, 781, 3393,
+2031, 2841, 9541, 12000, 8617, 8777 — value for value the control sequence, on both
+trees.
+
+**9. The honest negatives** are the tangent clause, the fixed point's residual on
+the fuzz's states, the constructed mixed model, and the cost — all written above.

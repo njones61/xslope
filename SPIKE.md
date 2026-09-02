@@ -5194,14 +5194,16 @@ Newton force evaluations, one constitutive pass each.
 | VP106-FEM-fixed | `vp106c_fem_fix` | 1591 | 1.587 | 0.01 | 1.5871094 | +0.0001 | **1.5941406** | +0.0071 | 0.0070 | 104,508 | 32,515 |
 | SSRM-TORGGLER | `xslope_torggler_3a_plate` | 6834 | 1.195 | 0.01 | 1.1945313 | −0.0005 | **1.1945313** | −0.0005 | **0.0000** | 33,442 | 28,067 |
 | SSRM-TORGGLER | `xslope_torggler_3b_plate` | 4945 | 1.673 | 0.01 | 1.6726563 | −0.0003 | **1.7429688** | +0.0700 **(out)** | 0.0703 | 289,072 | 22,065 |
-| SIGMAW-SRS-wall | `gs2_wall` | 6532 | 1.647 | 0.01 | (not completed) | | **1.6906250** | +0.0436 **(out)** | — | (not completed) | 25,218 |
+| SIGMAW-SRS-wall | `gs2_wall` | 6532 | 1.647 | 0.01 | 1.6468750 | −0.0001 | **1.6906250** | +0.0436 **(out)** | 0.0438 | 303,303 | 25,218 |
 
-The viscoplastic column reproduces every lock it reached — seven of seven, at
-0.0001 to 0.0005 — which is what makes the comparison readable. `gs2_wall` is the
-one row without a viscoplastic answer: its bisection is nine trials on 6,532
-elements with a 16,000-iteration budget and a 50,000 ceiling, and it did not
-complete inside this round. The Newton driver solved the same model in 25,218 force
-evaluations.
+The viscoplastic column reproduces every one of the eight locks, at 0.0001 to
+0.0005, which is what makes the comparison readable. It is also where the work is:
+`gs2_wall` costs it 303,303 constitutive passes against the Newton driver's 25,218
+force evaluations, and `xslope_torggler_3b_plate` 289,072 against 22,065 — 12x and
+13x. Across the eight rows the Newton driver does less constitutive work on six and
+more on two (`xslope_piles` at 0.6x and `xslope_piles_fem` at 0.7x, the two models
+whose bisection spends most of its trials past failure, which is the cost this
+document has recorded since Phase 0).
 
 **Four of the eight land inside their published tolerance and four do not.**
 `xslope_piles`, `xslope_piles_fem` and `xslope_torggler_3a_plate` return the

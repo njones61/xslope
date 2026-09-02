@@ -6164,3 +6164,73 @@ trees.
 
 **9. The honest negatives** are the tangent clause, the fixed point's residual on
 the fuzz's states, the constructed mixed model, and the cost — all written above.
+
+#### Verdict
+
+**Both curved envelopes are carried, per Gauss point, and on the corpus the two
+drivers do not merely agree — they return the same number.** Eight locked models,
+three Hoek-Brown and five power-curve, run in their locked configurations through
+the suite's own mesh and bracket mapping: every one reproduces its published lock,
+and every one closes on the same bisection interval as the viscoplastic driver, to
+nine digits. That is a better result than any previous round in this document
+produced on a vendor block, and it is better than the criterion asked for on both
+counts.
+
+What made it possible is that the round did not build a curved yield surface.
+Neither driver has one. Both carry a curved envelope as a per-Gauss-point
+Mohr-Coulomb tangent, re-derived from the current stress, with the ordinary psi = 0
+return running on it — so reproducing the viscoplastic answer meant reproducing
+that linearization, at the abscissa it uses, reduced the way it reduces it, and
+nothing else. The one thing this path had to add is that its linearization is
+closed as a self-consistent fixed point inside every residual evaluation rather
+than lagged an iteration, because a driver with a line search needs its residual to
+be a function of the displacement alone. That decision paid twice: it landed on the
+same fixed point the viscoplastic loop converges to, and it made the existing
+difference quotient carry the derivative of the linearization for free.
+
+**The owner's requirement is met and the corpus could not have shown it.** All eight
+curved-envelope models in the repository are SINGLE-material, so not one of them
+exercises per-element dispatch. The mixed model is therefore constructed — 137
+Mohr-Coulomb elements, 46 Hoek-Brown and 72 power-curve on one mesh — and on it the
+two drivers read 1.9703125 apiece, with the dispatch asserted material by material
+off the solve rather than inferred: every Mohr-Coulomb element on the plain path,
+every curved one on its own, in the same pass.
+
+The round found one defect and it was not in the envelope. A Gauss point held
+LINEAR ELASTIC is carried on this path as `c_r = inf`, and the linearization was
+writing a finite tangent over it. On `vp040`, where 1,284 of 2,539 elements sit in
+an SSR elastic zone, that stopped the driver reaching equilibrium at ANY strength —
+including F = 0.1, where the soil is ten times stronger than the file's own. Seven
+of the eight models solved without noticing.
+
+Three things did not close, and all three are written above rather than tuned away.
+The consistent tangent does not reach the 1e-8 the criterion asked against a central
+difference, and neither does the plain Mohr-Coulomb branch on the same harness —
+the comparison against that control is what stands in the clause's place. The
+linearization's fixed point does not always close to `_NR_ENV_TOL` on the fuzz's
+states: a handful in every 200,000 sit in a period-2 limit cycle that
+under-relaxation slows without ending, leaving a worst self-consistency residual of
+5.7e-3, which bounds how far a returned circle can sit from the CURVE rather than
+from its own tangent line. It is not reached on any corpus state. And the cost is
+real: counting the viscoplastic predictor iterations a Newton run charges on top,
+the Newton driver does more total constitutive work than the viscoplastic one on
+five of the eight, because one residual evaluation on a Hoek-Brown group is a fixed
+point of return maps wrapped around a 40-step Balmer bisection.
+
+What remains, in the order it matters:
+
+- **Post-peak bar softening is the last refusal**, and it is the reason neither of
+  the repository's published reinforced factors of safety is reachable on this
+  driver. Everything else in the eight-item list the ramp verdict named is carried.
+- **The corpus run.** With the two envelopes carried, the reachable locked set is
+  every `fem_ssrm` tag in the repository except the two behind bar softening.
+  Running it is what would turn "eight of eight" into a statement about the corpus,
+  and it is the same measurement the ramp verdict named as the thing standing
+  between this branch and any default-driver conversation.
+- **The cost of a Hoek-Brown evaluation.** The Balmer inversion is a 40-step
+  bisection run inside a fixed point run inside a difference quotient. A warm-started
+  Newton or secant on `sigma_3`, or a cached bracket, would cut it; nothing here
+  needed it, and no answer depends on it.
+- **The two duplicate models.** `hammah_hb1` and `xslope_rock_slope` are the same
+  model under two names, as `xslope_reinforce_fem` and `xslope_reinforced_slope`
+  are. The eight-row table above is seven distinct models.

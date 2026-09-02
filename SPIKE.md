@@ -5004,3 +5004,71 @@ which the design states next.
     freedom break the tangent's conditioning, if the locks cannot be reproduced, or
     if the capacity divergence turns out to decide a published number — that is the
     result.
+
+### PILES — results
+
+Same machine and settings as everything above: `force_tol` 1e-3, hybrid criterion,
+`capture_failure_state=False`, tolerance 0.01. Every number below was measured on
+this checkout in this session.
+
+#### What was built
+
+`_nr_build_piles` and `_nr_pile_force` in `xslope/fem.py`, threaded through
+`_nr_internal_force`, `_nr_prepare_assembly`, `_nr_assemble_tangent`,
+`_nr_equilibrate`, `_solve_fem_newton` and the ramp; `_nr_translational_dofs` and
+`_nr_umax` beside them; the guard's pile line replaced by the comment that says
+where the element is carried. A pile model now returns the same five diagnostic
+arrays the viscoplastic path returns — axial force, shear, the two end moments,
+and the two yielded masks — indexed by pile element in the same order, so the
+summary printer, the result CSVs and the pile-shear colorbar consume them
+unchanged.
+
+The pile blocks join the cached assembly pattern explicitly. For the bars that was
+a precaution; here it is a requirement, because a pile node's rotational degree of
+freedom appears in no soil element and in no bar, so relying on the soil pattern
+would drop every rotation from the tangent.
+
+#### The element, measured twice
+
+**The consistent tangent is exact, and the measurement says why.** 400 random beam
+elements — random orientation, length, `EA` and `EI`, two-node and three-node, with
+the caps drawn from the actions the displacement actually produces so that all
+eight combinations of (shear, end moment 1, end moment 2) at their cap are reached
+(92 elastic, 58 shear only, 56 and 56 one moment only, 44 / 36 / 34 two at once, 24
+with all three) — against a central difference of the element's own internal force,
+at four probe steps:
+
+| probe step, as a fraction of max&#124;u&#124; | 1e-7 | 1e-5 | 1e-4 | 1e-3 |
+|---|---|---|---|---|
+| worst relative gap, two-node | 5.26e-8 | 4.89e-10 | 9.27e-11 | 7.13e-12 |
+| worst relative gap, three-node | 2.19e-9 | 3.05e-11 | 2.12e-12 | 1.95e-13 |
+
+The gap falls as 1/h, exactly. That is round-off cancellation in the difference and
+nothing else — every branch is affine in the element displacement, so the analytic
+tangent is the derivative and the only error is in the measurement of it. The
+criterion asked for 1e-8; the reading is inside it at every probe step of 1e-5 or
+larger, and the 1/h scaling is the evidence that the residual at 1e-7 is the
+difference's and not the tangent's. No trial was skipped for straddling a branch.
+
+**An isolated beam reproduces the closed forms**, with no soil present, on the
+round's own assembly and residual. A six-element cantilever under a transverse end
+load and the same beam simply supported under a central load, at three
+orientations:
+
+| element | orientation | cantilever deflection | tip rotation | simply supported |
+|---|---|---|---|---|
+| two-node | 0 deg | 3.2e-14 | 2.3e-14 | 2.6e-15 |
+| two-node | 90 deg | 6.5e-14 | 5.6e-14 | 2.6e-15 |
+| two-node | 40.1 deg | 1.4e-13 | 1.3e-13 | 2.5e-14 |
+| three-node | 0 deg | 4.6e-12 | 4.4e-12 | 3.7e-13 |
+| three-node | 90 deg | 4.8e-12 | 4.5e-12 | 4.0e-13 |
+| three-node | 40.1 deg | 1.7e-12 | 1.3e-12 | 5.4e-13 |
+
+Relative to $PL^3/3EI$, $PL^2/2EI$ and $PL^3/48EI$. The criterion asked for 1e-10.
+
+**And it reads the same actions the viscoplastic driver reads.** The Newton element
+recovers its axial force, shear and end moments off constant ROWS, because it needs
+their gradients; the viscoplastic path computes the same four quantities in closed
+form at every iteration. On 300 random elements the two agree to 1.8e-14 (axial),
+1.7e-14 (shear), 4.1e-13 and 6.0e-14 (the two end moments) relative. The two
+drivers are capping the same quantities.

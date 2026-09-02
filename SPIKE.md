@@ -6713,3 +6713,118 @@ What remains:
   capacity enforced and 1.8007813 without it. Three numbers, one model, and the
   measurement behind each is in this document.
 - **Post-peak bar softening is the last refusal.** Unchanged by this round.
+
+## POST-PEAK SOFTENING — the last refusal
+
+Written before any feature code, so that what follows is a test and not a
+description. Same machine and settings as everything above: `force_tol` 1e-3,
+hybrid criterion, `capture_failure_state=False`, tolerance 0.01.
+
+### Why this one now
+
+It is the only refusal left. Every other item on the eight-item list the ramp
+verdict named — reinforcement, piles, the Rankine cap, K0, matric suction,
+Hoek-Brown, the power curve, and the two keywords `main` has since deleted — is
+carried. Post-peak softening on a reinforcement bar is what stands between this
+driver and the two published reinforced factors of safety, 1.497 and 1.496, because
+both are defined on models that declare it.
+
+The owner's ruling, on the design memo
+(`xslope_private/plans/newton_softening_design.md`, read in full for this round):
+implement the memo's recommended option **(a+)**. Option (c) — routing any trial
+with an active softening bar to the viscoplastic driver — is the fallback ONLY if
+(a+) misses the locks, and which one ships is reported. Continuum strain-softening
+stays refused on both drivers.
+
+### The semantics being reproduced, read from the viscoplastic driver
+
+Not assumed — read out of `solve_fem`'s post-peak fixed point and restated here,
+because the Newton path has to solve the same model:
+
+- **It is not a descending branch.** It is a one-way BRITTLE DROP of a bar's cap
+  from `t_allow` to `min(t_res, t_allow)`, and `build_fem_data` has already taken
+  that minimum, so a bar inside a pullout ramp where `t_allow < t_res` cannot soften
+  at all: bond slip stays perfectly plastic and only rupture softens.
+- **The trigger is read only on a converged state at FULL gravity.** Never
+  mid-iteration, never on a failed trial. The test is the UNCAPPED elastic demand
+  `k delta` against `t_allow`, and every softenable bar sitting at its capacity in a
+  converged state passes it, so in practice they all drop at once.
+- **The set grows and never shrinks**, bounded by the element count; after each drop
+  the solve continues from the converged state with the accumulated plastic strain
+  intact, at full gravity, under the new caps, and the process repeats until no bar
+  is newly over-demanded.
+- **Nothing crosses trials.** Every bisection trial is a cold `solve_fem` with an
+  empty softened set; only the at-failure capture solve receives a `_softened_seed`.
+- **Unloading after the drop is elastic** at the residual cap, so a softened bar can
+  carry less than `t_res`; the latch is one-way, the force is not.
+
+### Design — option (a+)
+
+Mirror that latch exactly at the converged full-load state, and apply the drop as a
+STEPPED CONTINUATION on the cap.
+
+- **The latch.** After the increment loop reaches full gravity and the state passes
+  the force gate, read each bar's uncapped demand — the same `k delta` the
+  viscoplastic path stores as `forces_1d` — and form
+  `newly = ~softened & can_soften & (demand > t_allow + 1e-9)`, exactly the
+  viscoplastic expression. Repeat until `newly` is empty.
+- **The drop is a continuation, not a jump.** The cap of a newly-softened bar walks
+  `t_cap(eta) = t_allow - eta (t_allow - t_res)` from eta = 0 to 1, re-equilibrating
+  at full gravity from the current state at each step, with the same halve-on-failure
+  step control and floor the gravity walk uses. A step the corrector cannot carry at
+  the floor is a LIMIT POINT in the drop — the structure cannot shed that force — and
+  the trial is FAILED. That is the same argument the driver already makes for
+  gravity, and it is what turns the round's main hazard from "the solver could not"
+  into "the structure cannot".
+- **The predictor rung sits behind it.** The viscoplastic predictor already accepts
+  `_softened_seed`; a trial that fails at the drop is retried from a bounded
+  viscoplastic run carrying the same softened set, and the corrector decides. The
+  seed supplies the plastic history and never a verdict, which is the rule every
+  predictor rung on this branch already follows.
+- **The verdict stays the corrector's.** The same force gate, the same displacement
+  bound and the same invariant-form yield reading every other trial passes.
+- **The ramp carries the set forward.** A bar that ruptured at F_k is ruptured at
+  F_{k+1}; the export solve takes the set as a seed rather than exporting a
+  peak-capacity field for a limit found with softened bars.
+- **Continuum strain-softening stays refused on both drivers.** There is no input
+  for it and no lock depends on it; §2.3 of the memo says why, and the round asserts
+  the refusal list rather than describing it.
+
+### Success criterion (verbatim)
+
+1. **Both published reinforced locks reproduced within 0.01**, on the tagged
+   brackets, built through `build_fem_ssrm_case`: `xslope_reinforce_fem` at 1.497
+   (`docs/fem/samples.md`, tri6/2.0, bracket 1.1-1.9, `max_iter` 16000) and
+   `xslope_reinforced_slope` at 1.496 (`docs/tutorials/fem02_reinforcement.md`,
+   bracket 1.0-2.0). They are the SAME model under two file names — SPIKE.md,
+   "Bookkeeping: five benchmarks, four models" — so the second is a bracket check
+   and not a second model, and this round says so rather than reporting two.
+2. **Per-trial verdicts and softened element sets identical to the viscoplastic
+   driver at every trial** of both bisections.
+3. **Every converged Newton state passes the referee-style admissibility audit** —
+   force equilibrium, the yield function in its INVARIANT form, and the displacement
+   bound.
+4. **The softening-on refinement ladder is monotone in verdicts.** The geogrid model
+   at 563, 978 and 2,101 elements with `t_res` active: everything below the limit
+   converges and everything above it fails, on every rung.
+5. **Everything else is bit-identical**, on the control-tree protocol every previous
+   round used: the plain-soil eight rows, the reinforced non-softening rows, the
+   tension-cutoff rows, a K0 vendor row, a matric-suction row, a pile row and the
+   curved-envelope rows, re-run against a control run of the parent commit staged in
+   a separate package tree — every trial identical in factor of safety, verdict,
+   iterations and force evaluations.
+6. **The refusal list is now EMPTY except continuum strain-softening**, and that is
+   asserted rather than described: what still refuses, and on which driver.
+7. **`test/nr_ssrm_check.py` gains `check_softening`**, with two mutations run both
+   ways and recorded: drop the latch — the locks must be missed; re-solve without
+   the seed — it must fail. The whole check file passes, and the default control run
+   is unchanged.
+8. **The memo's §5 risk measurements, the two that are cheap and in scope.** Re-run
+   the tutorial lock at a 32,000-iteration budget on the VISCOPLASTIC driver: does
+   the lock move through the latch? And referee the viscoplastic lock states at
+   F = 1.4922 and F = 1.5000 for illegal tension — the model's lower material is
+   c = 0 and it carries no tension cutoff. Both are reported and NOTHING on the
+   viscoplastic driver is changed.
+9. **An honest negative is a valid outcome and must be written.** If (a+) misses the
+   locks and the seed rung does not recover them, option (c) ships instead and the
+   round says which and why.

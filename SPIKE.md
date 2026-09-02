@@ -5366,3 +5366,159 @@ with one thing changed:
 The third mutation is the one worth reading twice: with the correction dropped, the
 REPORTED pile forces are still clipped at the cap, so a check that read only the
 reported array would pass on a driver enforcing nothing.
+
+#### The refusals that remain
+
+Every guard was exercised again on this checkout, and each must both fire and name
+its own feature:
+
+| Feature | Verdict |
+|---|---|
+| **pile beam elements** | **carried** |
+| post-peak softening on reinforcement bars | refuses, names softening and counts the bars |
+| Hoek-Brown strength envelopes | refuses, names Hoek-Brown |
+| power-curve strength envelopes | refuses, names the power curve |
+
+Three remain, against the four the suction round left. The viscoplastic control
+still accepts all three. Nothing in a pile model raises any more: the head and tip
+fixities are all four settings across these eight models (free, unrotated at
+`vp106c_fem_fix`, fixed at `xslope_pile_wall`'s tip), both element kinds are
+exercised, and both capacities are read.
+
+#### The criterion, line by line
+
+**1. The element is right — MET, both halves.** (a) 400 random elements over all
+eight capacity branches, worst relative gap against a central difference of the
+element's own internal force 4.89e-10 (two-node) and 3.05e-11 (three-node) at a
+probe step of 1e-5, falling as exactly 1/h to 7.13e-12 and 1.95e-13 at 1e-3 —
+round-off in the difference, not error in the tangent. (b) The cantilever and
+simply-supported closed forms at three orientations on both element types, 2.6e-15
+to 4.8e-12 relative, against the 1e-10 asked. And a leg the criterion did not ask
+for: the element's action rows reproduce the viscoplastic driver's own
+`_pile_element_actions` to 4.1e-13 over 300 elements, so the two drivers cap the
+same quantities.
+
+**2. The eight locked models — NOT MET, at four of eight on both counts.** Four land
+inside their published tolerance (`xslope_piles`, `xslope_piles_fem` and
+`xslope_torggler_3a_plate` reproduce the viscoplastic answer EXACTLY, trial for
+trial; `vp106c_fem_fix` at +0.0071) and four do not (+0.0436, +0.0700, +0.1061,
++0.2418, all HIGH). The criterion asked for six. **Every miss is diagnosed rather
+than reported as a direction**: at the strengths where the two drivers disagree the
+Newton state is in equilibrium to between 1.3e-6 and 3.1e-5 with a worst
+Mohr-Coulomb violation of 1.3e-8 to 1.6e-8 of the local strength, read in the
+invariant form, at 0.6% to 5.2% of the model height — a statically admissible field
+carrying full gravity, which by the lower-bound theorem is a proof that the slope
+stands there — while the viscoplastic trial is closed by the early-failure
+classifier with its out-of-balance two to three orders of magnitude outside the gate.
+
+**3. The capacity divergence — MET, and it costs nothing on these eight.** The
+moment cap is inert on both drivers (removing it moves neither answer on the one
+model that carries one) for a structural reason no sign can change. The shear cap
+binds on no trial of any of the eight — the largest shear anywhere is a third of the
+cap on the two models that carry one, and the other six carry none — so the two laws
+are the same law there, which is why the two capacity-bearing models agree exactly.
+Tightened until it binds, the two part company and the direction is measured on both.
+
+**4. Pile diagnostics — MET, and reported as numbers.** On `xslope_piles_fem` at
+F = 1.300, where the two drivers reach the same state, the axial force, shear and end
+moments agree to 0.37%, 0.68% and 0.31%; at F = 1.375, one cell below the limit and
+two different states, to 7.65%, 7.80% and 13.37%. The yielded masks agree element
+for element on both.
+
+**5. The displacement bound reads translational degrees of freedom only — MET
+structurally, and the behavioural mutation could not be built.** The lock asserts the
+index set and a mutation that returns the whole vector fails it. What could not be
+done is the behavioural half the criterion asked for: a nodal rotation is a
+deflection over a length, so it exceeds the largest displacement only in a model
+whose pile is under one unit long, and there is no such model. Measured, the
+rotations run 2.4% to 6.8% of the translational maximum on every pile model here, so
+the corrected bound reads the same number the raw one did. **That clause is not met
+as written and the measurement stands in its place.**
+
+**6. The no-pile path is bit-identical — MET.** Sixteen benchmark pairs and 137
+trials against a control run of the parent commit staged in a separate package tree:
+every one identical in factor of safety, verdict, iterations and force evaluations,
+across the plain-soil eight, the reinforced three, both tension-cutoff rows, a K0
+vendor row, a matric-suction row and the default viscoplastic path.
+
+**7. The ramp — MET on 3 of the 3 run**, against the 3 asked: 0.00000, +0.00234 and
++0.00469 from the Newton bisection. The pile is carried through the warm history
+without any extension, because `restrength` rewrites the soil groups and the pile
+groups are built once.
+
+**8. The refusal is gone and the guard list is updated — MET.** Piles are carried;
+bar softening, Hoek-Brown and the power curve each still raise and each still names
+itself, with the viscoplastic control accepting all three.
+
+**9. The locks — MET.** `check_pile_element` and `check_piles` pass as shipped and
+fail on all three mutations — the bending stiffness halved, the rotations back in the
+bound, the capacity correction dropped. The whole check file passes end to end.
+
+**10. The default path — MET.** Griffiths & Lane 6 dry, quad8, size 2, no
+`fem_solver` argument: FS 2.421875 on per-trial iteration counts 147, 781, 3393,
+2031, 2841, 9541, 12000, 8617, 8777 — value for value the control sequence, on both
+trees.
+
+**11. The honest negatives** are the four locks, the bound's unbuildable behavioural
+mutation, and the moment cap that neither driver enforces. All three are written
+above.
+
+#### Verdict
+
+**The pile element is right and the driver it is bolted to disagrees with the one
+that defines the locks on half the pile corpus.**
+
+Everything that can be checked about the element checks out, and the checks are
+sharp: the consistent tangent matches a central difference of its own residual to
+5e-10 on all eight capacity branches with the residual falling as 1/h, an isolated
+beam reproduces the cantilever and simply-supported closed forms to 1e-12 at three
+orientations on both element kinds, and the actions the element reads are the
+viscoplastic driver's own to 4e-13. Head and tip fixity needed no code — it is a
+constraint on `free_dofs`, which this path already read — and that is asserted
+rather than assumed. Sixteen benchmark pairs and 137 trials are bit-identical
+against a control tree, so nothing without a pile moved.
+
+And on four of the eight locked pile models the two drivers agree — three of them
+exactly, trial for trial and verdict for verdict, including both of the models that
+carry a finite pile capacity. On the other four the Newton driver reads 0.044 to
+0.242 HIGH, and the misses were not left as a direction: at the disputed strengths
+the Newton state is in equilibrium to a few parts in 10^5 with no Gauss point more
+than 1.6e-8 of its own strength outside the yield surface, which is a lower-bound
+proof that the slope stands there, while the viscoplastic trial is closed by the
+early-failure classifier with its out-of-balance a thousand times outside the gate.
+That is the same shape as the RS2-28 misses of the suction round, on a bigger scale:
+these are not eight benchmarks the Newton driver gets wrong, they are eight
+benchmarks whose locked values are the other driver's readings, and on the four where
+that driver's stopping rules bite the two answers are 4% to 24% apart. The
+`vp106c_fem` / `vp106c_fem_fix` pair is the sharpest single reading in the round —
+the same slope, the same mesh, the same pile row, and holding the head's rotation is
+the whole difference between agreeing to 0.007 and disagreeing by 0.106.
+
+Two things about the capacities came out of reading the code rather than running it,
+and both are measured. The moment cap is inert on both drivers, because the
+correction is applied at a rotational degree of freedom the two adjacent beam
+elements share and cancels there whichever sign it carries — a plastic hinge is a
+release of rotational continuity, and this is not one. And the shear cap is applied
+on the viscoplastic path with the sign the bar path's own comment calls an anti-cap:
+the tighter the cap, the more shear the pile delivers. Neither decides anything on
+the eight locked models, because no capacity binds on any trial of any of them. Both
+would decide something on a model where one did.
+
+What remains, in the order it matters:
+
+- **Whose number the four disputed pile models carry.** Four locked factors of
+  safety are defined by a driver whose verdict at those strengths is set by its
+  early-failure classifier, and the other driver produces an admissible field 4% to
+  24% higher. On `vp106c_fem` the vendor's own three-dimensional answer is BELOW
+  both, and `docs/verification/rocscience.md` already documents the plane-strain
+  beam as over-crediting that row — so a higher answer there is further from the
+  vendor, not nearer. This is a corpus decision with a measurement behind it and it
+  is the owner's, not a spike's; nothing here was changed.
+- **The two capacity findings.** The moment cap enforces nothing on either driver
+  and the shear cap is anti-enforced on the default one. Neither moves a published
+  number today. Both are defects in the shipped path, and fixing the hinge means
+  giving it a degree of freedom rather than a nodal moment.
+- **Three refusals remain**: post-peak bar softening, Hoek-Brown and the power
+  curve. Hoek-Brown and the power curve are two linearizations of the same shape and
+  would come together; softening is still the reason neither published reinforced
+  factor of safety is reachable here.

@@ -5283,3 +5283,84 @@ reproduces the bisection to eight digits. The ramp carries the pile through its 
 warm history without any extension: `restrength` rewrites the SOIL groups and nothing
 else, and the pile groups are built once, so a pile's rigidity and its capacity at
 the top of the ramp are the same objects they were at the foot.
+
+#### The no-pile path is unchanged
+
+Sixteen benchmark rows, each re-run on BOTH package trees — this checkout and a
+control run of **9f0b1515**, the driver before this round, staged separately — and
+compared trial by trial: factor of safety, and each trial's strength, verdict,
+iterations and force evaluations.
+
+| Row | Mesh | Driver | FS, both trees | trials | iterations | force evals | identical? |
+|---|---|---|---|---|---|---|---|
+| FEM-1 tutorial | tri6, 3.5 | Newton | 1.37109375 | 9 | 1,871 | 14,233 | **yes** |
+| LEM-3 tutorial | tri6, 1.2 | Newton | 1.26953125 | 9 | 4,945 | 38,463 | **yes** |
+| Griffiths & Lane 1 | quad8, 3.5 | Newton | 1.37187500 | 9 | 2,213 | 16,354 | **yes** |
+| Griffiths & Lane 1 | tri6, 3.5 | Newton | 1.36562500 | 9 | 3,121 | 22,650 | **yes** |
+| Griffiths & Lane 1 | quad9, 3.5 | Newton | 1.39687500 | 9 | 844 | 6,030 | **yes** |
+| Griffiths & Lane 6 dry | quad8, 2 | Newton | 2.41562500 | 9 | 4,146 | 29,059 | **yes** |
+| Griffiths & Lane 6 dry | tri6, 2 | Newton | 2.45937500 | 9 | 3,333 | 23,672 | **yes** |
+| Griffiths & Lane 3, r = 0.8 | tri6, 6 | Newton | 1.42812500 | 9 | 5,015 | 40,652 | **yes** |
+| Geogrid sample | tri6, 4 | Newton | 1.60781250 | 8 | 2,129 | 14,680 | **yes** |
+| Geogrid sample, LOCKED mesh | tri6, 2 | Newton | 1.56093750 | 8 | 2,732 | 17,903 | **yes** |
+| Half capacity | tri6, 4 | Newton | 1.41406250 | 8 | 2,728 | 18,214 | **yes** |
+| Griffiths & Lane 1, `t_cut` = 0 | tri6, 3.5 | Newton | 1.35312500 | 9 | 3,342 | 24,637 | **yes** |
+| Griffiths & Lane 1, `t_cut` = 30 | tri6, 3.5 | Newton | 1.35937500 | 9 | 2,494 | 18,570 | **yes** |
+| RS2-27-m1.5 (`vp036`, K0) | tri6, 1.5 | Newton | 1.37343750 | 7 | 772 | 6,487 | **yes** |
+| RS2-P4-VP102-t-60-c3 (suction) | tri6, 2.5 | Newton | 1.78984375 | 9 | 592 | 4,547 | **yes** |
+| **Griffiths & Lane 6 dry — the DEFAULT path** | quad8, 2 | viscoplastic | **2.421875** | 9 | 48,128 | — | **yes** |
+
+Sixteen pairs, 137 trials, every one identical in factor of safety, verdict,
+iterations and force evaluations. Every plain-soil, reinforced and tension-cutoff
+value reproduces the figure recorded earlier in this document to the digit, and the
+default viscoplastic path returns FS 2.421875 on per-trial iteration counts
+
+    147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777
+
+value for value the control sequence, on both trees.
+
+That it has to be identical is structural, not lucky: a model with no pile takes
+`piles = None` through every new code path, and `_nr_translational_dofs` returns
+None there, so the displacement bound, the elastic displacement scale, the tangent
+probe's step and the reported `residual` are each the plain `np.max(np.abs(u))` they
+always were, on the same array.
+
+#### The locks
+
+`test/nr_ssrm_check.py` gains `check_pile_element` and `check_piles`, together about
+74 s. Six legs:
+
+  * the element's consistent tangent against a central difference of its own
+    internal force on 120 random elements, with the branch histogram asserted to
+    have reached all eight capacity branches;
+  * the element's action rows against the viscoplastic driver's own
+    `_pile_element_actions`, so the two drivers are capping the same quantities;
+  * the closed-form cantilever and simply supported beam, at three orientations and
+    on both element types;
+  * the displacement bound's index set, asserted to exclude exactly the pile nodes'
+    rotations;
+  * head and tip fixity — the held degrees of freedom absent from `free_dofs` and
+    exactly zero in the solution — on the model whose tip is fixed;
+  * the shear capacity: it must bind, no element may report a force above it, the
+    displacement field must MOVE when the cap is tightened, and it must move
+    FARTHER, since a member that can deliver less force cannot hold the soil back
+    better;
+  * and the factor of safety, as a bracket: the FEM pile sample stands at F = 1.375
+    and fails at F = 1.384375 on BOTH drivers, which contains its published 1.380.
+
+The pile refusal left `check_reinforcement_refusals`, which now guards bar softening
+alone.
+
+**Mutation, run four ways.** Each is the same two check functions against a driver
+with one thing changed:
+
+| driver | verdict | what the check saw |
+|---|---|---|
+| as shipped | **PASS** | — |
+| the beam's bending stiffness halved | **FAIL** | all 18 closed-form legs, each off by exactly a factor of two ("cantilever tip deflection 2.40000000e+00 against the closed form 1.20000000e+00"), and the capacity direction leg with it |
+| `_nr_translational_dofs` returning None — the rotations back in the bound | **FAIL** | "the set it excludes is not exactly the pile nodes' rotations, so the bound is comparing a length against a radian" |
+| the capacity correction dropped from the residual | **FAIL** | the tangent leg at 6.28 relative — the tangent still gives up the stiffness the residual no longer gives up — and "capping the pile shear at 925.3 where the uncapped pile carries 3701.2 made the slope move LESS, not more" |
+
+The third mutation is the one worth reading twice: with the correction dropped, the
+REPORTED pile forces are still clipped at the cap, so a check that read only the
+reported array would pass on a driver enforcing nothing.

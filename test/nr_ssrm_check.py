@@ -211,6 +211,8 @@ def run():
     failures += check_tension_cutoff(fem_data)
     failures += check_matric_suction()
     failures += check_k0_initial_stress()
+    failures += check_pile_element()
+    failures += check_piles()
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
 
@@ -652,7 +654,7 @@ def _reinf_fem_data(path=None, target_size=REINF_SIZE, soften=False,
 
 
 def check_reinforcement_refusals():
-    """Bars are carried. Softening bars and piles are not, and they say so.
+    """Bars are carried. Softening bars are not, and they say so.
 
     The scope line is the whole point of the guard: the Newton driver's bar element
     is tension-only and elastic-perfectly-plastic, so a model whose bars declare a
@@ -692,28 +694,9 @@ def check_reinforcement_refusals():
                 f"plastic, so those bars would hold their peak capacity forever and "
                 f"the factor of safety would come back too high.")
 
-    # Piles are beam elements with rotational degrees of freedom and a bending
-    # capacity. Narrowing the guard to bars must not have narrowed it past them.
-    pile_model = (Path(__file__).resolve().parents[1] / 'docs' / 'fem' / 'files'
-                  / 'xslope_piles_fem.xlsx')
-    if pile_model.exists():
-        fd = _reinf_fem_data(path=pile_model, target_size=4.0)
-        if not fd.get('n_pile_elements', 0):
-            fails.append("the pile test model carries no pile elements, so the pile "
-                         "refusal is untested")
-        else:
-            try:
-                solve_fem(fd, F=1.0, fem_solver='newton')
-            except NotImplementedError as exc:
-                if 'pile' not in str(exc):
-                    fails.append(f"the Newton driver refused the pile model with a "
-                                 f"message that does not name piles: {exc}")
-            else:
-                fails.append(
-                    "the Newton driver ACCEPTED a pile model. Pile nodes carry a "
-                    "rotational degree of freedom, which the driver's displacement "
-                    "bound would then be comparing against a length, and the beam's "
-                    "bending capacity is not in its element at all.")
+    # Piles used to be asserted here. They are CARRIED now (see
+    # :func:`check_piles`), so a refusal expected here would be holding the driver
+    # to a limitation it no longer has.
     return fails
 
 
@@ -1605,6 +1588,396 @@ def check_k0_initial_stress():
             f"the two drivers disagree on {K0_MODEL.name} with K0 = 1: "
             f"viscoplastic {fs['viscoplastic']:.4f} against Newton "
             f"{fs['newton']:.4f}")
+    return fails
+
+
+# The pile cases (SPIKE.md, "PILES"), both at the mesh their own test tags carry.
+#
+# The FEM-3 tutorial's sheet pile wall is the one that holds an end — its tip is
+# FIXED — so it is what the fixity and capacity legs run on.
+PILE_MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'tutorials' / 'files'
+              / 'xslope_pile_wall.xlsx')
+PILE_SIZE = 2.0
+# The FEM pile sample: two pile rows, both capacities finite, both ends free. Its
+# published lock is FS 1.380 (docs/fem/samples.md), and the two drivers bracket it
+# identically — trial for trial, verdict for verdict, over the whole bisection. The
+# pair below is that bracket, which holds the same fact as the bisection for four
+# solves instead of two whole runs.
+PILES_MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'fem' / 'files'
+               / 'xslope_piles_fem.xlsx')
+PILES_SIZE = 2.0
+PILES_LOCKED_FS = 1.380
+PILES_STANDS, PILES_FAILS = 1.375, 1.384375
+
+
+def _pile_fem_data(path=None, target_size=PILE_SIZE, element_size_1d=None):
+    """A pile model, meshed with its pile axis as a constraint line.
+
+    A reinforcement-only extraction drops the pile axes, and without them in the
+    mesh there are no beam elements to extract — so the model would solve, silently,
+    with no pile in it at all.
+    """
+    from xslope.mesh import (extract_constraint_line_geometry,
+                             extract_point_constraints, extract_size_regions)
+    slope_data = load_slope_data(str(path or PILE_MODEL))
+    if element_size_1d is not None:
+        slope_data['element_size_1d'] = element_size_1d
+    lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+    mesh = build_mesh_from_polygons(
+        get_material_polygons(slope_data, reinf_lines=lines),
+        target_size=target_size, element_type='tri6', lines=lines,
+        element_size_1d=slope_data.get('element_size_1d'),
+        point_constraints=extract_point_constraints(slope_data),
+        size_regions=extract_size_regions(slope_data))
+    return build_fem_data(slope_data, mesh)
+
+
+def _beam_case(n_node, theta, L, EA, EI, V_cap=np.inf, M_cap=np.inf):
+    """A one-element ``fem_data`` carrying exactly what _nr_build_piles reads."""
+    from xslope.fem import _beam_local_stiffness, _beam_rotation
+    nd = 3 * n_node
+    Kl = _beam_local_stiffness(EA, EI, L, n_node == 3)
+    T = _beam_rotation(np.cos(theta), np.sin(theta), n_node)
+    dof = np.zeros((1, 9), dtype=np.int64)
+    dof[0, :nd] = np.arange(nd)
+    return {"n_pile_elements": 1, "K_global_pile_elems": [T.T @ Kl @ T],
+            "K_local_by_pile_elem": [Kl], "dof_indices_pile": dof,
+            "n_dof_by_pile_elem": np.array([nd]),
+            "cos_theta_pile": np.array([np.cos(theta)]),
+            "sin_theta_pile": np.array([np.sin(theta)]),
+            "elem_length_by_pile_elem": np.array([L]),
+            "EI_by_pile_elem": np.array([EI]), "EA_by_pile_elem": np.array([EA]),
+            "V_cap_by_pile_elem": np.array([V_cap]),
+            "M_cap_by_pile_elem": np.array([M_cap])}
+
+
+def _nr_translational_max(u, tidx):
+    """max|u| over the translational degrees of freedom, for the checks."""
+    v = u if tidx is None else np.asarray(u)[tidx]
+    return float(np.max(np.abs(v))) if np.size(v) else 0.0
+
+
+def check_pile_element():
+    """The beam element itself, before any soil: the tangent, and the closed forms.
+
+    Two measurements, and neither needs a slope.
+
+    **The consistent tangent is exact**, because every action the capacity clips is
+    LINEAR in the element displacement and every branch of the clip is affine — so
+    the analytic element tangent must equal a central difference of the element's
+    own internal force to round-off, on every branch. 120 random elements, random
+    orientation, length and rigidities, two-node and three-node, with the caps set
+    from the actions the drawn displacement actually produces so that all eight
+    combinations of (shear, end moment 1, end moment 2) at their cap are reached.
+    A probe that straddles a branch boundary is skipped rather than averaged, and
+    the histogram is asserted to have reached every branch — a check that never
+    lands on the capped branches would prove nothing about them.
+
+    **An isolated beam reproduces the closed forms.** A six-element cantilever
+    under a transverse end load must deflect PL^3/3EI and rotate PL^2/2EI at the
+    tip; simply supported under a central load it must deflect PL^3/48EI. The
+    assembly, the rotation into global coordinates and the residual are the
+    round's own, so a corrupted bending stiffness cannot pass this.
+    """
+    from xslope.fem import _nr_build_piles, _nr_pile_force
+    fails = []
+    rng = np.random.default_rng(20260901)
+
+    worst = 0.0
+    branches = {}
+    n_ok = 0
+    for trial in range(120):
+        n_node = 2 if trial % 2 == 0 else 3
+        nd = 3 * n_node
+        th = rng.uniform(0, 2 * np.pi)
+        L = float(np.exp(rng.uniform(np.log(0.5), np.log(20.0))))
+        EA = float(np.exp(rng.uniform(np.log(1e4), np.log(1e8))))
+        EI = float(np.exp(rng.uniform(np.log(1e3), np.log(1e7))))
+        u = rng.normal(0.0, 1.0, nd) * L * 1e-3
+        pg0 = _nr_build_piles(_beam_case(n_node, th, L, EA, EI))[0]
+        act = pg0['act'][0] @ u
+        caps = np.abs(act) * rng.choice([0.3, 0.8, 1.5, 3.0], size=3)
+        caps[rng.random(3) < 0.25] = np.inf
+        pg = _nr_build_piles(_beam_case(n_node, th, L, EA, EI, caps[0], caps[1]))[0]
+        pg['cap'][0, 2] = caps[2]
+        f0 = _nr_pile_force(pg, u, True)
+        K = pg['_Ke'][0].copy()
+        branch = tuple(bool(b) for b in (np.abs(pg['_s'][0]) > pg['cap'][0]))
+        h = 1e-5 * float(np.max(np.abs(u)))
+        D = np.zeros((nd, nd))
+        straddled = False
+        for j in range(nd):
+            up, um = u.copy(), u.copy()
+            up[j] += h
+            um[j] -= h
+            fp = _nr_pile_force(pg, up, False)[0].copy()
+            b1 = tuple(bool(b) for b in (np.abs(pg['_s'][0]) > pg['cap'][0]))
+            fm = _nr_pile_force(pg, um, False)[0].copy()
+            b2 = tuple(bool(b) for b in (np.abs(pg['_s'][0]) > pg['cap'][0]))
+            if b1 != branch or b2 != branch:
+                straddled = True
+                break
+            D[:, j] = (fp - fm) / (2 * h)
+        if straddled:
+            continue
+        worst = max(worst, float(np.max(np.abs(K - D)) / max(np.max(np.abs(K)), 1e-30)))
+        branches[branch] = branches.get(branch, 0) + 1
+        n_ok += 1
+
+    if n_ok < 80:
+        fails.append(f"only {n_ok} of 120 random beam elements could be verified; "
+                     f"the tangent check is not exercising the element")
+    if len(branches) < 8:
+        fails.append(
+            f"the pile tangent check reached only {len(branches)} of the 8 capacity "
+            f"branches ({sorted(branches)}) — a branch it never lands on is a branch "
+            f"it proves nothing about")
+    if worst > 1e-6:
+        fails.append(
+            f"the pile beam element's consistent tangent disagrees with a central "
+            f"difference of its own internal force by {worst:.2e} relative. Every "
+            f"branch is affine in the element displacement, so the tangent is exact "
+            f"and this can only be an error in the element.")
+
+    # ---- the same actions the viscoplastic driver reads -------------------
+    # The Newton element reads its axial force, shear and end moments off constant
+    # ROWS, because it needs their gradients; the viscoplastic path computes the
+    # same four quantities in closed form each iteration. They have to be the same
+    # numbers, or the two drivers are capping different things.
+    from xslope.fem import _pile_element_actions
+    worst_act = 0.0
+    for trial in range(60):
+        n_node = 2 if trial % 2 == 0 else 3
+        nd = 3 * n_node
+        th = rng.uniform(0, 2 * np.pi)
+        L = float(np.exp(rng.uniform(np.log(0.5), np.log(20.0))))
+        EA = float(np.exp(rng.uniform(np.log(1e4), np.log(1e8))))
+        EI = float(np.exp(rng.uniform(np.log(1e3), np.log(1e7))))
+        fd = _beam_case(n_node, th, L, EA, EI)
+        pg = _nr_build_piles(fd)[0]
+        u = rng.normal(0.0, 1.0, nd) * L * 1e-3
+        T_f, V, M1, M2, _ = _pile_element_actions(
+            u, np.cos(th), np.sin(th), L, EA, EI,
+            fd['K_local_by_pile_elem'][0], n_node)
+        got = pg['act'][0] @ u
+        for a, b in ((pg['ax'][0] @ u, T_f), (got[0], V), (got[1], M1), (got[2], M2)):
+            worst_act = max(worst_act, abs(a - b) / max(abs(b), 1e-30))
+    if worst_act > 1e-10:
+        fails.append(
+            f"the Newton element's action rows disagree with the viscoplastic "
+            f"driver's own _pile_element_actions by {worst_act:.2e} relative — the "
+            f"two drivers would be capping different quantities")
+
+    # ---- the closed forms -------------------------------------------------
+    E, I, A = 2.0e8, 3.0e-4, 1.2e-2
+    EI, EA = E * I, E * A
+    Ltot, P, n_elem = 6.0, 1000.0, 6
+
+    def _chain(n_node, th):
+        Le = Ltot / n_elem
+        nd_e = 3 * n_node
+        base = _beam_case(n_node, th, Le, EA, EI)
+        dof = np.zeros((n_elem, 9), dtype=np.int64)
+        for e in range(n_elem):
+            row = [3 * e, 3 * e + 1, 3 * e + 2,
+                   3 * (e + 1), 3 * (e + 1) + 1, 3 * (e + 1) + 2]
+            if n_node == 3:
+                m = n_elem + 1 + e
+                row += [3 * m, 3 * m + 1, 3 * m + 2]
+            dof[e, :nd_e] = row
+        fd = dict(base)
+        fd['n_pile_elements'] = n_elem
+        for key in ('K_global_pile_elems', 'K_local_by_pile_elem'):
+            fd[key] = [base[key][0]] * n_elem
+        fd['dof_indices_pile'] = dof
+        for key, val in (('n_dof_by_pile_elem', nd_e),
+                         ('cos_theta_pile', np.cos(th)),
+                         ('sin_theta_pile', np.sin(th)),
+                         ('elem_length_by_pile_elem', Le),
+                         ('EI_by_pile_elem', EI), ('EA_by_pile_elem', EA),
+                         ('V_cap_by_pile_elem', np.inf),
+                         ('M_cap_by_pile_elem', np.inf)):
+            fd[key] = np.full(n_elem, val)
+        n_nodes = n_elem + 1 + (n_elem if n_node == 3 else 0)
+        return _nr_build_piles(fd), 3 * n_nodes
+
+    def _solve(piles, n_dof, fixed, load):
+        K = np.zeros((n_dof, n_dof))
+        for pg in piles:
+            for j in range(len(pg['idx'])):
+                d = pg['dof'][j]
+                K[np.ix_(d, d)] += pg['K'][j]
+        free = np.array([i for i in range(n_dof) if i not in fixed])
+        u = np.zeros(n_dof)
+        u[free] = np.linalg.solve(K[np.ix_(free, free)], load[free])
+        return u
+
+    for n_node in (2, 3):
+        for th in (0.0, np.pi / 2, 0.7):
+            c, sn = np.cos(th), np.sin(th)
+            piles, n_dof = _chain(n_node, th)
+            tip = 3 * n_elem
+            load = np.zeros(n_dof)
+            load[tip], load[tip + 1] = -sn * P, c * P
+            u = _solve(piles, n_dof, {0, 1, 2}, load)
+            d_tip = -sn * u[tip] + c * u[tip + 1]
+            e_tip = P * Ltot ** 3 / (3.0 * EI)
+            e_rot = P * Ltot ** 2 / (2.0 * EI)
+            piles2, n_dof2 = _chain(n_node, th)
+            mid = 3 * (n_elem // 2)
+            load2 = np.zeros(n_dof2)
+            load2[mid], load2[mid + 1] = -sn * P, c * P
+            u2 = _solve(piles2, n_dof2, {0, 1, 3 * n_elem, 3 * n_elem + 1}, load2)
+            d_mid = -sn * u2[mid] + c * u2[mid + 1]
+            e_mid = P * Ltot ** 3 / (48.0 * EI)
+            for got, want, what in ((d_tip, e_tip, "cantilever tip deflection"),
+                                    (u[tip + 2], e_rot, "cantilever tip rotation"),
+                                    (d_mid, e_mid, "simply supported deflection")):
+                rel = abs(got - want) / abs(want)
+                if rel > 1e-8:
+                    fails.append(
+                        f"the {n_node}-node beam at {np.degrees(th):.0f} deg gets "
+                        f"{what} {got:.8e} against the closed form {want:.8e} "
+                        f"(relative {rel:.2e})")
+    return fails
+
+
+def check_piles():
+    """The Newton driver carries pile beam elements. Four things beyond the element.
+
+    **The displacement bound is a length.** A pile node carries a rotation as its
+    third degree of freedom, and the bound the verdict is read on is ``max|u|``. It
+    reads the TRANSLATIONAL degrees of freedom only — which is what the viscoplastic
+    driver's own displacement-limit check reads — and the index set is asserted to be
+    exactly the non-rotational ones. The behavioural half runs on a model meshed
+    finely enough along the pile that its rotations exceed its displacements, so a
+    bound that let the rotations in would read a different number: the trial has to
+    stand under the translational reading and be refused under the raw one.
+
+    **Fixity is already in force.** A held head rotation or a fixed tip is a
+    constraint on ``free_dofs``, which this path reads from the prepared model, so
+    nothing about it is built here — and that is asserted rather than assumed, on the
+    model whose tip is fixed: the held degrees of freedom must be absent from
+    ``free_dofs`` and exactly zero in the solution.
+
+    **The capacity is enforced.** With the shear capacity tightened until it binds,
+    the shear the element DELIVERS — read out of the residual the driver assembles,
+    not out of the reported array — must be at the cap and not above it, and the
+    state must differ from the uncapped one. Dropping the correction from the
+    residual leaves the reported array clipped and the physics uncapped, which is
+    the failure mode this leg exists for.
+
+    **The factor of safety.** The FEM pile sample at its own tagged mesh stands at a
+    strength below its published lock and fails at one above it, on BOTH drivers —
+    the two agree trial for trial over the whole bisection there, so the bracket
+    holds the same fact for four solves instead of two whole runs.
+    """
+    from xslope.fem import (_nr_build_piles, _nr_pile_force,
+                            _nr_translational_dofs, _prepare_fem_model)
+    fails = []
+    fem_data = _pile_fem_data()
+    n_pile = int(fem_data.get('n_pile_elements', 0))
+    if n_pile == 0:
+        return ["the pile test model carries no pile elements — the model, not the "
+                "driver, is broken"]
+
+    # ---- the translational index -------------------------------------------
+    n_dof = int(fem_data['dof_offset'][len(fem_data['nodes'])])
+    tidx = _nr_translational_dofs(fem_data, n_dof)
+    is_pile = np.asarray(fem_data['is_pile_node'], dtype=bool)
+    rot = np.asarray(fem_data['dof_offset'][:len(is_pile)])[is_pile] + 2
+    if tidx is None or set(np.setdiff1d(np.arange(n_dof), tidx)) != set(rot.tolist()):
+        fails.append(
+            "the Newton driver's displacement bound does not read the translational "
+            "degrees of freedom only: the set it excludes is not exactly the pile "
+            "nodes' rotations, so the bound is comparing a length against a radian")
+
+    # ---- fixity ------------------------------------------------------------
+    prep = _prepare_fem_model(fem_data)
+    free = set(int(d) for d in prep['free_dofs'])
+    held = []
+    for nodes_, rot_held, trans_held, end in (
+            (fem_data['pile_tip_nodes'], fem_data['pile_tip_fixed'],
+             fem_data['pile_tip_pinned'], 'tip'),
+            (fem_data['pile_head_nodes'], fem_data['pile_head_fixed'],
+             fem_data['pile_head_pinned'], 'head')):
+        for k in range(len(nodes_)):
+            base = int(fem_data['dof_offset'][int(nodes_[k])])
+            if bool(rot_held[k]):
+                held.append((base + 2, f"{end} rotation"))
+            if bool(trans_held[k]):
+                held += [(base, f"{end} x"), (base + 1, f"{end} y")]
+    if not held:
+        fails.append("the pile test model holds neither end, so the fixity leg is "
+                     "not exercising anything")
+    for dof, what in held:
+        if dof in free:
+            fails.append(f"the pile {what} is declared held and its degree of "
+                         f"freedom is still free on the Newton path")
+
+    # ---- the capacity, and what it delivers --------------------------------
+    F_CAP = 1.2
+    sol_free = solve_fem(fem_data, F=F_CAP, fem_solver='newton',
+                         max_disp_factor=None)
+    for dof, what in held:
+        if abs(float(sol_free['displacements'][dof])) > 1e-12:
+            fails.append(f"the pile {what} is held but moved "
+                         f"{sol_free['displacements'][dof]:.3e} in the solution")
+    V_free = float(np.max(np.abs(sol_free['forces_pile_lateral'])))
+    u_free = _nr_translational_max(sol_free['displacements'], tidx)
+    cap = 0.25 * V_free
+    saved = fem_data['V_cap_by_pile_elem']
+    try:
+        fem_data['V_cap_by_pile_elem'] = np.full(n_pile, cap)
+        sol_cap = solve_fem(fem_data, F=F_CAP, fem_solver='newton',
+                            max_disp_factor=None)
+    finally:
+        fem_data['V_cap_by_pile_elem'] = saved
+    u_cap = _nr_translational_max(sol_cap['displacements'], tidx)
+    if int(np.count_nonzero(sol_cap['yielded_pile_V'])) == 0:
+        fails.append(f"a shear cap at a quarter of the free shear ({cap:.1f} against "
+                     f"{V_free:.1f}) binds on no element, so the capacity leg is not "
+                     f"exercising the cap")
+    if float(np.max(np.abs(sol_cap['forces_pile_lateral']))) > cap * (1 + 1e-9):
+        fails.append(
+            f"a pile element reports a shear of "
+            f"{float(np.max(np.abs(sol_cap['forces_pile_lateral']))):.4f} above its "
+            f"cap of {cap:.4f}")
+    if np.allclose(sol_cap['displacements'], sol_free['displacements']):
+        fails.append(
+            "tightening the pile shear capacity to a quarter of the free shear left "
+            "the displacement field unchanged, so the correction is not reaching the "
+            "residual — the reported force would be clipped while the physics stayed "
+            "uncapped, which is the failure mode this leg exists for")
+    elif not u_cap > u_free:
+        fails.append(
+            f"capping the pile shear at {cap:.1f} where the uncapped pile carries "
+            f"{V_free:.1f} made the slope move LESS, not more: max|u| went from "
+            f"{u_free:.6g} to {u_cap:.6g}. A member that can deliver less force "
+            f"cannot hold the soil back better — that is the signature of a "
+            f"correction applied with the wrong sign (SPIKE.md, \"PILES\").")
+
+    # ---- the factor of safety, both drivers --------------------------------
+    # The FEM pile sample brackets its published lock on BOTH drivers: it stands at
+    # a strength below the lock and fails at one above it, so the limit is inside
+    # the bracket and the lock is inside it too. Two solves a driver rather than two
+    # whole bisections, and the same statement.
+    piles_fd = _pile_fem_data(path=PILES_MODEL, target_size=PILES_SIZE)
+    if not (PILES_STANDS < PILES_LOCKED_FS < PILES_FAILS):
+        fails.append(f"the pile bracket [{PILES_STANDS}, {PILES_FAILS}] does not "
+                     f"contain the locked {PILES_LOCKED_FS}")
+    for solver in ('viscoplastic', 'newton'):
+        for F, want in ((PILES_STANDS, True), (PILES_FAILS, False)):
+            sol = solve_fem(piles_fd, F=F, fem_solver=solver, max_iterations=16000,
+                            max_disp_factor=None)
+            got = bool(sol.get('stable', sol['converged']))
+            if got != want:
+                fails.append(
+                    f"{solver}: the FEM pile sample at F = {F} came back "
+                    f"{'CONVERGED' if got else 'FAILED'} where it must "
+                    f"{'stand' if want else 'fail'} — the two trials bracket the "
+                    f"published {PILES_LOCKED_FS} and both drivers agree on them "
+                    f"(exit {sol.get('exit_reason')})")
     return fails
 
 

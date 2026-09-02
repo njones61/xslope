@@ -64,9 +64,15 @@ strength more than its initial increment above the highest one it has carried,
 which is the whole of its cost advantage.
 
 Finally, the driver refuses what it cannot represent. Its return map is plain
-Mohr-Coulomb, so a Hoek-Brown, power-curve or suction-bearing model must raise
-rather than be solved on the wrong strength envelope; each is built as a real model
-and the refusal message has to name the feature.
+Mohr-Coulomb, so a Hoek-Brown or power-curve model must raise rather than be solved
+on the wrong strength envelope; each is built as a real model and the refusal
+message has to name the feature.
+
+Matric suction (SPIKE.md, "MATRIC SUCTION") is carried, not refused. Fredlund's
+credit is an apparent cohesion on the same linear envelope, so it enters as a
+per-Gauss-point cohesion and the check is written on that FIELD as well as on the
+answer: the two drivers must build the same field, the cap must bound it, the trial
+strength must reduce it, and the answer must move on the cap's value.
 
 Reinforcement (SPIKE.md, "REINFORCEMENT") is the one feature the driver DOES carry,
 and it is checked from both sides. What it carries: a reinforced bisection lands on
@@ -203,6 +209,7 @@ def run():
     failures += check_cohesionless_solve()
     failures += check_cohesionless_seed_depth()
     failures += check_tension_cutoff(fem_data)
+    failures += check_matric_suction()
     failures += check_k0_initial_stress()
     failures += check_env_override_announces_itself()
     failures += check_ramp(fem_data, results['newton'].get('FS'))
@@ -549,9 +556,12 @@ def check_unsupported_features_refuse():
 
       * Hoek-Brown (``option='hb'``), which the viscoplastic loop handles by
         inverting Balmer's curve for a tangent (c_i, phi_i) at each Gauss point;
-      * the power-curve envelope (``option='pow'``), linearized the same way;
-      * matric suction, which adds an apparent cohesion the return map knows
-        nothing about.
+      * the power-curve envelope (``option='pow'``), linearized the same way.
+
+    Matric suction used to be the third. It is CARRIED now (see
+    :func:`check_matric_suction`), so it is no longer asserted here — the guard
+    that refused it is gone, and a check still expecting the refusal would be
+    holding the driver to a limitation it no longer has.
 
     Each is built as a real model — the same coarse mesh the rest of this file
     uses, with the material re-declared on that envelope, or with a suction angle
@@ -571,9 +581,6 @@ def check_unsupported_features_refuse():
         d['materials'][0].update(over)
         return build_fem_data(d, mesh)
 
-    plain = build_fem_data(copy.deepcopy(slope_data), mesh)
-    suction_name = plain['material_names'][0]
-
     cases = [
         ("Hoek-Brown",
          _variant(option='hb', hb_sci=30000.0, hb_gsi=60.0, hb_mi=10.0, hb_d=0.0),
@@ -581,7 +588,6 @@ def check_unsupported_features_refuse():
         ("power-curve",
          _variant(option='pow', pow_a=1.1, pow_b=0.9, pow_c=2.0, pow_d=4.0),
          {}, 'pow_flag_by_elem'),
-        ("matric suction", plain, {'suction_phi_b': {suction_name: 15.0}}, None),
     ]
 
     for label, fd, kwargs, flag_key in cases:
@@ -1153,6 +1159,227 @@ def check_tension_cutoff(fem_data):
 
 
 
+# Matric suction (SPIKE.md, "MATRIC SUCTION"). The model is RS2 Part 4 VP102 at
+# t = 60 s — docs/verification/rs2.md, benchmark RS2-P4-VP102-t-60-c3: its own
+# transient seepage field on its own stored mesh (1,118 tri6 elements), an
+# unsaturated friction angle of 37 deg supplied by the TEST TAG rather than the
+# file, k0 = 1, tension_srf on, an SSR search zone, and a locked FS of
+# 1.779 +/- 0.02. The tag's settings are written out rather than read through
+# run_tests, so the assertion holds the mapping instead of following it.
+SUC_MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'verification' / 'files'
+             / 'rocscience' / 'vp102t_60.xlsx')
+SUC_PHI_B = {'Material 1': 37.0}
+SUC_K0 = 1.0
+SUC_MAX_ITER = 16000
+# One trial either side of the two drivers' measured answers on this model
+# (viscoplastic 1.7707, Newton 1.7926). The LOWER one is the load-bearing choice:
+# the same model with the credit off is locked at 1.713 (its own c2 row), so a
+# driver that loses the suction fails a trial it has to carry, and the leg cannot
+# pass by accident.
+SUC_F_STANDS, SUC_F_FAILS = 1.74, 1.82
+# The cap legs. The suction reaches 91.4 stress units on this model and is
+# positive at 474 Gauss points, so a cap of 5 binds at 421 of them — most of the
+# credit — and a cap of 20 binds at 294 and still leaves enough to carry the
+# trial. Both are asserted: a cap that changes every answer is as uninformative
+# as one that changes none.
+SUC_CAP_BINDS, SUC_CAP_LOOSE = 5.0, 20.0
+# The pair of strengths the F-reduction is read across. BOTH must be trials the
+# Newton driver CARRIES: a failing trial fires the viscoplastic predictor, whose
+# own group build calls the same helper, and the capture would then hold two
+# drivers' fields end to end rather than one driver's at two strengths.
+SUC_F_LOW, SUC_F_HIGH = 1.0, 1.5
+
+
+def _suction_fem_data():
+    """The suction benchmark, on the mesh its stored seepage field is written on.
+
+    ``u = seep`` means the nodal pore pressures belong to a particular mesh, so
+    the model's own mesh is used rather than a fresh one — build_fem_data would
+    silently zero the field if the node count differed.
+    """
+    slope_data = load_slope_data(str(SUC_MODEL))
+    return build_fem_data(slope_data, slope_data['mesh'])
+
+
+def _suction_field(fem_data, F, solver, phi_b=None, cap=None):
+    """The apparent-cohesion field a DRIVER actually computes, in its own order.
+
+    Captured at ``_suction_apparent_cohesion``, the one helper both drivers call,
+    by running a single solver iteration through the driver's own entry point.
+    Reading the field off a group the check built itself would prove only that the
+    check can build a group; this proves what the solve is running on.
+    """
+    got = []
+    original = _fem._suction_apparent_cohesion
+
+    def spy(tanphib, s_capped, finv):
+        out = original(tanphib, s_capped, finv)
+        got.append(np.asarray(out).copy())
+        return out
+
+    _fem._suction_apparent_cohesion = spy
+    try:
+        solve_fem(fem_data, F=F, max_iterations=1, max_disp_factor=None,
+                  tension_srf=True, k0=SUC_K0, fast_kernel=False,
+                  suction_phi_b=(SUC_PHI_B if phi_b is None else phi_b),
+                  suction_cap=cap, fem_solver=solver)
+    finally:
+        _fem._suction_apparent_cohesion = original
+    return np.concatenate(got) if got else np.zeros(0)
+
+
+def check_matric_suction():
+    """Fredlund's apparent cohesion, on the Newton driver.
+
+    The Newton driver used to refuse any model carrying a positive ``phi_b``,
+    which put six locked vendor benchmarks out of reach for a credit that needs no
+    new yield surface: ``min(max(0, -u_w), s_cap) tan(phi_b) / F`` is an APPARENT
+    COHESION on the same linear envelope the return map already solves, and the
+    return map already takes ``c`` per Gauss point.
+
+    That makes the whole of this feature plumbing — which pore-pressure field,
+    which cap, which F — so the check is written on the field and not only on a
+    factor of safety. Five things are asserted, and each fails on a different
+    defect:
+
+      * **the two drivers compute the same field**, point for point, captured at
+        the one helper they share by running a solver iteration through each
+        driver's own entry point. A plumbing difference is the only thing that can
+        show up here, which is the point.
+      * **the credit is reduced by the trial strength**, as the viscoplastic
+        driver reduces it and as docs/fem/overview.md states: the field at F = 1.5
+        must be exactly two thirds of the field at F = 1 wherever the strength is
+        actually reduced. The model carries an SSR search zone, so the points held
+        at full strength must NOT scale, and both facts are asserted.
+      * **``s_cap`` bounds the credit.** At F = 1 a cap of 5 must hold the largest
+        credit to ``5 tan(phi_b)``, where the uncapped field on the same model
+        reaches eighteen times that.
+      * **the answer.** One trial either side of the measured limit, on BOTH
+        drivers: F = 1.74 stands, F = 1.82 fails.
+      * **the credit is load-bearing, and the cap moves it.** With the credit off,
+        F = 1.74 must FAIL on both drivers — otherwise the trial above proves
+        nothing about suction. With the binding cap it must fail too, and with the
+        loose cap it must stand again, so what moved the answer is the cap's VALUE
+        and not the presence of a cap keyword.
+    """
+    fails = []
+    fd = _suction_fem_data()
+    tanb = float(np.tan(np.radians(SUC_PHI_B['Material 1'])))
+
+    # ---- (1) the two drivers' fields ---------------------------------------
+    vp1 = _suction_field(fd, SUC_F_LOW, 'viscoplastic')
+    nr1 = _suction_field(fd, SUC_F_LOW, 'newton')
+    if nr1.size == 0:
+        return ["the Newton driver computed no apparent cohesion at all on "
+                f"{SUC_MODEL.name}, which declares an unsaturated friction angle "
+                f"— the model, not the driver, may be the problem"]
+    n_credited = int(np.count_nonzero(nr1 > 0.0))
+    if n_credited == 0 or float(nr1.max()) <= 0.0:
+        fails.append(
+            f"{SUC_MODEL.name} credits suction at no Gauss point, so nothing "
+            f"below is a measurement of matric suction")
+    if vp1.shape != nr1.shape:
+        fails.append(
+            f"the two drivers built apparent-cohesion fields of different "
+            f"lengths ({vp1.size} viscoplastic against {nr1.size} Newton), so "
+            f"they are not walking the same Gauss points")
+    else:
+        d = float(np.max(np.abs(vp1 - nr1)))
+        if d > 1e-12:
+            fails.append(
+                f"the two drivers' matric-suction apparent cohesion differs by "
+                f"{d:.3e} at worst over {nr1.size} Gauss points. They share the "
+                f"formula, so a difference here is a plumbing difference — the "
+                f"signed pore-pressure field, the cap, or the trial factor")
+
+    # ---- (2) the credit is reduced by F ------------------------------------
+    nr_hi = _suction_field(fd, SUC_F_HIGH, 'newton')
+    want = SUC_F_HIGH / SUC_F_LOW
+    if nr_hi.shape != nr1.shape:
+        fails.append(
+            f"the apparent-cohesion field at F = {SUC_F_HIGH} has {nr_hi.size} "
+            f"entries against {nr1.size} at F = {SUC_F_LOW}, so the two cannot be "
+            f"compared point for point — both strengths must be trials the driver "
+            f"CARRIES, since a failing one fires the viscoplastic predictor and "
+            f"the capture then holds two drivers' fields")
+    else:
+        live = nr1 > 0.0
+        ratio = nr1[live] / nr_hi[live]
+        if not np.any(np.abs(ratio - want) < 1e-9):
+            fails.append(
+                f"the matric-suction apparent cohesion is NOT reduced by the "
+                f"trial strength: raising F from {SUC_F_LOW} to {SUC_F_HIGH} left "
+                f"the credit at a ratio of at most {float(ratio.max()):.6f} where "
+                f"the viscoplastic driver divides it by {want:g}. The credit "
+                f"enters the reduced envelope alongside c' and tan(phi'), so an "
+                f"unreduced one reports a factor of safety on a stronger soil "
+                f"than the trial actually has")
+        _known = (np.abs(ratio - want) < 1e-9) | (np.abs(ratio - 1.0) < 1e-9)
+        if not np.all(_known):
+            fails.append(
+                f"some credited Gauss points scale by neither 1 nor {want:g} "
+                f"between F = {SUC_F_LOW} and F = {SUC_F_HIGH}; the only two "
+                f"factors this model can produce are the SSR zone's full strength "
+                f"and the reduced strength")
+
+    # ---- (3) s_cap bounds it ------------------------------------------------
+    capped = _suction_field(fd, SUC_F_LOW, 'newton', cap=SUC_CAP_BINDS)
+    ceiling = SUC_CAP_BINDS * tanb
+    if float(capped.max()) > ceiling * (1.0 + 1e-9):
+        fails.append(
+            f"s_cap does not bound the credit: with a cap of {SUC_CAP_BINDS:g} "
+            f"the largest apparent cohesion is {float(capped.max()):.4f}, above "
+            f"the {ceiling:.4f} that cap allows")
+    if float(nr1.max()) <= ceiling:
+        fails.append(
+            f"the cap of {SUC_CAP_BINDS:g} does not bind on this model — the "
+            f"uncapped credit peaks at {float(nr1.max()):.4f}, at or below the "
+            f"{ceiling:.4f} the cap permits — so the leg above proves nothing")
+
+    # ---- (4) and (5) the verdicts, on both drivers --------------------------
+    def _verdict(F, phi_b=None, cap=None, solver='newton'):
+        sol = solve_fem(fd, F=F, max_iterations=SUC_MAX_ITER, max_disp_factor=None,
+                        tension_srf=True, k0=SUC_K0, fast_kernel=False,
+                        failure_criterion='hybrid',
+                        suction_phi_b=(SUC_PHI_B if phi_b is None else phi_b),
+                        suction_cap=cap, fem_solver=solver)
+        return bool(sol['converged'])
+
+    for solver in ('viscoplastic', 'newton'):
+        if not _verdict(SUC_F_STANDS, solver=solver):
+            fails.append(
+                f"{solver}: F = {SUC_F_STANDS} came back FAILED on "
+                f"{SUC_MODEL.name}, where both drivers put the limit near 1.78 "
+                f"with the suction credit and the vendor lock is 1.779")
+        if _verdict(SUC_F_FAILS, solver=solver):
+            fails.append(
+                f"{solver}: F = {SUC_F_FAILS} came back CONVERGED, above the "
+                f"limit both drivers measure on this model and above the vendor's "
+                f"own 1.779")
+        # The credit off: the same trial must fail, or the pair above is not a
+        # measurement of suction.
+        if _verdict(SUC_F_STANDS, phi_b={}, solver=solver):
+            fails.append(
+                f"{solver}: F = {SUC_F_STANDS} stands with the suction credit "
+                f"switched OFF, so the trial above is not evidence that the "
+                f"credit is carried — this model without suction is locked at "
+                f"1.713")
+        # The cap's VALUE, not its presence, is what moves the answer.
+        if _verdict(SUC_F_STANDS, cap=SUC_CAP_BINDS, solver=solver):
+            fails.append(
+                f"{solver}: F = {SUC_F_STANDS} stands under a suction cap of "
+                f"{SUC_CAP_BINDS:g}, which bounds the credit at 421 of the 474 "
+                f"Gauss points that carry it — the cap is being ignored in the "
+                f"solve even where the field says it is applied")
+        if not _verdict(SUC_F_STANDS, cap=SUC_CAP_LOOSE, solver=solver):
+            fails.append(
+                f"{solver}: F = {SUC_F_STANDS} FAILS under a suction cap of "
+                f"{SUC_CAP_LOOSE:g}, which leaves enough credit to carry it. "
+                f"A cap keyword must move the answer by its VALUE, not by being "
+                f"present at all")
+    return fails
+
+
 # The K0 initial stress (SPIKE.md, "K0 INITIAL STRESS"). The vendor lock this
 # check reproduces is RS2-27 at its coarsest tagged mesh — docs/verification/rs2.md,
 # `vp036.xlsx`, tri6 at target 1.5, k0 = 1, tension_srf off, FS 1.373 +/- 0.02. The
@@ -1435,7 +1662,7 @@ def main():
           "lands on the yield surface on every branch, a converged trial "
           "certifies its own stress field in force AND in displacement, neither "
           "the loading path nor the step control changes a verdict, Hoek-Brown, "
-          "power-curve, suction, softening-bar and pile models are refused by "
+          "power-curve, softening-bar and pile models are refused by "
           "name, a reinforced bisection lands on its measured strength with every "
           "bar force inside the capacity its embedment develops, a cohesionless "
           "base does not manufacture a failure at a strength the driver's "
@@ -1444,7 +1671,9 @@ def main():
           "strength while an inert cap changes nothing at all, the K0 initial "
           "stress is an exact equilibrium on level ground down to its "
           "out-of-plane component and reproduces a locked vendor benchmark on "
-          "both drivers, and the "
+          "both drivers, the matric-suction apparent cohesion is the same field "
+          "on both drivers and is bounded by its cap and reduced by the trial "
+          "strength, and the "
           "environment override cannot swap the driver in silence. The monotonic "
           "ramp reaches the same limit along one warm-started history, reports it "
           "on the bisection's midpoint convention, and never solves past it.")

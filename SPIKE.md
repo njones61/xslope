@@ -4364,3 +4364,397 @@ model:
    drivers disagree on a suction model by more than the bisection tolerance, or if
    the credit needs anything the return map does not already have, that is the
    result.
+
+### MATRIC SUCTION — results
+
+Same machine and settings as everything above: `force_tol` 1e-3, hybrid criterion,
+`capture_failure_state=False`, tolerance 0.01 unless a row says otherwise. Every
+number below was measured on this checkout in this session. The vendor benchmarks
+are built through `run_tests.py`'s own `build_fem_ssrm_case`, from the tags in
+`docs/verification/rs2.md` and the workbooks those tags name, so the mesh, the
+bracket, the `tension_srf` setting, the K0 value and the suction angle are the
+suite's own and not this round's.
+
+#### What was built
+
+Two module-level helpers, `_suction_capped` and `_suction_apparent_cohesion`, and
+two group-level ones beside `_nr_group_tension_cap`: `_nr_group_suction`, which
+caches the F-independent capped suction on a Newton group, and
+`_nr_group_apparent_cohesion`, which folds `tan(phi_b) s / F` into that group's
+cohesion. The guard's matric-suction line is gone. The ramp's `restrength` calls
+the folding helper at every new strength, beside the two lines that re-reduce `c`
+and the tensile cap.
+
+That is the whole of it, and the reason it is the whole of it is that the Newton
+return map already takes `c` PER GAUSS POINT. Fredlund's credit is an apparent
+cohesion on the same linear envelope, so it arrives at the return map as a
+different `c_r` and nothing else changes: no surface, no flow direction, no
+corner or apex construction, no tangent. Everything downstream that reads `c_r` —
+the return map, the algorithmic tangent, and the strength scale
+`nr_max_yield_violation` divides by — is then reading the envelope the trial is
+actually solved on, with no second code path to keep in step.
+
+The viscoplastic driver's own call site was rewritten to use the same two
+helpers. Its arithmetic and its order are unchanged, which is what keeps the
+default path bit-identical, and it is what makes the field comparison below a
+plumbing measurement rather than an algebra one.
+
+#### The two drivers' apparent-cohesion fields
+
+Captured at the one helper both drivers call, by running a single solver
+iteration through each driver's own entry point — so what is compared is what the
+solve runs on, not what a test could build for itself.
+
+| Model | Gauss points | credited | largest credit at F = 1.3 | max &#124;VP − N-R&#124; | max &#124;N-R − an independent expectation&#124; |
+|---|---|---|---|---|---|
+| `rs2_28a` | 11,064 | 1,219 | 12.861 kPa | **0.000e+00** | 1.776e-15 |
+| `vp102t_60` | 3,354 | 474 | 65.093 | **0.000e+00** | 7.105e-15 |
+
+The independent expectation is `min(max(0, -u_signed), s_cap) tan(phi_b) / F`
+recomputed from the prepared model's own arrays, so the zero in the fourth column
+is not two code paths agreeing with each other about the wrong thing.
+
+The credit is not decoration on either model. On `rs2_28a` the largest apparent
+cohesion is 12.9 kPa against the material's own `c'` of 10 kPa — the suction is
+worth more than the cohesion at the points where it bites — and `rs2_28a`'s
+vendor tensile cap of 10 kPa sits below the envelope's own apex, so the cap and
+the credit are both active on the same model.
+
+#### The suction-gated locked benchmarks
+
+Six workbooks, nine locked factors of safety, of which the six suction-gated ones
+are run here. Work is the honest count on each driver: viscoplastic iterations
+against Newton force evaluations, one constitutive pass each.
+
+| Benchmark | Model | Elements | Lock | Tol | VP FS | VP − lock | Newton FS | Newton − lock | driver gap | VP work | N-R work |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| RS2-28a | `rs2_28a` | 3,688 | 1.606 | 0.02 | 1.6218750 | +0.0159 | **1.6468750** | +0.0409 **(out)** | 0.0250 | 103,820 | 4,424 |
+| RS2-28b | `rs2_28b` | 3,688 | 1.544 | 0.02 | 1.5406250 | −0.0034 | **1.5656250** | +0.0216 **(out)** | 0.0250 | 137,542 | 6,431 |
+| RS2-28c | `rs2_28c` | 3,688 | 1.381 | 0.02 | 1.3968750 | +0.0159 | **1.4031250** | +0.0221 **(out)** | 0.0063 | 94,077 | 5,623 |
+| RS2-P4-VP102-t-60-c3 | `vp102t_60` | 1,118 | 1.779 | 0.02 | 1.7707031 | −0.0083 | **1.7925781** | +0.0136 | 0.0219 | 25,778 | 4,640 |
+| RS2-P4-VP102-t-300-c3 | `vp102t_300` | 1,118 | 2.162 | 0.02 | 2.1644531 | +0.0025 | **2.1644531** | +0.0025 | **0.0000** | 17,441 | 4,015 |
+| RS2-P4-VP102-t-1500-c3 | `vp102t_1500` | 1,118 | 2.687 | 0.02 | 2.6839844 | −0.0030 | **2.6894531** | +0.0025 | 0.0055 | 58,456 | 3,988 |
+
+**Three of the six reproduce their published lock and three do not.** All three
+misses are the RS2-28 family, all three are HIGH, and the direction is the
+one-sided one this document has recorded since its first table. The viscoplastic
+driver reproduces all six. Newton does 4.3x to 23.5x less constitutive work on
+every row.
+
+The three misses were re-run at the tag's OWN bisection resolution, which is the
+suite's configuration, in case the finer bisection was the cause:
+
+| Benchmark | Lock | Tol | VP FS | VP − lock | Newton FS | Newton − lock | driver gap |
+|---|---|---|---|---|---|---|---|
+| RS2-28a | 1.606 | 0.02 | 1.6187500 | +0.0127 | 1.6437500 | +0.0378 **(out)** | 0.0250 |
+| RS2-28b | 1.544 | 0.02 | 1.5437500 | −0.0002 | 1.5687500 | +0.0248 **(out)** | 0.0250 |
+| RS2-28c | 1.381 | 0.02 | 1.3937500 | +0.0127 | 1.4062500 | +0.0252 **(out)** | 0.0125 |
+
+It is not the resolution. The gap is a flat 0.0250 on two rows and 0.0125 on the
+third, at both settings.
+
+#### The RS2-28 gap, refereed by the driver's own evidence
+
+The bisection's answer is fixed by the trials whose verdicts differ, so those were
+run directly. RS2-28a, at two strengths between the viscoplastic answer (1.61875)
+and the Newton one (1.64375):
+
+| F | driver | verdict | exit | out-of-balance | iterations | worst yield violation |
+|---|---|---|---|---|---|---|
+| 1.6250 | viscoplastic | FAILED | `iteration_cap` | 1.142e-01 | 32,000 | — |
+| 1.6250 | **Newton** | **CONVERGED** | `converged` | **2.585e-06** | **126** | **2.84e-09** |
+| 1.6375 | viscoplastic | FAILED | `iteration_cap` | 2.322e-01 | 16,000 | — |
+| 1.6375 | **Newton** | **CONVERGED** | `converged` | **1.732e-05** | **252** | **2.86e-09** |
+
+A stress field in equilibrium with full gravity — an out-of-balance forty to four
+hundred times inside the trial tolerance — whose worst Mohr-Coulomb value, read in
+the INVARIANT form and not in the ordered-principal form the return map is written
+on, is 2.9e-9 of the local strength. That is a statically admissible field, and by
+the lower-bound theorem it is a proof that the slope stands at F = 1.6375. The
+argument needs neither driver to be trusted: it is the Newton driver's own
+converged state, checked against a yield function it does not solve on.
+
+The viscoplastic verdicts at those strengths are not near misses that a longer run
+would flip cheaply — the out-of-balance is 1.1e-1 and 2.3e-1 against a 1e-3 gate,
+two orders of magnitude out, and both trials are closed by the budget-extension
+heuristic (`iteration_cap`) rather than by the slope.
+
+**And the vendor's own numbers sit where the Newton driver does.** RS2's published
+SSR values for these three problems are 1.64, 1.55 and 1.41
+(`docs/verification/rs2.md`, RS2-28). At the tag's resolution the Newton driver
+reads 1.6438, 1.5688 and 1.4063 — **+0.0038, +0.0188 and −0.0038** from RS2's own
+answers — while the viscoplastic driver reads 1.6188, 1.5438 and 1.3938, which is
+−0.0213, −0.0063 and −0.0163 below them. XSLOPE's locked values for this row ARE
+the viscoplastic readings, and the verification page already scores them 2.1%,
+0.4% and 2.1% below RS2 and attributes the shortfall to the convergence check.
+So the honest statement is not that the Newton driver misses these three locks; it
+is that it misses three locks that are defined by the driver it is being compared
+against, and lands on the vendor's answer instead.
+
+That is a finding about the corpus and not a licence: moving those locks is the
+owner's decision and not a spike's, and nothing here was changed.
+
+#### The cap
+
+`s_cap` was lowered until it was the binding constraint, and the answer read on
+both drivers at a strength both carry uncapped. On `vp102t_60` the suction reaches
+91.4 stress units and is positive at 474 of 3,354 Gauss points:
+
+| suction cap | Gauss points where `s` exceeds it | F = 1.74, viscoplastic | F = 1.74, Newton |
+|---|---|---|---|
+| none (as the tag runs it) | — | CONVERGED, 1,667 iterations | CONVERGED, 15 iterations |
+| 40 | 165 | — | — |
+| 20 | 294 | CONVERGED, 1,330 | CONVERGED, 17 |
+| **5** | **421** | **FAILED**, 3,401 | **FAILED**, 354 |
+| the credit switched off entirely | — | **FAILED**, 2,031 | **FAILED**, 358 |
+
+The two drivers move together at every setting, and they move on the cap's VALUE
+rather than on the presence of a cap keyword: at 20 the trial still stands on both,
+at 5 it fails on both, and with the credit off it fails on both. The last row is
+what makes the others a measurement — this model without the suction credit is
+locked at 1.713 (its own `c2` row), below the trial being carried, so a driver that
+lost the credit would fail a trial it has to carry.
+
+On `rs2_28a` the same field reads 62.4 at most, positive at 1,219 of 11,064 points,
+with a cap of 5 binding at 1,102 of them.
+
+#### The ramp
+
+The three `vp102t` models on the monotonic strength-reduction ramp, against the
+Newton bisection on the same mesh and bracket:
+
+| Benchmark | Ramp FS | Ramp interval | Bisection-N FS | Ramp − bisection | steps | ramp force evals |
+|---|---|---|---|---|---|---|
+| RS2-P4-VP102-t-300-c3 | 2.1656250 | [2.16250, 2.16875] | 2.1644531 | **+0.0012** | 20 | 5,051 |
+| RS2-P4-VP102-t-1500-c3 | 2.6837500 | [2.68125, 2.68625] | 2.6894531 | **−0.0057** | 32 | 7,970 |
+| RS2-P4-VP102-t-60-c3 | 1.7837500 | [1.78125, 1.78625] | 1.7925781 | **−0.0088** | 14 | 6,301 |
+
+Three of three inside 0.01, against the two the criterion asked for. The ramp
+carries the credit through its whole warm history — `restrength` re-derives it at
+every step because it scales as 1/F — and on the `t-60` row it lands at 1.78375,
+which is 0.0048 from the vendor lock of 1.779 where the bisection is 0.0136.
+
+#### The no-suction path is unchanged
+
+Two proofs, and the first is the stronger one.
+
+**The arithmetic.** The plain Mohr-Coulomb return map, run against the driver as it
+stood at **53659aa4** — the criterion commit, before any of this code — staged in a
+separate package tree, on 800,000 random trial states across four friction angles:
+**BIT-IDENTICAL**, stress and branch code alike, to a SHA-256 of the concatenated
+returns. The reason it has to be is structural: a model with no `phi_b` never sets
+`prep['suction_active']`, so `_nr_group_suction` returns before it touches a group,
+`grp.get('s_suc')` is None at the one point the credit could enter, and
+`_nr_group_apparent_cohesion` returns without arithmetic.
+
+**The benchmarks**, every one re-run on BOTH trees rather than compared against a
+number in this document, and compared trial by trial: factor of safety, and each
+trial's strength, verdict, iterations and force evaluations.
+
+| Benchmark | Mesh | Driver | FS, both trees | trials | identical? |
+|---|---|---|---|---|---|
+| FEM-1 tutorial | tri6, 3.5 | Newton | 1.37109375 | 9 | **yes** |
+| LEM-3 tutorial | tri6, 1.2 | Newton | 1.26953125 | 9 | **yes** |
+| Griffiths & Lane 1 | quad8, 3.5 | Newton | 1.37187500 | 9 | **yes** |
+| Griffiths & Lane 1 | tri6, 3.5 | Newton | 1.36562500 | 9 | **yes** |
+| Griffiths & Lane 1 | quad9, 3.5 | Newton | 1.39687500 | 9 | **yes** |
+| Griffiths & Lane 6 dry | quad8, 2 | Newton | 2.41562500 | 9 | **yes** |
+| Griffiths & Lane 6 dry | tri6, 2 | Newton | 2.45937500 | 9 | **yes** |
+| Griffiths & Lane 3, r = 0.8 | tri6, 6 | Newton | 1.42812500 | 9 | **yes** |
+| Geogrid sample | tri6, 4 | Newton | 1.60781250 | 8 | **yes** |
+| Half capacity | tri6, 4 | Newton | 1.41406250 | 8 | **yes** |
+| Three layers | tri6, 4 | Newton | 1.21093750 | 8 | **yes** |
+| Geogrid sample, LOCKED mesh | tri6, 2 | Newton | 1.56093750 | 8 | **yes** |
+| Griffiths & Lane 1, `t_cut` = 0 | tri6, 3.5 | Newton | 1.35312500 | 9 | **yes** |
+| Griffiths & Lane 1, `t_cut` = 30 | tri6, 3.5 | Newton | 1.35937500 | 9 | **yes** |
+| Three layers, `t_cut` = 0 | tri6, 4 | Newton | 1.21093750 | 8 | **yes** |
+| **Griffiths & Lane 6 dry — the DEFAULT path** | quad8, 2 | viscoplastic | **2.421875** | 9 | **yes** |
+
+The default viscoplastic path returns FS 2.421875 on per-trial iteration counts
+
+    147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777
+
+value for value the control sequence, on both trees.
+
+The K0 vendor rows the criterion also named are covered by
+`check_k0_initial_stress`, which runs RS2-27 at its coarsest tagged mesh on both
+drivers inside the published tolerance and passes as part of the whole check file
+below; they were not additionally re-run against the control tree, and that is a
+shortfall against the criterion as written rather than a result.
+
+#### The refusals that remain
+
+Every guard was exercised again on this checkout, and each must both fire and name
+its own feature:
+
+| Feature | Verdict |
+|---|---|
+| pile beam elements | refuses, names piles |
+| post-peak softening on reinforcement bars | refuses, names softening and counts the bars (18 of 36) |
+| Hoek-Brown strength envelopes | refuses, names Hoek-Brown |
+| power-curve strength envelopes | refuses, names the power curve |
+| **matric suction** | **carried** |
+
+Four remain, and they are the four the eligibility inventory says block ten more
+locked models: five power-curve, three Hoek-Brown, eight piles and two bar
+softening, with overlaps. The viscoplastic control still accepts all four.
+
+#### The locks
+
+`test/nr_ssrm_check.py` gains `check_matric_suction`, on `vp102t_60` — RS2 Part 4
+VP102 at t = 60 s, its own transient seepage field on its own stored mesh, an
+unsaturated friction angle of 37 degrees from the TEST TAG, `k0 = 1`,
+`tension_srf` on, an SSR search zone, locked at 1.779 +/- 0.02 — in about 52 s.
+Five legs, and the field is asserted and not only the answer, because the two
+drivers share the formula and a shared-code defect moves them together:
+
+  * the two drivers' apparent-cohesion fields, captured at the helper they share by
+    running a solver iteration through each driver's own entry point, must be
+    identical point for point;
+  * the credit must be reduced by the trial strength — the field at F = 1.5 exactly
+    two thirds of the field at F = 1 where the strength is reduced, and UNCHANGED at
+    the Gauss points the model's SSR zone holds at full strength;
+  * `s_cap` must bound it: at a cap of 5 the largest credit is `5 tan(phi_b)` where
+    the uncapped field on the same model reaches eighteen times that;
+  * F = 1.74 stands and F = 1.82 fails, on BOTH drivers;
+  * and the credit is load-bearing: with it switched off F = 1.74 must FAIL on both
+    drivers (that model is locked at 1.713 without it), with the binding cap it must
+    fail, and with a looser cap of 20 it must stand again — so what moves the answer
+    is the cap's VALUE and not the presence of a cap keyword.
+
+The guard check lost its matric-suction case, which had been asserting a refusal the
+driver no longer has.
+
+**Mutation, run four ways.** Each is the same check function against a driver with
+one thing removed:
+
+| driver | verdict | what the check saw |
+|---|---|---|
+| as shipped | **PASS** | — |
+| the `s_cap` bound dropped from `_suction_capped` | **FAIL** | "s_cap does not bound the credit: with a cap of 5 the largest apparent cohesion is 68.9055, above the 3.7678 that cap allows", and both drivers then carry F = 1.74 under that cap |
+| the `1/F` dropped from `_suction_apparent_cohesion` | **FAIL** | "the matric-suction apparent cohesion is NOT reduced by the trial strength: raising F from 1.0 to 1.5 left the credit at a ratio of at most 1.000000 where the viscoplastic driver divides it by 1.5" |
+| the credit computed but not folded into `c_r` | **FAIL** | F = 1.74 comes back FAILED on the Newton driver — the field is right and the solve is not using it |
+
+The first two mutations move BOTH drivers together, which is why a driver-against-
+driver agreement check could not have caught either and why the criterion asked for
+the field. The third is Newton-only and is caught by the answer.
+
+One thing in the check's design is worth naming because it was found by running it
+rather than by reading. The F-reduction leg first compared the field at F = 1 with
+the field at F = 2; F = 2 is past this model's limit, the trial dies at the load-step
+floor, the viscoplastic predictor fires, and the predictor's own group build calls
+the same helper — so the capture held two drivers' fields end to end and the leg
+silently skipped on a length mismatch. It reads F = 1.0 against F = 1.5 now, two
+strengths the driver CARRIES, and a length mismatch is a failure rather than a skip.
+
+#### The criterion, line by line
+
+**1. The suction-gated locked models — PARTLY MET, at three of six.** The three
+`vp102t` `c3` rows reproduce their locks at +0.0025, +0.0025 and +0.0136 against a
+tolerance of 0.02, and two of the three agree with the viscoplastic driver inside
+the bisection tolerance (0.0000 and 0.0055) while the third is 0.0219 away. The
+three `rs2_28` rows do NOT reproduce their locks: +0.0409, +0.0216 and +0.0221
+against 0.02, all HIGH, and at the tag's own bisection resolution +0.0378, +0.0248
+and +0.0252. The viscoplastic driver reproduces all six. Work is 4.3x to 23.5x
+lower on the Newton driver on every row.
+
+**2. The two drivers build the same field — MET, exactly.** The maximum absolute
+difference is **0.000e+00** on both models measured, over 11,064 and 3,354 Gauss
+points, captured at the shared helper through each driver's own entry point; and
+each driver's field is within 1.8e-15 and 7.1e-15 of an expectation computed from
+scratch out of the prepared model's own arrays.
+
+**3. `s_cap` binds and both drivers move together — MET.** At a cap of 5 on
+`vp102t_60`, which bounds 421 of the 474 credited Gauss points, F = 1.74 fails on
+both drivers where it stands on both uncapped and at a cap of 20. With the credit
+switched off entirely it fails on both, which is what makes the pair a measurement
+of the credit rather than of the model.
+
+**4. The ramp — MET on 3 of the 3 run**, against the 2 asked: +0.0012, −0.0057 and
+−0.0088 from the Newton bisection.
+
+**5. The no-suction path is bit-identical — MET on 16 benchmark pairs and 139
+trials**, against the driver staged at 53659aa4 in a separate package tree: every
+one identical in factor of safety, verdict, iterations and force evaluations, and
+the plain return map bit-identical over 800,000 trial states. The K0 vendor rows
+the clause also named were not re-run against the control tree — that is a
+shortfall against the criterion as written, reported rather than glossed; they are
+covered by `check_k0_initial_stress` in the check file, which passes.
+
+**6. The refusal is gone and the guard list is updated — MET.** Matric suction is
+carried; piles, bar softening, Hoek-Brown and the power curve each still raise and
+each still names itself, with the viscoplastic control accepting all four.
+
+**7. The locks — MET.** `check_matric_suction` passes as shipped and fails on all
+three mutations: the cap dropped, the F-reduction dropped, and the credit computed
+but not folded into the envelope. The whole check file passes.
+
+**8. The default path — MET.** Griffiths & Lane 6 dry, quad8, size 2, no
+`fem_solver` argument: FS 2.421875 on per-trial iteration counts 147, 781, 3393,
+2031, 2841, 9541, 12000, 8617, 8777 — value for value the control sequence, on both
+trees.
+
+**9. The honest negatives** are the three RS2-28 locks, the 0.0219 driver gap on
+`vp102t_60`, and the K0 rows missing from the control sweep. All three are written
+above.
+
+#### Verdict
+
+**Matric suction costs the Newton driver nothing and it is carried.** Fredlund's
+apparent cohesion is not a new surface — it is a different `c` at a Gauss point,
+and the return map has taken `c` per Gauss point since the first round — so the
+whole feature is two helpers, one call in the group build and one in the ramp's
+`restrength`. The measurement that says the plumbing is right rather than merely
+plausible is the field: on 11,064 Gauss points of `rs2_28a` and 3,354 of
+`vp102t_60`, the apparent cohesion the two drivers compute is identical to
+0.000e+00, and each is within 7e-15 of an expectation built from scratch. The cap
+binds where it should and both drivers move together on its VALUE; the credit is
+divided by the trial strength as the viscoplastic driver divides it, and by the
+same per-element factor, so the Gauss points an SSR zone holds at full strength
+keep their whole credit. Sixteen benchmark pairs and 139 trials are bit-identical
+against a control tree, and the default path is untouched.
+
+**Three of the six locked models reproduce and three do not, and the three that do
+not are the interesting result.** On RS2-28 the Newton driver reads 0.022 to 0.041
+above the published XSLOPE values, always high. That gap was not left as a
+direction: the deciding trials were run. At F = 1.6250 and F = 1.6375 on RS2-28a —
+both above the viscoplastic answer and at or below the Newton one — the Newton
+driver reaches equilibrium in 126 and 252 iterations at an out-of-balance of 2.6e-6
+and 1.7e-5, with a worst Mohr-Coulomb value of 2.9e-9 of the local strength read in
+the INVARIANT form the return map is not written on. That is a statically
+admissible stress field carrying full gravity, and by the lower-bound theorem it is
+a proof that the slope stands there. The viscoplastic driver fails both, at the
+budget-extension heuristic, with its out-of-balance at 1.1e-1 and 2.3e-1 against a
+1e-3 gate — two orders of magnitude out, not a near miss.
+
+And the vendor agrees with the Newton driver. RS2's own SSR values on these three
+problems are 1.64, 1.55 and 1.41; the Newton bisection reads 1.6438, 1.5688 and
+1.4063, which is +0.0038, +0.0188 and −0.0038 from them, while the viscoplastic
+driver reads 0.006 to 0.021 below. XSLOPE's locked values for this row ARE the
+viscoplastic readings, and `docs/verification/rs2.md` already scores them 2.1%,
+0.4% and 2.1% below RS2 and attributes the shortfall to the convergence check. So
+the correct statement of this round's negative is narrow and it is not that the
+Newton driver is wrong on RS2-28: it misses three locks that are defined by the
+driver it is being measured against, and it lands on the vendor's answer instead.
+Whether those locks should move is the owner's decision and not a spike's, and
+nothing here was changed.
+
+What remains, in the order it matters:
+
+- **Whose number RS2-28 is.** The Newton answer is supported by an admissible field
+  and matches RS2's own SSR to 0.004 on two of the three; the locked answer is the
+  viscoplastic driver's, and the page already documents it as low against the
+  vendor. That is a corpus decision with a measurement behind it, and it is the
+  same decision the three-layer adjudication and the K0 round both walked up to
+  from different directions.
+- **`vp102t_60`'s 0.0219.** One row of six, the same direction, and the only one of
+  the three transient rows that misses. Unmeasured trial by trial; the RS2-28
+  diagnostic above is the method if it is worth doing.
+- **The eight refusals are down to four.** Piles, post-peak bar softening,
+  Hoek-Brown and the power curve. The eligibility inventory puts eight locked models
+  behind piles, two behind bar softening, three behind Hoek-Brown and five behind
+  the power curve; Hoek-Brown and the power curve are two linearizations of the same
+  shape and would come together.
+- **The corpus run.** Unchanged from the K0 round's verdict: the reachable set is now
+  larger by six workbooks and nine locks, and running it is still what would turn a
+  sample into a statement about the corpus.

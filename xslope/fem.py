@@ -2696,6 +2696,38 @@ def _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_mater
     return tanphib_by_elem, scap_by_elem, active
 
 
+def _suction_capped(u_signed_gp, scap):
+    """The suction credited at a Gauss point, before phi_b and the trial F.
+
+    Fredlund's ``s = max(0, -u_w)`` on the SIGNED pore pressure -- not the
+    clamped ``u >= 0`` the effective-normal term reads, since the whole point is
+    the negative pressure above the water table the clamp throws away -- bounded
+    by the material's ``s_cap`` (``inf`` = uncapped).
+
+    F-INDEPENDENT, which is why it is separated from the product below: the
+    Newton path caches it per group and re-forms only the ``tan(phi_b) * s / F``
+    factor when a ramp step changes the strength.
+    """
+    return np.minimum(np.maximum(-u_signed_gp, 0.0), scap)
+
+
+def _suction_apparent_cohesion(tanphib, s_capped, Finv):
+    """Fredlund's apparent cohesion at a Gauss point, reduced by the trial F.
+
+        c_suction,r = tan(phi_b) * min(max(0, -u_w), s_cap) / F
+
+    added to c' in the Mohr-Coulomb envelope. It IS divided by the trial strength,
+    alongside c' and tan(phi'), and by the same per-element factor -- so an
+    ssr_exclude element, whose F is 1.0, keeps its whole credit. That is what
+    distinguishes it from the tensile cap, which is reduced only when
+    ``tension_srf`` says so.
+
+    BOTH drivers call this, so the only thing a driver-against-driver comparison
+    can find is a plumbing difference: which field, which cap, which F.
+    """
+    return tanphib * s_capped * Finv
+
+
 # UNUSED (see solve_fem). Cormeau's limits are material-point bounds on the local
 # viscoplastic rate recurrence — they contain only E, nu and phi, and are element
 # INDEPENDENT, which is why Smith & Griffiths tabulate them per yield criterion
@@ -4297,11 +4329,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     grp['c_r'] = cc
                     grp['snph'] = np.sin(phi_r_new[e])
                     grp['csph'] = np.cos(phi_r_new[e])
+                    # The matric-suction apparent cohesion is re-derived at the
+                    # new strength for the same reason the tensile cap is: it
+                    # scales as 1/F, so a ramp carrying the FOOT's credit up the
+                    # whole ramp would be reducing only part of the envelope. The
+                    # capped suction itself is F-independent and stays cached.
+                    _nr_group_apparent_cohesion(grp, 1.0 / Fb)
                     _nr_group_tension_cap(grp, tc_new)
             _nr_export['restrength'] = _restrength
         _nr_kw = dict(
             c_reduced=c_reduced, phi_reduced=phi_reduced,
             elastic_by_elem=elastic_by_elem, t_cap_by_elem=t_cap_by_elem,
+            finv_by_elem=1.0 / F_by_elem,
             force_tol=force_tol,
             min_slip_depth=min_slip_depth, max_iterations=max_iterations,
             max_disp_factor=max_disp_factor, _nr_export=_nr_export,
@@ -4622,8 +4661,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 # stage credits no suction.
                 if u_gp_signed_active is not None:
                     u_sgn = np.array([u_gp_signed_active[e][g] for e, g in grp['pairs']])
-                    s_suc = np.minimum(np.maximum(-u_sgn, 0.0), grp['scap'])
-                    grp['c_suc_r'] = grp['tanphib'] * s_suc * grp['Finv']
+                    s_suc = _suction_capped(u_sgn, grp['scap'])
+                    grp['c_suc_r'] = _suction_apparent_cohesion(
+                        grp['tanphib'], s_suc, grp['Finv'])
                 else:
                     grp['c_suc_r'] = np.zeros(len(grp['pairs']))
 
@@ -6383,6 +6423,57 @@ def _nr_group_tension_cap(grp, t_cap_by_elem):
     grp['lam'] = grp['D4'][:, 0, 1].copy()
 
 
+def _nr_group_suction(grp, sg, prep):
+    """Attach one group's capped matric suction, the F-independent half.
+
+    ``s_suc`` is ``min(max(0, -u_w), s_cap)`` per Gauss point, read off the same
+    SIGNED pore-pressure field (``prep['u_gp_signed']``) and the same per-element
+    cap the viscoplastic path reads, through the same helper. The keys are set
+    only on a model that actually carries suction, so ``grp.get('s_suc')`` is None
+    everywhere else and none of the apparent-cohesion arithmetic is entered.
+
+    The credit itself is F-dependent and is folded into the cohesion by
+    :func:`_nr_group_apparent_cohesion`, which the ramp re-runs at every step.
+    """
+    if not prep.get("suction_active"):
+        return
+    u_sgn_all = prep.get("u_gp_signed")
+    if u_sgn_all is None:
+        # Suction is switched on but the pore-pressure source carries no signed
+        # field (u = none or ru). The viscoplastic path credits zero there; so
+        # does this, rather than skipping the keys, so the two agree on a model
+        # that asks for suction it cannot have.
+        grp['tanphib'] = np.zeros(grp['n'])
+        grp['s_suc'] = np.zeros(grp['n'])
+        return
+    u_sgn = np.array([u_sgn_all[e][g] for e, g in sg['pairs']], dtype=float)
+    grp['tanphib'] = sg['tanphib']
+    grp['s_suc'] = _suction_capped(u_sgn, sg['scap'])
+
+
+def _nr_group_apparent_cohesion(grp, finv_by_elem):
+    """Fold the F-reduced apparent cohesion into one group's cohesion.
+
+    This is the whole of matric suction on the Newton path. The return map
+    already takes ``c`` per Gauss point, so Fredlund's credit is a per-point
+    cohesion and nothing else: no surface, no flow direction and no tangent
+    changes, and everything downstream that reads ``c_r`` -- the return map, the
+    algorithmic tangent, the strength scale ``nr_max_yield_violation`` divides by
+    -- reads the envelope the trial is actually solved on.
+
+    A no-op on a model without suction. On an ``elastic`` material ``c_r`` is
+    already ``inf``, so the credit is inert there exactly as it is on the
+    viscoplastic path, which drops elastic points from the yielding mask.
+    """
+    s_suc = grp.get('s_suc')
+    if s_suc is None:
+        return
+    c_suc = _suction_apparent_cohesion(grp['tanphib'], s_suc,
+                                       finv_by_elem[grp['e_idx']])
+    grp['c_suc'] = c_suc
+    grp['c_r'] = grp['c_r'] + c_suc
+
+
 def _nr_group_sig0(grp, sg, prep, k0):
     """Attach one group's K0 initial stress, or leave the group without one.
 
@@ -6430,7 +6521,7 @@ def _nr_set_load_factor(groups, lam):
 
 
 def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
-                     t_cap_by_elem=None, k0=None):
+                     t_cap_by_elem=None, k0=None, finv_by_elem=None):
     """The Newton path's working Gauss-point groups.
 
     Geometry (B, D4, w, dof) is shared BY REFERENCE with the prepared model, which
@@ -6465,6 +6556,13 @@ def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
                 grp['c_r'] = grp['c_r'].copy()
                 grp['c_r'][em] = np.inf
                 grp['elastic'] = em
+        # Matric suction, after the elastic override: an elastic point's c_r is
+        # already inf and adding a finite credit to it leaves it inf, which is the
+        # same inertness the viscoplastic path gets by dropping the point from the
+        # yielding mask.
+        _nr_group_suction(grp, sg, prep)
+        if finv_by_elem is not None:
+            _nr_group_apparent_cohesion(grp, finv_by_elem)
         _nr_group_tension_cap(grp, t_cap_by_elem)
         _nr_group_sig0(grp, sg, prep, k0)
         groups.append(grp)
@@ -6865,7 +6963,7 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
 
 
 def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
-                      elastic_by_elem, t_cap_by_elem,
+                      elastic_by_elem, t_cap_by_elem, finv_by_elem,
                       force_tol, min_slip_depth, max_iterations,
                       max_disp_factor=None, _nr_export=None,
                       debug_level=0, progress_callback=None,
@@ -6939,8 +7037,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         unsupported.append("power-curve strength envelopes")
     if np.any(fem_data.get("hb_flag_by_elem", np.zeros(n_elements, bool))):
         unsupported.append("Hoek-Brown strength envelopes")
-    if prep.get("suction_active"):
-        unsupported.append("matric suction")
+    # Matric suction IS carried (see _nr_group_suction / _nr_group_apparent_
+    # cohesion). Fredlund's credit is an apparent cohesion on the same linear
+    # envelope, so it arrives here folded into the per-Gauss-point c_r that the
+    # return map already takes, reduced by the trial F exactly as c' is. Nothing
+    # about its semantics is decided on this path.
     # The Rankine tension cutoff IS carried (see mc_return_map's second surface and
     # _nr_rankine_return). It arrives here as t_cap_by_elem, already reduced by the
     # trial F where `tension_srf` says so, so nothing about the cap's semantics is
@@ -6970,7 +7071,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             "model on the default viscoplastic solver.")
 
     groups = _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
-                              t_cap_by_elem, k0=k0)
+                              t_cap_by_elem, k0=k0, finv_by_elem=finv_by_elem)
     bars = _nr_build_bars(fem_data)
     pattern = _nr_prepare_assembly(groups, free_dofs, n_dof, bars=bars)
 
@@ -7275,11 +7376,20 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     sig_by_gp = [[None] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
     branch_by_gp = [[0] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
     ep_by_gp = [[np.zeros(4)] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
+    # The matric-suction apparent cohesion per Gauss point, or None on a model
+    # without it. The REPORTED element yield function has to be read on the
+    # envelope the trial was solved on, which is c' + c_suction, and the
+    # viscoplastic path adds the element mean of exactly this quantity.
+    csuc_by_gp = ([[0.0] * len(prep["elem_gp_data"][e]) for e in range(n_elements)]
+                  if any(g.get('c_suc') is not None for g in groups) else None)
     for grp in groups:
+        _cs = grp.get('c_suc')
         for k, (e, g) in enumerate(grp['pairs']):
             sig_by_gp[e][g] = grp['_sig'][k]
             branch_by_gp[e][g] = int(grp['_branch'][k])
             ep_by_gp[e][g] = grp['ep'][k]
+            if csuc_by_gp is not None and _cs is not None:
+                csuc_by_gp[e][g] = float(_cs[k])
 
     final_stresses = np.zeros((n_elements, 4))
     plastic_elements = np.zeros(n_elements, dtype=bool)
@@ -7293,8 +7403,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         _, sig_vm, _ = stress_invariants(stress_total)
         final_stresses[e] = [-stress_total[0], -stress_total[1], stress_total[2], sig_vm]
         sigm, dsbar, theta = stress_invariants(sig_avg)
+        _c_rep = c_reduced[e]
+        if csuc_by_gp is not None:
+            _c_rep = _c_rep + sum(csuc_by_gp[e]) / n_gp
         yield_function_out[e] = mc_yield_invariants(sigm, dsbar, theta,
-                                                    c_reduced[e], phi_reduced[e])
+                                                    _c_rep, phi_reduced[e])
         plastic_elements[e] = any(b != _NR_ELASTIC for b in branch_by_gp[e])
         ep_avg = sum(ep_by_gp[e]) / n_gp
         vp_shear_strain[e] = float(np.sqrt((ep_avg[0] - ep_avg[1]) ** 2

@@ -7652,3 +7652,85 @@ the hand-off.
 >    chain cannot be made cheap without moving a verdict, that is the result, and it
 >    says the Newton driver's robustness is bought at the measured price and not at
 >    a lower one.
+
+### THE COST OF THE RESCUE — Phase 0, where the time goes
+
+The 46-row slice, Newton driver, eight worker processes, one model per process,
+every numerical library pinned to a single thread, `capture_failure_state=False`,
+each model built by `run_tests.py`'s own `build_fem_ssrm_case` so it carries the
+suite's configuration exactly. The instrumentation is bookkeeping: 41 of the 46 rows
+reproduce the Sweep 1 Newton column bit for bit in factor of safety, trial count,
+Newton iterations, force evaluations and predictor iterations. The five that do not
+are depth-filtered, and they moved with the `min_slip_depth` fix committed since
+that sweep.
+
+The slice is **8,774 s of Newton against 5,247 s of viscoplastic** on the same rows —
+1.67x, against 1.27x across the whole 191, because the slice is deliberately weighted
+toward the classes where the Newton driver is worst.
+
+**383 trials, and this is what they cost.**
+
+| | trials | wall (s) | cold attempt | predictor | seeded correctors |
+|---|---|---|---|---|---|
+| FAILED | 181 | 7,200 | 2,787 | 2,868 | 1,545 |
+| CONVERGED | 202 | 1,574 | 827 | 565 | 182 |
+| **all** | **383** | **8,774** | **3,614 (41%)** | **3,433 (39%)** | **1,727 (20%)** |
+
+**The rescue chain fired on 243 of the 383 trials and converted 62.** All 62 are
+CONVERGED trials — a rescue can only ever turn a failure into a stand. It fired on
+every one of the 181 FAILED trials and converted none of them, at a cost of 2,868 s
+of predictor plus 1,545 s of correctors: **4,413 s, half the slice's entire wall
+time, spent confirming a verdict the cold attempt had already reached.**
+
+**By rung, and this is the finding.**
+
+| rung | fired | converted | predictor iterations | predictor wall (s) | corrector wall (s) |
+|---|---|---|---|---|---|
+| 250 | 243 | 50 | 60,056 | 177 | 708 |
+| 1,000 | 193 | 5 | 192,615 | 471 | 532 |
+| adaptive | 188 | 7 | 1,020,006 | 2,784 | 487 |
+
+The adaptive rung is **80% of the slice's 1,272,677 predictor iterations and 32% of
+its wall time, and it decides seven trials in 383.** That is what it is for and it
+is not waste in the ordinary sense — those seven are trials no shorter seed could
+carry — but the price is that on the 181 trials it does not convert it runs a
+complete viscoplastic solve at that strength. A failing Newton trial therefore pays
+the viscoplastic driver's own cost for that trial, plus a cold Newton walk to the
+load-step floor, plus two shorter viscoplastic runs, plus three correctors. **That
+is the whole of the 1.67x, and it is structural rather than a tuning error.**
+
+**Distance does not separate the two populations.** Conversions occur at every
+bisection depth: four at half the initial bracket above the standing bound, nine at a
+quarter, and so on down to the last trial before the tolerance. Nothing above half a
+bracket width was ever converted, but the strictly-above-half set is only the 45
+bracket-establishment trials at F_max, worth 327 s of rescue — 3.7% of the slice.
+
+**Nor does a budget cap.** The seven adaptive-rung conversions needed 1,451 to 36,812
+predictor iterations, median 20,379; the 181 that converted nothing have a median of
+2,001. The conversions are the EXPENSIVE runs, so any cap that saves time removes
+them first.
+
+**By class**, the wall splits as follows (cold / predictor+correctors):
+
+| class | rows | trials | wall (s) | cold | rescue |
+|---|---|---|---|---|---|
+| plain Mohr-Coulomb | 12 | 100 | 2,964 | 1,582 | 1,382 |
+| depth-filtered | 5 | 40 | 1,169 | 144 | 1,025 |
+| reinforced | 3 | 27 | 1,167 | 620 | 547 |
+| sub-unity | 4 | 30 | 1,036 | 603 | 433 |
+| SSR zone | 7 | 58 | 993 | 87 | 906 |
+| piled | 3 | 25 | 559 | 380 | 179 |
+| curved envelope | 1 | 9 | 464 | 118 | 346 |
+| K0, no cap | 2 | 17 | 220 | 46 | 174 |
+| matric suction | 3 | 27 | 111 | 19 | 92 |
+| K0 + tensile cap | 6 | 50 | 90 | 14 | 76 |
+
+**Only four models in the slice were never carried by a cold attempt at all** —
+`vp069`, `vp044a`, `rs2_64c`, `vp084a` — and all four are cheap. The per-model memory
+P3 was written for has almost nothing to work on here.
+
+The answer to "where do the fifteen hours go" is therefore: **half of it goes into
+proving failures that were already proved, and the instrument doing the proving is a
+whole viscoplastic solve.** The three bisection policies are measured against that in
+what follows, and the ramp — which never visits a trial far past failure and carries
+one plastic history instead of nine — is measured against it first.

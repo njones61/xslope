@@ -3974,7 +3974,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
               suction_phi_b=None, suction_cap=None, _prepared=None,
               fast_kernel='auto', failure_criterion="hybrid", k0=None,
               max_iterations_ceiling=50000, early_failure=True, _init_state=None,
-              _softened_seed=None, fem_solver=None, _nr_export=None):
+              _softened_seed=None, fem_solver=None, _nr_export=None,
+              _nr_rescue_rungs=None, _nr_seed_first=False):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -4556,7 +4557,33 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             max_disp_factor=max_disp_factor, _nr_export=_nr_export,
             k0=k0, _nr_init_state=_init_state,
             debug_level=debug_level, progress_callback=progress_callback)
-        _sol = _solve_fem_newton(fem_data, F, prep, **_nr_kw)
+        # P3: on a model already known to be carried only from a seed, the cold
+        # attempt is skipped and the chain starts at the first rung (see
+        # _NR_SEED_MEMORY). The seed-first path is never taken by the ramp, which
+        # manages its own history.
+        _seed_first = bool(_nr_seed_first) and _nr_export is None
+        # P4: the cold attempt's own step control, coarsened only when it is going to
+        # be handed off anyway (see _NR_COLD_CHEAP). The correctors below take the
+        # shipped control from _nr_kw.
+        _cold_kw = dict(_nr_kw)
+        if _NR_COLD_CHEAP:
+            _cold_kw.update(nr_min_step=_NR_COLD_MIN_STEP,
+                            nr_max_iter=_NR_COLD_MAX_ITER)
+        _t_cold = time.perf_counter()
+        _sol = (None if _seed_first
+                else _solve_fem_newton(fem_data, F, prep, **_cold_kw))
+        if _sol is None:
+            _sol = {"converged": False, "exit_reason": 'diverging', "iterations": 0,
+                    "nr_force_evals": 0, "nr_predictor_iterations": 0,
+                    "softened_1d_elements": None, "_nr_cold_skipped": True}
+        # Cost attribution, bookkeeping only (see SPIKE.md, "THE COST OF THE RESCUE").
+        # Nothing below is ever read for a verdict; it exists so a trial's wall time
+        # can be split between the cold attempt, the predictor rungs and the seeded
+        # correctors without re-deriving it from a log.
+        _sol["nr_cold_wall"] = time.perf_counter() - _t_cold
+        _sol["nr_cold_iterations"] = int(_sol.get("iterations", 0) or 0)
+        _sol["nr_cold_force_evals"] = int(_sol.get("nr_force_evals", 0) or 0)
+        _sol["nr_rungs"] = []
         # The viscoplastic predictor (see _NR_VP_PREDICTOR_ITERS). Only a trial that
         # died at the LOAD-STEP FLOOR is retried — a trial that reached full gravity
         # and was refused on force or on displacement has an answer already, and
@@ -4570,10 +4597,25 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             _soft_seed = _sol.get("softened_1d_elements", None)
             if _soft_seed is not None and not np.any(_soft_seed):
                 _soft_seed = None
+            _cold_rec = dict(wall=_sol["nr_cold_wall"],
+                             iterations=_sol["nr_cold_iterations"],
+                             force_evals=_sol["nr_cold_force_evals"],
+                             rungs=[])
+            _rungs = _nr_predictor_rungs(
+                prep, n_elements, max_iterations, max_iterations_ceiling,
+                early_failure)
+            if _nr_rescue_rungs is not None:
+                # P2: a trial far above a standing bound gets a truncated chain. A
+                # seed-first trial (P3) has no cold attempt to fall back on, so it
+                # always keeps at least one rung — a trial with no attempt at all
+                # would be a verdict nothing measured.
+                _keep = int(_nr_rescue_rungs)
+                if _seed_first:
+                    _keep = max(_keep, 1)
+                _rungs = _rungs[:max(0, _keep)]
             for (_chunk, _ceiling, _prep_seed,
-                 _pred_early_failure) in _nr_predictor_rungs(
-                     prep, n_elements, max_iterations, max_iterations_ceiling,
-                     early_failure):
+                 _pred_early_failure) in _rungs:
+                _t_pred = time.perf_counter()
                 _vp = solve_fem(
                     fem_data, F=F, debug_level=0, max_iterations=_chunk,
                     _softened_seed=_soft_seed,
@@ -4592,6 +4634,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     early_failure=_pred_early_failure,
                     k0=k0, _init_state=_init_state,
                     fem_solver='viscoplastic')
+                _pred_wall = time.perf_counter() - _t_pred
                 # On a K0 model the predictor's reported displacement is measured
                 # from the in-situ datum, so the seed is read off its `_k0_state`,
                 # which carries the ABSOLUTE field and the plastic strain in this
@@ -4609,7 +4652,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     _seed_kw['_softened_seed'] = _vp_soft
                 elif _soft_seed is not None:
                     _seed_kw['_softened_seed'] = _soft_seed
+                _t_seed = time.perf_counter()
                 _retry = _solve_fem_newton(fem_data, F, prep, **_seed_kw, **_nr_kw)
+                _seed_wall = time.perf_counter() - _t_seed
+                _cold_rec['rungs'].append(dict(
+                    chunk=int(_chunk),
+                    pred_iterations=int(_vp.get("iterations", 0) or 0),
+                    pred_wall=_pred_wall,
+                    seed_iterations=int(_retry.get("iterations", 0) or 0),
+                    seed_force_evals=int(_retry.get("nr_force_evals", 0) or 0),
+                    seed_wall=_seed_wall,
+                    converged=bool(_retry.get("converged", False))))
                 # Work is CUMULATIVE: the failed cold attempt, every predictor run
                 # and every corrector are all charged to this trial, so no cost is
                 # hidden by the retry succeeding.
@@ -4621,6 +4674,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                 _sol = _retry
                 if _sol["converged"]:
                     break
+            _sol["nr_cold_wall"] = _cold_rec['wall']
+            _sol["nr_cold_iterations"] = _cold_rec['iterations']
+            _sol["nr_cold_force_evals"] = _cold_rec['force_evals']
+            _sol["nr_rungs"] = _cold_rec['rungs']
         return _sol
 
     if debug_level >= 1:
@@ -7638,6 +7695,45 @@ _NR_VP_PREDICTOR_ADAPTIVE = True
 # and reports the caller's own yield reading, so nothing about the verdict is capped.
 _NR_VP_PREDICTOR_TENSION_CAP = True
 
+# ===================== The rescue cost policy (SPIKE, "THE COST OF THE RESCUE") ==
+#
+# The rescue chain above buys the Newton driver its robustness — across the 191-row
+# corpus it left ZERO inconclusive trials against the viscoplastic driver's 37 — and
+# it buys it at two thirds of that driver's total constitutive work, because it runs
+# on every trial that dies at the load-step floor and half of every bisection is a
+# trial the search visits only to prove it fails. The three knobs below spend the
+# chain where it can change an answer and not where it cannot.
+#
+# ALL THREE DEFAULT TO OFF, and with them off every path below is the code that was
+# there, evaluation for evaluation.
+#
+# P2 — budget the chain by how far the trial sits above the highest strength this
+# search has SHOWN TO STAND, in units of the bracket it started from. A trial that
+# far above a standing bound is one the bisection visits to prove a failure; the
+# chain there can confirm the cold attempt's verdict but has never been measured to
+# overturn one, and it costs up to a full viscoplastic trial to do it. None = no
+# distance rule, every trial gets the whole chain.
+_NR_RESCUE_FAR_FRAC = None
+# ... and how many rungs a FAR trial is allowed: 0 = none, 2 = the two short fixed
+# rungs without the adaptive one (see _NR_VP_PREDICTOR_ITERS), which is where the
+# per-trial cost is, since the adaptive rung is budgeted as a whole viscoplastic
+# trial of the same model at the same strength.
+_NR_RESCUE_FAR_RUNGS = 2
+
+# P3 — per-model memory. On a model whose trials are carried only from a predictor
+# seed, the cold attempt is a walk down to the load-step floor that has already been
+# measured to fail at every increment; once one trial has been rescued that way, the
+# later trials skip it and start at the first rung.
+_NR_SEED_MEMORY = False
+
+# P4 — a cheaper cold attempt: the load-path walk that is going to be handed off
+# anyway stops at a coarser increment floor and a shorter per-increment budget. The
+# SEEDED correctors keep the shipped control, so nothing that decides a verdict is
+# coarsened — only the attempt whose failure is the trigger for the hand-off.
+_NR_COLD_CHEAP = False
+_NR_COLD_MIN_STEP = 1.0 / 8
+_NR_COLD_MAX_ITER = 60
+
 
 def _nr_predictor_rungs(prep, n_elements, max_iterations, max_iterations_ceiling,
                         early_failure):
@@ -10461,6 +10557,25 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     trials = []                        # per-trial verdict metadata (both settings)
     inconclusive = []                  # trials that hit the iteration ceiling, still improving
 
+    # The rescue cost policy's state (SPIKE.md, "THE COST OF THE RESCUE"). With the
+    # policy off — the default — none of it is read and every trial is solved the
+    # way it was. `_w0` is the bracket the search was ASKED for, which is the natural
+    # unit for "far above a standing bound"; `_carried` is the highest strength shown
+    # to stand so far, and is None until the lower bound is established, so the
+    # walk-down that looks for one is never budgeted against a bound that does not
+    # exist yet.
+    _w0 = max(float(F_max) - float(F_min), 1e-9)
+    _carried = [None]
+    _seed_carried = [False]            # has any trial on this model been seed-carried?
+
+    def _rescue_policy(F):
+        """(rung budget, seed-first) for a trial at F, from the standing bracket."""
+        rungs = None
+        if _NR_RESCUE_FAR_FRAC is not None and _carried[0] is not None:
+            if (float(F) - _carried[0]) > _NR_RESCUE_FAR_FRAC * _w0:
+                rungs = int(_NR_RESCUE_FAR_RUNGS)
+        return rungs, bool(_NR_SEED_MEMORY and _seed_carried[0])
+
     def _stable(sol):
         """Does the bisection treat this trial as standing at its F?"""
         return bool(sol.get("stable", sol["converged"])) if hybrid else bool(sol["converged"])
@@ -10513,7 +10628,24 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             # read off the trial record rather than re-derived.
             "nr_force_evals": int(sol.get("nr_force_evals", 0) or 0),
             "nr_predictor_iterations": int(sol.get("nr_predictor_iterations", 0) or 0),
+            # Cost attribution, bookkeeping only and never read for a verdict (see
+            # SPIKE.md, "THE COST OF THE RESCUE"): this trial's wall time, the
+            # standing bracket it was asked from, and — on the Newton driver — the
+            # split between the cold attempt, the predictor rungs and the seeded
+            # correctors. Zero/absent on the viscoplastic driver.
+            "wall": float(sol.get("_trial_wall", 0.0) or 0.0),
+            "bracket": (float(F_left), float(F_right)),
+            "nr_cold_wall": float(sol.get("nr_cold_wall", 0.0) or 0.0),
+            "nr_cold_iterations": int(sol.get("nr_cold_iterations", 0) or 0),
+            "nr_cold_force_evals": int(sol.get("nr_cold_force_evals", 0) or 0),
+            "nr_rungs": list(sol.get("nr_rungs", []) or []),
+            "nr_cold_skipped": bool(sol.get("_nr_cold_skipped", False)),
         })
+        if _stable(sol):
+            _carried[0] = (float(F) if _carried[0] is None
+                           else max(_carried[0], float(F)))
+            if any(r.get('converged') for r in (sol.get("nr_rungs") or ())):
+                _seed_carried[0] = True
         return sol
 
     if debug_level >= 1:
@@ -10550,6 +10682,12 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         return _cb
 
     def _solve_at(F, step, prefix):
+        _t0 = time.perf_counter()
+        _sol_at = _solve_at_inner(F, step, prefix)
+        _sol_at["_trial_wall"] = time.perf_counter() - _t0
+        return _sol_at
+
+    def _solve_at_inner(F, step, prefix):
         return solve_fem(fem_data, F=F, debug_level=max(0, debug_level - 1), force_tol=force_tol,
                          oob_window=oob_window,
                          dt_scale=dt_scale,
@@ -10566,6 +10704,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          failure_criterion=("hybrid" if hybrid else "non_convergence"),
                          k0=k0, early_failure=early_failure,
                          fem_solver=fem_solver,
+                         _nr_rescue_rungs=_rescue_policy(F)[0],
+                         _nr_seed_first=_rescue_policy(F)[1],
                          _prepared=_prepared, _init_state=_init_state)
 
     F_left = F_min

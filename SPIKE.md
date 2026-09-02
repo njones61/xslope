@@ -7497,7 +7497,7 @@ evaluations.
 | `xslope_griffiths6_full.xlsx_tri6_2.0_1.6` | newton | 1.86718750 | 8 | 3,502 | 23,871 | **yes** |
 | `xslope_piles_fem.xlsx_tri6_2.0_1.0` | newton | 1.37968750 | 8 | 4,061 | 27,790 | **yes** |
 
-**Fourteen pairs, 116 trials, every one identical in factor of safety, verdict,
+**Fourteen pairs, 117 trials, every one identical in factor of safety, verdict,
 iterations and force evaluations.** The set covers the plain Mohr-Coulomb rows
 (`FEM-1-ssrm`, `SSRM-1`, `SSRM-G4`, `SSRM-G5`, both Griffiths & Lane 6 models,
 Griffiths & Lane 1 at tri6, Griffiths & Lane 3), one reinforced (`FEM-2-ssrm`), one

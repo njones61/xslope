@@ -173,27 +173,33 @@ The bending moment diagram along the pile varies from element to element. The ma
 
 ## Structural Capacity Checks
 
+Both capacities enter the solve the way soil yielding and a reinforcement bar's tension limit do: as a body-load correction. The viscoplastic scheme solves $\mathbf{K}\mathbf{u} = \mathbf{F} + \mathbf{c}$ with the member's **full elastic stiffness** in $\mathbf{K}$, so the internal force the converged state is in equilibrium with is $\mathbf{K}\mathbf{u} - \mathbf{c}$. The correction is therefore the part of the elastic action the member cannot carry — the action minus the capacity, not the other way round — and what is left in the member is the capacity itself. The actions XSLOPE reports for a pile are read off $\mathbf{K}\mathbf{u} - \mathbf{c}$, so they are the actions the equilibrium carries rather than elastic actions trimmed to the capacity afterwards.
+
 ### Shear Capacity ($V_{\text{cap}}$)
 
-When $V_{\text{cap}}$ is provided, the shear force in each beam element is compared against $V_{\text{cap}} / S$ (per-unit-width capacity). If the elastic shear exceeds this limit, a body-force correction is applied to cap the force:
+When $V_{\text{cap}}$ is provided, the shear in each beam element is compared against $V_{\text{cap}} / S$ (the per-unit-width capacity). Where the elastic shear exceeds it, the correction
 
->$\Delta V = \text{sign}(V) \cdot V_{\text{cap}}/S - V$
+>$\Delta V = V - \text{sign}(V) \cdot V_{\text{cap}}/S$
 
-The correction is converted to equivalent nodal forces perpendicular to the element axis and added to the load vector for the next iteration.
+is applied on the shear's own internal-force pattern — $+1$ and $-1$ on the transverse rows of the element's two end nodes, rotated into global coordinates. The element then delivers exactly $V_{\text{cap}} / S$ and no more, and delivers less the tighter the capacity is drawn.
 
 ### Moment Capacity ($M_{\text{cap}}$) — Plastic Hinge
 
-When $M_{\text{cap}}$ is provided, the bending moment at each node is compared against $M_{\text{cap}} / S$. If exceeded, a **moment correction** is applied directly to the rotational DOF at that node:
+A moment capacity is a **release of rotational continuity**, not a moment applied at a node. Two beam elements meet at every interior node of a pile, and at equilibrium their end moments there are equal and opposite; a correction applied to the rotational degree of freedom the two elements *share* is equal and opposite too, cancels exactly, and enforces nothing at any capacity.
 
->$\Delta M = \text{sign}(M) \cdot M_{\text{cap}}/S - M$
+What a plastic hinge does instead is let the element end rotate freely once its moment reaches $M_{\text{cap}} / S$. The element's elastic end rotation is the nodal rotation less a **plastic rotation** $p$, so the moment it delivers is
 
-This is added to the load vector at the node's rotation DOF, creating an elastic-perfectly-plastic hinge. The pile carries moment up to $M_{\text{cap}}$ at the hinge location and redistributes the excess through the viscoplastic iteration — the same correction pattern used for soil yielding and reinforcement capacity.
+>$\mathbf{s} = \mathbf{K}_{\text{local}} (\mathbf{u}_{\text{local}} - \mathbf{p})$
+
+and the correction added to the load vector is the full element vector $\mathbf{K}_{\text{local}}\,\mathbf{p}$ — which, unlike a nodal moment, acts on the element's translational rows as well. Each end moment is linear in $\mathbf{p}$, so $\mathbf{p}$ follows from one small linear solve on the rotational block of $\mathbf{K}_{\text{local}}$ rather than being iterated to: the hinged ends are placed exactly on the capacity, and because releasing one end raises the moment at the other, the hinge set is grown until it is stable. The pile's moment diagram is then bounded by the equilibrium, the released shaft deflects further, and the factor of safety falls.
+
+A hinge is one release at one section, and every interior node of a pile carries two element ends on the same section. Exactly one of them takes the plastic rotation; the other stays elastic, and equilibrium at the node it shares puts it on the capacity too, with the opposite sign. Releasing both would leave the node's rotation seeing equal and opposite capacities whatever it did — no longer determined by the beam at all — and the iteration would drift along that direction without settling.
 
 The plastic hinge approach is the standard method used in commercial geotechnical FEM software (PLAXIS, RS2, FLAC) for modeling pile structural failure.
 
 ### Interaction
 
-Both checks are applied independently at each iteration. An element can yield in shear, moment, or both. The summary output reports which elements have yielded and by which mechanism.
+Both checks are applied at each iteration, in that order: the hinge first, then the shear read off the released element. An element can yield in shear, in bending, or in both, and the plastic rotation at each end node is carried alongside the actions. The summary output reports which elements have yielded and by which mechanism.
 
 
 ## Head and Tip Fixity

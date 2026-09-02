@@ -7224,6 +7224,42 @@ def run_beam_element_test(test):
     return 0.0, None
 
 
+def run_pile_capacity_test(test):
+    """A pile's shear and moment capacities, ENFORCED rather than reported.
+
+    A moment capacity is a RELEASE of rotational continuity. Two beam elements
+    meet at every interior node of a pile and their end moments there are equal
+    and opposite, so a correction applied at the rotational degree of freedom
+    they share cancels exactly and enforces nothing at all -- while the reported
+    moments, clipped separately, read as capped. The check reads the moments off
+    the internal force the equilibrium actually carries and requires the largest
+    of them to sit ON the capacity, a plastic rotation to appear at the hinge, and
+    the wall to soften. It also walks the shear capacity down a ladder and
+    requires the DELIVERED shear to fall with it and to equal the capacity where
+    it binds -- the bar's convention, whose opposite sign is an anti-cap that
+    makes a member carry more the tighter it is capped.
+
+    The check itself lives in test/pile_capacity_check.py: 400 random beam
+    elements with no soil and no solve, then a coarse mesh of the shipped
+    xslope_pile_wall model and six fixed-F solves (~10 s all told).
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'pile_capacity_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('pile_capacity_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures[:5]) + (
+            f" (+{len(failures) - 5} more)" if len(failures) > 5 else "")
+    return 0.0, None
+
+
 def run_one_d_compatibility_test(test):
     """Embedded 1D elements against the soil edge they lie on.
 
@@ -12820,6 +12856,8 @@ def _dispatch_test(test):
         return run_k0_level_ground_test(test)
     if test_type == 'beam_element':
         return run_beam_element_test(test)
+    if test_type == 'pile_capacity':
+        return run_pile_capacity_test(test)
     if test_type == 'one_d_compatibility':
         return run_one_d_compatibility_test(test)
     if test_type == 'flow_recovery':
@@ -12978,7 +13016,7 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'corpus_circles',
                        'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'beam_element', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'tag_k0', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'pullout_law', 'pullout_switch', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'reinforcement_edits', 'k0_level_ground', 'beam_element', 'pile_capacity', 'one_d_compatibility', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'tag_k0', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments', 'welcome_window',
                        'thread_safety',
@@ -13540,6 +13578,16 @@ def main():
         # assembles only the beam matrices build_fem_data returns).
         tests.append({'type': 'beam_element', 'file': 'pile beam element vs beam theory',
                       'method': '-', 'source': 'beam_element'})
+        # Guard that a pile's structural capacities are enforced by the
+        # equilibrium and not merely reported: the moment capacity as a plastic
+        # hinge whose moment diagram the equilibrium bounds (a correction at the
+        # rotational degree of freedom two beam elements SHARE cancels and
+        # enforces nothing), and the shear capacity as a cap rather than an
+        # anti-cap. Reads the internal force, never the reported arrays. ~10 s:
+        # 400 element-level trials plus six fixed-F solves of a coarse mesh.
+        tests.append({'type': 'pile_capacity',
+                      'file': 'pile capacities enforced (hinge + shear cap)',
+                      'method': '-', 'source': 'pile_capacity'})
         # Guard the coupling between an embedded 1D element and the soil edge it
         # lies on: on a quadratic mesh the element stands on the edge's midside
         # node as well as its corners, a bar under uniform axial strain carries

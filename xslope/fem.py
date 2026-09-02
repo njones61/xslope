@@ -341,6 +341,8 @@ def _fem_pile_dataframe(fem_data, solution):
     yielded_M = _as_len(solution.get("yielded_pile_M", np.zeros(n_pile)), n_pile, bool)
     V_cap = _as_len(fem_data.get("V_cap_by_pile_elem", np.full(n_pile, np.inf)), n_pile)
     M_cap = _as_len(fem_data.get("M_cap_by_pile_elem", np.full(n_pile, np.inf)), n_pile)
+    pr = np.asarray(solution.get("pile_plastic_rotation", np.zeros((n_pile, 2))))
+    plastic_rot = pr if pr.shape == (n_pile, 2) else np.zeros((n_pile, 2))
 
     line_ids = np.array([element_materials_1d[pile_elem_indices[p]]
                          if len(element_materials_1d) else 0 for p in range(n_pile)],
@@ -365,6 +367,10 @@ def _fem_pile_dataframe(fem_data, solution):
         "yielded_shear": yielded_V,
         "yielded_moment": yielded_M,
         "yielded": yielded_V | yielded_M,
+        # The rotation the moment capacity released at each end node. Zero
+        # wherever no hinge formed, which is every element of an uncapped model.
+        "plastic_rotation_1": plastic_rot[:, 0],
+        "plastic_rotation_2": plastic_rot[:, 1],
     })
 
 
@@ -411,8 +417,13 @@ def _reconstruct_piles(fem_data, pile_df, solution):
     axial = np.zeros(n_pile)
     shear = np.zeros(n_pile)
     moment = np.zeros((n_pile, 2))
+    plastic_rot = np.zeros((n_pile, 2))
     yV = np.zeros(n_pile, dtype=bool)
     yM = np.zeros(n_pile, dtype=bool)
+    # Written since the moment capacity became a hinge; a sidecar from before
+    # that carries no hinge and reads as zero, which is what it was.
+    has_pr = ("plastic_rotation_1" in pile_df.columns
+              and "plastic_rotation_2" in pile_df.columns)
 
     pidx = pile_df["pile_index"].to_numpy()
     for k in range(len(pile_df)):
@@ -424,10 +435,14 @@ def _reconstruct_piles(fem_data, pile_df, solution):
             moment[p, 1] = pile_df["moment_2"].iloc[k]
             yV[p] = bool(pile_df["yielded_shear"].iloc[k])
             yM[p] = bool(pile_df["yielded_moment"].iloc[k])
+            if has_pr:
+                plastic_rot[p, 0] = pile_df["plastic_rotation_1"].iloc[k]
+                plastic_rot[p, 1] = pile_df["plastic_rotation_2"].iloc[k]
 
     solution["forces_pile_axial"] = axial
     solution["forces_pile_lateral"] = shear
     solution["forces_pile_moment"] = moment
+    solution["pile_plastic_rotation"] = plastic_rot
     solution["yielded_pile_V"] = yV
     solution["yielded_pile_M"] = yM
     solution["yielded_pile"] = yV | yM
@@ -993,7 +1008,7 @@ _QUINTIC_SHEAR_MID = _quintic_hermite_third_derivative(0.5)
 _QUINTIC_LOAD_MID = _quintic_hermite_fourth_derivative(0.5)
 
 
-def pile_element_reaction(u_elem, cos_t, sin_t, L, EI, n_node):
+def pile_element_reaction(u_elem, cos_t, sin_t, L, EI, n_node, p_rot=None):
     """The lateral soil reaction per unit length at a pile element's center, or
     None on an element that cannot report one.
 
@@ -1006,10 +1021,20 @@ def pile_element_reaction(u_elem, cos_t, sin_t, L, EI, n_node):
     everywhere, so it can say nothing about the load along itself -- a chain of
     them reports the reaction at the nodes BETWEEN elements instead, by
     differencing their shears.
+
+    ``p_rot`` is the element's plastic end rotations where a moment capacity has
+    hinged it. Only the ELASTIC part of the shape carries EI times a curvature, so
+    the hinge rotation is taken out first; read on the raw nodal displacement, a
+    hinge reads as a kink and the fourth derivative of a kink is a spike that no
+    soil is applying.
     """
     if n_node != 3:
         return None
     u_local = _beam_rotation(cos_t, sin_t, 3) @ u_elem
+    if p_rot is not None:
+        u_local = u_local.copy()
+        u_local[2] -= float(p_rot[0])
+        u_local[5] -= float(p_rot[1])
     q_hat = np.array([u_local[1], L * u_local[2],
                       u_local[4], L * u_local[5],
                       u_local[7], L * u_local[8]])
@@ -1055,7 +1080,8 @@ def _beam_local_stiffness(EA, EI, L, three_node):
     return K
 
 
-def _pile_element_actions(u_elem, cos_t, sin_t, L, EA, EI, K_local, n_node):
+def _pile_element_actions(u_elem, cos_t, sin_t, L, EA, EI, K_local, n_node,
+                          u_local=None):
     """``(axial, V, M1, M2, u_local)`` for one pile beam element.
 
     ``axial`` is the axial force at the element center and ``V`` the shear there;
@@ -1068,9 +1094,15 @@ def _pile_element_actions(u_elem, cos_t, sin_t, L, EA, EI, K_local, n_node):
     end moments are rows 2 and 5 of K_local u_local -- the same quantity, read off
     the assembled element rather than off a transcribed row -- and the shear is
     EI v'''(L/2), which on a two-node element is exactly that constant shear.
+
+    ``u_local`` may be passed in place of ``u_elem`` when the caller already holds
+    the local displacement -- which is what the capacity check does, since it has
+    to read the actions a second time off the ELASTIC part of the displacement
+    once a plastic hinge has taken its share.
     """
-    T = _beam_rotation(cos_t, sin_t, n_node)
-    u_local = T @ u_elem
+    if u_local is None:
+        T = _beam_rotation(cos_t, sin_t, n_node)
+        u_local = T @ u_elem
 
     # Axial force at the element center: EA times the chord strain, on both the
     # linear and the quadratic bar.
@@ -1094,6 +1126,152 @@ def _pile_element_actions(u_elem, cos_t, sin_t, L, EA, EI, K_local, n_node):
                       u_local[7], L * u_local[8]])
     V = float(EI / (L * L * L) * (_QUINTIC_SHEAR_MID @ q_hat))
     return axial, V, M1, M2, u_local
+
+
+def _pile_moment_hinge(M1, M2, M_cap, K_local, allowed=None):
+    """``(p, m)`` for one beam element at its moment capacity: the plastic end
+    rotations and the end moments that survive them.
+
+    A moment capacity is a RELEASE of rotational continuity, not a moment applied
+    at a node. Two beam elements meet at every interior node of a pile, and at
+    equilibrium their end moments there are equal and opposite; a correction
+    applied to the rotational degree of freedom they SHARE is therefore equal and
+    opposite too, cancels exactly, and enforces nothing at all. What a plastic
+    hinge does instead is let the element end rotate freely once its moment
+    reaches ``M_cap``: the element's elastic end rotation is the nodal rotation
+    less a plastic rotation ``p``, so the moment it delivers is
+    ``K_local (u_local - p)`` and the pile's moment diagram is bounded by
+    equilibrium rather than by clipping what is reported.
+
+    Each end moment is linear in ``p``, so ``p`` is solved for directly rather
+    than iterated to. With ``A`` the rotational block of ``K_local`` (its rows and
+    columns 2 and 5, the two END nodes) and ``m_e`` the elastic end moments, the
+    delivered moments are ``m_e - A p``, and requiring the hinged ends to sit on
+    the capacity is one 1x1 or 2x2 solve. Releasing one end raises the moment at
+    the other, so the hinge set is grown until it is stable -- at most two passes,
+    there being two ends. ``p`` is zero at an end that has not hinged.
+
+    ``allowed`` masks the two ends. A hinge is ONE release at one node, and every
+    interior node of a pile has two element ends on it: releasing both would leave
+    the node's rotation carrying equal and opposite capacities whatever it does,
+    unconstrained by the beam, and the iteration drifts along it without ever
+    settling. Exactly one end per node is therefore released (see
+    ``_pile_hinge_ends``); the other end is left elastic, and equilibrium at the
+    node it shares puts it on the capacity too, with the opposite sign -- which is
+    what a hinge means and what keeps the node's rotation determined.
+    """
+    m_e = np.array([float(M1), float(M2)])
+    p = np.zeros(2)
+    can = np.ones(2, dtype=bool) if allowed is None else np.asarray(allowed, dtype=bool)
+    active = (np.abs(m_e) > M_cap) & can
+    if not active.any():
+        return p, m_e
+
+    A = K_local[np.ix_([2, 5], [2, 5])]
+    m = m_e
+    for _ in range(2):
+        idx = np.flatnonzero(active)
+        target = np.sign(m_e[idx]) * M_cap
+        p = np.zeros(2)
+        p[idx] = np.linalg.solve(A[np.ix_(idx, idx)], m_e[idx] - target)
+        m = m_e - A @ p
+        newly_over = (np.abs(m) > M_cap * (1.0 + 1e-12)) & ~active & can
+        if not newly_over.any():
+            break
+        active |= newly_over
+    return p, m
+
+
+def _pile_hinge_ends(pile_elem_nodes, n_pile_elements):
+    """Which element END may carry a plastic hinge, one per pile node.
+
+    A plastic hinge is a single release at a single section. Two beam elements
+    meet at every interior node of a pile, so releasing each element's own end
+    there would release the node twice: its rotation would then see the two
+    capacities, equal and opposite, whatever it did -- no longer determined by the
+    beam, and the initial-stiffness iteration drifts along that direction and
+    never settles, which reads as a failed trial and drops the factor of safety.
+
+    The first element to reach a node owns the release there; the other's end is
+    left elastic, and node equilibrium puts it on the capacity with the opposite
+    sign anyway. Every node the pile line ends on has one element and owns itself.
+    """
+    ends = np.ones((n_pile_elements, 2), dtype=bool)
+    if pile_elem_nodes is None or len(pile_elem_nodes) != n_pile_elements:
+        return ends
+    owner = set()
+    for p in range(n_pile_elements):
+        for e in (0, 1):
+            node = int(pile_elem_nodes[p][e])
+            if node in owner:
+                ends[p, e] = False
+            else:
+                owner.add(node)
+    return ends
+
+
+def _pile_element_capacity(u_local, cos_t, sin_t, L, EA, EI, K_local, n_node,
+                           V_cap, M_cap, hinge_ends=None):
+    """One pile beam element's actions under its structural capacities, together
+    with the body-load correction that enforces them.
+
+    Returns ``(axial, V, M1, M2, corr_local, p_rot, yielded_V, yielded_M)``, with
+    ``corr_local`` in the element's LOCAL frame. The viscoplastic scheme solves
+    ``K u = base_loads + corrections``, so the internal force the converged state
+    is in equilibrium with is ``K u - corrections``: a correction of ``K_local p``
+    leaves ``K_local (u_local - p)`` in the member, which is what makes the
+    returned actions the ones the equilibrium actually carries rather than a
+    clipped report of an uncapped state.
+
+    **Moment.** A plastic hinge (``_pile_moment_hinge``), whose correction is the
+    full element vector ``K_local p`` and not a moment at the shared rotational
+    degree of freedom. ``hinge_ends`` says which of the element's two ends may
+    carry the release, so that each pile NODE is released once (see
+    ``_pile_hinge_ends``). The axial force and the shear are re-read off the
+    released displacement ``u_local - p``, because a hinge changes them.
+
+    **Shear.** The BAR's convention: the correction is ``V - V_true`` on the
+    shear's own internal-force pattern (``+1`` and ``-1`` on the two ends'
+    transverse rows), so ``K u - corrections`` leaves ``V_true`` in the member.
+    The opposite sign -- which this code carried -- is an anti-cap, exactly as the
+    comment beside the bar's correction says: the member ends up delivering
+    ``2 V - V_true``, so it gets STIFFER the tighter the cap is drawn and the
+    delivered shear RISES as the capacity falls. The pattern has no component on
+    the rotational rows, so it leaves the capped end moments untouched.
+    """
+    if K_local is None:                 # a fem_data built before it was cached
+        K_local = _beam_local_stiffness(EA, EI, L, n_node == 3)
+
+    axial, V, M1, M2, _ = _pile_element_actions(
+        None, cos_t, sin_t, L, EA, EI, K_local, n_node, u_local=u_local)
+
+    n_dof = 3 * n_node
+    corr_local = np.zeros(n_dof)
+    p_rot = np.zeros(2)
+    yielded_M = False
+    yielded_V = False
+
+    if M_cap < float('inf') and (abs(M1) > M_cap or abs(M2) > M_cap):
+        p_rot, m = _pile_moment_hinge(M1, M2, M_cap, K_local, allowed=hinge_ends)
+        if p_rot.any():
+            p_local = np.zeros(n_dof)
+            p_local[2] = p_rot[0]
+            p_local[5] = p_rot[1]
+            corr_local += K_local @ p_local
+            M1, M2 = float(m[0]), float(m[1])
+            axial, V, _, _, _ = _pile_element_actions(
+                None, cos_t, sin_t, L, EA, EI, K_local, n_node,
+                u_local=u_local - p_local)
+        yielded_M = True
+
+    if abs(V) > V_cap:
+        V_true = np.sign(V) * V_cap
+        corr_local[1] += V - V_true
+        corr_local[4] -= V - V_true
+        V = float(V_true)
+        yielded_V = True
+
+    return axial, V, M1, M2, corr_local, p_rot, yielded_V, yielded_M
 
 
 def _beam_rotation(cos_t, sin_t, n_node):
@@ -4317,6 +4495,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         forces_pile_moment = np.zeros((n_pile_elements, 2))  # [M1, M2] at each node
         yielded_pile_V = np.zeros(n_pile_elements, dtype=bool)
         yielded_pile_M = np.zeros(n_pile_elements, dtype=bool)
+        # Plastic hinge rotation at the two END nodes of each element -- the
+        # rotation the moment capacity released, zero wherever no hinge formed.
+        plastic_rot_pile = np.zeros((n_pile_elements, 2))
+        # Which element end may carry that release: one per pile NODE, since a
+        # hinge is one release at one section and every interior node of a pile
+        # carries two element ends. F-independent, so it is built once here.
+        pile_hinge_ends = _pile_hinge_ends(
+            fem_data.get("pile_elem_nodes", None), n_pile_elements)
 
         if debug_level >= 1:
             _n_node_pile = sorted({int(n) // 3 for n in n_dof_pile}) or [2]
@@ -4970,55 +5156,37 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                     # [ux, uy, theta] at end 1, end 2 and -- on a three-node
                     # element -- the midside node of the soil edge.
                     u_elem = u[dof_idx]
-                    T_force, V, M1, M2, u_local = _pile_element_actions(
-                        u_elem, cos_t, sin_t, L, EA_val, EI_val, Kl, n_node_e)
+                    T_beam = _beam_rotation(cos_t, sin_t, n_node_e)
+                    u_local = T_beam @ u_elem
+
+                    # The capacities enter as a viscoplastic body-load correction,
+                    # exactly as the soil's plastic strain and the bar's tension
+                    # cap do: the global stiffness carries the member's FULL
+                    # elastic stiffness, so `K u - corrections` is the internal
+                    # force this state is in equilibrium with. See
+                    # _pile_element_capacity for the moment hinge, and for why the
+                    # shear correction carries the bar's sign.
+                    (T_force, V, M1, M2, corr_local, _p_rot,
+                     yielded_V_e, yielded_M_e) = _pile_element_capacity(
+                        u_local, cos_t, sin_t, L, EA_val, EI_val, Kl, n_node_e,
+                        V_cap_pile[p_idx], M_cap_pile[p_idx],
+                        hinge_ends=pile_hinge_ends[p_idx])
 
                     forces_pile_axial[p_idx] = T_force
+                    forces_pile_lateral[p_idx] = V
                     forces_pile_moment[p_idx] = [M1, M2]
 
-                    # --- V_cap check ---
-                    V_limit = V_cap_pile[p_idx]
-                    correction_V = 0.0
-                    if abs(V) > V_limit:
-                        correction_V = np.sign(V) * V_limit - V
-                        V = np.sign(V) * V_limit
+                    if yielded_V_e:
                         yielded_pile_V[p_idx] = True
                         n_pile_yielded_V += 1
+                    if yielded_M_e:
+                        yielded_pile_M[p_idx] = True
+                        n_pile_yielded_M += 1
 
-                    forces_pile_lateral[p_idx] = V
-
-                    if abs(correction_V) > 1e-30:
-                        # Convert lateral correction to global nodal forces.
-                        # In local coordinates the shear internal-force pattern is
-                        # [0, 1, 0, 0, -1, 0] at the two ends; on a three-node
-                        # element the midside node takes no share of it, so the
-                        # cap is delivered entirely at the ends. (Distributing it
-                        # over the element's own shear shape is a refinement, and
-                        # so is hinging at the midside node under M_cap.)
-                        f_local = np.zeros(n_dof_e)
-                        f_local[1] = correction_V
-                        f_local[4] = -correction_V
-                        f_global = _beam_rotation(cos_t, sin_t, n_node_e).T @ f_local
+                    if corr_local.any():
+                        f_global = T_beam.T @ corr_local
                         for k in range(n_dof_e):
                             loads[dof_idx[k]] += f_global[k]
-
-                    # --- M_cap check (plastic hinge at each node) ---
-                    M_cap_uw = M_cap_pile[p_idx]
-                    if M_cap_uw < float('inf'):
-                        # Node 1 moment check
-                        if abs(M1) > M_cap_uw:
-                            correction_M1 = np.sign(M1) * M_cap_uw - M1
-                            rot_dof_1 = dof_idx[2]  # theta1 DOF
-                            loads[rot_dof_1] += correction_M1
-                            yielded_pile_M[p_idx] = True
-                            n_pile_yielded_M += 1
-
-                        # Node 2 moment check
-                        if abs(M2) > M_cap_uw:
-                            correction_M2 = np.sign(M2) * M_cap_uw - M2
-                            rot_dof_2 = dof_idx[5]  # theta2 DOF
-                            loads[rot_dof_2] += correction_M2
-                            yielded_pile_M[p_idx] = True
 
                 if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
                     if n_pile_yielded_V > 0 or n_pile_yielded_M > 0:
@@ -5490,7 +5658,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
                    else t_allow_by_1d_elem[elem_idx_1d])
             forces_1d[elem_idx_1d] = min(max(T, 0.0), cap)
 
-    # ---- Step 10c: Compute final pile beam element forces (capped at capacity) ----
+    # ---- Step 10c: Final pile beam element actions, under the same capacity law
+    # the loop enforced ----
+    #
+    # Read through _pile_element_capacity, the one place the law is written, so the
+    # reported actions are the ones the converged equilibrium carries. Reading them
+    # any other way -- computing the elastic actions and then CLIPPING them to the
+    # capacity -- reports a cap the equilibrium never enforced, which is how a moment
+    # capacity that did nothing at all could read as an enforced one.
     if has_pile_elements:
         for p_idx in range(n_pile_elements):
             n_dof_e = int(n_dof_pile[p_idx])
@@ -5503,28 +5678,21 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
             EA_val = EA_pile[p_idx]
             Kl = K_local_pile[p_idx] if K_local_pile is not None else None
 
-            u_elem = u[dof_idx]
-            T_force, V, M1, M2, u_local = _pile_element_actions(
-                u_elem, cos_t, sin_t, L, EA_val, EI_val, Kl, n_node_e)
+            u_local = _beam_rotation(cos_t, sin_t, n_node_e) @ u[dof_idx]
+            (T_force, V, M1, M2, _corr, p_rot,
+             yielded_V_e, yielded_M_e) = _pile_element_capacity(
+                u_local, cos_t, sin_t, L, EA_val, EI_val, Kl, n_node_e,
+                V_cap_pile[p_idx], M_cap_pile[p_idx],
+                hinge_ends=pile_hinge_ends[p_idx])
 
             forces_pile_axial[p_idx] = T_force
-            forces_pile_moment[p_idx] = [M1, M2]
-
-            # Cap shear at V_cap
-            V_limit = V_cap_pile[p_idx]
-            if abs(V) > V_limit:
-                V = np.sign(V) * V_limit
-                yielded_pile_V[p_idx] = True
             forces_pile_lateral[p_idx] = V
-
-            # Cap moments at M_cap
-            M_cap_uw = M_cap_pile[p_idx]
-            if M_cap_uw < float('inf'):
-                if abs(M1) > M_cap_uw or abs(M2) > M_cap_uw:
-                    yielded_pile_M[p_idx] = True
-                M1_capped = np.sign(M1) * min(abs(M1), M_cap_uw) if M_cap_uw < float('inf') else M1
-                M2_capped = np.sign(M2) * min(abs(M2), M_cap_uw) if M_cap_uw < float('inf') else M2
-                forces_pile_moment[p_idx] = [M1_capped, M2_capped]
+            forces_pile_moment[p_idx] = [M1, M2]
+            plastic_rot_pile[p_idx] = p_rot
+            if yielded_V_e:
+                yielded_pile_V[p_idx] = True
+            if yielded_M_e:
+                yielded_pile_M[p_idx] = True
 
     # Reported displacement is measured from the datum (zero without a carried
     # state). Stresses, strains and every structural force above are functions of the
@@ -5606,6 +5774,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=12000, tolerance=1e
         "forces_pile_axial": forces_pile_axial if has_pile_elements else np.array([]),
         "forces_pile_lateral": forces_pile_lateral if has_pile_elements else np.array([]),
         "forces_pile_moment": forces_pile_moment if has_pile_elements else np.zeros((0, 2)),
+        "pile_plastic_rotation": (plastic_rot_pile if has_pile_elements
+                                  else np.zeros((0, 2))),
         "yielded_pile_V": yielded_pile_V if has_pile_elements else np.array([], dtype=bool),
         "yielded_pile_M": yielded_pile_M if has_pile_elements else np.array([], dtype=bool),
         "yielded_pile": (yielded_pile_V | yielded_pile_M) if has_pile_elements else np.array([], dtype=bool),

@@ -5072,3 +5072,51 @@ their gradients; the viscoplastic path computes the same four quantities in clos
 form at every iteration. On 300 random elements the two agree to 1.8e-14 (axial),
 1.7e-14 (shear), 4.1e-13 and 6.0e-14 (the two end moments) relative. The two
 drivers are capping the same quantities.
+
+#### The pile diagnostics, against the viscoplastic driver
+
+`xslope_piles_fem` at its tagged tri6/2.0 mesh (1,521 elements, 18 pile elements),
+element by element at the same strength on both drivers:
+
+| F | what each driver did | axial | shear | end moments | masks |
+|---|---|---|---|---|---|
+| 1.300 | both CONVERGED (VP 1,364 iterations at oob 9.99e-4; Newton 472 at 1.22e-7) | 0.37% | 0.68% | 0.31% | both empty, agree 18/18 |
+| 1.375 | both CONVERGED (VP 12,612 iterations at oob 9.86e-4; Newton 26 at 7.43e-10) | 7.65% | 7.80% | 13.37% | both empty, agree 18/18 |
+
+Percentages are the largest per-element difference as a fraction of the largest
+viscoplastic value. At F = 1.300 the two drivers are in the same state and the pile
+forces agree to under a percent on all three actions. At F = 1.375 — one bisection
+cell below this model's limit — they are not: the viscoplastic solve takes 12,612
+iterations to reach its 1e-3 gate while the Newton corrector lands at 7.4e-10 in
+26, at twice the displacement (1.00% of the model height against 0.50%), and a
+member reads the difference between two elastoplastic states more sharply than the
+soil does. Neither state has a pile at its capacity, so the two yielded masks are
+empty and agree element for element; the LATCHING difference the bar masks carry
+(the viscoplastic mask records every element that was ever over its capacity during
+the iteration history, this one is read on the reported state) is present in the
+code on this path too and is not exercised by these two states.
+
+#### Rotations are smaller than displacements, everywhere it was measured
+
+The displacement bound was a category error and is fixed; what it was NOT is a
+number. Measured on the converged states above and on the sheet pile wall, the
+largest nodal rotation against the largest translational displacement:
+
+| model | F | max&#124;u&#124;, translational | max rotation | ratio |
+|---|---|---|---|---|
+| `xslope_piles_fem` | 1.300 | 0.0541 | 0.00287 | 5.3% |
+| `xslope_piles_fem` | 1.375 | 0.3014 | 0.01570 | 5.2% |
+| `xslope_pile_wall` | 1.5625 | 0.1671 | 0.01134 | 6.8% |
+| `xslope_pile_wall` | 1.7500 | 0.2778 | 0.01758 | 6.3% |
+| `xslope_pile_wall` | 1.7969 | 0.8148 | 0.01922 | 2.4% |
+
+**So on the corpus the corrected bound reads the same number the raw one did**, and
+that is not an accident of these models: a nodal rotation is about a deflection
+divided by a length, so it can only exceed the largest displacement in a model whose
+pile is shorter than one unit of length. There is no such model in the repository,
+and there is unlikely to be one in feet or metres. The fix is a correctness fix with
+no measured consequence — which is exactly what it should be, since a bound that had
+been silently comparing a length against a radian would otherwise have been deciding
+verdicts. The lock asserts it structurally, on the index set the bound reads; the
+behavioural mutation the criterion asked for could not be built on a physically-sized
+model, and that is reported rather than manufactured.

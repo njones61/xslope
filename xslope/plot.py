@@ -3501,23 +3501,6 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
     return leg
 
 
-def material_legend_handles(materials, style=None, alpha=None):
-    """Filled-patch legend handles for material zones — the single consistent
-    material-zone swatch used across the inputs / mesh / seep / fem plots, so a zone
-    looks the same (filled patch in its style color) in every view. One patch per
-    material, labeled by material name. ``alpha`` overrides the per-material style
-    alpha when given (e.g. a busier result view that wants lighter zones)."""
-    import matplotlib.patches as mpatches
-    from .style import resolve_style, material_style
-    style = resolve_style(style)
-    handles = []
-    for i, m in enumerate(materials or []):
-        ms = material_style(style, i)
-        a = ms.get("alpha", 0.6) if alpha is None else alpha
-        name = (m.get("name") if isinstance(m, dict) else m) or f"Material {i + 1}"
-        handles.append(mpatches.Patch(facecolor=ms["color"], alpha=a,
-                                      edgecolor="none", label=name))
-    return handles
 
 
 def plot_inputs(
@@ -4130,26 +4113,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
 
 # ========== Functions for Search Results =========
 
-def plot_failure_surfaces(ax, fs_cache):
-    """
-    Plots all failure surfaces from the factor of safety cache.
 
-    Parameters:
-        ax: matplotlib Axes object
-        fs_cache: List of dictionaries containing failure surface data and FS values
-
-    Returns:
-        None
-    """
-    for i, result in reversed(list(enumerate(fs_cache))):
-        surface = result['failure_surface']
-        if surface is None or surface.is_empty:
-            continue
-        x, y = zip(*surface.coords)
-        color = 'red' if i == 0 else 'gray'
-        lw = 2 if i == 0 else 1
-        ax.plot(x, y, color=color, linestyle='-', linewidth=lw, alpha=1.0 if i == 0 else 0.6,
-                gid='CRITICAL_SURFACE' if i == 0 else 'TESTED_SURFACES')
 
 def plot_circle_centers(ax, fs_cache):
     """
@@ -4964,58 +4928,6 @@ def plot_polygons_separately(polygons, materials=None, save_png=False, dpi=300):
     plt.show()
 
 
-def find_best_table_position(ax, materials, plot_elements_bounds):
-    """
-    Find the best position for the material table to avoid overlaps.
-    
-    Parameters:
-        ax: matplotlib Axes object
-        materials: List of materials to determine table size
-        plot_elements_bounds: List of (x_min, x_max, y_min, y_max) for existing elements
-        
-    Returns:
-        (xloc, yloc) coordinates for table placement
-    """
-    # Calculate table size based on number of materials and columns
-    num_materials = len(materials)
-    has_d_psi = any(mat.get('d', 0) > 0 or mat.get('psi', 0) > 0 for mat in materials)
-    table_height = 0.05 + 0.025 * num_materials  # Height per row
-    table_width = 0.25 if has_d_psi else 0.2
-    
-    # Define candidate positions (priority order) - with margins from borders
-    candidates = [
-        (0.05, 0.70),  # upper left
-        (0.70, 0.70),  # upper right  
-        (0.05, 0.05),  # lower left
-        (0.70, 0.05),  # lower right
-        (0.35, 0.70),  # upper center
-        (0.35, 0.05),  # lower center
-        (0.05, 0.35),  # center left
-        (0.70, 0.35),  # center right
-        (0.35, 0.35),  # center
-    ]
-    
-    # Check each candidate position for overlaps
-    for xloc, yloc in candidates:
-        table_bounds = (xloc, xloc + table_width, yloc - table_height, yloc)
-        
-        # Check if table overlaps with any plot elements
-        overlap = False
-        for elem_bounds in plot_elements_bounds:
-            elem_x_min, elem_x_max, elem_y_min, elem_y_max = elem_bounds
-            table_x_min, table_x_max, table_y_min, table_y_max = table_bounds
-            
-            # Check for overlap
-            if not (table_x_max < elem_x_min or table_x_min > elem_x_max or
-                   table_y_max < elem_y_min or table_y_min > elem_y_max):
-                overlap = True
-                break
-        
-        if not overlap:
-            return xloc, yloc
-    
-    # If all positions have overlap, return the first candidate
-    return candidates[0]
 
 
 def get_plot_elements_bounds(ax, slope_data):

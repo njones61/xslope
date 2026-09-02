@@ -1,17 +1,15 @@
-import numpy as np
-
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import import_seep2d, run_seepage_analysis, print_seep_data_diagnostics
 
 
 # Load input
-seep_data = import_seep2d("docs/inputs/seep/lface.s2d")
+seep_data = import_seep2d("docs/inputs/seep/seep2d/lface.s2d")
 
 # Print diagnostics
 print_seep_data_diagnostics(seep_data)
 
 # Plot mesh
-plot_seep_data(seep_data, show_nodes=True, label_elements=True, label_nodes=True, show_bc=True)
+plot_seep_data(seep_data, show_nodes=True, label_elements=False, label_nodes=False, show_bc=True)
 
 # Run analysis
 solution = run_seepage_analysis(seep_data)

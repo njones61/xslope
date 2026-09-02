@@ -252,25 +252,27 @@ below (from EM 1110-2-1902) illustrates three such conventions; xslope implement
 
 ![uscoe_theta.png](images/uscoe_theta.png){width=500px }
 
-The convention is selected through the `variant` argument of `corps`:
-
-- **variant 1** (top panel) — a single constant inclination parallel to a line connecting the bottom of the failure
+- **Convention #1** (top panel) — a single constant inclination parallel to a line connecting the bottom of the failure
   surface to the top of the failure surface (the crest-to-toe chord). This matches the "Corps of Engineers #1"
   option in commercial packages.
-- **variant 2 (default)** (bottom panel) — the inclination at each slice boundary is parallel to the ground surface
+- **Convention #2** (bottom panel) — the inclination at each slice boundary is parallel to the ground surface
   at the top of that slice (the "Corps of Engineers #2" option).
+
+Studio and the input template always use convention #2; there is no cell or control that selects the other one.
+Convention #1 is reachable only from the Python API, through the `variant` argument of `corps`
+(`corps(slice_df, variant=1)`).
 
 The **middle panel** of the figure — all side forces parallel to the average embankment slope (a single straight
 line from the crest to the toe of the slope) — is a third Corps convention that xslope does not currently support.
 EM 1110-2-1902 (§C-4) notes that this average-embankment-slope assumption can yield unconservative (too-high)
 factors of safety relative to complete-equilibrium methods such as Spencer.
 
-xslope defaults to **variant 2**. Because xslope can drive its own non-circular search, a single fixed inclination
-(variant 1) can return a spuriously low factor of safety on surfaces with steep segments — the search will seek out
-exactly those surfaces. The per-slice ground-parallel inclination (variant 2) is robust to this, which is why it is
-the default; variant 1 remains available to reproduce the "#1" results reported by other codes on a fixed surface.
+Because xslope can drive its own non-circular search, a single fixed inclination (#1) can return a spuriously low
+factor of safety on surfaces with steep segments — the search will seek out exactly those surfaces. The per-slice
+ground-parallel inclination (#2) is robust to this, which is why it is the one Studio and the template run. Reach
+for `variant=1` when you need to reproduce another code's "#1" result on a fixed surface.
 
-Variant 2 is the default for robustness, **not** because it is conservative. The ground-parallel ("Corps #2")
+Convention #2 is the default for robustness, **not** because it is conservative. The ground-parallel ("Corps #2")
 convention systematically produces the **highest (least conservative)** factor of safety among xslope's methods —
 typically a few percent to ~15% above Spencer. EM 1110-2-1902 cautions that methods which do not satisfy all
 conditions of equilibrium "may involve significant inaccuracies and should be used only under the restricted

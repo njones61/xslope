@@ -3,7 +3,7 @@ from xslope.plot import plot_reliability_results
 from xslope.advanced import reliability
 
 # Load slope data
-slope_data = load_slope_data("docs/inputs/slope/input_template_reliability6.xlsx")
+slope_data = load_slope_data("docs/inputs/slope/xslope_reliability.xlsx")
 
 # Run reliability analysis. `method` can be any LEM method: 'oms', 'bishop',
 # 'janbu', 'corps', 'lowe', 'spencer', or 'mprice'.

@@ -1450,6 +1450,7 @@ $T_{max}$ plateau, are what the line's reported state is built from — *within 
 | `axial_force`, `shear_force` | Axial and lateral forces in the element. |
 | `moment_1`, `moment_2` | Bending moments at the element's two nodes. |
 | `v_cap`, `m_cap` | Structural shear and moment capacity per unit width (`inf` when uncapped). |
+| `plastic_rotation_1`, `plastic_rotation_2` | Plastic hinge rotation at the element's two nodes (zero where no hinge formed). |
 | `yielded_shear`, `yielded_moment`, `yielded` | Capacity flags. |
 
 ## References

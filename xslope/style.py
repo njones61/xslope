@@ -123,10 +123,6 @@ def material_style(style, mat_id):
     return out
 
 
-def style_delta(style):
-    """The sparse diff of a (resolved) style vs the defaults — what a project sidecar
-    stores. Inverse of ``resolve_style`` for round-tripping; empty dict if unchanged."""
-    return _diff(default_style_sheet(), style or {})
 
 
 def _diff(base, cur):

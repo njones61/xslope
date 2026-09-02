@@ -6254,3 +6254,62 @@ What remains, in the order it matters:
 - **The two duplicate models.** `hammah_hb1` and `xslope_rock_slope` are the same
   model under two names, as `xslope_reinforce_fem` and `xslope_reinforced_slope`
   are. The eight-row table above is seven distinct models.
+
+
+## MERGED FROM `main` again, 2026-09-02
+
+`main` moved thirteen commits while the pile and curved-envelope rounds were being
+written. Twelve are a dead-code cleanup and one is a fix to the shipped pile
+capacities that this branch has to answer.
+
+**The cleanup does not reach the Newton driver.** It removed a 728-line
+per-element stiffness family from `seep.py`, twenty-three zero-caller functions
+across `mesh`, `fem`, `plot`, `fileio`, `slice`, `preflight` and `style`,
+`global_config.py`, five code-only keyword arguments on `mprice`,
+`force_equilibrium`, `circular_search`, `reliability_mc` and
+`run_transient_seepage`, and two archived templates. Five of those functions were
+in `fem.py` — `compute_flow_vector_tp`, `compute_quad_area`, `mc_flow_vector_4`,
+`check_mohr_coulomb_cp` and `_n_reinforcement_lines`. Every deleted symbol was
+grepped for by whole word across `xslope/`, `test/`, `studio/` and `run_tests.py`
+after the merge, together with `global_config` and the two keywords the previous
+merge found gone under this branch: **not one hit**. The Newton, ramp and
+predictor code never called any of them.
+
+**The pile-capacity fix does reach it, and it is the subject of the next round.**
+a115d9c5 makes a moment capacity a plastic hinge on the DEFAULT driver — a
+released rotational degree of freedom whose correction is the full element vector
+`K_local p`, one release per pile node — and corrects the shear correction's sign
+to the bar's. Its own note says the Newton driver here "carries the same inert
+moment-cap form ... and needs the same hinge treatment, including the
+one-release-per-node rule, before its pile results mean anything on a model where
+M_cap binds." That is "THE PILE HINGE", below. Nothing on the Newton path was
+changed in this merge; `fem_details.py`'s soil-reaction reader, which now takes
+the hinge's plastic rotation out of the shape, merged identically on both sides.
+
+**The conflicts, and the hand fixes.** One textual conflict:
+`run_tests.py`'s `_expected_and_tol` type tuple, where this branch had added
+`nr_ssrm` and `main` had added `pile_capacity` to the same line. Resolved as the
+union, and both suite rows verified still registered — `run_nr_ssrm_test` and
+`run_pile_capacity_test` alike. `xslope/fem.py` auto-merged with no textual
+conflict, which is the dangerous outcome rather than the safe one and is why the
+whole-word grep above was run rather than assumed; the two signatures that changed
+under the branch, `_pile_element_actions` and `pile_element_reaction`, both gained
+keyword arguments with defaults, so every existing call site still means what it
+did.
+
+The post-merge checks, all run in the worktree with its root first on `sys.path`
+and `xslope.__file__` asserted:
+
+| Check | Result |
+|---|---|
+| Default path: Griffiths & Lane 6 dry, quad8/2, no `fem_solver` | FS **2.421875**, per-trial iterations 147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777 — value for value |
+| Griffiths & Lane 1, tri6/3.5, Newton bisection | FS **1.36562500**, 9 trials, 3,121 iterations, 22,650 force evaluations — value for value |
+| Three layers, `t_cut` = 0, tri6/4 | viscoplastic **1.2109375**, Newton **1.2109375**, 8 trials, 3,688 iterations, 25,515 force evaluations — value for value |
+| FEM pile sample (`xslope_piles_fem`), tri6/2, the tag's bracket | viscoplastic **1.3796875**, Newton **1.3796875**, 8 trials, 4,055 iterations, 27,736 force evaluations — value for value, and 0.0003 from the published 1.380 |
+| `test/nr_ssrm_check.py` | passes end to end |
+| `test/pile_capacity_check.py` (new on `main`) | 0 failures |
+| `python3 run_tests.py --preflight` | 31 passed, 0 failed |
+
+The pile sample is the sharp row: `main` rewrote the viscoplastic driver's pile
+capacity law, and that model's capacities do not bind, so both drivers had to come
+back on the number the piles round recorded. They did.

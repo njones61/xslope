@@ -1,26 +1,25 @@
 import os
+import tempfile
 
-from xslope.fileio import load_data_from_pickle, save_data_to_pickle, load_slope_data
+from xslope.fileio import load_slope_data, save_data_to_pickle, load_data_from_pickle
 
-filepath = "docs/input_template_lface2"  # without extensions
+xlsx_path = "docs/inputs/slope/xslope_lface.xlsx"
 
 print("Loading data from Excel file...")
-slope_data = load_slope_data(filepath + ".xlsx")
+slope_data = load_slope_data(xlsx_path)
 print(f"Data loaded successfully. Keys: {list(slope_data.keys())}")
 
+# A pickle round trip is faster than re-parsing the workbook, which matters when
+# the same model is solved repeatedly. Written to a temp file so the demo leaves
+# nothing behind; in real use it sits beside the .xlsx.
+pkl_path = os.path.join(tempfile.gettempdir(), "xslope_lface.pkl")
+
 print("Saving data to pickle file...")
-save_data_to_pickle(slope_data, filepath + ".pkl")
-print("Pickle file saved successfully!")
+save_data_to_pickle(slope_data, pkl_path)
+print(f"Pickle file saved: {os.path.getsize(pkl_path)} bytes")
 
-print("Verifying file was created...")
-if os.path.exists(filepath + ".pkl"):
-    print(f"File exists! Size: {os.path.getsize(filepath + '.pkl')} bytes")
-else:
-    print("File was not created!")
+print("Reading it back...")
+reloaded = load_data_from_pickle(pkl_path)
+print(f"Reloaded keys match: {list(reloaded.keys()) == list(slope_data.keys())}")
 
-
-
-
-
-
-
+os.remove(pkl_path)

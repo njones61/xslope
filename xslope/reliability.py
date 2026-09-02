@@ -1145,8 +1145,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                    progress_callback=None, cancel_check=None,
                    fs_tol=None, tol=None, max_iter=None, composite=False,
                    seed='circles', search_opts=None, use_file_window=True,
-                   check_inputs=True, converge_rel=None, converge_check=100,
-                   converge_min=500, sampling='lhs'):
+                   check_inputs=True, converge_rel=None, sampling='lhs'):
     """Monte Carlo reliability analysis — the sampling counterpart to the
     Taylor-series :func:`reliability`.
 
@@ -1187,10 +1186,10 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
         absolute half-percentage-point on a P_f of 17% and of 2% are entirely
         different amounts of knowledge, and the sample count the rule demands
         grows as (1−p)/p, roughly ten times more realizations at 2% than at
-        17%. When set, the campaign checks every ``converge_check``
-        realizations and stops once 1.96·sqrt(p(1−p)/n) ≤ converge_rel·p;
-        ``n_samples`` becomes the cap. The rule never fires before
-        ``converge_min`` realizations or before 10 failures have been observed
+        17%. When set, the campaign checks every 100 realizations and stops
+        once 1.96·sqrt(p(1−p)/n) ≤ converge_rel·p;
+        ``n_samples`` becomes the cap. The rule never fires before 500
+        realizations or before 10 failures have been observed
         (below that the normal approximation behind the half-width is not
         valid, which protects rare-event problems from stopping on false
         confidence). Because the whole sample matrix is drawn up front from the
@@ -1320,7 +1319,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
             run_valid += 1
             if fk < 1.0:
                 run_fail += 1
-        if (converge_rel is not None and (k + 1) % converge_check == 0
+        if (converge_rel is not None and (k + 1) % 100 == 0
                 and run_valid > 0):
             p = run_fail / run_valid
             half = 1.96 * math.sqrt(p * (1.0 - p) / run_valid)
@@ -1328,7 +1327,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
             # The half-width is a normal approximation; below ~10 observed
             # failures it is not credible, so a rare-event campaign keeps
             # sampling to the cap rather than stopping on false confidence.
-            if (k + 1 >= converge_min and run_fail >= 10 and p > 0
+            if (k + 1 >= 500 and run_fail >= 10 and p > 0
                     and half <= converge_rel * p):
                 n_used = k + 1
                 pf_ci_half = half

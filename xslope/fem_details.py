@@ -173,13 +173,6 @@ def has_1d_details(fem_data):
     return elements_1d is not None and len(elements_1d) > 0
 
 
-def _n_reinforcement_lines(fem_data, slope_data=None):
-    labels = fem_data.get("reinforce_line_labels", None)
-    if labels is not None:
-        return len(labels)
-    if slope_data:
-        return len(slope_data.get("reinforcement_lines", []) or [])
-    return 0
 
 
 def _reinforcement_line_ids(fem_data):
@@ -1120,6 +1113,13 @@ def _pile_reaction(fem_data, field, sel, node_ids, node_depth, elem_depth):
         sin_t = np.asarray(fem_data.get("sin_theta_pile", np.zeros(n_pile)),
                            dtype=float)
         EI = _pile_array(fem_data, "EI_by_pile_elem", n_pile)
+        # A hinged element's shape carries a plastic kink that no soil applied;
+        # only its elastic part carries EI times a curvature. Absent (an older
+        # sidecar), every element reads as unhinged, which is what it was.
+        p_rot_all = np.asarray((field or {}).get("pile_plastic_rotation",
+                                                 np.zeros((n_pile, 2))), dtype=float)
+        if p_rot_all.shape != (n_pile, 2):
+            p_rot_all = np.zeros((n_pile, 2))
         out = np.zeros(len(sel))
         for k, p in enumerate(sel):
             p = int(p)
@@ -1127,7 +1127,8 @@ def _pile_reaction(fem_data, field, sel, node_ids, node_depth, elem_depth):
             if int(idx.max()) >= len(disp):
                 return empty
             value = pile_element_reaction(disp[idx], cos_t[p], sin_t[p],
-                                          float(elem_len[k]), float(EI[p]), 3)
+                                          float(elem_len[k]), float(EI[p]), 3,
+                                          p_rot=p_rot_all[p])
             out[k] = 0.0 if value is None else value
         return elem_depth, _reaction_at_mesh_scale(np.asarray(elem_depth, dtype=float), out)
 

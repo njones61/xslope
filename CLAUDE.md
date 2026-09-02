@@ -22,7 +22,8 @@ The package also includes seepage analysis capabilities and integrates with fini
 ```bash
 python main.py
 ```
-This runs the primary slope stability analysis using the default input template.
+Solves one circle on a shipped sample with Spencer, compares every LEM method
+on the same slices, then searches for the critical circle.
 
 ### Documentation
 ```bash
@@ -31,13 +32,21 @@ mkdocs build
 mkdocs serve  # For local development server
 ```
 
-### Testing Individual Components
+### Driver Scripts
+Each is a plain demonstration script pointed at a shipped input file; edit the
+path at the top to run your own model. All of them open matplotlib windows, so
+run them from a desktop session (or set `MPLBACKEND=Agg` to skip the figures).
 ```bash
-python main_fileio_test.py    # Test file I/O functions
-python main_mesh.py           # Test mesh operations
-python main_search.py         # Test search algorithms
-python main_seep.py           # Test seep analysis
-python main_seep2d.py         # Test 2D seep analysis
+python main_lem.py            # LEM: inputs plot, auto search, critical surface
+python main_search.py         # Circular search on its own, printing each iteration
+python main_reliability.py    # Taylor-series reliability from the mat-sheet std devs
+python main_fem.py            # FEM / SSRM run and results plots
+python main_seep.py           # Seepage: mesh, solve, flow net, export the .csv
+python main_seep2d.py         # Seepage from a legacy SEEP2D .s2d file
+python main_design.py         # Slope-angle sweep to a target FS or reliability index
+python main_mesh.py           # Mesh a reinforced model and check 1D element alignment
+python main_fileio_test.py    # Load a workbook and dump every slope_data key
+python main_pickle.py         # Cache a parsed model to a pickle and read it back
 ```
 
 ## Code Architecture
@@ -51,7 +60,6 @@ python main_seep2d.py         # Test 2D seep analysis
 - **`plot.py`**: Visualization functions for slopes, slices, and results. Contains `plot_solution()` and `plot_inputs()`.
 - **`seep.py`**: Seepage analysis integration with finite element mesh data.
 - **`mesh.py`**: Finite element mesh handling and interpolation functions.
-- **`global_config.py`**: Configuration variables and constants.
 
 ### Data Flow
 

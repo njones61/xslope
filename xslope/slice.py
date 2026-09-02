@@ -82,51 +82,6 @@ def get_circular_y_coordinates(x_coords, Xo, Yo, R):
     return y_coords
 
 
-def get_circular_intersection_points(ground_surface, Xo, Yo, R, x_min, x_max):
-    """
-    Find intersection points between a circular failure surface and ground surface.
-    
-    Parameters:
-        ground_surface (LineString): Ground surface geometry
-        Xo, Yo, R (float): Circle parameters
-        x_min, x_max (float): X-range to search
-        
-    Returns:
-        tuple: (x_min, x_max, y_left, y_right, success)
-    """
-    # Create a dense set of points on the circle for intersection testing
-    x_test = np.linspace(x_min, x_max, 1000)
-    y_circle = get_circular_y_coordinates(x_test, Xo, Yo, R)
-    
-    # Create circle line for intersection
-    valid_mask = ~np.isnan(y_circle)
-    if not np.any(valid_mask):
-        return None, None, None, None, False
-    
-    circle_coords = list(zip(x_test[valid_mask], y_circle[valid_mask]))
-    circle_line = LineString(circle_coords)
-    
-    # Find intersections
-    intersections = circle_line.intersection(ground_surface)
-    
-    if isinstance(intersections, Point):
-        points = [intersections]
-    elif isinstance(intersections, MultiPoint):
-        points = list(intersections.geoms)
-    elif isinstance(intersections, GeometryCollection):
-        points = [g for g in intersections.geoms if isinstance(g, Point)]
-    else:
-        points = []
-    
-    if len(points) < 2:
-        return None, None, None, None, False
-    
-    # Sort by x and take the two endpoints
-    points = sorted(points, key=lambda p: p.x)
-    x_min, x_max = points[0].x, points[-1].x
-    y_left, y_right = points[0].y, points[-1].y
-    
-    return x_min, x_max, y_left, y_right, True
 
 
 def get_ground_surface_y_coordinates(x_coords, ground_surface):

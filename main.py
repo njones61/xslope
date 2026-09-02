@@ -12,39 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import xslope as xslope
-
-from xslope.global_config import non_circ
 from xslope.slice import generate_slices
-from xslope.fileio import load_slope_data, load_data_from_pickle
+from xslope.fileio import load_slope_data
 from xslope.plot import plot_circular_search_results, plot_inputs, plot_solution
 from xslope.solve import solve_selected, solve_all
-from xslope.search import circular_search, noncircular_search
+from xslope.search import circular_search
 
+slope_data = load_slope_data("docs/inputs/slope/xslope_simple1.xlsx")
 
-slope_data = load_slope_data("docs/inputs/slope/input_template_griffiths1_6.xlsx")
+plot_inputs(slope_data, mode='lem')
 
-# plot_inputs(slope_data)
+# Solve the first circle on the input sheet with one method, then compare every
+# method on the same slices.
+circle = slope_data['circles'][0]
+success, result = generate_slices(slope_data, circle=circle, num_slices=20)
 
-circle = slope_data['circles'][0] if slope_data['circular'] else None
-non_circ = slope_data['non_circ'] if slope_data['non_circ'] else None
-
-success, result = generate_slices(slope_data, circle=circle, non_circ=None, num_slices=20)
-
-if success:
-    slice_df, failure_surface = result
-else:
+if not success:
     print(result)
     exit()
 
-methods = ['oms', 'bishop', 'janbu', 'corps', 'lowe', 'spencer']
-results = solve_selected(methods[5], slice_df, rapid=False)  # spencer = methods[5]
-plot_solution(slope_data, slice_df, failure_surface, results)
+slice_df, failure_surface = result
 
+results = solve_selected('spencer', slice_df, rapid=False)
+plot_solution(slope_data, slice_df, failure_surface, results)
 
 solve_all(slice_df)
 
-
-fs_cache, converged, search_path, circle_cache = circular_search(slope_data, methods[5], diagnostic=False)
-plot_circular_search_results(slope_data, fs_cache, search_path)
-
+# Now search for the critical circle rather than solving the one on the sheet.
+fs_cache, converged, search_path, circle_cache = circular_search(slope_data, 'spencer', diagnostic=False)
+plot_circular_search_results(slope_data, fs_cache, search_path, circle_cache=circle_cache)

@@ -6811,15 +6811,20 @@ def _nr_build_piles(fem_data):
     are the per-unit-width capacities (the file's single-pile values divided by the
     spacing) the viscoplastic path checks against.
 
-    ``act`` holds the three rows that read the capped ACTIONS out of the element's
-    global displacement — the shear at the element center and the bending moment at
-    each end node — so ``act @ u_e`` is ``(V, M1, M2)``. ``pat`` holds the internal
-    force pattern each of those actions is delivered on: the transverse pair at the
-    two end nodes for the shear, rotated into global coordinates, and the node's own
-    rotational slot for each moment (a rotation is invariant under the frame change,
-    which is why the viscoplastic path applies its moment correction straight to the
-    global rotational degree of freedom). ``ax`` reads the axial force at the element
-    center, which carries no capacity and is reported only.
+    ``act`` holds the three rows that read the ACTIONS out of the element's global
+    displacement — the shear at the element center and the bending moment at each
+    end node — so ``act @ u_e`` is ``(V, M1, M2)``. ``patV`` holds the internal
+    force pattern the SHEAR capacity is delivered on: the transverse pair at the two
+    end nodes, rotated into global coordinates. ``ax`` reads the axial force at the
+    element center, which carries no capacity and is reported only.
+
+    The MOMENT capacity is not delivered on a pattern at all — it is a plastic hinge
+    (see :func:`_nr_pile_force`), so what the group carries for it is ``S``, the
+    rotational block of the element stiffness that the hinge is solved on, and
+    ``hinge``, the mask of which of the element's two ends may take the release.
+    That mask is built ONCE over the whole pile element list, before the grouping,
+    because a hinge is one release at one pile NODE and the two element ends meeting
+    at an interior node can land in different DOF-count groups.
     """
     n_pile = int(fem_data.get("n_pile_elements", 0))
     if n_pile == 0:
@@ -6836,6 +6841,11 @@ def _nr_build_piles(fem_data):
     EA_all = np.asarray(fem_data["EA_by_pile_elem"], dtype=float)
     V_all = np.asarray(fem_data["V_cap_by_pile_elem"], dtype=float)
     M_all = np.asarray(fem_data["M_cap_by_pile_elem"], dtype=float)
+    # Which element END may carry a plastic hinge, one per pile node. The same
+    # function the viscoplastic path uses, called on the WHOLE element list before
+    # the DOF-count grouping so the ownership is global: the two element ends that
+    # meet at an interior pile node can sit in different groups.
+    hinge_all = _pile_hinge_ends(fem_data.get("pile_elem_nodes", None), n_pile)
 
     piles = []
     for nd in (6, 9):
@@ -6844,9 +6854,11 @@ def _nr_build_piles(fem_data):
             continue
         n_node = nd // 3
         act = np.zeros((sel.size, 3, nd))
-        pat = np.zeros((sel.size, 3, nd))
+        patV = np.zeros((sel.size, nd))
         ax = np.zeros((sel.size, nd))
         K = np.zeros((sel.size, nd, nd))
+        Kl_g = np.zeros((sel.size, nd, nd))
+        S = np.zeros((sel.size, 2, 2))
         for j, i in enumerate(sel):
             L, EI, EA = L_all[i], EI_all[i], EA_all[i]
             T = _beam_rotation(cos_all[i], sin_all[i], n_node)
@@ -6854,7 +6866,13 @@ def _nr_build_piles(fem_data):
                   if K_local_list is not None
                   else _beam_local_stiffness(EA, EI, L, n_node == 3))
             K[j] = np.asarray(K_list[i], dtype=float)[:nd, :nd]
-            # --- the three capped actions, as local rows ---
+            Kl_g[j] = Kl
+            # The rotational block the hinge is solved on, rows and columns 2 and 5
+            # — the two END nodes. It is the same block in either frame: the beam
+            # rotation is the identity on a rotational row, so
+            # (T^T Kl T)[2, 5] == Kl[2, 5].
+            S[j] = Kl[np.ix_([2, 5], [2, 5])]
+            # --- the three actions, as local rows ---
             rV = np.zeros(nd)
             if n_node == 2:
                 rV[1], rV[2] = 12.0 * EI / L ** 3, 6.0 * EI / L ** 2
@@ -6872,61 +6890,109 @@ def _nr_build_piles(fem_data):
             rT = np.zeros(nd)
             rT[0], rT[3] = -EA / L, EA / L
             ax[j] = rT @ T
-            # --- the pattern each action is delivered on ---
+            # --- the pattern the SHEAR capacity is delivered on ---
             pV = np.zeros(nd)
             pV[1], pV[4] = 1.0, -1.0
-            pat[j, 0] = T.T @ pV
-            pat[j, 1, 2] = 1.0             # theta is frame-invariant
-            pat[j, 2, 5] = 1.0
-        cap = np.empty((sel.size, 3))
-        cap[:, 0] = V_all[sel]
-        cap[:, 1] = M_all[sel]
-        cap[:, 2] = M_all[sel]
+            patV[j] = T.T @ pV
         piles.append({'idx': sel, 'nd': nd, 'dof': dof_all[sel, :nd], 'K': K,
-                      'act': act, 'pat': pat, 'ax': ax, 'cap': cap})
+                      'Kl': Kl_g, 'S': S, 'act': act, 'patV': patV, 'ax': ax,
+                      'Vcap': V_all[sel], 'Mcap': M_all[sel],
+                      'hinge': hinge_all[sel]})
     return piles or None
 
 
 def _nr_pile_force(pg, u, want_tangent):
     """One pile group's internal force (and tangent) at displacement ``u``.
 
-    The beam is linear elastic; the only nonlinearity is the structural capacity,
-    and it is written the way the reinforcement bar's is — as the part of the
-    elastic action the member cannot deliver, subtracted from the element's own
-    internal force:
+    The beam is linear elastic; the only nonlinearities are its two structural
+    capacities, and they are two different KINDS of thing.
 
-        f_int = K_beam u_e - sum_k (s_k - clip(s_k, -cap_k, +cap_k)) q_k
+    **The moment capacity is a plastic hinge**, the same one the viscoplastic path
+    carries (:func:`_pile_moment_hinge`, :func:`_pile_hinge_ends`). The element's
+    elastic end rotation is the nodal rotation less a plastic rotation ``p``, so the
+    element delivers ``K (u_e - p)``. A correction applied instead to the rotational
+    degree of freedom the two adjacent beam elements SHARE is equal and opposite
+    there and cancels exactly, which is a capacity that enforces nothing; the
+    element vector ``K p`` has a translational part and does not. Exactly one of the
+    two element ends at a pile node may take the release, and the other is left
+    elastic — node equilibrium puts it on the capacity with the opposite sign
+    anyway, and releasing both would leave the node's rotation undetermined by the
+    beam.
 
-    over the shear at the element center and the bending moment at each end node,
-    with ``q_k`` that action's internal force pattern. A member at its cap therefore
-    delivers the cap, which is what a cap is. (The viscoplastic path applies the
-    opposite sign on the shear and applies its moment correction at a node the two
-    adjacent elements share, where it cancels; both are measured in SPIKE.md, "PILES
-    — the semantics being reproduced". Neither is reproduced here, and the
-    consequence is measured rather than assumed.)
+    Written in the element's GLOBAL frame the correction is ``K_global p`` outright,
+    because ``p`` carries only ROTATIONAL components and a rotation is invariant
+    under the beam's frame change (``T^T K_local p_local = K_global p``). So the
+    residual is the element matrix applied to the RELEASED displacement.
 
-    Each action is LINEAR in ``u_e`` and each branch of the clip is affine, so the
-    tangent is exact with nothing differenced: ``ds/du`` is a constant row and
-    ``d(s - s_true)/du`` is that row while the action is over its cap and zero
-    otherwise. The element tangent is ``K - sum_active q_k (x) g_k``.
+    **The shear capacity is the bar's convention** — the part of the elastic action
+    the member cannot deliver, subtracted from its own internal force — read on the
+    released displacement, because a hinge changes the shear:
 
-    There is no state. Nothing latches — the viscoplastic driver's ``yielded_pile_*``
-    masks are set for reporting and never read back into the constitutive rule — so
-    the pile law is nonlinear-ELASTIC and nothing is committed at the end of a step.
+        f_int = K (u_e - p) - (V - clip(V, -V_cap, +V_cap)) q_V
+
+    A member at its cap therefore delivers the cap, which is what a cap is.
+
+    **The tangent is exact, with the rotational block condensed.** On a fixed hinge
+    set ``A``, ``p_A = S_AA^-1 (m_A - sign(m_A) M_cap)`` is affine in ``u_e`` — every
+    end moment is linear in ``u_e`` and ``S`` is the rotational block of the element
+    stiffness — so ``dp/du_e`` is the constant matrix ``R`` carrying ``S_AA^-1 G_A``
+    in the released rotational rows and zero elsewhere, with ``G`` the two moment
+    rows. Then ``dw/du_e = I - R`` and
+
+        dK/du_e = K (I - R) - [|V| > V_cap] q_V (x) (g_V (I - R))
+
+    which is the derivative of the map the residual actually uses. A hinged end's
+    delivered moment has derivative exactly zero, which is what a hinge means.
+
+    There is no state. ``p`` is a function of the current displacement alone and the
+    ``yielded_pile_*`` masks are read on the reported state, so the pile law is
+    nonlinear-ELASTIC and nothing is committed at the end of a step.
     """
     ue = u[pg['dof']]
-    s = np.einsum('ikj,ij->ik', pg['act'], ue)
-    cap = pg['cap']
-    s_true = np.clip(s, -cap, cap)
-    d = s - s_true
-    f = (np.einsum('ijk,ik->ij', pg['K'], ue)
-         - np.einsum('ik,ikj->ij', d, pg['pat']))
-    pg['_s'], pg['_s_true'] = s, s_true
-    pg['_axial'] = np.einsum('ij,ij->i', pg['ax'], ue)
+    n, nd = ue.shape
+    gM = pg['act'][:, 1:3]                              # the two end-moment rows
+    m_e = np.einsum('ikj,ij->ik', gM, ue)               # elastic end moments
+    Mcap = pg['Mcap']
+    p = np.zeros((n, nd))
+    R = None
+    # yielded_M is set wherever the capacity is EXCEEDED, whether or not this
+    # element's own end took the release: the other end of a shared node is on the
+    # capacity too. Same convention as _pile_element_capacity.
+    yM = np.isfinite(Mcap) & (np.abs(m_e) > Mcap[:, None]).any(axis=1)
+    if yM.any():
+        R = np.zeros((n, nd, nd))
+        slots = np.array([2, 5])
+        for i in np.flatnonzero(yM):
+            p_rot, _m = _pile_moment_hinge(m_e[i, 0], m_e[i, 1], Mcap[i],
+                                           pg['Kl'][i], allowed=pg['hinge'][i])
+            act_i = np.flatnonzero(p_rot != 0.0)
+            if act_i.size == 0:                 # over the cap at a node it does
+                continue                        # not own; the other end releases
+            p[i, 2], p[i, 5] = p_rot[0], p_rot[1]
+            R[i, slots[act_i], :] = np.linalg.solve(
+                pg['S'][i][np.ix_(act_i, act_i)], gM[i][act_i])
+        if not R.any():
+            R = None
+    w = ue - p
+    V = np.einsum('ij,ij->i', pg['act'][:, 0], w)
+    Vcap = pg['Vcap']
+    V_true = np.clip(V, -Vcap, Vcap)
+    f = np.einsum('ijk,ik->ij', pg['K'], w) - (V - V_true)[:, None] * pg['patV']
+    pg['_V'], pg['_V_true'], pg['_m_e'] = V, V_true, m_e
+    pg['_M'] = np.einsum('ikj,ij->ik', gM, w)           # the delivered end moments
+    pg['_p_rot'] = p[:, [2, 5]]
+    pg['_yV'], pg['_yM'] = np.abs(V) > Vcap, yM
+    pg['_axial'] = np.einsum('ij,ij->i', pg['ax'], w)
     if want_tangent:
-        active = np.abs(s) > cap
-        Qa = pg['pat'] * active[:, :, None]
-        pg['_Ke'] = pg['K'] - np.einsum('ikj,ikl->ijl', Qa, pg['act'])
+        aV = (np.abs(V) > Vcap)[:, None, None]
+        gV = pg['act'][:, 0]
+        if R is None:
+            pg['_Ke'] = pg['K'] - aV * (pg['patV'][:, :, None] * gV[:, None, :])
+        else:
+            A = np.eye(nd)[None, :, :] - R
+            gVA = np.einsum('ij,ijk->ik', gV, A)
+            pg['_Ke'] = (np.einsum('ijk,ikl->ijl', pg['K'], A)
+                         - aV * (pg['patV'][:, :, None] * gVA[:, None, :]))
     return f
 
 
@@ -8017,17 +8083,21 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     pile_axial = np.zeros(n_pile_out)
     pile_shear = np.zeros(n_pile_out)
     pile_moment = np.zeros((n_pile_out, 2))
+    pile_prot = np.zeros((n_pile_out, 2))
     pile_yV = np.zeros(n_pile_out, dtype=bool)
     pile_yM = np.zeros(n_pile_out, dtype=bool)
     if piles is not None:
         for pg in piles:
             i = pg['idx']
             pile_axial[i] = pg['_axial']
-            pile_shear[i] = pg['_s_true'][:, 0]
-            pile_moment[i] = pg['_s_true'][:, 1:3]
-            over = np.abs(pg['_s']) > pg['cap']
-            pile_yV[i] = over[:, 0]
-            pile_yM[i] = over[:, 1] | over[:, 2]
+            pile_shear[i] = pg['_V_true']
+            # The DELIVERED end moments, read on the released displacement, so a
+            # hinged end reports the capacity because the equilibrium carries it
+            # and not because the report was clipped.
+            pile_moment[i] = pg['_M']
+            pile_prot[i] = pg['_p_rot']
+            pile_yV[i] = pg['_yV']
+            pile_yM[i] = pg['_yM']
 
     # ---- the verdict's own evidence -----------------------------------------
     # A converged Newton trial asserts two things about the slope: that full
@@ -8271,6 +8341,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         "forces_pile_axial": pile_axial if n_pile_out else np.array([]),
         "forces_pile_lateral": pile_shear if n_pile_out else np.array([]),
         "forces_pile_moment": pile_moment if n_pile_out else np.zeros((0, 2)),
+        "pile_plastic_rotation": pile_prot if n_pile_out else np.zeros((0, 2)),
         "yielded_pile_V": pile_yV if n_pile_out else np.array([], dtype=bool),
         "yielded_pile_M": pile_yM if n_pile_out else np.array([], dtype=bool),
         "yielded_pile": ((pile_yV | pile_yM) if n_pile_out

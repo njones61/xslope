@@ -5128,6 +5128,16 @@ written — the part of the elastic action the member cannot deliver, subtracted
 its own internal force — and that the consequence would be measured rather than
 assumed. It was, on the three locked models that carry a finite capacity.
 
+> **SUPERSEDED — see "THE PILE HINGE", below.** It was true of both drivers when it
+> was written, and it is true of neither now: `main` made the moment capacity a
+> plastic hinge on the viscoplastic driver (a115d9c5) and this branch has since done
+> the same on the Newton one. The reading that survives is the diagnosis — a
+> correction applied at the shared rotational degree of freedom cancels whatever
+> sign it carries — and the remedy is a RELEASE rather than a nodal moment. The
+> table below no longer reproduces on either driver: with the hinge, this model's
+> own 90,600 does bind on the Newton path, because Newton stands where the
+> viscoplastic driver does not and the moment demand grows with the strength.
+
 **The moment cap is inert on BOTH drivers, and no sign of it could be otherwise.**
 `xslope_pile_wall` carries `M_cap` = 90,600 and nothing else, and its Newton
 solution at the reported state has an element AT that cap. Run with the cap and with
@@ -6445,3 +6455,261 @@ the hinge solve is the same 2x2 either way.
    costs a lock, if the released tangent will not difference, or if the two drivers
    part on the binding case for a reason that is the formulation rather than a
    solver rule, that is the result.
+
+### THE PILE HINGE — results
+
+Same machine and settings as everything above: `force_tol` 1e-3, hybrid criterion,
+`capture_failure_state=False`, tolerance 0.01. Every number below was measured on
+this checkout in this session.
+
+#### What was built
+
+`_nr_build_piles` no longer carries a moment PATTERN. It carries `S`, the rotational
+block of the element stiffness the hinge is solved on, and `hinge`, the mask of which
+of an element's two ends may take the release — built once by `_pile_hinge_ends` over
+the whole pile element list, before the DOF-count grouping, so the one-release-per-node
+ownership is global and not per group. `_nr_pile_force` calls `_pile_moment_hinge` for
+the elements whose capacity is exceeded and returns the element matrix applied to the
+RELEASED displacement.
+
+**The law is the shared one.** `_pile_moment_hinge` and `_pile_hinge_ends` are the
+viscoplastic driver's own functions, called directly, so the hinge algebra and the
+ownership rule have exactly one implementation. `_pile_element_capacity` is NOT reused,
+and the reason is its interface rather than its law: it returns a LOCAL-frame
+correction and no tangent, and it re-reads the actions through `_pile_element_actions`'
+closed forms where this path needs them on the constant ROWS it differentiates. What
+the two drivers share is the two functions that carry the law.
+
+Written in the element's global frame the whole correction collapses to one line.
+`T^T K_local p_local = K_global p` because `p` carries only rotational components and a
+rotation is invariant under the beam's frame change, so the residual is
+`K (u_e - p)` less the shear correction, and the rotational block the hinge is solved
+on is the same 2x2 in either frame.
+
+#### The element tangent, across the released branch
+
+400 random beam elements — random orientation, length, `EA` and `EI`, two-node and
+three-node, with the capacities drawn from the actions the displacement produces so
+that all eight combinations of (shear at its cap, end 1 hinged, end 2 hinged) are
+reached — against a central difference of the element's own internal force:
+
+| probe step, as a fraction of max&#124;u&#124; | 1e-7 | 1e-5 | 1e-4 | 1e-3 |
+|---|---|---|---|---|
+| worst relative gap, two-node | 9.16e-7 | **5.03e-9** | 1.17e-9 | 1.08e-10 |
+| worst relative gap, three-node | 6.30e-9 | **5.65e-11** | 4.51e-12 | 5.49e-13 |
+
+Not one of the 400 straddled a branch. The gap falls as exactly 1/h, which is
+round-off cancellation in the difference and not error in the tangent: the hinge's
+plastic rotation is affine in the element displacement, as the shear clip is, so the
+analytic tangent IS the derivative. The criterion asked for 1e-8 and the reading is
+inside it at every probe step of 1e-5 or larger.
+
+The branch histogram at h = 1e-5, which says what actually ran:
+
+| (shear at cap, end 1 hinged, end 2 hinged) | count |
+|---|---|
+| (no, no, no) — elastic | 124 |
+| (no, no, yes) | 30 |
+| (no, yes, no) | 25 |
+| (no, yes, yes) | 101 |
+| (yes, no, no) | 83 |
+| (yes, no, yes) | 10 |
+| (yes, yes, no) | 7 |
+| (yes, yes, yes) | 20 |
+
+276 of the 400 land on a hinged branch, and both single-end releases and the two-end
+release are exercised.
+
+#### The binding case
+
+`docs/tutorials/files/xslope_pile_wall.xlsx`, tri6 at 2 ft, bracket 1.0-2.0, built
+through `run_tests.py`'s own `build_fem_ssrm_case`, with `M_cap`/S lowered from the
+file's 90,600 to 20,000 — a115d9c5's own binding case:
+
+| | viscoplastic | Newton |
+|---|---|---|
+| FS | **1.41015625** | **1.41015625** |
+| trials | 9 | 9 |
+| work | 24,910 iterations | 4,541 iterations / 29,690 force evaluations |
+| max &#124;M&#124; at the reported state | 20,000.0434 | **20,000.000000000** |
+| plastic rotation, largest | 1.103e-3 rad | 1.935e-3 rad |
+| elements at the capacity | 3 | 3 |
+| element ends released | 3 | 3 |
+
+**The two drivers return the same factor of safety to nine digits**, and it is
+a115d9c5's own 1.41015625. The Newton state carries its largest end moment exactly at
+the capacity — 20,000.000000000 against 20,000, which is 0 to twelve digits, against
+the 1e-6 the criterion asked. The viscoplastic reading of 20,000.0434 is its force
+gate: an element end that is over the capacity at a node it does not OWN keeps its
+elastic moment, and node equilibrium puts it on the capacity only as far as the solve
+has converged. Three elements carry a release on both drivers.
+
+#### The non-binding cap — the criterion is FALSIFIED as written, and why
+
+The criterion said the file's own 90,600 never binds, so a run at it must be
+bit-identical to a run with the cap removed. **It is not**, and the reason is the
+Newton driver rather than the hinge:
+
+| | Newton FS |
+|---|---|
+| `M_cap`/S = 90,600, as the file gives it | **1.79296875** |
+| `M_cap` removed | 1.80078125 |
+
+One bisection cell apart, and the deciding trial's reported state has one element at
+the capacity. The wall's uncapped moment demand, measured trial by trial:
+
+| F | 1.50 | 1.5586 | 1.75 | 1.78125 | 1.7929 | 1.80078 |
+|---|---|---|---|---|---|---|
+| viscoplastic, max &#124;M&#124; | 41,641 | 51,156 (failed) | — | — | — | — |
+| **Newton**, max &#124;M&#124; | 43,003 | 52,667 | 84,926 | **93,076** | **92,470** | 96,212 |
+
+a115d9c5 read the demand where the viscoplastic driver can stand — 41,641 at F = 1.5,
+against a capacity of 90,600 — and it is right there. The Newton driver stands 0.24
+higher on this model (SPIKE.md, "PILES — the two misses, refereed"), and the demand
+crosses 90,600 between F = 1.75 and F = 1.78125, inside the band only the Newton driver
+reaches. **So the file's capacity is genuinely non-binding on one driver and genuinely
+binding on the other, and the answer moving is the capacity doing its job.**
+
+What the criterion actually wanted proved is proved on a cap that IS above the demand:
+
+| | Newton FS | trials, iterations, force evaluations | final displacement field |
+|---|---|---|---|
+| `M_cap`/S = 1,000,000 | 1.80078125 | identical | identical |
+| `M_cap` removed | 1.80078125 | identical | identical |
+
+Nine trials, verdict for verdict, iteration for iteration, force evaluation for force
+evaluation, and the two final displacement fields differ by exactly 0.0.
+
+#### The eight pile-gated locked models
+
+Every row built through `run_tests.py`'s own `build_fem_ssrm_case`, the tag's own
+bisection tolerance, against the Newton column the piles round recorded:
+
+| Benchmark | Lock | Piles round, Newton | This round, Newton | move | fe, piles round | fe, this round | capacities |
+|---|---|---|---|---|---|---|---|
+| `xslope_piles` | 1.379 | 1.3789063 | **1.3789063** | **0.0000** | 32,057 | 32,087 | `V_cap` and `M_cap` on all 18 |
+| `xslope_piles_fem` | 1.380 | 1.3796875 | **1.3796875** | **0.0000** | 27,736 | 27,790 | `V_cap` and `M_cap` on all 18 |
+| `xslope_pile_wall` | 1.559 | 1.8007813 | **1.7929688** | **−0.0078125** | 26,436 | 33,499 | `M_cap` on all 10, no `V_cap` |
+| `vp106c_fem` | 1.472 | 1.5781250 | **1.5781250** | **0.0000** | 33,172 | 33,172 | none |
+| `vp106c_fem_fix` | 1.587 | 1.5941406 | **1.5941406** | **0.0000** | 32,515 | 32,515 | none |
+| `xslope_torggler_3a_plate` | 1.195 | 1.1945313 | **1.1945313** | **0.0000** | 28,067 | 28,067 | none |
+| `xslope_torggler_3b_plate` | 1.673 | 1.7429688 | **1.7429688** | **0.0000** | 22,065 | 22,065 | none |
+| `gs2_wall` | 1.647 | 1.6906250 | **1.6906250** | **0.0000** | 25,218 | 25,218 | none |
+
+**Seven of the eight do not move at any digit**, and the five that carry no capacity
+at all are bit-identical in force evaluations to the counts the piles round recorded —
+which is what a model the hinge cannot reach has to be. The two that carry a finite
+`M_cap` and a finite `V_cap` keep their factor of safety and cost 30 and 54 more force
+evaluations: on those models the capacity is exceeded transiently on trials that fail
+either way, so the iteration path moves and the answer does not.
+
+That attribution is measured rather than argued. The pre-hinge driver — the cancelling
+nodal-moment form, restored on this checkout — reads 1.3789063 on 32,057 force
+evaluations and 1.3796875 on 27,736, reproducing the piles round's numbers exactly, so
+the +30 and +54 are the hinge and nothing else. On the wall it reads 1.8007813 on
+25,905 where the piles round recorded 26,436; that 531-evaluation difference is present
+with the hinge REMOVED and therefore predates this round, and the factor of safety is
+the same.
+
+**The eighth row moves, and it is the wall — the same model and the same mechanism as
+the falsified non-binding clause above.** Its capacity binds on the Newton path because
+the Newton path stands where the viscoplastic driver does not, and 1.7929688 is the
+answer a wall whose sections can hinge actually has. The criterion asked for eight
+unchanged and got seven; the eighth is the one row where enforcing the capacity was
+supposed to change something, and it did.
+
+#### The locks
+
+`check_pile_element`'s tangent leg now reads the branch as (shear at its cap, end 1
+released, end 2 released) and asserts all eight are reached, so the hinged branches are
+exercised rather than assumed. `check_piles` gains a moment-capacity leg, on the same
+model and at the same strength as the shear leg: with `M_cap` tightened to half the
+free demand, the moment the EQUILIBRIUM carries — read out of the internal force the
+driver assembles, at the element's rotational rows — must sit at the capacity and equal
+the reported one; the hinged ends must carry a plastic rotation; at most one element end
+per pile node may carry it; and the slope must move, and move FARTHER.
+
+**Mutation, run both ways.** The mutation is the form this round removed: the moment
+correction restored as a nodal moment at the rotational degree of freedom the two
+adjacent elements share.
+
+| driver | verdict | what the check saw |
+|---|---|---|
+| as shipped | **PASS** | — |
+| the cancelling nodal-moment correction restored | **FAIL** | `check_pile_element`: "reached only 2 of the 8 capacity branches" — with no release there are no hinged branches to reach. `check_piles`: "a moment cap at half the free demand binds but no element reports a plastic rotation", and "capping the pile moment at 8369.4 where the uncapped pile carries 16738.8 made the slope move LESS, not more: max&#124;u&#124; went from 0.0362995 to 0.0359537" |
+
+The third line is the sharp one. Under the cancelling form the state does move a
+little — the two elements' end moments at a shared node are only equal and opposite to
+the accuracy of the solve — but it moves the WRONG WAY, which is the anti-physics
+signature a check that read only the reported array could not see.
+
+#### The criterion, line by line
+
+**1. The binding case — MET, and exactly.** Both drivers read **1.41015625** on
+a115d9c5's own binding case, which is a115d9c5's own number; the Newton state carries
+its largest end moment at **20,000.000000000** against a capacity of 20,000, three
+elements at the capacity on both drivers and three element ends released, against the
+1e-6 the criterion asked and a hinge count that had to match.
+
+**2. The non-binding cap — NOT MET as written, and the clause is falsified rather
+than missed.** The file's own `M_cap` of 90,600 is not non-binding on the Newton
+driver: its uncapped moment demand crosses that capacity between F = 1.75 and
+F = 1.78125, and the Newton driver stands there. Measured, and the mechanism named.
+What the clause wanted proved is proved at a capacity that is above the demand: at
+1,000,000 the run is identical to the uncapped one in factor of safety, verdicts,
+iterations, force evaluations and the final displacement field, which differs by 0.0.
+
+**3. The eight pile locks — MET at seven of eight, and the eighth is the wall.** Five
+rows are bit-identical in force evaluations as well, and they are the five that carry
+no capacity. The two that carry both capacities keep their answer and cost 30 and 54
+more force evaluations, attributed to the hinge against a pre-hinge control run on this
+checkout. `xslope_pile_wall` moves by one bisection cell, for the reason in clause 2.
+
+**4. The element tangent across the released branch — MET.** 5.03e-9 (two-node) and
+5.65e-11 (three-node) against a central difference at a probe step of 1e-5, falling as
+exactly 1/h to 1.08e-10 and 5.49e-13 at 1e-3, against the 1e-8 asked. All eight
+branches reached, 276 of the 400 trials on a hinged one, none straddling.
+
+**5. The locks — MET.** `check_piles` gains the moment leg and passes; the cancelling
+nodal-moment mutation fails it on three separate legs and fails `check_pile_element`'s
+branch histogram as well. The whole check file passes end to end.
+
+**6. The default path — MET.** Griffiths & Lane 6 dry, quad8, size 2, no `fem_solver`
+argument: FS 2.421875 on per-trial iteration counts 147, 781, 3393, 2031, 2841, 9541,
+12000, 8617, 8777 — value for value the control sequence.
+
+**7. The honest negative** is clause 2, and it is written above rather than tuned away.
+
+#### Verdict
+
+**The Newton driver's moment capacity is a plastic hinge, and on the one model where
+that changes anything it changes the answer by one bisection cell.**
+
+The two drivers now agree to nine digits on the binding case `main` built to decide
+this: 1.41015625 apiece, three hinges apiece, and the Newton state carrying its largest
+end moment at exactly the capacity rather than at the capacity as reported. The
+element tangent across the released branch is the derivative of its own residual to
+5e-9 with the residual falling as 1/h, on all eight capacity branches — the hinge's
+plastic rotation is affine in the element displacement, so there was never anything to
+approximate. Seven of the eight locked pile models do not move, five of them bit for
+bit, and the whole check file passes.
+
+The one clause that did not survive contact is the one that assumed the file's own
+capacity is decoration. It is not, on this driver. `main` measured the wall's moment
+demand where the viscoplastic driver can stand — 41,641 at F = 1.5 against a capacity
+of 90,600 — and that reading is right; the Newton driver stands 0.24 higher on the same
+model, and the demand crosses 90,600 on the way. So the capacity that enforces nothing
+on one driver enforces something on the other, and `xslope_pile_wall` reads 1.7929688
+where the piles round read 1.8007813. That is not a defect to close: it is the first
+number on this branch that a pile capacity has ever decided, and it is lower than the
+uncapped answer, which is the only direction a capacity can move a factor of safety.
+
+What remains:
+
+- **Whose number `xslope_pile_wall` carries is still the owner's**, and this round has
+  not simplified it. The published 1.559 is the viscoplastic driver's, defined at a
+  strength where its early-failure classifier closes the trial (SPIKE.md, "PILES — the
+  two misses, refereed"). The Newton driver reads 1.7929688 with the wall's own
+  capacity enforced and 1.8007813 without it. Three numbers, one model, and the
+  measurement behind each is in this document.
+- **Post-peak bar softening is the last refusal.** Unchanged by this round.

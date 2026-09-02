@@ -1891,16 +1891,18 @@ def check_pile_element():
 
     Two measurements, and neither needs a slope.
 
-    **The consistent tangent is exact**, because every action the capacity clips is
-    LINEAR in the element displacement and every branch of the clip is affine — so
-    the analytic element tangent must equal a central difference of the element's
-    own internal force to round-off, on every branch. 120 random elements, random
-    orientation, length and rigidities, two-node and three-node, with the caps set
-    from the actions the drawn displacement actually produces so that all eight
-    combinations of (shear, end moment 1, end moment 2) at their cap are reached.
-    A probe that straddles a branch boundary is skipped rather than averaged, and
-    the histogram is asserted to have reached every branch — a check that never
-    lands on the capped branches would prove nothing about them.
+    **The consistent tangent is exact**, on the elastic branch, on the shear cap and
+    across the plastic HINGE alike. Every action is linear in the element
+    displacement, the shear clip is affine, and the hinge's plastic rotation
+    ``p_A = S_AA^-1 (m_A - sign(m_A) M_cap)`` is affine too — so the analytic
+    element tangent, with the rotational block condensed, must equal a central
+    difference of the element's own internal force to round-off. 120 random
+    elements, random orientation, length and rigidities, two-node and three-node,
+    with the caps set from the actions the drawn displacement actually produces so
+    that all eight combinations of (shear at its cap, end 1 hinged, end 2 hinged)
+    are reached. A probe that straddles a branch boundary is skipped rather than
+    averaged, and the histogram is asserted to have reached every branch — a check
+    that never lands on a hinged branch would prove nothing about it.
 
     **An isolated beam reproduces the closed forms.** A six-element cantilever
     under a transverse end load must deflect PL^3/3EI and rotate PL^2/2EI at the
@@ -1925,13 +1927,26 @@ def check_pile_element():
         u = rng.normal(0.0, 1.0, nd) * L * 1e-3
         pg0 = _nr_build_piles(_beam_case(n_node, th, L, EA, EI))[0]
         act = pg0['act'][0] @ u
-        caps = np.abs(act) * rng.choice([0.3, 0.8, 1.5, 3.0], size=3)
-        caps[rng.random(3) < 0.25] = np.inf
-        pg = _nr_build_piles(_beam_case(n_node, th, L, EA, EI, caps[0], caps[1]))[0]
-        pg['cap'][0, 2] = caps[2]
-        f0 = _nr_pile_force(pg, u, True)
+        V_cap = abs(act[0]) * rng.choice([0.3, 0.8, 1.5, 3.0])
+        # ONE moment capacity per element, as the file states it and as the
+        # viscoplastic path reads it, drawn against one end or the other so that
+        # both ends, either end and neither end are all reached.
+        M_cap = abs(act[1 + rng.integers(2)]) * rng.choice([0.3, 0.8, 1.5, 3.0])
+        if rng.random() < 0.25:
+            V_cap = np.inf
+        if rng.random() < 0.25:
+            M_cap = np.inf
+        pg = _nr_build_piles(_beam_case(n_node, th, L, EA, EI, V_cap, M_cap))[0]
+
+        def _branch(g):
+            # The branch the tangent is built on: the shear at its cap, and which
+            # element ends actually took a plastic release.
+            return (bool(g['_yV'][0]), bool(g['_p_rot'][0, 0]),
+                    bool(g['_p_rot'][0, 1]))
+
+        _nr_pile_force(pg, u, True)
         K = pg['_Ke'][0].copy()
-        branch = tuple(bool(b) for b in (np.abs(pg['_s'][0]) > pg['cap'][0]))
+        branch = _branch(pg)
         h = 1e-5 * float(np.max(np.abs(u)))
         D = np.zeros((nd, nd))
         straddled = False
@@ -1940,9 +1955,9 @@ def check_pile_element():
             up[j] += h
             um[j] -= h
             fp = _nr_pile_force(pg, up, False)[0].copy()
-            b1 = tuple(bool(b) for b in (np.abs(pg['_s'][0]) > pg['cap'][0]))
+            b1 = _branch(pg)
             fm = _nr_pile_force(pg, um, False)[0].copy()
-            b2 = tuple(bool(b) for b in (np.abs(pg['_s'][0]) > pg['cap'][0]))
+            b2 = _branch(pg)
             if b1 != branch or b2 != branch:
                 straddled = True
                 break
@@ -1965,8 +1980,9 @@ def check_pile_element():
         fails.append(
             f"the pile beam element's consistent tangent disagrees with a central "
             f"difference of its own internal force by {worst:.2e} relative. Every "
-            f"branch is affine in the element displacement, so the tangent is exact "
-            f"and this can only be an error in the element.")
+            f"branch is affine in the element displacement — the hinge's plastic "
+            f"rotation included — so the tangent is exact and this can only be an "
+            f"error in the element.")
 
     # ---- the same actions the viscoplastic driver reads -------------------
     # The Newton element reads its axial force, shear and end moments off constant
@@ -2096,6 +2112,20 @@ def check_piles():
     residual leaves the reported array clipped and the physics uncapped, which is
     the failure mode this leg exists for.
 
+    **The moment capacity is a plastic hinge**, and the leg is written on what a
+    hinge does rather than on what it reports. With ``M_cap`` tightened until it
+    binds: an end moment READ OUT OF THE ASSEMBLED RESIDUAL — the rotational
+    component of the element's own internal force, which is the moment the
+    equilibrium carries — must sit at the capacity and not above it; the hinged ends
+    must carry a plastic rotation; at most ONE element end per pile node may carry
+    it, since a hinge is one release at one section; and the slope must MOVE, and
+    move FARTHER, because a member that can deliver less moment cannot hold the soil
+    back better. The last two are what a nodal moment applied at the shared
+    rotational degree of freedom cannot do: it is equal and opposite on the two
+    elements meeting there and cancels, so the state does not move at all while the
+    reported moments read as capped. That is the form this round removed, and it is
+    the mutation.
+
     **The factor of safety.** The FEM pile sample at its own tagged mesh stands at a
     strength below its published lock and fails at one above it, on BOTH drivers —
     the two agree trial for trial over the whole bisection there, so the bracket
@@ -2185,6 +2215,82 @@ def check_piles():
             f"{u_free:.6g} to {u_cap:.6g}. A member that can deliver less force "
             f"cannot hold the soil back better — that is the signature of a "
             f"correction applied with the wrong sign (SPIKE.md, \"PILES\").")
+
+    # ---- the moment capacity, which is a hinge -----------------------------
+    M_free = float(np.max(np.abs(sol_free['forces_pile_moment'])))
+    m_cap = 0.5 * M_free
+    saved_M = fem_data['M_cap_by_pile_elem']
+    try:
+        fem_data['M_cap_by_pile_elem'] = np.full(n_pile, m_cap)
+        sol_M = solve_fem(fem_data, F=F_CAP, fem_solver='newton',
+                          max_disp_factor=None)
+    finally:
+        fem_data['M_cap_by_pile_elem'] = saved_M
+    u_M = _nr_translational_max(sol_M['displacements'], tidx)
+    p_rot = np.abs(np.asarray(sol_M.get('pile_plastic_rotation',
+                                        np.zeros((n_pile, 2)))))
+    if int(np.count_nonzero(sol_M['yielded_pile_M'])) == 0:
+        fails.append(f"a moment cap at half the free demand ({m_cap:.1f} against "
+                     f"{M_free:.1f}) binds on no element, so the moment leg is not "
+                     f"exercising the cap")
+    if not p_rot.any():
+        fails.append(
+            f"a moment cap at half the free demand binds but no element reports a "
+            f"plastic rotation. A moment capacity is a RELEASE of rotational "
+            f"continuity; a correction applied at the rotational degree of freedom "
+            f"the two adjacent beam elements SHARE is equal and opposite there and "
+            f"enforces nothing (SPIKE.md, \"THE PILE HINGE\").")
+    # The moment the EQUILIBRIUM carries, read out of the internal force the driver
+    # assembles rather than out of the reported array. A form that only clips what it
+    # reports leaves this above the capacity.
+    from xslope.fem import _nr_build_piles, _nr_pile_force
+    fd_M = dict(fem_data)
+    fd_M['M_cap_by_pile_elem'] = np.full(n_pile, m_cap)
+    pgs = _nr_build_piles(fd_M)
+    worst_del, owners = 0.0, {}
+    node_of = fem_data.get('pile_elem_nodes', None)
+    for pg in pgs:
+        fint = _nr_pile_force(pg, np.asarray(sol_M['displacements']), False)
+        for j, e in enumerate(pg['idx']):
+            for end, slot in ((0, 2), (1, 5)):
+                delivered = float(fint[j, slot])
+                reported = float(sol_M['forces_pile_moment'][e][end])
+                worst_del = max(worst_del,
+                                abs(delivered - reported) / max(abs(reported), 1e-9))
+                if abs(delivered) > m_cap * (1 + 1e-9):
+                    fails.append(
+                        f"pile element {int(e)} end {end + 1} DELIVERS a moment of "
+                        f"{delivered:.6f} where its capacity is {m_cap:.6f} — the "
+                        f"reported array is capped and the equilibrium is not")
+            if node_of is not None and len(node_of) > int(e):
+                for end in (0, 1):
+                    if pg['_p_rot'][j, end]:
+                        nd_ = int(node_of[int(e)][end])
+                        owners.setdefault(nd_, []).append((int(e), end))
+    if worst_del > 1e-9:
+        fails.append(
+            f"the pile end moment the Newton residual carries differs from the one "
+            f"reported by {worst_del:.2e} relative — the report is not the physics")
+    for nd_, who in owners.items():
+        if len(who) > 1:
+            fails.append(
+                f"pile node {nd_} carries a plastic release on {len(who)} element "
+                f"ends ({who}). A hinge is ONE release at one section; releasing "
+                f"both leaves the node's rotation seeing equal and opposite "
+                f"capacities whatever it does, undetermined by the beam.")
+    if np.allclose(sol_M['displacements'], sol_free['displacements']):
+        fails.append(
+            f"tightening the pile MOMENT capacity to {m_cap:.1f} where the uncapped "
+            f"pile carries {M_free:.1f} left the displacement field unchanged. That "
+            f"is the signature of the cancelling nodal-moment form: the correction "
+            f"is applied at the rotational degree of freedom the two adjacent "
+            f"elements share, is equal and opposite there, and enforces nothing.")
+    elif not u_M > u_free:
+        fails.append(
+            f"capping the pile moment at {m_cap:.1f} where the uncapped pile "
+            f"carries {M_free:.1f} made the slope move LESS, not more: max|u| went "
+            f"from {u_free:.6g} to {u_M:.6g}. A member that can deliver less moment "
+            f"cannot hold the soil back better.")
 
     # ---- the factor of safety, both drivers --------------------------------
     # The FEM pile sample brackets its published lock on BOTH drivers: it stands at

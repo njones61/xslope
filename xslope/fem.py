@@ -3566,6 +3566,8 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     g_node_den = np.maximum(g_node, _floor)
 
     _deep_free_mask = None
+    _deep_dof_mask = None
+    _skin_elem_mask = None
     if min_slip_depth is not None and float(min_slip_depth) > 0:
         _nd = fem_data.get("node_depth")
         if _nd is not None:
@@ -3577,6 +3579,27 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                     f"deepest lies {float(_nd_free.max()) if _nd_free.size else 0.0:.3g} "
                     f"below the ground surface. Reduce min_slip_depth, or check that a "
                     f"ground surface is defined.")
+            # The same filter, in the two other shapes a driver needs it in.
+            #
+            # `deep_dof_mask` carries it to the DEGREES OF FREEDOM: the x and y
+            # translations of every deep node that has at least one free one. The
+            # Newton path reads its residual norms and its displacement bound
+            # through this, so the skin the filter excludes cannot decide a verdict
+            # there either — see the note above _nr_equilibrate's merit.
+            _dn = np.flatnonzero(node_has_free)[_deep_free_mask]
+            _deep_dof_mask = np.zeros(n_dof, dtype=bool)
+            _deep_dof_mask[node_dof_x[_dn]] = True
+            _deep_dof_mask[node_dof_y[_dn]] = True
+            _deep_dof_mask &= free_dof_mask.astype(bool)
+            # `skin_elem_mask` carries it to the ELEMENTS, and an element counts as
+            # skin only when EVERY one of its nodes is shallower than the filter, so
+            # anything straddling the depth keeps the consistent tangent.
+            _nd_all = np.asarray(_nd, dtype=float)
+            _en = np.asarray(elements)[:, :]
+            _skin_elem_mask = np.zeros(n_elements, dtype=bool)
+            for _e in range(n_elements):
+                _ids = [int(_n) - 1 for _n in _en[_e] if int(_n) > 0]
+                _skin_elem_mask[_e] = bool(np.all(_nd_all[_ids] < float(min_slip_depth)))
 
     return {
         "K_factor": K_factor,
@@ -3602,6 +3625,8 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         "node_has_free": node_has_free,
         "g_node_den": g_node_den,
         "deep_free_mask": _deep_free_mask,
+        "deep_dof_mask": _deep_dof_mask,
+        "skin_elem_mask": _skin_elem_mask,
         "suction_active": suction_active,
         "suction_tanphib_by_elem": suction_tanphib_by_elem,
         "suction_scap_by_elem": suction_scap_by_elem,
@@ -6698,6 +6723,20 @@ def _nr_group_state(grp, u, h_eps):
         # whole of a line search.
         grp['_env_seed'] = (_ce, _se, _cse)
     yid = branch != _NR_ELASTIC
+    # The min_slip_depth skin keeps the ELASTIC tangent, which is the viscoplastic
+    # driver's own operator: that path solves K_elastic u = f_ext + f_body(eps^vp)
+    # every iteration and never forms an elastoplastic tangent at all. A tangent is
+    # a search direction and nothing else — the residual, the return map and the
+    # committed plastic strain here are untouched — so this cannot move a converged
+    # answer; what it removes is the near-null collapse mode a fully yielded
+    # cohesionless skin puts into the consistent tangent, which the linear solve
+    # otherwise answers with a correction 1e15 times the elastic response and no
+    # backtrack can rescue. Measured on rs2_66b at F = 1.1: with the consistent
+    # tangent the second iteration of every load increment reaches max|u| = 2e13
+    # and the increment is dead; with this it stays at 0.08.
+    _skin = grp.get('skin')
+    if _skin is not None:
+        yid = yid & ~_skin
     Dep = np.array(grp['D3'], copy=True)
     if np.any(yid):
         idx = np.flatnonzero(yid)
@@ -6823,6 +6862,46 @@ def _nr_umax(u, trans_dofs):
     """max|u| over the translational degrees of freedom (all of them without a pile)."""
     v = u if trans_dofs is None else u[trans_dofs]
     return float(np.max(np.abs(v))) if v.size else 0.0
+
+
+def _nr_umax_split(u, trans_dofs, deep_dof_mask):
+    """``(deep, skin)`` maxima of |u|, split by the ``min_slip_depth`` filter.
+
+    With no filter (``deep_dof_mask is None``) the deep value is the ordinary
+    :func:`_nr_umax` and the skin value is ``None`` — the filtered path adds a
+    reading, it does not change the unfiltered one.
+    """
+    if deep_dof_mask is None:
+        return _nr_umax(u, trans_dofs), None
+    if trans_dofs is None:
+        trans = np.ones(len(u), dtype=bool)
+    else:
+        trans = np.zeros(len(u), dtype=bool)
+        trans[trans_dofs] = True
+    deep = trans & deep_dof_mask
+    skin = trans & ~deep_dof_mask
+    d = float(np.max(np.abs(u[deep]))) if deep.any() else 0.0
+    k = float(np.max(np.abs(u[skin]))) if skin.any() else 0.0
+    return d, k
+
+
+def _nr_oob_split(r_full, free_dof_mask, node_dof_x, node_dof_y, node_has_free,
+                  g_node_den, deep_free_mask):
+    """``(whole model, skin)`` Dawson out-of-balance from one residual vector.
+
+    The skin reading is ``None`` without a ``min_slip_depth`` filter, where there is
+    no skin to separate and the whole-model value is the reported one.
+    """
+    d = r_full * free_dof_mask
+    rn = np.sqrt(d[node_dof_x] ** 2 + d[node_dof_y] ** 2)
+    v = (rn / g_node_den)[node_has_free]
+    if v.size == 0:
+        return 0.0, (None if deep_free_mask is None else 0.0)
+    whole = float(np.max(v))
+    if deep_free_mask is None:
+        return whole, None
+    sk = v[~deep_free_mask]
+    return whole, (float(np.max(sk)) if sk.size else 0.0)
 
 
 def _nr_build_piles(fem_data):
@@ -7298,6 +7377,16 @@ def _nr_build_groups(prep, c_reduced, phi_reduced, elastic_by_elem,
             'csph': np.cos(phi_reduced[e_idx]),
             'ep': np.zeros((G, 4)),
         }
+        # The surficial skin the min_slip_depth filter excludes (None when the
+        # filter is off). It changes ONE thing: the tangent at these points stays
+        # elastic — see _nr_group_state. Nothing about the internal force, the
+        # return map or the committed plastic strain differs, so the equilibrium
+        # being solved is the same one.
+        _skin = prep.get("skin_elem_mask")
+        if _skin is not None:
+            _sk = _skin[e_idx]
+            if _sk.any():
+                grp['skin'] = _sk
         if elastic_by_elem is not None:
             em = elastic_by_elem[e_idx]
             if em.any():
@@ -7621,7 +7710,7 @@ def _nr_soften_set_eta(bars, newly, eta):
 
 def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
                      force_tol, oob_fn, nr_max_iter, u_el, piles=None,
-                     trans_dofs=None, debug_level=0):
+                     trans_dofs=None, debug_level=0, deep_free=None):
     """Run the post-peak latch to its fixed point on a converged full-load state.
 
     Returns ``(ok, u, iterations, force_evaluations, out_of_balance, rounds, cuts)``.
@@ -7652,7 +7741,7 @@ def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
                 groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
                 oob_fn, nr_max_iter, u_el, debug_level=debug_level,
                 label=f"soften eta={eta_try:.4f}", bars=bars, piles=piles,
-                trans_dofs=trans_dofs)
+                trans_dofs=trans_dofs, deep_free=deep_free)
             it_total += it
             fe_total += fe
             if ok:
@@ -7687,7 +7776,7 @@ def _nr_soften_latch(bars, groups, pattern, u, f_ext, free_dofs, n_dof, h_eps,
 def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
                     force_tol, oob_fn, nr_max_iter, u_elastic_scale,
                     debug_level=0, label="", bars=None, piles=None,
-                    trans_dofs=None):
+                    trans_dofs=None, deep_free=None):
     """Drive the equilibrium residual to zero at a FIXED external load.
 
     The inner Newton iteration, lifted out of :func:`_solve_fem_newton` verbatim so
@@ -7703,9 +7792,36 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
 
     without committing plastic strain — the caller decides whether the state is
     worth keeping.
+
+    ``deep_free`` is the ``min_slip_depth`` filter as a boolean over the free
+    degrees of freedom (``None`` when the filter is off, which is every unfiltered
+    run and leaves every quantity below bit-identical). When it is given, the MERIT
+    the iteration is driven and judged on — the residual norm the line search
+    minimizes, the no-progress watch, the divergence test, and the relative
+    equilibrium test — is taken over the deep degrees of freedom only. That is the
+    same convention the out-of-balance reading already carries, extended to the
+    place the Newton driver actually decides: this driver's dominant failure is
+    "the load increment cannot be carried", and read on the whole model that
+    verdict belongs to a cohesionless surface skin the filter exists to exclude.
+    The viscoplastic driver never faces the question — its elastic operator is
+    non-singular, its convergence test is a RATIO that a creeping skin's own
+    displacement flatters, and the one gate that decides is already filtered — so
+    a skin runaway is not a verdict there, and it is not one here either.
+
+    The skin is still free to move: nothing bounds it, and its state is carried
+    along untouched. It is only barred from ENDING the increment. The one
+    concession to arithmetic is the eligibility test in the line search, which
+    refuses a candidate whose whole-model residual has grown by more than
+    ``_NR_DIVERGED`` in a single step — the driver's own divergence factor, reused
+    rather than a new threshold — so a step that is good for the deep system does
+    not carry the skin to 1e26 and take the reported state with it.
     """
+    def _merit(v_free):
+        return float(np.linalg.norm(v_free if deep_free is None
+                                    else v_free[deep_free]))
+
     f_ext_free = f_ext[free_dofs]
-    f_norm = max(float(np.linalg.norm(f_ext_free)), 1e-30)
+    f_norm = max(_merit(f_ext_free), 1e-30)
     n_fe = 0
     rel_du = 0.0
     u_try = u_start.copy()
@@ -7733,7 +7849,7 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         n_fe += 1
         r = f_ext - fint
         r_free = r[free_dofs]
-        r_norm = float(np.linalg.norm(r_free))
+        r_norm = _merit(r_free)
         if not np.isfinite(r_norm):
             break
         r_full = np.zeros(n_dof)
@@ -7786,15 +7902,23 @@ def _nr_equilibrate(groups, pattern, u_start, f_ext, free_dofs, n_dof, h_eps,
         # stay small.
         alpha = 1.0
         best_alpha, best_rc = None, np.inf
+        g_now = (None if deep_free is None
+                 else max(float(np.linalg.norm(r_free)), 1e-30))
         for _ls in range(_NR_LS_MAX):
             cand = u_try + alpha * du
             f_c, _, _ = _nr_internal_force(groups, cand, n_dof, bars=bars,
                                            piles=piles)
             n_fe += 1
-            rc = float(np.linalg.norm((f_ext - f_c)[free_dofs]))
-            if np.isfinite(rc) and rc < best_rc:
+            rc_free = (f_ext - f_c)[free_dofs]
+            rc = _merit(rc_free)
+            eligible = bool(np.isfinite(rc))
+            if eligible and g_now is not None:
+                # See the docstring: the skin may run away, but not by a factor of
+                # a thousand in one accepted step.
+                eligible = float(np.linalg.norm(rc_free)) <= _NR_DIVERGED * g_now
+            if eligible and rc < best_rc:
                 best_rc, best_alpha = rc, alpha
-            if np.isfinite(rc) and rc < r_norm:
+            if eligible and rc < r_norm:
                 break
             alpha *= 0.5
         alpha = best_alpha if best_alpha is not None else 0.0
@@ -7982,6 +8106,11 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     g_node_den = prep["g_node_den"]
     deep_free_mask = prep["deep_free_mask"]
     free_dof_mask = prep["free_dof_mask"]
+    # The same filter on the degrees of freedom, restricted to the free ones in
+    # the order the residual vector carries them. None without a filter, and every
+    # quantity it touches is then exactly what it was.
+    deep_dof_mask = prep.get("deep_dof_mask")
+    deep_free = None if deep_dof_mask is None else deep_dof_mask[free_dofs]
 
     def _oob(r_full):
         """The Dawson, Roth & Drescher measure, on the TRUE residual.
@@ -8105,7 +8234,7 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             groups, pattern, u, f_ext, free_dofs, n_dof, h_eps, force_tol,
             _oob, nr_max_iter, u_elastic_scale, debug_level=debug_level,
             label=f"lam={lam_try:.4f}", bars=bars, piles=piles,
-            trans_dofs=trans_dofs)
+            trans_dofs=trans_dofs, deep_free=deep_free)
         n_force_evals += _fe
         total_iterations += it
         if ok:
@@ -8181,7 +8310,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
         _ok, u, _it, _fe, _oobs, n_soften_rounds, _cuts = _nr_soften_latch(
             bars, groups, pattern, u, base_loads, free_dofs, n_dof, h_eps,
             force_tol, _oob, nr_max_iter, u_elastic_scale, piles=piles,
-            trans_dofs=trans_dofs, debug_level=debug_level)
+            trans_dofs=trans_dofs, debug_level=debug_level,
+            deep_free=deep_free)
         total_iterations += _it
         n_force_evals += _fe
         n_cuts += _cuts
@@ -8207,8 +8337,15 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     nr_disp_limit = (disp_factor * prep["mesh_height"]
                      if disp_factor is not None and prep["mesh_height"] > 0
                      else None)
+    # With a min_slip_depth filter the bound is read on the DEEP degrees of freedom
+    # only, for the reason the out-of-balance reading already is: the skin the filter
+    # excludes is allowed to fail, and a state whose deep field is small-strain
+    # admissible is not disqualified by how far that skin has travelled. The skin's
+    # own travel is reported beside it rather than dropped.
+    nr_disp_deep, nr_disp_skin = _nr_umax_split(u - u_datum, trans_dofs,
+                                               deep_dof_mask)
     if converged and nr_disp_limit is not None:
-        if _nr_umax(u - u_datum, trans_dofs) > nr_disp_limit:
+        if nr_disp_deep > nr_disp_limit:
             converged = False
             exit_reason = 'displacement_limit'
 
@@ -8216,8 +8353,18 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
     for grp in groups:
         grp['_u'] = u
     # refresh _sig / _branch (and the bar and pile forces) at the reported state
-    _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles)
+    _fint_rep, _, _ = _nr_internal_force(groups, u, n_dof, bars=bars, piles=piles)
     n_force_evals += 1
+    # The out-of-balance at the reported state, over the WHOLE model and over the
+    # skin the min_slip_depth filter excludes. Reported, never read for a verdict:
+    # `unbalanced_force_ratio` stays the filtered quantity both drivers publish, and
+    # this says how much of the model that quantity is not looking at. Without a
+    # filter the skin reading is None and the global one is the same number.
+    _r_rep = np.zeros(n_dof)
+    _r_rep[free_dofs] = (base_loads - _fint_rep)[free_dofs]
+    nr_oob_global, nr_oob_skin = _nr_oob_split(
+        _r_rep, free_dof_mask, node_dof_x, node_dof_y, node_has_free, g_node_den,
+        deep_free_mask)
 
     # ---- reinforcement diagnostics ------------------------------------------
     # The same three arrays the viscoplastic path returns, at full 1D-element
@@ -8389,7 +8536,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
             'oob_fn': _oob, 'h_eps': h_eps, 'u_elastic_scale': u_elastic_scale,
             'free_dofs': free_dofs, 'n_dof': n_dof, 'u': u,
             'disp_limit': nr_disp_limit, 'prep': prep,
-            'u_datum': u_datum,
+            'u_datum': u_datum, 'deep_free': deep_free,
+            'deep_dof_mask': deep_dof_mask,
         })
 
     strains = compute_strains(nodes, elements, element_types, u,
@@ -8416,6 +8564,8 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
               f"out-of-balance {last_oob:.2e}"
               + ('' if converged else f", exit {exit_reason}")
               + (f", max|u| {max_disp:.4g}"
+                 + (f" (deep {nr_disp_deep:.4g}, skin {nr_disp_skin:.4g})"
+                    if nr_disp_skin is not None else "")
                  + (f" against limit {nr_disp_limit:.4g}"
                     if nr_disp_limit is not None else "")))
 
@@ -8442,6 +8592,16 @@ def _solve_fem_newton(fem_data, F, prep, *, c_reduced, phi_reduced,
                              .get(exit_reason, 'load_step_floor')),
         # The bound the final state was measured against (None = bound off).
         "nr_disp_limit": nr_disp_limit,
+        # The displacement the bound was READ on, and the skin's own. Without a
+        # min_slip_depth filter the first is `max_displacement` and the second is
+        # None; with one, the deep field is what the verdict rests on and the skin's
+        # travel is reported rather than hidden or used.
+        "nr_max_disp_deep": nr_disp_deep,
+        "nr_max_disp_skin": nr_disp_skin,
+        # The same reading for the out-of-balance: the whole model's, and the
+        # excluded skin's. Diagnostics, not a verdict.
+        "nr_oob_global": nr_oob_global,
+        "nr_oob_skin": nr_oob_skin,
         "early_exit_suppressed": False,
         "budget_extensions": 0,
         "iteration_budget": nr_max_iter,
@@ -8632,6 +8792,8 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
     free_dofs, n_dof = ctx['free_dofs'], ctx['n_dof']
     h_eps, u_el = ctx['h_eps'], ctx['u_elastic_scale']
     disp_limit = ctx['disp_limit']
+    deep_free = ctx.get('deep_free')
+    deep_dof_mask = ctx.get('deep_dof_mask')
     restrength = ctx['restrength']
     u = ctx['u']
     # Displacement is measured from the in-situ state on a K0 run and from zero
@@ -8686,7 +8848,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
             groups, pattern, u, base_loads, free_dofs, n_dof, h_eps, force_tol,
             oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
             label=f"ramp F={F_try:.4f}", bars=bars, piles=piles,
-            trans_dofs=trans_dofs)
+            trans_dofs=trans_dofs, deep_free=deep_free)
         total_iters += it
         total_fevals += fe
         if not (ok and oob < force_tol):
@@ -8740,7 +8902,7 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
                     groups, pattern, _u_seed, base_loads, free_dofs, n_dof, h_eps,
                     force_tol, oob_fn, _NR_MAX_ITER, u_el, debug_level=debug_level,
                     label=f"ramp F={F_try:.4f} (seeded)", bars=bars, piles=piles,
-                    trans_dofs=trans_dofs)
+                    trans_dofs=trans_dofs, deep_free=deep_free)
                 # Work is cumulative: the refused cold step, every predictor run and
                 # every corrector are all charged to this step.
                 it += it2
@@ -8764,14 +8926,19 @@ def _ssrm_ramp_newton(fem_data, F_min, F_max, *, prep, force_tol, convergence_to
             ok, u_try, it_s, fe_s, oob_s, _r, _c = _nr_soften_latch(
                 bars, groups, pattern, u_try, base_loads, free_dofs, n_dof, h_eps,
                 force_tol, oob_fn, _NR_MAX_ITER, u_el, piles=piles,
-                trans_dofs=trans_dofs, debug_level=debug_level)
+                trans_dofs=trans_dofs, debug_level=debug_level,
+                deep_free=deep_free)
             it += it_s
             fe += fe_s
             total_iters += it_s
             total_fevals += fe_s
             if _r:
                 oob = oob_s
-        maxu = _nr_umax(u_try - u_datum, trans_dofs) if u_try.size else 0.0
+        # The bound reads the DEEP field when a min_slip_depth filter is on — the
+        # same standard the bisection's trials are held to, for the same reason.
+        maxu, maxu_skin = (_nr_umax_split(u_try - u_datum, trans_dofs,
+                                          deep_dof_mask)
+                           if u_try.size else (0.0, None))
         # The SAME admissibility standard a converged bisection trial passes: force
         # equilibrium under the tolerance, and a state the small-strain model can
         # represent.

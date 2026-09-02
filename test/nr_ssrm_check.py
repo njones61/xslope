@@ -204,6 +204,7 @@ def run():
     failures += check_load_path_invariance(fem_data)
     failures += check_step_control_not_decisive(fem_data)
     failures += check_displacement_bound()
+    failures += check_min_slip_depth()
     failures += check_reinforcement_refusals()
     failures += check_curved_envelopes()
     failures += check_reinforcement()
@@ -546,6 +547,123 @@ def check_displacement_bound():
                 f"F = {Q9_INADMISSIBLE} was refused on displacement at max|u| = "
                 f"{over['max_displacement']:.4g}, which is UNDER the {bound:.4g} "
                 f"bound")
+    return fails
+
+
+# The min_slip_depth filter (SPIKE.md, "THE MINIMUM SLIP DEPTH"). RS2-66b is the
+# embankment-on-soft-ground model the filter exists for: a cohesionless fill face
+# whose skin mechanism governs the unfiltered answer, over a soft band that carries
+# the deep-seated one. It is run here on a mesh coarser than the locked 3.0 m so the
+# rather than a whole bisection, with the same K0 = 1 and
+# the same strength-reduced tensile cap.
+DEPTH_MODEL = (Path(__file__).resolve().parents[1] / 'docs' / 'verification'
+               / 'files' / 'rocscience' / 'rs2_66b.xlsx')
+DEPTH_SIZE = 3.0
+DEPTH_FILTER = 4.0       # m below the ground surface: below the fill skin
+DEPTH_F = 1.10           # stands with the filter, fails without it, on both drivers
+DEPTH_MAX_ITER = 16000
+
+
+def _depth_fem_data():
+    slope_data = load_slope_data(str(DEPTH_MODEL))
+    mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
+                                    target_size=DEPTH_SIZE,
+                                    element_type='tri6')
+    return build_fem_data(slope_data, mesh)
+
+
+def _depth_trial(fem_data, solver, min_slip_depth):
+    return solve_fem(fem_data, F=DEPTH_F, fem_solver=solver,
+                     max_iterations=DEPTH_MAX_ITER, max_disp_factor=None,
+                     min_slip_depth=min_slip_depth, k0=1.0, tension_srf=True,
+                     debug_level=0)
+
+
+def check_min_slip_depth():
+    """A skin that fails does not decide a depth-filtered trial, on either driver.
+
+    The filter's whole content is that a mechanism shallower than the cutoff is not
+    the question being asked. On the viscoplastic driver that is one rule — the deep
+    nodes alone are read for the out-of-balance — and it is enough there, because
+    that driver's operator is the elastic stiffness, which no amount of skin flow
+    makes singular, and its convergence test is a RATIO that a creeping skin's own
+    displacement flatters rather than defeats. The Newton driver decides in three
+    more places, and until this round none of them was filtered: the load increment
+    it could not carry, the merit its line search minimized, and the displacement
+    bound its converged state had to pass. All three belonged to the skin, so a
+    depth-filtered Newton run answered the question the filter was meant to exclude.
+
+    The check is a bracket, not a label. At one strength on one model:
+
+      * WITH the filter, BOTH drivers converge, and the Newton state passes the same
+        force gate and the same yield reading every other trial passes;
+      * WITHOUT it, BOTH drivers fail at that same strength — so the skin really is
+        governing there and the filter really is what changes the answer;
+      * the skin has moved FURTHER than the deep field in the converged filtered
+        state, which is what "the skin fails but the trial stands" looks like, and
+        the deep field is inside the small-strain bound the verdict is read on.
+
+    The second and third assertions are what make it mutation-sensitive. Drop the
+    filter from the increment decision — hand ``_nr_equilibrate`` ``deep_free=None``
+    — and the first assertion fails: the Newton trial dies at the load-step floor at
+    a strength the viscoplastic driver carries.
+    """
+    fails = []
+    fd = _depth_fem_data()
+    height = float(np.max(fd['nodes'][:, 1]) - np.min(fd['nodes'][:, 1]))
+
+    filtered = {s: _depth_trial(fd, s, DEPTH_FILTER)
+                for s in ('viscoplastic', 'newton')}
+    unfiltered = {s: _depth_trial(fd, s, None)
+                  for s in ('viscoplastic', 'newton')}
+
+    for solver, r in filtered.items():
+        if not r['converged']:
+            fails.append(
+                f"{solver}: F = {DEPTH_F} with min_slip_depth = {DEPTH_FILTER} came "
+                f"back {r['verdict']} ({r.get('exit_reason')}, "
+                f"{r['iterations']} iterations, out-of-balance "
+                f"{r['unbalanced_force_ratio']:.3e}, max|u| "
+                f"{r['max_displacement']:.4g} on a {height:.0f} m model) — the "
+                f"depth filter is not reaching this driver's verdict")
+
+    for solver, r in unfiltered.items():
+        if r['converged']:
+            fails.append(
+                f"{solver}: F = {DEPTH_F} stands with NO filter as well, so this "
+                f"model no longer separates the skin from the deep mechanism and "
+                f"the filtered result above proves nothing")
+
+    nr = filtered['newton']
+    if nr['converged']:
+        if nr['unbalanced_force_ratio'] >= 1e-3:
+            fails.append(
+                f"the filtered Newton trial was called converged at an "
+                f"out-of-balance of {nr['unbalanced_force_ratio']:.3e}, at or above "
+                f"the 1e-3 force tolerance")
+        if nr['nr_oob_global'] <= nr['unbalanced_force_ratio']:
+            fails.append(
+                f"the filtered Newton trial's whole-model out-of-balance "
+                f"({nr['nr_oob_global']:.3e}) is no larger than the filtered one "
+                f"({nr['unbalanced_force_ratio']:.3e}), so the filter is not "
+                f"excluding anything and this trial says nothing about it")
+        deep, skin = nr.get('nr_max_disp_deep'), nr.get('nr_max_disp_skin')
+        if skin is None or deep is None:
+            fails.append(
+                "the filtered Newton trial reported no deep/skin displacement "
+                "split, so nothing says which field the bound was read on")
+        else:
+            if skin <= deep:
+                fails.append(
+                    f"the skin moved {skin:.4g} against the deep field's "
+                    f"{deep:.4g}: the excluded skin is not the part that is "
+                    f"failing here, so this trial does not test the rule")
+            if deep > 0.1 * height:
+                fails.append(
+                    f"the filtered Newton trial converged with a DEEP displacement "
+                    f"of {deep:.4g} on a {height:.0f} m model, past the tenth of "
+                    f"the height the bound allows — the bound is not being applied "
+                    f"to the field the verdict rests on")
     return fails
 
 

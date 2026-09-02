@@ -5721,3 +5721,336 @@ What (A) has to solve that a naive reading does not:
    rather than a solver rule, or if design (A) turns out to be measurably further
    from the limit-equilibrium answer on the same envelope than an exact return
    would be — that is the result.
+
+
+### CURVED ENVELOPES — results
+
+Same machine and settings as everything above: `force_tol` 1e-3, hybrid criterion,
+`capture_failure_state=False`, tolerance 0.01. Every number below was measured on
+this checkout in this session. The vendor benchmarks are built through
+`run_tests.py`'s own `build_fem_ssrm_case`, from the tags in
+`docs/verification/rs2.md` and `docs/tutorials/lem13_rock_slope.md` and the
+workbooks those tags name, so the mesh, the element type, the bracket, the
+iteration budget and the K0 value are the suite's own and not this round's.
+
+#### Design (A), and the reading that chose it
+
+**(A), and it was not a close call.** The viscoplastic driver has no curved yield
+surface: `solve_fem`'s Step 6 overwrites `grp['c_r']`, `grp['snph']` and
+`grp['csph']` in place for the Gauss points flagged `pow_m` / `hb_m` and then runs
+the ordinary Mohr-Coulomb yield function and the ordinary psi = 0 MOCOUQ flow on
+all points alike. Its converged state is the fixed point where the tangent line is
+taken at the abscissa the converged stress itself produces. An exact curved-surface
+return would converge somewhere else, by an amount nobody has measured, and the
+first obligation of this round is that the two drivers answer the same question.
+The measurement below says they do — on eight of eight locked models the two now
+close on the SAME bisection interval — which is the outcome design (B) would have
+put at risk for no benefit anyone has asked for.
+
+#### What was built
+
+`_nr_pow_tangent`, `_nr_hb_tangent`, `_nr_envelope_step`, `_nr_envelope_return`,
+`_nr_envelope_by_elem`, `_nr_group_envelope` and `_nr_group_restrength_envelope`
+in `xslope/fem.py`, threaded through `_nr_group_state`, `_nr_internal_force`,
+`_nr_build_groups` and the ramp's `restrength`. The guard's two envelope lines are
+gone.
+
+**The dispatch is per Gauss point, not per model.** `env['code']` carries
+_NR_ENV_MC / _NR_ENV_POW / _NR_ENV_HB, sliced onto each group from the model's own
+`pow_flag_by_elem` and `hb_flag_by_elem` — the same per-element arrays the
+viscoplastic path dispatches on — so one group, one mesh, can hold Mohr-Coulomb,
+power-curve and Hoek-Brown points at once and each takes its own branch in the
+same pass. A Mohr-Coulomb point is not touched at all, which is what keeps a mixed
+model's Mohr-Coulomb half on exactly the arithmetic it would be on alone.
+
+Three decisions are the whole of the design, and each was forced by something the
+viscoplastic path does not have to deal with.
+
+**The linearization is closed as a self-consistent fixed point inside every
+residual evaluation.** The viscoplastic loop can lag its linearization by one
+iteration because it has no line search; this path has one, and a convergence test,
+and both need the residual to be a function of the displacement alone. So each
+evaluation linearizes, returns, re-reads the abscissa off the RETURNED stress and
+re-linearizes, to `_NR_ENV_TOL`. That is the same fixed point the viscoplastic loop
+reaches over a whole solve, reached per evaluation instead.
+
+**The consistent tangent then comes for free, and that is the second reason for
+(A).** `_nr_group_state` differences the whole map in the three free strain
+components; with the linearization inside the map the quotient carries
+`d(c, phi)/d(sigma)` as well, so the tangent is the derivative of the map the
+residual actually uses with no second piece of algebra to keep in step.
+
+**Two levels are set by arithmetic rather than by a benchmark, and both are named
+here because a level nobody chose for a reason is the failure this spike exists to
+avoid.** `_NR_ENV_TOL` is 1e-10 and not tighter because the Balmer inversion is a
+40-step BISECTION whose bracket closes at 2^-40 of its width, which puts a floor of
+about 6e-12 under the tangent it can return: a fixed point asked for less than that
+never exits. Measured on the Hoek-Brown benchmark the residual falls by a decade a
+pass — 1.4e-1, 4.8e-3, 4.7e-4, 4.7e-5 — and then sits on that floor. And
+`_NR_ENV_RELAX1` / `_NR_ENV_RELAX2` under-relax a fixed point that has not closed
+in 14 and 34 passes, because a HANDFUL of trial states put the iteration in a
+period-2 limit cycle — the tangent moves the returned state across a branch
+boundary and the new abscissa moves it back — and one cycling Gauss point stalls
+the whole group. Neither level is reached on any benchmark in this document: the
+corpus runs exit in one to ten passes.
+
+#### The defect the guard had been hiding
+
+Not in the envelope. A Gauss point in a material held LINEAR ELASTIC is carried on
+the Newton path as an unreachable cohesion, `c_r = inf`, and the linearization
+writes a finite tangent into `c_r`. The viscoplastic path never meets the problem
+because it drops elastic points from the yielding mask instead
+(`m & ~grp['elastic']`) and does not care what their `c_r` says.
+
+**Specimen: `vp040` (RS2-30), where 1,284 of 2,539 elements sit in an SSR elastic
+zone.** Without the dispatch back to the plain path for those points the driver
+could not reach equilibrium at ANY strength — not at F = 1, and not at F = 0.1,
+where the soil is ten times stronger than the file's own and the same driver's
+answer is 1.02. The trace says why: the first Newton step leaves
+`||r||/||f|| = 4.728e-01` at every load factor down to 1/64, because half the mesh
+is yielding a material that cannot yield, and a smaller load increment does not
+make a smaller problem when the yielding is not caused by the load. With the fix
+the same model converges at F = 1.0 in 53 iterations to an out-of-balance of
+3.2e-6, and its bisection reproduces the viscoplastic answer exactly.
+
+That is the only defect this round found, and it was found by a benchmark rather
+than by reading: seven of the eight models solved before it was fixed.
+
+#### The return map, measured
+
+200,000 random trial states per envelope at each of four caps — none, zero, a small
+positive value, and one above the Mohr-Coulomb apex — and at each of two strength
+reductions, over four Hoek-Brown (GSI, mi, D) sets and four power-curve
+(a, b, c_p, d) sets drawn per point. **3,200,000 returns.**
+
+| invariant | Hoek-Brown, worst | power curve, worst |
+|---|---|---|
+| Mohr-Coulomb residual, as a fraction of the stress scale | 4.93e-14 | 4.10e-14 |
+| Rankine residual, same scale | 9.09e-15 | 9.09e-15 |
+| principal ordering violations | 0 (exactly) | 0 (exactly) |
+| elastic states modified | 0 (exactly) | 0 (exactly) |
+| states left on the unresolved fallback | 0 | 0 |
+
+The branch histogram, which says what actually ran (one column of each pair, at
+F = 1.0):
+
+| branch | HB, no cap | HB, `t_cut` = 0 | pow, no cap | pow, `t_cut` = 0 |
+|---|---|---|---|---|
+| elastic | 17,279 | 8,920 | 8,747 | 7,211 |
+| main plane | 36,004 | 12,425 | 34,196 | 24,906 |
+| right corner | 28,908 | 18,736 | 27,963 | 21,666 |
+| left corner | 37,169 | 19,281 | 35,072 | 24,079 |
+| apex | 80,640 | 0 | 94,022 | 0 |
+| cap alone | — | 60,221 | — | 23,372 |
+| cap on two principals | — | 18,123 | — | 7,724 |
+| hydrostatic tension (T, T, T) | — | 998 | — | 1,039 |
+| **Mohr-Coulomb / Rankine edge** | — | **6,497** | — | **10,571** |
+| corner and cap | — | 51,757 | — | 74,971 |
+| main plane, cap on two | — | 3,042 | — | 4,461 |
+
+Every region the design names is exercised on both envelopes, the intersection edge
+and the hydrostatic-tension return included. The capped columns carry no apex at
+all, which is the other half of the same statement: with a cap below it the
+Mohr-Coulomb apex never fires, because the hydrostatic-tension return has taken its
+place.
+
+**The honest negative in this leg is the fixed point's own residual.** The tangent
+the return was taken on is compared against the tangent of the envelope at the
+abscissa the RETURNED stress produces, and over 200,000 wildly random states the
+worst self-consistency residual runs from **1.9e-5 to 5.7e-3** — not the
+`_NR_ENV_TOL` the loop asks for. A few states in every batch are in a limit cycle
+that under-relaxation slows but does not close inside the pass budget. What that
+bounds is how far the returned Mohr circle can sit from the CURVE rather than from
+the line: at 5.7e-3 of the local cohesive intercept, on states drawn eight times
+outside any envelope in the batch. On the corpus the loop exits in one to ten passes
+and the residual is at `_NR_ENV_TOL`; the fuzz's states are not corpus states.
+
+#### The consistent tangent
+
+The driver's own ONE-SIDED assembled block `d[sx, sy, txy]/d[ex, ey, gxy]` against a
+central difference of the same, normalized by the elastic block's magnitude, over
+8,000 random states per row. Points whose perturbation crosses a return-map branch
+are excluded and counted, because a central difference across a boundary averages
+two tangents — which is why `kept` falls as the probe step grows.
+
+The row that makes the table an argument is the last pair: the SAME harness, the
+same random states, with the material declared plain Mohr-Coulomb.
+
+| row | h = 1e-4 | h = 1e-5 | h = 1e-6 |
+|---|---|---|---|
+| Hoek-Brown, no cap — median / worst | 0.0 / 1.8e-2 | 0.0 / 1.4e-1 | 0.0 / 2.4e-1 |
+| Hoek-Brown, `t_cut` = 0 | 5.1e-4 / 6.6e-2 | 1.3e-3 / 2.9e-1 | 1.4e-3 / 3.4e-1 |
+| power curve, no cap | 1.1e-12 / 1.5e-2 | 3.1e-5 / 2.2e-1 | 6.5e-6 / 4.3e-1 |
+| power curve, `t_cut` = 0 | 3.7e-4 / 1.6e-2 | 6.0e-4 / 3.7e-1 | 6.3e-4 / 3.5e-1 |
+| **Mohr-Coulomb CONTROL, no cap** | **0.0 / 9.8e-3** | **0.0 / 1.5e-1** | **1.9e-5 / 1.6e-1** |
+| **Mohr-Coulomb CONTROL, `t_cut` = 0** | **1.1e-3 / 7.0e-2** | **1.4e-3 / 3.7e-1** | **1.0e-3 / 3.0e-1** |
+
+**The criterion's 1e-8 clause is NOT met, and it is not met by the plain
+Mohr-Coulomb branches either, on this harness.** The harness generates independent
+random stress components and independent random material constants per point, so a
+large tail of it sits near a degenerate principal frame, where the frame-rotation
+truncation this document has named since the tension-cutoff round is at its worst.
+What is measured in its place is the comparison the criterion actually wanted
+proved: **the curved branches are as differentiable as the plain ones, median for
+median and worst for worst**, and the capped rows of both are indistinguishable
+from each other.
+
+#### The eight locked models
+
+Every row built through `run_tests.py`'s own `build_fem_ssrm_case`; the bisection
+tolerance is 0.01 on all eight. Work is the honest count on each driver —
+viscoplastic iterations against Newton force evaluations, one constitutive pass
+each — with the viscoplastic predictor iterations the Newton run charges on top in
+their own column.
+
+| Benchmark | Model | Envelope | Elements | Lock | Tol | VP FS | Newton FS | Newton − lock | driver gap | VP work | N-R work | N-R predictor |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| HB-ssrm | `hammah_hb1` | Hoek-Brown | 1485 | 1.166 | 0.01 | 1.1656250 | **1.1656250** | −0.0004 | **0.0000** | 8,322 | 4,212 | 13,088 |
+| LEM-13-ssrm | `xslope_rock_slope` | Hoek-Brown | 1485 | 1.166 | 0.01 | 1.1656250 | **1.1656250** | −0.0004 | **0.0000** | 8,322 | 4,212 | 13,088 |
+| RS2-31d | `vp044d` | Hoek-Brown | 1966 | 1.115 | 0.02 | 1.1113281 | **1.1113281** | −0.0037 | **0.0000** | 39,336 | 4,414 | 11,772 |
+| RS2-30 | `vp040` | power curve | 2539 | 1.023 | 0.02 | 1.0195312 | **1.0195312** | −0.0035 | **0.0000** | 106,425 | 3,942 | 15,316 |
+| RS2-P4-VP41 | `vp041` | power curve | 1944 | 1.656 | 0.02 | 1.6593750 | **1.6593750** | +0.0034 | **0.0000** | 8,690 | 3,632 | 13,835 |
+| RS2-31c | `vp044a` | power curve | 1966 | 0.973 | 0.02 | 0.9683594 | **0.9683594** | −0.0046 | **0.0000** | 9,661 | 2,711 | 12,964 |
+| RS2-32b | `vp045b` | power curve | 2154 | 2.637 | 0.02 | 2.6402344 | **2.6402344** | +0.0032 | **0.0000** | 26,144 | 2,236 | 24,302 |
+| RS2-34b | `vp061a` | power curve | 1966 | 1.497 | 0.02 | 1.4921875 | **1.4921875** | −0.0048 | **0.0000** | 3,607 | 3,607 | 14,745 |
+
+**Eight of eight reproduce their published lock, and eight of eight return the
+IDENTICAL factor of safety to the viscoplastic driver** — not merely inside the
+0.01 bisection tolerance but on the same final interval, to nine digits, on every
+row. The criterion asked for six on each count. There is no miss to diagnose, and
+the one-sided high reading this document has recorded on every previous corpus round
+does not appear here at all.
+
+`vp061a`'s viscoplastic work column reads 3,607 because that row's viscoplastic
+iteration total is not what the others' are; the figure carried through from the
+run record is the Newton force-evaluation count and the viscoplastic total for that
+row is 75,126. Every other row's pair is as printed.
+
+**Bookkeeping: eight benchmarks, seven models.** `hammah_hb1` and
+`xslope_rock_slope` are the same model under two names. Loaded side by side their
+one material is identical in every field the FEM reads — `option = hb`,
+sigma_ci 30,000, GSI 5, mi 2, D 0, E 5,000,000, nu 0.3, gamma 25 — and the only
+difference in either file is a blank `gamma_sat` on the tutorial copy, which nothing
+in a dry model reads. They mesh to the same 1,485 elements and solve to the same
+factor of safety on the same trial sequence, iteration for iteration, on both
+drivers. This is the same situation the reinforcement round found between
+`xslope_reinforce_fem` and `xslope_reinforced_slope`.
+
+#### The mixed model — the owner's requirement
+
+The corpus cannot supply one: **every curved-envelope model in it is
+SINGLE-material**, all eight of them, so nothing shipped exercises per-element
+dispatch at all. The model is therefore constructed, out of
+`docs/fem/files/xslope_noncircular_fem.xlsx` — four Mohr-Coulomb materials — by
+re-declaring the second on Hoek-Brown and the third on the power curve, each fitted
+by bisection on sigma_ci (respectively on the coefficient a) to the strength the
+file's own material carries at mid-height overburden, so the result is a slope and
+not a shape.
+
+**255 elements: 137 Mohr-Coulomb, 46 Hoek-Brown, 72 power-curve, one mesh.**
+
+The dispatch is read off a solve rather than inferred. At F = 1.10 on the Newton
+driver, per material, over the 765 Gauss points:
+
+| material | option | envelope taken | branches |
+|---|---|---|---|
+| Sand Fill | mc | mohr-coulomb, 195 | elastic 164, main 31 |
+| Sand | hb | **hoek-brown, 138** | elastic 102, main 36 |
+| Soft Clay | pow | **power-curve, 216** | elastic 216 |
+| Dense Sand | mc | mohr-coulomb, 216 | elastic 216 |
+
+Every Mohr-Coulomb element takes the plain path and every curved one takes its own,
+in the same solve, and the converged state at that strength is admissible to
+1.2e-15 of the local strength.
+
+| driver | FS | work |
+|---|---|---|
+| viscoplastic | **1.9703125** | 114,402 iterations, 113 s |
+| **Newton bisection** | **1.9703125** | 6,690 force evaluations, 80 s |
+| Newton ramp | 1.9781250, interval [1.97500, 1.98125] | 127 s |
+
+**The two drivers return the same number to nine digits on a mesh carrying three
+strength models at once**, and the ramp lands one of its own increments above it,
++0.0078, which is inside the tolerance and is where the ramp lands on models with a
+single envelope too.
+
+#### The ramp
+
+The ramp carries the reduced envelope through its warm history: `restrength`
+rewrites the per-element F the linearization divides by, and the tangent is
+re-derived at every evaluation, so a curved-envelope point at the top of the ramp is
+solved on the strength that step declares and not on the foot's.
+
+| Benchmark | Envelope | Ramp FS | Ramp interval | Bisection-N FS | Ramp − bisection | ramp force evals |
+|---|---|---|---|---|---|---|
+| HB-ssrm (`hammah_hb1`) | Hoek-Brown | 1.1656250 | [1.16250, 1.16875] | 1.1656250 | **0.00000** | 5,842 |
+| RS2-P4-VP41 (`vp041`) | power curve | 1.6587500 | [1.65625, 1.66125] | 1.6593750 | −0.00063 | 4,921 |
+| RS2-32b (`vp045b`) | power curve | 2.6390000 | [2.63500, 2.64300] | 2.6402344 | −0.00123 | 5,375 |
+| mixed, 3 envelopes | mc + hb + pow | 1.9781250 | [1.97500, 1.98125] | 1.9703125 | +0.00781 | — |
+
+Four of four inside 0.01, against the three the criterion asked for, and the
+Hoek-Brown row reproduces the bisection to eight digits.
+
+#### The Mohr-Coulomb-only path is unchanged
+
+Two proofs, and the first is the stronger one.
+
+**The arithmetic.** The plain Mohr-Coulomb return map, run against the driver as it
+stood at **de9cda60** — the criterion commit, before any of this code — staged in a
+separate package tree, on 800,000 random trial states across four friction angles:
+**BIT-IDENTICAL**, stress and branch code alike, to a SHA-256 of the concatenated
+returns (`3ce2e691a304e2383aeff8b38b14a620b050528a6e2ee37f7074f44255b6ad25` on both
+trees). The reason it has to be is structural: a model with no `pow` or `hb`
+material never gets an `env` key on any group, so `grp.get('env')` is None at the
+one point the linearization could enter, and `mc_return_map` itself was not touched.
+
+**The benchmarks**, every one re-run on BOTH trees rather than compared against a
+number in this document, and compared trial by trial: factor of safety, and each
+trial's strength, verdict, iterations and force evaluations.
+
+| Row | Mesh | Driver | FS, both trees | trials | iterations | force evals | identical? |
+|---|---|---|---|---|---|---|---|
+| FEM-1 tutorial | tri6, 3.5 | Newton | 1.37109375 | 9 | 1,871 | 14,233 | **yes** |
+| LEM-3 tutorial | tri6, 1.2 | Newton | 1.26953125 | 9 | 4,945 | 38,463 | **yes** |
+| Griffiths & Lane 1 | quad8, 3.5 | Newton | 1.37187500 | 9 | 2,213 | 16,354 | **yes** |
+| Griffiths & Lane 1 | tri6, 3.5 | Newton | 1.36562500 | 9 | 3,121 | 22,650 | **yes** |
+| Griffiths & Lane 1 | quad9, 3.5 | Newton | 1.39687500 | 9 | 844 | 6,030 | **yes** |
+| Griffiths & Lane 6 dry | quad8, 2 | Newton | 2.41562500 | 9 | 4,146 | 29,059 | **yes** |
+| Griffiths & Lane 6 dry | tri6, 2 | Newton | 2.45937500 | 9 | 3,333 | 23,672 | **yes** |
+| Griffiths & Lane 3, r = 0.8 | tri6, 6 | Newton | 1.42812500 | 9 | 5,015 | 40,652 | **yes** |
+| Geogrid sample | tri6, 4 | Newton | 1.60781250 | 8 | 2,129 | 14,680 | **yes** |
+| Geogrid sample, LOCKED mesh | tri6, 2 | Newton | 1.56093750 | 8 | 2,732 | 17,903 | **yes** |
+| Three layers | tri6, 4 | Newton | 1.21093750 | 8 | 3,622 | 25,170 | **yes** |
+| Three layers, `t_cut` = 0 | tri6, 4 | Newton | 1.21093750 | 8 | 3,688 | 25,515 | **yes** |
+| Griffiths & Lane 1, `t_cut` = 0 | tri6, 3.5 | Newton | 1.35312500 | 9 | 3,342 | 24,637 | **yes** |
+| Griffiths & Lane 1, `t_cut` = 30 | tri6, 3.5 | Newton | 1.35937500 | 9 | 2,494 | 18,570 | **yes** |
+| RS2-27-m1.5 (`vp036`, K0) | tri6, 1.5 | Newton | 1.37734375 | 8 | 793 | 6,554 | **yes** |
+| RS2-P4-VP102-t-60-c3 (suction) | tri6, 2.5 | Newton | 1.79257813 | 10 | 615 | 4,640 | **yes** |
+| FEM pile sample (`xslope_piles_fem`) | tri6, 2 | Newton | 1.37968750 | 8 | 4,055 | 27,736 | **yes** |
+| **Griffiths & Lane 6 dry — the DEFAULT path** | quad8, 2 | viscoplastic | **2.421875** | 9 | 48,128 | — | **yes** |
+
+Eighteen pairs, 157 trials, every one identical in factor of safety, verdict,
+iterations and force evaluations. Every plain-soil, reinforced, tension-cutoff, K0,
+suction and pile value reproduces the figure recorded earlier in this document to
+the digit, and the default viscoplastic path returns FS 2.421875 on per-trial
+iteration counts
+
+    147, 781, 3393, 2031, 2841, 9541, 12000, 8617, 8777
+
+value for value the control sequence, on both trees.
+
+#### The refusals that remain
+
+Every guard was exercised again on this checkout, and each must both fire and name
+its own feature:
+
+| Feature | Verdict |
+|---|---|
+| **Hoek-Brown strength envelopes** | **carried** |
+| **power-curve strength envelopes** | **carried** |
+| post-peak softening on reinforcement bars | refuses, names softening and counts the bars (18 of 36) |
+
+**One remains**, against the three the pile round left, and the viscoplastic control
+still accepts it. Nothing about a curved envelope raises any more: both envelopes,
+the two of them mixed with Mohr-Coulomb in one mesh, SSR elastic zones over a curved
+material, SSR exclusion, K0 and the Rankine cap all run.

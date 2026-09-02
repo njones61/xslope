@@ -7734,3 +7734,66 @@ proving failures that were already proved, and the instrument doing the proving 
 whole viscoplastic solve.** The three bisection policies are measured against that in
 what follows, and the ramp — which never visits a trial far past failure and carries
 one plastic history instead of nine — is measured against it first.
+
+### P1 — the ramp, measured on the slice instead of on eight benchmarks
+
+The ramp round measured eight plain Mohr-Coulomb benchmarks and found force
+evaluations lower on eight of eight, by 1.07x to 15x, and wall time lower than the
+viscoplastic driver on all eight. **On 46 rows drawn across the corpus that does not
+hold**, and the way it fails is worth more than the way it succeeded.
+
+| | bisection | ramp | ratio |
+|---|---|---|---|
+| wall (s) | 8,955 | 10,086 | **1.13x** |
+| Newton force evaluations | 633,868 | 540,668 | 0.85x |
+| viscoplastic predictor iterations | 1,272,677 | 0 | — |
+| constitutive passes | 1,906,545 | 540,668 | **0.28x** |
+| rows returning a factor of safety | 46 | 43 | |
+| rows faster than the bisection | — | 14 of 43 | |
+
+**The ramp does 72% less constitutive work and takes 13% more wall time.** That is
+not a contradiction, it is what the two kinds of work cost. A viscoplastic predictor
+iteration reuses one pre-factorized elastic stiffness; a Newton iteration assembles
+and factorizes a consistent tangent. Counting the predictor's iterations against the
+Newton driver's force evaluations — which is what the calibration sweep did, and what
+made 69% of the constitutive work look like a saving next to 127% of the wall — flatters
+whichever driver is doing the cheap kind. The ramp is the clean case: it spends
+nothing on the predictor and still loses on the clock.
+
+**Where it wins and loses is systematic, and it is not the feature classes.** The
+ramp is faster exactly where the bisection's cold attempts are expensive — piled
+0.53x, reinforced 0.57x, sub-unity 0.66x, plain Mohr-Coulomb 0.87x — and slower
+everywhere the bisection's trials are already cheap: SSR-zone 2.21x, K0 with a
+tensile cap 2.28x, K0 without one 2.01x, depth-filtered 1.69x, matric suction 1.57x,
+curved 1.25x. The mechanism is the step count. The ramp evaluates a median of 16
+strengths and up to 44; the bisection visits a median of 8 trials. On a model whose
+whole bisection costs 12 s, walking 13 warm steps to the same limit costs 30.
+
+**Three rows return no answer at all**, and two of them are the same defect:
+
+- `vp044a` and `vp084a`. The ramp's foot is a COLD Newton solve with the predictor
+  deliberately held off, because a ramp manages its own plastic history. These are
+  two of the four models in the slice on which NO trial is ever carried cold — every
+  standing trial in their bisections comes from a predictor seed. So the ramp walks
+  its foot down to the floor at F = 0.10, refuses, and reports the slope unstable at
+  a tenth of its strength. The bisection returns 0.973 and 0.773.
+- `xslope_griffiths1` on the tag whose bracket is [0.5, 0.9]. The ramp does not
+  expand F_max upward — it reports "still stands at F = 0.9000, the top of the
+  requested range" where the bisection auto-expands and finds 1.4164.
+
+**Agreement, on the rows that answer**: 41 of 43 within 0.01 of the bisection, median
+gap 0.0031, largest 0.0125 (`rs2_64l_split`) and 0.0109 (`xslope_griffiths1` tri6).
+Against the published locks the two routes are indistinguishable — 29 of 43 for the
+ramp against the bisection's 30.
+
+**Criterion 2 is falsified.** It asked for agreement within 0.01 on at least 95% of
+the slice; the measurement is 41 of 46, or 89%, and three of the five misses are
+refusals rather than disagreements. The ramp is not the Newton driver's default SSRM
+driver on this evidence, and the eight-benchmark result that suggested it should be
+was a plain-Mohr-Coulomb result read as a general one.
+
+What the ramp is, on this measurement, is the right driver for exactly the class the
+spike began with: an expensive model whose cold Newton attempts are the cost. It
+stays selectable, and the two defects above — a foot that cannot use the predictor,
+and a bracket that cannot expand upward — are what would have to be fixed before the
+question of a default could be asked again.

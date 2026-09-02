@@ -5200,10 +5200,12 @@ The viscoplastic column reproduces every one of the eight locks, at 0.0001 to
 0.0005, which is what makes the comparison readable. It is also where the work is:
 `gs2_wall` costs it 303,303 constitutive passes against the Newton driver's 25,218
 force evaluations, and `xslope_torggler_3b_plate` 289,072 against 22,065 — 12x and
-13x. Across the eight rows the Newton driver does less constitutive work on six and
-more on two (`xslope_piles` at 0.6x and `xslope_piles_fem` at 0.7x, the two models
-whose bisection spends most of its trials past failure, which is the cost this
-document has recorded since Phase 0).
+13x. Across the eight rows the Newton driver does less constitutive work on five —
+1.2x, 1.2x, 3.2x, 12.0x and 13.1x — and MORE on three: `xslope_pile_wall` at 0.5x,
+`xslope_piles` at 0.6x and `xslope_piles_fem` at 0.7x. All three of those are models
+whose bisection spends several trials past failure, which is where load control has
+nothing to offer and where this document has measured the Newton driver at 17x to
+47x the viscoplastic cost since Phase 0.
 
 **Four of the eight land inside their published tolerance and four do not.**
 `xslope_piles`, `xslope_piles_fem` and `xslope_torggler_3a_plate` return the
